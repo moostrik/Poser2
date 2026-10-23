@@ -19,7 +19,8 @@ class StateId(IntEnum):
     value is what ``/global/state`` sends. OFF = 0 is the operational off (the boot state,
     also entered by pinning ``blackout``), followed by its wake transition. The *_INTRO / *_IDLE / *_PLAY
     entries are transitions promoted to states: their durations are the transition
-    durations."""
+    durations. PLAY_INTRO, the sync end's wind-down, is appended after the narrative order so
+    the wire values of the states before it stay."""
     OFF        = 0
     OFF_IDLE   = auto()
     IDLE       = auto()
@@ -31,6 +32,7 @@ class StateId(IntEnum):
     END        = auto()
     END_INTRO  = auto()
     END_IDLE   = auto()
+    PLAY_INTRO = auto()
 
 
 class ManualSettings(BaseSettings):
@@ -63,19 +65,21 @@ class StateMachineSettings(BaseSettings):
     players: Field[int]       = Field(0, access=Field.READ, pinned=True, description="Live player count")
 
     # Transition-state durations — one per state. spin_down_seconds is shared (via the
-    # root) into the beam_wind_down layer, which runs the S9/S10 wall fade on it; those
+    # root) into the beam_wind_down layer, which runs the S9–S11 wall fade on it; those
     # states exit once the fade is complete and the playhead lock holds.
     spin_up_seconds:       Field[float] = Field(14.0, min=1.0, max=60.0,  step=0.5, description="INTRO_PLAY: spin-up transition (seconds) — hand-tuned to the physical spin-up (spin_down_seconds' mirror)", newline=True)
-    spin_down_seconds:     Field[float] = Field(10.0, min=1.0, max=60.0,  step=0.5, description="END_INTRO/END_IDLE: wall fade towards the line (seconds) — hand-tuned to the physical spin-down (drives the beam_wind_down layer)")
+    spin_down_seconds:     Field[float] = Field(10.0, min=1.0, max=60.0,  step=0.5, description="END_INTRO/END_IDLE/PLAY_INTRO: wall fade towards the line (seconds) — hand-tuned to the physical spin-down (drives the beam_wind_down layer)")
     off_idle_bars:         Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="OFF_IDLE: wake fade from dark, in playhead bars", newline=True)
     intro_idle_bars:       Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="INTRO_IDLE: playhead bars back to IDLE")
     end_bars:              Field[float] = Field(3.0,  min=0.5, max=20.0,  step=0.5, description="END: wind-down playhead bars (bidirectional ramp)")
 
     # Looks
-    dim_level: Field[float] = Field(0.4, min=0.0, max=1.0, step=0.01, description="DIM line level: the front white lamp in INTRO, and where INTRO_PLAY and END_INTRO hold it", newline=True)
+    dim_level: Field[float] = Field(0.4, min=0.0, max=1.0, step=0.01, description="DIM line level: the front white lamp in INTRO, and where INTRO_PLAY, END_INTRO and PLAY_INTRO hold it", newline=True)
 
     # Condition tunables
     min_players:        Field[int]   = Field(3, min=2, max=16, description="Players the show needs at least: present to play, alike hits in a row to start", newline=True)
+    play_full_sync_seconds: Field[float] = Field(20.0, min=0.0, max=600.0, step=1.0, description="PLAY → PLAY_INTRO once full sync has held this long (s); 0 never")
+    intro_grace_seconds:    Field[float] = Field(20.0, min=0.0, max=300.0, step=1.0, description="INTRO after PLAY_INTRO: spins up only once the hits have been out of sync this long (s)")
 
     # The sync condition's group is HitSync's settings (pose/hit_sync.py): it fills the telemetry.
     sync:    Group[HitSyncSettings]     = Group(HitSyncSettings)

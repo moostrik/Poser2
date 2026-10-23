@@ -399,7 +399,7 @@ class Settings(BaseSettings):
     lens_fov        : Field[float] = Field(0.0, access=Field.INIT, step=0.1, description="Field (°) the lens spans across the full sensor width; 0 = same as fov")
     lens_centre_x   : Field[float] = Field(0.0, access=Field.INIT, step=0.5, description="Optical centre offset from the frame centre (px), full sensor mode")
     lens_centre_y   : Field[float] = Field(0.0, access=Field.INIT, step=0.5, description="Optical centre offset from the frame centre (px), positive = down")
-    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — canonical value tying states (the visible slider) to the wind_down layer")
+    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9–S11 wall-fade seconds — canonical value tying states (the visible slider) to the wind_down layer")
 
     # In panel order: what you look at, what you capture, the wires out, the sensors, what is made of
     # them, and what the show does with it.

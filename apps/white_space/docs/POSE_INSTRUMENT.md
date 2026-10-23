@@ -402,8 +402,8 @@ Presence opens the window from the mask over `window.attack_seconds` and closes 
 `window.release_seconds`, the last pose held while it closes and the mask dimming with it.
 
 The bridge sets each side's **reach** every tick: `window.width`, grown toward the full circle
-by the sync **growth** (`PI.grow`). The growth is room-level: while full sync holds — the band
-(`PI.on_at`, `PI.off_at`), shared with the sync strobe but with its own state and envelope —
+by the sync **growth** (`PI.grow`). The growth is room-level: while full sync holds — the room's
+gate (*The sync strobe*), the growth's own envelope —
 the envelope rises over `grow.attack_seconds` and every
 window grows toward half the circle each side, so at full sync lines are everywhere; when the
 band closes, the windows fall back over `grow.release_seconds`. The grown windows
@@ -456,8 +456,10 @@ default) or go dark (black), whole patterns at once, returning on the frame betw
 is in full sync while its least alike present pair holds over the band: the gate opens when
 every pair reads `PI.on_at` and closes only when one falls below
 `PI.off_at` — the band is the hysteresis, so a room hovering at one level never
-swaps the gate. The band is declared on the root and shared into the strobe, the growth and
-the blend, each with its own state and envelope. A person at neutral holds the room off (the neutral weight is in the feature,
+swaps the gate. The gate is the room's, computed once per tick (`PoseInstrument._set_full_sync`)
+and published as `PI.full_sync`: the show reads it in PLAY, where full sync held long enough is
+the sync end (`STATES.md`, S7 and S11), and the strobe, the growth and the blend each take it
+through their own bypass into their own envelope. A person at neutral holds the room off (the neutral weight is in the feature,
 `SIMILARITY.md`), as does a pair that cannot be read; below two people there is no pair and
 no strobe.
 
@@ -500,6 +502,7 @@ tuned together, knobs throughout:
 | `playhead`                    | the marker's width, white and blue; its level inside a mask     |
 | `window`                      | shape: taper, attack, release, their curves, the cap; reach: width, bypass; the scale, the crowd factor and the overlap |
 | `on_at`, `off_at`             | the full-sync band, shared into `sync_strobe`, `grow` and `blend` |
+| `full_sync`                   | read-only: the room's gate, open while every present pair holds the band (the show's sync end) |
 | `sync_strobe`                 | full sync's display: bypass, mode (invert or black), attack, release |
 | `grow`                        | full sync's reach: windows grow to the full circle; attack, release |
 | `blend`                       | full sync's union: everyone's measures to the room's mean; bypass, attack, release |

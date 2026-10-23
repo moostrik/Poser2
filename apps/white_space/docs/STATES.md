@@ -1,5 +1,5 @@
 # White Space — States
-Eleven states played by the `StateMachine` (`apps/white_space/statemachine/`). This document is the
+Twelve states played by the `StateMachine` (`apps/white_space/statemachine/`). This document is the
 source of truth for the installation's dramaturgy; the state classes in `statemachine/states.py` point
 here. Transition lists are in **priority order**, matching each class's `needs_state_change()`. Timing
 tunables live in the `states` settings group; each state returns its mix from `update()`.
@@ -16,6 +16,10 @@ Vocabulary:
   neutral. `sync.hits` is how many in a row, `sync.distance` the largest distance between them in degrees; a
   hit that does not match restarts the count from itself at once. `HitSync` (`pose/hit_sync.py`) records
   each hit's pose off the LERP frame and publishes the streak on the board
+- **full sync** — the room's gate in the pose instrument: every present pair alike over the band `PI.on_at` /
+  `PI.off_at`, with hysteresis (`POSE_INSTRUMENT.md`, *The sync strobe*). The instrument computes it once per
+  tick while it draws and publishes it as `PI.full_sync`; the machine reads it in PLAY, where held for
+  `play_full_sync_seconds` it is the sync end (S11)
 - **neutral** — arms hanging: the arm joint furthest from neutral within
   `pose.arm_deviation_extractor.min_degrees` of it (`ArmDeviation` 0; 1 from `max_degrees`, linear between).
   For the hit sync it is a gate: a hit counts only fully out of neutral (`ArmDeviation` 1), so pings never
@@ -52,13 +56,16 @@ What **in sync** means in degrees, the settings behind it and how they depend on
 | S4  | INTRO      | > 0               | ∞                               | BEAM       | DIM line + flash on hit            | none                 | yes        | none                          |
 | S5  | INTRO_IDLE | 0                 | `intro_idle_bars`, or until hit | BEAM       | DIM → BRIGHT line                  | none → sound visuals | no         | none → soundscape             |
 | S6  | INTRO_PLAY | ≥ min_players     | `spin_up_seconds`               | PROJECTION | dark → instrument + playhead       | none → instrument    | yes        | enhance spin-up chaos         |
-| S7  | PLAY       | ≥ min_players     | ∞                               | PROJECTION | instrument + playhead              | instrument           | yes        | enhance spin                  |
+| S7  | PLAY       | ≥ min_players     | ∞, or full sync held            | PROJECTION | instrument + playhead              | instrument           | yes        | enhance spin                  |
 | S8  | END        | < min_players     | `end_bars`, both ways           | PROJECTION | instrument + playhead → full white | instrument → none    | open       | enhance spin → none           |
 | S9  | END_INTRO  | < min_players, >0 | `spin_down_seconds`, then lock  | BEAM       | wall → DIM line                    | none                 | open       | open                          |
 | S10 | END_IDLE   | 0                 | `spin_down_seconds`, then lock  | BEAM       | wall → BRIGHT line                 | none → sound visuals | open       | open                          |
+| S11 | PLAY_INTRO | ≥ min_players     | `spin_down_seconds`, then lock  | BEAM       | wall → DIM line                    | none                 | open       | open                          |
 
 Durations name settings in the `states` group; `studio.json` sets `off_idle_bars` 1, `intro_idle_bars` 2,
-`spin_up_seconds` 14, `end_bars` 8 and `spin_down_seconds` 6. `open` cells are listed under *Open*. The
+`spin_up_seconds` 14, `end_bars` 8 and `spin_down_seconds` 6. S7 ends on its own once full sync has held
+`play_full_sync_seconds` (20; 0 never), and S4 reached from S11 arms only after the hits have been out of
+sync for `intro_grace_seconds` (20). `open` cells are listed under *Open*. The
 P column is the stand-alone show; in session mode S6 is entered with any P > 0 and S7 and S8 run on time
 whatever the count (see below).
 
@@ -78,6 +85,7 @@ stateDiagram-v2
     END        : S8 END
     END_INTRO  : S9 END_INTRO
     END_IDLE   : S10 END_IDLE
+    PLAY_INTRO : S11 PLAY_INTRO
 
     %% transitions, grouped by source state
     [*]        --> OFF
@@ -102,6 +110,7 @@ stateDiagram-v2
     INTRO_PLAY --> PLAY       : spin-up done
 
     PLAY       --> END        : too few players (P < min_players)
+    PLAY       --> PLAY_INTRO : full sync held (play_full_sync_seconds)
 
     END        --> PLAY       : players back (P ≥ min_players), wound back
     END        --> END_INTRO  : wound down, players remain (P > 0)
@@ -109,6 +118,8 @@ stateDiagram-v2
 
     END_INTRO  --> INTRO      : fade done, playhead locked
     END_IDLE   --> IDLE       : fade done, playhead locked
+
+    PLAY_INTRO --> INTRO      : fade done, playhead locked
 ```
 
 The graph is the stand-alone show; the exact conditions and their settings are in each state's
@@ -117,11 +128,11 @@ The graph is the stand-alone show; the exact conditions and their settings are i
 **A hit starts the intro, from every lit idle state.** S1 OFF_IDLE, S2 IDLE, S3 IDLE_INTRO and S5
 INTRO_IDLE each take the hit first, above their own timed or count condition: in all four the
 searchlight is the visible sweep and the playhead is locked, so the hit is an event the person sees
-land on them, and waiting a bar for the next pass would read as the light ignoring them. The two
+land on them, and waiting a bar for the next pass would read as the light ignoring them. The
 exclusions follow from the same sentence. **S0 OFF** is not idle, it is off — dark and possibly
-blackout-pinned. **S9 END_INTRO / S10 END_IDLE** are the wind-down: the wall of white is still up and
-the playhead is not yet locked — they exit *on* that lock — so a crossing there is a number, not
-something anyone can see.
+blackout-pinned. **S9 END_INTRO / S10 END_IDLE / S11 PLAY_INTRO** are the wind-downs: the wall of white
+is still up and the playhead is not yet locked — they exit *on* that lock — so a crossing there is a
+number, not something anyone can see.
 
 The machine always **boots into OFF** — dark, motor at BEAM — and wakes through OFF_IDLE by itself once
 the playhead has locked, so power-on is the same wake as a blackout release. The persisted
@@ -161,8 +172,8 @@ state, or selecting a projection layer in the debug select.
 
 **Hardware failsafe**: if the machine does not rotate, it turns the lights off **(site fact)**, so a
 stalled spin-down cannot strand bright lights on a stationary bar. A sensor failure on a machine that is
-still spinning can hold a state (S9/S10 waiting for the lock); that is an operator-intervention case
-(`goto` or the debug select), not a safety one. A debug layer soloed during S9/S10 also holds it: the
+still spinning can hold a state (S9–S11 waiting for the lock); that is an operator-intervention case
+(`goto` or the debug select), not a safety one. A debug layer soloed during S9–S11 also holds it: the
 `beam_wind_down` fade pauses while the layer is not drawn (`LAYERS.md`, *beam_wind_down*).
 
 **Shutdown**: a clean quit ends with an explicit **blackout from each sender**. The light sender sends
@@ -198,7 +209,7 @@ revolutions to lock). After a blackout the lock is already there, so the wake st
   unlocked · **Motor**: BEAM
 - **Transitions**: **in** — boot; or pinning `states.blackout`, the machine's highest-priority input: from
   any state, beating `hold` and `goto`. **out** — `blackout` released *and* playhead lock → S1 OFF_IDLE. A
-  silent sensor holds it dark — the operator `goto` case, as for S9/S10.
+  silent sensor holds it dark — the operator `goto` case, as for S9–S11.
 - **Mix**: empty — the bar is turning and the fixture is in beam mode, so darkness comes from the mix alone
 - **White / Blue**: none
 - **Pose sound / Secondary sound**: no
@@ -264,9 +275,12 @@ sound `min_players` times in a row.
 - **Players**: > 0 · **Duration**: ∞ · **Motor**: BEAM
 - **Transitions**
   1. P == 0 → S5 INTRO_IDLE
-  2. `sync.hits` ≥ min_players (the last min_players hits **in sync**, *Vocabulary*) and P ≥ min_players →
+  2. armed, `sync.hits` ≥ min_players (the last min_players hits **in sync**, *Vocabulary*) and P ≥ min_players →
      S6 INTRO_PLAY. A neutral hit is alike to nothing, so pings never spin the show up; a hit that does not
-     match restarts the count at once, and the count is visible on the panel as it builds
+     match restarts the count at once, and the count is visible on the panel as it builds. Entered from
+     S11 PLAY_INTRO the intro is **disarmed**: the room is still posing, so it arms only once the streak has
+     stayed under min_players for `intro_grace_seconds` without a break (a streak reaching min_players
+     restarts the wait). From every other state it is armed on entry, so the first alike hits count
   3. session: elapsed ≥ `session.intro_seconds` → S6 INTRO_PLAY *(checked after P == 0, so an empty room
      never spins up)*
 - **Mix**: `beam_playhead` DIM · `beam_flash` 1.0 (reset on entry)
@@ -274,6 +288,7 @@ sound `min_players` times in a row.
 - **Blue**: none
 - **Pose sound**: yes (only sound)
 - **Secondary sound**: none
+- **Progress** (OSC `/global/state/progress`): 1; after S11, the grace as it is waited out (0 → 1), then 1
 
 ## S5 — INTRO_IDLE
 
@@ -315,12 +330,16 @@ line during the spin-up, and the sound enhances the accelerating chaos.
 ## S7 — PLAY
 
 The players play the instrument, creating music and light patterns. The space between players
-holding the same pose fills with light.
+holding the same pose fills with light. Holding **full sync** (*Vocabulary*) is how the players end it:
+once the room has held it for `play_full_sync_seconds` the machine spins down to the intro (S11).
 
-- **Players**: ≥ min_players (session: any) · **Duration**: ∞ (session: `session.play_seconds`) · **Motor**: PROJECTION
+- **Players**: ≥ min_players (session: any) · **Duration**: ∞, or until full sync has held
+  `play_full_sync_seconds` (session: `session.play_seconds`) · **Motor**: PROJECTION
 - **Transitions**
   1. stand-alone: P < min_players → S8 END
-  2. session: elapsed ≥ `session.play_seconds` → S8 END *(the count is not checked: a session plays out
+  2. stand-alone: full sync held `play_full_sync_seconds` without a break → S11 PLAY_INTRO; 0 disables it.
+     Checked after the count, so a room losing a player ends through S8 even in sync
+  3. session: elapsed ≥ `session.play_seconds` → S8 END *(the count is not checked: a session plays out
      its time)*
 - **Mix**: `pose_instrument` 1.0
 - **White**: the pose instrument — patterns per pose plus the sync strobe at full sync — and
@@ -394,6 +413,29 @@ holds — landing on the BRIGHT line instead of the dim one.
 - **Progress** (OSC `/global/state/progress`): the layer's own fade readout, so the sound-side fades ride the
   actual fade
 
+## S11 — PLAY_INTRO
+
+The sync end: the players have held full sync for `play_full_sync_seconds`, and the machine spins down
+to the intro. The same engine as S9 — `beam_wind_down` owns the timed fade over `spin_down_seconds`, the
+dim line sits underneath and is revealed, and the state hands over once the fade is complete and the
+playhead lock holds. The entry is a cut: BEAM is commanded at once and the fixture reads beam mode from
+the first packet, so the instrument's picture gives way to the full wall in one frame, where S8 crosses
+to it over `end_bars`. The instrument is reset on entry: it is done, and `PI.full_sync` reads off from
+here until S6 starts the next one. The intro it lands in is disarmed (S4): the room is still posing, and
+the show spins up again only once the hits have been out of sync for `intro_grace_seconds`.
+
+- **Players**: ≥ min_players · **Duration**: the spin-down (fade complete, then the lock) · **Motor**: BEAM
+- **Transitions**
+  1. fade complete (`progress` ≥ 1) and playhead lock → S4 INTRO
+- **Mix**: `beam_wind_down` 1.0 · `beam_playhead` DIM — S9's mix; `beam_wind_down` and `pose_instrument`
+  reset on entry
+- **White**: the wall from the first packet, both lamps fading to gone over `spin_down_seconds`; the front
+  lands on the dim line underneath
+- **Blue**: none
+- **Pose sound**: open
+- **Secondary sound**: open
+- **Progress** (OSC `/global/state/progress`): the layer's own fade readout, as S9's
+
 ---
 
 ## Open
@@ -404,3 +446,6 @@ holds — landing on the BRIGHT line instead of the dim one.
 - **S7**: an inactivity exit — "no action for x bars → END", with an action-gated wind-back in END to
   match; left out to keep the graph simple
 - **S8–S10**: the distortion treatment (Max side); `/global/state/progress` is the ramp that drives it
+- **S11**: the sound treatment (Max side); `/global/state` 11 is new to the patch
+- **S11**: whether the sync end wants an entry of its own beyond the cut (a flash, the strobe running
+  out) — a layer in S11's mix, not a change to the state

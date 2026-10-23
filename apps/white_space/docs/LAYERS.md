@@ -25,8 +25,9 @@ projection block's generic patterns keep a `test_` prefix.
 ## Inputs
 
 Show layers and the state machine read pose frames from the board, never the tracker's tracklets. The
-state machine also reads the board's hit streak (`HitSync`, `STATES.md` *Vocabulary*: in sync); the live
-`Similarity` feature stays the instrument's (the window opening) and the sound's.
+state machine also reads the board's hit streak (`HitSync`, `STATES.md` *Vocabulary*: in sync) and the pose
+instrument's full-sync readout (`PI.full_sync`, `STATES.md` *Vocabulary*: full sync); the live `Similarity`
+feature stays the instrument's (the window opening, the gate) and the sound's.
 A person is present while their pose exists: the pose pipeline stops posing a person
 `pose.tracklets.detection_timeout` (1.0 s) after their last detection, and every filter downstream
 resets a track the moment its pose is missing. A layer adds no presence test of its own. A person's
@@ -50,17 +51,17 @@ layers nothing.
 
 | Layer                 | Mode       | Reads                         | Writes                                   | Used by                   |
 |-----------------------|------------|-------------------------------|------------------------------------------|---------------------------|
-| `beam_playhead`       | beam       | — (settings only)             | front white lamp                         | S1–S6, S9, S10            |
+| `beam_playhead`       | beam       | — (settings only)             | front white lamp                         | S1–S6, S9–S11             |
 | `beam_flash`          | beam       | LERP frames (PlayheadOffset)  | front white + blue lamps; board flashes  | S4                        |
 | `pose_instrument`     | projection | LERP frames                   | white and blue lines, masks, marker      | S6 (projecting), S7, S8   |
 | `flood`               | projection | — (settings only)             | whole projection white                   | S8                        |
-| `beam_wind_down`      | beam       | tick clock                    | both white lamps, fading                 | S9, S10                   |
+| `beam_wind_down`      | beam       | tick clock                    | both white lamps, fading                 | S9, S10, S11              |
 | `beam_blue_sound`     | beam       | sound levels from Max (board) | left/right blue lamps                    | S1, S2, S3, S5, S10       |
 
 `beam_flash`'s blue lamps are zeroed in the presets: S4 runs blue-none by design.
 
 `beam_wind_down` is `flood`'s ending and a plain beam layer: the fixture is in beam mode from
-S9's first packet, so the wall while the bar is still fast is the two white lamps
+S9's or S11's first packet, so the wall while the bar is still fast is the two white lamps
 spinning. See its section below.
 
 Debug layers (never in a state's mix; reached via the `light.debug` select — choosing a
@@ -113,15 +114,15 @@ at 1.0 hands over to S9/S10's wind_down starting at the full wall, seamlessly.
 
 ## beam_wind_down (BeamLayer)
 
-The dying wall of light: owns the S9/S10 ending fade. It writes the two white lamps at a
-fading level; everything else is physics. The fixture is in beam mode from S9's first
+The dying wall of light: owns the S9–S11 ending fade. It writes the two white lamps at a
+fading level; everything else is physics. The fixture is in beam mode from S9's or S11's first
 packet (its readout mode follows the commanded rpm), so the two lamps spin at whatever
 speed the bar still has — a wall of white while fast, thinning into two beams as it
 slows — and the fade rides through both. One mechanism; the layer never needs to know
 when the bar is slow. The S8 → S9 hand-off is seamless at the DACs: `flood` at 1.0 in projection
 mode drives the same two white outputs as this layer at 1.0 in beam mode.
 
-- **Used by**: S9/S10 at constant weight 1.0 (reset on state entry). The states put the
+- **Used by**: S9–S11 at constant weight 1.0 (reset on state entry). The states put the
   landing look underneath (`beam_playhead` at DIM/BRIGHT, `beam_blue_sound`) — it is
   revealed as the wall dies, so nothing has to splice or match at the hand-off.
 - **Input**: the tick clock; no pose data, no playhead signals.
@@ -134,7 +135,7 @@ mode drives the same two white outputs as this layer at 1.0 in beam mode.
   `states.spin_down_seconds`, next to `spin_up_seconds`, shared in via the root),
   `progress` (read-only fade readout 0..1: the states' exit, `/global/state/progress` and S10's
   sound-visual reveal ride it)
-- **Reset**: restarts the fade at the full wall (called from S9/S10 `enter()`)
+- **Reset**: restarts the fade at the full wall (called from S9–S11 `enter()`)
 
 ## pose_instrument (ProjectionLayer)
 

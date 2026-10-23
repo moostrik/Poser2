@@ -172,7 +172,7 @@ class WhiteSpaceMain:
         # STATE MACHINE — the show's single decision maker; commands the Conductor through
         # its three channels (look, layer resets, motor) and emits state to board + OSC.
         self.state_machine = StateMachine(
-            self.settings.states, self.settings.light, board=self.board,
+            self.settings.states, self.settings.light, self.settings.PI, board=self.board,
             set_mix=self.conductor.set_mix,
             reset_layers=self.conductor.reset_layers,
             set_motor=self.conductor.set_motor_mode,

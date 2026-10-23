@@ -910,6 +910,44 @@ class PoseInstrumentTest(unittest.TestCase):
         f = self._render()
         self.assertEqual(float(f.white[b + MASK + 1:b + 300].sum()), 0.0)
 
+    # -- the room's gate --
+
+    def test_full_sync_is_published_from_the_band_with_hysteresis(self) -> None:
+        # The room's one gate, read by the show (STATES.md, S7): on when every present pair reads
+        # on_at, held inside the band, off below off_at, and needing on_at again to re-enter.
+        self._sync_pair(sim=0.92)                                # inside the band from below: off
+        self._render()
+        self.assertFalse(self.cfg.full_sync)
+        self._sync_pair()
+        self._render()
+        self.assertTrue(self.cfg.full_sync)
+        self._sync_pair(sim=0.92)                                # hovering: held
+        self._render()
+        self.assertTrue(self.cfg.full_sync)
+        self._sync_pair(sim=0.85)                                # below the band: off
+        self._render()
+        self.assertFalse(self.cfg.full_sync)
+        self._sync_pair(sim=0.92)                                # back inside: stays off
+        self._render()
+        self.assertFalse(self.cfg.full_sync)
+
+    def test_the_gate_is_the_rooms_not_the_strobes(self) -> None:
+        # A bypassed strobe shows nothing, but the room is in full sync all the same.
+        self._sync_pair()
+        self.cfg.sync_strobe.bypass = True
+        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)   # no strobe
+        self.assertTrue(self.cfg.full_sync)
+
+    def test_no_full_sync_alone_and_a_reset_clears_it(self) -> None:
+        self._sync_pair()
+        self._render()
+        self.assertTrue(self.cfg.full_sync)
+        self.layer.reset()
+        self.assertFalse(self.cfg.full_sync)
+        self._people({0: _pose(0.3)})                            # alone: full sync needs a pair
+        self._render()
+        self.assertFalse(self.cfg.full_sync)
+
     # -- the sync strobe --
 
     PROBE = round(0.3 * IRES) + 300          # inside the 0.3 person's full window, clear of the mask

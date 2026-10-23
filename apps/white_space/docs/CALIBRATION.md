@@ -778,7 +778,7 @@ Across a spin-up and a spin-down the playhead is never reset; only its rate sour
 - *Spin-down:* the bar lands at an angle unrelated to the content clock. The playhead keeps
   free-running until a current sensor reading sits near `beam_rpm`, then `tracking`
   eases it onto the bar over roughly 1 / `tracking` ticks. Up to half a turn of re-alignment is
-  physics, not calibration; the show hides it by exiting S8/S9 only once the lock is in.
+  physics, not calibration; the show hides it by exiting S9–S11 only once the lock is in.
 
 ---
 

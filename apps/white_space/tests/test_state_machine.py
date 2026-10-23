@@ -1,13 +1,14 @@
 """Tests for the show StateMachine — the CSV transition graph in both modes,
 bar-denominated durations, goto/hold, motor commands, and looks. The hits and the
-streak of alike ones come from the board (HitSync's, tested in test_hit_sync.py)."""
+streak of alike ones come from the board (HitSync's, tested in test_hit_sync.py); the room's
+full sync from the pose instrument's readout (PI.full_sync, tested in test_pose_instrument.py)."""
 
 import unittest
 from types import SimpleNamespace
 
 from modules.board import HitStreak
 
-from apps.white_space.light import LayerId, LightSettings, MotorMode
+from apps.white_space.light import LayerId, LightSettings, MotorMode, PoseInstrumentSettings
 from apps.white_space.statemachine import StateId, StateMachine, StateMachineSettings
 from apps.white_space.statemachine import machine as machine_module
 
@@ -46,6 +47,7 @@ class StateMachineTest(unittest.TestCase):
 
         self.config = StateMachineSettings()
         self.light = LightSettings()
+        self.instrument = PoseInstrumentSettings()
         self.board = FakeBoard()
         self.mixes: list = []
         self.resets: list = []
@@ -53,7 +55,7 @@ class StateMachineTest(unittest.TestCase):
         self.emitted: list = []
 
         self.machine = StateMachine(
-            self.config, self.light, board=self.board,
+            self.config, self.light, self.instrument, board=self.board,
             set_mix=self.mixes.append,
             reset_layers=self.resets.append,
             set_motor=self.motors.append,
@@ -86,6 +88,10 @@ class StateMachineTest(unittest.TestCase):
     def set_streak(self, hits: int) -> None:
         """HitSync's streak on the board: this many hits in a row struck alike poses."""
         self.board.hit_streak = HitStreak(hit=False, hits=hits)
+
+    def set_full_sync(self, on: bool) -> None:
+        """The instrument's readout: the room in full sync (every present pair alike over the band)."""
+        self.instrument.full_sync = on
 
     @property
     def current(self) -> StateId:
@@ -279,7 +285,7 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.INTRO)
 
     def test_wind_down_states_hold_a_constant_mix_and_ride_the_layer(self) -> None:
-        # S9/S10's fade lives in the wind_down layer: the mix is constant (the landing look
+        # S9–S11's fade lives in the wind_down layer: the mix is constant (the landing look
         # underneath the dying wall), the layer is reset on entry, stage_progress is the
         # layer's own readout, and the exit is the fade complete plus the playhead lock.
         self._to_play()
@@ -324,6 +330,145 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.END)
         self.tick(dbar=self.config.end_bars)        # ramp reaches 0
         self.assertEqual(self.current, StateId.PLAY)
+
+    # -- the sync end: PLAY → PLAY_INTRO → INTRO --------------------------------
+
+    def _to_play_intro(self) -> None:
+        """Full sync held for play_full_sync_seconds in PLAY: the sync end."""
+        self._to_play()
+        self.set_full_sync(True)
+        self.tick()                                                   # the anchor: full sync came on
+        self.tick(dt=self.config.play_full_sync_seconds + 0.1)
+        self.assertEqual(self.current, StateId.PLAY_INTRO)
+
+    def test_full_sync_held_winds_play_down_to_the_intro(self) -> None:
+        # The room holds full sync (the instrument's readout) for play_full_sync_seconds: PLAY hands
+        # over to PLAY_INTRO, commanding BEAM — the spin-down starts at once.
+        self._to_play()
+        self.set_full_sync(True)
+        self.tick()
+        self.tick(dt=self.config.play_full_sync_seconds / 2)
+        self.assertEqual(self.current, StateId.PLAY)
+        self.tick(dt=self.config.play_full_sync_seconds / 2 + 0.1)
+        self.assertEqual(self.current, StateId.PLAY_INTRO)
+        self.assertEqual(self.motors[-1], MotorMode.BEAM)
+
+    def test_full_sync_dropping_restarts_the_hold(self) -> None:
+        self._to_play()
+        self.set_full_sync(True)
+        self.tick()
+        self.tick(dt=self.config.play_full_sync_seconds * 0.8)
+        self.set_full_sync(False)                                     # the band closes: the hold restarts
+        self.tick()
+        self.set_full_sync(True)
+        self.tick()
+        self.tick(dt=self.config.play_full_sync_seconds * 0.8)
+        self.assertEqual(self.current, StateId.PLAY)
+        self.tick(dt=self.config.play_full_sync_seconds * 0.2 + 0.1)
+        self.assertEqual(self.current, StateId.PLAY_INTRO)
+
+    def test_a_zero_hold_never_ends_play_on_sync(self) -> None:
+        self.config.play_full_sync_seconds = 0.0
+        self._to_play()
+        self.set_full_sync(True)
+        for _ in range(5):
+            self.tick(dt=100.0)
+        self.assertEqual(self.current, StateId.PLAY)
+
+    def test_too_few_players_beats_the_sync_end(self) -> None:
+        # Both true the same tick: the count exit comes first — END, the path that winds back.
+        self._to_play()
+        self.set_full_sync(True)
+        self.tick()
+        self.board.frames = {0: FakeFrame()}
+        self.tick(dt=self.config.play_full_sync_seconds + 0.1)
+        self.assertEqual(self.current, StateId.END)
+
+    def test_play_intro_is_the_wind_down_engine(self) -> None:
+        # S9's engine: the wall (beam_wind_down, reset on entry) over the dim line, the instrument
+        # reset too (it is done, and its readout goes with it). Exit on the fade and the lock only.
+        self._to_play_intro()
+        self.assertIn([LayerId.beam_wind_down, LayerId.pose_instrument], self.resets)
+        self.assertEqual(self.mixes[-1], [(LayerId.beam_wind_down, 1.0), (LayerId.beam_playhead, 0.4)])
+        self.light.beam_layers.beam_wind_down.progress = 0.5
+        self.tick()
+        self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.5)
+        self.tick(dt=999.0, dbar=5.0)                                 # time and bars alone never exit
+        self.hit()                                                    # nor a crossing: the wall is up
+        self.assertEqual(self.current, StateId.PLAY_INTRO)
+        self.light.beam_layers.beam_wind_down.progress = 1.0          # fade complete — no lock yet
+        self.tick()
+        self.assertEqual(self.current, StateId.PLAY_INTRO)
+        self.board.is_locked = True
+        self.tick()
+        self.assertEqual(self.current, StateId.INTRO)
+
+    def _to_intro_after_the_sync_end(self) -> None:
+        self._to_play_intro()
+        self.light.beam_layers.beam_wind_down.progress = 1.0
+        self.board.is_locked = True
+        self.tick()
+        self.assertEqual(self.current, StateId.INTRO)
+
+    def test_intro_after_the_sync_end_waits_for_the_hits_to_fall_out_of_sync(self) -> None:
+        # The room is still posing: alike hits do not relaunch. The intro arms once the streak has
+        # stayed under min_players for intro_grace_seconds; the next streak spins up.
+        self._to_intro_after_the_sync_end()
+        self.set_streak(3)
+        for _ in range(5):
+            self.tick(dt=10.0)
+        self.assertEqual(self.current, StateId.INTRO)                 # disarmed: a streak counts for nothing
+        self.assertEqual(self.emitted[-1].stage_progress, 0.0)        # and no grace under way
+        self.set_streak(1)
+        self.tick()                                                   # the anchor: out of sync from here
+        self.tick(dt=self.config.intro_grace_seconds / 2)
+        self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.5, places=2)   # the grace shows as progress
+        self.tick(dt=self.config.intro_grace_seconds / 2 + 0.1)
+        self.assertEqual(self.emitted[-1].stage_progress, 1.0)        # armed
+        self.assertEqual(self.current, StateId.INTRO)
+        self.set_streak(3)
+        self.tick()
+        self.assertEqual(self.current, StateId.INTRO_PLAY)
+
+    def test_a_streak_during_the_grace_restarts_it(self) -> None:
+        self._to_intro_after_the_sync_end()
+        self.set_streak(1)
+        self.tick()
+        self.tick(dt=self.config.intro_grace_seconds * 0.8)
+        self.set_streak(3)                                            # alike again: the grace restarts
+        self.tick()
+        self.assertEqual(self.current, StateId.INTRO)
+        self.assertEqual(self.emitted[-1].stage_progress, 0.0)
+        self.set_streak(1)
+        self.tick()
+        self.tick(dt=self.config.intro_grace_seconds * 0.8)           # 1.6 × the grace since the first anchor
+        self.set_streak(3)
+        self.tick()
+        self.assertEqual(self.current, StateId.INTRO)                 # still disarmed: the count restarted
+
+    def test_a_zero_grace_arms_the_intro_at_once(self) -> None:
+        self.config.intro_grace_seconds = 0.0
+        self._to_intro_after_the_sync_end()
+        self.assertEqual(self.emitted[-1].stage_progress, 1.0)
+        self.set_streak(3)
+        self.tick()
+        self.assertEqual(self.current, StateId.INTRO_PLAY)
+
+    def test_intro_from_elsewhere_is_armed_at_once(self) -> None:
+        # The grace belongs to the sync end: an intro reached from END_INTRO (someone left) spins up
+        # on the first alike hits once the room is back, as before; IDLE → INTRO is the streak tests.
+        self._to_play()
+        self.set_players(2)
+        for _ in range(4):
+            self.tick(dbar=self.config.end_bars / 3)
+        self.assertEqual(self.current, StateId.END_INTRO)
+        self.board.is_locked = True
+        self.light.beam_layers.beam_wind_down.progress = 1.0
+        self.tick()
+        self.assertEqual(self.current, StateId.INTRO)
+        self.set_streak(3)
+        self.set_players(3)
+        self.assertEqual(self.current, StateId.INTRO_PLAY)
 
     # -- session mode ---------------------------------------------------------
 

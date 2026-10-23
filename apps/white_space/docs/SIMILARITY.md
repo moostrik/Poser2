@@ -67,8 +67,8 @@ The arms are alike, then, when every arm joint is within the tolerance, allowing
 | Reads                 | the distance, and the similarity's plateau               | the similarity, 0 to 1                                        |
 | Neutral               | a gate: every hit in the run has `ArmDeviation` 1        | a ramp: the pair times the smaller `ArmDeviation` (`pose/neutral_weight.py`) |
 | In time               | none: the poses as they were at the hits                 | `SimilarityStickyFiller`, `SimilarityEuroSmoother` (SMOOTH), `SimilarityChaseInterpolator` (LERP) |
-| Decision              | a run of hits is in sync when every pair's similarity is 1 and the gate holds; `min_players` in a row | none; each reader shapes it: the sync strobe while every pair holds over `PI.sync_strobe.on_at` / `off_at` |
-| Output                | `HitStreak` on the board; `states.sync.hits`, `states.sync.distance` (°) | the rows on the LERP frames; `/pose/N/similarity/pose` to Max |
+| Decision              | a run of hits is in sync when every pair's similarity is 1 and the gate holds; `min_players` in a row | the instrument's full-sync gate: every present pair over `PI.on_at` / `off_at` (`POSE_INSTRUMENT.md`, *The sync strobe*) drives the strobe, the growth, the blend, and PLAY's sync end once held `states.play_full_sync_seconds` (`STATES.md`, S7) |
+| Output                | `HitStreak` on the board; `states.sync.hits`, `states.sync.distance` (°) | the rows on the LERP frames; `/pose/N/similarity/pose` to Max; `PI.full_sync` |
 
 Both read one settings group, `pose.similarity.posture`, and one switch for neutral,
 `pose.similarity.neutral_weight.enabled`. The feature's chain: `PostureSimilarity` runs on the SMOOTH
@@ -95,6 +95,8 @@ zeros.
 | `pose.similarity.smoother` (`min_cutoff`, `cutoff_rise`) | feature          | 0.3, 1.0      | the Euro smoother on the stamped rows |
 | `pose.similarity.interpolator` (`responsiveness`, `friction`) | feature    | 0.33, 0.05    | the chase at LERP |
 | `states.min_players`                                 | hit sync            | 2             | alike hits in a row to spin up |
+| `states.play_full_sync_seconds`                      | the show (S7)       | 20 s          | PLAY winds down once full sync has held this long; 0 never |
+| `states.intro_grace_seconds`                         | the show (S4)       | 20 s          | after the sync end, the hits out of sync this long before INTRO can spin up again |
 | `PI.sync_strobe.on_at`, `off_at`                     | the sync strobe     | 0.95, 0.9     | full sync's band: on when every pair reads `on_at`, off below `off_at` |
 | `PI.sync_strobe.threshold`                           | the reach growth    | 0.9           | where sync's reach growth begins (bypassed in the preset) |
 | `PI.window.width`                                    | window              | 33°           | the window before it opens |

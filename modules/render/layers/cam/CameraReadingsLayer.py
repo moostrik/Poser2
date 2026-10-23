@@ -57,8 +57,8 @@ class CameraReadingsLayer(LayerBase):
             self._label(x, 'no IMU', _UNMEASURED_COLOR)
             return
 
-        x = self._label(x, self._reading('tilt', tilt), self._mount_color(tilt)) + _GAP_PX
-        self._label(x, self._reading('roll', roll), self._mount_color(roll))
+        x = self._label(x, self._reading('T', tilt), self._mount_color(tilt)) + _GAP_PX
+        self._label(x, self._reading('R', roll), self._mount_color(roll))
 
     @staticmethod
     def _reading(axis: str, value: float) -> str:

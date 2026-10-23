@@ -5,9 +5,11 @@ A condition-driven state machine that plays the states designed in ``docs/STATES
 condition-driven *between* states. Each tick (on the Conductor's light thread) it builds a
 ``StateContext`` from the board (the players present, the hit streak ``HitSync`` publishes — this
 tick's hit and how many hits in a row struck alike poses — and the playhead's content clock and
-lock signals), lets the active state return its mix, evaluates that state's transition conditions,
-and emits a ``SequencerState`` snapshot for the board and OSC sound. It reads the board only; the
-hits and their poses are ``pose/hit_sync.py``'s.
+lock signals) and from the pose instrument's readout (``PI.full_sync``: the room in full sync, as
+the instrument drew it last tick), lets the active state return its mix, evaluates that state's
+transition conditions, and emits a ``SequencerState`` snapshot for the board and OSC sound. It
+reads the board and that readout only; the hits and their poses are ``pose/hit_sync.py``'s, the
+gate the instrument's.
 
 The machine is the only component that talks to the Conductor, through three explicit
 command callables: ``set_mix`` (the mix), ``reset_layers`` (explicit layer resets), and
@@ -28,7 +30,7 @@ from modules.board import HitStreak
 from modules.session import SequencerState
 
 from ..board import Board
-from ..light import LightSettings, LayerId, Mix, MotorMode
+from ..light import LightSettings, LayerId, Mix, MotorMode, PoseInstrumentSettings
 from .settings import StateId, StateMachineSettings, ManualSettings
 
 import logging
@@ -45,13 +47,15 @@ class StateContext:
     players: int            # live player count (ghosts excluded)
     sync_hits: int          # hits in a row, within one round, that struck alike poses (HitSync's streak)
     hit:     bool           # this tick the playhead is closest to a live player (the flash tick)
+    full_sync: bool         # the room in full sync: every present pair alike over the instrument's band
+                            # (PI.full_sync as the instrument drew it last tick — PLAY's sync end)
     session: bool           # session mode active — states consult it in needs_state_change()
     blackout: bool          # the pinned blackout toggle — OFF stays put while pinned and
                             # wakes through OFF_IDLE once released and the playhead lock holds
     prev: StateId | None    # the state we arrived from (None at boot) — lets a transition
                             # state ramp from where the show actually was (no dips)
     is_playhead_locked: bool  # playhead lock: the sweep tracks the measured rotation at BEAM
-                              # (stale-proof after a spin-down — OFF and S9/S10 exit on it)
+                              # (stale-proof after a spin-down — OFF and S9–S11 exit on it)
     is_projecting: bool     # PROJECTION commanded and the sensor silent: the bar is fast enough
                             # for the projection to show (S6's swap to the instrument)
 
@@ -61,13 +65,15 @@ class StateMachine:
     ``conductor.add_update_callback`` — everything runs on the light thread and every input is
     read from the board there, so composing needs no locking."""
 
-    def __init__(self, config: StateMachineSettings, light: LightSettings, board: Board,
+    def __init__(self, config: StateMachineSettings, light: LightSettings, instrument: PoseInstrumentSettings,
+                 board: Board,
                  set_mix: Callable[[Mix], None],
                  reset_layers: Callable[[list[LayerId]], None],
                  set_motor: Callable[[MotorMode | None], None],
                  pose_stage: int) -> None:
         self._config = config
         self._light = light
+        self._instrument = instrument
         self._board = board
         self._set_mix = set_mix
         self._reset_layers = reset_layers
@@ -123,6 +129,7 @@ class StateMachine:
             players=players,
             sync_hits=self._streak.hits,
             hit=hit,
+            full_sync=self._instrument.full_sync,
             session=self._config.session.enabled,
             blackout=self._config.blackout,
             prev=self._prev_state,

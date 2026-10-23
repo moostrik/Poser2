@@ -129,7 +129,7 @@ class Playhead:
         cannot pulse above the ceiling, so silence is the evidence the bar spins fast enough for
         the projection to show. The spin-down side anchors on ``is_locked`` itself (the playhead
         lock): the sensor's spin-down readings don't resolve a usable deceleration ramp, so the
-        S9/S10 fade is timed instead (the beam_wind_down layer)."""
+        S9–S11 fade is timed instead (the beam_wind_down layer)."""
         self._is_projecting = command.mode == MotorMode.PROJECTION and motor.fall_age > _PROJECTING_SILENCE_S
 
     def _advance_internal(self, dt: float, motor: MotorMeasurement, command: MotorCommand) -> None:

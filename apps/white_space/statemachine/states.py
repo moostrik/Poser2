@@ -4,7 +4,7 @@ Each state owns its outgoing transitions (``needs_state_change``, in priority or
 when several conditions are true the same tick, the first wins) and returns its mix every
 tick (``update``: a weighted layer list the machine forwards to the Compositor). Steady
 states return constant weights; transition states blend by their own ``progress`` — their
-duration *is* the transition duration. S9/S10 are the exception: their fade lives in the
+duration *is* the transition duration. S9–S11 are the exception: their fade lives in the
 ``beam_wind_down`` layer (constant mix; the layer owns the timed fade) and they exit once that
 fade is complete and the playhead lock holds.
 
@@ -134,28 +134,63 @@ class IntroState(StateBase):
     """S4 — INTRO. See docs/STATES.md."""
     MOTOR = MotorMode.BEAM
 
+    def __init__(self, *args) -> None:
+        super().__init__(*args)
+        self._armed: bool = True                      # the spin-up condition counts; disarmed after PLAY_INTRO
+        self._unsynced_since: float | None = None     # disarmed: elapsed at which the hits last fell out of sync
+
     def enter(self, ctx: StateContext) -> None:
         self._reset_layers([LayerId.beam_flash])   # no stale flash decay from a previous cycle
+        # After the sync end the room is still posing: the intro arms only once the hits have been
+        # out of sync for the grace period. From everywhere else the first alike hits count at once.
+        self._armed = ctx.prev != StateId.PLAY_INTRO or self._config.intro_grace_seconds <= 0.0
+        self._unsynced_since = None
 
     def update(self, ctx: StateContext) -> Mix:
+        if not self._armed:
+            if ctx.sync_hits >= self._config.min_players:
+                self._unsynced_since = None                   # alike again: the grace restarts
+            elif self._unsynced_since is None:
+                self._unsynced_since = ctx.elapsed
+            elif ctx.elapsed - self._unsynced_since >= self._config.intro_grace_seconds:
+                self._armed = True
         return [(LayerId.beam_playhead, self._config.dim_level), (LayerId.beam_flash, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.players == 0:       # before the session timeout: an empty room never spins up
             return StateId.INTRO_IDLE
         # The players heard the same sound min_players times in a row: that many alike hits launch the spin-up.
-        if ctx.sync_hits >= self._config.min_players and ctx.players >= self._config.min_players:
+        if self._armed and ctx.sync_hits >= self._config.min_players and ctx.players >= self._config.min_players:
             return StateId.INTRO_PLAY
         if ctx.session and ctx.elapsed >= self._config.session.intro_seconds:
             return StateId.INTRO_PLAY
         return None
+
+    def progress(self, ctx: StateContext) -> float:
+        """Disarmed: the grace as it is waited out (0 → 1 while the hits stay out of sync); 1.0 armed."""
+        if self._armed:
+            return 1.0
+        if self._unsynced_since is None:
+            return 0.0
+        return _clamp((ctx.elapsed - self._unsynced_since) / self._config.intro_grace_seconds)
 
 
 class PlayState(StateBase):
     """S7 — PLAY. See docs/STATES.md."""
     MOTOR = MotorMode.PROJECTION
 
+    def __init__(self, *args) -> None:
+        super().__init__(*args)
+        self._full_sync_since: float | None = None    # elapsed at which full sync last came on
+
+    def enter(self, ctx: StateContext) -> None:
+        self._full_sync_since = None                  # no layer reset: PLAY inherits the running instrument
+
     def update(self, ctx: StateContext) -> Mix:
+        if not ctx.full_sync:
+            self._full_sync_since = None
+        elif self._full_sync_since is None:
+            self._full_sync_since = ctx.elapsed
         return [(LayerId.pose_instrument, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
@@ -165,6 +200,10 @@ class PlayState(StateBase):
             return None
         if ctx.players < self._config.min_players:
             return StateId.END
+        # The room has held full sync long enough: the sync end, the wind-down to the intro.
+        held = self._config.play_full_sync_seconds
+        if held > 0.0 and self._full_sync_since is not None and ctx.elapsed - self._full_sync_since >= held:
+            return StateId.PLAY_INTRO
         return None
 
 
@@ -286,7 +325,7 @@ class EndState(StateBase):
 
 
 class WindDownStateBase(StateBase):
-    """Shared S9/S10 engine: the dying wall. The mix is constant — the ``beam_wind_down`` layer
+    """Shared S9–S11 engine: the dying wall. The mix is constant — the ``beam_wind_down`` layer
     (reset on entry) owns the whole fade, timed over its ``spin_down_seconds`` — and the
     landing look sits underneath, revealed as the wall dies. Exit: the fade complete and
     the playhead lock (the landing state needs a live playhead). Progress is the
@@ -323,6 +362,19 @@ class EndIdleState(WindDownStateBase):
                 (LayerId.beam_blue_sound, self.progress(ctx))]
 
 
+class PlayIntroState(WindDownStateBase):
+    """S11 — PLAY_INTRO. See docs/STATES.md."""
+    TARGET = StateId.INTRO
+
+    def enter(self, ctx: StateContext) -> None:
+        # The wall restarts full, and the instrument is done: PLAY_INTRO never returns to PLAY, and
+        # its full-sync readout clears with it (the layer is not drawn again before S6 resets it).
+        self._reset_layers([LayerId.beam_wind_down, LayerId.pose_instrument])
+
+    def update(self, ctx: StateContext) -> Mix:
+        return [(LayerId.beam_wind_down, 1.0), (LayerId.beam_playhead, self._config.dim_level)]
+
+
 # -- Registry (total over StateId) ----------------------------------------------
 
 STATES: dict[StateId, type[StateBase]] = {
@@ -337,4 +389,5 @@ STATES: dict[StateId, type[StateBase]] = {
     StateId.END:        EndState,
     StateId.END_INTRO:  EndIntroState,
     StateId.END_IDLE:   EndIdleState,
+    StateId.PLAY_INTRO: PlayIntroState,
 }

@@ -131,7 +131,7 @@ Sent once per bundle.
 
 | Address                   | Value   | Range    | What it is                                                   |
 |---------------------------|---------|----------|--------------------------------------------------------------|
-| `/global/state`           | int     | −1..10   | the show state (`STATES.md`); −1 in the shutdown blackout    |
+| `/global/state`           | int     | −1..11   | the show state (`STATES.md`); −1 in the shutdown blackout    |
 | `/global/state/progress`  | float   | 0..1     | the state's progress (`STATES.md`)                           |
 | `/global/progress`        | float   | 0..1     | the show's progress                                          |
 | `/global/playhead`        | float   | −π..π    | the playhead as an azimuth (`CALIBRATION.md`, *Playhead*)    |

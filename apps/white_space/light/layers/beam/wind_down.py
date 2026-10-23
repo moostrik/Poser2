@@ -1,7 +1,7 @@
-"""BeamWindDown — the dying wall of light: the S9/S10 ending fade.
+"""BeamWindDown — the dying wall of light: the S9–S11 ending fade.
 
 Writes the two white beam lights at a fading level; everything else is physics. The fixture
-is in beam mode from S9's first packet (its readout mode follows the commanded rpm, see
+is in beam mode from S9's or S11's first packet (its readout mode follows the commanded rpm, see
 ``inout/osc_light_sender.py``), so the two lamps spin at whatever speed the bar still has:
 a wall of white while it is fast, thinning into two beams as it slows — and the fade rides
 through both. One mechanism, and the layer never needs to know when the bar is slow. The
