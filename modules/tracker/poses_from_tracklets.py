@@ -3,18 +3,36 @@ import math
 from threading import Lock
 
 from modules.pose.frame import Frame, FrameDict, FrameDictCallbackMixin
-from modules.pose.features import BBox, Azimuth
+from modules.pose.features import BBox, BBoxAzimuth, Distance
+from modules.settings import BaseSettings, Field
 from .tracklet import Tracklet
-from . import PanoramicAnnotation
+from .panoramic.annotation import Annotation as PanoramicAnnotation
 
 logger = logging.getLogger(__name__)
+
+
+class PosesFromTrackletsSettings(BaseSettings):
+    # How long after their last detection a person is still cropped from their last box. Judged here
+    # rather than in the tracker, which emits everyone it still remembers: inside this window a
+    # person the detector dropped keeps their pose, so a missed detection neither interrupts it nor
+    # resets the filters downstream. Not below a few frames: a fresh detection is already some
+    # milliseconds old by the time the frame bang crops it, so at 0 nobody would ever be posed.
+    detection_timeout: Field[float] = Field(2.0, min=0.1, max=5.0, step=0.05,
+                                            description="Seconds after the last detection a person still gets a pose")
 
 
 class PosesFromTracklets(FrameDictCallbackMixin):
     """Generates poses from tracklets, maintaining state per track."""
 
-    def __init__(self, num_tracks: int) -> None:
+    def __init__(self, config: PosesFromTrackletsSettings, num_tracks: int) -> None:
         super().__init__()
+        self._config: PosesFromTrackletsSettings = config
+        # The incoming dict keys are used directly as slot indices below, so the feeding tracker
+        # must key by a slot under `num_tracks` (the panoramic tracker's player slots; cam ids for
+        # one-per-cam rigs): a key at or above it would vanish here without a trace. Both come from
+        # `num_players` in main.py — an invariant spanning two modules, so it is worth stating.
+        if num_tracks <= 0:
+            raise ValueError(f"PosesFromTracklets needs at least one track slot, got {num_tracks}")
         self._num_tracks = num_tracks
         # Store submitted tracklets per track ID
         self._tracklets: dict[int, Tracklet | None] = {
@@ -29,6 +47,12 @@ class PosesFromTracklets(FrameDictCallbackMixin):
         Args:
             tracklet_dict: Dictionary of track_id -> Tracklet
         """
+        dropped: list[int] = [k for k in tracklet_dict if k >= self._num_tracks]
+        if dropped:
+            logger.warning(
+                f"PosesFromTracklets: track ids {dropped} are beyond {self._num_tracks} slots "
+                f"and produce no pose — the feeding tracker has more slots than num_tracks."
+            )
         with self._lock:
             # Update all track slots
             for track_id in range(self._num_tracks):
@@ -49,18 +73,24 @@ class PosesFromTracklets(FrameDictCallbackMixin):
             self._batch_id_counter += 1
 
         generated_poses: FrameDict = {}
+        # Checked on every frame, not when the tracker last published: a latched box goes stale
+        # between tracker ticks, and a stale one is left out so downstream filters reset for it.
+        detection_timeout: float = self._config.detection_timeout
 
         for track_id, tracklet in tracklets_snapshot.items():
-            if tracklet is None:
+            if tracklet is None or tracklet.is_expired(detection_timeout):
                 continue
 
             try:
                 bounding_box = BBox.from_rect(tracklet.roi)
-                world_angle = tracklet.annotation.world_angle if isinstance(tracklet.annotation, PanoramicAnnotation) else None
+                annotation = tracklet.annotation if isinstance(tracklet.annotation, PanoramicAnnotation) else None
                 features: dict = {BBox: bounding_box}
-                if world_angle is not None:
+                if annotation is not None:
                     # SingleAngle.from_value wraps degrees-as-radians to [-π, π).
-                    features[Azimuth] = Azimuth.from_value(math.radians(float(world_angle)))
+                    features[BBoxAzimuth] = BBoxAzimuth.from_value(math.radians(float(annotation.world_angle)))
+                    # Without a reading the feature stays absent (NaN, score 0.0).
+                    if not math.isnan(annotation.zone_distance):
+                        features[Distance] = Distance.from_value(annotation.zone_distance)
 
                 generated_poses[track_id] = Frame(
                     track_id=tracklet.id,
@@ -79,8 +109,10 @@ class PosesFromTracklets(FrameDictCallbackMixin):
 
     def is_ready(self) -> bool:
         """Return True if at least one tracklet is ready for generation."""
+        detection_timeout: float = self._config.detection_timeout
         with self._lock:
-            return any(tracklet is not None for tracklet in self._tracklets.values())
+            return any(tracklet is not None and not tracklet.is_expired(detection_timeout)
+                       for tracklet in self._tracklets.values())
 
     def reset(self) -> None:
         """Reset all tracklets."""

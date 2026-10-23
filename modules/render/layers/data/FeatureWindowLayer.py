@@ -14,7 +14,7 @@ from modules.pose.frame import FeatureWindow
 from ..LayerBase import LayerBase, DataCache, Rect
 from ...shaders import WindowShader
 from modules.pose.features import BaseScalarFeature
-from .DataLayerSettings import DataLayerConfig, LayerMode, FEATURE_MAP, TRACK_COLOR_FEATURES
+from .DataLayerSettings import DataLayerConfig, LayerMode, FEATURE_MAP, TRACK_COLOR_FEATURES, AngleOffset, has_pi_range, offset_angles
 from ...color_settings import ColorSettings
 
 
@@ -109,6 +109,9 @@ class FeatureWindowLayer(LayerBase):
 
         # Convert numpy arrays to image format: (feature_len, time, 2)
         values = window.values.T.astype(np.float32)  # (feature_len, time)
+        offset = self._config.angle_offset
+        if offset != AngleOffset.NONE and has_pi_range(feature_type):
+            values = offset_angles(values, offset)
         mask = window.mask.astype(np.float32).T      # (feature_len, time)
 
         # Stack as 2-channel RG texture

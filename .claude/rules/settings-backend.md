@@ -20,16 +20,7 @@ Maintain the settings engine contract and reactive behavior in `modules/settings
 - Keep JSON serialization/deserialization deterministic and backward-compatible with existing presets
 - Treat GUI metadata as hint-only data; backend logic must never depend on GUI frameworks
 
-## Consumer usage rules
-
-- Pass settings (or `Group`/`Child` subgroups) via constructor dependency injection, not globals
-- Bind reactive updates explicitly with callbacks and keep callback logic thread-safe
-- Use `bind()` only for reacting to configuration changes; do not use it as a runtime data relay between components
-- Cache `Field.INIT` values when useful; do not long-term cache mutable non-INIT values
-- Avoid circular updates where a callback writes the same field that triggered it
-- Treat READ-only values as snapshots; copy arrays before cross-thread handoff
-
 ## Scope note
 
 This file governs the settings system implementation in `modules/settings/`.
-Consumer usage and preset workflow rules are in @.claude/rules/settings-presets.md.
+Consumer usage rules are in `CLAUDE.md`; preset workflow rules are in @.claude/rules/settings-presets.md.

@@ -12,10 +12,10 @@ The root class is ``Settings``.
 from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
-from modules.oak import CameraSettings, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.oak import CameraSettings, CameraCheckSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
-from modules.tracker import OnePerCamTrackerSettings
+from modules.tracker import OnePerCamTrackerSettings, PosesFromTrackletsSettings
 from modules.pose import nodes, trackers, window
 from modules import inference
 from modules.gl import WindowSettings
@@ -46,6 +46,7 @@ class Layers(IntEnum):
     # composite layers
     tracker =       auto()
     poser =         auto()
+    cam_readings =  auto()   # the camera's frame rate, tilt and roll error; draw it over poser
     # centre layers
     centre_geom =   auto()
     centre_cam =    auto()
@@ -88,12 +89,14 @@ class OakGroup(BaseSettings):
     color:              Field[bool]              = Field(True, access=Field.INIT, description="Enable color capture")
     square:             Field[bool]              = Field(True, access=Field.INIT, description="Use square aspect ratio")
     stereo:             Field[bool]              = Field(False, access=Field.INIT, description="Enable stereo mode")
-    hd_ready:           Field[bool]              = Field(False, access=Field.INIT, description="Use HD resolution")
+    resolution:         Field[CameraResolution]  = Field(CameraResolution.P1080, access=Field.INIT, description="Sensor mode. P720 and P800 on both sensors, P1080 colour only.")
     sim_enabled:        Field[bool]              = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path:         Field[str]               = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
+    fov:                Field[float]             = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-D Pro W, OV9782 colour, 1280x800 native. 720p is a vertical crop, so the full width and this figure both hold.")
 
-    _cam_share = [fps, color, square, stereo, yolo, hd_ready, model_path]
+    _cam_share = [fps, color, square, stereo, yolo, resolution, model_path, fov]
     cam_0         = Group(CameraSettings, share=_cam_share)
+    camera_check  = Group(CameraCheckSettings)
     simulator     = Group(SimulatorSettings, share=[num_cameras, fps])
     recorder      = Group(RecorderSettings, share=[num_cameras, fps, keyframe_interval])
     tracker       = Group(OnePerCamTrackerSettings)
@@ -181,6 +184,7 @@ class PoseGroup(BaseSettings):
     pose         = Group(inference.pose.Settings, share=_batch_share)
     segmentation = Group(inference.segmentation.Settings, share=_batch_share)
     optical_flow = Group(inference.optical_flow.Settings, share=_batch_share)
+    tracklets    = Group(PosesFromTrackletsSettings)
     image_crop   = Group(inference.crop.Settings, share=[max_poses])
     angle_extractor = Group(nodes.AngleExtractorSettings)
     bbox         = Group(BboxFeature, share=_feature_share)

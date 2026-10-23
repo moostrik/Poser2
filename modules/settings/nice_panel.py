@@ -34,6 +34,7 @@ Design principles for settings widgets and layout:
 from __future__ import annotations
 
 import json
+import math
 import socket
 from enum import Enum
 from pathlib import Path
@@ -47,6 +48,7 @@ from .nice_util import SafeTimer
 from . import presets
 from .field import Field, Access
 from .widget import Widget
+from .nice_knob import Knob, CHANGE_THROTTLE
 from modules.utils import Color, Point2f, Rect
 
 # ---------------------------------------------------------------------------
@@ -102,6 +104,11 @@ def generate_label(name):
     return " ".join(result)
 
 
+def _field_label(name: str, field: Field) -> str:
+    """The control's title: the field's own ``label`` when it has one, else its name made readable."""
+    return field.label if field.label is not None else generate_label(name)
+
+
 def _build_field_title(label: str, description: str | None, *, classes: str = ""):
     """Create a shared field title area with an optional hover description."""
     title = ui.label(label).classes(classes)
@@ -122,6 +129,18 @@ def _attach_description_tooltip(element, description: str | None):
 def _is_field_read_only(settings, name: str, field: Field) -> bool:
     """Return True when a field should render read-only in this settings instance."""
     return field.access is Access.READ
+
+
+def _lock_prop(locked: bool, *, readonly: bool = True) -> str:
+    """Return the Quasar prop suffix that locks a read-only control.
+
+    ``readonly`` keeps hover events alive (tooltips) and the value legible;
+    ``disable`` sets ``pointer-events:none`` on q-field controls, so it is used
+    only for components without a ``readonly`` prop (QToggle, QBtn).
+    """
+    if not locked:
+        return ""
+    return " readonly" if readonly else " disable"
 
 
 def _field_needs_poll(settings, name: str, field: Field) -> bool:
@@ -167,10 +186,10 @@ def _build_field_header(
                 actions()
 
 
-def _build_init_field(settings, name: str) -> None:
+def _build_init_field(settings, name: str, field: Field) -> None:
     """Render a single init-only field without forcing it into a separate section."""
     with ui.row().classes("items-center gap-2 poser-init"):
-        ui.label(generate_label(name))
+        _build_field_title(_field_label(name, field), _wiring_tooltip(settings, name, field.description))
         ui.label(str(getattr(settings, name))).classes("text-secondary italic")
 
 
@@ -194,7 +213,7 @@ def _build_settings_entry(settings, name: str, field: Field, polls) -> None:
             _build_action_button(settings, name, field)
         return
     if field.access is Access.INIT:
-        _build_init_field(settings, name)
+        _build_init_field(settings, name, field)
         return
     with ui.element("div").classes(css):
         _build_field_control(settings, name, field, polls)
@@ -246,9 +265,9 @@ def _commit_typed(element, commit, *, on_enter=True):
     element.on("blur", lambda _e: commit(element.value), [])
 
 
-def _commit_on_release(element, commit):
-    """Commit a slider/knob value when the drag ends (Quasar lazy 'change')."""
-    element.on("change", lambda _e: commit(element.value))
+def _commit_while_dragging(element, commit):
+    """Commit a slider's value as it is dragged, throttled; the last value always arrives."""
+    element.on("update:model-value", lambda e: commit(e.args), [None], throttle=CHANGE_THROTTLE)
 
 
 # -- bool builders -----------------------------------------------------------
@@ -256,12 +275,12 @@ def _commit_on_release(element, commit):
 @widget_builder(Widget.switch)
 def _build_switch(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
     sw = _attach_description_tooltip(ui.switch(label, value=value).props(
-        "dense" + (" disable" if is_disabled else "")
+        "dense" + _lock_prop(is_disabled, readonly=False)
     ), desc)
 
     if not is_disabled:
@@ -273,10 +292,39 @@ def _build_switch(settings, name, field, polls):
         polls.append((settings, name, [value], lambda v, sw=sw: sw.set_value(v)))
 
 
+@widget_builder(Widget.status)
+def _build_status(settings, name, field, polls):
+    """Read-only good/bad indicator: one badge carrying the field's label, green with OK or red
+    with WARNING.
+
+    Both texts sit in the same grid cell and only one is visible, so the badge is always as wide as
+    the longer one and does not jump in size when the value flips.
+    """
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+
+    with ui.badge().classes("text-weight-bold px-2 py-1").style("display: inline-grid") as badge:
+        ok_text = ui.label(f"{label} OK").classes("text-center").style("grid-area: 1 / 1")
+        warning_text = ui.label(f"{label} WARNING").classes("text-center").style("grid-area: 1 / 1")
+    _attach_description_tooltip(badge, desc)
+
+    def _apply_style(ok: bool):
+        shown, hidden = (ok_text, warning_text) if ok else (warning_text, ok_text)
+        shown.classes(remove="invisible")
+        hidden.classes(add="invisible")
+        badge._props["color"] = "positive" if ok else "negative"
+        badge.update()
+
+    _apply_style(value)
+
+    polls.append((settings, name, [value], lambda v: _apply_style(v)))
+
+
 @widget_builder(Widget.toggle)
 def _build_toggle(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -290,7 +338,7 @@ def _build_toggle(settings, name, field, polls):
         btn.update()
 
     btn = _attach_description_tooltip(ui.button(label).props(
-        "dense" + (" disable" if is_disabled else "")
+        "dense" + _lock_prop(is_disabled, readonly=False)
     ), desc)
     _apply_style(btn, value)
 
@@ -314,7 +362,7 @@ def _build_toggle(settings, name, field, polls):
 @widget_builder(Widget.slider)
 def _build_slider(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
@@ -330,19 +378,21 @@ def _build_slider(settings, name, field, polls):
                 format=fmt,
             ).props(
                 "dense borderless"
-                + (" disable" if is_disabled else "")
+                + _lock_prop(is_disabled)
             ).classes("w-16")
         sl = ui.slider(
             min=field.min, max=field.max, step=step, value=value
         ).props(
             f"dense color={color}"
-            + (" disable" if is_disabled else "")
+            + _lock_prop(is_disabled)
         ).classes("w-full")
 
     _updating = {"lock": False}
+    # The poll's last-seen value: a commit records what it wrote, so the poll does not push it
+    # back into the slider while the user is still dragging.
+    last = [value]
 
     if not is_disabled:
-        # Live readout only while dragging — do NOT commit until release.
         def on_slider_change(e):
             if not _updating["lock"]:
                 _updating["lock"] = True
@@ -353,12 +403,9 @@ def _build_slider(settings, name, field, polls):
         def commit_slider(val):
             if val is None:
                 return
-            _updating["lock"] = True
-            v = field.type_(val)
-            setattr(settings, name, v)
-            val_input.set_value(v)
-            _updating["lock"] = False
-        _commit_on_release(sl, commit_slider)
+            setattr(settings, name, field.type_(val))
+            last[0] = getattr(settings, name)
+        _commit_while_dragging(sl, commit_slider)
 
         def commit_input(val):
             if _updating["lock"] or val is None:
@@ -366,6 +413,7 @@ def _build_slider(settings, name, field, polls):
             _updating["lock"] = True
             clamped = max(field.min, min(field.max, field.type_(val)))
             setattr(settings, name, clamped)
+            last[0] = getattr(settings, name)
             sl.set_value(clamped)
             val_input.set_value(clamped)
             _updating["lock"] = False
@@ -375,13 +423,102 @@ def _build_slider(settings, name, field, polls):
         def _poll_slider(v, _sl=sl, _vi=val_input):
             _sl.set_value(v)
             _vi.set_value(v)
-        polls.append((settings, name, [value], _poll_slider))
+        polls.append((settings, name, last, _poll_slider))
+
+
+@widget_builder(Widget.log_slider)
+def _build_log_slider(settings, name, field, polls):
+    """Slider over log10(min)..log10(max); the number input holds the real value."""
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    desc = _wiring_tooltip(settings, name, field.description)
+    is_disabled = _is_field_read_only(settings, name, field)
+    color = getattr(field, "color", "primary")
+
+    def clamp(v: float) -> float:
+        return max(field.min, min(field.max, v))
+
+    with ui.column().classes("w-48 max-w-full gap-1"):
+        with ui.row().classes("w-full items-center justify-between flex-nowrap"):
+            _build_field_title(label, desc, classes="flex-1 truncate")
+            # HTML min is 0, not field.min: the browser steps in multiples of step counted
+            # from min, so 0 keeps the values round. field.min is enforced on commit.
+            val_input = ui.number(
+                value=value,
+                min=0,
+                max=field.max,
+                step=Widget.log_step(clamp(value)),
+                format="%.3g",
+            ).props(
+                "dense borderless"
+                + _lock_prop(is_disabled)
+            ).classes("w-16")
+        sl = ui.slider(
+            min=Widget.log_position(field.min),
+            max=Widget.log_position(field.max),
+            step=0.01,
+            value=Widget.log_position(clamp(value)),
+        ).props(
+            f"dense color={color}"
+            + _lock_prop(is_disabled)
+        ).classes("w-full")
+
+    _updating = {"lock": False}
+
+    def set_input(v: float) -> None:
+        val_input.set_value(v)
+
+    def on_input_change(e):
+        # The arrow step follows the value (a tenth of its decade) on every change, not
+        # only on commit: a held arrow keeps stepping in the browser without committing.
+        if e.value is not None and e.value > 0:
+            val_input.props(f"step={Widget.log_step(clamp(e.value))}")
+    val_input.on_value_change(on_input_change)
+
+    # The poll's last-seen value: a commit records what it wrote, so the poll does not push it
+    # back into the slider while the user is still dragging.
+    last = [value]
+
+    if not is_disabled:
+        def on_slider_change(e):
+            if not _updating["lock"]:
+                _updating["lock"] = True
+                set_input(Widget.log_value(e.value))
+                _updating["lock"] = False
+        sl.on_value_change(on_slider_change)
+
+        def commit_slider(pos):
+            if pos is None:
+                return
+            setattr(settings, name, field.type_(clamp(Widget.log_value(pos))))
+            last[0] = getattr(settings, name)
+        _commit_while_dragging(sl, commit_slider)
+
+        def commit_input(val):
+            if _updating["lock"] or val is None:
+                return
+            _updating["lock"] = True
+            clamped = field.type_(clamp(float(f"{val:.3g}")))
+            setattr(settings, name, clamped)
+            last[0] = getattr(settings, name)
+            sl.set_value(Widget.log_position(clamped))
+            set_input(clamped)
+            _updating["lock"] = False
+        _commit_typed(val_input, commit_input)
+
+    if _field_needs_poll(settings, name, field):
+        def _poll_log_slider(v, _sl=sl):
+            _updating["lock"] = True
+            _sl.set_value(Widget.log_position(clamp(v)))
+            set_input(v)
+            _updating["lock"] = False
+        polls.append((settings, name, last, _poll_log_slider))
 
 
 @widget_builder(Widget.number)
 def _build_number(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -390,7 +527,7 @@ def _build_number(settings, name, field, polls):
         value=value,
         step=field.step if field.step is not None else (1 if field.type_ is int else 0.01),
         format="%.0f" if field.type_ is int else "%.2f",
-    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24"), desc)
+    ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24"), desc)
 
     if not is_disabled:
         def commit_num(val):
@@ -405,30 +542,40 @@ def _build_number(settings, name, field, polls):
 @widget_builder(Widget.knob)
 def _build_knob(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
     min_val = field.min if field.min is not None else 0
     max_val = field.max if field.max is not None else 100
+    # The knob shows its value as it is, so a value that is not on the step's grid (a read-only
+    # knob fed by the app) is shown to the step's decimals and not with a float's tail.
+    decimals = 0 if field.type_ is int else max(0, -math.floor(math.log10(step))) if step > 0 else 2
 
-    with ui.column().classes("gap-1"):
-        _build_field_title(label, desc)
-        kn = ui.knob(
-            value=value, min=min_val, max=max_val, step=step,
-            show_value=True, size="lg",
-        ).props(
-            "thickness=0.2" + (" disable" if is_disabled else "")
-        )
+    def shown(v):
+        return field.type_(round(v, decimals)) if v is not None else v
+
+    # The title goes into the knob's caption, above the value and beside the dial.
+    with Knob(
+        shown(value), min=min_val, max=max_val, step=step,
+        default=field.default, decimals=decimals, readonly=is_disabled,
+    ) as kn:
+        _build_field_title(label, desc, classes="truncate max-w-full")
+
+    # The poll's last-seen value: a change records what it wrote, so the poll does not echo it.
+    last = [value]
 
     if not is_disabled:
+        # Answer every change with the setting's value: the knob shows its own value until then.
         def commit_knob(val):
             if val is not None:
                 setattr(settings, name, field.type_(val))
-        _commit_on_release(kn, commit_knob)
+            last[0] = getattr(settings, name)
+            kn.set_value(shown(last[0]))
+        kn.on_change(commit_knob)
 
     if _field_needs_poll(settings, name, field):
-        polls.append((settings, name, [value], lambda v, kn=kn: kn.set_value(v)))
+        polls.append((settings, name, last, lambda v, kn=kn: kn.set_value(shown(v))))
 
 
 # -- enum builders -----------------------------------------------------------
@@ -436,16 +583,17 @@ def _build_knob(settings, name, field, polls):
 @widget_builder(Widget.select)
 def _build_select(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
     options = {m: generate_label(m.name) for m in field.type_}
+    width = f"w-{field.width}" if field.width is not None else "w-48"
     sel = _attach_description_tooltip(ui.select(
         options=options,
         value=value,
         label=label,
-    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-48 max-w-full"), desc)
+    ).props("dense outlined" + _lock_prop(is_disabled)).classes(f"{width} max-w-full"), desc)
 
     if not is_disabled:
         def on_select_change(e):
@@ -459,7 +607,7 @@ def _build_select(settings, name, field, polls):
 @widget_builder(Widget.text_select)
 def _build_text_select(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -470,24 +618,30 @@ def _build_text_select(settings, name, field, polls):
         options=option_list,
         value=value if value in option_list else None,
         label=label,
-    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-48 max-w-full"), desc)
+    ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-48 max-w-full"), desc)
 
     if not is_disabled:
         def on_select_change(e):
+            if e.value is None:         # the select clears itself when its options change; not a choice
+                return
             setattr(settings, name, e.value)
         sel.on_value_change(on_select_change)
 
     polls.append((settings, name, [value], lambda v, s=sel: s.set_value(v)))
-    # Add a custom poll for the options field too
+    # Add a custom poll for the options field too; re-apply the value the new options may have cleared
     if options_field:
-        polls.append((settings, options_field.name, [list(option_list)],
-                       lambda v, s=sel: (setattr(s, 'options', v), s.update())))
+        def on_options_change(v, s=sel):
+            s.options = v
+            s.update()
+            current = getattr(settings, name)
+            s.set_value(current if current in v else None)
+        polls.append((settings, options_field.name, [list(option_list)], on_options_change))
 
 
 @widget_builder(Widget.radio)
 def _build_radio(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -495,7 +649,7 @@ def _build_radio(settings, name, field, polls):
     with ui.column().classes("gap-1"):
         _build_field_title(label, desc)
         rg = ui.toggle(options=options, value=value).props(
-            "dense" + (" disable" if is_disabled else "")
+            "dense" + _lock_prop(is_disabled)
         )
 
     if not is_disabled:
@@ -512,12 +666,12 @@ def _build_radio(settings, name, field, polls):
 @widget_builder(Widget.input)
 def _build_input(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
     inp = _attach_description_tooltip(ui.input(label=label, value=value).props(
-        "dense outlined" + (" disable" if is_disabled else "")
+        "dense outlined" + _lock_prop(is_disabled)
     ), desc)
 
     if not is_disabled:
@@ -532,7 +686,7 @@ def _build_input(settings, name, field, polls):
 @widget_builder(Widget.ip_field)
 def _build_ip(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -544,7 +698,7 @@ def _build_ip(settings, name, field, polls):
         label=label, value=value,
         validation={"": is_valid_ip},
     ).props(
-        'dense outlined hide-bottom-space' + (" disable" if is_disabled else "")
+        'dense outlined hide-bottom-space' + _lock_prop(is_disabled)
     ).classes("w-36"), desc)
 
     if not is_disabled:
@@ -560,7 +714,7 @@ def _build_ip(settings, name, field, polls):
 @widget_builder(Widget.number_field)
 def _build_number_input(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
     lo = field.min
@@ -582,7 +736,7 @@ def _build_number_input(settings, name, field, polls):
         label=label, value=str(value),
         validation={"": is_valid},
     ).props(
-        'dense outlined hide-bottom-space' + (" disable" if is_disabled else "")
+        'dense outlined hide-bottom-space' + _lock_prop(is_disabled)
     ).classes("w-24"), desc)
 
     if not is_disabled:
@@ -598,12 +752,12 @@ def _build_number_input(settings, name, field, polls):
 @widget_builder(Widget.textarea)
 def _build_textarea(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
     ta = _attach_description_tooltip(ui.textarea(label=label, value=value).props(
-        "dense outlined" + (" disable" if is_disabled else "")
+        "dense outlined" + _lock_prop(is_disabled)
     ), desc)
 
     if not is_disabled:
@@ -619,7 +773,7 @@ def _build_textarea(settings, name, field, polls):
 @widget_builder(Widget.color)
 def _build_color(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -633,11 +787,13 @@ def _build_color(settings, name, field, polls):
 
     ci = _attach_description_tooltip(ui.color_input(
         label=label, value=hex_val
-    ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-36").style(
+    ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-36").style(
         _color_style(hex_val)
     ), desc)
 
-    if not is_disabled:
+    if is_disabled:
+        ci.button.disable()  # readonly does not block the picker button
+    else:
         def on_color_change(e):
             if e.value:
                 c = Color.from_hex(e.value)
@@ -656,7 +812,7 @@ def _build_color(settings, name, field, polls):
 @widget_builder(Widget.color_alpha)
 def _build_color_alpha(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     is_disabled = _is_field_read_only(settings, name, field)
 
     hex_val = value.to_hex() if isinstance(value, Color) else '#000000'
@@ -667,15 +823,17 @@ def _build_color_alpha(settings, name, field, polls):
         with ui.row().classes("items-end gap-2"):
             ci = ui.color_input(
                 label="Color", value=hex_val
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-36")
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-36")
 
             alpha_num = ui.number(
                 label="A", value=alpha,
                 min=0.0, max=1.0, step=0.01,
                 format="%.2f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
 
-    if not is_disabled:
+    if is_disabled:
+        ci.button.disable()  # readonly does not block the picker button
+    else:
         def on_color_change(e):
             if e.value:
                 c = Color.from_hex(e.value)
@@ -703,7 +861,7 @@ def _build_color_alpha(settings, name, field, polls):
 def _build_sortable_list(settings, name, field, polls, *, with_checkboxes: bool, with_order: bool = True):
     """Shared implementation for checklist, playlist, and order widgets."""
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
 
@@ -841,7 +999,7 @@ def _build_order(settings, name, field, polls):
 def _build_number_list(settings, name, field, polls):
     """Render a fixed-length list of numbers as styled rows (matches sortable list look)."""
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     desc = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
     elem_type = get_args(field.type_)[0] if get_args(field.type_) else float
@@ -901,7 +1059,7 @@ def _build_number_list(settings, name, field, polls):
 @widget_builder(Widget.point2f)
 def _build_point2f(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     is_disabled = _is_field_read_only(settings, name, field)
 
     with ui.column().classes("w-full gap-1"):
@@ -910,11 +1068,11 @@ def _build_point2f(settings, name, field, polls):
             x_num = ui.number(
                 label="X", value=value.x if isinstance(value, Point2f) else 0.0,
                 step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
             y_num = ui.number(
                 label="Y", value=value.y if isinstance(value, Point2f) else 0.0,
                 step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
 
     if not is_disabled:
         def commit_x(val):
@@ -941,7 +1099,7 @@ def _build_point2f(settings, name, field, polls):
 @widget_builder(Widget.rect)
 def _build_rect(settings, name, field, polls):
     value = getattr(settings, name)
-    label = generate_label(name)
+    label = _field_label(name, field)
     is_disabled = _is_field_read_only(settings, name, field)
 
     with ui.column().classes("w-full gap-1"):
@@ -950,19 +1108,19 @@ def _build_rect(settings, name, field, polls):
             rx = ui.number(
                 label="X", value=value.x if isinstance(value, Rect) else 0.0,
                 step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
             ry = ui.number(
                 label="Y", value=value.y if isinstance(value, Rect) else 0.0,
                 step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
             rw = ui.number(
                 label="W", value=value.width if isinstance(value, Rect) else 0.0,
                 step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
             rh = ui.number(
                 label="H", value=value.height if isinstance(value, Rect) else 0.0,
                 step=0.01, format="%.3f",
-            ).props("dense outlined" + (" disable" if is_disabled else "")).classes("w-24")
+            ).props("dense outlined" + _lock_prop(is_disabled)).classes("w-24")
 
     if not is_disabled:
         def commit_rx(val):
@@ -1000,17 +1158,45 @@ def _build_rect(settings, name, field, polls):
         polls.append((settings, name, [value], _rect_setter))
 
 
+# -- Pinned read-outs ----------------------------------------------------------
+
+def _format_readout(value) -> str:
+    """A read-only value as short text for a pinned chip."""
+    if isinstance(value, bool):
+        return "on" if value else "off"
+    if isinstance(value, Enum):
+        return value.name
+    if isinstance(value, float):
+        return f"{value:.1f}"
+    return str(value)
+
+
+def _build_pinned_readout(settings, name, field, polls):
+    """A read-only pinned field as one compact chip, "<Label> <value> <unit>", instead of a
+    locked input."""
+    value = getattr(settings, name)
+    label = _field_label(name, field)
+    unit = f" {field.unit}" if field.unit else ""
+    desc = _wiring_tooltip(settings, name, field.description)
+
+    chip = _attach_description_tooltip(
+        ui.label(f"{label} {_format_readout(value)}{unit}").classes("bg-grey-8 rounded px-2 py-1"),
+        desc,
+    )
+    polls.append((settings, name, [value],
+                  lambda v, c=chip: c.set_text(f"{label} {_format_readout(v)}{unit}")))
+
+
 # -- Fallback for unregistered / unsupported types --------------------------
 
 def _build_fallback(settings, name, field, polls):
     """Build a control for types without a registered Widget builder."""
     value = getattr(settings, name)
-    label = generate_label(name)
-    is_disabled = _is_field_read_only(settings, name, field)
+    label = _field_label(name, field)
 
     # -- Generic fallback: read-only label -----------------------------------
     with ui.row().classes("items-center gap-2"):
-        ui.label(label)
+        _build_field_title(label, _wiring_tooltip(settings, name, field.description))
         lbl = ui.label(str(value)).classes("text-secondary")
 
     if _field_needs_poll(settings, name, field):
@@ -1019,7 +1205,7 @@ def _build_fallback(settings, name, field, polls):
 
 def _build_action_button(settings, name, field):
     """Create a NiceGUI button for a Widget.button Setting."""
-    label = generate_label(name)
+    label = _field_label(name, field)
     description = _wiring_tooltip(settings, name, field.description)
     is_disabled = _is_field_read_only(settings, name, field)
     props = "dense disable" if is_disabled else "dense"
@@ -1132,6 +1318,9 @@ def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=
                 ui.element("div").classes(
                     f"{_access_css_class(field)} pt-2"
                 ).style("flex-basis: 100%; height: 0")
+            if field.row_label is not None:
+                # The row's title: a fixed width, so the controls of successive rows line up.
+                ui.label(field.row_label).classes(f"{_access_css_class(field)} w-24 font-bold")
             _build_settings_entry(settings, field_name, field, polls)
 
     # Register this card's polls with the page-level timer.
@@ -1407,6 +1596,36 @@ def create_settings_panel(
 
     .poser-source { border-left: 2px solid #26a69a; padding-left: 6px; }
     .poser-synced { border-left: 2px solid #ffa726; padding-left: 6px; }
+
+    .poser-knob { display: flex; align-items: center; gap: 6px; }
+    .poser-knob-caption { display: flex; flex-direction: column; align-items: flex-end; min-width: 56px; max-width: 110px; }
+    .poser-knob-dial { width: 40px; height: 40px; flex: none; cursor: grab; touch-action: none; user-select: none; }
+    .poser-knob-dragging .poser-knob-dial { cursor: grabbing; }
+    .poser-knob-readonly .poser-knob-dial { cursor: default; }
+    .poser-knob-track { fill: none; stroke: #424242; stroke-width: 8; stroke-linecap: round; }
+    .poser-knob-value { fill: none; stroke: var(--q-primary); stroke-width: 8; stroke-linecap: round; }
+    .poser-knob-body { stroke: #0e0e0e; stroke-width: 2; }
+    .poser-knob-pointer { stroke: #e0e0e0; stroke-width: 5; stroke-linecap: round; }
+    /* The value and its editor share one box (border, padding, font), so the digits do not move
+       when editing starts; the editor only lights the border. */
+    .poser-knob-text { width: 100%; box-sizing: border-box; margin: 0; padding: 0 3px;
+                       border: 1px solid #424242; border-radius: 3px;
+                       font-family: inherit; font-size: 12px; line-height: 18px; text-align: right;
+                       font-variant-numeric: tabular-nums; cursor: text; }
+    .poser-knob-readonly .poser-knob-text { cursor: default; border-color: transparent; }
+    .poser-knob-value-box { position: relative; width: 100%; }
+    .poser-knob-editor { position: absolute; inset: 0; min-width: 0; height: 100%;
+                         background: #2a2a2a; color: inherit; border-color: var(--q-primary); outline: none; }
+
+    /* Scaled with transform, not zoom: zoom puts getBoundingClientRect and pointer clientX in
+       different spaces in some browsers, and Quasar sliders compare the two. A transform keeps
+       its layout size, so the bar is laid out wider and the frame is sized by script. */
+    .poser-pinned-frame { --scale: 0.8; overflow: hidden; }
+    .poser-pinned {
+        width: calc(100% / var(--scale));
+        transform: scale(var(--scale));
+        transform-origin: top left;
+    }
     ''')
 
     # -- Shutdown overlay (client-side JS) ---------------------------------
@@ -1519,21 +1738,41 @@ def create_settings_panel(
 
         _collect_pinned(root)
 
-        # Render pinned fields and actions in a compact row above the tabs
+        # Render pinned fields above the tabs, scaled down: a controls row (what can be changed)
+        # and a status row (what can only be read), status indicators first.
         if pinned_fields or pinned_actions:
             pinned_polls: list[tuple] = []
-            with ui.row().classes("w-full gap-4 flex-wrap items-end bg-grey-9 rounded px-3 py-2 mt-2"):
-                for settings, field_name, field in pinned_fields:
-                    if field.access is Access.INIT:
-                        with ui.row().classes("items-center gap-1"):
-                            ui.label(generate_label(field_name))
-                            ui.label(str(getattr(settings, field_name))).classes(
-                                "text-secondary italic"
-                            )
-                    else:
-                        _build_field_control(settings, field_name, field, pinned_polls)
-                for settings, action_name, action_field in pinned_actions:
-                    _build_action_button(settings, action_name, action_field)
+            controls = [p for p in pinned_fields if p[2].access in (Access.WRITE, Access.READWRITE)]
+            readouts = [p for p in pinned_fields if p[2].access in (Access.READ, Access.INIT)]
+            readouts.sort(key=lambda p: p[2].widget is not Widget.status)   # stable: tree order otherwise
+            # The frame follows the bar's scaled height (see .poser-pinned in the CSS above).
+            ui.add_head_html('''<script>(function() {
+              var _i = setInterval(function() {
+                var frame = document.querySelector(".poser-pinned-frame");
+                var bar = frame && frame.querySelector(".poser-pinned");
+                if (!bar) return;
+                clearInterval(_i);
+                var scale = parseFloat(getComputedStyle(frame).getPropertyValue("--scale"));
+                new ResizeObserver(function() {
+                  frame.style.height = bar.offsetHeight * scale + "px";
+                }).observe(bar);
+              }, 100);
+            })();</script>''')
+            with ui.element("div").classes("poser-pinned-frame w-full mt-2"), \
+                    ui.column().classes("poser-pinned gap-2 bg-grey-9 rounded px-3 py-2"):
+                if controls or pinned_actions:
+                    with ui.row().classes("w-full gap-4 flex-wrap items-end"):
+                        for settings, field_name, field in controls:
+                            _build_field_control(settings, field_name, field, pinned_polls)
+                        for settings, action_name, action_field in pinned_actions:
+                            _build_action_button(settings, action_name, action_field)
+                if readouts:
+                    with ui.row().classes("w-full gap-3 flex-wrap items-center"):
+                        for settings, field_name, field in readouts:
+                            if field.widget is Widget.status:
+                                _build_field_control(settings, field_name, field, pinned_polls)
+                            else:
+                                _build_pinned_readout(settings, field_name, field, pinned_polls)
             _register_polls(pinned_polls, all_polls)
 
         # Tabs inside the sticky header

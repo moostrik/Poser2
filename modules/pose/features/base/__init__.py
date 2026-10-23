@@ -1,4 +1,4 @@
-from .BaseFeature import BaseFeature
+from .BaseFeature import BaseFeature, SYMMETRIC_PI_RANGE
 from .BaseScalarFeature import BaseScalarFeature
 from .BaseVectorFeature import BaseVectorFeature
 from .NormalizedScalarFeature import NormalizedScalarFeature, AggregationMethod

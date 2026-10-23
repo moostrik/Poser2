@@ -13,19 +13,21 @@ logger = logging.getLogger(__name__)
 
 class RenderBase(ABC):
     def __init__(self, window_settings: WindowSettings) -> None:
-        self._update_callbacks: set[Callable] = set()
+        self._update_callbacks: list[Callable] = []     # run in registration order
         self._update_lock = Lock()
         self.window_manager: WindowManager = WindowManager(self, window_settings)
 
     def add_update_callback(self, callback: Callable) -> None:
         """Register a per-frame update callback."""
         with self._update_lock:
-            self._update_callbacks.add(callback)
+            if callback not in self._update_callbacks:
+                self._update_callbacks.append(callback)
 
     def remove_update_callback(self, callback: Callable) -> None:
         """Unregister a per-frame update callback."""
         with self._update_lock:
-            self._update_callbacks.discard(callback)
+            if callback in self._update_callbacks:
+                self._update_callbacks.remove(callback)
 
     def _notify_update(self) -> None:
         """Dispatch all registered update callbacks. Call from update()."""

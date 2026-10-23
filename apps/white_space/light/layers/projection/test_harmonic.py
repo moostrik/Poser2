@@ -1,0 +1,75 @@
+"""TestHarmonic composition — spatiotemporal LFO/wave-interference sources (rates in Hz)."""
+
+import math
+
+import numpy as np
+
+from modules.settings import BaseSettings, Field, Group
+
+from .._base_layer import ProjectionLayer, LayerSettings
+from ...frame import Frame
+
+
+class TestHarmonicSourceSettings(BaseSettings):
+    """One LFO source contributing to white and/or blue channels."""
+    enabled:         Field[bool]  = Field(True,  description="Enable this source")
+    hz:              Field[float] = Field(1.0,  min=0.0, max=32.0, step=0.25,
+                                           description="Oscillation rate (Hz)")
+    spatial_cycles:  Field[float] = Field(3.0,  min=0.0, max=64.0, step=0.25,
+                                           description="Spatial wavelength cycles around the whole projection")
+    phase_offset:    Field[float] = Field(0.0,  min=0.0, max=1.0,  step=0.01,
+                                           description="Temporal phase offset (0–1)")
+    spatial_phase:   Field[float] = Field(0.0,  min=0.0, max=1.0,  step=0.01,
+                                           description="Spatial phase offset (0–1)")
+    amplitude_white: Field[float] = Field(0.5,  min=0.0, max=1.0,  step=0.01,
+                                           description="Contribution to white channel")
+    amplitude_blue:  Field[float] = Field(0.0,  min=0.0, max=1.0,  step=0.01,
+                                           description="Contribution to blue channel")
+
+
+class TestHarmonicSettings(LayerSettings):
+    """Settings for the LFO/harmonic-interference composition."""
+    source_0: Group[TestHarmonicSourceSettings] = Group(TestHarmonicSourceSettings)
+    source_1: Group[TestHarmonicSourceSettings] = Group(TestHarmonicSourceSettings)
+    source_2: Group[TestHarmonicSourceSettings] = Group(TestHarmonicSourceSettings)
+    source_3: Group[TestHarmonicSourceSettings] = Group(TestHarmonicSourceSettings)
+
+
+class TestHarmonic(ProjectionLayer):
+    """Spatiotemporal LFO and harmonic interference composition.
+
+    Each source generates a 1-D spatial sine wave::
+
+        value(x, t) = sin(2π * (spatial_cycles * x + hz * t + phase_offset + spatial_phase))
+
+    with ``t`` in plain seconds.  Sources accumulate additively into white and blue
+    according to their individual amplitudes.
+    """
+
+    def __init__(self, resolution: int, config: TestHarmonicSettings, board) -> None:
+        super().__init__(resolution, config, board)
+        self._config = config
+        # Normalized azimuth per pixel: 0.0 → 1.0 (exclusive)
+        self._x: np.ndarray = np.linspace(0.0, 1.0, resolution, endpoint=False, dtype=np.float32)
+
+    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+        sources = (
+            self._config.source_0,
+            self._config.source_1,
+            self._config.source_2,
+            self._config.source_3,
+        )
+        for src in sources:
+            if not src.enabled:
+                continue
+            arg = (
+                self._x * src.spatial_cycles
+                + src.hz * frame.tick.time
+                + src.phase_offset
+                + src.spatial_phase
+            ) * math.tau
+            wave = (np.sin(arg) * 0.5 + 0.5).astype(np.float32)
+            if src.amplitude_white > 0.0:
+                white += wave * src.amplitude_white
+            if src.amplitude_blue > 0.0:
+                blue  += wave * src.amplitude_blue

@@ -1,18 +1,21 @@
 from .LayerBase import LayerBase, Rect, DataCache, Blit
 
-from .cam import      BBoxRenderer, BBoxRendererSettings, CropLayer, CropSettings, \
+from .cam import      BBoxRenderer, BBoxRendererSettings, CameraReadingsLayer, CropLayer, CropSettings, \
                       PoseRenderer, PoseRendererSettings, PoseCompositor, PoseCompSettings, \
                       TrackerCompositor, TrackerCompSettings, TrackletRenderer
 from .centre import   CentreGeometry, CentreGeomSettings, SnapPoint, CentreCamLayer, CentreCamSettings, \
                       CentreMaskLayer, CentreMaskSettings, CentreFrgLayer, CentreFrgSettings, \
                       CentrePoseLayer, CentrePoseSettings, CentreDenseFlowLayer, CentreDlowSettings
-from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, FEATURE_MAP, TRACK_COLOR_FEATURES, \
+from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOffset, FEATURE_MAP, TRACK_COLOR_FEATURES, \
                       FeatureFrameLayer, FeatureWindowLayer, MTimeRenderer, MTimeRendererSettings, \
                       PoseDotLayer, PoseDotSettings, PoseLineLayer, PoseLineSettings
 from .flow import     FlowLayer, FlowLayerSettings, FlowSettings, FlowDrawMode, \
                       FluidLayer, FluidLayerSettings, FluidDrawMode, \
-                      Fluid3DLayer, Fluid3DLayerSettings, Fluid3DDrawMode, UnifiedFluidLayer
+                      Fluid3DLayer, Fluid3DLayerSettings
 from .generic import  CompositeLayer, CompositeLayerSettings, LutSettings, \
                       HDTPrepare, HDTBlend, MotionLayer, \
-                      MSColorMaskLayer, ColorMaskLayerSettings, PanoramicTrackerLayer
+                      MSColorMaskLayer, ColorMaskLayerSettings
+from .panorama import Compositor, PanoramaLayerSettings, PanoramaBlend, Part, \
+                      GridRenderer, LabelRenderer, MarkRenderer, SeamRenderer, \
+                      StitchRenderer, Mark, MarkContext, build_marks, strip_spans
 from .source import   CropSourceLayer, DFlowSourceLayer, FrgSourceLayer, ImageSourceLayer, MaskSourceLayer

@@ -46,7 +46,7 @@ class Predictor:
         self._verbose: bool = settings.verbose
 
         # Callbacks
-        self._callbacks: set[ImageCallback] = set()
+        self._callbacks: list[ImageCallback] = []       # run in registration order
         self._callback_lock: Lock = Lock()
 
         # Pending frames awaiting segmentation results, keyed by batch_id
@@ -154,12 +154,14 @@ class Predictor:
     def add_segmentation_image_callback(self, callback: ImageCallback) -> None:
         """Register callback to receive poses and segmentation images."""
         with self._callback_lock:
-            self._callbacks.add(callback)
+            if callback not in self._callbacks:
+                self._callbacks.append(callback)
 
     def remove_segmentation_image_callback(self, callback: ImageCallback) -> None:
         """Unregister callback."""
         with self._callback_lock:
-            self._callbacks.discard(callback)
+            if callback in self._callbacks:
+                self._callbacks.remove(callback)
 
     def reset(self) -> None:
         """Clear all pending and buffered data."""

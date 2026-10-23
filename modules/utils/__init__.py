@@ -19,3 +19,4 @@ from .Interpolation import \
 from .PointsAndRects import Point2f, Rect
 from .Color import Color
 from .pool import ObjectPool
+from .thread_priority import ThreadPriority, set_current_thread_priority, get_current_thread_priority

@@ -5,9 +5,9 @@ import unittest
 
 from modules.pose.frame import Frame
 from modules.pose.features import Azimuth
-from apps.white_space.pose import PlayheadOffset, PlayheadOffsetExtractor
-from apps.white_space.light.layers._utilities import angle_to_strip_position
-from apps.white_space.light.layers.low.playhead_flash import offset_to_level, stability_lerp
+from apps.white_space.pose import PlayheadOffset, PlayheadOffsetExtractor, playhead_step, ticks_to_crossing
+from apps.white_space.light.layers._utilities import normalize_azimuth
+from apps.white_space.light.layers.beam.haunted import offset_to_level
 
 PI = math.pi
 TAU = math.tau
@@ -35,12 +35,12 @@ class SingleAngleTest(unittest.TestCase):
         self.assertTrue(math.isnan(dummy.value))
 
 
-class AngleToStripPositionTest(unittest.TestCase):
+class NormalizeAzimuthTest(unittest.TestCase):
     def test_round_trip_inverts_producer(self) -> None:
         # producer: world_angle (deg) -> Azimuth radians; layer: -> [0,1) == world_angle/360
         for deg in (0.0, 45.0, 179.0, 200.0, 359.0):
             az = Azimuth.from_value(math.radians(deg)).value
-            self.assertAlmostEqual(angle_to_strip_position(az), (deg / 360.0) % 1.0, places=4)
+            self.assertAlmostEqual(normalize_azimuth(az), (deg / 360.0) % 1.0, places=4)
 
 
 class PlayheadOffsetExtractorTest(unittest.TestCase):
@@ -68,7 +68,25 @@ class PlayheadOffsetExtractorTest(unittest.TestCase):
         self.assertNotIn(PlayheadOffset, PlayheadOffsetExtractor(lambda: float("nan")).process(_frame(0.5)))
 
 
-class PlayheadFlashWindowTest(unittest.TestCase):
+class TicksToCrossingTest(unittest.TestCase):
+    STEP = math.radians(7.2)     # 36 rpm at 30 Hz
+
+    def test_step_is_the_sweep_per_tick(self) -> None:
+        self.assertAlmostEqual(playhead_step(36.0, 1.0 / 30.0), self.STEP, places=9)
+
+    def test_signed_ticks_to_the_crossing(self) -> None:
+        self.assertAlmostEqual(ticks_to_crossing(math.radians(3.6), self.STEP), 0.5, places=9)    # approaching
+        self.assertAlmostEqual(ticks_to_crossing(math.radians(-7.2), self.STEP), -1.0, places=9)  # just past
+        self.assertEqual(ticks_to_crossing(0.0, self.STEP), 0.0)
+
+    def test_nan_far_half_and_no_motion_have_no_crossing(self) -> None:
+        self.assertTrue(math.isnan(ticks_to_crossing(float("nan"), self.STEP)))
+        self.assertTrue(math.isnan(ticks_to_crossing(PI / 2, self.STEP)))       # far half
+        self.assertTrue(math.isnan(ticks_to_crossing(-3.0, self.STEP)))         # far half, past the wrap
+        self.assertTrue(math.isnan(ticks_to_crossing(0.1, 0.0)))                # playhead not moving
+
+
+class FlashWindowTest(unittest.TestCase):
     def test_on_within_window(self) -> None:
         self.assertEqual(offset_to_level(0.0, 0.5), 1.0)     # on the playhead
         self.assertEqual(offset_to_level(0.25, 0.5), 1.0)    # ahead, within width
@@ -89,20 +107,6 @@ class PlayheadFlashWindowTest(unittest.TestCase):
         self.assertEqual(offset_to_level(0.1, 0.4, 0.25), 1.0)   # notch edge (inclusive) → on
         self.assertEqual(offset_to_level(0.3, 0.4, 0.25), 1.0)   # past notch, within width → on
         self.assertEqual(offset_to_level(0.5, 0.4, 0.25), 0.0)   # beyond width → off
-
-
-class StabilityLerpTest(unittest.TestCase):
-    def test_endpoints_and_midpoint(self) -> None:
-        self.assertAlmostEqual(stability_lerp(0.0, 0.2, 1.0), 0.2, places=5)   # stability 0 → lo
-        self.assertAlmostEqual(stability_lerp(1.0, 0.2, 1.0), 1.0, places=5)   # stability 1 → hi
-        self.assertAlmostEqual(stability_lerp(0.5, 0.2, 1.0), 0.6, places=5)   # midpoint
-
-    def test_nan_maps_to_lo(self) -> None:
-        self.assertAlmostEqual(stability_lerp(float("nan"), 0.2, 1.0), 0.2, places=5)
-
-    def test_inverted_endpoints(self) -> None:
-        # lo may exceed hi (e.g. unstable wider than stable); still a straight interpolation
-        self.assertAlmostEqual(stability_lerp(0.5, 1.0, 0.0), 0.5, places=5)
 
 
 if __name__ == "__main__":

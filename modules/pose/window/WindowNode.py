@@ -63,12 +63,12 @@ class WindowNode:
         self._values = np.zeros((window_size, feature_len), dtype=np.float32)
         self._mask = np.zeros((window_size, feature_len), dtype=bool)
 
-    def process(self, frame: Frame) -> FeatureWindow | None:
-        """Buffer frame's feature and return current window state.
+    def process(self, frame: Frame) -> None:
+        """Buffer the frame's feature: the ring-buffer append only.
 
-        Returns:
-            FeatureWindow with values and mask arrays, both shape (current_len, feature_len), oldest first.
-            Returns None if emit_partial=False and window not yet full.
+        The ordered window is built on demand by ``get_window`` — building it here, for every
+        feature of every track on every frame, was the pose chain's largest GIL cost while only
+        the displayed window is ever read.
         """
         feature = frame[self._feature_type]
 
@@ -84,11 +84,19 @@ class WindowNode:
             if self._count < self._config.window_size:
                 self._count += 1
 
-            # Check if we should emit
+    def get_window(self) -> FeatureWindow | None:
+        """The current window, oldest first, built on demand (a copy, safe to hand across threads).
+
+        Returns:
+            FeatureWindow with values and mask arrays, both shape (window_size, feature_len).
+            None while the buffer is empty (absent or reset track), or not yet full with
+            emit_partial=False.
+        """
+        with self._lock:
+            if self._count == 0:
+                return None
             if not self._config.emit_partial and self._count < self._config.window_size:
                 return None
-
-            # Return reordered view (oldest first)
             return self._get_ordered_window()
 
     def _get_ordered_window(self) -> FeatureWindow:

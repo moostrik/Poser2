@@ -1,20 +1,26 @@
 
+import logging
+
 import numpy as np
 from depthai import Pipeline
 from ..camera.camera import *
+from ..camera import frame_size, mode_size
 from ..camera.settings import CameraSettings
 from .settings import SimulatorSettings
 from .player import Player
-from cv2 import resize, COLOR_RGB2GRAY, cvtColor
+from cv2 import resize, COLOR_BGR2GRAY, cvtColor
 from time import process_time
 from datetime import timedelta
+
+logger = logging.getLogger(__name__)
+
 
 class Simulator(Camera):
 
     def __init__(self, syncplayer: Player, core_settings: CameraSettings, player_settings: SimulatorSettings) -> None:
 
         if core_settings.stereo and not core_settings.yolo:
-            core_settings.show_stereo = True  # stereo pipeline needs to be connected (in case of no person detection)
+            core_settings.depth.show = True  # stereo pipeline needs to be connected (in case of no person detection)
 
         super().__init__(core_settings)
 
@@ -24,6 +30,10 @@ class Simulator(Camera):
         self.ex_right:  dai.DataInputQueue
 
         self.passthrough: bool = player_settings.sim_passthrough
+        self.warp_clips: bool = player_settings.apply_warp
+
+        # Last clip size reported by _check_frame_size, so the warning fires once per size.
+        self._warned_frame_size: tuple[int, int] | None = None
 
     def start(self) -> None: # override
         if self.passthrough:
@@ -39,7 +49,7 @@ class Simulator(Camera):
             super().run()
 
     def _setup_pipeline(self, pipeline: Pipeline) -> None: # override
-        setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.do_720p, self.show_stereo, self.perspective, simulate=True)
+        setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.resolution, self.show_stereo, self.mount, simulate=True, warp_clips=self.warp_clips, frame_height=self.frame_height)
 
 
     def _setup_queues(self) -> None: # override
@@ -73,6 +83,7 @@ class Simulator(Camera):
         frame_time = timedelta(seconds = process_time())
         height, width = frame.shape[:2]
         if id == self.id:
+            self._check_frame_size(width, height)
             if frame_type == FrameType.VIDEO and Input.VIDEO_FRAME_IN in self.inputs:
                 img = dai.ImgFrame()
                 # img.setInstanceNum(int(dai.CameraBoardSocket.CAM_A))
@@ -81,8 +92,8 @@ class Simulator(Camera):
                     img.setData(self.to_planar(frame, (width, height))) # type: ignore
                 else:
                     img.setType(dai.ImgFrame.Type.RAW8)
-                    if frame.shape[2] == 3:
-                        frame = cvtColor(frame, COLOR_RGB2GRAY)
+                    if frame.ndim == 3:
+                        frame = cvtColor(frame, COLOR_BGR2GRAY)  # clip frames arrive BGR (OpenCV convention); a gray-decoded clip skips this
                     img.setData(frame.flatten()) # type: ignore
                 img.setTimestamp(frame_time)
                 img.setWidth(width)
@@ -108,6 +119,31 @@ class Simulator(Camera):
                 img.setWidth(width)
                 img.setHeight(height)
                 self.inputs[Input.RIGHT_FRAME_IN].send(img)
+
+    def _check_frame_size(self, width: int, height: int) -> None:
+        """Warn once per size when a clip's frames differ from what the pipeline was built for.
+
+        Nothing breaks mechanically: XLinkIn's max data size is a ceiling, the ImgFrame carries
+        the clip's own dimensions, and the detector resizes whatever arrives. But every
+        frame-relative setting is tuned for the configured size and is silently off by the
+        ratio — the tracker's vfov and height gates, and the pose distance thresholds.
+
+        The fix is in the preset, not here: set `camera.resolution` to the label the clip was
+        shot at and the whole chain derives correctly again.
+
+        A clip that is being warped (`apply_warp`) feeds the warp's INPUT, so it must be the
+        sensor's size; one that passes through must be the delivered size, its derived height and all.
+        """
+        expected: tuple[int, int] = (mode_size(self.do_color, self.resolution) if self.warp_clips
+                                     else frame_size(self.do_color, self.resolution, self.square, self.frame_height))
+        if (width, height) == expected or (width, height) == self._warned_frame_size:
+            return
+        self._warned_frame_size = (width, height)
+        logger.warning(
+            "cam %d: clip frames are %dx%d, pipeline is built for %dx%d — frame-relative "
+            "settings (vfov, tracker height gates, pose distance) are tuned for the latter",
+            self.id, width, height, expected[0], expected[1],
+        )
 
     def _passthrough_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray) -> None:
         if id != self.id:

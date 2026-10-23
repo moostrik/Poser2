@@ -1,103 +1,116 @@
-from modules.settings import BaseSettings, Field, Group
-from .geometry import DistortAlgorithm
-
-
-class SeamAngles(BaseSettings):
-    fov: Field[float] = Field(0.0, access=Field.READ, description="Camera FOV (°)")
-    overlap: Field[float] = Field(0.0, access=Field.READ, description="Camera FOV overlap zone (°)")
-    reject: Field[float] = Field(0.0, access=Field.READ, description="Dead zone at camera edges (°)")
-    reach: Field[float] = Field(0.0, access=Field.READ, description="Cross-camera matching zone from camera edges (°)")
+from modules.oak import CameraResolution
+from modules.settings import BaseSettings, Field, Group, Widget
 
 
 class SeamSettings(BaseSettings):
-    reject: Field[float] = Field(0.5, min=0.0, max=0.75, step=0.05,
-                                 description="Dead zone size as a fraction of the overlap zone.")
-    reach: Field[float] = Field(1.3, min=1.0, max=1.5, step=0.05,
-                                description="Matching zone size as a fraction of the overlap zone.")
+    """When two cameras' views of a seam are one person, where a person may be born, and which view
+    speaks for them.
+
+    In real units — degrees of world azimuth, a fraction of a measured height, seconds — so a number
+    means the same after a change of `fov`, mount or lens. The derived overlap is published on
+    `RigSettings`, beside what it comes from.
+    """
+    dead_zone: Field[float] = Field(5.0, min=0.0, max=20.0, step=0.5,
+                                    description="No new person is born within this many ° of a camera's field edge")
+    link_angle: Field[float] = Field(8.0, min=0.0, max=40.0, step=0.5,
+                                     description="Two cameras' observations within this many ° of azimuth are one person")
+    link_height: Field[float] = Field(0.15, min=0.0, max=1.0, step=0.01,
+                                      description="Maximum fraction the two measured heights may differ when linking")
     hysteresis: Field[float] = Field(0.9, min=0.1, max=1.0, step=0.05,
-                                     description="Lower values make active camera stickier.")
-    max_height_diff: Field[float] = Field(0.15, min=0.0, max=0.5, step=0.01,
-                                          description="Maximum ROI height difference for cross-camera matching.")
-    angles: Group[SeamAngles] = Group(SeamAngles)
+                                     description="Edge-distance ratio another camera must beat to take over; lower is stickier")
+    # A primary that loses the person hands over at once, skipping `hysteresis`; without this a
+    # one-frame miss would switch cameras twice.
+    hold: Field[float] = Field(0.5, min=0.0, max=2.0, step=0.05,
+                               description="Seconds after a lost primary is replaced before the better-placed camera may take the person back")
 
 
-class TanhSettings(BaseSettings):
+class RigSettings(BaseSettings):
+    """The installation in metres: where the lenses are (``camera_``), and where people are tracked
+    (``zone_``). Measured and taped, not tuned.
+
+    **Every length is a radius from the fixture axis** — the physical centre the installation is
+    taped from — and the same number goes into `Rig`, `projection`, the stitch shader and the
+    panorama's ``R`` label, unconverted. (``camera_height`` is a height.)
+
+    What depends on them: the parallax correction (the lenses sit ``camera_radius`` out, not at a shared centre;
+    ``camera_radius`` 0 disables it), the parallax depth and overlap band derived from the zone
+    (`Rig._update_parallax_depth`), and the far edge past which ``zone_filter`` ignores people.
+
+    The rest is read-only, published by the tracker so the panel and the panorama use the numbers it
+    tracks with.
     """
-    S-curve (sigmoid) undistortion via tanh.
-
-    Maps the normalised x position through:
-        x' = 0.5 * (1 + tanh(slope * (2x-1) + cubic * (2x-1)³))
-
-    Use this to correct barrel/pincushion distortion where the deviation
-    follows a smooth symmetric S-shape. ``slope`` controls how steeply the
-    correction ramps at the centre; ``cubic`` adds an asymmetric higher-order
-    bend. Start by tuning ``slope`` alone (typical range 1–3) and only add
-    ``cubic`` if the residual error is asymmetric across the frame.
-
-    At slope=0 and cubic=0 the output equals 0.5 for all inputs — this is
-    NOT an identity. Set algorithm to NONE when no correction is needed.
-    """
-    slope: Field[float] = Field(0.0, min=0.0, max=5.0, step=0.1,
-                                description="Sigmoid slope. Higher values sharpen the S-curve.")
-    cubic: Field[float] = Field(0.0, min=-2.0, max=2.0, step=0.05,
-                                description="Cubic modifier added to the sigmoid input.")
-
-
-class PolySettings(BaseSettings):
-    D = """
-    Polynomial undistortion.
-
-    Maps the normalised x position through:
-        x' = x + k1*(x-0.5) + k2*(x-0.5)³
-
-    Use this for classic lens radial distortion where displacement from
-    centre grows roughly linearly (k1) with a cubic roll-off (k2). Positive
-    k1 stretches the edges outward; negative pulls them inward. k2 refines
-    the correction at the extremes without affecting the centre.
-
-    At k1=0 and k2=0 the transform is an exact identity, so this mode is
-    safe to leave active during tuning.
-    """
-    k1: Field[float] = Field(0.0, min=-0.5, max=0.5, step=0.01,
-                             description="Linear coefficient. Positive stretches edges outward, negative pulls inward.")
-    k2: Field[float] = Field(0.0, min=-2.0, max=2.0, step=0.05,
-                             description="Cubic coefficient. Refines correction at the frame extremes.")
-
-
-class DistortionSettings(BaseSettings):
-    algorithm: Field[DistortAlgorithm] = Field(DistortAlgorithm.NONE)
-    poly: Group[PolySettings] = Group(PolySettings)
-    tanh: Group[TanhSettings] = Group(TanhSettings)
-
-
-class ParallaxSettings(BaseSettings):
-    """
-    Corrects for the cameras sitting on a ring rather than at a shared optical
-    centre. Each camera is ``ring_radius`` metres from the rig centre, so the
-    same person is seen at different world angles by neighbouring cameras — a
-    disagreement of several degrees at the seams. Distance to the person is
-    estimated from the bounding-box height (assuming ``person_height`` and the
-    detection frame's ``vfov``), which is enough to re-project each observation
-    to the shared centre.
-
-    At ``ring_radius = 0`` the correction is disabled (identity).
-    """
-    ring_radius: Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01,
-                                      description="Camera distance from rig center (m). 0 disables parallax correction.")
-    person_height: Field[float] = Field(1.7, min=1.0, max=2.2, step=0.05,
-                                        description="Assumed person height (m) for distance-from-bbox estimation.")
-    vfov: Field[float] = Field(71.6, min=40.0, max=110.0, step=0.1,
-                              description="Vertical FOV (°) of the detection frame, for distance estimation.")
+    camera_radius: Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01,
+                                        description="Distance (m) of each lens from the fixture axis. 0 disables the parallax correction")
+    camera_height: Field[float] = Field(0.5, min=0.1, max=3.0, step=0.01,
+                                        description="Lens height above the floor (m), measured")
+    zone_min_radius: Field[float] = Field(1.5, min=0.25, max=10.0, step=0.05, newline=True,
+                                          description="Radius (m) of the tracked floor's near edge — the nearest distance claimed")
+    zone_max_radius: Field[float] = Field(3.5, min=0.5, max=15.0, step=0.05,
+                                          description="Radius (m) of its far edge — sets the overlap band, and where zone_filter ignores people")
+    parallax_radius: Field[float] = Field(2.1, access=Field.READ,
+                                          description="Radius (m) the world azimuth is corrected at — derived, the zone's harmonic mean")
+    # In world azimuth, as the panorama's grid measures it; the `Rig` keeps the local-angle
+    # equivalent it tests to itself.
+    overlap: Field[float] = Field(0.0, access=Field.READ,
+                                  description="Azimuth (°) two neighbours share, at the zone's far edge")
+    # The delivered frame's shape. The two angles are the whole row model (`projection.row_model`), so
+    # nothing in row space is published. `angle_top` is the frame's top row, which may sit above
+    # what the sensor fills.
+    hfov: Field[float] = Field(127.0, access=Field.READ, newline=True,
+                               description="Azimuth span (°) of the delivered frame, left edge to right")
+    vfov: Field[float] = Field(79.5, access=Field.READ,
+                              description="Angle span (°) of the delivered frame, bottom row to top row")
+    tilt: Field[float] = Field(0.0, access=Field.READ,
+                               description="Camera up-tilt (°), as the frame was built with")
+    angle_bottom: Field[float] = Field(-39.7, access=Field.READ,
+                                       description="Angle (°) from eye level of the frame's bottom row; negative is below")
+    angle_top: Field[float] = Field(39.7, access=Field.READ,
+                                    description="Angle (°) from eye level of the frame's top row")
+    # What the frame allows, against what the sensor actually fills (CALIBRATION.md, *Tilt — derived
+    # from the build*). Hands twice, because the sensor's top edge falls toward the seams.
+    feet_from: Field[float] = Field(0.0, access=Field.READ, newline=True,
+                                    description="Nearest radius (m) with the feet in frame")
+    hands_from: Field[float] = Field(0.0, access=Field.READ,
+                                     description="Nearest radius (m) with 2.2 m raised hands in frame, on a camera's axis")
+    hands_seam: Field[float] = Field(0.0, access=Field.READ,
+                                     description="Nearest radius (m) with 2.2 m raised hands in frame, on a seam")
 
 
 class TrackerSettings(BaseSettings):
-    fov: Field[float] = Field(110.0, min=90.0, max=130.0, step=0.5, visible=False)
-    min_age: Field[int] = Field(5, min=0, max=9, step=1,
-                                description="Minimum age in frames before a tracklet is considered.")
-    min_height: Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05,
-                                     description="Minimum ROI height to accept a tracklet.")
-    timeout: Field[float] = Field(2.0, min=1.0, max=5.0, step=0.1,
-                                  description="Seconds before an inactive tracklet is retired.")
+    fov: Field[float] = Field(110.0, access=Field.INIT)
+    # The frame geometry, shared from the camera group: what the warp was built with.
+    resolution: Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT,
+                                                description="Sensor mode, shared — the frame's shape")
+    tilt: Field[float] = Field(0.0, access=Field.INIT, description="Camera up-tilt (°), shared")
+    lens_fov: Field[float] = Field(0.0, access=Field.INIT, description="Lens field (°) across the sensor width, shared; 0 = fov")
+    lens_centre_x: Field[float] = Field(0.0, access=Field.INIT, description="Optical centre offset (px), shared")
+    lens_centre_y: Field[float] = Field(0.0, access=Field.INIT, description="Optical centre offset (px), shared")
+    # The intake's filters. A detection one rejects is drawn grey on the panorama, labelled with the
+    # filter; a person already tracked goes LOST instead, their own label naming it.
+    age_filter: Field[int] = Field(5, min=0, max=9, step=1,
+                                   description="Minimum device track age (frames) before a detection counts")
+    height_filter: Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05,
+                                        description="Minimum box height (fraction of frame) before a detection counts")
+    zone_filter: Field[bool] = Field(True, widget=Widget.switch,
+                                     description="Ignore people past rig.zone_max_radius")
+    # A property of the detector, not the site, hence not in `rig`. Tuned by walking one person out
+    # until the panorama's `H` stops drifting.
+    foot_offset: Field[float] = Field(0.0, min=0.0, max=0.2, step=0.005,
+                                      description="How far below the feet the detector's box bottom sits (frame heights)")
+    # The same camera re-finding a person, anywhere in its field: not a seam setting.
+    reacquire_angle: Field[float] = Field(5.0, min=0.0, max=20.0, step=0.5,
+                                          description="How far (°) a re-acquired person may be from the lost one and still be them")
+    # Simultaneous tracks in one camera: the device does not always de-duplicate — NMS can pass two
+    # boxes on one body, and a re-acquired person's old device id can come back.
+    same_cam_angle: Field[float] = Field(5.0, min=0.0, max=20.0, step=0.5,
+                                         description="How far (°) apart two simultaneous tracks in one camera may be and still be one person")
+    # How long they keep a pose from their last box is the pose side's `detection_timeout`.
+    lost_timeout: Field[float] = Field(2.0, min=1.0, max=5.0, step=0.1,
+                                       description="Seconds a lost person is remembered, for seam links and re-acquisition")
+    # Live read-outs, written by the tracker each tick (`PlayerSlots`).
+    players: Field[int] = Field(0, access=Field.READ, newline=True,
+                                description="People holding a player slot, of max players")
+    waiting: Field[int] = Field(0, access=Field.READ,
+                                description="People tracked but waiting for a free player slot")
     seam: Group[SeamSettings] = Group(SeamSettings)
-    distortion: Group[DistortionSettings] = Group(DistortionSettings)
-    parallax: Group[ParallaxSettings] = Group(ParallaxSettings)
+    rig: Group[RigSettings] = Group(RigSettings)

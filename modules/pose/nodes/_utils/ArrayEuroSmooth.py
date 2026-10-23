@@ -1,15 +1,27 @@
 # Standard library imports
+import math
 from typing import Union
 
 # Third-party imports
 import numpy as np
-from OneEuroFilter import OneEuroFilter
 
 
 class EuroSmooth:
-    """Smoother for arbitrary vector data (positions, coordinates, etc.)."""
+    """Smoother for arbitrary vector data (positions, coordinates, etc.).
 
-    def __init__(self, vector_size: int, frequency: float, min_cutoff: float, beta: float,
+    The One Euro recurrence (Casiez et al.), vectorized over the whole vector:
+
+        dx     = (x - smoothed) * frequency
+        edx    = low-pass(dx, d_cutoff)
+        cutoff = min_cutoff + cutoff_rise * |edx|
+        x_hat  = low-pass(x, cutoff)        with alpha(c) = 1 / (1 + frequency / (2π c))
+
+    Vectorized in numpy rather than one filter object per component: the per-component
+    Python loop dominated the pose chain's GIL time. A component's first valid sample
+    passes through unfiltered with its derivative state cleared, so a track starts (and
+    reappears after a NaN gap) fresh."""
+
+    def __init__(self, vector_size: int, frequency: float, min_cutoff: float, cutoff_rise: float,
                  d_cutoff: float, clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the vectorized smoother."""
         if vector_size <= 0:
@@ -18,8 +30,8 @@ class EuroSmooth:
             raise ValueError("Frequency must be positive.")
         if min_cutoff < 0.0:
             raise ValueError("min_cutoff must be non-negative.")
-        if beta < 0.0:
-            raise ValueError("beta must be non-negative.")
+        if cutoff_rise < 0.0:
+            raise ValueError("cutoff_rise must be non-negative.")
         if d_cutoff < 0.0:
             raise ValueError("d_cutoff must be non-negative.")
         if clamp_range is not None:
@@ -29,61 +41,52 @@ class EuroSmooth:
         self._vector_size: int = vector_size
         self._frequency: float = frequency
         self._min_cutoff: float = min_cutoff
-        self._beta: float = beta
+        self._cutoff_rise: float = cutoff_rise
         self._d_cutoff: float = d_cutoff
         self._clamp_range: tuple[float, float] | None = clamp_range
 
-        # Current smoothed values (initialized to NaN)
+        # Current smoothed values (NaN = no state) and the filtered derivative per component
         self._smoothed: np.ndarray = np.full(vector_size, np.nan)
+        self._dx: np.ndarray = np.zeros(vector_size)
 
-        # Create OneEuroFilters for each vector component
-        self._filters: list[OneEuroFilter] = []
-        self._create_filters()
+    @staticmethod
+    def _alpha(frequency: float, cutoff) -> np.ndarray | float:
+        """The low-pass alpha for a cutoff (scalar or per-component array)."""
+        return 1.0 / (1.0 + frequency / (2.0 * math.pi * cutoff))
 
     def add_sample(self, values: np.ndarray) -> None:
         """Add a new sample and calculate smoothing.
 
-        OneEuroFilter does not handle NaN inputs gracefully - NaN corrupts
-        the internal state. We must handle NaN explicitly:
-        - Skip filtering for NaN inputs (preserve NaN in output)
-        - Reset filter when transitioning from NaN to valid
-        - Reset filter when transitioning from valid to NaN (to clear corrupted state)
+        NaN handling per component: a NaN input stays NaN in the output and clears that
+        component's state; the first valid sample after (or ever) passes through unfiltered
+        and starts the recurrence fresh.
         """
         if values.shape[0] != self._vector_size:
             raise ValueError(f"Expected array of size {self._vector_size}, got {values.shape[0]}")
 
-        # Compute validity masks once
         was_valid = np.isfinite(self._smoothed)
         is_valid = np.isfinite(values)
+        both = was_valid & is_valid
+        fresh = is_valid & ~was_valid
 
-        for i in range(self._vector_size):
-            if not is_valid[i]:
-                # Input is NaN → output NaN, reset filter if was valid
-                if was_valid[i]:
-                    self._filters[i].reset()
-                self._smoothed[i] = np.nan
-            elif not was_valid[i]:
-                # NaN → Valid transition: reset filter and initialize
-                self._filters[i].reset()
-                self._smoothed[i] = values[i]
-            else:
-                # Both valid → filter normally
-                self._smoothed[i] = self._filters[i](values[i])
+        # The recurrence over every lane; lanes where it is NaN are discarded by the masks below.
+        freq = self._frequency
+        dx = (values - self._smoothed) * freq
+        a_d = self._alpha(freq, self._d_cutoff)
+        edx = a_d * dx + (1.0 - a_d) * self._dx
+        cutoff = self._min_cutoff + self._cutoff_rise * np.abs(edx)
+        a = self._alpha(freq, np.maximum(cutoff, 1e-12))
+        filtered = a * values + (1.0 - a) * self._smoothed
+
+        self._dx = np.where(both, edx, 0.0)
+        self._smoothed = np.where(both, filtered, np.where(fresh, values, np.nan))
 
         self._apply_constraints()
 
     def reset(self) -> None:
         """Reset the vector and smooth filters."""
-        self._smoothed.fill(np.nan)
-        for filter in self._filters:
-            filter.reset()
-
-    def _create_filters(self) -> None:
-        """Create the OneEuroFilters for each vector component."""
-        self._filters = [
-            OneEuroFilter(self._frequency, self._min_cutoff, self._beta, self._d_cutoff)
-            for _ in range(self._vector_size)
-        ]
+        self._smoothed = np.full(self._vector_size, np.nan)
+        self._dx = np.zeros(self._vector_size)
 
     def _apply_constraints(self) -> None:
         """Apply value constraints (clamping for vectors, overridden for angles)."""
@@ -106,8 +109,6 @@ class EuroSmooth:
         if value <= 0.0:
             raise ValueError("Frequency must be positive.")
         self._frequency = value
-        for filter in self._filters:
-            filter.setFrequency(value)
 
     @property
     def min_cutoff(self) -> float:
@@ -120,22 +121,18 @@ class EuroSmooth:
         if value < 0.0:
             raise ValueError("min_cutoff must be non-negative.")
         self._min_cutoff = value
-        for filter in self._filters:
-            filter.setMinCutoff(value)
 
     @property
-    def beta(self) -> float:
-        """Get the beta parameter."""
-        return self._beta
+    def cutoff_rise(self) -> float:
+        """Get the cutoff rise (the One Euro beta)."""
+        return self._cutoff_rise
 
-    @beta.setter
-    def beta(self, value: float) -> None:
-        """Set the beta parameter."""
+    @cutoff_rise.setter
+    def cutoff_rise(self, value: float) -> None:
+        """Set the cutoff rise (the One Euro beta)."""
         if value < 0.0:
-            raise ValueError("beta must be non-negative.")
-        self._beta = value
-        for filter in self._filters:
-            filter.setBeta(value)
+            raise ValueError("cutoff_rise must be non-negative.")
+        self._cutoff_rise = value
 
     @property
     def d_cutoff(self) -> float:
@@ -148,8 +145,6 @@ class EuroSmooth:
         if value < 0.0:
             raise ValueError("d_cutoff must be non-negative.")
         self._d_cutoff = value
-        for filter in self._filters:
-            filter.setDerivateCutoff(value)
 
     @property
     def clamp_range(self) -> tuple[float, float] | None:
@@ -173,14 +168,14 @@ class AngleEuroSmooth(EuroSmooth):
     at the ±π boundary without requiring custom angular filters.
     """
 
-    def __init__(self, vector_size: int, frequency: float, min_cutoff: float, beta: float,
+    def __init__(self, vector_size: int, frequency: float, min_cutoff: float, cutoff_rise: float,
                  d_cutoff: float, clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the angle smoother.
 
         Note: clamp_range is not supported for angles (automatic wrapping to [-π, π]).
         """
         # Create 2x filters (one for sin, one for cos per angle)
-        super().__init__(vector_size * 2, frequency, min_cutoff, beta, d_cutoff, clamp_range=None)
+        super().__init__(vector_size * 2, frequency, min_cutoff, cutoff_rise, d_cutoff, clamp_range=None)
         self._num_angles: int = vector_size
 
     def add_sample(self, angles: np.ndarray) -> None:
@@ -220,10 +215,10 @@ class AngleEuroSmooth(EuroSmooth):
 class PointEuroSmooth(EuroSmooth):
     """Smoother for 2D points with (x, y) coordinates."""
 
-    def __init__(self, vector_size: int, frequency: float, min_cutoff: float, beta: float,
+    def __init__(self, vector_size: int, frequency: float, min_cutoff: float, cutoff_rise: float,
                  d_cutoff: float, clamp_range: tuple[float, float] | None = None) -> None:
         """Initialize the point smoother."""
-        super().__init__(vector_size * 2, frequency, min_cutoff, beta, d_cutoff, clamp_range)
+        super().__init__(vector_size * 2, frequency, min_cutoff, cutoff_rise, d_cutoff, clamp_range)
         self._num_points: int = vector_size
 
     def add_sample(self, points: np.ndarray) -> None:

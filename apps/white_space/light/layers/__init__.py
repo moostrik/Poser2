@@ -1,18 +1,24 @@
 
-from ._base_layer   import BaseLayer, LayerSettings, ChannelSettings
-from ._utilities    import BlendType
-from .crossfade     import Crossfade
+from ._base_layer   import BaseLayer, BeamLayer, ProjectionLayer, LayerSettings, ChannelSettings
+from ._utilities    import BlendType, normalize_azimuth, mask_half_width, apply_circular
+from .compositor    import Compositor, Mix
 
-from .high.pose_waves    import PoseWaves,   PoseWavesSettings
-from .test.fill          import Fill,         FillSettings
-from .test.pulse         import Pulse,        PulseSettings
-from .test.chase         import Chase,        ChaseSettings
-from .test.lines         import Lines,        LinesSettings
-from .test.random        import Random,       RandomSettings, RandomChannelSettings
-from .high.harmonic      import Harmonic,     HarmonicSettings, HarmonicSourceSettings
-from .high.player_azimuth  import PlayerLines,  PlayerLinesSettings
-from .high.camera_light   import CameraLight,    CameraLightSettings
-from .low.playhead_flash import PlayheadFlash, PlayheadFlashSettings
-from .low.haunted_flash import HauntedFlash, HauntedFlashSettings
-from .low.playhead   import Playhead as PlayheadLow,  PlayheadSettings as PlayheadLowSettings
-from .high.playhead  import Playhead as PlayheadHigh, PlayheadSettings as PlayheadHighSettings
+from .beam.blue_sound               import BeamBlueSound,       BeamBlueSoundSettings
+from .beam.playhead                 import BeamPlayhead,        BeamPlayheadSettings
+from .beam.flash                    import BeamFlash,           BeamFlashSettings
+from .beam.wind_down                import BeamWindDown,        BeamWindDownSettings
+from .beam.haunted                  import BeamHaunted,         BeamHauntedSettings
+from .beam.test                     import BeamTest,            BeamTestSettings
+from .projection.pose_instrument    import PoseInstrument,      PoseInstrumentSettings, SyncStrobeMode, Opposite
+from .projection.playhead_marker    import PlayheadMarker,      PlayheadMarkerSettings
+from .projection.projection_playhead import ProjectionPlayhead
+from .projection.flood              import Flood,               FloodSettings
+from .projection.test_player_lines  import TestPlayerLines,     TestPlayerLinesSettings
+from .projection.test_calibration   import TestCalibration,     TestCalibrationSettings
+from .projection.test_fill          import TestFill,            TestFillSettings
+from .projection.test_pulse         import TestPulse,           TestPulseSettings
+from .projection.test_chase         import TestChase,           TestChaseSettings
+from .projection.test_lines         import TestLines,           TestLinesSettings
+from .projection.test_random        import TestRandom,          TestRandomSettings, TestRandomChannelSettings
+from .projection.test_pose_waves    import TestPoseWaves,       TestPoseWavesSettings
+from .projection.test_harmonic      import TestHarmonic,        TestHarmonicSettings, TestHarmonicSourceSettings

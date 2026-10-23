@@ -4,7 +4,7 @@ from typing import Optional
 from functools import partial
 
 from modules.utils import Broadcast
-from modules.oak import Camera, Simulator, Player, Recorder, Sync
+from modules.oak import Camera, CameraCheck, Simulator, Player, Recorder, Sync
 from modules.settings import presets, NiceServer
 from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
@@ -21,7 +21,7 @@ DATA_PATH = 'apps/deep_flow/data'
 
 
 class DeepFlowMain:
-    def __init__(self, simulation: bool = False) -> None:
+    def __init__(self, simulation: bool = False, interface: bool = True) -> None:
 
         self.is_running: bool = False
         self.is_finished: bool = False
@@ -33,6 +33,8 @@ class DeepFlowMain:
         if not presets.load(self.settings, preset_file):
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
         self.settings.camera.sim_enabled = simulation
+        if not interface:
+            self.settings.server.browser = False  # launcher override; the preset cannot turn it back on
         self.settings.initialize()
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
@@ -73,7 +75,7 @@ class DeepFlowMain:
             camera.add_tracker_callback(self.tracklet_sync_bang.submit_frame)
 
         # DETECTION
-        self.poses_from_tracklets = PosesFromTracklets(num_players)
+        self.poses_from_tracklets = PosesFromTracklets(p.tracklets, num_players)
         self.pose_predictor = pose.Predictor(p.pose)
         self.segmentation_predictor  = segmentation.Predictor(p.segmentation)
         self.optical_flow_predictor  = optical_flow.Predictor(p.optical_flow)
@@ -103,7 +105,7 @@ class DeepFlowMain:
         self.stages: dict[Stage, Broadcast] = {}
         for stage in Stage:
             wt = window.WindowTracker(num_players, getattr(p, f'window_{stage.name.lower()}'))
-            wt.add_windows_callback(partial(self.board.set_windows, stage))
+            self.board.set_window_tracker(stage, wt)
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([
                 partial(self.board.set_frames, stage),
@@ -119,6 +121,7 @@ class DeepFlowMain:
             i: trackers.FilterPipeline([
                 nodes.PointDualConfFilter(p.point.confidence_filter),
                 nodes.AngleExtractor(p.angle_extractor),
+                nodes.AngleCalibrator(),
                 nodes.AngleVelExtractor(p.velocity.extractor),
             ])
             for i in range(num_players)
@@ -131,6 +134,7 @@ class DeepFlowMain:
             i: trackers.FilterPipeline([
                 nodes.PointEuroSmoother(p.point.smoother),
                 nodes.AngleExtractor(p.angle_extractor),
+                nodes.AngleCalibrator(),
                 nodes.AngleVelExtractor(p.velocity.extractor),
                 nodes.AngleVelEuroSmoother(p.velocity.smoother),
                 nodes.AngleEuroSmoother(p.angle.smoother),
@@ -192,9 +196,14 @@ class DeepFlowMain:
         self.filters_lerp.add_frames_callback(self.gate_lerp.process)
         self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
 
+        # CAMERA CHECK — the camera's IMU reading and frame rate against the preset, as pinned indicators
+        self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
+
         # RENDER
-        self.render = DeepFlowRender(self.board, self.settings.render, num_cams=len(self.cameras), num_players=num_players)
+        self.render = DeepFlowRender(self.board, self.settings.render, self.settings.camera.cameras,
+                                     self.settings.camera.camera_check, num_cams=len(self.cameras), num_players=num_players)
         self.render.add_exit_callback(self.stop)
+        self.render.add_update_callback(self.camera_check.update)
 
         # IN/OUT
         self.render.add_update_callback(self.interpolators_lerp.update)

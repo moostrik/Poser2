@@ -1,0 +1,43 @@
+# Standard library imports
+import math
+from dataclasses import dataclass
+from enum import IntEnum, auto
+
+# Local application imports
+from ..tracker_base import TrackerAnnotation
+
+
+class Rejection(IntEnum):
+    """Why the tracker did not count a detection this frame — one member per filter in the intake.
+
+    Carried on the annotation so the panorama can draw the rejected detection and name the filter,
+    rather than it vanishing.
+    """
+    YOUNG = auto()       # the device has not held it for `age_filter` frames yet
+    SMALL = auto()       # its box is shorter than `height_filter`
+    DEAD_ZONE = auto()   # a new arrival inside `seam.dead_zone` of a field edge
+    PAST_EDGE = auto()   # past `rig.zone_max_radius`, with `zone_filter` on
+
+
+@dataclass(frozen=True)
+class Annotation(TrackerAnnotation):
+    """What one camera's box says about one person, all of it derived in `Rig`.
+
+    `distance` is from that camera (m); `radius` is the same reading from the fixture axis (m), and
+    `zone_distance` that radius within the tracked zone: 0 at `rig.zone_min_radius`, 1 at
+    `rig.zone_max_radius`, NaN without a reading. `height` is absolute (m) and needs no
+    re-projection, since the same camera sees the person's feet and head; NaN without a reading
+    (`height_is_measured`). `rejected` is set when a
+    filter rejected this detection (or, for a person already tracked, stopped counting it).
+    `player` is the slot this person is emitted on downstream, stamped by the tracker on its
+    callback copies; None while they wait for a free slot.
+    """
+    local_angle: float
+    world_angle: float
+    overlap: bool
+    distance: float = 0.0
+    height: float = 0.0
+    rejected: Rejection | None = None
+    radius: float = 0.0
+    zone_distance: float = math.nan
+    player: int | None = None

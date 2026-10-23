@@ -1,32 +1,68 @@
 """Frame — the full per-tick render context and output.
 
-Carries the clock snapshot (`tick`), motor state (`motor`), and the LED pixel buffer.
-One object flows into every layer's `_draw` and out to every consumer (board, osc_light,
-osc_sound, render).
+Carries the clock snapshot (`tick`), the motor's two halves (`motor`, the measurement the
+playhead advanced under; `motor_command`, the command this frame is sent with — read after
+the state machine ran, so a mode commanded on a state's entry tick reaches the frame whose
+mix that state drew), the projection's pixels and the four beam lights. One object
+flows into every layer's `_draw` and out to every consumer (board, the light/sound senders,
+render).
+
+The beam lights are the discrete lamps on the rotating bar that the fixture drives directly
+while it is in beam mode (commanded below ``FIXTURE_PROJECTION_RPM``, see ``motor.py``): the beam
+layers write them by name, the light sender maps them to the firmware's pixel slots, the
+render simulates them as beams. This module describes them (id, output channel, beam
+heading); the sender knows the slots, the render knows how to draw.
 """
 
-import numpy as np
-from typing import Callable
+import math
 from dataclasses import dataclass, field
+from enum import IntEnum, auto
+from typing import Callable
+
+import numpy as np
 
 from .clock import Tick
-from .motor import MotorState
+from .motor import MotorMeasurement, MotorCommand
 
 BUFFER_DTYPE = np.float32
 
 
+class BeamLightId(IntEnum):
+    """The four fixed lights on the bar, by heading and colour."""
+    FRONT_WHITE = 0
+    BACK_WHITE  = auto()
+    LEFT_BLUE   = auto()
+    RIGHT_BLUE  = auto()
+
+
+# Output channel per beam light (index = BeamLightId): 0 = white, 1 = blue.
+BEAM_LIGHT_CHANNEL: np.ndarray = np.array([0, 0, 1, 1], dtype=np.int64)
+
+# Beam heading of each beam light relative to the front white (radians, index = BeamLightId),
+# read off the firmware's fast-mode sampling offsets (firmware.cpp lines 277-280, of 3600):
+# white 2 at +1800, blue 1 (the ``blue[0]`` slot, LEFT) at +2700, blue 2 (``blue[R//2]``,
+# RIGHT) at +900. A pixel index is an azimuth, so left trails the front by a quarter turn and
+# right leads it by one. The ±10 px alignment corrections are not modelled.
+BEAM_LIGHT_HEADINGS: np.ndarray = np.array([0.0, math.pi, -math.pi / 2.0, math.pi / 2.0], dtype=np.float64)
+
+
 @dataclass
 class Frame:
-    """Per-tick render context + LED output. `white`/`blue` are views into `light_img`."""
-    resolution: int
-    tick:       Tick
-    motor:      MotorState              = field(default_factory=MotorState)
-    playhead:   float                   = 0.0   # continuous content playhead (radians [-π,π), offset applied)
+    """Per-tick render context + light output. `white`/`blue` are views into `light_img`
+    (the projection); `beam_lights` holds the four lamp levels, indexed by `BeamLightId`."""
+    resolution:    int
+    tick:          Tick
+    motor:         MotorMeasurement     = field(default_factory=MotorMeasurement)   # what the playhead advanced under
+    motor_command: MotorCommand         = field(default_factory=MotorCommand)       # what this frame is sent with
+    playhead:      float                = 0.0   # continuous content playhead (radians [-π,π), offset applied)
+    sync:          float                = 0.0   # full sync's envelope (0..1): the pose instrument's, carried over by the compositor only while the layer draws
     light_img:  np.ndarray              = field(init=False)
+    beam_lights: np.ndarray              = field(init=False)
 
     def __post_init__(self) -> None:
         # Shape (1, R, 3): channel 0 = white, channel 1 = blue, channel 2 = reserved
-        self.light_img = np.zeros((1, self.resolution, 3), dtype=BUFFER_DTYPE)
+        self.light_img  = np.zeros((1, self.resolution, 3), dtype=BUFFER_DTYPE)
+        self.beam_lights = np.zeros(len(BeamLightId), dtype=BUFFER_DTYPE)
 
     @property
     def white(self) -> np.ndarray:

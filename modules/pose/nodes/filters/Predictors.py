@@ -11,7 +11,7 @@ from collections import defaultdict
 import numpy as np
 
 # Pose imports
-from ...features import Angles, BBox, Points2D, AngleVelocity, AngleSymmetry, BaseFeature
+from ...features import Angles, Azimuth, BBox, Points2D, AngleVelocity, AngleSymmetry, BaseFeature
 from .._utils.ArrayPredict import AnglePredict, PointPredict, Predict, PredictionMethod
 from ..Nodes import FilterNode
 from ...frame import Frame, replace
@@ -32,6 +32,7 @@ class FeaturePredictor(FilterNode):
         lambda: Predict,
         {
             Angles: AnglePredict,
+            Azimuth: AnglePredict,
             Points2D: PointPredict,
         }
     )
@@ -123,3 +124,8 @@ class AngleVelPredictor(FeaturePredictor):
 class AngleSymPredictor(FeaturePredictor):
     def __init__(self, config: PredictorSettings) -> None:
         super().__init__(config, AngleSymmetry)
+
+
+class AzimuthPredictor(FeaturePredictor):
+    def __init__(self, config: PredictorSettings) -> None:
+        super().__init__(config, Azimuth)

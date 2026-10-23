@@ -192,7 +192,7 @@ class FluidLayer(LayerBase):
         """Update fluid simulation with inputs from all flow layers."""
         # Get motion data from pose
         pose: Frame | None = self._board.get_frame(self.settings.stage, self._cam_id)
-        similarities: np.ndarray = pose[Similarity].values if pose is not None and Similarity in pose else np.full((self.settings.num_players,), 0.0)
+        similarities: np.ndarray = np.nan_to_num(pose[Similarity].values) if pose is not None and Similarity in pose else np.full((self.settings.num_players,), 0.0)
         motion_gates: np.ndarray = pose[MotionGate].values if pose is not None and MotionGate in pose else np.full((self.settings.num_players,), 0.0)
         motion: float = pose[AngleMotion].value if pose is not None and AngleMotion in pose else 0.0
         # Cross-camera weight for both velocity and density below. The own-camera

@@ -18,7 +18,7 @@ class Divergence3D(ComputeShader):
 
     def use(self, velocity: Texture3D, obstacle: Texture3D,
             divergence_out: Texture3D,
-            grid_scale: float, aspect: float, depth_scale: float,
+            grid_scale: float, aspect: float, z_spacing: float,
             has_obstacles: bool = True) -> None:
         """Compute divergence of 3D velocity field.
 
@@ -28,7 +28,7 @@ class Divergence3D(ComputeShader):
             divergence_out: Output divergence volume (R16F)
             grid_scale: Grid scaling factor
             aspect: Width/height ratio
-            depth_scale: Z grid spacing relative to XY
+            z_spacing: Sim-grid Z cell size in sim texels (dz/dx)
             has_obstacles: Whether obstacle logic is active
         """
         if not self.allocated or not self.shader_program:
@@ -46,7 +46,7 @@ class Divergence3D(ComputeShader):
         # Aspect-corrected grid scales
         dx = grid_scale
         dy = grid_scale * aspect
-        dz = grid_scale * depth_scale
+        dz = grid_scale * z_spacing
         glUniform3f(self.get_uniform_loc("uHalfRdxInv"), 0.5 / dx, 0.5 / dy, 0.5 / dz)
         glUniform3i(self.get_uniform_loc("uSize"),
                     divergence_out.width, divergence_out.height, divergence_out.depth)

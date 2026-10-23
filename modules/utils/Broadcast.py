@@ -13,6 +13,9 @@ Callback = Callable[[T], Any]
 class Broadcast(Generic[T]):
     """Thread-safe fan-out that broadcasts a value to registered callbacks.
 
+    Callbacks run in registration order; registering one twice keeps its
+    first position.
+
     Use as a composable building block — instantiate as an attribute,
     not as a base class.  ``__call__`` makes the instance directly
     usable wherever a single callback is expected.
@@ -22,8 +25,13 @@ class Broadcast(Generic[T]):
     """
 
     def __init__(self, callbacks: list[Callback] | None = None) -> None:
-        self._callbacks: set[Callback] = set(callbacks) if callbacks else set()
+        self._callbacks: list[Callback] = list(dict.fromkeys(callbacks)) if callbacks else []
         self._lock = Lock()
+
+    def __bool__(self) -> bool:
+        """True when any callback is registered — lets producers skip building the payload."""
+        with self._lock:
+            return bool(self._callbacks)
 
     def __call__(self, output: T) -> None:
         with self._lock:
@@ -35,8 +43,10 @@ class Broadcast(Generic[T]):
 
     def add_callback(self, callback: Callback) -> None:
         with self._lock:
-            self._callbacks.add(callback)
+            if callback not in self._callbacks:
+                self._callbacks.append(callback)
 
     def remove_callback(self, callback: Callback) -> None:
         with self._lock:
-            self._callbacks.discard(callback)
+            if callback in self._callbacks:
+                self._callbacks.remove(callback)

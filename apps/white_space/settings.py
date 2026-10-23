@@ -12,23 +12,24 @@ The root class is ``Settings``.
 from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
-from modules.oak import CameraSettings, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.oak import CameraSettings, CameraResolution, CameraCheckSettings, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
-from modules.render.layers import LayerMode
+from modules.render.layers import LayerMode, AngleOffset
 from modules.inout import OscSoundSettings, OscReceiverSettings
-from modules.tracker import PanoramicTrackerSettings
+from modules.tracker import PanoramicTrackerSettings, PosesFromTrackletsSettings
 from modules.pose import nodes, trackers, window, analytics
 from modules import inference
-from modules.session import SessionSettings, SequencerSettings
+from modules.session import SessionSettings
 from modules.gl import WindowSettings
-from .light import LightSettings
-from .inout import OscLightSettings, UdpReceiverSettings
-from .pose import GhosterSettings
-from .escalator import GhostEscalatorSettings
+from .light import LightSettings, PoseInstrumentSettings
+from .inout import OscLightSenderSettings, UdpLightReceiverSettings
+from .pose import GhosterSettings, NeutralWeightSettings
+from .statemachine import StateMachineSettings
+from .tracker_journal import TrackerJournalSettings
 
 
 # ---------------------------------------------------------------------------
-#  Pipeline stages & show sequencer
+#  Pipeline stages
 # ---------------------------------------------------------------------------
 
 class Stage(IntEnum):
@@ -39,19 +40,23 @@ class Stage(IntEnum):
     LERP    = auto()
 
 
-class ShowStage(IntEnum):
-    START      = 0
-    PLAY_IN    = auto()
-    PLAY       = auto()
-    CONCLUSION = auto()
-    IDLE       = auto()
+class CameraView(IntEnum):
+    """Which of the two camera-derived rows the window shows.
+
+    They show the same pixels in two projections — the frames as each camera delivers them, and
+    all four stitched into one 360° strip at the rig centre — so which one you want depends on
+    what you are doing: aiming a camera, or reading the calibration. Hiding one gives its height
+    to the other and skips its compositing entirely.
+    """
+    BOTH     = 0
+    CAMERAS  = auto()   # the four delivered frames only
+    PANORAMA = auto()   # the 360° strip only
 
 
-class ShowSequencerSettings(SequencerSettings):
-    """White Space show sequencer."""
-    stages:    Field[list[ShowStage]] = Field(list(ShowStage), widget=Widget.checklist, description="Stages to play")
-    durations: Field[list]            = Field([10.0, 3.0, 120.0, 10.0, 5.0], min=0.0, max=600.0, step=0.1, description="Stage durations")
-    stage:     Field[ShowStage]       = Field(ShowStage.START, access=Field.READ, description="Current stage", newline=True)
+class Layout(IntEnum):
+    """What the window shows: the cameras' rows, or three poses large."""
+    CAMERA = 0          # the camera rows (per camera_view), the projection and the pose row
+    POSE   = auto()     # the three longest-present poses side by side, the projection under them
 
 
 # ---------------------------------------------------------------------------
@@ -61,14 +66,18 @@ class ShowSequencerSettings(SequencerSettings):
 class Layers(IntEnum):
     # source layers
     cam_image    = 0
-    cam_mask     = auto()
     cam_crop     = auto()
     # composite
     tracker      = auto()
+    cam_readings = auto()   # each camera's frame rate, tilt and roll error, over its own view
     poser        = auto()
+    dummy_pose   = auto()   # the dummy's skeleton at LERP, no crop; the pose row's last column
     # WS visualization
-    ws_tracker   = auto()
-    ws_light     = auto()
+    cam_panorama = auto()   # the 360° calibration strip: the stitch with the tracker data over it
+    ws_light     = auto()   # the projection (fixture in projection mode)
+    ws_beam       = auto()   # the bar's four lights (fixture in beam mode); shares ws_light's row
+    ws_azimuth   = auto()   # eye and bbox azimuth lines, over whichever of the two is shown
+    ws_figures   = auto()   # each pose's figure at its azimuth, over the same
     # data
     data_W       = auto()
     data_F       = auto()
@@ -82,26 +91,32 @@ class Layers(IntEnum):
 # ---------------------------------------------------------------------------
 
 class OakGroup(BaseSettings):
-    fov               : Field[float]           = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV")
+    fov               : Field[float]           = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°), quoted for the full sensor width")
     num_cameras       : Field[int]             = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     fps               : Field[float]           = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
     yolo              : Field[bool]            = Field(True, access=Field.INIT, description="Enable YOLO person detection")
     color             : Field[bool]            = Field(False, access=Field.INIT, description="Color camera (False = mono)")
     square            : Field[bool]            = Field(True, access=Field.INIT, description="Use square aspect ratio")
     stereo            : Field[bool]            = Field(False, access=Field.INIT, description="Enable stereo mode")
-    hd_ready          : Field[bool]            = Field(False, access=Field.INIT, description="Use HD resolution")
+    resolution        : Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode, all four cameras. P800 is the full readout, P720 a vertical crop")
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, description="Model files directory")
     ir_flood_light    : Field[float]           = Field(0.8, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
+    tilt              : Field[float]           = Field(0.0, access=Field.INIT, description="Camera up-tilt (degrees), positive = aimed upward, the same for all four cameras. Baked into the warp when the devices open.")
+    lens_fov          : Field[float]           = Field(0.0, access=Field.INIT, step=0.1, description="Field (°) the lens spans across the full sensor width; 0 = same as fov")
+    lens_centre_x     : Field[float]           = Field(0.0, access=Field.INIT, step=0.5, description="Optical centre offset from the frame centre (px), full sensor mode")
+    lens_centre_y     : Field[float]           = Field(0.0, access=Field.INIT, step=0.5, description="Optical centre offset from the frame centre (px), positive = down")
+    mono_auto_exposure: Field[bool]            = Field(True, widget=Widget.switch, description="Mono auto exposure, all four cameras")
 
-    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, model_path, ir_flood_light]
+    _cam_share: list = [fps, color, square, stereo, yolo, resolution, model_path, ir_flood_light, fov, tilt,
+                        lens_fov, lens_centre_x, lens_centre_y, mono_auto_exposure]
 
     cam_0     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_1     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_2     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_3     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
+    camera_check: Group[CameraCheckSettings]     = Group(CameraCheckSettings)
     simulator : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cameras, fps])
-    tracker   : Group[PanoramicTrackerSettings]  = Group(PanoramicTrackerSettings, share=[fov])
     frame_sync: Group[SyncSettings]              = Group(SyncSettings, share=[num_cameras, fps])
     tracklet_sync: Group[SyncSettings]           = Group(SyncSettings, share=[num_cameras, fps])
 
@@ -117,17 +132,22 @@ class OakGroup(BaseSettings):
 class _OscSoundSettings(OscSoundSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage to read poses from")
     virtual_players: Field[int] = Field(0, min=0, max=16, access=Field.INIT, visible=False, description="Extra virtual (ghost) id slots beyond max_players (shared from root num_virtual)")
+    volume: Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, newline=True, pinned=True, description="Main sound volume — sent to Max on /global/volume")
+    speaker_offset: Field[float] = Field(0.0, min=0.0, max=360.0, step=1.0, description="Where speaker 0 stands, as an azimuth (degrees) — Max adds it in its panner. 0 when the speakers are placed by the layout")
 
 
 class InOutGroup(BaseSettings):
-    num_players:     Field[int] = Field(8,   access=Field.INIT, visible=False)
+    """Sender/receiver per domain: the light sender feeds the fixture and its receiver
+    hears the fall sensor (plain UDP); the sound sender feeds Max and its receiver hears
+    /WS/idle/blue/left and /right (real OSC)."""
+    max_players:     Field[int] = Field(8,   access=Field.INIT, visible=False)
     num_virtual:     Field[int] = Field(8,   access=Field.INIT, visible=False)
     resolution:      Field[int] = Field(3600, access=Field.INIT, visible=False)
-    osc_light      : Group[OscLightSettings]       = Group(OscLightSettings, share=[resolution])
+    osc_light_sender  : Group[OscLightSenderSettings]   = Group(OscLightSenderSettings, share=[resolution])
+    udp_light_receiver: Group[UdpLightReceiverSettings] = Group(UdpLightReceiverSettings)
     # OSC sends max_players (live) + virtual_players (ghost) id slots; both shared from root.
-    osc_sound      : Group[_OscSoundSettings]      = Group(_OscSoundSettings, share=[num_players.as_('max_players'), num_virtual.as_('virtual_players')])
-    osc_receiver   : Group[OscReceiverSettings]    = Group(OscReceiverSettings)
-    udp_receiver   : Group[UdpReceiverSettings]    = Group(UdpReceiverSettings)
+    osc_sound_sender  : Group[_OscSoundSettings]        = Group(_OscSoundSettings, share=[max_players, num_virtual.as_('virtual_players')])
+    osc_sound_receiver: Group[OscReceiverSettings]      = Group(OscReceiverSettings)
 
 
 # ---------------------------------------------------------------------------
@@ -136,12 +156,12 @@ class InOutGroup(BaseSettings):
 
 class BboxFeature(BaseSettings):
     frequency        : Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency : Field[float] = Field(30.0)
+    output_frequency : Field[float] = Field(32.0)
 
 
 class PointFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency: Field[float] = Field(30.0)
+    output_frequency: Field[float] = Field(32.0)
 
     confidence      : Group[nodes.DualConfFilterSettings]    = Group(nodes.DualConfFilterSettings)
     sticky          : Group[nodes.StickyFillerSettings]      = Group(nodes.StickyFillerSettings)
@@ -154,17 +174,35 @@ class PointFeature(BaseSettings):
 
 class AngleFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency: Field[float] = Field(30.0)
+    output_frequency: Field[float] = Field(32.0)
 
     smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
     prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
     interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
+    rate_limiter: Group[nodes.RateLimiterSettings]       = Group(nodes.RateLimiterSettings)
     sticky      : Group[nodes.StickyFillerSettings]      = Group(nodes.StickyFillerSettings)
+
+
+class AzimuthFeature(BaseSettings):
+    frequency       : Field[float] = Field(30.0, access=Field.INIT)
+    output_frequency: Field[float] = Field(32.0)
+
+    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
+    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
+    interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
+
+
+class DistanceFeature(BaseSettings):
+    frequency       : Field[float] = Field(30.0, access=Field.INIT)
+    output_frequency: Field[float] = Field(32.0)
+
+    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
+    interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
 
 class VelocityFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency: Field[float] = Field(30.0)
+    output_frequency: Field[float] = Field(32.0)
 
     extractor   : Group[nodes.AngleVelExtractorSettings] = Group(nodes.AngleVelExtractorSettings, share=[frequency])
     smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
@@ -180,18 +218,20 @@ class MotionFeature(BaseSettings):
 
 class SimilarityFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
-    output_frequency: Field[float] = Field(30.0)
-    max_poses       : Field[int]   = Field(3, min=1, max=16, access=Field.INIT)
+    output_frequency: Field[float] = Field(32.0)
+    max_players     : Field[int]   = Field(3, min=1, max=16, access=Field.INIT, description="Players tracked at most (shared from root max_players): the similarity row's width")
 
-    # pose similarity (WindowSimilarity) enabled; movement correlation disabled by default
-    window_similarity    : Group[analytics.WindowSimilaritySettings]      = Group(analytics.WindowSimilaritySettings, share=[max_poses])
-    window_correlation   : Group[analytics.WindowCorrelationSettings]     = Group(analytics.WindowCorrelationSettings, share=[max_poses])
-    similarity_applicator: Group[nodes.SimilarityApplicatorSettings]  = Group(nodes.SimilarityApplicatorSettings, share=[max_poses])
-    leader_applicator    : Group[nodes.LeaderScoreApplicatorSettings] = Group(nodes.LeaderScoreApplicatorSettings, share=[max_poses])
+    # In pipeline order. On the SMOOTH poses, synchronously: the posture similarity (distance in degrees →
+    # 0..1), a present pair's gap held, the pair weighted by the arm deviation out of neutral; then, per
+    # frame: stamped on the poses and smoothed.
+    posture              : Group[analytics.PostureSimilaritySettings] = Group(analytics.PostureSimilaritySettings, share=[max_players.as_('max_poses')])
+    sticky               : Group[analytics.SimilarityStickyFillerSettings] = Group(analytics.SimilarityStickyFillerSettings)
+    neutral_weight       : Group[NeutralWeightSettings]               = Group(NeutralWeightSettings)
+    similarity_applicator: Group[nodes.SimilarityApplicatorSettings]  = Group(nodes.SimilarityApplicatorSettings, share=[max_players.as_('max_poses')])
     smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, share=[frequency])
+    # LERP: interpolated to the output rate, then the motion gate.
     interpolator         : Group[nodes.ChaseInterpolatorSettings]     = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
-    sticky               : Group[nodes.StickyFillerSettings]          = Group(nodes.StickyFillerSettings)
-    motion_gate          : Group[nodes.MotionGateApplicatorSettings]  = Group(nodes.MotionGateApplicatorSettings, share=[max_poses])
+    motion_gate          : Group[nodes.MotionGateApplicatorSettings]  = Group(nodes.MotionGateApplicatorSettings, share=[max_players.as_('max_poses')])
 
 
 # ---------------------------------------------------------------------------
@@ -199,45 +239,56 @@ class SimilarityFeature(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class PoseGroup(BaseSettings):
-    max_poses        : Field[int]       = Field(3, min=1, max=16, access=Field.INIT)
+    max_players      : Field[int]       = Field(3, min=1, max=16, access=Field.INIT, description="Players tracked at most (shared from root max_players)")
+    ghost_slots      : Field[int]       = Field(8, min=0, max=16, access=Field.INIT, visible=False, description="Ghost id pool size (shared from root num_virtual)")
     model_type       : Field[inference.ModelType] = Field(inference.ModelType.TRT, access=Field.INIT)
     model_path       : Field[str]       = Field("", access=Field.INIT, visible=False)
     verbose          : Field[bool]      = Field(False, access=Field.INIT)
     frequency        : Field[float]     = Field(30.0, access=Field.INIT)
-    output_frequency : Field[float]     = Field(30.0)
-    ws_input_stage   : Field[Stage]     = Field(Stage.LERP, description="Pipeline stage that feeds the WS light pipeline")
+    output_frequency : Field[float]     = Field(32.0, min=1.0, max=120.0, description="LERP tick rate (fps, shared from the root light_rate)")
 
     _feature_share: list = [frequency, output_frequency]
 
-    pose            : Group[inference.pose.Settings]         = Group(inference.pose.Settings, share=[max_poses, model_type, model_path, verbose])
-    segmentation    : Group[inference.segmentation.Settings] = Group(inference.segmentation.Settings, share=[max_poses, model_type, model_path, verbose])
-    image_crop      : Group[inference.crop.Settings]         = Group(inference.crop.Settings, share=[max_poses])
+    pose            : Group[inference.pose.Settings]         = Group(inference.pose.Settings, share=[max_players.as_('max_poses'), model_type, model_path, verbose])
+    tracklets       : Group[PosesFromTrackletsSettings]      = Group(PosesFromTrackletsSettings)
+    image_crop      : Group[inference.crop.Settings]         = Group(inference.crop.Settings, share=[max_players.as_('max_poses')])
     angle_extractor : Group[nodes.AngleExtractorSettings]    = Group(nodes.AngleExtractorSettings)
-    distance_extractor: Group[nodes.DistanceExtractorSettings] = Group(nodes.DistanceExtractorSettings)
+    angle_calibrator: Group[nodes.AngleCalibratorSettings]   = Group(nodes.AngleCalibratorSettings)
+    leg_deviation_extractor: Group[nodes.LegDeviationExtractorSettings] = Group(nodes.LegDeviationExtractorSettings)
+    arm_deviation_extractor: Group[nodes.ArmDeviationExtractorSettings] = Group(nodes.ArmDeviationExtractorSettings)
+    arm_travel_extractor: Group[nodes.ArmTravelExtractorSettings] = Group(nodes.ArmTravelExtractorSettings)
+    torso_tilt_extractor: Group[nodes.TorsoTiltExtractorSettings] = Group(nodes.TorsoTiltExtractorSettings)
     bbox            : Group[BboxFeature]                     = Group(BboxFeature, share=_feature_share)
     point           : Group[PointFeature]                    = Group(PointFeature, share=_feature_share)
     angle           : Group[AngleFeature]                    = Group(AngleFeature, share=_feature_share)
-    velocity        : Group[VelocityFeature]                 = Group(VelocityFeature, share=_feature_share)
+    azimuth         : Group[AzimuthFeature]                  = Group(AzimuthFeature, share=_feature_share)
+    distance        : Group[DistanceFeature]                 = Group(DistanceFeature, share=_feature_share)
+    velocity       : Group[VelocityFeature]                 = Group(VelocityFeature, share=_feature_share)
     motion          : Group[MotionFeature]                   = Group(MotionFeature)
-    similarity      : Group[SimilarityFeature]               = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
+    similarity      : Group[SimilarityFeature]               = Group(SimilarityFeature, share=[frequency, output_frequency, max_players])
     window_raw      : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_clean    : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_smooth   : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_predict  : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_lerp     : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
+    # The ghost subsystem — virtual poses injected into the pipeline (feeds the OSC sound
+    # id slots and the beam_haunted debug visual; the show's beam_flash is independent of it).
+    ghoster         : Group[GhosterSettings]                 = Group(GhosterSettings, share=[max_players, ghost_slots.as_('ghost_slots')])
 
 
 # ---------------------------------------------------------------------------
-#  Session group (recording lifecycle)
+#  Recording group (recording lifecycle — independent of the show state machine)
 # ---------------------------------------------------------------------------
 
-class SessionGroup(BaseSettings):
-    """App session group — composes SessionSettings with app-specific recorders."""
+class RecordingGroup(BaseSettings):
+    """App recording group — composes SessionSettings with app-specific recorders.
+    Recording is decoupled from the show: it works stand-alone and during session mode,
+    and nothing here touches the state machine."""
     num_cameras:   Field[int]   = Field(4, access=Field.INIT, description="Number of cameras")
     fps:           Field[float] = Field(30.0, access=Field.INIT, description="Camera frame rate")
 
-    start:         Field[bool]  = Field(False, widget=Widget.button, description="Start session")
-    stop:          Field[bool]  = Field(False, widget=Widget.button, description="Stop session")
+    start:         Field[bool]  = Field(False, widget=Widget.button, description="Start recording")
+    stop:          Field[bool]  = Field(False, widget=Widget.button, description="Stop recording")
     output_path:   Field[str]   = Field("recordings", access=Field.INIT, description="Recordings output directory")
     name:          Field[str]   = Field("", widget=Widget.input, description="Recording group ID")
     split:         Field[bool]  = Field(False, widget=Widget.button, description="Split chunk", visible=False)
@@ -248,8 +299,10 @@ class SessionGroup(BaseSettings):
 
     osc:      Group[OscReceiverSettings]    = Group(OscReceiverSettings)
     core:     Group[SessionSettings]        = Group(SessionSettings, share=_session_share)
-    sequencer: Group[ShowSequencerSettings] = Group(ShowSequencerSettings, share=[start, stop])
     video:    Group[RecorderSettings]       = Group(RecorderSettings, share=_recorder_share + [num_cameras, fps])
+    # The tracker diagnosis journal runs for the whole app run while enabled, so it deliberately
+    # does not share the record start/stop buttons.
+    journal:  Group[TrackerJournalSettings] = Group(TrackerJournalSettings)
 
 
 # ---------------------------------------------------------------------------
@@ -295,29 +348,37 @@ class PlayheadDataLayerSettings(BaseSettings):
     use_scores:        Field[bool]                = Field(False)
     render_labels:     Field[bool]                = Field(True)
     use_history_color: Field[bool]                = Field(False)
+    angle_offset:      Field[AngleOffset]         = Field(AngleOffset.NONE, description="Shift ±π angles before drawing: HALF_PI puts the seam at -π/2, PI at 0")
+
+
+class BeamLightSimSettings(BaseSettings):
+    """The render's simulation of the bar in beam mode: the four beam lights as lines on the
+    walls."""
+    width: Field[float] = Field(15.0, min=0.0, max=90.0, step=0.5, description="Solid width of a beam light's line on the wall (deg)")
+    blur: Field[float] = Field(6.0,  min=0.0, max=45.0, step=0.5, description="Soft falloff on each side of the line (deg); 0 = a hard edge")
+    flash_seconds: Field[float] = Field(1.0, min=0.0, max=5.0, step=0.05, description="Flash marker: seconds a flash stays drawn, fading out; 0 = off")
 
 
 class RenderSettings(BaseSettings):
+    layout:      Field[Layout]     = Field(Layout.CAMERA, widget=Widget.select,
+                                           description="CAMERA: the cameras' rows; POSE: the three longest-present poses, large, over the projection")
+    camera_view: Field[CameraView] = Field(CameraView.BOTH, widget=Widget.select,
+                                           description="Which camera row to show: the delivered frames, the 360° strip, or both")
+    azimuth_overlay: Field[bool] = Field(True, description="Eye (solid) and bbox (faint) azimuth lines over the projection row")
+    pose_figures:    Field[bool] = Field(True, description="Each pose as a figure over the projection row, at its azimuth")
     num_cams:    Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
-    num_players: Field[int]  = Field(4, access=Field.INIT, visible=False, description="Number of players")
+    max_players: Field[int]  = Field(4, access=Field.INIT, visible=False, description="Players tracked at most (shared from the root): the pose row's columns")
+    tilt:        Field[float] = Field(0.0, access=Field.INIT, visible=False, description="Camera up-tilt (°), shared from the root — relayed to the panorama layer")
     preview:     Group[PreviewGroup]        = Group(PreviewGroup)
     data_time:   Group[_MTimeSettings]      = Group(_MTimeSettings)
     data:        Group[_DataLayerSettings]  = Group(_DataLayerSettings)
     playhead_data: Group[PlayheadDataLayerSettings] = Group(PlayheadDataLayerSettings)
+    beam_light_sim: Group[BeamLightSimSettings] = Group(BeamLightSimSettings)
+    # Shared down from the root so the panorama can size itself to the picture the mount
+    # actually delivers; it moves nothing, the warp has already levelled the frame.
+    panorama:    Group[layers.PanoramaLayerSettings] = Group(layers.PanoramaLayerSettings, share=[tilt])
     colors:      Group[ColorSettings]       = Group(ColorSettings)
     window:      Group[WindowSettings]      = Group(WindowSettings)
-
-
-# ---------------------------------------------------------------------------
-#  Ghost group — the ghost subsystem: the Ghoster and its motor Escalator
-# ---------------------------------------------------------------------------
-
-class GhostGroup(BaseSettings):
-    live_players: Field[int] = Field(4, access=Field.INIT, visible=False, description="Live player count (shared from root num_players)")
-    ghost_slots:  Field[int] = Field(8, min=0, max=16, access=Field.INIT, visible=False, description="Ghost id pool size (shared from root num_virtual)")
-
-    ghoster  : Group[GhosterSettings]        = Group(GhosterSettings, share=[live_players, ghost_slots])
-    escalator: Group[GhostEscalatorSettings] = Group(GhostEscalatorSettings)
 
 
 # ---------------------------------------------------------------------------
@@ -325,19 +386,36 @@ class GhostGroup(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class Settings(BaseSettings):
-    num_players     : Field[int]   = Field(4, access=Field.INIT)
+    max_players     : Field[int]   = Field(4, access=Field.INIT, description="Players tracked at most: the id slots 0..N−1")
     num_virtual     : Field[int]   = Field(8, access=Field.INIT)
     num_cameras     : Field[int]   = Field(4, access=Field.INIT)
     input_fps       : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
-    render_fps      : Field[float] = Field(30.0)
-    light_resolution: Field[int]   = Field(300, min=10, max=1000, access=Field.INIT, description="LED strip resolution (pixels)")
-    fov             : Field[float] = Field(110.0, min=60.0, max=180.0, step=0.5, description="Camera horizontal FOV — shared with tracker and composition")
+    light_rate      : Field[float] = Field(32.0, min=1.0, max=120.0, description="Light tick rate (fps): the fixture's frame rate, the conductor's clock and the LERP stage's step")
+    light_resolution: Field[int]   = Field(300, min=10, max=1000, access=Field.INIT, description="Projection resolution (pixels per turn)")
+    fov             : Field[float] = Field(127.0, access=Field.INIT, description="Azimuth span (°) of each delivered camera frame — the tracker's contract, baked in at open")
+    resolution      : Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode for all cameras")
+    tilt            : Field[float] = Field(0.0, access=Field.INIT, description="Camera up-tilt (°), positive = aimed up, the same for all four")
+    # The lens, shared by all four — read off their calibrations; see CALIBRATION.md, Camera.
+    lens_fov        : Field[float] = Field(0.0, access=Field.INIT, step=0.1, description="Field (°) the lens spans across the full sensor width; 0 = same as fov")
+    lens_centre_x   : Field[float] = Field(0.0, access=Field.INIT, step=0.5, description="Optical centre offset from the frame centre (px), full sensor mode")
+    lens_centre_y   : Field[float] = Field(0.0, access=Field.INIT, step=0.5, description="Optical centre offset from the frame centre (px), positive = down")
+    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9/S10 wall-fade seconds — canonical value tying states (the visible slider) to the wind_down layer")
 
-    camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov])
-    inout  : Group[InOutGroup]      = Group(InOutGroup, share=[num_players.as_('num_players'), num_virtual.as_('num_virtual'), light_resolution.as_('resolution')])
-    pose   : Group[PoseGroup]       = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
-    ghost  : Group[GhostGroup]      = Group(GhostGroup, share=[num_players.as_('live_players'), num_virtual.as_('ghost_slots')])
-    light: Group[LightSettings] = Group(LightSettings, share=[num_players.as_('max_poses'), num_cameras.as_('num_cameras'), light_resolution.as_('light_resolution'), fov])
-    render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_cameras.as_('num_cams')])
+    # In panel order: what you look at, what you capture, the wires out, the sensors, what is made of
+    # them, and what the show does with it.
+    render : Group[RenderSettings]  = Group(RenderSettings, share=[max_players, num_cameras.as_('num_cams'), tilt])
+    record : Group[RecordingGroup]  = Group(RecordingGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])
+    inout  : Group[InOutGroup]      = Group(InOutGroup, share=[max_players, num_virtual.as_('num_virtual'), light_resolution.as_('resolution')])
+    camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov, tilt, resolution,
+                                                             lens_fov, lens_centre_x, lens_centre_y])
+    # Its own group, not under `camera`: the tracker fuses the cameras' output, as `pose` does, and
+    # nothing in it is a camera setting. The frame's shape is shared in straight from the root.
+    track  : Group[PanoramicTrackerSettings] = Group(PanoramicTrackerSettings, share=[fov, resolution, tilt,
+                                                                                      lens_fov, lens_centre_x, lens_centre_y])
+    # The LERP stage is ticked by the light conductor, so its interpolators step at the light rate.
+    pose   : Group[PoseGroup]       = Group(PoseGroup, share=[max_players, num_virtual.as_('ghost_slots'), input_fps.as_('frequency'), light_rate.as_('output_frequency')])
+    light  : Group[LightSettings]   = Group(LightSettings, share=[max_players, num_cameras.as_('num_cameras'), light_rate, light_resolution.as_('light_resolution'), fov, spin_down_seconds])
+    # The pose instrument's values: its own root group, not a layer group (POSE_INSTRUMENT.md, Settings).
+    PI     : Group[PoseInstrumentSettings] = Group(PoseInstrumentSettings)
+    states : Group[StateMachineSettings] = Group(StateMachineSettings, share=[spin_down_seconds])
     server : Group[NiceSettings]    = Group(NiceSettings)
-    session: Group[SessionGroup]    = Group(SessionGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])

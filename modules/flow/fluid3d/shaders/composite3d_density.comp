@@ -1,0 +1,178 @@
+#version 460 core
+
+/*
+ * Composite3DDensity - Volumetric front-to-back composite of the RGBA
+ * GL_TEXTURE_2D_ARRAY density volume into a 2D image, with depth cues.
+ *
+ * Per ray step (front -> back, manual Z-lerp between layers):
+ *   occlusion    per-channel Beer-Lambert extinction; near ink covers far ink
+ *   glow         the unoccluded additive sum is accumulated alongside and
+ *                mixed in: uGlow = 1 reproduces the legacy additive composite
+ *   parallax     per-layer UV shift from a virtual eye; layers shear with depth
+ *   perspective  per-layer shrink toward the vanishing point
+ *   tint + fog   far ink shifts toward water colour and fades
+ *   depth blur   optional jittered taps, radius growing with depth
+ *
+ * uDebugDepth: dominant layer as hue (red = back, violet = front).
+ *
+ * Dispatched as a 2D compute (one thread per output pixel).
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler2DArray uDensity;  // RGBA16F
+
+layout(rgba16f, binding = 0) writeonly uniform image2D uOutput;
+
+uniform int   uDepth;        // Number of physical depth layers
+uniform ivec2 uOutputSize;   // 2D output dimensions
+uniform float uEmission;     // Ink brightness gain
+uniform float uGamma;        // Density response exponent: >1 hides haze, pops cores
+uniform float uAbsorption;   // Extinction per unit density
+uniform float uTint;         // 0..1 mix toward per-channel water extinction
+uniform float uFog;          // Medium extinction over the full depth
+uniform float uGlow;         // 0 = occluded volumetric, 1 = legacy additive
+uniform vec2  uEye;          // Virtual eye offset (UV units)
+uniform float uPerspective;  // Per-layer shrink toward vanishing point
+uniform float uDepthBlur;    // Jitter radius in texels at the back layer
+uniform bool  uDebugDepth;
+
+const vec3 WATER_CHAN = vec3(1.8, 1.0, 0.6);  // relative extinction: red dies first
+
+/*
+ * Per-layer UV remap: far layers shrink toward the vanishing point
+ * (sampling expands -> content appears smaller) and shear with the eye
+ * offset. d01: 0 = front layer, 1 = back layer.
+ */
+vec2 layerUV(vec2 uv, float d01) {
+    vec2 vanish = vec2(0.5) + uEye;
+    float s = 1.0 + uPerspective * d01;
+    return vanish + (uv - vanish) * s + uEye * d01;
+}
+
+/*
+ * Displaced layers fade out smoothly past the texture border instead of
+ * smearing edge texels (clamp-to-edge). Inside [0,1] the factor is 1, so
+ * legitimate edge content is not vignetted.
+ */
+float borderFade(vec2 st) {
+    float d = max(max(-st.x, st.x - 1.0), max(-st.y, st.y - 1.0));
+    return 1.0 - smoothstep(0.0, 0.03, d);
+}
+
+/*
+ * Manual Z-interpolated sample from the density array:
+ * two hardware-bilinear layer reads + mix. Out-of-range Z returns empty.
+ */
+vec4 sampleDensity(vec2 uv, float z_norm) {
+    int layers = uDepth;
+    float z_coord = z_norm * float(layers) - 0.5;
+
+    if (z_coord < -0.5 || z_coord > float(layers) - 0.5) {
+        return vec4(0.0);
+    }
+
+    int z0 = int(floor(z_coord));
+    int z1 = z0 + 1;
+    float frac = z_coord - float(z0);
+
+    vec4 s0 = (z0 >= 0 && z0 < layers)
+        ? texture(uDensity, vec3(uv, float(z0))) : vec4(0.0);
+    vec4 s1 = (z1 >= 0 && z1 < layers)
+        ? texture(uDensity, vec3(uv, float(z1))) : vec4(0.0);
+
+    return mix(s0, s1, frac);
+}
+
+/* Depth-graded blur: 4 jittered taps on the nearest layer. */
+vec4 sampleDensityBlur(vec2 uv, float z_norm, float radius_texels) {
+    float layer = clamp(floor(z_norm * float(uDepth)), 0.0, float(uDepth - 1));
+    vec2 r = radius_texels / vec2(uOutputSize);
+    vec4 acc = texture(uDensity, vec3(uv + vec2( 0.7,  0.3) * r, layer));
+    acc +=     texture(uDensity, vec3(uv + vec2(-0.3,  0.7) * r, layer));
+    acc +=     texture(uDensity, vec3(uv + vec2(-0.7, -0.3) * r, layer));
+    acc +=     texture(uDensity, vec3(uv + vec2( 0.3, -0.7) * r, layer));
+    return acc * 0.25;
+}
+
+void main() {
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(gid, uOutputSize))) return;
+
+    vec2 uv = (vec2(gid) + 0.5) / vec2(uOutputSize);
+
+    if (uDebugDepth) {
+        // Density-weighted mean depth as hue: red = back, violet = front.
+        // (A dominant-layer view is blind to ink traveling behind its own
+        // birth column; the mean shifts as soon as depth fills anywhere.)
+        float sum_d = 0.0;
+        float sum_dz = 0.0;
+        for (int z = 0; z < uDepth; z++) {
+            float z_norm = (float(z) + 0.5) / float(uDepth);
+            vec2 st = layerUV(uv, z_norm);
+            vec4 s = sampleDensity(st, z_norm) * borderFade(st);
+            float d = max(s.r, max(s.g, s.b));
+            sum_d += d;
+            sum_dz += d * z_norm;
+        }
+        float max_density = sum_d / float(uDepth);
+        float mean_z = (sum_d > 1e-5) ? (sum_dz / sum_d) : 0.0;
+
+        float hue = 0.8 * (1.0 - mean_z);
+        float h6 = hue * 6.0;
+        float c = 1.0;
+        float x = 1.0 - abs(mod(h6, 2.0) - 1.0);
+        vec3 rgb;
+        if      (h6 < 1.0) rgb = vec3(c, x, 0.0);
+        else if (h6 < 2.0) rgb = vec3(x, c, 0.0);
+        else if (h6 < 3.0) rgb = vec3(0.0, c, x);
+        else if (h6 < 4.0) rgb = vec3(0.0, x, c);
+        else if (h6 < 5.0) rgb = vec3(x, 0.0, c);
+        else               rgb = vec3(c, 0.0, x);
+
+        float brightness = min(max_density * 25.0, 1.0);
+        imageStore(uOutput, gid, vec4(rgb * brightness, 1.0));
+        return;
+    }
+
+    // 2x the layer count samples the manual Z-lerp at its full resolution;
+    // more steps cannot reveal anything (the data between layers is linear)
+    int steps = max(uDepth * 2, 1);
+    float inv_steps = 1.0 / float(steps);
+    float dt = float(uDepth) * inv_steps;  // step thickness in layer units
+
+    vec3 chan  = mix(vec3(1.0), WATER_CHAN, uTint);
+    vec3 sigma = uAbsorption * chan;
+    vec3 fog_s = (uFog / float(uDepth)) * chan;
+
+    vec3 T   = vec3(1.0);  // transmittance
+    vec3 vol = vec3(0.0);  // occluded accumulation
+    vec3 add = vec3(0.0);  // unoccluded additive sum (legacy look)
+
+    for (int i = 0; i < steps; i++) {
+        float z_norm = (float(i) + 0.5) * inv_steps;
+        vec2 st = layerUV(uv, z_norm);
+
+        float blur = uDepthBlur * z_norm;
+        vec4 s = (blur > 0.25) ? sampleDensityBlur(st, z_norm, blur)
+                               : sampleDensity(st, z_norm);
+        s *= borderFade(st);
+
+        // Response shaping: thin haze vanishes, dense cores keep their weight
+        s.rgb = pow(max(s.rgb, vec3(0.0)), vec3(uGamma));
+
+        vec3 e = uEmission * s.rgb * dt;
+        vol += T * e;
+        add += e;
+
+        float d = max(s.r, max(s.g, s.b));
+        T *= exp(-(sigma * d + fog_s) * dt);
+
+        // Fully occluded and no additive term left to accumulate
+        if (uGlow <= 0.0 && all(lessThan(T, vec3(0.004)))) break;
+    }
+
+    vec3 rgb = mix(vol, add, uGlow);
+    float alpha = 1.0 - dot(T, vec3(0.299, 0.587, 0.114));
+    imageStore(uOutput, gid, vec4(rgb, alpha));
+}

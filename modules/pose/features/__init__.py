@@ -1,24 +1,31 @@
 from enum import IntEnum
 
-from .base import           BaseFeature, BaseScalarFeature, BaseVectorFeature, NormalizedScalarFeature, AggregationMethod, NormalizedSingleValue, SingleValue, SingleAngle
+from .base import           BaseFeature, BaseScalarFeature, BaseVectorFeature, NormalizedScalarFeature, AggregationMethod, NormalizedSingleValue, SingleValue, SingleAngle, SYMMETRIC_PI_RANGE
 from .BBox import           BBox, BBoxElement
 from .Points2D import       Points2D, PointLandmark
 from .Angles import         Angles, AngleLandmark
 from .AngleVelocity import  AngleVelocity
 from .AngleMotion import    AngleMotion
 from .AngleSymmetry import  AngleSymmetry, SymmetryElement
+from .ArmDeviation import   ArmDeviation
+from .ArmTravel import      ArmTravel, TravelElement
+from .ShoulderDifference import ShoulderDifference
 from .Similarity import     Similarity
 from .LeaderScore import    LeaderScore
 from .MotionGate import     MotionGate
 from .MotionTime import     MotionTime
 from .Age import            Age
 from .Azimuth import        Azimuth
+from .BBoxAzimuth import    BBoxAzimuth
 from .Distance import       Distance
+from .LegDeviation import   LegDeviation
+from .TorsoTilt import      TorsoTilt
 
 
 FEATURES: list[type[BaseFeature]] = [
-    Age, AngleMotion, Angles, AngleSymmetry, AngleVelocity,
-    Azimuth, BBox, Distance, LeaderScore, MotionGate, MotionTime, Points2D, Similarity,
+    Age, AngleMotion, Angles, AngleSymmetry, AngleVelocity, ArmDeviation, ArmTravel,
+    Azimuth, BBox, BBoxAzimuth, Distance, LeaderScore, LegDeviation, MotionGate, MotionTime, Points2D,
+    ShoulderDifference, Similarity, TorsoTilt,
 ]
 
 Feature: type[IntEnum] = IntEnum('Feature', {cls.__name__: i for i, cls in enumerate(FEATURES, 1)})  # type: ignore[misc]

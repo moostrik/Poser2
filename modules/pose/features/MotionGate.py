@@ -72,14 +72,14 @@ class MotionGate(NormalizedScalarFeature):
 
     @classmethod
     def create_dummy(cls) -> 'MotionGate':
-        """Create a dummy MotionGate with all zeros (no motion gate computed)."""
+        """Create a dummy MotionGate with NaN values and zero scores (no motion gate computed)."""
         if cls._empty_instance is None:
             if _PoseEnum is None:
                 # Return minimal dummy if not configured yet
                 return cls.__new__(cls)
             n = len(_PoseEnum)
             cls._empty_instance = cls(
-                values=np.zeros(n, dtype=np.float32),
+                values=np.full(n, np.nan, dtype=np.float32),
                 scores=np.zeros(n, dtype=np.float32)
             )
         return cls._empty_instance
