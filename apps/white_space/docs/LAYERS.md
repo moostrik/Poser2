@@ -55,7 +55,8 @@ layers nothing.
 | `beam_flash`          | beam       | LERP frames (PlayheadOffset)  | front white + blue lamps; board flashes  | S4                        |
 | `pose_instrument`     | projection | LERP frames                   | white and blue lines, masks, marker      | S6 (projecting), S7, S8   |
 | `flood`               | projection | — (settings only)             | whole projection white                   | S8                        |
-| `beam_wind_down`      | beam       | tick clock                    | both white lamps, fading                 | S9, S10, S11              |
+| `beam_wind_down`      | beam       | tick clock                    | both white lamps, fading                 | S9, S10                   |
+| `beam_sync_wind_down` | beam       | tick clock; `PI.sync_strobe`  | the wall strobing white ↔ blue, fading   | S11                       |
 | `beam_blue_sound`     | beam       | sound levels from Max (board) | left/right blue lamps                    | S1, S2, S3, S5, S10       |
 
 `beam_flash`'s blue lamps are zeroed in the presets: S4 runs blue-none by design.
@@ -122,10 +123,21 @@ slows — and the fade rides through both. One mechanism; the layer never needs 
 when the bar is slow. The S8 → S9 hand-off is seamless at the DACs: `flood` at 1.0 in projection
 mode drives the same two white outputs as this layer at 1.0 in beam mode.
 
-- **Used by**: S9–S11 at constant weight 1.0 (reset on state entry). The states put the
-  landing look underneath (`beam_playhead` at DIM/BRIGHT, `beam_blue_sound`) — it is
-  revealed as the wall dies, so nothing has to splice or match at the hand-off.
-- **Input**: the tick clock; no pose data, no playhead signals.
+Two layers are instances of it. `beam_sync_wind_down`, the **strobing wall** of S11, is built with
+the instrument's `PI.sync_strobe`: the sync end leaves PLAY with the patterns strobing at the top
+rung, and the wall keeps that strobe on the lamps — on the strobes' shared tick grid
+(`LIGHT_SYNTH.md`, *The strobe*) at 16 per second, a strobe frame swaps the wall to the two blue
+lamps (INVERT, as the patterns swap white and blue) or blanks it (BLACK). The first S11 frame
+continues the last PLAY frame's strobe; only the picture under it changes. The amplitude is the
+fade, so the strobe dies with the wall into the dim line underneath, and `frame.sync` is carried
+at 1 while the wall is up (`SOUND.md`, `/global/sync`).
+
+- **Used by**: S9/S10 as `beam_wind_down`, S11 as `beam_sync_wind_down`, at constant weight 1.0
+  (reset on state entry). The states put the landing look underneath (`beam_playhead` at
+  DIM/BRIGHT, `beam_blue_sound`) — it is revealed as the wall dies, so nothing has to splice or
+  match at the hand-off.
+- **Input**: the tick clock; no pose data, no playhead signals. The strobing wall reads
+  `PI.sync_strobe.mode`.
 - **Behavior**: both white lamps at `f × level`, `f = 1 − ease(elapsed / spin_down_seconds)`,
   hand-tuned to ride the physical spin-down (the sensor is silent above 200 rpm, so the
   deceleration is not measurable). The states exit once `progress` reaches 1 and the

@@ -15,6 +15,17 @@ states put the landing look (the playhead line, the sound visuals) underneath at
 weight; this layer fades the wall to nothing and thereby reveals it. ``reset()`` (a show
 state's entry) restarts at the full wall. ``progress`` is the read-only fade readout the
 states' exit and stage_progress (and S10's sound-visual reveal) ride.
+
+Two layers are instances of this class: ``beam_wind_down``, the plain wall of S9/S10, and
+``beam_sync_wind_down``, the **strobing wall** of S11, built with the instrument's
+``PI.sync_strobe`` settings. The sync end leaves PLAY at full sync, the patterns strobing at the
+top rung, and the wall keeps that strobe on the lamps: on the strobes' shared tick grid at the
+same rate (``Strobe.rate`` at 16 per second, ``Strobe.period``: every other tick at 32 fps), a
+strobe frame swaps the wall to the two blue lamps (``SyncStrobeMode.INVERT``, as the patterns
+swap white and blue) or blanks it (``BLACK``). The first S11 frame continues the last PLAY
+frame's strobe; only the picture under it changes. The amplitude is the wall's fade, so the
+strobe dies with the wall into the dim line underneath, and ``frame.sync`` is carried at 1
+while the wall is up, so ``/global/sync`` holds until it is gone (``docs/SOUND.md``).
 """
 
 import numpy as np
@@ -23,7 +34,11 @@ import pytweening
 from modules.settings import Field, Widget
 
 from .._base_layer import BeamLayer, LayerSettings
+from ..projection.pose_instrument import SyncStrobeSettings, SyncStrobeMode
 from ...frame import Frame
+from ...synth import Strobe
+
+_TOP_RUNG = 16.0     # the sync strobe's rate at full sync (2 ** round(4 × 1)), strobes per second
 
 
 class BeamWindDownSettings(LayerSettings):
@@ -33,11 +48,14 @@ class BeamWindDownSettings(LayerSettings):
 
 
 class BeamWindDown(BeamLayer):
-    """The two white beam lights at the current fade level; see the module docstring."""
+    """The two white beam lights at the current fade level — under the sync strobe when built
+    with ``strobe``; see the module docstring."""
 
-    def __init__(self, resolution: int, config: BeamWindDownSettings, board) -> None:
+    def __init__(self, resolution: int, config: BeamWindDownSettings, board,
+                 strobe: SyncStrobeSettings | None = None) -> None:
         super().__init__(resolution, config, board)
         self._config = config
+        self._strobe = strobe
         self._elapsed: float = 0.0
 
     def reset(self) -> None:
@@ -50,4 +68,13 @@ class BeamWindDown(BeamLayer):
         f = 1.0 - pytweening.easeInOutSine(t)
         self._config.progress = 1.0 - f
         wall = f * self._config.level
-        self._add_beam_lights(beam_lights, front_white=wall, back_white=wall)
+        if self._strobe is None:
+            self._add_beam_lights(beam_lights, front_white=wall, back_white=wall)
+            return
+        frame.sync = 1.0 if f > 0.0 else 0.0                     # the strobe as the sound hears it
+        ticks_per_second = max(1, round(1.0 / max(frame.tick.interval, 1e-3)))
+        period = Strobe.period(Strobe.rate(_TOP_RUNG, ticks_per_second), ticks_per_second)
+        if frame.tick.index % period != 0:
+            self._add_beam_lights(beam_lights, front_white=wall, back_white=wall)
+        elif self._strobe.mode == SyncStrobeMode.INVERT:
+            self._add_beam_lights(beam_lights, left_blue=wall, right_blue=wall)

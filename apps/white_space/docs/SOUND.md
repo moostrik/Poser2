@@ -136,13 +136,14 @@ Sent once per bundle.
 | `/global/progress`        | float   | 0..1     | the show's progress                                          |
 | `/global/playhead`        | float   | −π..π    | the playhead as an azimuth (`CALIBRATION.md`, *Playhead*)    |
 | `/global/motor`           | int     | mode     | the motor command's mode                                     |
-| `/global/sync`            | float   | 0..1     | full sync's envelope: the sync strobe's attack and release while every present pair holds the band (`POSE_INSTRUMENT.md`, *The sync strobe*) |
+| `/global/sync`            | float   | 0..1     | full sync's envelope: the sync strobe's attack and release while every present pair holds the band (`POSE_INSTRUMENT.md`, *The sync strobe*); 1 through S11's strobing wall until it is gone (`LAYERS.md`, *beam_wind_down*) |
 | `/global/players`         | int     | 0..6     | the number of live players: occupied slots 0–5, ghosts and the dummy not counted |
 | `/global/volume`          | float   | 0..1     | the operator's fader (`CALIBRATION.md`, *Sound (Max)*)       |
 | `/global/speaker/offset`  | float   | radians  | where speaker 0 stands (`CALIBRATION.md`, *Sound (Max)*)     |
 
 The playhead, the motor mode and the sync are 0 while no show runs; the sync is also 0 whenever
-the pose instrument layer is not drawn — the compositor carries it out of a rendered frame only.
+neither the pose instrument nor S11's strobing wall is drawn — the compositor carries it out of a
+rendered frame only.
 The player count is presence data like the per-pose `active` flags: it reads true whenever the
 app runs, show or no show, and 0 in the shutdown blackout. The volume and the speaker offset
 are operator settings and are never zeroed.

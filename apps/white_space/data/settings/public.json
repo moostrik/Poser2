@@ -213,7 +213,7 @@
     },
     "osc_sound_sender": {
       "stage": "LERP",
-      "volume": 0.93,
+      "volume": 1.0,
       "speaker_offset": 0.0,
       "ip_addresses": "192.168.1.40",
       "port": 8000
@@ -291,7 +291,7 @@
       },
       "mono_sensor": {
         "exposure": 29992,
-        "iso": 1477,
+        "iso": 1395,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -571,7 +571,7 @@
     },
     "similarity": {
       "posture": {
-        "angle_tolerance": 30.0,
+        "angle_tolerance": 40.0,
         "forgiveness": 1.5,
         "joints": {
           "left_shoulder": true,
@@ -650,7 +650,7 @@
       "projection_rpm": 1920.0
     },
     "playhead": {
-      "pulse_offset": 220.0,
+      "pulse_offset": 215.0,
       "tracking": 0.12,
       "speed_smoothing": 0.66
     },
@@ -676,6 +676,10 @@
         "blend": "ADD"
       },
       "beam_wind_down": {
+        "level": 1.0,
+        "blend": "ADD"
+      },
+      "beam_sync_wind_down": {
         "level": 1.0,
         "blend": "ADD"
       },
@@ -1052,9 +1056,11 @@
     "end_bars": 4.0,
     "dim_level": 0.4,
     "min_players": 3,
+    "play_full_sync_seconds": 6.0,
+    "intro_grace_seconds": 10.0,
     "sync": {},
     "manual": {
-      "select": "INTRO_PLAY",
+      "select": "END",
       "hold": false
     },
     "session": {

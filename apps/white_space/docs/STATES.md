@@ -416,25 +416,29 @@ holds — landing on the BRIGHT line instead of the dim one.
 ## S11 — PLAY_INTRO
 
 The sync end: the players have held full sync for `play_full_sync_seconds`, and the machine spins down
-to the intro. The same engine as S9 — `beam_wind_down` owns the timed fade over `spin_down_seconds`, the
-dim line sits underneath and is revealed, and the state hands over once the fade is complete and the
-playhead lock holds. The entry is a cut: BEAM is commanded at once and the fixture reads beam mode from
-the first packet, so the instrument's picture gives way to the full wall in one frame, where S8 crosses
-to it over `end_bars`. The instrument is reset on entry: it is done, and `PI.full_sync` reads off from
-here until S6 starts the next one. The intro it lands in is disarmed (S4): the room is still posing, and
-the show spins up again only once the hits have been out of sync for `intro_grace_seconds`.
+to the intro under the sync strobe. The same engine as S9 — the wall owns the timed fade over
+`spin_down_seconds`, the dim line sits underneath and is revealed, and the state hands over once the fade
+is complete and the playhead lock holds — but the wall is `beam_sync_wind_down`, the **strobing wall**
+(`LAYERS.md`, *beam_wind_down*). BEAM is commanded at once and the fixture reads beam mode from the first
+packet, so the instrument's picture gives way to the wall in one frame, and the sync strobe carries
+across: on the lamps, on the strobes' shared tick grid at the top rung, in the instrument's mode
+(`PI.sync_strobe.mode`: INVERT swaps the wall to the blue lamps, BLACK blanks it), until the fade has
+taken the wall. The instrument is reset on entry: it is done, and `PI.full_sync` reads off from here
+until S6 starts the next one. The intro it lands in is disarmed (S4): the room is still posing, and the
+show spins up again only once the hits have been out of sync for `intro_grace_seconds`.
 
 - **Players**: ≥ min_players · **Duration**: the spin-down (fade complete, then the lock) · **Motor**: BEAM
 - **Transitions**
   1. fade complete (`progress` ≥ 1) and playhead lock → S4 INTRO
-- **Mix**: `beam_wind_down` 1.0 · `beam_playhead` DIM — S9's mix; `beam_wind_down` and `pose_instrument`
-  reset on entry
-- **White**: the wall from the first packet, both lamps fading to gone over `spin_down_seconds`; the front
-  lands on the dim line underneath
-- **Blue**: none
+- **Mix**: `beam_sync_wind_down` 1.0 · `beam_playhead` DIM — S9's mix with the strobing wall;
+  `beam_sync_wind_down` and `pose_instrument` reset on entry
+- **White**: the wall from the first packet, both lamps fading to gone over `spin_down_seconds`, off on
+  strobe frames; the front lands on the dim line underneath, which does not strobe
+- **Blue**: the wall on strobe frames (INVERT), fading with the white; none in BLACK
 - **Pose sound**: open
 - **Secondary sound**: open
-- **Progress** (OSC `/global/state/progress`): the layer's own fade readout, as S9's
+- **Progress** (OSC `/global/state/progress`): the layer's own fade readout, as S9's; `/global/sync` holds
+  1 until the wall is gone (`SOUND.md`)
 
 ---
 
@@ -446,6 +450,5 @@ the show spins up again only once the hits have been out of sync for `intro_grac
 - **S7**: an inactivity exit — "no action for x bars → END", with an action-gated wind-back in END to
   match; left out to keep the graph simple
 - **S8–S10**: the distortion treatment (Max side); `/global/state/progress` is the ramp that drives it
-- **S11**: the sound treatment (Max side); `/global/state` 11 is new to the patch
-- **S11**: whether the sync end wants an entry of its own beyond the cut (a flash, the strobe running
-  out) — a layer in S11's mix, not a change to the state
+- **S11**: the sound treatment (Max side); `/global/state` 11 is new to the patch, and `/global/sync` now
+  holds through the wind-down

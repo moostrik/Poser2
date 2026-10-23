@@ -30,6 +30,7 @@ class LayerId(IntEnum):
     beam_playhead       = auto()   # beam: front white lamp (the searchlight line)
     beam_flash          = auto()   # beam: flash as the playhead crosses a player
     beam_wind_down      = auto()   # beam: flood's ending — the two white lamps fading over the spin-down (the wall while fast)
+    beam_sync_wind_down = auto()   # beam: the sync end's wall — the dying wall under the sync strobe (S11)
     beam_haunted        = auto()   # beam: player/ghost flash (debug/experimentation)
     beam_test           = auto()   # beam: direct levels for the four physical lamps (debug)
     # projection mode — the projection
@@ -61,6 +62,7 @@ class DebugLayer(IntEnum):
     beam_playhead       = auto()
     beam_flash          = auto()
     beam_wind_down      = auto()
+    beam_sync_wind_down = auto()
     beam_haunted        = auto()
     beam_test           = auto()
     # projection mode — the projection
@@ -87,6 +89,7 @@ class BeamLayersSettings(BaseSettings):
     beam_playhead:      Group[BeamPlayheadSettings]     = Group(BeamPlayheadSettings)
     beam_flash:         Group[BeamFlashSettings]        = Group(BeamFlashSettings)
     beam_wind_down:     Group[BeamWindDownSettings]     = Group(BeamWindDownSettings, share=[spin_down_seconds.as_('spin_down_seconds')])
+    beam_sync_wind_down: Group[BeamWindDownSettings]    = Group(BeamWindDownSettings, share=[spin_down_seconds.as_('spin_down_seconds')])
     beam_haunted:       Group[BeamHauntedSettings]      = Group(BeamHauntedSettings)
     beam_test:          Group[BeamTestSettings]         = Group(BeamTestSettings)
 

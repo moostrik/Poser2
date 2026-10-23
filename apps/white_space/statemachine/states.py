@@ -325,16 +325,18 @@ class EndState(StateBase):
 
 
 class WindDownStateBase(StateBase):
-    """Shared S9–S11 engine: the dying wall. The mix is constant — the ``beam_wind_down`` layer
-    (reset on entry) owns the whole fade, timed over its ``spin_down_seconds`` — and the
-    landing look sits underneath, revealed as the wall dies. Exit: the fade complete and
-    the playhead lock (the landing state needs a live playhead). Progress is the
-    layer's own fade readout, so OSC stage_progress rides the actual fade."""
+    """Shared S9–S11 engine: the dying wall. The mix is constant — the wall layer ``LAYER``
+    (``beam_wind_down``; S11 the strobing ``beam_sync_wind_down``), reset on entry, owns the
+    whole fade, timed over its ``spin_down_seconds`` — and the landing look sits underneath,
+    revealed as the wall dies. Exit: the fade complete and the playhead lock (the landing
+    state needs a live playhead). Progress is the layer's own fade readout, so OSC
+    stage_progress rides the actual fade."""
     MOTOR = MotorMode.BEAM
     TARGET: StateId
+    LAYER: LayerId = LayerId.beam_wind_down       # the wall this state dies under
 
     def enter(self, ctx: StateContext) -> None:
-        self._reset_layers([LayerId.beam_wind_down])  # restart the fade at the full wall
+        self._reset_layers([self.LAYER])            # restart the fade at the full wall
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.is_playhead_locked and self.progress(ctx) >= 1.0:
@@ -342,7 +344,7 @@ class WindDownStateBase(StateBase):
         return None
 
     def progress(self, ctx: StateContext) -> float:
-        return self._light.beam_layers.beam_wind_down.progress
+        return getattr(self._light.beam_layers, self.LAYER.name).progress
 
 
 class EndIntroState(WindDownStateBase):
@@ -365,14 +367,16 @@ class EndIdleState(WindDownStateBase):
 class PlayIntroState(WindDownStateBase):
     """S11 — PLAY_INTRO. See docs/STATES.md."""
     TARGET = StateId.INTRO
+    LAYER = LayerId.beam_sync_wind_down           # the strobing wall: the sync strobe carries across
 
     def enter(self, ctx: StateContext) -> None:
-        # The wall restarts full, and the instrument is done: PLAY_INTRO never returns to PLAY, and
-        # its full-sync readout clears with it (the layer is not drawn again before S6 resets it).
-        self._reset_layers([LayerId.beam_wind_down, LayerId.pose_instrument])
+        # The strobing wall restarts full, and the instrument is done: PLAY_INTRO never returns to
+        # PLAY, and its full-sync readout clears with it (the layer is not drawn again before S6
+        # resets it).
+        self._reset_layers([LayerId.beam_sync_wind_down, LayerId.pose_instrument])
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.beam_wind_down, 1.0), (LayerId.beam_playhead, self._config.dim_level)]
+        return [(LayerId.beam_sync_wind_down, 1.0), (LayerId.beam_playhead, self._config.dim_level)]
 
 
 # -- Registry (total over StateId) ----------------------------------------------

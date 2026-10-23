@@ -476,7 +476,9 @@ The sync strobe acts after the synth: the voices render as ever and the bridge s
 outputs between the channels (or skips painting them), so no parameter, slot or oscillator is
 touched, the per-oscillator strobes stay independent, and the masks and the marker, painted
 after, hold steady through it. The steps are the point, as a strobe's are: a deliberate
-event, not jitter.
+event, not jitter. At the sync end (`STATES.md`, S11) the strobe does not stop with the
+instrument: the wind-down's wall carries it on the lamps, same grid, same rate, this mode
+(`LAYERS.md`, *beam_wind_down*).
 
 ### The hit
 

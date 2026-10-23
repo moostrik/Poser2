@@ -384,19 +384,25 @@ class StateMachineTest(unittest.TestCase):
         self.tick(dt=self.config.play_full_sync_seconds + 0.1)
         self.assertEqual(self.current, StateId.END)
 
-    def test_play_intro_is_the_wind_down_engine(self) -> None:
-        # S9's engine: the wall (beam_wind_down, reset on entry) over the dim line, the instrument
-        # reset too (it is done, and its readout goes with it). Exit on the fade and the lock only.
+    def test_play_intro_is_the_wind_down_engine_under_the_strobing_wall(self) -> None:
+        # S9's engine with the strobing wall (beam_sync_wind_down, reset on entry) over the dim line,
+        # the instrument reset too (it is done, and its readout goes with it). Exit on that wall's
+        # own fade and the lock only — the plain wall's readout is not S11's.
         self._to_play_intro()
-        self.assertIn([LayerId.beam_wind_down, LayerId.pose_instrument], self.resets)
-        self.assertEqual(self.mixes[-1], [(LayerId.beam_wind_down, 1.0), (LayerId.beam_playhead, 0.4)])
-        self.light.beam_layers.beam_wind_down.progress = 0.5
+        self.assertIn([LayerId.beam_sync_wind_down, LayerId.pose_instrument], self.resets)
+        self.assertEqual(self.mixes[-1], [(LayerId.beam_sync_wind_down, 1.0), (LayerId.beam_playhead, 0.4)])
+        self.light.beam_layers.beam_sync_wind_down.progress = 0.5
         self.tick()
         self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.5)
         self.tick(dt=999.0, dbar=5.0)                                 # time and bars alone never exit
         self.hit()                                                    # nor a crossing: the wall is up
         self.assertEqual(self.current, StateId.PLAY_INTRO)
-        self.light.beam_layers.beam_wind_down.progress = 1.0          # fade complete — no lock yet
+        self.board.is_locked = True
+        self.light.beam_layers.beam_wind_down.progress = 1.0          # the plain wall's fade: not this state's
+        self.tick()
+        self.assertEqual(self.current, StateId.PLAY_INTRO)
+        self.board.is_locked = False
+        self.light.beam_layers.beam_sync_wind_down.progress = 1.0     # fade complete — no lock yet
         self.tick()
         self.assertEqual(self.current, StateId.PLAY_INTRO)
         self.board.is_locked = True
@@ -405,7 +411,7 @@ class StateMachineTest(unittest.TestCase):
 
     def _to_intro_after_the_sync_end(self) -> None:
         self._to_play_intro()
-        self.light.beam_layers.beam_wind_down.progress = 1.0
+        self.light.beam_layers.beam_sync_wind_down.progress = 1.0
         self.board.is_locked = True
         self.tick()
         self.assertEqual(self.current, StateId.INTRO)
