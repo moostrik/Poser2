@@ -353,19 +353,59 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.PLAY_INTRO)
         self.assertEqual(self.motors[-1], MotorMode.BEAM)
 
-    def test_full_sync_dropping_restarts_the_hold(self) -> None:
+    def test_a_break_in_full_sync_drains_the_hold_over_the_release(self) -> None:
+        # Hold 20 s, release 5 s: 16 s in sync builds 0.8; a 1 s break drains 0.2; back in sync, 8 s
+        # more fill it — the break cost its length times hold/release, not the whole hold.
+        self.config.play_full_sync_seconds = 20.0
+        self.config.play_full_sync_release_seconds = 5.0
         self._to_play()
         self.set_full_sync(True)
-        self.tick()
-        self.tick(dt=self.config.play_full_sync_seconds * 0.8)
-        self.set_full_sync(False)                                     # the band closes: the hold restarts
-        self.tick()
+        self.tick(dt=16.0)
+        self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.8, places=6)
+        self.set_full_sync(False)
+        self.tick(dt=1.0)
+        self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.6, places=6)
         self.set_full_sync(True)
-        self.tick()
+        self.tick(dt=7.9)
+        self.assertEqual(self.current, StateId.PLAY)
+        self.tick(dt=0.2)
+        self.assertEqual(self.current, StateId.PLAY_INTRO)
+
+    def test_a_break_of_the_whole_release_starts_the_hold_over(self) -> None:
+        self.config.play_full_sync_seconds = 20.0
+        self.config.play_full_sync_release_seconds = 5.0
+        self._to_play()
+        self.set_full_sync(True)
+        self.tick(dt=16.0)
+        self.set_full_sync(False)
+        self.tick(dt=5.0)                                             # drained
+        self.assertEqual(self.emitted[-1].stage_progress, 0.0)
+        self.set_full_sync(True)
+        self.tick(dt=19.9)
+        self.assertEqual(self.current, StateId.PLAY)
+        self.tick(dt=0.2)
+        self.assertEqual(self.current, StateId.PLAY_INTRO)
+
+    def test_a_zero_release_restarts_the_hold_on_any_break(self) -> None:
+        self.config.play_full_sync_release_seconds = 0.0
+        self._to_play()
+        self.set_full_sync(True)
+        self.tick(dt=self.config.play_full_sync_seconds * 0.8)
+        self.set_full_sync(False)
+        self.tick()                                                   # one tick out: gone
+        self.assertEqual(self.emitted[-1].stage_progress, 0.0)
+        self.set_full_sync(True)
         self.tick(dt=self.config.play_full_sync_seconds * 0.8)
         self.assertEqual(self.current, StateId.PLAY)
         self.tick(dt=self.config.play_full_sync_seconds * 0.2 + 0.1)
         self.assertEqual(self.current, StateId.PLAY_INTRO)
+
+    def test_plays_progress_is_the_hold(self) -> None:
+        self._to_play()
+        self.assertEqual(self.emitted[-1].stage_progress, 0.0)
+        self.set_full_sync(True)
+        self.tick(dt=self.config.play_full_sync_seconds / 2)
+        self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.5, places=6)
 
     def test_a_zero_hold_never_ends_play_on_sync(self) -> None:
         self.config.play_full_sync_seconds = 0.0

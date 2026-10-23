@@ -213,7 +213,7 @@
     },
     "osc_sound_sender": {
       "stage": "LERP",
-      "volume": 0.6,
+      "volume": 1.0,
       "speaker_offset": 0.0,
       "ip_addresses": "192.168.1.40",
       "port": 8000
@@ -382,9 +382,9 @@
         "VIDEO"
       ],
       "apply_warp": false,
-      "folder": "20260924-203306_2_person",
+      "folder": "20261023-163234_ICK",
       "sim_passthrough": false,
-      "start_norm": 0.04,
+      "start_norm": 0.0,
       "end_norm": 1.0
     },
     "frame_sync": {},
@@ -392,7 +392,7 @@
   },
   "track": {
     "age_filter": 3,
-    "height_filter": 0.2,
+    "height_filter": 0.3,
     "zone_filter": true,
     "foot_offset": 0.02,
     "reacquire_angle": 7.0,
@@ -409,7 +409,7 @@
       "camera_radius": 0.32,
       "camera_height": 0.52,
       "zone_min_radius": 1.5,
-      "zone_max_radius": 6.7
+      "zone_max_radius": 6.0
     }
   },
   "pose": {
@@ -572,7 +572,7 @@
     "similarity": {
       "posture": {
         "angle_tolerance": 33.0,
-        "forgiveness": 1.5,
+        "forgiveness": 2.0,
         "joints": {
           "left_shoulder": true,
           "right_shoulder": true,
@@ -790,7 +790,7 @@
       "test_lines": {
         "blend": "ADD",
         "white": {
-          "level": 0.67,
+          "level": 1.0,
           "speed": 0.33,
           "phase": 0.3,
           "width": 0.2,
@@ -801,7 +801,7 @@
           "level": 1.0,
           "speed": -1.19,
           "phase": 0.5,
-          "width": 0.2,
+          "width": 0.5,
           "amount": 16,
           "hardness": 1.0
         }
@@ -1055,12 +1055,13 @@
     "intro_idle_bars": 2.0,
     "end_bars": 4.0,
     "dim_level": 0.4,
-    "min_players": 3,
+    "min_players": 2,
     "play_full_sync_seconds": 6.0,
+    "play_full_sync_release_seconds": 5.0,
     "intro_grace_seconds": 10.0,
     "sync": {},
     "manual": {
-      "select": "IDLE",
+      "select": "PLAY",
       "hold": false
     },
     "session": {

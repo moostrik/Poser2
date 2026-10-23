@@ -515,7 +515,7 @@ class PoseInstrument(ProjectionLayer):
         read holds the room off, as does a person at neutral (the neutral weight is in the
         feature); below two people there is no pair. Computed once per tick, once the players'
         presences and similarities are this tick's; published on ``PI.full_sync`` for the show
-        (``docs/STATES.md``, S7: PLAY winds down once it has held), and taken by the sync strobe,
+        (``docs/STATES.md``, S7: PLAY winds down once its hold has built), and taken by the sync strobe,
         the growth and the blend, each through its own bypass into its own envelope."""
         P = self._instrument
         present = [id for id, p in self._players.items() if p.present]

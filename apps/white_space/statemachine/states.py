@@ -25,8 +25,11 @@ from typing import Callable
 import pytweening
 
 from ..light import LightSettings, LayerId, Mix, MotorMode
+from ..light.synth import Envelope
 from .settings import StateId, StateMachineSettings
 from .machine import StateContext
+
+_FULL = 1.0 - 1e-6       # "reads 1" for a float: an envelope at its top
 
 
 # -- Easing helpers (weight curves over progress p in [0, 1]; pytweening easings) --
@@ -181,16 +184,16 @@ class PlayState(StateBase):
 
     def __init__(self, *args) -> None:
         super().__init__(*args)
-        self._full_sync_since: float | None = None    # elapsed at which full sync last came on
+        self._hold = Envelope()                       # the sync end's hold: builds while full sync holds, drains while not
 
     def enter(self, ctx: StateContext) -> None:
-        self._full_sync_since = None                  # no layer reset: PLAY inherits the running instrument
+        self._hold.reset()                            # no layer reset: PLAY inherits the running instrument
 
     def update(self, ctx: StateContext) -> Mix:
-        if not ctx.full_sync:
-            self._full_sync_since = None
-        elif self._full_sync_since is None:
-            self._full_sync_since = ctx.elapsed
+        # A break in full sync drains the hold over the release instead of clearing it, so one pair
+        # flickering under the band costs seconds, not the whole hold.
+        self._hold.update(ctx.full_sync, ctx.dt, self._config.play_full_sync_seconds,
+                          self._config.play_full_sync_release_seconds)
         return [(LayerId.pose_instrument, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
@@ -200,11 +203,14 @@ class PlayState(StateBase):
             return None
         if ctx.players < self._config.min_players:
             return StateId.END
-        # The room has held full sync long enough: the sync end, the wind-down to the intro.
-        held = self._config.play_full_sync_seconds
-        if held > 0.0 and self._full_sync_since is not None and ctx.elapsed - self._full_sync_since >= held:
+        # The hold has built: the sync end, the wind-down to the intro.
+        if self._config.play_full_sync_seconds > 0.0 and self._hold.level >= _FULL:
             return StateId.PLAY_INTRO
         return None
+
+    def progress(self, ctx: StateContext) -> float:
+        """The sync end's hold, 0 → 1."""
+        return self._hold.level
 
 
 # -- Transition states (ramps) ----------------------------------------------------
