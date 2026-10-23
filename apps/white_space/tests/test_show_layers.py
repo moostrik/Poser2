@@ -131,7 +131,7 @@ class BeamWindDownTest(unittest.TestCase):
 class BeamSyncWindDownTest(unittest.TestCase):
     """The strobing wall (S11): the same fade under the sync strobe — on the strobes' shared tick
     grid at the top rung (every other tick at 32 fps), a strobe frame swaps the wall to the blue
-    lamps (INVERT) or blanks it (BLACK); the sync is carried at 1 while the wall is up."""
+    lamps (INVERT) or blanks it (BLACK); it carries no sync — /global/sync is the instrument's."""
 
     def setUp(self) -> None:
         from apps.white_space.light.layers.beam.wind_down import BeamWindDown, BeamWindDownSettings
@@ -176,13 +176,11 @@ class BeamSyncWindDownTest(unittest.TestCase):
             plain.render(Frame(RES, Tick(i / 32, 1 / 32, 1 / 32, i)))
         self.assertAlmostEqual(self.cfg.progress, plain_cfg.progress, places=6)
 
-    def test_the_sync_holds_until_the_wall_is_gone(self) -> None:
+    def test_the_wall_fades_through_the_strobe_and_carries_no_sync(self) -> None:
         self.cfg.spin_down_seconds = 1.0
         frames = [self._next() for _ in range(48)]                              # 1.5 s
-        self.assertEqual(frames[0].sync, 1.0)
-        self.assertEqual(frames[20].sync, 1.0)                                  # still fading: up
         self.assertEqual(self.cfg.progress, 1.0)
-        self.assertEqual(frames[-1].sync, 0.0)                                  # the wall is gone
+        self.assertEqual({f.sync for f in frames}, {0.0})                       # the sound's sync is the instrument's
         whites = [float(f.beam_lights[BeamLightId.FRONT_WHITE]) for f in frames[1::2]]   # the wall frames
         self.assertEqual(whites, sorted(whites, reverse=True))                  # fading through the strobe
         self.assertEqual(whites[-1], 0.0)

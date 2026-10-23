@@ -437,8 +437,8 @@ show spins up again only once the hits have been out of sync for `intro_grace_se
 - **Blue**: the wall on strobe frames (INVERT), fading with the white; none in BLACK
 - **Pose sound**: open
 - **Secondary sound**: open
-- **Progress** (OSC `/global/state/progress`): the layer's own fade readout, as S9's; `/global/sync` holds
-  1 until the wall is gone (`SOUND.md`)
+- **Progress** (OSC `/global/state/progress`): the layer's own fade readout, as S9's. `/global/sync` is 0:
+  the strobe is carried in light only (`SOUND.md`)
 
 ---
 
@@ -450,5 +450,4 @@ show spins up again only once the hits have been out of sync for `intro_grace_se
 - **S7**: an inactivity exit — "no action for x bars → END", with an action-gated wind-back in END to
   match; left out to keep the graph simple
 - **S8–S10**: the distortion treatment (Max side); `/global/state/progress` is the ramp that drives it
-- **S11**: the sound treatment (Max side); `/global/state` 11 is new to the patch, and `/global/sync` now
-  holds through the wind-down
+- **S11**: the sound treatment (Max side); `/global/state` 11 is new to the patch

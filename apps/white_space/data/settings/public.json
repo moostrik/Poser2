@@ -162,8 +162,8 @@
   },
   "record": {
     "output_path": "recordings",
-    "name": "2_person",
-    "split_seconds": 10,
+    "name": "ICK",
+    "split_seconds": 60,
     "osc": {
       "port_in": 9000,
       "return_messages": true,
@@ -213,7 +213,7 @@
     },
     "osc_sound_sender": {
       "stage": "LERP",
-      "volume": 1.0,
+      "volume": 0.6,
       "speaker_offset": 0.0,
       "ip_addresses": "192.168.1.40",
       "port": 8000
@@ -234,7 +234,7 @@
     "sim_enabled": false,
     "model_path": "data/models",
     "ir_flood_light": 0.75,
-    "mono_auto_exposure": true,
+    "mono_auto_exposure": false,
     "cam_0": {
       "device_id": "14442C10110AD3D200",
       "flip_h": true,
@@ -256,7 +256,7 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 30001,
+        "exposure": 20000,
         "iso": 1549,
         "ir_grid_light": 0.0
       },
@@ -290,8 +290,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 29992,
-        "iso": 1395,
+        "exposure": 20000,
+        "iso": 1149,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -324,7 +324,7 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 30001,
+        "exposure": 20000,
         "iso": 1549,
         "ir_grid_light": 0.0
       },
@@ -358,7 +358,7 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 30001,
+        "exposure": 20000,
         "iso": 1549,
         "ir_grid_light": 0.0
       },
@@ -392,7 +392,7 @@
   },
   "track": {
     "age_filter": 3,
-    "height_filter": 0.25,
+    "height_filter": 0.2,
     "zone_filter": true,
     "foot_offset": 0.02,
     "reacquire_angle": 7.0,
@@ -571,7 +571,7 @@
     },
     "similarity": {
       "posture": {
-        "angle_tolerance": 40.0,
+        "angle_tolerance": 33.0,
         "forgiveness": 1.5,
         "joints": {
           "left_shoulder": true,
@@ -883,11 +883,11 @@
     }
   },
   "PI": {
-    "max_lines": 90,
+    "max_lines": 132,
     "opposite": "OFF",
     "lean_share": 2.0,
-    "on_at": 0.98,
-    "off_at": 0.93,
+    "on_at": 0.85,
+    "off_at": 0.5,
     "mask": {
       "width": 15.0,
       "white": 0.0,
@@ -922,7 +922,7 @@
       "bypass": false,
       "mode": "INVERT",
       "attack_seconds": 2.0,
-      "release_seconds": 8.0
+      "release_seconds": 5.0
     },
     "grow": {
       "attack_seconds": 3.0,
@@ -1060,7 +1060,7 @@
     "intro_grace_seconds": 10.0,
     "sync": {},
     "manual": {
-      "select": "END",
+      "select": "IDLE",
       "hold": false
     },
     "session": {

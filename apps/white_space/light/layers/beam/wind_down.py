@@ -24,8 +24,8 @@ same rate (``Strobe.rate`` at 16 per second, ``Strobe.period``: every other tick
 strobe frame swaps the wall to the two blue lamps (``SyncStrobeMode.INVERT``, as the patterns
 swap white and blue) or blanks it (``BLACK``). The first S11 frame continues the last PLAY
 frame's strobe; only the picture under it changes. The amplitude is the wall's fade, so the
-strobe dies with the wall into the dim line underneath, and ``frame.sync`` is carried at 1
-while the wall is up, so ``/global/sync`` holds until it is gone (``docs/SOUND.md``).
+strobe dies with the wall into the dim line underneath. The wall carries no ``frame.sync``:
+the sound's ``/global/sync`` is the instrument's alone and reads 0 here (``docs/SOUND.md``).
 """
 
 import numpy as np
@@ -71,7 +71,6 @@ class BeamWindDown(BeamLayer):
         if self._strobe is None:
             self._add_beam_lights(beam_lights, front_white=wall, back_white=wall)
             return
-        frame.sync = 1.0 if f > 0.0 else 0.0                     # the strobe as the sound hears it
         ticks_per_second = max(1, round(1.0 / max(frame.tick.interval, 1e-3)))
         period = Strobe.period(Strobe.rate(_TOP_RUNG, ticks_per_second), ticks_per_second)
         if frame.tick.index % period != 0:

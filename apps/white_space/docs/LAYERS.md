@@ -129,8 +129,8 @@ rung, and the wall keeps that strobe on the lamps — on the strobes' shared tic
 (`LIGHT_SYNTH.md`, *The strobe*) at 16 per second, a strobe frame swaps the wall to the two blue
 lamps (INVERT, as the patterns swap white and blue) or blanks it (BLACK). The first S11 frame
 continues the last PLAY frame's strobe; only the picture under it changes. The amplitude is the
-fade, so the strobe dies with the wall into the dim line underneath, and `frame.sync` is carried
-at 1 while the wall is up (`SOUND.md`, `/global/sync`).
+fade, so the strobe dies with the wall into the dim line underneath. The wall carries no
+`frame.sync`: `/global/sync` is the instrument's and reads 0 under it (`SOUND.md`).
 
 - **Used by**: S9/S10 as `beam_wind_down`, S11 as `beam_sync_wind_down`, at constant weight 1.0
   (reset on state entry). The states put the landing look underneath (`beam_playhead` at
