@@ -153,8 +153,8 @@
       "monitor": "M1",
       "x": 1,
       "y": 31,
-      "width": 2558,
-      "height": 2080,
+      "width": 1278,
+      "height": 1000,
       "secondary_list": [],
       "secondary_fullscreen": true,
       "fullscreen_mode": "WINDOWED"
@@ -231,12 +231,12 @@
     "color": false,
     "square": false,
     "stereo": false,
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "ir_flood_light": 0.75,
     "mono_auto_exposure": true,
     "cam_0": {
-      "device_id": "14442C101136D1D200",
+      "device_id": "14442C10110AD3D200",
       "flip_h": true,
       "flip_v": false,
       "keystone": 0.0,
@@ -256,8 +256,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 0,
-        "iso": 0,
+        "exposure": 30001,
+        "iso": 1549,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -290,8 +290,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 0,
-        "iso": 0,
+        "exposure": 29992,
+        "iso": 1477,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -304,7 +304,7 @@
       }
     },
     "cam_2": {
-      "device_id": "14442C10110AD3D200",
+      "device_id": "14442C101136D1D200",
       "flip_h": true,
       "flip_v": false,
       "keystone": 0.0,
@@ -324,8 +324,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 0,
-        "iso": 0,
+        "exposure": 30001,
+        "iso": 1549,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -358,8 +358,8 @@
         "sharpness": 0
       },
       "mono_sensor": {
-        "exposure": 0,
-        "iso": 0,
+        "exposure": 30001,
+        "iso": 1549,
         "ir_grid_light": 0.0
       },
       "depth": {
@@ -392,7 +392,7 @@
   },
   "track": {
     "age_filter": 3,
-    "height_filter": 0.3,
+    "height_filter": 0.25,
     "zone_filter": true,
     "foot_offset": 0.02,
     "reacquire_angle": 7.0,
@@ -409,7 +409,7 @@
       "camera_radius": 0.32,
       "camera_height": 0.52,
       "zone_min_radius": 1.5,
-      "zone_max_radius": 5.5
+      "zone_max_radius": 6.7
     }
   },
   "pose": {
@@ -571,8 +571,8 @@
     },
     "similarity": {
       "posture": {
-        "angle_tolerance": 25.0,
-        "forgiveness": 1.4,
+        "angle_tolerance": 30.0,
+        "forgiveness": 1.5,
         "joints": {
           "left_shoulder": true,
           "right_shoulder": true,
@@ -896,16 +896,16 @@
       "flash_release_seconds": 0.4
     },
     "playhead": {
-      "width": 1.0,
+      "width": 5.0,
       "white": 1.0,
       "blue": 0.0,
-      "at_mask": 0.23
+      "at_mask": 1.0
     },
     "window": {
       "width": 45.0,
       "width_bypass": false,
-      "scale": 1.02,
-      "crowd": 0.9,
+      "scale": 1.0,
+      "crowd": 0.8,
       "overlap": 0.0,
       "taper": 0.1,
       "attack_seconds": 2.0,
@@ -918,7 +918,7 @@
       "bypass": false,
       "mode": "INVERT",
       "attack_seconds": 2.0,
-      "release_seconds": 1.2
+      "release_seconds": 8.0
     },
     "grow": {
       "attack_seconds": 3.0,
@@ -1054,7 +1054,7 @@
     "min_players": 3,
     "sync": {},
     "manual": {
-      "select": "PLAY",
+      "select": "INTRO_PLAY",
       "hold": false
     },
     "session": {
