@@ -3,14 +3,17 @@
 The playhead crosses each player once per round and plays that pose's sound; that crossing is the hit
 (``PlayheadCrossing``, the one rule the flash, the instrument and the show share). This component records the
 hit player's LERP pose at that tick and compares the most recent hits with the pipeline's own posture module
-on its own settings (``posture_distance`` / ``posture_similarity``, ``pose.similarity.posture``). A run of
+on its own settings (``posture_distance`` / ``posture_similarity``, ``pose.similarity.posture``). A hit is
+recorded only on a pose at least ``min_age_seconds`` old (its ``Age``, the time since the track's first
+frame): a double or a false positive lives a moment, so its hits neither build nor break the streak. The hit
+flag itself counts every crossing, so the intro still starts on a newcomer's first pass. A run of
 hits is **in sync** when two sentences hold: every pair of its poses is fully alike — the similarity reads 1,
 its plateau, the postures within ``angle_tolerance`` — and, while the neutral weight is enabled, every one of
 them is fully out of neutral (``ArmDeviation`` 1, at or beyond the arm extractor's ``max_degrees``), so a
 neutral hit — the glass ping — is alike to nothing. The streak is the longest such run of the most recent
 hits spanning less than one round (bar). A hit that does not match becomes the newest hit and the count
-restarts from it at once. The tolerance, in degrees, is the sync's only knob, and the sync is the test of it:
-too strict and the show never spins up.
+restarts from it at once. The tolerance, in degrees, is the sync's knob, and the sync is the test of it:
+too strict and the show never spins up; the age is the gate in front of it.
 
 Published on the board per light tick (``HitStreak``): the state machine spins the show up at ``min_players``
 alike hits in a row, and anything else may read the tension building. The readout is in degrees: the largest
@@ -45,9 +48,11 @@ _FULL = 1.0 - 1e-6       # "reads 1" for a float: the similarity's plateau, the 
 
 
 class HitSyncSettings(BaseSettings):
-    """The sync condition's telemetry; its one tunable is the posture similarity's ``angle_tolerance``."""
+    """The sync condition's telemetry and its age gate; its other tunable is the posture similarity's
+    ``angle_tolerance``."""
     hits:     Field[int]   = Field(0, access=Field.READ, pinned=True, description="Hits in a row that struck alike poses, this round")
     distance: Field[float] = Field(0.0, min=0.0, max=180.0, widget=Widget.number, access=Field.READ, description="Largest distance (°) between the hits in the streak; 0 with fewer than two")
+    min_age_seconds: Field[float] = Field(2.0, min=0.0, max=10.0, step=0.5, description="Seconds a pose must have existed before its hits count in the streak; 0 counts every hit")
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,20 +85,22 @@ class HitSync:
         self._streak = (0, 0.0)
 
     def update(self) -> None:
-        """One light tick: record this tick's hits, drop those older than a round, publish the streak."""
+        """One light tick: record this tick's hits on poses old enough, drop those older than a round, publish
+        the streak. The crossing runs on every pose, so a pose that comes of age mid-pass fires no second hit."""
         signals = self._board.get_playhead_signals()
         frames = self._board.get_frames(self._pose_stage)
         step = playhead_step(self._light.motor.beam_rpm, 1.0 / self._light.light_rate)
         offsets = {id: frame[PlayheadOffset].value for id, frame in frames.items()}
         ids = self._crossing.update(offsets, step, 1)
 
-        for id in sorted(ids):
+        recorded = [id for id in sorted(ids) if self._is_old_enough(frames[id])]
+        for id in recorded:
             self._hits.append(_Hit(signals.bars, id, frames[id]))
         expired = False
         while self._hits and signals.bars - self._hits[0].bar >= 1.0:
             self._hits.popleft()
             expired = True
-        if ids or expired:
+        if recorded or expired:
             self._streak = self._compute_streak()
 
         hits, distance = self._streak
@@ -124,6 +131,11 @@ class HitSync:
             if all(posture_similarity(float(d), self._posture) >= _FULL for d in run):
                 return size, float(run.max())
         return 1, 0.0
+
+    def _is_old_enough(self, pose: Frame) -> bool:
+        """``Age`` at least ``min_age_seconds``; a NaN age (the track's first frame) is 0."""
+        age = pose[features.Age].value
+        return (0.0 if math.isnan(age) else age) >= self._config.min_age_seconds
 
     def _is_posing(self, pose: Frame) -> bool:
         """Fully out of neutral, or the neutral weight is off; arms not seen are neutral."""

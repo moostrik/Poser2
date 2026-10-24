@@ -14,8 +14,10 @@ Vocabulary:
 - **in sync** — the most recent hits, within one round, whose poses are alike: every pair of them fully
   alike (`SIMILARITY.md`: the arm postures within `angle_tolerance` of each other) and every one fully out of
   neutral. `sync.hits` is how many in a row, `sync.distance` the largest distance between them in degrees; a
-  hit that does not match restarts the count from itself at once. `HitSync` (`pose/hit_sync.py`) records
-  each hit's pose off the LERP frame and publishes the streak on the board
+  hit that does not match restarts the count from itself at once. Only a pose at least `sync.min_age_seconds`
+  old (its `Age`; `studio.json`: 2 s) has its hits recorded: a double or a false positive lives a moment, so
+  its hits neither build nor break the streak, while the hit itself still starts the intro. `HitSync`
+  (`pose/hit_sync.py`) records each hit's pose off the LERP frame and publishes the streak on the board
 - **full sync** — the room's gate in the pose instrument: every present pair alike over the band `PI.on_at` /
   `PI.off_at`, with hysteresis (`POSE_INSTRUMENT.md`, *The sync strobe*). The instrument computes it once per
   tick while it draws and publishes it as `PI.full_sync`; the machine reads it in PLAY, where its **hold** —
@@ -279,7 +281,8 @@ sound `min_players` times in a row.
   1. P == 0 → S5 INTRO_IDLE
   2. armed, `sync.hits` ≥ min_players (the last min_players hits **in sync**, *Vocabulary*) and P ≥ min_players →
      S6 INTRO_PLAY. A neutral hit is alike to nothing, so pings never spin the show up; a hit that does not
-     match restarts the count at once, and the count is visible on the panel as it builds. Entered from
+     match restarts the count at once, a hit on a pose younger than `sync.min_age_seconds` is not recorded
+     (*Vocabulary*: in sync), and the count is visible on the panel as it builds. Entered from
      S11 PLAY_INTRO the intro is **disarmed**: the room is still posing, so it arms only once the streak has
      stayed under min_players for `intro_grace_seconds` without a break (a streak reaching min_players
      restarts the wait). From every other state it is armed on entry, so the first alike hits count

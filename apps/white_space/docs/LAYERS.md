@@ -45,7 +45,8 @@ projection row at its azimuth (`render.pose_figures`). How the tracker produces 
 The hit is detected by `PlayheadCrossing` (`pose/playhead_offset.py`) in three instances
 (`beam_flash`, `pose_instrument`, `HitSync`) on the same LERP `PlayheadOffset` and the same step
 (`beam_rpm` at the tick rate), so they agree by construction; one shared detector would gain the
-layers nothing.
+layers nothing. `HitSync` records in its streak only the hits on poses at least `sync.min_age_seconds` old
+(`STATES.md` *Vocabulary*: in sync); its hit flag, the flash and the instrument's mark fire on every crossing.
 
 ## Index — show layers
 

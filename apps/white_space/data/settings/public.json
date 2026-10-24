@@ -884,7 +884,7 @@
   },
   "PI": {
     "max_lines": 132,
-    "opposite": "OFF",
+    "opposite": "BOTH",
     "lean_share": 2.0,
     "on_at": 0.85,
     "off_at": 0.5,
@@ -1061,7 +1061,7 @@
     "intro_grace_seconds": 10.0,
     "sync": {},
     "manual": {
-      "select": "END_INTRO",
+      "select": "INTRO_PLAY",
       "hold": false
     },
     "session": {

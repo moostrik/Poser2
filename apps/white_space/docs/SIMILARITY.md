@@ -63,7 +63,7 @@ The arms are alike, then, when every arm joint is within the tolerance, allowing
 | | Hit sync | `Similarity` feature |
 |-----------------------|----------------------------------------------------------|---------------------------------------------------------------|
 | Component             | `HitSync` (`pose/hit_sync.py`)                           | `PostureSimilarity` (the module), wired in `main.py`          |
-| Input                 | the hit player's LERP pose at the hit tick               | the current SMOOTH poses, every frame                         |
+| Input                 | the hit player's LERP pose at the hit tick, once the pose is `sync.min_age_seconds` old | the current SMOOTH poses, every frame |
 | Reads                 | the distance, and the similarity's plateau               | the similarity, 0 to 1                                        |
 | Neutral               | a gate: every hit in the run has `ArmDeviation` 1        | a ramp: the pair times the smaller `ArmDeviation` (`pose/neutral_weight.py`) |
 | In time               | none: the poses as they were at the hits                 | `SimilarityStickyFiller`, `SimilarityEuroSmoother` (SMOOTH), `SimilarityChaseInterpolator` (LERP) |
@@ -95,6 +95,7 @@ zeros.
 | `pose.similarity.smoother` (`min_cutoff`, `cutoff_rise`) | feature          | 0.3, 1.0      | the Euro smoother on the stamped rows |
 | `pose.similarity.interpolator` (`responsiveness`, `friction`) | feature    | 0.33, 0.05    | the chase at LERP |
 | `states.min_players`                                 | hit sync            | 2             | alike hits in a row to spin up |
+| `states.sync.min_age_seconds`                        | hit sync            | 2 s           | a pose this old (its `Age`) before its hits are recorded |
 | `states.play_full_sync_seconds`                      | the show (S7)       | 20 s          | PLAY winds down once the full-sync hold has built over this; 0 never |
 | `states.play_full_sync_release_seconds`              | the show (S7)       | 5 s           | a break in full sync drains the hold over this; 0 restarts it |
 | `states.intro_grace_seconds`                         | the show (S4)       | 20 s          | after the sync end, the hits out of sync this long before INTRO can spin up again |

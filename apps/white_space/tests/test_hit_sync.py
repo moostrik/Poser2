@@ -8,7 +8,7 @@ import numpy as np
 
 from modules.board import HitStreak
 from modules.pose.analytics import PostureSimilaritySettings
-from modules.pose.features import Angles, AngleLandmark, ArmDeviation
+from modules.pose.features import Age, Angles, AngleLandmark, ArmDeviation
 
 from apps.white_space.light import LightSettings
 from apps.white_space.pose import HitSync, HitSyncSettings, NeutralWeightSettings, PlayheadOffset
@@ -24,11 +24,14 @@ def _angles(degrees: float) -> Angles:
 
 
 class FakeFrame:
-    """A player's LERP frame: their playhead offset, pose and arm deviation."""
-    def __init__(self, offset: float = math.nan, angles: Angles | None = None, arms: float = 1.0) -> None:
+    """A player's LERP frame: their playhead offset, pose, arm deviation and age (seconds; old enough by
+    default)."""
+    def __init__(self, offset: float = math.nan, angles: Angles | None = None, arms: float = 1.0,
+                 age: float = 10.0) -> None:
         self.offset = offset
         self.angles = angles if angles is not None else _angles(0.0)
         self.arms = arms
+        self.age = age
 
     def __getitem__(self, key):
         if key is PlayheadOffset:
@@ -37,6 +40,8 @@ class FakeFrame:
             return self.angles
         if key is ArmDeviation:
             return ArmDeviation.from_value(self.arms) if not math.isnan(self.arms) else ArmDeviation.create_dummy()
+        if key is Age:
+            return Age.from_value(self.age) if not math.isnan(self.age) else Age.create_dummy()
         raise KeyError(key)
 
 
@@ -74,12 +79,12 @@ class HitSyncTest(unittest.TestCase):
         self.sync.update()
         return self.board.streaks[-1]
 
-    def hit(self, id: int, degrees: float = 60.0, arms: float = 1.0) -> HitStreak:
+    def hit(self, id: int, degrees: float = 60.0, arms: float = 1.0, age: float = 10.0) -> HitStreak:
         """The playhead crosses ``id`` this tick (the closest tick, −0.1 rad at 72 rpm / 30 Hz), a round
         divided by the players later than the last hit; the pass ends on the next tick."""
-        self.board.frames[id] = FakeFrame(offset=-0.1, angles=_angles(degrees), arms=arms)
+        self.board.frames[id] = FakeFrame(offset=-0.1, angles=_angles(degrees), arms=arms, age=age)
         streak = self._tick(dbar=1.0 / self.players)
-        self.board.frames[id] = FakeFrame(angles=_angles(degrees), arms=arms)
+        self.board.frames[id] = FakeFrame(angles=_angles(degrees), arms=arms, age=age)
         return streak
 
     def test_alike_hits_in_a_row_build_the_streak(self) -> None:
@@ -146,6 +151,33 @@ class HitSyncTest(unittest.TestCase):
         self.hit(0)
         self.hit(1)
         self.assertEqual(self.hit(0).hits, 2)                 # three hits span a full bar: the oldest is out
+
+    def test_a_young_poses_hit_is_a_hit_but_not_in_the_streak(self) -> None:
+        # A double or a false positive lives a moment: its crossing is a hit (the intro's trigger) and
+        # nothing to the streak, which it neither extends nor restarts. Six hits fit in a round here.
+        self.players = 6
+        self.hit(0)
+        self.hit(1)
+        streak = self.hit(2, 150.0, age=1.0)                  # not alike, and too young to count
+        self.assertEqual(streak, HitStreak(hit=True, hits=2, distance=0.0))
+        self.assertEqual(self.hit(3, age=1.0).hits, 2)        # alike, still too young to count
+        self.assertEqual(self.hit(2).hits, 3)                 # old enough: counts
+
+    def test_a_nan_age_is_young(self) -> None:
+        # The track's first frame carries no Age yet: it is 0 s old, not exempt.
+        self.hit(0)
+        self.assertEqual(self.hit(1, age=math.nan).hits, 1)
+        self.assertEqual(self.hit(2).hits, 2)
+
+    def test_the_age_threshold_is_inclusive(self) -> None:
+        self.hit(0)
+        self.assertEqual(self.hit(1, age=1.9).hits, 1)
+        self.assertEqual(self.hit(2, age=2.0).hits, 2)
+
+    def test_at_zero_every_hit_counts(self) -> None:
+        self.config.min_age_seconds = 0.0
+        self.hit(0, age=math.nan)
+        self.assertEqual(self.hit(1, age=0.0).hits, 2)
 
     def test_a_pass_fires_once(self) -> None:
         self.board.frames[0] = FakeFrame(offset=0.1)          # the closest tick, still approaching
