@@ -150,7 +150,7 @@
     "window": {
       "title": "Poser",
       "v_sync": true,
-      "monitor": "M1",
+      "monitor": "M0",
       "x": 1,
       "y": 31,
       "width": 1278,
@@ -392,7 +392,7 @@
   },
   "track": {
     "age_filter": 3,
-    "height_filter": 0.3,
+    "height_filter": 0.2,
     "zone_filter": true,
     "foot_offset": 0.02,
     "reacquire_angle": 7.0,
@@ -572,7 +572,7 @@
     "similarity": {
       "posture": {
         "angle_tolerance": 33.0,
-        "forgiveness": 2.0,
+        "forgiveness": 1.5,
         "joints": {
           "left_shoulder": true,
           "right_shoulder": true,
@@ -1055,13 +1055,13 @@
     "intro_idle_bars": 2.0,
     "end_bars": 4.0,
     "dim_level": 0.4,
-    "min_players": 2,
+    "min_players": 3,
     "play_full_sync_seconds": 6.0,
     "play_full_sync_release_seconds": 5.0,
     "intro_grace_seconds": 10.0,
     "sync": {},
     "manual": {
-      "select": "PLAY",
+      "select": "END_INTRO",
       "hold": false
     },
     "session": {
