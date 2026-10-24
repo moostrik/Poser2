@@ -1,0 +1,38 @@
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  unit:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      # The runtime requirements without the CUDA stack: torch from the CPU index,
+      # TensorRT and cuda-python left out (TensorRT is only imported when a TRT model runs).
+      - name: Install dependencies
+        shell: bash
+        run: |
+          grep -v -E '^(--extra-index-url|torch|torchvision|cuda-python|tensorrt|onnx_simplifier)' requirements.txt > requirements-ci.txt
+          python -m pip install --upgrade pip
+          pip install -r requirements-ci.txt
+          pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Unit tests
+        shell: bash
+        run: |
+          status=0
+          for dir in modules/settings modules/pose modules/tracker modules/oak modules/render apps/white_space; do
+            echo "::group::$dir"
+            python -m unittest discover -s "$dir/tests" -t . || status=1
+            echo "::endgroup::"
+          done
+          exit $status
