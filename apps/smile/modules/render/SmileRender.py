@@ -45,7 +45,7 @@ class SmileRender(RenderBase):
             diffusion=DiffusionLayer(self.inputs.diffusion),
             destruct=DestructLayer(self.inputs.diffusion_depth),
         )
-        # the artist's credit, over the grin and the result
+        # the artist's credit: the QR code always, the caption over the grin and the result
         self._credit: CreditLayer = CreditLayer(settings)
         self._credit_alpha: float = 0.0
         self._credit_time: float = time.time()
@@ -111,10 +111,9 @@ class SmileRender(RenderBase):
 
     def _render_credit(self, sequence_type: SequenceType) -> None:
         now: float = time.time()
-        shown: bool = self.settings.credit and sequence_type in CREDIT_SHOWN
-        self._credit_alpha = fade_step(self._credit_alpha, shown, now - self._credit_time)
+        self._credit_alpha = fade_step(self._credit_alpha, sequence_type in CREDIT_SHOWN, now - self._credit_time)
         self._credit_time = now
-        if self._credit_alpha > 0.0:
+        if self.settings.credit:
             self._credit.render(self._output, self._credit_alpha)
             self._output = self._credit.texture
 

@@ -17,7 +17,7 @@ parser.add_argument('--recycle_every',      type=float, default=20.0,   help='a 
 parser.add_argument('--fps',                type=float, default=20.0,   help='playback speed of the clips (frames per second); 0 plays each clip at its own rate')
 parser.add_argument('--spread',             type=float, default=0.1,    help='random speed difference per clip, as a fraction of --fps (0.1 = 10 percent slower to faster), 0 = none')
 parser.add_argument('--trail',              type=float, default=0.0,    help='blend of each frame with the previous output, 0 = none (0.5 was the old look)')
-parser.add_argument('--credit_every',       type=float, default=30.0,   help="one cell shows the artist's name and QR code, on another cell every this many seconds; 0 = no credit")
+parser.add_argument('--no_credit',          action='store_true',        help="leave out the cell with the artist's name and QR code (it moves on with every clip it covers)")
 parser.add_argument('--credit_name',        type=str,   default=NAME,   help='name on the credit cell')
 parser.add_argument('--credit_url',         type=str,   default=URL,    help='page the credit cell\'s QR code opens')
 parser.add_argument('--root',              type=str,   default='output/', help='output folder (clips in its grins/ subfolder)')
@@ -30,7 +30,7 @@ setup_logging(verbose=args.verbose, name=f'player{args.monitor}')
 install_excepthooks()
 
 player: Player = Player(args.osc_port, args.root, args.monitor, args.trail, args.clips, args.pool, args.hwdecode, args.window, args.fps, args.spread, args.recent, args.recycle_every, args.listen,
-                        args.credit_every, args.credit_name, args.credit_url)
+                        not args.no_credit, args.credit_name, args.credit_url)
 player.start()
 
 def signal_handler_exit(sig, frame) -> None:

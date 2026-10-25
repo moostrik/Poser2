@@ -148,11 +148,12 @@ no new sequence while it is on (`Sequencer.blocked`). Shaders are
 ## Credit
 
 `modules/credit.py` holds the artist's credit (name, line, URL) and makes the QR code (OpenCV's encoder, whole pixels per
-module, with its quiet zone). `CreditLayer` draws the line as a meme caption over the top (white with a black edge, in the comic font
-`data/Bangers-Regular.ttf`: the credit is a joke) and the code in the bottom right corner, over the grin and the
-result (DIFF_LOOP and TIMEOUT, fading in and out), from the Render tab's `credit` fields; it is not in the saved clips. The
-players show the code and the name under it (scaled to the code's width) on one cell instead of its clip, moving to a random other cell every `--credit_every`
-seconds (`PlayerRender._move_credit`).
+module, with its quiet zone). `CreditLayer` draws the code in the bottom right corner of everything the main screen shows, and the line as a meme
+caption over the top (white with a black edge, in the comic font `data/Bangers-Regular.ttf`: the credit is a joke) over the
+grin and the result only (DIFF_LOOP and TIMEOUT, fading in and out), from the Render tab's `credit` fields; it is not in the
+saved clips. The players show the code and the name under it (scaled to the code's width) on one cell instead of its clip,
+for one play: it takes a cell when a clip starts there and leaves at that cell's next start (`next_credit_cell`), so no
+clip start flashes white over it.
 
 ## Recordings
 
