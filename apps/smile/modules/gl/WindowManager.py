@@ -57,6 +57,7 @@ class WindowSettings(BaseSettings):
     secondary_list: Field[list[MonitorId]] = Field([MonitorId.M0], widget=Widget.order, newline=True)
     secondary_fullscreen: Field[bool] =       Field(True)
     fullscreen_mode: Field[FullscreenMode] = Field(FullscreenMode.WINDOWED)
+    fullscreen_mouse: Field[bool] =          Field(False, description="Show the mouse pointer in fullscreen (a window always shows it)")
 
 
 class MouseButton(IntEnum):
@@ -125,6 +126,7 @@ class WindowManager():
         self._cb_xy         = lambda _: self._deferred.put(lambda: self.set_position(s.x, s.y))
         self._cb_size       = lambda _: self._deferred.put(lambda: self.set_size(s.width, s.height))
         self._cb_sec_fs     = lambda v: self._deferred.put(lambda: self.set_secondary_fullscreen(v))
+        self._cb_mouse      = lambda _: self._deferred.put(self.apply_cursor)
         s.bind(WindowSettings.fullscreen_mode, self._cb_fm)
         s.bind(WindowSettings.monitor,    self._cb_monitor)
         s.bind(WindowSettings.x,         self._cb_xy)
@@ -132,6 +134,7 @@ class WindowManager():
         s.bind(WindowSettings.width,     self._cb_size)
         s.bind(WindowSettings.height,    self._cb_size)
         s.bind(WindowSettings.secondary_fullscreen, self._cb_sec_fs)
+        s.bind(WindowSettings.fullscreen_mouse, self._cb_mouse)
 
 
     @property
@@ -354,6 +357,7 @@ class WindowManager():
         s.unbind_all(self._cb_xy)
         s.unbind_all(self._cb_size)
         s.unbind_all(self._cb_sec_fs)
+        s.unbind_all(self._cb_mouse)
 
         try:
             glfw.set_monitor_callback(None)
@@ -472,7 +476,7 @@ class WindowManager():
             glfw.set_window_attrib(window, glfw.DECORATED, glfw.FALSE)
             glfw.set_window_size(window, width, height)
             glfw.set_window_pos(window, posX, posY)
-            glfw.set_input_mode(window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
+            glfw.set_input_mode(window, glfw.CURSOR, self._cursor_mode(True))
         else:
             glfw.set_window_attrib(window, glfw.DECORATED, glfw.TRUE)
             glfw.set_window_size(window, int(width * 0.5), int(height * 0.5))
@@ -635,6 +639,18 @@ class WindowManager():
             self._key_callbacks.clear()
             # exit_callbacks are intentionally preserved — they must fire on both natural and programmatic stop
 
+    def _cursor_mode(self, fullscreen: bool) -> int:
+        """The mouse pointer of a window: hidden in fullscreen unless `fullscreen_mouse` shows it, always shown in a window."""
+        return glfw.CURSOR_NORMAL if not fullscreen or self.settings.fullscreen_mouse else glfw.CURSOR_HIDDEN
+
+    def apply_cursor(self) -> None:
+        """Set the mouse pointer of every window to what `fullscreen_mouse` says (its callback)."""
+        if self._main_window:
+            glfw.set_input_mode(self._main_window, glfw.CURSOR, self._cursor_mode(self._fullscreen_mode != FullscreenMode.WINDOWED))
+        for logical_id, win in self._secondary_windows.items():
+            fullscreen: bool = self.settings.secondary_fullscreen and logical_id not in self._secondary_fallback
+            glfw.set_input_mode(win, glfw.CURSOR, self._cursor_mode(fullscreen))
+
     # SETTERS
     def set_fullscreen_mode(self, mode: FullscreenMode) -> None:
         if not self._main_window: return
@@ -652,7 +668,7 @@ class WindowManager():
                 self._main_window, monitor, 0, 0,
                 video_mode.size.width, video_mode.size.height, video_mode.refresh_rate
             )
-            glfw.set_input_mode(self._main_window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
+            glfw.set_input_mode(self._main_window, glfw.CURSOR, self._cursor_mode(True))
         elif mode == FullscreenMode.WINDOWED_FULLSCREEN:
             monitor = self._monitor or glfw.get_primary_monitor()
             video_mode = glfw.get_video_mode(monitor)
@@ -662,7 +678,7 @@ class WindowManager():
                 self._main_window, None, posX, posY,
                 video_mode.size.width, video_mode.size.height, 0
             )
-            glfw.set_input_mode(self._main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
+            glfw.set_input_mode(self._main_window, glfw.CURSOR, self._cursor_mode(True))
         else:  # WINDOWED
             logger.info("Restoring windowed mode")
             mon_x, mon_y = glfw.get_monitor_pos(self._monitor) if self._monitor else (0, 0)
