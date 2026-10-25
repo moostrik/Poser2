@@ -154,10 +154,21 @@ visitor's line under it (drawn at the capture, `CreditLayer.new_visitor`, into t
 the top (white with a black edge, in the comic font `data/Bangers-Regular.ttf`: the credit is a joke) over the grin and the result (DIFF_LOOP and TIMEOUT, fading in and out), and with `credit_camera` over the camera view too (its
 own line, drawn when that view begins: `new_line_due`), from the Render tab's `credit` fields; it is not in the saved clips. The players show the code and the name under it (scaled to the code's width) on one cell instead of its clip,
 for one play: it takes a cell when a clip starts there and leaves at that cell's next start (`next_credit_cell`), so no
-clip start flashes over it; with the credit on, every cell's start flash is that card too, instead of white. `credit_players` goes
+clip start flashes over it. `credit_players` goes
 to both players as `/caption 0|1` every second (`ScreenTest.send_players`, the test's ports): on, every cell shows a caption over its
 clip, the name over the top and a random line from the same file along the bottom, new at every play (`Player._on_play`, not tied
 to the clip), drawn into a transparent portrait texture per cell (`PlayerRender._draw_caption`).
+The **scrolling name** (`modules/credit_scroll.py`, no GL) runs along one ring of the sphere from time to time: 12 ribs holding 5 and 3
+screens by turn, rows 0 (top) to 4, so rows 1 to 3 have 12 screens and 0 and 4 have 6; screen s (from 0) is cell s mod 24 of player s div 24,
+as in `screen_angles.txt` and the laughter test (`row_screens`, `screen_cell`). `CreditScroller` (stepped from `Main.sequence_callback`, not
+during the laughter test) plans a pass every `credit_scroll_every` seconds, or at the `credit_scroll_now` button: one of `credit_scroll_rows`,
+a random first screen, `credit_scroll_screens_min` to `max` screens round the ring (`plan_pass`, `ScrollPass.screens`, wrapping; `reverse`
+goes the other way round), and sends each player its own cells with their place along the path (`/scroll <name> <px/s> <gap> <padding> <cell>
+<place> ...`, `ScreenTest.send_player`); `credit_scroll_last` is the readout. The players (`PlayerRender.scroll`, `_draw_scroll`) draw the name
+as a ticker reading left to right and moving left: `name_strip` renders it once with freetype into one long BGRA image, 640 high, the ink
+`credit_scroll_padding` inside the top and bottom, white with a black edge (not the font atlas: too big at that size); each cell on the path
+blits the strip shifted by `scroll_offset` (its place times screen width plus `credit_scroll_gap`, minus the distance travelled) into its
+own portrait texture, over the clips and the credit card, under the lit test cells, until `scroll_done`. Nothing of it is in the recordings.
 
 ## Recordings
 

@@ -9,6 +9,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TES
                        glDisable, glEnable, glScissor, glViewport)
 
 from modules.credit import FONT, NAME, URL, qr_image, quiet_px, wrap_balanced
+from modules.credit_scroll import name_strip, scroll_done, scroll_offset
 from modules.gl import Blit, Fbo, Image, RenderBase, Shader, Style, SwapFbo, Text, WindowSettings, clear_color
 from modules.gl.Utils import fit
 from modules.render.shaders import Blend
@@ -35,6 +36,26 @@ CAPTION_OUTLINE: list[tuple[int, int]] = [(x, y) for x in (-CAPTION_OUTLINE_PX, 
                                           for y in (-CAPTION_OUTLINE_PX, 0, CAPTION_OUTLINE_PX) if x or y]
 
 
+class Scroll:
+    """A pass of the scrolling name on this player (SMILE's `/scroll`): the cells on the path with their
+    place along it, moving at `speed` px/s from `started`, with `gap` px of wall between two screens."""
+
+    def __init__(self, name: str, speed: float, gap: float, padding: int, cells: list[tuple[str, int]], started: float) -> None:
+        self.name: str = name
+        self.speed: float = speed
+        self.gap: float = gap
+        self.padding: int = padding
+        self.cells: list[tuple[str, int]] = cells
+        self.started: float = started
+
+    @property
+    def count(self) -> int:
+        return max((place for _, place in self.cells), default=-1) + 1
+
+    def travelled(self, now: float) -> float:
+        return max(0.0, now - self.started) * self.speed
+
+
 def lit_cells(lit: dict[str, float], now: float) -> list[str]:
     """The cells lit at `now` (id -> the time its light ends), in the order they were lit; the ones
     that ended are dropped from `lit`."""
@@ -58,12 +79,14 @@ def next_credit_cell(current: str | None, left: str | None, started: list[str]) 
 
 class PlayerRender(RenderBase):
     """Grin sequences in a grid of cells, each image turned a quarter, with a trail over the whole grid.
-    A cell flashes for one frame when its next sequence starts (the credit card with the credit on, else white), and is white with its screen's
+    A cell flashes white for one frame when its next sequence starts, and is white with its screen's
     number while the laughter test lights it (`light`). One cell shows the artist's name and a QR code to
-    the project page instead of its clip (`credit`): it takes a cell when a clip starts there, with its white
+    the project page instead of its clip (`credit`): it takes a cell when a clip starts there, after its white
     frame, and stays for that play, so it moves on as often as the clips change. With `caption` on (SMILE's
     `credit_players` switch, over OSC), every cell shows a caption over its clip, set at every play
-    (`set_caption`): the artist's name over the top and a random line along the bottom. Keys: f fullscreen (borderless), Esc quit (the
+    (`set_caption`): the artist's name over the top and a random line along the bottom. From time to time
+    SMILE sends a pass of the name scrolling by (`scroll`): letters nearly a screen tall move over the cells
+    of one ring of the sphere, each cell showing its part of one long texture (`name_strip`). Keys: f fullscreen (borderless), Esc quit (the
     window manager)."""
 
     COLUMNS: int = 6
@@ -120,6 +143,12 @@ class PlayerRender(RenderBase):
         self._caption_drawn: dict[str, tuple[str, str] | None] = {id: None for id in ids}
         self._caption_fbos: dict[str, Fbo] = {id: Fbo() for id in ids}
         self._caption_text: Text = Text()
+        # the scrolling name: the strip texture (drawn again when the name or the padding changes), per cell
+        # a transparent portrait texture with the part of the strip on that screen
+        self._scroll: Scroll | None = None
+        self._scroll_strip: Image = Image('BGR')
+        self._scroll_key: tuple[str, int] | None = None
+        self._scroll_fbos: dict[str, Fbo] = {id: Fbo() for id in ids}
 
     # RENDER THREAD
     def allocate(self) -> None:
@@ -140,6 +169,8 @@ class PlayerRender(RenderBase):
             fbo.allocate(self.CELL_HEIGHT, self.CELL_WIDTH, GL_RGBA8)
         if not self._caption_text.allocate(FONT, CAPTION_PX):
             logger.warning('No font for the captions: the clips play without')
+        for fbo in self._scroll_fbos.values():
+            fbo.allocate(self.CELL_HEIGHT, self.CELL_WIDTH, GL_RGBA8)
         Shader.enable_hot_reload()
 
     def deallocate(self) -> None:
@@ -155,6 +186,9 @@ class PlayerRender(RenderBase):
         self._caption_text.deallocate()
         for fbo in self._caption_fbos.values():
             fbo.deallocate()
+        for fbo in self._scroll_fbos.values():
+            fbo.deallocate()
+        self._scroll_strip.deallocate()
         for image in self._images.values():
             image.deallocate()
 
@@ -177,6 +211,7 @@ class PlayerRender(RenderBase):
             numbers: dict[str, int] = {id: self._numbers.get(id, 0) for id in lit}
             self._numbers = numbers
             captions: dict[str, tuple[str, str]] = dict(self._captions) if self.caption else {}
+            scroll: Scroll | None = self._scroll
         for image in self._images.values():
             image.update()
         if self.credit:
@@ -196,16 +231,17 @@ class PlayerRender(RenderBase):
         if lit:
             self._draw_number(numbers[lit[-1]])
         if self.credit:
-            self._draw_credit()     # also the flash of every new sequence
+            self._draw_credit()
         for id, caption in captions.items():
             if caption != self._caption_drawn[id]:
                 self._draw_caption(id, *caption)
                 self._caption_drawn[id] = caption
+        scrolling: list[str] = self._draw_scroll(scroll, time.time()) if scroll else []
 
         self._trail_fbo.swap()
         self._trail_fbo.begin()
         self._blend.use(self._image_fbo, self._trail_fbo.back_texture, self.trail)
-        # a new sequence skips the trail: one white (or credit card) frame, then its first image
+        # a new sequence skips the trail: one white frame, then its first image
         for id in starts:
             glViewport(*self._rects[id])
             self._rotated.use(self._images[id])
@@ -221,22 +257,24 @@ class PlayerRender(RenderBase):
         if self._credit_cell is not None:
             glViewport(*self._rects[self._credit_cell])
             self._rotated.use(self._credit_fbo)
+        # the scrolling name, over the cells it is on now
+        if scrolling:
+            Style.set_blend_mode(Style.BlendMode.ALPHA)
+            for id in scrolling:
+                glViewport(*self._rects[id])
+                self._rotated.use(self._scroll_fbos[id])
+            Style.set_blend_mode(Style.BlendMode.DISABLED)
         # the cells the laughter test lights: white with the number, over everything, every frame
         for id in lit:
             glViewport(*self._rects[id])
             self._rotated.use(self._number_fbo)
-        # the flash of a new sequence: the credit card, or white without the credit
-        if self.credit:
-            for id in flashes:
-                glViewport(*self._rects[id])
-                self._rotated.use(self._credit_fbo)
-        else:
-            glEnable(GL_SCISSOR_TEST)
-            glClearColor(1.0, 1.0, 1.0, 1.0)
-            for id in flashes:
-                glScissor(*self._rects[id])
-                glClear(GL_COLOR_BUFFER_BIT)
-            glDisable(GL_SCISSOR_TEST)
+        # the flash of a new sequence: one white frame
+        glEnable(GL_SCISSOR_TEST)
+        glClearColor(1.0, 1.0, 1.0, 1.0)
+        for id in flashes:
+            glScissor(*self._rects[id])
+            glClear(GL_COLOR_BUFFER_BIT)
+        glDisable(GL_SCISSOR_TEST)
         self._trail_fbo.end()
 
     def _draw_number(self, number: int) -> None:
@@ -276,6 +314,41 @@ class PlayerRender(RenderBase):
                     text.draw_text(x, y + i * line_height, part, CAPTION_COLOR, width, height)
             Style.set_blend_mode(Style.BlendMode.DISABLED)
         fbo.end()
+
+    def _draw_scroll(self, scroll: Scroll, now: float) -> list[str]:
+        """The cells the scrolling name is on at `now`, each cell's texture filled with its part of the
+        strip; a pass whose name has left its last screen is dropped."""
+        key: tuple[str, int] = (scroll.name, scroll.padding)
+        if key != self._scroll_key:
+            self._scroll_key = key
+            self._scroll_strip.set_image(name_strip(scroll.name, self.CELL_WIDTH, scroll.padding))
+        self._scroll_strip.update()
+        strip: Image = self._scroll_strip
+        if not strip.allocated:
+            return []
+        travelled: float = scroll.travelled(now)
+        if scroll_done(travelled, scroll.count, strip.width, scroll.gap, self.CELL_HEIGHT):
+            with self._mutex:
+                if self._scroll is scroll:
+                    self._scroll = None
+            return []
+        width, height = self.CELL_HEIGHT, self.CELL_WIDTH     # the screen upright: its width is the cell's height
+        shown: list[str] = []
+        for id, place in scroll.cells:
+            offset: float = scroll_offset(place, travelled, scroll.gap, width)
+            if offset >= strip.width or offset + width <= 0:
+                continue
+            fbo: Fbo = self._scroll_fbos[id]
+            fbo.begin()
+            glClearColor(0.0, 0.0, 0.0, 0.0)
+            glClear(GL_COLOR_BUFFER_BIT)
+            # the strip's x = offset at the screen's left edge: the strip drawn whole, shifted left by it
+            glViewport(-round(offset), 0, strip.width, height)
+            Blit.use(strip)
+            glViewport(0, 0, width, height)
+            fbo.end()
+            shown.append(id)
+        return shown
 
     def _allocate_credit_name(self, width: int) -> None:
         """The name's font at the size that makes the name `width` pixels wide."""
@@ -335,6 +408,14 @@ class PlayerRender(RenderBase):
             return
         with self._mutex:
             self._captions[id] = (name, line)
+
+    def scroll(self, name: str, speed: float, gap: float, padding: int, cells: list[tuple[str, int]]) -> None:
+        """A pass of the scrolling name from now (any thread): `cells` are the ids on the path with their
+        place along it, 0 where the name enters; it moves at `speed` px/s with `gap` px between two screens
+        and `padding` px above and below the letters. A pass under way is replaced."""
+        cells = [(id, place) for id, place in cells if id in self._rects]
+        with self._mutex:
+            self._scroll = Scroll(name, speed, gap, padding, cells, time.time()) if cells else None
 
     def light(self, id: str, seconds: float, number: int = 0) -> None:
         """Light a cell white with the screen's `number` (0: none) for `seconds` (the laughter test); an
