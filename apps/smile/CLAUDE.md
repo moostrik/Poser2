@@ -158,9 +158,13 @@ clip start flashes over it; `credit_qr_players` switches it (`/credit 0|1` every
 to both players as `/caption 0|1` every second (`ScreenTest.send_players`, the test's ports): on, every cell shows a caption over its
 clip, the name over the top and a random line from the same file along the bottom, new at every play (`Player._on_play`, not tied
 to the clip), drawn into a transparent portrait texture per cell (`PlayerRender._draw_caption`).
-The **scrolling name** (`modules/credit_scroll.py`, no GL) runs along one ring of the sphere from time to time: 12 ribs holding 5 and 3
-screens by turn, rows 0 (top) to 4, so rows 1 to 3 have 12 screens and 0 and 4 have 6; screen s (from 0) is cell s mod 24 of player s div 24,
-as in `screen_angles.txt` and the laughter test (`row_screens`, `screen_cell`). `CreditScroller` (stepped from `Main.sequence_callback`, not
+`modules/sphere.py` is the one place that knows the sphere and its wiring: 12 ribs holding 5 and 3 screens by turn, heights 0 (top) to 4
+(heights 1 to 3 have 12 screens, 0 and 4 have 6), screens numbered down each rib (1-5, 6-8, 9-13 …), and screen s on Datapath unit
+⌈s/4⌉ output ((s-1) mod 4)+1, unit n = grid column n-1, output k = grid row k-1 (`screen_of_cell`, `cell_of_screen`, `row_screens`,
+`cell_angles`): the laughter test (it steps the screens in the sphere's order, 1 to 48 down the ribs, lighting the cell `cell_of_screen` gives), the scrolling name's rows and `data/audio/screen_angles.txt` (generated: `screen_angles_text`,
+a test keeps the file equal to it) all come from it; a cabling that differs is changed there.
+The **scrolling name** (`modules/credit_scroll.py`, no GL) runs along one ring of the sphere from time to time (`row_screens`, `screen_cell`,
+screens counted from 0 there). `CreditScroller` (stepped from `Main.sequence_callback`, not
 during the laughter test) plans a pass every `credit_scroll_every` seconds, or at the `credit_scroll_now` button: one of `credit_scroll_rows`,
 a random first screen, `credit_scroll_screens_min` to `max` screens round the ring (`plan_pass`, `ScrollPass.screens`, wrapping; `reverse`
 goes the other way round), and sends each player its own cells with their place along the path (`/scroll <name> <px/s> <gap> <padding> <cell>
@@ -230,8 +234,8 @@ Three speakers on the Realtek jacks (Windows at Quadraphonic, 4 channels, so the
 stereo on channels 1 and 2 (`ezdac~`, `p musicMixer` filters both channels), the laughter panned over 1, 2 and 3
 (`dac~ 1 2 3`). A `/bang` carries the cell its clip starts
 in; `p laughterSampler` adds 24 for port 4116, looks the screen's angle up in `data/audio/screen_angles.txt`
-(`coll screen_angles.txt`, found through the patch's folder; `modules/audio/tests/test_screen_angles.py` checks
-the file), adds the panel's `laughter_offset` (`/laughter_offset`, degrees) and turns the angle into a gain per
+(`coll screen_angles.txt`, found through the patch's folder; generated from `modules/sphere.py`, `modules/tests/test_sphere.py` checks
+the file against it), adds the panel's `laughter_offset` (`/laughter_offset`, degrees) and turns the angle into a gain per
 speaker (three `expr`s: speakers at -60, 60 and 180 degrees from the camera, each laugh over its two nearest at
 constant power). The gains travel with the note into the `poly~` voice (`SmileSamplepoly.maxpat`), which
 applies them only on a note-on, so the note-off from `makenote` does not move a fading laugh. The panel's

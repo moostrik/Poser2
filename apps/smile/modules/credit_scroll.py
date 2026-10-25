@@ -14,20 +14,17 @@ import cv2
 import freetype
 import numpy as np
 
+from modules import sphere
 from modules.credit import FONT
 
 logger = logging.getLogger(__name__)
 
-# the sphere: 12 ribs 30 degrees apart, holding 5 and 3 screens by turn, at heights 0 (top) to 4; a 3-rib
-# holds the heights 1, 2 and 3. The screens are numbered from the top of a 5-rib down, then the 3-rib to
-# its right, and so on round the sphere (the numbering of data/audio/screen_angles.txt and the laughter
-# test); screen s (from 0) is cell s mod 24 of player s div 24.
-RIB_PAIRS: int = 6
-PAIR_SCREENS: int = 8           # a 5-rib and the 3-rib after it
-ROWS: int = 5
-SCREENS: int = RIB_PAIRS * PAIR_SCREENS
-CELLS: int = 24                 # per player
-PLAYERS: int = 2
+# the sphere and the wiring of its screens to the players' cells are in `modules.sphere`; here a screen
+# is counted from 0 (the sphere's number minus 1)
+ROWS: int = sphere.HEIGHTS
+SCREENS: int = sphere.SCREENS
+CELLS: int = sphere.CELLS
+PLAYERS: int = sphere.PLAYERS
 SCREEN_PX: int = 512            # a screen's width, in the player's pixels (the clip's upright 512 x 640)
 SCREEN_HEIGHT_PX: int = 640
 
@@ -37,18 +34,12 @@ ADDRESS: str = '/scroll'        # to the players: name, speed (px/s), gap (px), 
 
 def row_screens(row: int) -> list[int]:
     """The screens (from 0) of ring `row` in order round the sphere: 12 for rows 1 to 3, 6 for 0 and 4."""
-    screens: list[int] = []
-    for pair in range(RIB_PAIRS):
-        base: int = pair * PAIR_SCREENS
-        screens.append(base + row)
-        if 1 <= row <= 3:
-            screens.append(base + 5 + row - 1)
-    return screens
+    return [screen - 1 for screen in sphere.row_screens(row)]
 
 
 def screen_cell(screen: int) -> tuple[int, int]:
-    """The player (0 or 1) and its cell of a screen (from 0)."""
-    return divmod(screen, CELLS)
+    """The player (0 or 1) and its cell of a screen (from 0), by the wiring."""
+    return sphere.cell_of_screen(screen + 1)
 
 
 def parse_rows(text: str) -> list[int]:

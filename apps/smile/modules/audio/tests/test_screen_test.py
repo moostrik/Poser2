@@ -59,7 +59,7 @@ class TestScreenTest(unittest.TestCase):
         self.assertEqual(self.banged, [(0, 4)])
         self.settings.laughter_test_sample = 'V005_12.wav'
         self.test.update(2.0)
-        self.assertEqual(self.banged[-1], (1, 5))
+        self.assertEqual(self.banged[-1], (6, 5))     # screen 2 is cell 6
 
     def test_off_sends_nothing_and_shows_0(self):
         self.test.update(0.0)
@@ -86,8 +86,8 @@ class TestScreenTest(unittest.TestCase):
         self.test.update(11.9)      # not yet
         self.assertEqual(len(self.sent), 1)
         self.test.update(12.0)
-        self.assertEqual(self.sent[-1], (4117, 1, 2.0, 2))
-        self.assertEqual(self.banged[-1], (1, 1))
+        self.assertEqual(self.sent[-1], (4117, 6, 2.0, 2))      # screen 2 is cell 6: unit 1, output 2
+        self.assertEqual(self.banged[-1], (6, 1))
         self.assertEqual(self.settings.laughter_test_screen, 2)
         for i in range(2, SCREENS):
             self.test.update(10.0 + 2.0 * i)

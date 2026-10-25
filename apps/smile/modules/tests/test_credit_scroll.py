@@ -20,8 +20,10 @@ class TestRows(unittest.TestCase):
         # every screen is in exactly one row
         self.assertEqual(sorted(s for row in range(5) for s in row_screens(row)), list(range(48)))
 
-    def test_a_screen_is_a_cell_of_a_player(self):
+    def test_a_screen_is_a_cell_of_a_player_by_the_wiring(self):
         self.assertEqual(screen_cell(0), (0, 0))
+        self.assertEqual(screen_cell(1), (0, 6))     # screen 2: unit 1 output 2, grid row 1
+        self.assertEqual(screen_cell(4), (0, 1))     # screen 5: unit 2 output 1
         self.assertEqual(screen_cell(23), (0, 23))
         self.assertEqual(screen_cell(24), (1, 0))
         self.assertEqual(screen_cell(47), (1, 23))
@@ -40,9 +42,9 @@ class TestPass(unittest.TestCase):
         self.assertEqual(ScrollPass(1, 1, 3, reverse=True).screens, [5, 1, 45])
 
     def test_each_player_gets_its_own_cells_with_their_place_on_the_whole_path(self):
-        scroll = ScrollPass(1, 4, 6)      # screens 17, 21 | 25, 29, 33, 37
-        self.assertEqual(scroll.cells(0), [(17, 0), (21, 1)])
-        self.assertEqual(scroll.cells(1), [(1, 2), (5, 3), (9, 4), (13, 5)])
+        scroll = ScrollPass(1, 4, 6)      # screens (from 0) 17, 21 | 25, 29, 33, 37: height 1, grid row 1
+        self.assertEqual(scroll.cells(0), [(10, 0), (11, 1)])
+        self.assertEqual(scroll.cells(1), [(6, 2), (7, 3), (8, 4), (9, 5)])
 
     def test_the_readout_numbers_the_screens_from_one(self):
         self.assertEqual(ScrollPass(3, 0, 2).describe(), "row 3: screens 4, 8")

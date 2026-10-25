@@ -7,12 +7,14 @@ from typing import Callable
 
 from pythonosc.udp_client import SimpleUDPClient
 
+from modules import sphere
+
 from modules.audio.settings import AudioSettings
 
 logger = logging.getLogger(__name__)
 
-SCREENS: int = 48               # the sphere: two players of CELLS
-CELLS: int = 24                 # cells per player
+SCREENS: int = sphere.SCREENS   # the sphere: two players of CELLS
+CELLS: int = sphere.CELLS       # cells per player
 PLAYER_IP: str = '127.0.0.1'    # the players run on this PC (start_players.bat)
 SAMPLE_FOLDER: str = 'data/audio/laughter'
 SAMPLE_TYPES: tuple[str, ...] = ('.wav', '.aif', '.aiff', '.mp3', '.flac', '.m4a', '.ogg')
@@ -34,10 +36,11 @@ def list_samples(folder: str) -> list[str]:
 
 
 class ScreenTest:
-    """While `laughter_test` is on, every `laughter_test_step` seconds the next of the 48 screens is lit:
-    `/light <cell> <seconds> <number>` goes to its player's port (the player shows the number, 1-48), and
-    `bang(index, sample)` sends Max `/test_bang` (the patch plays the sample from where the table puts that
-    screen, past its gates; meanwhile `/laughter_test` closes the gate of the clips' laughs, so this is the
+    """While `laughter_test` is on, every `laughter_test_step` seconds the next of the 48 screens is lit, in
+    the sphere's order (1 to 5 down the first rib, 6 to 8 the next ...), on the cell the wiring gives it
+    (`sphere.cell_of_screen`): `/light <cell> <seconds> <number>` goes to its player's port (the player shows
+    the number), and `bang(index, sample)` sends Max `/test_bang` with the cell's index (the patch plays the
+    sample from where the table puts that cell, past its gates; meanwhile `/laughter_test` closes the gate of the clips' laughs, so this is the
     only one). The sample is the file `laughter_test_sample`, offered from the laughter folder
     (`laughter_samples`), sent as its number in the patch. `laughter_test_screen` shows the screen. Driven
     from Main.sequence_callback, the app clock, and never raises there: a player that is not running is one
@@ -74,18 +77,20 @@ class ScreenTest:
             return
         if now < self._next_time:
             return
+        # the screens in their own order, 1 to 48 down each rib, on whatever cell the wiring puts them
         self._index = (self._index + 1) % SCREENS
-        player, cell = divmod(self._index, CELLS)
+        screen: int = self._index + 1
+        player, cell = sphere.cell_of_screen(screen)
         port: int = settings.player_1_port if player == 0 else settings.player_2_port
         step: float = settings.laughter_test_step
         try:
-            self._send(port, cell, step, self._index + 1)
-            self._bang(self._index, self.sample_number())
+            self._send(port, cell, step, screen)
+            self._bang(player * CELLS + cell, self.sample_number())     # the patch's index is the cell's
         except Exception:
             if not self._warned:
                 self._warned = True
-                logger.exception('Laughter test: screen %d failed (player %d on port %d running?)', self._index + 1, player + 1, port)
-        settings.laughter_test_screen = self._index + 1
+                logger.exception('Laughter test: screen %d failed (player %d on port %d running?)', screen, player + 1, port)
+        settings.laughter_test_screen = screen
         self._next_time = now + step
 
     def send_players(self, address: str, *args) -> None:
