@@ -143,11 +143,11 @@ class PlayerRender(RenderBase):
         self._caption_drawn: dict[str, tuple[str, str] | None] = {id: None for id in ids}
         self._caption_fbos: dict[str, Fbo] = {id: Fbo() for id in ids}
         self._caption_text: Text = Text()
-        # the scrolling name: the strip texture (drawn again when the name or the padding changes), per cell
-        # a transparent portrait texture with the part of the strip on that screen
-        self._scroll: Scroll | None = None
-        self._scroll_strip: Image = Image('BGR')
-        self._scroll_key: tuple[str, int] | None = None
+        # the scrolling name: the passes under way (a new one does not end the others), a strip texture per
+        # name and padding in use, and per cell a transparent portrait texture with the parts of the strips
+        # on that screen
+        self._scrolls: list[Scroll] = []
+        self._scroll_strips: dict[tuple[str, int], Image] = {}
         self._scroll_fbos: dict[str, Fbo] = {id: Fbo() for id in ids}
 
     # RENDER THREAD
@@ -188,7 +188,9 @@ class PlayerRender(RenderBase):
             fbo.deallocate()
         for fbo in self._scroll_fbos.values():
             fbo.deallocate()
-        self._scroll_strip.deallocate()
+        for strip in self._scroll_strips.values():
+            strip.deallocate()
+        self._scroll_strips.clear()
         for image in self._images.values():
             image.deallocate()
 
@@ -211,7 +213,7 @@ class PlayerRender(RenderBase):
             numbers: dict[str, int] = {id: self._numbers.get(id, 0) for id in lit}
             self._numbers = numbers
             captions: dict[str, tuple[str, str]] = dict(self._captions) if self.caption else {}
-            scroll: Scroll | None = self._scroll
+            scrolls: list[Scroll] = list(self._scrolls)
         for image in self._images.values():
             image.update()
         if self.credit:
@@ -238,7 +240,7 @@ class PlayerRender(RenderBase):
             if caption != self._caption_drawn[id]:
                 self._draw_caption(id, *caption)
                 self._caption_drawn[id] = caption
-        scrolling: list[str] = self._draw_scroll(scroll, time.time()) if scroll else []
+        scrolling: list[str] = self._draw_scrolls(scrolls, time.time()) if scrolls else []
 
         self._trail_fbo.swap()
         self._trail_fbo.begin()
@@ -317,40 +319,50 @@ class PlayerRender(RenderBase):
             Style.set_blend_mode(Style.BlendMode.DISABLED)
         fbo.end()
 
-    def _draw_scroll(self, scroll: Scroll, now: float) -> list[str]:
-        """The cells the scrolling name is on at `now`, each cell's texture filled with its part of the
-        strip; a pass whose name has left its last screen is dropped."""
-        key: tuple[str, int] = (scroll.name, scroll.padding)
-        if key != self._scroll_key:
-            self._scroll_key = key
-            self._scroll_strip.set_image(name_strip(scroll.name, self.CELL_WIDTH, scroll.padding))
-        self._scroll_strip.update()
-        strip: Image = self._scroll_strip
-        if not strip.allocated:
-            return []
-        travelled: float = scroll.travelled(now)
-        if scroll_done(travelled, scroll.count, strip.width, scroll.gap, self.CELL_HEIGHT):
-            with self._mutex:
-                if self._scroll is scroll:
-                    self._scroll = None
-            return []
+    def _draw_scrolls(self, scrolls: list[Scroll], now: float) -> list[str]:
+        """The cells the scrolling name is on at `now`, each cell's texture filled with its part of every
+        pass that crosses it; a pass whose name has left its last screen is dropped, and so is a strip no
+        pass uses any more."""
         width, height = self.CELL_HEIGHT, self.CELL_WIDTH     # the screen upright: its width is the cell's height
-        shown: list[str] = []
-        for id, place in scroll.cells:
-            offset: float = scroll_offset(place, travelled, scroll.gap, width)
-            if offset >= strip.width or offset + width <= 0:
+        parts: dict[str, list[tuple[Image, float]]] = {}     # per cell: the strips on it with their offsets
+        keys: set[tuple[str, int]] = set()
+        for scroll in scrolls:
+            key: tuple[str, int] = (scroll.name, scroll.padding)
+            keys.add(key)
+            strip: Image | None = self._scroll_strips.get(key)
+            if strip is None:
+                strip = self._scroll_strips[key] = Image('BGR')
+                strip.set_image(name_strip(scroll.name, height, scroll.padding))
+            strip.update()
+            if not strip.allocated:
                 continue
+            travelled: float = scroll.travelled(now)
+            if scroll_done(travelled, scroll.count, strip.width, scroll.gap, width):
+                with self._mutex:
+                    if scroll in self._scrolls:
+                        self._scrolls.remove(scroll)
+                continue
+            for id, place in scroll.cells:
+                offset: float = scroll_offset(place, travelled, scroll.gap, width)
+                if offset < strip.width and offset + width > 0:
+                    parts.setdefault(id, []).append((strip, offset))
+        for key in [key for key in self._scroll_strips if key not in keys]:
+            self._scroll_strips.pop(key).deallocate()
+        for id, strips in parts.items():
             fbo: Fbo = self._scroll_fbos[id]
             fbo.begin()
             glClearColor(0.0, 0.0, 0.0, 0.0)
             glClear(GL_COLOR_BUFFER_BIT)
-            # the strip's x = offset at the screen's left edge: the strip drawn whole, shifted left by it
-            glViewport(-round(offset), 0, strip.width, height)
-            Blit.use(strip)
+            for index, (strip, offset) in enumerate(strips):
+                # the strip's x = offset at the screen's left edge: the strip drawn whole, shifted left by it;
+                # the first pass straight into the cleared texture, another over it
+                Style.set_blend_mode(Style.BlendMode.ALPHA if index else Style.BlendMode.DISABLED)
+                glViewport(-round(offset), 0, strip.width, height)
+                Blit.use(strip)
+            Style.set_blend_mode(Style.BlendMode.DISABLED)
             glViewport(0, 0, width, height)
             fbo.end()
-            shown.append(id)
-        return shown
+        return list(parts)
 
     def _allocate_credit_name(self, width: int) -> None:
         """The name's font at the size that makes the name `width` pixels wide."""
@@ -414,10 +426,12 @@ class PlayerRender(RenderBase):
     def scroll(self, name: str, speed: float, gap: float, padding: int, cells: list[tuple[str, int]]) -> None:
         """A pass of the scrolling name from now (any thread): `cells` are the ids on the path with their
         place along it, 0 where the name enters; it moves at `speed` px/s with `gap` px between two screens
-        and `padding` px above and below the letters. A pass under way is replaced."""
+        and `padding` px above and below the letters. A pass under way goes on beside it."""
         cells = [(id, place) for id, place in cells if id in self._rects]
+        if not cells:
+            return
         with self._mutex:
-            self._scroll = Scroll(name, speed, gap, padding, cells, time.time()) if cells else None
+            self._scrolls.append(Scroll(name, speed, gap, padding, cells, time.time()))
 
     def light(self, id: str, seconds: float, number: int = 0) -> None:
         """Light a cell white with the screen's `number` (0: none) for `seconds` (the laughter test); an

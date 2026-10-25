@@ -172,7 +172,7 @@ name moves to the visitor's left; `reverse` goes the other way round), and sends
 as a ticker reading left to right and moving left: `name_strip` renders it once with freetype into one long BGRA image, 640 high, the ink
 `credit_scroll_padding` inside the top and bottom, white with a black edge (not the font atlas: too big at that size); each cell on the path
 blits the strip shifted by `scroll_offset` (its place times screen width plus `credit_scroll_gap`, minus the distance travelled) into its
-own portrait texture, over the clips and the credit card, under the lit test cells, until `scroll_done`. Nothing of it is in the recordings.
+own portrait texture, over the clips and the credit card, under the lit test cells, until `scroll_done`; a new pass does not end one under way (`_scrolls`, a strip per word in use). Nothing of it is in the recordings.
 
 ## Recordings
 
