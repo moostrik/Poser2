@@ -7,8 +7,8 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from modules.credit_scroll import (ADDRESS, SCREEN_PX, CreditScroller, ScrollPass, name_strip, parse_rows, plan_pass,
-                                   row_screens, screen_cell, scroll_done, scroll_offset)
+from modules.credit_scroll import (ADDRESS, LOOP_ADDRESS, SCREEN_PX, CreditScroller, ScrollPass, name_strip, parse_rows,
+                                   plan_loops, plan_pass, row_screens, screen_cell, scroll_done, scroll_offset)
 
 
 class TestRows(unittest.TestCase):
@@ -64,6 +64,16 @@ class TestPass(unittest.TestCase):
         self.assertTrue(6 <= plan_pass([1], 10, 6, False, rng).count <= 10)
 
 
+class TestLoops(unittest.TestCase):
+    def test_each_row_gets_a_word_and_the_whole_ring(self):
+        loops = plan_loops([1, 3], ["Matthias", "Oostrik"], False)
+        self.assertEqual([(word, scroll.row, scroll.count) for word, scroll in loops], [("Matthias", 1, 12), ("Oostrik", 3, 12)])
+        self.assertEqual(sorted(loops[0][1].screens), row_screens(1))
+        self.assertEqual([word for word, _ in plan_loops([0, 1, 2], ["One"], False)], ["One"] * 3)
+        self.assertEqual(plan_loops([1], [], False), [])
+        self.assertEqual(plan_loops([], ["A"], False), [])
+
+
 class TestPosition(unittest.TestCase):
     def test_the_name_enters_the_first_screen_at_its_right_edge_and_moves_left(self):
         # before moving, the strip's x = 0 is at the screen's right edge: the screen shows nothing of it yet
@@ -82,8 +92,8 @@ class TestPosition(unittest.TestCase):
 
 
 class TestStrip(unittest.TestCase):
-    def test_the_strip_is_the_screen_high_with_the_ink_inside_the_padding(self):
-        strip = name_strip("Matthias Oostrik", 640, 64)
+    def test_the_strip_is_the_screen_high_with_the_ink_the_size_in_the_middle(self):
+        strip = name_strip("Matthias Oostrik", 640, 512)
         self.assertEqual(strip.shape[0], 640)
         self.assertEqual(strip.shape[2], 4)
         alpha = strip[:, :, 3]
@@ -93,23 +103,26 @@ class TestStrip(unittest.TestCase):
         self.assertLessEqual(rows[-1], 640 - 64)
         # nearly as tall as the screen: the letters with their edge fill the inner height
         self.assertGreater(rows[-1] - rows[0], 0.9 * (640 - 2 * 64))
+        # in the vertical middle
+        self.assertLessEqual(abs(rows[0] - (639 - rows[-1])), 3)
         # white letters on a black edge: both colours are there where the alpha is
         self.assertTrue((strip[:, :, :3][alpha > 0] == 255).any())
         self.assertTrue((strip[:, :, :3][alpha > 0] == 0).any())
         # several screens long
         self.assertGreater(strip.shape[1], 6 * SCREEN_PX)
 
-    def test_less_padding_makes_a_taller_and_longer_name(self):
-        self.assertGreater(name_strip("Matthias Oostrik", 640, 0).shape[1], name_strip("Matthias Oostrik", 640, 100).shape[1])
+    def test_a_bigger_size_makes_a_longer_name_and_the_screen_is_the_most(self):
+        self.assertGreater(name_strip("Matthias Oostrik", 640, 640).shape[1], name_strip("Matthias Oostrik", 640, 440).shape[1])
+        self.assertEqual(name_strip("Matthias", 640, 900).shape[1], name_strip("Matthias", 640, 640).shape[1])
 
     def test_an_empty_name_is_an_empty_strip(self):
-        self.assertEqual(name_strip("", 640, 64).shape, (640, 1, 4))
+        self.assertEqual(name_strip("", 640, 512).shape, (640, 1, 4))
 
 
 def settings(**values) -> SimpleNamespace:
     base = dict(credit_name="Matthias Oostrik", credit_scroll=True, credit_scroll_every=120, credit_scroll_rows="1,3",
-                credit_scroll_screens_min=6, credit_scroll_screens_max=10, credit_scroll_speed=1.0, credit_scroll_padding=64,
-                credit_scroll_gap=0, credit_scroll_reverse=False, credit_scroll_last='x')
+                credit_scroll_screens_min=6, credit_scroll_screens_max=10, credit_scroll_speed=1.0, credit_scroll_size=512,
+                credit_scroll_gap=0, credit_scroll_reverse=False, credit_scroll_loop=False, credit_scroll_last='x')
     base.update(values)
     return SimpleNamespace(**base)
 
@@ -145,7 +158,7 @@ class TestScroller(unittest.TestCase):
         for player, address, args in self.sent:
             self.assertEqual(address, ADDRESS)
             self.assertIn(args[0], ("Matthias", "Oostrik"))
-            self.assertEqual(args[1:4], [512.0, 0, 64])
+            self.assertEqual(args[1:4], [512.0, 0, 512])
             pairs = args[4:]
             self.assertEqual(len(pairs) % 2, 0)
             self.assertTrue(all(0 <= cell < 24 for cell in pairs[::2]))
@@ -187,6 +200,38 @@ class TestScroller(unittest.TestCase):
         self.assertEqual(self.sent, [])
         self.scroller.update(240.0, False)
         self.assertTrue(self.sent)
+
+    def test_the_continuous_mode_sends_the_loops_every_second_with_the_distance_travelled(self):
+        self.settings.credit_scroll_loop = True
+        self.scroller.update(100.0, False)
+        self.scroller.update(100.5, False)
+        loops = [(player, args) for player, address, args in self.sent if address == LOOP_ADDRESS]
+        self.assertEqual(len(loops), 4)        # two rows, both players
+        self.assertEqual({args[0] for _, args in loops}, {"Matthias", "Oostrik"})
+        for _, args in loops:
+            self.assertEqual(args[1:6], [512.0, 0, 512, 12, 0.0])
+            self.assertEqual(len(args[6::2]), 6)                   # this player's half of the ring
+            self.assertTrue(set(args[7::2]) < set(range(12)))      # with their places round it
+        self.assertEqual(self.settings.credit_scroll_last, 'continuous: Matthias row 1, Oostrik row 3')
+        self.sent.clear()
+        self.scroller.update(101.0, False)
+        self.assertEqual({args[5] for _, _, args in self.sent}, {512.0})
+        # no timed passes meanwhile, but the button still works
+        self.sent.clear()
+        self.scroller.update(300.0, False)
+        self.assertFalse([1 for _, address, _ in self.sent if address == ADDRESS])
+        self.scroller.request()
+        self.scroller.update(300.1, False)
+        self.assertTrue([1 for _, address, _ in self.sent if address == ADDRESS])
+
+    def test_the_loops_stop_while_blocked_and_start_again_from_zero(self):
+        self.settings.credit_scroll_loop = True
+        self.scroller.update(0.0, False)
+        self.scroller.update(10.0, True)
+        self.assertFalse([1 for _, _, args in self.sent if args[5] == 10.0 * 512])
+        self.sent.clear()
+        self.scroller.update(20.0, False)
+        self.assertEqual({args[5] for _, _, args in self.sent}, {0.0})
 
     def test_no_valid_row_is_a_warning_not_a_pass(self):
         self.settings.credit_scroll_rows = "7"
