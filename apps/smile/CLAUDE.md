@@ -163,20 +163,17 @@ to the clip), drawn into a transparent portrait texture per cell (`PlayerRender.
 ⌈s/4⌉ output ((s-1) mod 4)+1, unit n = grid column n-1, output k = grid row k-1 (`screen_of_cell`, `cell_of_screen`, `row_screens`,
 `cell_angles`): the laughter test (it steps the screens in the sphere's order, 1 to 48 down the ribs, lighting the cell `cell_of_screen` gives), the scrolling name's rows and `data/audio/screen_angles.txt` (generated: `screen_angles_text`,
 a test keeps the file equal to it) all come from it; a cabling that differs is changed there.
-The **scrolling name** (`modules/credit_scroll.py`, no GL): one word of `credit_name` at a time (`CreditScroller.next_word`, by turns) runs along one ring of the sphere from time to time (`row_screens`, `screen_cell`,
-screens counted from 0 there). `CreditScroller` (stepped from `Main.sequence_callback`, not
-during the laughter test) plans a pass every `credit_scroll_every` seconds, or at the `credit_scroll_now` button: one of `credit_scroll_rows`,
-a random first screen, `credit_scroll_screens_min` to `max` screens round the ring (`plan_pass`, `ScrollPass.screens`, wrapping, down the rib numbers: the ribs count to the camera's left, the visitor's right, and the
-name moves to the visitor's left; `reverse` goes the other way round), and sends each player its own cells with their place along the path (`/scroll <word> <px/s> <gap> <size> <cell>
-<place> ...`, `ScreenTest.send_player`); `credit_scroll_last` is the readout. `credit_scroll_loop` sends loops instead of timed passes (`plan_loops`, `send_loops`: word i
-round the whole ring of row i, `/scroll_loop <word> <px/s> <gap> <size> <ring screens> <started> <cell> <place> ...` every `LOOP_SEND_EVERY` second, `started` the
-time it began by `time.time()`, word i `credit_scroll_offset` * i degrees ahead; the players (`PlayerRender.scroll_loop`) take the position from
-that and their own clock (one PC: a resend moves nothing, which keeps the movement smooth), draw the strip at its place on the lap and the next lap's
-copy, and drop a loop no message renewed for `LOOP_TIMEOUT`). The players (`PlayerRender.scroll`, `_draw_scrolls`) draw the name
-as a ticker reading left to right and moving left: `name_strip` renders it once with freetype into one long BGRA image, 640 high, the ink
-`credit_scroll_size` tall in the vertical middle, white with a black edge (not the font atlas: too big at that size); each cell on the path
-blits the strip shifted by `scroll_offset` (its place times screen width plus `credit_scroll_gap`, minus the distance travelled) into its
-own portrait texture, over the clips and the credit card, under the lit test cells, until `scroll_done`; a new pass does not end one under way (`_scrolls`, a strip per word in use). Nothing of it is in the recordings.
+The **scrolling name** (`modules/credit_scroll.py`, no GL): each word of `credit_name` goes round its own ring of the sphere without end, the first word on the
+first of `credit_scroll_rows` (`plan_loops`, `RingPath`: all the ring's screens from the rib at the camera down the rib numbers, since the ribs count to the camera's left,
+the visitor's right, and a ticker moves to the visitor's left; `reverse` the other way round; `row_screens`, `screen_cell`, screens counted from 0 there). `CreditScroller`
+(stepped from `Main.sequence_callback` with `time.time()`, not during the laughter test) sends each player its own cells with their place round the ring every `SEND_EVERY`
+second (`send_loops`: `/scroll_loop <word> <px/s> <gap> <size> <ring screens> <started> <cell> <place> ...`, `ScreenTest.send_player`), `started` the time the loops began
+as text (an OSC float is 32-bit and loses 128 s of a Unix time), the word of row i `credit_scroll_offset` * i degrees earlier; `credit_scroll_last` is the readout. The players
+(`PlayerRender.scroll_loop`, `_draw_scrolls`) take the position from that and their own clock (one PC: a resend moves nothing, which keeps the movement smooth) and drop a
+loop no message renewed for `TIMEOUT`. They draw a word as a ticker reading left to right and moving left: `name_strip` renders it once with freetype into one long BGRA image,
+640 high, the ink `credit_scroll_size` tall in the vertical middle, white with a black edge (not the font atlas: too big at that size); each cell on the ring blits the strip
+shifted by `scroll_offset` (its place times screen width plus `credit_scroll_gap`, minus the distance travelled round the lap, and the next lap's copy) into its own portrait
+texture, over the clips and the credit card, under the lit test cells. Nothing of it is in the recordings.
 
 ## Recordings
 

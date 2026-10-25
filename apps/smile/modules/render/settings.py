@@ -4,7 +4,7 @@ from typing import Callable
 import pytweening as easing
 
 from modules.credit import LINE as CREDIT_LINE, LINES as CREDIT_LINES, NAME as CREDIT_NAME, URL as CREDIT_URL
-from modules.credit_scroll import DEFAULT_ROWS as CREDIT_SCROLL_ROWS
+from modules.credit_scroll import DEFAULT_GAP_PX as CREDIT_SCROLL_GAP, DEFAULT_ROWS as CREDIT_SCROLL_ROWS
 from modules.gl import WindowSettings
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.utils import Color
@@ -90,19 +90,14 @@ class RenderSettings(BaseSettings):
     credit_players: Field[bool] = Field(False, label="On players", description="Show each clip's caption on the player walls (name top, line bottom)")
     credit_qr_players: Field[bool] = Field(True, label="QR on players", description="One cell of each player wall shows the QR code and the name instead of its clip, one play at a time")
     credit_size:   Field[int]   = Field(200, min=120, max=480, step=10, label="QR size (px)", description="Size of the QR code (px)")
-    credit_scroll: Field[bool]  = Field(False, newline=True, row_label="Scroll", label="On players", description="The name scrolls by on the player walls from time to time, along one ring of screens")
-    credit_scroll_loop: Field[bool] = Field(False, label="Continuous", description="Each word of the name goes round its own row without end (first word on the first row), instead of passes")
-    credit_scroll_offset: Field[int] = Field(90, min=0, max=359, step=5, label="Offset (deg)", description="In the continuous mode, the second word starts this far round the sphere ahead of the first")
-    credit_scroll_every: Field[int] = Field(60, min=10, max=3600, step=10, label="Every (s)", description="Seconds between two passes of the scrolling name")
-    credit_scroll_rows: Field[str] = Field(CREDIT_SCROLL_ROWS, label="Rows", description="Rings the name runs on, 0 (top) to 4, one of them per pass; 1 to 3 have 12 screens")
-    credit_scroll_screens_min: Field[int] = Field(6, min=1, max=12, label="Screens min", description="Fewest screens a pass covers")
-    credit_scroll_screens_max: Field[int] = Field(10, min=1, max=12, label="Screens max", description="Most screens a pass covers")
-    credit_scroll_speed: Field[float] = Field(1.0, min=0.1, max=5.0, step=0.1, label="Speed (screens/s)", description="How fast the name moves, in screen widths per second")
+    credit_scroll: Field[bool]  = Field(False, newline=True, row_label="Scroll", label="On players", description="Each word of the name goes round its own ring of the player walls without end, like a ticker")
+    credit_scroll_rows: Field[str] = Field(CREDIT_SCROLL_ROWS, label="Rows", description="Rings the words go round, 0 (top) to 4, the first word on the first; 1 to 3 have 12 screens")
+    credit_scroll_offset: Field[int] = Field(90, min=0, max=359, step=5, label="Offset (deg)", description="The second word starts this far round the sphere ahead of the first")
+    credit_scroll_speed: Field[float] = Field(1.0, min=0.1, max=5.0, step=0.1, label="Speed (screens/s)", description="How fast the words move, in screen widths per second")
     credit_scroll_size: Field[int] = Field(512, min=64, max=640, step=16, label="Size (px)", description="Height of the letters with their edge, of the screen's 640 px, centred")
-    credit_scroll_gap: Field[int] = Field(0, min=0, max=2048, step=16, label="Gap (px)", description="The wall between two neighbouring screens, as pixels the letters cross unseen")
-    credit_scroll_reverse: Field[bool] = Field(False, label="Reverse", description="The name runs the other way round the sphere")
-    credit_scroll_now: Field[bool] = Field(False, widget=Widget.button, label="Scroll now", description="One pass of the name now")
-    credit_scroll_last: Field[str] = Field('', access=Field.READ, label="Last pass", description="When the name last ran, its row and its screens (numbered from 1)")
+    credit_scroll_gap: Field[int] = Field(CREDIT_SCROLL_GAP, min=0, max=2048, step=16, label="Gap (px)", description="The wall between two neighbouring screens, as pixels the letters cross unseen")
+    credit_scroll_reverse: Field[bool] = Field(False, label="Reverse", description="The words go the other way round the sphere")
+    credit_scroll_last: Field[str] = Field('', access=Field.READ, label="Going round", description="Which word goes round which row now")
 
 
 class SequencerSettings(BaseSettings):

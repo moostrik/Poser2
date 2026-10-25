@@ -51,7 +51,7 @@ class Player():
         osc_settings.port = int(osc_port)
         self.osc:Osc = Osc(osc_settings)
         # SMILE's laughter test lights a cell with its screen's number: /light <cell> <seconds> <number> (0: no port, no test)
-        self.receiver: Receiver | None = Receiver(int(listen_port), {'/light': self._on_light, '/caption': self._on_caption, '/credit': self._on_credit, '/scroll': self._on_scroll, '/scroll_loop': self._on_scroll_loop}) if listen_port else None
+        self.receiver: Receiver | None = Receiver(int(listen_port), {'/light': self._on_light, '/caption': self._on_caption, '/credit': self._on_credit, '/scroll_loop': self._on_scroll_loop}) if listen_port else None
         self._light_warning_time: float = 0.0
         self._lines: CreditLines = CreditLines()        # the captions' lines, one at random per play
         self._lines_lock = threading.Lock()
@@ -201,20 +201,10 @@ class Player():
             self.render.credit = on
             logger.info('Credit cell on the wall: %s', 'on' if on else 'off')
 
-    def _on_scroll(self, name, speed, gap, size, *pairs) -> None:
-        """A pass of the scrolling name from SMILE (the receiver's thread): the name, its speed in px/s, the
-        gap between screens and the size in px, then this player's cells on the path, each with its place."""
-        try:
-            cells: list[tuple[str, int]] = [(str(int(pairs[i])), int(pairs[i + 1])) for i in range(0, len(pairs) - 1, 2)]
-            self.render.scroll(str(name), float(speed), float(gap), int(size), cells)
-        except (TypeError, ValueError):
-            logger.warning('/scroll ignored: %r', (name, speed, gap, size) + pairs)
-            return
-        logger.info('Scrolling name over cells %s', ', '.join(f'{id}@{place}' for id, place in cells))
-
     def _on_scroll_loop(self, name, speed, gap, size, ring, started, *pairs) -> None:
-        """A word of the name going round a ring without end (the receiver's thread, every second): as `/scroll`,
-        with the ring's number of screens and the time it began (SMILE's clock, the same PC) before the cells."""
+        """A word of the name going round a ring without end (the receiver's thread, every second): the word, its
+        speed in px/s, the gap between screens and the letter size in px, the ring's number of screens and the time
+        it began (SMILE's clock, the same PC, as text), then this player's cells on the ring, each with its place."""
         try:
             cells: list[tuple[str, int]] = [(str(int(pairs[i])), int(pairs[i + 1])) for i in range(0, len(pairs) - 1, 2)]
             new: bool = self.render.scroll_loop(str(name), float(speed), float(gap), int(size), int(ring), float(started), cells)

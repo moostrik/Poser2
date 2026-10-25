@@ -1,13 +1,12 @@
-"""The artist's name scrolling by on the player walls: from time to time one word of it (the first name,
-the next time the surname) runs once along one ring of the sphere, over the playing clips, like a ticker,
-letters nearly as tall as a screen. SMILE plans every
-pass (`CreditScroller`, in the render loop) and sends each player the cells of its own that are on the
-path with their place along it; the players know nothing of the sphere and draw the name from one long
-texture (`name_strip`). No GL here: the geometry is shared by both apps and tested without one."""
+"""The artist's name going round the sphere on the player walls: each word of it (the first name, the
+surname) circles its own ring of screens without end, over the playing clips, like a ticker, letters most of
+a screen tall, one word per lap so a screen is clear between two laps. SMILE plans the loops
+(`CreditScroller`, in the render loop) and sends each player, every second, the cells of its own on each ring
+with their place round it and the time the loop began; the players know nothing of the sphere and draw the
+word from one long texture (`name_strip`) by their own clock. No GL here: the geometry is shared by both apps
+and tested without one."""
 
 import logging
-import random
-import time
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -30,12 +29,12 @@ SCREEN_PX: int = 512            # a screen's width, in the player's pixels (the 
 SCREEN_HEIGHT_PX: int = 640
 
 DEFAULT_ROWS: str = "1,3"       # the rings with 12 screens, leaving the middle one to the clips
-ADDRESS: str = '/scroll'        # to the players: name, speed (px/s), gap (px), size (px), then cell, place, cell, place ...
-LOOP_ADDRESS: str = '/scroll_loop'  # a word going round a ring without end: word, speed, gap, size, the ring's screens, the
-                                    # time it began (time.time(): SMILE and the players share the PC's clock, so the
-                                    # resends move nothing), then cell, place ...; sent every second, a loop no message renews ends
-LOOP_SEND_EVERY: float = 1.0
-LOOP_TIMEOUT: float = 3.0       # the players drop a loop that got no message for this long (SMILE gone, the switch off)
+DEFAULT_GAP_PX: int = 288       # the wall between two screens, found on site 2026-10-25
+ADDRESS: str = '/scroll_loop'   # to the players: word, speed (px/s), gap (px), size (px), the ring's screens, the time the
+                                # loop began (time.time() as text: an OSC float is 32-bit and loses 128 s of a Unix time;
+                                # SMILE and the players share the PC's clock), then cell, place, cell, place ...
+SEND_EVERY: float = 1.0         # a loop is sent again every second: a player that starts late joins in step
+TIMEOUT: float = 3.0            # the players drop a loop that got no message for this long (SMILE gone, the switch off)
 
 
 def row_screens(row: int) -> list[int]:
@@ -62,70 +61,48 @@ def parse_rows(text: str) -> list[int]:
 
 
 @dataclass(frozen=True)
-class ScrollPass:
-    """One pass of the name: along `row`, entering at the `start`th screen of the ring and covering `count`
-    screens from there, round the ring the other way with `reverse`. The name moves to the left of whoever
-    stands in front of it, and the ribs count to the camera's left, which is that visitor's right: so the
-    next screen is the rib before (checked on site 2026-10-25)."""
+class RingPath:
+    """The path of a word round ring `row`: all its screens in the order the word reaches them, from the rib at
+    the camera, down the rib numbers (the ribs count to the camera's left, the visitor's right, and a ticker
+    moves to the visitor's left: checked on site 2026-10-25), the other way round with `reverse`."""
     row: int
-    start: int
-    count: int
     reverse: bool = False
 
     @property
     def screens(self) -> list[int]:
-        """The screens in the order the name reaches them (a ring is closed: the path wraps)."""
         ring: list[int] = row_screens(self.row)
         step: int = 1 if self.reverse else -1
-        return [ring[(self.start + step * i) % len(ring)] for i in range(self.count)]
+        return [ring[(step * i) % len(ring)] for i in range(len(ring))]
+
+    @property
+    def count(self) -> int:
+        return len(row_screens(self.row))
 
     def cells(self, player: int) -> list[tuple[int, int]]:
-        """The cells of `player` on the path, each with its place along it (0: where the name enters)."""
+        """The cells of `player` on the ring, each with its place round it (0: the rib at the camera)."""
         return [(cell, place) for place, screen in enumerate(self.screens)
                 for p, cell in [screen_cell(screen)] if p == player]
 
-    def describe(self) -> str:
-        """For the readout: the row and the screens as numbered on site (from 1)."""
-        return f"row {self.row}: screens {', '.join(str(screen + 1) for screen in self.screens)}"
 
-
-def plan_pass(rows: list[int], count_min: int, count_max: int, reverse: bool, rng: random.Random | None = None) -> ScrollPass | None:
-    """A pass on one of `rows` at random, from a random screen, over `count_min` to `count_max` screens (at
-    most the ring's, at least 1); None without a row."""
-    if not rows:
-        return None
-    rng = rng or random.Random()
-    row: int = rng.choice(rows)
-    ring: int = len(row_screens(row))
-    low: int = max(1, min(count_min, count_max, ring))
-    high: int = max(low, min(max(count_min, count_max), ring))
-    return ScrollPass(row, rng.randrange(ring), rng.randint(low, high), reverse)
-
-
-def plan_loops(rows: list[int], words: list[str], reverse: bool) -> list[tuple[str, ScrollPass]]:
-    """The continuous mode: each of `rows` gets a word of the name going round it, the first word on the
-    first row and so on (the words again when there are more rows); the path is the whole ring."""
+def plan_loops(rows: list[int], words: list[str], reverse: bool) -> list[tuple[str, RingPath]]:
+    """Each of `rows` gets a word of the name going round it, the first word on the first row and so on (the
+    words again when there are more rows)."""
     if not words:
         return []
-    return [(words[index % len(words)], ScrollPass(row, 0, len(row_screens(row)), reverse)) for index, row in enumerate(rows)]
+    return [(words[index % len(words)], RingPath(row, reverse)) for index, row in enumerate(rows)]
 
 
 def scroll_offset(place: int, travelled: float, gap_px: float, screen_px: int = SCREEN_PX) -> float:
-    """Where the screen at `place` is in the name's texture after the name moved `travelled` px: the texture
-    x at the screen's left edge. The name reads left to right and moves to the left, as a ticker, so it
+    """Where the screen at `place` is in the word's texture after the word moved `travelled` px: the texture
+    x at the screen's left edge. The word reads left to right and moves to the left, as a ticker, so it
     enters the first screen at its right edge and the next screen lies beyond the first one's left edge, a
     `gap_px` wide wall between them."""
     return travelled - screen_px - place * (screen_px + gap_px)
 
 
-def scroll_done(travelled: float, count: int, strip_px: int, gap_px: float, screen_px: int = SCREEN_PX) -> bool:
-    """Whether the end of a `strip_px` wide name has left the last of `count` screens."""
-    return scroll_offset(count - 1, travelled, gap_px, screen_px) >= strip_px
-
-
 def name_strip(text: str, height: int, size: int, font: str = FONT, outline_ratio: float = 0.025,
                probe_px: int = 200) -> np.ndarray:
-    """The name as one long transparent BGRA image `height` px tall, white letters with a black edge, their
+    """The word as one long transparent BGRA image `height` px tall, white letters with a black edge, their
     ink `size` px tall (edge included, at most the height) in the vertical middle (no font: an empty strip)."""
     text = text.strip()
     inner: int = max(1, min(size, height))
@@ -188,122 +165,65 @@ Send = Callable[[int, str, list], None]     # player (0 or 1), address, argument
 
 
 class CreditScroller:
-    """Plans the passes from the panel's Scroll settings (`RenderSettings`) and sends them to the players.
-    `update` runs in SMILE's render loop and never raises there: while `credit_scroll` is on and nothing
-    blocks it (the laughter test), a pass goes out every `credit_scroll_every` seconds; the button
-    (`request`) sends one at once. Each pass carries one word of `credit_name`, the words by turns (a whole
-    name is too long for a pass of a few screens). With `credit_scroll_loop` the words go round the rows
-    without end instead (`plan_loops`), sent again every second with the time they began so a player that
-    starts late joins in step, the second word `credit_scroll_offset` degrees ahead of the first; the button
-    still sends a pass. `credit_scroll_last` shows the last pass."""
+    """Sends the loops from the panel's Scroll settings (`RenderSettings`) to the players. `update` runs in
+    SMILE's render loop (with `time.time()`) and never raises there: while `credit_scroll` is on and nothing
+    blocks it (the laughter test), every `SEND_EVERY` second each row of `credit_scroll_rows` gets its word of
+    `credit_name` (`plan_loops`) with the time the loops began, the word of row i `credit_scroll_offset` * i
+    degrees ahead round the sphere. Off, or blocked, nothing is sent and the players' loops time out.
+    `credit_scroll_last` shows what goes round."""
 
     def __init__(self, settings: Any, send: Send) -> None:
         self.settings: Any = settings
         self._send: Send = send
-        self._next_time: float | None = None    # when the next timed pass is due, None while off
-        self._requested: bool = False
+        self._start: float | None = None     # when the loops began, None while off
+        self._sent: float = 0.0
+        self._text: str = ''
         self._warned: bool = False
-        self._word: int = random.randrange(2)   # which word of the name the next pass takes
-        self._loop_start: float | None = None   # when the continuous mode began, None while off
-        self._loop_sent: float = 0.0
-        self._loop_text: str = ''
         settings.credit_scroll_last = ''
-
-    def request(self, _: Any = None) -> None:
-        """One pass now (the panel's button, any thread)."""
-        self._requested = True
 
     def update(self, now: float, blocked: bool) -> None:
         settings = self.settings
-        looping: bool = bool(settings.credit_scroll) and bool(settings.credit_scroll_loop)
-        if looping and not blocked:
-            if self._loop_start is None:
-                self._loop_start = now
-                self._loop_sent = now - LOOP_SEND_EVERY
-            if now - self._loop_sent >= LOOP_SEND_EVERY:
-                self._loop_sent = now
-                self.send_loops(now)
-        else:
-            self._loop_start = None
-            self._loop_text = ''
-        if not settings.credit_scroll or looping:
-            self._next_time = None
-        elif self._next_time is None:
-            self._next_time = now + float(settings.credit_scroll_every)
-        due: bool = self._next_time is not None and now >= self._next_time
-        if blocked:
-            self._requested = False
-            if due:
-                self._next_time = now + float(settings.credit_scroll_every)
+        if not settings.credit_scroll or blocked:
+            self._start = None
+            if self._text:
+                self._text = ''
+                settings.credit_scroll_last = ''
             return
-        if not due and not self._requested:
-            return
-        self._requested = False
-        if self._next_time is not None:
-            self._next_time = now + float(settings.credit_scroll_every)
-        self.send_pass(now)
+        if self._start is None:
+            self._start = now
+            self._sent = now - SEND_EVERY
+        if now - self._sent >= SEND_EVERY:
+            self._sent = now
+            self.send_loops(now)
 
-    def send_pass(self, now: float) -> ScrollPass | None:
+    def send_loops(self, now: float) -> list[tuple[str, RingPath]]:
         settings = self.settings
         rows: list[int] = parse_rows(str(settings.credit_scroll_rows))
-        scroll: ScrollPass | None = plan_pass(rows, int(settings.credit_scroll_screens_min), int(settings.credit_scroll_screens_max),
-                                              bool(settings.credit_scroll_reverse))
-        if scroll is None:
-            if not self._warned:
-                self._warned = True
-                logger.warning('No rows for the scrolling name in "%s" (0 to 4, like "%s")', settings.credit_scroll_rows, DEFAULT_ROWS)
-            return None
-        self._warned = False
-        word: str = self.next_word(str(settings.credit_name))
-        head: list = [word, float(settings.credit_scroll_speed) * SCREEN_PX,
-                      int(settings.credit_scroll_gap), int(settings.credit_scroll_size)]
-        for player in range(PLAYERS):
-            cells: list[tuple[int, int]] = scroll.cells(player)
-            if cells:
-                try:
-                    self._send(player, ADDRESS, head + [value for pair in cells for value in pair])
-                except Exception:
-                    logger.exception('Scrolling name: player %d could not be reached', player + 1)
-        settings.credit_scroll_last = f"{time.strftime('%H:%M:%S', time.localtime(now))} {word}, {scroll.describe()}"
-        logger.info('Scrolling name: %s, %s', word, scroll.describe())
-        return scroll
-
-    def send_loops(self, now: float) -> list[tuple[str, ScrollPass]]:
-        settings = self.settings
-        rows: list[int] = parse_rows(str(settings.credit_scroll_rows))
-        loops: list[tuple[str, ScrollPass]] = plan_loops(rows, str(settings.credit_name).split(), bool(settings.credit_scroll_reverse))
+        loops: list[tuple[str, RingPath]] = plan_loops(rows, str(settings.credit_name).split(), bool(settings.credit_scroll_reverse))
         if not loops:
             if not self._warned:
                 self._warned = True
-                logger.warning('No rows or no name for the continuous scrolling name ("%s", "%s")', settings.credit_scroll_rows, settings.credit_name)
+                logger.warning('No rows or no name for the scrolling name ("%s", "%s"; rows 0 to 4, like "%s")',
+                               settings.credit_scroll_rows, settings.credit_name, DEFAULT_ROWS)
             return []
         self._warned = False
-        speed: float = float(settings.credit_scroll_speed) * SCREEN_PX
+        speed: float = max(1.0, float(settings.credit_scroll_speed) * SCREEN_PX)
         gap: int = int(settings.credit_scroll_gap)
-        start: float = self._loop_start if self._loop_start is not None else now
-        for index, (word, scroll) in enumerate(loops):
+        start: float = self._start if self._start is not None else now
+        for index, (word, path) in enumerate(loops):
             # the word of row i starts i * offset degrees further round its ring: that far ahead is that much earlier
-            ahead: float = index * float(settings.credit_scroll_offset) / 360.0 * scroll.count * (SCREEN_PX + gap)
-            head: list = [word, speed, gap, int(settings.credit_scroll_size), scroll.count, start - ahead / speed]
+            ahead: float = index * float(settings.credit_scroll_offset) / 360.0 * path.count * (SCREEN_PX + gap)
+            head: list = [word, speed, gap, int(settings.credit_scroll_size), path.count, repr(start - ahead / speed)]
             for player in range(PLAYERS):
-                cells: list[tuple[int, int]] = scroll.cells(player)
+                cells: list[tuple[int, int]] = path.cells(player)
                 if cells:
                     try:
-                        self._send(player, LOOP_ADDRESS, head + [value for pair in cells for value in pair])
+                        self._send(player, ADDRESS, head + [value for pair in cells for value in pair])
                     except Exception:
                         logger.exception('Scrolling name: player %d could not be reached', player + 1)
-        text: str = 'continuous: ' + ', '.join(f'{word} row {scroll.row}' for word, scroll in loops)
-        if text != self._loop_text:
-            self._loop_text = text
+        text: str = ', '.join(f'{word} round row {path.row}' for word, path in loops)
+        if text != self._text:
+            self._text = text
             settings.credit_scroll_last = text
-            logger.info('Scrolling name %s', text)
+            logger.info('Scrolling name: %s', text)
         return loops
-
-    def next_word(self, name: str) -> str:
-        """The word of `name` this pass takes: the words by turns, the whole name when it is one word."""
-        words: list[str] = name.split()
-        if not words:
-            return ''
-        word: str = words[self._word % len(words)]
-        self._word = (self._word + 1) % len(words)
-        return word
