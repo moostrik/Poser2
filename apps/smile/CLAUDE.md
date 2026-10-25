@@ -159,7 +159,7 @@ to both players as `/caption 0|1` every second (`ScreenTest.send_players`, the t
 clip, the name over the top and a random line from the same file along the bottom, new at every play (`Player._on_play`, not tied
 to the clip), drawn into a transparent portrait texture per cell (`PlayerRender._draw_caption`).
 `modules/sphere.py` is the one place that knows the sphere and its wiring: 12 ribs holding 5 and 3 screens by turn, heights 0 (top) to 4
-(heights 1 to 3 have 12 screens, 0 and 4 have 6), screens numbered down each rib (1-5, 6-8, 9-13 …), and screen s on Datapath unit
+(heights 1 to 3 have 12 screens, 0 and 4 have 6), screens numbered down each rib (1-5, 6-8, 9-13 …, the ribs counting to the left, so rib r is at -30r degrees), and screen s on Datapath unit
 ⌈s/4⌉ output ((s-1) mod 4)+1, unit n = grid column n-1, output k = grid row k-1 (`screen_of_cell`, `cell_of_screen`, `row_screens`,
 `cell_angles`): the laughter test (it steps the screens in the sphere's order, 1 to 48 down the ribs, lighting the cell `cell_of_screen` gives), the scrolling name's rows and `data/audio/screen_angles.txt` (generated: `screen_angles_text`,
 a test keeps the file equal to it) all come from it; a cabling that differs is changed there.
