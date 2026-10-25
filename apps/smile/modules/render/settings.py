@@ -91,7 +91,7 @@ class RenderSettings(BaseSettings):
     credit_qr_players: Field[bool] = Field(True, label="QR on players", description="One cell of each player wall shows the QR code and the name instead of its clip, one play at a time")
     credit_size:   Field[int]   = Field(200, min=120, max=480, step=10, label="QR size (px)", description="Size of the QR code (px)")
     credit_scroll: Field[bool]  = Field(False, newline=True, row_label="Scroll", label="On players", description="The name scrolls by on the player walls from time to time, along one ring of screens")
-    credit_scroll_every: Field[int] = Field(120, min=10, max=3600, step=10, label="Every (s)", description="Seconds between two passes of the scrolling name")
+    credit_scroll_every: Field[int] = Field(60, min=10, max=3600, step=10, label="Every (s)", description="Seconds between two passes of the scrolling name")
     credit_scroll_rows: Field[str] = Field(CREDIT_SCROLL_ROWS, label="Rows", description="Rings the name runs on, 0 (top) to 4, one of them per pass; 1 to 3 have 12 screens")
     credit_scroll_screens_min: Field[int] = Field(6, min=1, max=12, label="Screens min", description="Fewest screens a pass covers")
     credit_scroll_screens_max: Field[int] = Field(10, min=1, max=12, label="Screens max", description="Most screens a pass covers")

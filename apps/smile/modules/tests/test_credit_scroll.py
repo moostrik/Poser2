@@ -37,17 +37,18 @@ class TestRows(unittest.TestCase):
 
 class TestPass(unittest.TestCase):
     def test_the_path_follows_the_ring_and_wraps(self):
-        self.assertEqual(ScrollPass(1, 0, 3).screens, [1, 5, 9])
-        self.assertEqual(ScrollPass(1, 10, 4).screens, [41, 45, 1, 5])
-        self.assertEqual(ScrollPass(1, 1, 3, reverse=True).screens, [5, 1, 45])
+        # down the ribs: the ribs count to the camera's left, the visitor's right, and the name moves left
+        self.assertEqual(ScrollPass(1, 2, 3).screens, [9, 5, 1])
+        self.assertEqual(ScrollPass(1, 1, 4).screens, [5, 1, 45, 41])
+        self.assertEqual(ScrollPass(1, 10, 3, reverse=True).screens, [41, 45, 1])
 
     def test_each_player_gets_its_own_cells_with_their_place_on_the_whole_path(self):
-        scroll = ScrollPass(1, 4, 6)      # screens (from 0) 17, 21 | 25, 29, 33, 37: height 1, grid row 1
-        self.assertEqual(scroll.cells(0), [(10, 0), (11, 1)])
-        self.assertEqual(scroll.cells(1), [(6, 2), (7, 3), (8, 4), (9, 5)])
+        scroll = ScrollPass(1, 4, 6)      # screens (from 0) 17, 13, 9, 5, 1 | 45: height 1, grid row 1
+        self.assertEqual(scroll.cells(0), [(10, 0), (9, 1), (8, 2), (7, 3), (6, 4)])
+        self.assertEqual(scroll.cells(1), [(11, 5)])
 
     def test_the_readout_numbers_the_screens_from_one(self):
-        self.assertEqual(ScrollPass(3, 0, 2).describe(), "row 3: screens 4, 8")
+        self.assertEqual(ScrollPass(3, 0, 2).describe(), "row 3: screens 4, 48")
 
     def test_a_pass_is_planned_within_the_settings(self):
         rng = random.Random(1)
@@ -136,20 +137,37 @@ class TestScroller(unittest.TestCase):
         self.scroller.update(1240.0, False)
         self.assertTrue(self.sent)
 
-    def test_the_message_carries_the_name_the_speed_in_px_and_each_players_cells(self):
+    def test_the_message_carries_one_word_of_the_name_the_speed_in_px_and_each_players_cells(self):
         random.seed(3)
         self.scroller.send_pass(0.0)
         players = {player for player, _, _ in self.sent}
         self.assertTrue(players)
         for player, address, args in self.sent:
             self.assertEqual(address, ADDRESS)
-            self.assertEqual(args[:4], ["Matthias Oostrik", 512.0, 0, 64])
+            self.assertIn(args[0], ("Matthias", "Oostrik"))
+            self.assertEqual(args[1:4], [512.0, 0, 64])
             pairs = args[4:]
             self.assertEqual(len(pairs) % 2, 0)
             self.assertTrue(all(0 <= cell < 24 for cell in pairs[::2]))
             self.assertTrue(all(0 <= place < 10 for place in pairs[1::2]))
         places = sorted(place for _, _, args in self.sent for place in args[5::2])
         self.assertEqual(places, list(range(len(places))))
+
+    def test_the_passes_take_the_words_of_the_name_by_turns(self):
+        words = []
+        for _ in range(4):
+            self.sent.clear()
+            self.scroller.send_pass(0.0)
+            words.append({args[0] for _, _, args in self.sent}.pop())
+        self.assertEqual(words[0], words[2])
+        self.assertEqual(words[1], words[3])
+        self.assertEqual(set(words), {"Matthias", "Oostrik"})
+        self.assertIn(words[-1], self.settings.credit_scroll_last)
+
+    def test_a_one_word_name_is_sent_whole(self):
+        self.settings.credit_name = "  Banksy "
+        self.scroller.send_pass(0.0)
+        self.assertTrue(all(args[0] == "Banksy" for _, _, args in self.sent))
 
     def test_the_button_sends_one_pass_at_once_and_the_switch_off_sends_none(self):
         self.settings.credit_scroll = False

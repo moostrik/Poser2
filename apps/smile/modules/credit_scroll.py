@@ -1,5 +1,6 @@
-"""The artist's name scrolling by on the player walls: from time to time it runs once along one ring of
-the sphere, over the playing clips, like a ticker, letters nearly as tall as a screen. SMILE plans every
+"""The artist's name scrolling by on the player walls: from time to time one word of it (the first name,
+the next time the surname) runs once along one ring of the sphere, over the playing clips, like a ticker,
+letters nearly as tall as a screen. SMILE plans every
 pass (`CreditScroller`, in the render loop) and sends each player the cells of its own that are on the
 path with their place along it; the players know nothing of the sphere and draw the name from one long
 texture (`name_strip`). No GL here: the geometry is shared by both apps and tested without one."""
@@ -58,7 +59,9 @@ def parse_rows(text: str) -> list[int]:
 @dataclass(frozen=True)
 class ScrollPass:
     """One pass of the name: along `row`, entering at the `start`th screen of the ring and covering `count`
-    screens from there, round the ring the other way with `reverse`."""
+    screens from there, round the ring the other way with `reverse`. The name moves to the left of whoever
+    stands in front of it, and the ribs count to the camera's left, which is that visitor's right: so the
+    next screen is the rib before (checked on site 2026-10-25)."""
     row: int
     start: int
     count: int
@@ -68,7 +71,7 @@ class ScrollPass:
     def screens(self) -> list[int]:
         """The screens in the order the name reaches them (a ring is closed: the path wraps)."""
         ring: list[int] = row_screens(self.row)
-        step: int = -1 if self.reverse else 1
+        step: int = 1 if self.reverse else -1
         return [ring[(self.start + step * i) % len(ring)] for i in range(self.count)]
 
     def cells(self, player: int) -> list[tuple[int, int]]:
@@ -175,7 +178,8 @@ class CreditScroller:
     """Plans the passes from the panel's Scroll settings (`RenderSettings`) and sends them to the players.
     `update` runs in SMILE's render loop and never raises there: while `credit_scroll` is on and nothing
     blocks it (the laughter test), a pass goes out every `credit_scroll_every` seconds; the button
-    (`request`) sends one at once. `credit_scroll_last` shows the last pass."""
+    (`request`) sends one at once. Each pass carries one word of `credit_name`, the words by turns (a whole
+    name is too long for a pass of a few screens). `credit_scroll_last` shows the last pass."""
 
     def __init__(self, settings: Any, send: Send) -> None:
         self.settings: Any = settings
@@ -183,6 +187,7 @@ class CreditScroller:
         self._next_time: float | None = None    # when the next timed pass is due, None while off
         self._requested: bool = False
         self._warned: bool = False
+        self._word: int = random.randrange(2)   # which word of the name the next pass takes
         settings.credit_scroll_last = ''
 
     def request(self, _: Any = None) -> None:
@@ -219,7 +224,8 @@ class CreditScroller:
                 logger.warning('No rows for the scrolling name in "%s" (0 to 4, like "%s")', settings.credit_scroll_rows, DEFAULT_ROWS)
             return None
         self._warned = False
-        head: list = [str(settings.credit_name), float(settings.credit_scroll_speed) * SCREEN_PX,
+        word: str = self.next_word(str(settings.credit_name))
+        head: list = [word, float(settings.credit_scroll_speed) * SCREEN_PX,
                       int(settings.credit_scroll_gap), int(settings.credit_scroll_padding)]
         for player in range(PLAYERS):
             cells: list[tuple[int, int]] = scroll.cells(player)
@@ -228,6 +234,15 @@ class CreditScroller:
                     self._send(player, ADDRESS, head + [value for pair in cells for value in pair])
                 except Exception:
                     logger.exception('Scrolling name: player %d could not be reached', player + 1)
-        settings.credit_scroll_last = f"{time.strftime('%H:%M:%S', time.localtime(now))} {scroll.describe()}"
-        logger.info('Scrolling name: %s', scroll.describe())
+        settings.credit_scroll_last = f"{time.strftime('%H:%M:%S', time.localtime(now))} {word}, {scroll.describe()}"
+        logger.info('Scrolling name: %s, %s', word, scroll.describe())
         return scroll
+
+    def next_word(self, name: str) -> str:
+        """The word of `name` this pass takes: the words by turns, the whole name when it is one word."""
+        words: list[str] = name.split()
+        if not words:
+            return ''
+        word: str = words[self._word % len(words)]
+        self._word = (self._word + 1) % len(words)
+        return word
