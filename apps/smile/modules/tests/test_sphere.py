@@ -48,10 +48,11 @@ class TestWiring(unittest.TestCase):
     def test_angles(self):
         angles = sphere.cell_angles()
         self.assertEqual(len(angles), 48)
-        self.assertEqual(angles[:6], [0.0, 0.0, 60.0, 60.0, 120.0, 120.0])
-        self.assertEqual(angles[6:12], [0.0, 30.0, 60.0, 90.0, 120.0, 150.0])
-        self.assertEqual(angles[24:30], [180.0, 180.0, -120.0, -120.0, -60.0, -60.0])
-        self.assertEqual(angles[30:36], [180.0, -150.0, -120.0, -90.0, -60.0, -30.0])
+        # the ribs count to the left: rib 1 is at -30 degrees
+        self.assertEqual(angles[:6], [0.0, 0.0, -60.0, -60.0, -120.0, -120.0])
+        self.assertEqual(angles[6:12], [0.0, -30.0, -60.0, -90.0, -120.0, -150.0])
+        self.assertEqual(angles[24:30], [180.0, 180.0, 120.0, 120.0, 60.0, 60.0])
+        self.assertEqual(angles[30:36], [180.0, 150.0, 120.0, 90.0, 60.0, 30.0])
 
     def test_the_angles_file_is_the_wiring(self):
         data = Path('data/audio/screen_angles.txt').read_bytes()

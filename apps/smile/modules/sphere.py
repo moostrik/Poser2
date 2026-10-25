@@ -2,7 +2,8 @@
 screen a cell is. Used by the laughter test (the number a lit cell shows), the scrolling name (the
 screens of a row) and `data/audio/screen_angles.txt` (the angle of every cell, for the laughter).
 
-The sphere has 12 ribs 30 degrees apart (rib 0 at the camera, counting to the right seen from above),
+The sphere has 12 ribs 30 degrees apart (rib 0 at the camera, counting to the LEFT seen from above:
+checked on site 2026-10-25),
 holding 5 and 3 screens by turn at heights 0 (top) to 4; a 3-rib holds the heights 1, 2 and 3. The
 screens are numbered from 1 down each rib, then the next rib: 1-5 the first 5-rib, 6-8 the 3-rib
 after it, 9-13, 14-16 and so on round. The wiring: screen s is Datapath unit ceil(s / 4), output
@@ -12,7 +13,7 @@ heights 1, 2 and 3 of a player's six ribs on its grid rows 1, 2 and 3 in order, 
 bottoms of its three 5-ribs by turns on grid row 0."""
 
 RIBS: int = 12
-RIB_STEP_DEG: float = 30.0
+RIB_STEP_DEG: float = -30.0             # per rib, seen from above with the right positive: the ribs count to the left
 HEIGHTS: int = 5                        # rows of the sphere, 0 the top
 RIB_HEIGHTS: tuple[range, range] = (range(0, 5), range(1, 4))   # the heights a 5-rib and a 3-rib hold
 PAIR_SCREENS: int = 8                   # a 5-rib and the 3-rib after it
