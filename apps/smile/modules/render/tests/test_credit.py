@@ -8,7 +8,7 @@ from unittest import mock
 import cv2
 
 from modules.credit import LINE, LINES, QUIET_MODULES, URL, CreditLines, qr_image, quiet_px, wrap_balanced
-from modules.render.layers.CreditLayer import FADE_S, SHOWN, fade_step
+from modules.render.layers.CreditLayer import FADE_S, SHOWN, caption_shown, fade_step, new_line_due
 from modules.render.Sequencer import SequenceType
 
 
@@ -90,6 +90,22 @@ class TestLines(unittest.TestCase):
 class TestFade(unittest.TestCase):
     def test_shown_with_the_grin_and_the_result(self):
         self.assertEqual(SHOWN, {SequenceType.DIFF_LOOP, SequenceType.TIMEOUT})
+
+    def test_on_the_camera_only_with_the_switch(self):
+        self.assertFalse(caption_shown(SequenceType.CAMERA_SHOW, False))
+        self.assertTrue(caption_shown(SequenceType.CAMERA_DETECT, True))
+        self.assertTrue(caption_shown(SequenceType.TIMEOUT, False))
+        self.assertFalse(caption_shown(SequenceType.FLASH, True))
+
+    def test_a_new_line_at_the_capture_and_when_the_camera_view_begins(self):
+        S = SequenceType
+        self.assertTrue(new_line_due(S.CAPTURE, S.FLASH))
+        self.assertFalse(new_line_due(S.CAPTURE, S.CAPTURE))
+        self.assertTrue(new_line_due(S.CAMERA_SHOW, S.FADE))
+        self.assertTrue(new_line_due(S.CAMERA_SHOW, S.NONE))
+        # a face that comes and goes within the camera view keeps the line
+        self.assertFalse(new_line_due(S.CAMERA_SHOW, S.CAMERA_DETECT))
+        self.assertFalse(new_line_due(S.CAMERA_DETECT, S.CAMERA_SHOW))
 
     def test_fades_in_and_out(self):
         alpha = 0.0

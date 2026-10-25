@@ -80,6 +80,7 @@ class Main():
         self.audio: AudioDB = AudioDB(self.settings.audio, 'data/audio/music_map.json')
         self.osc: Osc = Osc(self.settings.audio.osc)
         self.screen_test: ScreenTest = ScreenTest(self.settings.audio, bang=self._test_bang)  # the laughter test, stepped from sequence_callback
+        self._caption_sent: float = 0.0     # when the players last got the caption switch
         self.save: ClipSaver = ClipSaver(self.settings.sequence)
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
         self._saving: bool = False          # the visitor's files are open in the saver
@@ -199,6 +200,11 @@ class Main():
             self.osc.send('/laughter_test', int(audio.laughter_test))
         # the laughter test steps on the app clock too (the lights to the players, the test bangs to Max)
         self.screen_test.update(time.time())
+        # the players' caption switch, every second, so a player that starts later follows it too
+        now: float = time.time()
+        if now - self._caption_sent > 1.0:
+            self._caption_sent = now
+            self.screen_test.send_players('/caption', int(self.settings.render.credit_players))
 
         if seq == SequenceType.CAMERA_SHOW and message.initial:
             self.face.reset()
@@ -277,7 +283,8 @@ class Main():
             return
         if message.state == GenState.DIFFUSION and message.final:
             # the record first: it goes into the portrait and the clip
-            self.save.set_record(self.diffuse.record())
+            render = self.settings.render
+            self.save.set_record({**self.diffuse.record(), 'credit_name': render.credit_name, 'credit_line': render.credit_line})
             self.save.save_portrait(message.image)
         if message.state == GenState.DIFF_LOOP:
             self.save.save_frame(message.image)

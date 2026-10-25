@@ -8,6 +8,7 @@ from modules.player.ClipPool import ClipPool, Clip
 ImageCallback= Callable[[str, np.ndarray, bool], None]
 
 LoaderCallback= Callable[[int], None]     # the cell a play starts in
+ClipCallback= Callable[[str, Clip], None]  # the cell and the clip it starts
 
 def play_rate(fps: float, clip_fps: float, spread: float) -> float:
     """The speed of one play: fps (the clip's own rate when 0), off by a random fraction up to spread.
@@ -27,6 +28,7 @@ class LoadImages(Thread):
         self._stop_event: Event = Event()
         self._message_callbacks: list[ImageCallback] = []
         self._loader_callbacks: list[LoaderCallback] = []
+        self._clip_callbacks: list[ClipCallback] = []
 
         self._id: str = id
         self.pool: ClipPool = pool
@@ -71,6 +73,7 @@ class LoadImages(Thread):
         count: int = len(clip.frames)
         # the cell this play starts in: the Max patch places the laugh by the cell's screen
         self._loader_callback(int(self._id))
+        self._clip_callback(clip)
         for i in range(count):
             if self._stop_event.is_set():
                 return
@@ -117,6 +120,16 @@ class LoadImages(Thread):
         with self._callback_mutex:
             for c in self._loader_callbacks:
                 c(cell)
+
+    def _clip_callback(self, clip: Clip) -> None:
+        with self._callback_mutex:
+            for c in self._clip_callbacks:
+                c(self._id, clip)
+
+    def add_clip_callback(self, callback: ClipCallback) -> None:
+        """Called with the clip at the start of every play (the loader's thread)."""
+        with self._callback_mutex:
+            self._clip_callbacks.append(callback)
 
     def add_loader_callback(self, callback: LoaderCallback) -> None:
         with self._callback_mutex:

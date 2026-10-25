@@ -8,9 +8,10 @@ import numpy as np
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TEST, glClear, glClearColor,  # type: ignore
                        glDisable, glEnable, glScissor, glViewport)
 
-from modules.credit import FONT, NAME, URL, qr_image, quiet_px
+from modules.credit import FONT, NAME, URL, qr_image, quiet_px, wrap_balanced
 from modules.gl import Blit, Fbo, Image, RenderBase, Shader, Style, SwapFbo, Text, WindowSettings, clear_color
 from modules.gl.Utils import fit
+from modules.player.ClipPool import Clip
 from modules.render.shaders import Blend
 from modules.player.shaders import BlitRotated
 
@@ -24,6 +25,15 @@ CREDIT_QR_PX: int = 500         # with its white border, which the white cell hi
 CREDIT_GAP_PX: int = 64         # between the code and the name
 CREDIT_PROBE_PX: int = 100      # the font size the name is measured at, to scale it to the code's width
 CREDIT_NAME_COLOR: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
+
+# a clip's caption, in the clip's upright 512 x 640: the name over the top, the line along the bottom, as on the main screen
+CAPTION_PX: int = 44
+CAPTION_MARGIN_PX: int = 20
+CAPTION_OUTLINE_PX: int = 3
+CAPTION_COLOR: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
+CAPTION_OUTLINE_COLOR: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
+CAPTION_OUTLINE: list[tuple[int, int]] = [(x, y) for x in (-CAPTION_OUTLINE_PX, 0, CAPTION_OUTLINE_PX)
+                                          for y in (-CAPTION_OUTLINE_PX, 0, CAPTION_OUTLINE_PX) if x or y]
 
 
 def lit_cells(lit: dict[str, float], now: float) -> list[str]:
@@ -52,7 +62,9 @@ class PlayerRender(RenderBase):
     A cell flashes for one frame when its next sequence starts (the credit card with the credit on, else white), and is white with its screen's
     number while the laughter test lights it (`light`). One cell shows the artist's name and a QR code to
     the project page instead of its clip (`credit`): it takes a cell when a clip starts there, with its white
-    frame, and stays for that play, so it moves on as often as the clips change. Keys: f fullscreen (borderless), Esc quit (the
+    frame, and stays for that play, so it moves on as often as the clips change. With `caption` on (SMILE's
+    `credit_players` switch, over OSC), every cell shows its clip's caption from the clip's record: the
+    artist's name over the top and the visitor's line along the bottom. Keys: f fullscreen (borderless), Esc quit (the
     window manager)."""
 
     COLUMNS: int = 6
@@ -102,6 +114,13 @@ class PlayerRender(RenderBase):
         self._credit_qr: Image = Image('BGR')
         self._credit_quiet: int = 0         # the QR image's white border (px)
         self._credit_name_text: Text = Text()
+        # the clips' captions: per cell the name and line of the clip it plays, drawn into a transparent
+        # portrait texture when they change, and blitted over the cell turned like the clip
+        self.caption: bool = False
+        self._captions: dict[str, tuple[str, str]] = {id: ('', '') for id in ids}
+        self._caption_drawn: dict[str, tuple[str, str] | None] = {id: None for id in ids}
+        self._caption_fbos: dict[str, Fbo] = {id: Fbo() for id in ids}
+        self._caption_text: Text = Text()
 
     # RENDER THREAD
     def allocate(self) -> None:
@@ -118,6 +137,10 @@ class PlayerRender(RenderBase):
             self._credit_quiet = quiet_px(qr)
             self._credit_qr.set_image(qr)
             self._allocate_credit_name(qr.shape[1] - 2 * self._credit_quiet)
+        for fbo in self._caption_fbos.values():
+            fbo.allocate(self.CELL_HEIGHT, self.CELL_WIDTH, GL_RGBA8)
+        if not self._caption_text.allocate(FONT, CAPTION_PX):
+            logger.warning('No font for the captions: the clips play without')
         Shader.enable_hot_reload()
 
     def deallocate(self) -> None:
@@ -130,6 +153,9 @@ class PlayerRender(RenderBase):
         self._credit_fbo.deallocate()
         self._credit_qr.deallocate()
         self._credit_name_text.deallocate()
+        self._caption_text.deallocate()
+        for fbo in self._caption_fbos.values():
+            fbo.deallocate()
         for image in self._images.values():
             image.deallocate()
 
@@ -151,6 +177,7 @@ class PlayerRender(RenderBase):
             lit: list[str] = lit_cells(self._lit, time.time())
             numbers: dict[str, int] = {id: self._numbers.get(id, 0) for id in lit}
             self._numbers = numbers
+            captions: dict[str, tuple[str, str]] = dict(self._captions) if self.caption else {}
         for image in self._images.values():
             image.update()
         if self.credit:
@@ -171,6 +198,10 @@ class PlayerRender(RenderBase):
             self._draw_number(numbers[lit[-1]])
         if self.credit:
             self._draw_credit()     # also the flash of every new sequence
+        for id, caption in captions.items():
+            if caption != self._caption_drawn[id]:
+                self._draw_caption(id, *caption)
+                self._caption_drawn[id] = caption
 
         self._trail_fbo.swap()
         self._trail_fbo.begin()
@@ -179,6 +210,14 @@ class PlayerRender(RenderBase):
         for id in starts:
             glViewport(*self._rects[id])
             self._rotated.use(self._images[id])
+        # the clips' captions, over each cell's clip
+        if captions:
+            Style.set_blend_mode(Style.BlendMode.ALPHA)
+            for id, (name, line) in captions.items():
+                if name or line:
+                    glViewport(*self._rects[id])
+                    self._rotated.use(self._caption_fbos[id])
+            Style.set_blend_mode(Style.BlendMode.DISABLED)
         # the credit, over its cell's clip
         if self._credit_cell is not None:
             glViewport(*self._rects[self._credit_cell])
@@ -214,6 +253,30 @@ class PlayerRender(RenderBase):
                                  self.CELL_HEIGHT, self.CELL_WIDTH)
             Style.set_blend_mode(Style.BlendMode.DISABLED)
         self._number_fbo.end()
+
+    def _draw_caption(self, id: str, name: str, line: str) -> None:
+        """The cell's caption texture: transparent, the name in even lines over the top and the line along
+        the bottom, white with a black edge."""
+        fbo: Fbo = self._caption_fbos[id]
+        width, height = self.CELL_HEIGHT, self.CELL_WIDTH
+        fbo.begin()
+        glClearColor(0.0, 0.0, 0.0, 0.0)
+        glClear(GL_COLOR_BUFFER_BIT)
+        text: Text = self._caption_text
+        if text.allocated:
+            measure = lambda part: text.measure_text(part)[0]
+            _, line_height = text.measure_text("Mg")
+            top: list[str] = wrap_balanced(name, measure, width - 2 * CAPTION_MARGIN_PX)
+            bottom: list[str] = wrap_balanced(line, measure, width - 2 * CAPTION_MARGIN_PX)
+            Style.set_blend_mode(Style.BlendMode.ALPHA)
+            for lines, y in ((top, CAPTION_MARGIN_PX), (bottom, height - CAPTION_MARGIN_PX - len(bottom) * line_height)):
+                for i, part in enumerate(lines):
+                    x: float = (width - measure(part)) / 2
+                    for dx, dy in CAPTION_OUTLINE:
+                        text.draw_text(x + dx, y + i * line_height + dy, part, CAPTION_OUTLINE_COLOR, width, height)
+                    text.draw_text(x, y + i * line_height, part, CAPTION_COLOR, width, height)
+            Style.set_blend_mode(Style.BlendMode.DISABLED)
+        fbo.end()
 
     def _allocate_credit_name(self, width: int) -> None:
         """The name's font at the size that makes the name `width` pixels wide."""
@@ -266,6 +329,11 @@ class PlayerRender(RenderBase):
         self._images[id].set_image(image)
         with self._mutex:
             self._initials[id] = int(initial)
+
+    def set_caption(self, id: str, clip: Clip) -> None:
+        """The clip a cell starts: its caption goes on the cell while `caption` is on (any thread)."""
+        with self._mutex:
+            self._captions[id] = (clip.name, clip.line)
 
     def light(self, id: str, seconds: float, number: int = 0) -> None:
         """Light a cell white with the screen's `number` (0: none) for `seconds` (the laughter test); an

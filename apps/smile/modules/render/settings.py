@@ -85,6 +85,8 @@ class RenderSettings(BaseSettings):
     credit_lines:  Field[str]   = Field(CREDIT_LINES, access=Field.INIT, label="Lines file", description="Text file with the lines under the name, one per line")
     credit_line:   Field[str]   = Field(CREDIT_LINE, access=Field.READ, label="Line", description="The line under the name for the current visitor")
     credit_url:    Field[str]   = Field(CREDIT_URL, label="URL", description="Page the QR code opens")
+    credit_camera: Field[bool]  = Field(False, newline=True, row_label="Caption", label="On camera", description="Also show the caption over the camera view, while waiting for a visitor")
+    credit_players: Field[bool] = Field(False, label="On players", description="Show each clip's caption on the player walls (name top, line bottom)")
     credit_size:   Field[int]   = Field(200, min=120, max=480, step=10, label="QR size (px)", description="Size of the QR code (px)")
 
 

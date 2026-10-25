@@ -20,6 +20,23 @@ FADE_S: float = 0.5             # the caption fades in and out over this time
 
 # the caption is shown with the visitor's portrait: while the grin plays and while the result holds after it
 SHOWN: frozenset[SequenceType] = frozenset({SequenceType.DIFF_LOOP, SequenceType.TIMEOUT})
+# and, with `credit_camera`, over the camera while the installation waits for a visitor
+CAMERA: frozenset[SequenceType] = frozenset({SequenceType.CAMERA_SHOW, SequenceType.CAMERA_DETECT})
+
+
+def caption_shown(sequence_type: SequenceType, camera: bool) -> bool:
+    """Whether the caption is on in this sequence state (`camera`: the camera view has it too)."""
+    return sequence_type in SHOWN or (camera and sequence_type in CAMERA)
+
+
+def new_line_due(sequence_type: SequenceType, previous: SequenceType) -> bool:
+    """A new line is drawn at the capture (the visitor's own), and when the camera view begins after a
+    visitor (the waiting screen's), not when a face comes and goes within the camera view."""
+    if sequence_type == previous:
+        return False
+    if sequence_type == SequenceType.CAPTURE:
+        return True
+    return sequence_type == SequenceType.CAMERA_SHOW and previous not in CAMERA
 
 
 def fade_step(alpha: float, shown: bool, dt: float) -> float:

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from modules.save import record
 from modules.video import ffmpeg
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,8 @@ class Clip:
     style: str = ''         # the folder the clip was saved in: A or B
     plays: int = 0          # times started on a cell (levelled when the clip joins the archive)
     active: int = 0         # cells playing it now
+    name: str = ''          # the credit caption the visitor saw: the artist's name
+    line: str = ''          # and the line under it ('' for a clip without, or saved before the credit)
 
 
 def next_start(clips: list[Clip], started: set[str]) -> Clip | None:
@@ -219,7 +222,12 @@ class ClipPool:
             except Exception as e2:
                 logger.warning('Skipping %s: %s', id, e2)
                 return None
-        return Clip(id, frames, fps, style)
+        try:
+            info: dict = record.read(path) or {}
+        except Exception as e:
+            logger.warning('No record in %s: %s', id, e)
+            info = {}
+        return Clip(id, frames, fps, style, name=str(info.get('credit_name', '')), line=str(info.get('credit_line', '')))
 
     def _insert(self, clip: Clip, recent: bool = False, reused: bool = False) -> None:
         """The clip joins `recent` (a recording) or `archive` (from disk). One that is in the pool

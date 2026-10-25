@@ -11,7 +11,7 @@ from modules.gl import Blit, Fbo, RenderBase, Shader, Style, Texture, clear_colo
 from modules.gl.Utils import fit
 from modules.render.inputs import Inputs
 from modules.render.layers import CameraLayer, CreditLayer, DestructLayer, DiffusionLayer, FlashLayer, LayerBase, RevealLayer, StatusLayer
-from modules.render.layers.CreditLayer import SHOWN as CREDIT_SHOWN, fade_step
+from modules.render.layers.CreditLayer import caption_shown, fade_step, new_line_due
 from modules.render.layers.passes import copy
 from modules.render.Sequencer import SequenceType, Sequencer
 from modules.render.settings import RenderSettings
@@ -112,10 +112,11 @@ class SmileRender(RenderBase):
 
     def _render_credit(self, sequence_type: SequenceType) -> None:
         now: float = time.time()
-        if sequence_type == SequenceType.CAPTURE and self._credit_sequence != SequenceType.CAPTURE:
+        if new_line_due(sequence_type, self._credit_sequence):
             self._credit.new_visitor()
         self._credit_sequence = sequence_type
-        self._credit_alpha = fade_step(self._credit_alpha, sequence_type in CREDIT_SHOWN, now - self._credit_time)
+        shown: bool = caption_shown(sequence_type, self.settings.credit_camera)
+        self._credit_alpha = fade_step(self._credit_alpha, shown, now - self._credit_time)
         self._credit_time = now
         if self.settings.credit:
             self._credit.render(self._output, self._credit_alpha)

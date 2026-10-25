@@ -88,6 +88,18 @@ class ScreenTest:
         settings.laughter_test_screen = self._index + 1
         self._next_time = now + step
 
+    def send_players(self, address: str, *args) -> None:
+        """A message to both players (over the test's ports); a player that is not running is ignored."""
+        settings: AudioSettings = self.settings
+        for port in (settings.player_1_port, settings.player_2_port):
+            try:
+                client: SimpleUDPClient | None = self._clients.get(port)
+                if client is None:
+                    client = self._clients[port] = SimpleUDPClient(PLAYER_IP, port)
+                client.send_message(address, list(args))
+            except Exception:
+                logger.debug('Could not send %s to port %d', address, port, exc_info=True)
+
     def sample_number(self) -> int:
         """The chosen file's number in the patch (its position in the folder + 1); 1 when it is not listed."""
         samples: list[str] = list(self.settings.laughter_samples)
