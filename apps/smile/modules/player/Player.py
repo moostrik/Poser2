@@ -6,6 +6,7 @@ import time
 
 import numpy as np
 
+from modules.credit import NAME, URL
 from modules.player.ImgLoader import LoadImages
 from modules.player.Render import PlayerRender
 from modules.player.ClipPool import Clip, ClipPool, next_start
@@ -43,7 +44,7 @@ class Player():
     def __init__(self, osc_port: int, root: str = 'output/', monitor: int = 1, trail: float = 0.9,
                  clips: int = 24, pool: int = 30, hwdecode: int | None = None, windowed: bool = False,
                  fps: float = 30.0, spread: float = 0.0, recent: int = 4, recycle_every: float = 20.0,
-                 listen_port: int = 0) -> None:
+                 listen_port: int = 0, credit_every: float = 0.0, credit_name: str = NAME, credit_url: str = URL) -> None:
         # the first line of every log: what happened before this start
         logger.info(crash_summary())
         osc_settings = OscSettings()
@@ -72,7 +73,7 @@ class Player():
         # a plain window for testing (Esc quits, f toggles borderless fullscreen), else borderless fullscreen
         window.fullscreen_mode = FullscreenMode.WINDOWED if windowed else FullscreenMode.WINDOWED_FULLSCREEN
         window.initialize()
-        self.render: PlayerRender = PlayerRender(window, ids, trail)
+        self.render: PlayerRender = PlayerRender(window, ids, trail, credit_every, credit_name, credit_url)
         self.render.add_exit_callback(self.stop)
 
         # the clips are decoded once into RAM at the size the cells show them (the portrait is turned a quarter)
@@ -99,6 +100,7 @@ class Player():
                     f'a clip from disk after {recycle_every:g} s without a new one' if recycle_every > 0 else 'no recycling',
                     (f'{fps:g} fps' if fps > 0 else 'clip fps') + (f' +-{spread:.0%}' if spread > 0 else ''), root, 'window' if windowed else 'fullscreen',
                     f'/light on port {listen_port}' if listen_port else 'no /light port')
+        logger.info('Credit: %s', f'{credit_name}, {credit_url}, moves every {credit_every:g} s' if credit_every > 0 else 'none')
 
     def start(self) -> None:
         self.pool.start()
