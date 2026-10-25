@@ -32,7 +32,8 @@ SCREEN_HEIGHT_PX: int = 640
 DEFAULT_ROWS: str = "1,3"       # the rings with 12 screens, leaving the middle one to the clips
 ADDRESS: str = '/scroll'        # to the players: name, speed (px/s), gap (px), size (px), then cell, place, cell, place ...
 LOOP_ADDRESS: str = '/scroll_loop'  # a word going round a ring without end: word, speed, gap, size, the ring's screens, the
-                                    # px travelled so far, then cell, place ...; sent every second, a loop no message renews ends
+                                    # time it began (time.time(): SMILE and the players share the PC's clock, so the
+                                    # resends move nothing), then cell, place ...; sent every second, a loop no message renews ends
 LOOP_SEND_EVERY: float = 1.0
 LOOP_TIMEOUT: float = 3.0       # the players drop a loop that got no message for this long (SMILE gone, the switch off)
 
@@ -192,8 +193,9 @@ class CreditScroller:
     blocks it (the laughter test), a pass goes out every `credit_scroll_every` seconds; the button
     (`request`) sends one at once. Each pass carries one word of `credit_name`, the words by turns (a whole
     name is too long for a pass of a few screens). With `credit_scroll_loop` the words go round the rows
-    without end instead (`plan_loops`), sent again every second with the distance travelled so a player that
-    starts late joins in step; the button still sends a pass. `credit_scroll_last` shows the last pass."""
+    without end instead (`plan_loops`), sent again every second with the time they began so a player that
+    starts late joins in step, the second word `credit_scroll_offset` degrees ahead of the first; the button
+    still sends a pass. `credit_scroll_last` shows the last pass."""
 
     def __init__(self, settings: Any, send: Send) -> None:
         self.settings: Any = settings
@@ -277,9 +279,12 @@ class CreditScroller:
             return []
         self._warned = False
         speed: float = float(settings.credit_scroll_speed) * SCREEN_PX
-        travelled: float = (now - (self._loop_start if self._loop_start is not None else now)) * speed
-        for word, scroll in loops:
-            head: list = [word, speed, int(settings.credit_scroll_gap), int(settings.credit_scroll_size), scroll.count, travelled]
+        gap: int = int(settings.credit_scroll_gap)
+        start: float = self._loop_start if self._loop_start is not None else now
+        for index, (word, scroll) in enumerate(loops):
+            # the word of row i starts i * offset degrees further round its ring: that far ahead is that much earlier
+            ahead: float = index * float(settings.credit_scroll_offset) / 360.0 * scroll.count * (SCREEN_PX + gap)
+            head: list = [word, speed, gap, int(settings.credit_scroll_size), scroll.count, start - ahead / speed]
             for player in range(PLAYERS):
                 cells: list[tuple[int, int]] = scroll.cells(player)
                 if cells:

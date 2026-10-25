@@ -448,17 +448,16 @@ class PlayerRender(RenderBase):
         with self._mutex:
             self._scrolls.append(Scroll(name, speed, gap, size, cells, time.time()))
 
-    def scroll_loop(self, name: str, speed: float, gap: float, size: int, ring: int, travelled: float,
+    def scroll_loop(self, name: str, speed: float, gap: float, size: int, ring: int, started: float,
                     cells: list[tuple[str, int]]) -> bool:
         """A word going round a ring of `ring` screens without end (any thread, SMILE sends it every second):
-        `travelled` px since it began sets the phase, so every message keeps the loop in step with SMILE and a
-        player that starts late joins in. The loop ends when no message renews it for `LOOP_TIMEOUT`. True for
-        a loop that is new."""
+        `started` is when it began by the PC's clock, which SMILE and the player share, so the position comes
+        from this player's own clock and a resend moves nothing, while a player that starts late joins in step.
+        The loop ends when no message renews it for `LOOP_TIMEOUT`. True for a loop that is new."""
         cells = [(id, place) for id, place in cells if id in self._rects]
         if not cells or ring <= 0:
             return False
         now: float = time.time()
-        started: float = now - travelled / speed if speed > 0 else now
         with self._mutex:
             for scroll in self._scrolls:
                 if scroll.ring == ring and scroll.name == name and scroll.cells == cells:
