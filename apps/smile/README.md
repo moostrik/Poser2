@@ -87,7 +87,7 @@ not in git, safe to delete).
 * monitors are numbered primary first, then left to right: SMILE uses the one in its preset (`render.window.monitor`), the players the ones in `scripts\start_players.bat` (`PLAYER_1_MONITOR`, `PLAYER_2_MONITOR`); a player whose monitor is not connected opens in a window on the primary one
 
 ### Keys
-* in the SMILE window: Enter starts a sequence, F fullscreen, W borderless fullscreen, Esc quits (the panel's Exit button does the same)
+* in the SMILE window: Enter starts a sequence, F fullscreen, W borderless fullscreen, Esc quits (the panel's Exit button does the same); fullscreen hides the mouse pointer unless the panel's window setting `fullscreen_mouse` is on (a window always shows it)
 * in a player window: F borderless fullscreen, Esc quits
 
 ### Pieces on their own

@@ -187,14 +187,15 @@
       "height": 1541,
       "secondary_list": [],
       "secondary_fullscreen": false,
-      "fullscreen_mode": "WINDOWED_FULLSCREEN"
+      "fullscreen_mode": "WINDOWED_FULLSCREEN",
+      "fullscreen_mouse": false
     }
   },
   "audio": {
     "sound": true,
-    "laughter": false,
-    "music_volume": 0.0,
-    "laughter_volume": 0.0,
+    "laughter": true,
+    "music_volume": -2.0,
+    "laughter_volume": -15.0,
     "laughter_offset": 0.0,
     "laughter_test": false,
     "laughter_test_step": 2.0,
@@ -210,7 +211,7 @@
   },
   "artnet": {
     "active": true,
-    "ip": "10.0.0.11",
+    "ip": "192.168.0.111",
     "universe": 1,
     "fps": 40.0
   },

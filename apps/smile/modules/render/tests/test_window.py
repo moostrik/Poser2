@@ -77,6 +77,20 @@ class TestWindowManager(unittest.TestCase):
         self.manager._on_monitor_change(ctypes.pointer(ours.contents), DISCONNECTED)
         self.assertIsNone(self.manager._monitor)
 
+    def test_the_mouse_is_hidden_in_fullscreen_unless_the_setting_shows_it(self):
+        glfw, settings = self.glfw, self.manager.settings
+        self.manager._main_window = window = object()
+        self.manager._fullscreen_mode = FullscreenMode.WINDOWED_FULLSCREEN
+        self.manager.apply_cursor()
+        glfw.set_input_mode.assert_called_with(window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
+        settings.fullscreen_mouse = True                 # the panel's switch: applied by the render loop
+        self.run_loop(1)
+        glfw.set_input_mode.assert_called_with(self.manager._main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
+        settings.fullscreen_mouse = False
+        self.manager._fullscreen_mode = FullscreenMode.WINDOWED      # a window always shows it
+        self.manager.apply_cursor()
+        glfw.set_input_mode.assert_called_with(self.manager._main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
+
 
 if __name__ == '__main__':
     unittest.main()
