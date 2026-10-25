@@ -145,6 +145,15 @@ no new sequence while it is on (`Sequencer.blocked`). Shaders are
 `classname.frag` next to their `.py` and hot-reload while running. `player.py` uses the same engine
 (`modules/player/Render.py`).
 
+## Credit
+
+`modules/credit.py` holds the artist's credit (name, line, URL) and makes the QR code (OpenCV's encoder, whole pixels per
+module, with its quiet zone). `CreditLayer` draws the line as a meme caption over the top (white with a black edge, in the comic font
+`data/Bangers-Regular.ttf`: the credit is a joke) and the code in the bottom right corner, over the grin and the
+result (DIFF_LOOP and TIMEOUT, fading in and out), from the Render tab's `credit` fields; it is not in the saved clips. The
+players show the code and the name under it (scaled to the code's width) on one cell instead of its clip, moving to a random other cell every `--credit_every`
+seconds (`PlayerRender._move_credit`).
+
 ## Recordings
 
 `modules/save/ClipSaver.py` saves each finished visitor for the players under `output/` (git-ignored):

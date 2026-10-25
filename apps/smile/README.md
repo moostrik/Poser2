@@ -98,6 +98,10 @@ not in git, safe to delete).
 * drop a saved clip or portrait on ```scripts\clip_info.bat``` to see what it was made with (the record: id, style, description, seed, settings); ```.venv\Scripts\python -m modules.save.record <file> --preset <name>``` writes those settings to `data\settings\<name>.json`
 * tests: ```.venv\Scripts\python -m pytest``` from the repo root
 
+### Credit
+* the main screen shows `Matthias Oostrik likes your smile!` as a meme caption over the top of the portrait (in the comic font `data\Bangers-Regular.ttf`) and a QR code in the bottom right corner to https://oostrik.net/smile with each visitor's grin and result (the panel's Render tab: `credit` on or off, the text, the URL, the QR size)
+* each player wall has one cell with the QR code and the name under it, as wide as the code, instead of a clip, on another cell every 30 s: ```start_players.bat --credit_every 60```, `--credit_name`, `--credit_url`; `--credit_every 0` leaves it out
+
 ### Output
 * `output\grins\A\` and `output\grins\B\` hold the grin clips (h264 mp4, the players read the style from the folder), `output\portraits\` the capture and the portrait of each visitor; `output\temp\` is where they are built. About 2.9 MB per visitor, nothing is cleaned up
 
@@ -125,6 +129,7 @@ rig.
 12. **Startup after a reboot** (open): everything comes up by itself through the shortcut, SMILE waits for ComfyUI with its status line
 13. **Network stays up for a day** (open): in the System log the adapter driver (`aqnic650`) reports `Network link is lost` only at boot, and `Microsoft-Windows-NCSI/Operational` has no `ArpProbeFailed`; the SMILE log has no `no complete frame for 5 s`
 14. **Three speakers** (open): after a restart Max's Audio Status still shows the WASAPI driver with 4 output channels and no error in the Max console (`coll` found its file); the music is stereo on the front pair only; with the Audio tab's `laughter_test` on, the white screen with its number walks round the sphere, 1 to 48, the same laugh each time and no other (a clip starting meanwhile stays silent), and every laugh comes from the numbered screen (one near the back speaker from the back, one beside the camera from that side); turning the panel's `laughter_offset` by 180 swaps them; the test off: the readout shows 0, the clips' laughs are back and the next visitor starts
+15. **Credit** (open): a phone scans the QR code from the main screen during a result and from a player wall's credit cell, at the distance visitors stand and from a phone video of the screen; both open https://oostrik.net/smile
 
 ## KNOWN LIMITS
 * no automatic restart: an app that ends by itself stays down until `startSMILE.bat` is run; `crashes.log` says what happened

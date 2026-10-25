@@ -5,3 +5,4 @@ from .RevealLayer import RevealLayer
 from .DiffusionLayer import DiffusionLayer
 from .DestructLayer import DestructLayer
 from .StatusLayer import StatusLayer
+from .CreditLayer import CreditLayer

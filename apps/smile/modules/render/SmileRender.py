@@ -10,7 +10,8 @@ from modules.face.FaceFinder import FaceFrame
 from modules.gl import Blit, Fbo, RenderBase, Shader, Style, Texture, clear_color
 from modules.gl.Utils import fit
 from modules.render.inputs import Inputs
-from modules.render.layers import CameraLayer, DestructLayer, DiffusionLayer, FlashLayer, LayerBase, RevealLayer, StatusLayer
+from modules.render.layers import CameraLayer, CreditLayer, DestructLayer, DiffusionLayer, FlashLayer, LayerBase, RevealLayer, StatusLayer
+from modules.render.layers.CreditLayer import SHOWN as CREDIT_SHOWN, fade_step
 from modules.render.layers.passes import copy
 from modules.render.Sequencer import SequenceType, Sequencer
 from modules.render.settings import RenderSettings
@@ -44,10 +45,14 @@ class SmileRender(RenderBase):
             diffusion=DiffusionLayer(self.inputs.diffusion),
             destruct=DestructLayer(self.inputs.diffusion_depth),
         )
+        # the artist's credit, over the grin and the result
+        self._credit: CreditLayer = CreditLayer(settings)
+        self._credit_alpha: float = 0.0
+        self._credit_time: float = time.time()
         # the operator's status line, drawn over the output while there is something to say
         self._status: StatusLayer = StatusLayer()
         self._status_text: str | None = None
-        self._all_layers: list[LayerBase] = list(vars(self.layers).values()) + [self._status]
+        self._all_layers: list[LayerBase] = list(vars(self.layers).values()) + [self._credit, self._status]
 
         # one instance per stage class, shared by the sequence types it covers
         stages: dict[type[Stage], Stage] = {cls: cls(self.inputs, self.layers, settings) for cls in set(STAGES.values())}
@@ -93,6 +98,7 @@ class SmileRender(RenderBase):
         stage.update(message)
 
         self._output = stage.output
+        self._render_credit(message.sequence_type)
         status: str | None = self._status_text
         if status:
             self._status.render(self._output, status)
@@ -102,6 +108,15 @@ class SmileRender(RenderBase):
                 copy(self._output, self._freeze_fbo)
             self._output = self._freeze_fbo
         self._frozen = self.settings.freeze
+
+    def _render_credit(self, sequence_type: SequenceType) -> None:
+        now: float = time.time()
+        shown: bool = self.settings.credit and sequence_type in CREDIT_SHOWN
+        self._credit_alpha = fade_step(self._credit_alpha, shown, now - self._credit_time)
+        self._credit_time = now
+        if self._credit_alpha > 0.0:
+            self._credit.render(self._output, self._credit_alpha)
+            self._output = self._credit.texture
 
     def _play_grin(self) -> None:
         """Show the grin frame that is due. Its first frame arrives during DIFFUSION and blends in as
