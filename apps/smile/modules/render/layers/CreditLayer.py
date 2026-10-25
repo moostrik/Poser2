@@ -1,6 +1,6 @@
 from OpenGL.GL import glViewport  # type: ignore
 
-from modules.credit import FONT, qr_image, wrap_balanced
+from modules.credit import FONT, CreditLines, qr_image, wrap_balanced
 from modules.gl import Blit, Fbo, Image, Style, Text, Texture
 from modules.render.Sequencer import SequenceType
 from modules.render.settings import RenderSettings
@@ -20,6 +20,23 @@ FADE_S: float = 0.5             # the caption fades in and out over this time
 
 # the caption is shown with the visitor's portrait: while the grin plays and while the result holds after it
 SHOWN: frozenset[SequenceType] = frozenset({SequenceType.DIFF_LOOP, SequenceType.TIMEOUT})
+# and, with `credit_camera`, over the camera while the installation waits for a visitor
+CAMERA: frozenset[SequenceType] = frozenset({SequenceType.CAMERA_SHOW, SequenceType.CAMERA_DETECT})
+
+
+def caption_shown(sequence_type: SequenceType, camera: bool) -> bool:
+    """Whether the caption is on in this sequence state (`camera`: the camera view has it too)."""
+    return sequence_type in SHOWN or (camera and sequence_type in CAMERA)
+
+
+def new_line_due(sequence_type: SequenceType, previous: SequenceType) -> bool:
+    """A new line is drawn at the capture (the visitor's own), and when the camera view begins after a
+    visitor (the waiting screen's), not when a face comes and goes within the camera view."""
+    if sequence_type == previous:
+        return False
+    if sequence_type == SequenceType.CAPTURE:
+        return True
+    return sequence_type == SequenceType.CAMERA_SHOW and previous not in CAMERA
 
 
 def fade_step(alpha: float, shown: bool, dt: float) -> float:
@@ -29,12 +46,14 @@ def fade_step(alpha: float, shown: bool, dt: float) -> float:
 
 
 class CreditLayer(LayerBase):
-    """A QR code to the project page in the bottom right corner, always, and the artist's line as a meme
-    caption over the top of the image (white with a black edge, centred, in even lines) at the opacity
-    `render` gets. People film the result, so the credit is in their videos."""
+    """A QR code to the project page in the bottom right corner, always, and the artist's credit as a meme
+    caption over the top of the image (white with a black edge, centred): the name, and under it the
+    visitor's line, drawn from the lines file at every capture (`new_visitor`), at the opacity `render`
+    gets. People film the result, so the credit is in their videos."""
 
     def __init__(self, settings: RenderSettings) -> None:
         self.settings: RenderSettings = settings
+        self._lines: CreditLines = CreditLines(settings.credit_lines)
         self._base: Fbo = Fbo()             # the image with the QR code
         self._card: Fbo = Fbo()             # and with the caption
         self._fbo: Fbo = Fbo()              # the two mixed by the caption's opacity
@@ -98,9 +117,15 @@ class CreditLayer(LayerBase):
         self._blend.use(self._base, self._card, alpha)
         self._fbo.end()
 
+    def new_visitor(self) -> None:
+        """Draw the line under the name for the visitor that is captured now."""
+        self.settings.credit_line = self._lines.pick()
+
     def _draw_caption(self) -> None:
         measure = lambda line: self._text.measure_text(line)[0]
-        lines: list[str] = wrap_balanced(self.settings.credit_text, measure, self._width - 2 * MARGIN_PX)
+        width: int = self._width - 2 * MARGIN_PX
+        # the name and the line each on a line of their own; one that is too wide for the image wraps
+        lines: list[str] = wrap_balanced(self.settings.credit_name, measure, width) + wrap_balanced(self.settings.credit_line, measure, width)
         _, text_height = self._text.measure_text("Mg")
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         for i, line in enumerate(lines):

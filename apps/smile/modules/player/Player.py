@@ -6,7 +6,7 @@ import time
 
 import numpy as np
 
-from modules.credit import NAME, URL
+from modules.credit import NAME, URL, CreditLines
 from modules.player.ImgLoader import LoadImages
 from modules.player.Render import PlayerRender
 from modules.player.ClipPool import Clip, ClipPool, next_start
@@ -51,8 +51,10 @@ class Player():
         osc_settings.port = int(osc_port)
         self.osc:Osc = Osc(osc_settings)
         # SMILE's laughter test lights a cell with its screen's number: /light <cell> <seconds> <number> (0: no port, no test)
-        self.receiver: Receiver | None = Receiver(int(listen_port), {'/light': self._on_light}) if listen_port else None
+        self.receiver: Receiver | None = Receiver(int(listen_port), {'/light': self._on_light, '/caption': self._on_caption}) if listen_port else None
         self._light_warning_time: float = 0.0
+        self._lines: CreditLines = CreditLines()        # the captions' lines, one at random per play
+        self._lines_lock = threading.Lock()
 
         self._running: bool = False
 
@@ -86,6 +88,7 @@ class Player():
             loader = LoadImages(id, self.pool, fps, spread)
             loader.add_image_callback(self.render.set_image)
             loader.add_image_callback(self._count_frame)
+            loader.add_loader_callback(self._on_play)
             loader.add_loader_callback(self.send_osc)
             self.loaders.append(loader)
 
@@ -99,7 +102,7 @@ class Player():
         logger.info('Player %d: %d cells, pool %d (last %d always shown), %s, %s, root %s, %s, %s', monitor, clips, pool, recent,
                     f'a clip from disk after {recycle_every:g} s without a new one' if recycle_every > 0 else 'no recycling',
                     (f'{fps:g} fps' if fps > 0 else 'clip fps') + (f' +-{spread:.0%}' if spread > 0 else ''), root, 'window' if windowed else 'fullscreen',
-                    f'/light on port {listen_port}' if listen_port else 'no /light port')
+                    f'/light and /caption on port {listen_port}' if listen_port else 'no /light port')
         logger.info('Credit: %s', f'{credit_name}, {credit_url}, one play per cell' if credit else 'none')
 
     def start(self) -> None:
@@ -170,6 +173,23 @@ class Player():
         """A clip starts in a cell: the Max patch places its laugh by that screen's angle
         (data/audio/screen_angles.txt, by cell for port 4115 and cell + 24 for 4116)."""
         self.osc.send('/bang', cell)
+
+    def _on_play(self, cell: int) -> None:
+        """A clip starts in a cell (the loader's thread): the cell gets a caption for this play, the
+        artist's name and a random line, as on the main screen. The lines are not tied to the clips."""
+        with self._lines_lock:
+            line: str = self._lines.pick()
+        self.render.set_caption(str(cell), self.render.credit_name, line)
+
+    def _on_caption(self, on) -> None:
+        """SMILE's `credit_players` switch (the receiver's thread, sent every second): the clips' captions on or off."""
+        try:
+            on = bool(int(on))
+        except (TypeError, ValueError):
+            return
+        if on != self.render.caption:
+            self.render.caption = on
+            logger.info('Captions on the clips: %s', 'on' if on else 'off')
 
     def _on_light(self, cell, seconds, number=0) -> None:
         """SMILE's laughter test (the receiver's thread): show the cell white with the screen's `number` for
