@@ -38,8 +38,11 @@ CAPTION_OUTLINE: list[tuple[int, int]] = [(x, y) for x in (-CAPTION_OUTLINE_PX, 
 
 class Scroll:
     """A word of the name going round a ring of `ring` screens on this player (SMILE's `/scroll_loop`): the
-    cells on the ring with their place round it, moving at `speed` px/s from `started` (the PC's clock), with
-    `gap` px of wall between two screens, until `expires`, the time SMILE's next message is due by."""
+    cells on the ring with their place round it, moving at `speed` px/s from `started` (SMILE's `time.time()`,
+    the PC's clock), with `gap` px of wall between two screens, until `expires`, the time SMILE's next message
+    is due by. The frames are timed with `time.perf_counter()`: on Windows `time.time()` moves in steps of the
+    system tick (15.6 ms on Python 3.12), coarser than a frame, which made the word stand still one frame and
+    jump the next. `started` is carried onto that clock once, when it is new (`started_perf`)."""
 
     def __init__(self, name: str, speed: float, gap: float, size: int, ring: int, cells: list[tuple[str, int]],
                  started: float, expires: float) -> None:
@@ -50,13 +53,18 @@ class Scroll:
         self.ring: int = ring
         self.cells: list[tuple[str, int]] = cells
         self.started: float = started
+        self.started_perf: float = time.perf_counter() - (time.time() - started)
         self.expires: float = expires
 
     def renew(self, speed: float, gap: float, size: int, started: float, expires: float) -> None:
-        self.speed, self.gap, self.size, self.started, self.expires = speed, gap, size, started, expires
+        if started != self.started:         # a new phase (a speed changed in the panel): carry it over again
+            self.started_perf = time.perf_counter() - (time.time() - started)
+            self.started = started
+        self.speed, self.gap, self.size, self.expires = speed, gap, size, expires
 
-    def travelled(self, now: float) -> float:
-        return max(0.0, now - self.started) * self.speed
+    def travelled(self, now_perf: float) -> float:
+        """The px the word moved by `now_perf` (`time.perf_counter()`)."""
+        return max(0.0, now_perf - self.started_perf) * self.speed
 
 
 def lit_cells(lit: dict[str, float], now: float) -> list[str]:
@@ -242,7 +250,7 @@ class PlayerRender(RenderBase):
             if caption != self._caption_drawn[id]:
                 self._draw_caption(id, *caption)
                 self._caption_drawn[id] = caption
-        scrolling: list[str] = self._draw_scrolls(scrolls, time.time()) if scrolls else []
+        scrolling: list[str] = self._draw_scrolls(scrolls, time.perf_counter()) if scrolls else []
 
         self._trail_fbo.swap()
         self._trail_fbo.begin()
@@ -321,9 +329,10 @@ class PlayerRender(RenderBase):
             Style.set_blend_mode(Style.BlendMode.DISABLED)
         fbo.end()
 
-    def _draw_scrolls(self, scrolls: list[Scroll], now: float) -> list[str]:
-        """The cells the scrolling name is on at `now`, each cell's texture filled with its part of every
-        word that crosses it; a loop SMILE stopped renewing is dropped, and so is a strip no loop uses."""
+    def _draw_scrolls(self, scrolls: list[Scroll], now_perf: float) -> list[str]:
+        """The cells the scrolling name is on at `now_perf` (`time.perf_counter()`), each cell's texture filled
+        with its part of every word that crosses it; a loop SMILE stopped renewing is dropped, and so is a strip
+        no loop uses."""
         width, height = self.CELL_HEIGHT, self.CELL_WIDTH     # the screen upright: its width is the cell's height
         parts: dict[str, list[tuple[Image, float]]] = {}     # per cell: the strips on it with their offsets
         keys: set[tuple[str, int]] = set()
@@ -337,7 +346,7 @@ class PlayerRender(RenderBase):
             strip.update()
             if not strip.allocated:
                 continue
-            if now > scroll.expires:
+            if now_perf > scroll.expires:
                 with self._mutex:
                     if scroll in self._scrolls:
                         self._scrolls.remove(scroll)
@@ -345,7 +354,7 @@ class PlayerRender(RenderBase):
             # the distance round the ring: the strip drawn where it is on this lap and where the next lap's copy
             # enters at the end of the ring
             lap: float = scroll.ring * (width + scroll.gap)
-            travelled: float = scroll.travelled(now) % lap
+            travelled: float = scroll.travelled(now_perf) % lap
             for id, place in scroll.cells:
                 for t in (travelled, travelled + lap):
                     offset: float = scroll_offset(place, t, scroll.gap, width)
@@ -437,13 +446,13 @@ class PlayerRender(RenderBase):
         cells = [(id, place) for id, place in cells if id in self._rects]
         if not cells or ring <= 0:
             return False
-        now: float = time.time()
+        expires: float = time.perf_counter() + SCROLL_TIMEOUT
         with self._mutex:
             for scroll in self._scrolls:
                 if scroll.ring == ring and scroll.name == name and scroll.cells == cells:
-                    scroll.renew(speed, gap, size, started, now + SCROLL_TIMEOUT)
+                    scroll.renew(speed, gap, size, started, expires)
                     return False
-            self._scrolls.append(Scroll(name, speed, gap, size, ring, cells, started, now + SCROLL_TIMEOUT))
+            self._scrolls.append(Scroll(name, speed, gap, size, ring, cells, started, expires))
         return True
 
     def light(self, id: str, seconds: float, number: int = 0) -> None:

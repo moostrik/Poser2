@@ -170,7 +170,8 @@ the visitor's right, and a ticker moves to the visitor's left; `reverse` the oth
 second (`send_loops`: `/scroll_loop <word> <px/s> <gap> <size> <ring screens> <started> <cell> <place> ...`, `ScreenTest.send_player`), `started` the time the loops began
 as text (an OSC float is 32-bit and loses 128 s of a Unix time), each word at its own speed (`credit_scroll_speed_1`, `_2`; a speed changed in the panel moves the start
 so the word goes on from where it is, `word_start`); `credit_scroll_last` is the readout. The players
-(`PlayerRender.scroll_loop`, `_draw_scrolls`) take the position from that and their own clock (one PC: a resend moves nothing, which keeps the movement smooth) and drop a
+(`PlayerRender.scroll_loop`, `_draw_scrolls`) take the position from that and their own clock (one PC: a resend moves nothing), carried once onto `time.perf_counter()` for the frames: on Windows
+`time.time()` moves in 15.6 ms steps on Python 3.12, coarser than a frame, which made the word stand still one frame and jump the next and drop a
 loop no message renewed for `TIMEOUT`. They draw a word as a ticker reading left to right and moving left: `name_strip` renders it once with freetype into one long BGRA image,
 640 high, the ink `credit_scroll_size` tall in the vertical middle, white with a black edge (not the font atlas: too big at that size); each cell on the ring blits the strip
 shifted by `scroll_offset` (its place times screen width plus `credit_scroll_gap`, minus the distance travelled round the lap, and the next lap's copy) into its own portrait
