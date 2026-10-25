@@ -62,7 +62,7 @@ not in git, safe to delete).
 
 ### Music (Max)
 * install Max (Cycling '74); the patch is `data\audio\Smile-Music-Player.maxpat`
-* the music files go into `data\audio\` by hand (they are not in git); `data\audio\music_map.json` maps the two movements (`0000` for style A, `0001` for style B) to the tracks and their weights
+* the music (`data\audio\SMILE-BS-Music\`) and the laughter samples (`data\audio\laughter\`) are in git LFS and come in with the models (`scripts\install.bat`, or `git lfs pull`); `data\audio\music_map.json` maps the two movements (`0000` for style A, `0001` for style B) to the tracks and their weights
 * SMILE sends OSC to Max on `127.0.0.1:4114` (`/music_id`, `/state`, `/progress` and the controls below; the OSC card of the panel's Audio tab); the players send `/bang <cell>` on 4115 and 4116 when a clip starts in a cell
 * the panel's Audio tab holds the Max panel's controls: `sound` (the patch's DSP), `music_volume` and `laughter_volume` (both dB), `laughter` (the samples those `/bang`s trigger) and `laughter_offset` (degrees, see the speakers below); SMILE sends them every frame (`/sound`, `/music_volume`, `/laughter`, `/laughter_volume`, `/laughter_offset`), so the patch's own controls show them and only work on their own while SMILE does not send (the patch loads with sound and laughter on, laughter level 0 dB); the speaker button in Max holds a click until the panel's `sound` changes
 * laughter off: no new laugh starts and one that plays fades out
