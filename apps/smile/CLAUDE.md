@@ -152,13 +152,12 @@ it changes and `pick`s a random line, never the last one again, `LINE` when it h
 module, with its quiet zone). `CreditLayer` draws the code in the bottom right corner of everything the main screen shows, and the caption, the name with the
 visitor's line under it (drawn at the capture, `CreditLayer.new_visitor`, into the `credit_line` readout), as a meme caption over
 the top (white with a black edge, in the comic font `data/Bangers-Regular.ttf`: the credit is a joke) over the grin and the result (DIFF_LOOP and TIMEOUT, fading in and out), and with `credit_camera` over the camera view too (its
-own line, drawn when that view begins: `new_line_due`), from the Render tab's `credit` fields; it is not in the saved clips' images,
-but their record carries `credit_name` and `credit_line` (`Main.diffusion_callback`). The players show the code and the name under it (scaled to the code's width) on one cell instead of its clip,
+own line, drawn when that view begins: `new_line_due`), from the Render tab's `credit` fields; it is not in the saved clips. The players show the code and the name under it (scaled to the code's width) on one cell instead of its clip,
 for one play: it takes a cell when a clip starts there and leaves at that cell's next start (`next_credit_cell`), so no
 clip start flashes over it; with the credit on, every cell's start flash is that card too, instead of white. `credit_players` goes
-to both players as `/caption 0|1` every second (`ScreenTest.send_players`, the test's ports): on, every cell shows its clip's
-caption from the record (`Clip.name`, `Clip.line`; a clip without gets a random line per play, `Player._on_clip`), the name over
-the top and the line along the bottom, drawn into a transparent portrait texture per cell (`PlayerRender._draw_caption`).
+to both players as `/caption 0|1` every second (`ScreenTest.send_players`, the test's ports): on, every cell shows a caption over its
+clip, the name over the top and a random line from the same file along the bottom, new at every play (`Player._on_play`, not tied
+to the clip), drawn into a transparent portrait texture per cell (`PlayerRender._draw_caption`).
 
 ## Recordings
 

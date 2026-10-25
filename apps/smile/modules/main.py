@@ -283,8 +283,7 @@ class Main():
             return
         if message.state == GenState.DIFFUSION and message.final:
             # the record first: it goes into the portrait and the clip
-            render = self.settings.render
-            self.save.set_record({**self.diffuse.record(), 'credit_name': render.credit_name, 'credit_line': render.credit_line})
+            self.save.set_record(self.diffuse.record())
             self.save.save_portrait(message.image)
         if message.state == GenState.DIFF_LOOP:
             self.save.save_frame(message.image)

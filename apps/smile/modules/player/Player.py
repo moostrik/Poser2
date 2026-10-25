@@ -53,7 +53,7 @@ class Player():
         # SMILE's laughter test lights a cell with its screen's number: /light <cell> <seconds> <number> (0: no port, no test)
         self.receiver: Receiver | None = Receiver(int(listen_port), {'/light': self._on_light, '/caption': self._on_caption}) if listen_port else None
         self._light_warning_time: float = 0.0
-        self._lines: CreditLines = CreditLines()        # a line for a clip that carries none (saved before the credit)
+        self._lines: CreditLines = CreditLines()        # the captions' lines, one at random per play
         self._lines_lock = threading.Lock()
 
         self._running: bool = False
@@ -88,7 +88,7 @@ class Player():
             loader = LoadImages(id, self.pool, fps, spread)
             loader.add_image_callback(self.render.set_image)
             loader.add_image_callback(self._count_frame)
-            loader.add_clip_callback(self._on_clip)
+            loader.add_loader_callback(self._on_play)
             loader.add_loader_callback(self.send_osc)
             self.loaders.append(loader)
 
@@ -174,14 +174,12 @@ class Player():
         (data/audio/screen_angles.txt, by cell for port 4115 and cell + 24 for 4116)."""
         self.osc.send('/bang', cell)
 
-    def _on_clip(self, cell: str, clip: Clip) -> None:
-        """A clip starts in a cell (the loader's thread): its caption goes on the cell. A clip without one
-        (saved before the credit) gets the artist's name and a random line for this play."""
-        if not clip.line:
-            with self._lines_lock:
-                line: str = self._lines.pick()
-            clip = Clip(clip.id, clip.frames, clip.fps, clip.style, name=clip.name or self.render.credit_name, line=line)
-        self.render.set_caption(cell, clip)
+    def _on_play(self, cell: int) -> None:
+        """A clip starts in a cell (the loader's thread): the cell gets a caption for this play, the
+        artist's name and a random line, as on the main screen. The lines are not tied to the clips."""
+        with self._lines_lock:
+            line: str = self._lines.pick()
+        self.render.set_caption(str(cell), self.render.credit_name, line)
 
     def _on_caption(self, on) -> None:
         """SMILE's `credit_players` switch (the receiver's thread, sent every second): the clips' captions on or off."""

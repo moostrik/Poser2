@@ -11,7 +11,6 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TES
 from modules.credit import FONT, NAME, URL, qr_image, quiet_px, wrap_balanced
 from modules.gl import Blit, Fbo, Image, RenderBase, Shader, Style, SwapFbo, Text, WindowSettings, clear_color
 from modules.gl.Utils import fit
-from modules.player.ClipPool import Clip
 from modules.render.shaders import Blend
 from modules.player.shaders import BlitRotated
 
@@ -63,8 +62,8 @@ class PlayerRender(RenderBase):
     number while the laughter test lights it (`light`). One cell shows the artist's name and a QR code to
     the project page instead of its clip (`credit`): it takes a cell when a clip starts there, with its white
     frame, and stays for that play, so it moves on as often as the clips change. With `caption` on (SMILE's
-    `credit_players` switch, over OSC), every cell shows its clip's caption from the clip's record: the
-    artist's name over the top and the visitor's line along the bottom. Keys: f fullscreen (borderless), Esc quit (the
+    `credit_players` switch, over OSC), every cell shows a caption over its clip, set at every play
+    (`set_caption`): the artist's name over the top and a random line along the bottom. Keys: f fullscreen (borderless), Esc quit (the
     window manager)."""
 
     COLUMNS: int = 6
@@ -114,8 +113,8 @@ class PlayerRender(RenderBase):
         self._credit_qr: Image = Image('BGR')
         self._credit_quiet: int = 0         # the QR image's white border (px)
         self._credit_name_text: Text = Text()
-        # the clips' captions: per cell the name and line of the clip it plays, drawn into a transparent
-        # portrait texture when they change, and blitted over the cell turned like the clip
+        # the clips' captions: per cell a name and a line, drawn into a transparent portrait texture when
+        # they change, and blitted over the cell turned like the clip
         self.caption: bool = False
         self._captions: dict[str, tuple[str, str]] = {id: ('', '') for id in ids}
         self._caption_drawn: dict[str, tuple[str, str] | None] = {id: None for id in ids}
@@ -330,10 +329,12 @@ class PlayerRender(RenderBase):
         with self._mutex:
             self._initials[id] = int(initial)
 
-    def set_caption(self, id: str, clip: Clip) -> None:
-        """The clip a cell starts: its caption goes on the cell while `caption` is on (any thread)."""
+    def set_caption(self, id: str, name: str, line: str) -> None:
+        """The caption on a cell from now on, shown while `caption` is on (any thread); an unknown id is ignored."""
+        if id not in self._rects:
+            return
         with self._mutex:
-            self._captions[id] = (clip.name, clip.line)
+            self._captions[id] = (name, line)
 
     def light(self, id: str, seconds: float, number: int = 0) -> None:
         """Light a cell white with the screen's `number` (0: none) for `seconds` (the laughter test); an
