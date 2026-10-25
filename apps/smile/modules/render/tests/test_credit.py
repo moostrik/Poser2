@@ -4,7 +4,7 @@ import unittest
 
 import cv2
 
-from modules.credit import LINE, URL, qr_image, shown_url, wrap_balanced
+from modules.credit import LINE, QUIET_MODULES, URL, qr_image, quiet_px, wrap_balanced
 from modules.render.layers.CreditLayer import FADE_S, SHOWN, fade_step
 from modules.render.Sequencer import SequenceType
 
@@ -22,9 +22,12 @@ class TestQr(unittest.TestCase):
         self.assertEqual(image.shape[2], 3)
         self.assertTrue((image[:8] == 255).all())       # the quiet zone is white
 
-    def test_shown_url_drops_the_scheme(self):
-        self.assertEqual(shown_url("https://oostrik.net/smile/"), "oostrik.net/smile")
-        self.assertEqual(shown_url("oostrik.net"), "oostrik.net")
+    def test_quiet_px_is_the_white_border(self):
+        image = qr_image(URL, 500)
+        quiet = quiet_px(image)
+        self.assertEqual(quiet % QUIET_MODULES, 0)
+        self.assertTrue((image[:quiet] == 255).all())
+        self.assertTrue((image[quiet] < 255).any())
 
 
 class TestWrap(unittest.TestCase):

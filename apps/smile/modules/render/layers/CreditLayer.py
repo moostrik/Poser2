@@ -1,6 +1,6 @@
 from OpenGL.GL import glViewport  # type: ignore
 
-from modules.credit import qr_image, wrap_balanced
+from modules.credit import FONT, qr_image, wrap_balanced
 from modules.gl import Blit, Fbo, Image, Style, Text, Texture
 from modules.render.Sequencer import SequenceType
 from modules.render.settings import RenderSettings
@@ -8,13 +8,13 @@ from modules.render.shaders import Blend
 
 from .LayerBase import LayerBase
 
-FONT_SIZE: int = 48
-MARGIN_PX: int = 32             # from the image's edges
-GAP_PX: int = 24                # between the text and the QR code
-LINE_SPACING: float = 1.15      # of the text's height
-SHADOW_PX: int = 3
+FONT_SIZE: int = 96
+MARGIN_PX: int = 40             # from the image's edges
+LINE_SPACING: float = 1.0       # of the text's height
+OUTLINE_PX: int = 5             # the black edge round the letters, as on a meme
 TEXT_COLOR: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
-SHADOW_COLOR: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.7)
+OUTLINE_COLOR: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
+OUTLINE: list[tuple[int, int]] = [(x, y) for x in (-OUTLINE_PX, 0, OUTLINE_PX) for y in (-OUTLINE_PX, 0, OUTLINE_PX) if x or y]
 FADE_S: float = 0.5             # the credit fades in and out over this time
 
 # the credit is shown with the visitor's portrait: while the grin plays and while the result holds after it
@@ -28,8 +28,8 @@ def fade_step(alpha: float, shown: bool, dt: float) -> float:
 
 
 class CreditLayer(LayerBase):
-    """The artist's line and a QR code to the project page in the bottom right corner, over the image:
-    the line to the left of the code, its last line level with the code's bottom. People film the
+    """The artist's line as a meme caption over the top of the image (white with a black edge, centred,
+    in even lines) and a QR code to the project page in the bottom right corner. People film the
     result, so the credit is in their videos."""
 
     def __init__(self, settings: RenderSettings) -> None:
@@ -49,7 +49,7 @@ class CreditLayer(LayerBase):
         self._card.allocate(width, height, internal_format)
         self._fbo.allocate(width, height, internal_format)
         self._blend.allocate()
-        self._text.allocate(font_size=FONT_SIZE)
+        self._text.allocate(FONT, FONT_SIZE)
 
     def deallocate(self) -> None:
         self._card.deallocate()
@@ -90,16 +90,14 @@ class CreditLayer(LayerBase):
             Blit.use(self._qr)
             glViewport(0, 0, self._width, self._height)
 
-        right: int = self._width - MARGIN_PX - (qr + GAP_PX if qr else 0)
         measure = lambda line: self._text.measure_text(line)[0]
-        lines: list[str] = wrap_balanced(self.settings.credit_text, measure, right - MARGIN_PX)
+        lines: list[str] = wrap_balanced(self.settings.credit_text, measure, self._width - 2 * MARGIN_PX)
         _, text_height = self._text.measure_text("Mg")
-        line_height: float = text_height * LINE_SPACING
-        top: float = self._height - MARGIN_PX - text_height - (len(lines) - 1) * line_height
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         for i, line in enumerate(lines):
-            x: float = right - measure(line)
-            y: float = top + i * line_height
-            self._text.draw_text(x + SHADOW_PX, y + SHADOW_PX, line, SHADOW_COLOR, self._width, self._height)
+            x: float = (self._width - measure(line)) / 2
+            y: float = MARGIN_PX + i * text_height * LINE_SPACING
+            for dx, dy in OUTLINE:
+                self._text.draw_text(x + dx, y + dy, line, OUTLINE_COLOR, self._width, self._height)
             self._text.draw_text(x, y, line, TEXT_COLOR, self._width, self._height)
         Style.set_blend_mode(Style.BlendMode.DISABLED)

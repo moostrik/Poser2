@@ -99,8 +99,8 @@ not in git, safe to delete).
 * tests: ```.venv\Scripts\python -m pytest``` from the repo root
 
 ### Credit
-* the main screen shows `Matthias Oostrik likes your smile!` and a QR code to https://oostrik.net/smile with each visitor's grin and result (the panel's Render tab: `credit` on or off, the text, the URL, the QR size)
-* each player wall has one cell with the name and the QR code instead of a clip, on another cell every 30 s: ```start_players.bat --credit_every 60```, `--credit_name`, `--credit_url`; `--credit_every 0` leaves it out
+* the main screen shows `Matthias Oostrik likes your smile!` as a meme caption over the top of the portrait (in the comic font `data\Bangers-Regular.ttf`) and a QR code in the bottom right corner to https://oostrik.net/smile with each visitor's grin and result (the panel's Render tab: `credit` on or off, the text, the URL, the QR size)
+* each player wall has one cell with the QR code and the name under it, as wide as the code, instead of a clip, on another cell every 30 s: ```start_players.bat --credit_every 60```, `--credit_name`, `--credit_url`; `--credit_every 0` leaves it out
 
 ### Output
 * `output\grins\A\` and `output\grins\B\` hold the grin clips (h264 mp4, the players read the style from the folder), `output\portraits\` the capture and the portrait of each visitor; `output\temp\` is where they are built. About 2.9 MB per visitor, nothing is cleaned up

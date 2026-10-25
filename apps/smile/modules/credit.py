@@ -9,6 +9,7 @@ import numpy as np
 NAME: str = "Matthias Oostrik"
 LINE: str = f"{NAME} likes your smile!"
 URL: str = "https://oostrik.net/smile"
+FONT: str = "data/Bangers-Regular.ttf"     # a comic book font: the credit is a joke (SIL Open Font License)
 
 QUIET_MODULES: int = 4      # white modules around the code: scanners need them (the QR standard's quiet zone)
 
@@ -19,15 +20,18 @@ def qr_image(url: str, size: int) -> np.ndarray:
     params = cv2.QRCodeEncoder.Params()
     params.correction_level = cv2.QRCodeEncoder_CORRECT_LEVEL_M
     modules: np.ndarray = cv2.QRCodeEncoder.create(params).encode(url)
-    modules = np.pad(modules, QUIET_MODULES, constant_values=255)
+    # OpenCV adds a narrower border of its own: crop to the code, then add the standard one
+    dark = np.argwhere(modules < 128)
+    (top, left), (bottom, right) = dark.min(axis=0), dark.max(axis=0) + 1
+    modules = np.pad(modules[top:bottom, left:right], QUIET_MODULES, constant_values=255)
     scale: int = max(1, size // modules.shape[0])
     image: np.ndarray = np.kron(modules, np.ones((scale, scale), np.uint8))
     return cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
 
 
-def shown_url(url: str) -> str:
-    """The url as people read it: without the scheme."""
-    return url.split("://", 1)[-1].rstrip("/")
+def quiet_px(image: np.ndarray) -> int:
+    """The width of a QR image's white border (`qr_image`): the code itself starts this far in."""
+    return int(np.argmax(image.min(axis=(1, 2)) < 255))
 
 
 def wrap_balanced(text: str, measure: Callable[[str], int], max_width: int) -> list[str]:
