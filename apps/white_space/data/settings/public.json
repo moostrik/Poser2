@@ -1055,11 +1055,13 @@
     "intro_idle_bars": 2.0,
     "end_bars": 4.0,
     "dim_level": 0.4,
-    "min_players": 3,
+    "min_players": 2,
     "play_full_sync_seconds": 6.0,
     "play_full_sync_release_seconds": 5.0,
     "intro_grace_seconds": 10.0,
-    "sync": {},
+    "sync": {
+      "min_age_seconds": 2.0
+    },
     "manual": {
       "select": "INTRO_PLAY",
       "hold": false
