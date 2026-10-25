@@ -168,14 +168,15 @@ class CreditScroller:
     """Sends the loops from the panel's Scroll settings (`RenderSettings`) to the players. `update` runs in
     SMILE's render loop (with `time.time()`) and never raises there: while `credit_scroll` is on and nothing
     blocks it (the laughter test), every `SEND_EVERY` second each row of `credit_scroll_rows` gets its word of
-    `credit_name` (`plan_loops`) with the time the loops began, the word of row i `credit_scroll_offset` * i
-    degrees ahead round the sphere. Off, or blocked, nothing is sent and the players' loops time out.
-    `credit_scroll_last` shows what goes round."""
+    `credit_name` (`plan_loops`) with the time it began and its own speed (`credit_scroll_speed_1` for the
+    first word, `_2` for the others). A speed changed in the panel moves the start time so the word goes on
+    from where it is. Off, or blocked, nothing is sent and the players' loops time out. `credit_scroll_last`
+    shows what goes round."""
 
     def __init__(self, settings: Any, send: Send) -> None:
         self.settings: Any = settings
         self._send: Send = send
-        self._start: float | None = None     # when the loops began, None while off
+        self._words: dict[int, tuple[float, float]] = {}    # per word: when its loop began, at what speed (px/s)
         self._sent: float = 0.0
         self._text: str = ''
         self._warned: bool = False
@@ -184,13 +185,12 @@ class CreditScroller:
     def update(self, now: float, blocked: bool) -> None:
         settings = self.settings
         if not settings.credit_scroll or blocked:
-            self._start = None
+            self._words.clear()
             if self._text:
                 self._text = ''
                 settings.credit_scroll_last = ''
             return
-        if self._start is None:
-            self._start = now
+        if not self._words:
             self._sent = now - SEND_EVERY
         if now - self._sent >= SEND_EVERY:
             self._sent = now
@@ -207,13 +207,12 @@ class CreditScroller:
                                settings.credit_scroll_rows, settings.credit_name, DEFAULT_ROWS)
             return []
         self._warned = False
-        speed: float = max(1.0, float(settings.credit_scroll_speed) * SCREEN_PX)
         gap: int = int(settings.credit_scroll_gap)
-        start: float = self._start if self._start is not None else now
+        speeds: tuple[float, float] = (float(settings.credit_scroll_speed_1), float(settings.credit_scroll_speed_2))
         for index, (word, path) in enumerate(loops):
-            # the word of row i starts i * offset degrees further round its ring: that far ahead is that much earlier
-            ahead: float = index * float(settings.credit_scroll_offset) / 360.0 * path.count * (SCREEN_PX + gap)
-            head: list = [word, speed, gap, int(settings.credit_scroll_size), path.count, repr(start - ahead / speed)]
+            speed: float = max(1.0, speeds[min(index, 1)] * SCREEN_PX)
+            start: float = self.word_start(index, speed, now)
+            head: list = [word, speed, gap, int(settings.credit_scroll_size), path.count, repr(start)]
             for player in range(PLAYERS):
                 cells: list[tuple[int, int]] = path.cells(player)
                 if cells:
@@ -221,9 +220,24 @@ class CreditScroller:
                         self._send(player, ADDRESS, head + [value for pair in cells for value in pair])
                     except Exception:
                         logger.exception('Scrolling name: player %d could not be reached', player + 1)
+        for index in [index for index in self._words if index >= len(loops)]:
+            del self._words[index]
         text: str = ', '.join(f'{word} round row {path.row}' for word, path in loops)
         if text != self._text:
             self._text = text
             settings.credit_scroll_last = text
             logger.info('Scrolling name: %s', text)
         return loops
+
+    def word_start(self, index: int, speed: float, now: float) -> float:
+        """When word `index`'s loop began for its `speed` (px/s): now for a new word; a word whose speed changed
+        gets a start that leaves it where it is, so it goes on from there at the new speed."""
+        known: tuple[float, float] | None = self._words.get(index)
+        if known is None:
+            start: float = now
+        else:
+            start, old = known
+            if old != speed:
+                start = now - (now - start) * old / speed
+        self._words[index] = (start, speed)
+        return start

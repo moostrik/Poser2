@@ -168,7 +168,8 @@ first of `credit_scroll_rows` (`plan_loops`, `RingPath`: all the ring's screens 
 the visitor's right, and a ticker moves to the visitor's left; `reverse` the other way round; `row_screens`, `screen_cell`, screens counted from 0 there). `CreditScroller`
 (stepped from `Main.sequence_callback` with `time.time()`, not during the laughter test) sends each player its own cells with their place round the ring every `SEND_EVERY`
 second (`send_loops`: `/scroll_loop <word> <px/s> <gap> <size> <ring screens> <started> <cell> <place> ...`, `ScreenTest.send_player`), `started` the time the loops began
-as text (an OSC float is 32-bit and loses 128 s of a Unix time), the word of row i `credit_scroll_offset` * i degrees earlier; `credit_scroll_last` is the readout. The players
+as text (an OSC float is 32-bit and loses 128 s of a Unix time), each word at its own speed (`credit_scroll_speed_1`, `_2`; a speed changed in the panel moves the start
+so the word goes on from where it is, `word_start`); `credit_scroll_last` is the readout. The players
 (`PlayerRender.scroll_loop`, `_draw_scrolls`) take the position from that and their own clock (one PC: a resend moves nothing, which keeps the movement smooth) and drop a
 loop no message renewed for `TIMEOUT`. They draw a word as a ticker reading left to right and moving left: `name_strip` renders it once with freetype into one long BGRA image,
 640 high, the ink `credit_scroll_size` tall in the vertical middle, white with a black edge (not the font atlas: too big at that size); each cell on the ring blits the strip

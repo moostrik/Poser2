@@ -98,8 +98,8 @@ class TestStrip(unittest.TestCase):
 
 
 def settings(**values) -> SimpleNamespace:
-    base = dict(credit_name="Matthias Oostrik", credit_scroll=True, credit_scroll_rows="1,3", credit_scroll_offset=90,
-                credit_scroll_speed=1.0, credit_scroll_size=512, credit_scroll_gap=288, credit_scroll_reverse=False,
+    base = dict(credit_name="Matthias Oostrik", credit_scroll=True, credit_scroll_rows="1,3", credit_scroll_speed_1=1.0,
+                credit_scroll_speed_2=0.5, credit_scroll_size=512, credit_scroll_gap=288, credit_scroll_reverse=False,
                 credit_scroll_last='x')
     base.update(values)
     return SimpleNamespace(**base)
@@ -121,26 +121,30 @@ class TestScroller(unittest.TestCase):
         self.assertEqual({args[0] for _, _, args in self.sent}, {"Matthias", "Oostrik"})
         for player, address, args in self.sent:
             self.assertEqual(address, ADDRESS)
-            self.assertEqual(args[1:5], [512.0, 288, 512, 12])
-            # the time as text, since an OSC float would lose 128 s of it; Matthias began when the switch went on,
-            # Oostrik 90 degrees of 12 screens ahead: 3 screens of 800 px, 4.6875 s at 512 px/s
+            # each word at its own speed
+            self.assertEqual(args[1:5], [512.0 if args[0] == "Matthias" else 256.0, 288, 512, 12])
+            # the time as text, since an OSC float would lose 128 s of it: both began when the switch went on
             self.assertIsInstance(args[5], str)
-            self.assertEqual(float(args[5]), 100.0 if args[0] == "Matthias" else 100.0 - 3 * 800 / 512)
+            self.assertEqual(float(args[5]), 100.0)
             self.assertEqual(len(args[6::2]), 6)                   # this player's half of the ring
             self.assertTrue(set(args[7::2]) < set(range(12)))      # with their places round it
             self.assertTrue(all(0 <= cell < 24 for cell in args[6::2]))
         self.assertEqual(self.settings.credit_scroll_last, 'Matthias round row 1, Oostrik round row 3')
         self.sent.clear()
         self.scroller.update(101.0, False)
-        self.assertEqual({float(args[5]) for _, _, args in self.sent}, {100.0, 100.0 - 3 * 800 / 512})     # a resend moves nothing
+        self.assertEqual({float(args[5]) for _, _, args in self.sent}, {100.0})     # a resend moves nothing
 
-    def test_the_offset_changes_take_at_once(self):
+    def test_a_changed_speed_leaves_the_word_where_it_is(self):
         self.scroller.update(0.0, False)
-        self.settings.credit_scroll_offset = 180
+        self.settings.credit_scroll_speed_2 = 1.0           # Oostrik from 256 to 512 px/s after 10 s: 2560 px so far
         self.sent.clear()
-        self.scroller.update(1.0, False)
-        oostrik = {float(args[5]) for _, _, args in self.sent if args[0] == "Oostrik"}
-        self.assertEqual(oostrik, {-6 * 800 / 512})
+        self.scroller.update(10.0, False)
+        for _, _, args in self.sent:
+            if args[0] == "Oostrik":
+                self.assertEqual(args[1], 512.0)
+                self.assertEqual(float(args[5]), 10.0 - 2560 / 512)     # 2560 px at the new speed: began 5 s ago
+            else:
+                self.assertEqual(float(args[5]), 0.0)
 
     def test_nothing_goes_out_while_off_or_blocked_and_the_loops_begin_again_from_the_camera(self):
         self.settings.credit_scroll = False
