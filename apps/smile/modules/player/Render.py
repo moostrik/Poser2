@@ -34,25 +34,32 @@ def lit_cells(lit: dict[str, float], now: float) -> list[str]:
     return list(lit)
 
 
-def next_credit_cell(ids: list[str], current: str | None) -> str:
-    """The cell the credit moves to: a random one, never the one it is on."""
-    others: list[str] = [id for id in ids if id != current]
-    return random.choice(others or ids)
+def next_credit_cell(current: str | None, left: str | None, started: list[str]) -> tuple[str | None, str | None]:
+    """The credit's cell and the cell it last left, after the cells in `started` started a clip this frame.
+    The credit stays for one play: it leaves its cell when the next clip starts there, and takes a cell
+    whose clip starts, never the one it just left (with none, it waits for the next start)."""
+    if current is not None and current in started:
+        current, left = None, current
+    if current is None:
+        candidates: list[str] = [id for id in started if id != left]
+        if candidates:
+            current = random.choice(candidates)
+    return current, left
 
 
 class PlayerRender(RenderBase):
     """Grin sequences in a grid of cells, each image turned a quarter, with a trail over the whole grid.
     A cell flashes white for one frame when its next sequence starts, and is white with its screen's
     number while the laughter test lights it (`light`). One cell shows the artist's name and a QR code to
-    the project page instead of its clip, and moves to another cell every `credit_every` seconds (0: no
-    credit), with the white frame of a new sequence on both cells. Keys: f fullscreen (borderless), Esc quit (the
+    the project page instead of its clip (`credit`): it takes a cell when a clip starts there, with its white
+    frame, and stays for that play, so it moves on as often as the clips change. Keys: f fullscreen (borderless), Esc quit (the
     window manager)."""
 
     COLUMNS: int = 6
     CELL_WIDTH: int = 640
     CELL_HEIGHT: int = 512
 
-    def __init__(self, window: WindowSettings, ids: list[str], trail: float, credit_every: float = 0.0,
+    def __init__(self, window: WindowSettings, ids: list[str], trail: float, credit: bool = False,
                  credit_name: str = NAME, credit_url: str = URL) -> None:
         super().__init__(window)
         # exclusive fullscreen next to SMILE and the other player chokes the GPU: the generation times out
@@ -86,11 +93,11 @@ class PlayerRender(RenderBase):
         self._number_fbo: Fbo = Fbo()
         self._text: Text = Text()
         # the credit: drawn upright into a portrait texture like the number, on the cell `_credit_cell`
-        self.credit_every: float = credit_every
+        self.credit: bool = credit
         self.credit_name: str = credit_name
         self.credit_url: str = credit_url
         self._credit_cell: str | None = None
-        self._credit_moved: float = 0.0
+        self._credit_left: str | None = None
         self._credit_fbo: Fbo = Fbo()
         self._credit_qr: Image = Image('BGR')
         self._credit_quiet: int = 0         # the QR image's white border (px)
@@ -105,7 +112,7 @@ class PlayerRender(RenderBase):
         self._number_fbo.allocate(self.CELL_HEIGHT, self.CELL_WIDTH, GL_RGBA8)
         if not self._text.allocate(font_size=NUMBER_FONT_PX):
             logger.warning('No font for the screen numbers: a lit cell is plain white')
-        if self.credit_every > 0.0:
+        if self.credit:
             self._credit_fbo.allocate(self.CELL_HEIGHT, self.CELL_WIDTH, GL_RGBA8)
             qr = qr_image(self.credit_url, CREDIT_QR_PX)
             self._credit_quiet = quiet_px(qr)
@@ -146,7 +153,8 @@ class PlayerRender(RenderBase):
             self._numbers = numbers
         for image in self._images.values():
             image.update()
-        flashes += self._move_credit(time.time())
+        if self.credit:
+            self._credit_cell, self._credit_left = next_credit_cell(self._credit_cell, self._credit_left, flashes)
 
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
@@ -201,16 +209,6 @@ class PlayerRender(RenderBase):
                                  self.CELL_HEIGHT, self.CELL_WIDTH)
             Style.set_blend_mode(Style.BlendMode.DISABLED)
         self._number_fbo.end()
-
-    def _move_credit(self, now: float) -> list[str]:
-        """Put the credit on its first cell, or on another one when it is due; the cells it left and
-        took, for their white frame."""
-        if self.credit_every <= 0.0 or (self._credit_cell is not None and now - self._credit_moved < self.credit_every):
-            return []
-        left: str | None = self._credit_cell
-        self._credit_cell = next_credit_cell(self._ids, left)
-        self._credit_moved = now
-        return [id for id in (left, self._credit_cell) if id is not None]
 
     def _allocate_credit_name(self, width: int) -> None:
         """The name's font at the size that makes the name `width` pixels wide."""
