@@ -169,9 +169,10 @@ during the laughter test) plans a pass every `credit_scroll_every` seconds, or a
 a random first screen, `credit_scroll_screens_min` to `max` screens round the ring (`plan_pass`, `ScrollPass.screens`, wrapping, down the rib numbers: the ribs count to the camera's left, the visitor's right, and the
 name moves to the visitor's left; `reverse` goes the other way round), and sends each player its own cells with their place along the path (`/scroll <word> <px/s> <gap> <size> <cell>
 <place> ...`, `ScreenTest.send_player`); `credit_scroll_last` is the readout. `credit_scroll_loop` sends loops instead of timed passes (`plan_loops`, `send_loops`: word i
-round the whole ring of row i, `/scroll_loop <word> <px/s> <gap> <size> <ring screens> <px travelled> <cell> <place> ...` every `LOOP_SEND_EVERY` second; the
-players (`PlayerRender.scroll_loop`) take the phase from the distance travelled, draw the strip at its place on the lap and the next lap's copy, and
-drop a loop no message renewed for `LOOP_TIMEOUT`). The players (`PlayerRender.scroll`, `_draw_scrolls`) draw the name
+round the whole ring of row i, `/scroll_loop <word> <px/s> <gap> <size> <ring screens> <started> <cell> <place> ...` every `LOOP_SEND_EVERY` second, `started` the
+time it began by `time.time()`, word i `credit_scroll_offset` * i degrees ahead; the players (`PlayerRender.scroll_loop`) take the position from
+that and their own clock (one PC: a resend moves nothing, which keeps the movement smooth), draw the strip at its place on the lap and the next lap's
+copy, and drop a loop no message renewed for `LOOP_TIMEOUT`). The players (`PlayerRender.scroll`, `_draw_scrolls`) draw the name
 as a ticker reading left to right and moving left: `name_strip` renders it once with freetype into one long BGRA image, 640 high, the ink
 `credit_scroll_size` tall in the vertical middle, white with a black edge (not the font atlas: too big at that size); each cell on the path
 blits the strip shifted by `scroll_offset` (its place times screen width plus `credit_scroll_gap`, minus the distance travelled) into its

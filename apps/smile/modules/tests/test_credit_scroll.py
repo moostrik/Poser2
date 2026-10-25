@@ -122,7 +122,8 @@ class TestStrip(unittest.TestCase):
 def settings(**values) -> SimpleNamespace:
     base = dict(credit_name="Matthias Oostrik", credit_scroll=True, credit_scroll_every=120, credit_scroll_rows="1,3",
                 credit_scroll_screens_min=6, credit_scroll_screens_max=10, credit_scroll_speed=1.0, credit_scroll_size=512,
-                credit_scroll_gap=0, credit_scroll_reverse=False, credit_scroll_loop=False, credit_scroll_last='x')
+                credit_scroll_gap=0, credit_scroll_reverse=False, credit_scroll_loop=False, credit_scroll_offset=90,
+                credit_scroll_last='x')
     base.update(values)
     return SimpleNamespace(**base)
 
@@ -201,7 +202,7 @@ class TestScroller(unittest.TestCase):
         self.scroller.update(240.0, False)
         self.assertTrue(self.sent)
 
-    def test_the_continuous_mode_sends_the_loops_every_second_with_the_distance_travelled(self):
+    def test_the_continuous_mode_sends_the_loops_every_second_with_the_time_they_began(self):
         self.settings.credit_scroll_loop = True
         self.scroller.update(100.0, False)
         self.scroller.update(100.5, False)
@@ -209,13 +210,15 @@ class TestScroller(unittest.TestCase):
         self.assertEqual(len(loops), 4)        # two rows, both players
         self.assertEqual({args[0] for _, args in loops}, {"Matthias", "Oostrik"})
         for _, args in loops:
-            self.assertEqual(args[1:6], [512.0, 0, 512, 12, 0.0])
+            self.assertEqual(args[1:5], [512.0, 0, 512, 12])
+            # Matthias began when the mode went on; Oostrik 90 degrees of 12 screens ahead: 3 screens, 3 s at a screen per second
+            self.assertEqual(args[5], 100.0 if args[0] == "Matthias" else 97.0)
             self.assertEqual(len(args[6::2]), 6)                   # this player's half of the ring
             self.assertTrue(set(args[7::2]) < set(range(12)))      # with their places round it
         self.assertEqual(self.settings.credit_scroll_last, 'continuous: Matthias row 1, Oostrik row 3')
         self.sent.clear()
         self.scroller.update(101.0, False)
-        self.assertEqual({args[5] for _, _, args in self.sent}, {512.0})
+        self.assertEqual({args[5] for _, _, args in self.sent}, {100.0, 97.0})     # the resend moves nothing
         # no timed passes meanwhile, but the button still works
         self.sent.clear()
         self.scroller.update(300.0, False)
@@ -226,12 +229,13 @@ class TestScroller(unittest.TestCase):
 
     def test_the_loops_stop_while_blocked_and_start_again_from_zero(self):
         self.settings.credit_scroll_loop = True
+        self.settings.credit_scroll_offset = 0
         self.scroller.update(0.0, False)
         self.scroller.update(10.0, True)
-        self.assertFalse([1 for _, _, args in self.sent if args[5] == 10.0 * 512])
+        self.assertFalse([1 for _, _, args in self.sent if args[5] == 10.0])
         self.sent.clear()
         self.scroller.update(20.0, False)
-        self.assertEqual({args[5] for _, _, args in self.sent}, {0.0})
+        self.assertEqual({args[5] for _, _, args in self.sent}, {20.0})
 
     def test_no_valid_row_is_a_warning_not_a_pass(self):
         self.settings.credit_scroll_rows = "7"

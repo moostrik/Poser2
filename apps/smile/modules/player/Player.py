@@ -212,14 +212,14 @@ class Player():
             return
         logger.info('Scrolling name over cells %s', ', '.join(f'{id}@{place}' for id, place in cells))
 
-    def _on_scroll_loop(self, name, speed, gap, size, ring, travelled, *pairs) -> None:
+    def _on_scroll_loop(self, name, speed, gap, size, ring, started, *pairs) -> None:
         """A word of the name going round a ring without end (the receiver's thread, every second): as `/scroll`,
-        with the ring's number of screens and the px travelled so far before the cells."""
+        with the ring's number of screens and the time it began (SMILE's clock, the same PC) before the cells."""
         try:
             cells: list[tuple[str, int]] = [(str(int(pairs[i])), int(pairs[i + 1])) for i in range(0, len(pairs) - 1, 2)]
-            new: bool = self.render.scroll_loop(str(name), float(speed), float(gap), int(size), int(ring), float(travelled), cells)
+            new: bool = self.render.scroll_loop(str(name), float(speed), float(gap), int(size), int(ring), float(started), cells)
         except (TypeError, ValueError):
-            logger.warning('/scroll_loop ignored: %r', (name, speed, gap, size, ring, travelled) + pairs)
+            logger.warning('/scroll_loop ignored: %r', (name, speed, gap, size, ring, started) + pairs)
             return
         if new:
             logger.info('Scrolling name %s going round over cells %s', name, ', '.join(f'{id}@{place}' for id, place in cells))
