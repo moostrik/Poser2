@@ -21,7 +21,7 @@ NUMBER_COLOR: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
 
 # the credit cell, in the clip's upright 512 x 640: the QR code and the name under it, as wide as the code
 CREDIT_QR_PX: int = 500         # with its white border, which the white cell hides
-CREDIT_GAP_PX: int = 28         # between the code and the name
+CREDIT_GAP_PX: int = 64         # between the code and the name
 CREDIT_PROBE_PX: int = 100      # the font size the name is measured at, to scale it to the code's width
 CREDIT_NAME_COLOR: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
 
@@ -49,7 +49,7 @@ def next_credit_cell(current: str | None, left: str | None, started: list[str]) 
 
 class PlayerRender(RenderBase):
     """Grin sequences in a grid of cells, each image turned a quarter, with a trail over the whole grid.
-    A cell flashes white for one frame when its next sequence starts, and is white with its screen's
+    A cell flashes for one frame when its next sequence starts (the credit card with the credit on, else white), and is white with its screen's
     number while the laughter test lights it (`light`). One cell shows the artist's name and a QR code to
     the project page instead of its clip (`credit`): it takes a cell when a clip starts there, with its white
     frame, and stays for that play, so it moves on as often as the clips change. Keys: f fullscreen (borderless), Esc quit (the
@@ -169,13 +169,13 @@ class PlayerRender(RenderBase):
         # one cell at a time; with more, all show the last one's number)
         if lit:
             self._draw_number(numbers[lit[-1]])
-        if self._credit_cell is not None:
-            self._draw_credit()
+        if self.credit:
+            self._draw_credit()     # also the flash of every new sequence
 
         self._trail_fbo.swap()
         self._trail_fbo.begin()
         self._blend.use(self._image_fbo, self._trail_fbo.back_texture, self.trail)
-        # a new sequence skips the trail: one white frame, then its first image
+        # a new sequence skips the trail: one white (or credit card) frame, then its first image
         for id in starts:
             glViewport(*self._rects[id])
             self._rotated.use(self._images[id])
@@ -187,13 +187,18 @@ class PlayerRender(RenderBase):
         for id in lit:
             glViewport(*self._rects[id])
             self._rotated.use(self._number_fbo)
-        # the white frame of a new sequence
-        glEnable(GL_SCISSOR_TEST)
-        glClearColor(1.0, 1.0, 1.0, 1.0)
-        for id in flashes:
-            glScissor(*self._rects[id])
-            glClear(GL_COLOR_BUFFER_BIT)
-        glDisable(GL_SCISSOR_TEST)
+        # the flash of a new sequence: the credit card, or white without the credit
+        if self.credit:
+            for id in flashes:
+                glViewport(*self._rects[id])
+                self._rotated.use(self._credit_fbo)
+        else:
+            glEnable(GL_SCISSOR_TEST)
+            glClearColor(1.0, 1.0, 1.0, 1.0)
+            for id in flashes:
+                glScissor(*self._rects[id])
+                glClear(GL_COLOR_BUFFER_BIT)
+            glDisable(GL_SCISSOR_TEST)
         self._trail_fbo.end()
 
     def _draw_number(self, number: int) -> None:

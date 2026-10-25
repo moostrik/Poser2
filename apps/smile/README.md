@@ -100,7 +100,7 @@ not in git, safe to delete).
 
 ### Credit
 * the main screen always has a QR code to https://oostrik.net/smile in its bottom right corner, and shows `Matthias Oostrik likes your smile!` as a meme caption over the top of the portrait (in the comic font `data\Bangers-Regular.ttf`) with each visitor's grin and result (the panel's Render tab: `credit` on or off, the text, the URL, the QR size)
-* each player wall has one cell with the QR code and the name under it, as wide as the code, instead of a clip, for the length of one clip, then on the next cell where a clip starts: `--credit_name`, `--credit_url`, `--no_credit` (```start_players.bat --no_credit```) leaves it out
+* each player wall has one cell with the QR code and the name under it, as wide as the code, instead of a clip, for the length of one clip, then on the next cell where a clip starts: `--credit_name`, `--credit_url`, `--no_credit` (```start_players.bat --no_credit```) leaves it out; with the credit on, every clip start flashes that card instead of white
 
 ### Output
 * `output\grins\A\` and `output\grins\B\` hold the grin clips (h264 mp4, the players read the style from the folder), `output\portraits\` the capture and the portrait of each visitor; `output\temp\` is where they are built. About 2.9 MB per visitor, nothing is cleaned up
