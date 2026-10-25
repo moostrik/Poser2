@@ -9,7 +9,7 @@ from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TES
                        glDisable, glEnable, glScissor, glViewport)
 
 from modules.credit import FONT, NAME, URL, qr_image, quiet_px, wrap_balanced
-from modules.credit_scroll import LOOP_TIMEOUT, name_strip, scroll_done, scroll_offset
+from modules.credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_offset
 from modules.gl import Blit, Fbo, Image, RenderBase, Shader, Style, SwapFbo, Text, WindowSettings, clear_color
 from modules.gl.Utils import fit
 from modules.render.shaders import Blend
@@ -37,28 +37,23 @@ CAPTION_OUTLINE: list[tuple[int, int]] = [(x, y) for x in (-CAPTION_OUTLINE_PX, 
 
 
 class Scroll:
-    """A pass of the scrolling name on this player (SMILE's `/scroll`): the cells on the path with their
-    place along it, moving at `speed` px/s from `started`, with `gap` px of wall between two screens. With
-    `ring` (the ring's screens) it goes round without end (`/scroll_loop`) until `expires`, the time SMILE's
-    next message is due by."""
+    """A word of the name going round a ring of `ring` screens on this player (SMILE's `/scroll_loop`): the
+    cells on the ring with their place round it, moving at `speed` px/s from `started` (the PC's clock), with
+    `gap` px of wall between two screens, until `expires`, the time SMILE's next message is due by."""
 
-    def __init__(self, name: str, speed: float, gap: float, size: int, cells: list[tuple[str, int]], started: float,
-                 ring: int = 0, expires: float | None = None) -> None:
+    def __init__(self, name: str, speed: float, gap: float, size: int, ring: int, cells: list[tuple[str, int]],
+                 started: float, expires: float) -> None:
         self.name: str = name
         self.speed: float = speed
         self.gap: float = gap
         self.size: int = size
+        self.ring: int = ring
         self.cells: list[tuple[str, int]] = cells
         self.started: float = started
-        self.ring: int = ring
-        self.expires: float | None = expires
+        self.expires: float = expires
 
     def renew(self, speed: float, gap: float, size: int, started: float, expires: float) -> None:
         self.speed, self.gap, self.size, self.started, self.expires = speed, gap, size, started, expires
-
-    @property
-    def count(self) -> int:
-        return max((place for _, place in self.cells), default=-1) + 1
 
     def travelled(self, now: float) -> float:
         return max(0.0, now - self.started) * self.speed
@@ -93,8 +88,8 @@ class PlayerRender(RenderBase):
     frame, and stays for that play, so it moves on as often as the clips change. With `caption` on (SMILE's
     `credit_players` switch, over OSC), every cell shows a caption over its clip, set at every play
     (`set_caption`): the artist's name over the top and a random line along the bottom. From time to time
-    SMILE sends a pass of the name scrolling by (`scroll`): letters nearly a screen tall move over the cells
-    of one ring of the sphere, each cell showing its part of one long texture (`name_strip`). Keys: f fullscreen (borderless), Esc quit (the
+    SMILE sends the words of the name going round the sphere (`scroll_loop`, every second): letters most of a
+    screen tall move over the cells of a ring, each cell showing its part of one long texture (`name_strip`). Keys: f fullscreen (borderless), Esc quit (the
     window manager)."""
 
     COLUMNS: int = 6
@@ -151,9 +146,8 @@ class PlayerRender(RenderBase):
         self._caption_drawn: dict[str, tuple[str, str] | None] = {id: None for id in ids}
         self._caption_fbos: dict[str, Fbo] = {id: Fbo() for id in ids}
         self._caption_text: Text = Text()
-        # the scrolling name: the passes under way (a new one does not end the others), a strip texture per
-        # name and size in use, and per cell a transparent portrait texture with the parts of the strips
-        # on that screen
+        # the scrolling name: the words going round, a strip texture per word and size in use, and per cell a
+        # transparent portrait texture with the parts of the strips on that screen
         self._scrolls: list[Scroll] = []
         self._scroll_strips: dict[tuple[str, int], Image] = {}
         self._scroll_fbos: dict[str, Fbo] = {id: Fbo() for id in ids}
@@ -329,8 +323,7 @@ class PlayerRender(RenderBase):
 
     def _draw_scrolls(self, scrolls: list[Scroll], now: float) -> list[str]:
         """The cells the scrolling name is on at `now`, each cell's texture filled with its part of every
-        pass that crosses it; a pass whose name has left its last screen is dropped, and so is a strip no
-        pass uses any more."""
+        word that crosses it; a loop SMILE stopped renewing is dropped, and so is a strip no loop uses."""
         width, height = self.CELL_HEIGHT, self.CELL_WIDTH     # the screen upright: its width is the cell's height
         parts: dict[str, list[tuple[Image, float]]] = {}     # per cell: the strips on it with their offsets
         keys: set[tuple[str, int]] = set()
@@ -344,20 +337,17 @@ class PlayerRender(RenderBase):
             strip.update()
             if not strip.allocated:
                 continue
-            travelled: float = scroll.travelled(now)
-            ended: bool = (now > scroll.expires) if scroll.expires is not None else \
-                scroll_done(travelled, scroll.count, strip.width, scroll.gap, width)
-            if ended:
+            if now > scroll.expires:
                 with self._mutex:
                     if scroll in self._scrolls:
                         self._scrolls.remove(scroll)
                 continue
-            # a loop: the distance round the ring, the strip drawn where it is on this lap and where the next
-            # lap's copy enters at the end of the ring
+            # the distance round the ring: the strip drawn where it is on this lap and where the next lap's copy
+            # enters at the end of the ring
             lap: float = scroll.ring * (width + scroll.gap)
-            travels: list[float] = [travelled % lap, travelled % lap + lap] if lap > 0 else [travelled]
+            travelled: float = scroll.travelled(now) % lap
             for id, place in scroll.cells:
-                for t in travels:
+                for t in (travelled, travelled + lap):
                     offset: float = scroll_offset(place, t, scroll.gap, width)
                     if offset < strip.width and offset + width > 0:
                         parts.setdefault(id, []).append((strip, offset))
@@ -438,22 +428,12 @@ class PlayerRender(RenderBase):
         with self._mutex:
             self._captions[id] = (name, line)
 
-    def scroll(self, name: str, speed: float, gap: float, size: int, cells: list[tuple[str, int]]) -> None:
-        """A pass of the scrolling name from now (any thread): `cells` are the ids on the path with their
-        place along it, 0 where the name enters; it moves at `speed` px/s with `gap` px between two screens
-        and `size` px above and below the letters. A pass under way goes on beside it."""
-        cells = [(id, place) for id, place in cells if id in self._rects]
-        if not cells:
-            return
-        with self._mutex:
-            self._scrolls.append(Scroll(name, speed, gap, size, cells, time.time()))
-
     def scroll_loop(self, name: str, speed: float, gap: float, size: int, ring: int, started: float,
                     cells: list[tuple[str, int]]) -> bool:
         """A word going round a ring of `ring` screens without end (any thread, SMILE sends it every second):
         `started` is when it began by the PC's clock, which SMILE and the player share, so the position comes
         from this player's own clock and a resend moves nothing, while a player that starts late joins in step.
-        The loop ends when no message renews it for `LOOP_TIMEOUT`. True for a loop that is new."""
+        The loop ends when no message renews it for `SCROLL_TIMEOUT`. True for a loop that is new."""
         cells = [(id, place) for id, place in cells if id in self._rects]
         if not cells or ring <= 0:
             return False
@@ -461,9 +441,9 @@ class PlayerRender(RenderBase):
         with self._mutex:
             for scroll in self._scrolls:
                 if scroll.ring == ring and scroll.name == name and scroll.cells == cells:
-                    scroll.renew(speed, gap, size, started, now + LOOP_TIMEOUT)
+                    scroll.renew(speed, gap, size, started, now + SCROLL_TIMEOUT)
                     return False
-            self._scrolls.append(Scroll(name, speed, gap, size, cells, started, ring, now + LOOP_TIMEOUT))
+            self._scrolls.append(Scroll(name, speed, gap, size, ring, cells, started, now + SCROLL_TIMEOUT))
         return True
 
     def light(self, id: str, seconds: float, number: int = 0) -> None:
