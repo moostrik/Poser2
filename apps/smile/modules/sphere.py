@@ -2,8 +2,9 @@
 screen a cell is. Used by the laughter test (the number a lit cell shows), the scrolling name (the
 screens of a row) and `data/audio/screen_angles.txt` (the angle of every cell, for the laughter).
 
-The sphere has 12 ribs 30 degrees apart (rib 0 at the camera, counting to the LEFT seen from above:
-checked on site 2026-10-25),
+The sphere has 12 ribs 30 degrees apart (rib 0 at the camera, counting to the LEFT seen from above
+with the camera's right positive, the Max patch's convention: a visitor facing the sphere sees them
+count to the right; checked on site 2026-10-25),
 holding 5 and 3 screens by turn at heights 0 (top) to 4; a 3-rib holds the heights 1, 2 and 3. The
 screens are numbered from 1 down each rib, then the next rib: 1-5 the first 5-rib, 6-8 the 3-rib
 after it, 9-13, 14-16 and so on round. The wiring: screen s is Datapath unit ceil(s / 4), output

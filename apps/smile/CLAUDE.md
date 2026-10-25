@@ -163,11 +163,11 @@ to the clip), drawn into a transparent portrait texture per cell (`PlayerRender.
 ⌈s/4⌉ output ((s-1) mod 4)+1, unit n = grid column n-1, output k = grid row k-1 (`screen_of_cell`, `cell_of_screen`, `row_screens`,
 `cell_angles`): the laughter test (it steps the screens in the sphere's order, 1 to 48 down the ribs, lighting the cell `cell_of_screen` gives), the scrolling name's rows and `data/audio/screen_angles.txt` (generated: `screen_angles_text`,
 a test keeps the file equal to it) all come from it; a cabling that differs is changed there.
-The **scrolling name** (`modules/credit_scroll.py`, no GL) runs along one ring of the sphere from time to time (`row_screens`, `screen_cell`,
+The **scrolling name** (`modules/credit_scroll.py`, no GL): one word of `credit_name` at a time (`CreditScroller.next_word`, by turns) runs along one ring of the sphere from time to time (`row_screens`, `screen_cell`,
 screens counted from 0 there). `CreditScroller` (stepped from `Main.sequence_callback`, not
 during the laughter test) plans a pass every `credit_scroll_every` seconds, or at the `credit_scroll_now` button: one of `credit_scroll_rows`,
-a random first screen, `credit_scroll_screens_min` to `max` screens round the ring (`plan_pass`, `ScrollPass.screens`, wrapping; `reverse`
-goes the other way round), and sends each player its own cells with their place along the path (`/scroll <name> <px/s> <gap> <padding> <cell>
+a random first screen, `credit_scroll_screens_min` to `max` screens round the ring (`plan_pass`, `ScrollPass.screens`, wrapping, down the rib numbers: the ribs count to the camera's left, the visitor's right, and the
+name moves to the visitor's left; `reverse` goes the other way round), and sends each player its own cells with their place along the path (`/scroll <word> <px/s> <gap> <padding> <cell>
 <place> ...`, `ScreenTest.send_player`); `credit_scroll_last` is the readout. The players (`PlayerRender.scroll`, `_draw_scroll`) draw the name
 as a ticker reading left to right and moving left: `name_strip` renders it once with freetype into one long BGRA image, 640 high, the ink
 `credit_scroll_padding` inside the top and bottom, white with a black edge (not the font atlas: too big at that size); each cell on the path
