@@ -51,7 +51,7 @@ class Player():
         osc_settings.port = int(osc_port)
         self.osc:Osc = Osc(osc_settings)
         # SMILE's laughter test lights a cell with its screen's number: /light <cell> <seconds> <number> (0: no port, no test)
-        self.receiver: Receiver | None = Receiver(int(listen_port), {'/light': self._on_light, '/caption': self._on_caption}) if listen_port else None
+        self.receiver: Receiver | None = Receiver(int(listen_port), {'/light': self._on_light, '/caption': self._on_caption, '/scroll': self._on_scroll}) if listen_port else None
         self._light_warning_time: float = 0.0
         self._lines: CreditLines = CreditLines()        # the captions' lines, one at random per play
         self._lines_lock = threading.Lock()
@@ -190,6 +190,17 @@ class Player():
         if on != self.render.caption:
             self.render.caption = on
             logger.info('Captions on the clips: %s', 'on' if on else 'off')
+
+    def _on_scroll(self, name, speed, gap, padding, *pairs) -> None:
+        """A pass of the scrolling name from SMILE (the receiver's thread): the name, its speed in px/s, the
+        gap between screens and the padding in px, then this player's cells on the path, each with its place."""
+        try:
+            cells: list[tuple[str, int]] = [(str(int(pairs[i])), int(pairs[i + 1])) for i in range(0, len(pairs) - 1, 2)]
+            self.render.scroll(str(name), float(speed), float(gap), int(padding), cells)
+        except (TypeError, ValueError):
+            logger.warning('/scroll ignored: %r', (name, speed, gap, padding) + pairs)
+            return
+        logger.info('Scrolling name over cells %s', ', '.join(f'{id}@{place}' for id, place in cells))
 
     def _on_light(self, cell, seconds, number=0) -> None:
         """SMILE's laughter test (the receiver's thread): show the cell white with the screen's `number` for

@@ -41,7 +41,7 @@ class TestMaxControls(unittest.TestCase):
             audio=mock.Mock(get_audio_id=lambda: '0001'), osc=mock.Mock(), screen_test=mock.Mock(),
             _limit_visitor=lambda seq: None,
             _style_picked=False, _face_frame_time=0.0, _visitor_start=None, _saving=False, _grin_saved=False,
-            _caption_sent=0.0)
+            _caption_sent=0.0, credit_scroller=mock.Mock())
 
     def frame(self) -> dict:
         """One sequencer frame: what went to the OSC sender, by address."""

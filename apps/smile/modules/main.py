@@ -8,6 +8,8 @@ from modules.comfy.messages import GenMessage, GenState
 from modules.osc.Sender import Sender as Osc
 from modules.audio.DB import DB as AudioDB
 from modules.audio.ScreenTest import ScreenTest
+from modules.credit_scroll import CreditScroller
+from modules.render.settings import RenderSettings
 from modules.save.ClipSaver import ClipSaver
 from modules.artnet.Sender import Sender as Artnet
 from modules.settings import presets, NiceServer
@@ -81,6 +83,10 @@ class Main():
         self.osc: Osc = Osc(self.settings.audio.osc)
         self.screen_test: ScreenTest = ScreenTest(self.settings.audio, bang=self._test_bang)  # the laughter test, stepped from sequence_callback
         self._caption_sent: float = 0.0     # when the players last got the caption switch
+        # the name scrolling by on the players, planned here and sent to them; the button sends one pass
+        self.credit_scroller: CreditScroller = CreditScroller(
+            self.settings.render, lambda player, address, args: self.screen_test.send_player(player, address, *args))
+        self.settings.render.bind(RenderSettings.credit_scroll_now, self.credit_scroller.request)
         self.save: ClipSaver = ClipSaver(self.settings.sequence)
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
         self._saving: bool = False          # the visitor's files are open in the saver
@@ -131,6 +137,7 @@ class Main():
                  self.camera.clearColorCallbacks, self.camera.close,
                  self.diffuse.clear_message_callbacks, self.diffuse.stop,
                  self.face.clear_frame_callbacks, self.face.stop,
+                 lambda: self.settings.render.unbind(RenderSettings.credit_scroll_now, self.credit_scroller.request),
                  self.save.stop,
                  self.settings_server.stop)
         try:
@@ -205,6 +212,8 @@ class Main():
         if now - self._caption_sent > 1.0:
             self._caption_sent = now
             self.screen_test.send_players('/caption', int(self.settings.render.credit_players))
+        # and the scrolling name's passes, timed on the app clock too; not while the test lights the screens
+        self.credit_scroller.update(now, self.settings.audio.laughter_test)
 
         if seq == SequenceType.CAMERA_SHOW and message.initial:
             self.face.reset()
