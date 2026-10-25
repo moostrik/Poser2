@@ -102,6 +102,16 @@ class TestStrip(unittest.TestCase):
     def test_less_padding_makes_a_taller_and_longer_name(self):
         self.assertGreater(name_strip("Matthias Oostrik", 640, 0).shape[1], name_strip("Matthias Oostrik", 640, 100).shape[1])
 
+    def test_the_words_stand_twice_as_far_apart_as_the_font_puts_them(self):
+        single = name_strip("Matthias Oostrik", 640, 64, word_gap=1.0).shape[1]
+        double = name_strip("Matthias Oostrik", 640, 64).shape[1]
+        triple = name_strip("Matthias Oostrik", 640, 64, word_gap=3.0).shape[1]
+        # every extra space adds the same width: the font's space at that size
+        self.assertGreater(double - single, 50)
+        self.assertAlmostEqual(triple - double, double - single, delta=3)
+        # a name of one word has no space to widen
+        self.assertEqual(name_strip("Matthias", 640, 64).shape, name_strip("Matthias", 640, 64, word_gap=1.0).shape)
+
     def test_an_empty_name_is_an_empty_strip(self):
         self.assertEqual(name_strip("", 640, 64).shape, (640, 1, 4))
 
@@ -137,37 +147,20 @@ class TestScroller(unittest.TestCase):
         self.scroller.update(1240.0, False)
         self.assertTrue(self.sent)
 
-    def test_the_message_carries_one_word_of_the_name_the_speed_in_px_and_each_players_cells(self):
+    def test_the_message_carries_the_name_the_speed_in_px_and_each_players_cells(self):
         random.seed(3)
         self.scroller.send_pass(0.0)
         players = {player for player, _, _ in self.sent}
         self.assertTrue(players)
         for player, address, args in self.sent:
             self.assertEqual(address, ADDRESS)
-            self.assertIn(args[0], ("Matthias", "Oostrik"))
-            self.assertEqual(args[1:4], [512.0, 0, 64])
+            self.assertEqual(args[:4], ["Matthias Oostrik", 512.0, 0, 64])
             pairs = args[4:]
             self.assertEqual(len(pairs) % 2, 0)
             self.assertTrue(all(0 <= cell < 24 for cell in pairs[::2]))
             self.assertTrue(all(0 <= place < 10 for place in pairs[1::2]))
         places = sorted(place for _, _, args in self.sent for place in args[5::2])
         self.assertEqual(places, list(range(len(places))))
-
-    def test_the_passes_take_the_words_of_the_name_by_turns(self):
-        words = []
-        for _ in range(4):
-            self.sent.clear()
-            self.scroller.send_pass(0.0)
-            words.append({args[0] for _, _, args in self.sent}.pop())
-        self.assertEqual(words[0], words[2])
-        self.assertEqual(words[1], words[3])
-        self.assertEqual(set(words), {"Matthias", "Oostrik"})
-        self.assertIn(words[-1], self.settings.credit_scroll_last)
-
-    def test_a_one_word_name_is_sent_whole(self):
-        self.settings.credit_name = "  Banksy "
-        self.scroller.send_pass(0.0)
-        self.assertTrue(all(args[0] == "Banksy" for _, _, args in self.sent))
 
     def test_the_button_sends_one_pass_at_once_and_the_switch_off_sends_none(self):
         self.settings.credit_scroll = False

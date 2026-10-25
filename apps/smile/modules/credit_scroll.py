@@ -1,6 +1,5 @@
-"""The artist's name scrolling by on the player walls: from time to time one word of it (the first name,
-the next time the surname) runs once along one ring of the sphere, over the playing clips, like a ticker,
-letters nearly as tall as a screen. SMILE plans every
+"""The artist's name scrolling by on the player walls: from time to time it runs once along one ring of
+the sphere, over the playing clips, like a ticker, letters nearly as tall as a screen. SMILE plans every
 pass (`CreditScroller`, in the render loop) and sends each player the cells of its own that are on the
 path with their place along it; the players know nothing of the sphere and draw the name from one long
 texture (`name_strip`). No GL here: the geometry is shared by both apps and tested without one."""
@@ -31,6 +30,7 @@ SCREEN_HEIGHT_PX: int = 640
 
 DEFAULT_ROWS: str = "1,3"       # the rings with 12 screens, leaving the middle one to the clips
 ADDRESS: str = '/scroll'        # to the players: name, speed (px/s), gap (px), padding (px), then cell, place, cell, place ...
+WORD_GAP: float = 2.0           # the space between the words of the name, in the font's spaces: the words stand apart on the sphere
 
 
 def row_screens(row: int) -> list[int]:
@@ -111,9 +111,10 @@ def scroll_done(travelled: float, count: int, strip_px: int, gap_px: float, scre
 
 
 def name_strip(text: str, height: int, padding: int, font: str = FONT, outline_ratio: float = 0.025,
-               probe_px: int = 200) -> np.ndarray:
+               probe_px: int = 200, word_gap: float = WORD_GAP) -> np.ndarray:
     """The name as one long transparent BGRA image `height` px tall, white letters with a black edge, their
-    ink as tall as the height minus the padding above and below (no font: an empty strip)."""
+    ink as tall as the height minus the padding above and below, every space `word_gap` spaces wide (no
+    font: an empty strip)."""
     text = text.strip()
     inner: int = max(1, height - 2 * padding)
     outline: int = max(1, round(inner * outline_ratio))
@@ -122,11 +123,11 @@ def name_strip(text: str, height: int, padding: int, font: str = FONT, outline_r
     except Exception:
         logger.exception('No font %s for the scrolling name', font)
         return np.zeros((height, 1, 4), np.uint8)
-    probe: np.ndarray = _render(face, text, probe_px)
+    probe: np.ndarray = _render(face, text, probe_px, word_gap)
     ink: int = probe.shape[0]
     if not text or ink == 0:
         return np.zeros((height, 1, 4), np.uint8)
-    glyphs: np.ndarray = _render(face, text, max(1, round(probe_px * (inner - 2 * outline) / ink)))
+    glyphs: np.ndarray = _render(face, text, max(1, round(probe_px * (inner - 2 * outline) / ink)), word_gap)
     # the black edge: the letters' alpha grown by `outline`, under the white letters
     kernel: np.ndarray = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * outline + 1, 2 * outline + 1))
     padded: np.ndarray = np.pad(glyphs, outline)
@@ -140,8 +141,9 @@ def name_strip(text: str, height: int, padding: int, font: str = FONT, outline_r
     return strip
 
 
-def _render(face: Any, text: str, px: int) -> np.ndarray:
-    """The text's ink at `px` pixels, as an alpha image cropped to the ink (0 x 0 without any)."""
+def _render(face: Any, text: str, px: int, word_gap: float = 1.0) -> np.ndarray:
+    """The text's ink at `px` pixels, as an alpha image cropped to the ink (0 x 0 without any); a space
+    advances `word_gap` times its own width."""
     face.set_pixel_sizes(0, px)
     pen: int = 0
     pieces: list[tuple[int, int, np.ndarray]] = []     # x, top (from the baseline up), bitmap
@@ -155,7 +157,7 @@ def _render(face: Any, text: str, px: int) -> np.ndarray:
         if bitmap.width and bitmap.rows:
             pieces.append((pen + glyph.bitmap_left, glyph.bitmap_top,
                            np.array(bitmap.buffer, np.uint8).reshape(bitmap.rows, bitmap.width)))
-        pen += glyph.advance.x >> 6
+        pen += round((glyph.advance.x >> 6) * (word_gap if char.isspace() else 1.0))
         previous = char
     if not pieces:
         return np.zeros((0, 0), np.uint8)
@@ -178,8 +180,7 @@ class CreditScroller:
     """Plans the passes from the panel's Scroll settings (`RenderSettings`) and sends them to the players.
     `update` runs in SMILE's render loop and never raises there: while `credit_scroll` is on and nothing
     blocks it (the laughter test), a pass goes out every `credit_scroll_every` seconds; the button
-    (`request`) sends one at once. Each pass carries one word of `credit_name`, the words by turns (a whole
-    name is too long for a pass of a few screens). `credit_scroll_last` shows the last pass."""
+    (`request`) sends one at once. `credit_scroll_last` shows the last pass."""
 
     def __init__(self, settings: Any, send: Send) -> None:
         self.settings: Any = settings
@@ -187,7 +188,6 @@ class CreditScroller:
         self._next_time: float | None = None    # when the next timed pass is due, None while off
         self._requested: bool = False
         self._warned: bool = False
-        self._word: int = random.randrange(2)   # which word of the name the next pass takes
         settings.credit_scroll_last = ''
 
     def request(self, _: Any = None) -> None:
@@ -224,8 +224,7 @@ class CreditScroller:
                 logger.warning('No rows for the scrolling name in "%s" (0 to 4, like "%s")', settings.credit_scroll_rows, DEFAULT_ROWS)
             return None
         self._warned = False
-        word: str = self.next_word(str(settings.credit_name))
-        head: list = [word, float(settings.credit_scroll_speed) * SCREEN_PX,
+        head: list = [str(settings.credit_name), float(settings.credit_scroll_speed) * SCREEN_PX,
                       int(settings.credit_scroll_gap), int(settings.credit_scroll_padding)]
         for player in range(PLAYERS):
             cells: list[tuple[int, int]] = scroll.cells(player)
@@ -234,15 +233,6 @@ class CreditScroller:
                     self._send(player, ADDRESS, head + [value for pair in cells for value in pair])
                 except Exception:
                     logger.exception('Scrolling name: player %d could not be reached', player + 1)
-        settings.credit_scroll_last = f"{time.strftime('%H:%M:%S', time.localtime(now))} {word}, {scroll.describe()}"
-        logger.info('Scrolling name: %s, %s', word, scroll.describe())
+        settings.credit_scroll_last = f"{time.strftime('%H:%M:%S', time.localtime(now))} {scroll.describe()}"
+        logger.info('Scrolling name: %s', scroll.describe())
         return scroll
-
-    def next_word(self, name: str) -> str:
-        """The word of `name` this pass takes: the words by turns, the whole name when it is one word."""
-        words: list[str] = name.split()
-        if not words:
-            return ''
-        word: str = words[self._word % len(words)]
-        self._word = (self._word + 1) % len(words)
-        return word
