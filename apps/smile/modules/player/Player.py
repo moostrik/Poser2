@@ -51,7 +51,7 @@ class Player():
         osc_settings.port = int(osc_port)
         self.osc:Osc = Osc(osc_settings)
         # SMILE's laughter test lights a cell with its screen's number: /light <cell> <seconds> <number> (0: no port, no test)
-        self.receiver: Receiver | None = Receiver(int(listen_port), {'/light': self._on_light, '/caption': self._on_caption, '/scroll': self._on_scroll}) if listen_port else None
+        self.receiver: Receiver | None = Receiver(int(listen_port), {'/light': self._on_light, '/caption': self._on_caption, '/credit': self._on_credit, '/scroll': self._on_scroll}) if listen_port else None
         self._light_warning_time: float = 0.0
         self._lines: CreditLines = CreditLines()        # the captions' lines, one at random per play
         self._lines_lock = threading.Lock()
@@ -103,7 +103,7 @@ class Player():
                     f'a clip from disk after {recycle_every:g} s without a new one' if recycle_every > 0 else 'no recycling',
                     (f'{fps:g} fps' if fps > 0 else 'clip fps') + (f' +-{spread:.0%}' if spread > 0 else ''), root, 'window' if windowed else 'fullscreen',
                     f'/light and /caption on port {listen_port}' if listen_port else 'no /light port')
-        logger.info('Credit: %s', f'{credit_name}, {credit_url}, one play per cell' if credit else 'none')
+        logger.info('Credit: %s, %s, one play per cell, %s until SMILE says otherwise', credit_name, credit_url, 'on' if credit else 'off')
 
     def start(self) -> None:
         self.pool.start()
@@ -190,6 +190,16 @@ class Player():
         if on != self.render.caption:
             self.render.caption = on
             logger.info('Captions on the clips: %s', 'on' if on else 'off')
+
+    def _on_credit(self, on) -> None:
+        """SMILE's `credit_qr_players` switch (the receiver's thread, sent every second): the QR credit cell on or off."""
+        try:
+            on = bool(int(on))
+        except (TypeError, ValueError):
+            return
+        if on != self.render.credit:
+            self.render.credit = on
+            logger.info('Credit cell on the wall: %s', 'on' if on else 'off')
 
     def _on_scroll(self, name, speed, gap, padding, *pairs) -> None:
         """A pass of the scrolling name from SMILE (the receiver's thread): the name, its speed in px/s, the

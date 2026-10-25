@@ -212,6 +212,7 @@ class Main():
         if now - self._caption_sent > 1.0:
             self._caption_sent = now
             self.screen_test.send_players('/caption', int(self.settings.render.credit_players))
+            self.screen_test.send_players('/credit', int(self.settings.render.credit_qr_players))
         # and the scrolling name's passes, timed on the app clock too; not while the test lights the screens
         self.credit_scroller.update(now, self.settings.audio.laughter_test)
 
