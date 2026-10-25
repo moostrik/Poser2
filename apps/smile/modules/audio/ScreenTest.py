@@ -7,12 +7,14 @@ from typing import Callable
 
 from pythonosc.udp_client import SimpleUDPClient
 
+from modules import sphere
+
 from modules.audio.settings import AudioSettings
 
 logger = logging.getLogger(__name__)
 
-SCREENS: int = 48               # the sphere: two players of CELLS
-CELLS: int = 24                 # cells per player
+SCREENS: int = sphere.SCREENS   # the sphere: two players of CELLS
+CELLS: int = sphere.CELLS       # cells per player
 PLAYER_IP: str = '127.0.0.1'    # the players run on this PC (start_players.bat)
 SAMPLE_FOLDER: str = 'data/audio/laughter'
 SAMPLE_TYPES: tuple[str, ...] = ('.wav', '.aif', '.aiff', '.mp3', '.flac', '.m4a', '.ogg')
@@ -76,16 +78,17 @@ class ScreenTest:
             return
         self._index = (self._index + 1) % SCREENS
         player, cell = divmod(self._index, CELLS)
+        screen: int = sphere.screen_of_cell(player, cell)    # the number the wiring gives this cell
         port: int = settings.player_1_port if player == 0 else settings.player_2_port
         step: float = settings.laughter_test_step
         try:
-            self._send(port, cell, step, self._index + 1)
+            self._send(port, cell, step, screen)
             self._bang(self._index, self.sample_number())
         except Exception:
             if not self._warned:
                 self._warned = True
-                logger.exception('Laughter test: screen %d failed (player %d on port %d running?)', self._index + 1, player + 1, port)
-        settings.laughter_test_screen = self._index + 1
+                logger.exception('Laughter test: screen %d failed (player %d on port %d running?)', screen, player + 1, port)
+        settings.laughter_test_screen = screen
         self._next_time = now + step
 
     def send_players(self, address: str, *args) -> None:

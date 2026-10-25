@@ -86,9 +86,9 @@ class TestScreenTest(unittest.TestCase):
         self.test.update(11.9)      # not yet
         self.assertEqual(len(self.sent), 1)
         self.test.update(12.0)
-        self.assertEqual(self.sent[-1], (4117, 1, 2.0, 2))
+        self.assertEqual(self.sent[-1], (4117, 1, 2.0, 5))      # cell 1 is screen 5: unit 2, output 1
         self.assertEqual(self.banged[-1], (1, 1))
-        self.assertEqual(self.settings.laughter_test_screen, 2)
+        self.assertEqual(self.settings.laughter_test_screen, 5)
         for i in range(2, SCREENS):
             self.test.update(10.0 + 2.0 * i)
         self.assertEqual(self.sent[24], (4118, 0, 2.0, 25))     # the second player's first cell
@@ -132,7 +132,7 @@ class TestScreenTest(unittest.TestCase):
                     test.update(0.0)
                     test.update(2.0)
                 self.assertEqual(len(logs.records), 1)
-                self.assertEqual(settings.laughter_test_screen, 2)
+                self.assertEqual(settings.laughter_test_screen, 5)     # cell 1 is screen 5
 
 
 if __name__ == '__main__':
