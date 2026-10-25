@@ -81,7 +81,7 @@ class PlayerRender(RenderBase):
     """Grin sequences in a grid of cells, each image turned a quarter, with a trail over the whole grid.
     A cell flashes white for one frame when its next sequence starts, and is white with its screen's
     number while the laughter test lights it (`light`). One cell shows the artist's name and a QR code to
-    the project page instead of its clip (`credit`): it takes a cell when a clip starts there, after its white
+    the project page instead of its clip (`credit`, SMILE's `credit_qr_players` switch over OSC): it takes a cell when a clip starts there, after its white
     frame, and stays for that play, so it moves on as often as the clips change. With `caption` on (SMILE's
     `credit_players` switch, over OSC), every cell shows a caption over its clip, set at every play
     (`set_caption`): the artist's name over the top and a random line along the bottom. From time to time
@@ -159,12 +159,12 @@ class PlayerRender(RenderBase):
         self._number_fbo.allocate(self.CELL_HEIGHT, self.CELL_WIDTH, GL_RGBA8)
         if not self._text.allocate(font_size=NUMBER_FONT_PX):
             logger.warning('No font for the screen numbers: a lit cell is plain white')
-        if self.credit:
-            self._credit_fbo.allocate(self.CELL_HEIGHT, self.CELL_WIDTH, GL_RGBA8)
-            qr = qr_image(self.credit_url, CREDIT_QR_PX)
-            self._credit_quiet = quiet_px(qr)
-            self._credit_qr.set_image(qr)
-            self._allocate_credit_name(qr.shape[1] - 2 * self._credit_quiet)
+        # the credit card is ready whether the credit is on or off: SMILE's switch turns it on at any time
+        self._credit_fbo.allocate(self.CELL_HEIGHT, self.CELL_WIDTH, GL_RGBA8)
+        qr = qr_image(self.credit_url, CREDIT_QR_PX)
+        self._credit_quiet = quiet_px(qr)
+        self._credit_qr.set_image(qr)
+        self._allocate_credit_name(qr.shape[1] - 2 * self._credit_quiet)
         for fbo in self._caption_fbos.values():
             fbo.allocate(self.CELL_HEIGHT, self.CELL_WIDTH, GL_RGBA8)
         if not self._caption_text.allocate(FONT, CAPTION_PX):
@@ -216,6 +216,8 @@ class PlayerRender(RenderBase):
             image.update()
         if self.credit:
             self._credit_cell, self._credit_left = next_credit_cell(self._credit_cell, self._credit_left, flashes)
+        else:
+            self._credit_cell = None     # switched off: the card leaves at once, the clip under it goes on
 
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.DISABLED)

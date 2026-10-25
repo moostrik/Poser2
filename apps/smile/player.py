@@ -17,7 +17,7 @@ parser.add_argument('--recycle_every',      type=float, default=20.0,   help='a 
 parser.add_argument('--fps',                type=float, default=20.0,   help='playback speed of the clips (frames per second); 0 plays each clip at its own rate')
 parser.add_argument('--spread',             type=float, default=0.1,    help='random speed difference per clip, as a fraction of --fps (0.1 = 10 percent slower to faster), 0 = none')
 parser.add_argument('--trail',              type=float, default=0.0,    help='blend of each frame with the previous output, 0 = none (0.5 was the old look)')
-parser.add_argument('--no_credit',          action='store_true',        help="leave out the cell with the artist's name and QR code (it moves on with every clip it covers)")
+parser.add_argument('--no_credit',          action='store_true',        help="start without the cell with the artist's name and QR code (SMILE's credit_qr_players switch sets it while SMILE runs)")
 parser.add_argument('--credit_name',        type=str,   default=NAME,   help='name on the credit cell')
 parser.add_argument('--credit_url',         type=str,   default=URL,    help='page the credit cell\'s QR code opens')
 parser.add_argument('--root',              type=str,   default='output/', help='output folder (clips in its grins/ subfolder)')

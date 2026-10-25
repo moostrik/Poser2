@@ -88,6 +88,7 @@ class RenderSettings(BaseSettings):
     credit_url:    Field[str]   = Field(CREDIT_URL, label="URL", description="Page the QR code opens")
     credit_camera: Field[bool]  = Field(False, newline=True, row_label="Caption", label="On camera", description="Also show the caption over the camera view, while waiting for a visitor")
     credit_players: Field[bool] = Field(False, label="On players", description="Show each clip's caption on the player walls (name top, line bottom)")
+    credit_qr_players: Field[bool] = Field(True, label="QR on players", description="One cell of each player wall shows the QR code and the name instead of its clip, one play at a time")
     credit_size:   Field[int]   = Field(200, min=120, max=480, step=10, label="QR size (px)", description="Size of the QR code (px)")
     credit_scroll: Field[bool]  = Field(False, newline=True, row_label="Scroll", label="On players", description="The name scrolls by on the player walls from time to time, along one ring of screens")
     credit_scroll_every: Field[int] = Field(120, min=10, max=3600, step=10, label="Every (s)", description="Seconds between two passes of the scrolling name")
