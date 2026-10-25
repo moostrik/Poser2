@@ -99,7 +99,7 @@ not in git, safe to delete).
 * tests: ```.venv\Scripts\python -m pytest``` from the repo root
 
 ### Credit
-* the main screen always has a QR code to https://oostrik.net/smile in its bottom right corner, and shows `Matthias Oostrik likes your smile!` as a meme caption over the top of the portrait (in the comic font `data\Bangers-Regular.ttf`) with each visitor's grin and result (the panel's Render tab: `credit` on or off, the text, the URL, the QR size)
+* the main screen always has a QR code to https://oostrik.net/smile in its bottom right corner, and shows a meme caption over the top of the portrait (in the comic font `data\Bangers-Regular.ttf`) with each visitor's grin and result: `Matthias Oostrik` and under it one of the lines of `data\credit_lines.txt` (one per line, `#` comments; edit it any time, each visitor draws a random one, never the last one again; `loves your smile!` when the file is empty or missing), the panel's Render tab has `credit` on or off, the name, the file, the line of the current visitor, the URL and the QR size
 * each player wall has one cell with the QR code and the name under it, as wide as the code, instead of a clip, for the length of one clip, then on the next cell where a clip starts: `--credit_name`, `--credit_url`, `--no_credit` (```start_players.bat --no_credit```) leaves it out; with the credit on, every clip start flashes that card instead of white
 
 ### Output

@@ -1,13 +1,19 @@
 """The artist's credit: a QR code to the project page and the text around it, shown with the result on
 the main screen (`CreditLayer`) and on one changing cell of each player wall (`PlayerRender`). No GL here."""
 
+import logging
+import os
+import random
 from typing import Callable
 
 import cv2
 import numpy as np
 
+logger = logging.getLogger(__name__)
+
 NAME: str = "Matthias Oostrik"
-LINE: str = f"{NAME} likes your smile!"
+LINE: str = "loves your smile!"             # the line under the name when the lines file has none
+LINES: str = "data/credit_lines.txt"        # one line each, blank lines and # comments skipped
 URL: str = "https://oostrik.net/smile"
 FONT: str = "data/Bangers-Regular.ttf"     # a comic book font: the credit is a joke (SIL Open Font License)
 
@@ -32,6 +38,47 @@ def qr_image(url: str, size: int) -> np.ndarray:
 def quiet_px(image: np.ndarray) -> int:
     """The width of a QR image's white border (`qr_image`): the code itself starts this far in."""
     return int(np.argmax(image.min(axis=(1, 2)) < 255))
+
+
+class CreditLines:
+    """The lines under the artist's name, from a text file that is read again whenever it changes, so it
+    can be edited while the installation runs. `pick` draws one at random, never the last one again."""
+
+    def __init__(self, path: str = LINES) -> None:
+        self.path: str = path
+        self._lines: list[str] = []
+        self._mtime: float | None = None
+        self._last: str | None = None
+
+    @property
+    def lines(self) -> list[str]:
+        try:
+            mtime: float = os.path.getmtime(self.path)
+        except OSError:
+            mtime = -1.0
+        if mtime != self._mtime:
+            self._mtime = mtime
+            self._lines = self._read() if mtime >= 0 else []
+            if not self._lines:
+                logger.warning('No credit lines in %s: the caption says "%s"', self.path, LINE)
+            else:
+                logger.info('%d credit lines from %s', len(self._lines), self.path)
+        return self._lines
+
+    def _read(self) -> list[str]:
+        try:
+            with open(self.path, encoding='utf-8') as file:
+                return [line.strip() for line in file if line.strip() and not line.lstrip().startswith('#')]
+        except OSError:
+            logger.exception('Could not read %s', self.path)
+            return []
+
+    def pick(self) -> str:
+        """A line at random, a different one from the last pick when there is more than one."""
+        lines: list[str] = self.lines or [LINE]
+        candidates: list[str] = [line for line in lines if line != self._last] or lines
+        self._last = random.choice(candidates)
+        return self._last
 
 
 def wrap_balanced(text: str, measure: Callable[[str], int], max_width: int) -> list[str]:

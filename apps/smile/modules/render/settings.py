@@ -3,7 +3,7 @@ from typing import Callable
 
 import pytweening as easing
 
-from modules.credit import LINE as CREDIT_LINE, URL as CREDIT_URL
+from modules.credit import LINE as CREDIT_LINE, LINES as CREDIT_LINES, NAME as CREDIT_NAME, URL as CREDIT_URL
 from modules.gl import WindowSettings
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.utils import Color
@@ -81,7 +81,9 @@ class RenderSettings(BaseSettings):
     destroy_blur:  Field[float] = Field(0.1, min=0.0, max=1.0, step=0.01, description="Blur while fading the last image out")
     destroy_bloom: Field[float] = Field(0.6, min=0.0, max=1.0, step=0.1, description="Bloom while fading the last image out")
     credit:        Field[bool]  = Field(True, newline=True, row_label="Credit", label="Show", description="Show the QR code in the corner, and the artist's line with the grin and the result")
-    credit_text:   Field[str]   = Field(CREDIT_LINE, label="Text", description="The artist's line next to the QR code")
+    credit_name:   Field[str]   = Field(CREDIT_NAME, label="Name", description="The artist's name, the caption's first line")
+    credit_lines:  Field[str]   = Field(CREDIT_LINES, access=Field.INIT, label="Lines file", description="Text file with the lines under the name, one per line")
+    credit_line:   Field[str]   = Field(CREDIT_LINE, access=Field.READ, label="Line", description="The line under the name for the current visitor")
     credit_url:    Field[str]   = Field(CREDIT_URL, label="URL", description="Page the QR code opens")
     credit_size:   Field[int]   = Field(200, min=120, max=480, step=10, label="QR size (px)", description="Size of the QR code (px)")
 

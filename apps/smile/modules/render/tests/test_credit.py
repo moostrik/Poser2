@@ -1,10 +1,13 @@
 """Tests for the artist's credit: the QR code scans, the line wraps evenly, and it fades with the result (no GL)."""
 
+import os
+import tempfile
 import unittest
+from unittest import mock
 
 import cv2
 
-from modules.credit import LINE, QUIET_MODULES, URL, qr_image, quiet_px, wrap_balanced
+from modules.credit import LINE, LINES, QUIET_MODULES, URL, CreditLines, qr_image, quiet_px, wrap_balanced
 from modules.render.layers.CreditLayer import FADE_S, SHOWN, fade_step
 from modules.render.Sequencer import SequenceType
 
@@ -45,6 +48,43 @@ class TestWrap(unittest.TestCase):
 
     def test_empty(self):
         self.assertEqual(wrap_balanced("  ", self.measure, 100), [])
+
+
+class TestLines(unittest.TestCase):
+    def write(self, text: str) -> str:
+        path = os.path.join(tempfile.mkdtemp(), 'lines.txt')
+        with open(path, 'w', encoding='utf-8') as file:
+            file.write(text)
+        return path
+
+    def test_the_file_in_the_repo_has_lines_that_fit(self):
+        lines = CreditLines(LINES).lines
+        self.assertGreaterEqual(len(lines), 100)
+        self.assertEqual(len(lines), len(set(lines)))
+        self.assertIn(LINE, lines)
+
+    def test_skips_blanks_and_comments(self):
+        lines = CreditLines(self.write('# a comment\n\nloves your smile!\n  says: cheese!  \n')).lines
+        self.assertEqual(lines, ['loves your smile!', 'says: cheese!'])
+
+    def test_never_the_same_line_twice_in_a_row(self):
+        credit = CreditLines(self.write('a\nb\nc\n'))
+        picks = [credit.pick() for _ in range(50)]
+        self.assertEqual(set(picks), {'a', 'b', 'c'})
+        self.assertTrue(all(x != y for x, y in zip(picks, picks[1:])))
+
+    def test_a_missing_or_empty_file_gives_the_default_line(self):
+        self.assertEqual(CreditLines('/nowhere/lines.txt').pick(), LINE)
+        self.assertEqual(CreditLines(self.write('# nothing\n')).pick(), LINE)
+
+    def test_the_file_is_read_again_when_it_changes(self):
+        path = self.write('a\n')
+        credit = CreditLines(path)
+        self.assertEqual(credit.pick(), 'a')
+        with open(path, 'w') as file:
+            file.write('b\n')
+        os.utime(path, (1, 1))     # a changed mtime, however fast the test writes
+        self.assertEqual(credit.pick(), 'b')
 
 
 class TestFade(unittest.TestCase):

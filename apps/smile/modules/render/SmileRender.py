@@ -49,6 +49,7 @@ class SmileRender(RenderBase):
         self._credit: CreditLayer = CreditLayer(settings)
         self._credit_alpha: float = 0.0
         self._credit_time: float = time.time()
+        self._credit_sequence: SequenceType = SequenceType.NONE
         # the operator's status line, drawn over the output while there is something to say
         self._status: StatusLayer = StatusLayer()
         self._status_text: str | None = None
@@ -111,6 +112,9 @@ class SmileRender(RenderBase):
 
     def _render_credit(self, sequence_type: SequenceType) -> None:
         now: float = time.time()
+        if sequence_type == SequenceType.CAPTURE and self._credit_sequence != SequenceType.CAPTURE:
+            self._credit.new_visitor()
+        self._credit_sequence = sequence_type
         self._credit_alpha = fade_step(self._credit_alpha, sequence_type in CREDIT_SHOWN, now - self._credit_time)
         self._credit_time = now
         if self.settings.credit:
