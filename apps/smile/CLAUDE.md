@@ -78,9 +78,13 @@ reaches past the image is drawn clamped to `BOX_PAD_PX` inside it (`fit_box`), s
 ## Image generator
 
 ComfyUI server (installed in `ComfyUI/` by `scripts/install.bat` through `scripts/install_comfy.ps1`: the core commit and the pack versions
-pinned in `comfy/comfy.lock`, the venv from `comfy/requirements.lock`, the patches of `comfy/patches`; the models live in `../smile-models`
-behind the junction `ComfyUI/models`, listed with size and sha256 in `comfy/models.json` and fetched by `modules/comfy/models.py` from a
-mirror, the private HF repo or the public source; `ComfyUI/` is git-ignored, API on
+pinned in `comfy/comfy.lock`, the packs from their registry archives kept in `comfy/packs` (git LFS), the venv from `comfy/requirements.lock`;
+no pack is patched, what SMILE needs from a pack that the pack does wrong is done in `comfy/aiia_grin`; `install_comfy.ps1 -Update` builds the
+newest ComfyUI and packs beside the install, copies the models over, smoke-tests them with a fixed-seed picture before and after, and `-Accept`
+writes the locks, `-Rollback` restores: an update may change what a node expects, which the smoke test reports by node and `workflow.py` then
+provides; the models live in `ComfyUI/models` as ComfyUI has it, listed with size, sha256 and source in `comfy/models.json` and fetched by
+`modules/comfy/models.py` from a local folder when one is given, else from the source: the public URL, or for the three LoRAs the copy in
+`data/comfy/loras` (git LFS); a backup is a copy of the SMILE folder; `ComfyUI/` is git-ignored, API on
 127.0.0.1:8188), started by `scripts/start_comfy.bat`, with a log per start in `output/logs/comfy_*.log`. Every model is
 local and a run makes no internet calls; a model that is missing is an error (`HF_HUB_OFFLINE=1` in `start_comfy.bat`) and a WARNING in the SMILE log when the panel names it. Keep ComfyUI core and the node packs unmodified; depth comes from
 ComfyUI's own Depth Anything 3 nodes. `modules/comfy/`: `Generator` sends each capture to ComfyUI and turns its

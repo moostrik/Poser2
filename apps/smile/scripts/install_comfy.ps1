@@ -1,12 +1,13 @@
 <#
 Installs, or checks, the ComfyUI server of SMILE at <repo>\ComfyUI from comfy\comfy.lock:
-ComfyUI core at its pinned commit, the node packs at theirs, the patches of comfy\patches, our node
-pack comfy\aiia_grin as a junction, the venv from comfy\requirements.lock, and ComfyUI\models as a junction
-to the models folder beside the repo. Safe to run again: everything that is in place is skipped, so a
-second run is the check. Exit 1 on the first failure, with its reason. Called by scripts\install.bat,
-which installs the models afterwards (the model tool, modules\comfy\models.py).
+ComfyUI core at its pinned commit, the node packs at theirs from the archives in comfy\packs (the
+Comfy Registry's files, kept in the repo), any patch in comfy\patches (none today), our node pack
+comfy\aiia_grin as a junction, and the venv from comfy\requirements.lock. The models live in
+ComfyUI\models as ComfyUI has it; scripts\install.bat fills that folder afterwards with the model tool
+(modules\comfy\models.py). Safe to run again: everything in place is skipped, so a second run is the
+check. Exit 1 on the first failure, with its reason.
 
-    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install_comfy.ps1 [-Target DIR] [-Models DIR]
+    powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install_comfy.ps1 [-Target DIR]
 
 Updating (first on the dev PC, never on the ICK PC during the show):
 
@@ -14,18 +15,24 @@ Updating (first on the dev PC, never on the ICK PC during the show):
                                                    --save output\smoke\before: a fixed-seed portrait and grin frame),
                                                    is renamed <Target>-previous, and a new one is built with ComfyUI
                                                    at origin HEAD (or the commit given), every pack at the registry's
-                                                   latest version and the venv from their requirements.txt files
-                                                   (not the lock), then smoke-tested with its picture in output\smoke\after
+                                                   latest version (its archive downloaded into comfy\packs) and the venv
+                                                   from their requirements.txt files (not the lock), the models copied
+                                                   over from the previous install, then smoke-tested with its picture
+                                                   in output\smoke\after
     install_comfy.ps1 -Accept                      the pictures compared and good: comfy.lock and requirements.lock
-                                                   are written from the new install and <Target>-previous is deleted
+                                                   are written from the new install and <Target>-previous is deleted;
+                                                   commit the locks and the new archives in comfy\packs
     install_comfy.ps1 -Rollback                    the new install is deleted and <Target>-previous comes back
+
+An update may change what a node expects (an input added, a node renamed): the smoke test then refuses the
+workflow and names the node; the fix belongs in modules\comfy\workflow.py or a re-export of the workflow,
+never in ComfyUI or a pack.
 
 Everything is cloned with core.autocrlf off: the packs' files stay as upstream has them, which a patch
 would need (a patch made for LF does not apply to a CRLF checkout).
 #>
 param(
     [string]$Target = (Join-Path (Split-Path $PSScriptRoot -Parent) 'ComfyUI'),
-    [string]$Models = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'smile-models'),
     [switch]$Update,
     [string]$ComfyCommit = '',
     [switch]$Accept,
@@ -68,11 +75,10 @@ function PackVersion([string]$path) {
     if ($m) { return $m.Matches[0].Groups[1].Value } else { return '' }
 }
 function RemoveInstall([string]$dir) {
-    # an install folder holds junctions (models, aiia_grin): those links go first, as links, so nothing
-    # behind them is touched; rmdir does not follow junctions either
-    foreach ($link in @((Join-Path $dir 'models'), (Join-Path $dir 'custom_nodes\aiia_grin'))) {
-        if (IsLink $link) { (Get-Item $link -Force).Delete() }
-    }
+    # the aiia_grin junction goes first, as a link, so the repo folder behind it is not touched;
+    # rmdir does not follow junctions either
+    $link = Join-Path $dir 'custom_nodes\aiia_grin'
+    if (IsLink $link) { (Get-Item $link -Force).Delete() }
     & cmd /c rmdir /s /q "$dir"
     if (Test-Path $dir) { Fail "could not remove $dir" }
 }
@@ -126,7 +132,7 @@ try {
         if (-not (Test-Path $previous)) { Fail "no update to accept: $previous is not there" }
         WriteLocks $lock $Target (Join-Path $Target '.venv\Scripts\python.exe')
         RemoveInstall $previous
-        Write-Host "`nThe update is the install: comfy.lock and requirements.lock describe it, $previous is gone. Commit the locks." -ForegroundColor Green
+        Write-Host "`nThe update is the install: comfy.lock and requirements.lock describe it, $previous is gone. Commit the locks and comfy\packs (git rm the archives of versions no longer in the lock)." -ForegroundColor Green
         exit 0
     }
     if ($Update) {
@@ -184,14 +190,14 @@ try {
     } else {
         Note 'at the pinned commit'
     }
-    # models/ is left out: the junction step below moves its placeholders into the models folder
-    $dirty = & git -C $Target status --porcelain --untracked-files=no -- . ':!models'
+    $dirty = & git -C $Target status --porcelain --untracked-files=no
     if ($dirty) { Fail "ComfyUI core has local changes (it must stay unmodified):`n$($dirty -join "`n")" }
 
     # --- node packs, pinned ---------------------------------------------------------------------------
     Step 'Node packs'
     $nodes = Join-Path $Target 'custom_nodes'
-    New-Item -ItemType Directory -Force $nodes | Out-Null
+    $packs = Join-Path $src 'packs'
+    New-Item -ItemType Directory -Force $nodes, $packs | Out-Null
     foreach ($pack in $lock.packs) {
         $dst = Join-Path $nodes $pack.id
         if ((Test-Path $dst) -and -not (Get-ChildItem $dst -Force | Select-Object -First 1)) { Remove-Item $dst }    # an empty folder (a failed download) counts as absent
@@ -226,14 +232,24 @@ try {
                 if ($v -ne $pack.version) { Fail "$($pack.id) at $dst is version '$v', the pin is $($pack.version): remove the folder and run again" }
                 Note "$($pack.id) $($pack.version): in place"
             } else {
-                $meta = Invoke-RestMethod "https://api.comfy.org/nodes/$($pack.id)/versions/$($pack.version)"
-                $archive = Join-Path $env:TEMP "$($pack.id)-$($pack.version).archive"
-                Invoke-WebRequest $meta.downloadUrl -OutFile $archive
+                # the archive lives in the repo (comfy\packs, git LFS); a version not there yet (an update) comes
+                # from the Comfy Registry and stays in comfy\packs, to be committed with the locks
+                $archive = Get-ChildItem (Join-Path $packs "$($pack.id)-$($pack.version).*") -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($archive -and $archive.Length -lt 1024) { Fail "$($archive.Name) is a git LFS pointer, not the archive: run git lfs pull" }
+                if (-not $archive) {
+                    $meta = Invoke-RestMethod "https://api.comfy.org/nodes/$($pack.id)/versions/$($pack.version)"
+                    $tmp = Join-Path $packs "$($pack.id)-$($pack.version).download"
+                    Invoke-WebRequest $meta.downloadUrl -OutFile $tmp
+                    # the registry names every file node.tar.gz, some are zips: name it by its content
+                    $magic = [IO.File]::ReadAllBytes($tmp)[0..1]
+                    $ext = if ($magic[0] -eq 0x50 -and $magic[1] -eq 0x4B) { '.zip' } else { '.tar.gz' }
+                    $archive = Rename-Item $tmp "$($pack.id)-$($pack.version)$ext" -PassThru
+                    Note "$($pack.id) $($pack.version): archive downloaded from the registry into comfy\packs"
+                }
                 New-Item -ItemType Directory -Force $dst | Out-Null
-                & (Join-Path $env:SystemRoot 'System32\tar.exe') -xf $archive -C $dst     # Windows' bsdtar reads both the tar.gz and the zip the registry serves (Git's tar on the PATH would not)
-                if ($LASTEXITCODE -ne 0) { Fail "could not extract $archive" }
-                Remove-Item $archive
-                Note "$($pack.id) $($pack.version): registry archive installed"
+                & (Join-Path $env:SystemRoot 'System32\tar.exe') -xf $archive.FullName -C $dst     # Windows' bsdtar reads both formats (Git's tar on the PATH would not)
+                if ($LASTEXITCODE -ne 0) { Fail "could not extract $($archive.FullName)" }
+                Note "$($pack.id) $($pack.version): installed from $($archive.Name)"
             }
         }
     }
@@ -324,36 +340,12 @@ try {
     }
     Note 'onnxruntime CUDA provider ok'
 
-    # --- the models folder: ComfyUI\models is a junction to it ------------------------------------------
-    Step "Models folder $Models"
-    New-Item -ItemType Directory -Force $Models | Out-Null
-    $modelsDir = Join-Path $Target 'models'
-    if (IsLink $modelsDir) {
-        $to = (Get-Item $modelsDir -Force).Target
-        if ("$to" -and ((Resolve-Path "$to").Path -ne (Resolve-Path $Models).Path)) { Fail "ComfyUI\models is a junction to $to, not to $Models" }
-        Note 'junction in place'
-    } else {
-        if (Test-Path $modelsDir) {
-            # a real folder (a fresh clone's placeholders, or an old install's models): moved into the models
-            # folder, nothing overwritten; what stays behind is a name clash
-            & robocopy $modelsDir $Models /E /MOVE /XC /XN /XO /NFL /NDL /NJH /NJS /NP | Out-Null
-            if ($LASTEXITCODE -ge 8) { Fail "robocopy of $modelsDir into $Models failed ($LASTEXITCODE)" }
-            # what stayed behind exists on both sides: the same bytes (ComfyUI's put_*_here placeholders) is no clash
-            foreach ($file in Get-ChildItem $modelsDir -Recurse -File -Force -ErrorAction SilentlyContinue) {
-                $twin = Join-Path $Models $file.FullName.Substring($modelsDir.Length + 1)
-                if ((Test-Path $twin) -and ((Get-Item $twin).Length -eq $file.Length) -and
-                    (($file.Length -eq 0) -or ((Get-FileHash $twin -Algorithm SHA256).Hash -eq (Get-FileHash $file.FullName -Algorithm SHA256).Hash))) {
-                    Remove-Item $file.FullName -Force
-                }
-            }
-            $left = @(Get-ChildItem $modelsDir -Recurse -File -Force -ErrorAction SilentlyContinue)
-            if ($left.Count -gt 0) {
-                Fail "these files exist in both $modelsDir and ${Models}:`n$(($left | ForEach-Object { $_.FullName }) -join "`n")`nresolve them by hand, then run again"
-            }
-            Remove-Item -Recurse -Force $modelsDir -ErrorAction SilentlyContinue
-        }
-        New-Item -ItemType Junction -Path $modelsDir -Target $Models | Out-Null
-        Note "junction made: $modelsDir -> $Models"
+    # --- the models of an update: copied over from the previous install ----------------------------------
+    if ($Update -and (Test-Path (Join-Path $previous 'models'))) {
+        Step 'Models from the previous install'
+        & robocopy (Join-Path $previous 'models') (Join-Path $Target 'models') /E /XC /XN /XO /NFL /NDL /NJH /NJS /NP | Out-Null
+        if ($LASTEXITCODE -ge 8) { Fail "robocopy of the models from $previous failed ($LASTEXITCODE)" }
+        Note "copied into $Target\models (nothing overwritten)"
     }
 
     if ($Update) {
@@ -365,7 +357,7 @@ try {
         Write-Host "then: install_comfy.ps1 -Accept (writes the locks, removes $previous) or install_comfy.ps1 -Rollback." -ForegroundColor Green
         exit 0
     }
-    Write-Host "`nComfyUI is installed at $Target. Next: the models (scripts\install.bat does it: py -3.12 -m modules.comfy.models install)." -ForegroundColor Green
+    Write-Host "`nComfyUI is installed at $Target. Next: the models into $Target\models (scripts\install.bat does it: py -3.12 -m modules.comfy.models install)." -ForegroundColor Green
     exit 0
 }
 catch {

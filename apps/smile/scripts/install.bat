@@ -1,9 +1,10 @@
 @REM Installs SMILE, or checks an install: the LFS files, the app venv, ComfyUI (scripts\install_comfy.ps1),
 @REM the models (modules\comfy\models.py), then a smoke test that runs the warm-up in ComfyUI once.
-@REM Safe to run again: everything in place is skipped. Extra arguments go to the model tool:
-@REM     scripts\install.bat --mirror E:\smile-models      (a folder with the models, for a PC without internet)
+@REM Safe to run again: everything in place is skipped. Extra arguments go to the model tool; without --mirror
+@REM it asks for a folder with the models to copy from (the backup's ComfyUI\models, a USB stick):
+@REM     scripts\install.bat --mirror E:\SMILE\ComfyUI\models
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 set "ROOT_DIR=%~dp0.."
 set "VENV_DIR=%ROOT_DIR%\.venv"
 echo.
@@ -69,8 +70,17 @@ if %errorlevel% neq 0 (
 echo.
 
 echo [44m Models [0m
+set "MODEL_ARGS=%*"
+echo %MODEL_ARGS% | find "--mirror" >nul
+if errorlevel 1 (
+    echo The models go into ComfyUI\models. A folder in the same layout to copy them from, for instance the backup's
+    echo ComfyUI\models or a USB stick, saves the download of what it holds; what it lacks comes from the sources.
+    set "MIRROR="
+    set /p "MIRROR=Folder with the models to copy from (Enter for none): "
+    if defined MIRROR set "MODEL_ARGS=!MODEL_ARGS! --mirror "!MIRROR!""
+)
 pushd "%ROOT_DIR%"
-py -3.12 -m modules.comfy.models install %*
+py -3.12 -m modules.comfy.models install !MODEL_ARGS!
 set "RC=%errorlevel%"
 popd
 if not "%RC%"=="0" (

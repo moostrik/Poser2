@@ -1,5 +1,16 @@
 # A better install protocol: one script, a model manifest, a private model mirror
 
+**Simplified the same evening (2026-10-26):** the user found the private Hugging Face store, its upload/export tooling
+and the models folder beside the repo overkill: "with this system on two PCs and a backup of the repository on my
+backup disk we keep the important data; it is easy to copy a couple of files from a USB drive". So decisions 1 and 7
+below are reversed: the models live in `ComfyUI\models` as ComfyUI has it (an update copies the folder into the new
+install), they come from their original sources (the manifest keeps URL, size and sha256) or from a local folder the
+install asks for, the three private LoRAs and the four pack archives live in the repo as git LFS files
+(`data/comfy/loras`, `comfy/packs`), and a backup is a copy of the SMILE folder. The HF repo was deleted, and so was
+`comfy/inventory.py` (the on-site inventory never ran; the locks and the manifest are the record of an install). The
+rest of this document stays as the record of how the install path was built; where it names the inventory, the HF
+repo or `..\smile-models`, that is history.
+
 **Status (2026-10-26, evening): the install path is built and runs on the dev PC (IAAI).** `scripts\install.bat`
 installs app, ComfyUI and models from `comfy\models.json`, `comfy\comfy.lock` and `comfy\requirements.lock` and ends
 in a passing smoke test (the warm-up through a fresh ComfyUI in 20 s). What this round changed against the plan below,

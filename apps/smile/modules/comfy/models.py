@@ -1,35 +1,28 @@
-"""The model tool: keeps a models folder equal to the manifest comfy/models.json.
+"""The model tool: keeps ComfyUI's models folder equal to the manifest comfy/models.json.
 
-The manifest lists every model file ComfyUI needs for SMILE (path relative to the models folder, size,
-sha256, a public source URL or null) and the private Hugging Face repo that holds the verified copies.
-Standard library only, so it runs before any venv exists, from the repo root:
+The manifest lists every model file ComfyUI needs for SMILE: its path under ComfyUI/models, size, sha256 and
+source. A source is a public URL (Hugging Face, where the file came from) or a file in the repo
+(data/comfy/loras/..., the LoRAs that exist nowhere else, kept in git LFS). Standard library only, so it runs
+before any venv exists, from the repo root:
 
     py -3.12 -m modules.comfy.models check [--quick]            every file ok / missing / wrong size / corrupt, extras listed
-    py -3.12 -m modules.comfy.models install [--mirror DIR]     fetch what is not ok: mirror copy, else the HF repo, else the source
-    py -3.12 -m modules.comfy.models export DIR                 verify, then copy the set into DIR (a USB SSD, iCloud Drive)
+    py -3.12 -m modules.comfy.models install [--mirror DIR]     fetch what is not ok: a copy from the mirror, else the source
     py -3.12 -m modules.comfy.models hash [--write] [--add P]   size and sha256 of the files present, into the manifest
-    py -3.12 -m modules.comfy.models sources [--write] [--repo] the public sources (and the HF repo) against the manifest
-    py -3.12 -m modules.comfy.models upload                     the verified set into the HF repo (runs hf.exe)
+    py -3.12 -m modules.comfy.models sources [--write]          the sources still hold the manifest's files (no download)
 
-Defaults: the manifest in comfy/, the models folder beside the repo (<repo>\\..\\smile-models); --manifest and
---models override. The HF token comes from HF_TOKEN, else ~/.cache/huggingface/token (where `hf auth login`
-writes it), else a prompt that saves it there; without one the HF repo is skipped and only the sources are tried.
-
-A Hugging Face `resolve` URL answers 302 to a CDN URL on another host that refuses the Authorization header,
-and that 302 carries the file's LFS sha256 (`x-linked-etag`) and size (`x-linked-size`): the HEAD with the
-token checks a source against the manifest before a byte is downloaded, the GET goes to the CDN without the
-token. Downloads go to `<path>.part` and resume; a file is renamed into place only after its sha256 matches.
-Every network call goes through `http()`, which the tests replace.
+Defaults: the manifest in comfy/, the models folder ComfyUI\\models; --manifest and --models override. The mirror
+is any folder in the same layout: the backup disk's ComfyUI\\models, a USB stick. A download goes to <path>.part,
+resumes after an interruption, and is renamed into place only after its sha256 matches. A Hugging Face `resolve`
+URL answers 302 to a CDN URL, and that 302 carries the file's LFS sha256 (`x-linked-etag`) and size: the HEAD
+checks a source against the manifest before a byte is downloaded. Every network call goes through `http()`,
+which the tests replace.
 """
 
 import argparse
-import getpass
 import hashlib
 import json
 import logging
 import os
-import shutil
-import subprocess
 import sys
 import urllib.error
 import urllib.request
@@ -41,9 +34,7 @@ logger = logging.getLogger('models')
 
 ROOT: Path = Path(__file__).resolve().parents[2]
 MANIFEST: Path = ROOT / 'comfy' / 'models.json'
-MODELS: Path = ROOT.parent / 'smile-models'
-HF_TOKEN_FILE: Path = Path.home() / '.cache' / 'huggingface' / 'token'
-HF_EXE: Path = ROOT / 'ComfyUI' / '.venv' / 'Scripts' / 'hf.exe'
+MODELS: Path = ROOT / 'ComfyUI' / 'models'
 CHUNK: int = 1 << 22
 TIMEOUT: float = 60.0
 PART: str = '.part'
@@ -56,7 +47,7 @@ class Entry:
     path: str                       # relative to the models folder, with forward slashes
     size: int = 0
     sha256: str = ''                # empty: not known yet (hash or sources --write fill it)
-    source: str | None = None       # public URL, the fallback behind the HF repo; None: none
+    source: str | None = None       # a public URL, or a file in the repo (relative to its root); None: none
     note: str = ''
 
     @classmethod
@@ -66,10 +57,13 @@ class Entry:
     def to_dict(self) -> dict:
         return {'path': self.path, 'size': self.size, 'sha256': self.sha256, 'source': self.source, 'note': self.note}
 
+    @property
+    def source_is_url(self) -> bool:
+        return bool(self.source) and '://' in self.source
+
 
 @dataclass
 class Manifest:
-    repo: str
     files: list[Entry] = field(default_factory=list)
     path: Path | None = None
 
@@ -77,23 +71,15 @@ class Manifest:
     def load(cls, path: Path) -> 'Manifest':
         with open(path, encoding='utf-8') as f:
             data: dict = json.load(f)
-        return cls(data.get('repo') or '', [Entry.from_dict(d) for d in data.get('files', [])], Path(path))
+        return cls([Entry.from_dict(d) for d in data.get('files', [])], Path(path))
 
     def save(self, path: Path | None = None) -> None:
         target: Path = path or self.path
         if target is None:
             raise ValueError('the manifest has no path')
         with open(target, 'w', encoding='utf-8', newline='\n') as f:
-            json.dump({'repo': self.repo, 'files': [e.to_dict() for e in self.files]}, f, indent=2)
+            json.dump({'files': [e.to_dict() for e in self.files]}, f, indent=2)
             f.write('\n')
-
-    @property
-    def repo_ready(self) -> bool:
-        """False while repo is the placeholder of a fresh manifest."""
-        return bool(self.repo) and '<' not in self.repo and '/' in self.repo
-
-    def hf_url(self, entry: Entry) -> str:
-        return f'https://huggingface.co/{self.repo}/resolve/main/{entry.path}'
 
     def get(self, path: str) -> Entry | None:
         return next((e for e in self.files if e.path == path), None)
@@ -121,7 +107,7 @@ def _http(url: str, method: str = 'GET', headers: dict[str, str] | None = None) 
     the host cannot be reached at all."""
     request = urllib.request.Request(url, method=method)
     for name, value in (headers or {}).items():
-        request.add_unredirected_header(name, value)      # never forwarded to a redirect target
+        request.add_unredirected_header(name, value)
     opener = urllib.request.build_opener(_NoRedirect)
     try:
         reply = opener.open(request, timeout=TIMEOUT)
@@ -138,14 +124,12 @@ class Resolved:
     url: str                        # where the bytes are (the CDN after a 302, else the URL itself)
     sha256: str | None              # the server's LFS hash, when it gives one
     size: int | None
-    direct: bool                    # True: served by the URL itself, so the token goes with the GET
 
 
-def resolve(url: str, token: str | None = None) -> Resolved | None:
+def resolve(url: str) -> Resolved | None:
     """HEAD a URL: where it leads and what it says about the file. None when it is not there."""
-    headers: dict[str, str] = {'Authorization': f'Bearer {token}'} if token else {}
     try:
-        reply: Response = http(url, 'HEAD', headers)
+        reply: Response = http(url, 'HEAD', {})
     except OSError as e:
         logger.warning('%s: %s', url, e)
         return None
@@ -155,9 +139,9 @@ def resolve(url: str, token: str | None = None) -> Resolved | None:
             return None
         if location.startswith('/'):
             location = url.split('/', 3)[0] + '//' + url.split('/', 3)[2] + location
-        return Resolved(location, _sha_of(reply.header('x-linked-etag')), _int_or_none(reply.header('x-linked-size')), False)
+        return Resolved(location, _sha_of(reply.header('x-linked-etag')), _int_or_none(reply.header('x-linked-size')))
     if reply.status == 200:
-        return Resolved(url, _sha_of(reply.header('x-linked-etag')), _int_or_none(reply.header('content-length')), True)
+        return Resolved(url, _sha_of(reply.header('x-linked-etag')), _int_or_none(reply.header('content-length')))
     logger.warning('%s: HTTP %s', url, reply.status)
     return None
 
@@ -240,16 +224,16 @@ def _write_verified(entry: Entry, target: Path, reader: BinaryIO, digest: Any, m
 
 
 def copy_verified(entry: Entry, source: Path, target: Path) -> bool:
-    """A mirror copy, hashed while it is copied."""
+    """A copy from a mirror or from the repo, hashed while it is copied."""
     logger.info('%s: copying from %s', entry.path, source)
     with open(source, 'rb') as f:
         return _write_verified(entry, target, f, hashlib.sha256(), 'wb', 0)
 
 
-def download(entry: Entry, url: str, target: Path, token: str | None = None) -> bool:
+def download(entry: Entry, url: str, target: Path) -> bool:
     """Fetch a URL into place, resuming a .part, verified; False when the URL is not there, says it
     holds another file, or delivered one."""
-    found: Resolved | None = resolve(url, token)
+    found: Resolved | None = resolve(url)
     if found is None:
         return False
     if found.sha256 is not None and found.sha256 != entry.sha256:
@@ -259,7 +243,7 @@ def download(entry: Entry, url: str, target: Path, token: str | None = None) -> 
         logger.warning('%s: %s holds %d bytes, the manifest says %d, skipped', entry.path, url, found.size, entry.size)
         return False
     part: Path = target.with_name(target.name + PART)
-    headers: dict[str, str] = {'Authorization': f'Bearer {token}'} if token and found.direct else {}
+    headers: dict[str, str] = {}
     digest = hashlib.sha256()
     offset: int = 0
     if part.is_file():
@@ -287,25 +271,17 @@ def download(entry: Entry, url: str, target: Path, token: str | None = None) -> 
     return _write_verified(entry, target, reply.body, digest, mode, offset)
 
 
-# TOKEN
-
-def get_token(prompt: bool = True) -> str | None:
-    """HF_TOKEN, else the saved token, else one asked for once and saved."""
-    token: str = os.environ.get('HF_TOKEN', '').strip()
-    if token:
-        return token
-    if HF_TOKEN_FILE.is_file():
-        token = HF_TOKEN_FILE.read_text(encoding='utf-8').strip()
-        if token:
-            return token
-    if not prompt or not sys.stdin or not sys.stdin.isatty():
-        return None
-    token = getpass.getpass('Hugging Face token (write access to the models repo; saved to %s): ' % HF_TOKEN_FILE).strip()
-    if not token:
-        return None
-    HF_TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
-    HF_TOKEN_FILE.write_text(token, encoding='utf-8')
-    return token
+def fetch_source(entry: Entry, target: Path, root: Path = ROOT) -> bool:
+    """The entry from its source: a download for a URL, a verified copy for a file in the repo."""
+    if not entry.source:
+        return False
+    if entry.source_is_url:
+        return download(entry, entry.source, target)
+    source: Path = root / entry.source
+    if not source.is_file():
+        logger.warning('%s: the repo has no %s (git lfs pull?)', entry.path, entry.source)
+        return False
+    return copy_verified(entry, source, target)
 
 
 # COMMANDS
@@ -345,11 +321,8 @@ def check(manifest: Manifest, folder: Path, quick: bool = False) -> int:
     return 1 if bad else 0
 
 
-def install(manifest: Manifest, folder: Path, mirror: Path | None = None, quick: bool = False,
-            token_getter: Callable[[], str | None] = get_token) -> int:
-    """Every file that is not ok, in order: the mirror, the HF repo, the public source."""
-    token: str | None = None
-    token_asked: bool = False
+def install(manifest: Manifest, folder: Path, mirror: Path | None = None, quick: bool = False, root: Path = ROOT) -> int:
+    """Every file that is not ok: a verified copy from the mirror when it has the path, else the source."""
     failed: list[str] = []
     fetched: int = 0
     for entry in manifest.files:
@@ -363,15 +336,8 @@ def install(manifest: Manifest, folder: Path, mirror: Path | None = None, quick:
         done: bool = False
         if mirror is not None and (mirror / entry.path).is_file():
             done = copy_verified(entry, mirror / entry.path, target)
-        if not done and manifest.repo_ready:
-            if not token_asked:
-                token, token_asked = token_getter(), True
-                if token is None:
-                    logger.info('no Hugging Face token: the repo %s is skipped, only the public sources are tried', manifest.repo)
-            if token is not None:
-                done = download(entry, manifest.hf_url(entry), target, token)
-        if not done and entry.source:
-            done = download(entry, entry.source, target)
+        if not done:
+            done = fetch_source(entry, target, root)
         if done:
             fetched += 1
             logger.info('%s: ok', entry.path)
@@ -384,24 +350,6 @@ def install(manifest: Manifest, folder: Path, mirror: Path | None = None, quick:
             print(f'  {path}')
         return 1
     print(f'{fetched} file(s) installed, all {len(manifest.files)} ok in {folder}')
-    return 0
-
-
-def export(manifest: Manifest, folder: Path, dest: Path) -> int:
-    """The verified set copied into dest with the manifest beside it (a mirror for an offline install)."""
-    if check(manifest, folder) != 0:
-        logger.error('not every file is ok, nothing exported')
-        return 1
-    copied: int = 0
-    for entry in manifest.files:
-        target: Path = dest / entry.path
-        if status(entry, dest) == 'ok':
-            continue
-        if not copy_verified(entry, folder / entry.path, target):
-            return 1
-        copied += 1
-    manifest.save(dest / 'models.json')
-    print(f'{copied} file(s) copied, all {len(manifest.files)} in {dest}')
     return 0
 
 
@@ -432,21 +380,33 @@ def hash_files(manifest: Manifest, folder: Path, write: bool = False, add: list[
     return 0
 
 
-def sources(manifest: Manifest, write: bool = False, repo: bool = False, drop_mismatch: bool = False,
-            token_getter: Callable[[], str | None] = get_token) -> int:
-    """Every public source against its entry, by the hash and size the server reports (no download).
-    An entry without a hash adopts the source's. --repo does the same for the HF repo's copies."""
+def sources(manifest: Manifest, write: bool = False, drop_mismatch: bool = False, root: Path = ROOT) -> int:
+    """Every source against its entry: a URL by the hash and size the server reports (no download), a repo
+    file by its bytes. An entry without a hash adopts the source's. Exit 1 on a mismatch or a source gone."""
     bad: int = 0
     for entry in manifest.files:
         if not entry.source:
             continue
+        if not entry.source_is_url:
+            path: Path = root / entry.source
+            if not path.is_file():
+                state: str = 'missing in repo'
+            elif not entry.sha256:
+                state = 'adopted' if write else 'adoptable'
+                if write:
+                    entry.size, entry.sha256 = path.stat().st_size, file_sha256(path)
+            else:
+                state = 'ok' if path.stat().st_size == entry.size and file_sha256(path) == entry.sha256 else 'MISMATCH'
+            bad += state in ('missing in repo', 'MISMATCH')
+            print(f'{state:20} {entry.path}')
+            continue
         found: Resolved | None = resolve(entry.source)
         if found is None:
-            print(f'unreachable  {entry.path}  {entry.source}')
+            print(f'unreachable          {entry.path}  {entry.source}')
             bad += 1
             continue
         if found.sha256 is None:
-            state: str = 'no hash from source' if found.size is None else 'size ok' if found.size == entry.size else 'size MISMATCH'
+            state = 'no hash from source' if found.size is None else 'size ok' if found.size == entry.size else 'size MISMATCH'
         elif not entry.sha256:
             state = 'adopted' if write else 'adoptable'
             if write:
@@ -462,70 +422,9 @@ def sources(manifest: Manifest, write: bool = False, repo: bool = False, drop_mi
                 state = 'MISMATCH, source dropped'
         bad += 'MISMATCH' in state        # 'no hash from source' (a small non-LFS file) is information, not a failure
         print(f'{state:20} {entry.path}')
-    if repo:
-        bad += _check_repo(manifest, token_getter)
     if write:
         manifest.save()
     return 1 if bad else 0
-
-
-def _check_repo(manifest: Manifest, token_getter: Callable[[], str | None]) -> int:
-    if not manifest.repo_ready:
-        print(f'the manifest has no repo yet ({manifest.repo!r})')
-        return 1
-    token: str | None = token_getter()
-    headers: dict[str, str] = {'Authorization': f'Bearer {token}'} if token else {}
-    url: str = f'https://huggingface.co/api/models/{manifest.repo}/tree/main?recursive=true'
-    try:
-        reply: Response = http(url, 'GET', headers)
-    except OSError as e:
-        print(f'repo {manifest.repo}: {e}')
-        return 1
-    if reply.status != 200 or reply.body is None:
-        print(f'repo {manifest.repo}: HTTP {reply.status}')
-        return 1
-    tree: dict[str, dict] = {item['path']: item for item in json.load(reply.body) if item.get('type') == 'file'}
-    bad: int = 0
-    for entry in manifest.files:
-        item: dict | None = tree.get(entry.path)
-        if item is None:
-            state: str = 'not in repo'
-        else:
-            lfs: dict = item.get('lfs') or {}
-            oid: str = lfs.get('oid', '')
-            size: int = int(lfs.get('size') or item.get('size') or 0)
-            state = 'ok' if (not oid or oid == entry.sha256) and size == entry.size else 'MISMATCH'
-            if not oid and size == entry.size:
-                state = 'size ok'
-        bad += state not in ('ok', 'size ok')
-        print(f'{state:20} {manifest.repo}/{entry.path}')
-    return bad
-
-
-def upload(manifest: Manifest, folder: Path, hf_exe: Path | None = None,
-           token_getter: Callable[[], str | None] = get_token, run: Callable[..., Any] = subprocess.run) -> int:
-    """The verified set into the HF repo with hf.exe (huggingface_hub's CLI, in the ComfyUI venv)."""
-    if not manifest.repo_ready:
-        logger.error('the manifest has no repo yet (%r): create the private repo and put its id in the manifest', manifest.repo)
-        return 1
-    exe: Path | None = hf_exe or (HF_EXE if HF_EXE.is_file() else None) or (Path(shutil.which('hf')) if shutil.which('hf') else None)
-    if exe is None or not Path(exe).is_file():
-        logger.error('hf.exe not found (looked in %s and on the PATH): install ComfyUI first, or give --hf', HF_EXE)
-        return 1
-    if check(manifest, folder) != 0:
-        logger.error('not every file is ok, nothing uploaded')
-        return 1
-    token: str | None = token_getter()
-    if token is None:
-        logger.error('no Hugging Face token (HF_TOKEN, %s, or the prompt)', HF_TOKEN_FILE)
-        return 1
-    command: list[str] = [str(exe), 'upload', manifest.repo, str(folder), '.', '--repo-type', 'model', '--private',
-                          '--commit-message', 'SMILE models (modules.comfy.models upload)', '--token', token]
-    for entry in manifest.files:
-        command += ['--include', entry.path]        # one flag per file: hf takes a single pattern per --include
-    print(' '.join('<token>' if arg == token else arg for arg in command))
-    result = run(command, check=False)
-    return int(result.returncode)
 
 
 # ENTRY POINT
@@ -534,25 +433,20 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog='models', description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     common = argparse.ArgumentParser(add_help=False)      # the options every command takes, after its name
     common.add_argument('--manifest', type=Path, default=MANIFEST, help='the manifest (default comfy/models.json)')
-    common.add_argument('--models', type=Path, default=MODELS, help='the models folder (default <repo>\..\smile-models)')
+    common.add_argument('--models', type=Path, default=MODELS, help='the models folder (default ComfyUI\\models)')
     common.add_argument('-v', '--verbose', action='store_true', help='debug logging')
     sub = parser.add_subparsers(dest='command', required=True, parser_class=lambda **kw: argparse.ArgumentParser(parents=[common], **kw))
     p = sub.add_parser('check', help='every manifest file ok / missing / wrong size / corrupt, extras listed')
     p.add_argument('--quick', action='store_true', help='sizes only, no hashing')
-    p = sub.add_parser('install', help='fetch every file that is not ok: mirror, HF repo, public source')
-    p.add_argument('--mirror', type=Path, help='a folder in the manifest layout to copy from first')
+    p = sub.add_parser('install', help='fetch every file that is not ok: a copy from the mirror, else the source')
+    p.add_argument('--mirror', type=Path, help='a folder in the same layout to copy from first (a backup, a USB stick)')
     p.add_argument('--quick', action='store_true', help='trust files whose size is right')
-    p = sub.add_parser('export', help='verify, then copy the set with the manifest into DIR')
-    p.add_argument('dir', type=Path)
     p = sub.add_parser('hash', help='size and sha256 of the files present; --write into the manifest')
     p.add_argument('--write', action='store_true')
     p.add_argument('--add', nargs='*', default=[], metavar='PATH', help='new entries (source null) for these paths')
-    p = sub.add_parser('sources', help='the public sources (hash and size the server reports) against the manifest')
+    p = sub.add_parser('sources', help='the sources (hash and size the server reports, or the repo file) against the manifest')
     p.add_argument('--write', action='store_true', help='entries without a hash adopt the source\'s')
     p.add_argument('--drop-mismatch', action='store_true', help='with --write: a source that holds another file becomes null')
-    p.add_argument('--repo', action='store_true', help='also the HF repo\'s copies (needs the token)')
-    p = sub.add_parser('upload', help='the verified set into the HF repo (hf.exe)')
-    p.add_argument('--hf', type=Path, help='hf.exe to use (default ComfyUI\\.venv\\Scripts\\hf.exe)')
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format='%(levelname)s %(message)s', stream=sys.stderr)
@@ -565,14 +459,10 @@ def main(argv: list[str] | None = None) -> int:
         return check(manifest, folder, args.quick)
     if args.command == 'install':
         return install(manifest, folder, args.mirror, args.quick)
-    if args.command == 'export':
-        return export(manifest, folder, args.dir)
     if args.command == 'hash':
         return hash_files(manifest, folder, args.write, args.add)
     if args.command == 'sources':
-        return sources(manifest, args.write, args.repo, args.drop_mismatch)
-    if args.command == 'upload':
-        return upload(manifest, folder, args.hf)
+        return sources(manifest, args.write, args.drop_mismatch)
     return 2
 
 
