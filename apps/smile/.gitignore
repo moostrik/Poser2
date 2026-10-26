@@ -17,3 +17,8 @@ __pycache__/
 *.py[cod]
 *$py.class
 .pytest_cache/
+
+# SMILE Online
+data/online_token.txt
+relay/token.txt
+relay/data/

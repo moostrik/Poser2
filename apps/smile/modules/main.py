@@ -12,6 +12,7 @@ from modules.credit_scroll import CreditScroller
 from modules.render.settings import RenderSettings
 from modules.save.ClipSaver import ClipSaver
 from modules.artnet.Sender import Sender as Artnet
+from modules.online.Online import Online
 from modules.settings import presets, NiceServer
 from modules.gl import FullscreenMode
 from modules.main_settings import Settings
@@ -93,6 +94,10 @@ class Main():
         self._face_frame_time: float = 0.0  # arrival of the camera frame the face finder got last
         self._visitor_start: float | None = None    # the capture of the visitor the generator is working on
         self.artnet = Artnet(self.settings.artnet, 'data/artnet.json')
+        # SMILE Online: a turn for someone outside when the room's eye is free, stepped from sequence_callback
+        self.online: Online = Online(self.settings.online, self.settings.pipeline, self.camera, self.sequencer, self.face,
+                                     self.diffuse.record, lambda: (self.settings.render.credit_name, self.settings.render.credit_line))
+        self.save.set_saved_callback(self.online.on_saved)
 
         self._running: bool = False
         self._stopping: bool = False
@@ -132,7 +137,7 @@ class Main():
 
         # first: stops the sequencer callbacks
         steps = (self.sequencer.clear_message_callbacks, self.render.stop, self.sequencer.close,
-                 self.artnet.stop, self.osc.stop,
+                 self.online.stop, self.artnet.stop, self.osc.stop,
                  self.camera.clearColorCallbacks, self.camera.close,
                  self.diffuse.clear_message_callbacks, self.diffuse.stop,
                  self.face.clear_frame_callbacks, self.face.stop,
@@ -213,6 +218,8 @@ class Main():
             self.screen_test.send_players('/credit', int(self.settings.render.credit_qr_players))
         # and the scrolling name's passes, timed on the app clock too; not while the test lights the screens
         self.credit_scroller.update(now, self.settings.audio.laughter_test)
+        # the online turn: it takes the camera when the room's eye is free, and the sequence runs as for a visitor inside
+        self.online.update(now, message, ready, self.settings.render.show_camera or self.settings.audio.laughter_test)
 
         if seq == SequenceType.CAMERA_SHOW and message.initial:
             self.face.reset()
@@ -280,8 +287,10 @@ class Main():
     def face_callback(self, frame: FaceFrame) -> None:
         # the sequencer charges toward the flash while the face qualifies
         self.sequencer.set_face(frame.qualified, frame.time)
+        self.online.on_face(frame)
 
     def diffusion_callback(self, message: GenMessage) -> None:
+        self.online.on_generation(message)
         # a visitor's recording: the portrait still and the grin clip (not the step previews)
         if message.image is None:
             return

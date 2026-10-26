@@ -17,6 +17,7 @@ requests==2.34.2
 stupidArtnet==1.6.0
 watchdog==6.0.0
 websocket-client==1.9.2
+aiohttp==3.14.5                         # the relay of SMILE Online, when it runs on this PC (relay/)
 
 # Development
 pytest==9.1.1
