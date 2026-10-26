@@ -85,8 +85,8 @@ mirror, the private HF repo or the public source; `ComfyUI/` is git-ignored, API
 local and a run makes no internet calls; a model that is missing is an error (`HF_HUB_OFFLINE=1` in `start_comfy.bat`) and a WARNING in the SMILE log when the panel names it. Keep ComfyUI core and the node packs unmodified; depth comes from
 ComfyUI's own Depth Anything 3 nodes. `modules/comfy/`: `Generator` sends each capture to ComfyUI and turns its
 websocket events into `GenMessage`s for the render (CAM_DEPTH → DIFFUSION → DIFF_LOOP → IDLE);
-`workflow.py` adapts the API export in `data/comfy/` (face crop removed — SMILE crops and rotates
-the face itself — depth outputs added) and fills in every value from `PipelineSettings` per run: the
+`workflow.py` adapts the API export in `data/comfy/` (SMILE crops and rotates the face itself, so the export
+starts from the uploaded image; an old export's crop subgraph and video recorder are stripped; depth outputs added) and fills in every value from `PipelineSettings` per run: the
 panel is the source of truth, the workflow only provides the structure. Each visitor gets one of two
 styles (`style_a`, `style_b`, cycled by `styles.py`: `style_visitors_a` visitors in A, then `style_visitors_b` in B, or one of them for
 everyone with `style_mode` A or B; the style id is the movement id of the music): a style holds the describe settings (instruction, max tokens, repetition
@@ -121,7 +121,8 @@ not ready until a warm-up gets its events again; a warm-up that fails is retried
 ready. Keep no ComfyUI tab open on the installation, or exclude `127.0.0.1:8188` from Edge's sleeping tabs.
 For tests in the ComfyUI page, `python -m modules.comfy.testflow` writes `data/comfy/smile_test.json`
 (drag it into the page): what the app sends with a preset's values, plus an input switch (the
-app's last capture, or any photo through the face crop), previews and a video recorder. Regenerate
+app's last capture; any other photo is cropped first with `python -m modules.face.crop`), previews and a video
+recorder from ComfyUI's own video nodes. Regenerate
 it after changing the workflow or the presets instead of editing a copy by hand.
 Our own ComfyUI nodes live in `comfy/aiia_grin/` (`ComfyUI/custom_nodes/aiia_grin` is a junction to it: restart ComfyUI after a change).
 The grin's random picks are SMILE's (`Workflow._fill_grin`, from the visitor's seed): each value's peak between its min and max, and

@@ -3,7 +3,7 @@
 import os
 import unittest
 
-from modules.comfy.testflow import CAPTURE, OUTPUT_CLASSES, PROMPT, SWITCH, make_test_workflow
+from modules.comfy.testflow import CAPTURE, PROMPT, VIDEO, VIDEO_FILE, make_test_workflow
 from modules.comfy.workflow import Workflow
 from modules.main_settings import Settings
 
@@ -31,38 +31,23 @@ class TestTestflow(unittest.TestCase):
                 self.assertIn(source, self.test, f'{node_id} -> missing {source}')
 
     def test_what_the_app_sends_is_in_it(self):
-        image = [self.wf.load_image, 0]
         for node_id, node in self.app.items():
             other = self.test[node_id]
             self.assertEqual(other['class_type'], node['class_type'], node_id)
             for name, value in node['inputs'].items():
-                self.assertEqual(other['inputs'][name], [SWITCH, 0] if value == image else value, f'{node_id}.{name}')
-
-    def test_input_switch(self):
-        switch = self.test[SWITCH]['inputs']
-        self.assertFalse(switch['switch'])
-        self.assertEqual(switch['on_false'], [self.wf.load_image, 0])
+                self.assertEqual(other['inputs'][name], value, f'{node_id}.{name}')
         self.assertEqual(self.test[self.wf.load_image]['inputs']['image'], CAPTURE)
-        # the on side is the face crop, back to the same photo
-        chain, todo = set(), [switch['on_true'][0]]
-        while todo:
-            node_id = todo.pop()
-            if node_id not in chain and node_id != self.wf.load_image:
-                chain.add(node_id)
-                todo.extend(sources(self.test[node_id]))
-        self.assertIn('LivePortraitCropper', {self.test[node_id]['class_type'] for node_id in chain})
-        self.assertIn(self.wf.load_image, {s for node_id in chain for s in sources(self.test[node_id])})
-        # only the switch reads the crop, and no output node: it stays off while the switch is off
-        for node_id, node in self.test.items():
-            if node_id in chain:
-                self.assertNotIn(node['class_type'], OUTPUT_CLASSES)
-            elif node_id != SWITCH:
-                self.assertFalse(sources(node) & chain, node_id)
+
+    def test_video_recorder_is_comfyui_s_own(self):
+        # no node pack needed for the page: the grin becomes a video with ComfyUI's core video nodes
+        self.assertEqual(self.test[VIDEO]['class_type'], 'CreateVideo')
+        self.assertEqual(self.test[VIDEO]['inputs'], {'images': [self.wf.grin, 0], 'fps': 13.0})
+        self.assertEqual(self.test[VIDEO_FILE]['class_type'], 'SaveVideo')
+        self.assertEqual(self.test[VIDEO_FILE]['inputs']['video'], [VIDEO, 0])
+        self.assertNotIn('VHS_VideoCombine', {node['class_type'] for node in self.test.values()})
+        self.assertNotIn('LivePortraitCropper', {node['class_type'] for node in self.test.values()})
 
     def test_extras(self):
-        video = next(node for node in self.test.values() if node['class_type'] == 'VHS_VideoCombine')
-        self.assertEqual(video['inputs']['images'], [self.wf.grin, 0])
-        self.assertEqual(video['inputs']['frame_rate'], 13.0)
         overlay = next(node for node in self.test.values() if node['class_type'] == 'ImageBlend')
         self.assertEqual(overlay['inputs']['image2'], self.test[self.wf.portrait]['inputs']['images'])
         self.assertEqual(self.test[PROMPT]['inputs']['source'], [self.wf.suffix, 0])

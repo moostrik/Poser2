@@ -1,7 +1,7 @@
 # A better install protocol: one script, a model manifest, a private model mirror
 
 **Status (2026-10-26, evening): the install path is built and runs on the dev PC (IAAI).** `scripts\install.bat`
-installs app, ComfyUI and models from `comfy\models.json`, `comfy\comfy.lock` and `comfyequirements.lock` and ends
+installs app, ComfyUI and models from `comfy\models.json`, `comfy\comfy.lock` and `comfy\requirements.lock` and ends
 in a passing smoke test (the warm-up through a fresh ComfyUI in 20 s). What this round changed against the plan below,
 and what is left, is in **Migration** at the end. Earlier status: the plan of 2026-10-06 (deferred until after the
 presentation), merged with the clean-install plan of 2026-10-26: the installation runs at ICK, SMILE gets installed on
@@ -231,36 +231,73 @@ Keep the colour-echo style and sections; extra arguments go to the model tool (`
    the app venv) and waits for its result, then stops ComfyUI. A failure names the step.
 7. "Install complete" only when every step passed; a second run prints skips everywhere.
 
-## 4. Patches: down to none (2026-10-26)
+## 4. Patches: down to none (round 2a, **done 2026-10-26**: `comfy/patches` is empty, four unpatched packs; 4.1 proven by 16 identical grin frames on one portrait, old code with patch against new code without)
 
-ComfyUI core is never patched. What SMILE needs from a pack that the pack does wrong goes into
-`aiia_grin`; a patch file is a stopgap with a link to its upstream fix. The three of today:
+ComfyUI core is never patched. A patch on a pack is a stopgap: the install applies it, recognises it as applied,
+or stops by its name, so an update cannot drop one unnoticed. Round 2 makes them unnecessary, so that any version
+of a pack installs clean. What each patch is and what replaces it:
 
-- `advancedliveportrait-mask.patch` (the paste mask placed with the crop region instead of the face
-  region; this one changes the grin): Grin Frames already redoes the Expression Editor's per-frame steps
-  (`render_frame`); it also builds the mask and the crop transform itself after the editor has prepared
-  the face, so the pack runs unpatched. Checked by the record of an ICK clip rendered again with the
-  same seed. Offered upstream as well.
-- `liveportraitkj-import.patch` (a broken relative import of the face detector): only the face crop of
-  `smile_test.json` uses the pack. `testflow` writes the crop as SMILE does it (`portrait_crop`) with a
-  `LoadImage` of the cropped photo instead; the workflow is re-exported without the crop subgraph, and
-  the pack, `comfyui-kjnodes` and the crop-removal code in `workflow.py` go with it. (Until that is
-  done the pack stays with its patch.)
-- `qwenvl-8bit-dtype.patch` (8-bit loading gets `torch.float16`): only the 8-bit fallback under VRAM
-  pressure; both PCs have 24 GB and run FP16. The one-liner goes upstream (the pack is maintained);
-  the file is dropped.
+1. **`advancedliveportrait-mask.patch`** (the only one that changes the picture). The pack's `prepare_source`
+   (`nodes.py` ~354) warps its paste mask with a transform made from `face_region`, and when the face square was
+   clipped at the image edge (`is_changed`) it then remakes the transform from `crop_region` but keeps the mask
+   where it was: pasted face and mask disagree. The patch makes both from `crop_region`. Grin Frames
+   (`comfy/aiia_grin/__init__.py`) already redoes every per-frame step itself (`render_frame`) and only takes the
+   prepared source (`psi`) from the pack's `ExpressionEditor.run`. It will make the two values itself: after
+   `editor.run`, call the pack's engine `detect_face(img_rgb, crop_factor)` once more (the same detector, the same
+   answer, milliseconds), build `crop_trans_m` with the pack's `create_transform_matrix` from `crop_region` and
+   `mask_ori` by warping `engine.GetMaskImg()` with it, and use those in `render_frame` instead of `psi.crop_trans_m`
+   and `psi.mask_ori`. The debug print the patch removed is already swallowed (`redirect_stdout`). Proof: the
+   record of a saved clip (`modules.save.record --preset`) rendered again with the patch and without it gives
+   the same frames (`test_grin_mask.py` in `comfy/aiia_grin` is not possible without ComfyUI: the user compares
+   two clips, or `smile_test.json` with a fixed seed, by eye and by a frame diff).
+2. **`liveportraitkj-import.patch`** (a broken relative import in `face_alignment/api.py`). The pack serves only
+   the face crop of `smile_test.json` in the ComfyUI page (the subgraph with `LivePortraitCropper`,
+   `LivePortraitLoadFaceAlignmentCropper`, `DownloadAndLoadLivePortraitModels` and kjnodes' `ImageResizeKJv2`;
+   `Workflow` strips it for SMILE, `testflow` puts it back behind the "use face crop" switch). It goes:
+   - a command `python -m modules.face.crop <photo> [-o out.png]` crops a photo as SMILE does (`FaceFinder` +
+     `portrait_crop`, the eyes levelled, the workflow's portrait size) so any photo can be tested in the page;
+   - `testflow` loses the crop branch: the switch becomes a second `LoadImage` (the cropped photo) or goes
+     altogether (a `LoadImage` is a file picker already);
+   - the user deletes the crop subgraph in the ComfyUI page and re-exports `data/comfy/smile_workflow.json`;
+     `Workflow.__init__` loses the crop removal (`_find(LivePortraitCropper)`, `_remove(crop_nodes)`), the tests
+     that assert the crop is gone (`test_face_crop_removed_and_rewired`) assert there was none;
+   - `comfyui-liveportraitkj` and `comfyui-kjnodes` leave `comfy.lock`; `liveportrait/landmark_model.pth` (only
+     liveportraitkj loads it) leaves the manifest (`check` then lists it as extra, the user deletes it).
+3. **`qwenvl-8bit-dtype.patch`** (8-bit loading gets `torch.float16`). SMILE runs `None (FP16)`
+   (`smile_workflow.json` node 1002:17); the 8-bit path is only the pack's fallback under VRAM pressure, which a
+   24 GB card does not reach. The one-liner is offered upstream (`1038lab/ComfyUI-QwenVL`), the file is dropped,
+   and the README's log-lines note says what a `dtype` error in 8-bit mode means.
+4. Optional, same spirit: `comfyui-videohelpersuite` serves only the video recorder of `smile_test.json`;
+   ComfyUI core's `CreateVideo` + `SaveVideo` nodes do the same, so `testflow` can use those and the pack leaves
+   the lock. `ComfyUI-Crystools` (GPU monitor) stays, unpatched and optional.
 
-## 5. Updating (2026-10-26)
+End state: `comfy/patches` is empty (the installer's patch step stays for a future stopgap), four packs in the
+lock (`advancedliveportrait`, `instantid`, `QwenVL`, `Crystools`), each at its registry version, none modified.
 
-`scripts\install_comfy.ps1 -Update [-Core] [-Packs]`: clones the newest ComfyUI and packs into
-`ComfyUI-next\` with the same junctions (models, aiia_grin), builds its venv from ComfyUI's own
-`requirements.txt` plus the packs' (not the lock: that is what is being renewed), applies what patches
-are left (a patch that no longer applies stops the update with its name), and runs the smoke test
-plus one portrait from a fixed preset and seed (`GenerationTest.json`) that the user compares by eye.
-On a pass: `pip freeze` becomes the new `requirements.lock`, the commits the new `comfy.lock`,
-`ComfyUI\` is renamed `ComfyUI-previous\` and `ComfyUI-next\` takes its place. On a failure
-`ComfyUI-next\` stays for a look and nothing else changes. First on the test PC, never on the ICK
-PC during the show.
+## 5. Updating (round 2b, **built 2026-10-26**: `install_comfy.ps1 -Update` / `-Accept` / `-Rollback` as below; the first update on the dev PC, ComfyUI `4ef23c34` to `cdf272f3` and QwenVL 2.2.0 to 2.3.2, gave the same fixed-seed portrait and needed one workflow change, the new `video_frame_size` input of the describe node)
+
+The install is already rebuildable (the models live beside it, `install.bat` is idempotent), so an update is:
+new pins, a fresh build next to the old one, the proof, then the switch. `scripts\install_comfy.ps1 -Update`:
+
+1. `ComfyUI\` is renamed `ComfyUI-previous\` (the junctions inside it keep working; nothing is deleted).
+2. The pins are renewed in memory: ComfyUI at `origin/master` HEAD (or `-ComfyCommit`), each pack at the
+   registry's `latest_version` (or the version given); the venv is built **unlocked**: ComfyUI's own
+   `requirements.txt`, then every pack's `requirements.txt`, then the known extras of today's lock that no pack
+   declares (`numba`, the `numpy` the install runs, `onnxruntime-gpu` forced last). Everything else of the
+   install path runs as is: junctions, patches (none), the CUDA provider check.
+3. The proof: `modules.comfy.smoke` (`--comfy ComfyUI`) as in every install, plus `smoke.py --save` writes the
+   portrait and the last grin frame of a **fixed-seed** run of `data/settings/GenerationTest.json` to
+   `output\smoke\<stamp>\`; the user puts them next to the previous install's (made the same way before the
+   update) and judges. A seed that gives the same picture is not expected across torch versions, a picture of the
+   same quality is.
+4. On a pass the user says so (`-Accept`): `comfy.lock` gets the new commit and versions (`git rev-parse` and the
+   packs' `pyproject.toml`), `requirements.lock` the new `pip freeze --all` (minus the plain `onnxruntime`), the
+   stamp file is written, and `ComfyUI-previous\` can be deleted. On a failure `ComfyUI-next` stays for a look,
+   and `-Rollback` renames `ComfyUI-previous\` back; nothing of the locks changed.
+5. First on the dev PC, never on the ICK PC during the show; the ICK PC then gets the new locks with `git pull`
+   and `install.bat` (a changed lock rebuilds the venv, a changed commit or version re-clones).
+
+Order of work: 4.1 (the mask, the one that matters), 4.2, 4.3, 4.4, then 5. Each step keeps `install.bat` passing.
 
 ## 6. Code changes
 

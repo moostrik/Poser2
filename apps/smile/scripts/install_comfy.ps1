@@ -8,12 +8,28 @@ which installs the models afterwards (the model tool, modules\comfy\models.py).
 
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install_comfy.ps1 [-Target DIR] [-Models DIR]
 
-Everything is cloned with core.autocrlf off: the packs' files stay as upstream has them, which the patches
-need (a patch made for LF does not apply to a CRLF checkout).
+Updating (first on the dev PC, never on the ICK PC during the show):
+
+    install_comfy.ps1 -Update [-ComfyCommit SHA]   the install as it is gets its picture taken (modules.comfy.smoke
+                                                   --save output\smoke\before: a fixed-seed portrait and grin frame),
+                                                   is renamed <Target>-previous, and a new one is built with ComfyUI
+                                                   at origin HEAD (or the commit given), every pack at the registry's
+                                                   latest version and the venv from their requirements.txt files
+                                                   (not the lock), then smoke-tested with its picture in output\smoke\after
+    install_comfy.ps1 -Accept                      the pictures compared and good: comfy.lock and requirements.lock
+                                                   are written from the new install and <Target>-previous is deleted
+    install_comfy.ps1 -Rollback                    the new install is deleted and <Target>-previous comes back
+
+Everything is cloned with core.autocrlf off: the packs' files stay as upstream has them, which a patch
+would need (a patch made for LF does not apply to a CRLF checkout).
 #>
 param(
     [string]$Target = (Join-Path (Split-Path $PSScriptRoot -Parent) 'ComfyUI'),
-    [string]$Models = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'smile-models')
+    [string]$Models = (Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'smile-models'),
+    [switch]$Update,
+    [string]$ComfyCommit = '',
+    [switch]$Accept,
+    [switch]$Rollback
 )
 
 $ErrorActionPreference = 'Stop'
@@ -51,9 +67,95 @@ function PackVersion([string]$path) {
     $m = Select-String -Path $toml -Pattern '^version\s*=\s*"([^"]+)"' | Select-Object -First 1
     if ($m) { return $m.Matches[0].Groups[1].Value } else { return '' }
 }
+function RemoveInstall([string]$dir) {
+    # an install folder holds junctions (models, aiia_grin): those links go first, as links, so nothing
+    # behind them is touched; rmdir does not follow junctions either
+    foreach ($link in @((Join-Path $dir 'models'), (Join-Path $dir 'custom_nodes\aiia_grin'))) {
+        if (IsLink $link) { (Get-Item $link -Force).Delete() }
+    }
+    & cmd /c rmdir /s /q "$dir"
+    if (Test-Path $dir) { Fail "could not remove $dir" }
+}
+function WriteText([string]$path, [string]$text) {
+    [IO.File]::WriteAllText($path, $text.Replace("`r`n", "`n"), (New-Object Text.UTF8Encoding $false))
+}
+function WriteLocks($lockObj, [string]$target, [string]$python) {
+    # the locks from the install as it stands: the core commit, the packs' versions, the venv's freeze
+    $nodes = Join-Path $target 'custom_nodes'
+    $packs = @(foreach ($pack in $lockObj.packs) {
+        [ordered]@{ id = $pack.id; version = (PackVersion (Join-Path $nodes $pack.id)); git = $pack.git; commit = $null; note = $pack.note }
+    })
+    $new = [ordered]@{
+        _comment = $lockObj._comment
+        comfyui = [ordered]@{ git = $lockObj.comfyui.git; commit = ((& git -C $target rev-parse HEAD) -join ''); date = (Get-Date -Format yyyy-MM-dd) }
+        torch_index = $lockObj.torch_index
+        packs = $packs
+    }
+    $json = ($new | ConvertTo-Json -Depth 5).Replace('\u0027', "'") + "`n"
+    WriteText (Join-Path $src 'comfy.lock') $json
+    $freeze = @(& $python -m pip freeze --all) | Where-Object { $_ -notmatch '^onnxruntime==' }
+    $header = @(
+        "# The ComfyUI venv, pinned: pip freeze --all of the install accepted on $(Get-Date -Format yyyy-MM-dd) (scripts\install_comfy.ps1 -Accept).",
+        "# install_comfy.ps1 installs this file with --no-deps (a freeze is complete); the packs' requirements.txt are not run.",
+        "# torch/torchvision are CUDA builds from the PyTorch index below; the plain onnxruntime is left out (the GPU build must win).",
+        "--extra-index-url $($lockObj.torch_index)")
+    WriteText (Join-Path $src 'requirements.lock') (($header + $freeze) -join "`n") + "`n"
+    $hash = (Get-FileHash (Join-Path $src 'requirements.lock') -Algorithm SHA256).Hash
+    Set-Content -Path (Join-Path $target '.venv\smile-install.stamp') -Value $hash -Encoding ascii
+    Note "comfy.lock: ComfyUI $($new.comfyui.commit.Substring(0, 8)), packs $(($packs | ForEach-Object { "$($_.id) $($_.version)" }) -join ', ')"
+    Note "requirements.lock: $($freeze.Count) lines"
+}
+
+$previous = "$Target-previous"
+$appPython = Join-Path $repo '.venv\Scripts\python.exe'
+$smokeOut = Join-Path $repo 'output\smoke'
 
 try {
     $lock = Get-Content (Join-Path $src 'comfy.lock') -Raw -Encoding UTF8 | ConvertFrom-Json
+
+    if ($Rollback) {
+        Step 'Rollback'
+        if (-not (Test-Path $previous)) { Fail "nothing to roll back to: $previous is not there" }
+        if (Test-Path $Target) { RemoveInstall $Target }
+        Rename-Item $previous (Split-Path $Target -Leaf)
+        Write-Host "`n$previous is $Target again; the locks were never changed." -ForegroundColor Green
+        exit 0
+    }
+    if ($Accept) {
+        Step 'Accept the update'
+        if (-not (Test-Path $previous)) { Fail "no update to accept: $previous is not there" }
+        WriteLocks $lock $Target (Join-Path $Target '.venv\Scripts\python.exe')
+        RemoveInstall $previous
+        Write-Host "`nThe update is the install: comfy.lock and requirements.lock describe it, $previous is gone. Commit the locks." -ForegroundColor Green
+        exit 0
+    }
+    if ($Update) {
+        Step 'Update: new pins'
+        if (Test-Path $previous) { Fail "$previous exists: -Accept or -Rollback the last update first" }
+        if (-not (Test-Path $appPython)) { Fail "the app venv is missing ($appPython): run scripts\install.bat first" }
+        if (Test-Path $Target) {
+            Note "the picture of the install as it is -> $smokeOut\before"
+            & $appPython -m modules.comfy.smoke --comfy $Target --save (Join-Path $smokeOut 'before')
+            if ($LASTEXITCODE -ne 0) { Fail 'the install as it is does not pass its own smoke test; sort that out before updating' }
+            # nothing may run from the folder while it is renamed (a ComfyUI, or a child it left)
+            foreach ($proc in Get-Process | Where-Object { $_.Path -and $_.Path -like "$Target\*" }) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
+            $tries = 0
+            while ($true) {
+                try { Rename-Item $Target (Split-Path $previous -Leaf) -ErrorAction Stop; break }
+                catch { if (++$tries -ge 10) { throw }; Start-Sleep 3 }
+            }
+            Note "$Target renamed to $previous"
+        }
+        $lock.comfyui.commit = if ($ComfyCommit) { $ComfyCommit } else { ((& git ls-remote $lock.comfyui.git HEAD) -split '\s+')[0] }
+        Note "ComfyUI: $($lock.comfyui.commit.Substring(0, 8)) (origin HEAD)"
+        foreach ($pack in $lock.packs) {
+            $meta = Invoke-RestMethod "https://api.comfy.org/nodes/$($pack.id)"
+            $was = $pack.version
+            $pack.version = $meta.latest_version.version
+            $pack.commit = $null
+            Note "$($pack.id): $was -> $($pack.version)"
+        }
+    }
 
     # --- prerequisites -----------------------------------------------------------------------------
     Step 'Prerequisites'
@@ -142,7 +244,9 @@ try {
 
     # --- patches (pack fixes; a stopgap each, see data\InstallMigration.md section 4) -----------------
     Step 'Patches'
-    foreach ($patch in Get-ChildItem (Join-Path $src 'patches\*.patch')) {
+    $patches = @(Get-ChildItem (Join-Path $src 'patches\*.patch') -ErrorAction SilentlyContinue)     # the folder may not exist: no pack is patched
+    if ($patches.Count -eq 0) { Note 'none: no pack is patched' }
+    foreach ($patch in $patches) {
         # the pack a patch belongs to is in its first path: --- a/custom_nodes/<pack>/...
         $first = (Select-String -Path $patch.FullName -Pattern '^--- a/custom_nodes/([^/]+)/' | Select-Object -First 1)
         if (-not $first) { Fail "$($patch.Name): no custom_nodes path in it" }
@@ -184,7 +288,23 @@ try {
     $lockFile = Join-Path $src 'requirements.lock'
     $lockHash = (Get-FileHash $lockFile -Algorithm SHA256).Hash
     $stamp = Join-Path $venv 'smile-install.stamp'
-    if ((Test-Path $stamp) -and ((Get-Content $stamp -Raw).Trim() -eq $lockHash)) {
+    if ($Update) {
+        # unlocked: what ComfyUI and the packs ask for today, the lock is written at -Accept from the result
+        & $python -m pip install --quiet --upgrade pip
+        & $python -m pip install torch torchvision --index-url $lock.torch_index
+        if ($LASTEXITCODE -ne 0) { Fail 'pip install torch failed' }
+        & $python -m pip install -r (Join-Path $Target 'requirements.txt')
+        if ($LASTEXITCODE -ne 0) { Fail "pip install -r ComfyUI's requirements.txt failed" }
+        & $python -m pip install comfyui-manager
+        foreach ($req in Get-ChildItem (Join-Path $nodes '*\requirements.txt')) {
+            & $python -m pip install -r $req.FullName
+            if ($LASTEXITCODE -ne 0) { Fail "pip install -r $($req.FullName) failed" }
+        }
+        # a pack's metadata may pull numpy back below 2 (facenet-pytorch); the install runs on numpy 2
+        & $python -m pip install --quiet --upgrade numpy numba
+        & $python -m pip install --quiet --force-reinstall --no-deps onnxruntime-gpu
+        Note 'venv built from the requirements of today (unlocked)'
+    } elseif ((Test-Path $stamp) -and ((Get-Content $stamp -Raw).Trim() -eq $lockHash)) {
         Note 'requirements.lock unchanged since the last install, pip skipped'
     } else {
         & $python -m pip install --quiet --upgrade pip
@@ -236,6 +356,15 @@ try {
         Note "junction made: $modelsDir -> $Models"
     }
 
+    if ($Update) {
+        Step 'Update: the proof'
+        Note "the smoke test of the new install, its picture -> $smokeOut\after"
+        & $appPython -m modules.comfy.smoke --comfy $Target --save (Join-Path $smokeOut 'after')
+        if ($LASTEXITCODE -ne 0) { Fail "the new install fails its smoke test: look at it, then install_comfy.ps1 -Rollback (or fix and run -Update again after -Rollback)" }
+        Write-Host "`nThe update is built at $Target and passes the smoke test. Compare $smokeOut\before with $smokeOut\after (portrait.png, grin_last.png)," -ForegroundColor Green
+        Write-Host "then: install_comfy.ps1 -Accept (writes the locks, removes $previous) or install_comfy.ps1 -Rollback." -ForegroundColor Green
+        exit 0
+    }
     Write-Host "`nComfyUI is installed at $Target. Next: the models (scripts\install.bat does it: py -3.12 -m modules.comfy.models install)." -ForegroundColor Green
     exit 0
 }

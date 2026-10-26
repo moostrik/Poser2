@@ -4,8 +4,10 @@ Starts ComfyUI from its own venv the way start_comfy.bat does, waits for it, che
 and that onnxruntime has its CUDA provider, runs the warm-up workflow once (every model loads, the whole
 chain works), then stops it. A failure names the step. Exit 0 when all passed.
 
-    .venv\\Scripts\\python -m modules.comfy.smoke [--comfy DIR] [--port 8188] [--preset FILE] [--keep]
+    .venv\\Scripts\\python -m modules.comfy.smoke [--comfy DIR] [--port 8188] [--preset FILE] [--keep] [--save DIR]
 
+--save runs the whole workflow with the fixed seed instead and writes its portrait and last grin frame into
+DIR: the picture of an install, which install_comfy.ps1 -Update makes before and after to put side by side.
 Refuses when the port is taken: a ComfyUI that is already running (the dev install on this PC, SMILE's own)
 would be tested instead of the install.
 """
@@ -81,8 +83,10 @@ def check_cuda(log: Path) -> None:
     logger.info('%s', line.strip())
 
 
-def warm_up(client: ComfyClient, preset: str) -> float:
-    """The warm-up workflow once, as the generator runs it after every connect. The seconds it took."""
+def warm_up(client: ComfyClient, preset: str, save: Path | None = None) -> float:
+    """The warm-up workflow once, as the generator runs it after every connect. The seconds it took.
+    With save: the full run instead, with the fixed seed, and its portrait and last grin frame written
+    into that folder as PNGs (the picture of an install, to put next to another's)."""
     settings = Settings()
     if not presets.load(settings, preset):
         raise Failed(f'could not load the preset {preset}')
@@ -102,24 +106,50 @@ def warm_up(client: ComfyClient, preset: str) -> float:
     if image is None:
         raise Failed(f'no warm-up image at {WARMUP_IMAGE}')
     wf = Workflow(str(ROOT / p.connection.workflow))
-    workflow: dict = wf.build_warmup(client.upload(image, 'smile_smoke.png'), p.style_a, p)
+    name: str = client.upload(image, 'smile_smoke.png')
+    if save is not None:
+        p.portrait.fixed_seed = True
+        workflow: dict = wf.build(name, p.style_a, p)
+    else:
+        workflow = wf.build_warmup(name, p.style_a, p)
     started: float = time.monotonic()
-    prompt_id: str = client.queue(workflow)
-    logger.info('warm-up queued (%d steps)', wf.step_count)
+    try:
+        prompt_id: str = client.queue(workflow)
+    except RuntimeError as e:
+        raise Failed(f'{e} (a node of the workflow changed its inputs? re-export data/comfy/smile_workflow.json from the ComfyUI page)') from e
+    logger.info('%s queued (%d steps)', 'fixed-seed run' if save else 'warm-up', wf.step_count)
     deadline: float = started + WARMUP_TIMEOUT
+    last_grin_frame = None
+    portrait = None
     while time.monotonic() < deadline:
         event: Event | None = client.receive(5.0)
-        if event is None or event.data.get('prompt_id') not in (None, prompt_id):
+        if event is None:
+            continue
+        if event.type == 'preview' and event.image is not None and event.data.get('node_id') == wf.grin:
+            last_grin_frame = event.image
+            continue
+        if event.data.get('prompt_id') not in (None, prompt_id):
             continue
         if event.type == 'executing' and event.data.get('node'):
             step: str | None = wf.step(event.data['node'])
             if step:
                 logger.info('  %s', step)
+        elif event.type == 'executed' and event.data.get('node') == wf.portrait:
+            images: list[dict] = event.data.get('output', {}).get('images', [])
+            portrait = client.view(images[0]) if images else None
         elif event.type == 'execution_success' or (event.type == 'executing' and event.data.get('node') is None and 'prompt_id' in event.data):
-            return time.monotonic() - started
+            seconds: float = time.monotonic() - started
+            if save is not None:
+                save.mkdir(parents=True, exist_ok=True)
+                if portrait is not None:
+                    cv2.imwrite(str(save / 'portrait.png'), portrait)
+                if last_grin_frame is not None:
+                    cv2.imwrite(str(save / 'grin_last.png'), last_grin_frame)
+                logger.info('saved the portrait and the last grin frame into %s', save)
+            return seconds
         elif event.type in ('execution_error', 'execution_interrupted'):
-            raise Failed(f"the warm-up failed in ComfyUI: {event.data.get('exception_message') or event.type} (node {event.data.get('node_type')})")
-    raise Failed(f'the warm-up did not finish within {WARMUP_TIMEOUT:.0f} s')
+            raise Failed(f"the run failed in ComfyUI: {event.data.get('exception_message') or event.type} (node {event.data.get('node_type')})")
+    raise Failed(f'the run did not finish within {WARMUP_TIMEOUT:.0f} s')
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -129,6 +159,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--port', type=int, default=8188)
     parser.add_argument('--preset', default=PRESET, help='the preset whose models and workflow are tested')
     parser.add_argument('--keep', action='store_true', help='leave ComfyUI running afterwards')
+    parser.add_argument('--save', type=Path, help='run the full workflow with the fixed seed and save its portrait and last grin frame here')
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format='%(levelname)s %(message)s', stream=sys.stderr)
 
@@ -147,8 +178,8 @@ def main(argv: list[str] | None = None) -> int:
         process = start_comfy(args.comfy, python, args.port, log)
         wait_for(client, process, START_TIMEOUT)
         check_cuda(log)
-        seconds: float = warm_up(client, args.preset)
-        print(f'Smoke test passed: ComfyUI on CUDA, the warm-up ran in {seconds:.0f} s (log {log})')
+        seconds: float = warm_up(client, args.preset, args.save)
+        print(f'Smoke test passed: ComfyUI on CUDA, the {"fixed-seed run" if args.save else "warm-up"} took {seconds:.0f} s (log {log})')
         return 0
     except Failed as e:
         print(f'Smoke test FAILED: {e}' + (f' (log {log})' if log.exists() else ''))
@@ -156,7 +187,8 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         client.close()
         if process is not None and not args.keep:
-            process.terminate()
+            # the whole tree: ComfyUI may have children of its own that would keep its folder in use
+            subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'], capture_output=True, creationflags=0x08000000)
             try:
                 process.wait(15.0)
             except subprocess.TimeoutExpired:

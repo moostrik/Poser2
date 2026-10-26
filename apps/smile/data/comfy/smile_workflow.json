@@ -24,7 +24,7 @@
   "1006": {
     "inputs": {
       "images": [
-        "1000:5",
+        "1",
         0
       ]
     },
@@ -96,28 +96,6 @@
       "title": "Grin Frames"
     }
   },
-  "1025": {
-    "inputs": {
-      "frame_rate": 15,
-      "loop_count": 0,
-      "filename_prefix": "AIIAv3_grin",
-      "format": "video/h264-mp4",
-      "pix_fmt": "yuv420p",
-      "crf": 19,
-      "save_metadata": false,
-      "trim_to_audio": false,
-      "pingpong": false,
-      "save_output": true,
-      "images": [
-        "1024",
-        0
-      ]
-    },
-    "class_type": "VHS_VideoCombine",
-    "_meta": {
-      "title": "Save video"
-    }
-  },
   "1026": {
     "inputs": {
       "images": [
@@ -160,87 +138,6 @@
     "class_type": "ImageCrop",
     "_meta": {
       "title": "Crop portrait (keep 4:5)"
-    }
-  },
-  "1000:2": {
-    "inputs": {
-      "precision": "auto"
-    },
-    "class_type": "DownloadAndLoadLivePortraitModels",
-    "_meta": {
-      "title": "(Down)Load LivePortraitModels"
-    }
-  },
-  "1000:3": {
-    "inputs": {
-      "face_detector": "blazeface_back_camera",
-      "landmarkrunner_device": "CUDA",
-      "face_detector_device": "cuda",
-      "face_detector_dtype": "fp16",
-      "keep_model_loaded": true
-    },
-    "class_type": "LivePortraitLoadFaceAlignmentCropper",
-    "_meta": {
-      "title": "LivePortrait Load FaceAlignmentCropper"
-    }
-  },
-  "1000:4": {
-    "inputs": {
-      "dsize": 1152,
-      "scale": 2,
-      "vx_ratio": 0,
-      "vy_ratio": -0.1,
-      "face_index": 0,
-      "face_index_order": "large-small",
-      "rotate": true,
-      "pipeline": [
-        "1000:2",
-        0
-      ],
-      "cropper": [
-        "1000:3",
-        0
-      ],
-      "source_image": [
-        "1",
-        0
-      ]
-    },
-    "class_type": "LivePortraitCropper",
-    "_meta": {
-      "title": "Face crop"
-    }
-  },
-  "1000:5": {
-    "inputs": {
-      "width": 896,
-      "height": 1120,
-      "upscale_method": "lanczos",
-      "keep_proportion": "crop",
-      "pad_color": "0, 0, 0",
-      "crop_position": "center",
-      "divisible_by": 2,
-      "device": "cpu",
-      "image": [
-        "1000:4",
-        0
-      ]
-    },
-    "class_type": "ImageResizeKJv2",
-    "_meta": {
-      "title": "To 896x1120"
-    }
-  },
-  "1000:6": {
-    "inputs": {
-      "images": [
-        "1000:5",
-        0
-      ]
-    },
-    "class_type": "PreviewImage",
-    "_meta": {
-      "title": "Crop"
     }
   },
   "1001:10": {

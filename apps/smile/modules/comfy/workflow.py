@@ -1,9 +1,9 @@
 """The ComfyUI workflow (API format), adapted for SMILE and filled in per run.
 
-SMILE crops and rotates the face itself (modules/face/FaceFinder.py), so the workflow's own
-face crop is removed and its consumers read the uploaded image directly. The video and the
-overlay check are removed too, and the saved portrait becomes a preview (nothing piles up in
-ComfyUI's output folder). The crop and scale in front of the grin are removed as well: the grin
+SMILE crops and rotates the face itself (modules/face/FaceFinder.py), so the export starts from the
+uploaded image; an older export's face crop subgraph and video recorder are removed and their consumers
+rewired to the image. The overlay check is removed too, and the saved portrait becomes a preview (nothing
+piles up in ComfyUI's output folder). The crop and scale in front of the grin are removed as well: the grin
 animates the whole portrait. Nodes are found by class type or title, not by id.
 
 The workflow only provides the structure: every run fills in the values from PipelineSettings.
@@ -44,13 +44,20 @@ PREFER_CURVES: dict[Prefer, Callable[[float], float]] = {
 
 
 def _find(workflow: dict, class_type: str | None = None, title: str | None = None) -> str:
+    node_id: str | None = _find_optional(workflow, class_type, title)
+    if node_id is None:
+        raise KeyError(f'workflow has no node with class {class_type!r} and title {title!r}')
+    return node_id
+
+
+def _find_optional(workflow: dict, class_type: str | None = None, title: str | None = None) -> str | None:
     for node_id, node in workflow.items():
         if class_type is not None and node['class_type'] != class_type:
             continue
         if title is not None and node.get('_meta', {}).get('title') != title:
             continue
         return node_id
-    raise KeyError(f'workflow has no node with class {class_type!r} and title {title!r}')
+    return None
 
 
 def _remove(workflow: dict, node_ids: set[str], replacement: list | None = None) -> None:
@@ -86,17 +93,17 @@ class Workflow():
 
         self.load_image: str = _find(workflow, class_type='LoadImage')
 
-        # the face crop chain: everything in the subgraph that holds the LivePortrait cropper
-        cropper: str = _find(workflow, class_type='LivePortraitCropper')
-        prefix: str = cropper.split(':')[0] + ':'
-        crop_nodes: set[str] = {node_id for node_id in workflow if node_id.startswith(prefix)}
-        _remove(workflow, crop_nodes, [self.load_image, 0])
+        # an older export's face crop chain (the subgraph that holds the LivePortrait cropper) and video recorder
+        cropper: str | None = _find_optional(workflow, class_type='LivePortraitCropper')
+        if cropper is not None:
+            prefix: str = cropper.split(':')[0] + ':'
+            _remove(workflow, {node_id for node_id in workflow if node_id.startswith(prefix)}, [self.load_image, 0])
+        video: str | None = _find_optional(workflow, class_type='VHS_VideoCombine')
+        if video is not None:
+            _remove(workflow, {video})
 
         # outputs SMILE doesn't use
-        unused: set[str] = {_find(workflow, class_type='VHS_VideoCombine'),
-                            _find(workflow, title='Overlay'),
-                            _find(workflow, title='Overlay preview')}
-        _remove(workflow, unused)
+        _remove(workflow, {_find(workflow, title='Overlay'), _find(workflow, title='Overlay preview')})
 
         self.portrait: str = _find(workflow, title='Save portrait')
         workflow[self.portrait] = {'class_type': 'PreviewImage',
@@ -133,7 +140,8 @@ class Workflow():
         # the basic node fixes repetition_penalty at 1.2, which drops the commas; the advanced one takes it
         workflow[self.describe]['class_type'] = 'AILab_QwenVL_Advanced'
         workflow[self.describe]['inputs'].update(use_torch_compile=False, device='auto', temperature=0.6,
-                                                 top_p=0.9, num_beams=1, repetition_penalty=1.0, frame_count=16)
+                                                 top_p=0.9, num_beams=1, repetition_penalty=1.0, frame_count=16,
+                                                 video_frame_size='auto')     # required since QwenVL 2.3 (video input only; we send an image)
         self.description: str = _find(workflow, title='Preview as Text')
         self.grin: str = _find(workflow, class_type='GrinFrames')
 

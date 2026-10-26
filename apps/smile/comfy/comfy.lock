@@ -1,5 +1,5 @@
 {
-  "_comment": "What scripts/install_comfy.ps1 installs: ComfyUI core at a commit, the node packs by Comfy Registry version (the archive the registry serves; a pack with a commit is cloned from its git instead), the torch index for comfy/requirements.lock. Renewed by hand after a verified update.",
+  "_comment": "What scripts/install_comfy.ps1 installs: ComfyUI core at a commit, the node packs by Comfy Registry version (the archive the registry serves; a pack with a commit is cloned from its git instead), the torch index for comfy/requirements.lock. Renewed by hand after a verified update. No pack is patched: what SMILE needs from a pack that the pack does wrong lives in comfy/aiia_grin.",
   "comfyui": {
     "git": "https://github.com/comfyanonymous/ComfyUI",
     "commit": "4ef23c34d950eecc37040a21ee1741a49d2e44b1",
@@ -12,7 +12,7 @@
       "version": "1.0.0",
       "git": "https://github.com/PowerHouseMan/ComfyUI-AdvancedLivePortrait",
       "commit": null,
-      "note": "the grin (Expression Editor); patched: advancedliveportrait-mask.patch"
+      "note": "the grin (Expression Editor)"
     },
     {
       "id": "comfyui_instantid",
@@ -26,28 +26,7 @@
       "version": "2.2.0",
       "git": "https://github.com/1038lab/ComfyUI-QwenVL",
       "commit": null,
-      "note": "the description; patched: qwenvl-8bit-dtype.patch"
-    },
-    {
-      "id": "comfyui-liveportraitkj",
-      "version": "1.1.0",
-      "git": "https://github.com/kijai/ComfyUI-LivePortraitKJ",
-      "commit": null,
-      "note": "only the face crop of smile_test.json; patched: liveportraitkj-import.patch"
-    },
-    {
-      "id": "comfyui-kjnodes",
-      "version": "1.5.0",
-      "git": "https://github.com/kijai/ComfyUI-KJNodes",
-      "commit": null,
-      "note": "only smile_test.json"
-    },
-    {
-      "id": "comfyui-videohelpersuite",
-      "version": "1.7.9",
-      "git": "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite",
-      "commit": null,
-      "note": "only the video recorder of smile_test.json"
+      "note": "the description"
     },
     {
       "id": "ComfyUI-Crystools",

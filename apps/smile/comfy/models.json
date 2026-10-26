@@ -142,13 +142,6 @@
       "note": "LivePortrait (the grin). canonical HF file"
     },
     {
-      "path": "liveportrait/landmark_model.pth",
-      "size": 114910599,
-      "sha256": "48ba55140fda4c292d3faf3e3ed9106784c7c32aebf170d4983fb67cd0a3c9c8",
-      "source": "https://huggingface.co/Kijai/LivePortrait_safetensors/resolve/main/landmark_model.pth",
-      "note": "LivePortrait (the grin). canonical HF file"
-    },
-    {
       "path": "ultralytics/face_yolov8n.pt",
       "size": 6230011,
       "sha256": "70b640f8f60b1cf0dcc72f30caf3da9495eb2fb6509da48c53374ad6806e6a9c",

@@ -50,6 +50,7 @@ class GrinFrames:
 
     def __init__(self):
         self.editor = None
+        self.pasted = None      # (the editor's prepared source, the same with our paste transform and mask)
 
     @classmethod
     def INPUT_TYPES(cls):
@@ -112,6 +113,7 @@ class GrinFrames:
         for line in said.getvalue().splitlines():
             if line.strip() and line.strip() != "Prepare source...":
                 print(line)
+        psi = self.paste_setup(link[0], crop_factor)
         curve = EASES[ease]
 
         def envelope(t, peak):
@@ -125,11 +127,28 @@ class GrinFrames:
         for i in range(count):
             t = i / frames  # the next loop starts at neutral again, so no doubled frame at the seam
             values = targets if still else {name: envelope(t, peaks[name]) * target for name, target in targets.items()}
-            frame = self.render_frame(link[0], values, stitching)
+            frame = self.render_frame(psi, values, stitching)
             out.append(frame)
             preview = Image.fromarray(np.clip(frame[0].cpu().numpy() * 255, 0, 255).astype(np.uint8))
             pbar.update_absolute(i + 1, count, ("JPEG", preview, None))
         return (torch.cat(out, dim=0),)
+
+    def paste_setup(self, psi, crop_factor):
+        """The prepared source with the transform that puts the 512 px render back into the portrait and the
+        paste mask, both made from the detector's crop square. The pack makes its mask from that square clipped
+        to the image and, when it was clipped, its transform from the unclipped square, so a face near an edge
+        pastes with the mask off by the clipped margin. Done here, from the same detector, so the pack runs as
+        published. Cached while the editor keeps the same prepared source."""
+        if self.pasted is not None and self.pasted[0] is psi:
+            return self.pasted[1]
+        alp = sys.modules[type(self.editor).__module__]
+        engine = alp.g_engine
+        crop = engine.detect_face(psi.src_rgb, crop_factor)
+        crop_trans_m = alp.create_transform_matrix(crop[0], crop[1], (crop[2] - crop[0]) / 512., (crop[3] - crop[1]) / 512.)
+        mask = cv2.warpAffine(engine.GetMaskImg(), crop_trans_m, alp.get_rgb_size(psi.src_rgb), cv2.INTER_LINEAR)
+        ours = alp.PreparedSrcImg(psi.src_rgb, crop_trans_m, psi.x_s_info, psi.f_s_user, psi.x_s_user, mask.astype(np.float32) / 255.)
+        self.pasted = (psi, ours)
+        return ours
 
     def render_frame(self, psi, v, stitching):
         """One frame, the same steps as Advanced Live Portrait's ExpressionEditor.run (src_ratio 1,
