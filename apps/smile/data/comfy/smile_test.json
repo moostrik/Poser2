@@ -5,7 +5,7 @@
     },
     "class_type": "LoadImage",
     "_meta": {
-      "title": "Portrait photo"
+      "title": "Input (the app's capture, or a photo cropped with modules.face.crop)"
     }
   },
   "1003": {
@@ -23,7 +23,7 @@
   "1006": {
     "inputs": {
       "images": [
-        "test_input",
+        "1",
         0
       ]
     },
@@ -34,44 +34,44 @@
   },
   "1024": {
     "inputs": {
-      "seed": 4112934062,
+      "seed": 2659950773,
       "frames": 250,
       "ease": "sine_in_out",
       "crop_factor": 1.7,
-      "midpoint": 0.72,
+      "midpoint": 0.75,
       "midpoint_deviation": 0.18,
       "smile": 2.0,
-      "aaa": 1.4427776578136147,
-      "eee": -18.35209543530712,
-      "eyebrow": -28.686893552173522,
-      "blink": -13.746008965151354,
+      "aaa": -16.759101478106974,
+      "eee": 5.283261834187146,
+      "eyebrow": 23.21381892401527,
+      "blink": -29.19349512087298,
       "wink": 0.0,
-      "woo": 6.67225637759087,
+      "woo": -4.951752392729281,
       "pupil_x": 0.0,
       "pupil_y": 0.0,
-      "rotate_pitch_min": 4.590716272995493,
-      "rotate_pitch_max": 4.590716272995493,
-      "rotate_yaw_min": -3.095546256902045,
-      "rotate_yaw_max": -3.095546256902045,
-      "rotate_roll_min": 9.765788152572902,
-      "rotate_roll_max": 9.765788152572902,
+      "rotate_pitch_min": -9.904068313487464,
+      "rotate_pitch_max": -9.904068313487464,
+      "rotate_yaw_min": 9.54403576824414,
+      "rotate_yaw_max": 9.54403576824414,
+      "rotate_roll_min": -9.324633437870252,
+      "rotate_roll_max": -9.324633437870252,
       "image": [
         "1002:36",
         0
       ],
-      "stitching": true,
-      "smile_peak": 0.7709629459568812,
-      "aaa_peak": 0.594685512127823,
-      "eee_peak": 0.6305566566730703,
-      "woo_peak": 0.7508868143933279,
-      "eyebrow_peak": 0.5494394716727934,
-      "blink_peak": 0.7507134611209189,
-      "wink_peak": 0.6990504569079903,
-      "pupil_x_peak": 0.5866221107743346,
-      "pupil_y_peak": 0.6187356849017127,
-      "rotate_pitch_peak": 0.5554406933742033,
-      "rotate_yaw_peak": 0.5953512859083357,
-      "rotate_roll_peak": 0.8578988147369193,
+      "stitching": false,
+      "smile_peak": 0.7408343452485837,
+      "aaa_peak": 0.9035564581857416,
+      "eee_peak": 0.6680751616863781,
+      "woo_peak": 0.5731073293799465,
+      "eyebrow_peak": 0.6743359974629217,
+      "blink_peak": 0.8599103569274599,
+      "wink_peak": 0.6372729009879157,
+      "pupil_x_peak": 0.9104779146229486,
+      "pupil_y_peak": 0.896871484580575,
+      "rotate_pitch_peak": 0.5996264447230291,
+      "rotate_yaw_peak": 0.8496878614593094,
+      "rotate_roll_peak": 0.8652343044398749,
       "still": false
     },
     "class_type": "GrinFrames",
@@ -100,7 +100,7 @@
       "custom_prompt": "Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips, happy ",
       "max_tokens": 64,
       "keep_model_loaded": true,
-      "seed": 4112934062,
+      "seed": 2659950773,
       "image": [
         "1006",
         0
@@ -120,7 +120,7 @@
   },
   "1002:20": {
     "inputs": {
-      "ckpt_name": "realvisxlV40_v40LightningBakedvae.safetensors"
+      "ckpt_name": "realvisxlV40_v40Bakedvae.safetensors"
     },
     "class_type": "CheckpointLoaderSimple",
     "_meta": {
@@ -130,10 +130,10 @@
   "1002:1040": {
     "inputs": {
       "lora_name": "clothing_slider.safetensors",
-      "strength_model": 3.0,
-      "strength_clip": 3.0,
+      "strength_model": 1.0,
+      "strength_clip": 1.0,
       "model": [
-        "1002:20",
+        "smile_distill",
         0
       ],
       "clip": [
@@ -380,9 +380,9 @@
   },
   "1002:33": {
     "inputs": {
-      "strength": 0.0,
+      "strength": 0.65,
       "start_percent": 0,
-      "end_percent": 0.0,
+      "end_percent": 0.55,
       "positive": [
         "1002:30",
         1
@@ -418,7 +418,7 @@
   },
   "1002:35": {
     "inputs": {
-      "seed": 4112934062,
+      "seed": 2659950773,
       "steps": 4,
       "cfg": 1.2,
       "sampler_name": "lcm",
@@ -585,90 +585,15 @@
       "title": "Depth of last frame"
     }
   },
-  "1000:4": {
+  "smile_distill": {
+    "class_type": "LoraLoaderModelOnly",
     "inputs": {
-      "dsize": 1152,
-      "scale": 2,
-      "vx_ratio": 0,
-      "vy_ratio": -0.1,
-      "face_index": 0,
-      "face_index_order": "large-small",
-      "rotate": true,
-      "pipeline": [
-        "1000:2",
+      "model": [
+        "1002:20",
         0
       ],
-      "cropper": [
-        "1000:3",
-        0
-      ],
-      "source_image": [
-        "1",
-        0
-      ]
-    },
-    "class_type": "LivePortraitCropper",
-    "_meta": {
-      "title": "Face crop"
-    }
-  },
-  "1000:2": {
-    "inputs": {
-      "precision": "auto"
-    },
-    "class_type": "DownloadAndLoadLivePortraitModels",
-    "_meta": {
-      "title": "(Down)Load LivePortraitModels"
-    }
-  },
-  "1000:3": {
-    "inputs": {
-      "face_detector": "blazeface_back_camera",
-      "landmarkrunner_device": "CUDA",
-      "face_detector_device": "cuda",
-      "face_detector_dtype": "fp16",
-      "keep_model_loaded": true
-    },
-    "class_type": "LivePortraitLoadFaceAlignmentCropper",
-    "_meta": {
-      "title": "LivePortrait Load FaceAlignmentCropper"
-    }
-  },
-  "1000:5": {
-    "inputs": {
-      "width": 896,
-      "height": 1120,
-      "upscale_method": "lanczos",
-      "keep_proportion": "crop",
-      "pad_color": "0, 0, 0",
-      "crop_position": "center",
-      "divisible_by": 2,
-      "device": "cpu",
-      "image": [
-        "1000:4",
-        0
-      ]
-    },
-    "class_type": "ImageResizeKJv2",
-    "_meta": {
-      "title": "To 896x1120"
-    }
-  },
-  "test_input": {
-    "class_type": "ComfySwitchNode",
-    "inputs": {
-      "switch": false,
-      "on_false": [
-        "1",
-        0
-      ],
-      "on_true": [
-        "1000:5",
-        0
-      ]
-    },
-    "_meta": {
-      "title": "Use face crop (on for an uncropped photo)"
+      "lora_name": "dmd2_sdxl_4step_lora_fp16.safetensors",
+      "strength_model": 1.0
     }
   },
   "test_prompt": {
@@ -713,26 +638,32 @@
       "title": "Overlay preview"
     }
   },
-  "1025": {
+  "test_video": {
+    "class_type": "CreateVideo",
     "inputs": {
-      "frame_rate": 13.0,
-      "loop_count": 0,
-      "filename_prefix": "smile_test",
-      "format": "video/h264-mp4",
-      "pix_fmt": "yuv420p",
-      "crf": 19,
-      "save_metadata": false,
-      "trim_to_audio": false,
-      "pingpong": false,
-      "save_output": true,
       "images": [
         "1024",
         0
-      ]
+      ],
+      "fps": 12.0
     },
-    "class_type": "VHS_VideoCombine",
     "_meta": {
-      "title": "Save video"
+      "title": "Grin video"
+    }
+  },
+  "test_video_file": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "test_video",
+        0
+      ],
+      "filename_prefix": "smile_test",
+      "format": "mp4",
+      "codec": "h264"
+    },
+    "_meta": {
+      "title": "Save grin video"
     }
   }
 }

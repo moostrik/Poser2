@@ -1,0 +1,39 @@
+{
+    "_comment":  "What scripts/install_comfy.ps1 installs: ComfyUI core at a commit, the node packs by Comfy Registry version (the archive the registry serves; a pack with a commit is cloned from its git instead), the torch index for comfy/requirements.lock. Renewed by hand after a verified update. No pack is patched: what SMILE needs from a pack that the pack does wrong lives in comfy/aiia_grin.",
+    "comfyui":  {
+                    "git":  "https://github.com/comfyanonymous/ComfyUI",
+                    "commit":  "cdf272f3514353aab04dc2d9fceef57a260dc156",
+                    "date":  "2026-10-26"
+                },
+    "torch_index":  "https://download.pytorch.org/whl/cu130",
+    "packs":  [
+                  {
+                      "id":  "comfyui-advancedliveportrait",
+                      "version":  "1.0.0",
+                      "git":  "https://github.com/PowerHouseMan/ComfyUI-AdvancedLivePortrait",
+                      "commit":  null,
+                      "note":  "the grin (Expression Editor)"
+                  },
+                  {
+                      "id":  "comfyui_instantid",
+                      "version":  "1.0.0",
+                      "git":  "https://github.com/cubiq/ComfyUI_InstantID",
+                      "commit":  null,
+                      "note":  "the face identity"
+                  },
+                  {
+                      "id":  "ComfyUI-QwenVL",
+                      "version":  "2.3.2",
+                      "git":  "https://github.com/1038lab/ComfyUI-QwenVL",
+                      "commit":  null,
+                      "note":  "the description"
+                  },
+                  {
+                      "id":  "ComfyUI-Crystools",
+                      "version":  "1.27.4",
+                      "git":  "https://github.com/crystian/ComfyUI-Crystools",
+                      "commit":  null,
+                      "note":  "optional, the GPU monitor in the ComfyUI page"
+                  }
+              ]
+}

@@ -1,8 +1,24 @@
 # A better install protocol: one script, a model manifest, a private model mirror
 
-**Status (2026-10-06): deferred until after the presentation of the installation.** Nothing has been
-changed; no interim backup copy was made (the user's call: the models are not going anywhere in the
-next weeks). Pick this up as is afterwards.
+**Simplified the same evening (2026-10-26):** the user found the private Hugging Face store, its upload/export tooling
+and the models folder beside the repo overkill: "with this system on two PCs and a backup of the repository on my
+backup disk we keep the important data; it is easy to copy a couple of files from a USB drive". So decisions 1 and 7
+below are reversed: the models live in `ComfyUI\models` as ComfyUI has it (an update copies the folder into the new
+install), they come from their original sources (the manifest keeps URL, size and sha256) or from a local folder the
+install asks for, the three private LoRAs and the four pack archives live in the repo as git LFS files
+(`data/comfy/loras`, `comfy/packs`), and a backup is a copy of the SMILE folder. The HF repo was deleted, and so was
+`comfy/inventory.py` (the on-site inventory never ran; the locks and the manifest are the record of an install). The
+rest of this document stays as the record of how the install path was built; where it names the inventory, the HF
+repo or `..\smile-models`, that is history.
+
+**Status (2026-10-26, evening): the install path is built and runs on the dev PC (IAAI).** `scripts\install.bat`
+installs app, ComfyUI and models from `comfy\models.json`, `comfy\comfy.lock` and `comfy\requirements.lock` and ends
+in a passing smoke test (the warm-up through a fresh ComfyUI in 20 s). What this round changed against the plan below,
+and what is left, is in **Migration** at the end. Earlier status: the plan of 2026-10-06 (deferred until after the
+presentation), merged with the clean-install plan of 2026-10-26: the installation runs at ICK, SMILE gets installed on
+a second PC (24 GB card) to test the `online` branch, and the install must stay updatable. The additions are marked
+**(2026-10-26)**: an inventory of the ICK PC as step 0, packs pinned by git commit, the patches removed, an update
+path, the models in a folder outside ComfyUI, a smoke test at the end of the install, no downloads at runtime.
 
 ## Context
 
@@ -32,6 +48,23 @@ Decided with the user (2026-10-06):
 4. The old AIIAv3 workflows in `comfy/workflows/` are dropped (git history keeps them), and with them
    the `comfyui_controlnet_aux` pack (MiDaS) and its HF cache.
 
+Added 2026-10-26:
+
+5. **The ICK PC is the reference**, not the dev PC of October 6: presets and settings changed since.
+   `comfy/inventory.py` (in the repo, stdlib only, read-only) records it: ComfyUI commit, every pack
+   with its version and a diff against its Comfy Registry archive (hand edits we forgot), every model
+   file with size and sha256, `pip freeze`. Its output (`output/inventory/`) fills the manifest, the
+   `requirements.lock` and the pack pins below. Nothing else starts before it has run.
+6. **Updatable**: ComfyUI core and the packs are pinned by git commit in `comfy/comfy.lock`, the
+   patches go (section 7), and `install_comfy.ps1 -Update` builds the newest versions next to the
+   install and switches over only when the smoke test passes (section 8).
+7. **Models outside ComfyUI**: the models folder lives beside the repo (default `<repo>\..\smile-models`,
+   `-Models` overrides) and `ComfyUI\models` is a directory junction to it, so a ComfyUI install can be
+   thrown away and rebuilt, and packs that build their own paths under `models/` still find their files
+   (`extra_model_paths.yaml` does not reach those). The model tool's default `--models` is that folder.
+8. **No downloads at runtime**: `start_comfy.bat` sets `HF_HUB_OFFLINE=1`; a missing model is an error
+   in the ComfyUI log instead of a silent download of whatever is current.
+
 ## Target layout
 
 ```
@@ -41,9 +74,11 @@ scripts/
   (start_comfy.bat, startSMILE.bat, start_players.bat, make_test_workflow.bat, clip_info.bat unchanged)
 comfy/
   models.json             the manifest: HF repo id + every model file (path, size, sha256, public source)
+  comfy.lock              (2026-10-26) ComfyUI commit, each pack as git URL + commit, the torch index
   requirements.lock       pip freeze of the verified ComfyUI venv (exact reproduction)
-  patches/                unchanged
-  aiia_grin/              unchanged
+  inventory.py            (2026-10-26) records an install: the reference for the locks
+  patches/                (2026-10-26) empty when section 7 is done
+  aiia_grin/              unchanged; installed as a junction (2026-10-26), not a copy
 modules/comfy/models.py   the model tool (stdlib only, runs with `py -3.12` before any venv exists)
 modules/comfy/tests/test_models.py
 ```
@@ -161,12 +196,19 @@ error and `exit 1`, `$LASTEXITCODE` checked after every `git`/`pip`/`tar` call) 
 - **ComfyUI core**: clone when `$Target\.git` is missing; `git rev-parse --verify <commit>^{commit}` or
   fetch; `git checkout -B smile <commit>`; `git status --porcelain` must be empty for tracked files
   (core stays unmodified).
-- **Packs**: the list minus `comfyui_controlnet_aux`; skip a folder that exists (print its `pyproject.toml`
-  version and warn when it differs from the pin). Crystools stays, marked optional in the comment.
+- **Packs** (2026-10-26): from `comfy/comfy.lock`, each a git clone at its commit (the registry archive
+  of a version and the pack's tagged commit hold the same files; the inventory's diff proves it per
+  pack). A folder that exists is fetched and checked out at the pin; a dirty one fails with its name.
+  The list: `comfyui-advancedliveportrait`, `comfyui_instantid`, `ComfyUI-QwenVL` (what SMILE runs),
+  `comfyui-liveportraitkj`, `comfyui-kjnodes`, `comfyui-videohelpersuite` (only `smile_test.json`
+  in the ComfyUI page: the face crop and the video recorder), `ComfyUI-Crystools` (optional, GPU
+  monitor). `comfyui_controlnet_aux` goes.
 - **Patches**: `git apply --check` first; when that fails, `git apply --reverse --check` succeeding means
-  already applied → skip; otherwise fail with the patch name.
-- **aiia_grin**: `Copy-Item comfy\aiia_grin\*.py custom_nodes\aiia_grin\` every run (closes the "copy
-  again by hand" gap; a stale `__pycache__` is harmless). No workflows copy anymore.
+  already applied → skip; otherwise fail with the patch name. (2026-10-26: none left after section 7;
+  the step stays for a future stopgap.)
+- **aiia_grin** (2026-10-26): `custom_nodes\aiia_grin` is a directory junction to `comfy\aiia_grin`
+  (`New-Item -ItemType Junction`), so an edit needs a ComfyUI restart and nothing else. A folder that
+  is a copy from the old setup is replaced.
 - **venv**: create when missing. Install from `comfy/requirements.lock` (pip freeze of the verified venv:
   192 lines, no local-wheel entries, so it reproduces from the indexes; minus the plain `onnxruntime` line,
   plus `--extra-index-url https://download.pytorch.org/whl/cu130` so `torch==2.14.0+cu130` resolves). The pack `requirements.txt` files are not run (the lock supersedes
@@ -176,6 +218,9 @@ error and `exit 1`, `$LASTEXITCODE` checked after every `git`/`pip`/`tar` call) 
   of `requirements.lock` skips the pip step when it matches, so the lock is the one place to change pins.
   The onnxruntime GPU fix (`--force-reinstall --no-deps onnxruntime-gpu==1.30.0`) runs only when
   `python -c "import onnxruntime as o; assert 'CUDAExecutionProvider' in o.get_available_providers()"` fails.
+- **Models junction** (2026-10-26): `ComfyUI\models` → the models folder (`-Models`), created when the
+  folder is not a junction yet; an existing real `models\` folder with files in it is moved into the
+  models folder first (name clashes fail, nothing is overwritten).
 - No models step here: `install.bat` runs the model tool after this script. Final line says so.
 - `scripts/start_comfy.bat` line 16: the hint "see comfy\README.md" becomes "run scripts\install.bat".
 
@@ -191,9 +236,81 @@ Keep the colour-echo style and sections; extra arguments go to the model tool (`
 5. `pushd "%ROOT_DIR%"`, `py -3.12 -m modules.comfy.models install %*` (so `install.bat --mirror E:\smile-models`
    passes through), `popd`; stop on error. Runs with the system Python before any venv; prompts for the
    token once when the HF source is needed.
-6. "Install complete" only when every step passed; a second run prints skips everywhere.
+6. **Smoke test** (2026-10-26): starts ComfyUI from the venv (the way `start_comfy.bat` does, in the
+   background), waits for `/system_stats`, checks the log for `Device: cuda` and the venv for the CUDA
+   onnxruntime provider, queues the warm-up workflow (`modules.comfy.workflow.build_warmup`, through
+   the app venv) and waits for its result, then stops ComfyUI. A failure names the step.
+7. "Install complete" only when every step passed; a second run prints skips everywhere.
 
-## 4. Code changes
+## 4. Patches: down to none (round 2a, **done 2026-10-26**: `comfy/patches` is empty, four unpatched packs; 4.1 proven by 16 identical grin frames on one portrait, old code with patch against new code without)
+
+ComfyUI core is never patched. A patch on a pack is a stopgap: the install applies it, recognises it as applied,
+or stops by its name, so an update cannot drop one unnoticed. Round 2 makes them unnecessary, so that any version
+of a pack installs clean. What each patch is and what replaces it:
+
+1. **`advancedliveportrait-mask.patch`** (the only one that changes the picture). The pack's `prepare_source`
+   (`nodes.py` ~354) warps its paste mask with a transform made from `face_region`, and when the face square was
+   clipped at the image edge (`is_changed`) it then remakes the transform from `crop_region` but keeps the mask
+   where it was: pasted face and mask disagree. The patch makes both from `crop_region`. Grin Frames
+   (`comfy/aiia_grin/__init__.py`) already redoes every per-frame step itself (`render_frame`) and only takes the
+   prepared source (`psi`) from the pack's `ExpressionEditor.run`. It will make the two values itself: after
+   `editor.run`, call the pack's engine `detect_face(img_rgb, crop_factor)` once more (the same detector, the same
+   answer, milliseconds), build `crop_trans_m` with the pack's `create_transform_matrix` from `crop_region` and
+   `mask_ori` by warping `engine.GetMaskImg()` with it, and use those in `render_frame` instead of `psi.crop_trans_m`
+   and `psi.mask_ori`. The debug print the patch removed is already swallowed (`redirect_stdout`). Proof: the
+   record of a saved clip (`modules.save.record --preset`) rendered again with the patch and without it gives
+   the same frames (`test_grin_mask.py` in `comfy/aiia_grin` is not possible without ComfyUI: the user compares
+   two clips, or `smile_test.json` with a fixed seed, by eye and by a frame diff).
+2. **`liveportraitkj-import.patch`** (a broken relative import in `face_alignment/api.py`). The pack serves only
+   the face crop of `smile_test.json` in the ComfyUI page (the subgraph with `LivePortraitCropper`,
+   `LivePortraitLoadFaceAlignmentCropper`, `DownloadAndLoadLivePortraitModels` and kjnodes' `ImageResizeKJv2`;
+   `Workflow` strips it for SMILE, `testflow` puts it back behind the "use face crop" switch). It goes:
+   - a command `python -m modules.face.crop <photo> [-o out.png]` crops a photo as SMILE does (`FaceFinder` +
+     `portrait_crop`, the eyes levelled, the workflow's portrait size) so any photo can be tested in the page;
+   - `testflow` loses the crop branch: the switch becomes a second `LoadImage` (the cropped photo) or goes
+     altogether (a `LoadImage` is a file picker already);
+   - the user deletes the crop subgraph in the ComfyUI page and re-exports `data/comfy/smile_workflow.json`;
+     `Workflow.__init__` loses the crop removal (`_find(LivePortraitCropper)`, `_remove(crop_nodes)`), the tests
+     that assert the crop is gone (`test_face_crop_removed_and_rewired`) assert there was none;
+   - `comfyui-liveportraitkj` and `comfyui-kjnodes` leave `comfy.lock`; `liveportrait/landmark_model.pth` (only
+     liveportraitkj loads it) leaves the manifest (`check` then lists it as extra, the user deletes it).
+3. **`qwenvl-8bit-dtype.patch`** (8-bit loading gets `torch.float16`). SMILE runs `None (FP16)`
+   (`smile_workflow.json` node 1002:17); the 8-bit path is only the pack's fallback under VRAM pressure, which a
+   24 GB card does not reach. The one-liner is offered upstream (`1038lab/ComfyUI-QwenVL`), the file is dropped,
+   and the README's log-lines note says what a `dtype` error in 8-bit mode means.
+4. Optional, same spirit: `comfyui-videohelpersuite` serves only the video recorder of `smile_test.json`;
+   ComfyUI core's `CreateVideo` + `SaveVideo` nodes do the same, so `testflow` can use those and the pack leaves
+   the lock. `ComfyUI-Crystools` (GPU monitor) stays, unpatched and optional.
+
+End state: `comfy/patches` is empty (the installer's patch step stays for a future stopgap), four packs in the
+lock (`advancedliveportrait`, `instantid`, `QwenVL`, `Crystools`), each at its registry version, none modified.
+
+## 5. Updating (round 2b, **built 2026-10-26**: `install_comfy.ps1 -Update` / `-Accept` / `-Rollback` as below; the first update on the dev PC, ComfyUI `4ef23c34` to `cdf272f3` and QwenVL 2.2.0 to 2.3.2, gave the same fixed-seed portrait and needed one workflow change, the new `video_frame_size` input of the describe node)
+
+The install is already rebuildable (the models live beside it, `install.bat` is idempotent), so an update is:
+new pins, a fresh build next to the old one, the proof, then the switch. `scripts\install_comfy.ps1 -Update`:
+
+1. `ComfyUI\` is renamed `ComfyUI-previous\` (the junctions inside it keep working; nothing is deleted).
+2. The pins are renewed in memory: ComfyUI at `origin/master` HEAD (or `-ComfyCommit`), each pack at the
+   registry's `latest_version` (or the version given); the venv is built **unlocked**: ComfyUI's own
+   `requirements.txt`, then every pack's `requirements.txt`, then the known extras of today's lock that no pack
+   declares (`numba`, the `numpy` the install runs, `onnxruntime-gpu` forced last). Everything else of the
+   install path runs as is: junctions, patches (none), the CUDA provider check.
+3. The proof: `modules.comfy.smoke` (`--comfy ComfyUI`) as in every install, plus `smoke.py --save` writes the
+   portrait and the last grin frame of a **fixed-seed** run of `data/settings/GenerationTest.json` to
+   `output\smoke\<stamp>\`; the user puts them next to the previous install's (made the same way before the
+   update) and judges. A seed that gives the same picture is not expected across torch versions, a picture of the
+   same quality is.
+4. On a pass the user says so (`-Accept`): `comfy.lock` gets the new commit and versions (`git rev-parse` and the
+   packs' `pyproject.toml`), `requirements.lock` the new `pip freeze --all` (minus the plain `onnxruntime`), the
+   stamp file is written, and `ComfyUI-previous\` can be deleted. On a failure `ComfyUI-next` stays for a look,
+   and `-Rollback` renames `ComfyUI-previous\` back; nothing of the locks changed.
+5. First on the dev PC, never on the ICK PC during the show; the ICK PC then gets the new locks with `git pull`
+   and `install.bat` (a changed lock rebuilds the venv, a changed commit or version re-clones).
+
+Order of work: 4.1 (the mask, the one that matters), 4.2, 4.3, 4.4, then 5. Each step keeps `install.bat` passing.
+
+## 6. Code changes
 
 - `data/comfy/smile_workflow.json`: node `1002:20` `ckpt_name` → `realvisxlV40_v40Bakedvae.safetensors`.
   Regenerate `data/comfy/smile_test.json` with `scripts\make_test_workflow.bat` (the user runs it: it
@@ -222,7 +339,7 @@ Keep the colour-echo style and sections; extra arguments go to the model tool (`
 - `.gitignore`: the `comfy/models/` line stays until the user has deleted that folder (otherwise
   `git status` lists 27 GiB as untracked); its removal is the last migration step below.
 
-## 5. Docs: `README.md`
+## 7. Docs: `README.md`
 
 Replace "Install script" and "Image generator (ComfyUI)" under INSTALLATION with one section:
 
@@ -233,11 +350,13 @@ Replace "Install script" and "Image generator (ComfyUI)" under INSTALLATION with
 - **after a model change**: `hash`, `sources`, `upload`, `export`, in that order, and the extra-files note;
 - **ComfyUI log lines** (the "Safe to ignore" / "Not ignorable" list from `comfy/README.md`, trimmed) under
   RUN → "Pieces on their own", since it is about running, not installing;
-- the pinned versions live in `scripts/install_comfy.ps1` and `comfy/requirements.lock` (say so; no table).
+- the pinned versions live in `comfy/comfy.lock` and `comfy/requirements.lock` (say so; no table), and
+  the update procedure of section 5 in a few lines;
+- the models folder beside the repo and the junction (2026-10-26).
 
 Delete `comfy/README.md`, `comfy/setup.ps1`, `comfy/workflows/`.
 
-## 6. Tests: `modules/comfy/tests/test_models.py`
+## 8. Tests: `modules/comfy/tests/test_models.py`
 
 The repo's idiom: `unittest.TestCase`, `tempfile.TemporaryDirectory()` + `addCleanup`, files of a few
 bytes, `_http` replaced by a fake keyed by URL (302 with `x-linked-*` for `resolve` URLs, 206 honouring
@@ -253,26 +372,46 @@ bytes, `_http` replaced by a fake keyed by URL (302 with `x-linked-*` for `resol
 - token lookup order (env, file, patched `getpass`) and the saved file;
 - `export` copies, skips what is already right, writes `models.json`; `main([...])` exit codes 0/1.
 
-## Migration on this PC (user steps, in this order)
+## Migration
 
-1. Create a **private** HF repo `smile-models` and a fine-grained write token for it; put the repo id in
-   `comfy/models.json` (`repo`); `hf auth login` in any shell, or paste the token into the tool's prompt.
-2. `py -3.12 -m modules.comfy.models check` (all 33 ok, the extras listed), `sources` (confirms the public
-   fallbacks), `upload` (~18.5 GB to HF), then `sources --repo` (the HF copies match).
-3. `export E:\smile-models` to the USB SSD; copy that folder into iCloud Drive as the second cold copy
-   (set it to "Always keep on this device" there: evicted placeholders read slowly or fail).
-4. Delete `comfy\models\` (27 GiB) by hand, then drop the `comfy/models/` line from `.gitignore`;
-   optionally remove the extra files `check` lists.
-5. `scripts\install.bat` on this PC: everything skips; the first run writes the venv stamp without
-   reinstalling when every pin is satisfied.
-6. On a new PC: prerequisites, `git clone`, `scripts\install.bat` (with `--mirror E:\smile-models` offline).
+### Done on the dev PC IAAI, 2026-10-26 (round 1: the install path)
+
+The reference turned out to be **the install that runs**, not the ICK PC's bytes: nothing was run on the ICK PC
+(its repository is not touched remotely), only its three private LoRAs were copied over. The 28 public models were
+taken from the dev install `C:\Developer\ComfyUI\models` (every one happens to equal its canonical Hugging Face file,
+`sources` confirmed it, but that is a record, not a gate), Depth Anything 3 was downloaded, and `hash --write` wrote
+what is in the folder into the manifest after the smoke test passed. The pins are what the dev PC ran: ComfyUI
+`4ef23c34`, the packs as **registry archives by version** (not git commits: matching a commit to an archive byte for
+byte was not worth it, and the archives are what both PCs run), the venv a `pip freeze` of the dev venv, installed
+with `--no-deps` (facenet-pytorch's `numpy<2` metadata contradicts the numpy 2.5.3 that runs).
+
+- `modules/comfy/models.py` + tests (section 1, 8), `comfy/models.json` (32 files; the doc's 33 was a miscount), `comfy/comfy.lock`,
+  `comfy/requirements.lock`, `scripts/install_comfy.ps1`, `scripts/install.bat`, `modules/comfy/smoke.py` (section 2, 3),
+  the code changes (section 6), README and CLAUDE.md (section 7); `comfy/README.md`, `comfy/setup.ps1`, `comfy/workflows/` deleted.
+- Found on the way: the registry serves some packs as a zip named `node.tar.gz` (`inventory.py` sniffs it); the pack archives
+  have CRLF files, so the patches apply with `--ignore-whitespace`; clones are made with `core.autocrlf=false`.
+- Not done: the HF upload (`repo` is still the placeholder: the user creates the repo and a Write token, puts
+  `<user>/smile-models` in the manifest, runs `upload` and `sources --repo`), the USB/iCloud `export`, SMILE's own run here
+  with a visitor (the user's check).
+
+### Left
+
+1. HF: repo, token, `py -3.12 -m modules.comfy.models upload`, then `sources --repo`; `export E:\smile-models` for the USB SSD
+   and iCloud Drive (set to "Always keep on this device").
+2. Section 4 (patches to none) and section 5 (`-Update`), later rounds.
+3. The ICK PC, on site: `py -3.12 comfy\inventory.py` as the check of what it runs against the locks, `git pull`,
+   `scripts\install.bat` (its `ComfyUI\models` is moved into `..\smile-models` by the junction step; never during the show),
+   delete `comfy\models\` (27 GiB) by hand, drop the `comfy/models/` line from `.gitignore`.
+4. The `online` branch: merge `main` into it and run it on the dev PC.
 
 ## Verification
 
 - `.venv\Scripts\python -m pytest` passes (new `test_models.py`, the updated `test_workflow.py`).
 - `py -3.12 -m modules.comfy.models check` on this PC: every manifest file `ok`, the extras listed.
 - `sources` confirms (or refutes, setting null) every public URL in the table above.
-- `scripts\install.bat` run twice: the second run skips every step and ends in "Install complete".
+- `scripts\install.bat` run twice: the second run skips every step and ends in "Install complete",
+  the smoke test included (2026-10-26).
+- `install_comfy.ps1 -Update` on the test PC once, with the lock files as the proof (2026-10-26).
 - `export` into a temp folder, then `install --mirror <that folder> --models <empty temp dir>` fills the
   empty dir and `check --models <it>` passes (this doubles as the offline-install test, ~18.5 GB copy).
 - The user starts ComfyUI (`scripts\start_comfy.bat`) and SMILE: the warm-up passes, the panel's
@@ -287,8 +426,12 @@ bytes, `_http` replaced by a fake keyed by URL (302 with `x-linked-*` for `resol
 - `.part` files: an interrupted install leaves one next to the target; the next run resumes it.
 - `git ls-files` tracks `data/settings/Smile.json` while the disk has `smile.json` (`core.ignorecase`
   hides it on Windows); `git mv -f Smile.json smile.json` fixes the case. Side note, not part of this change.
-- Packs not pinned by a lock of their own: the Comfy Registry archive at a version is immutable; if the
-  registry ever drops one, copy the folder from a good install (as the old README said).
+- Packs are git clones at a commit (2026-10-26); a pack whose repository disappears is copied from a
+  good install, as before. A pack without a public git repository stays a registry archive, pinned by
+  version in `comfy.lock`.
+- Poser2 (2026-10-26): everything ComfyUI stays in `comfy/` and `scripts/install_comfy.ps1`, both
+  self-contained with paths relative to the repo root, so they move into Poser2 as a unit when SMILE
+  does; the model tool is the one that Poser2's own models can use too.
 - The manifest must stay complete, because the packs stop healing a half-present folder: QwenVL skips
   its download when the folder has any `.safetensors` (weights without tokenizer files never heal),
   liveportraitkj downloads only when `models/liveportrait` is absent altogether.

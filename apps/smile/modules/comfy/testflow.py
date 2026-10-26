@@ -1,11 +1,11 @@
 """A test workflow for the ComfyUI page: what SMILE sends for one visitor, with a preset's values,
-plus an input switch, previews and a video recorder. Generated, so it can't drift from the app:
+plus previews and a video recorder. Generated, so it can't drift from the app:
 
     .venv\\Scripts\\python -m modules.comfy.testflow [-p preset] [-s a|b] [-o file]
 
-The input switch is off for the app's own capture (SMILE uploads every capture as smile_capture.png)
-and on for any photo, which then goes through the face crop of the workflow file. API format: drag
-the file into the page, which lays the nodes out itself.
+The input is the app's own capture (SMILE uploads every capture as smile_capture.png); for any other
+photo, crop it first as SMILE would (python -m modules.face.crop photo.jpg) and pick the crop in the
+Load Image node. API format: drag the file into the page, which lays the nodes out itself.
 """
 
 import argparse
@@ -18,9 +18,9 @@ from modules.settings import presets
 from modules.main_settings import Settings
 
 CAPTURE: str = 'smile_capture.png'      # the name Generator uploads every capture under
-SWITCH: str = 'test_input'
 PROMPT: str = 'test_prompt'
-OUTPUT_CLASSES: tuple[str, ...] = ('PreviewImage', 'PreviewAny', 'SaveImage')
+VIDEO: str = 'test_video'
+VIDEO_FILE: str = 'test_video_file'
 
 
 def make_test_workflow(workflow_path: str, settings: Settings, style: str = 'a') -> dict:
@@ -33,27 +33,7 @@ def make_test_workflow(workflow_path: str, settings: Settings, style: str = 'a')
     def title(node_id: str, text: str) -> None:
         workflow[node_id]['_meta'] = {'title': text}
 
-    # the face crop chain without its previews: nothing forces it to run while the switch is off
-    cropper: str = _find(source, class_type='LivePortraitCropper')
-    prefix: str = cropper.split(':')[0] + ':'
-    crop_nodes: set[str] = {node_id for node_id, node in source.items()
-                            if node_id.startswith(prefix) and node['class_type'] not in OUTPUT_CLASSES}
-    crop_out: str = next(value[0] for node_id, node in source.items() if not node_id.startswith(prefix)
-                         for value in node['inputs'].values() if isinstance(value, list) and value[0] in crop_nodes)
-    for node_id in crop_nodes:
-        workflow[node_id] = copy.deepcopy(source[node_id])
-
-    # everything that read the uploaded image reads the switch: off the image as it is, on the crop
-    for node_id, node in workflow.items():
-        if node_id in crop_nodes:
-            continue
-        for name, value in node['inputs'].items():
-            if value == [wf.load_image, 0]:
-                node['inputs'][name] = [SWITCH, 0]
-    workflow[SWITCH] = {'class_type': 'ComfySwitchNode',
-                        'inputs': {'switch': False, 'on_false': [wf.load_image, 0], 'on_true': [crop_out, 0]},
-                        '_meta': {'title': 'Use face crop (on for an uncropped photo)'}}
-
+    title(wf.load_image, "Input (the app's capture, or a photo cropped with modules.face.crop)")
     workflow[PROMPT] = {'class_type': 'PreviewAny', 'inputs': {'source': [wf.suffix, 0]}, '_meta': {'title': 'Prompt'}}
     title(wf.description, 'Description')
     title(wf.capture_depth, 'Depth of capture')
@@ -62,12 +42,15 @@ def make_test_workflow(workflow_path: str, settings: Settings, style: str = 'a')
     title(wf.last_frame, 'Last grin frame')
     title(wf.last_depth_run, 'Depth of last frame (run)')
 
-    # from the workflow file, as in the old tests: capture over portrait, and the grin as a video
+    # from the workflow file, as in the old tests: capture over portrait; the grin as a video (ComfyUI's own nodes)
     overlay: str = _find(source, title='Overlay')
-    video: str = _find(source, class_type='VHS_VideoCombine')
-    for node_id in (overlay, _find(source, title='Overlay preview'), video):
+    for node_id in (overlay, _find(source, title='Overlay preview')):
         workflow[node_id] = copy.deepcopy(source[node_id])
-    workflow[video]['inputs'].update(images=[wf.grin, 0], frame_rate=settings.sequence.grin_fps, filename_prefix='smile_test')
+    workflow[VIDEO] = {'class_type': 'CreateVideo', 'inputs': {'images': [wf.grin, 0], 'fps': settings.sequence.grin_fps},
+                       '_meta': {'title': 'Grin video'}}
+    workflow[VIDEO_FILE] = {'class_type': 'SaveVideo', 'inputs': {'video': [VIDEO, 0], 'filename_prefix': 'smile_test',
+                                                                  'format': 'mp4', 'codec': 'h264'},
+                            '_meta': {'title': 'Save grin video'}}
     return workflow
 
 

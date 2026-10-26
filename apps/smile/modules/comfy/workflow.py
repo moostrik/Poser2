@@ -1,9 +1,9 @@
 """The ComfyUI workflow (API format), adapted for SMILE and filled in per run.
 
-SMILE crops and rotates the face itself (modules/face/FaceFinder.py), so the workflow's own
-face crop is removed and its consumers read the uploaded image directly. The video and the
-overlay check are removed too, and the saved portrait becomes a preview (nothing piles up in
-ComfyUI's output folder). The crop and scale in front of the grin are removed as well: the grin
+SMILE crops and rotates the face itself (modules/face/FaceFinder.py), so the export starts from the
+uploaded image; an older export's face crop subgraph and video recorder are removed and their consumers
+rewired to the image. The overlay check is removed too, and the saved portrait becomes a preview (nothing
+piles up in ComfyUI's output folder). The crop and scale in front of the grin are removed as well: the grin
 animates the whole portrait. Nodes are found by class type or title, not by id.
 
 The workflow only provides the structure: every run fills in the values from PipelineSettings.
@@ -11,12 +11,15 @@ The workflow only provides the structure: every run fills in the values from Pip
 
 import copy
 import json
+import logging
 import random
 from typing import Callable
 
 import pytweening as easing
 
 from modules.comfy.settings import PipelineSettings, Prefer, StyleSettings
+
+logger = logging.getLogger(__name__)
 
 MAX_SEED: int = 2 ** 32 - 1     # the smallest maximum of the seeded nodes (QwenVL: 1 .. 4294967295)
 FIXED_SEED: int = 1             # with portrait.fixed_seed: the description and the grin too, or the runs still differ
@@ -41,13 +44,20 @@ PREFER_CURVES: dict[Prefer, Callable[[float], float]] = {
 
 
 def _find(workflow: dict, class_type: str | None = None, title: str | None = None) -> str:
+    node_id: str | None = _find_optional(workflow, class_type, title)
+    if node_id is None:
+        raise KeyError(f'workflow has no node with class {class_type!r} and title {title!r}')
+    return node_id
+
+
+def _find_optional(workflow: dict, class_type: str | None = None, title: str | None = None) -> str | None:
     for node_id, node in workflow.items():
         if class_type is not None and node['class_type'] != class_type:
             continue
         if title is not None and node.get('_meta', {}).get('title') != title:
             continue
         return node_id
-    raise KeyError(f'workflow has no node with class {class_type!r} and title {title!r}')
+    return None
 
 
 def _remove(workflow: dict, node_ids: set[str], replacement: list | None = None) -> None:
@@ -83,17 +93,17 @@ class Workflow():
 
         self.load_image: str = _find(workflow, class_type='LoadImage')
 
-        # the face crop chain: everything in the subgraph that holds the LivePortrait cropper
-        cropper: str = _find(workflow, class_type='LivePortraitCropper')
-        prefix: str = cropper.split(':')[0] + ':'
-        crop_nodes: set[str] = {node_id for node_id in workflow if node_id.startswith(prefix)}
-        _remove(workflow, crop_nodes, [self.load_image, 0])
+        # an older export's face crop chain (the subgraph that holds the LivePortrait cropper) and video recorder
+        cropper: str | None = _find_optional(workflow, class_type='LivePortraitCropper')
+        if cropper is not None:
+            prefix: str = cropper.split(':')[0] + ':'
+            _remove(workflow, {node_id for node_id in workflow if node_id.startswith(prefix)}, [self.load_image, 0])
+        video: str | None = _find_optional(workflow, class_type='VHS_VideoCombine')
+        if video is not None:
+            _remove(workflow, {video})
 
         # outputs SMILE doesn't use
-        unused: set[str] = {_find(workflow, class_type='VHS_VideoCombine'),
-                            _find(workflow, title='Overlay'),
-                            _find(workflow, title='Overlay preview')}
-        _remove(workflow, unused)
+        _remove(workflow, {_find(workflow, title='Overlay'), _find(workflow, title='Overlay preview')})
 
         self.portrait: str = _find(workflow, title='Save portrait')
         workflow[self.portrait] = {'class_type': 'PreviewImage',
@@ -130,7 +140,8 @@ class Workflow():
         # the basic node fixes repetition_penalty at 1.2, which drops the commas; the advanced one takes it
         workflow[self.describe]['class_type'] = 'AILab_QwenVL_Advanced'
         workflow[self.describe]['inputs'].update(use_torch_compile=False, device='auto', temperature=0.6,
-                                                 top_p=0.9, num_beams=1, repetition_penalty=1.0, frame_count=16)
+                                                 top_p=0.9, num_beams=1, repetition_penalty=1.0, frame_count=16,
+                                                 video_frame_size='auto')     # required since QwenVL 2.3 (video input only; we send an image)
         self.description: str = _find(workflow, title='Preview as Text')
         self.grin: str = _find(workflow, class_type='GrinFrames')
 
@@ -161,6 +172,7 @@ class Workflow():
         latent: dict = workflow[_find(workflow, class_type='EmptyLatentImage')]['inputs']
         self.portrait_size: tuple[int, int] = (latent['width'], latent['height'])
         self._template: dict = workflow
+        self._warned: set[str] = set()      # model files ComfyUI does not offer, each said once
         # the nodes that take time, by the name the panel shows while they run
         self._steps: dict[str, str] = {self.describe: 'describe', self.depth_run: 'depth', self.sampler: 'portrait',
                                        self.grin: 'grin', self.last_depth_run: 'depth of last frame'}
@@ -198,9 +210,14 @@ class Workflow():
             sampler['inputs']['vae'] = list(self.vae)
         workflow[self.instantid]['inputs'].update(ip_weight=p.embedding_strength, cn_strength=p.keypoint_strength)
         workflow[self.depth]['inputs'].update(strength=p.depth_strength, end_percent=p.depth_end)
-        # ComfyUI refuses a file it doesn't have: the workflow's checkpoint stays, and no distillation
+        # ComfyUI refuses a file it doesn't have: the workflow's checkpoint stays, and no distillation.
+        # An install that misses a model would otherwise run quietly with another: say it, once per file
         if p.checkpoint in p.checkpoint_options:
             workflow[self.checkpoint]['inputs']['ckpt_name'] = p.checkpoint
+        else:
+            self._missing('checkpoint', p.checkpoint, f"the workflow's {workflow[self.checkpoint]['inputs']['ckpt_name']}")
+        if p.distill_lora != NO_LORA and p.distill_strength != 0.0 and p.distill_lora not in p.lora_options:
+            self._missing('distillation LoRA', p.distill_lora, 'no distillation')
         if p.distill_lora != NO_LORA and p.distill_lora in p.lora_options and p.distill_strength != 0.0:
             # on the model only (the text encoder stays the checkpoint's), in front of the style LoRAs
             workflow[self.distill] = {'class_type': 'LoraLoaderModelOnly',
@@ -211,6 +228,8 @@ class Workflow():
         for slot, node_id in enumerate(self.loras, start=1):
             name: str = getattr(style, f'lora_{slot}')
             strength: float = getattr(style, f'lora_{slot}_strength')
+            if name != NO_LORA and name not in style.lora_options:
+                self._missing(f'LoRA {slot}', name, 'the slot switched off')
             if name == NO_LORA or name not in style.lora_options:
                 # ComfyUI refuses a file it doesn't have: the slot keeps the workflow's file, switched off
                 name, strength = workflow[node_id]['inputs']['lora_name'], 0.0
@@ -222,6 +241,11 @@ class Workflow():
             workflow[node_id]['inputs']['seed'] = seed
         self._fill_grin(workflow, s, seed)
         return workflow
+
+    def _missing(self, what: str, name: str, instead: str) -> None:
+        if name not in self._warned:
+            self._warned.add(name)
+            logger.warning('ComfyUI does not offer the %s %s: %s is used instead', what, name, instead)
 
     def build_warmup(self, image_name: str, style: StyleSettings, s: PipelineSettings) -> dict:
         """The same run at its shortest: one sampler step and one grin frame. The models load at the

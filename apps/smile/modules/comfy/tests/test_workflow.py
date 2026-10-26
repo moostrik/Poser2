@@ -126,9 +126,14 @@ class TestWorkflow(unittest.TestCase):
 
     def test_distill_lora(self):
         p = self.settings.portrait
-        first = self.built[self.wf.loras[0]]['inputs']
-        self.assertNotIn(self.wf.distill, self.built)
-        self.assertEqual(first['model'], [self.wf.checkpoint, 0])
+        # the default is a distilled checkpoint: DMD2 at full strength, in front of the style LoRAs
+        self.assertEqual(self.built[self.wf.distill]['inputs'],
+                         {'model': [self.wf.checkpoint, 0], 'lora_name': 'dmd2_sdxl_4step_lora_fp16.safetensors', 'strength_model': 1.0})
+        self.assertEqual(self.built[self.wf.loras[0]]['inputs']['model'], [self.wf.distill, 0])
+        p.distill_lora = 'none'
+        b = self.wf.build('x.png', self.settings.style_a, self.settings)
+        self.assertNotIn(self.wf.distill, b)
+        self.assertEqual(b[self.wf.loras[0]]['inputs']['model'], [self.wf.checkpoint, 0])
         p.lora_options = ['none', 'dmd2.safetensors']
         p.distill_lora, p.distill_strength = 'dmd2.safetensors', 0.7
         b = self.wf.build('x.png', self.settings.style_a, self.settings)
@@ -143,6 +148,26 @@ class TestWorkflow(unittest.TestCase):
             b = self.wf.build('x.png', self.settings.style_a, self.settings)
             self.assertNotIn(self.wf.distill, b)
             self.assertEqual(b[self.wf.loras[0]]['inputs']['model'], [self.wf.checkpoint, 0])
+
+    def test_missing_model_files_are_logged_once(self):
+        p = self.settings.portrait
+        with self.assertNoLogs('modules.comfy.workflow', 'WARNING'):
+            self.wf.build('x.png', self.settings.style_a, self.settings)        # every file is offered
+        p.checkpoint = 'missing_ckpt.safetensors'
+        p.distill_lora = 'missing_distill.safetensors'
+        self.settings.style_a.lora_2 = 'missing_lora.safetensors'
+        with self.assertLogs('modules.comfy.workflow', 'WARNING') as logs:
+            self.wf.build('x.png', self.settings.style_a, self.settings)
+        text = ' '.join(logs.output)
+        for name in ('missing_ckpt', 'missing_distill', 'missing_lora'):
+            self.assertIn(name, text)
+        self.assertEqual(len(logs.output), 3)
+        with self.assertNoLogs('modules.comfy.workflow', 'WARNING'):
+            self.wf.build('x.png', self.settings.style_a, self.settings)        # said once per file
+        self.settings.style_a.lora_3 = 'another_missing.safetensors'
+        with self.assertLogs('modules.comfy.workflow', 'WARNING') as logs:
+            self.wf.build('x.png', self.settings.style_a, self.settings)
+        self.assertEqual(len(logs.output), 1)
 
     def test_peaks_random_within_the_range(self):
         g = self.settings.grin
@@ -305,12 +330,15 @@ class TestWorkflow(unittest.TestCase):
     def test_lora_chain(self):
         # checkpoint -> the LoRAs in a row -> InstantID (model) and the three text encoders (clip)
         checkpoint = next(node_id for node_id, node in self.built.items() if node['class_type'] == 'CheckpointLoaderSimple')
-        source = checkpoint
+        # the model passes the distillation LoRA first (model only), the text encoder comes straight from the checkpoint
+        self.assertEqual(self.built[self.wf.distill]['inputs']['model'], [checkpoint, 0])
+        model_source, clip_source = self.wf.distill, checkpoint
         self.assertEqual(len(self.wf.loras), 3)
         for node_id in self.wf.loras:
             inputs = self.built[node_id]['inputs']
-            self.assertEqual((inputs['model'], inputs['clip']), ([source, 0], [source, 1]))
-            source = node_id
+            self.assertEqual((inputs['model'], inputs['clip']), ([model_source, 0], [clip_source, 1]))
+            model_source = clip_source = node_id
+        source = model_source
         self.assertEqual(self.built[self.wf.instantid]['inputs']['model'], [source, 0])
         encoders = [node for node in self.built.values() if node['class_type'] == 'CLIPTextEncode']
         self.assertEqual(len(encoders), 3)

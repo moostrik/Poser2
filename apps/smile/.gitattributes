@@ -6,3 +6,5 @@
 *.wav filter=lfs diff=lfs merge=lfs -text
 # small enough for git itself, and the LFS server refuses uploads from the cloud sessions
 data/Bangers-Regular.ttf -filter -diff -merge -text
+data/comfy/loras/*.safetensors filter=lfs diff=lfs merge=lfs -text
+comfy/packs/* filter=lfs diff=lfs merge=lfs -text
