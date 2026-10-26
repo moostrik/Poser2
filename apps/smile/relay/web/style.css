@@ -1,0 +1,197 @@
+/* SMILE Online: a grid of portraits with the camera window in its middle. 4 columns on a phone,
+   every cell 4:5 like the portraits; the window takes the middle 2 x 2. */
+
+:root {
+  --gap: 2px;
+  --ink: #fff;
+  --paper: #000;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+#grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: calc((100vw - 3 * var(--gap)) / 4 * 1.25);
+  grid-auto-flow: row dense;
+  gap: var(--gap);
+}
+
+@media (min-width: 700px) {
+  #grid { max-width: 560px; margin: 0 auto; grid-auto-rows: calc((560px - 3 * var(--gap)) / 4 * 1.25); }
+}
+
+#grid img.still {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: #111;
+  transition: opacity 0.5s;
+}
+
+/* the ring light: every portrait goes white while the eye is on you */
+body.light #grid img.still { opacity: 0; }
+body.light, body.light #grid { background: #fff; }
+
+#window {
+  grid-column: 2 / 4;
+  grid-row: 2 / 4;
+  position: relative;
+  background: #000;
+  overflow: hidden;
+}
+
+#window > * { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+#cam { display: none; }
+
+/* the camera is drawn mirrored, like a mirror, in black and white, in pixels while waiting */
+#view, #fill {
+  transform: scaleX(-1);
+  image-rendering: pixelated;
+}
+#view { filter: grayscale(1); }
+body.colour #view { filter: none; }
+#fill { pointer-events: none; }
+
+#grin, #portrait { object-fit: cover; display: none; background: #000; }
+body.grin #grin { display: block; }
+body.done #portrait { display: block; }
+
+#flash { background: #fff; opacity: 0; pointer-events: none; transition: opacity 1.2s ease-out; }
+#flash.on { opacity: 1; transition: none; }
+
+/* the meme caption over the grin and the result */
+#caption { display: none; pointer-events: none; height: auto; inset: 0; }
+body.grin #caption, body.done #caption { display: block; }
+#caption-name, #caption-line {
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  text-align: center;
+  font-weight: 900;
+  text-transform: uppercase;
+  line-height: 1.05;
+  font-size: 7vw;
+  color: #fff;
+  text-shadow: -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 2px 2px 0 #000, 0 3px 4px #000;
+}
+#caption-name { top: 3%; }
+#caption-line { bottom: 3%; font-size: 5.5vw; }
+@media (min-width: 700px) { #caption-name { font-size: 40px; } #caption-line { font-size: 32px; } }
+
+#describe {
+  inset: auto 0 12% 0;
+  height: auto;
+  padding: 0 6%;
+  text-align: center;
+  font-size: 3.2vw;
+  line-height: 1.3;
+  color: #fff;
+  text-shadow: 0 0 4px #000, 0 0 8px #000;
+  display: none;
+}
+body.describe #describe { display: block; }
+@media (min-width: 700px) { #describe { font-size: 16px; } }
+
+/* the status line: what the eye does, why you wait */
+#status {
+  inset: auto 0 0 0;
+  height: auto;
+  padding: 6px 8px;
+  font-size: 3.2vw;
+  letter-spacing: 0.02em;
+  color: #ddd;
+  text-shadow: 0 0 4px #000;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.5));
+  pointer-events: none;
+}
+@media (min-width: 700px) { #status { font-size: 16px; } }
+
+/* the reject reason under a face, as the installation's marks show it */
+#labels { pointer-events: none; }
+#labels span {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 2.6vw;
+  color: #bbb;
+  text-shadow: 0 0 3px #000;
+  white-space: nowrap;
+}
+@media (min-width: 700px) { #labels span { font-size: 13px; } }
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+#join {
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  width: auto;
+  height: auto;
+  transform: translate(-50%, -50%);
+  padding: 10px 22px;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  display: none;
+}
+body.idle #join { display: block; }
+
+#share {
+  inset: 8px 8px auto auto;
+  width: auto;
+  height: auto;
+  padding: 6px 14px;
+  border: 1px solid #fff;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 14px;
+  display: none;
+}
+body.done #share { display: block; }
+
+/* the terms */
+#terms {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  z-index: 10;
+}
+#terms[hidden] { display: none; }
+#terms-box {
+  max-width: 420px;
+  border: 2px solid #fff;
+  padding: 20px 24px;
+  background: #000;
+}
+#terms-box h1 { margin: 0 0 12px; font-size: 22px; letter-spacing: 0.06em; }
+#terms-box ol { margin: 0 0 20px; padding-left: 22px; line-height: 1.6; font-size: 16px; }
+#agree {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #fff;
+  background: #fff;
+  color: #000;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}

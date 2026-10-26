@@ -18,3 +18,8 @@ __pycache__/
 *$py.class
 .pytest_cache/
 /ComfyUI-previous/
+
+# SMILE Online
+data/online_token.txt
+relay/token.txt
+relay/data/

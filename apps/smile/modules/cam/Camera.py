@@ -1,5 +1,6 @@
 """The app's image source: the frames of a camera device (Vimba or webcam), or, with `use_image` on,
-an image from `input/`, whether a device was found or not. Every frame is fitted to the output size
+an image from `input/`, whether a device was found or not; or, during an online turn, the frames of a
+phone (`set_online`, `push_online`: SMILE Online, modules/online/). Every frame is fitted to the output size
 here (`cover`: scaled to fill it, the middle kept, no distortion); the device only rotates and flips.
 A missing device is a warning and the
 `device` readout says `none`; there is no automatic fallback to the image, so a failed camera on
@@ -72,6 +73,7 @@ class Camera:
         self._frame: np.ndarray = np.zeros((self._height, self._width, 3), dtype=np.uint8)
         self._frame_time: float = 0.0       # when the newest frame arrived; 0 before the first
         self._image: np.ndarray | None = None
+        self._online: bool = False          # the online source has the image: the device and the image source are muted
 
         self._running: bool = False
         self._thread: Thread = Thread(target=self._run, daemon=True)
@@ -142,9 +144,25 @@ class Camera:
             self._callbacks = []
 
     def _on_device_frame(self, frame: np.ndarray) -> None:
-        if self.settings.use_image:
+        if self.settings.use_image or self._online:
             return
         # the one fit of every source to the output size: the device sends its frames as they are
+        self._emit(cover(frame, self._width, self._height))
+
+    # ONLINE SOURCE: the frames of a phone during its turn (modules/online/), in place of the device
+    # and the image; the device keeps running underneath and is back the moment the turn ends
+    @property
+    def online(self) -> bool:
+        return self._online
+
+    def set_online(self, active: bool) -> None:
+        with self._mutex:
+            self._online = active
+
+    def push_online(self, frame: np.ndarray) -> None:
+        """A frame of the online source: fitted like any other; dropped while the source is off."""
+        if not self._online:
+            return
         self._emit(cover(frame, self._width, self._height))
 
     def _run(self) -> None:
@@ -152,7 +170,7 @@ class Camera:
         while self._running:
             self._show_device()
             image: np.ndarray | None = self._image
-            if self.settings.use_image and image is not None:
+            if self.settings.use_image and image is not None and not self._online:
                 self._emit(image)
                 sleep(1.0 / IMAGE_FPS)
             else:

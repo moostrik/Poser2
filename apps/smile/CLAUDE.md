@@ -260,6 +260,22 @@ the panel's `laughter_test_sample` (a file of the laughter folder; `ScreenTest.l
 `laughterOn` and `laughterTest`) and the sequencer is blocked, so only the test laugh sounds. The patch is JSON, edited by hand in Max's own formatting (tabs, LF) so the diff stays
 readable; Max rewrites the whole file when the patch is saved from Max.
 
+## Online
+
+SMILE Online (branch `online`, a proof of concept): someone outside gets the eye when nobody inside has it. Three parts.
+`relay/` is a small aiohttp server that runs on the VPS or, for a test, on the PC (`scripts/start_relay.bat`): it serves
+the phone page (`relay/web/`: the grid of stills, the terms, the camera window; it draws the judging itself from the face
+data), keeps the waiting line (`relay/line.py`, pure logic) and passes messages (`relay/server.py` has the protocol: JSON
+text, images as binary with one leading byte); it decides nothing, SMILE starts and ends every turn. `modules/online/`
+is SMILE's side: `Link` (a websocket client thread that reconnects, plus an upload thread), `Online` (the turn, stepped
+from `Main.sequence_callback`, the only place its phase changes: IDLE, ASKING, JUDGING, TRANSFORMING, DELIVERING) and
+`fake.py`, a stand-in for SMILE at the relay. A turn puts the phone's frames into `Camera` as a third source
+(`set_online`, `push_online`; the device and the image are muted meanwhile and back when the turn ends) and the face finder,
+the charge, the flash and the generation run unchanged; `Online.on_face` sends the judging, `on_generation` the
+transformation's images (`SHOW`), and after TIMEOUT `ClipSaver`'s saved callback gives the files to upload before the
+phone gets its result. The token is a file (`data/online_token.txt`, git-ignored), never a setting in a preset.
+Tests: `relay/tests` (the server on aiohttp's test server) and `modules/online/tests` (a fake link and camera).
+
 ## Settings
 
 Settings system copied from poser2 (`modules/settings/`); root tree in `modules/main_settings.py`,

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SMILE</title>
+  <link rel="stylesheet" href="web/style.css">
+</head>
+<body>
+  <div id="grid">
+    <div id="window">
+      <video id="cam" playsinline muted autoplay></video>
+      <canvas id="view"></canvas>
+      <canvas id="fill"></canvas>
+      <video id="grin" playsinline muted loop></video>
+      <img id="portrait" alt="">
+      <div id="flash"></div>
+      <div id="caption"><div id="caption-name"></div><div id="caption-line"></div></div>
+      <div id="describe"></div>
+      <div id="status"></div>
+      <div id="labels"></div>
+      <button id="join">SMILE</button>
+      <button id="share">share</button>
+    </div>
+  </div>
+
+  <div id="terms" hidden>
+    <div id="terms-box">
+      <h1>Terms of SMILE</h1>
+      <ol>
+        <li>Matthias Oostrik owns your portrait.</li>
+        <li>He can do anything he wants with it.</li>
+        <li>He probably never will.</li>
+        <li>The machine will perfect you.</li>
+        <li>It is nothing personal. It is statistics.</li>
+        <li>You will smile.</li>
+      </ol>
+      <button id="agree">I AGREE TO SMILE</button>
+    </div>
+  </div>
+
+  <script src="web/app.js"></script>
+</body>
+</html>

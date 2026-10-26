@@ -6,6 +6,7 @@ import os
 import datetime
 import json
 import logging
+from typing import Callable
 
 from modules.render.settings import SequencerSettings
 from modules.save.record import embed_jpeg
@@ -15,6 +16,7 @@ from modules.video.ffmpeg import ClipWriter, Encoder
 logger = logging.getLogger(__name__)
 
 Command = tuple
+SavedCallback = Callable[[str, str, bool, str, str], None]   # id, style, kept, grin path, portrait path
 
 STYLES: tuple[str, ...] = ('A', 'B')
 
@@ -47,6 +49,7 @@ class ClipSaver:
 
         self.queue: queue.Queue[Command] = queue.Queue(max_queue_size)
         self._dropped: bool = False
+        self._saved_callback: SavedCallback | None = None
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self._save_loop, name='ClipSaver')
         self.thread.start()
@@ -154,7 +157,10 @@ class ClipSaver:
     def _finish(self, id: str, style: str, writer: ClipWriter, keep: bool) -> None:
         complete: bool = writer.close()
         temp = {name: self._temp_path(id, name) for name in ('.mp4', '_capture.jpg', '_portrait.jpg')}
-        if keep and complete:
+        kept: bool = keep and complete
+        grin: str = ''
+        portrait: str = ''
+        if kept:
             grins: str = os.path.join(self.grins_dir, style)
             portraits: str = os.path.join(self.portraits_dir, style)
             os.makedirs(grins, exist_ok=True)
@@ -163,7 +169,9 @@ class ClipSaver:
             for name in ('_capture.jpg', '_portrait.jpg'):
                 if os.path.exists(temp[name]):
                     os.replace(temp[name], os.path.join(portraits, id + name))
-            os.replace(temp['.mp4'], os.path.join(grins, id + '.mp4'))
+            grin = os.path.join(grins, id + '.mp4')
+            portrait = os.path.join(portraits, id + '_portrait.jpg')
+            os.replace(temp['.mp4'], grin)
             logger.info('Saved %s %s (%d frames)', style, id, writer.frames)
         else:
             for path in temp.values():
@@ -171,6 +179,17 @@ class ClipSaver:
                     os.remove(path)
                 except FileNotFoundError:
                     pass
+        callback: SavedCallback | None = self._saved_callback
+        if callback is not None:
+            try:
+                callback(id, style, kept, grin, portrait)
+            except Exception:
+                logger.exception('The saved callback failed for %s', id)
+
+    def set_saved_callback(self, callback: SavedCallback | None) -> None:
+        """Called on the save thread when a visitor's files are closed: (id, style, kept, grin path,
+        portrait path); the paths are empty when the files were not kept."""
+        self._saved_callback = callback
 
     def _temp_path(self, id: str, suffix: str) -> str:
         return os.path.join(self.temp_dir, id + suffix)

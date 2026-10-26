@@ -110,6 +110,13 @@ not in git, safe to delete).
 ### Output
 * `output\grins\A\` and `output\grins\B\` hold the grin clips (h264 mp4, the players read the style from the folder), `output\portraits\` the capture and the portrait of each visitor; `output\temp\` is where they are built. About 2.9 MB per visitor, nothing is cleaned up
 
+## SMILE ONLINE (proof of concept, branch `online`)
+Someone outside gets the eye when nobody inside has it: a phone page (the grid of the newest portraits with the camera window in its middle), a relay that keeps the waiting line, and a link in SMILE that puts the phone's frames in place of the camera for one turn. The experience and the technical plan are the two docs in the project; `relay\README.md` has the relay.
+* **run a test on this PC**: one line of random text in `relay\token.txt` and the same in `data\online_token.txt`; `scripts\start_relay.bat` (the relay on port 8800); in SMILE's panel, Online tab: `active` on (`relay` is `ws://127.0.0.1:8800/ws/smile` by default). A phone needs HTTPS for its camera: `tailscale serve --bg 8800` and open the PC's ts.net address on a phone with Tailscale, or `tailscale funnel 8800` for a phone without (switch it off after the test). Without SMILE, `.venv\Scripts\python -m modules.online.fake` stands in for it
+* **what happens**: with `active` on, SMILE connects to the relay and tells it every second whether its eye is free (`CAMERA_SHOW` with an empty charge for `eye_free_after` seconds, the generator ready, no raw camera, no laughter test, not paused). When it is and someone waits, SMILE takes a turn: the phone's frames (640 x 800 JPEG, 15 a second) become the camera, the face finder and the charge run on them, the phone draws the judging (every face's box and distance, the charge) on its own live video. No qualifying face within `turn_window` seconds: the turn passes (a charge that is rising gets its chance). The flash and the sequence run as for a visitor inside; the phone shows the depth, QwenVL's own words, the sampler previews and the portrait as the generator sends them, and after the result stands the saved portrait and grin are uploaded (`online.status`, `waiting`, `turns` are the readouts; the log says every turn)
+* **the room**: an online turn takes the camera, nothing else; the main screen shows the phone's image and the sequence as always. A reset ends the turn; `active` off ends it and disconnects (the phones see `asleep`)
+* **not yet** (the plan's later steps): the still at the grin's peak (the portrait stands in on the grid), the grin's caption burned in for sharing, music and laughter on the phone, the outside caption, the QwenVL line and the light ring's state on the machine, the QR screen's stream in the players, the capture at the phone's full resolution (the 640 x 800 frames make a softer portrait than the Mako's), the page on oostrik.net (it is served by the relay)
+
 ## STARTUP
 * make a shortcut to `scripts\startSMILE.bat`
 * press Windows+R, type `shell:startup`, move the shortcut into that folder
@@ -141,6 +148,7 @@ rig.
 * no automatic restart: an app that ends by itself stays down until `startSMILE.bat` is run; `crashes.log` says what happened
 * an app that hangs without ending is not detected either
 * no messages to a phone when something fails
+* SMILE Online is a proof of concept: see its section for what is not there yet
 * `output\` grows about 2.9 MB per visitor; nothing is cleaned up
 * on a camera path that does not pass jumbo frames the packet size stays 1500 (see the camera section)
 * `data\audio\screen_angles.txt` and the scrolling name's rows assume the wiring in `modules\sphere.py` (unit PL1 output 1 = screen 1, the top of the first 5-rib, output 2 the screen under it, unit PL2 output 1 = screen 5); check it on site (the laughter test counts 1 to 5 down the first rib, 6 to 8 down the next, and the laugh comes from the lit screen). A screen without an entry leaves its laugh where the previous one was
