@@ -13,10 +13,12 @@ if "%ERRORLEVEL%"=="0" (
 )
 
 if not exist "%COMFY_DIR%\.venv\Scripts\python.exe" (
-    echo ComfyUI is not installed in %COMFY_DIR%, see comfy\README.md
+    echo ComfyUI is not installed in %COMFY_DIR%: run scripts\install.bat
     exit /b 1
 )
 
+@REM every model is local (comfy\models.json): a missing one is an error in the log, never a download of whatever is current
+set "HF_HUB_OFFLINE=1"
 @REM no line per image from the face detector of the grin (ultralytics)
 set "YOLO_VERBOSE=false"
 @REM harmless deprecation warnings inside packages: three on every run, two at startup

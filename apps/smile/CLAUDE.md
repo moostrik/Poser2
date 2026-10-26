@@ -77,9 +77,12 @@ reaches past the image is drawn clamped to `BOX_PAD_PX` inside it (`fit_box`), s
 
 ## Image generator
 
-ComfyUI server (installed in `ComfyUI/` from the `comfy/` bundle; `ComfyUI/` and `comfy/models/` are git-ignored, API on
+ComfyUI server (installed in `ComfyUI/` by `scripts/install.bat` through `scripts/install_comfy.ps1`: the core commit and the pack versions
+pinned in `comfy/comfy.lock`, the venv from `comfy/requirements.lock`, the patches of `comfy/patches`; the models live in `../smile-models`
+behind the junction `ComfyUI/models`, listed with size and sha256 in `comfy/models.json` and fetched by `modules/comfy/models.py` from a
+mirror, the private HF repo or the public source; `ComfyUI/` is git-ignored, API on
 127.0.0.1:8188), started by `scripts/start_comfy.bat`, with a log per start in `output/logs/comfy_*.log`. Every model is
-local and a run makes no internet calls; a pack only downloads a model that is missing. Keep ComfyUI core and the node packs unmodified; depth comes from
+local and a run makes no internet calls; a model that is missing is an error (`HF_HUB_OFFLINE=1` in `start_comfy.bat`) and a WARNING in the SMILE log when the panel names it. Keep ComfyUI core and the node packs unmodified; depth comes from
 ComfyUI's own Depth Anything 3 nodes. `modules/comfy/`: `Generator` sends each capture to ComfyUI and turns its
 websocket events into `GenMessage`s for the render (CAM_DEPTH → DIFFUSION → DIFF_LOOP → IDLE);
 `workflow.py` adapts the API export in `data/comfy/` (face crop removed — SMILE crops and rotates
@@ -120,7 +123,7 @@ For tests in the ComfyUI page, `python -m modules.comfy.testflow` writes `data/c
 (drag it into the page): what the app sends with a preset's values, plus an input switch (the
 app's last capture, or any photo through the face crop), previews and a video recorder. Regenerate
 it after changing the workflow or the presets instead of editing a copy by hand.
-Our own ComfyUI nodes live in `comfy/aiia_grin/` (copied into `ComfyUI/custom_nodes/aiia_grin`: copy again and restart ComfyUI after a change).
+Our own ComfyUI nodes live in `comfy/aiia_grin/` (`ComfyUI/custom_nodes/aiia_grin` is a junction to it: restart ComfyUI after a change).
 The grin's random picks are SMILE's (`Workflow._fill_grin`, from the visitor's seed): each value's peak between its min and max, and
 the moment of that peak within midpoint ± deviation, sent to Grin Frames as `<name>_peak` (without them the node draws its own moments).
 

@@ -1,0 +1,229 @@
+{
+  "repo": "moostrik/smile-models",
+  "files": [
+    {
+      "path": "checkpoints/realvisxlV40_v40Bakedvae.safetensors",
+      "size": 6938040706,
+      "sha256": "912c9dc74f5855175c31a7993f863a043ac8dcc31732b324cd05d75cd7e16844",
+      "source": "https://huggingface.co/SG161222/RealVisXL_V4.0/resolve/main/RealVisXL_V4.0.safetensors",
+      "note": "SDXL checkpoint, VAE baked in; Civitai name. canonical HF file"
+    },
+    {
+      "path": "loras/dmd2_sdxl_4step_lora_fp16.safetensors",
+      "size": 393854592,
+      "sha256": "b3d9173815a4b595991c3a7a0e0e63ad821080f314a0b2a3cc31ecd7fcf2cbb8",
+      "source": "https://huggingface.co/tianweiy/DMD2/resolve/main/dmd2_sdxl_4step_lora_fp16.safetensors",
+      "note": "distillation LoRA (pipeline.distill_lora). canonical HF file"
+    },
+    {
+      "path": "loras/clothing_slider.safetensors",
+      "size": 23474312,
+      "sha256": "084426d4448cc6dd0754c8ec4875666350e0f9b5372ab185b095d617b96d6be2",
+      "source": null,
+      "note": "own LoRA (ai-toolkit); the ICK PC copy"
+    },
+    {
+      "path": "loras/looking_at_viewer.safetensors",
+      "size": 8789076,
+      "sha256": "b0f2bc8342b4aad13ce4df863308881128428ab40f48fb05d10af8b3d2d9ed70",
+      "source": null,
+      "note": "LoRA without metadata; the ICK PC copy"
+    },
+    {
+      "path": "loras/dark.safetensors",
+      "size": 34340216,
+      "sha256": "6c1a6fa99a2b19f0ed890436458d8b98a19e5d844746b6fa6be7775055279534",
+      "source": null,
+      "note": "LoRA without metadata; the ICK PC copy"
+    },
+    {
+      "path": "controlnet/control_instant_id_sdxl.safetensors",
+      "size": 2502139136,
+      "sha256": "c8127be9f174101ebdafee9964d856b49b634435cf6daa396d3f593cf0bbbb05",
+      "source": "https://huggingface.co/InstantX/InstantID/resolve/main/ControlNetModel/diffusion_pytorch_model.safetensors",
+      "note": "InstantID ControlNet. canonical HF file"
+    },
+    {
+      "path": "instantid/ip-adapter_instant_id_sdxl.bin",
+      "size": 1691134141,
+      "sha256": "02b3618e36d803784166660520098089a81388e61a93ef8002aa79a5b1c546e1",
+      "source": "https://huggingface.co/InstantX/InstantID/resolve/main/ip-adapter.bin",
+      "note": "InstantID IP-Adapter. canonical HF file"
+    },
+    {
+      "path": "controlnet/t2i-depth_diffusers.safetensors",
+      "size": 158060416,
+      "sha256": "44d1b9d4c04c1228aada2162ed7489119ed11f12a2bbf1d307fbb1d4bbacba51",
+      "source": "https://huggingface.co/lllyasviel/sd_control_collection/resolve/main/t2i-adapter_diffusers_xl_depth_midas.safetensors",
+      "note": "T2I depth adapter (SDXL, MiDaS), the fp16 conversion of the sd_control_collection (TencentARC's own fp16 file is 24 bytes larger: another header). canonical HF file"
+    },
+    {
+      "path": "geometry_estimation/depth_anything_3_mono_large.safetensors",
+      "size": 1336748056,
+      "sha256": "9b44eda5bedba5b4e125686fdb79d1db309c1b9785277576eb930f885b008f96",
+      "source": "https://huggingface.co/Comfy-Org/Depth-Anything-3/resolve/main/geometry_estimation/depth_anything_3_mono_large.safetensors",
+      "note": "Depth Anything 3 (ComfyUI's own nodes). canonical HF file"
+    },
+    {
+      "path": "insightface/models/antelopev2/1k3d68.onnx",
+      "size": 143607619,
+      "sha256": "df5c06b8a0c12e422b2ed8947b8869faa4105387f199c477af038aa01f9a45cc",
+      "source": null,
+      "note": "insightface antelopev2 (ships as one zip, no per-file URL); bundle copy, byte-verified 2026-09-28"
+    },
+    {
+      "path": "insightface/models/antelopev2/2d106det.onnx",
+      "size": 5030888,
+      "sha256": "f001b856447c413801ef5c42091ed0cd516fcd21f2d6b79635b1e733a7109dbf",
+      "source": null,
+      "note": "insightface antelopev2 (ships as one zip, no per-file URL); bundle copy, byte-verified 2026-09-28"
+    },
+    {
+      "path": "insightface/models/antelopev2/genderage.onnx",
+      "size": 1322532,
+      "sha256": "4fde69b1c810857b88c64a335084f1c3fe8f01246c9a191b48c7bb756d6652fb",
+      "source": null,
+      "note": "insightface antelopev2 (ships as one zip, no per-file URL); bundle copy, byte-verified 2026-09-28"
+    },
+    {
+      "path": "insightface/models/antelopev2/glintr100.onnx",
+      "size": 260665334,
+      "sha256": "4ab1d6435d639628a6f3e5008dd4f929edf4c4124b1a7169e1048f9fef534cdf",
+      "source": null,
+      "note": "insightface antelopev2 (ships as one zip, no per-file URL); bundle copy, byte-verified 2026-09-28"
+    },
+    {
+      "path": "insightface/models/antelopev2/scrfd_10g_bnkps.onnx",
+      "size": 16923827,
+      "sha256": "5838f7fe053675b1c7a08b633df49e7af5495cee0493c7dcf6697200b85b5b91",
+      "source": null,
+      "note": "insightface antelopev2 (ships as one zip, no per-file URL); bundle copy, byte-verified 2026-09-28"
+    },
+    {
+      "path": "liveportrait/appearance_feature_extractor.safetensors",
+      "size": 3361936,
+      "sha256": "38bef5de50a92bf1fc66e8c511051a19dfacdf80c37f8713425ec15dc9ca7d34",
+      "source": "https://huggingface.co/Kijai/LivePortrait_safetensors/resolve/main/appearance_feature_extractor.safetensors",
+      "note": "LivePortrait (the grin). canonical HF file"
+    },
+    {
+      "path": "liveportrait/motion_extractor.safetensors",
+      "size": 112496256,
+      "sha256": "3568cd410e29d046771acb55ecfdfe4c7c197d345bd8b7f95942ef63130b6c9e",
+      "source": "https://huggingface.co/Kijai/LivePortrait_safetensors/resolve/main/motion_extractor.safetensors",
+      "note": "LivePortrait (the grin). canonical HF file"
+    },
+    {
+      "path": "liveportrait/spade_generator.safetensors",
+      "size": 221771768,
+      "sha256": "ca04fbec765745e9eae836d2d7522c274647b277ce5f25104fa1705b75222212",
+      "source": "https://huggingface.co/Kijai/LivePortrait_safetensors/resolve/main/spade_generator.safetensors",
+      "note": "LivePortrait (the grin). canonical HF file"
+    },
+    {
+      "path": "liveportrait/stitching_retargeting_module.safetensors",
+      "size": 911836,
+      "sha256": "60725cf3523ae413880da28ed583c9e84c5c25695a0cef1b77210ea31cc424ea",
+      "source": "https://huggingface.co/Kijai/LivePortrait_safetensors/resolve/main/stitching_retargeting_module.safetensors",
+      "note": "LivePortrait (the grin). canonical HF file"
+    },
+    {
+      "path": "liveportrait/warping_module.safetensors",
+      "size": 182158564,
+      "sha256": "f7b7834bd6039b4088f72e5161e60ad366f68a3763df8a3eac0bc0f9d46fdbbf",
+      "source": "https://huggingface.co/Kijai/LivePortrait_safetensors/resolve/main/warping_module.safetensors",
+      "note": "LivePortrait (the grin). canonical HF file"
+    },
+    {
+      "path": "liveportrait/landmark.onnx",
+      "size": 114666491,
+      "sha256": "31d22a5041326c31f19b78886939a634a5aedcaa5ab8b9b951a1167595d147db",
+      "source": "https://huggingface.co/Kijai/LivePortrait_safetensors/resolve/main/landmark.onnx",
+      "note": "LivePortrait (the grin). canonical HF file"
+    },
+    {
+      "path": "liveportrait/landmark_model.pth",
+      "size": 114910599,
+      "sha256": "48ba55140fda4c292d3faf3e3ed9106784c7c32aebf170d4983fb67cd0a3c9c8",
+      "source": "https://huggingface.co/Kijai/LivePortrait_safetensors/resolve/main/landmark_model.pth",
+      "note": "LivePortrait (the grin). canonical HF file"
+    },
+    {
+      "path": "ultralytics/face_yolov8n.pt",
+      "size": 6230011,
+      "sha256": "70b640f8f60b1cf0dcc72f30caf3da9495eb2fb6509da48c53374ad6806e6a9c",
+      "source": "https://huggingface.co/Bingsu/adetailer/resolve/main/face_yolov8n.pt",
+      "note": "face detector of Advanced LivePortrait. canonical HF file"
+    },
+    {
+      "path": "LLM/Qwen-VL/Qwen3-VL-2B-Instruct/model.safetensors",
+      "size": 4255140312,
+      "sha256": "7de1838c87a5349b016c26a1c3f7d2bc400a3d485f95ef39a7059ffd734977a0",
+      "source": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct/resolve/main/model.safetensors",
+      "note": "Qwen3-VL-2B-Instruct weights (the description). canonical HF file"
+    },
+    {
+      "path": "LLM/Qwen-VL/Qwen3-VL-2B-Instruct/config.json",
+      "size": 1505,
+      "sha256": "bec4b3d446efa05807365c9e1cec03ac590836879d02f3a6da879971154bdd3b",
+      "source": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct/resolve/main/config.json",
+      "note": "Qwen3-VL-2B-Instruct config (not LFS: the source gives a size, no hash); the ICK PC copy"
+    },
+    {
+      "path": "LLM/Qwen-VL/Qwen3-VL-2B-Instruct/generation_config.json",
+      "size": 269,
+      "sha256": "1e241830b48b397cb0900101421df5450baddc7adf01e5fc86b5615865f3bae4",
+      "source": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct/resolve/main/generation_config.json",
+      "note": "Qwen3-VL-2B-Instruct config (not LFS: the source gives a size, no hash); the ICK PC copy"
+    },
+    {
+      "path": "LLM/Qwen-VL/Qwen3-VL-2B-Instruct/preprocessor_config.json",
+      "size": 390,
+      "sha256": "27225450ac9c6529872ee1924fcb0962ff5634834f817040f444118116f4e516",
+      "source": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct/resolve/main/preprocessor_config.json",
+      "note": "Qwen3-VL-2B-Instruct config (not LFS: the source gives a size, no hash); the ICK PC copy"
+    },
+    {
+      "path": "LLM/Qwen-VL/Qwen3-VL-2B-Instruct/video_preprocessor_config.json",
+      "size": 385,
+      "sha256": "7768af27c1fafa9cc9011c1dc20067e03f8915e03b63504550e11d5066986d13",
+      "source": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct/resolve/main/video_preprocessor_config.json",
+      "note": "Qwen3-VL-2B-Instruct config (not LFS: the source gives a size, no hash); the ICK PC copy"
+    },
+    {
+      "path": "LLM/Qwen-VL/Qwen3-VL-2B-Instruct/chat_template.json",
+      "size": 5502,
+      "sha256": "6f8a6a55027e3da5160105556cda5dd69f6423f1c32645f6730d32de7773d0c4",
+      "source": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct/resolve/main/chat_template.json",
+      "note": "Qwen3-VL-2B-Instruct config (not LFS: the source gives a size, no hash); the ICK PC copy"
+    },
+    {
+      "path": "LLM/Qwen-VL/Qwen3-VL-2B-Instruct/tokenizer.json",
+      "size": 7032403,
+      "sha256": "a5d85b6dcc535e6b93115a9ef287e6132fdbf30270da6218194ba742261173c7",
+      "source": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct/resolve/main/tokenizer.json",
+      "note": "Qwen3-VL-2B-Instruct config (not LFS: the source gives a size, no hash); the ICK PC copy"
+    },
+    {
+      "path": "LLM/Qwen-VL/Qwen3-VL-2B-Instruct/tokenizer_config.json",
+      "size": 10868,
+      "sha256": "c2da771801886ad9ae98181793ffd3dfb7f1af30f6f7c6a4e15d7dbba52e2399",
+      "source": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct/resolve/main/tokenizer_config.json",
+      "note": "Qwen3-VL-2B-Instruct config (not LFS: the source gives a size, no hash); the ICK PC copy"
+    },
+    {
+      "path": "LLM/Qwen-VL/Qwen3-VL-2B-Instruct/vocab.json",
+      "size": 2776833,
+      "sha256": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910",
+      "source": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct/resolve/main/vocab.json",
+      "note": "Qwen3-VL-2B-Instruct config (not LFS: the source gives a size, no hash); the ICK PC copy"
+    },
+    {
+      "path": "LLM/Qwen-VL/Qwen3-VL-2B-Instruct/merges.txt",
+      "size": 1671839,
+      "sha256": "599bab54075088774b1733fde865d5bd747cbcc7a547c5bc12610e874e26f5e3",
+      "source": "https://huggingface.co/Qwen/Qwen3-VL-2B-Instruct/resolve/main/merges.txt",
+      "note": "Qwen3-VL-2B-Instruct config (not LFS: the source gives a size, no hash); the ICK PC copy"
+    }
+  ]
+}

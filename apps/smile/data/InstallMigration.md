@@ -1,11 +1,13 @@
 # A better install protocol: one script, a model manifest, a private model mirror
 
-**Status (2026-10-26): active.** The plan of 2026-10-06 (deferred until after the presentation), merged
-with the clean-install plan of 2026-10-26: the installation runs at ICK, SMILE gets installed on a
-second PC (24 GB card) to test the `online` branch, and the install must stay updatable. The additions
-are marked **(2026-10-26)**: an inventory of the ICK PC as step 0, packs pinned by git commit, the
-patches removed, an update path, the models in a folder outside ComfyUI, a smoke test at the end of the
-install, no downloads at runtime.
+**Status (2026-10-26, evening): the install path is built and runs on the dev PC (IAAI).** `scripts\install.bat`
+installs app, ComfyUI and models from `comfy\models.json`, `comfy\comfy.lock` and `comfyequirements.lock` and ends
+in a passing smoke test (the warm-up through a fresh ComfyUI in 20 s). What this round changed against the plan below,
+and what is left, is in **Migration** at the end. Earlier status: the plan of 2026-10-06 (deferred until after the
+presentation), merged with the clean-install plan of 2026-10-26: the installation runs at ICK, SMILE gets installed on
+a second PC (24 GB card) to test the `online` branch, and the install must stay updatable. The additions are marked
+**(2026-10-26)**: an inventory of the ICK PC as step 0, packs pinned by git commit, the patches removed, an update
+path, the models in a folder outside ComfyUI, a smoke test at the end of the install, no downloads at runtime.
 
 ## Context
 
@@ -322,23 +324,37 @@ bytes, `_http` replaced by a fake keyed by URL (302 with `x-linked-*` for `resol
 - token lookup order (env, file, patched `getpass`) and the saved file;
 - `export` copies, skips what is already right, writes `models.json`; `main([...])` exit codes 0/1.
 
-## Migration (user steps, in this order)
+## Migration
 
-0. (2026-10-26) On the ICK PC: `py -3.12 comfy\inventory.py`; the output goes into the manifest, the
-   locks and the pack pins. The dev PC steps below then apply to the ICK PC, remotely.
-1. Create a **private** HF repo `smile-models` and a fine-grained write token for it; put the repo id in
-   `comfy/models.json` (`repo`); `hf auth login` in any shell, or paste the token into the tool's prompt.
-2. `py -3.12 -m modules.comfy.models check` (all 33 ok, the extras listed), `sources` (confirms the public
-   fallbacks), `upload` (~18.5 GB to HF), then `sources --repo` (the HF copies match).
-3. `export E:\smile-models` to the USB SSD; copy that folder into iCloud Drive as the second cold copy
-   (set it to "Always keep on this device" there: evicted placeholders read slowly or fail).
-4. Delete `comfy\models\` (27 GiB) by hand, then drop the `comfy/models/` line from `.gitignore`;
-   optionally remove the extra files `check` lists.
-5. `scripts\install.bat` on this PC: everything skips; the first run writes the venv stamp without
-   reinstalling when every pin is satisfied.
-6. On the test PC: prerequisites, `git clone`, `scripts\install.bat` (with `--mirror E:\smile-models`
-   offline), the `online` branch. Then one visitor with the seed of an ICK clip (`modules.save.record
-   --preset`) and the two grins side by side: the unpatched Advanced LivePortrait must give the same.
+### Done on the dev PC IAAI, 2026-10-26 (round 1: the install path)
+
+The reference turned out to be **the install that runs**, not the ICK PC's bytes: nothing was run on the ICK PC
+(its repository is not touched remotely), only its three private LoRAs were copied over. The 28 public models were
+taken from the dev install `C:\Developer\ComfyUI\models` (every one happens to equal its canonical Hugging Face file,
+`sources` confirmed it, but that is a record, not a gate), Depth Anything 3 was downloaded, and `hash --write` wrote
+what is in the folder into the manifest after the smoke test passed. The pins are what the dev PC ran: ComfyUI
+`4ef23c34`, the packs as **registry archives by version** (not git commits: matching a commit to an archive byte for
+byte was not worth it, and the archives are what both PCs run), the venv a `pip freeze` of the dev venv, installed
+with `--no-deps` (facenet-pytorch's `numpy<2` metadata contradicts the numpy 2.5.3 that runs).
+
+- `modules/comfy/models.py` + tests (section 1, 8), `comfy/models.json` (32 files; the doc's 33 was a miscount), `comfy/comfy.lock`,
+  `comfy/requirements.lock`, `scripts/install_comfy.ps1`, `scripts/install.bat`, `modules/comfy/smoke.py` (section 2, 3),
+  the code changes (section 6), README and CLAUDE.md (section 7); `comfy/README.md`, `comfy/setup.ps1`, `comfy/workflows/` deleted.
+- Found on the way: the registry serves some packs as a zip named `node.tar.gz` (`inventory.py` sniffs it); the pack archives
+  have CRLF files, so the patches apply with `--ignore-whitespace`; clones are made with `core.autocrlf=false`.
+- Not done: the HF upload (`repo` is still the placeholder: the user creates the repo and a Write token, puts
+  `<user>/smile-models` in the manifest, runs `upload` and `sources --repo`), the USB/iCloud `export`, SMILE's own run here
+  with a visitor (the user's check).
+
+### Left
+
+1. HF: repo, token, `py -3.12 -m modules.comfy.models upload`, then `sources --repo`; `export E:\smile-models` for the USB SSD
+   and iCloud Drive (set to "Always keep on this device").
+2. Section 4 (patches to none) and section 5 (`-Update`), later rounds.
+3. The ICK PC, on site: `py -3.12 comfy\inventory.py` as the check of what it runs against the locks, `git pull`,
+   `scripts\install.bat` (its `ComfyUI\models` is moved into `..\smile-models` by the junction step; never during the show),
+   delete `comfy\models\` (27 GiB) by hand, drop the `comfy/models/` line from `.gitignore`.
+4. The `online` branch: merge `main` into it and run it on the dev PC.
 
 ## Verification
 

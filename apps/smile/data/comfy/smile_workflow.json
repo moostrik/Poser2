@@ -265,7 +265,7 @@
   },
   "1002:20": {
     "inputs": {
-      "ckpt_name": "realvisxlV40_v40LightningBakedvae.safetensors"
+      "ckpt_name": "realvisxlV40_v40Bakedvae.safetensors"
     },
     "class_type": "CheckpointLoaderSimple",
     "_meta": {

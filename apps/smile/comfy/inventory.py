@@ -68,10 +68,11 @@ def registry_diff(path: Path, version: str) -> dict:
         with urllib.request.urlopen(f'https://api.comfy.org/nodes/{path.name}/versions/{version}', timeout=30) as r:
             url: str = json.load(r)['downloadUrl']
         with tempfile.TemporaryDirectory() as temp:
-            archive = Path(temp) / ('pack.tar.gz' if url.endswith('.tar.gz') else 'pack.zip')
+            archive = Path(temp) / 'pack'
             urllib.request.urlretrieve(url, archive)
-            original = Path(temp) / 'pack'
-            if archive.suffix == '.zip':
+            original = Path(temp) / 'files'
+            # the registry names every archive node.tar.gz, some of them are zips: go by the content
+            if zipfile.is_zipfile(archive):
                 zipfile.ZipFile(archive).extractall(original)
             else:
                 tarfile.open(archive).extractall(original, filter='data')

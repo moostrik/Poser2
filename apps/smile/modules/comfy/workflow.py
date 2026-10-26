@@ -11,12 +11,15 @@ The workflow only provides the structure: every run fills in the values from Pip
 
 import copy
 import json
+import logging
 import random
 from typing import Callable
 
 import pytweening as easing
 
 from modules.comfy.settings import PipelineSettings, Prefer, StyleSettings
+
+logger = logging.getLogger(__name__)
 
 MAX_SEED: int = 2 ** 32 - 1     # the smallest maximum of the seeded nodes (QwenVL: 1 .. 4294967295)
 FIXED_SEED: int = 1             # with portrait.fixed_seed: the description and the grin too, or the runs still differ
@@ -161,6 +164,7 @@ class Workflow():
         latent: dict = workflow[_find(workflow, class_type='EmptyLatentImage')]['inputs']
         self.portrait_size: tuple[int, int] = (latent['width'], latent['height'])
         self._template: dict = workflow
+        self._warned: set[str] = set()      # model files ComfyUI does not offer, each said once
         # the nodes that take time, by the name the panel shows while they run
         self._steps: dict[str, str] = {self.describe: 'describe', self.depth_run: 'depth', self.sampler: 'portrait',
                                        self.grin: 'grin', self.last_depth_run: 'depth of last frame'}
@@ -198,9 +202,14 @@ class Workflow():
             sampler['inputs']['vae'] = list(self.vae)
         workflow[self.instantid]['inputs'].update(ip_weight=p.embedding_strength, cn_strength=p.keypoint_strength)
         workflow[self.depth]['inputs'].update(strength=p.depth_strength, end_percent=p.depth_end)
-        # ComfyUI refuses a file it doesn't have: the workflow's checkpoint stays, and no distillation
+        # ComfyUI refuses a file it doesn't have: the workflow's checkpoint stays, and no distillation.
+        # An install that misses a model would otherwise run quietly with another: say it, once per file
         if p.checkpoint in p.checkpoint_options:
             workflow[self.checkpoint]['inputs']['ckpt_name'] = p.checkpoint
+        else:
+            self._missing('checkpoint', p.checkpoint, f"the workflow's {workflow[self.checkpoint]['inputs']['ckpt_name']}")
+        if p.distill_lora != NO_LORA and p.distill_strength != 0.0 and p.distill_lora not in p.lora_options:
+            self._missing('distillation LoRA', p.distill_lora, 'no distillation')
         if p.distill_lora != NO_LORA and p.distill_lora in p.lora_options and p.distill_strength != 0.0:
             # on the model only (the text encoder stays the checkpoint's), in front of the style LoRAs
             workflow[self.distill] = {'class_type': 'LoraLoaderModelOnly',
@@ -211,6 +220,8 @@ class Workflow():
         for slot, node_id in enumerate(self.loras, start=1):
             name: str = getattr(style, f'lora_{slot}')
             strength: float = getattr(style, f'lora_{slot}_strength')
+            if name != NO_LORA and name not in style.lora_options:
+                self._missing(f'LoRA {slot}', name, 'the slot switched off')
             if name == NO_LORA or name not in style.lora_options:
                 # ComfyUI refuses a file it doesn't have: the slot keeps the workflow's file, switched off
                 name, strength = workflow[node_id]['inputs']['lora_name'], 0.0
@@ -222,6 +233,11 @@ class Workflow():
             workflow[node_id]['inputs']['seed'] = seed
         self._fill_grin(workflow, s, seed)
         return workflow
+
+    def _missing(self, what: str, name: str, instead: str) -> None:
+        if name not in self._warned:
+            self._warned.add(name)
+            logger.warning('ComfyUI does not offer the %s %s: %s is used instead', what, name, instead)
 
     def build_warmup(self, image_name: str, style: StyleSettings, s: PipelineSettings) -> dict:
         """The same run at its shortest: one sampler step and one grin frame. The models load at the

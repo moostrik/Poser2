@@ -34,44 +34,44 @@
   },
   "1024": {
     "inputs": {
-      "seed": 4112934062,
+      "seed": 4348275,
       "frames": 250,
       "ease": "sine_in_out",
       "crop_factor": 1.7,
-      "midpoint": 0.72,
+      "midpoint": 0.75,
       "midpoint_deviation": 0.18,
       "smile": 2.0,
-      "aaa": 1.4427776578136147,
-      "eee": -18.35209543530712,
-      "eyebrow": -28.686893552173522,
-      "blink": -13.746008965151354,
+      "aaa": -18.486515216477372,
+      "eee": -5.328046419006869,
+      "eyebrow": 0.875060940774425,
+      "blink": -28.942423571074865,
       "wink": 0.0,
-      "woo": 6.67225637759087,
+      "woo": 4.1158413896844,
       "pupil_x": 0.0,
       "pupil_y": 0.0,
-      "rotate_pitch_min": 4.590716272995493,
-      "rotate_pitch_max": 4.590716272995493,
-      "rotate_yaw_min": -3.095546256902045,
-      "rotate_yaw_max": -3.095546256902045,
-      "rotate_roll_min": 9.765788152572902,
-      "rotate_roll_max": 9.765788152572902,
+      "rotate_pitch_min": -0.5715062271409685,
+      "rotate_pitch_max": -0.5715062271409685,
+      "rotate_yaw_min": -10.849252839160126,
+      "rotate_yaw_max": -10.849252839160126,
+      "rotate_roll_min": 6.815813741299586,
+      "rotate_roll_max": 6.815813741299586,
       "image": [
         "1002:36",
         0
       ],
-      "stitching": true,
-      "smile_peak": 0.7709629459568812,
-      "aaa_peak": 0.594685512127823,
-      "eee_peak": 0.6305566566730703,
-      "woo_peak": 0.7508868143933279,
-      "eyebrow_peak": 0.5494394716727934,
-      "blink_peak": 0.7507134611209189,
-      "wink_peak": 0.6990504569079903,
-      "pupil_x_peak": 0.5866221107743346,
-      "pupil_y_peak": 0.6187356849017127,
-      "rotate_pitch_peak": 0.5554406933742033,
-      "rotate_yaw_peak": 0.5953512859083357,
-      "rotate_roll_peak": 0.8578988147369193,
+      "stitching": false,
+      "smile_peak": 0.5801434794237339,
+      "aaa_peak": 0.8626577708256477,
+      "eee_peak": 0.8557030382058142,
+      "woo_peak": 0.660183656685138,
+      "eyebrow_peak": 0.6149197630054377,
+      "blink_peak": 0.5798334195553634,
+      "wink_peak": 0.8075551826886429,
+      "pupil_x_peak": 0.5739682340078279,
+      "pupil_y_peak": 0.7598456676485261,
+      "rotate_pitch_peak": 0.7963474561344054,
+      "rotate_yaw_peak": 0.9034404855671685,
+      "rotate_roll_peak": 0.6688134670058742,
       "still": false
     },
     "class_type": "GrinFrames",
@@ -100,7 +100,7 @@
       "custom_prompt": "Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips, happy ",
       "max_tokens": 64,
       "keep_model_loaded": true,
-      "seed": 4112934062,
+      "seed": 4348275,
       "image": [
         "1006",
         0
@@ -120,7 +120,7 @@
   },
   "1002:20": {
     "inputs": {
-      "ckpt_name": "realvisxlV40_v40LightningBakedvae.safetensors"
+      "ckpt_name": "realvisxlV40_v40Bakedvae.safetensors"
     },
     "class_type": "CheckpointLoaderSimple",
     "_meta": {
@@ -130,10 +130,10 @@
   "1002:1040": {
     "inputs": {
       "lora_name": "clothing_slider.safetensors",
-      "strength_model": 3.0,
-      "strength_clip": 3.0,
+      "strength_model": 1.0,
+      "strength_clip": 1.0,
       "model": [
-        "1002:20",
+        "smile_distill",
         0
       ],
       "clip": [
@@ -380,9 +380,9 @@
   },
   "1002:33": {
     "inputs": {
-      "strength": 0.0,
+      "strength": 0.65,
       "start_percent": 0,
-      "end_percent": 0.0,
+      "end_percent": 0.55,
       "positive": [
         "1002:30",
         1
@@ -418,7 +418,7 @@
   },
   "1002:35": {
     "inputs": {
-      "seed": 4112934062,
+      "seed": 4348275,
       "steps": 4,
       "cfg": 1.2,
       "sampler_name": "lcm",
@@ -585,31 +585,15 @@
       "title": "Depth of last frame"
     }
   },
-  "1000:4": {
+  "smile_distill": {
+    "class_type": "LoraLoaderModelOnly",
     "inputs": {
-      "dsize": 1152,
-      "scale": 2,
-      "vx_ratio": 0,
-      "vy_ratio": -0.1,
-      "face_index": 0,
-      "face_index_order": "large-small",
-      "rotate": true,
-      "pipeline": [
-        "1000:2",
+      "model": [
+        "1002:20",
         0
       ],
-      "cropper": [
-        "1000:3",
-        0
-      ],
-      "source_image": [
-        "1",
-        0
-      ]
-    },
-    "class_type": "LivePortraitCropper",
-    "_meta": {
-      "title": "Face crop"
+      "lora_name": "dmd2_sdxl_4step_lora_fp16.safetensors",
+      "strength_model": 1.0
     }
   },
   "1000:2": {
@@ -652,6 +636,33 @@
     "class_type": "ImageResizeKJv2",
     "_meta": {
       "title": "To 896x1120"
+    }
+  },
+  "1000:4": {
+    "inputs": {
+      "dsize": 1152,
+      "scale": 2,
+      "vx_ratio": 0,
+      "vy_ratio": -0.1,
+      "face_index": 0,
+      "face_index_order": "large-small",
+      "rotate": true,
+      "pipeline": [
+        "1000:2",
+        0
+      ],
+      "cropper": [
+        "1000:3",
+        0
+      ],
+      "source_image": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "LivePortraitCropper",
+    "_meta": {
+      "title": "Face crop"
     }
   },
   "test_input": {
@@ -715,7 +726,7 @@
   },
   "1025": {
     "inputs": {
-      "frame_rate": 13.0,
+      "frame_rate": 12.0,
       "loop_count": 0,
       "filename_prefix": "smile_test",
       "format": "video/h264-mp4",
