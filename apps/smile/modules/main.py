@@ -6,7 +6,7 @@ from modules.comfy.Generator import Generator
 from modules.render.GrinPlayer import GrinPlayer
 from modules.comfy.messages import GenMessage, GenState
 from modules.osc.Sender import Sender as Osc
-from modules.audio.DB import DB as AudioDB
+from modules.audio.DB import DB as AudioDB, laugh_files
 from modules.audio.ScreenTest import ScreenTest
 from modules.credit_scroll import CreditScroller
 from modules.render.settings import RenderSettings
@@ -87,16 +87,19 @@ class Main():
         # the name going round the players' walls, planned here and sent to them every second
         self.credit_scroller: CreditScroller = CreditScroller(
             self.settings.render, lambda player, address, args: self.screen_test.send_player(player, address, *args))
-        self.save: ClipSaver = ClipSaver(self.settings.sequence)
+        self.save: ClipSaver = ClipSaver(self.settings.sequence, watermark=self.settings.render.credit_name)
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
         self._saving: bool = False          # the visitor's files are open in the saver
         self._style_picked: bool = False    # the style of the next visitor is picked: until the flash
         self._face_frame_time: float = 0.0  # arrival of the camera frame the face finder got last
         self._visitor_start: float | None = None    # the capture of the visitor the generator is working on
+        self._flash_time: float = 0.0       # when the flash started: the music starts then (Max, the phone, the clip's sound)
         self.artnet = Artnet(self.settings.artnet, 'data/artnet.json')
         # SMILE Online: a turn for someone outside when the room's eye is free, stepped from sequence_callback
-        self.online: Online = Online(self.settings.online, self.settings.pipeline, self.camera, self.sequencer, self.face,
-                                     self.diffuse.record, lambda: (self.settings.render.credit_name, self.settings.render.credit_line))
+        self.online: Online = Online(self.settings.online, self.camera, self.sequencer, self.face, self.render.grab,
+                                     lambda: (self.settings.render.credit_name, self.settings.render.credit_line),
+                                     lambda: (self.audio.get_audio_id(), self.audio.track_path()),
+                                     laughs=laugh_files, laughter=lambda: self.settings.audio.laughter, pick=self.pick_style)
         self.save.set_saved_callback(self.online.on_saved)
 
         self._running: bool = False
@@ -181,15 +184,14 @@ class Main():
             artnet_progress = 1.0
         self.artnet.set_progress(artnet_progress, ani)
 
-        if seq == SequenceType.CAMERA_DETECT and not self._style_picked:
-            # one style per visitor; the style id is also the movement id that picks the music.
-            # Picked when a face starts charging, so the music player has the track loaded at the
-            # flash; a charge that drains and starts again keeps the style that was picked
-            self._style_picked = True
-            movement_id: str = self.diffuse.next_style()
-            self.audio.update(movement_id)
+        if seq == SequenceType.CAMERA_DETECT:
+            self.pick_style()
         if seq == SequenceType.FLASH and message.initial:
             self._style_picked = False
+            self._flash_time = time.time()
+        if seq == SequenceType.DIFF_LOOP and message.initial:
+            # the grin starts playing: the share clip gets the track from the point the room hears now
+            self.save.set_share(self.audio.track_path(), time.time() - self._flash_time)
 
         audio = self.settings.audio
         if audio.osc.active:
@@ -255,8 +257,8 @@ class Main():
         self._limit_visitor(seq)
 
         if seq == SequenceType.TIMEOUT:
-            if message.initial == True:
-                # a failed or stopped visitor has no complete grin: its folder is not kept
+            if message.initial == True and self._saving:
+                # still open here: a failed or stopped visitor has no complete grin, its folder is not kept
                 self._saving = False
                 self.save.end_sequence(keep=self._grin_saved)
 
@@ -284,13 +286,21 @@ class Main():
             self.diffuse.interrupt()
             self.sequencer.finish()
 
+    def pick_style(self) -> None:
+        """One style per visitor; the style id is also the movement id that picks the music. Picked when a
+        face starts charging (an online turn picks at its start), so the music player has the track loaded
+        at the flash; a charge that drains and starts again keeps it."""
+        if not self._style_picked:
+            self._style_picked = True
+            movement_id: str = self.diffuse.next_style()
+            self.audio.update(movement_id)
+
     def face_callback(self, frame: FaceFrame) -> None:
         # the sequencer charges toward the flash while the face qualifies
         self.sequencer.set_face(frame.qualified, frame.time)
         self.online.on_face(frame)
 
     def diffusion_callback(self, message: GenMessage) -> None:
-        self.online.on_generation(message)
         # a visitor's recording: the portrait still and the grin clip (not the step previews)
         if message.image is None:
             return
@@ -304,8 +314,13 @@ class Main():
             self.save.save_portrait(message.image)
         if message.state == GenState.DIFF_LOOP:
             self.save.save_frame(message.image)
-            if message.progress >= 1.0:
+            if message.progress >= 1.0 and not self._grin_saved:
+                # the grin is complete: the recording closes now, while the grin still plays on the screens,
+                # so the share clip is built and on its way to a visitor outside before the turn is over
                 self._grin_saved = True
+                if self._saving:
+                    self._saving = False
+                    self.save.end_sequence(keep=True)
 
     def isRunning(self) -> bool :
         return self._running

@@ -159,7 +159,7 @@ no new sequence while it is on (`Sequencer.blocked`). Shaders are
 it changes and `pick`s a random line, never the last one again, `LINE` when it has none) and makes the QR code (OpenCV's encoder, whole pixels per
 module, with its quiet zone). `CreditLayer` draws the code in the bottom right corner of everything the main screen shows, and the caption, the name with the
 visitor's line under it (drawn at the capture, `CreditLayer.new_visitor`, into the `credit_line` readout), as a meme caption over
-the top (white with a black edge, in the comic font `data/Bangers-Regular.ttf`: the credit is a joke) over the grin and the result (DIFF_LOOP and TIMEOUT, fading in and out), and with `credit_camera` over the camera view too (its
+the top (white with a black edge, in the comic font `data/Bangers-Regular.ttf`: the credit is a joke) over the generation, the grin and the result (DIFFUSION, DIFF_LOOP and TIMEOUT, fading in and out), and with `credit_camera` over the camera view too (its
 own line, drawn when that view begins: `new_line_due`), from the Render tab's `credit` fields; it is not in the saved clips. The players show the code and the name under it (scaled to the code's width) on one cell instead of its clip,
 for one play: it takes a cell when a clip starts there and leaves at that cell's next start (`next_credit_cell`), so no
 clip start flashes over it; `credit_qr_players` switches it (`/credit 0|1` every second, like `/caption`), off takes the card away at once. `credit_players` goes
@@ -188,8 +188,13 @@ texture, over the clips and the credit card, under the lit test cells. Nothing o
 ## Recordings
 
 `modules/save/ClipSaver.py` saves each finished visitor for the players under `output/` (git-ignored):
-the grin as `grins/<style>/<id>.mp4` (h264 at the full portrait size, at `grin_fps`), the capture and the
-portrait as `portraits/<style>/<id>_capture.jpg` and `<id>_portrait.jpg`. `<style>` is the visitor's
+the grin as `grins/<style>/<id>.mp4` (silent h264 at the full portrait size, at `grin_fps`), the capture and the
+portrait as `portraits/<style>/<id>_capture.jpg` and `<id>_portrait.jpg`, and after the grin landed the phone's copy
+`shares/<style>/<id>.mp4` (`modules/save/share.py`: the same grin re-encoded with the watermark, a circled "ai" and the credit name, in the bottom
+right, no caption, built before the players' clip lands, and the visitor's track as its sound: `ClipSaver.set_share` from `Main` at DIFF_LOOP's start with the seconds
+since the flash, read with `ffmpeg.read_audio`, played on the tape of `modules/audio/tape.py`, the Max patch's spin-up over
+the first half second and a wind-down over the last, muxed by `ffmpeg.make_share`; a share clip that fails is a warning and
+the players' clip goes to the phone instead). `<style>` is the visitor's
 style, `A` (colourful and happy) or `B` (monochrome and dark); the players read it from the folder, the id is the time. Files are built in `output/temp/`
 and renamed into place when the grin is complete, so the players never see a partial file
 (a visitor that failed, or was reset, is closed and deleted there).
@@ -271,9 +276,22 @@ is SMILE's side: `Link` (a websocket client thread that reconnects, plus an uplo
 from `Main.sequence_callback`, the only place its phase changes: IDLE, ASKING, JUDGING, TRANSFORMING, DELIVERING) and
 `fake.py`, a stand-in for SMILE at the relay. A turn puts the phone's frames into `Camera` as a third source
 (`set_online`, `push_online`; the device and the image are muted meanwhile and back when the turn ends) and the face finder,
-the charge, the flash and the generation run unchanged; `Online.on_face` sends the judging, `on_generation` the
-transformation's images (`SHOW`), and after TIMEOUT `ClipSaver`'s saved callback gives the files to upload before the
-phone gets its result. The token is a file (`data/online_token.txt`, git-ignored), never a setting in a preset.
+the charge, the flash and the generation run unchanged; `Online.on_face` sends the judging, and from the flash to the
+end of the timeout the phone gets the main screen as rendered (`ScreenGrab` in `modules/render/grab.py`, taken in
+`SmileRender._render_credit` from a credit pass without the QR code and before the status line, `stream_fps` x `stream_width`,
+encoded on the link's thread as `SHOW` frames, paced by the relay to one in flight per phone (`seen` from the page); the phone's own judging is the whole image in pixels while the face is not right and the
+page's white as the charge). The phone plays the visitor's track from the flash (`music` message; the relay keeps the
+tracks in `data/tracks` as AAC, `Link._track_aac` transcodes one the first time it is used, `DB.track_path`) on the tape: SMILE picks the style
+and track at the turn's start (`Main.pick_style` from `Online._begin_turn`) and names the track to the phone, which fetches it
+during the judging; `Online._send_stage`
+sends the sequence's stage and progress (`STAGE_NAMES`, every 0.25 s) and the page follows the Max patch's curves (speed
+and low-pass filter, `tapeStage` in `app.js`, floored to what a phone speaker can do; `?debug` shows the sound state); the turn runs through the bloom (frames) and the fade (sound only) and ends
+back at the camera. The phone also plays the room's laughter samples (`laugh_files`, uploaded to the relay's `laughs/` at
+the first connect, `/api/library`) at random, following `audio.laughter` through the `eye` message. The turn ends
+with the sequence; `ClipSaver`'s saved callback gives the files (the recording closes at the last grin frame, `Main.diffusion_callback`, while the
+grin still plays), which are uploaded at once (`Delivery`)
+and the `result` goes to the phone by its id, so it has the video when its turn ends and the next turn can start meanwhile. The phone sends its camera mirrored, as it
+shows it. The token is a file (`data/online_token.txt`, git-ignored), never a setting in a preset.
 Tests: `relay/tests` (the server on aiohttp's test server) and `modules/online/tests` (a fake link and camera).
 
 ## Settings

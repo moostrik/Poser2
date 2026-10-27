@@ -4,8 +4,9 @@
 
 It connects like SMILE, says its eye is free, takes the first in line, judges their frames with
 SMILE's own face detector (SCRFD; without its model, the middle of the frame counts as a face: a box,
-its distance from good by its size and place, the charge rising while it is good), flashes, sends the
-frame back through a few fake stages and uploads it as the portrait and the still. No grin: the page
+its distance from good by its size and place, the charge rising while it is good), flashes, streams a
+fake transformation of the frame as the screen (a few seconds at 10 fps), ends the turn and then
+uploads the frame as the portrait and the still, the result addressed to the phone. No grin: the page
 then shows the portrait."""
 
 import argparse
@@ -18,8 +19,7 @@ from threading import Lock, Thread
 import cv2
 import numpy as np
 
-from modules.online.Link import Link, read_token
-from modules.online.Online import encode
+from modules.online.Link import Link, encode, read_token
 
 logger = logging.getLogger('fake-smile')
 
@@ -27,7 +27,7 @@ MODEL: str = 'data/models/scrfd_10g_bnkps.onnx'
 
 CHARGE_SECONDS: float = 3.0
 WINDOW: float = 15.0
-STAGES: tuple[str, ...] = ('depth', 'describe', 'diffusion', 'portrait', 'grin')
+STREAM_FPS: float = 10.0
 
 
 class FakeSmile:
@@ -48,6 +48,7 @@ class FakeSmile:
         self.charged_at: float = 0.0
         self.last_frame: np.ndarray | None = None
         self.asked: float = 0.0
+        self.phone: str = ''
 
     def on_message(self, message: dict) -> None:
         kind: str = message.get('type', '')
@@ -56,6 +57,7 @@ class FakeSmile:
                 self.waiting = int(message.get('waiting', 0))
             elif kind == 'turn':
                 if message.get('id'):
+                    self.phone = str(message['id'])
                     self.turn = True
                     self.turn_start = time.time()
                     self.charge = 0.0
@@ -117,44 +119,43 @@ class FakeSmile:
             Thread(target=self.transform, args=(image,), daemon=True).start()
 
     def transform(self, image: np.ndarray) -> None:
-        """The flash and a fake transformation: the frame itself, worked over a little per stage."""
+        """The flash and a fake transformation streamed as the screen: the frame itself, worked over
+        frame by frame, white at the flash, the blur falling, then the portrait standing."""
         with self.mutex:
             if not self.turn or self.busy:
                 return
-            self.busy = True        # the turn goes on until the result is delivered: no judging, no new turn
+            self.busy = True        # the turn goes on until the sequence is over: no judging, no new turn
         link: Link = self.link
-        link.send({'type': 'stage', 'stage': 'flash'})
-        time.sleep(1.0)
-        link.send({'type': 'stage', 'stage': 'depth'})
-        depth: np.ndarray = cv2.cvtColor(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), cv2.COLOR_GRAY2BGR)
-        link.send_image(encode(cv2.GaussianBlur(depth, (31, 31), 0)) or b'')
-        time.sleep(1.5)
-        link.send({'type': 'stage', 'stage': 'describe', 'text': 'a person, looking at a phone, hopeful'})
-        for step in range(1, 7):
-            time.sleep(0.5)
-            blur: int = 2 * (7 - step) * 4 + 1
-            link.send({'type': 'stage', 'stage': 'diffusion', 'progress': round(step / 6, 2)})
-            link.send_image(encode(cv2.GaussianBlur(image, (blur, blur), 0)) or b'')
+        phone: str = self.phone
+        link.send({'type': 'stage', 'stage': 'flash', 'out': 1.5})
         portrait: np.ndarray = cv2.applyColorMap(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), cv2.COLORMAP_PINK)
-        link.send({'type': 'stage', 'stage': 'portrait'})
-        link.send_image(encode(portrait) or b'')
-        time.sleep(1.0)
-        link.send({'type': 'stage', 'stage': 'grin'})
+        frames: int = int(6 * STREAM_FPS)
+        for i in range(frames):
+            t: float = i / frames
+            if t < 0.15:
+                shown: np.ndarray = cv2.addWeighted(image, t / 0.15, np.full_like(image, 255), 1 - t / 0.15, 0)
+            elif t < 0.7:
+                blur: int = 2 * int(30 * (0.7 - t) / 0.55) + 1
+                shown = cv2.GaussianBlur(image, (blur, blur), 0)
+            else:
+                shown = cv2.addWeighted(image, max(0.0, 1 - (t - 0.7) / 0.1), portrait, min(1.0, (t - 0.7) / 0.1), 0)
+            link.send_image(encode(shown) or b'')
+            time.sleep(1.0 / STREAM_FPS)
+        link.send({'type': 'turn_end', 'reason': 'done'})
+        with self.mutex:
+            self.turn = False
+            self.busy = False
+        logger.info('turn ends (done)')
+        # the delivery, after the turn: the files, then the result to the phone
         id: str = time.strftime('%Y_%m_%d_%H_%M_%S')
         path: str = os.path.join(tempfile.gettempdir(), f'fake_smile_{id}.jpg')
         cv2.imwrite(path, portrait)
 
         def done(ok: bool) -> None:
-            if ok:
-                link.send({'type': 'result', 'id': id, 'name': 'Matthias Oostrik', 'caption': 'loves your smile!'})
-                link.send({'type': 'turn_end', 'reason': 'done'})
-            else:
-                link.send({'type': 'turn_end', 'reason': 'reset'})
-            with self.mutex:
-                self.turn = False
-                self.busy = False
+            link.send({'type': 'result', 'id': id, 'phone': phone, 'name': 'Matthias Oostrik', 'caption': 'loves your smile!', 'ok': ok})
             os.remove(path)
-            logger.info('turn ends (%s)', 'done' if ok else 'upload failed')
+            logger.info('result delivered (%s)', 'ok' if ok else 'upload failed')
+        time.sleep(2.0)
         link.upload([('portrait', id, path), ('still', id, path)], done)
 
     def run(self) -> None:

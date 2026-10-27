@@ -18,8 +18,9 @@ OUTLINE_COLOR: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
 OUTLINE: list[tuple[int, int]] = [(x, y) for x in (-OUTLINE_PX, 0, OUTLINE_PX) for y in (-OUTLINE_PX, 0, OUTLINE_PX) if x or y]
 FADE_S: float = 0.5             # the caption fades in and out over this time
 
-# the caption is shown with the visitor's portrait: while the grin plays and while the result holds after it
-SHOWN: frozenset[SequenceType] = frozenset({SequenceType.DIFF_LOOP, SequenceType.TIMEOUT})
+# the caption is shown with the visitor's portrait: from the first generated image, while the grin plays and
+# while the result holds after it
+SHOWN: frozenset[SequenceType] = frozenset({SequenceType.DIFFUSION, SequenceType.DIFF_LOOP, SequenceType.TIMEOUT})
 # and, with `credit_camera`, over the camera while the installation waits for a visitor
 CAMERA: frozenset[SequenceType] = frozenset({SequenceType.CAMERA_SHOW, SequenceType.CAMERA_DETECT})
 
@@ -93,13 +94,14 @@ class CreditLayer(LayerBase):
     def texture(self) -> Texture:
         return self._fbo
 
-    def render(self, source: Texture, alpha: float) -> None:
-        """The QR code over source, and the caption at opacity `alpha`."""
+    def render(self, source: Texture, alpha: float, qr_code: bool = True) -> None:
+        """The QR code over source, and the caption at opacity `alpha`; without the QR code for the copy
+        that goes to a phone (SMILE Online: the code is for the room)."""
         if not source.allocated:
             return
         self._base.begin()
         Blit.use(source)
-        qr: int = self._qr.width if self._qr.allocated else 0
+        qr: int = self._qr.width if self._qr.allocated and qr_code else 0
         if qr:
             # the viewport's origin is the bottom left
             glViewport(self._width - MARGIN_PX - qr, MARGIN_PX, qr, qr)

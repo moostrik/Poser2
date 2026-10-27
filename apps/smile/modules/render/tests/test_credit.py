@@ -88,8 +88,8 @@ class TestLines(unittest.TestCase):
 
 
 class TestFade(unittest.TestCase):
-    def test_shown_with_the_grin_and_the_result(self):
-        self.assertEqual(SHOWN, {SequenceType.DIFF_LOOP, SequenceType.TIMEOUT})
+    def test_shown_from_the_first_generated_image_to_the_result(self):
+        self.assertEqual(SHOWN, {SequenceType.DIFFUSION, SequenceType.DIFF_LOOP, SequenceType.TIMEOUT})
 
     def test_on_the_camera_only_with_the_switch(self):
         self.assertFalse(caption_shown(SequenceType.CAMERA_SHOW, False))

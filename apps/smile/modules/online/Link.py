@@ -1,6 +1,8 @@
 """The connection to the relay (relay/server.py): a websocket client on its own thread that reconnects
-by itself, hands every message to a callback and sends what the other threads queue. Uploads (the
-visitor's files, over HTTP) run on a second thread, so a slow upload never holds the frames.
+by itself, hands every message to a callback and sends what the other threads queue. The screen frames
+for the phone (`send_frame`) have one slot, the newest wins, and are JPEG-encoded on the link's thread,
+never on the render thread. Uploads (the visitor's files, over HTTP) run on a third thread, so a slow
+upload never holds the frames.
 
 Nothing here ends the thread: a relay that is down, refuses the token or sends rubbish is a warning
 (not at every try) and the next try. Messages are JSON text; images are binary with one leading byte
@@ -11,12 +13,17 @@ import logging
 import os
 import queue
 import ssl
+import tempfile
 import time
-from threading import Event, Thread
+from threading import Event, Lock, Thread
 from typing import Any, Callable
 
+import cv2
+import numpy as np
 import requests
 import websocket
+
+from modules.video import ffmpeg
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +33,7 @@ RECONNECT_INTERVAL: float = 3.0
 RECEIVE_TIMEOUT: float = 0.05       # s; between receives the queued messages go out
 WARN_INTERVAL: float = 60.0         # s between the log lines of a connection that keeps failing
 UPLOAD_TIMEOUT: float = 60.0
+STREAM_QUALITY: int = 70            # JPEG, the screen frames for the phone
 
 MessageCallback = Callable[[dict], None]
 FrameCallback = Callable[[bytes], None]
@@ -38,6 +46,12 @@ def read_token(path: str) -> str:
             return f.read().strip()
     except OSError:
         return ''
+
+
+def encode(image: np.ndarray, quality: int = STREAM_QUALITY) -> bytes | None:
+    """A JPEG of a BGR image for the phone's window."""
+    ok, jpeg = cv2.imencode('.jpg', image, [cv2.IMWRITE_JPEG_QUALITY, quality])
+    return jpeg.tobytes() if ok else None
 
 
 def http_base(ws_url: str) -> str:
@@ -56,6 +70,8 @@ class Link(Thread):
         self._on_frame: FrameCallback = on_frame
         self._out: queue.Queue[str | bytes] = queue.Queue(maxsize=256)
         self._uploads: queue.Queue[tuple[list[tuple[str, str, str]], DoneCallback]] = queue.Queue()
+        self._frame: np.ndarray | None = None       # the newest screen frame (RGBA) not sent yet
+        self._frame_mutex: Lock = Lock()
         self._stop: Event = Event()
         self._ws: websocket.WebSocket | None = None
         self._connected: bool = False
@@ -82,8 +98,13 @@ class Link(Thread):
         self._queue(json.dumps(message, separators=(',', ':')))
 
     def send_image(self, jpeg: bytes) -> None:
-        """An image for the phone's window (SHOW)."""
+        """An image for the phone's window (SHOW), encoded already."""
         self._queue(bytes([SHOW]) + jpeg)
+
+    def send_frame(self, frame: np.ndarray) -> None:
+        """A screen frame (RGBA, the render's grab) for the phone's window: replaces one not sent yet."""
+        with self._frame_mutex:
+            self._frame = frame
 
     def _queue(self, item: str | bytes) -> None:
         try:
@@ -114,6 +135,7 @@ class Link(Thread):
         self._connected = True
         self._warned = 0.0
         logger.info('online link: connected to %s', self.url)
+        self._on_message({'type': 'library', **self._library()})
         while not self._stop.is_set():
             self._flush(ws)
             ws.settimeout(RECEIVE_TIMEOUT)
@@ -137,11 +159,44 @@ class Link(Thread):
             try:
                 item: str | bytes = self._out.get_nowait()
             except queue.Empty:
-                return
+                break
             if isinstance(item, bytes):
                 ws.send_binary(item)
             else:
                 ws.send(item)
+        with self._frame_mutex:
+            frame, self._frame = self._frame, None
+        if frame is not None:
+            jpeg: bytes | None = encode(cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR))
+            if jpeg is not None:
+                ws.send_binary(bytes([SHOW]) + jpeg)
+
+    @staticmethod
+    def _track_aac(path: str) -> bytes:
+        """A music track as AAC for the phones (every phone decodes it; Safari refuses some MP3s)."""
+        fd, temp = tempfile.mkstemp(suffix='.m4a')
+        os.close(fd)
+        try:
+            ffmpeg.transcode_aac(path, temp)
+            with open(temp, 'rb') as f:
+                return f.read()
+        finally:
+            try:
+                os.remove(temp)
+            except OSError:
+                pass
+
+    def _library(self) -> dict:
+        """The music tracks and laughter samples the relay has (its /api/library), so only the missing
+        ones are uploaded: {'tracks': [ids], 'laughs': [file names]}."""
+        try:
+            response = requests.get(f'{http_base(self.url)}/api/library', timeout=5)
+            response.raise_for_status()
+            library: dict = response.json()
+            return {'tracks': [str(t) for t in library.get('tracks', [])], 'laughs': [str(t) for t in library.get('laughs', [])]}
+        except Exception as e:
+            logger.warning("online link: the relay's library: %s", e)
+            return {'tracks': [], 'laughs': []}
 
     def _disconnect(self) -> None:
         if self._connected:
@@ -154,6 +209,8 @@ class Link(Thread):
             except Exception:
                 pass
         # what was queued for a connection that is gone is stale
+        with self._frame_mutex:
+            self._frame = None
         while not self._out.empty():
             try:
                 self._out.get_nowait()
@@ -176,9 +233,9 @@ class Link(Thread):
             ok: bool = True
             for kind, id, path in files:
                 try:
-                    with open(path, 'rb') as f:
-                        data: bytes = f.read()
-                    response = requests.post(f'{base}/api/upload', params={'token': self.token, 'kind': kind, 'id': id},
+                    data: bytes = self._track_aac(path) if kind == 'track' else open(path, 'rb').read()
+                    ext: str = 'm4a' if kind == 'track' else os.path.splitext(path)[1].lstrip('.').lower()
+                    response = requests.post(f'{base}/api/upload', params={'token': self.token, 'kind': kind, 'id': id, 'ext': ext},
                                              data=data, timeout=UPLOAD_TIMEOUT)
                     response.raise_for_status()
                 except Exception as e:

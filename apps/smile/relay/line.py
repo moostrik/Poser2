@@ -17,10 +17,13 @@ BLOCKS: tuple[int, ...] = (64, 48, 32, 16)
 
 @dataclass
 class Eye:
+    """SMILE's eye as it tells it: there, free, its status line; `laughter` the room's laughter switch,
+    which the phones follow too."""
     """What SMILE last said about its eye."""
     connected: bool = False
     free: bool = False
     status: str = ASLEEP
+    laughter: bool = True
 
 
 @dataclass
@@ -65,27 +68,29 @@ class Line:
         return turn
 
     # THE EYE
-    def set_eye(self, connected: bool, free: bool = False, status: str = ASLEEP) -> None:
+    def set_eye(self, connected: bool, free: bool = False, status: str = ASLEEP, laughter: bool = True) -> None:
         if not connected:
             self.turn = None
-            self.eye = Eye(False, False, ASLEEP)
+            self.eye = Eye(False, False, ASLEEP, self.eye.laughter)
         else:
-            self.eye = Eye(True, free, status or LOOKING)
+            self.eye = Eye(True, free, status or LOOKING, laughter)
 
     def state(self, phone: str) -> dict:
         """What a phone is told: `eye` is `asleep`, `you`, `waiting`, `busy` or `free`; `status` the
         line under the image; `place` and `waiting` the line; `block` the pixel size while waiting."""
         waiting: int = len(self.waiting)
+        laughter: bool = self.eye.laughter
         if not self.eye.connected:
-            return {'type': 'state', 'eye': 'asleep', 'status': ASLEEP, 'place': self.place(phone), 'waiting': waiting, 'block': BLOCKS[0]}
+            return {'type': 'state', 'eye': 'asleep', 'status': ASLEEP, 'place': self.place(phone), 'waiting': waiting, 'block': BLOCKS[0],
+                    'laughter': laughter}
         if self.turn == phone:
-            return {'type': 'state', 'eye': 'you', 'status': '', 'place': 0, 'waiting': waiting, 'block': 1}
+            return {'type': 'state', 'eye': 'you', 'status': '', 'place': 0, 'waiting': waiting, 'block': 1, 'laughter': laughter}
         status: str = OUTSIDE if self.turn is not None else self.eye.status
         place: int = self.place(phone)
         if place:
             if place > 1:
                 status = f'{place - 1} before you, {status}'
             return {'type': 'state', 'eye': 'waiting', 'status': status, 'place': place, 'waiting': waiting,
-                    'block': BLOCKS[max(0, len(BLOCKS) - place)]}
+                    'block': BLOCKS[max(0, len(BLOCKS) - place)], 'laughter': laughter}
         eye: str = 'free' if self.eye.free and self.turn is None else 'busy'
-        return {'type': 'state', 'eye': eye, 'status': status, 'place': 0, 'waiting': waiting, 'block': BLOCKS[0]}
+        return {'type': 'state', 'eye': eye, 'status': status, 'place': 0, 'waiting': waiting, 'block': BLOCKS[0], 'laughter': laughter}

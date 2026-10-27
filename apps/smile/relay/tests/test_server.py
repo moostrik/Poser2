@@ -50,6 +50,22 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
                 return message.data
         self.fail('no binary message')
 
+    async def test_the_page_is_not_cached(self):
+        web_dir = os.path.join(self.folder.name, 'web')
+        os.mkdir(web_dir)
+        for name in ('index.html', 'app.js'):
+            with open(os.path.join(web_dir, name), 'w') as f:
+                f.write(name)
+        client = TestClient(TestServer(make_app(self.relay, web_dir)))
+        await client.start_server()
+        self.addAsyncCleanup(client.close)
+        for path in ('/', '/web/app.js'):
+            response = await client.get(path)
+            self.assertEqual(response.status, 200)
+            self.assertEqual(response.headers.get('Cache-Control'), 'no-cache')
+        response = await client.get('/api/grid')
+        self.assertIsNone(response.headers.get('Cache-Control'))
+
     async def test_smile_needs_the_token(self):
         response = await self.client.get('/ws/smile?token=wrong', headers={'Upgrade': 'websocket'})
         self.assertEqual(response.status, 401)
@@ -59,8 +75,8 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
     async def test_a_phone_joins_and_smile_hears_the_line(self):
         phone = await self.phone()
         smile = await self.smile()
-        await smile.send_json({'type': 'eye', 'free': True, 'status': 'looking for faces'})
-        await self.receive(phone, 'state', eye='free')
+        await smile.send_json({'type': 'eye', 'free': True, 'status': 'looking for faces', 'laughter': False})
+        self.assertFalse((await self.receive(phone, 'state', eye='free'))['laughter'])     # the room's switch, for the phones too
         await phone.send_json({'type': 'join'})
         await self.receive(phone, 'state', eye='waiting')
         self.assertEqual((await self.receive(smile, 'line'))['waiting'], 1)
@@ -79,23 +95,37 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await self.receive_bytes(smile), bytes([FRAME]) + b'jpeg')
         await smile.send_json({'type': 'face', 'charge': 0.5})
         self.assertEqual((await self.receive(phone, 'face'))['charge'], 0.5)
+        await smile.send_json({'type': 'music', 'id': '0001', 'url': '/files/tracks/0001.m4a', 'offset': 0})
+        self.assertEqual((await self.receive(phone, 'music'))['url'], '/files/tracks/0001.m4a')
         await smile.send_bytes(bytes([SHOW]) + b'img')
         self.assertEqual(await self.receive_bytes(phone), bytes([SHOW]) + b'img')
-        # the files, then the result with their urls, and the still on every grid
+        # the next frames wait until the phone has seen that one, and only the newest of them goes
+        await smile.send_bytes(bytes([SHOW]) + b'img2')
+        await smile.send_bytes(bytes([SHOW]) + b'img3')
+        await smile.send_json({'type': 'stage', 'stage': 'grin', 'progress': 0.1})
+        self.assertEqual((await self.receive(phone, 'stage'))['stage'], 'grin')      # not held behind the frames
+        await phone.send_json({'type': 'seen'})
+        self.assertEqual(await self.receive_bytes(phone), bytes([SHOW]) + b'img3')
+        # the turn ends with the sequence; the files and the result follow, addressed to the phone
+        await smile.send_json({'type': 'turn_end', 'reason': 'done'})
+        self.assertEqual((await self.receive(phone, 'turn_end'))['reason'], 'done')
+        self.assertIsNone(self.relay.line.turn)
         other = await self.phone()
         response = await self.client.post(f'/api/upload?token={TOKEN}&kind=still&id=v1', data=b'still')
         self.assertEqual(response.status, 200)
-        await smile.send_json({'type': 'result', 'id': 'v1', 'name': 'Name', 'caption': 'hi'})
+        await smile.send_json({'type': 'result', 'id': 'v1', 'phone': turn['id'], 'name': 'Name', 'caption': 'hi', 'ok': True})
         result = await self.receive(phone, 'result')
-        self.assertEqual((result['name'], result['caption']), ('Name', 'hi'))
+        self.assertEqual((result['name'], result['caption'], result['ok']), ('Name', 'hi', True))
         self.assertEqual(result['still'], '/files/stills/v1.jpg')
         self.assertIsNone(result['grin'])
         self.assertEqual((await self.receive(other, 'grid'))['stills'], ['/files/stills/v1.jpg'])
         response = await self.client.get('/files/stills/v1.jpg')
         self.assertEqual(await response.read(), b'still')
-        await smile.send_json({'type': 'turn_end', 'reason': 'done'})
-        self.assertEqual((await self.receive(phone, 'turn_end'))['reason'], 'done')
-        self.assertIsNone(self.relay.line.turn)
+        # a result without files (the visitor was not kept) still reaches the phone, so it stops waiting
+        await smile.send_json({'type': 'result', 'id': '', 'phone': turn['id'], 'name': 'Name', 'caption': 'hi', 'ok': False})
+        result = await self.receive(phone, 'result')
+        self.assertFalse(result['ok'])
+        self.assertIsNone(result['still'])
 
     async def test_frames_from_a_phone_without_the_turn_are_dropped(self):
         phone = await self.phone()
@@ -125,6 +155,26 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
         await smile.close()
         self.assertEqual((await self.receive(phone, 'turn_end'))['reason'], 'lost')
         await self.receive(phone, 'state', eye='asleep')
+
+    async def test_the_library_is_uploaded_once_and_listed(self):
+        response = await self.client.get('/api/library')
+        self.assertEqual(await response.json(), {'tracks': [], 'laughs': []})
+        response = await self.client.post(f'/api/upload?token={TOKEN}&kind=track&id=0001', data=b'aac')
+        self.assertEqual(response.status, 200)
+        self.assertEqual((await response.json())['url'], '/files/tracks/0001.m4a')
+        # a laugh keeps its own extension, mp3 or wav
+        response = await self.client.post(f'/api/upload?token={TOKEN}&kind=laugh&id=Hehe-2&ext=wav', data=b'wav')
+        self.assertEqual((await response.json())['url'], '/files/laughs/Hehe-2.wav')
+        response = await self.client.post(f'/api/upload?token={TOKEN}&kind=laugh&id=Haha', data=b'x')
+        self.assertEqual(response.status, 400)
+        response = await self.client.post(f'/api/upload?token={TOKEN}&kind=laugh&id=Haha&ext=exe', data=b'x')
+        self.assertEqual(response.status, 400)
+        response = await self.client.get('/api/library')
+        self.assertEqual(await response.json(), {'tracks': ['0001'], 'laughs': ['Hehe-2.wav']})
+        response = await self.client.get('/files/tracks/0001.m4a')
+        self.assertEqual(await response.read(), b'aac')
+        # a track is not one of a visitor's files
+        self.assertNotIn('track', (await self.client.get('/api/grid')).headers)
 
     async def test_an_upload_needs_a_safe_id_and_kind(self):
         response = await self.client.post(f'/api/upload?token={TOKEN}&kind=still&id=../x', data=b'x')

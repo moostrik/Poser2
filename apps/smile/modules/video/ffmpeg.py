@@ -37,6 +37,12 @@ _CODECS: dict[Encoder, tuple[str, list[str], str]] = {
     Encoder.CPU:   ('libx264',    ['-crf', '18', '-preset', 'veryfast', '-threads', '4'], 'yuv420p'),
 }
 _AUTO_ORDER: list[Encoder] = [Encoder.QSV, Encoder.NVENC, Encoder.CPU]
+# the share clip for a phone: lighter than the players' clip, it travels
+_SHARE_QUALITY: dict[Encoder, list[str]] = {
+    Encoder.QSV:   ['-global_quality', '27'],
+    Encoder.NVENC: ['-preset', 'p4', '-rc', 'vbr', '-cq', '27', '-b:v', '0'],
+    Encoder.CPU:   ['-crf', '25', '-preset', 'veryfast', '-threads', '4'],
+}
 
 
 def available() -> bool:
@@ -178,6 +184,75 @@ class ClipWriter:
         return not self.failed and self.frames > 0
 
 
+def transcode_aac(src: str, dst: str, bitrate: str = '128k') -> None:
+    """Write `dst` (an .m4a) from any audio file: AAC, which every phone decodes (Safari refuses some MP3s),
+    at about a third of the MP3's size. Raises when ffmpeg fails."""
+    args = ['-y', '-i', src, '-vn', '-c:a', 'aac', '-b:a', bitrate, '-movflags', '+faststart', dst]
+    process = popen(args, subprocess.DEVNULL, subprocess.DEVNULL)
+    try:
+        _, err = process.communicate(timeout=60)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.communicate()
+        raise RuntimeError(f'ffmpeg did not finish transcoding {src}')
+    if process.returncode != 0:
+        raise RuntimeError(f'ffmpeg could not transcode {src}: {_stderr(err)}')
+
+
+def read_audio(path: str, offset: float, seconds: float, rate: int = 48000) -> np.ndarray:
+    """`seconds` of an audio file from `offset` s as (n, 2) float32 at `rate`; silence pads a file that
+    ends first. Raises when ffmpeg fails."""
+    args = ['-ss', f'{max(0.0, offset):.3f}', '-t', f'{seconds:.3f}', '-i', path,
+            '-f', 'f32le', '-ac', '2', '-ar', str(rate), 'pipe:1']
+    process = popen(args, subprocess.DEVNULL, subprocess.PIPE)
+    try:
+        out, err = process.communicate(timeout=60)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.communicate()
+        raise RuntimeError(f'ffmpeg did not finish reading {path}')
+    if process.returncode != 0:
+        raise RuntimeError(f'ffmpeg could not read {path}: {_stderr(err)}')
+    audio: np.ndarray = np.frombuffer(out[:len(out) - len(out) % 8], np.float32).reshape(-1, 2)
+    wanted: int = round(seconds * rate)
+    if audio.shape[0] < wanted:
+        audio = np.concatenate([audio, np.zeros((wanted - audio.shape[0], 2), np.float32)])
+    return audio
+
+
+def make_share(video: str, overlays: list[tuple[str, str]], pcm: np.ndarray, rate: int, encoder: Encoder, out: str) -> None:
+    """Write `out`: the video re-encoded with the `overlays` (PNGs with alpha, each with its place as ffmpeg's
+    overlay takes it, e.g. 'W-w-24:H-h-24') and `pcm` ((n, 2) float32 at `rate`) as its sound, cut to the
+    shorter of the two; the video's comment tag is kept. Raises when ffmpeg fails."""
+    codec, _, pix_fmt = _CODECS[encoder]
+    quality: list[str] = _SHARE_QUALITY[encoder]
+    comment: str | None = read_comment(video)
+    metadata: list[str] = ['-metadata', f'comment={comment}'] if comment else []
+    inputs: list[str] = ['-i', video]
+    chain: list[str] = []
+    last: str = '[0:v]'
+    for n, (png, place) in enumerate(overlays, start=1):
+        inputs += ['-i', png]
+        label: str = f'[v{n}]' if n < len(overlays) else ''
+        chain.append(f'{last}[{n}:v]overlay={place}{label}')
+        last = label
+    filters: list[str] = ['-filter_complex', ';'.join(chain)] if chain else []
+    audio_index: int = len(overlays) + 1
+    args = ['-y', *inputs, '-f', 'f32le', '-ar', str(rate), '-ac', '2', '-i', 'pipe:0', *filters,
+            '-map', f'{audio_index}:a:0', *([] if overlays else ['-map', '0:v:0']),
+            '-c:v', codec, *quality, '-pix_fmt', pix_fmt, '-c:a', 'aac', '-b:a', '128k',
+            '-shortest', '-movflags', '+faststart', *metadata, out]
+    process = popen(args, subprocess.PIPE, subprocess.DEVNULL)
+    try:
+        _, err = process.communicate(input=np.ascontiguousarray(pcm, dtype=np.float32).tobytes(), timeout=120)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.communicate()
+        raise RuntimeError(f'ffmpeg did not finish the share clip of {video}')
+    if process.returncode != 0:
+        raise RuntimeError(f'ffmpeg could not make the share clip of {video}: {_stderr(err)}')
+
+
 # DECODING
 
 def probe(path: str) -> tuple[int, float, int, int]:
@@ -236,7 +311,7 @@ def decode_clip(path: str, size: tuple[int, int], hwdecode: int | None = None) -
     frame_bytes = width * height * 3
     args = ['-nostdin', '-threads', str(DECODE_THREADS), *hwdecode_args(hwdecode), '-i', path,
             '-filter_threads', str(DECODE_THREADS), '-vf', f'scale={width}:{height}',
-            '-f', 'rawvideo', '-pix_fmt', 'bgr24', 'pipe:1']
+            '-an', '-f', 'rawvideo', '-pix_fmt', 'bgr24', 'pipe:1']
     out, write_fd = _big_pipe()
     try:
         process = popen(args, subprocess.DEVNULL, write_fd, background=True)

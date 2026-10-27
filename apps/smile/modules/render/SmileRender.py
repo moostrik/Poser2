@@ -5,6 +5,7 @@ import numpy as np
 from OpenGL.GL import GL_RGBA32F, glViewport  # type: ignore
 
 from modules.render.GrinPlayer import GrinPlayer
+from modules.render.grab import ScreenGrab
 from modules.comfy.messages import GenMessage, GenState
 from modules.face.FaceFinder import FaceFrame
 from modules.gl import Blit, Fbo, RenderBase, Shader, Style, Texture, clear_color
@@ -63,6 +64,8 @@ class SmileRender(RenderBase):
         self._output: Texture = self.layers.camera.texture
         self._freeze_fbo: Fbo = Fbo()
         self._frozen: bool = False
+        # the screen for the phones of SMILE Online: switched on and read by modules/online
+        self.grab: ScreenGrab = ScreenGrab()
 
         self.window_manager.add_keyboard_callback(self._on_key)
 
@@ -77,6 +80,7 @@ class SmileRender(RenderBase):
         for layer in self._all_layers:
             layer.deallocate()
         self._freeze_fbo.deallocate()
+        self.grab.deallocate()
         self.inputs.deallocate()
 
     def update(self) -> None:
@@ -99,7 +103,7 @@ class SmileRender(RenderBase):
         stage.update(message)
 
         self._output = stage.output
-        self._render_credit(message.sequence_type)
+        self._render_credit(message.sequence_type, self.grab.due(time.time()))
         status: str | None = self._status_text
         if status:
             self._status.render(self._output, status)
@@ -110,7 +114,9 @@ class SmileRender(RenderBase):
             self._output = self._freeze_fbo
         self._frozen = self.settings.freeze
 
-    def _render_credit(self, sequence_type: SequenceType) -> None:
+    def _render_credit(self, sequence_type: SequenceType, grab: bool) -> None:
+        """The credit over the output; with `grab`, the phone's copy of the screen is taken here: the
+        caption yes, the QR code and the status line no."""
         now: float = time.time()
         if new_line_due(sequence_type, self._credit_sequence):
             self._credit.new_visitor()
@@ -119,8 +125,13 @@ class SmileRender(RenderBase):
         self._credit_alpha = fade_step(self._credit_alpha, shown, now - self._credit_time)
         self._credit_time = now
         if self.settings.credit:
+            if grab:
+                self._credit.render(self._output, self._credit_alpha, qr_code=False)
+                self.grab.grab(self._credit.texture)
             self._credit.render(self._output, self._credit_alpha)
             self._output = self._credit.texture
+        elif grab:
+            self.grab.grab(self._output)
 
     def _play_grin(self) -> None:
         """Show the grin frame that is due. Its first frame arrives during DIFFUSION and blends in as

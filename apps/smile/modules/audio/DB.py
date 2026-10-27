@@ -1,10 +1,32 @@
 import json
 import logging
+import os
 import random
 
 from modules.audio.settings import AudioSettings
 
 logger = logging.getLogger(__name__)
+
+MUSIC_FOLDER: str = 'data/audio/SMILE-BS-Music'    # the tracks, named "<audio id> <title>.mp3", as the Max patch reads them
+LAUGHTER_FOLDER: str = 'data/audio/laughter'        # the laughter samples (mp3 and wav), as the Max patch reads them
+
+
+def track_path(audio_id: str, folder: str = MUSIC_FOLDER) -> str | None:
+    """The track's file: the one in the folder whose name starts with the id; None for `none` or no file."""
+    if not audio_id or audio_id == 'none' or not os.path.isdir(folder):
+        return None
+    for name in sorted(os.listdir(folder)):
+        if name.startswith(audio_id) and name.lower().endswith('.mp3'):
+            return os.path.join(folder, name)
+    return None
+
+
+def laugh_files(folder: str = LAUGHTER_FOLDER) -> list[tuple[str, str]]:
+    """The laughter samples as (file name, path), sorted; for the phones (the relay keeps a copy)."""
+    if not os.path.isdir(folder):
+        return []
+    return [(name, os.path.join(folder, name)) for name in sorted(os.listdir(folder)) if name.lower().endswith(('.mp3', '.wav'))]
+
 
 def load_json(file_path: str) -> dict:
     with open(file_path, 'r') as json_file:
@@ -48,3 +70,7 @@ class DB():
 
     def get_audio_id(self) -> str:
         return self._audio_id
+
+    def track_path(self) -> str | None:
+        """The file of the track picked last (for the phone and the saved clip; Max finds it itself)."""
+        return track_path(self._audio_id)

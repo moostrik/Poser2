@@ -1,4 +1,4 @@
-"""Tests for the online turn: a fake link and camera, the sequence fed as messages, a clock passed in."""
+"""Tests for the online turn: a fake link, camera and screen grab, the sequence fed as messages, a clock passed in."""
 
 import os
 import tempfile
@@ -8,11 +8,9 @@ from unittest import mock
 
 import numpy as np
 
-from modules.comfy.messages import GenMessage, GenState
-from modules.comfy.settings import PipelineSettings
 from modules.face.FaceFinder import FaceFrame
 from modules.face.quality import FaceObservation, Pose, Rejection
-from modules.online.Online import ASK_TIMEOUT, INSIDE, LOOKING, Online, Phase, core_description, face_message
+from modules.online.Online import ASK_TIMEOUT, INSIDE, LOOKING, SAVE_TIMEOUT, Online, Phase, face_message
 from modules.online.settings import OnlineSettings
 from modules.render.Sequencer import SeqenceMessage, SequenceType
 
@@ -25,7 +23,7 @@ class FakeLink:
         self.started: bool = False
         self.stopped: bool = False
         self.sent: list[dict] = []
-        self.images: list[bytes] = []
+        self.frames: list = []
         self.uploads: list = []
 
     def start(self) -> None:
@@ -37,8 +35,8 @@ class FakeLink:
     def send(self, message: dict) -> None:
         self.sent.append(message)
 
-    def send_image(self, jpeg: bytes) -> None:
-        self.images.append(jpeg)
+    def send_frame(self, frame) -> None:
+        self.frames.append(frame)
 
     def upload(self, files, done) -> None:
         self.uploads.append((files, done))
@@ -48,6 +46,22 @@ class FakeLink:
 
     def last(self, type: str) -> dict | None:
         return next((m for m in reversed(self.sent) if m['type'] == type), None)
+
+
+class FakeGrab:
+    """The render's screen grab: frames are put in by the test, taken once."""
+    def __init__(self) -> None:
+        self.on: bool = False
+        self.width: int = 0
+        self.fps: float = 0.0
+        self.frame = None
+
+    def set(self, on: bool, width: int = 512, fps: float = 10.0) -> None:
+        self.on, self.width, self.fps = on, width, fps
+
+    def take(self):
+        frame, self.frame = self.frame, None
+        return frame
 
 
 class FakeCamera:
@@ -79,9 +93,9 @@ class TestOnline(unittest.TestCase):
         self.settings.token_file = token
         self.settings.turn_window = 10.0
         self.settings.eye_free_after = 2.0
-        self.pipeline = PipelineSettings()
         self.camera = FakeCamera()
-        self.sequencer = SimpleNamespace(settings=SimpleNamespace(pause=False))
+        self.grab = FakeGrab()
+        self.sequencer = SimpleNamespace(settings=SimpleNamespace(pause=False, flash_in=0.5, flash_out=1.25))
         self.face = mock.Mock()
         self.links: list[FakeLink] = []
 
@@ -89,13 +103,21 @@ class TestOnline(unittest.TestCase):
             link = FakeLink(url, token, on_message, on_frame)
             self.links.append(link)
             return link
-        self.online = Online(self.settings, self.pipeline, self.camera, self.sequencer, self.face,
-                             record=lambda: {'description': 'a face'}, caption=lambda: ('Name', 'line'), link_factory=factory)
+        self.music: tuple = ('none', None)      # the visitor's track: none unless a test gives one
+        self.laughs: list = []                  # the laughter samples SMILE has
+        self.laughter: bool = True              # the panel's laughter switch
+        self.picks: int = 0                     # Main.pick_style calls
+        self.online = Online(self.settings, self.camera, self.sequencer, self.face, self.grab,
+                             caption=lambda: ('Name', 'line'), music=lambda: self.music,
+                             laughs=lambda: self.laughs, laughter=lambda: self.laughter, pick=self.pick, link_factory=factory)
         self.now: float = 1000.0
 
     @property
     def link(self) -> FakeLink:
         return self.links[-1]
+
+    def pick(self) -> None:
+        self.picks += 1
 
     def step(self, seq: SequenceType = SequenceType.CAMERA_SHOW, dt: float = 0.1, progress: float = 0.0, initial: bool = False,
              ready: bool = True, busy: bool = False) -> None:
@@ -233,78 +255,200 @@ class TestOnline(unittest.TestCase):
         self.assertFalse(self.camera.online)
         self.assertEqual(self.online.phase, Phase.IDLE)
 
-    def test_the_flash_through_the_result(self):
+    def test_the_flash_streams_the_screen_until_the_sequence_is_over(self):
+        self.settings.stream_width = 320
+        self.settings.stream_fps = 12.0
         self.start_turn()
+        self.assertFalse(self.grab.on)
         self.step(seq=SequenceType.FLASH, initial=True)
-        self.assertEqual(self.link.last('stage')['stage'], 'flash')
+        stages = lambda: [m for m in self.link.sent if m['type'] == 'stage']
+        self.assertEqual(stages()[0], {'type': 'stage', 'stage': 'flash', 'in': 0.5, 'out': 1.25})
+        self.assertEqual(stages()[1], {'type': 'stage', 'stage': 'flash_in', 'progress': 0.0})
         self.assertEqual(self.online.phase, Phase.TRANSFORMING)
         self.assertTrue(self.camera.online)
+        self.assertEqual((self.grab.on, self.grab.width, self.grab.fps), (True, 320, 12.0))
+        # the screen's frames go to the phone as the render grabs them
+        frame = np.zeros((400, 320, 4), np.uint8)
+        self.grab.frame = frame
         self.step(seq=SequenceType.CAPTURE)
+        self.assertIs(self.link.frames[0], frame)
         self.step(seq=SequenceType.ASK)
+        self.assertEqual(len(self.link.frames), 1)      # nothing new, nothing sent
         self.assertFalse(self.camera.online)     # the capture is taken: the room's camera is back
-        # the transformation's messages go to the phone
-        image = np.zeros((100, 80, 3), np.uint8)
-        self.online.on_generation(GenMessage(GenState.CAM_DEPTH, image=image))
-        self.assertEqual(self.link.last('stage')['stage'], 'depth')
-        self.assertEqual(len(self.link.images), 1)
-        self.online.on_generation(GenMessage(GenState.DIFFUSION, 0.5, image=image))
-        self.assertEqual([m['stage'] for m in self.link.sent if m['type'] == 'stage'][-2:], ['describe', 'diffusion'])
-        self.assertEqual(self.link.last('stage')['progress'], 0.5)
-        self.online.on_generation(GenMessage(GenState.DIFFUSION, 1.0, image=image, final=True))
-        self.assertEqual(self.link.last('stage')['stage'], 'portrait')
-        self.assertEqual(len(self.link.images), 2)      # the previews are rate limited, the portrait always goes
-        self.online.on_generation(GenMessage(GenState.DIFF_LOOP, 0.1, image=image))
+        self.assertEqual(len(stages()), 2)       # the same stage at the same progress: not sent again
+        # the stages with their progress, a few times a second, for the phone's tape
+        self.step(seq=SequenceType.DIFFUSION, progress=0.5)
+        self.assertEqual(self.link.last('stage'), {'type': 'stage', 'stage': 'diffusion', 'progress': 0.5})
+        self.step(seq=SequenceType.DIFFUSION, progress=0.6, dt=0.05)
+        self.assertEqual(self.link.last('stage')['progress'], 0.5)      # too soon
+        self.step(seq=SequenceType.DIFFUSION, progress=0.7, dt=0.3)
+        self.assertEqual(self.link.last('stage')['progress'], 0.7)
+        self.step(seq=SequenceType.DIFF_LOOP)
         self.assertEqual(self.link.last('stage')['stage'], 'grin')
-        # the result stands: the saver closes the files, they are uploaded, the phone gets the result
         self.step(seq=SequenceType.TIMEOUT, initial=True)
-        self.assertEqual(self.online.phase, Phase.DELIVERING)
+        self.assertEqual(self.online.phase, Phase.TRANSFORMING)
+        self.assertEqual((self.grab.on, self.grab.fps), (True, 2.0))      # the result stands: the link is the clip's
+        self.assertIsNone(self.link.last('turn_end'))
+        # the sequencer passes RESET at the end of the timeout, then the bloom and the fade: the turn
+        # goes on, the picture through the bloom, the sound through the fade
+        self.step(seq=SequenceType.RESET)
+        self.assertEqual(self.online.phase, Phase.TRANSFORMING)
+        self.step(seq=SequenceType.BLOOM, progress=0.5)
+        self.assertEqual(self.link.last('stage'), {'type': 'stage', 'stage': 'bloom', 'progress': 0.5})
+        self.assertTrue(self.grab.on)
+        self.step(seq=SequenceType.FADE, progress=0.2)
+        self.assertEqual(self.link.last('stage')['stage'], 'fade')
+        self.assertFalse(self.grab.on)
+        self.assertIsNone(self.link.last('turn_end'))
+        # back at the camera: the turn ends, no result yet
+        self.step(seq=SequenceType.CAMERA_SHOW)
+        self.assertEqual(self.link.last('turn_end')['reason'], 'done')
+        self.assertEqual(self.online.phase, Phase.IDLE)
+        self.assertIsNone(self.link.last('result'))
+
+    # THE MUSIC
+    def test_the_track_is_picked_and_named_at_the_turns_start(self):
+        self.music = ('0001', 'data/audio/SMILE-BS-Music/0001 V030 CC.mp3')
+        self.go_idle()
+        self.link.on_message({'type': 'library', 'tracks': ['0001'], 'laughs': []})
+        self.start_turn()
+        self.assertEqual(self.picks, 1)
+        self.assertEqual(self.link.last('music'), {'type': 'music', 'id': '0001', 'url': '/files/tracks/0001.m4a', 'offset': 0.0})
+        self.step(seq=SequenceType.CAMERA_DETECT, progress=0.4)
+        self.step(seq=SequenceType.FLASH, initial=True)
+        self.assertEqual(len([m for m in self.link.sent if m['type'] == 'music']), 1)    # once per turn
+
+    def test_a_track_the_relay_lacks_is_uploaded_first(self):
+        self.music = ('0001', 'data/audio/SMILE-BS-Music/0001 V030 CC.mp3')
+        self.start_turn()
+        self.step(seq=SequenceType.FLASH, initial=True)
+        self.assertIsNone(self.link.last('music'))
+        files, done = self.link.uploads[0]
+        self.assertEqual(files, [('track', '0001', 'data/audio/SMILE-BS-Music/0001 V030 CC.mp3')])
+        self.step(seq=SequenceType.CAPTURE, dt=1.2)
+        done(True)
+        self.step(seq=SequenceType.ASK, dt=0.1)
+        music = self.link.last('music')
+        self.assertEqual((music['id'], music['offset']), ('0001', 1.3))     # the seconds since the flash
+        # the relay has it now: the next visitor's goes at once
+        self.step(seq=SequenceType.TIMEOUT, initial=True)
+        self.step(seq=SequenceType.RESET)
+        self.step(seq=SequenceType.CAMERA_SHOW)     # the turn ends here
+        self.start_turn()
+        self.step(seq=SequenceType.FLASH, initial=True)
+        self.assertEqual(self.link.last('music')['offset'], 0.0)
+        self.assertEqual(len(self.link.uploads), 1)
+
+    def test_a_track_uploaded_after_its_turn_is_not_sent(self):
+        self.music = ('0001', 'x.mp3')
+        self.start_turn()
+        self.step(seq=SequenceType.FLASH, initial=True)
+        _, done = self.link.uploads[0]
+        self.step(seq=SequenceType.RESET)       # the operator's reset
+        done(True)
+        self.step()
+        self.assertIsNone(self.link.last('music'))
+
+    def test_no_music_without_a_track_or_with_the_switch_off(self):
+        self.start_turn()
+        self.step(seq=SequenceType.FLASH, initial=True)
+        self.assertIsNone(self.link.last('music'))
+        self.assertEqual(self.link.uploads, [])
+        self.step(seq=SequenceType.RESET)
+        self.settings.music = False
+        self.music = ('0001', 'x.mp3')
+        self.link.on_message({'type': 'library', 'tracks': ['0001'], 'laughs': []})
+        self.start_turn()
+        self.step(seq=SequenceType.FLASH, initial=True)
+        self.assertIsNone(self.link.last('music'))
+
+    def test_the_laughter_samples_the_relay_lacks_are_uploaded_once(self):
+        self.laughs = [('a.mp3', 'l/a.mp3'), ('b.wav', 'l/b.wav'), ('c.mp3', 'l/c.mp3')]
+        self.go_idle()
+        self.link.on_message({'type': 'library', 'tracks': [], 'laughs': ['a.mp3']})
+        self.step()
+        self.assertEqual(self.link.uploads[0][0], [('laugh', 'b', 'l/b.wav'), ('laugh', 'c', 'l/c.mp3')])
+        self.link.on_message({'type': 'library', 'tracks': [], 'laughs': ['a.mp3', 'b.wav', 'c.mp3']})
+        self.step()
+        self.assertEqual(len(self.link.uploads), 1)
+
+    def test_the_eye_carries_the_laughter_switch(self):
+        self.go_idle()
+        self.assertTrue(self.link.last('eye')['laughter'])
+        self.laughter = False
+        self.step()
+        self.assertFalse(self.link.last('eye')['laughter'])     # a change goes at once
+
+    def test_the_result_is_delivered_as_soon_as_the_files_are_there(self):
+        self.start_turn()
+        self.step(seq=SequenceType.FLASH, initial=True)
+        self.step(seq=SequenceType.ASK)
+        # the saver closes the files during the timeout: the upload starts then, before the turn is over
+        self.step(seq=SequenceType.TIMEOUT, initial=True)
         self.online.on_saved('v1', 'A', True, 'grins/A/v1.mp4', 'portraits/A/v1_portrait.jpg')
         self.step(seq=SequenceType.TIMEOUT)
         files, done = self.link.uploads[0]
         self.assertEqual([f[0] for f in files], ['portrait', 'still', 'grin'])
-        self.assertEqual(files[2], ('grin', 'v1', 'grins/A/v1.mp4'))
+        self.assertEqual(files[2], ('grin', 'v1', 'grins/A/v1.mp4'))     # no share clip: the players' clip
         done(True)
-        self.step(seq=SequenceType.RESET)       # the natural end of the visitor: not an operator reset
         result = self.link.last('result')
-        self.assertEqual((result['id'], result['name'], result['caption']), ('v1', 'Name', 'line'))
+        self.assertEqual((result['id'], result['phone'], result['name'], result['caption'], result['ok']),
+                         ('v1', 'phone1', 'Name', 'line', True))
+        self.assertIsNone(self.link.last('turn_end'))                   # the turn goes on
+        self.step(seq=SequenceType.CAMERA_SHOW)
         self.assertEqual(self.link.last('turn_end')['reason'], 'done')
-        self.assertEqual(self.online.phase, Phase.IDLE)
+        self.step(seq=SequenceType.CAMERA_SHOW)
+        self.assertEqual(len(self.link.uploads), 1)     # once
 
-    def test_the_description_is_qwens_words_only(self):
-        self.pipeline.style_a.prefix = 'portrait of'
-        self.pipeline.style_a.suffix = ', (serious: 1.2)'
-        self.pipeline.style_current = 'A'
-        online = Online(self.settings, self.pipeline, self.camera, self.sequencer, self.face,
-                        record=lambda: {'description': 'portrait of a woman, red hair , (serious: 1.2)'}, caption=lambda: ('', ''),
-                        link_factory=FakeLink)
-        self.assertEqual(online.description(), 'a woman, red hair')
-        self.assertEqual(core_description('plain', '', ''), 'plain')
-
-    def test_a_reset_during_the_transformation_ends_the_turn(self):
+    def test_the_files_may_come_after_the_turn_and_the_eye_is_free_meanwhile(self):
         self.start_turn()
         self.step(seq=SequenceType.FLASH, initial=True)
-        self.step(seq=SequenceType.RESET)
+        self.step(seq=SequenceType.TIMEOUT, initial=True)
+        self.step(seq=SequenceType.CAMERA_SHOW)
+        self.assertEqual(self.link.last('turn_end')['reason'], 'done')
+        self.step()                                         # idle: the free count starts
+        self.step(dt=self.settings.eye_free_after + 0.1)
+        self.assertTrue(self.link.last('eye')['free'])      # the delivery does not hold the eye
+        self.online.on_saved('v1', 'A', True, 'g.mp4', 'p.jpg', 'shares/A/v1.mp4')
+        self.step()
+        self.assertEqual(len(self.link.uploads), 1)
+        self.assertEqual(self.link.uploads[0][0][2], ('grin', 'v1', 'shares/A/v1.mp4'))   # the phone's video is the share clip
+        self.link.uploads[0][1](False)
+        self.assertFalse(self.link.last('result')['ok'])
+
+    def test_no_files_within_the_save_timeout_is_a_result_without_them(self):
+        self.start_turn()
+        self.step(seq=SequenceType.FLASH, initial=True)
+        self.step(seq=SequenceType.TIMEOUT, initial=True)
+        self.step(seq=SequenceType.CAMERA_SHOW)
+        self.step(dt=SAVE_TIMEOUT + 1)
+        result = self.link.last('result')
+        self.assertEqual((result['id'], result['phone'], result['ok']), ('', 'phone1', False))
+        self.assertEqual(self.link.uploads, [])
+
+    def test_a_reset_during_the_transformation_ends_the_turn_and_drops_the_delivery(self):
+        self.start_turn()
+        self.step(seq=SequenceType.FLASH, initial=True)
+        self.step(seq=SequenceType.DIFFUSION)
+        self.step(seq=SequenceType.RESET)       # before the timeout: the operator's
         self.assertEqual(self.link.last('turn_end')['reason'], 'reset')
         self.assertFalse(self.camera.online)
+        self.assertFalse(self.grab.on)
+        self.online.on_saved('v1', 'A', False, '', '')
+        self.step(seq=SequenceType.CAMERA_SHOW, dt=SAVE_TIMEOUT + 1)
+        self.assertIsNone(self.link.last('result'))
 
-    def test_a_visitor_that_was_not_kept_has_no_result(self):
+    def test_a_visitor_that_was_not_kept_is_a_result_without_files(self):
         self.start_turn()
         self.step(seq=SequenceType.FLASH, initial=True)
         self.step(seq=SequenceType.TIMEOUT, initial=True)
         self.online.on_saved('v1', 'A', False, '', '')
-        self.step(seq=SequenceType.TIMEOUT)
-        self.assertEqual(self.link.last('turn_end')['reason'], 'reset')
-        self.assertIsNone(self.link.last('result'))
-
-    def test_a_failed_upload_has_no_result(self):
-        self.start_turn()
-        self.step(seq=SequenceType.FLASH, initial=True)
-        self.step(seq=SequenceType.TIMEOUT, initial=True)
-        self.online.on_saved('v1', 'A', True, 'g.mp4', 'p.jpg')
-        self.step(seq=SequenceType.TIMEOUT)
-        self.link.uploads[0][1](False)
-        self.step(seq=SequenceType.TIMEOUT)
-        self.assertEqual(self.link.last('turn_end')['reason'], 'reset')
+        self.step(seq=SequenceType.CAMERA_SHOW)
+        self.step(seq=SequenceType.CAMERA_SHOW)
+        self.assertEqual(self.link.last('turn_end')['reason'], 'done')
+        result = self.link.last('result')
+        self.assertEqual((result['id'], result['ok']), ('v1', False))
+        self.assertEqual(self.link.uploads, [])
 
     def test_face_message_shape(self):
         frame = FaceFrame((observation(0.5),), 1.0)

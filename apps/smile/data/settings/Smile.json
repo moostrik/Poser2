@@ -1,7 +1,7 @@
 {
   "camera": {
     "use_image": false,
-    "image": "2024_09_15_14_56_05_B.jpg",
+    "image": "IMG_2307.jpeg",
     "image_next": false,
     "flip_h": false,
     "flip_v": false,
@@ -196,13 +196,13 @@
       "title": "SMILE",
       "v_sync": true,
       "monitor": "M0",
-      "x": 0,
-      "y": 288,
-      "width": 400,
-      "height": 500,
+      "x": 1708,
+      "y": 31,
+      "width": 851,
+      "height": 1360,
       "secondary_list": [],
       "secondary_fullscreen": false,
-      "fullscreen_mode": "WINDOWED_FULLSCREEN",
+      "fullscreen_mode": "WINDOWED",
       "fullscreen_mouse": false
     }
   },
@@ -229,6 +229,16 @@
     "ip": "192.168.0.111",
     "universe": 1,
     "fps": 40.0
+  },
+  "online": {
+    "active": true,
+    "relay": "ws://127.0.0.1:8800/ws/smile",
+    "token_file": "data/online_token.txt",
+    "turn_window": 10.0,
+    "eye_free_after": 3.0,
+    "stream_fps": 10.0,
+    "stream_width": 512,
+    "music": true
   },
   "server": {
     "title": "SMILE",

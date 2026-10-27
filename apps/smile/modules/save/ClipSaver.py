@@ -9,6 +9,7 @@ import logging
 from typing import Callable
 
 from modules.render.settings import SequencerSettings
+from modules.save import share
 from modules.save.record import embed_jpeg
 from modules.video import ffmpeg
 from modules.video.ffmpeg import ClipWriter, Encoder
@@ -16,7 +17,7 @@ from modules.video.ffmpeg import ClipWriter, Encoder
 logger = logging.getLogger(__name__)
 
 Command = tuple
-SavedCallback = Callable[[str, str, bool, str, str], None]   # id, style, kept, grin path, portrait path
+SavedCallback = Callable[[str, str, bool, str, str, str], None]   # id, style, kept, grin path, portrait path, share path
 
 STYLES: tuple[str, ...] = ('A', 'B')
 
@@ -27,19 +28,28 @@ class ClipSaver:
     Files are built in output/temp/ and moved (an atomic rename) to output/grins/<style>/ and
     output/portraits/<style>/ when the sequence ends complete, else deleted. The players read the
     style (A or B) from that folder. The clip and the portrait carry the visitor's record: how they
-    were made (modules/save/record.py). The save thread is the only
+    were made (modules/save/record.py). After the clip, the share clip for the visitor's phone
+    (modules/save/share.py, `shares/<style>/<id>.mp4`): the same grin with the visitor's track as its
+    sound (`set_music`: the file and the point of it the room hears when the grin starts) on the tape, and
+    the watermark; the players' clip stays silent. The share clip is built first, the players' clip
+    lands after it: the visitor outside is waiting for theirs. The save thread is the only
     owner of the encoder process; the other threads only enqueue commands, in order."""
 
-    def __init__(self, settings: SequencerSettings, root: str = 'output/', max_queue_size: int = 64) -> None:
+    def __init__(self, settings: SequencerSettings, root: str = 'output/', max_queue_size: int = 64, watermark: str = '') -> None:
         self.settings: SequencerSettings = settings
         self.temp_dir: str = os.path.join(root, 'temp')
         self.grins_dir: str = os.path.join(root, 'grins')
         self.portraits_dir: str = os.path.join(root, 'portraits')
+        self.shares_dir: str = os.path.join(root, 'shares')
         os.makedirs(self.temp_dir, exist_ok=True)
         for style in STYLES:
             os.makedirs(os.path.join(self.grins_dir, style), exist_ok=True)
             os.makedirs(os.path.join(self.portraits_dir, style), exist_ok=True)
+            os.makedirs(os.path.join(self.shares_dir, style), exist_ok=True)
         self._clean_temp()
+        self._watermark: str | None = os.path.join(self.shares_dir, 'watermark.png') if watermark else None    # beside the share clips
+        if self._watermark and not share.write_watermark(watermark, self._watermark):
+            self._watermark = None
 
         self.enabled: bool = ffmpeg.available()
         if not self.enabled:
@@ -48,6 +58,7 @@ class ClipSaver:
         logger.info('Clip encoder: %s', self.encoder.value)
 
         self.queue: queue.Queue[Command] = queue.Queue(max_queue_size)
+        self._share: tuple[str | None, float] | None = None   # the open visitor's track and offset (save thread)
         self._dropped: bool = False
         self._saved_callback: SavedCallback | None = None
         self.stop_event = threading.Event()
@@ -75,6 +86,12 @@ class ClipSaver:
     def save_portrait(self, image: np.ndarray) -> None:
         if self._active():
             self.queue.put(('portrait', image))
+
+    def set_share(self, track: str | None, offset: float) -> None:
+        """The share clip's sound: the track's file and the second of it that plays when the grin starts in
+        the room (None: silence)."""
+        if self._active():
+            self.queue.put(('share', track, offset))
 
     def save_frame(self, image: np.ndarray) -> None:
         """A grin frame; dropped with a warning when the encoder is that far behind, so the caller never blocks."""
@@ -126,6 +143,7 @@ class ClipSaver:
                     id = command[1]
                     style = command[3]
                     writer = ClipWriter(self._temp_path(id, '.mp4'), command[2], self.encoder)
+                    self._share = None
                 elif writer is None:
                     continue
                 elif kind == 'capture':
@@ -144,6 +162,8 @@ class ClipSaver:
                         f.write(data)
                 elif kind == 'frame':
                     writer.add(command[1])
+                elif kind == 'share':
+                    self._share = (command[1] or None, float(command[2]))
                 elif kind == 'close':
                     self._finish(id, style, writer, keep=command[1])
                     writer = None
@@ -158,8 +178,10 @@ class ClipSaver:
         complete: bool = writer.close()
         temp = {name: self._temp_path(id, name) for name in ('.mp4', '_capture.jpg', '_portrait.jpg')}
         kept: bool = keep and complete
+        to_share, self._share = self._share, None
         grin: str = ''
         portrait: str = ''
+        shared: str = ''
         if kept:
             grins: str = os.path.join(self.grins_dir, style)
             portraits: str = os.path.join(self.portraits_dir, style)
@@ -171,6 +193,9 @@ class ClipSaver:
                     os.replace(temp[name], os.path.join(portraits, id + name))
             grin = os.path.join(grins, id + '.mp4')
             portrait = os.path.join(portraits, id + '_portrait.jpg')
+            # the phone's clip first, from the finished file where it is: the visitor outside waits for it,
+            # the wall only gets one more clip
+            shared = self._build_share(id, style, temp['.mp4'], to_share)
             os.replace(temp['.mp4'], grin)
             logger.info('Saved %s %s (%d frames)', style, id, writer.frames)
         else:
@@ -182,13 +207,31 @@ class ClipSaver:
         callback: SavedCallback | None = self._saved_callback
         if callback is not None:
             try:
-                callback(id, style, kept, grin, portrait)
+                callback(id, style, kept, grin, portrait, shared)
             except Exception:
                 logger.exception('The saved callback failed for %s', id)
 
+    def _build_share(self, id: str, style: str, grin: str, to_share: tuple[str | None, float] | None) -> str:
+        """The share clip from the landed grin: its path, or '' when it could not be made (a warning)."""
+        temp: str = self._temp_path(id, '_share.mp4')
+        path: str = os.path.join(self.shares_dir, style, id + '.mp4')
+        track, offset = to_share if to_share is not None else (None, 0.0)
+        try:
+            share.build_share(grin, track, offset, self._watermark, self.encoder, temp)
+            os.replace(temp, path)
+            return path
+        except Exception as e:
+            logger.warning('No share clip for %s: %s', id, e)
+            try:
+                os.remove(temp)
+            except FileNotFoundError:
+                pass
+            return ''
+
     def set_saved_callback(self, callback: SavedCallback | None) -> None:
         """Called on the save thread when a visitor's files are closed: (id, style, kept, grin path,
-        portrait path); the paths are empty when the files were not kept."""
+        portrait path, share path); the paths are empty when the files were not kept (the share path
+        also when it could not be made)."""
         self._saved_callback = callback
 
     def _temp_path(self, id: str, suffix: str) -> str:
