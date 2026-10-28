@@ -1,0 +1,669 @@
+{
+  "1": {
+    "inputs": {
+      "image": "smile_capture.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Input (the app's capture, or a photo cropped with modules.face.crop)"
+    }
+  },
+  "1003": {
+    "class_type": "PreviewImage",
+    "inputs": {
+      "images": [
+        "1002:36",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Save portrait"
+    }
+  },
+  "1006": {
+    "inputs": {
+      "images": [
+        "1",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Preview Image"
+    }
+  },
+  "1024": {
+    "inputs": {
+      "seed": 2659950773,
+      "frames": 250,
+      "ease": "sine_in_out",
+      "crop_factor": 1.7,
+      "midpoint": 0.75,
+      "midpoint_deviation": 0.18,
+      "smile": 2.0,
+      "aaa": -16.759101478106974,
+      "eee": 5.283261834187146,
+      "eyebrow": 23.21381892401527,
+      "blink": -29.19349512087298,
+      "wink": 0.0,
+      "woo": -4.951752392729281,
+      "pupil_x": 0.0,
+      "pupil_y": 0.0,
+      "rotate_pitch_min": -9.904068313487464,
+      "rotate_pitch_max": -9.904068313487464,
+      "rotate_yaw_min": 9.54403576824414,
+      "rotate_yaw_max": 9.54403576824414,
+      "rotate_roll_min": -9.324633437870252,
+      "rotate_roll_max": -9.324633437870252,
+      "image": [
+        "1002:36",
+        0
+      ],
+      "stitching": false,
+      "smile_peak": 0.7408343452485837,
+      "aaa_peak": 0.9035564581857416,
+      "eee_peak": 0.6680751616863781,
+      "woo_peak": 0.5731073293799465,
+      "eyebrow_peak": 0.6743359974629217,
+      "blink_peak": 0.8599103569274599,
+      "wink_peak": 0.6372729009879157,
+      "pupil_x_peak": 0.9104779146229486,
+      "pupil_y_peak": 0.896871484580575,
+      "rotate_pitch_peak": 0.5996264447230291,
+      "rotate_yaw_peak": 0.8496878614593094,
+      "rotate_roll_peak": 0.8652343044398749,
+      "still": false
+    },
+    "class_type": "GrinFrames",
+    "_meta": {
+      "title": "Grin Frames"
+    }
+  },
+  "1026": {
+    "class_type": "PreviewAny",
+    "inputs": {
+      "source": [
+        "1024",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "All frames"
+    }
+  },
+  "1001:10": {
+    "inputs": {
+      "model_name": "Qwen3-VL-2B-Instruct",
+      "quantization": "None (FP16)",
+      "attention_mode": "auto",
+      "preset_prompt": "🖼️ Tags",
+      "custom_prompt": "Describe this person for a text-to-image prompt. Only visible physical features: gender, age group (one of: child, adolescent, young adult, adult, middle-aged, elderly), race and ethnicity, hair style, face shape, facial features. No clothing, no background, no negatives. Short comma-separated phrases on one line. Output only the phrases. Example: male, young adult, east asian, short straight hair, oval face, thin lips, happy ",
+      "max_tokens": 64,
+      "keep_model_loaded": true,
+      "seed": 2659950773,
+      "image": [
+        "1006",
+        0
+      ],
+      "use_torch_compile": false,
+      "device": "auto",
+      "temperature": 0.6,
+      "top_p": 0.9,
+      "num_beams": 1,
+      "repetition_penalty": 1.0,
+      "frame_count": 16
+    },
+    "class_type": "AILab_QwenVL_Advanced",
+    "_meta": {
+      "title": "QwenVL describe"
+    }
+  },
+  "1002:20": {
+    "inputs": {
+      "ckpt_name": "realvisxlV40_v40Bakedvae.safetensors"
+    },
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": {
+      "title": "Load Checkpoint"
+    }
+  },
+  "1002:1040": {
+    "inputs": {
+      "lora_name": "clothing_slider.safetensors",
+      "strength_model": 1.0,
+      "strength_clip": 1.0,
+      "model": [
+        "smile_distill",
+        0
+      ],
+      "clip": [
+        "1002:20",
+        1
+      ]
+    },
+    "class_type": "LoraLoader",
+    "_meta": {
+      "title": "LoRA: clothing"
+    }
+  },
+  "1002:1043": {
+    "inputs": {
+      "lora_name": "looking_at_viewer.safetensors",
+      "strength_model": 1.0,
+      "strength_clip": 1.0,
+      "model": [
+        "1002:1040",
+        0
+      ],
+      "clip": [
+        "1002:1040",
+        1
+      ]
+    },
+    "class_type": "LoraLoader",
+    "_meta": {
+      "title": "LoRA: looking at viewer"
+    }
+  },
+  "1002:1045": {
+    "inputs": {
+      "lora_name": "dark.safetensors",
+      "strength_model": -0.5,
+      "strength_clip": -0.5,
+      "model": [
+        "1002:1043",
+        0
+      ],
+      "clip": [
+        "1002:1043",
+        1
+      ]
+    },
+    "class_type": "LoraLoader",
+    "_meta": {
+      "title": "LoRA: dark"
+    }
+  },
+  "1002:22": {
+    "inputs": {
+      "text": "(nude) portrait by (David LaChapelle: 1.3), high gloss, hard studio flash, studio lighting, (bright color solid background)",
+      "clip": [
+        "1002:1045",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Prompt: style"
+    }
+  },
+  "1002:23": {
+    "inputs": {
+      "string_a": [
+        "smile_prefix",
+        0
+      ],
+      "string_b": ", looking at viewer",
+      "delimiter": ""
+    },
+    "class_type": "StringConcatenate",
+    "_meta": {
+      "title": "Description + model"
+    }
+  },
+  "1002:24": {
+    "inputs": {
+      "text": [
+        "1002:23",
+        0
+      ],
+      "clip": [
+        "1002:1045",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Prompt: description"
+    }
+  },
+  "1002:25": {
+    "inputs": {
+      "conditioning_to": [
+        "1002:22",
+        0
+      ],
+      "conditioning_from": [
+        "1002:24",
+        0
+      ]
+    },
+    "class_type": "ConditioningConcat",
+    "_meta": {
+      "title": "Style + description"
+    }
+  },
+  "1002:26": {
+    "inputs": {
+      "text": "(text, logo), clothing, (necklace), blurred, illustration, 3d, 2d, painting, cartoons, crooked teeth, ugly teeth",
+      "clip": [
+        "1002:1045",
+        1
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "Negative"
+    }
+  },
+  "1002:27": {
+    "inputs": {
+      "instantid_file": "ip-adapter_instant_id_sdxl.bin"
+    },
+    "class_type": "InstantIDModelLoader",
+    "_meta": {
+      "title": "Load InstantID Model"
+    }
+  },
+  "1002:28": {
+    "inputs": {
+      "provider": "CUDA"
+    },
+    "class_type": "InstantIDFaceAnalysis",
+    "_meta": {
+      "title": "InstantID Face Analysis"
+    }
+  },
+  "1002:29": {
+    "inputs": {
+      "control_net_name": "control_instant_id_sdxl.safetensors"
+    },
+    "class_type": "ControlNetLoader",
+    "_meta": {
+      "title": "InstantID ControlNet"
+    }
+  },
+  "1002:30": {
+    "inputs": {
+      "ip_weight": 0.9,
+      "cn_strength": 1.0,
+      "start_at": 0,
+      "end_at": 1,
+      "noise": 0,
+      "combine_embeds": "average",
+      "instantid": [
+        "1002:27",
+        0
+      ],
+      "insightface": [
+        "1002:28",
+        0
+      ],
+      "control_net": [
+        "1002:29",
+        0
+      ],
+      "image": [
+        "1006",
+        0
+      ],
+      "model": [
+        "1002:1045",
+        0
+      ],
+      "positive": [
+        "1002:25",
+        0
+      ],
+      "negative": [
+        "1002:26",
+        0
+      ]
+    },
+    "class_type": "ApplyInstantIDAdvanced",
+    "_meta": {
+      "title": "Apply InstantID (aiia2: 1.0 / 1.0, no noise)"
+    }
+  },
+  "1002:38": {
+    "inputs": {
+      "model_name": "depth_anything_3_mono_large.safetensors",
+      "weight_dtype": "fp16"
+    },
+    "class_type": "LoadDA3Model",
+    "_meta": {
+      "title": "Depth Anything 3 model"
+    }
+  },
+  "1002:39": {
+    "inputs": {
+      "resolution": 1008,
+      "resize_method": "upper_bound_resize",
+      "mode": "mono",
+      "da3_model": [
+        "1002:38",
+        0
+      ],
+      "image": [
+        "1006",
+        0
+      ]
+    },
+    "class_type": "DA3Inference",
+    "_meta": {
+      "title": "Depth (Depth Anything 3)"
+    }
+  },
+  "1002:31": {
+    "inputs": {
+      "output": "depth",
+      "output.normalization": "v2_style",
+      "output.apply_sky_clip": false,
+      "da3_geometry": [
+        "1002:39",
+        0
+      ]
+    },
+    "class_type": "DA3Render",
+    "_meta": {
+      "title": "Depth map"
+    }
+  },
+  "1002:32": {
+    "inputs": {
+      "control_net_name": "t2i-depth_diffusers.safetensors"
+    },
+    "class_type": "ControlNetLoader",
+    "_meta": {
+      "title": "T2I depth adapter"
+    }
+  },
+  "1002:33": {
+    "inputs": {
+      "strength": 0.65,
+      "start_percent": 0,
+      "end_percent": 0.55,
+      "positive": [
+        "1002:30",
+        1
+      ],
+      "negative": [
+        "1002:30",
+        2
+      ],
+      "control_net": [
+        "1002:32",
+        0
+      ],
+      "image": [
+        "1002:31",
+        0
+      ]
+    },
+    "class_type": "ControlNetApplyAdvanced",
+    "_meta": {
+      "title": "Depth 0.5, off after 50%"
+    }
+  },
+  "1002:34": {
+    "inputs": {
+      "width": 896,
+      "height": 1120,
+      "batch_size": 1
+    },
+    "class_type": "EmptyLatentImage",
+    "_meta": {
+      "title": "Empty Latent Image"
+    }
+  },
+  "1002:35": {
+    "inputs": {
+      "seed": 2659950773,
+      "steps": 4,
+      "cfg": 1.2,
+      "sampler_name": "lcm",
+      "scheduler": "exponential",
+      "denoise": 1,
+      "model": [
+        "1002:30",
+        0
+      ],
+      "positive": [
+        "1002:33",
+        0
+      ],
+      "negative": [
+        "1002:33",
+        1
+      ],
+      "latent_image": [
+        "1002:34",
+        0
+      ],
+      "vae": [
+        "1002:20",
+        2
+      ]
+    },
+    "class_type": "KSamplerFullPreview",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "1002:36": {
+    "inputs": {
+      "samples": [
+        "1002:35",
+        0
+      ],
+      "vae": [
+        "1002:20",
+        2
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "1002:37": {
+    "inputs": {
+      "images": [
+        "1002:36",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Portrait"
+    }
+  },
+  "1002:1004": {
+    "inputs": {
+      "source": [
+        "1002:23",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Description"
+    }
+  },
+  "1002:1010": {
+    "inputs": {
+      "value": "Male, young adult,"
+    },
+    "class_type": "PrimitiveString",
+    "_meta": {
+      "title": "Text"
+    }
+  },
+  "smile_prefix": {
+    "class_type": "StringConcatenate",
+    "inputs": {
+      "string_a": "nude supermodel,",
+      "string_b": [
+        "1001:10",
+        0
+      ],
+      "delimiter": " "
+    },
+    "_meta": {
+      "title": "Prompt prefix"
+    }
+  },
+  "smile_capture_depth": {
+    "class_type": "PreviewImage",
+    "inputs": {
+      "images": [
+        "1002:31",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Depth of capture"
+    }
+  },
+  "smile_last_frame": {
+    "class_type": "ImageFromBatch",
+    "inputs": {
+      "image": [
+        "1024",
+        0
+      ],
+      "batch_index": 249,
+      "length": 1
+    },
+    "_meta": {
+      "title": "Last grin frame"
+    }
+  },
+  "smile_last_geometry": {
+    "inputs": {
+      "resolution": 1008,
+      "resize_method": "upper_bound_resize",
+      "mode": "mono",
+      "da3_model": [
+        "1002:38",
+        0
+      ],
+      "image": [
+        "smile_last_frame",
+        0
+      ]
+    },
+    "class_type": "DA3Inference",
+    "_meta": {
+      "title": "Depth of last frame (run)"
+    }
+  },
+  "smile_last_depth_map": {
+    "inputs": {
+      "output": "depth",
+      "output.normalization": "v2_style",
+      "output.apply_sky_clip": false,
+      "da3_geometry": [
+        "smile_last_geometry",
+        0
+      ]
+    },
+    "class_type": "DA3Render",
+    "_meta": {
+      "title": "Depth map"
+    }
+  },
+  "smile_last_depth": {
+    "class_type": "PreviewImage",
+    "inputs": {
+      "images": [
+        "smile_last_depth_map",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Depth of last frame"
+    }
+  },
+  "smile_distill": {
+    "class_type": "LoraLoaderModelOnly",
+    "inputs": {
+      "model": [
+        "1002:20",
+        0
+      ],
+      "lora_name": "dmd2_sdxl_4step_lora_fp16.safetensors",
+      "strength_model": 1.0
+    }
+  },
+  "test_prompt": {
+    "class_type": "PreviewAny",
+    "inputs": {
+      "source": [
+        "1002:23",
+        0
+      ]
+    },
+    "_meta": {
+      "title": "Prompt"
+    }
+  },
+  "1007": {
+    "inputs": {
+      "blend_factor": 0.5,
+      "blend_mode": "normal",
+      "image1": [
+        "1006",
+        0
+      ],
+      "image2": [
+        "1002:36",
+        0
+      ]
+    },
+    "class_type": "ImageBlend",
+    "_meta": {
+      "title": "Overlay"
+    }
+  },
+  "1008": {
+    "inputs": {
+      "images": [
+        "1007",
+        0
+      ]
+    },
+    "class_type": "PreviewImage",
+    "_meta": {
+      "title": "Overlay preview"
+    }
+  },
+  "test_video": {
+    "class_type": "CreateVideo",
+    "inputs": {
+      "images": [
+        "1024",
+        0
+      ],
+      "fps": 12.0
+    },
+    "_meta": {
+      "title": "Grin video"
+    }
+  },
+  "test_video_file": {
+    "class_type": "SaveVideo",
+    "inputs": {
+      "video": [
+        "test_video",
+        0
+      ],
+      "filename_prefix": "smile_test",
+      "format": "mp4",
+      "codec": "h264"
+    },
+    "_meta": {
+      "title": "Save grin video"
+    }
+  }
+}

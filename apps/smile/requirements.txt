@@ -1,0 +1,28 @@
+# Fixed versions, same as the comfy venv
+numpy==2.5.3
+onnxruntime-gpu[cuda,cudnn]==1.30.0     # extras install the CUDA and cuDNN libraries
+
+# Same as poser2
+nicegui==3.11.1
+
+# Latest versions as of sep 2026
+opencv-python==5.0.0.93
+freetype-py==2.5.1
+glfw==2.10.0
+PyOpenGL==3.1.10
+PyOpenGL-accelerate==3.1.10
+python-osc==1.10.2
+pytweening==1.2.0
+requests==2.34.2
+stupidArtnet==1.6.0
+watchdog==6.0.0
+websocket-client==1.9.2
+aiohttp==3.14.5                         # the relay of SMILE Online, when it runs on this PC (relay/)
+
+# Development
+pytest==9.1.1
+
+
+
+
+# Check for updates with:   pip list --outdated

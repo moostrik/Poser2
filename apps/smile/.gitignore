@@ -1,0 +1,25 @@
+# project
+.venv/
+*.log
+output/*
+!output/.gitkeep
+data/input/*
+!data/input/.gitkeep
+data/settings/.*
+comfy/models/
+/ComfyUI/
+
+# Claude Code
+.claude/settings.local.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+/ComfyUI-previous/
+
+# SMILE Online
+data/online_token.txt
+relay/token.txt
+relay/data/
