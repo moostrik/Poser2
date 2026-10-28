@@ -23,10 +23,12 @@ def convert_rtmpose_to_tensorrt(
     min_batch: int = 1,
     opt_batch: int = 3,
     max_batch: int = 4,
-    workspace_gb: int = 8,
-    force_fp16: bool = False
+    workspace_gb: int = 8
 ) -> bool:
     """Convert RTMPose ONNX model to TensorRT engine.
+
+    The engine's precision is the ONNX model's (TensorRT builds strongly typed); an FP32 model is
+    made FP16 beforehand with `convert_onnx_to_fp16.py`.
 
     Args:
         onnx_path: Path to input ONNX file
@@ -35,7 +37,6 @@ def convert_rtmpose_to_tensorrt(
         opt_batch: Optimal batch size (used for optimization)
         max_batch: Maximum batch size (set to opt_batch if never exceeded)
         workspace_gb: Workspace size in GB
-        force_fp16: Force FP16 precision even if ONNX is FP32
 
     Returns:
         bool: True if successful, False otherwise
@@ -65,7 +66,7 @@ def convert_rtmpose_to_tensorrt(
     print("📦 Creating TensorRT builder...", end='', flush=True)
     logger = trt.Logger(trt.Logger.WARNING)
     builder = trt.Builder(logger)
-    network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+    network = builder.create_network(0)   # strongly typed: the precision is the ONNX model's (TensorRT 11)
     parser = trt.OnnxParser(network, logger)
     print(" ✓")
 
@@ -181,7 +182,6 @@ def convert_rtmpose_to_tensorrt(
     onnx_model = onnx.load(onnx_path)
 
     # Check initializer (weights) precision
-    use_fp16 = False
     detected_precision = "UNKNOWN"
     if onnx_model.graph.initializer:
         onnx_dtype_map = {1: "FLOAT32", 10: "FLOAT16", 2: "UINT8", 3: "INT8", 6: "INT32", 7: "INT64"}
@@ -193,10 +193,8 @@ def convert_rtmpose_to_tensorrt(
         # Determine precision (prefer FP16 if found, otherwise FP32)
         if "FLOAT16" in weight_dtypes:
             detected_precision = "FP16"
-            use_fp16 = True
         elif "FLOAT32" in weight_dtypes:
             detected_precision = "FP32"
-            use_fp16 = False
         else:
             detected_precision = ", ".join(sorted(weight_dtypes))
 
@@ -206,17 +204,10 @@ def convert_rtmpose_to_tensorrt(
         print("  ⚠️  ONNX weights: No initializers found")
         print("  Defaulting to FP32")
         detected_precision = "FP32"
-        use_fp16 = False
-
-    # Override with force_fp16 if requested
-    if force_fp16 and not use_fp16:
-        print(f"  ⚙️  Force FP16 enabled: overriding {detected_precision} → FP16")
-        use_fp16 = True
-        detected_precision = "FP16 (forced)"
 
     # Show build configuration
     print("\n🎯 TensorRT Build Configuration:")
-    print(f"  Precision: {detected_precision}")
+    print(f"  Precision: {detected_precision} (the ONNX model's)")
 
     # Configure builder
     print("\n⚙️  Configuring builder...")
@@ -233,14 +224,7 @@ def convert_rtmpose_to_tensorrt(
                       (max_batch, 3, height, width))
 
     config.add_optimization_profile(profile)
-    print(f"  ├─ Optimization profile: batch {min_batch}/{opt_batch}/{max_batch}, shape {height}×{width}")
-
-    # Set precision mode based on detected ONNX precision
-    if use_fp16:
-        config.set_flag(trt.BuilderFlag.FP16)
-        print(f"  └─ Precision: FP16")
-    else:
-        print(f"  └─ Precision: FP32")
+    print(f"  └─ Optimization profile: batch {min_batch}/{opt_batch}/{max_batch}, shape {height}×{width}")
 
     # Build engine
     print("\n🔨 Building TensorRT engine...")
@@ -302,8 +286,6 @@ if __name__ == '__main__':
                         help='Maximum batch size (default: 3, set to opt-batch if never exceeded)')
     parser.add_argument('--workspace', type=int, default=8,
                         help='Workspace size in GB (default: 8)')
-    parser.add_argument('--force-fp16', action='store_true',
-                        help='Force FP16 precision even if ONNX is FP32')
 
     args = parser.parse_args()
 
@@ -313,8 +295,7 @@ if __name__ == '__main__':
         args.min_batch,
         args.opt_batch,
         args.max_batch,
-        args.workspace,
-        args.force_fp16
+        args.workspace
     )
 
     sys.exit(0 if success else 1)

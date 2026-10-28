@@ -3,11 +3,13 @@ echo.
 echo  TensorRT Model Conversion
 
 set APP=%1
+set MODE=%2
 set "VENV_DIR=%~dp0..\.venv"
 
 if "%APP%"=="" (
-    echo Usage: %~nx0 APP
-    echo   APP    hd_trio, white_space, deep_flow, all
+    echo Usage: %~nx0 APP [rebuild]
+    echo   APP      hd_trio, white_space, deep_flow, all
+    echo   rebuild  build the engines that exist again ^(after a TensorRT upgrade^)
     goto endofscript
 )
 
@@ -68,7 +70,7 @@ for %%A in (!_ARGS!) do (
     if "!_PREV!"=="--output" set "_OUT=%%A"
     set "_PREV=%%A"
 )
-if exist "!_OUT!" (
+if exist "!_OUT!" if /I not "%MODE%"=="rebuild" (
     echo Skipping !_OUT! - already exists
     endlocal & exit /b 0
 )

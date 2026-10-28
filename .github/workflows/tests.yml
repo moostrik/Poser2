@@ -16,15 +16,15 @@ jobs:
           enable-cache: true
 
       # The locked packages without the CUDA stack: torch from the CPU index,
-      # TensorRT and cuda-python left out (TensorRT is only imported when a TRT model runs).
+      # TensorRT left out (it is only imported when a TRT model runs).
       - name: Install dependencies
         shell: bash
         run: |
           uv venv --python 3.12
           uv export --locked --no-hashes --no-annotate --no-emit-project --format requirements-txt \
-            | grep -v -E '^(-|torch|tensorrt|cuda-|nvidia-)' > requirements-ci.txt
+            | grep -v -E '^(-|torch|tensorrt|nvidia-)' > requirements-ci.txt
           uv pip install -r requirements-ci.txt
-          uv pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+          uv pip install torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu
 
       - name: Unit tests
         shell: bash
