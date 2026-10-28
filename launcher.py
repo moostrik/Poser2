@@ -6,7 +6,8 @@ import OpenGL
 OpenGL.ERROR_CHECKING = False  # must be set before any other OpenGL import; per-call glGetError otherwise dominates the render thread
 import sys
 import time
-from argparse import ArgumentParser, Namespace
+from argparse import ArgumentParser
+from inspect import signature
 from pathlib import Path
 from signal import signal, SIGINT
 from threading import Event, Thread
@@ -57,7 +58,7 @@ if __name__ == '__main__':
     parser.add_argument('-v',       '--verbose',        action='store_true',        help='enable verbose (DEBUG) console output')
     parser.add_argument('-timing',  '--timing',         type=float, default=0.0,    help='seconds of timing session: write a timing report to logs/, then quit (0 = off)')
     parser.add_argument('-warmup',  '--timing-warmup',  type=float, default=30.0,   help='seconds before the timing session starts')
-    args: Namespace = parser.parse_args()
+    args, app_args = parser.parse_known_args()     # the rest are the app's own (`-app smile -h` lists them)
     if args.app is None:
         args.app = _read_launcher_file()   # its warnings go to stderr: the log file is named after the app
     log_file = setup_logging(verbose=args.verbose, name=args.app)
@@ -68,7 +69,12 @@ if __name__ == '__main__':
     logging.info(crash_summary())
 
     AppClass = load_app(args.app)
-    app = AppClass(simulation=args.simulation, interface=not args.no_interface)
+    if 'args' in signature(AppClass).parameters:
+        app = AppClass(simulation=args.simulation, interface=not args.no_interface, args=app_args)
+    elif app_args:
+        parser.error(f"unrecognized arguments: {' '.join(app_args)} ({args.app} takes none of its own)")
+    else:
+        app = AppClass(simulation=args.simulation, interface=not args.no_interface)
     app.start()
 
     shutdown_event = Event()

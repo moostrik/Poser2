@@ -1,4 +1,4 @@
-"""The model tool: keeps ComfyUI's models folder equal to the manifest comfy/models.json.
+"""The model tool: keeps ComfyUI's models folder equal to the manifest data/comfy/models.json.
 
 The manifest lists every model file ComfyUI needs for SMILE: its path under ComfyUI/models, size, sha256 and
 source. A source is a public URL (Hugging Face, where the file came from) or a file in the repo
@@ -10,7 +10,7 @@ before any venv exists, from the repo root:
     py -3.12 -m apps.smile.comfy.models hash [--write] [--add P]   size and sha256 of the files present, into the manifest
     py -3.12 -m apps.smile.comfy.models sources [--write]          the sources still hold the manifest's files (no download)
 
-Defaults: the manifest in comfy/, the models folder ComfyUI\\models; --manifest and --models override. The mirror
+Defaults: the manifest in apps/smile/data/comfy/, the models folder apps/smile/ComfyUI\\models; --manifest and --models override. The mirror
 is any folder in the same layout: the backup disk's ComfyUI\\models, a USB stick. A download goes to <path>.part,
 resumes after an interruption, and is renamed into place only after its sha256 matches. A Hugging Face `resolve`
 URL answers 302 to a CDN URL, and that 302 carries the file's LFS sha256 (`x-linked-etag`) and size: the HEAD
@@ -32,9 +32,10 @@ from typing import Any, BinaryIO, Callable
 
 logger = logging.getLogger('models')
 
-ROOT: Path = Path(__file__).resolve().parents[2]
-MANIFEST: Path = ROOT / 'data' / 'comfy' / 'models.json'
-MODELS: Path = ROOT / 'ComfyUI' / 'models'
+ROOT: Path = Path(__file__).resolve().parents[3]       # the Poser2 root: the app runs from it
+APP: Path = ROOT / 'apps' / 'smile'
+MANIFEST: Path = APP / 'data' / 'comfy' / 'models.json'
+MODELS: Path = APP / 'ComfyUI' / 'models'
 CHUNK: int = 1 << 22
 TIMEOUT: float = 60.0
 PART: str = '.part'

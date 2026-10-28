@@ -9,7 +9,7 @@ from apps.smile.render.GrinPlayer import GrinPlayer
 from apps.smile.render.grab import ScreenGrab
 from apps.smile.comfy.messages import GenMessage, GenState
 from apps.smile.face.FaceFinder import FaceFrame
-from modules import sphere
+from apps.smile import sphere
 from modules.gl import Blit, Fbo, MonitorId, RenderBase, Shader, Style, Texture, clear_color
 from modules.gl.Utils import fit
 from apps.smile.player.Render import PlayerRender

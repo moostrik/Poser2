@@ -8,7 +8,7 @@ from apps.smile.comfy.settings import PipelineSettings, Ease, Prefer, StyleMode
 from apps.smile.comfy.styles import Styles
 from apps.smile.comfy.workflow import FIXED_SEED, GRIN_ROTATIONS, GRIN_TARGETS, MAX_SEED, Workflow
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))     # apps/smile
 WORKFLOW = os.path.join(ROOT, 'data', 'comfy', 'smile_workflow.json')
 
 

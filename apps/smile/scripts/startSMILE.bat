@@ -4,11 +4,12 @@
 
 @echo off
 
-set "CURRENT_DIR=%~dp0..\"
+set "SMILE_DIR=%~dp0..\"
+set "CURRENT_DIR=%~dp0..\..\..\"
 cd /d "%CURRENT_DIR%"
 
 echo Closing SMILE
-powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='pythonw.exe' or Name='python.exe'\" | Where-Object { $_.CommandLine -like '*smile.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='pythonw.exe' or Name='python.exe'\" | Where-Object { $_.CommandLine -like '*-app smile*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"
 
 @REM whatever listens on ComfyUI's port, however it was started; then wait until the port is free
 echo Closing Image Generator (ComfyUI)
@@ -41,14 +42,14 @@ if not errorlevel 1 (
 
 @REM ComfyUI first: it takes the longest to load. SMILE waits for it and shows that on its screen
 echo Opening Image Generator (ComfyUI)
-start "ComfyUI" /MIN cmd /c "%CURRENT_DIR%scripts\start_comfy.bat"
+start "ComfyUI" /MIN cmd /c "%SMILE_DIR%scripts\start_comfy.bat"
 
 echo Opening Music Player
-explorer "%CURRENT_DIR%data\audio\Smile-Music-Player.maxpat"
+explorer "%SMILE_DIR%data\audio\Smile-Music-Player.maxpat"
 timeout /t 4 /nobreak >nul
 
 echo Opening Main App
-start "" "%CURRENT_DIR%.venv\Scripts\pythonw.exe" smile.py -pm -fs
+start "" "%CURRENT_DIR%.venv\Scripts\pythonw.exe" launcher.py -app smile -fs
 timeout /t 2 /nobreak >nul
 
 echo Exit this script

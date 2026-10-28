@@ -14,8 +14,9 @@ Where it runs and how it is reached, on the tailnet for a test and on the VPS, i
 
 * a token: one line of random text in `relay/token.txt` (git-ignored) and the same in SMILE's
   `data/online_token.txt`
-* `pip install aiohttp` (in SMILE's venv it is in `requirements.txt`), then from the repo root:
-  `python -m relay.server --port 8800` (`-v` for debug logging); `scripts\start_relay.bat` does this on the PC.
+* `pip install aiohttp` (Poser2's venv has it), then from the Poser2 root:
+  `python -m apps.smile.relay.server --port 8800` (`-v` for debug logging); `apps\smile\scripts\start_relay.bat` does this on the PC.
+  On the VPS the `relay` folder stands alone and runs as `python -m relay.server` beside it.
   The log goes to the console and to `data/relay.log`; every phone reports the end of its turn there
   (`phone … timing: result, play, playing, file; first byte, KB, KB at every second`: seconds after the turn's end that
   the result came, the video was started, played its first frame, and the file was on the phone; then the
@@ -24,5 +25,5 @@ Where it runs and how it is reached, on the tailnet for a test and on the VPS, i
   front (`data/documents/OnlineHosting.md`); without one the relay takes `--cert` and `--key`
 * tests: `relay/tests` covers the line, the server and the page's files (`test_web.py`: the stylesheet's structure, every
   id the script and the stylesheet name, no name declared twice in the script: what a browser would refuse silently)
-* without SMILE: `python -m modules.online.fake` stands in for it (the SCRFD face detector, or the middle of the
+* without SMILE: `python -m apps.smile.online.fake` stands in for it (the SCRFD face detector, or the middle of the
   frame without the model; a fake transformation with SMILE's stages; the frame comes back as the portrait)

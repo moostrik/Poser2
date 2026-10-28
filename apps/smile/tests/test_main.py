@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from apps.smile.comfy.settings import PipelineSettings
-from apps.smile.main import VISITOR_MARGIN, Main
+from apps.smile.main import VISITOR_MARGIN, SmileMain
 from apps.smile.render.Sequencer import SequenceType
 
 
@@ -20,7 +20,7 @@ class TestVisitorLimit(unittest.TestCase):
 
     def step(self, now: float, seq: SequenceType) -> None:
         with mock.patch('apps.smile.main.time.time', lambda: now):
-            Main._limit_visitor(self.app, seq)
+            SmileMain._limit_visitor(self.app, seq)
 
     def test_a_visitor_within_its_time_is_left_alone(self):
         self.step(self.limit - 1.0, SequenceType.DIFFUSION)

@@ -13,7 +13,7 @@ import cv2
 import freetype
 import numpy as np
 
-from modules import sphere
+from apps.smile import sphere
 from apps.smile.credit import FONT
 
 logger = logging.getLogger(__name__)

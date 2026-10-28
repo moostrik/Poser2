@@ -3,7 +3,7 @@
 import unittest
 from pathlib import Path
 
-from modules import sphere
+from apps.smile import sphere
 
 
 class TestWiring(unittest.TestCase):

@@ -1,31 +1,31 @@
 <#
-Installs, or checks, the ComfyUI server of SMILE at <repo>\ComfyUI from comfy\comfy.lock:
-ComfyUI core at its pinned commit, the node packs at theirs from the archives in comfy\packs (the
-Comfy Registry's files, kept in the repo), any patch in comfy\patches (none today), our node pack
-comfy\aiia_grin as a junction, and the venv from comfy\requirements.lock. The models live in
+Installs, or checks, the ComfyUI server of SMILE at apps\smile\ComfyUI from data\comfy\comfy.lock:
+ComfyUI core at its pinned commit, the node packs at theirs from the archives in data\comfy\packs (the
+Comfy Registry's files, kept in the repo), any patch in data\comfy\patches (none today), our node pack
+data\comfy\aiia_grin as a junction, and the venv from data\comfy\requirements.lock. The models live in
 ComfyUI\models as ComfyUI has it; scripts\install.bat fills that folder afterwards with the model tool
-(modules\comfy\models.py). Safe to run again: everything in place is skipped, so a second run is the
+(comfy\models.py). Safe to run again: everything in place is skipped, so a second run is the
 check. Exit 1 on the first failure, with its reason.
 
     powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install_comfy.ps1 [-Target DIR]
 
 Updating (first on the dev PC, never on the ICK PC during the show):
 
-    install_comfy.ps1 -Update [-ComfyCommit SHA]   the install as it is gets its picture taken (modules.comfy.smoke
+    install_comfy.ps1 -Update [-ComfyCommit SHA]   the install as it is gets its picture taken (apps.smile.comfy.smoke
                                                    --save output\smoke\before: a fixed-seed portrait and grin frame),
                                                    is renamed <Target>-previous, and a new one is built with ComfyUI
                                                    at origin HEAD (or the commit given), every pack at the registry's
-                                                   latest version (its archive downloaded into comfy\packs) and the venv
+                                                   latest version (its archive downloaded into data\comfy\packs) and the venv
                                                    from their requirements.txt files (not the lock), the models copied
                                                    over from the previous install, then smoke-tested with its picture
                                                    in output\smoke\after
     install_comfy.ps1 -Accept                      the pictures compared and good: comfy.lock and requirements.lock
                                                    are written from the new install and <Target>-previous is deleted;
-                                                   commit the locks and the new archives in comfy\packs
+                                                   commit the locks and the new archives in data\comfy\packs
     install_comfy.ps1 -Rollback                    the new install is deleted and <Target>-previous comes back
 
 An update may change what a node expects (an input added, a node renamed): the smoke test then refuses the
-workflow and names the node; the fix belongs in modules\comfy\workflow.py or a re-export of the workflow,
+workflow and names the node; the fix belongs in comfy\workflow.py or a re-export of the workflow,
 never in ComfyUI or a pack.
 
 Everything is cloned with core.autocrlf off: the packs' files stay as upstream has them, which a patch
@@ -40,7 +40,9 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$repo = Split-Path $PSScriptRoot -Parent
+$repo = Split-Path $PSScriptRoot -Parent                  # apps\smile
+$root = Split-Path (Split-Path $repo -Parent) -Parent      # the Poser2 root: the venv, and where the app runs
+Set-Location $root
 $src = Join-Path $repo 'data\comfy'
 
 function Step([string]$name) { Write-Host "`n== $name" -ForegroundColor Cyan }
@@ -113,7 +115,7 @@ function WriteLocks($lockObj, [string]$target, [string]$python) {
 }
 
 $previous = "$Target-previous"
-$appPython = Join-Path $repo '.venv\Scripts\python.exe'
+$appPython = Join-Path $root '.venv\Scripts\python.exe'
 $smokeOut = Join-Path $repo 'output\smoke'
 
 try {
@@ -132,16 +134,16 @@ try {
         if (-not (Test-Path $previous)) { Fail "no update to accept: $previous is not there" }
         WriteLocks $lock $Target (Join-Path $Target '.venv\Scripts\python.exe')
         RemoveInstall $previous
-        Write-Host "`nThe update is the install: comfy.lock and requirements.lock describe it, $previous is gone. Commit the locks and comfy\packs (git rm the archives of versions no longer in the lock)." -ForegroundColor Green
+        Write-Host "`nThe update is the install: comfy.lock and requirements.lock describe it, $previous is gone. Commit the locks and data\comfy\packs (git rm the archives of versions no longer in the lock)." -ForegroundColor Green
         exit 0
     }
     if ($Update) {
         Step 'Update: new pins'
         if (Test-Path $previous) { Fail "$previous exists: -Accept or -Rollback the last update first" }
-        if (-not (Test-Path $appPython)) { Fail "the app venv is missing ($appPython): run scripts\install.bat first" }
+        if (-not (Test-Path $appPython)) { Fail "the app venv is missing ($appPython): run scripts\install.bat at the Poser2 root first" }
         if (Test-Path $Target) {
             Note "the picture of the install as it is -> $smokeOut\before"
-            & $appPython -m modules.comfy.smoke --comfy $Target --save (Join-Path $smokeOut 'before')
+            & $appPython -m apps.smile.comfy.smoke --comfy $Target --save (Join-Path $smokeOut 'before')
             if ($LASTEXITCODE -ne 0) { Fail 'the install as it is does not pass its own smoke test; sort that out before updating' }
             # nothing may run from the folder while it is renamed (a ComfyUI, or a child it left)
             foreach ($proc in Get-Process | Where-Object { $_.Path -and $_.Path -like "$Target\*" }) { Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue }
@@ -232,8 +234,8 @@ try {
                 if ($v -ne $pack.version) { Fail "$($pack.id) at $dst is version '$v', the pin is $($pack.version): remove the folder and run again" }
                 Note "$($pack.id) $($pack.version): in place"
             } else {
-                # the archive lives in the repo (comfy\packs, git LFS); a version not there yet (an update) comes
-                # from the Comfy Registry and stays in comfy\packs, to be committed with the locks
+                # the archive lives in the repo (data\comfy\packs, git LFS); a version not there yet (an update) comes
+                # from the Comfy Registry and stays in data\comfy\packs, to be committed with the locks
                 $archive = Get-ChildItem (Join-Path $packs "$($pack.id)-$($pack.version).*") -ErrorAction SilentlyContinue | Select-Object -First 1
                 if ($archive -and $archive.Length -lt 1024) { Fail "$($archive.Name) is a git LFS pointer, not the archive: run git lfs pull" }
                 if (-not $archive) {
@@ -244,7 +246,7 @@ try {
                     $magic = [IO.File]::ReadAllBytes($tmp)[0..1]
                     $ext = if ($magic[0] -eq 0x50 -and $magic[1] -eq 0x4B) { '.zip' } else { '.tar.gz' }
                     $archive = Rename-Item $tmp "$($pack.id)-$($pack.version)$ext" -PassThru
-                    Note "$($pack.id) $($pack.version): archive downloaded from the registry into comfy\packs"
+                    Note "$($pack.id) $($pack.version): archive downloaded from the registry into data\comfy\packs"
                 }
                 New-Item -ItemType Directory -Force $dst | Out-Null
                 & (Join-Path $env:SystemRoot 'System32\tar.exe') -xf $archive.FullName -C $dst     # Windows' bsdtar reads both formats (Git's tar on the PATH would not)
@@ -284,6 +286,14 @@ try {
     if ((Test-Path $grin) -and -not (IsLink $grin)) {
         Remove-Item -Recurse -Force $grin
         Note 'the copied folder of the old setup removed'
+    }
+    if ((Test-Path $grin) -and (IsLink $grin)) {
+        $old = "$((Get-Item $grin -Force).Target)"
+        if ($old -ne (Join-Path $src 'aiia_grin')) {
+            # an install moved from another checkout: its junction still points there
+            (Get-Item $grin -Force).Delete()
+            Note "junction to $old removed"
+        }
     }
     if (-not (Test-Path $grin)) {
         New-Item -ItemType Junction -Path $grin -Target (Join-Path $src 'aiia_grin') | Out-Null
@@ -327,7 +337,7 @@ try {
         # --no-deps: the lock is a complete freeze; resolving it would fail on metadata the working venv
         # itself contradicts (facenet-pytorch asks numpy<2, the install runs numpy 2.5.3)
         & $python -m pip install --no-deps -r $lockFile
-        if ($LASTEXITCODE -ne 0) { Fail 'pip install -r comfy\requirements.lock failed' }
+        if ($LASTEXITCODE -ne 0) { Fail 'pip install -r data\comfy\requirements.lock failed' }
         Set-Content -Path $stamp -Value $lockHash -Encoding ascii
         Note 'requirements.lock installed'
     }
@@ -351,13 +361,13 @@ try {
     if ($Update) {
         Step 'Update: the proof'
         Note "the smoke test of the new install, its picture -> $smokeOut\after"
-        & $appPython -m modules.comfy.smoke --comfy $Target --save (Join-Path $smokeOut 'after')
+        & $appPython -m apps.smile.comfy.smoke --comfy $Target --save (Join-Path $smokeOut 'after')
         if ($LASTEXITCODE -ne 0) { Fail "the new install fails its smoke test: look at it, then install_comfy.ps1 -Rollback (or fix and run -Update again after -Rollback)" }
         Write-Host "`nThe update is built at $Target and passes the smoke test. Compare $smokeOut\before with $smokeOut\after (portrait.png, grin_last.png)," -ForegroundColor Green
         Write-Host "then: install_comfy.ps1 -Accept (writes the locks, removes $previous) or install_comfy.ps1 -Rollback." -ForegroundColor Green
         exit 0
     }
-    Write-Host "`nComfyUI is installed at $Target. Next: the models into $Target\models (scripts\install.bat does it: py -3.12 -m modules.comfy.models install)." -ForegroundColor Green
+    Write-Host "`nComfyUI is installed at $Target. Next: the models into $Target\models (apps\smile\scripts\install.bat does it: .venv\Scripts\python -m apps.smile.comfy.models install)." -ForegroundColor Green
     exit 0
 }
 catch {

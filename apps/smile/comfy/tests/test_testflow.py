@@ -7,7 +7,7 @@ from apps.smile.comfy.testflow import CAPTURE, PROMPT, VIDEO, VIDEO_FILE, make_t
 from apps.smile.comfy.workflow import Workflow
 from apps.smile.settings import Settings
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))     # apps/smile
 WORKFLOW = os.path.join(ROOT, 'data', 'comfy', 'smile_workflow.json')
 
 

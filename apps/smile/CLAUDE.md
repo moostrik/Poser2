@@ -2,23 +2,26 @@
 
 Art installation: a camera captures a face, an image generator turns it into a portrait, and the
 result is shown with music (Max patch via OSC) and lights (Art-Net), and the grins of the visitors before
-play on two walls of screens. Entry point: `smile.py` (`Main` in `modules/main.py`; the walls are two secondary
-windows of its render). Python 3.12, venv in
-`.venv`, installed with `scripts/install.bat`. Tests: `.venv\Scripts\python -m pytest` from the repo root.
-All Python code lives in `modules/`; `data/` is what the installation is given (presets, models,
-workflow, audio, test photos), `output/` what it produces (git-ignored, safe to delete).
+play on two walls of screens. SMILE is `apps/smile/` of Poser2: `launcher.py -app smile` from the Poser2 root starts it
+(`SmileMain` in `main.py`; its own arguments `-fs`, `-wc`, `-lm`, `-dw`, `-dh` follow the launcher's; the walls are two
+secondary windows of its render). Paths in this file are relative to `apps/smile/`; commands run from the Poser2 root with
+its `.venv` (`scripts/install.bat` there makes it, `apps/smile/scripts/install.bat` adds ComfyUI). Tests:
+`python -m unittest discover -s apps/smile/<package>/tests -t .` (`tests`, `face`, `comfy`, ..., `relay`).
+The app's packages are its own (`cam`, `face`, `comfy`, `render`, `player`, ...); `modules/gl`, `modules/settings`,
+`modules/utils` and `modules/log_config.py` are Poser2's, shared with the other apps. `data/` is what the installation
+is given (presets, models, workflow, audio, test photos), `output/` what it produces (git-ignored, safe to delete).
 `README.md` is for whoever installs or runs the installation: setup, scripts, the on-site checklist
 with the date each check passed, and the known limits; keep it current when any of that changes.
-The apps run under pythonw, without a console: say things with `logging`, never `print` (the log file
-in `output/logs/` is the only place they show; unhandled exceptions of the threads and of the main
+The app runs under pythonw, without a console: say things with `logging`, never `print` (the log file
+in Poser2's `logs/` is the only place they show; unhandled exceptions of the threads and of the main
 thread go there too, `log_config.install_excepthooks`, and each one is a line in
-`output/logs/crashes.log`, which every start reports as its first log line, `crash_summary`). A worker thread's loop catches what its work
+`logs/crashes.log`, which every start reports as its first log line, `crash_summary`). ComfyUI's logs are in `output/logs/`. A worker thread's loop catches what its work
 raises, logs it (not at every round) and goes on: a thread that ends leaves an installation that looks
 alive and does nothing (the face finder: nobody is ever chosen; the generator: the flash stays).
 
 ## Camera
 
-`modules/cam/Camera.py` is the one source the app reads: it wraps the device (`VimbaCam` default,
+`cam/Camera.py` is the one source the app reads: it wraps the device (`VimbaCam` default,
 `WebCam` with `-wc`) and an image source from `data/input/` that the panel's `use_image` switch puts in
 place of the device frames at any time. `Camera` fits every frame to the render size with `cover()`
 (scaled to fill it, the middle kept, no distortion); the devices only rotate and flip. A missing device is a warning and `device: none`, never an
@@ -49,7 +52,7 @@ drop more easily, and the log warns at open. The size is only negotiated at open
 
 ## Face
 
-`modules/face/`: `FaceFinder` (own thread) detects every face of a camera frame (SCRFD,
+`face/`: `FaceFinder` (own thread) detects every face of a camera frame (SCRFD,
 `data/models/scrfd_10g_bnkps.onnx`) and judges it in `quality.py`: detector confidence, size (the
 distance between the eyes, a minimum), the portrait crop's box at least `crop_margin` crop widths inside the image edge
 (`crop_edge`: the one check for too close and too near an edge; negative lets it reach past),
@@ -79,16 +82,16 @@ reaches past the image is drawn clamped to `BOX_PAD_PX` inside it (`fit_box`), s
 ## Image generator
 
 ComfyUI server (installed in `ComfyUI/` by `scripts/install.bat` through `scripts/install_comfy.ps1`: the core commit and the pack versions
-pinned in `comfy/comfy.lock`, the packs from their registry archives kept in `comfy/packs` (git LFS), the venv from `comfy/requirements.lock`;
-no pack is patched, what SMILE needs from a pack that the pack does wrong is done in `comfy/aiia_grin`; `install_comfy.ps1 -Update` builds the
+pinned in `data/comfy/comfy.lock`, the packs from their registry archives kept in `data/comfy/packs` (git LFS), the venv from `data/comfy/requirements.lock`;
+no pack is patched, what SMILE needs from a pack that the pack does wrong is done in `data/comfy/aiia_grin`; `install_comfy.ps1 -Update` builds the
 newest ComfyUI and packs beside the install, copies the models over, smoke-tests them with a fixed-seed picture before and after, and `-Accept`
 writes the locks, `-Rollback` restores: an update may change what a node expects, which the smoke test reports by node and `workflow.py` then
-provides; the models live in `ComfyUI/models` as ComfyUI has it, listed with size, sha256 and source in `comfy/models.json` and fetched by
-`modules/comfy/models.py` from a local folder when one is given, else from the source: the public URL, or for the three LoRAs the copy in
+provides; the models live in `ComfyUI/models` as ComfyUI has it, listed with size, sha256 and source in `data/comfy/models.json` and fetched by
+`comfy/models.py` from a local folder when one is given, else from the source: the public URL, or for the three LoRAs the copy in
 `data/comfy/loras` (git LFS); a backup is a copy of the SMILE folder; `ComfyUI/` is git-ignored, API on
 127.0.0.1:8188), started by `scripts/start_comfy.bat`, with a log per start in `output/logs/comfy_*.log`. Every model is
 local and a run makes no internet calls; a model that is missing is an error (`HF_HUB_OFFLINE=1` in `start_comfy.bat`) and a WARNING in the SMILE log when the panel names it. Keep ComfyUI core and the node packs unmodified; depth comes from
-ComfyUI's own Depth Anything 3 nodes. `modules/comfy/`: `Generator` sends each capture to ComfyUI and turns its
+ComfyUI's own Depth Anything 3 nodes. `comfy/`: `Generator` sends each capture to ComfyUI and turns its
 websocket events into `GenMessage`s for the render (CAM_DEPTH → DIFFUSION → DIFF_LOOP → IDLE);
 `workflow.py` adapts the API export in `data/comfy/` (SMILE crops and rotates the face itself, so the export
 starts from the uploaded image; an old export's crop subgraph and video recorder are stripped; depth outputs added) and fills in every value from `PipelineSettings` per run: the
@@ -124,24 +127,22 @@ them for SMILE too: a ComfyUI browser tab that Edge put to sleep did this (Comfy
 queue without one event), shows `no events from ComfyUI: close or reload its browser tab` and is
 not ready until a warm-up gets its events again; a warm-up that fails is retried, never counted as
 ready. Keep no ComfyUI tab open on the installation, or exclude `127.0.0.1:8188` from Edge's sleeping tabs.
-For tests in the ComfyUI page, `python -m modules.comfy.testflow` writes `data/comfy/smile_test.json`
+For tests in the ComfyUI page, `python -m apps.smile.comfy.testflow` writes `data/comfy/smile_test.json`
 (drag it into the page): what the app sends with a preset's values, plus an input switch (the
-app's last capture; any other photo is cropped first with `python -m modules.face.crop`), previews and a video
+app's last capture; any other photo is cropped first with `python -m apps.smile.face.crop`), previews and a video
 recorder from ComfyUI's own video nodes. Regenerate
 it after changing the workflow or the presets instead of editing a copy by hand.
-Our own ComfyUI nodes live in `comfy/aiia_grin/` (`ComfyUI/custom_nodes/aiia_grin` is a junction to it: restart ComfyUI after a change).
+Our own ComfyUI nodes live in `data/comfy/aiia_grin/` (`ComfyUI/custom_nodes/aiia_grin` is a junction to it: restart ComfyUI after a change).
 The grin's random picks are SMILE's (`Workflow._fill_grin`, from the visitor's seed): each value's peak between its min and max, and
 the moment of that peak within midpoint ± deviation, sent to Grin Frames as `<name>_peak` (without them the node draws its own moments).
 
 ## Render
 
-OpenGL engine copied from poser2 (`modules/gl/`: glfw, GL 4.6 core, render thread owned by
-`WindowManager`); keep it identical to poser2 so it can be synced with a diff, and fix shared bugs in
-both. The render loop goes on when `update`, `draw`, an event callback (key, mouse, window, monitor) or
+OpenGL engine: Poser2's `modules/gl/` (glfw, GL 4.6 core, render thread owned by `WindowManager`). The render loop goes on when `update`, `draw`, an event callback (key, mouse, window, monitor) or
 a deferred settings call raises: it is logged, and a monitor that is unplugged does not close the app
-(`modules/render/tests/test_window.py`). The render is the display's 1024 x 1280 (`smile.py` defaults, swapped by the
+(`modules/render/tests/test_window.py`). The render is the display's 1024 x 1280 (`main.py` defaults, swapped by the
 default portrait mode): the same 4:5 as the workflow's 896 x 1120 portrait, which stays at the size SDXL is best at and fills
-the render as a texture. `modules/render/SmileRender.py` runs the `Sequencer` once per frame (it is the app clock:
+the render as a texture. `render/SmileRender.py` runs the `Sequencer` once per frame (it is the app clock:
 Art-Net, OSC and saving hang off its messages), then the stage for the current `SequenceType`
 (`stages.py`) renders the layers (`layers/`) and picks the one to show. Images from other threads go
 through `inputs.py` (`Image.set_image`, uploaded on the render thread); the grin frames go
@@ -155,7 +156,7 @@ no new sequence while it is on (`Sequencer.blocked`). Shaders are
 The two **walls** of the sphere are secondary windows of the same `WindowManager` (`render.window.secondary_list`, read at
 the start: the first entry is wall 0, screens 1-24, the second wall 1; `secondary_fullscreen` borderless on that monitor,
 forced on by `-fs` like the main window; a monitor that is missing gets a small window on the primary one, and back when
-it is plugged in). `SmileRender.walls` are two `PlayerRender`s (`modules/player/Render.py`, no window of their own)
+it is plugged in). `SmileRender.walls` are two `PlayerRender`s (`player/Render.py`, no window of their own)
 composited in `update()` after the main screen, and `draw_secondary` blits the wall of the monitor's index in the list
 (poser2's pattern, hd_trio). The secondary windows share the main context (textures yes, FBOs and VAOs no), so the
 render loop makes the main context current at the start of every frame and before `deallocate` (`WindowManager._render_loop`;
@@ -163,7 +164,7 @@ drawing a secondary leaves its context current; the same fix is in poser2).
 
 ## Credit
 
-`modules/credit.py` holds the artist's credit (name, URL, the lines file `data/credit_lines.txt`: `CreditLines` reads it again when
+`credit.py` holds the artist's credit (name, URL, the lines file `data/credit_lines.txt`: `CreditLines` reads it again when
 it changes and `pick`s a random line, never the last one again, `LINE` when it has none) and makes the QR code (OpenCV's encoder, whole pixels per
 module, with its quiet zone). `CreditLayer` draws the code in the bottom right corner of everything the main screen shows, and the caption, the name with the
 visitor's line under it (drawn at the capture, `CreditLayer.new_visitor`, into the `credit_line` readout), as a meme caption over
@@ -174,12 +175,12 @@ for one play: it takes a cell when a clip starts there and leaves at that cell's
 clip start flashes over it; `credit_qr_players` switches it (the walls read the Render tab's fields every frame), off takes the card away at once. With `credit_players`
 on, every cell shows a caption over its clip, the name over the top and a random line from the same file along the bottom, new at every play (`Player._on_play`, not tied
 to the clip), drawn into a transparent portrait texture per cell (`PlayerRender._draw_caption`).
-`modules/sphere.py` is the one place that knows the sphere and its wiring: 12 ribs holding 5 and 3 screens by turn, heights 0 (top) to 4
+`sphere.py` is the one place that knows the sphere and its wiring: 12 ribs holding 5 and 3 screens by turn, heights 0 (top) to 4
 (heights 1 to 3 have 12 screens, 0 and 4 have 6), screens numbered down each rib (1-5, 6-8, 9-13 …, the ribs counting to the left, so rib r is at -30r degrees), and screen s on Datapath unit
 ⌈s/4⌉ output ((s-1) mod 4)+1, unit n = grid column n-1, output k = grid row k-1 (`screen_of_cell`, `cell_of_screen`, `row_screens`,
 `cell_angles`): the laughter test (it steps the screens in the sphere's order, 1 to 48 down the ribs, lighting the cell `cell_of_screen` gives), the scrolling name's rows and `data/audio/screen_angles.txt` (generated: `screen_angles_text`,
 a test keeps the file equal to it) all come from it; a cabling that differs is changed there.
-The **scrolling name** (`modules/credit_scroll.py`, no GL): each word of `credit_name` goes round its own ring of the sphere without end, the first word on the
+The **scrolling name** (`credit_scroll.py`, no GL): each word of `credit_name` goes round its own ring of the sphere without end, the first word on the
 first of `credit_scroll_rows` (`plan_loops`, `RingPath`: all the ring's screens from the rib at the camera down the rib numbers, since the ribs count to the camera's left,
 the visitor's right, and a ticker moves to the visitor's left; `reverse` the other way round; `row_screens`, `screen_cell`, screens counted from 0 there). `CreditScroller`
 (stepped from `Main.sequence_callback` with `time.time()`, not during the laughter test) hands each wall its own cells with their place round the ring every `SEND_EVERY`
@@ -195,12 +196,12 @@ texture, over the clips and the credit card, under the lit test cells. Nothing o
 
 ## Recordings
 
-`modules/save/ClipSaver.py` saves each finished visitor for the players under `output/` (git-ignored):
+`save/ClipSaver.py` saves each finished visitor for the players under `output/` (git-ignored):
 the grin as `grins/<style>/<id>.mp4` (silent h264 at the full portrait size, at `grin_fps`), the capture and the
 portrait as `portraits/<style>/<id>_capture.jpg` and `<id>_portrait.jpg`, and after the grin landed the phone's copy
-`shares/<style>/<id>.mp4` (`modules/save/share.py`: the same grin re-encoded with the watermark, "SMILE", a circled "ai" and "by" the credit name, in the bottom
+`shares/<style>/<id>.mp4` (`save/share.py`: the same grin re-encoded with the watermark, "SMILE", a circled "ai" and "by" the credit name, in the bottom
 right, no caption, built before the players' clip lands, and the visitor's track as its sound: `ClipSaver.set_share` from `Main` at DIFF_LOOP's start with the seconds
-since the flash, read with `ffmpeg.read_audio`, played on the tape of `modules/audio/tape.py`, the Max patch's spin-up over
+since the flash, read with `ffmpeg.read_audio`, played on the tape of `audio/tape.py`, the Max patch's spin-up over
 the first half second and a wind-down over the last, muxed by `ffmpeg.make_share`; a share clip that fails is a warning and
 the players' clip goes to the phone instead). `<style>` is the visitor's
 style, `A` (colourful and happy) or `B` (monochrome and dark); the players read it from the folder, the id is the time. Files are built in `output/temp/`
@@ -209,17 +210,17 @@ and renamed into place when the grin is complete, so the players never see a par
 The clip (its `comment` tag) and the portrait (JPEG comment segments) carry the visitor's **record** as JSON: id, style, description,
 the visitor's one seed (portrait, description and grin share it), the settings of its style (not the other's) and of the portrait
 as the workflow was filled with them, and the grin as it was drawn: each value's peak and the moment of it (`peak`, `peak_at`), not
-the ranges (`Generator.record`, handed to the saver with the final portrait). `modules/save/record.py` reads it:
-`python -m modules.save.record <file>` prints it, `--preset <name>` writes it as a preset to `data/settings/<name>.json` (the grin's
+the ranges (`Generator.record`, handed to the saver with the final portrait). `save/record.py` reads it:
+`python -m apps.smile.save.record <file>` prints it, `--preset <name>` writes it as a preset to `data/settings/<name>.json` (the grin's
 ranges closed on the drawn values, so loading it repeats the pose); dropping a clip or portrait on `scripts/clip_info.bat` opens it.
-Encoding and decoding run `ffmpeg`/`ffprobe` subprocesses through `modules/video/ffmpeg.py` (ffmpeg
+Encoding and decoding run `ffmpeg`/`ffprobe` subprocesses through `video/ffmpeg.py` (ffmpeg
 must be on the PATH: the gyan.dev full build); the encoder is picked at startup by a trial encode
 (Intel Quick Sync on the iGPU, then Nvidia, then libx264; `sequence.encoder` forces one). Never start
 those processes any other way: the apps run under pythonw, so they need `CREATE_NO_WINDOW` and no
-inherited handles. The clip player (`modules/player/`: `Player`, one for the sphere, started and stopped by `Main`) decodes each of the newest clips once into RAM
+inherited handles. The clip player (`player/`: `Player`, one for the sphere, started and stopped by `Main`) decodes each of the newest clips once into RAM
 (`ClipPool`, 512x640, about 200 MB per clip) and plays from memory on the 48 cells of the two walls (`sphere.CELLS` each, cell ids
 0-47, wall = id // 24; the loaders feed `PlayerRender.set_image` and bang Max on 4115 for wall 0, 4116 for wall 1); the Players tab
-(`modules/player/settings.py`) has `pool` the clips kept, `recent`, `recycle_every` and `hwdecode` (read at the start), `fps` the playback
+(`player/settings.py`) has `pool` the clips kept, `recent`, `recycle_every` and `hwdecode` (read at the start), `fps` the playback
 speed (default 20, 0 = the clip's own rate), `spread` a random speed difference per play so the cells drift apart (default 0.1), `trail` a blend
 with the previous output (default 0: none), read at every play or frame.
 The pool (`pool`, default 30) is two lists. `recent`: the last `recent` recordings of the style (default 4), always playing on every
@@ -243,8 +244,8 @@ restarts everything (ComfyUI, Max, SMILE with its walls).
 
 ## Music
 
-`modules/audio/DB.py` picks the track of a visitor's movement from `data/audio/music_map.json` into
-`audio.music_id`. `modules/osc/Sender.py` (`Settings.audio.osc`; the clip player builds an `OscSettings` of its
+`audio/DB.py` picks the track of a visitor's movement from `data/audio/music_map.json` into
+`audio.music_id`. `osc/Sender.py` (`Settings.audio.osc`; the clip player builds an `OscSettings` of its
 own per wall for the `/bang`) sends what `Main.sequence_callback` queues every frame, the newest value per address:
 `/music_id`, `/state`, `/progress` and the Audio tab's controls `/sound`, `/music_volume`, `/laughter`,
 `/laughter_volume` (both levels in dB; the laughter gets a `dbtoa` in front of its linear multipliers). The panel is
@@ -259,12 +260,12 @@ Three speakers on the Realtek jacks (Windows at Quadraphonic, 4 channels, so the
 stereo on channels 1 and 2 (`ezdac~`, `p musicMixer` filters both channels), the laughter panned over 1, 2 and 3
 (`dac~ 1 2 3`). A `/bang` carries the cell its clip starts
 in; `p laughterSampler` adds 24 for port 4116, looks the screen's angle up in `data/audio/screen_angles.txt`
-(`coll screen_angles.txt`, found through the patch's folder; generated from `modules/sphere.py`, `modules/tests/test_sphere.py` checks
+(`coll screen_angles.txt`, found through the patch's folder; generated from `sphere.py`, `tests/test_sphere.py` checks
 the file against it), adds the panel's `laughter_offset` (`/laughter_offset`, degrees) and turns the angle into a gain per
 speaker (three `expr`s: speakers at -60, 60 and 180 degrees from the camera, each laugh over its two nearest at
 constant power). The gains travel with the note into the `poly~` voice (`SmileSamplepoly.maxpat`), which
 applies them only on a note-on, so the note-off from `makenote` does not move a fading laugh. The panel's
-`laughter_test` (`modules/audio/ScreenTest.py`, stepped from `Main.sequence_callback`) lights the cell on its wall
+`laughter_test` (`audio/ScreenTest.py`, stepped from `Main.sequence_callback`) lights the cell on its wall
 (`Player.light`, a call: no OSC between SMILE and its walls): the wall shows the cell white with the screen's number (`Text` into a portrait FBO, blitted with `BlitRotated`
 like a clip, so it stands upright on the turned screen). SMILE bangs Max itself with `/test_bang <index> <sample>`
 (`Sender` sends a tuple as separate arguments), which `p laughterSampler` takes past the gates (`r testBang`) with
@@ -279,14 +280,14 @@ SMILE Online (branch `online`, a proof of concept): someone outside gets the eye
 `relay/` is a small aiohttp server that runs on the VPS or, for a test, on the PC (`scripts/start_relay.bat`): it serves
 the phone page (`relay/web/`: one camera frame with the terms over it and the bar under it, a field of smileys behind; it
 draws the judging itself from the face data), keeps the waiting line (`relay/line.py`, pure logic) and passes messages (`relay/server.py` has the protocol: JSON
-text, images as binary with one leading byte); it decides nothing, SMILE starts and ends every turn. `modules/online/`
+text, images as binary with one leading byte); it decides nothing, SMILE starts and ends every turn. `online/`
 is SMILE's side: `Link` (a websocket client thread that reconnects, plus an upload thread), `Online` (the turn, stepped
 from `Main.sequence_callback`, the only place its phase changes: OFF, IDLE, ASKING, JUDGING, TRANSFORMING; the files
 after a turn are a `Delivery` record beside the phase) and
 `fake.py`, a stand-in for SMILE at the relay. A turn puts the phone's frames into `Camera` as a third source
 (`set_online`, `push_online`; the device and the image are muted meanwhile and back once the capture is taken) and the face finder,
 the charge, the flash and the generation run unchanged; `Online.on_face` sends the judging, and from the flash to the
-end of the timeout the phone gets the main screen as rendered (`ScreenGrab` in `modules/render/grab.py`, taken in
+end of the timeout the phone gets the main screen as rendered (`ScreenGrab` in `render/grab.py`, taken in
 `SmileRender._render_credit` from a credit pass without the QR code and before the status line, `stream_fps` x `stream_width`,
 encoded on the link's thread as `SHOW` frames, paced by the relay to one in flight per phone (`seen` from the page); the phone's own judging is the whole image in pixels while the face is not right and the
 page's white as the charge). The phone plays the visitor's track from the flash (`music` message; the relay keeps the
@@ -308,21 +309,10 @@ and the relay connected, and the main screen as the phone sees it (`CreditLayer.
 from the judging to the phone's last frame (`Online.showing`), then the card again; off or disconnected it is a clip cell like any
 (`online_cell_mode` in `Player.py`). `Main._online_cell` sets it every frame: `Player.online_cell` (no bang, no caption: its clip plays
 unseen) and `SmileRender.set_online_cell`, which the walls take in `update()` (`PlayerRender.set_online`).
-Tests: `relay/tests` (the line, the server on aiohttp's test server, the page's files: `test_web.py`) and `modules/online/tests`
+Tests: `relay/tests` (the line, the server on aiohttp's test server, the page's files: `test_web.py`) and `online/tests`
 (a fake link and camera).
 
 ## Settings
 
-Settings system copied from poser2 (`modules/settings/`); root tree in `modules/main_settings.py`,
-presets in `data/settings/`, web panel at `http://localhost:667`.
-
-- `BaseSettings` subclasses are pure data containers with no runtime side effects
-- Use `BaseSettings` for reactive configuration and `@dataclass` for plain value objects
-- Components take their settings object (or a `Group`/`Child` of it) in the constructor, never as a global, and read fields when they use them
-- Never unpack setting values into constructor parameters; a copied value goes stale when the panel changes it
-- Cache only `Field.INIT` values, since they cannot change after `initialize()`
-- Use `bind()` only to react to configuration changes, never to relay runtime data between components
-- Keep bound callbacks thread-safe, and never write the field that triggered the callback
-- Components that `bind()` must `unbind()` the same callbacks on teardown
-- Treat `Field.READ` values as snapshots; copy arrays before handing them to another thread
-- Keep `Field` descriptions to one short line of panel text: what the value is and its unit
+Poser2's settings system (`modules/settings/`, its rules in Poser2's CLAUDE.md); root tree in `settings.py`,
+presets in `data/settings/` (`Smile` at startup unless `.ui_preset.json` names another), web panel at `http://localhost:667`.

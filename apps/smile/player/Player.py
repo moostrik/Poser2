@@ -12,7 +12,7 @@ from typing import Any
 
 import numpy as np
 
-from modules import sphere
+from apps.smile import sphere
 from apps.smile.credit import CreditLines
 from apps.smile.player.ImgLoader import LoadImages
 from apps.smile.player.Render import PlayerRender

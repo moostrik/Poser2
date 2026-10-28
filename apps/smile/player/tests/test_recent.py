@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from modules import sphere
+from apps.smile import sphere
 from apps.smile.player.ClipPool import Clip, ClipPool, choose
 from apps.smile.player.FolderScanner import FolderScanner
 from apps.smile.player.tests.test_even_spread import turns

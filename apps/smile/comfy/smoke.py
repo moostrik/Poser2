@@ -32,7 +32,8 @@ from modules.settings import presets
 
 logger = logging.getLogger('smoke')
 
-ROOT: Path = Path(__file__).resolve().parents[2]
+ROOT: Path = Path(__file__).resolve().parents[3]       # the Poser2 root: the app runs from it
+APP: Path = ROOT / 'apps' / 'smile'
 START_TIMEOUT: float = 240.0        # s for ComfyUI to answer /system_stats (the packs import torch, insightface, transformers)
 PRESET: str = 'apps/smile/data/settings/Smile.json'
 
@@ -154,7 +155,7 @@ def warm_up(client: ComfyClient, preset: str, save: Path | None = None) -> float
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('--comfy', type=Path, default=ROOT / 'ComfyUI', help='the ComfyUI install')
+    parser.add_argument('--comfy', type=Path, default=APP / 'ComfyUI', help='the ComfyUI install')
     parser.add_argument('--host', default='127.0.0.1')
     parser.add_argument('--port', type=int, default=8188)
     parser.add_argument('--preset', default=PRESET, help='the preset whose models and workflow are tested')
@@ -164,7 +165,7 @@ def main(argv: list[str] | None = None) -> int:
     logging.basicConfig(level=logging.INFO, format='%(levelname)s %(message)s', stream=sys.stderr)
 
     python: Path = args.comfy / '.venv' / 'Scripts' / 'python.exe'
-    log_dir: Path = ROOT / 'output' / 'logs'
+    log_dir: Path = APP / 'output' / 'logs'
     log_dir.mkdir(parents=True, exist_ok=True)
     log: Path = log_dir / f'comfy_smoke_{datetime.now():%Y%m%d_%H%M%S}.log'
     process: subprocess.Popen | None = None

@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from apps.smile.main import Main
+from apps.smile.main import SmileMain
 from apps.smile.settings import Settings
 from apps.smile.osc.settings import OscSettings
 from apps.smile.render.Sequencer import SeqenceMessage, SequenceType
@@ -42,12 +42,12 @@ class TestMaxControls(unittest.TestCase):
             _limit_visitor=lambda seq: None,
             _style_picked=False, _face_frame_time=0.0, _visitor_start=None, _saving=False, _grin_saved=False,
             credit_scroller=mock.Mock(), online=mock.Mock(showing=False), clip_player=mock.Mock())
-        self.app._online_cell = lambda: Main._online_cell(self.app)
+        self.app._online_cell = lambda: SmileMain._online_cell(self.app)
 
     def frame(self) -> dict:
         """One sequencer frame: what went to the OSC sender, by address."""
         self.app.osc.send.reset_mock()
-        Main.sequence_callback(self.app, SeqenceMessage(SequenceType.CAMERA_SHOW, 0.0))
+        SmileMain.sequence_callback(self.app, SeqenceMessage(SequenceType.CAMERA_SHOW, 0.0))
         return {c.args[0]: c.args[1] for c in self.app.osc.send.call_args_list}
 
     def test_the_panel_controls_go_out_every_frame_in_max_units(self):
@@ -92,7 +92,7 @@ class TestMaxControls(unittest.TestCase):
         self.assertEqual(sent['/laughter_test'], 0)
 
     def test_the_test_bang_goes_to_max_with_the_screen_and_the_sample(self):
-        Main._test_bang(self.app, 3, 1)
+        SmileMain._test_bang(self.app, 3, 1)
         self.app.osc.send.assert_called_once_with('/test_bang', (3, 1))
 
     def test_the_online_cell_follows_the_screen_setting_the_link_and_the_turn(self):

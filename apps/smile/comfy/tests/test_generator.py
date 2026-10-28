@@ -12,7 +12,7 @@ from apps.smile.comfy.settings import PipelineSettings
 from apps.smile.render.GrinPlayer import GrinPlayer
 from apps.smile.render.settings import SequencerSettings
 
-ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))     # apps/smile
 WORKFLOW = os.path.join(ROOT, 'data', 'comfy', 'smile_workflow.json')
 WARMUP = os.path.join(ROOT, 'data', 'comfy', 'warmup.jpg')
 

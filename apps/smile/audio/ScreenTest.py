@@ -5,7 +5,7 @@ import logging
 import os
 from typing import Callable
 
-from modules import sphere
+from apps.smile import sphere
 
 from apps.smile.audio.settings import AudioSettings
 

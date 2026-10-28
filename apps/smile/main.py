@@ -1,3 +1,6 @@
+"""SMILE: a camera captures a face, an image generator turns it into a portrait, shown with music and lights,
+and the grins of the visitors before play on the two walls of the sphere (README.md, CLAUDE.md)."""
+
 from apps.smile.cam.Camera import Camera
 from apps.smile.face.FaceFinder import FaceFinder, FaceFrame
 from apps.smile.render.SmileRender import SmileRender
@@ -15,17 +18,20 @@ from apps.smile.artnet.Sender import Sender as Artnet
 from apps.smile.online.Online import Online
 from apps.smile.online.Link import http_base
 from apps.smile.player.Player import Player, online_cell_mode
-from modules import sphere
+from apps.smile import sphere
 from modules.settings import presets, NiceServer
 from modules.gl import FullscreenMode
 from apps.smile.settings import Settings
-from modules.log_config import crash_summary
+from argparse import ArgumentParser, Namespace
 from enum import Enum
 import logging
 import time
 import numpy as np
 
 logger = logging.getLogger(__name__)
+
+APP_NAME = 'smile'
+DATA_PATH = 'apps/smile/data'
 
 # a visitor the generator has not ended this long after its own limit (connection.job_timeout) is ended
 # here: the generator answers by itself unless its thread is stuck, and then the flash would stay
@@ -36,26 +42,41 @@ class CamType(Enum):
     VIMBA   = 2
     WEB     = 3
 
-class Main():
-    def __init__(self, width: int, height: int, portraitMode: bool = False, camType: CamType = CamType.VIMBA,
-                 fullscreen: bool = False) -> None:
-        # the first line of every log: what happened before this start
-        logger.info(crash_summary())
-        self.width: int = width
-        self.height: int = height
-        self.portraitMode: bool = portraitMode
+
+def parse_args(args: list[str]) -> Namespace:
+    """The app's own arguments, after the launcher's: `launcher.py -app smile -fs -wc`."""
+    parser: ArgumentParser = ArgumentParser(prog='launcher.py -app smile', description='SMILE')
+    parser.add_argument('-dw',  '--width',          type=int,   default=1280,   help='image width (4:5 like the generated portraits; 1280 x 1024 is the display in portrait mode)')
+    parser.add_argument('-dh',  '--height',         type=int,   default=1024,   help='image height')
+    parser.add_argument('-wc',  '--webcam',         action='store_true',        help='use a webcam instead of the Vimba camera')
+    parser.add_argument('-lm',  '--landscape',      action='store_true',        help='landscape instead of portrait mode')
+    parser.add_argument('-fs',  '--fullscreen',     action='store_true',        help='open borderless fullscreen, the walls too (the installation) instead of the window modes of the preset')
+    return parser.parse_args(args)
+
+
+class SmileMain():
+    def __init__(self, simulation: bool = False, interface: bool = True, args: list[str] = []) -> None:
+        self.is_running: bool = False
+        self.is_finished: bool = False
+        options: Namespace = parse_args(args)
+        self.width: int = round(options.width / 4) * 4
+        self.height: int = round(options.height / 4) * 4
+        self.portraitMode: bool = not options.landscape
         if self.portraitMode:
-            self.width: int = height
-            self.height: int = width
+            self.width, self.height = self.height, self.width
+        camType: CamType = CamType.WEB if options.webcam else CamType.VIMBA
+        fullscreen: bool = options.fullscreen
 
         # SETTINGS
-        presets.set_app('smile')
+        presets.set_app(APP_NAME, default_startup='Smile')
         self.settings = Settings()
         self.settings.server.title = 'SMILE'
         self.settings.server.port = 667
         preset_file = presets.startup_path()
         if not presets.load(self.settings, preset_file):
             logger.warning('No preset at %s, using defaults', preset_file)
+        if not interface:
+            self.settings.server.browser = False  # launcher override; the preset cannot turn it back on
         if fullscreen:
             # the installation's start: borderless (exclusive fullscreen minimizes when a wall gets focus), the walls too
             self.settings.render.window.fullscreen_mode = FullscreenMode.WINDOWED_FULLSCREEN
@@ -86,7 +107,7 @@ class Main():
         self.camera: Camera = Camera(self.settings.camera, (self.width, self.height), device, device_name)
         self.camera.setRotate90(self.portraitMode)
 
-        self.audio: AudioDB = AudioDB(self.settings.audio, 'apps/smile/data/audio/music_map.json')
+        self.audio: AudioDB = AudioDB(self.settings.audio, f'{DATA_PATH}/audio/music_map.json')
         self.osc: Osc = Osc(self.settings.audio.osc)
         # the laughter test, stepped from sequence_callback: it lights the walls' cells and bangs Max
         self.screen_test: ScreenTest = ScreenTest(self.settings.audio, send=self.clip_player.light, bang=self._test_bang)
@@ -99,7 +120,7 @@ class Main():
         self._face_frame_time: float = 0.0  # arrival of the camera frame the face finder got last
         self._visitor_start: float | None = None    # the capture of the visitor the generator is working on
         self._flash_time: float = 0.0       # when the flash started: the music starts then (Max, the phone, the clip's sound)
-        self.artnet = Artnet(self.settings.artnet, 'apps/smile/data/artnet.json')
+        self.artnet = Artnet(self.settings.artnet, f'{DATA_PATH}/artnet.json')
         # SMILE Online: a turn for someone outside when the room's eye is free, stepped from sequence_callback
         self.online: Online = Online(self.settings.online, self.camera, self.sequencer, self.face, self.render.grab,
                                      lambda: (self.settings.render.credit_name, self.settings.render.credit_line),
@@ -107,7 +128,6 @@ class Main():
                                      laughs=laugh_files, laughter=lambda: self.settings.audio.laughter, pick=self.pick_style)
         self.save.set_saved_callback(self.online.on_saved)
 
-        self._running: bool = False
         self._stopping: bool = False
 
         self.laststate: str = ''
@@ -139,7 +159,7 @@ class Main():
         else:
             logger.info('No wall monitors in the preset (render.window.secondary_list): the clip player stays off')
 
-        self._running = True
+        self.is_running = True
 
     def stop(self) -> None:
         # called from the render window (Esc), the settings panel (Exit) and Ctrl+C; run once
@@ -163,7 +183,8 @@ class Main():
                 except Exception:
                     logger.exception('Error while stopping (%s)', getattr(step, '__qualname__', step))
         finally:
-            self._running = False
+            self.is_running = False
+            self.is_finished = True
 
     def _test_bang(self, index: int, sample: int) -> None:
         """The laughter test's bang to Max: the screen's index and the sample, past the patch's gates."""
@@ -341,5 +362,3 @@ class Main():
                     self._saving = False
                     self.save.end_sequence(keep=True)
 
-    def isRunning(self) -> bool :
-        return self._running
