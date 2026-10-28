@@ -22,7 +22,7 @@ class Advect3D(ComputeShader):
         super().__init__()
 
     def use(self, source: Texture3D, velocity: Texture3D, obstacle: Texture3D,
-            aspect: float, depth_scale: float, timestep: float, dissipation: float,
+            aspect: float, z_extent: float, timestep: float, dissipation: float,
             has_obstacles: bool = True) -> None:
         """Apply 3D advection.
 
@@ -31,7 +31,7 @@ class Advect3D(ComputeShader):
             velocity: 3D velocity field (RGBA16F: xyz = u,v,w)
             obstacle: 3D obstacle mask (R8)
             aspect: Width/height ratio for isotropic XY advection
-            depth_scale: Z grid spacing relative to XY (controls volume thickness)
+            z_extent: Slab thickness in sim-width units (uRdx.z = 1/z_extent)
             timestep: dt * speed — advection distance per frame
             dissipation: Exponential decay multiplier
             has_obstacles: Whether obstacle logic is active
@@ -52,7 +52,7 @@ class Advect3D(ComputeShader):
         # Uniforms
         glUniform1f(self.get_uniform_loc("uTimestep"), timestep)
         rdx_y = 1.0 / aspect if aspect > 0.0 else 1.0
-        rdx_z = 1.0 / depth_scale if depth_scale > 0.0 else 1.0
+        rdx_z = 1.0 / z_extent if z_extent > 0.0 else 1.0
         glUniform3f(self.get_uniform_loc("uRdx"), 1.0, rdx_y, rdx_z)
         glUniform1f(self.get_uniform_loc("uDissipation"), dissipation)
         glUniform3i(self.get_uniform_loc("uSize"), source.width, source.height, source.depth)
@@ -62,7 +62,7 @@ class Advect3D(ComputeShader):
 
     def advect(self, source_read: Texture3D, result_write: Texture3D,
                velocity: Texture3D, obstacle: Texture3D,
-               aspect: float, depth_scale: float, timestep: float, dissipation: float,
+               aspect: float, z_extent: float, timestep: float, dissipation: float,
                internal_format: int = GL_RGBA16F,
                has_obstacles: bool = True) -> None:
         """Advect from source_read into result_write (separate read/write buffers).
@@ -75,7 +75,7 @@ class Advect3D(ComputeShader):
             velocity: 3D velocity field
             obstacle: 3D obstacle mask
             aspect: Width/height ratio
-            depth_scale: Z grid spacing relative to XY
+            z_extent: Slab thickness in sim-width units (uRdx.z = 1/z_extent)
             timestep: dt * speed
             dissipation: Decay multiplier
             internal_format: Image format for output (default RGBA16F)
@@ -97,7 +97,7 @@ class Advect3D(ComputeShader):
         # Uniforms
         glUniform1f(self.get_uniform_loc("uTimestep"), timestep)
         rdx_y = 1.0 / aspect if aspect > 0.0 else 1.0
-        rdx_z = 1.0 / depth_scale if depth_scale > 0.0 else 1.0
+        rdx_z = 1.0 / z_extent if z_extent > 0.0 else 1.0
         glUniform3f(self.get_uniform_loc("uRdx"), 1.0, rdx_y, rdx_z)
         glUniform1f(self.get_uniform_loc("uDissipation"), dissipation)
         glUniform3i(self.get_uniform_loc("uSize"),

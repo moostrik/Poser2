@@ -67,7 +67,7 @@ class RunnerONNX(Thread):
 
         # Callbacks
         self._callback_lock: Lock = Lock()
-        self._callbacks: set[SegmentationOutputCallback] = set()
+        self._callbacks: list[SegmentationOutputCallback] = []      # run in registration order
         self._callback_queue: Queue[SegmentationOutput | None] = Queue(maxsize=2)
         self._callback_thread: Thread = Thread(target=self._dispatch_callbacks, daemon=True)
 
@@ -533,7 +533,8 @@ class RunnerONNX(Thread):
     def register_callback(self, callback: SegmentationOutputCallback) -> None:
         """Register callback to receive segmentation results (success and dropped batches)."""
         with self._callback_lock:
-            self._callbacks.add(callback)
+            if callback not in self._callbacks:
+                self._callbacks.append(callback)
 
     def unregister_callback(self, callback: SegmentationOutputCallback) -> None:
         """Unregister previously registered callback."""

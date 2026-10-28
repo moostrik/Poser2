@@ -4,11 +4,11 @@ from .base import NormalizedSingleValue
 
 
 class Distance(NormalizedSingleValue):
-    """Normalized distance estimate in [0, 1] derived from a person's vertical position.
+    """How far a person stands from the fixture within the tracked zone, in [0, 1].
 
-    Approximates how far a person is from the camera by mapping the bbox bottom
-    edge (feet) between two y thresholds: closest → 0.0, farthest → 1.0.
-    Populated by DistanceExtractor. Absent (NaN, score 0.0) when not extracted.
+    0 at the zone's near edge, 1 at its far edge, clamped. Populated by the panoramic tracker from
+    where the feet meet the floor. Absent (NaN, score 0.0) for other tracker types and without a
+    reading.
     """
 
     @classmethod

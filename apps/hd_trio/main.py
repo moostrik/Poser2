@@ -5,7 +5,7 @@ from typing import Optional
 from functools import partial
 
 from modules.utils import Broadcast
-from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder
+from modules.oak import Camera, CameraCheck, Simulator, Player, Sync, Recorder as VideoRecorder
 from modules.settings import presets, NiceServer
 from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
@@ -27,7 +27,7 @@ DATA_PATH = 'apps/hd_trio/data'
 
 
 class HDTrioMain:
-    def __init__(self, simulation: bool = False) -> None:
+    def __init__(self, simulation: bool = False, interface: bool = True) -> None:
 
         self.is_running: bool = False
         self.is_finished: bool = False
@@ -39,6 +39,8 @@ class HDTrioMain:
         if not presets.load(self.settings, preset_file):
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
         self.settings.camera.sim_enabled = simulation
+        if not interface:
+            self.settings.server.browser = False  # launcher override; the preset cannot turn it back on
         # Never resume armed: a preset saved mid-take would otherwise record the
         # first show after startup.
         self.settings.render.intro_sequence.arm_record = False
@@ -101,7 +103,7 @@ class HDTrioMain:
         # DETECTION
         features.configure_features(num_players)
 
-        self.poses_from_tracklets = PosesFromTracklets(num_players)
+        self.poses_from_tracklets = PosesFromTracklets(ps.tracklets, num_players)
         self.pose_predictor = pose.Predictor(ps.pose)
         self.segmentation_predictor  = segmentation.Predictor(ps.segmentation)
 
@@ -130,7 +132,7 @@ class HDTrioMain:
         self.stages: dict[Stage, Broadcast] = {}
         for stage in Stage:
             wt = window.WindowTracker(num_players, getattr(ps, f'window_{stage.name.lower()}'))
-            wt.add_windows_callback(partial(self.board.set_windows, stage))
+            self.board.set_window_tracker(stage, wt)
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([
                 partial(self.board.set_frames, stage),
@@ -148,6 +150,7 @@ class HDTrioMain:
             i: trackers.FilterPipeline([
                 nodes.PointDualConfFilter(ps.point.confidence_filter),
                 nodes.AngleExtractor(ps.angle_extractor),
+                nodes.AngleCalibrator(),
                 nodes.AngleVelExtractor(ps.velocity.extractor),
             ])
             for i in range(num_players)
@@ -163,6 +166,7 @@ class HDTrioMain:
             i: trackers.FilterPipeline([
                 nodes.PointEuroSmoother(ps.point.smoother),
                 nodes.AngleExtractor(ps.angle_extractor),
+                nodes.AngleCalibrator(),
                 nodes.AngleVelExtractor(ps.velocity.extractor),
                 nodes.AngleVelEuroSmoother(ps.velocity.smoother),
                 nodes.AngleEuroSmoother(ps.angle.smoother),
@@ -182,13 +186,16 @@ class HDTrioMain:
 
         self.window_similator  = analytics.WindowSimilarity(ps.similarity.window_similarity)
         self.window_correlator = analytics.WindowCorrelation(ps.similarity.window_correlation)
+        # On the result, where presence is known: a present pair's gap is held, a departed player's slot stays NaN.
+        self.similarity_sticky = analytics.SimilarityStickyFiller(ps.similarity.sticky)
+        self.similarity_sticky.add_similarity_callback(self.similarity_applicator.set)
 
         self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similator.submit)
-        self.window_similator.add_similarity_callback(self.similarity_applicator.set)
+        self.window_similator.add_similarity_callback(self.similarity_sticky.process)
         self.window_similator.add_similarity_callback(self.leader_applicator.set)
 
         self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_correlator.submit)
-        self.window_correlator.add_similarity_callback(self.similarity_applicator.set)
+        self.window_correlator.add_similarity_callback(self.similarity_sticky.process)
         self.window_correlator.add_similarity_callback(self.leader_applicator.set)
 
         # POSE STAGE PREDICT
@@ -198,7 +205,6 @@ class HDTrioMain:
                 nodes.AnglePredictor(ps.angle.prediction),
                 nodes.AngleVelPredictor(ps.velocity.prediction),
                 nodes.AngleStickyFiller(ps.angle.sticky),
-                nodes.SimilarityStickyFiller(ps.similarity.sticky),
             ])
             for i in range(num_players)
         })
@@ -240,9 +246,14 @@ class HDTrioMain:
         self.filters_lerp.add_frames_callback(self.gate_lerp.process)
         self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
 
+        # CAMERA CHECK — each camera's IMU reading and frame rate against the preset, as pinned indicators
+        self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
+
         # RENDER
-        self.render = HDTrioRender(self.board, self.settings.render, data_path=DATA_PATH)
+        self.render = HDTrioRender(self.board, self.settings.render, self.settings.camera.cameras,
+                                   self.settings.camera.camera_check, data_path=DATA_PATH)
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
+        self.render.add_update_callback(self.camera_check.update)
         self.render.add_update_callback(self.sequencer.update)
         self.render.add_update_callback(self.interpolators_lerp.update)
         self.render.add_exit_callback(self.stop)

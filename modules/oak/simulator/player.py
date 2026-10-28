@@ -1,10 +1,10 @@
 from threading import Thread, Event, Lock
 from pathlib import Path
 from numpy import ndarray
-from typing import Set, Dict
+from typing import Dict
 from enum import Enum, auto
 from queue import Queue
-from time import sleep
+from time import sleep, monotonic
 
 from ..camera.definitions import CoderType, CoderFormat, FrameType, FrameCallback
 from .settings import SimulatorSettings
@@ -41,9 +41,10 @@ class MessageType(Enum):
     NEXT = auto()
 
 class Message():
-    def __init__(self, state: MessageType, value: str = '') -> None:
+    def __init__(self, state: MessageType, value: str = '', prepare: bool = False) -> None:
         self.state: MessageType = state
         self.value: str = value
+        self.prepare: bool = prepare
 
 class Folder():
     def __init__(self, name: str, path: Path, chunks: int) -> None:
@@ -54,10 +55,12 @@ class Folder():
 FolderDict = Dict[str, Folder]
 
 class Player(Thread):
-    def __init__(self, settings: SimulatorSettings, data_path: str = "") -> None:
+    def __init__(self, settings: SimulatorSettings, data_path: str = "", gray: bool = False) -> None:
+        """``gray``: the consuming pipeline is mono, so video decodes straight to gray."""
         super().__init__()
         self.settings: SimulatorSettings = settings
         self.data_path: str = data_path
+        self.gray: bool = gray
         self.num_cams: int = settings.num_cameras
         self.types: list[FrameType] = settings.video_frame_types
         self.fps: float = settings.fps
@@ -100,7 +103,8 @@ class Player(Thread):
         self.drift:int = 0
 
         self.playback_lock: Lock = Lock()
-        self.frameCallbacks: Set[FrameCallback] = set()
+        self.frameCallbacks: list[FrameCallback] = []
+        self._gui_update_time: float = 0.0
 
         # Bind player settings callbacks
         self.settings.bind(SimulatorSettings.start, self._on_start)
@@ -125,8 +129,7 @@ class Player(Thread):
         # Auto-start if a folder was loaded from preset
         folder = self.settings.folder
         if folder and folder in self.folders:
-            self._prepare_folder(folder)
-            self.play(True, folder)
+            self.play(True, folder, prepare=True)
 
         while self.running:
             try:
@@ -137,6 +140,8 @@ class Player(Thread):
                     message = None
 
                 if message and message.state == MessageType.START:
+                    if message.prepare:
+                        self._prepare_folder(message.value)
                     self._set_load_folder(message.value)
                     self._set_load_chunk(-1)
                     self._set_play_chunk(-1)
@@ -192,7 +197,8 @@ class Player(Thread):
                 path: Path = folder.path / make_file_name(c, t, self.load_chunk, self.suffix)
                 if path.is_file():
 
-                    player: StreamReader = StreamReader(c, t, self._frame_sync_callback, self.hwt, self.hwd, self.fps)
+                    player: StreamReader = StreamReader(c, t, self._frame_sync_callback, self.hwt, self.hwd, self.fps,
+                                                        gray=self.gray)
                     player.load(str(path), self.load_chunk, lo, hi)
                     self.loaders.append(player)
                 else:
@@ -349,12 +355,13 @@ class Player(Thread):
             return self.load_folder
 
     # EXTERNAL METHODS
-    def play(self, value: bool, name: str = '') -> None:
+    def play(self, value: bool, name: str = '', prepare: bool = False) -> None:
+        """``prepare``: probe the folder's chunk frame counts on the player thread before loading."""
         if value:
             if not name in self.folders:
                 logger.warning(f"Folder {name} not found")
                 return
-            message: Message = Message(MessageType.START, name)
+            message: Message = Message(MessageType.START, name, prepare)
             self.active_folder = name
         else:
             message: Message = Message(MessageType.STOP)
@@ -391,7 +398,8 @@ class Player(Thread):
         if self.running:
             logger.warning('Camera: cannot add callback while player is running')
             return
-        self.frameCallbacks.add(callback)
+        if callback not in self.frameCallbacks:
+            self.frameCallbacks.append(callback)
 
     # STATIC METHODS
     @staticmethod
@@ -423,8 +431,9 @@ class Player(Thread):
 
     def _on_folder_changed(self, folder: str) -> None:
         if folder and folder in self.folders:
-            self._prepare_folder(folder)
-            self.play(True, folder)
+            # prepare on the player thread: the probe decodes whole clips and this callback
+            # runs on the GUI event loop, which must not stall past the socket heartbeat
+            self.play(True, folder, prepare=True)
 
     def _on_refresh_path(self, _=None) -> None:
         self.folders = self._get_video_folders(self.settings, self.data_path)
@@ -440,6 +449,12 @@ class Player(Thread):
             self.play(True, self.active_folder)
 
     def update_gui(self, frame_id: int = 0) -> None:
+        # Settings writes run share propagation and callbacks on this (reader) thread; a GUI
+        # readout needs no more than 4 Hz
+        now: float = monotonic()
+        if now - self._gui_update_time < 0.25:
+            return
+        self._gui_update_time = now
         chunk: int = self.get_current_chunk()
         self.settings.current_chunk = chunk
         global_frame: int = self._global_frame(chunk, frame_id)

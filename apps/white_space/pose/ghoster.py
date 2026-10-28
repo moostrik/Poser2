@@ -57,7 +57,7 @@ from .playhead_offset import PlayheadOffset
 logger = logging.getLogger(__name__)
 
 # Beat-crossing guard: only treat a PlayheadOffset sign change as a hit when both samples are within a
-# quarter-turn of the playhead, so the ±π wrap (opposite side of the ring) never counts.
+# quarter-turn of the playhead, so the ±π wrap (opposite side of the circle) never counts.
 _HALF_PI: float = math.pi / 2.0
 _TWO_PI:  float = 2.0 * math.pi
 
@@ -94,7 +94,7 @@ class _Passive:
 
 class GhosterSettings(BaseSettings):
     """Configuration for ``Ghoster``."""
-    live_players:           Field[int]   = Field(4, access=Field.INIT, description="Live player count (shared from root num_players)")
+    max_players:            Field[int]   = Field(4, access=Field.INIT, description="Players tracked at most (shared from root max_players); the ghost ids start above the dummy's")
     ghost_slots:            Field[int]   = Field(8, access=Field.INIT, description="Ghost id pool size (shared from root num_virtual)")
     enabled:                Field[bool]  = Field(True, description="Record and commit ghosts", newline=True)
     reset:                  Field[bool]  = Field(False, widget=Widget.button, description="Clear all ghosts")
@@ -109,7 +109,7 @@ class GhosterSettings(BaseSettings):
     motion_scale:           Field[float] = Field(5.0, min=0.1, max=4.0, step=0.1, description="On-spot MotionTime that maps motion to 1.0")
     stability_hold_beats:   Field[int]   = Field(2, min=1, max=8, step=1, description="Beats a pose must be held to become a valid ghost pose (1 = off)", newline=True)
     stability_expiry_beats: Field[int]   = Field(3, min=0, max=8, step=1, description="A valid pose expires this many beats after it was last held")
-    stability_scale:        Field[float] = Field(0.8, min=0.1, max=2.0, step=0.05, description="Pose-similarity scale (rad) — larger = more forgiving")
+    stability_tolerance:    Field[float] = Field(45.0, min=5.0, max=120.0, step=1.0, description="Joint angles this far apart still count as the same pose (°); smaller is stricter")
     stability_threshold:    Field[float] = Field(0.9, min=0.0, max=1.0, step=0.01, description="Min pose similarity between beats to count as 'held'")
 
 
@@ -119,8 +119,9 @@ class Ghoster:
     def __init__(self, settings: GhosterSettings, playhead: Callable[[], float]) -> None:
         self._settings = settings
         self._playhead = playhead   # live playhead (radians) — refreshes each ghost's PlayheadOffset
-        live = settings.live_players
-        self._ghost_ids: list[int] = list(range(live, live + settings.ghost_slots))
+        live = settings.max_players
+        # The id above the live players is the dummy's (`dummy.py`); the ghosts start above it.
+        self._ghost_ids: list[int] = list(range(live + 1, live + 1 + settings.ghost_slots))
 
         self._lock = Lock()
         self._prev_offset: dict[int, float] = {}   # live id -> last PlayheadOffset (beat-crossing detection)
@@ -249,7 +250,7 @@ class Ghoster:
                              stable_beats=1, stable_frame=None, stable_spot=float("nan"), stable_age=0)
                 self._passive[tid] = p
             else:
-                sim = _pose_similarity(frame[Angles], p.frame[Angles], self._settings.stability_scale)
+                sim = _pose_similarity(frame[Angles], p.frame[Angles], math.radians(self._settings.stability_tolerance))
                 p.stable_beats = p.stable_beats + 1 if sim >= self._settings.stability_threshold else 1
                 p.beats += 1           # still on the spot → follow him, build dwell
                 p.spot = az

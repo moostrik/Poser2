@@ -30,7 +30,8 @@ DEPTHAI_TO_TRACKINGSTATUS: dict[DepthTracklet.TrackingStatus, TrackingStatus] = 
 @dataclass(frozen=True)
 class Tracklet:
     cam_id: int
-    id: int = field(default=-1)
+    id: int = field(default=-1)          # world identity in a tracker's store; the player slot on its emitted copies
+    obs_id: int = field(default=-1)      # this observation's identity, assigned by a store
 
     time_stamp: float = field(default_factory=time.time)
     created_at: float = field(default_factory=time.time)
@@ -102,3 +103,4 @@ class Tracklet:
 TrackletCallback: TypeAlias = Callable[[Tracklet], None]
 TrackletDict: TypeAlias = dict[int, Tracklet]
 TrackletDictCallback: TypeAlias = Callable[[TrackletDict], None]
+TrackletListCallback: TypeAlias = Callable[[list[Tracklet]], None]

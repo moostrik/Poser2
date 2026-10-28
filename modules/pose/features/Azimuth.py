@@ -4,7 +4,7 @@ from .base import SingleAngle
 
 
 class Azimuth(SingleAngle):
-    """Horizontal world-space angular position in radians [-π, π).
+    """A person's horizontal world-space angle at their eyes, in radians [-π, π).
 
-    Populated by the panoramic tracker. Absent (NaN, score 0.0) for other tracker types.
+    Derived from ``BBoxAzimuth`` by ``AzimuthExtractor``. Absent (NaN, score 0.0) without one.
     """

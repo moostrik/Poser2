@@ -12,9 +12,9 @@ from modules.settings import BaseSettings, Field
 
 
 class RateLimiterSettings(BaseSettings):
-    """Configuration for pose rate limiting."""
-    max_increase: Field[float] = Field(1.0)
-    max_decrease: Field[float] = Field(1.0)
+    """Configuration for pose rate limiting: the fastest a value may move, per second."""
+    max_increase: Field[float] = Field(1.0, min=0.0, description="Fastest rise (units per second)")
+    max_decrease: Field[float] = Field(1.0, min=0.0, description="Fastest fall (units per second)")
 
 
 class FeatureRateLimiter(FilterNode):

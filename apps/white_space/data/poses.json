@@ -1,0 +1,189 @@
+{
+  "neutral": {
+    "torso": 0.0,
+    "left_shoulder": -20.0,
+    "right_shoulder": -20.0,
+    "left_elbow": 12.0,
+    "right_elbow": 12.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
+  "raised": {
+    "torso": 0.0,
+    "left_shoulder": -170.0,
+    "right_shoulder": -170.0,
+    "left_elbow": -14.0,
+    "right_elbow": -14.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
+  "arms out level, a T": {
+    "torso": 0.0,
+    "left_shoulder": -95.0,
+    "right_shoulder": -95.0,
+    "left_elbow": -1.0,
+    "right_elbow": -1.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
+  "left arm up, right hanging": {
+    "torso": 0.0,
+    "left_shoulder": -170.0,
+    "right_shoulder": -20.0,
+    "left_elbow": -14.0,
+    "right_elbow": 12.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
+  "right arm up, left hanging": {
+    "torso": 0.0,
+    "left_shoulder": -20.0,
+    "right_shoulder": -170.0,
+    "left_elbow": 12.0,
+    "right_elbow": -14.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
+  "neutral, both elbows folded": {
+    "torso": 0.0,
+    "left_shoulder": -20.0,
+    "right_shoulder": -20.0,
+    "left_elbow": 179.0,
+    "right_elbow": 179.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
+  "a T, both elbows folded": {
+    "torso": 0.0,
+    "left_shoulder": -95.0,
+    "right_shoulder": -95.0,
+    "left_elbow": 179.0,
+    "right_elbow": 179.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
+  "a T, left elbow folded": {
+    "torso": 0.0,
+    "left_shoulder": -95.0,
+    "right_shoulder": -95.0,
+    "left_elbow": 179.0,
+    "right_elbow": -1.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
+  "a T, right elbow folded": {
+    "torso": 0.0,
+    "left_shoulder": -95.0,
+    "right_shoulder": -95.0,
+    "left_elbow": -1.0,
+    "right_elbow": 179.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
+  "a T, leaning left": {
+    "torso": -45.0,
+    "left_shoulder": -95.0,
+    "right_shoulder": -95.0,
+    "left_elbow": -1.0,
+    "right_elbow": -1.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
+  "a T, leaning right": {
+    "torso": 45.0,
+    "left_shoulder": -95.0,
+    "right_shoulder": -95.0,
+    "left_elbow": -1.0,
+    "right_elbow": -1.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
+  "left arm up, leaning left": {
+    "torso": -45.0,
+    "left_shoulder": -170.0,
+    "right_shoulder": -20.0,
+    "left_elbow": -14.0,
+    "right_elbow": 12.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
+  "left arm up, leaning right": {
+    "torso": 45.0,
+    "left_shoulder": -170.0,
+    "right_shoulder": -20.0,
+    "left_elbow": -14.0,
+    "right_elbow": 12.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
+  "a T, in a crouch": {
+    "torso": 0.0,
+    "left_shoulder": -95.0,
+    "right_shoulder": -95.0,
+    "left_elbow": -1.0,
+    "right_elbow": -1.0,
+    "left_hip": -70.0,
+    "right_hip": -69.0,
+    "left_knee": 98.0,
+    "right_knee": 98.0
+  },
+  "|__": {
+    "torso": 0.0,
+    "left_shoulder": -95.0,
+    "right_shoulder": -95.0,
+    "left_elbow": -1.0,
+    "right_elbow": -90.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
+  "__|": {
+    "torso": 0.0,
+    "left_shoulder": -95.0,
+    "right_shoulder": -95.0,
+    "left_elbow": -90.0,
+    "right_elbow": -1.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  },
+  "|_|": {
+    "torso": 0.0,
+    "left_shoulder": -95.0,
+    "right_shoulder": -95.0,
+    "left_elbow": -90.0,
+    "right_elbow": -90.0,
+    "left_hip": -10.0,
+    "right_hip": -9.0,
+    "left_knee": 8.0,
+    "right_knee": 8.0
+  }
+}

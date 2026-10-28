@@ -1,0 +1,88 @@
+"""StateMachine settings — the show's identity enums and configuration tree.
+
+Pure data (fields, groups, enums), mirroring ``light/settings.py``'s role for its
+package: ``StateId`` is the state vocabulary of ``docs/STATES.md`` and ``StateMachineSettings`` the
+panel — telemetry first, then the show timings, with the sync (``HitSyncSettings``, the INTRO →
+INTRO_PLAY condition on the hits, owned by ``pose/hit_sync.py``) / manual / session corners as
+nested groups.
+"""
+
+from enum import IntEnum, auto
+
+from modules.settings import BaseSettings, Field, Group, Widget
+
+from ..pose import HitSyncSettings
+
+
+class StateId(IntEnum):
+    """The states of ``docs/STATES.md`` (the source of truth), in narrative order — the
+    value is what ``/global/state`` sends. OFF = 0 is the operational off (the boot state,
+    also entered by pinning ``blackout``), followed by its wake transition. The *_INTRO / *_IDLE / *_PLAY
+    entries are transitions promoted to states: their durations are the transition
+    durations. PLAY_INTRO, the sync end's wind-down, is appended after the narrative order so
+    the wire values of the states before it stay."""
+    OFF        = 0
+    OFF_IDLE   = auto()
+    IDLE       = auto()
+    IDLE_INTRO = auto()
+    INTRO      = auto()
+    INTRO_IDLE = auto()
+    INTRO_PLAY = auto()
+    PLAY       = auto()
+    END        = auto()
+    END_INTRO  = auto()
+    END_IDLE   = auto()
+    PLAY_INTRO = auto()
+
+
+class ManualSettings(BaseSettings):
+    """The operator's manual corner: jump the show anywhere, freeze it in place."""
+    select: Field[StateId] = Field(StateId.IDLE, description="State to jump to with the goto button")
+    goto:   Field[bool]    = Field(False, widget=Widget.button, description="Jump to the selected state now")
+    hold:   Field[bool]    = Field(False, description="Freeze transitions; the active state keeps updating")
+
+
+class SessionModeSettings(BaseSettings):
+    """Session mode: timed overrides for the open-ended states (INTRO, PLAY) and no
+    END wind-back — a session always concludes."""
+    enabled:       Field[bool]  = Field(False, description="Session mode on: INTRO and PLAY gain timed exits; END only winds down")
+    intro_seconds: Field[float] = Field(60.0,  min=5.0, max=600.0,  step=1.0, description="INTRO → INTRO_PLAY after this time")
+    play_seconds:  Field[float] = Field(150.0, min=5.0, max=1200.0, step=1.0, description="PLAY → END after this time")
+
+
+class StateMachineSettings(BaseSettings):
+    """Configuration for the show StateMachine. Every timing is named for the state it
+    times, unit in the name (seconds = wall clock, bars = playhead bars)."""
+
+    # Blackout — the installation's big switch. Pinning it is OFF's entry door (from any
+    # state, beating hold and goto); leaving OFF is a normal condition: once unpinned and
+    # the playhead lock holds, OffState wakes through OFF_IDLE.
+    blackout: Field[bool] = Field(False, pinned=True, description="Switch the installation OFF: dark and silent, still sweeping at BEAM")
+
+    # Telemetry (read-only) — the show at a glance
+    current:      Field[StateId] = Field(StateId.OFF, access=Field.READ, description="Current show state", pinned=True)
+    progress:     Field[float]     = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, access=Field.READ, description="Active state progress")
+    players: Field[int]       = Field(0, access=Field.READ, pinned=True, description="Live player count")
+
+    # Transition-state durations — one per state. spin_down_seconds is shared (via the
+    # root) into the beam_wind_down layer, which runs the S9–S11 wall fade on it; those
+    # states exit once the fade is complete and the playhead lock holds.
+    spin_up_seconds:       Field[float] = Field(14.0, min=1.0, max=60.0,  step=0.5, description="INTRO_PLAY: spin-up transition (seconds) — hand-tuned to the physical spin-up (spin_down_seconds' mirror)", newline=True)
+    spin_down_seconds:     Field[float] = Field(10.0, min=1.0, max=60.0,  step=0.5, description="END_INTRO/END_IDLE/PLAY_INTRO: wall fade towards the line (seconds) — hand-tuned to the physical spin-down (drives the beam_wind_down layer)")
+    off_idle_bars:         Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="OFF_IDLE: wake fade from dark, in playhead bars", newline=True)
+    intro_idle_bars:       Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="INTRO_IDLE: playhead bars back to IDLE")
+    end_bars:              Field[float] = Field(3.0,  min=0.5, max=20.0,  step=0.5, description="END: wind-down playhead bars (bidirectional ramp)")
+
+    # Looks
+    dim_level: Field[float] = Field(0.4, min=0.0, max=1.0, step=0.01, description="DIM line level: the front white lamp in INTRO, and where INTRO_PLAY, END_INTRO and PLAY_INTRO hold it", newline=True)
+
+    # Condition tunables
+    min_players:        Field[int]   = Field(3, min=2, max=16, description="Players the show needs at least: present to play, alike hits in a row to start", newline=True)
+    play_full_sync_seconds: Field[float] = Field(20.0, min=0.0, max=600.0, step=1.0, description="PLAY → PLAY_INTRO once the full-sync hold has built over this long (s); 0 never")
+    play_full_sync_release_seconds: Field[float] = Field(5.0, min=0.0, max=60.0, step=0.5, description="PLAY: a break in full sync drains the hold over this (s); 0 restarts it at once")
+    intro_grace_seconds:    Field[float] = Field(20.0, min=0.0, max=300.0, step=1.0, description="INTRO after PLAY_INTRO: spins up only once the hits have been out of sync this long (s)")
+
+    # The sync condition's group is HitSync's settings (pose/hit_sync.py): it fills the telemetry.
+    sync:    Group[HitSyncSettings]     = Group(HitSyncSettings)
+    manual:  Group[ManualSettings]      = Group(ManualSettings)
+    session: Group[SessionModeSettings] = Group(SessionModeSettings)

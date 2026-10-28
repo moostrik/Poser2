@@ -1,27 +1,30 @@
 """White Space — 3-camera panoramic installation with circular LED light output."""
 
+import math
+from pathlib import Path
 from typing import Optional
 from functools import partial
 
+import glfw
 import numpy as np
 
 from modules.utils import Broadcast
-from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder, FrameType
+from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder, FrameType, CameraCheck
 from modules.settings import presets, NiceServer
 from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict
-from modules.inference import source, crop, pose, segmentation
-from modules.session import Session, Sequencer
-from modules.gl import WindowSettings
+from modules.inference import source, crop, pose
+from modules.session import Session
 
 from .board import Board
-from .pose import GhostFeature, PlayheadOffset, PlayheadOffsetExtractor, Ghoster
-from .escalator import GhostEscalator
-from .light import Render as LightRender
-from .inout import OscLight, OscSound, UdpReceiver
+from .pose import GhostFeature, PlayheadOffset, PlayheadOffsetExtractor, Ghoster, Dummy, dummy_id, NeutralWeight, HitSync
+from .light import Conductor
+from .inout import OscLightSender, OscSoundSender, UdpLightReceiver
 from .render import Render as WindowRender
 from .settings import Settings, Stage
+from .statemachine import StateMachine
+from .tracker_journal import TrackerJournal
 
 APP_NAME = 'white_space'
 DATA_PATH = 'apps/white_space/data'
@@ -31,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 class WhiteSpaceMain:
-    def __init__(self, simulation: bool = False) -> None:
+    def __init__(self, simulation: bool = False, interface: bool = True) -> None:
 
         self.is_running: bool = False
         self.is_finished: bool = False
@@ -43,38 +46,49 @@ class WhiteSpaceMain:
         if not presets.load(self.settings, preset_file):
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
         self.settings.camera.sim_enabled = simulation
+        if not interface:
+            self.settings.server.browser = False  # launcher override; the preset cannot turn it back on
+        # The crop is the pose model's input, so it is cut at that size: one antialiased resample
+        # from the camera frame, rather than a larger crop the runner scales down again. Derived
+        # from the model so a change of pose resolution cannot silently reintroduce the second one.
+        crop_settings = self.settings.pose.image_crop
+        crop_settings.output_width = self.settings.pose.pose.width
+        crop_settings.output_height = self.settings.pose.pose.height
         self.settings.initialize()
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
-        num_players: int = self.settings.num_players
+        max_players: int = self.settings.max_players
         num_cameras: int = self.settings.camera.num_cameras
-        logging.info("Settings loaded: %s players, %s cameras, simulation=%s", num_players, num_cameras, simulation)
+        logging.info("Settings loaded: %s players, %s cameras, simulation=%s", max_players, num_cameras, simulation)
         ps = self.settings.pose
 
         # BLACKBOARD
         self.board = Board()
 
-        # SESSION
-        self.session = Session(self.settings.session.core)
-        self.osc_sound = OscSound(self.settings.inout.osc_sound)
-        self.ghoster = Ghoster(self.settings.ghost.ghoster, playhead=self.board.get_playhead)   # live/pool counts shared from root
-        self.sequencer = Sequencer(self.settings.session.sequencer)
-        self.sequencer.add_state_callback(self.board.set_sequence)
-        self.sequencer.add_state_callback(self.osc_sound.set_sequencer_state)
-        self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
+        # RECORDING (independent of the show — works stand-alone and during session mode)
+        self.session = Session(self.settings.record.core)
+        self.osc_sound_sender = OscSoundSender(self.settings.inout.osc_sound_sender)
+        self.ghoster = Ghoster(self.settings.pose.ghoster, playhead=self.board.get_playhead)   # live/pool counts shared from root
+        # The dummy has its own id between the live players and the ghosts; the LERP stage is
+        # built one id wider for it, so it is a pose like any other from there.
+        self.dummy = Dummy(self.settings.PI.dummy, ps.angle_extractor, ps.angle_calibrator, dummy_id(max_players),
+                           Path(DATA_PATH) / "poses.json")
+        self.video_recorder = VideoRecorder(self.settings.record.video, data_path=DATA_PATH)
 
         # CAMERA
         self.cameras: list[Camera | Simulator] = []
         self.player: Optional[Player] = None
         if self.settings.camera.sim_enabled:
-            self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH)
+            # The rig is uniform: mono cameras decode their clips straight to gray
+            gray = not self.settings.camera.cameras[0].color
+            self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH, gray=gray)
             for i in range(num_cameras):
                 self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:
             for i in range(num_cameras):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
-        self.tracker = PanoramicTracker(self.settings.camera.tracker, num_players, num_cameras)
+        self.tracker = PanoramicTracker(self.settings.track, max_players, num_cameras)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
         self.source_uploader = source.Uploader()
         self.crop_extractor = crop.Extractor(ps.image_crop)
@@ -88,22 +102,34 @@ class WhiteSpaceMain:
             camera.add_tracker_callback(self.tracklet_sync_bang.submit_frame)
 
         # DETECTION
-        features.configure_features(num_players)
+        features.configure_features(max_players)
 
-        self.poses_from_tracklets = PosesFromTracklets(num_players)
+        self.poses_from_tracklets = PosesFromTracklets(ps.tracklets, max_players)
 
         self.pose_predictor = pose.Predictor(ps.pose)
-        self.segmentation_predictor  = segmentation.Predictor(ps.segmentation)
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         self.tracker.add_tracklet_callback(self.board.set_tracklets)
+        # The unfused view, for the calibration display only — two observations of one person on
+        # a seam, which the line above reduces to one.
+        self.tracker.add_observation_callback(self.board.set_observations)
         self.tracklet_sync_bang.add_sync_callback(self.tracker.notify_update)
         self.frame_sync_bang.add_sync_callback(self.poses_from_tracklets.process)
 
+        # DIAGNOSIS — a subscribe-only journal of the tracker's inputs, observations and emitted
+        # primaries (JSONL under data/diagnosis), for dissecting identity incidents offline.
+        # Always wired; `record.journal.enabled` (panel, preset or `launcher.py -journal`) toggles
+        # capture live, one folder per capture, and the taps return on a flag check while off.
+        self.tracker_journal = TrackerJournal(self.settings.record.journal, data_path=DATA_PATH,
+                                              meta_provider=self._journal_meta,
+                                              track_provider=self.settings.track.to_dict)
+        for camera in self.cameras:
+            camera.add_tracker_callback(self.tracker_journal.submit_cam_tracklets)
+        self.tracker.add_observation_callback(self.tracker_journal.submit_observations)
+        self.tracker.add_tracklet_callback(self.tracker_journal.submit_tracklets)
+
         self.crop_extractor.add_image_callback(self.pose_predictor.process)
         self.crop_extractor.add_image_callback(lambda _f, gpu: self.board.set_crop_images(gpu))
-        self.crop_extractor.add_image_callback(self.segmentation_predictor.process)
-        self.segmentation_predictor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
         self.poses_from_tracklets.add_frames_callback(self._process_poses)
 
@@ -115,8 +141,9 @@ class WhiteSpaceMain:
         self.stages: dict[Stage, Broadcast] = {}
         for stage in Stage:
             wt_features = lerp_features if stage == Stage.LERP else None
-            wt = window.WindowTracker(num_players, getattr(ps, f'window_{stage.name.lower()}'), features=wt_features)
-            wt.add_windows_callback(partial(self.board.set_windows, stage))
+            tracks = max_players + 1 if stage == Stage.LERP else max_players      # LERP also holds the dummy's id
+            wt = window.WindowTracker(tracks, getattr(ps, f'window_{stage.name.lower()}'), features=wt_features)
+            self.board.set_window_tracker(stage, wt)
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([
                 partial(self.board.set_frames, stage),
@@ -124,17 +151,39 @@ class WhiteSpaceMain:
             ])
 
         # WS PIPELINE — light output
-        ws_input: Stage = Stage(int(ps.ws_input_stage))
-        self.light_renderer = LightRender(self.settings.light, distortion=self.settings.camera.tracker.distortion, board=self.board, pose_stage=int(ws_input))
-        self.osc_light    = OscLight(self.settings.inout.osc_light)
-        self.osc_receiver = OscReceiver(self.settings.inout.osc_receiver)
-        self.udp_receiver = UdpReceiver(self.settings.inout.udp_receiver)
-        self.osc_receiver.bind("/WS/sensor/fall", self.light_renderer.notify_fall)
-        self.udp_receiver.bind("/WS/sensor/fall", self.light_renderer.notify_fall)
+        # The show reads LERP poses: the stable eye azimuth, and the only stage with PlayheadOffset.
+        self.conductor = Conductor(self.settings.light, self.settings.PI, board=self.board, pose_stage=int(Stage.LERP))
+        # One receiver per domain, matching each source's actual transport: the fixture
+        # firmware sends the fall as a plain UDP text packet (not OSC) to the light
+        # receiver's port; Max sends /WS/idle/blue/left and /right as real OSC (the UDP
+        # receiver could never decode their float args). Don't cross-bind them.
+        self.osc_light_sender   = OscLightSender(self.settings.inout.osc_light_sender, self.settings.light.motor)
+        self.udp_light_receiver = UdpLightReceiver(self.settings.inout.udp_light_receiver)
+        self.osc_sound_receiver = OscReceiver(self.settings.inout.osc_sound_receiver)
+        self.udp_light_receiver.bind("/WS/sensor/fall", self.conductor.notify_fall)
+        # Sound levels from Max (one 0..1 float each) → board → the beam_blue_sound layer.
+        self.osc_sound_receiver.bind("/WS/idle/blue/left",  self._on_sound_level_left)
+        self.osc_sound_receiver.bind("/WS/idle/blue/right", self._on_sound_level_right)
         for camera in self.cameras:
             camera.add_frame_callback(self._store_video_frame)
-        self.light_renderer.add_render_callback(self.osc_light.send_message)
-        self.light_renderer.add_render_callback(self.osc_sound.set_composition)
+        self.conductor.add_render_callback(self.osc_light_sender.send_message)
+        self.conductor.add_render_callback(self.osc_sound_sender.set_composition)
+
+        # STATE MACHINE — the show's single decision maker; commands the Conductor through
+        # its three channels (look, layer resets, motor) and emits state to board + OSC.
+        self.state_machine = StateMachine(
+            self.settings.states, self.settings.light, self.settings.PI, board=self.board,
+            set_mix=self.conductor.set_mix,
+            reset_layers=self.conductor.reset_layers,
+            set_motor=self.conductor.set_motor_mode,
+            pose_stage=int(Stage.LERP),
+        )
+        self.state_machine.add_state_callback(self.board.set_sequence)
+        self.state_machine.add_state_callback(self.osc_sound_sender.set_sequencer_state)
+        # HIT SYNC — the hits' poses and the streak of alike ones, published on the board for the machine. It
+        # compares the hit poses with the posture module's own distance, on the posture settings.
+        self.hit_sync = HitSync(self.settings.states.sync, ps.similarity.posture, ps.similarity.neutral_weight,
+                                self.settings.light, board=self.board, pose_stage=int(Stage.LERP))
 
         # POSE STAGE RAW
         self.pose_predictor.add_frames_callback(self.stages[Stage.RAW])
@@ -144,50 +193,64 @@ class WhiteSpaceMain:
             i: trackers.FilterPipeline([
                 nodes.PointDualConfFilter(ps.point.confidence),
                 nodes.PointStickyFiller(ps.point.sticky),
+                # Here, not later: the keypoints are still normalised in the crop they came from, so
+                # the box's jitter cancels out of the eye azimuth. A held eye moves with the box.
+                nodes.AzimuthExtractor(self._column_to_azimuth),
                 nodes.AngleExtractor(ps.angle_extractor),
+                nodes.AngleCalibrator(ps.angle_calibrator),
                 nodes.AngleVelExtractor(ps.velocity.extractor),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         })
         self.stages[Stage.RAW].add_callback(self.filters_clean.process)
         self.filters_clean.add_frames_callback(self.stages[Stage.CLEAN])
 
         # POSE STAGE SMOOTH
         self.similarity_applicator = nodes.SimilarityApplicator(ps.similarity.similarity_applicator)
-        self.leader_applicator     = nodes.LeaderScoreApplicator(ps.similarity.leader_applicator)
 
         self.filters_smooth = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 nodes.PointEuroSmoother(ps.point.smoother),
                 nodes.AngleExtractor(ps.angle_extractor),
+                nodes.AngleCalibrator(ps.angle_calibrator),
                 nodes.AngleVelExtractor(ps.velocity.extractor),
                 nodes.AngleVelEuroSmoother(ps.velocity.smoother),
                 nodes.AngleEuroSmoother(ps.angle.smoother),
+                nodes.AzimuthEuroSmoother(ps.azimuth.smoother),
+                nodes.DistanceEuroSmoother(ps.distance.smoother),
                 nodes.AngleMotionExtractor(ps.motion.extractor),
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
-                nodes.AngleSymExtractor(),
+                nodes.AngleSymExtractor(ps.leg_deviation_extractor),
+                nodes.LegDeviationExtractor(ps.leg_deviation_extractor),
+                nodes.ArmDeviationExtractor(ps.arm_deviation_extractor),
+                nodes.ArmTravelExtractor(ps.arm_travel_extractor),
+                nodes.ShoulderDifferenceExtractor(),
+                nodes.TorsoTiltExtractor(ps.torso_tilt_extractor),
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),
                 self.similarity_applicator,
-                self.leader_applicator,
                 nodes.SimilarityEuroSmoother(ps.similarity.smoother),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         })
         self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
         self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
 
-        # Pose similarity (enabled by default); movement correlation (disabled by default)
-        self.window_similator  = analytics.WindowSimilarity(ps.similarity.window_similarity)
-        self.window_correlator = analytics.WindowCorrelation(ps.similarity.window_correlation)
+        # Posture similarity: the pairwise distance of the current SMOOTH poses, as a 0..1 similarity, computed
+        # synchronously on this broadcast. On the result, where presence is known: the sticky filler bridges a
+        # present pair's gap (a departed player's slot stays NaN), then the neutral weight scales a pair by
+        # how far both are out of neutral (their arm deviation). Then the rows are stamped on the next SMOOTH
+        # frames and smoothed; the light show reads the LERP frames. The neutral weight's frames come off the
+        # same broadcast, registered first so its deviations are this frame's.
+        self.posture_similarity = analytics.PostureSimilarity(ps.similarity.posture)
+        self.similarity_sticky = analytics.SimilarityStickyFiller(ps.similarity.sticky)
+        self.neutral_weight = NeutralWeight(ps.similarity.neutral_weight)
 
-        self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similator.submit)
-        self.window_similator.add_similarity_callback(self.similarity_applicator.set)
-        self.window_similator.add_similarity_callback(self.leader_applicator.set)
-
-        self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_correlator.submit)
-        self.window_correlator.add_similarity_callback(self.similarity_applicator.set)
-        self.window_correlator.add_similarity_callback(self.leader_applicator.set)
+        self.stages[Stage.SMOOTH].add_callback(self.neutral_weight.set_frames)
+        self.stages[Stage.SMOOTH].add_callback(self.posture_similarity.process)
+        self.posture_similarity.add_similarity_callback(self.similarity_sticky.process)
+        self.similarity_sticky.add_similarity_callback(self.neutral_weight.process)
+        self.neutral_weight.add_similarity_callback(self.similarity_applicator.set)
 
         # POSE STAGE PREDICT
         self.filters_predict = trackers.FilterTracker({
@@ -195,10 +258,10 @@ class WhiteSpaceMain:
                 nodes.PointPredictor(ps.point.prediction),
                 nodes.AnglePredictor(ps.angle.prediction),
                 nodes.AngleVelPredictor(ps.velocity.prediction),
+                nodes.AzimuthPredictor(ps.azimuth.prediction),
                 nodes.AngleStickyFiller(ps.angle.sticky),
-                nodes.SimilarityStickyFiller(ps.similarity.sticky),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         })
         self.stages[Stage.SMOOTH].add_callback(self.filters_predict.process)
         self.filters_predict.add_frames_callback(self.stages[Stage.PREDICT])
@@ -212,13 +275,22 @@ class WhiteSpaceMain:
                 nodes.AngleChaseInterpolator(ps.angle.interpolator),
                 nodes.AngleVelChaseInterpolator(ps.velocity.interpolator),
                 nodes.SimilarityChaseInterpolator(ps.similarity.interpolator),
+                nodes.AzimuthChaseInterpolator(ps.azimuth.interpolator),
+                nodes.DistanceChaseInterpolator(ps.distance.interpolator),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         })
         self.filters_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([
-                nodes.DistanceExtractor(ps.distance_extractor),
-                nodes.AngleSymExtractor(),
+                # First, before the extractors: every angle-derived measure (arm travel, leg
+                # deviation) inherits the cap, and the sound's angle messages read the same values.
+                nodes.AngleRateLimiter(ps.angle.rate_limiter),
+                nodes.AngleSymExtractor(ps.leg_deviation_extractor),
+                nodes.LegDeviationExtractor(ps.leg_deviation_extractor),
+                nodes.ArmDeviationExtractor(ps.arm_deviation_extractor),
+                nodes.ArmTravelExtractor(ps.arm_travel_extractor),
+                nodes.ShoulderDifferenceExtractor(),
+                nodes.TorsoTiltExtractor(ps.torso_tilt_extractor),
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),
                 nodes.AngleVelStickyFiller(ps.velocity.sticky),
@@ -227,14 +299,17 @@ class WhiteSpaceMain:
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
                 PlayheadOffsetExtractor(self.board.get_playhead),
             ])
-            for i in range(num_players)
+            for i in range(max_players + 1)                                       # the players and the dummy
         })
         self.gate_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([self.motion_gate_applicator])
-            for i in range(num_players)
+            for i in range(max_players + 1)
         })
         self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.set)
-        self.interpolators_lerp.add_frames_callback(self.filters_lerp.process)
+        # The dummy joins the interpolated poses before the LERP filters, which stamp on it
+        # everything a person has (the playhead offset, the symmetries, the leg deviation, the bend).
+        self.interpolators_lerp.add_frames_callback(self.dummy.process)
+        self.dummy.add_frames_callback(self.filters_lerp.process)
         self.filters_lerp.add_frames_callback(self.motion_gate_applicator.set)
         self.filters_lerp.add_frames_callback(self.gate_lerp.process)
         # Ghoster sits between LERP and the fan-out: records held poses, commits/refreshes ghosts,
@@ -242,17 +317,23 @@ class WhiteSpaceMain:
         self.gate_lerp.add_frames_callback(self.ghoster.process)
         self.ghoster.add_frames_callback(self.stages[Stage.LERP])
         self.ghoster.add_ghosts_callback(self.board.set_ghosts)
-        self.ghoster.add_sound_callback(partial(self.osc_sound.set_frames, int(Stage.LERP)))
-        # GhostEscalator counts ghosts ever made and escalates the motor LOW→HIGH at its threshold.
-        self.escalator = GhostEscalator(self.settings.ghost.escalator, self.settings.light.motor)
-        self.ghoster.add_new_ghost_callback(self.escalator.on_new_ghost)
+        self.ghoster.add_sound_callback(partial(self.osc_sound_sender.set_frames, int(Stage.LERP)))
+
+        # CAMERA CHECK — compares each camera's own IMU reading and frame rate against the preset,
+        # and summarises them as pinned indicators. A setup aid; nothing downstream reads it.
+        self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
 
         # RENDER
-        self.render = WindowRender(self.board, self.settings.render)
-        self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
-        self.light_renderer.add_update_callback(self.sequencer.update)
-        self.light_renderer.add_update_callback(self.interpolators_lerp.update)
+        self.render = WindowRender(self.board, self.settings.render, self.settings.track,
+                                   self.settings.camera.cameras, self.settings.camera.camera_check, ps.angle_extractor)
+        self.render.add_update_callback(self.camera_check.update)
+        # In order: LERP first, so the hit reads this tick's PlayheadOffset (the same the flash draws on);
+        # then HitSync publishes the hit and the streak; then the state machine reads them.
+        self.conductor.add_update_callback(self.interpolators_lerp.update)
+        self.conductor.add_update_callback(self.hit_sync.update)
+        self.conductor.add_update_callback(self.state_machine.update)
         self.render.add_exit_callback(self.stop)
+        self.render.window_manager.add_keyboard_callback(self._on_key)
 
     def start(self) -> None:
         self.settings_server.start()
@@ -262,27 +343,55 @@ class WhiteSpaceMain:
 
         self.tracker.start()
         self.pose_predictor.start()
-        self.segmentation_predictor.start()
-        self.window_similator.start()
-        self.window_correlator.start()
-        self.light_renderer.start()
-        self.osc_light.start()
-        self.osc_receiver.start()
-        self.udp_receiver.start()
+        self.conductor.start()
+        self.osc_light_sender.start()
+        self.osc_sound_receiver.start()
+        self.udp_light_receiver.start()
 
-        self.osc_sound.start()
+        self.osc_sound_sender.start()
 
         if self.player:
             self.player.start()
         self.video_recorder.start()
+        self.tracker_journal.start()
 
         self.is_running = True
         self.render.start()
+
+    def _on_sound_level_left(self, level: float = 0.0, *_rest: object) -> None:
+        """OSC callback for /WS/idle/blue/left — store the Max soundscape's left level."""
+        self.board.set_sound_level_left(float(level))
+
+    def _on_sound_level_right(self, level: float = 0.0, *_rest: object) -> None:
+        """OSC callback for /WS/idle/blue/right — store the Max soundscape's right level."""
+        self.board.set_sound_level_right(float(level))
 
     def _store_video_frame(self, cam_id: int, frame_type: FrameType, frame: np.ndarray) -> None:
         """Camera frame callback — store raw VIDEO frames on the board for the light renderer."""
         if frame_type == FrameType.VIDEO:
             self.board.set_video_image(cam_id, frame)
+
+    def _column_to_azimuth(self, cam_id: int, x: float) -> float:
+        """A camera column's world azimuth in radians, through the tracker's own geometry."""
+        return math.radians(self.tracker.column_to_azimuth(cam_id, x))
+
+    def _on_key(self, key: int, action: int, _mods: int) -> None:
+        """Render-window hotkeys: M marks an incident in the tracker journal."""
+        if key == glfw.KEY_M and action == glfw.PRESS:
+            self.tracker_journal.mark()
+
+    def _journal_meta(self) -> dict:
+        """The journal's meta line: the numbers an offline analysis recomputes the gates from."""
+        sim = self.settings.camera.simulator
+        return {
+            'app': APP_NAME,
+            'num_cameras': self.settings.camera.num_cameras,
+            'max_players': self.settings.max_players,
+            'fps': self.settings.camera.fps,
+            'track': self.settings.track.to_dict(),
+            'source': {'folder': sim.folder, 'start': sim.start_norm, 'end': sim.end_norm}
+                      if self.player else None,
+        }
 
     def _process_poses(self, poses: FrameDict) -> None:
         images, prev_images = self.source_uploader.snapshot()
@@ -305,24 +414,18 @@ class WhiteSpaceMain:
         self.video_recorder.stop()
 
         self.tracker.stop()
-        self.osc_sound.stop()
-        self.escalator.stop()
+        self.tracker_journal.stop()
+        self.osc_sound_sender.stop()
+        self.state_machine.stop()
         self.ghoster.stop()
-        self.osc_light.stop()
-        self.osc_receiver.stop()
-        self.udp_receiver.stop()
-        self.light_renderer.stop()
+        self.osc_light_sender.stop()
+        self.osc_sound_receiver.stop()
+        self.udp_light_receiver.stop()
+        self.conductor.stop()
 
         self.pose_predictor.stop()
-        self.segmentation_predictor.stop()
-        self.window_similator.stop()
-        self.window_correlator.stop()
 
         for camera in self.cameras:
             camera.join(timeout=10)
 
         self.is_finished = True
-
-    def _on_render_fps(self, fps: int) -> None:
-        if fps > 0:
-            self.settings.render_fps = float(fps)

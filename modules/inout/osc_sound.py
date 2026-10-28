@@ -9,7 +9,7 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from modules.pose.frame import Frame, FrameDict
-from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, Similarity, MotionGate, LeaderScore, MotionTime, Age, AngleLandmark, BBox
+from modules.pose.features import Angles, AngleVelocity, AngleSymmetry, Similarity, MotionGate, LeaderScore, MotionTime, Age, AngleLandmark, BBox, LegDeviation, TorsoTilt
 
 from modules.session import SequencerState
 from modules.settings import BaseSettings, Field, Widget
@@ -147,7 +147,7 @@ class OscSound:
         same leaf builders as the live path, so _build_bundle stays blackout-agnostic.
         """
         bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
-        self._add_global_messages(bundle, None)  # None → zeroed globals
+        self._add_global_messages(bundle, {}, None)  # no frames, None → zeroed globals
         num_players = self._config.max_players
         for id in range(num_players):
             self._add_inactive_frame_messages(bundle, id, num_players)
@@ -156,7 +156,7 @@ class OscSound:
 
     def _build_bundle(self, frames: FrameDict, seq_state: SequencerState | None) -> OscBundleBuilder:
         bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
-        self._add_global_messages(bundle, seq_state)
+        self._add_global_messages(bundle, frames, seq_state)
 
         num_players = self._config.max_players
         self._config.active_players = sum(1 for id in range(num_players) if id in frames)
@@ -182,8 +182,9 @@ class OscSound:
             self._client = SimpleUDPClient(self._config.ip_addresses, self._config.port)
         logger.info(f"Reconnected to {self._config.ip_addresses}:{self._config.port}")
 
-    def _add_global_messages(self, bundle_builder: OscBundleBuilder, seq_state: SequencerState | None) -> None:
-        """Tick-wide messages. A None seq_state yields the all-zero (idle/blackout) globals."""
+    def _add_global_messages(self, bundle_builder: OscBundleBuilder, frames: FrameDict, seq_state: SequencerState | None) -> None:
+        """Tick-wide messages, built from the tick's frames and sequencer state. A None
+        seq_state yields the all-zero (idle/blackout) globals."""
         stage_msg = OscMessageBuilder(address="/global/state")
         stage_msg.add_arg(seq_state.stage if seq_state is not None else _NO_STATE, arg_type=OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(stage_msg.build()) # type: ignore
@@ -230,10 +231,17 @@ class OscSound:
             vel_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(vel_reset_msg.build()) # type: ignore
 
-        # Reset angle/sym to 0
+        # Reset angle/sym values to 0
         sym_msg = OscMessageBuilder(address=f"/pose/{id}/angle/sym")
-        sym_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+        for _ in range(AngleSymmetry.length()):
+            sym_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(sym_msg.build()) # type: ignore
+
+        # Reset angle/legs and angle/tilt to 0
+        for address in (f"/pose/{id}/angle/legs", f"/pose/{id}/angle/tilt"):
+            body_reset_msg = OscMessageBuilder(address=address)
+            body_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
+            bundle_builder.add_content(body_reset_msg.build()) # type: ignore
 
         # Reset similarity values to 0
         similarity_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")
@@ -265,6 +273,11 @@ class OscSound:
             leader_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(leader_reset_msg.build()) # type: ignore
 
+    def _angle_values(self, frame: Frame) -> list[float]:
+        """The nine values of ``/pose/{id}/angle/rad``, in ``AngleLandmark`` order; a subclass may
+        shape some of them."""
+        return frame[Angles].values.tolist()
+
     def _add_active_frame_messages(self, bundle_builder: OscBundleBuilder, frame: Frame, frames: FrameDict, num_players: int) -> None:
         id: int = frame.track_id
         active_msg = OscMessageBuilder(address=f"/pose/{id}/active")
@@ -291,7 +304,7 @@ class OscSound:
         bundle_builder.add_content(change_msg.build()) # type: ignore
 
         # range [-pi, pi]
-        angle_rad_values: list[float] = frame[Angles].values.tolist()
+        angle_rad_values: list[float] = self._angle_values(frame)
         angle_rad_msg = OscMessageBuilder(address=f"/pose/{id}/angle/rad")
         for angle in angle_rad_values:
             angle_rad_msg.add_arg(angle, OscMessageBuilder.ARG_TYPE_FLOAT)
@@ -304,14 +317,27 @@ class OscSound:
             angle_vel_msg.add_arg(angle_vel, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(angle_vel_msg.build()) # type: ignore
 
-        # range [0, 1]
-        mean_sym: float = frame[AngleSymmetry].overall_symmetry() if AngleSymmetry in frame else 0.0
-        mean_sym_msg = OscMessageBuilder(address=f"/pose/{id}/angle/sym")
-        mean_sym_msg.add_arg(float(mean_sym), OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(mean_sym_msg.build()) # type: ignore
+        # range [-1, 1] - signed left-minus-right per pair: shoulder, elbow, hip, knee, arms, legs
+        sym_values: list[float] = frame[AngleSymmetry].values.tolist() if AngleSymmetry in frame else [0.0] * AngleSymmetry.length()
+        sym_msg = OscMessageBuilder(address=f"/pose/{id}/angle/sym")
+        for val in sym_values:
+            sym_msg.add_arg(float(val), OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(sym_msg.build()) # type: ignore
 
-        # range [0, 1] - raw angle similarity
-        pose_sim_values: list[float] = frame[Similarity].values.tolist() if Similarity in frame else [0.0] * num_players
+        # range [0, 1] - joint-weighted leg deviation from standing straight
+        legs: float = frame[LegDeviation].value if LegDeviation in frame else 0.0
+        legs_msg = OscMessageBuilder(address=f"/pose/{id}/angle/legs")
+        legs_msg.add_arg(float(legs), OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(legs_msg.build()) # type: ignore
+
+        # range [-1, 1] - signed sideways torso lean against the image vertical
+        tilt: float = frame[TorsoTilt].value if TorsoTilt in frame else 0.0
+        tilt_msg = OscMessageBuilder(address=f"/pose/{id}/angle/tilt")
+        tilt_msg.add_arg(float(tilt), OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(tilt_msg.build()) # type: ignore
+
+        # range [0, 1] - pose similarity per player; NaN (no pair, or no such player) is sent as 0
+        pose_sim_values: list[float] = np.nan_to_num(frame[Similarity].values, nan=0.0).tolist() if Similarity in frame else [0.0] * num_players
         pose_sim_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/pose")
         for val in pose_sim_values:
             pose_sim_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
@@ -325,8 +351,7 @@ class OscSound:
         bundle_builder.add_content(gate_msg.build()) # type: ignore
 
         # range [0, 1] - motion-gated similarity (similarity * motion_gate)
-        motion_sim_values: list[float] = frame[Similarity].values.tolist() if Similarity in frame else [0.0] * num_players
-        motion_sim_values = [0.0 if np.isnan(v) else v for v in motion_sim_values]
+        motion_sim_values: list[float] = np.nan_to_num(frame[Similarity].values, nan=0.0).tolist() if Similarity in frame else [0.0] * num_players
         motion_sim_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/motion")
         for val in motion_sim_values:
             motion_sim_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)

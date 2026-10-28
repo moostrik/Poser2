@@ -15,14 +15,14 @@ from OpenGL.GL import *  # type: ignore
 import numpy as np
 
 # Local application imports
-from modules.gl import Texture, Style
+from modules.gl import Texture, Style, Text
 from ..LayerBase import LayerBase, Blit
 from modules.board import HasFrames
 from modules.pose.frame import Frame
-from modules.pose.features import Similarity, MotionGate, AngleMotion
+from modules.pose.features import Similarity, MotionGate, AngleMotion, Points2D, PointLandmark
 
 from modules.settings import Field, BaseSettings, Group
-from modules.flow import Visualizer, VisualisationFieldSettings, FluidFlow, FluidFlow3D, FluidFlow3DArray, FluidFlowSettings
+from modules.flow import FluidFlow, FluidFlow3D, FluidFlowSettings
 
 from modules.utils import HotReloadMethods
 
@@ -32,44 +32,28 @@ from ...color_settings import ColorSettings
 class FluidSimEngine(IntEnum):
     """Simulation engine selection.
 
-    FLUID_2D:       2D Navier-Stokes (FluidFlow) — fastest, no depth
-    FLUID_3D:       3D volumetric with GL_TEXTURE_3D density (FluidFlow3D)
-    FLUID_3D_ARRAY: 3D volumetric with GL_TEXTURE_2D_ARRAY density (FluidFlow3DArray) — fastest 3D
+    FLUID_2D: 2D Navier-Stokes (FluidFlow) — the hd_trio reference look, no depth
+    FLUID_3D: 3D volumetric Navier-Stokes (FluidFlow3D)
     """
     FLUID_2D = 0
     FLUID_3D = auto()
-    FLUID_3D_ARRAY = auto()
 
 
 # Map enum -> class for engine creation
 _ENGINE_CLASSES: dict[FluidSimEngine, type] = {
     FluidSimEngine.FLUID_2D: FluidFlow,
     FluidSimEngine.FLUID_3D: FluidFlow3D,
-    FluidSimEngine.FLUID_3D_ARRAY: FluidFlow3DArray,
 }
-
-
-class Fluid3DDrawMode(IntEnum):
-    """Draw modes for Fluid3DLayer.
-
-    Only fields with a 2D composited output are exposed:
-        DENSITY      - RGB-coloured composited density (colour baked in during injection)
-        DENSITY_RAW  - Alias for DENSITY (kept for API compatibility)
-    """
-    DENSITY = 0
-    DENSITY_RAW = auto()
 
 
 class Fluid3DLayerSettings(BaseSettings):
     """Configuration for Fluid3DLayer (3D fluid simulation)."""
     stage: Field[int] =                     Field(0, description="Pipeline stage for pose data")
     num_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
-    sim_engine: Field[FluidSimEngine] =     Field(FluidSimEngine.FLUID_3D_ARRAY)
-    draw_mode: Field[Fluid3DDrawMode] =     Field(Fluid3DDrawMode.DENSITY)
+    sim_engine: Field[FluidSimEngine] =     Field(FluidSimEngine.FLUID_3D)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
 
     fluid_flow    = Group(FluidFlowSettings)
-    visualisation = Group(VisualisationFieldSettings)
 
 
 class Fluid3DLayer(LayerBase):
@@ -78,13 +62,12 @@ class Fluid3DLayer(LayerBase):
     Receives velocity, density, and temperature from all FlowLayers and runs
     a volumetric Navier-Stokes fluid simulation:
     1. Aggregate inputs from connected FlowLayers
-    2. Inject velocity, density (decomposed to V+colour), temperature into 3D volume
+    2. Inject velocity, density (RGB colour baked in), temperature into the 3D volume
     3. Run 3D advection, pressure projection, viscosity, buoyancy, vorticity
-    4. Composite 3D density+colour -> 2D output (colour is already baked in)
+    4. Composite the 3D density volume -> coloured 2D output
 
-    The density volume stores scalar brightness (R16F, output resolution).
-    The colour volume stores RGB colour (RGBA16F, sim resolution).
-    Both are composited by Composite3D into a final RGBA16F 2D output.
+    The density volume stores coloured ink directly (RGBA16F GL_TEXTURE_2D_ARRAY,
+    output resolution); Composite3DDensity flattens it to the final RGBA16F 2D output.
 
     Cross-camera support:
         Each Fluid3DLayer receives a dict of all FlowLayers, enabling
@@ -118,19 +101,24 @@ class Fluid3DLayer(LayerBase):
         self._color_settings: ColorSettings = color_settings
 
         # Simulation engine (swappable at runtime)
-        self._fluid_flow: FluidFlow | FluidFlow3D | FluidFlow3DArray = self._create_engine()
+        self._fluid_flow: FluidFlow | FluidFlow3D = self._create_engine()
         self._alloc_width: int = 0
         self._alloc_height: int = 0
         self._swap_engine_pending: bool = False
 
-        self._visualizer: Visualizer = Visualizer(self.config.visualisation)
+        # Legend for the debug depth view (hue = layer)
+        self._legend_text: Text = Text()
+
+        # Smoothed head position for the head-coupled parallax eye
+        self._eye_x: float = 0.0
+        self._eye_y: float = 0.0
 
         # Defer engine swap to GL thread (callbacks fire from websocket thread)
         self.config.bind(Fluid3DLayerSettings.sim_engine, lambda _: self._request_swap_engine())
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
-    def _create_engine(self) -> FluidFlow | FluidFlow3D | FluidFlow3DArray:
+    def _create_engine(self) -> FluidFlow | FluidFlow3D:
         """Instantiate the selected simulation engine with the shared config."""
         cls = _ENGINE_CLASSES[self.config.sim_engine]
         return cls(self.config.fluid_flow)
@@ -155,8 +143,8 @@ class Fluid3DLayer(LayerBase):
 
     @property
     def texture(self) -> Texture:
-        """Visualization output texture."""
-        return self._visualizer.texture
+        """Composited 2D density output (RGBA16F, colour baked in)."""
+        return self._fluid_flow.density
 
     @property
     def density(self) -> Texture:
@@ -176,12 +164,12 @@ class Fluid3DLayer(LayerBase):
         self._alloc_width = width
         self._alloc_height = height
         self._fluid_flow.allocate(width, height)
-        self._visualizer.allocate(self._fluid_flow.sim_width, self._fluid_flow.sim_height)
+        self._legend_text.allocate(font_size=18)
 
     def deallocate(self) -> None:
         """Deallocate all resources."""
         self._fluid_flow.deallocate()
-        self._visualizer.deallocate()
+        self._legend_text.deallocate()
 
     def reset(self) -> None:
         """Reset fluid simulation state."""
@@ -199,7 +187,7 @@ class Fluid3DLayer(LayerBase):
         # Get motion data from pose
         pose: Frame | None = self._board.get_frame(self.config.stage, self._cam_id)
         similarities: np.ndarray = (
-            pose[Similarity].values if pose is not None and Similarity in pose
+            np.nan_to_num(pose[Similarity].values) if pose is not None and Similarity in pose
             else np.full((self.config.num_players,), 0.0)
         )
         motion_gates: np.ndarray = (
@@ -225,12 +213,8 @@ class Fluid3DLayer(LayerBase):
                 vel_strength = m_s[cam_id]
                 den_strength = m_s[cam_id]
 
-            # Add velocity from each flow layer
+            # Add the flow as one velocity input (3D synthesizes w from it)
             self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength)
-
-            # Add Z-velocity from motion magnitude (3D engines only)
-            if isinstance(self._fluid_flow, (FluidFlow3D, FluidFlow3DArray)):
-                self._fluid_flow.add_velocity_z(flow_layer.magnitude, vel_strength * 0.1)
 
             # Add density to per-camera channel (R=cam0, G=cam1, B=cam2, A=cam3)
             channel: int = cam_id % 4
@@ -240,20 +224,38 @@ class Fluid3DLayer(LayerBase):
             # Add temperature from each flow layer
             self._fluid_flow.add_temperature(flow_layer.temperature, 1.0)
 
-        # Snapshot sim dims before update for resize detection
-        prev_sw, prev_sh = self._fluid_flow.sim_width, self._fluid_flow.sim_height
+        # Head-coupled parallax eye (3D engine only)
+        self._update_eye(pose)
 
         # Update 3D fluid simulation (handles its own reallocation internally)
         self._fluid_flow.update()
 
-        # Resize visualizer if sim dims changed
-        if self._fluid_flow.sim_width != prev_sw or self._fluid_flow.sim_height != prev_sh:
-            self._visualizer.allocate(self._fluid_flow.sim_width, self._fluid_flow.sim_height)
-
-        # Update visualization
-        self._visualizer.update(self._get_draw_texture())
-
         Style.pop_style()
+
+    def _update_eye(self, pose: Frame | None) -> None:
+        """Steer the parallax eye toward the tracked head.
+
+        Head column/row follow white_space's eye-centre convention: the eyes'
+        mean, the nose when they are missing, easing back to centre when both
+        are. Offsets are ±1 across the frame (vertical at half range).
+        """
+        if not isinstance(self._fluid_flow, FluidFlow3D):
+            return
+        target_x, target_y = 0.0, 0.0
+        if pose is not None and Points2D in pose:
+            pts = pose[Points2D].values
+            head = pts[[PointLandmark.left_eye, PointLandmark.right_eye]].mean(axis=0)
+            if np.isnan(head).any():
+                head = pts[PointLandmark.nose]
+            if not np.isnan(head).any():
+                target_x = (float(head[0]) - 0.5) * 2.0
+                target_y = float(head[1]) - 0.5
+        # ~0.4 s ease keeps keypoint jitter out of the eye (render thread only)
+        dt = 1.0 / max(1, self.config.fluid_flow.fps)
+        k = 1.0 - 0.01 ** (dt / 0.4)
+        self._eye_x += (target_x - self._eye_x) * k
+        self._eye_y += (target_y - self._eye_y) * k
+        self._fluid_flow.set_eye(self._eye_x, self._eye_y)
 
     # ========== Rendering ==========
 
@@ -263,23 +265,35 @@ class Fluid3DLayer(LayerBase):
         Style.set_blend_mode(self.config.blend_mode)
         if self.texture.allocated:
             Blit.use(self.texture)
+        if self.config.fluid_flow.depth.debug_depth and self._legend_text.allocated:
+            self._draw_depth_legend()
         Style.pop_style()
 
-    # ========== Texture Selection ==========
+    def _draw_depth_legend(self) -> None:
+        """Hue legend for the debug depth view: violet = front ... red = back."""
+        vp = glGetIntegerv(GL_VIEWPORT)
+        w, h = int(vp[2]), int(vp[3])
+        if w <= 0 or h <= 0:
+            return
+        Style.set_blend_mode(Style.BlendMode.ALPHA)
 
-    def _get_draw_texture(self) -> Texture:
-        """Get texture to draw based on draw_mode."""
-        textures = {
-            Fluid3DDrawMode.DENSITY: self._fluid_flow.density,
-            Fluid3DDrawMode.DENSITY_RAW: self._fluid_flow.density,
-        }
-        return textures.get(self.config.draw_mode, self._fluid_flow.density)
-
-    def _colorize_density(self) -> None:
-        """Removed: colour is now baked into the density volume during injection.
-
-        The RGBA16F colour volume at sim resolution is composited with the R16F
-        density volume by Composite3D, producing an already-coloured 2D output.
-        No post-processing colorisation step is required.
-        """
-        pass  # No-op — kept for API compatibility
+        n = 12
+        swatch_w = 16
+        x = 16
+        y = h - 46
+        self._legend_text.draw_box_text(x, y, "FRONT", (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 0.0, 0.6), w, h)
+        bar_x = x + 76
+        for i in range(n):
+            hue = 0.8 * (1.0 - i / (n - 1))  # violet (front) -> red (back), matching the shader
+            h6 = hue * 6.0
+            xx = 1.0 - abs(h6 % 2.0 - 1.0)
+            if   h6 < 1.0: rgb = (1.0, xx, 0.0)
+            elif h6 < 2.0: rgb = (xx, 1.0, 0.0)
+            elif h6 < 3.0: rgb = (0.0, 1.0, xx)
+            elif h6 < 4.0: rgb = (0.0, xx, 1.0)
+            elif h6 < 5.0: rgb = (xx, 0.0, 1.0)
+            else:          rgb = (1.0, 0.0, xx)
+            self._legend_text.draw_box_text(bar_x + i * swatch_w, y, " ",
+                                            (0.0, 0.0, 0.0, 0.0), (*rgb, 1.0), w, h)
+        self._legend_text.draw_box_text(bar_x + n * swatch_w + 8, y, "BACK",
+                                        (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 0.0, 0.6), w, h)

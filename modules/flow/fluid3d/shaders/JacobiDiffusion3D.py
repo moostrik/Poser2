@@ -27,7 +27,7 @@ class JacobiDiffusion3D(ComputeShader):
 
     def use(self, velocity_in: Texture3D, velocity_out: Texture3D,
             obstacle: Texture3D,
-            grid_scale: float, aspect: float, depth_scale: float,
+            grid_scale: float, aspect: float, z_spacing: float,
             viscosity_dt: float,
             iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH,
             has_obstacles: bool = True) -> None:
@@ -39,7 +39,7 @@ class JacobiDiffusion3D(ComputeShader):
             obstacle: 3D obstacle mask (R8)
             grid_scale: Grid scaling factor
             aspect: Width/height ratio
-            depth_scale: Z grid spacing relative to XY
+            z_spacing: Sim-grid Z cell size in sim texels (dz/dx)
             viscosity_dt: Viscosity * delta_time
             iterations: Iterations per dispatch
             has_obstacles: Whether obstacle logic is active
@@ -49,7 +49,7 @@ class JacobiDiffusion3D(ComputeShader):
 
         dx = grid_scale
         dy = grid_scale * aspect
-        dz = grid_scale * depth_scale
+        dz = grid_scale * z_spacing
 
         alpha_x = 1.0 / (dx * dx)
         alpha_y = 1.0 / (dy * dy)
@@ -76,7 +76,7 @@ class JacobiDiffusion3D(ComputeShader):
 
     def solve(self, velocity_a: Texture3D, velocity_b: Texture3D,
               obstacle: Texture3D,
-              grid_scale: float, aspect: float, depth_scale: float,
+              grid_scale: float, aspect: float, z_spacing: float,
               viscosity_dt: float,
               total_iterations: int = 20,
               iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH,
@@ -95,7 +95,7 @@ class JacobiDiffusion3D(ComputeShader):
             iters = min(iterations_per_dispatch,
                         total_iterations - i * iterations_per_dispatch)
             self.use(src, dst, obstacle,
-                     grid_scale, aspect, depth_scale, viscosity_dt, iters,
+                     grid_scale, aspect, z_spacing, viscosity_dt, iters,
                      has_obstacles)
             src, dst = dst, src
 

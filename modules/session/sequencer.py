@@ -74,7 +74,7 @@ class Sequencer:
         if not config.durations:
             raise ValueError("config.durations must contain at least one entry")
 
-        self._state_callbacks: set[Callable[[SequencerState], None]] = set()
+        self._state_callbacks: list[Callable[[SequencerState], None]] = []      # run in registration order
 
         self._active = False
         self._pos: int = 0
@@ -180,7 +180,8 @@ class Sequencer:
     # -- Callbacks -----------------------------------------------------------
 
     def add_state_callback(self, callback: Callable[[SequencerState], None]) -> None:
-        self._state_callbacks.add(callback)
+        if callback not in self._state_callbacks:
+            self._state_callbacks.append(callback)
         callback(SequencerState(
             stage=self.config.stage,
             stage_progress=self.config.stage_progress,
@@ -190,7 +191,8 @@ class Sequencer:
         ))
 
     def remove_state_callback(self, callback: Callable[[SequencerState], None]) -> None:
-        self._state_callbacks.discard(callback)
+        if callback in self._state_callbacks:
+            self._state_callbacks.remove(callback)
 
     def _notify_state(self, elapsed: float) -> None:
         state = SequencerState(

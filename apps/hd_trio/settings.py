@@ -13,11 +13,11 @@ from enum import IntEnum, auto
 from typing import Any
 
 from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
-from modules.oak import CameraSettings, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.oak import CameraSettings, CameraCheckSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, ArtNetBarsSettings, OscReceiverSettings
 from modules.utils import Color
-from modules.tracker import OnePerCamTrackerSettings
+from modules.tracker import OnePerCamTrackerSettings, PosesFromTrackletsSettings
 from modules.pose import nodes, trackers, window, analytics
 from modules import inference
 from modules.pose.recorder import RecorderSettings as PoseRecorderSettings
@@ -97,6 +97,7 @@ class Layers(IntEnum):
     # composite layers
     tracker =       auto()
     poser =         auto()
+    cam_readings =  auto()   # each camera's frame rate, tilt and roll error, over its own view
     # centre layers
     centre_geom=    auto()
     centre_cam =    auto()
@@ -138,15 +139,17 @@ class OakGroup(BaseSettings):
     color             : Field[bool]            = Field(True, access=Field.INIT, description="Color camera (False = mono)")
     square            : Field[bool]            = Field(True, access=Field.INIT, description="Use square aspect ratio")
     stereo            : Field[bool]            = Field(False, access=Field.INIT, description="Enable stereo mode")
-    hd_ready          : Field[bool]            = Field(False, access=Field.INIT, description="Use HD resolution")
+    resolution        : Field[CameraResolution] = Field(CameraResolution.P1080, access=Field.INIT, description="Sensor mode. P720 and P800 on both sensors, P1080 colour only.")
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
+    fov               : Field[float]           = Field(95.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-1 W, IMX378 colour, 16:9 modes. Quoted for the full frame width; the square crop keeps the same degrees per pixel.")
 
-    _cam_share: list = [fps, color, square, stereo, yolo, hd_ready, model_path]
+    _cam_share: list = [fps, color, square, stereo, yolo, resolution, model_path, fov]
 
     cam_0        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_1        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
     cam_2        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
+    camera_check : Group[CameraCheckSettings]       = Group(CameraCheckSettings)
     simulator    : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cameras, fps])
     tracker      : Group[OnePerCamTrackerSettings]  = Group(OnePerCamTrackerSettings)
     frame_sync   : Group[SyncSettings]              = Group(SyncSettings, share=[num_cameras, fps])
@@ -231,7 +234,7 @@ class SimilarityFeature(BaseSettings):
     leader_applicator    : Group[nodes.LeaderScoreApplicatorSettings] = Group(nodes.LeaderScoreApplicatorSettings, share=[max_poses])
     smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, share=[frequency])
     interpolator         : Group[nodes.ChaseInterpolatorSettings]     = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
-    sticky               : Group[nodes.StickyFillerSettings]          = Group(nodes.StickyFillerSettings)
+    sticky               : Group[analytics.SimilarityStickyFillerSettings] = Group(analytics.SimilarityStickyFillerSettings)
     motion_gate          : Group[nodes.MotionGateApplicatorSettings]  = Group(nodes.MotionGateApplicatorSettings, share=[max_poses])
 
 
@@ -253,6 +256,7 @@ class PoseGroup(BaseSettings):
     pose            : Group[inference.pose.Settings]          = Group(inference.pose.Settings, share=_batch_share)
     segmentation    : Group[inference.segmentation.Settings]  = Group(inference.segmentation.Settings, share=_batch_share)
     optical_flow    : Group[inference.optical_flow.Settings]  = Group(inference.optical_flow.Settings, share=_batch_share)
+    tracklets       : Group[PosesFromTrackletsSettings]       = Group(PosesFromTrackletsSettings)
     image_crop      : Group[inference.crop.Settings]          = Group(inference.crop.Settings, share=[max_poses])
     angle_extractor : Group[nodes.AngleExtractorSettings]     = Group(nodes.AngleExtractorSettings)
     bbox            : Group[BboxFeature]                      = Group(BboxFeature, share=_feature_share)

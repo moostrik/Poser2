@@ -9,7 +9,12 @@ logger = logging.getLogger(__name__)
 
 class PosePointLines(Shader):
     def use(self, points: Points2D, line_width: float = 0.01, line_smooth: float = 0.01,
-            color: tuple[float, float, float, float] | None = None, use_scores: bool = True) -> None:
+            color: tuple[float, float, float, float] | None = None, use_scores: bool = True,
+            rect: tuple[float, float, float, float] = (0.0, 0.0, 1.0, 1.0), aspect_ratio: float = 1.0) -> None:
+        """Draw the skeleton into ``rect`` (normalised, origin bottom-left as GL's; the whole
+        target by default, exactly as without a rect), ``aspect_ratio`` the rect's width over
+        height in pixels so line widths are round; ``line_width`` and ``line_smooth`` are
+        fractions of the rect's height."""
         if not self.allocated or not self.shader_program:
             logger.warning("PosePointLines shader not allocated or shader program missing.")
             return
@@ -29,6 +34,8 @@ class PosePointLines(Shader):
         glUseProgram(self.shader_program)
 
         # Configure shader uniforms
+        glUniform4f(self.get_uniform_loc("rect"), *rect)
+        glUniform1f(self.get_uniform_loc("aspect_ratio"), aspect_ratio)
         glUniform1f(self.get_uniform_loc("line_width"), line_width)
         glUniform1f(self.get_uniform_loc("line_smooth"), line_smooth)
         if color is not None:

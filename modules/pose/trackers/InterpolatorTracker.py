@@ -30,24 +30,27 @@ class InterpolatorTracker(TrackerBase):
             if id not in poses:
                 self.reset_at(id)
 
-        try:
-            for id, pose in poses.items():
+        for id, pose in poses.items():
+            try:
                 self._pipelines[id].set(pose)
-        except Exception as e:
-            logger.error(f"Error setting pose {id}: {e}")
+            except Exception as e:
+                logger.error(f"Error setting pose {id}: {e}")
+                # Some nodes may hold the new target and others not; don't emit a half-updated frame
+                self.reset_at(id)
 
     def update(self) -> FrameDict:
         """Get interpolated poses from all pipelines."""
 
         interpolated_poses: FrameDict = {}
 
-        try:
-            for id, pipeline in self._pipelines.items():
+        for id, pipeline in self._pipelines.items():
+            try:
                 pose = pipeline.update()
-                if pose is not None:
-                    interpolated_poses[id] = pose
-        except Exception as e:
-            logger.error(f"Error updating pose {id}: {e}")
+            except Exception as e:
+                logger.error(f"Error updating pose {id}: {e}")
+                continue
+            if pose is not None:
+                interpolated_poses[id] = pose
 
         self._notify_frames_callbacks(interpolated_poses)
 

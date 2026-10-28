@@ -5,6 +5,7 @@ from typing import cast
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId, WindowSettings
+from modules.oak import CameraSettings, CameraCheckSettings
 from modules.render.layers import LayerBase
 from modules.render import layers as ls, make_subdivision, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
@@ -33,6 +34,7 @@ UPDATE_LAYERS: list[Layers] = [
 INTERFACE_LAYERS: list[Layers] = [
     Layers.poser,
     Layers.tracker,
+    Layers.cam_readings,
 ]
 
 LARGE_LAYERS: list[Layers] = [
@@ -43,7 +45,9 @@ LARGE_LAYERS: list[Layers] = [
 
 
 class DeepFlowRender(RenderBase):
-    def __init__(self, board: RenderBoard, settings: RenderSettings, num_cams: int = 1, num_players: int = 1) -> None:
+    def __init__(self, board: RenderBoard, settings: RenderSettings,
+                 cameras: list[CameraSettings], camera_check: CameraCheckSettings,
+                 num_cams: int = 1, num_players: int = 1) -> None:
         super().__init__(settings.window)
         self.num_players: int = num_players
         self.num_cams: int = num_cams
@@ -74,6 +78,7 @@ class DeepFlowRender(RenderBase):
 
             cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.board,   cam_image.texture,          settings.preview.tracker,   settings.colors)
             track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.board,   cam_image.texture,          settings.preview.poser,     settings.colors)
+            self.L[Layers.cam_readings][i] =                 ls.CameraReadingsLayer( cameras[i], camera_check)
 
             centre_gmtry =  self.L[Layers.centre_geom][i] = ls.CentreGeometry(      i, self.board,                               settings.centre.geometry)
             centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(     i, centre_gmtry,    cam_mask.texture,           settings.centre.mask)
