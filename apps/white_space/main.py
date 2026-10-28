@@ -201,7 +201,7 @@ class WhiteSpaceMain:
                 nodes.AngleVelExtractor(ps.velocity.extractor),
             ])
             for i in range(max_players)
-        })
+        }, name="Pose clean")
         self.stages[Stage.RAW].add_callback(self.filters_clean.process)
         self.filters_clean.add_frames_callback(self.stages[Stage.CLEAN])
 
@@ -232,7 +232,7 @@ class WhiteSpaceMain:
                 nodes.SimilarityEuroSmoother(ps.similarity.smoother),
             ])
             for i in range(max_players)
-        })
+        }, name="Pose smooth")
         self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
         self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
 
@@ -262,7 +262,7 @@ class WhiteSpaceMain:
                 nodes.AngleStickyFiller(ps.angle.sticky),
             ])
             for i in range(max_players)
-        })
+        }, name="Pose predict")
         self.stages[Stage.SMOOTH].add_callback(self.filters_predict.process)
         self.filters_predict.add_frames_callback(self.stages[Stage.PREDICT])
 
@@ -279,7 +279,7 @@ class WhiteSpaceMain:
                 nodes.DistanceChaseInterpolator(ps.distance.interpolator),
             ])
             for i in range(max_players)
-        })
+        }, name="Pose interpolate")
         self.filters_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 # First, before the extractors: every angle-derived measure (arm travel, leg
@@ -300,11 +300,11 @@ class WhiteSpaceMain:
                 PlayheadOffsetExtractor(self.board.get_playhead),
             ])
             for i in range(max_players + 1)                                       # the players and the dummy
-        })
+        }, name="Pose lerp")
         self.gate_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([self.motion_gate_applicator])
             for i in range(max_players + 1)
-        })
+        }, name="Pose gate")
         self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.set)
         # The dummy joins the interpolated poses before the LERP filters, which stamp on it
         # everything a person has (the playhead offset, the symmetries, the leg deviation, the bend).

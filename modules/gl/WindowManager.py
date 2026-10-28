@@ -5,7 +5,7 @@ import logging
 from enum import IntEnum
 from queue import SimpleQueue
 from threading import Thread, Lock, current_thread
-from time import sleep, time_ns
+from time import perf_counter, sleep, time_ns
 from typing import Callable, Optional, TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from .RenderBase import RenderBase
 from .Utils import FpsCounter
 from modules.settings import Field, BaseSettings, Widget
+from modules.utils import PerformanceTimer
 
 
 class MonitorId(IntEnum):
@@ -90,6 +91,11 @@ class WindowManager():
         self._current_vsync: bool | None = None
         logger.info("Initialized with width=%s, height=%s, fullscreen_mode=%s, v_sync=%s, fps=%s", settings.width, settings.height, settings.fullscreen_mode, settings.v_sync, settings.avg_fps)
         self._fps = FpsCounter()
+        # CPU time of the renderer's calls; the GPU work they queue is not waited for
+        self._update_timer = PerformanceTimer(name="Render update", sample_count=200)
+        self._draw_timer = PerformanceTimer(name="Render draw", sample_count=200)
+        self._interval_timer = PerformanceTimer(name="Render interval", sample_count=200)
+        self._last_update: float = 0.0
         self._mouse_px: float = 0.0
         self._mouse_py: float = 0.0
 
@@ -339,10 +345,15 @@ class WindowManager():
         """Update renderer state. Called once per frame."""
         self._fps.tick()
         self._push_fps(self._fps.get_fps())
+        start = perf_counter()
+        if self._last_update:
+            self._interval_timer.add_time((start - self._last_update) * 1000.0, report=False)
+        self._last_update = start
         try:
             self.renderer.update()
         except Exception:
             logger.exception("Error in update")
+        self._update_timer.add_time((perf_counter() - start) * 1000.0, report=False)
 
     def _push_fps(self, fps: int) -> None:
         self.settings.avg_fps = fps
@@ -427,10 +438,12 @@ class WindowManager():
         self._bind_quad_vao(self._main_window)
 
         glViewport(0, 0, self._actual_width, self._actual_height)  # Set viewport here
+        start = perf_counter()
         try:
             self.renderer.draw_main(self._actual_width, self._actual_height)
         except Exception:
             logger.exception("Error in draw")
+        self._draw_timer.add_time((perf_counter() - start) * 1000.0, report=False)
 
         glfw.swap_buffers(self._main_window)
 

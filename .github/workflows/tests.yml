@@ -30,7 +30,7 @@ jobs:
         shell: bash
         run: |
           status=0
-          for dir in modules/settings modules/pose modules/tracker modules/oak modules/render apps/white_space; do
+          for dir in modules/settings modules/utils modules/pose modules/tracker modules/oak modules/render apps/white_space; do
             echo "::group::$dir"
             python -m unittest discover -s "$dir/tests" -t . || status=1
             echo "::endgroup::"

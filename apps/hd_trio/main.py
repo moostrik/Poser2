@@ -113,7 +113,7 @@ class HDTrioMain:
                 nodes.BBoxPredictor(ps.bbox.prediction),
             ])
             for i in range(num_players)
-        })
+        }, name="Pose bbox")
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         self.tracklet_sync_bang.add_sync_callback(self.tracker.notify_update)
@@ -154,7 +154,7 @@ class HDTrioMain:
                 nodes.AngleVelExtractor(ps.velocity.extractor),
             ])
             for i in range(num_players)
-        })
+        }, name="Pose clean")
         self.stages[Stage.RAW].add_callback(self.filters_clean.process)
         self.filters_clean.add_frames_callback(self.stages[Stage.CLEAN])
 
@@ -180,7 +180,7 @@ class HDTrioMain:
                 nodes.SimilarityEuroSmoother(ps.similarity.smoother),
             ])
             for i in range(num_players)
-        })
+        }, name="Pose smooth")
         self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
         self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
 
@@ -207,7 +207,7 @@ class HDTrioMain:
                 nodes.AngleStickyFiller(ps.angle.sticky),
             ])
             for i in range(num_players)
-        })
+        }, name="Pose predict")
         self.stages[Stage.SMOOTH].add_callback(self.filters_predict.process)
         self.filters_predict.add_frames_callback(self.stages[Stage.PREDICT])
 
@@ -223,7 +223,7 @@ class HDTrioMain:
                 nodes.SimilarityChaseInterpolator(ps.similarity.interpolator),
             ])
             for i in range(num_players)
-        })
+        }, name="Pose interpolate")
         self.filters_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 nodes.AngleSymExtractor(),
@@ -235,11 +235,11 @@ class HDTrioMain:
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
             ])
             for i in range(num_players)
-        })
+        }, name="Pose lerp")
         self.gate_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([self.motion_gate_applicator])
             for i in range(num_players)
-        })
+        }, name="Pose gate")
         self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.set)
         self.interpolators_lerp.add_frames_callback(self.filters_lerp.process)
         self.filters_lerp.add_frames_callback(self.motion_gate_applicator.set)

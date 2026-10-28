@@ -1,13 +1,23 @@
 import threading
+import weakref
 import numpy as np
-from typing import Optional
+from typing import ClassVar, Optional
 
 import logging
 logger = logging.getLogger(__name__)
 
 
 class PerformanceTimer:
-    """Track and report performance timing statistics over a rolling window."""
+    """Track and report performance timing statistics over a rolling window.
+
+    Every timer also takes part in the timing session: between `start_session()` and
+    `stop_session()` each sample is kept, and `stop_session()` returns the statistics of the
+    whole session per timer name (timers that share a name are pooled).
+    """
+
+    _registry: ClassVar[weakref.WeakSet['PerformanceTimer']] = weakref.WeakSet()
+    _registry_lock: ClassVar[threading.Lock] = threading.Lock()
+    _session_active: ClassVar[bool] = False
 
     # ANSI color codes
     COLORS = {
@@ -48,8 +58,10 @@ class PerformanceTimer:
         self.mutex = threading.Lock()
         self.count: int = 0
         self.omit_count: int = 0
+        self._session_times: list[float] = []
 
-
+        with PerformanceTimer._registry_lock:
+            PerformanceTimer._registry.add(self)
 
         # Set color codes
         if color and color.lower() in self.COLORS:
@@ -62,6 +74,8 @@ class PerformanceTimer:
     def add_time(self, time_ms: float, report: bool = True) -> None:
         """Add timing sample and optionally print report, omitting the first omit_init samples from recording."""
         with self.mutex:
+            if PerformanceTimer._session_active:
+                self._session_times.append(time_ms)
             if self.omit_count < self.omit_init:
                 self.omit_count += 1
                 return
@@ -114,3 +128,39 @@ class PerformanceTimer:
             self.times.fill(0)
             self.current_index = 0
             self.count = 0
+
+    @classmethod
+    def start_session(cls) -> None:
+        """Start keeping every sample of every timer, dropping those of an earlier session."""
+        with cls._registry_lock:
+            timers = list(cls._registry)
+        for timer in timers:
+            with timer.mutex:
+                timer._session_times = []
+        cls._session_active = True
+
+    @classmethod
+    def stop_session(cls) -> dict[str, dict[str, float]]:
+        """End the session; return count, mean, p50, p95, p99 and max (ms) per timer name."""
+        cls._session_active = False
+        with cls._registry_lock:
+            timers = list(cls._registry)
+        pooled: dict[str, list[float]] = {}
+        for timer in timers:
+            with timer.mutex:
+                samples, timer._session_times = timer._session_times, []
+            if samples:
+                pooled.setdefault(timer.name.strip(), []).extend(samples)
+        stats: dict[str, dict[str, float]] = {}
+        for name in sorted(pooled):
+            times = np.asarray(pooled[name], dtype=float)
+            p50, p95, p99 = np.percentile(times, [50, 95, 99])
+            stats[name] = {
+                'count': int(times.size),
+                'mean': float(times.mean()),
+                'p50': float(p50),
+                'p95': float(p95),
+                'p99': float(p99),
+                'max': float(times.max()),
+            }
+        return stats
