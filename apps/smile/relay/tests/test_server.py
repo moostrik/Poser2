@@ -9,7 +9,7 @@ import unittest
 from aiohttp import ClientWebSocketResponse, web
 from aiohttp.test_utils import TestClient, TestServer
 
-from relay.server import FRAME, SHOW, Relay, make_app
+from relay.server import FRAME, LAST, SHOW, Relay, make_app
 
 TOKEN: str = 'test-token'
 
@@ -106,6 +106,10 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await self.receive(phone, 'stage'))['stage'], 'grin')      # not held behind the frames
         await phone.send_json({'type': 'seen'})
         self.assertEqual(await self.receive_bytes(phone), bytes([SHOW]) + b'img3')
+        # the turn's last frame goes the same way
+        await smile.send_bytes(bytes([LAST]) + b'end')
+        await phone.send_json({'type': 'seen'})
+        self.assertEqual(await self.receive_bytes(phone), bytes([LAST]) + b'end')
         # the turn ends with the sequence; the files and the result follow, addressed to the phone
         await smile.send_json({'type': 'turn_end', 'reason': 'done'})
         self.assertEqual((await self.receive(phone, 'turn_end'))['reason'], 'done')

@@ -6,7 +6,7 @@ upload never holds the frames.
 
 Nothing here ends the thread: a relay that is down, refuses the token or sends rubbish is a warning
 (not at every try) and the next try. Messages are JSON text; images are binary with one leading byte
-(relay.server: FRAME 0 from the phone, SHOW 1 to the phone)."""
+(relay.server: FRAME 0 from the phone, SHOW 1 to the phone, LAST 2 the turn's last frame)."""
 
 import json
 import logging
@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 FRAME: int = 0
 SHOW: int = 1
+LAST: int = 2                       # the turn's last screen frame: the phone fades to it and keeps it
 RECONNECT_INTERVAL: float = 3.0
 RECEIVE_TIMEOUT: float = 0.05       # s; between receives the queued messages go out
 WARN_INTERVAL: float = 60.0         # s between the log lines of a connection that keeps failing
@@ -70,7 +71,7 @@ class Link(Thread):
         self._on_frame: FrameCallback = on_frame
         self._out: queue.Queue[str | bytes] = queue.Queue(maxsize=256)
         self._uploads: queue.Queue[tuple[list[tuple[str, str, str]], DoneCallback]] = queue.Queue()
-        self._frame: np.ndarray | None = None       # the newest screen frame (RGBA) not sent yet
+        self._frame: tuple[np.ndarray, bool] | None = None      # the newest screen frame (RGBA, last) not sent yet
         self._frame_mutex: Lock = Lock()
         self._stop: Event = Event()
         self._ws: websocket.WebSocket | None = None
@@ -101,10 +102,11 @@ class Link(Thread):
         """An image for the phone's window (SHOW), encoded already."""
         self._queue(bytes([SHOW]) + jpeg)
 
-    def send_frame(self, frame: np.ndarray) -> None:
-        """A screen frame (RGBA, the render's grab) for the phone's window: replaces one not sent yet."""
+    def send_frame(self, frame: np.ndarray, last: bool = False) -> None:
+        """A screen frame (RGBA, the render's grab) for the phone's window: replaces one not sent yet;
+        `last` is the turn's last, the one the phone keeps."""
         with self._frame_mutex:
-            self._frame = frame
+            self._frame = (frame, last)
 
     def _queue(self, item: str | bytes) -> None:
         try:
@@ -165,11 +167,12 @@ class Link(Thread):
             else:
                 ws.send(item)
         with self._frame_mutex:
-            frame, self._frame = self._frame, None
-        if frame is not None:
+            item, self._frame = self._frame, None
+        if item is not None:
+            frame, last = item
             jpeg: bytes | None = encode(cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR))
             if jpeg is not None:
-                ws.send_binary(bytes([SHOW]) + jpeg)
+                ws.send_binary(bytes([LAST if last else SHOW]) + jpeg)
 
     @staticmethod
     def _track_aac(path: str) -> bytes:

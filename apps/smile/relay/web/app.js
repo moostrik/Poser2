@@ -21,6 +21,8 @@
 
 const FRAME = 0;        // a binary message: our camera frame to SMILE
 const SHOW = 1;         // a binary message: a frame of the main screen from SMILE
+const LAST = 2;         // the turn's last frame, without the caption: the window fades to it and keeps it
+const CAPTION_FADE = 0.5;   // s, the caption's fade on the main screen (CreditLayer.FADE_S)
 const W = 640, H = 800; // the frame we send and draw, 4:5 like the installation's image
 const FPS = 15;         // frames a second to SMILE during the turn
 const QUALITY = 0.6;    // JPEG
@@ -51,8 +53,17 @@ let track = { id: '', buffer: null, source: null, playing: false, error: '' };  
 let pendingTrack = null;    // a track named before the sound was unlocked: fetched at the unlock
 let lastStage = '';
 const timing = {};          // moments of the turn's end (ms since the page loaded): what took how long, for the relay's log
+// the video's download as it comes in: bytes so far, the total, when it started, the first byte, and the bytes
+// at every second (KB), for the readout and the timing line: a wait before the first byte, a trickle, bursts
+// with pauses, or the whole file early and the page late are four different problems
+let download = { bytes: 0, total: 0, started: 0, first: 0, trace: [] };
 let flashAt = 0;            // performance.now() of the flash: the track starts there
 let streaming = false;      // the window shows the main screen: from full white on, the flash-in is the phone's own image going white
+let ended = false;          // the last frame came: the picture stands, frames after it are not drawn
+const before = document.createElement('canvas');    // the frame shown when the last one comes, for the fade between them
+before.width = W;
+before.height = H;
+const beforeCtx = before.getContext('2d');
 let laughs = [];            // the laughter samples' urls, from the relay's library
 const laughBuffers = new Map();
 let laughMuted = false;     // from the flash until the track has stopped: the laughter is for the waiting, not over the music
@@ -143,6 +154,7 @@ function onMessage(message) {
       result = null;
       for (const key of Object.keys(timing)) delete timing[key];
       document.body.classList.remove('video');
+      ended = false;
       stopTrack(0.5);           // the decoded track stays: it is most likely this turn's
       tapeReset();
       setState('you');
@@ -190,16 +202,18 @@ function onStage(message) {
   if (state !== 'transform') return;
   const p = message.progress || 0;
   lastStage = `${message.stage} ${p.toFixed(2)}`;
+  // `value` is the room's eased progress, the white as the room draws it (an older SMILE sends the progress only)
+  const value = 'value' in message ? message.value : p;
   if (message.stage === 'flash_in') {
-    const white = p * p;                                // the room's flash-in eases in (quad)
-    setFlash(white, 0.25);
-    setLight(Math.max(white, lightNow()), 0.25);
+    setFlash(value, 0.25);
+    setLight(Math.max(value, lightNow()), 0.25);
     if (p >= 1) setTimeout(startStreaming, 250);   // under full white the window becomes the main screen
   } else if (message.stage === 'flash_out') {
+    // the window is the main screen now and the room's flash out is in its frames (the capture appearing from
+    // the white by its depth): nothing of the page's own white over it; the light behind the grid goes down with it
     startStreaming();
-    const white = 1 - Math.sin(p * Math.PI / 2);        // and eases out (sine)
-    setFlash(white, 0.25);
-    setLight(white, 0.25);
+    setFlash(0, 0.25);
+    setLight(1 - value, 0.25);
   } else {
     setFlash(0, 0.25);
     setLight(0, 0.25);
@@ -218,19 +232,40 @@ function lightNow() {
 
 function onImage(data) {
   const bytes = new Uint8Array(data);
-  if (bytes[0] !== SHOW) return;
+  if (bytes[0] !== SHOW && bytes[0] !== LAST) return;
   // every frame is answered, drawn or not: the relay sends the next one only then, so a slow phone gets
   // fewer frames instead of frames (and everything behind them) seconds late
   if (ws && ws.readyState === WebSocket.OPEN) ws.send('{"type":"seen"}');
-  if (state !== 'transform' || !streaming) return;
+  if (state !== 'transform' || !streaming || ended) return;
+  const last = bytes[0] === LAST;
   const blob = new Blob([bytes.subarray(1)], { type: 'image/jpeg' });
   const url = URL.createObjectURL(blob);
   const img = new Image();
   img.onload = () => {
-    viewCtx.drawImage(img, 0, 0, W, H);
+    if (last) fadeToLast(img);
+    else viewCtx.drawImage(img, 0, 0, W, H);
     URL.revokeObjectURL(url);
   };
   img.src = url;
+}
+
+function fadeToLast(img) {
+  // the turn's last frame is the result without the caption: the frame shown now fades into it over the
+  // caption's fade time, and it stands until the video (the room's bloom and fade are not shown)
+  ended = true;
+  beforeCtx.drawImage(view, 0, 0);
+  const started = performance.now();
+  const step = () => {
+    const t = Math.min(1, (performance.now() - started) / (CAPTION_FADE * 1000));
+    viewCtx.drawImage(img, 0, 0, W, H);
+    if (t < 1) {
+      viewCtx.globalAlpha = 1 - t;
+      viewCtx.drawImage(before, 0, 0);
+      viewCtx.globalAlpha = 1;
+      requestAnimationFrame(step);
+    }
+  };
+  step();
 }
 
 function onTurnEnd(reason) {
@@ -285,7 +320,8 @@ function reportTiming() {
   if (!ws || ws.readyState !== WebSocket.OPEN || !timing.done) return;
   const since = (t) => (t ? Math.round((t - timing.done) / 100) / 10 : null);
   ws.send(JSON.stringify({ type: 'timing', result: since(timing.result), play: since(timing.play), playing: since(timing.playing),
-                           file: since(timing.file), agent: navigator.userAgent.slice(0, 60) }));
+                           file: since(timing.file), first: since(download.first), kb: Math.round(download.total / 1024),
+                           trace: download.trace, agent: navigator.userAgent.slice(0, 60) }));
 }
 
 function playVideo(url) {
@@ -511,8 +547,17 @@ if (location.search.includes('debug')) {
       `rate ${src ? src.playbackRate.value.toFixed(2) : '-'} target ${tape.target.toFixed(2)}  gain ${musicGain ? musicGain.gain.value.toFixed(2) : '-'}`,
       `filter ${musicFilter ? Math.round(musicFilter.frequency.value) : '-'} Hz q ${musicFilter ? musicFilter.Q.value.toFixed(1) : '-'}`,
       `video ${grinVideo.src ? (grinVideo.paused ? 'paused' : 'playing') : '-'} ${grinVideo.muted ? 'muted' : 'sound'}`,
+      downloadLine(),
     ].join('\n');
   }, 250);
+}
+
+function downloadLine() {
+  if (!download.started) return 'download -';
+  const now = performance.now();
+  const seconds = ((shareFile ? timing.file : now) - download.started) / 1000;
+  const first = download.first ? `first byte ${((download.first - download.started) / 1000).toFixed(1)} s` : 'no byte yet';
+  return `download ${Math.round(download.bytes / 1024)}/${Math.round(download.total / 1024)} KB  ${seconds.toFixed(1)} s  ${first}`;
 }
 
 // THE LAUGHTER: the room's samples (the relay's library), one every second or two at a random place while
@@ -552,8 +597,8 @@ async function laugh() {
   } catch (error) { /* a sample that does not play is skipped */ }
 }
 
-// JOINING
-$('join').onclick = () => { $('terms').hidden = false; };
+// JOINING: the page opens with the terms; the one tap on "I agree" is the consent, the sound's unlock and
+// the camera's start
 $('agree').onclick = async () => {
   $('terms').hidden = true;
   unlockAudio();
@@ -582,12 +627,41 @@ async function prefetchShare(message) {
   shareFile = null;
   const url = message.grin || message.portrait;
   if (!url) return;
+  download = { bytes: 0, total: 0, started: performance.now(), first: 0, trace: [] };
   try {
     const response = await fetch(url);
-    const blob = await response.blob();
-    if (result === message) { shareFile = new File([blob], url.split('/').pop(), { type: blob.type }); timing.file = performance.now(); reportTiming(); }
+    download.total = Number(response.headers.get('content-length')) || 0;
+    const blob = await readMeasured(response);
+    if (result === message) { shareFile = new File([blob], fileName(message, url), { type: blob.type }); timing.file = performance.now(); reportTiming(); }
   } catch (error) { /* the tap then fetches it */ }
   if (state === 'done' && result === message) setShare(message);
+}
+
+async function readMeasured(response) {
+  // the body read chunk by chunk, so the readout and the timing line see the download as it happens
+  if (!response.body || !response.body.getReader) return response.blob();
+  const reader = response.body.getReader();
+  const chunks = [];
+  const sampler = setInterval(() => { if (download.trace.length < 120) download.trace.push(Math.round(download.bytes / 1024)); }, 1000);
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (!download.first) download.first = performance.now();
+      download.bytes += value.byteLength;
+      chunks.push(value);
+    }
+  } finally { clearInterval(sampler); }
+  return new Blob(chunks, { type: response.headers.get('content-type') || 'video/mp4' });
+}
+
+function fileName(message, url) {
+  // the file the visitor keeps or shares is the artist's: smile_by_<the credit's name>, with the file's own
+  // extension, whatever the relay calls it
+  const name = String(message.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const ext = (String(url).match(/\.[a-z0-9]+$/i) || ['.mp4'])[0];
+  return (name ? `smile_by_${name}` : 'smile') + ext;
 }
 
 share.onclick = async () => {
@@ -604,7 +678,7 @@ share.onclick = async () => {
   } catch (error) { /* the share sheet was closed, or there is none: download instead */ }
   const a = document.createElement('a');
   a.href = result.grin || result.portrait;
-  a.download = '';
+  a.download = fileName(result, a.href);
   a.click();
 };
 

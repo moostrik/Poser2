@@ -9,8 +9,8 @@ visitors' files (`/files/<kind>s/<name>`, kept under `--data`). It keeps the lin
 passes messages; it decides nothing about a turn: SMILE starts and ends every turn.
 
 Messages are JSON text, images are binary with one leading byte: FRAME (0) a phone's camera frame to
-SMILE, SHOW (1) an image from SMILE for the phone's window. The phone with the turn is the only one
-whose frames are passed on, and only while SMILE is connected.
+SMILE, SHOW (1) an image from SMILE for the phone's window, LAST (2) the turn's last one, which the phone
+keeps. The phone with the turn is the only one whose frames are passed on, and only while SMILE is connected.
 
 Phone -> relay: join, leave; frames.
 Relay -> phone: state (see Line.state), grid (the newest stills), turn, face, stage, result, turn_end;
@@ -18,7 +18,7 @@ Relay -> SMILE: line {waiting}, turn {id}, gone;
     show images.
 phone -> relay: join, leave, seen (a screen frame drawn), timing (its turn's end, for the log);
 SMILE -> relay: eye {free, status, laughter}, turn_start, face, stage {flash, in, out} then stage {name, progress}
-    through the sequence, music {id, url, offset} (the visitor's track, which SMILE uploaded as kind `track` the
+    through the sequence (the flash stages with `value`, the room's eased progress), music {id, url, offset} (the visitor's track, which SMILE uploaded as kind `track` the
     first time; the laughter samples as kind `laugh` with `ext`; `GET /api/library` lists what the relay has),
     turn_end {reason}, and after the turn
     result {id, phone, name, caption, ok} (to that phone, whatever it does now; without `phone` to the turn's);
@@ -53,6 +53,7 @@ logger = logging.getLogger('relay')
 
 FRAME: int = 0      # a phone's camera frame, to SMILE
 SHOW: int = 1       # an image from SMILE, to the phone with the turn
+LAST: int = 2       # the turn's last image from SMILE: paced like the others, the phone keeps it
 
 KINDS: dict[str, str] = {'still': '.jpg', 'portrait': '.jpg', 'grin': '.mp4'}     # a visitor's files, and their folders (kind + 's')
 UPLOAD_KINDS: dict[str, str] = {**KINDS, 'track': '.m4a', 'laugh': ''}            # and the library: tracks/ (AAC, for every phone), laughs/ (their own extension)
@@ -151,8 +152,9 @@ class Relay:
         elif kind == 'timing':
             # the phone's own account of its turn's end: seconds from turn_end to the result, the play, the
             # first frame playing, the share file; what a visitor outside waits for, measured where they wait
-            logger.info('phone %s timing: result %s, play %s, playing %s, file %s (%s)', phone[:8], message.get('result'),
-                        message.get('play'), message.get('playing'), message.get('file'), message.get('agent', ''))
+            logger.info('phone %s timing: result %s, play %s, playing %s, file %s; first byte %s, %s KB, KB per second %s (%s)',
+                        phone[:8], message.get('result'), message.get('play'), message.get('playing'), message.get('file'),
+                        message.get('first'), message.get('kb'), message.get('trace'), message.get('agent', ''))
         elif kind == 'seen':
             # the phone drew the frame in flight: the newest one waiting may go; SMILE hears how long it took
             if phone == self.line.turn:
@@ -188,7 +190,7 @@ class Relay:
                     await self.smile_message(message.json())
                 elif message.type == WSMsgType.BINARY:
                     data: bytes = message.data
-                    if data and data[0] == SHOW:
+                    if data and data[0] in (SHOW, LAST):
                         self._frame_pending = data
                         await self._push_frame()
                 elif message.type == WSMsgType.ERROR:

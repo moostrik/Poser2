@@ -116,7 +116,8 @@ class SmileRender(RenderBase):
 
     def _render_credit(self, sequence_type: SequenceType, grab: bool) -> None:
         """The credit over the output; with `grab`, the phone's copy of the screen is taken here: the
-        caption yes, the QR code and the status line no."""
+        caption yes, the QR code and the status line no; the turn's last frame (`grab.clean`) without the
+        caption too, the phone fades it out itself and keeps that frame."""
         now: float = time.time()
         if new_line_due(sequence_type, self._credit_sequence):
             self._credit.new_visitor()
@@ -126,7 +127,7 @@ class SmileRender(RenderBase):
         self._credit_time = now
         if self.settings.credit:
             if grab:
-                self._credit.render(self._output, self._credit_alpha, qr_code=False)
+                self._credit.render(self._output, 0.0 if self.grab.clean else self._credit_alpha, qr_code=False)
                 self.grab.grab(self._credit.texture)
             self._credit.render(self._output, self._credit_alpha)
             self._output = self._credit.texture

@@ -53,6 +53,8 @@ STAGE_NAMES: dict[SequenceType, str] = {
     SequenceType.CONTROL_0: 'flash_out', SequenceType.CONTROL_1: 'flash_out', SequenceType.CONTROL_2: 'flash_out',
     SequenceType.DIFFUSION: 'diffusion', SequenceType.DIFF_LOOP: 'grin', SequenceType.TIMEOUT: 'timeout',
     SequenceType.RESET: 'timeout', SequenceType.BLOOM: 'bloom', SequenceType.FADE: 'fade'}
+# the stages whose message carries the room's eased value too: the white as the room draws it (FlashStage, RevealStage)
+FLASH_STAGES: frozenset[str] = frozenset({'flash_in', 'flash_out'})
 
 # the eye's status line as the phones see it (the installation's own language)
 LOOKING: str = 'looking for faces'
@@ -280,7 +282,7 @@ class Online:
                 self._flash_at = now
                 self._set_stream()
                 self._start_music(now, link)
-                self._send_stage(now, link, seq, message.progress)
+                self._send_stage(now, link, message)
                 if self._delivery is not None and not self._delivery.started:
                     logger.warning('online: the result of the previous turn was never delivered')
                 self._delivery = Delivery(self._phone)
@@ -291,10 +293,12 @@ class Online:
             if self.camera.online and seq >= SequenceType.ASK:
                 # the capture is taken: the room's camera is back underneath, unseen until the result fades
                 self.camera.set_online(False)
-            frame: np.ndarray | None = self.grab.take()
+            frame, last = self.grab.take()
             if frame is not None:
-                link.send_frame(frame)
-            self._send_stage(now, link, seq, message.progress)
+                link.send_frame(frame, last)
+                if last:
+                    self.grab.set(False)     # the picture stands on the phone from here; the bloom and the fade are the room's
+            self._send_stage(now, link, message)
             if self._delivery is not None and not self._delivery.captioned and seq >= SequenceType.ASK:
                 # the capture is taken: the visitor's line is drawn, the caption is theirs
                 self._delivery.name, self._delivery.line = self._caption()
@@ -303,8 +307,12 @@ class Online:
                 # the result stands: a few frames a second are enough, the phone is downloading its clip
                 self._timed_out = True
                 self._set_stream()
+            if seq == SequenceType.RESET and self._timed_out and self._seq != SequenceType.RESET:
+                # the result has stood its time: the phone's last frame, without the caption (the page fades the
+                # caption out itself and keeps the frame; the bloom would brighten it)
+                self.grab.last()
             if seq == SequenceType.FADE and self._seq != SequenceType.FADE:
-                # the fade shows the room's camera: the picture stops at the bloom, the sound winds down
+                # the fade shows the room's camera: a last frame that never came stops here
                 self.grab.set(False)
             if seq == SequenceType.RESET and not self._timed_out:
                 # the operator's reset (the sequencer passes RESET at the end of the timeout too: not this)
@@ -327,19 +335,23 @@ class Online:
             fps = min(fps, STILL_FPS)
         self.grab.set(True, int(s.stream_width), max(1.0, fps))
 
-    def _send_stage(self, now: float, link: Link, seq: SequenceType, progress: float) -> None:
+    def _send_stage(self, now: float, link: Link, message: SeqenceMessage) -> None:
         """The stage and its progress to the phone: at every change of stage, else a few times a second
-        while the progress moves (the phone's tape follows them as the Max patch follows the room's)."""
-        name: str | None = STAGE_NAMES.get(seq)
+        while the progress moves (the phone's tape follows them as the Max patch follows the room's). The
+        flash stages carry the room's eased value too, the white as the room draws it."""
+        name: str | None = STAGE_NAMES.get(message.sequence_type)
         if name is None:
             return
-        progress = round(float(progress), 3)
+        progress: float = round(float(message.progress), 3)
         if self._stage_sent is not None and self._stage_sent[0] == name:
             if self._stage_sent[1] == progress or now - self._stage_time < STAGE_INTERVAL:
                 return
         self._stage_sent = (name, progress)
         self._stage_time = now
-        link.send({'type': 'stage', 'stage': name, 'progress': progress})
+        stage: dict = {'type': 'stage', 'stage': name, 'progress': progress}
+        if name in FLASH_STAGES:
+            stage['value'] = round(float(message.value_1), 3)
+        link.send(stage)
 
     # THE MUSIC
     def _start_music(self, now: float, link: Link) -> None:

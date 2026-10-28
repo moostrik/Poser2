@@ -24,6 +24,7 @@ class FakeLink:
         self.stopped: bool = False
         self.sent: list[dict] = []
         self.frames: list = []
+        self.last_frame = None
         self.uploads: list = []
 
     def start(self) -> None:
@@ -35,8 +36,10 @@ class FakeLink:
     def send(self, message: dict) -> None:
         self.sent.append(message)
 
-    def send_frame(self, frame) -> None:
+    def send_frame(self, frame, last: bool = False) -> None:
         self.frames.append(frame)
+        if last:
+            self.last_frame = frame
 
     def upload(self, files, done) -> None:
         self.uploads.append((files, done))
@@ -55,13 +58,19 @@ class FakeGrab:
         self.width: int = 0
         self.fps: float = 0.0
         self.frame = None
+        self.last_wanted: bool = False     # the turn's last frame asked for (the render takes it without the caption)
+        self.is_last: bool = False         # the frame put in is that one
 
     def set(self, on: bool, width: int = 512, fps: float = 10.0) -> None:
         self.on, self.width, self.fps = on, width, fps
 
+    def last(self) -> None:
+        self.last_wanted = True
+
     def take(self):
         frame, self.frame = self.frame, None
-        return frame
+        last, self.is_last = self.is_last, False
+        return frame, last
 
 
 class FakeCamera:
@@ -120,9 +129,9 @@ class TestOnline(unittest.TestCase):
         self.picks += 1
 
     def step(self, seq: SequenceType = SequenceType.CAMERA_SHOW, dt: float = 0.1, progress: float = 0.0, initial: bool = False,
-             ready: bool = True, busy: bool = False) -> None:
+             ready: bool = True, busy: bool = False, value: float = 0.0) -> None:
         self.now += dt
-        self.online.update(self.now, SeqenceMessage(seq, progress, initial), ready, busy)
+        self.online.update(self.now, SeqenceMessage(seq, progress, initial, value), ready, busy)
 
     def go_idle(self) -> None:
         self.settings.active = True
@@ -263,7 +272,7 @@ class TestOnline(unittest.TestCase):
         self.step(seq=SequenceType.FLASH, initial=True)
         stages = lambda: [m for m in self.link.sent if m['type'] == 'stage']
         self.assertEqual(stages()[0], {'type': 'stage', 'stage': 'flash', 'in': 0.5, 'out': 1.25})
-        self.assertEqual(stages()[1], {'type': 'stage', 'stage': 'flash_in', 'progress': 0.0})
+        self.assertEqual(stages()[1], {'type': 'stage', 'stage': 'flash_in', 'progress': 0.0, 'value': 0.0})
         self.assertEqual(self.online.phase, Phase.TRANSFORMING)
         self.assertTrue(self.camera.online)
         self.assertEqual((self.grab.on, self.grab.width, self.grab.fps), (True, 320, 12.0))
@@ -276,6 +285,9 @@ class TestOnline(unittest.TestCase):
         self.assertEqual(len(self.link.frames), 1)      # nothing new, nothing sent
         self.assertFalse(self.camera.online)     # the capture is taken: the room's camera is back
         self.assertEqual(len(stages()), 2)       # the same stage at the same progress: not sent again
+        # the flash stages carry the room's eased value, the white as the room draws it
+        self.step(seq=SequenceType.CONTROL_0, progress=0.5, value=0.707)
+        self.assertEqual(self.link.last('stage'), {'type': 'stage', 'stage': 'flash_out', 'progress': 0.5, 'value': 0.707})
         # the stages with their progress, a few times a second, for the phone's tape
         self.step(seq=SequenceType.DIFFUSION, progress=0.5)
         self.assertEqual(self.link.last('stage'), {'type': 'stage', 'stage': 'diffusion', 'progress': 0.5})
@@ -289,13 +301,19 @@ class TestOnline(unittest.TestCase):
         self.assertEqual(self.online.phase, Phase.TRANSFORMING)
         self.assertEqual((self.grab.on, self.grab.fps), (True, 2.0))      # the result stands: the link is the clip's
         self.assertIsNone(self.link.last('turn_end'))
-        # the sequencer passes RESET at the end of the timeout, then the bloom and the fade: the turn
-        # goes on, the picture through the bloom, the sound through the fade
+        # the sequencer passes RESET at the end of the timeout, then the bloom and the fade: the turn goes
+        # on, the sound through both; the picture stops with a last frame, taken without the caption at the
+        # RESET (the page fades the caption out and keeps it: the bloom would brighten it)
+        self.assertFalse(self.grab.last_wanted)
         self.step(seq=SequenceType.RESET)
         self.assertEqual(self.online.phase, Phase.TRANSFORMING)
+        self.assertTrue(self.grab.last_wanted)
+        clean = np.zeros((400, 320, 4), np.uint8)
+        self.grab.frame, self.grab.is_last = clean, True
         self.step(seq=SequenceType.BLOOM, progress=0.5)
         self.assertEqual(self.link.last('stage'), {'type': 'stage', 'stage': 'bloom', 'progress': 0.5})
-        self.assertTrue(self.grab.on)
+        self.assertIs(self.link.last_frame, clean)
+        self.assertFalse(self.grab.on)
         self.step(seq=SequenceType.FADE, progress=0.2)
         self.assertEqual(self.link.last('stage')['stage'], 'fade')
         self.assertFalse(self.grab.on)

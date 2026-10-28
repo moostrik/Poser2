@@ -285,8 +285,9 @@ tracks in `data/tracks` as AAC, `Link._track_aac` transcodes one the first time 
 and track at the turn's start (`Main.pick_style` from `Online._begin_turn`) and names the track to the phone, which fetches it
 during the judging; `Online._send_stage`
 sends the sequence's stage and progress (`STAGE_NAMES`, every 0.25 s) and the page follows the Max patch's curves (speed
-and low-pass filter, `tapeStage` in `app.js`, floored to what a phone speaker can do; `?debug` shows the sound state); the turn runs through the bloom (frames) and the fade (sound only) and ends
-back at the camera. The phone also plays the room's laughter samples (`laugh_files`, uploaded to the relay's `laughs/` at
+and low-pass filter, `tapeStage` in `app.js`, floored to what a phone speaker can do; `?debug` shows the sound state); the picture stops at the end of the timeout with a last frame
+taken without the caption (`ScreenGrab.last`, sent as `LAST`: the page fades the caption out itself and keeps the frame; the
+bloom would brighten it), the turn runs on through the bloom and the fade (sound only) and ends back at the camera. The phone also plays the room's laughter samples (`laugh_files`, uploaded to the relay's `laughs/` at
 the first connect, `/api/library`) at random, following `audio.laughter` through the `eye` message. The turn ends
 with the sequence; `ClipSaver`'s saved callback gives the files (the recording closes at the last grin frame, `Main.diffusion_callback`, while the
 grin still plays), which are uploaded at once (`Delivery`)

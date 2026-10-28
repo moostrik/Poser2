@@ -12,12 +12,11 @@ visitor inside. The phone shows the grid of the newest portraits and, in its mid
 camera until the flash, the installation's main screen after it. The page explains nothing and shows no
 control before the thing it controls exists.
 
-**Opening the page.** The grid of stills is there, built once from the relay's list; it does not change while
-the page is open. The window shows one button, SMILE. The line under the window says what the eye is doing:
-looking for faces, looking at someone inside, warming up, busy inside, asleep when SMILE is not there.
-
-**Consent.** The button opens the terms; one tap on I AGREE TO SMILE unlocks the sound and opens the camera.
-Without a camera the line says so and the page goes no further.
+**Opening the page.** The terms stand over the page; one tap on I AGREE TO SMILE is the consent, it unlocks
+the sound and opens the camera. Without a camera the line under the window says so and the page goes no
+further. Behind the terms the grid of stills is there, built once from the relay's list; it does not change
+while the page is open. The line under the window says what the eye is doing: looking for faces, looking at
+someone inside, warming up, busy inside, asleep when SMILE is not there.
 
 **Waiting.** The window shows the visitor's own camera, mirrored, black and white, in coarse pixels, coarser
 the further back in line; the line under it says how many are before them. The room's laughter plays, a laugh
@@ -33,18 +32,20 @@ resets.
 
 **The flash.** The visitor's own image goes white in the room's flash-in curve while the track starts from
 standstill: it spins up with the wobble of the room's tape, muffled, the pitch rising. At full white the
-window becomes the main screen of the installation and the white fades as the room's flash fades. From here
-the visitor watches the room: the capture coming out of the flash, the generation steps, the grin, the
-portrait standing after it, the bloom. The caption, the artist's name and the visitor's line, fades in with
+window becomes the main screen of the installation, and shows the room's flash out as the room draws it: the
+capture appearing from the white by its depth, while the page behind the grid goes dark with the same curve.
+From here the visitor watches the room: the generation steps, the grin, the
+portrait standing after it. The caption, the artist's name and the visitor's line, fades in with
 the first generated image, as on the main screen. The track opens up through the transformation and runs at
 full speed through the grin. The laughter is silent through the turn.
 
-**The end.** The room's picture stops at the bloom (the fade would show the room's camera), the portrait
-stands, the track plays on. When the visitor's own video is on the phone the track winds down to a stop and
+**The end.** When the portrait has stood its time the caption fades out and the portrait stands, without
+the room's bloom and fade (the fade would show the room's camera), the track plays on. When the visitor's
+own video is on the phone the track winds down to a stop and
 the video takes over: the grin, looping, with its own sound (the track on the tape, spun up at the start and
 wound down at the end) and a small watermark bottom right, a circled "ai" and the artist's name. The video
-has no caption. The share button appears with the file and opens the share sheet at once, with the file and
-the text (the name, the line, the tags). A browser that will not start the video's sound by itself plays it
+has no caption. The share button appears with the file and opens the share sheet at once, with the file,
+named `smile_by_matthias_oostrik.mp4` (the credit's name), and the text (the name, the line, the tags). A browser that will not start the video's sound by itself plays it
 silent; a tap on the video turns the sound on.
 
 **After.** The grin loops. The visitor closes the page or reloads it for another turn.
@@ -72,11 +73,13 @@ The messages of a turn, in order, as the page sees them (`relay/server.py` has t
 | SMILE | `face {charge, faces}`      | every detector frame                | the pixels and the white             |
 | SMILE | `stage flash {in, out}`     | the flash starts                    | own image to white, the track starts |
 | SMILE | `stage {name, progress}`    | every change, else every 0.25 s     | the white and the tape follow        |
-| SMILE | binary `SHOW` frame         | flash to fade, one in flight        | the window, from full white on       |
+| SMILE | `… flash_in/out {value}`    | the flash stages                    | the white, as the room eases it      |
+| SMILE | binary `SHOW` frame         | flash to the result's end, one in flight | the window, from full white on  |
+| SMILE | binary `LAST` frame         | the result has stood its time       | fade to it, keep it                  |
 | SMILE | `result {phone, grin, ...}` | the files are built                 | download the video                   |
 | SMILE | `turn_end {done}`           | the sequence is back at the camera  | wind down into the video             |
 | page  | `seen`                      | every `SHOW` frame received         | the relay sends the next frame       |
-| page  | `timing`                    | the video plays, the file is here   | the relay logs it                    |
+| page  | `timing`                    | the video plays, the file is here   | the relay logs it (with the download) |
 
 A phone that is not the turn's gets `state` only, and the grid once at load.
 
@@ -92,14 +95,21 @@ qualifies within `online.turn_window` (10 s) passes.
 ### The flash and the stream
 
 At `stage flash` the page keeps drawing its own image, sharp, and whitens it with the room's flash-in
-progress; at full white it switches to the stream, so the room's face marks are never shown. The stream is
+`value` (the eased progress, the white as `FlashStage` draws it); at full white it switches to the stream, so
+the room's face marks are never shown. The flash out is in the stream (the capture appearing from the white by
+its depth, `RevealStage`): the page draws no white of its own over it, and the white behind the grid goes
+down with `1 - value`. The stream is
 the main screen as rendered, taken in `SmileRender._render_credit` before the status line and from a credit
 pass without the QR code (`ScreenGrab`; `online.stream_width`, 4:5, `online.stream_fps`; JPEG at
 `Link.STREAM_QUALITY`, encoded on the link's thread). The relay keeps one frame in flight per phone: the next
 goes when the phone has answered `seen`, or after `FRAME_PATIENCE`, and the newest replaces one still
 waiting. A slow phone so gets fewer frames, never late ones, and the messages behind the frames never queue.
 While the result stands (the timeout) the stream runs at `Online.STILL_FPS`, 2 a second, because the phone is
-downloading its video then. The frames stop at the fade.
+downloading its video then. The frames stop at the end of the timeout with the turn's last frame: the render takes
+it at once and without the caption (`ScreenGrab.last`, `clean`), it travels as `LAST`, and the page fades
+from the frame it shows to it over the caption's fade time (`CAPTION_FADE`, `CreditLayer.FADE_S`) and keeps
+it; the room's bloom and fade are not shown (the bloom would brighten the standing picture, the fade shows
+the room's camera). A last frame that never came stops the frames at the fade.
 
 ### The sound
 
@@ -132,8 +142,9 @@ heard at the grin's start, on the tape, spun up over its first half second and w
 second, the watermark, no caption) and lands the players' silent clip after it. `Online` uploads the three
 files as soon as they exist and sends `result`, addressed to the phone, so a phone finds it after its turn as
 well. The page downloads the video once, alone (nothing else is fetched meanwhile), plays it from that
-download after the wind-down and uses the same bytes for the share sheet; the completed download is what
-shows the share button. The video element is shown only once it plays (it is black before), so the last
+download after the wind-down and uses the same bytes for the share sheet, as a file named `smile_by_<name>`
+from the credit's name (`fileName`), with the file's extension; the completed download is what shows the
+share button. The video element is shown only once it plays (it is black before), so the last
 frame of the screen stands until then. A result that has no files `Online.SAVE_TIMEOUT` (20 s) after the turn
 ends the turn without a video.
 
@@ -153,12 +164,14 @@ encoder, this PC as room and relay, the phone over Tailscale on a direct connect
 ### Logs
 
 - `relay/data/relay.log`: SMILE and phones connecting; per turn `phone … timing: result, play, playing,
-  file` (seconds after the turn's end) and `frames to the phone: n, flight median, max`; the access log of
-  every file served.
+  file` (seconds after the turn's end), then the video's download as the phone saw it (`first byte`, its size,
+  the KB received at every second), and `frames to the phone: n, flight median, max`; the access log of every
+  file served.
 - SMILE's log (`output/logs/smile_*.log`): `turn n starts`, `turn ends (reason)`, the track uploads, the
   saver's `Saved`, warnings.
 - The page with `?debug` in its address: its state, the audio context, the track (named, decoded, playing,
-  error), the tape's rate, gain and filter, the video.
+  error), the tape's rate, gain and filter, the video, and the download (KB so far of the total, seconds,
+  the first byte).
 
 ## Open
 

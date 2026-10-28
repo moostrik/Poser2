@@ -17,8 +17,9 @@ Where it runs and how it is reached, on the tailnet for a test and on the VPS, i
 * `pip install aiohttp` (in SMILE's venv it is in `requirements.txt`), then from the repo root:
   `python -m relay.server --port 8800` (`-v` for every message); `scripts\start_relay.bat` does this on the PC.
   The log goes to the console and to `data/relay.log`; every phone reports the end of its turn there
-  (`phone … timing: result, play, playing, file`: seconds after the turn's end that the result came, the
-  video was started, played its first frame, and the share file was on the phone)
+  (`phone … timing: result, play, playing, file; first byte, KB, KB per second`: seconds after the turn's end that
+  the result came, the video was started, played its first frame, and the file was on the phone; then the
+  download itself: when its first byte came, its size, and the KB received at every second of it)
 * the page is at `http://<host>:8800/`. A phone only opens its camera over HTTPS, so a TLS proxy stands in
   front (`data/documents/OnlineHosting.md`); without one the relay takes `--cert` and `--key`
 * without SMILE: `python -m modules.online.fake` stands in for it (a Haar face detector, a fake
