@@ -208,6 +208,8 @@ def _build_settings_entry(settings, name: str, field: Field, polls) -> None:
     wiring = _wiring_css_class(settings, name)
     if wiring:
         css = f"{css} {wiring}"
+    if Widget.resolve(field) is Widget.textarea:
+        css = f"{css} w-full"   # a text area takes a whole row of its card
     if field.widget == Widget.button:
         with ui.element("div").classes(css):
             _build_action_button(settings, name, field)
@@ -357,6 +359,12 @@ def _build_toggle(settings, name, field, polls):
 
 # -- numeric builders --------------------------------------------------------
 
+SLIDER_WIDTH: int = 48
+
+
+def _slider_width(field) -> str:
+    return f"w-{field.width}" if field.width is not None else f"w-{SLIDER_WIDTH}"
+
 
 
 @widget_builder(Widget.slider)
@@ -368,7 +376,7 @@ def _build_slider(settings, name, field, polls):
     step = field.step if field.step is not None else (1 if field.type_ is int else 0.01)
     color = getattr(field, "color", "primary")
 
-    with ui.column().classes("w-48 max-w-full gap-1"):
+    with ui.column().classes(f"{_slider_width(field)} max-w-full gap-1"):
         with ui.row().classes("w-full items-center justify-between flex-nowrap"):
             _build_field_title(label, desc, classes="flex-1 truncate")
             fmt = "%.0f" if field.type_ is int else "%.2f"
@@ -438,7 +446,7 @@ def _build_log_slider(settings, name, field, polls):
     def clamp(v: float) -> float:
         return max(field.min, min(field.max, v))
 
-    with ui.column().classes("w-48 max-w-full gap-1"):
+    with ui.column().classes(f"{_slider_width(field)} max-w-full gap-1"):
         with ui.row().classes("w-full items-center justify-between flex-nowrap"):
             _build_field_title(label, desc, classes="flex-1 truncate")
             # HTML min is 0, not field.min: the browser steps in multiples of step counted
@@ -758,7 +766,7 @@ def _build_textarea(settings, name, field, polls):
 
     ta = _attach_description_tooltip(ui.textarea(label=label, value=value).props(
         "dense outlined" + _lock_prop(is_disabled)
-    ), desc)
+    ).classes("w-full"), desc)
 
     if not is_disabled:
         # Enter inserts a newline in a textarea, so commit on focus-out / change only.
