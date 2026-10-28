@@ -1,5 +1,9 @@
 """Tracks and interpolates multiple poses independently."""
 
+from time import perf_counter
+
+from modules.utils import PerformanceTimer
+
 from ..frame import FrameDict
 from .InterpolatorPipeline import InterpolatorPipeline
 from .TrackerBase import TrackerBase
@@ -13,14 +17,16 @@ class InterpolatorTracker(TrackerBase):
 
     Handles dispatch, result collection, lifecycle reset on track
     disappearance, and callback fan-out. Pipeline construction is
-    the caller's responsibility.
+    the caller's responsibility. A `name` times every update (the pipelines
+    only, not the callbacks) for the timing session.
     """
 
-    def __init__(self, pipelines: dict[int, InterpolatorPipeline]) -> None:
+    def __init__(self, pipelines: dict[int, InterpolatorPipeline], name: str | None = None) -> None:
         super().__init__()
         if not pipelines:
             raise ValueError("pipelines dict must not be empty.")
         self._pipelines = pipelines
+        self._timer: PerformanceTimer | None = PerformanceTimer(name=name, sample_count=200) if name else None
 
     def set(self, poses: FrameDict) -> None:
         """Set target poses for interpolation."""
@@ -41,6 +47,7 @@ class InterpolatorTracker(TrackerBase):
     def update(self) -> FrameDict:
         """Get interpolated poses from all pipelines."""
 
+        start = perf_counter()
         interpolated_poses: FrameDict = {}
 
         for id, pipeline in self._pipelines.items():
@@ -51,6 +58,9 @@ class InterpolatorTracker(TrackerBase):
                 continue
             if pose is not None:
                 interpolated_poses[id] = pose
+
+        if self._timer is not None:
+            self._timer.add_time((perf_counter() - start) * 1000.0, report=False)
 
         self._notify_frames_callbacks(interpolated_poses)
 

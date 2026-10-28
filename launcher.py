@@ -14,6 +14,7 @@ from threading import Event, Thread
 import psutil
 
 from modules.log_config import setup_logging, install_thread_excepthook
+from modules.utils import timing
 from apps import APP_NAMES, load_app
 
 
@@ -54,6 +55,8 @@ if __name__ == '__main__':
     parser.add_argument('-sim',     '--simulation',     action='store_true',        help='use prerecorded video with camera')
     parser.add_argument('-ni',      '--no-interface',   action='store_true',        help='do not open the settings interface in an Edge window')
     parser.add_argument('-v',       '--verbose',        action='store_true',        help='enable verbose (DEBUG) console output')
+    parser.add_argument('-timing',  '--timing',         type=float, default=0.0,    help='seconds of timing session: write a timing report to logs/, then quit (0 = off)')
+    parser.add_argument('-warmup',  '--timing-warmup',  type=float, default=30.0,   help='seconds before the timing session starts')
     args: Namespace = parser.parse_args()
     log_file = setup_logging(verbose=args.verbose)
     install_thread_excepthook()
@@ -76,6 +79,19 @@ if __name__ == '__main__':
             logging.debug("Heartbeat — running for %d min %d s", elapsed // 60, elapsed % 60)
 
     Thread(target=_heartbeat, daemon=True, name="heartbeat").start()
+
+    def _timing_session() -> None:
+        stats = timing.run_session(args.timing_warmup, args.timing, shutdown_event)
+        if stats is None:
+            return
+        timing.write_report(log_file.parent, args.app, args.simulation, args.timing_warmup, args.timing, stats)
+        if app.is_running:
+            app.stop()
+
+    if args.timing > 0:
+        if not args.simulation:
+            logging.warning("Timing session without -sim: the report is not comparable to another run")
+        Thread(target=_timing_session, daemon=True, name="timing").start()
 
     def signal_handler_exit(sig, frame) -> None:
         logging.info("Received interrupt signal, shutting down...")

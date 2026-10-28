@@ -1,11 +1,13 @@
 # Standard library imports
 import logging
+import time
 from queue import Empty, Queue
 from threading import Lock, Thread, Event
 
 # Local application imports
 from modules.oak import DepthTracklet
 from modules.settings import BaseSettings, Field
+from modules.utils import PerformanceTimer
 from .. import (
     BaseTracker,
     Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback,
@@ -32,6 +34,8 @@ class Tracker(Thread, BaseTracker):
         self._running: bool = False
         self._update_event: Event = Event()
         self._input_queue: Queue[list[Tracklet]] = Queue()
+        # One tick: the intake, the expiry and the emission (its callbacks only store)
+        self._timer: PerformanceTimer = PerformanceTimer(name="Tracker", sample_count=200)
         self._callback_lock = Lock()
         self._tracklet_callbacks: list[TrackletDictCallback] = []       # run in registration order
 
@@ -61,6 +65,7 @@ class Tracker(Thread, BaseTracker):
             self._update_event.wait(timeout=0.1)
             self._update_event.clear()
 
+            start: float = time.perf_counter()
             try:
                 while True:
                     try:
@@ -72,6 +77,7 @@ class Tracker(Thread, BaseTracker):
                 self._update_and_notify()
             except Exception:
                 logger.exception("OnePerCamTracker error")
+            self._timer.add_time((time.perf_counter() - start) * 1000.0, report=False)
 
     def _add_tracklet(self, tracklets: list[Tracklet]) -> None:
         # UPDATE EXISTING TRACKLET

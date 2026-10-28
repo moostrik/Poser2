@@ -52,6 +52,13 @@ depth cam pose synchony detection
 ### Run Project
 * activate venv and run ```python launcher.py```
 
+### Timing
+* ```scripts\timing.bat <app> [seconds]``` runs the app in simulation for a timing session (300 s after a 30 s warm-up, no settings window) and writes `logs/timing_<app>_<date>_<time>.json`: count, mean, p50, p95, p99 and max per timer, with the commit and the package versions
+* ```.venv\Scripts\python scripts\timing_compare.py <baseline>.json <new>.json``` compares two reports; a timer fails when its mean or p95 is more than 5% slower
+* The timers: inference (RTM pose, RVM, RAFT), GPU image upload, window similarity and correlation, tracker tick, each pose stage's filters, render update, draw and frame interval
+* ```.venv\Scripts\python -m modules.inference.tools.benchmark --app <app> [--model-type onnx] [--reference <earlier>.npz]``` times the app's enabled models through its runners without cameras (the startup preset's resolutions, batch and crop size; seeded input or `--image`) and writes `logs/inference_<app>_<type>_<date>_<time>.json` in the same format, with each model's GPU memory, and an `.npz` of the outputs; `--reference` reports how far the outputs moved
+* A package upgrade lands only when its report passes against a baseline of the build before it, both from the same simulation preset on the same PC
+
 ### Startup
 * make a shortcut to `scripts\start\<app>.bat`
 * Press Windows+R to open the Run dialog, type shell:Common Startup
