@@ -11,20 +11,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      - uses: astral-sh/setup-uv@v6
         with:
-          python-version: '3.12'
-          cache: pip
+          enable-cache: true
 
-      # The runtime requirements without the CUDA stack: torch from the CPU index,
+      # The locked packages without the CUDA stack: torch from the CPU index,
       # TensorRT and cuda-python left out (TensorRT is only imported when a TRT model runs).
       - name: Install dependencies
         shell: bash
         run: |
-          grep -v -E '^(--extra-index-url|torch|torchvision|cuda-python|tensorrt|onnx_simplifier)' requirements.txt > requirements-ci.txt
-          python -m pip install --upgrade pip
-          pip install -r requirements-ci.txt
-          pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+          uv venv --python 3.12
+          uv export --locked --no-hashes --no-annotate --no-emit-project --format requirements-txt \
+            | grep -v -E '^(-|torch|tensorrt|cuda-|nvidia-)' > requirements-ci.txt
+          uv pip install -r requirements-ci.txt
+          uv pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
 
       - name: Unit tests
         shell: bash
@@ -32,7 +32,7 @@ jobs:
           status=0
           for dir in modules/settings modules/utils modules/pose modules/tracker modules/oak modules/render apps/white_space; do
             echo "::group::$dir"
-            python -m unittest discover -s "$dir/tests" -t . || status=1
+            .venv/Scripts/python -m unittest discover -s "$dir/tests" -t . || status=1
             echo "::endgroup::"
           done
           exit $status

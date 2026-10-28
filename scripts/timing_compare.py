@@ -2,7 +2,8 @@
 
     python scripts/timing_compare.py logs/timing_white_space_<base>.json logs/timing_white_space_<new>.json
 
-A timer passes when its mean and its p95 are at most `--tolerance` percent above the baseline's.
+A timer passes when its mean is at most `--tolerance` percent above the baseline's and its p95 at most
+twice that: a p95 of a few milliseconds moves several percent between two runs on the same build.
 The exit code is 1 when a timer fails or is missing from the new report.
 """
 
@@ -24,7 +25,7 @@ def main() -> int:
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('baseline', type=Path)
     parser.add_argument('new', type=Path)
-    parser.add_argument('--tolerance', type=float, default=5.0, help='percent a timer may be slower (default 5)')
+    parser.add_argument('--tolerance', type=float, default=5.0, help='percent a mean may be slower (default 5); p95 may be twice that')
     args = parser.parse_args()
 
     base, new = _load(args.baseline), _load(args.new)
@@ -50,13 +51,13 @@ def main() -> int:
             failed = failed or n is None
             continue
         mean_change, p95_change = _change(b['mean'], n['mean']), _change(b['p95'], n['p95'])
-        ok = mean_change <= args.tolerance and p95_change <= args.tolerance
+        ok = mean_change <= args.tolerance and p95_change <= 2 * args.tolerance
         failed = failed or not ok
         print(f"{name:<22} {b['count']:>6}/{n['count']:<6} {b['mean']:>8.3f}/{n['mean']:<8.3f} {mean_change:>+6.1f}% "
               f"{b['p95']:>8.3f}/{n['p95']:<8.3f} {p95_change:>+6.1f}%  {'ok' if ok else 'SLOWER'}")
 
     print()
-    print('FAIL' if failed else 'PASS', f"(tolerance {args.tolerance:.0f}%)")
+    print('FAIL' if failed else 'PASS', f"(tolerance: mean {args.tolerance:.0f}%, p95 {2 * args.tolerance:.0f}%)")
     return 1 if failed else 0
 
 

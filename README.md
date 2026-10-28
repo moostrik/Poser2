@@ -7,9 +7,8 @@ depth cam pose synchony detection
 * Maybe it is necessary to instal visual studio with python and c++ modules (investigate on next clean install)
 * install latest Visual C++ Redistributable [download](https://aka.ms/vs/17/release/vc_redist.x86.exe) or [site](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-supported-redistributable-version) and RESTART
 
-### Python
-* ~~Install python 3.10 from Microsoft Store (or find a better method)~~
-* Install python 3.12 Windows Installer (64 bit) [download](https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe) or [site](https://www.python.org/downloads/release/python-31210/)
+### uv
+* In a terminal run ```winget install astral-sh.uv``` and open a new terminal; uv installs Python 3.12 and the packages
 
 ### Git for Windows
 * Install latest version from [site](https://git-scm.com/download/win)
@@ -46,15 +45,19 @@ depth cam pose synchony detection
 * ```git clone https://github.com/moostrik/Poser2.git```
 
 ### Install Script
-* in the terminal run ```scripts\install.bat```
+* in the terminal run ```scripts\install.bat```: it pulls the LFS files and builds `.venv` from `uv.lock` (run it again after every pull that changes `uv.lock`)
 * and make the models for an app ```scripts/makemodels.bat <app_name>``` or all apps ```scripts/makemodels.bat all``` using the .venv environment
+
+### Upgrade Packages
+* ```uv lock --upgrade``` moves `uv.lock` to the newest versions that fit `pyproject.toml`; then ```scripts\install.bat```, the timing check below, and commit `uv.lock`
+* The exact pins in `pyproject.toml` (depthai, torch, TensorRT, cuda-python) never move this way; the GPU stack moves only together with rebuilt TensorRT engines
 
 ### Run Project
 * activate venv and run ```python launcher.py```
 
 ### Timing
 * ```scripts\timing.bat <app> [seconds]``` runs the app in simulation for a timing session (300 s after a 30 s warm-up, no settings window) and writes `logs/timing_<app>_<date>_<time>.json`: count, mean, p50, p95, p99 and max per timer, with the commit and the package versions
-* ```.venv\Scripts\python scripts\timing_compare.py <baseline>.json <new>.json``` compares two reports; a timer fails when its mean or p95 is more than 5% slower
+* ```.venv\Scripts\python scripts\timing_compare.py <baseline>.json <new>.json``` compares two reports; a timer fails when its mean is more than 5% slower or its p95 more than 10%
 * The timers: inference (RTM pose, RVM, RAFT), GPU image upload, window similarity and correlation, tracker tick, each pose stage's filters, render update, draw and frame interval
 * ```.venv\Scripts\python -m modules.inference.tools.benchmark --app <app> [--model-type onnx] [--reference <earlier>.npz]``` times the app's enabled models through its runners without cameras (the startup preset's resolutions, batch and crop size; seeded input or `--image`) and writes `logs/inference_<app>_<type>_<date>_<time>.json` in the same format, with each model's GPU memory, and an `.npz` of the outputs; `--reference` reports how far the outputs moved
 * A package upgrade lands only when its report passes against a baseline of the build before it, both from the same simulation preset on the same PC
