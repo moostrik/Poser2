@@ -190,7 +190,7 @@ texture, over the clips and the credit card, under the lit test cells. Nothing o
 `modules/save/ClipSaver.py` saves each finished visitor for the players under `output/` (git-ignored):
 the grin as `grins/<style>/<id>.mp4` (silent h264 at the full portrait size, at `grin_fps`), the capture and the
 portrait as `portraits/<style>/<id>_capture.jpg` and `<id>_portrait.jpg`, and after the grin landed the phone's copy
-`shares/<style>/<id>.mp4` (`modules/save/share.py`: the same grin re-encoded with the watermark, a circled "ai" and the credit name, in the bottom
+`shares/<style>/<id>.mp4` (`modules/save/share.py`: the same grin re-encoded with the watermark, "SMILE", a circled "ai" and "by" the credit name, in the bottom
 right, no caption, built before the players' clip lands, and the visitor's track as its sound: `ClipSaver.set_share` from `Main` at DIFF_LOOP's start with the seconds
 since the flash, read with `ffmpeg.read_audio`, played on the tape of `modules/audio/tape.py`, the Max patch's spin-up over
 the first half second and a wind-down over the last, muxed by `ffmpeg.make_share`; a share clip that fails is a warning and

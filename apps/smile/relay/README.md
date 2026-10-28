@@ -4,7 +4,7 @@ One small server between the phones and SMILE: it serves the phone page (`web/`;
 `web/Bangers-Regular.ttf` is a copy of SMILE's `data/Bangers-Regular.ttf`, the VPS has only this folder), keeps the waiting
 line and passes the frames, the judging and the results (`server.py`, the protocol is in its docstring).
 SMILE decides every turn; the relay only keeps the line. Its data is a folder of the visitors' files
-(`data/`, git-ignored): the stills the grid shows, the portraits and the grins (the phones' share clips), and the library the
+(`data/`, git-ignored): the stills (one per turn, served at `/api/grid`; the page shows none), the portraits and the grins (the phones' share clips), and the library the
 phones play from: the music tracks (`tracks/`, AAC, about 150 MB for all 75: SMILE uploads a track the first time a
 visitor gets it) and the laughter samples (`laughs/`, 8.7 MB, uploaded at SMILE's first connect).
 Where it runs and how it is reached, on the tailnet for a test and on the VPS, is in

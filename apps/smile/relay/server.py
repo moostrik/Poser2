@@ -13,7 +13,7 @@ SMILE, SHOW (1) an image from SMILE for the phone's window, LAST (2) the turn's 
 keeps. The phone with the turn is the only one whose frames are passed on, and only while SMILE is connected.
 
 Phone -> relay: join, leave; frames.
-Relay -> phone: state (see Line.state), grid (the newest stills), turn, face, stage, result, turn_end;
+Relay -> phone: state (see Line.state), grid (the newest stills; the page ignores it), turn, face, stage, result, turn_end;
 Relay -> SMILE: line {waiting}, turn {id}, gone;
     show images.
 phone -> relay: join, leave, seen (a screen frame drawn), timing (its turn's end, for the log);

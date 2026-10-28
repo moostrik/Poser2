@@ -1,8 +1,9 @@
-/* SMILE Online, the phone page. The grid shows the newest portraits; the window in its middle is the
+/* SMILE Online, the phone page. One portrait frame under the title of the machine, the artist's link under
+   it, and behind everything the same picture as a field of smileys (drawHalftone). The frame is the
    camera: pixelated with the reason while you wait; when it is your turn, your live video, in pixels as
    long as the face is not right, the worse the coarser, sharp when it is (the face data comes from SMILE,
    the drawing happens here, so only the judging lags; nothing is drawn on the image), and the charge is
-   the ring light: the page goes white behind the grid as it fills, quickly at first, full white at the flash. From the flash the window is the main screen of the installation
+   the ring light: the page goes white behind the frame as it fills, quickly at first, full white at the flash. From the flash the window is the main screen of the installation
    as it is rendered, frame by frame, to the end of its sequence, while the white fades with the
    installation's flash, and the visitor's track plays from the flash as in the room: on the tape, spun up
    from standstill at the flash, muffled and opening up through the transformation, from the room's own
@@ -28,10 +29,11 @@ const FPS = 15;         // frames a second to SMILE during the turn
 const QUALITY = 0.6;    // JPEG
 const MAX_BLOCK = 32;   // a face's pixel size at distance 1 (the installation's face_effect)
 const TAGS = '#smile #oostrik';   // the share text, until the real tags are decided
+const CELL = 20;        // css pixels per smiley of the background
 
 const $ = (id) => document.getElementById(id);
 const cam = $('cam'), view = $('view'), grinVideo = $('grin'), portraitImg = $('portrait'), light = $('light');
-const statusLine = $('status'), flash = $('flash'), share = $('share');
+const flash = $('flash'), share = $('share');
 const frame = document.createElement('canvas');     // the camera as we send it: mirrored
 const small = document.createElement('canvas');     // for the pixelation
 view.width = frame.width = W;
@@ -69,23 +71,6 @@ const laughBuffers = new Map();
 let laughMuted = false;     // from the flash until the track has stopped: the laughter is for the waiting, not over the music
 let laughTimer = null;
 
-// THE GRID: the newest stills first, built once from the relay's first list and left alone after that
-// (empty cells until the relay answers)
-let gridBuilt = false;
-function setGrid(stills) {
-  if (gridBuilt) return;
-  gridBuilt = stills.length > 0;
-  const grid = $('grid');
-  for (const img of grid.querySelectorAll('img.still')) img.remove();
-  const cells = Math.max(12, stills.length);
-  for (let i = 0; i < cells; i++) {
-    const img = document.createElement('img');
-    img.className = 'still';
-    if (stills[i]) img.src = stills[i];
-    grid.appendChild(img);
-  }
-}
-
 // THE STATE
 function setState(next) {
   state = next;
@@ -98,15 +83,22 @@ function setState(next) {
   if (next !== 'done') { grinVideo.pause(); document.body.classList.remove('playing'); }
 }
 
-function setStatus(text) {
-  statusLine.textContent = text || '';
+function lineText(message) {
+  // the bar while waiting for the turn, from the relay's state (its own sentence, `status`, is for the API):
+  // asleep when SMILE is not there, else the place in line
+  if (message.eye === 'asleep') return 'SMILE(ai) IS ASLEEP';
+  const before = Math.max(0, (message.place || 1) - 1);
+  return before ? `${before} BEFORE YOU` : 'WAITING FOR SMILE(ai)';
 }
 
-// THE RING LIGHT: the white behind the grid, 0..1, reached in `seconds`
+function setStatus(text) {
+  // what the eye does and why you wait: the bar's text (the page has one line of text, the bar)
+  setLabel(text || '');
+}
+
+// THE RING LIGHT: the white over the halftone, behind the frame, 0..1, reached in `seconds`
 function setLight(value, seconds) {
-  const duration = `${seconds}s`;
-  light.style.transitionDuration = duration;
-  for (const img of document.querySelectorAll('#grid img.still')) img.style.transitionDuration = duration;
+  light.style.transitionDuration = `${seconds}s`;
   document.documentElement.style.setProperty('--light', String(value));
 }
 
@@ -137,16 +129,11 @@ function connect() {
 
 function onMessage(message) {
   switch (message.type) {
-    case 'grid':
-      setGrid(message.stills);
-      break;
     case 'state':
-      eye = message;
-      if (state === 'idle' || state === 'nocam') {
-        setStatus(message.status);
-      } else if (state === 'waiting' || state === 'asleep' || state === 'lost') {
+      eye = message;      // under the terms the bar is the agree button; the line comes after the tap
+      if (state === 'waiting' || state === 'asleep' || state === 'lost') {
         setState(message.eye === 'asleep' ? 'asleep' : 'waiting');
-        setStatus(message.status);
+        setStatus(lineText(message));
       }
       break;
     case 'turn':
@@ -155,10 +142,11 @@ function onMessage(message) {
       for (const key of Object.keys(timing)) delete timing[key];
       document.body.classList.remove('video');
       ended = false;
+      setProgress(0);
       stopTrack(0.5);           // the decoded track stays: it is most likely this turn's
       tapeReset();
       setState('you');
-      setStatus('');
+      setLabel('SHOW ME YOUR FACE');
       break;
     case 'music':
       // this turn's track, named at the turn's start: fetched and decoded now, started at the flash (or that far in)
@@ -169,6 +157,7 @@ function onMessage(message) {
         faces = message;
         const charge = message.charge || 0;
         setLight(1 - (1 - charge) * (1 - charge), 0.25);     // white quickly at first, then the last stretch
+        setLabel(faceHint(message));
       }
       break;
     case 'stage':
@@ -191,8 +180,17 @@ function onStage(message) {
     // room waits for the capture's depth, down with the flash-out (the stage messages below)
     setState('transform');
     setStatus('');
+    setProgress(0);
+    setTappable(false);
+    setLabel('');           // the bar empties; TURN YOUR VOLUME UP once the white is full (below)
     streaming = false;      // the phone's own image goes white first (the room's marks are not for the phone)
     laughMuted = true;      // until the track has stopped
+    bullshitting = false;
+    volumeAsked = false;
+    grinFrom = null;
+    creep.p = null;
+    stageNow.stage = null;
+    preparing = false;
     flashAt = performance.now();
     tapeReset();
     startTrack(0);
@@ -207,10 +205,14 @@ function onStage(message) {
   if (message.stage === 'flash_in') {
     setFlash(value, 0.25);
     setLight(Math.max(value, lightNow()), 0.25);
-    if (p >= 1) setTimeout(startStreaming, 250);   // under full white the window becomes the main screen
+    if (p >= 1) {
+      setTimeout(startStreaming, 250);   // under full white the window becomes the main screen
+      askVolume();
+    }
   } else if (message.stage === 'flash_out') {
+    askVolume();      // the white was full (a flash-in message at 1 is not always sent: the room's stage moves on first)
     // the window is the main screen now and the room's flash out is in its frames (the capture appearing from
-    // the white by its depth): nothing of the page's own white over it; the light behind the grid goes down with it
+    // the white by its depth): nothing of the page's own white over it; the light behind the frame goes down with it
     startStreaming();
     setFlash(0, 0.25);
     setLight(1 - value, 0.25);
@@ -219,6 +221,22 @@ function onStage(message) {
     setLight(0, 0.25);
   }
   tapeStage(message.stage, p);
+  if (message.stage === 'timeout' && !preparing) {
+    // the grin is done, the file is on its way: the bar prepares, still, without the poops
+    preparing = true;
+    if (state === 'transform') setLabel(PREPARING);
+  }
+  if ((message.stage === 'diffusion' || message.stage === 'grin') && !bullshitting) {
+    // the generation: BULLSHITTING from here, but not before TURN YOUR VOLUME UP has had its time (the
+    // generation can start within a second of the flash out), and once VOLUME is back at its size
+    bullshitting = true;
+    const wait = Math.max(0, volumeAskedAt + VOLUME_HOLD - performance.now());
+    setTimeout(() => whenLoudStill(() => { if (state === 'transform' && bullshitting && !preparing) setShare(null); }), wait);
+  }
+  stageNow.stage = message.stage;
+  stageNow.p = p;
+  const bar = stageProgress(message.stage, p);
+  if (bar !== null) setProgress(bar);
 }
 
 function startStreaming() {
@@ -274,6 +292,7 @@ function onTurnEnd(reason) {
     timing.done = performance.now();
     setState('done');
     setStatus('');
+    setProgress(1);
     stopCamera();
     setShare(result);
     if (result) finishWithVideo();
@@ -343,11 +362,198 @@ $('window').onclick = () => {
   }
 };
 
+// the bar from the flash: TURN YOUR VOLUME UP over the flash (a phone on silent hears nothing and knows nothing,
+// and the track has just started), BULLSHITTING through the generation and the grin, PREPARING YOUR SMILE
+// through the timeout (the file is on its way), SHARE YOUR SMILE with the video
+const VOLUME = 'TURN YOUR *VOLUME* UP', PREPARING = 'PREPARING YOUR SMILE(ai)';
+const VOLUME_HOLD = 5000;       // ms the volume is asked for at least, before BULLSHITTING takes the bar
+let bullshitting = false, volumeAsked = false, volumeAskedAt = 0, preparing = false;
+function askVolume() {
+  // the picture is taken, the white is full, the track starts: the one moment to ask for the volume, once
+  if (volumeAsked) return;
+  volumeAsked = true;
+  volumeAskedAt = performance.now();
+  setLabel(VOLUME);
+}
+function setTappable(on) {
+  // the bar takes a tap as the agree button and as the share button, and none in between (it is a box, not a
+  // button element: a button clips its contents, and the loud word grows past the bar)
+  share.classList.toggle('off', !on);
+  share.setAttribute('aria-disabled', on ? 'false' : 'true');
+}
+// the loud word's cycle and the point in it from which the word stands at its size (the keyframes agree: 2.4 s,
+// still from 55 %); a label change waits for that, so the bar does not switch mid-bounce
+const LOUD_CYCLE = 2400, LOUD_STILL = 0.55 * LOUD_CYCLE;
+function whenLoudStill(fn) {
+  const word = share.querySelector('i.loud');
+  try {
+    const motion = word && word.getAnimations()[0];
+    if (motion && motion.currentTime !== null) {
+      const t = motion.currentTime % LOUD_CYCLE;
+      if (t < LOUD_STILL) { setTimeout(fn, LOUD_STILL - t); return; }
+    }
+  } catch (error) { /* an old browser: now */ }
+  fn();
+}
 function setShare(result) {
-  // the button appears when the video is here on the phone; nothing before, nothing without one
+  // the bar is the button once the video is here on the phone; until then it is the animation's loading bar
   const ready = !!(result && (result.grin || result.portrait) && shareFile);
-  share.disabled = !ready;
-  share.hidden = !ready;
+  setTappable(ready);
+  setLabel(ready ? 'SHARE YOUR SMILE(ai)' : 'BULLSHITTING(ai)');
+}
+
+// the labels that move get a letter each: I AGREE TO SMILE and SHARE YOUR SMILE, the calls to action, ripple
+// (a pop running through the words, 60 ms a letter, then rest); BULLSHITTING stands still and each letter
+// jolts when a poop leaves it (flyPoops); the hints stand still.
+// "(ai)" in a label is the machine's mark, the ring with "ai" in it (one letter to the motion); *word* is the
+// loud word, growing now and then, the bar with it (in a label that stands still)
+const MOTION = { 'BULLSHITTING(ai)': ['still', 0], 'I AGREE TO SMILE(ai)': ['ripple', 0.06], 'SHARE YOUR SMILE(ai)': ['ripple', 0.06] };
+function mark() {
+  const ring = document.createElement('span');
+  ring.className = 'ai';
+  ring.textContent = 'ai';
+  return ring;
+}
+function loud(text) {
+  // the text with its *loud words* as elements: a fragment of text nodes and <i class="loud">
+  const piece = document.createDocumentFragment();
+  text.split(/\*([^*]+)\*/).forEach((part, n) => {
+    if (n % 2 === 0) { if (part) piece.appendChild(document.createTextNode(part)); return; }
+    const word = document.createElement('i');
+    word.className = 'loud';
+    word.textContent = part;
+    piece.appendChild(word);
+  });
+  return piece;
+}
+function setLabel(text, still = false) {
+  // `still`: the text without its motion (the agree button before the camera is allowed)
+  const label = $('label');
+  const motion = still ? null : MOTION[text];
+  stopPoop();
+  const pieces = (text || '\u00a0').split('(ai)');      // the text between the marks; empty: the bar keeps its height
+  label.textContent = '';
+  let i = 0;
+  pieces.forEach((piece, n) => {
+    const letters = motion ? Array.from(piece) : [piece];
+    if (n < pieces.length - 1) letters.push(null);        // the mark after this piece
+    for (const letter of letters) {
+      const node = letter === null ? mark() : document.createTextNode(letter);
+      if (!motion) { label.appendChild(letter === null ? node : loud(letter)); continue; }
+      const step = document.createElement('i');
+      step.className = motion[0];
+      step.style.animationDelay = `${i++ * motion[1]}s`;
+      step.appendChild(node);
+      label.appendChild(step);
+    }
+  });
+  for (const copy of share.querySelectorAll('.copy .text')) copy.innerHTML = label.innerHTML;    // the text as seen
+  if (text === 'BULLSHITTING(ai)') flyPoops(label);
+}
+
+// THE POOPS: while the bar says BULLSHITTING poops fly out of the word, three or four at a time from a random
+// letter every while, each thrown its own way (any direction, its own speed, spinning, falling under gravity,
+// fading, CSS: fly) and gone when it has flown, and the letter they leave jolts (CSS: jolt); they stand
+// outside the label, so they keep their colour over the fill
+const POOP_EVERY = 150, POOPS_IN_AIR = 60;
+const POOP_SPEED = [60, 150], POOP_GRAVITY = 100, POOP_FLIGHT = [1300, 2200];     // px/s, px/s^2, ms
+let poopTimer = null;
+function flyPoops(label) {
+  const letters = Array.from(label.querySelectorAll('i')).filter((i) => !i.querySelector('.ai'));
+  if (!letters.length) return;
+  const one = () => {
+    if (share.querySelectorAll('i.fly').length >= POOPS_IN_AIR) return;     // enough in the air
+    const at = Math.floor(Math.random() * letters.length);
+    const from = letters[at];
+    for (const text of [label, ...share.querySelectorAll('.copy .text')]) {
+      const letter = Array.from(text.querySelectorAll('i')).filter((i) => !i.querySelector('.ai'))[at];   // the same letter in the label and in both copies
+      letter.classList.remove('jolt');
+      void letter.offsetWidth;      // the jolt starts over
+      letter.classList.add('jolt');
+    }
+    const count = 3 + Math.floor(Math.random() * 2);
+    for (let n = 0; n < count; n++) {
+      const poop = document.createElement('i');
+      poop.className = 'fly';
+      poop.textContent = '\uD83D\uDCA9';
+      poop.style.left = `${label.offsetLeft + from.offsetLeft}px`;
+      poop.style.top = `${label.offsetTop + from.offsetTop}px`;
+      const angle = 2 * Math.PI * Math.random();      // thrown out of the word, any way
+      const speed = POOP_SPEED[0] + (POOP_SPEED[1] - POOP_SPEED[0]) * Math.random();
+      const flight = Math.round(POOP_FLIGHT[0] + (POOP_FLIGHT[1] - POOP_FLIGHT[0]) * Math.random());
+      const seconds = flight / 1000;
+      poop.style.setProperty('--vx', `${(Math.cos(angle) * speed * seconds).toFixed(0)}px`);
+      poop.style.setProperty('--vy', `${(Math.sin(angle) * speed * seconds).toFixed(0)}px`);
+      poop.style.setProperty('--drop', `${(0.5 * POOP_GRAVITY * seconds * seconds).toFixed(0)}px`);
+      poop.style.setProperty('--spin', `${((Math.random() - 0.5) * 540).toFixed(0)}deg`);
+      poop.style.animationDuration = `${flight}ms`;
+      share.appendChild(poop);
+      setTimeout(() => poop.remove(), flight + 100);
+    }
+  };
+  one();
+  poopTimer = setInterval(one, POOP_EVERY);
+}
+function stopPoop() {
+  clearInterval(poopTimer);
+  poopTimer = null;
+  for (const poop of share.querySelectorAll('i.fly')) poop.remove();
+}
+
+// THE HINTS: during the turn the bar says what the face still needs, from the judging's reject label (the
+// panel's words, the measure first: `yaw 32 > 20`, see modules/face/quality.py rejection_label), and fills
+// with the charge; a face that is right holds while the charge fills
+const HINTS = { conf: 'IS THAT A FACE?', eyes: 'COME CLOSER', edge: 'INTO THE MIDDLE', yaw: 'LOOK STRAIGHT AT ME',
+                roll: 'HEAD STRAIGHT', open: 'OPEN YOUR EYES' };
+function faceHint(message) {
+  const list = message.faces || [];
+  const width = (face) => (face.box ? face.box[2] - face.box[0] : 0);
+  const subject = list.find((face) => face.subject) || list.slice().sort((a, b) => width(b) - width(a))[0];
+  if (!subject) return 'SHOW ME YOUR FACE';
+  if (!subject.reject) return 'HOLD IT';
+  const [what, value] = subject.reject.split(' ');
+  if (what === 'pitch') return parseFloat(value) < 0 ? 'CHIN UP' : 'CHIN DOWN';    // the pitch is positive looking up
+  return HINTS[what] || 'SHOW ME YOUR FACE';
+}
+
+// THE LOADING BAR: the bar is empty through the flash (it asks for the volume then). The diffusion and the
+// grin are one bar: the diffusion fills it to DIFF_END; whenever its progress then stands still (the portrait
+// waits for the grin: the room's player holds it until the frames come in fast enough to play without a
+// stall, a wait the page cannot know, and the room sends no stage meanwhile), the bar creeps on from where it
+// is toward CREEP_TO, slower and slower, on the page's own clock (tickBar), so it never stands still and never
+// arrives; the grin takes it from wherever it is to full. The timeout is a bar of its own; full from the bloom on
+const DIFF_END = 0.1, CREEP_TO = 0.25, CREEP_TAU = 6000;    // the creep: a time constant in ms
+let progress = 0, grinFrom = null;
+const stageNow = { stage: null, p: 0 };                        // the last stage message
+const creep = { p: null, since: 0, from: 0 };                 // the diffusion's progress, since when it stands, the bar then
+function stageProgress(stage, p) {
+  // the bar's value for a stage's progress (null: not a stage of the bar)
+  if (stage === 'diffusion') {
+    const now = performance.now();
+    const base = DIFF_END * Math.min(1, p);
+    if (p !== creep.p) { creep.p = p; creep.since = now; creep.from = Math.max(base, progress); }
+    return Math.max(base, creep.from + (CREEP_TO - creep.from) * (1 - Math.exp(-(now - creep.since) / CREEP_TAU)));
+  }
+  if (stage === 'grin') {
+    if (grinFrom === null) grinFrom = progress;
+    return grinFrom + (1 - grinFrom) * Math.min(1, p);
+  }
+  if (stage === 'timeout') return Math.min(1, p);
+  if (stage === 'bloom' || stage === 'fade') return 1;
+  return null;
+}
+function tickBar() {
+  if (state === 'transform' && stageNow.stage === 'diffusion') setProgress(stageProgress('diffusion', stageNow.p));
+}
+setInterval(tickBar, 100);
+function setProgress(value) {
+  if (value < progress) {
+    // a new stage or a new turn: the fill jumps back to the start instead of running back
+    share.classList.add('snap');
+    requestAnimationFrame(() => requestAnimationFrame(() => share.classList.remove('snap')));
+  }
+  progress = value;
+  share.style.setProperty('--progress', String(value));
 }
 
 // THE SOUND: browsers only play sound after a tap, so the "I agree" tap wakes the audio context (the
@@ -548,6 +754,7 @@ if (location.search.includes('debug')) {
       `filter ${musicFilter ? Math.round(musicFilter.frequency.value) : '-'} Hz q ${musicFilter ? musicFilter.Q.value.toFixed(1) : '-'}`,
       `video ${grinVideo.src ? (grinVideo.paused ? 'paused' : 'playing') : '-'} ${grinVideo.muted ? 'muted' : 'sound'}`,
       downloadLine(),
+      `halftone ${half.gl ? 'webgl' : 'none'} ${half.cols}x${half.rows}`,
     ].join('\n');
   }, 250);
 }
@@ -597,23 +804,49 @@ async function laugh() {
   } catch (error) { /* a sample that does not play is skipped */ }
 }
 
-// JOINING: the page opens with the terms; the one tap on "I agree" is the consent, the sound's unlock and
-// the camera's start
-$('agree').onclick = async () => {
-  $('terms').hidden = true;
-  unlockAudio();
+// JOINING: the page asks for the camera as it opens and shows it in the frame, in pixels, under the terms;
+// the bar under the frame is the agree button (full white, I AGREE TO SMILE): the one tap is the consent, the
+// sound's unlock and the joining of the line, and the bar goes black for the wait. Without a camera
+// the terms go, the bar says so and nothing can be tapped.
+async function startCamera() {
+  // the camera, or false: the page asks as it loads, and asks again inside the agree tap when there is no
+  // camera by then, without waiting for the first ask (on iOS an ask made outside a tap may never be answered:
+  // no prompt, no refusal; a request made in a tap is the one every browser treats best). Whichever ask gets
+  // a camera first keeps it, the other's is stopped
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 1600 } }, audio: false });
+    const got = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 1600 } }, audio: false });
+    if (stream) { for (const track of got.getTracks()) track.stop(); return true; }
+    stream = got;
     cam.srcObject = stream;
-    await cam.play();
-    setState('waiting');
-    setStatus(eye.status || '');
-    if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'join' }));
+    await cam.play().catch(() => {});
+    return true;
   } catch (error) {
-    setState('nocam');
-    setStatus('no camera, no smile');
+    return false;
   }
-};
+}
+function noCamera() {
+  $('terms').hidden = true;
+  setState('nocam');
+  setTappable(false);
+  setProgress(0);
+  setStatus('no camera, no smile');
+}
+const cameraReady = startCamera();
+setProgress(1);     // the bar opens white: the agree button
+setLabel('I AGREE TO SMILE(ai)', true);
+cameraReady.then((ok) => { if (ok && state === 'idle') setLabel('I AGREE TO SMILE(ai)'); });     // the camera allowed: the button moves
+
+async function agree() {
+  unlockAudio();
+  if (!stream && !(await startCamera())) { noCamera(); return; }     // the ask in the tap, when the load's got nothing
+  $('terms').hidden = true;
+  setTappable(false);
+  setProgress(0);
+  setLabel('');
+  setState('waiting');
+  setStatus(lineText(eye));
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'join' }));
+}
 
 function stopCamera() {
   if (stream) for (const track of stream.getTracks()) track.stop();
@@ -664,8 +897,14 @@ function fileName(message, url) {
   return (name ? `smile_by_${name}` : 'smile') + ext;
 }
 
-share.onclick = async () => {
-  if (!result || share.disabled) return;
+share.onclick = () => {
+  if (share.classList.contains('off')) return;
+  if (state === 'idle') agree(); else shareSmile();
+};
+share.onkeydown = (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); share.onclick(); } };   // a keyboard, on a desktop
+
+async function shareSmile() {
+  if (!result) return;
   const text = `${result.name || ''} ${result.caption || ''} ${TAGS}`.trim();
   try { navigator.clipboard.writeText(text).catch(() => {}); } catch (error) { /* no clipboard: the share text is all */ }
   try {
@@ -682,9 +921,14 @@ share.onclick = async () => {
   a.click();
 };
 
-// DRAWING, on every display frame
+// DRAWING, on every display frame: the frame, then the halftone from what the frame shows
 function draw() {
   requestAnimationFrame(draw);
+  drawCamera();
+  drawHalftone();
+}
+
+function drawCamera() {
   if (!stream || cam.readyState < 2) return;
   if (state === 'done' || (state === 'transform' && streaming)) return;
   // the camera as a 4:5 frame: scaled to cover, the middle kept, mirrored like a mirror
@@ -729,6 +973,162 @@ function drawFaces() {
   if (block > 1) pixelate(0, 0, W, H, block, viewCtx);
 }
 
+// THE HALFTONE: the page behind the frame is the picture the frame shows as a field of smileys, black and
+// white: one cell of CELL css pixels per face, its size from the brightness there, a dot in the dark, a ring,
+// and a face with eyes and a smile in the light, breathing a little so the field moves while the picture
+// stands still. The source is the camera (mirrored, as the frame), the main screen while it streams, the last
+// frame while it stands, the video when it plays; nothing before the camera is on.
+// One WebGL quad: the picture goes up as a texture and the fragment shader draws the faces, one draw a frame
+// and nothing per cell on the CPU, so a weak phone keeps up; without WebGL the background stays black.
+const halftone = $('halftone');
+const half = { gl: null, cols: 1, rows: 1, odd: false, source: null, u: {} };
+
+const HALFTONE_VERT = `
+attribute vec2 p;
+varying vec2 v;
+void main() { v = p; gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }`;
+
+const HALFTONE_FRAG = `
+precision mediump float;
+varying vec2 v;
+uniform sampler2D source;
+uniform vec2 grid;          // cells across and down
+uniform vec2 scale;         // the source fitted to cover the page: source uv = page uv * scale + shift
+uniform vec2 shift;
+uniform float time;
+
+// a line of half width w at distance d, with a soft edge
+float line(float d, float w) { return 1.0 - smoothstep(w - 0.05, w + 0.05, d); }
+
+void main() {
+  vec2 cell = floor(v * grid);
+  vec3 c = texture2D(source, (cell + 0.5) / grid * scale + shift).rgb;
+  float luma = dot(c, vec3(0.299, 0.587, 0.114));
+  float value = clamp(luma + 0.08 * sin(time * 0.7 + cell.x * 0.3 + cell.y * 0.2), 0.0, 1.0);
+  vec2 p = fract(v * grid) * 2.0 - 1.0;      // -1..1 across the cell
+  float r = 0.12 + 0.76 * value;             // the face's radius: a dot in the dark, a whole face in the light
+  float d = length(p);
+  float ink;
+  if (r < 0.3) ink = 1.0 - smoothstep(r, r + 0.08, d);     // the smallest: a dot
+  else ink = line(abs(d - r), 0.09);                        // a ring
+  if (r > 0.5) {
+    // the face: two eyes, and a smile (the lower arc of a circle set a little above the middle)
+    float eye = min(length(p - vec2(-0.36, 0.28) * r), length(p - vec2(0.36, 0.28) * r));
+    ink = max(ink, 1.0 - smoothstep(0.1 * r, 0.1 * r + 0.08, eye));
+    float arc = abs(length(p - vec2(0.0, 0.12 * r)) - 0.6 * r);
+    ink = max(ink, line(arc, 0.07) * step(p.y, -0.12 * r));
+  }
+  gl_FragColor = vec4(vec3(0.4 * ink), 1.0);
+}`;
+
+function initHalftone() {
+  half.gl = null;
+  let gl = null;
+  try { gl = halftone.getContext('webgl', { alpha: false, antialias: false, depth: false, stencil: false }); } catch (error) { gl = null; }
+  if (!gl) return;
+  const shader = (type, text) => {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, text);
+    gl.compileShader(s);
+    return s;
+  };
+  const program = gl.createProgram();
+  gl.attachShader(program, shader(gl.VERTEX_SHADER, HALFTONE_VERT));
+  gl.attachShader(program, shader(gl.FRAGMENT_SHADER, HALFTONE_FRAG));
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) return;
+  gl.useProgram(program);
+  const quad = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]), gl.STATIC_DRAW);
+  const p = gl.getAttribLocation(program, 'p');
+  gl.enableVertexAttribArray(p);
+  gl.vertexAttribPointer(p, 2, gl.FLOAT, false, 0, 0);
+  // the source texture: any size (no power of two), so clamped and without mipmaps
+  half.source = gl.createTexture();
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, half.source);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+  for (const name of ['source', 'grid', 'scale', 'shift', 'time']) half.u[name] = gl.getUniformLocation(program, name);
+  gl.uniform1i(half.u.source, 0);
+  half.gl = gl;
+  sizeHalftone();
+}
+
+function sizeHalftone() {
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  half.cols = Math.max(1, Math.round(window.innerWidth / CELL));
+  half.rows = Math.max(1, Math.round(window.innerHeight / CELL));
+  halftone.width = Math.round(window.innerWidth * dpr);
+  halftone.height = Math.round(window.innerHeight * dpr);
+  const gl = half.gl;
+  if (!gl) return;
+  gl.viewport(0, 0, halftone.width, halftone.height);
+  gl.uniform2f(half.u.grid, half.cols, half.rows);
+}
+
+function halftoneSource() {
+  if (state === 'done') return (document.body.classList.contains('playing') && grinVideo.readyState >= 2) ? grinVideo : view;
+  if (state === 'transform' && streaming) return view;
+  if (stream && cam.readyState >= 2) return frame;
+  return null;
+}
+
+function drawHalftone() {
+  const gl = half.gl;
+  if (!gl) return;
+  half.odd = !half.odd;
+  if (half.odd) return;      // every other display frame is enough
+  const src = halftoneSource();
+  const sw = src ? (src.videoWidth || src.width) : 0, sh = src ? (src.videoHeight || src.height) : 0;
+  if (!sw || !sh) {
+    gl.clearColor(0, 0, 0, 1);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    return;
+  }
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, half.source);
+  try { gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src); } catch (error) { return; }   // a video frame not yet decodable
+  // the source scaled to cover the page, the middle kept
+  const k = Math.max(window.innerWidth / sw, window.innerHeight / sh);
+  const sx = window.innerWidth / (sw * k), sy = window.innerHeight / (sh * k);
+  gl.uniform2f(half.u.scale, sx, sy);
+  gl.uniform2f(half.u.shift, (1 - sx) / 2, (1 - sy) / 2);
+  gl.uniform1f(half.u.time, performance.now() / 1000);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+}
+
+halftone.addEventListener('webglcontextlost', (event) => { event.preventDefault(); half.gl = null; });
+halftone.addEventListener('webglcontextrestored', initHalftone);
+window.addEventListener('resize', sizeHalftone);
+
+// THE TERMS: the heading and the list each at the size that makes its longest line span the frame, both
+// smaller by the same factor when they would not fit its height; measured at 10 px and scaled. Nothing to do
+// while the terms are gone or the page is hidden (a turned phone)
+function fitTerms() {
+  const terms = $('terms'), box = $('terms-box');
+  if (terms.hidden) return;
+  const style = getComputedStyle(terms);
+  const width = terms.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  const height = terms.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom);
+  if (!(width > 0 && height > 0)) return;
+  const head = box.querySelector('h1'), list = box.querySelector('ol');
+  box.style.setProperty('--terms-head', '10px');
+  box.style.setProperty('--terms', '10px');
+  let headSize = 10 * width / head.scrollWidth, listSize = 10 * width / list.scrollWidth;
+  const needed = (head.scrollHeight + 3) * headSize / 10 + list.scrollHeight * listSize / 10;   // the margin under the heading is 0.3 em
+  if (needed > height) { headSize *= height / needed; listSize *= height / needed; }
+  box.style.setProperty('--terms-head', `${headSize.toFixed(2)}px`);
+  box.style.setProperty('--terms', `${listSize.toFixed(2)}px`);
+}
+window.addEventListener('resize', fitTerms);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitTerms);     // the font's width, not the fallback's
+fitTerms();
+
 function sendFrame() {
   const now = performance.now();
   if (sending || now - lastSend < 1000 / FPS) return;
@@ -750,7 +1150,7 @@ function sendFrame() {
   }, 'image/jpeg', QUALITY);
 }
 
-setGrid([]);
+initHalftone();
 setState('idle');
 connect();
 draw();
