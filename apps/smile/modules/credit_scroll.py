@@ -132,6 +132,11 @@ def name_strip(text: str, height: int, size: int, font: str = FONT, outline_rati
 
 def _render(face: Any, text: str, px: int) -> np.ndarray:
     """The text's ink at `px` pixels, as an alpha image cropped to the ink (0 x 0 without any)."""
+    return _render_baseline(face, text, px)[0]
+
+
+def _render_baseline(face: Any, text: str, px: int) -> tuple[np.ndarray, int]:
+    """`_render`'s image and the row of the baseline in it (the rows above it hold the ascent)."""
     face.set_pixel_sizes(0, px)
     pen: int = 0
     pieces: list[tuple[int, int, np.ndarray]] = []     # x, top (from the baseline up), bitmap
@@ -148,7 +153,7 @@ def _render(face: Any, text: str, px: int) -> np.ndarray:
         pen += glyph.advance.x >> 6
         previous = char
     if not pieces:
-        return np.zeros((0, 0), np.uint8)
+        return np.zeros((0, 0), np.uint8), 0
     left: int = min(x for x, _, _ in pieces)
     right: int = max(x + b.shape[1] for x, _, b in pieces)
     top: int = max(t for _, t, _ in pieces)
@@ -158,7 +163,7 @@ def _render(face: Any, text: str, px: int) -> np.ndarray:
         y: int = top - t
         region = image[y:y + b.shape[0], x - left:x - left + b.shape[1]]
         np.maximum(region, b, out=region)
-    return image
+    return image, top
 
 
 Send = Callable[[int, str, list], None]     # player (0 or 1), address, arguments

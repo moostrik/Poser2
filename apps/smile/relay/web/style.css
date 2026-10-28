@@ -1,7 +1,8 @@
 /* SMILE Online: one portrait frame, as the installation's main screen, with the title of the machine above it
    and the artist's site below; all text in the caption's comic font (the credit is a joke); behind everything
-   the same picture as a field of smileys, black and white (app.js draws it), and over that the ring light. The frame is 4:5 like the portraits and never
-   fills the screen. */
+   the same picture as a field of smileys, black and white (app.js draws it), and over that the ring light.
+   The frame is 4:5 like the portraits and never fills the screen. The rules follow the page from the top:
+   the layers behind it, the column (title, frame, bar, credit), then a turned phone. */
 
 @font-face {
   font-family: Bangers;
@@ -12,7 +13,7 @@
 :root {
   --ink: #fff;
   --paper: #000;
-  --light: 0;       /* the ring light, 0..1: the charge while the eye is on you, full at the flash */
+  --light: 0;       /* the ring light, 0..1: the charge while the eye is on you, full at the flash (JS sets it) */
   --gutter: 24px;
   --vh: 100vh;                /* the screen's height; dvh where the browser has it (the phone's bars come and go) */
   /* the frame's width (the bar and the link take it too): the screen's width less the gutters, or what is left
@@ -36,6 +37,8 @@ html, body {
   letter-spacing: 0.03em;     /* Bangers is narrow */
 }
 
+/* THE LAYERS BEHIND THE PAGE */
+
 /* the halftone: the whole page behind the frame, drawn by JS */
 #halftone {
   position: fixed;
@@ -45,8 +48,8 @@ html, body {
   pointer-events: none;
 }
 
-/* the ring light: the page goes white as the charge fills; JS sets --light and the transition's duration
-   (the charge: short; the flash out: the installation's) */
+/* the ring light: the page goes white as the charge fills and with the room's flash; JS sets --light and the
+   transition's duration */
 #light {
   position: fixed;
   inset: 0;
@@ -56,7 +59,38 @@ html, body {
   pointer-events: none;
 }
 
-/* the column: title, frame, share, credit; centred, the frame fits with the rest in view */
+/* the readout for testing: the page with ?debug in its address (JS shows it) */
+#debug {
+  position: fixed;
+  left: 0; top: 0;
+  margin: 0;
+  padding: 4px 6px;
+  font: 11px/1.3 monospace;
+  color: #0f0;
+  background: rgba(0, 0, 0, 0.7);
+  pointer-events: none;
+  z-index: 20;
+  white-space: pre-wrap;
+}
+
+/* a phone turned on its side: the page is a portrait thing, like the room's screen, and asks to be turned
+   back (the camera and the line go on meanwhile; the halftone and the light stay). A desktop window that is
+   wider than tall gets the column as it is, fitted to its height (the media query at the end) */
+#turn {
+  display: none;
+  position: fixed;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  font-size: clamp(32px, 12vh, 72px);
+  letter-spacing: 0.04em;
+  color: #fff;
+  -webkit-text-stroke: 1.5px #000;
+  paint-order: stroke fill;
+  text-shadow: 0 0 2px #000, 0 2px 4px #000;
+}
+
+/* THE COLUMN: title, frame, bar, credit; centred, the frame fits with the rest in view */
 #page {
   position: relative;
   height: var(--vh);
@@ -87,11 +121,9 @@ html, body {
   white-space: nowrap;
 }
 
-/* the "ai" mark: the ring with "ai" in it that the share video carries as its watermark (share.py,
-   watermark_image: the ring 5.5 % of its size, the letters 62 % of it), raised like a (R) after a name so it
-   stands out a little above the letters */
-/* the mark: the ring with "ai" in it (the share video's watermark), raised after the name like a (R),
-   wherever a text names the machine (the title, the terms, the bar). It takes its size from the text */
+/* the mark: the ring with "ai" in it, raised after the name like a (R) so it stands out a little above the
+   letters, wherever a text names the machine (the title, the terms, the bar); the share video's watermark
+   draws it with these proportions (share.py, MARK_*). It takes its size from the text */
 .ai {
   display: inline-flex;       /* the letters centred in the ring (the border counts inside the box) */
   align-items: center;
@@ -119,6 +151,7 @@ html, body {
   box-shadow: 0 0 0 1.5px #000, inset 0 0 0 1.5px #000;   /* the ring's black edge, outside and inside */
 }
 
+/* THE FRAME: the camera, the main screen, the video, the flash, the terms, all filling it */
 #window {
   position: relative;
   width: var(--column);
@@ -132,32 +165,44 @@ html, body {
 
 #cam { display: none; }
 
-/* the camera (drawn and sent as a mirror) in black and white, in pixels while waiting and where a face
-   is not right; from the flash the window is the main screen, in colour */
+/* the camera (drawn and sent as a mirror) in black and white, the whole image in pixels while waiting and as
+   long as a face is not right; from the flash the window is the main screen, in colour */
 #view { image-rendering: pixelated; filter: grayscale(1); }
 body.colour #view { filter: none; }
 
-/* the saved video is the result and loops on over the last frame of the screen, which stands until the
-   video actually plays (the element is black before that) */
-#grin, #portrait { object-fit: cover; display: none; background: #000; }
+/* the saved video is the result and loops on over the last frame of the screen, which stands until the video
+   actually plays (the element is black before that) */
+#grin { object-fit: cover; display: none; background: #000; }
 body.done.playing #grin { display: block; }
 
 #flash { background: #fff; opacity: 0; pointer-events: none; transition: opacity 0.25s linear; }   /* JS sets the opacity and the duration */
 
-button {
-  font: inherit;
-  cursor: pointer;
+/* the terms, over the camera in the frame (the page asks for the camera as it opens); the bar under the frame
+   is the one tap that agrees */
+#terms {
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 16px calc(16px + 12%);     /* the block stands a little above the frame's middle */
 }
+#terms[hidden] { display: none; }
+/* the frame is the box; the heading and the list each at the size (--terms-head, --terms; JS sets them:
+   fitTerms) that makes their longest line span the frame, the other lines under it */
+#terms-box { width: 100%; }
+#terms-box h2, #terms-box ol { width: fit-content; max-width: 100%; white-space: nowrap; }
+#terms-box h2 { margin: 0 0 0.3em; font-size: var(--terms-head, 22px); font-weight: 400; letter-spacing: 0.06em; }
+#terms-box ol { margin: 0; padding-left: 1.3em; line-height: 1.35; font-size: var(--terms, 16px); }
 
-/* the bar, as wide as the frame, the page's one button and one line of text: I AGREE TO SMILE under the terms
-   (full, black text), then black with white text the wait and during the turn what the face still needs, after
-   the flash TURN YOUR VOLUME UP, then BULLSHITTING over the loading bar of the animation, filling once per stage
-   (--progress, 0..1, JS sets it), and the share button once the file is on the phone (full, black text) */
+/* THE BAR, as wide as the frame: the page's one button and one line of text (app.js, THE BAR). Its texts in
+   order: I AGREE TO SMILE under the terms (full, black text), then black with white text the wait and, in the
+   turn, what the face still needs, TURN YOUR VOLUME UP once the flash's white is full, BULLSHITTING over the
+   loading bar of the generation and the grin (one fill), PREPARING YOUR SMILE over the timeout (a fill of its
+   own), and the share button once the turn is over and the file is on the phone (full, black text) */
 #share {
-  --progress: 0;
+  --progress: 0;              /* the fill, 0..1 (JS sets it) */
   display: block;
   position: relative;
-  box-sizing: border-box;
   width: var(--column);
   padding: 14px;
   text-align: center;
@@ -171,10 +216,12 @@ button {
   font-size: 20px;
   letter-spacing: 0.12em;
 }
-/* the fill runs smoothly after --progress (a browser without @property steps it) */
-@property --progress { syntax: '<number>'; inherits: true; initial-value: 0; }   /* inherits: the fill (::before) and the copies read it */
+#share.off { cursor: default; }     /* no tap to take (JS: bar.tappable) */
+/* the fill runs smoothly after --progress (a browser without @property steps it); it inherits, so the fill
+   (::before) and the label copies read it */
+@property --progress { syntax: '<number>'; inherits: true; initial-value: 0; }
 #share { transition: --progress 0.3s linear; }
-#share.snap { transition: none; }   /* a new stage: the fill starts over without running back */
+#share.snap { transition: none; }   /* a fill that starts over jumps back instead of running back */
 #share::before {
   content: "";
   position: absolute;
@@ -183,9 +230,9 @@ button {
   background: #fff;
 }
 /* the label: #label stands in the flow, invisible, for its room and the bar's height (VOLUME grows it); the
-   text seen is two copies laid over the bar with the same content (JS: setLabel), the white one clipped to
-   the black part of the bar and the black one to the fill. Two opaque texts, no blending: the poops can fly
-   out from behind the letters (z-index between the fill and the copies) without colouring them */
+   text seen is two copies laid over the bar with the same content (JS: bar.say), the white one clipped to the
+   black part of the bar and the black one to the fill. Two opaque texts, no blending: the poops can fly out
+   from behind the letters (z-index between the fill and the copies) without colouring them */
 #share > span { text-transform: uppercase; white-space: pre; }
 #label { position: relative; visibility: hidden; }
 #share > span.copy {
@@ -200,13 +247,16 @@ button {
 #share > span.copy .text { display: inline-block; }       /* the letters laid out as in #label, the mark raised */
 #label-white { color: #fff; clip-path: inset(0 0 0 calc(var(--progress) * 100%)); }
 #label-black { color: #000; clip-path: inset(0 calc((1 - var(--progress)) * 100%) 0 0); }
-/* the moving labels, each letter its own element (JS sets the delays): BULLSHITTING waves up and down in a
-   sine, a fifth of a period apart; SHARE YOUR SMILE pops letter by letter, a ripple through the word every
-   two seconds, then rests */
+/* the moving labels, each letter its own element (JS sets the delays): I AGREE TO SMILE and SHARE YOUR SMILE,
+   the calls to action, pop letter by letter, a ripple through the words every two seconds, then rest;
+   BULLSHITTING stands still and a letter jolts when poops leave it */
 #share i { display: inline-block; font-style: normal; white-space: pre; }
-#share i.wave { animation: wave 1s ease-in-out infinite; }
-#share i.jolt { animation: jolt 0.45s ease-out; }     /* a poop just left this letter */
 #share i.ripple { animation: ripple 2s ease-in-out infinite; }
+#share i.jolt { animation: jolt 0.45s ease-out; }
+@keyframes ripple {
+  0%, 14%, 100% { transform: scale(1); }
+  7% { transform: scale(1.25); }
+}
 @keyframes jolt {
   0% { transform: scale(1); }
   25% { transform: scale(1.35, 0.65) translateY(0.12em); }
@@ -214,26 +264,16 @@ button {
   80% { transform: scale(1.05, 0.95); }
   100% { transform: scale(1); }
 }
-@keyframes wave {
-  0%, 100% { transform: translateY(-0.15em); }
-  50% { transform: translateY(0.15em); }
-}
-@keyframes ripple {
-  0%, 14%, 100% { transform: scale(1); }
-  7% { transform: scale(1.25); }
-}
-#share.off { cursor: default; }     /* no tap to take (JS: setTappable) */
-/* the poops flying out of BULLSHITTING (JS makes one at a letter now and then, flyPoops, and takes it away
-   when it has flown: --dx, --dy, --spin are its way); they stand outside the label so the blend does not turn
-   them blue over the fill */
+/* the poops flying out of BULLSHITTING: JS throws three or four from a letter every 150 ms (bar, flyPoops) and
+   takes each away when it has flown; --vx, --vy, --drop, --spin and the duration are each poop's own, set by
+   JS. They stand outside the label, over the fill and under the letters, so they keep their colour */
 #share i.fly {
   position: absolute;
   z-index: 1;                 /* over the fill, under the letters: a poop comes out from behind the word */
-  font-style: normal;
   font-size: 0.9em;
   line-height: 1;
   pointer-events: none;
-  animation: fly 1.4s linear forwards;     /* the duration is each poop's own (JS: its way at its speed) */
+  animation: fly 1.4s linear forwards;     /* the duration is each poop's own */
 }
 /* a throw under gravity: the way is the first speed times the time plus the drop (--vx, --vy the way the first
    speed alone would go over the whole flight, --drop how far gravity takes it down by its end), in steps of a
@@ -252,7 +292,6 @@ button {
   90% { transform: translate(calc(var(--vx) * 0.9), calc(var(--vy) * 0.9 + var(--drop) * 0.81)) rotate(calc(var(--spin) * 0.9)) scale(1); opacity: 0.50; }
   100% { transform: translate(calc(var(--vx) * 1.0), calc(var(--vy) * 1.0 + var(--drop) * 1.00)) rotate(calc(var(--spin) * 1.0)) scale(1); opacity: 0.00; }
 }
-
 /* the loud word (*word* in a label): VOLUME in TURN YOUR VOLUME UP grows now and then to twice the text, the
    words beside it moving aside and the bar growing with it (the size itself grows, not a transform, so it
    takes its room in the line): the whole bar asks for attention */
@@ -264,7 +303,7 @@ button {
   42% { font-size: 2em; }
 }
 
-/* the artist's site, flush with the frame's right edge; only the word is the link */
+/* THE CREDIT: the artist's site, flush with the frame's right edge; only the word is the link */
 #credit {
   width: var(--column);
   margin-top: 8px;            /* a little more room over it than the page's gap */
@@ -274,55 +313,8 @@ button {
 #credit a { color: inherit; text-decoration: none; }
 #credit a:hover, #credit a:active { color: #ddd; }
 
-/* a phone turned on its side: the page is a portrait thing, like the room's screen, and asks to be turned
-   back (the camera and the line go on meanwhile). A desktop window that is wider than tall gets the column as
-   it is, fitted to its height. */
-#turn {
-  display: none;
-  position: fixed;
-  inset: 0;
-  align-items: center;
-  justify-content: center;
-  font-size: clamp(32px, 12vh, 72px);
-  letter-spacing: 0.04em;
-  color: #fff;
-  -webkit-text-stroke: 1.5px #000;
-  paint-order: stroke fill;
-  text-shadow: 0 0 2px #000, 0 2px 4px #000;
-}
+/* A TURNED PHONE (see #turn): the column goes, the ask stands */
 @media (orientation: landscape) and (pointer: coarse) {
   #page { display: none; }
   #turn { display: flex; }
 }
-
-/* the readout for testing: the page with ?debug in its address */
-#debug {
-  position: fixed;
-  left: 0; top: 0;
-  margin: 0;
-  padding: 4px 6px;
-  font: 11px/1.3 monospace;
-  color: #0f0;
-  background: rgba(0, 0, 0, 0.7);
-  pointer-events: none;
-  z-index: 20;
-  white-space: pre-wrap;
-}
-#debug[hidden] { display: none; }
-
-/* the terms, over the camera in the frame (the page asks for the camera as it opens); the bar under the frame
-   is the one tap that agrees */
-#terms {
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px 16px calc(16px + 12%);     /* the block stands a little above the frame's middle */
-}
-#terms[hidden] { display: none; }
-/* the frame is the box; the heading and the list each at the size (--terms-head, --terms; JS sets them:
-   fitTerms) that makes their longest line span the frame, the other lines under it */
-#terms-box { width: 100%; }
-#terms-box h1, #terms-box ol { width: fit-content; max-width: 100%; white-space: nowrap; }
-#terms-box h1 { margin: 0 0 0.3em; font-size: var(--terms-head, 22px); font-weight: 400; letter-spacing: 0.06em; }
-#terms-box ol { margin: 0; padding-left: 1.3em; line-height: 1.35; font-size: var(--terms, 16px); }

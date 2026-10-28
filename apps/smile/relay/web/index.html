@@ -17,12 +17,11 @@
     <div id="window">
       <video id="cam" playsinline muted autoplay></video>
       <canvas id="view"></canvas>
-      <img id="portrait" alt="">
       <video id="grin" playsinline loop></video>
       <div id="flash"></div>
       <div id="terms">
         <div id="terms-box">
-          <h1>TERMS OF YOUR SMILE<span class="ai">ai</span></h1>
+          <h2>TERMS OF YOUR SMILE<span class="ai">ai</span></h2>
           <ol>
             <li>SMILE<span class="ai">ai</span> owns your portrait</li>
             <li>SMILE<span class="ai">ai</span> can do anything it wants with it</li>
@@ -35,13 +34,15 @@
         </div>
       </div>
     </div>
-    <!-- a box, not a button: a button clips its contents, and the loud word grows past the bar's edges -->
+    <!-- the bar: a box, not a button (a button clips its contents, and the loud word grows past the bar's
+         edges); #label holds the text's room, the two copies are the text seen (app.js, THE BAR) -->
     <div id="share" role="button" tabindex="0">
       <span id="label">I AGREE TO SMILE<span class="ai">ai</span></span>
       <span class="copy" id="label-white"><span class="text"></span></span>
       <span class="copy" id="label-black"><span class="text"></span></span>
     </div>
-    <!-- the artist's site; modules/credit.py (NAME, URL) names the artist for the room, a change goes to both -->
+    <!-- the artist's site: the name and the site are modules/credit.py's (NAME, URL) for the room; the page
+         links the site's root -->
     <div id="credit"><a href="https://oostrik.net" target="_blank" rel="noopener">oostrik.net</a></div>
   </main>
 

@@ -269,19 +269,20 @@ readable; Max rewrites the whole file when the patch is saved from Max.
 
 SMILE Online (branch `online`, a proof of concept): someone outside gets the eye when nobody inside has it. Three parts.
 `relay/` is a small aiohttp server that runs on the VPS or, for a test, on the PC (`scripts/start_relay.bat`): it serves
-the phone page (`relay/web/`: the grid of stills, the terms, the camera window; it draws the judging itself from the face
-data), keeps the waiting line (`relay/line.py`, pure logic) and passes messages (`relay/server.py` has the protocol: JSON
+the phone page (`relay/web/`: one camera frame with the terms over it and the bar under it, a field of smileys behind; it
+draws the judging itself from the face data), keeps the waiting line (`relay/line.py`, pure logic) and passes messages (`relay/server.py` has the protocol: JSON
 text, images as binary with one leading byte); it decides nothing, SMILE starts and ends every turn. `modules/online/`
 is SMILE's side: `Link` (a websocket client thread that reconnects, plus an upload thread), `Online` (the turn, stepped
-from `Main.sequence_callback`, the only place its phase changes: IDLE, ASKING, JUDGING, TRANSFORMING, DELIVERING) and
+from `Main.sequence_callback`, the only place its phase changes: OFF, IDLE, ASKING, JUDGING, TRANSFORMING; the files
+after a turn are a `Delivery` record beside the phase) and
 `fake.py`, a stand-in for SMILE at the relay. A turn puts the phone's frames into `Camera` as a third source
-(`set_online`, `push_online`; the device and the image are muted meanwhile and back when the turn ends) and the face finder,
+(`set_online`, `push_online`; the device and the image are muted meanwhile and back once the capture is taken) and the face finder,
 the charge, the flash and the generation run unchanged; `Online.on_face` sends the judging, and from the flash to the
 end of the timeout the phone gets the main screen as rendered (`ScreenGrab` in `modules/render/grab.py`, taken in
 `SmileRender._render_credit` from a credit pass without the QR code and before the status line, `stream_fps` x `stream_width`,
 encoded on the link's thread as `SHOW` frames, paced by the relay to one in flight per phone (`seen` from the page); the phone's own judging is the whole image in pixels while the face is not right and the
 page's white as the charge). The phone plays the visitor's track from the flash (`music` message; the relay keeps the
-tracks in `data/tracks` as AAC, `Link._track_aac` transcodes one the first time it is used, `DB.track_path`) on the tape: SMILE picks the style
+tracks in its own `data/tracks` as AAC, `Link._track_aac` transcodes one the first time it is used, `DB.track_path`) on the tape: SMILE picks the style
 and track at the turn's start (`Main.pick_style` from `Online._begin_turn`) and names the track to the phone, which fetches it
 during the judging; `Online._send_stage`
 sends the sequence's stage and progress (`STAGE_NAMES`, every 0.25 s) and the page follows the Max patch's curves (speed
@@ -293,7 +294,8 @@ with the sequence; `ClipSaver`'s saved callback gives the files (the recording c
 grin still plays), which are uploaded at once (`Delivery`)
 and the `result` goes to the phone by its id, so it has the video when its turn ends and the next turn can start meanwhile. The phone sends its camera mirrored, as it
 shows it. The token is a file (`data/online_token.txt`, git-ignored), never a setting in a preset.
-Tests: `relay/tests` (the server on aiohttp's test server) and `modules/online/tests` (a fake link and camera).
+Tests: `relay/tests` (the line, the server on aiohttp's test server, the page's files: `test_web.py`) and `modules/online/tests`
+(a fake link and camera).
 
 ## Settings
 

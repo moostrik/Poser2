@@ -12,12 +12,15 @@ Messages are JSON text, images are binary with one leading byte: FRAME (0) a pho
 SMILE, SHOW (1) an image from SMILE for the phone's window, LAST (2) the turn's last one, which the phone
 keeps. The phone with the turn is the only one whose frames are passed on, and only while SMILE is connected.
 
-Phone -> relay: join, leave; frames.
-Relay -> phone: state (see Line.state), grid (the newest stills; the page ignores it), turn, face, stage, result, turn_end;
-Relay -> SMILE: line {waiting}, turn {id}, gone;
-    show images.
-phone -> relay: join, leave, seen (a screen frame drawn), timing (its turn's end, for the log);
-SMILE -> relay: eye {free, status, laughter}, turn_start, face, stage {flash, in, out} then stage {name, progress}
+Phone -> relay: join (on the tap, after a missed or lost turn, at a reconnect), leave, seen (a screen frame
+    drawn), timing (its turn's end, for the log); frames (FRAME).
+Relay -> phone: state (see Line.state: eye, status, place, waiting, block, laughter; at every change of the line
+    and at every `eye` from SMILE, about once a second), grid (the newest stills: at every connect and after every
+    result with a still; the page ignores it), turn {window}, music, face, stage, result {id, ok, name, caption,
+    still, portrait, grin: the urls, None for a file that is not there}, turn_end {reason: done, missed, lost or
+    reset; `lost` also from the relay itself when SMILE goes}; SHOW and LAST images.
+Relay -> SMILE: line {waiting}, turn {id}, gone (the phone with the turn left); frames.
+SMILE -> relay: eye {free, status, laughter}, turn_start, face, stage {flash, in, out} then stage {stage, progress}
     through the sequence (the flash stages with `value`, the room's eased progress), music {id, url, offset} (the visitor's track, which SMILE uploaded as kind `track` the
     first time; the laughter samples as kind `laugh` with `ext`; `GET /api/library` lists what the relay has),
     turn_end {reason}, and after the turn
@@ -26,7 +29,6 @@ SMILE -> relay: eye {free, status, laughter}, turn_start, face, stage {flash, in
 The screen frames (SHOW) are paced by the phone: one is in flight at a time, the phone answers each with
 `seen`, and a newer frame from SMILE replaces one still waiting. So a slow phone gets fewer frames, not
 frames seconds late, and the messages behind them (stage, result, turn_end) are never held up in the pipe.
-Relay -> SMILE: line {waiting}, turn {id}, gone (the phone with the turn left); frames.
 
 Phones only open their camera on HTTPS: run it behind `tailscale serve`, a reverse proxy, or with
 `--cert` and `--key`."""
@@ -152,7 +154,7 @@ class Relay:
         elif kind == 'timing':
             # the phone's own account of its turn's end: seconds from turn_end to the result, the play, the
             # first frame playing, the share file; what a visitor outside waits for, measured where they wait
-            logger.info('phone %s timing: result %s, play %s, playing %s, file %s; first byte %s, %s KB, KB per second %s (%s)',
+            logger.info('phone %s timing: result %s, play %s, playing %s, file %s; first byte %s, %s KB, KB at every second %s (%s)',
                         phone[:8], message.get('result'), message.get('play'), message.get('playing'), message.get('file'),
                         message.get('first'), message.get('kb'), message.get('trace'), message.get('agent', ''))
         elif kind == 'seen':

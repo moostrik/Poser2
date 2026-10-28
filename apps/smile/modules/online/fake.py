@@ -120,27 +120,34 @@ class FakeSmile:
 
     def transform(self, image: np.ndarray) -> None:
         """The flash and a fake transformation streamed as the screen: the frame itself, worked over
-        frame by frame, white at the flash, the blur falling, then the portrait standing."""
+        frame by frame, white at the flash, the blur falling, then the portrait standing; the stages as SMILE
+        sends them (flash_in, flash_out, diffusion, grin, timeout), since the page streams from the flash-out on."""
         with self.mutex:
             if not self.turn or self.busy:
                 return
             self.busy = True        # the turn goes on until the sequence is over: no judging, no new turn
         link: Link = self.link
         phone: str = self.phone
-        link.send({'type': 'stage', 'stage': 'flash', 'out': 1.5})
+        link.send({'type': 'stage', 'stage': 'flash', 'in': 0.9, 'out': 1.5})
+        link.send({'type': 'stage', 'stage': 'flash_in', 'progress': 1.0, 'value': 1.0})
         portrait: np.ndarray = cv2.applyColorMap(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), cv2.COLORMAP_PINK)
         frames: int = int(6 * STREAM_FPS)
         for i in range(frames):
             t: float = i / frames
             if t < 0.15:
                 shown: np.ndarray = cv2.addWeighted(image, t / 0.15, np.full_like(image, 255), 1 - t / 0.15, 0)
+                stage: dict = {'type': 'stage', 'stage': 'flash_out', 'progress': round(t / 0.15, 3), 'value': round(t / 0.15, 3)}
             elif t < 0.7:
                 blur: int = 2 * int(30 * (0.7 - t) / 0.55) + 1
                 shown = cv2.GaussianBlur(image, (blur, blur), 0)
+                stage = {'type': 'stage', 'stage': 'diffusion', 'progress': round((t - 0.15) / 0.55, 3)}
             else:
                 shown = cv2.addWeighted(image, max(0.0, 1 - (t - 0.7) / 0.1), portrait, min(1.0, (t - 0.7) / 0.1), 0)
+                stage = {'type': 'stage', 'stage': 'grin', 'progress': round((t - 0.7) / 0.3, 3)}
+            link.send(stage)
             link.send_image(encode(shown) or b'')
             time.sleep(1.0 / STREAM_FPS)
+        link.send({'type': 'stage', 'stage': 'timeout', 'progress': 1.0})
         link.send({'type': 'turn_end', 'reason': 'done'})
         with self.mutex:
             self.turn = False
