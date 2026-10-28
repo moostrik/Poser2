@@ -34,9 +34,6 @@ depth cam pose synchony detection
 ### ExecutionPolicy
 * open powershell as administrator and type ```Set-ExecutionPolicy -ExecutionPolicy RemoteSigned```
 
-### Cuda
-* install CUDA 12.9.1 [download](https://developer.download.nvidia.com/compute/cuda/12.9.1/local_installers/cuda_12.9.1_576.57_windows.exe) or [site](https://developer.nvidia.com/cuda-12-9-1-download-archive?target_os=Windows&target_arch=x86_64&target_version=11&target_type=exe_local)
-
 ### FFmpeg
 * Install latest version from [site](https://ffmpeg.org/download.html#build-windows)
 * And add its 'bin' to path
@@ -46,11 +43,12 @@ depth cam pose synchony detection
 
 ### Install Script
 * in the terminal run ```scripts\install.bat```: it pulls the LFS files and builds `.venv` from `uv.lock` (run it again after every pull that changes `uv.lock`)
-* and make the models for an app ```scripts/makemodels.bat <app_name>``` or all apps ```scripts/makemodels.bat all``` using the .venv environment
+* and make the models for an app ```scripts/makemodels.bat <app_name>``` or all apps ```scripts/makemodels.bat all``` using the .venv environment; it skips the engines that exist, ```scripts/makemodels.bat all rebuild``` builds them again (needed after a TensorRT upgrade: an engine only runs on the version that built it)
+* The CUDA runtime comes with torch's wheel (CUDA 13) and TensorRT builds the engines from Python, so no CUDA toolkit is installed; the NVIDIA driver has to support CUDA 13
 
 ### Upgrade Packages
 * ```uv lock --upgrade``` moves `uv.lock` to the newest versions that fit `pyproject.toml`; then ```scripts\install.bat```, the timing check below, and commit `uv.lock`
-* The exact pins in `pyproject.toml` (depthai, torch, TensorRT, cuda-python) never move this way; the GPU stack moves only together with rebuilt TensorRT engines
+* The exact pins in `pyproject.toml` (depthai, torch, TensorRT) never move this way; the GPU stack moves only together with rebuilt TensorRT engines
 
 ### Run Project
 * activate venv and run ```python launcher.py```

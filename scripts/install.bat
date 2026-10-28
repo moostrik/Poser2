@@ -2,17 +2,6 @@
 cd /d "%~dp0.."
 echo.
 
-echo [44m CUDA 12.9 [0m
-echo %PATH% | find /I "CUDA\v12.9\bin" >nul
-if %errorlevel%==0 (
-    echo [92mCUDA 12.9 bin directory found in PATH.[0m
-) else (
-    echo [91mCUDA 12.9 bin directory NOT found in PATH![0m
-    echo Please add "C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\bin" to your PATH.
-    goto endofscript
-)
-echo.
-
 echo [44m Git LFS [0m
 where git >nul 2>nul
 if %errorlevel% neq 0 (

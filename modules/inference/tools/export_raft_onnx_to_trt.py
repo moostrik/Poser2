@@ -24,10 +24,12 @@ def convert_raft_to_tensorrt(
     min_batch: int = 1,
     opt_batch: int = 3,
     max_batch: int = 4,
-    workspace_gb: int = 8,
-    fp16_override: bool = False
+    workspace_gb: int = 8
 ) -> bool:
     """Convert RAFT ONNX model to TensorRT engine.
+
+    The engine's precision is the ONNX model's (TensorRT builds strongly typed); an FP32 model is
+    made FP16 beforehand with `convert_onnx_to_fp16.py`.
 
     Args:
         onnx_path: Path to input ONNX file
@@ -36,7 +38,6 @@ def convert_raft_to_tensorrt(
         opt_batch: Optimal batch size (used for optimization)
         max_batch: Maximum batch size (set to opt_batch if never exceeded)
         workspace_gb: Workspace size in GB
-        fp16_override: Force FP16 precision even if ONNX is FP32 (default: False)
 
     Returns:
         bool: True if successful, False otherwise
@@ -65,7 +66,7 @@ def convert_raft_to_tensorrt(
     print("📦 Creating TensorRT builder...", end='', flush=True)
     logger = trt.Logger(trt.Logger.WARNING)
     builder = trt.Builder(logger)
-    network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+    network = builder.create_network(0)   # strongly typed: the precision is the ONNX model's (TensorRT 11)
     parser = trt.OnnxParser(network, logger)
     print(" ✓")
 
@@ -122,7 +123,6 @@ def convert_raft_to_tensorrt(
     onnx_model = onnx.load(onnx_path)
 
     # Check initializer (weights) precision
-    use_fp16 = False
     detected_precision = "UNKNOWN"
     if onnx_model.graph.initializer:
         onnx_dtype_map = {1: "FLOAT32", 10: "FLOAT16", 2: "UINT8", 3: "INT8", 6: "INT32", 7: "INT64"}
@@ -134,10 +134,8 @@ def convert_raft_to_tensorrt(
         # Determine precision (prefer FP16 if found, otherwise FP32)
         if "FLOAT16" in weight_dtypes:
             detected_precision = "FP16"
-            use_fp16 = True
         elif "FLOAT32" in weight_dtypes:
             detected_precision = "FP32"
-            use_fp16 = False
         else:
             detected_precision = ", ".join(sorted(weight_dtypes))
 
@@ -147,19 +145,10 @@ def convert_raft_to_tensorrt(
         print("  ⚠️  ONNX weights: No initializers found")
         print("  Defaulting to FP32")
         detected_precision = "FP32"
-        use_fp16 = False
-
-    # Apply FP16 override if requested
-    if fp16_override:
-        use_fp16 = True
-        build_precision = "FP16 (forced override)"
-        print(f"  ⚠️  FP16 override: Forcing FP16 build from {detected_precision} ONNX")
-    else:
-        build_precision = f"{detected_precision} (auto-detected)"
 
     # Show build configuration
     print("\n🎯 TensorRT Build Configuration:")
-    print(f"  Precision: {build_precision}")
+    print(f"  Precision: {detected_precision} (the ONNX model's)")
 
     # Configure builder
     print("\n⚙️  Configuring builder...")
@@ -182,17 +171,10 @@ def convert_raft_to_tensorrt(
                       (max_batch, 3, height, width))
 
     config.add_optimization_profile(profile)
-    print(f"  ├─ Optimization profile: batch {min_batch}/{opt_batch}/{max_batch}, shape {height}×{width}")
-
-    # Set precision mode based on detected ONNX precision
-    if use_fp16:
-        config.set_flag(trt.BuilderFlag.FP16)
-        print(f"  └─ Precision: FP16")
-    else:
-        print(f"  └─ Precision: FP32")
+    print(f"  └─ Optimization profile: batch {min_batch}/{opt_batch}/{max_batch}, shape {height}×{width}")
 
     # Build engine
-    print(f"\n🔨 Building TensorRT engine ({detected_precision})...)")
+    print(f"\n🔨 Building TensorRT engine ({detected_precision})...")
     print("   ⏱️  This may take 2-5 minutes, please wait...")
     serialized_engine = builder.build_serialized_network(network, config)
 
@@ -231,12 +213,7 @@ def convert_raft_to_tensorrt(
     }
     actual_precision = precision_map.get(input_dtype, "UNKNOWN")
 
-    if fp16_override and actual_precision == "FP16":
-        print(f" ✓ (Built as {actual_precision} ✅)")
-    elif fp16_override and actual_precision != "FP16":
-        print(f" ⚠️ (Requested FP16 but built as {actual_precision})")
-    else:
-        print(f" ✓ (Built as {actual_precision})")
+    print(f" ✓ (Built as {actual_precision})")
 
     print(f"\n{'═'*70}")
     print(f"✅ CONVERSION COMPLETE")
@@ -277,8 +254,6 @@ if __name__ == '__main__':
                         help='Maximum batch size (default: 3, set to opt-batch if never exceeded)')
     parser.add_argument('--workspace', type=int, default=8,
                         help='Workspace size in GB (default: 8)')
-    parser.add_argument('--fp16', action='store_true',
-                        help='Force FP16 precision even if ONNX is FP32 (faster inference, minimal accuracy loss)')
 
     args = parser.parse_args()
 
@@ -288,8 +263,7 @@ if __name__ == '__main__':
         args.min_batch,
         args.opt_batch,
         args.max_batch,
-        args.workspace,
-        args.fp16
+        args.workspace
     )
 
     sys.exit(0 if success else 1)

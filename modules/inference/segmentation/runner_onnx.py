@@ -8,6 +8,8 @@ import numpy as np
 import torch
 import onnxruntime as ort
 
+from ..ort_runtime import preload_cuda
+
 from .io import SegmentationInput, SegmentationOutput, SegmentationOutputCallback
 
 from typing import TYPE_CHECKING
@@ -194,6 +196,7 @@ class RunnerONNX(Thread):
         """Initialize ONNX session, executor, and warmup. Called from run()."""
         try:
             # Initialize ONNX Runtime session with CUDA provider
+            preload_cuda()
             providers = [
                 ('CUDAExecutionProvider', {
                     'device_id': 0,
@@ -220,7 +223,7 @@ class RunnerONNX(Thread):
             # Verify CUDA provider is active
             providers_used = self._session.get_providers()
             if 'CUDAExecutionProvider' not in providers_used:
-                logger.warning("Segmentation WARNING: CUDA provider not available, using CPU")
+                raise RuntimeError("CUDA provider not available: the runner binds CUDA tensors, the CPU provider cannot take them")
 
             # Determine model precision from 'src' input tensor
             src_input = self._session.get_inputs()[0]  # First input is 'src'

@@ -32,6 +32,9 @@ def convert_rvm_to_tensorrt(
 ) -> bool:
     """Convert RVM ONNX model to TensorRT engine.
 
+    The engine's precision is the ONNX model's (TensorRT builds strongly typed); an FP32 model is
+    made FP16 beforehand with `convert_onnx_to_fp16.py`.
+
     Args:
         onnx_path: Path to input ONNX file
         output_path: Path to output TensorRT engine (auto-generated from input if not provided)
@@ -68,7 +71,7 @@ def convert_rvm_to_tensorrt(
     print("📦 Creating TensorRT builder...", end='', flush=True)
     logger = trt.Logger(trt.Logger.WARNING)
     builder = trt.Builder(logger)
-    network = builder.create_network(1 << int(trt.NetworkDefinitionCreationFlag.EXPLICIT_BATCH))
+    network = builder.create_network(0)   # strongly typed: the precision is the ONNX model's (TensorRT 11)
     parser = trt.OnnxParser(network, logger)
     print(" ✓")
 
@@ -125,7 +128,6 @@ def convert_rvm_to_tensorrt(
     onnx_model = onnx.load(onnx_path)
 
     # Check initializer (weights) precision
-    use_fp16 = False
     detected_precision = "UNKNOWN"
     if onnx_model.graph.initializer:
         onnx_dtype_map = {1: "FLOAT32", 10: "FLOAT16", 2: "UINT8", 3: "INT8", 6: "INT32", 7: "INT64"}
@@ -137,10 +139,8 @@ def convert_rvm_to_tensorrt(
         # Determine precision (prefer FP16 if found, otherwise FP32)
         if "FLOAT16" in weight_dtypes:
             detected_precision = "FP16"
-            use_fp16 = True
         elif "FLOAT32" in weight_dtypes:
             detected_precision = "FP32"
-            use_fp16 = False
         else:
             detected_precision = ", ".join(sorted(weight_dtypes))
 
@@ -150,11 +150,10 @@ def convert_rvm_to_tensorrt(
         print("  ⚠️  ONNX weights: No initializers found")
         print("  Defaulting to FP32")
         detected_precision = "FP32"
-        use_fp16 = False
 
     # Show build configuration
     print("\n🎯 TensorRT Build Configuration:")
-    print(f"  Precision: {detected_precision} (auto-detected from ONNX)")
+    print(f"  Precision: {detected_precision} (the ONNX model's)")
 
     # Configure builder
     print("\n⚙️  Configuring builder...")
@@ -189,14 +188,7 @@ def convert_rvm_to_tensorrt(
                               (max_batch, 64, height // 16, width // 16))
 
     config.add_optimization_profile(profile)
-    print(f"  ├─ Optimization profile: batch {min_batch}/{opt_batch}/{max_batch}, shape {height}×{width}")
-
-    # Set precision mode based on detected ONNX precision
-    if use_fp16:
-        config.set_flag(trt.BuilderFlag.FP16)
-        print(f"  ├─ Precision: FP16")
-    else:
-        print(f"  ├─ Precision: FP32")
+    print(f"  └─ Optimization profile: batch {min_batch}/{opt_batch}/{max_batch}, shape {height}×{width}")
 
     # Build engine
     print(f"\n🔨 Building TensorRT engine ({detected_precision})...")

@@ -9,9 +9,9 @@ logger = logging.getLogger(__name__)
 import numpy as np
 try:
     import torch
-    from cuda.bindings import runtime  # type: ignore
+    from . import cudart   # binds torch's CUDA runtime; fails without a CUDA torch
     _GPU_OK = True
-except ImportError:
+except (ImportError, OSError):
     _GPU_OK = False
 
 if TYPE_CHECKING:
@@ -177,13 +177,7 @@ class Tensor(Texture):
         # Register PBO with CUDA for interop
         if _GPU_OK:
             try:
-                err, self._cuda_gl_resource = runtime.cudaGraphicsGLRegisterBuffer(
-                    self._pbo,
-                    runtime.cudaGraphicsRegisterFlags.cudaGraphicsRegisterFlagsWriteDiscard
-                )
-                if err != runtime.cudaError_t.cudaSuccess:
-                    logger.warning("CUDA-GL interop registration failed (error %s), using CPU fallback", err)
-                    self._cuda_gl_resource = None
+                self._cuda_gl_resource = cudart.register_gl_buffer(self._pbo)
             except Exception as e:
                 logger.warning("CUDA-GL interop registration failed (%s), using CPU fallback", e)
                 self._cuda_gl_resource = None
@@ -198,7 +192,10 @@ class Tensor(Texture):
 
         # Unregister CUDA resource
         if _GPU_OK and self._cuda_gl_resource is not None:
-            runtime.cudaGraphicsUnregisterResource(self._cuda_gl_resource)
+            try:
+                cudart.unregister_resource(self._cuda_gl_resource)
+            except cudart.CudaError as e:
+                logger.warning("CUDA-GL interop unregister failed: %s", e)
             self._cuda_gl_resource = None
 
         super().deallocate()
@@ -303,28 +300,14 @@ class Tensor(Texture):
         # This is critical when tensor comes from TensorRT on different streams
         # torch.cuda.synchronize()
 
-        # Map graphics resource to get CUDA device pointer
-        (err,) = runtime.cudaGraphicsMapResources(1, self._cuda_gl_resource, torch.cuda.current_stream().cuda_stream)
-        if err != runtime.cudaError_t.cudaSuccess:
-            raise RuntimeError(f"Failed to map graphics resource: {err}")
-
-        # Get mapped device pointer
-        err, pbo_dev_ptr, pbo_size = runtime.cudaGraphicsResourceGetMappedPointer(self._cuda_gl_resource)
-        if err != runtime.cudaError_t.cudaSuccess:
-            raise RuntimeError(f"Failed to get mapped pointer: {err}")
-
-        # Get PyTorch tensor's CUDA device pointer
-        tensor_ptr = tensor.data_ptr()
-
-        # Copy directly from tensor to PBO (device-to-device, no CPU involved)
-        (err,) = runtime.cudaMemcpy(pbo_dev_ptr, tensor_ptr, self._pbo_size, runtime.cudaMemcpyKind.cudaMemcpyDeviceToDevice)
-        if err != runtime.cudaError_t.cudaSuccess:
-            raise RuntimeError(f"Failed to copy to PBO: {err}")
-
-        # Unmap graphics resource
-        (err,) = runtime.cudaGraphicsUnmapResources(1, self._cuda_gl_resource, torch.cuda.current_stream().cuda_stream)
-        if err != runtime.cudaError_t.cudaSuccess:
-            raise RuntimeError(f"Failed to unmap graphics resource: {err}")
+        # Map the PBO on the current stream, copy the tensor into it on the device, unmap
+        stream = torch.cuda.current_stream().cuda_stream
+        cudart.map_resource(self._cuda_gl_resource, stream)
+        try:
+            pbo_dev_ptr, _ = cudart.mapped_pointer(self._cuda_gl_resource)
+            cudart.memcpy_device_to_device(pbo_dev_ptr, tensor.data_ptr(), self._pbo_size)
+        finally:
+            cudart.unmap_resource(self._cuda_gl_resource, stream)
 
         # Get channel count and GL type
         channels = get_channel_count_from_format(self.internal_format)

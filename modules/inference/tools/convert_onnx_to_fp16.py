@@ -3,13 +3,13 @@
 
 Usage:
     # Inspect model ops
-    python modules/pose/batch/detection/convert_onnx_to_fp16.py --input models/rtmpose-l_256x192_fp32.onnx --inspect
+    python modules/inference/tools/convert_onnx_to_fp16.py --input models/rtmpose-l_256x192_fp32.onnx --inspect
 
     # Convert only Conv to FP16, keep everything else FP32
-    python modules/pose/batch/detection/convert_onnx_to_fp16.py --input models/rtmpose-l_256x192_fp32.onnx --output models/rtmpose-l_256x192_test.onnx --fp16-ops Conv
+    python modules/inference/tools/convert_onnx_to_fp16.py --input models/rtmpose-l_256x192_fp32.onnx --output models/rtmpose-l_256x192_test.onnx --fp16-ops Conv
 
     # Add more ops to FP16
-    python modules/pose/batch/detection/convert_onnx_to_fp16.py --input models/rtmpose-l_256x192_fp32.onnx --output models/rtmpose-l_256x192_test.onnx --fp16-ops Conv Mul Sigmoid
+    python modules/inference/tools/convert_onnx_to_fp16.py --input models/rtmpose-l_256x192_fp32.onnx --output models/rtmpose-l_256x192_test.onnx --fp16-ops Conv Mul Sigmoid
 """
 
 import argparse
