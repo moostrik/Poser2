@@ -13,7 +13,7 @@ from threading import Event, Thread
 
 import psutil
 
-from modules.log_config import setup_logging, install_thread_excepthook
+from modules.log_config import setup_logging, install_excepthooks, crash_summary
 from modules.utils import timing
 from apps import APP_NAMES, load_app
 
@@ -58,13 +58,14 @@ if __name__ == '__main__':
     parser.add_argument('-timing',  '--timing',         type=float, default=0.0,    help='seconds of timing session: write a timing report to logs/, then quit (0 = off)')
     parser.add_argument('-warmup',  '--timing-warmup',  type=float, default=30.0,   help='seconds before the timing session starts')
     args: Namespace = parser.parse_args()
-    log_file = setup_logging(verbose=args.verbose)
-    install_thread_excepthook()
     if args.app is None:
-        args.app = _read_launcher_file()
+        args.app = _read_launcher_file()   # its warnings go to stderr: the log file is named after the app
+    log_file = setup_logging(verbose=args.verbose, name=args.app)
+    install_excepthooks()
 
     logging.info("Starting  >>> %s <<<  pid: %s  simulation: %s", args.app, process_id, args.simulation)
     logging.info("Logging to: %s", log_file)
+    logging.info(crash_summary())
 
     AppClass = load_app(args.app)
     app = AppClass(simulation=args.simulation, interface=not args.no_interface)

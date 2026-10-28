@@ -24,6 +24,7 @@ class BlurV(Shader):
         # Configure shader uniforms (using cached locations)
         glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform1f(self.get_uniform_loc("radius"), radius)
+        glUniform2f(self.get_uniform_loc("resolution"), tex0.width, tex0.height)
 
         # Render
         draw_quad()

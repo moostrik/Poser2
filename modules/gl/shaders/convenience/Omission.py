@@ -31,6 +31,7 @@ class Omission(Shader):
         glUniform1i(self.get_uniform_loc("mask"), 2)
         glUniform1f(self.get_uniform_loc("bloom"), bloom)
         glUniform1f(self.get_uniform_loc("omission"), omission)
+        glUniform2f(self.get_uniform_loc("resolution"), tex0.width, tex0.height)
 
         # Render
         draw_quad()

@@ -48,6 +48,37 @@ class TestWindowManager(unittest.TestCase):
         self.assertEqual(done, [1])                 # the calls after it still run
         self.assertEqual(self.glfw.poll_events.call_count, 2)
 
+    def test_every_frame_starts_in_the_main_context(self):
+        # drawing a secondary window leaves its context current; the renderer's FBOs live in the main one
+        main, secondary = object(), object()
+        self.manager._main_window = main
+        self.manager._secondary_windows[1] = secondary
+        self.glfw.window_should_close.side_effect = [False, False, True]
+        self.glfw.get_framebuffer_size.return_value = (100, 100)
+        current: list[object] = []
+        self.glfw.make_context_current.side_effect = current.append
+        self.renderer.update.side_effect = lambda: current.append(('update', current[-1]))
+        self.renderer.deallocate.side_effect = lambda: current.append(('deallocate', current[-1]))
+        with mock.patch.object(self.manager, '_bind_quad_vao'), mock.patch.object(MODULE, 'glBindFramebuffer'), \
+                mock.patch.object(MODULE, 'glViewport'), mock.patch.object(MODULE, 'glGetString', return_value=b'4.6'):
+            self.manager._render_loop()
+        self.assertEqual([c for c in current if isinstance(c, tuple)], [('update', main), ('update', main), ('deallocate', main)])
+        self.assertIn(secondary, current)
+
+    def test_the_mouse_is_hidden_in_fullscreen_unless_the_setting_shows_it(self):
+        glfw, settings = self.glfw, self.manager.settings
+        self.manager._main_window = window = object()
+        self.manager._fullscreen_mode = FullscreenMode.WINDOWED_FULLSCREEN
+        self.manager.apply_cursor()
+        glfw.set_input_mode.assert_called_with(window, glfw.CURSOR, glfw.CURSOR_HIDDEN)
+        settings.fullscreen_mouse = True                 # the panel's switch: applied by the render loop
+        self.run_loop(1)
+        glfw.set_input_mode.assert_called_with(self.manager._main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
+        settings.fullscreen_mouse = False
+        self.manager._fullscreen_mode = FullscreenMode.WINDOWED      # a window always shows it
+        self.manager.apply_cursor()
+        glfw.set_input_mode.assert_called_with(self.manager._main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
+
     def test_a_monitor_without_a_video_mode_is_skipped(self):
         # a monitor that is being unplugged is still listed, and asking for its video mode fails
         gone, good = object(), object()

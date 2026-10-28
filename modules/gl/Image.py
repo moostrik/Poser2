@@ -220,6 +220,9 @@ class Image(Fbo):
             return
 
         # Upload image data to source texture using glTexSubImage2D (faster than glTexImage2D)
+        # numpy rows are tightly packed; OpenGL's default row alignment of 4 bytes shears any image
+        # whose row isn't a multiple of 4 bytes (e.g. an 878 px wide BGR image)
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1)
         self._source.bind()
         glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height,
                         self._source.format, self._source.data_type, image)
