@@ -58,6 +58,7 @@ class CreditLayer(LayerBase):
         self._base: Fbo = Fbo()             # the image with the QR code
         self._card: Fbo = Fbo()             # and with the caption
         self._fbo: Fbo = Fbo()              # the two mixed by the caption's opacity
+        self._clean: Fbo = Fbo()            # the same without the QR code: the phone's and the online cell's copy
         self._blend: Blend = Blend()
         self._text: Text = Text()
         self._qr: Image = Image('BGR')
@@ -71,6 +72,7 @@ class CreditLayer(LayerBase):
         self._base.allocate(width, height, internal_format)
         self._card.allocate(width, height, internal_format)
         self._fbo.allocate(width, height, internal_format)
+        self._clean.allocate(width, height, internal_format)
         self._blend.allocate()
         self._text.allocate(FONT, FONT_SIZE)
 
@@ -78,6 +80,7 @@ class CreditLayer(LayerBase):
         self._base.deallocate()
         self._card.deallocate()
         self._fbo.deallocate()
+        self._clean.deallocate()
         self._blend.deallocate()
         self._text.deallocate()
         self._qr.deallocate()
@@ -94,11 +97,17 @@ class CreditLayer(LayerBase):
     def texture(self) -> Texture:
         return self._fbo
 
+    @property
+    def clean(self) -> Texture:
+        """The output of the last `render` without the QR code (SMILE Online: the phone's and the online cell's copy)."""
+        return self._clean
+
     def render(self, source: Texture, alpha: float, qr_code: bool = True) -> None:
-        """The QR code over source, and the caption at opacity `alpha`; without the QR code for the copy
-        that goes to a phone (SMILE Online: the code is for the room)."""
+        """The QR code over source, and the caption at opacity `alpha`, into `texture`; without the QR code
+        into `clean` for the copy that goes to a phone and the online cell (SMILE Online: the code is for the room)."""
         if not source.allocated:
             return
+        target: Fbo = self._fbo if qr_code else self._clean
         self._base.begin()
         Blit.use(source)
         qr: int = self._qr.width if self._qr.allocated and qr_code else 0
@@ -109,15 +118,15 @@ class CreditLayer(LayerBase):
             glViewport(0, 0, self._width, self._height)
         self._base.end()
         if alpha <= 0.0:
-            copy(self._base, self._fbo)
+            copy(self._base, target)
             return
         self._card.begin()
         Blit.use(self._base)
         self._draw_caption()
         self._card.end()
-        self._fbo.begin()
+        target.begin()
         self._blend.use(self._base, self._card, alpha)
-        self._fbo.end()
+        target.end()
 
     def new_visitor(self) -> None:
         """Draw the line under the name for the visitor that is captured now."""

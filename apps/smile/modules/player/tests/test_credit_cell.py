@@ -21,6 +21,11 @@ class TestCreditCell(unittest.TestCase):
         self.assertEqual(next_credit_cell(None, '4', ['4']), (None, '4'))
         self.assertEqual(next_credit_cell(None, '4', ['4', '2']), ('2', '4'))
 
+    def test_never_the_online_cell_and_leaves_it_when_it_becomes_one(self):
+        self.assertEqual(next_credit_cell(None, None, ['4'], exclude='4'), (None, None))
+        self.assertEqual(next_credit_cell(None, None, ['4', '2'], exclude='4'), ('2', None))
+        self.assertEqual(next_credit_cell('4', None, [], exclude='4'), (None, '4'))
+
 
 if __name__ == '__main__':
     unittest.main()

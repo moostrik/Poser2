@@ -1,10 +1,9 @@
-"""The artist's name going round the sphere on the player walls: each word of it (the first name, the
-surname) circles its own ring of screens without end, over the playing clips, like a ticker, letters most of
-a screen tall, one word per lap so a screen is clear between two laps. SMILE plans the loops
-(`CreditScroller`, in the render loop) and sends each player, every second, the cells of its own on each ring
-with their place round it and the time the loop began; the players know nothing of the sphere and draw the
-word from one long texture (`name_strip`) by their own clock. No GL here: the geometry is shared by both apps
-and tested without one."""
+"""The artist's name going round the sphere on the walls: each word of it (the first name, the surname)
+circles its own ring of screens without end, over the playing clips, like a ticker, letters most of a screen
+tall, one word per lap so a screen is clear between two laps. SMILE plans the loops (`CreditScroller`, in the
+render loop) and hands each wall, every second, the cells of its own on each ring with their place round it
+and the time the loop began; the walls know nothing of the sphere and draw the word from one long texture
+(`name_strip`) by the clock. No GL here: the geometry is tested without one."""
 
 import logging
 from dataclasses import dataclass
@@ -30,11 +29,8 @@ SCREEN_HEIGHT_PX: int = 640
 
 DEFAULT_ROWS: str = "1,3"       # the rings with 12 screens, leaving the middle one to the clips
 DEFAULT_GAP_PX: int = 288       # the wall between two screens, found on site 2026-10-25
-ADDRESS: str = '/scroll_loop'   # to the players: word, speed (px/s), gap (px), size (px), the ring's screens, the time the
-                                # loop began (time.time() as text: an OSC float is 32-bit and loses 128 s of a Unix time;
-                                # SMILE and the players share the PC's clock), then cell, place, cell, place ...
-SEND_EVERY: float = 1.0         # a loop is sent again every second: a player that starts late joins in step
-TIMEOUT: float = 3.0            # the players drop a loop that got no message for this long (SMILE gone, the switch off)
+SEND_EVERY: float = 1.0         # a loop is renewed every second
+TIMEOUT: float = 3.0            # the walls drop a loop that was not renewed for this long (the switch off, the test on)
 
 
 def row_screens(row: int) -> list[int]:
@@ -166,17 +162,18 @@ def _render_baseline(face: Any, text: str, px: int) -> tuple[np.ndarray, int]:
     return image, top
 
 
-Send = Callable[[int, str, list], None]     # player (0 or 1), address, arguments
+# wall (0 or 1), word, speed (px/s), gap (px), size (px), the ring's screens, when the loop began, the wall's cells with their places
+Send = Callable[[int, str, float, float, int, int, float, list[tuple[int, int]]], None]
 
 
 class CreditScroller:
-    """Sends the loops from the panel's Scroll settings (`RenderSettings`) to the players. `update` runs in
-    SMILE's render loop (with `time.time()`) and never raises there: while `credit_scroll` is on and nothing
-    blocks it (the laughter test), every `SEND_EVERY` second each row of `credit_scroll_rows` gets its word of
-    `credit_name` (`plan_loops`) with the time it began and its own speed (`credit_scroll_speed_1` for the
-    first word, `_2` for the others). A speed changed in the panel moves the start time so the word goes on
-    from where it is. Off, or blocked, nothing is sent and the players' loops time out. `credit_scroll_last`
-    shows what goes round."""
+    """Hands the loops from the panel's Scroll settings (`RenderSettings`) to the walls (the clip player's
+    `scroll_loop`). `update` runs in SMILE's render loop (with `time.time()`) and never raises there: while
+    `credit_scroll` is on and nothing blocks it (the laughter test), every `SEND_EVERY` second each row of
+    `credit_scroll_rows` gets its word of `credit_name` (`plan_loops`) with the time it began and its own speed
+    (`credit_scroll_speed_1` for the first word, `_2` for the others). A speed changed in the panel moves the
+    start time so the word goes on from where it is. Off, or blocked, nothing is sent and the walls' loops
+    time out. `credit_scroll_last` shows what goes round."""
 
     def __init__(self, settings: Any, send: Send) -> None:
         self.settings: Any = settings
@@ -217,14 +214,13 @@ class CreditScroller:
         for index, (word, path) in enumerate(loops):
             speed: float = max(1.0, speeds[min(index, 1)] * SCREEN_PX)
             start: float = self.word_start(index, speed, now)
-            head: list = [word, speed, gap, int(settings.credit_scroll_size), path.count, repr(start)]
-            for player in range(PLAYERS):
-                cells: list[tuple[int, int]] = path.cells(player)
+            for wall in range(PLAYERS):
+                cells: list[tuple[int, int]] = path.cells(wall)
                 if cells:
                     try:
-                        self._send(player, ADDRESS, head + [value for pair in cells for value in pair])
+                        self._send(wall, word, speed, float(gap), int(settings.credit_scroll_size), path.count, start, cells)
                     except Exception:
-                        logger.exception('Scrolling name: player %d could not be reached', player + 1)
+                        logger.exception('Scrolling name: wall %d failed', wall + 1)
         for index in [index for index in self._words if index >= len(loops)]:
             del self._words[index]
         text: str = ', '.join(f'{word} round row {path.row}' for word, path in loops)

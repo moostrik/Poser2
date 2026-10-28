@@ -47,6 +47,7 @@ relay itself, `OnlinePhone.md` what happens on a phone.
 | the name               | `iaai.tail63e3df.ts.net`                 | a DNS name of the VPS                 |
 | who reaches the page   | the tailnet (`funnel`: anyone)           | anyone                                |
 | SMILE's `online.relay` | `wss://iaai.tail63e3df.ts.net/ws/smile`  | `wss://<name>/ws/smile`               |
+| the QR code on the walls | `https://iaai.tail63e3df.ts.net/` (`online.page` empty: the relay's host) | `https://<name>/`, or `online.page` |
 | SMILE to the relay     | one PC                                   | the venue's uplink                    |
 
 The relay never terminates TLS itself in either case and reads no difference between the two.

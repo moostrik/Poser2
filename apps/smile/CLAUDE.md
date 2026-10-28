@@ -1,8 +1,9 @@
 # SMILE
 
 Art installation: a camera captures a face, an image generator turns it into a portrait, and the
-result is shown with music (Max patch via OSC) and lights (Art-Net). Entry points: `smile.py`
-(main app, `Main` in `modules/main.py`) and `player.py` (image players). Python 3.12, venv in
+result is shown with music (Max patch via OSC) and lights (Art-Net), and the grins of the visitors before
+play on two walls of screens. Entry point: `smile.py` (`Main` in `modules/main.py`; the walls are two secondary
+windows of its render). Python 3.12, venv in
 `.venv`, installed with `scripts/install.bat`. Tests: `.venv\Scripts\python -m pytest` from the repo root.
 All Python code lives in `modules/`; `data/` is what the installation is given (presets, models,
 workflow, audio, test photos), `output/` what it produces (git-ignored, safe to delete).
@@ -150,8 +151,15 @@ its timings in the sequence settings. At the capture the diffusion layer starts 
 a generation that fails shows the capture as its result and nothing of the previous visitor.
 `render.show_camera` draws the raw camera on top and starts
 no new sequence while it is on (`Sequencer.blocked`). Shaders are
-`classname.frag` next to their `.py` and hot-reload while running. `player.py` uses the same engine
-(`modules/player/Render.py`).
+`classname.frag` next to their `.py` and hot-reload while running.
+The two **walls** of the sphere are secondary windows of the same `WindowManager` (`render.window.secondary_list`, read at
+the start: the first entry is wall 0, screens 1-24, the second wall 1; `secondary_fullscreen` borderless on that monitor,
+forced on by `-fs` like the main window; a monitor that is missing gets a small window on the primary one, and back when
+it is plugged in). `SmileRender.walls` are two `PlayerRender`s (`modules/player/Render.py`, no window of their own)
+composited in `update()` after the main screen, and `draw_secondary` blits the wall of the monitor's index in the list
+(poser2's pattern, hd_trio). The secondary windows share the main context (textures yes, FBOs and VAOs no), so the
+render loop makes the main context current at the start of every frame and before `deallocate` (`WindowManager._render_loop`;
+drawing a secondary leaves its context current; the same fix is in poser2).
 
 ## Credit
 
@@ -160,11 +168,11 @@ it changes and `pick`s a random line, never the last one again, `LINE` when it h
 module, with its quiet zone). `CreditLayer` draws the code in the bottom right corner of everything the main screen shows, and the caption, the name with the
 visitor's line under it (drawn at the capture, `CreditLayer.new_visitor`, into the `credit_line` readout), as a meme caption over
 the top (white with a black edge, in the comic font `data/Bangers-Regular.ttf`: the credit is a joke) over the generation, the grin and the result (DIFFUSION, DIFF_LOOP and TIMEOUT, fading in and out), and with `credit_camera` over the camera view too (its
-own line, drawn when that view begins: `new_line_due`), from the Render tab's `credit` fields; it is not in the saved clips. The players show the code and the name under it (scaled to the code's width) on one cell instead of its clip,
-for one play: it takes a cell when a clip starts there and leaves at that cell's next start (`next_credit_cell`), so no
-clip start flashes over it; `credit_qr_players` switches it (`/credit 0|1` every second, like `/caption`), off takes the card away at once. `credit_players` goes
-to both players as `/caption 0|1` every second (`ScreenTest.send_players`, the test's ports): on, every cell shows a caption over its
-clip, the name over the top and a random line from the same file along the bottom, new at every play (`Player._on_play`, not tied
+own line, drawn when that view begins: `new_line_due`), from the Render tab's `credit` fields; it is not in the saved clips. The
+same pass without the QR code goes into `CreditLayer.clean`, the phone's and the online cell's copy. The walls show the code and the name under it (scaled to the code's width) on one cell instead of its clip,
+for one play: it takes a cell when a clip starts there and leaves at that cell's next start (`next_credit_cell`, never the online cell), so no
+clip start flashes over it; `credit_qr_players` switches it (the walls read the Render tab's fields every frame), off takes the card away at once. With `credit_players`
+on, every cell shows a caption over its clip, the name over the top and a random line from the same file along the bottom, new at every play (`Player._on_play`, not tied
 to the clip), drawn into a transparent portrait texture per cell (`PlayerRender._draw_caption`).
 `modules/sphere.py` is the one place that knows the sphere and its wiring: 12 ribs holding 5 and 3 screens by turn, heights 0 (top) to 4
 (heights 1 to 3 have 12 screens, 0 and 4 have 6), screens numbered down each rib (1-5, 6-8, 9-13 …, the ribs counting to the left, so rib r is at -30r degrees), and screen s on Datapath unit
@@ -174,11 +182,11 @@ a test keeps the file equal to it) all come from it; a cabling that differs is c
 The **scrolling name** (`modules/credit_scroll.py`, no GL): each word of `credit_name` goes round its own ring of the sphere without end, the first word on the
 first of `credit_scroll_rows` (`plan_loops`, `RingPath`: all the ring's screens from the rib at the camera down the rib numbers, since the ribs count to the camera's left,
 the visitor's right, and a ticker moves to the visitor's left; `reverse` the other way round; `row_screens`, `screen_cell`, screens counted from 0 there). `CreditScroller`
-(stepped from `Main.sequence_callback` with `time.time()`, not during the laughter test) sends each player its own cells with their place round the ring every `SEND_EVERY`
-second (`send_loops`: `/scroll_loop <word> <px/s> <gap> <size> <ring screens> <started> <cell> <place> ...`, `ScreenTest.send_player`), `started` the time the loops began
-as text (an OSC float is 32-bit and loses 128 s of a Unix time), each word at its own speed (`credit_scroll_speed_1`, `_2`; a speed changed in the panel moves the start
-so the word goes on from where it is, `word_start`); `credit_scroll_last` is the readout. The players
-(`PlayerRender.scroll_loop`, `_draw_scrolls`) take the position from that and their own clock (one PC: a resend moves nothing), carried once onto `time.perf_counter()` for the frames: on Windows
+(stepped from `Main.sequence_callback` with `time.time()`, not during the laughter test) hands each wall its own cells with their place round the ring every `SEND_EVERY`
+second (`send_loops` to `Player.scroll_loop`: wall, word, px/s, gap, size, the ring's screens, `started` the time the loop began, the cells with their places),
+each word at its own speed (`credit_scroll_speed_1`, `_2`; a speed changed in the panel moves the start
+so the word goes on from where it is, `word_start`); `credit_scroll_last` is the readout. The walls
+(`PlayerRender.scroll_loop`, `_draw_scrolls`) take the position from that and the clock (a renewal moves nothing), carried once onto `time.perf_counter()` for the frames: on Windows
 `time.time()` moves in 15.6 ms steps on Python 3.12, coarser than a frame, which made the word stand still one frame and jump the next and drop a
 loop no message renewed for `TIMEOUT`. They draw a word as a ticker reading left to right and moving left: `name_strip` renders it once with freetype into one long BGRA image,
 640 high, the ink `credit_scroll_size` tall in the vertical middle, white with a black edge (not the font atlas: too big at that size); each cell on the ring blits the strip
@@ -208,35 +216,36 @@ Encoding and decoding run `ffmpeg`/`ffprobe` subprocesses through `modules/video
 must be on the PATH: the gyan.dev full build); the encoder is picked at startup by a trial encode
 (Intel Quick Sync on the iGPU, then Nvidia, then libx264; `sequence.encoder` forces one). Never start
 those processes any other way: the apps run under pythonw, so they need `CREATE_NO_WINDOW` and no
-inherited handles. The players (`modules/player/`) decode each of the newest clips once into RAM
-(`ClipPool`, 512x640, about 200 MB per clip) and play from memory; `player.py -n` sets the number
-of cells, `--pool` the clips kept, `--fps` the playback speed (default 20, 0 = the clip's own rate), `--spread` a random speed difference per play so the cells drift apart (default 0.1), `--trail` a blend with the previous output (default 0: none).
-The pool (`--pool`, default 30) is two lists. `recent`: the last `--recent` recordings of the style (default 4), always on
-the wall. `archive`: the other clips, in the order they joined. A new recording joins `recent`; when that holds too many,
+inherited handles. The clip player (`modules/player/`: `Player`, one for the sphere, started and stopped by `Main`) decodes each of the newest clips once into RAM
+(`ClipPool`, 512x640, about 200 MB per clip) and plays from memory on the 48 cells of the two walls (`sphere.CELLS` each, cell ids
+0-47, wall = id // 24; the loaders feed `PlayerRender.set_image` and bang Max on 4115 for wall 0, 4116 for wall 1); the Players tab
+(`modules/player/settings.py`) has `pool` the clips kept, `recent`, `recycle_every` and `hwdecode` (read at the start), `fps` the playback
+speed (default 20, 0 = the clip's own rate), `spread` a random speed difference per play so the cells drift apart (default 0.1), `trail` a blend
+with the previous output (default 0: none), read at every play or frame.
+The pool (`pool`, default 30) is two lists. `recent`: the last `recent` recordings of the style (default 4), always playing on every
+third of the sphere (`sphere.SECTORS`, by rib: 0-3, 4-7, 8-11, `sector_of_cell`; a cell's loader passes its sector to the pool, `Clip.on` counts
+the cells per sector), so a visitor sees their video wherever they stand. `archive`: the other clips, in the order they joined. A new recording joins `recent`; when that holds too many,
 its oldest moves to `archive` as the newest there. A clip from disk joins `archive` as its newest. Over its size, the pool
 drops the oldest of `archive` (a cell playing it finishes its play), so a recording that leaves `recent` gets a full turn.
-The players show one style, that of the newest recording (`FolderScanner`): a recording is a file newer than every clip
+The walls show one style, that of the newest recording (`FolderScanner`): a recording is a file newer than every clip
 seen, and one in the other style's folder is the switch. The pool then gets that clip and the newest others of its style
 as `recent` and a random selection of that style from disk as `archive`, and each cell changes over at the end of its play;
 an older file that appears (clips sorted into a folder by hand) is archive and waits on disk.
-Recycling keeps the wall changing: whenever no clip has joined for `--recycle_every` seconds (default 20, 0 = never), one
+Recycling keeps the walls changing: whenever no clip has joined for `recycle_every` seconds (default 20, 0 = never), one
 clip of the style that is on disk and not in the pool joins `archive`, from a shuffled deck, so all come round before any
 repeats; a recording counts as a clip joining, and with every clip of the style already in the pool nothing is loaded.
-A cell that finishes first takes a `recent` clip that is on no cell; else a clip that is on the fewest cells, of those the
+A cell that finishes first takes a `recent` clip that is on no cell of its third of the sphere; else a clip that is on the fewest cells, of those the
 least played, at random among equals and never the one it just played (`ClipPool.choose`), so the pool is spread evenly
-over the wall. Joining `archive` levels a clip's play count, or a recording that was always on a cell would never be drawn there.
+over the sphere. Joining `archive` levels a clip's play count, or a recording that was always on a cell would never be drawn there.
 The cells start one by one, each in a random place on the next clip that is loaded (going round the
-loaded clips again when there are fewer than cells). `scripts/start_players.bat` (re)starts both players alone,
-each fullscreen on its own monitor (a player whose monitor is not connected takes a window on the
-primary one); leading `window` puts both in a window for testing, `console` gives them a console
-for logs, other arguments pass through. `scripts/startSMILE.bat` is the main startup: it closes and
-restarts everything (ComfyUI, Max, the players, SMILE).
+loaded clips again when there are fewer than cells). `scripts/startSMILE.bat` is the main startup: it closes and
+restarts everything (ComfyUI, Max, SMILE with its walls).
 
 ## Music
 
 `modules/audio/DB.py` picks the track of a visitor's movement from `data/audio/music_map.json` into
-`audio.music_id`. `modules/osc/Sender.py` (`Settings.audio.osc`; the players build an `OscSettings` of their
-own for their `/bang`) sends what `Main.sequence_callback` queues every frame, the newest value per address:
+`audio.music_id`. `modules/osc/Sender.py` (`Settings.audio.osc`; the clip player builds an `OscSettings` of its
+own per wall for the `/bang`) sends what `Main.sequence_callback` queues every frame, the newest value per address:
 `/music_id`, `/state`, `/progress` and the Audio tab's controls `/sound`, `/music_volume`, `/laughter`,
 `/laughter_volume` (both levels in dB; the laughter gets a `dbtoa` in front of its linear multipliers). The panel is
 their source: the patch's own controls follow it, and a control moved
@@ -255,9 +264,8 @@ the file against it), adds the panel's `laughter_offset` (`/laughter_offset`, de
 speaker (three `expr`s: speakers at -60, 60 and 180 degrees from the camera, each laugh over its two nearest at
 constant power). The gains travel with the note into the `poly~` voice (`SmileSamplepoly.maxpat`), which
 applies them only on a note-on, so the note-off from `makenote` does not move a fading laugh. The panel's
-`laughter_test` (`modules/audio/ScreenTest.py`, stepped from `Main.sequence_callback`) sends `/light <cell> <seconds> <number>`
-to the players' `Receiver` (`modules/osc/Receiver.py`, ports `player_1_port`/`player_2_port`, `start_players.bat -l`):
-the player shows the cell white with the screen's number (`Text` into a portrait FBO, blitted with `BlitRotated`
+`laughter_test` (`modules/audio/ScreenTest.py`, stepped from `Main.sequence_callback`) lights the cell on its wall
+(`Player.light`, a call: no OSC between SMILE and its walls): the wall shows the cell white with the screen's number (`Text` into a portrait FBO, blitted with `BlitRotated`
 like a clip, so it stands upright on the turned screen). SMILE bangs Max itself with `/test_bang <index> <sample>`
 (`Sender` sends a tuple as separate arguments), which `p laughterSampler` takes past the gates (`r testBang`) with
 the panel's `laughter_test_sample` (a file of the laughter folder; `ScreenTest.list_samples` numbers the folder as
@@ -294,6 +302,12 @@ with the sequence; `ClipSaver`'s saved callback gives the files (the recording c
 grin still plays), which are uploaded at once (`Delivery`)
 and the `result` goes to the phone by its id, so it has the video when its turn ends and the next turn can start meanwhile. The phone sends its camera mirrored, as it
 shows it. The token is a file (`data/online_token.txt`, git-ignored), never a setting in a preset.
+The **online cell**: the screen `online.screen` (1-48, 0 = none; pick one off the scroll rows) of the walls shows a white card with the
+QR code to the phone page (`online.page`, empty = the relay's host, `Link.http_base`) and a line under it while SMILE Online is on
+and the relay connected, and the main screen as the phone sees it (`CreditLayer.clean`: the caption, no QR code, no status line)
+from the judging to the phone's last frame (`Online.showing`), then the card again; off or disconnected it is a clip cell like any
+(`online_cell_mode` in `Player.py`). `Main._online_cell` sets it every frame: `Player.online_cell` (no bang, no caption: its clip plays
+unseen) and `SmileRender.set_online_cell`, which the walls take in `update()` (`PlayerRender.set_online`).
 Tests: `relay/tests` (the line, the server on aiohttp's test server, the page's files: `test_web.py`) and `modules/online/tests`
 (a fake link and camera).
 

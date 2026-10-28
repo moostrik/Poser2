@@ -144,8 +144,10 @@ class TestOnline(unittest.TestCase):
         self.step(dt=self.settings.eye_free_after + 0.1)
         self.assertEqual(self.online.phase, Phase.ASKING)
         self.link.on_message({'type': 'turn', 'id': 'phone1'})
+        self.assertFalse(self.online.showing)
         self.step()
         self.assertEqual(self.online.phase, Phase.JUDGING)
+        self.assertTrue(self.online.showing)        # the online cell of the walls shows the main screen from here
 
     # OFF AND ON
     def test_off_does_nothing(self):
@@ -240,6 +242,7 @@ class TestOnline(unittest.TestCase):
         self.step(dt=2.0)
         self.assertEqual(self.link.last('turn_end')['reason'], 'missed')
         self.assertFalse(self.camera.online)
+        self.assertFalse(self.online.showing)
         self.assertEqual(self.online.phase, Phase.IDLE)
 
     def test_a_charge_that_is_rising_at_the_window_keeps_the_turn(self):
@@ -305,9 +308,11 @@ class TestOnline(unittest.TestCase):
         # on, the sound through both; the picture stops with a last frame, taken without the caption at the
         # RESET (the page fades the caption out and keeps it: the bloom would brighten it)
         self.assertFalse(self.grab.last_wanted)
+        self.assertTrue(self.online.showing)
         self.step(seq=SequenceType.RESET)
         self.assertEqual(self.online.phase, Phase.TRANSFORMING)
         self.assertTrue(self.grab.last_wanted)
+        self.assertFalse(self.online.showing)       # the picture stops here on the walls too: the QR card is back
         clean = np.zeros((400, 320, 4), np.uint8)
         self.grab.frame, self.grab.is_last = clean, True
         self.step(seq=SequenceType.BLOOM, progress=0.5)
@@ -452,6 +457,7 @@ class TestOnline(unittest.TestCase):
         self.assertEqual(self.link.last('turn_end')['reason'], 'reset')
         self.assertFalse(self.camera.online)
         self.assertFalse(self.grab.on)
+        self.assertFalse(self.online.showing)
         self.online.on_saved('v1', 'A', False, '', '')
         self.step(seq=SequenceType.CAMERA_SHOW, dt=SAVE_TIMEOUT + 1)
         self.assertIsNone(self.link.last('result'))

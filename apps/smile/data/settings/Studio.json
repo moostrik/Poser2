@@ -200,8 +200,11 @@
       "y": 31,
       "width": 851,
       "height": 1360,
-      "secondary_list": [],
-      "secondary_fullscreen": false,
+      "secondary_list": [
+        "M1",
+        "M2"
+      ],
+      "secondary_fullscreen": true,
       "fullscreen_mode": "WINDOWED",
       "fullscreen_mouse": false
     }
@@ -215,8 +218,6 @@
     "laughter_test": false,
     "laughter_test_step": 2.0,
     "laughter_test_sample": "Deep_dutch_laugh-2.mp3",
-    "player_1_port": 4117,
-    "player_2_port": 4118,
     "osc": {
       "active": true,
       "ip": "127.0.0.1",
@@ -238,7 +239,8 @@
     "eye_free_after": 3.0,
     "stream_fps": 10.0,
     "stream_width": 512,
-    "music": true
+    "music": true,
+    "screen": 3
   },
   "server": {
     "title": "SMILE",

@@ -1,5 +1,5 @@
 @REM The main startup: closes whatever runs of the installation and starts all of it again
-@REM (ComfyUI, the music player, the image players, SMILE).
+@REM (ComfyUI, the music player, SMILE with its two walls).
 @REM Windows Key + R, type shell:startup, place shortcut in folder
 
 @echo off
@@ -7,8 +7,8 @@
 set "CURRENT_DIR=%~dp0..\"
 cd /d "%CURRENT_DIR%"
 
-echo Closing SMILE and the image players
-powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='pythonw.exe' or Name='python.exe'\" | Where-Object { $_.CommandLine -like '*smile.py*' -or $_.CommandLine -like '*player.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"
+echo Closing SMILE
+powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter \"Name='pythonw.exe' or Name='python.exe'\" | Where-Object { $_.CommandLine -like '*smile.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"
 
 @REM whatever listens on ComfyUI's port, however it was started; then wait until the port is free
 echo Closing Image Generator (ComfyUI)
@@ -46,9 +46,6 @@ start "ComfyUI" /MIN cmd /c "%CURRENT_DIR%scripts\start_comfy.bat"
 echo Opening Music Player
 explorer "%CURRENT_DIR%data\audio\Smile-Music-Player.maxpat"
 timeout /t 4 /nobreak >nul
-
-call "%CURRENT_DIR%scripts\start_players.bat"
-timeout /t 2 /nobreak >nul
 
 echo Opening Main App
 start "" "%CURRENT_DIR%.venv\Scripts\pythonw.exe" smile.py -pm -fs

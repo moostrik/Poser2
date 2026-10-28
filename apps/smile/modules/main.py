@@ -13,6 +13,9 @@ from modules.render.settings import RenderSettings
 from modules.save.ClipSaver import ClipSaver
 from modules.artnet.Sender import Sender as Artnet
 from modules.online.Online import Online
+from modules.online.Link import http_base
+from modules.player.Player import Player, online_cell_mode
+from modules import sphere
 from modules.settings import presets, NiceServer
 from modules.gl import FullscreenMode
 from modules.main_settings import Settings
@@ -54,15 +57,18 @@ class Main():
         if not presets.load(self.settings, preset_file):
             logger.warning('No preset at %s, using defaults', preset_file)
         if fullscreen:
-            # the installation's start: borderless (exclusive fullscreen minimizes when a player gets focus)
+            # the installation's start: borderless (exclusive fullscreen minimizes when a wall gets focus), the walls too
             self.settings.render.window.fullscreen_mode = FullscreenMode.WINDOWED_FULLSCREEN
+            self.settings.render.window.secondary_fullscreen = True
         self.settings.initialize()
         self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
 
         self.sequencer: Sequencer = Sequencer(self.settings.sequence)
         # the generator fills the player with the grin frames, the render plays them on its own clock
         self.player: GrinPlayer = GrinPlayer(self.settings.sequence)
-        self.render: SmileRender = SmileRender(self.settings.render, self.sequencer, self.player, self.width, self.height)
+        self.render: SmileRender = SmileRender(self.settings.render, self.settings.players, self.sequencer, self.player, self.width, self.height)
+        # the clip player of the sphere's walls: one pool for the 48 cells of the render's two walls
+        self.clip_player: Player = Player(self.settings.players, self.render.walls, self.settings.render)
         self.diffuse: Generator = Generator(self.settings.pipeline, self.player)
         # the face crop is the image ComfyUI generates from, so it has the workflow's portrait size
         portrait_width, portrait_height = self.diffuse.workflow.portrait_size
@@ -82,11 +88,10 @@ class Main():
 
         self.audio: AudioDB = AudioDB(self.settings.audio, 'data/audio/music_map.json')
         self.osc: Osc = Osc(self.settings.audio.osc)
-        self.screen_test: ScreenTest = ScreenTest(self.settings.audio, bang=self._test_bang)  # the laughter test, stepped from sequence_callback
-        self._caption_sent: float = 0.0     # when the players last got the caption switch
-        # the name going round the players' walls, planned here and sent to them every second
-        self.credit_scroller: CreditScroller = CreditScroller(
-            self.settings.render, lambda player, address, args: self.screen_test.send_player(player, address, *args))
+        # the laughter test, stepped from sequence_callback: it lights the walls' cells and bangs Max
+        self.screen_test: ScreenTest = ScreenTest(self.settings.audio, send=self.clip_player.light, bang=self._test_bang)
+        # the name going round the walls, planned here and handed to them every second
+        self.credit_scroller: CreditScroller = CreditScroller(self.settings.render, self.clip_player.scroll_loop)
         self.save: ClipSaver = ClipSaver(self.settings.sequence, watermark=self.settings.render.credit_name)
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
         self._saving: bool = False          # the visitor's files are open in the saver
@@ -129,6 +134,10 @@ class Main():
         self.render.add_exit_callback(self.stop)
         self.sequencer.add_message_callback(self.sequence_callback)
         self.render.start()
+        if self.settings.render.window.secondary_list:
+            self.clip_player.start()
+        else:
+            logger.info('No wall monitors in the preset (render.window.secondary_list): the clip player stays off')
 
         self._running = True
 
@@ -139,7 +148,7 @@ class Main():
         self._stopping = True
 
         # first: stops the sequencer callbacks
-        steps = (self.sequencer.clear_message_callbacks, self.render.stop, self.sequencer.close,
+        steps = (self.sequencer.clear_message_callbacks, self.render.stop, self.clip_player.stop, self.sequencer.close,
                  self.online.stop, self.artnet.stop, self.osc.stop,
                  self.camera.clearColorCallbacks, self.camera.close,
                  self.diffuse.clear_message_callbacks, self.diffuse.stop,
@@ -210,18 +219,14 @@ class Main():
             self.osc.send('/laughter_offset', audio.laughter_offset)
             # the test closes the gate of the clips' laughs in the patch; its own bangs pass that gate
             self.osc.send('/laughter_test', int(audio.laughter_test))
-        # the laughter test steps on the app clock too (the lights to the players, the test bangs to Max)
-        self.screen_test.update(time.time())
-        # the players' caption switch, every second, so a player that starts later follows it too
+        # the laughter test steps on the app clock too (the lights on the walls, the test bangs to Max)
         now: float = time.time()
-        if now - self._caption_sent > 1.0:
-            self._caption_sent = now
-            self.screen_test.send_players('/caption', int(self.settings.render.credit_players))
-            self.screen_test.send_players('/credit', int(self.settings.render.credit_qr_players))
+        self.screen_test.update(now)
         # and the scrolling name's passes, timed on the app clock too; not while the test lights the screens
         self.credit_scroller.update(now, self.settings.audio.laughter_test)
         # the online turn: it takes the camera when the room's eye is free, and the sequence runs as for a visitor inside
         self.online.update(now, message, ready, self.settings.render.show_camera or self.settings.audio.laughter_test)
+        self._online_cell()
 
         if seq == SequenceType.CAMERA_SHOW and message.initial:
             self.face.reset()
@@ -268,6 +273,20 @@ class Main():
                 # a reset before the result: the visitor's files are not kept
                 self._saving = False
                 self.save.end_sequence(keep=False)
+
+    def _online_cell(self) -> None:
+        """The online cell of the walls, every frame: the screen `online.screen` shows the QR code to the phone
+        page while SMILE Online waits for someone, the main screen during a turn, a clip like any cell otherwise."""
+        online = self.settings.online
+        screen: int = int(online.screen)
+        mode: str = 'clip'
+        wall = cell = 0
+        if 1 <= screen <= sphere.SCREENS:
+            wall, cell = sphere.cell_of_screen(screen)
+            mode = online_cell_mode(bool(online.active), bool(online.connected), self.online.showing)
+        self.clip_player.online_cell = wall * sphere.CELLS + cell if mode != 'clip' else None
+        page: str = str(online.page).strip() or http_base(str(online.relay)) + '/'
+        self.render.set_online_cell(wall, cell, mode, page)
 
     def _limit_visitor(self, seq: SequenceType) -> None:
         """End a visitor the generator did not end: it does so itself at connection.job_timeout, so

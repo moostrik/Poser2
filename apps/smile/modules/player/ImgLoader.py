@@ -2,7 +2,7 @@ import random
 from threading import Thread, Lock, Event
 import time
 import numpy as np
-from typing import Callable
+from typing import Any, Callable
 from modules.player.ClipPool import ClipPool, Clip
 
 ImageCallback= Callable[[str, np.ndarray, bool], None]
@@ -19,9 +19,10 @@ def play_rate(fps: float, clip_fps: float, spread: float) -> float:
 
 class LoadImages(Thread):
     """One cell: stays empty until the player assigns its first clip, then plays clips from the pool
-    on its own clock, one after the other."""
+    on its own clock, one after the other, at the speed the settings say at each play (`fps`, `spread`).
+    `sector` is the cell's third of the sphere, which the pool keeps every recent recording on."""
 
-    def __init__(self, id: str, pool: ClipPool, fps: float = 0.0, spread: float = 0.0) -> None:
+    def __init__(self, id: str, pool: ClipPool, settings: Any, sector: int = 0) -> None:
         super().__init__()
         self._callback_mutex: Lock = Lock()
         self._stop_event: Event = Event()
@@ -30,8 +31,8 @@ class LoadImages(Thread):
 
         self._id: str = id
         self.pool: ClipPool = pool
-        self._fps: float = fps      # playback speed; 0 plays each clip at its own rate
-        self._spread: float = spread    # random speed difference per play, as a fraction
+        self.settings: Any = settings   # fps (0 plays each clip at its own rate) and spread (a fraction)
+        self.sector: int = sector
         self._end_time: float = 0.0
         self._first: Clip | None = None
         self._assigned: Event = Event()
@@ -56,18 +57,18 @@ class LoadImages(Thread):
             if clip is None:
                 self._sleep_until(time.time() + 1.0)
                 self._end_time = time.time()
-                clip = self.pool.get_clip()
+                clip = self.pool.get_clip(sector=self.sector)
                 continue
             self._play(clip)
             if self._stop_event.is_set():
-                self.pool.release(clip)
+                self.pool.release(clip, self.sector)
                 return
             # the next clip is one the other cells show the least, never the one just played; the
             # reference to that one is dropped here (the pool may have evicted it meanwhile)
-            clip = self.pool.get_clip(clip)
+            clip = self.pool.get_clip(clip, self.sector)
 
     def _play(self, clip: Clip) -> None:
-        interval: float = 1.0 / play_rate(self._fps, clip.fps, self._spread)
+        interval: float = 1.0 / play_rate(float(self.settings.fps), clip.fps, float(self.settings.spread))
         count: int = len(clip.frames)
         # the cell this play starts in: the Max patch places the laugh by the cell's screen
         self._loader_callback(int(self._id))

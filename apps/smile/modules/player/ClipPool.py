@@ -3,10 +3,11 @@ import os
 import queue
 import random
 import threading
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 
+from modules import sphere
 from modules.video import ffmpeg
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,7 @@ class Clip:
     style: str = ''         # the folder the clip was saved in: A or B
     plays: int = 0          # times started on a cell (levelled when the clip joins the archive)
     active: int = 0         # cells playing it now
+    on: list[int] = field(default_factory=lambda: [0] * sphere.SECTORS)     # of them, per third of the sphere
 
 
 def next_start(clips: list[Clip], started: set[str]) -> Clip | None:
@@ -30,18 +32,19 @@ def next_start(clips: list[Clip], started: set[str]) -> Clip | None:
     return None
 
 
-def choose(clips: list[Clip], exclude: Clip | None = None, recent: list[Clip] | tuple[Clip, ...] = ()) -> Clip | None:
-    """The clip a cell plays next. `exclude` (the clip the cell just played) is left out unless it
-    is the only one, so no clip repeats in its cell.
+def choose(clips: list[Clip], exclude: Clip | None = None, recent: list[Clip] | tuple[Clip, ...] = (), sector: int = 0) -> Clip | None:
+    """The clip a cell in `sector` (its third of the sphere) plays next. `exclude` (the clip the cell
+    just played) is left out unless it is the only one, so no clip repeats in its cell.
 
-    First, the `recent` clips (the last recordings) are always on the wall: one of them that is on
-    no cell is taken. The cell that just played it leaves it to the next cell that finishes, so it
-    moves around the wall. Otherwise: a clip that is on the fewest cells now, of those one that was
-    played the least, of those at random. So every clip is on the wall about equally."""
+    First, the `recent` clips (the last recordings) are always on every third of the sphere, so a
+    visitor sees their video wherever they stand: one of them that is on no cell of this third is
+    taken. The cell that just played it leaves it to the next cell that finishes there, so it moves
+    around. Otherwise: a clip that is on the fewest cells now, of those one that was played the
+    least, of those at random. So every clip is on the sphere about equally."""
     candidates: list[Clip] = [clip for clip in clips if clip is not exclude] or clips
     if not candidates:
         return None
-    missing: list[Clip] = [clip for clip in recent if clip.active == 0 and clip is not exclude]
+    missing: list[Clip] = [clip for clip in recent if clip.on[sector] == 0 and clip is not exclude]
     if missing:
         candidates = missing
     active: int = min(clip.active for clip in candidates)
@@ -131,34 +134,40 @@ class ClipPool:
         with self._lock:
             return self._outstanding == 0
 
-    def use(self, clip: Clip) -> None:
-        """A cell starts on this clip (the player's hand-out at startup)."""
+    def use(self, clip: Clip, sector: int = 0) -> None:
+        """A cell in `sector` starts on this clip (the player's hand-out at startup)."""
         with self._lock:
-            self._take(clip)
+            self._take(clip, sector)
 
-    def release(self, clip: Clip) -> None:
-        """A cell stopped playing this clip without taking a next one."""
+    def release(self, clip: Clip, sector: int = 0) -> None:
+        """A cell in `sector` stopped playing this clip without taking a next one."""
         with self._lock:
-            clip.active -= 1
+            self._drop(clip, sector)
 
-    def get_clip(self, previous: Clip | None = None) -> Clip | None:
-        """The next clip for a cell that just played `previous` (see `choose`); None while the pool
-        is empty. Taking the next and giving up the previous is one step, so two cells that finish
-        together never both take the same free clip."""
+    def get_clip(self, previous: Clip | None = None, sector: int = 0) -> Clip | None:
+        """The next clip for a cell in `sector` that just played `previous` (see `choose`); None while
+        the pool is empty. Taking the next and giving up the previous is one step, so two cells that
+        finish together never both take the same free clip."""
         with self._lock:
             candidates: list[Clip] = self._candidates()
             recent: list[Clip] = [clip for clip in self._recent if clip in candidates]
-            clip: Clip | None = choose(candidates, previous, recent)
+            clip: Clip | None = choose(candidates, previous, recent, sector)
             if previous is not None:
-                previous.active -= 1
+                self._drop(previous, sector)
             if clip is not None:
-                self._take(clip)
+                self._take(clip, sector)
             return clip
 
     @staticmethod
-    def _take(clip: Clip) -> None:
+    def _take(clip: Clip, sector: int) -> None:
         clip.plays += 1
         clip.active += 1
+        clip.on[sector] += 1
+
+    @staticmethod
+    def _drop(clip: Clip, sector: int) -> None:
+        clip.active -= 1
+        clip.on[sector] -= 1
 
     def spread(self) -> tuple[int, int]:
         """How the clips are spread over the cells now: (clips on at least one cell, most cells on one clip)."""

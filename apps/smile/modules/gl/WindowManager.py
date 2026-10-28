@@ -305,6 +305,9 @@ class WindowManager():
         next_frame_time: int = time_ns()
         try:
             while not glfw.window_should_close(self._main_window):
+                # the renderer's objects (FBOs, VAOs) live in the main context: drawing a secondary window
+                # leaves its context current, so every frame starts by making the main one current again
+                glfw.make_context_current(self._main_window)
                 while not self._deferred.empty():
                     try:
                         self._deferred.get_nowait()()
@@ -334,6 +337,7 @@ class WindowManager():
                     elif -remaining > self.frame_interval:
                         next_frame_time = time_ns()  # reset on spiral of death
         finally:
+            glfw.make_context_current(self._main_window)
             self.renderer.deallocate()
 
     def _update(self) -> None:
@@ -456,6 +460,12 @@ class WindowManager():
 
     def _destroy_secondary_windows(self) -> None:
         for win in self._secondary_windows.values():
+            # a window's quad VAO belongs to its own context: deleted there, before the window goes
+            buffers: tuple[int, int] | None = self._quad_buffers.pop(id(win), None)
+            if buffers:
+                glfw.make_context_current(win)
+                glDeleteVertexArrays(1, [buffers[0]])
+                glDeleteBuffers(1, [buffers[1]])
             glfw.destroy_window(win)
         self._secondary_windows.clear()
 

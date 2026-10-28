@@ -41,7 +41,8 @@ class TestMaxControls(unittest.TestCase):
             audio=mock.Mock(get_audio_id=lambda: '0001'), osc=mock.Mock(), screen_test=mock.Mock(),
             _limit_visitor=lambda seq: None,
             _style_picked=False, _face_frame_time=0.0, _visitor_start=None, _saving=False, _grin_saved=False,
-            _caption_sent=0.0, credit_scroller=mock.Mock(), online=mock.Mock())
+            credit_scroller=mock.Mock(), online=mock.Mock(showing=False), clip_player=mock.Mock())
+        self.app._online_cell = lambda: Main._online_cell(self.app)
 
     def frame(self) -> dict:
         """One sequencer frame: what went to the OSC sender, by address."""
@@ -93,6 +94,26 @@ class TestMaxControls(unittest.TestCase):
     def test_the_test_bang_goes_to_max_with_the_screen_and_the_sample(self):
         Main._test_bang(self.app, 3, 1)
         self.app.osc.send.assert_called_once_with('/test_bang', (3, 1))
+
+    def test_the_online_cell_follows_the_screen_setting_the_link_and_the_turn(self):
+        online = self.settings.online
+        online.active, online.screen = True, 27         # screen 27: wall 1, unit 1 output 3, cell 12
+        online.connected = False
+        self.frame()
+        self.assertIsNone(self.app.clip_player.online_cell)
+        self.app.render.set_online_cell.assert_called_with(1, 12, 'clip', 'http://127.0.0.1:8800/')
+        online.connected = True
+        self.frame()
+        self.assertEqual(self.app.clip_player.online_cell, 24 + 12)     # the player's cells count over both walls
+        self.app.render.set_online_cell.assert_called_with(1, 12, 'qr', 'http://127.0.0.1:8800/')
+        self.app.online.showing = True
+        online.page = ' https://smile.example/ '
+        self.frame()
+        self.app.render.set_online_cell.assert_called_with(1, 12, 'screen', 'https://smile.example/')
+        online.screen = 0
+        self.frame()
+        self.assertIsNone(self.app.clip_player.online_cell)
+        self.assertEqual(self.app.render.set_online_cell.call_args.args[2], 'clip')
 
 
 if __name__ == '__main__':

@@ -6,6 +6,7 @@ import unittest
 
 import numpy as np
 
+from modules import sphere
 from modules.player.ClipPool import Clip, ClipPool, choose
 from modules.player.FolderScanner import FolderScanner
 from modules.player.tests.test_even_spread import turns
@@ -13,7 +14,7 @@ from modules.player.tests.test_follow_style import FakePool, touch
 
 
 def clip(id: str, plays: int = 0, active: int = 0) -> Clip:
-    return Clip(id, np.zeros((1, 2, 2, 3), np.uint8), 15.0, 'A', plays, active)
+    return Clip(id, np.zeros((1, 2, 2, 3), np.uint8), 15.0, 'A', plays, active, [active, 0, 0])
 
 
 def pool_of(count: int, size: int | None = None, recent: int = 3) -> ClipPool:
@@ -95,6 +96,33 @@ class TestRecentOnTheWall(unittest.TestCase):
                 shown += was_third.active == 1
         self.assertGreater(off_the_wall, 24)        # in the normal rotation: off the wall now and then
         self.assertGreater(shown, off_the_wall)     # and on it most of the time, like any archive clip
+
+
+class TestRecentOnEveryThird(unittest.TestCase):
+    """The sphere's 48 cells in three sectors of 16: every recent recording plays on each of them."""
+
+    SECTORS: list[int] = [sphere.sector_of_cell(*divmod(id, sphere.CELLS)) for id in range(sphere.SCREENS)]
+
+    def test_the_cells_fall_into_three_equal_thirds(self):
+        self.assertEqual([self.SECTORS.count(s) for s in range(sphere.SECTORS)], [16, 16, 16])
+
+    def test_every_recent_recording_is_on_every_third(self):
+        pool = pool_of(30, recent=4)
+        last = list(pool._recent)
+        playing: list[Clip | None] = [None] * 48
+        missing_before: set[tuple[str, int]] = set()
+        for step, cell in enumerate(turns(48, 60)):
+            sector: int = self.SECTORS[cell]
+            playing[cell] = pool.get_clip(playing[cell], sector)
+            if step > 150:
+                for c in pool.clips():      # the bookkeeping per third matches what the cells play
+                    self.assertEqual(c.on, [sum(1 for i, p in enumerate(playing) if p is c and self.SECTORS[i] == s) for s in range(3)])
+                missing = {(c.id, s) for c in last for s in range(3) if c.on[s] == 0}
+                self.assertLessEqual(len(missing), 3)                   # at most the one whose cell just ended, per third
+                # a recording missing from a third is taken by the next cell that finishes there
+                self.assertFalse({(id, s) for id, s in missing_before if s == sector} & missing)
+                missing_before = missing
+        self.assertEqual(pool.spread()[1], 3)                           # a recent clip is on each third once
 
 
 class TestScannerLoadsTheNewest(unittest.TestCase):

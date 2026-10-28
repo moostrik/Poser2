@@ -7,6 +7,7 @@ from modules.cam.settings import CameraSettings
 from modules.audio.settings import AudioSettings
 from modules.artnet.settings import ArtnetSettings
 from modules.online.settings import OnlineSettings
+from modules.player.settings import PlayersSettings
 
 
 class Settings(BaseSettings):
@@ -15,6 +16,7 @@ class Settings(BaseSettings):
     sequence: Group[SequencerSettings] = Group(SequencerSettings)
     render:   Group[RenderSettings]    = Group(RenderSettings)
     audio:    Group[AudioSettings]     = Group(AudioSettings)
+    players:  Group[PlayersSettings]   = Group(PlayersSettings)
     artnet:   Group[ArtnetSettings]    = Group(ArtnetSettings)
     online:   Group[OnlineSettings]    = Group(OnlineSettings)
     server:   Group[NiceSettings]      = Group(NiceSettings)

@@ -79,9 +79,11 @@ video (the visitor was not kept, or nothing was saved in time) ends with NO SMIL
 missed, lost or reset turn puts the phone back in line by itself.
 
 **The room meanwhile.** An online turn takes the room's camera and nothing else: the main screen shows the
-phone's image and the sequence as always, the music and the lights follow it, the wall gets the clip. A reset
-ends the turn. A turn starts only when the room has had no face for a few seconds and the generator is
-ready, so whoever is inside keeps the eye.
+phone's image and the sequence as always, the music and the lights follow it, the wall gets the clip. One screen
+of the walls (`online.screen`) is the way in: a white card with the QR code to the page while the eye waits for
+someone, and during a turn the main screen as the phone sees it, from the judging to the end of the result, so the
+room watches the visitor outside; then the card again. A reset ends the turn. A turn starts only when the room
+has had no face for a few seconds and the generator is ready, so whoever is inside keeps the eye.
 
 ## 2. The machine
 
@@ -249,6 +251,5 @@ encoder, this PC as room and relay, the phone over Tailscale on a direct connect
 
 - The still at the grin's peak (the relay keeps a still per turn; the portrait stands in).
 - The caption for the outside and the QwenVL line on the machine.
-- The QR screen's stream in the players.
 - The capture at the phone's full resolution.
 - The page on its own domain; the relay on the VPS.

@@ -133,6 +133,7 @@ class Online:
         self._flash_at: float = 0.0     # when the turn's flash came
         self._music_sent: str = ''      # the track the phone was told this turn
         self._timed_out: bool = False   # the sequence reached TIMEOUT: the RESET after it is its natural end
+        self._showing: bool = False     # the turn is on the room's screens: from the judging to the last frame
         self._delivery: Delivery | None = None
         self._no_token_warned: bool = False
         # the switch is saved with the presets: the readouts start clean
@@ -149,6 +150,12 @@ class Online:
     def turn(self) -> bool:
         """A turn runs: the installation is someone outside's."""
         return self._phase in (Phase.JUDGING, Phase.TRANSFORMING)
+
+    @property
+    def showing(self) -> bool:
+        """The turn is on the room's screens (the online cell of the walls): from the judging to the end of the
+        result, the phone's last frame; the bloom and the fade after it are the room's."""
+        return self._showing
 
     def stop(self) -> None:
         self._end_turn(None)
@@ -311,6 +318,7 @@ class Online:
                 # the result has stood its time: the phone's last frame, without the caption (the page fades the
                 # caption out itself and keeps the frame; the bloom would brighten it)
                 self.grab.last()
+                self._showing = False
             if seq == SequenceType.FADE and self._seq != SequenceType.FADE:
                 # the fade shows the room's camera: a last frame that never came stops here
                 self.grab.set(False)
@@ -458,6 +466,7 @@ class Online:
         self._phone = phone
         self._music_sent = ''
         self._phase = Phase.JUDGING
+        self._showing = True
         self._charge = 0.0
         self.face.reset()               # the room's last faces are not this visitor's
         self.camera.set_online(True)
@@ -471,6 +480,7 @@ class Online:
         """Back to the room: the camera, and the phone is told why (None: nothing can be sent)."""
         if not self.turn and self._phase != Phase.ASKING:
             return
+        self._showing = False
         self.camera.set_online(False)
         self.grab.set(False)
         if reason is not None and self._link is not None:

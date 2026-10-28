@@ -9,7 +9,7 @@ from modules.player.ClipPool import Clip, ClipPool, choose
 
 
 def clip(id: str, plays: int = 0, active: int = 0) -> Clip:
-    return Clip(id, np.zeros((1, 2, 2, 3), np.uint8), 15.0, 'A', plays, active)
+    return Clip(id, np.zeros((1, 2, 2, 3), np.uint8), 15.0, 'A', plays, active, [active, 0, 0])
 
 
 def pool_of(count: int, size: int | None = None) -> ClipPool:

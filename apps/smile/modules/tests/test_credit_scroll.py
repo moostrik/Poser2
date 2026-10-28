@@ -1,12 +1,12 @@
-"""Tests for the scrolling name: the sphere's rows, a word's path round a ring over both players, the word's
-position on every screen, the strip image, and the scroller that sends the loops (no GL, no players)."""
+"""Tests for the scrolling name: the sphere's rows, a word's path round a ring over both walls, the word's
+position on every screen, the strip image, and the scroller that hands the loops to the walls (no GL)."""
 
 import unittest
 from types import SimpleNamespace
 
 import numpy as np
 
-from modules.credit_scroll import (ADDRESS, SCREEN_PX, CreditScroller, RingPath, name_strip, parse_rows, plan_loops,
+from modules.credit_scroll import (SCREEN_PX, CreditScroller, RingPath, name_strip, parse_rows, plan_loops,
                                    row_screens, screen_cell, scroll_offset)
 
 
@@ -107,9 +107,9 @@ def settings(**values) -> SimpleNamespace:
 
 class TestScroller(unittest.TestCase):
     def setUp(self):
-        self.sent: list[tuple[int, str, list]] = []
+        self.sent: list[tuple] = []        # wall, word, speed, gap, size, ring, started, cells
         self.settings = settings()
-        self.scroller = CreditScroller(self.settings, lambda player, address, args: self.sent.append((player, address, args)))
+        self.scroller = CreditScroller(self.settings, lambda *args: self.sent.append(args))
 
     def test_the_readout_starts_empty(self):
         self.assertEqual(self.settings.credit_scroll_last, '')
@@ -117,34 +117,32 @@ class TestScroller(unittest.TestCase):
     def test_the_loops_go_out_every_second_with_the_time_they_began(self):
         self.scroller.update(100.0, False)
         self.scroller.update(100.5, False)
-        self.assertEqual(len(self.sent), 4)        # two rows, both players
-        self.assertEqual({args[0] for _, _, args in self.sent}, {"Matthias", "Oostrik"})
-        for player, address, args in self.sent:
-            self.assertEqual(address, ADDRESS)
+        self.assertEqual(len(self.sent), 4)        # two rows, both walls
+        self.assertEqual({word for _, word, *_ in self.sent}, {"Matthias", "Oostrik"})
+        for wall, word, speed, gap, size, ring, started, cells in self.sent:
+            self.assertIn(wall, (0, 1))
             # each word at its own speed
-            self.assertEqual(args[1:5], [512.0 if args[0] == "Matthias" else 256.0, 288, 512, 12])
-            # the time as text, since an OSC float would lose 128 s of it: both began when the switch went on
-            self.assertIsInstance(args[5], str)
-            self.assertEqual(float(args[5]), 100.0)
-            self.assertEqual(len(args[6::2]), 6)                   # this player's half of the ring
-            self.assertTrue(set(args[7::2]) < set(range(12)))      # with their places round it
-            self.assertTrue(all(0 <= cell < 24 for cell in args[6::2]))
+            self.assertEqual((speed, gap, size, ring), (512.0 if word == "Matthias" else 256.0, 288.0, 512, 12))
+            self.assertEqual(started, 100.0)                       # both began when the switch went on
+            self.assertEqual(len(cells), 6)                        # this wall's half of the ring
+            self.assertTrue({place for _, place in cells} < set(range(12)))     # with their places round it
+            self.assertTrue(all(0 <= cell < 24 for cell, _ in cells))
         self.assertEqual(self.settings.credit_scroll_last, 'Matthias round row 1, Oostrik round row 3')
         self.sent.clear()
         self.scroller.update(101.0, False)
-        self.assertEqual({float(args[5]) for _, _, args in self.sent}, {100.0})     # a resend moves nothing
+        self.assertEqual({started for *_, started, _ in self.sent}, {100.0})     # a resend moves nothing
 
     def test_a_changed_speed_leaves_the_word_where_it_is(self):
         self.scroller.update(0.0, False)
         self.settings.credit_scroll_speed_2 = 1.0           # Oostrik from 256 to 512 px/s after 10 s: 2560 px so far
         self.sent.clear()
         self.scroller.update(10.0, False)
-        for _, _, args in self.sent:
-            if args[0] == "Oostrik":
-                self.assertEqual(args[1], 512.0)
-                self.assertEqual(float(args[5]), 10.0 - 2560 / 512)     # 2560 px at the new speed: began 5 s ago
+        for _, word, speed, *_, started, _ in self.sent:
+            if word == "Oostrik":
+                self.assertEqual(speed, 512.0)
+                self.assertEqual(started, 10.0 - 2560 / 512)        # 2560 px at the new speed: began 5 s ago
             else:
-                self.assertEqual(float(args[5]), 0.0)
+                self.assertEqual(started, 0.0)
 
     def test_nothing_goes_out_while_off_or_blocked_and_the_loops_begin_again_from_the_camera(self):
         self.settings.credit_scroll = False
@@ -158,7 +156,7 @@ class TestScroller(unittest.TestCase):
         self.assertEqual(self.sent, [])
         self.assertEqual(self.settings.credit_scroll_last, '')
         self.scroller.update(40.0, False)
-        self.assertEqual({float(args[5]) for _, _, args in self.sent if args[0] == "Matthias"}, {40.0})
+        self.assertEqual({started for _, word, *_, started, _ in self.sent if word == "Matthias"}, {40.0})
 
     def test_no_valid_row_is_a_warning_not_a_loop(self):
         self.settings.credit_scroll_rows = "7"
@@ -166,16 +164,16 @@ class TestScroller(unittest.TestCase):
             self.assertEqual(self.scroller.send_loops(0.0), [])
         self.assertEqual(self.sent, [])
 
-    def test_a_player_that_cannot_be_reached_does_not_stop_the_other(self):
-        def send(player, address, args):
-            if player == 0:
-                raise OSError('no player')
-            self.sent.append((player, address, args))
+    def test_a_wall_that_fails_does_not_stop_the_other(self):
+        def send(wall, *args):
+            if wall == 0:
+                raise OSError('no wall')
+            self.sent.append((wall, *args))
         scroller = CreditScroller(self.settings, send)
         with self.assertLogs('modules.credit_scroll'):
             scroller.send_loops(0.0)
         self.assertEqual(len(self.sent), 2)
-        self.assertTrue(all(player == 1 for player, _, _ in self.sent))
+        self.assertTrue(all(wall == 1 for wall, *_ in self.sent))
 
 
 if __name__ == '__main__':

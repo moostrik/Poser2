@@ -1,6 +1,7 @@
 """The sphere of screens and how the players' cells are wired to it: the one place that knows which
 screen a cell is. Used by the laughter test (the number a lit cell shows), the scrolling name (the
-screens of a row) and `data/audio/screen_angles.txt` (the angle of every cell, for the laughter).
+screens of a row), `data/audio/screen_angles.txt` (the angle of every cell, for the laughter) and the
+clip pool (the third of the sphere a cell is in: every recent recording plays on each).
 
 The sphere has 12 ribs 30 degrees apart (rib 0 at the camera, counting to the LEFT seen from above
 with the camera's right positive, the Max patch's convention: a visitor facing the sphere sees them
@@ -23,6 +24,7 @@ PLAYERS: int = 2
 CELLS: int = SCREENS // PLAYERS         # 24 per player
 COLUMNS: int = 6                        # the player's grid: Datapath units
 OUTPUTS: int = 4                        # grid rows: a unit's outputs
+SECTORS: int = 3                        # the sphere in thirds, 4 ribs each: a visitor standing anywhere sees one whole
 
 
 def rib_height(screen: int) -> tuple[int, int]:
@@ -58,6 +60,11 @@ def cell_of_screen(screen: int) -> tuple[int, int]:
     player, rest = divmod(screen - 1, CELLS)
     column, row = divmod(rest, OUTPUTS)
     return player, row * COLUMNS + column
+
+
+def sector_of_cell(player: int, cell: int) -> int:
+    """The third of the sphere (0 to SECTORS - 1, by rib: 0-3, 4-7, 8-11) that a cell of a player is in."""
+    return rib_height(screen_of_cell(player, cell))[0] * SECTORS // RIBS
 
 
 def rib_angle(rib: int) -> float:

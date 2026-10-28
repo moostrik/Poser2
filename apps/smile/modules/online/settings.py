@@ -10,6 +10,8 @@ class OnlineSettings(BaseSettings):
     stream_fps:     Field[float] = Field(10.0, min=1.0, max=30.0, step=1.0, description="Frames a second of the main screen sent to the phone during its transformation")
     stream_width:   Field[int]   = Field(512, min=256, max=1024, step=64, description="Width in pixels of the screen frames sent to the phone")
     music:          Field[bool]  = Field(True, widget=Widget.switch, description="Play the visitor's track on the phone (uploaded to the relay once per track)")
+    screen:         Field[int]   = Field(0, min=0, max=48, newline=True, description="Screen of the sphere (1-48) with the QR code to the phone page, showing the turn meanwhile; 0 = none")
+    page:           Field[str]   = Field("", description="Page the QR code opens; empty = the relay's host")
     connected:      Field[bool]  = Field(False, access=Field.READ, newline=True, description="Connected to the relay")
     status:         Field[str]   = Field("off", access=Field.READ, description="What the online side does now")
     waiting:        Field[int]   = Field(0, access=Field.READ, description="People in line at the relay")

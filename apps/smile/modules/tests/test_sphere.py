@@ -57,7 +57,8 @@ class TestWiring(unittest.TestCase):
     def test_the_angles_file_is_the_wiring(self):
         data = Path('data/audio/screen_angles.txt').read_bytes()
         self.assertFalse(data.startswith(b'\xef\xbb\xbf'), 'a byte order mark breaks the first entry in Max')
-        self.assertEqual(data.decode('ascii'), sphere.screen_angles_text(),
+        # the line endings are the checkout's (a dev PC with autocrlf has CRLF): the lines must match, the endings may differ
+        self.assertEqual(data.decode('ascii').replace('\r\n', '\n'), sphere.screen_angles_text(),
                          'regenerate the file: python -c "from modules.sphere import screen_angles_text as t; print(t(), end=\'\')"')
 
 

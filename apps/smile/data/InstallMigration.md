@@ -71,7 +71,7 @@ Added 2026-10-26:
 scripts/
   install.bat             ONE entry point: prerequisites, LFS, app venv, then install_comfy.ps1, then models
   install_comfy.ps1       from comfy/setup.ps1: ComfyUI at the pinned commit, 7 packs, patches, aiia_grin, venv; idempotent
-  (start_comfy.bat, startSMILE.bat, start_players.bat, make_test_workflow.bat, clip_info.bat unchanged)
+  (start_comfy.bat, startSMILE.bat, make_test_workflow.bat, clip_info.bat unchanged)
 comfy/
   models.json             the manifest: HF repo id + every model file (path, size, sha256, public source)
   comfy.lock              (2026-10-26) ComfyUI commit, each pack as git URL + commit, the torch index

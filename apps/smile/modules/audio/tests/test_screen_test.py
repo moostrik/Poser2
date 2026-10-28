@@ -1,5 +1,5 @@
-"""Tests for the laughter test stepper: recording send and bang instead of the network, a clock passed in,
-a folder of empty sample files."""
+"""Tests for the laughter test stepper: recording the lights and bangs, a clock passed in, a folder of
+empty sample files."""
 
 import tempfile
 import unittest
@@ -35,7 +35,7 @@ class TestScreenTest(unittest.TestCase):
 
     def make(self, settings: AudioSettings) -> ScreenTest:
         return ScreenTest(settings,
-                          send=lambda port, cell, seconds, number: self.sent.append((port, cell, seconds, number)),
+                          send=lambda wall, cell, seconds, number: self.sent.append((wall, cell, seconds, number)),
                           bang=lambda index, sample: self.banged.append((index, sample)),
                           folder=self.folder.name)
 
@@ -76,37 +76,28 @@ class TestScreenTest(unittest.TestCase):
         self.assertFalse(settings.laughter_test)
         self.assertEqual(settings.laughter_test_screen, 0)
 
-    def test_steps_round_the_screens_one_player_then_the_other(self):
+    def test_steps_round_the_screens_one_wall_then_the_other(self):
         self.settings.laughter_test = True
         self.settings.laughter_test_step = 2.0
         self.test.update(10.0)      # the first screen at once
-        self.assertEqual(self.sent, [(4117, 0, 2.0, 1)])
+        self.assertEqual(self.sent, [(0, 0, 2.0, 1)])
         self.assertEqual(self.banged, [(0, 1)])
         self.assertEqual(self.settings.laughter_test_screen, 1)
         self.test.update(11.9)      # not yet
         self.assertEqual(len(self.sent), 1)
         self.test.update(12.0)
-        self.assertEqual(self.sent[-1], (4117, 6, 2.0, 2))      # screen 2 is cell 6: unit 1, output 2
+        self.assertEqual(self.sent[-1], (0, 6, 2.0, 2))         # screen 2 is cell 6: unit 1, output 2
         self.assertEqual(self.banged[-1], (6, 1))
         self.assertEqual(self.settings.laughter_test_screen, 2)
         for i in range(2, SCREENS):
             self.test.update(10.0 + 2.0 * i)
-        self.assertEqual(self.sent[24], (4118, 0, 2.0, 25))     # the second player's first cell
+        self.assertEqual(self.sent[24], (1, 0, 2.0, 25))        # the second wall's first cell
         self.assertEqual(self.banged[24], (24, 1))
-        self.assertEqual(self.sent[-1], (4118, 23, 2.0, 48))
+        self.assertEqual(self.sent[-1], (1, 23, 2.0, 48))
         self.assertEqual(self.settings.laughter_test_screen, SCREENS)
         self.test.update(10.0 + 2.0 * SCREENS)                  # round again
-        self.assertEqual(self.sent[-1], (4117, 0, 2.0, 1))
+        self.assertEqual(self.sent[-1], (0, 0, 2.0, 1))
         self.assertEqual(self.settings.laughter_test_screen, 1)
-
-    def test_the_ports_come_from_the_panel(self):
-        self.settings.player_1_port, self.settings.player_2_port = 5001, 5002
-        self.settings.laughter_test = True
-        self.settings.laughter_test_step = 1.0
-        for i in range(25):
-            self.test.update(float(i))
-        self.assertEqual(self.sent[0][0], 5001)
-        self.assertEqual(self.sent[24][0], 5002)
 
     def test_off_then_on_starts_at_screen_1_again(self):
         self.settings.laughter_test = True
@@ -117,7 +108,7 @@ class TestScreenTest(unittest.TestCase):
         self.assertEqual(self.settings.laughter_test_screen, 0)
         self.settings.laughter_test = True
         self.test.update(4.0)
-        self.assertEqual(self.sent[-1], (4117, 0, 2.0, 1))
+        self.assertEqual(self.sent[-1], (0, 0, 2.0, 1))
         self.assertEqual(self.settings.laughter_test_screen, 1)
 
     def test_a_failing_send_or_bang_is_one_warning_and_the_test_goes_on(self):

@@ -1,4 +1,5 @@
 import time
+from typing import Any
 
 import glfw
 import numpy as np
@@ -8,8 +9,10 @@ from modules.render.GrinPlayer import GrinPlayer
 from modules.render.grab import ScreenGrab
 from modules.comfy.messages import GenMessage, GenState
 from modules.face.FaceFinder import FaceFrame
-from modules.gl import Blit, Fbo, RenderBase, Shader, Style, Texture, clear_color
+from modules import sphere
+from modules.gl import Blit, Fbo, MonitorId, RenderBase, Shader, Style, Texture, clear_color
 from modules.gl.Utils import fit
+from modules.player.Render import PlayerRender
 from modules.render.inputs import Inputs
 from modules.render.layers import CameraLayer, CreditLayer, DestructLayer, DiffusionLayer, FlashLayer, LayerBase, RevealLayer, StatusLayer
 from modules.render.layers.CreditLayer import caption_shown, fade_step, new_line_due
@@ -26,9 +29,12 @@ class SmileRender(RenderBase):
     """The installation display. Runs the sequencer every frame (it is the app clock), then lets the
     stage of the current sequence state render the layers, and fits its output in the window.
     The grin frames come from the player, which is asked every frame for the one that is due.
+    The two walls of the sphere (`walls`, `PlayerRender`) are composited after it, each shown in the
+    secondary window of its monitor (`window.secondary_list`: the first entry is wall 0, screens 1-24);
+    the online cell of one of them shows the output as the phone sees it during an online turn.
     Keys: Enter starts a sequence; f fullscreen, w borderless, Esc quit (the window manager)."""
 
-    def __init__(self, settings: RenderSettings, sequencer: Sequencer, player: GrinPlayer, width: int, height: int) -> None:
+    def __init__(self, settings: RenderSettings, players: Any, sequencer: Sequencer, player: GrinPlayer, width: int, height: int) -> None:
         super().__init__(settings.window)
         self.settings: RenderSettings = settings
         self.sequencer: Sequencer = sequencer
@@ -66,6 +72,10 @@ class SmileRender(RenderBase):
         self._frozen: bool = False
         # the screen for the phones of SMILE Online: switched on and read by modules/online
         self.grab: ScreenGrab = ScreenGrab()
+        self._phone_view: Texture = self._output     # the output as the phone sees it: no QR code, no status line
+        # the walls of the sphere, and which cell of which one is SMILE Online's (wall, cell, mode, page)
+        self.walls: list[PlayerRender] = [PlayerRender(settings, players, [str(i) for i in range(sphere.CELLS)]) for _ in range(sphere.PLAYERS)]
+        self._online: tuple[int, int, str, str] | None = None
 
         self.window_manager.add_keyboard_callback(self._on_key)
 
@@ -74,6 +84,8 @@ class SmileRender(RenderBase):
         for layer in self._all_layers:
             layer.allocate(self.width, self.height, COMPOSITION_FORMAT)
         self._freeze_fbo.allocate(self.width, self.height, COMPOSITION_FORMAT)
+        for wall in self.walls:
+            wall.allocate()
         Shader.enable_hot_reload()
 
     def deallocate(self) -> None:
@@ -82,6 +94,8 @@ class SmileRender(RenderBase):
         self._freeze_fbo.deallocate()
         self.grab.deallocate()
         self.inputs.deallocate()
+        for wall in self.walls:
+            wall.deallocate()
 
     def update(self) -> None:
         self._play_grin()
@@ -113,11 +127,12 @@ class SmileRender(RenderBase):
                 copy(self._output, self._freeze_fbo)
             self._output = self._freeze_fbo
         self._frozen = self.settings.freeze
+        self._update_walls()
 
     def _render_credit(self, sequence_type: SequenceType, grab: bool) -> None:
-        """The credit over the output; with `grab`, the phone's copy of the screen is taken here: the
-        caption yes, the QR code and the status line no; the turn's last frame (`grab.clean`) without the
-        caption too, the phone fades it out itself and keeps that frame."""
+        """The credit over the output; the copy without the QR code (`CreditLayer.clean`) is the phone's and the
+        online cell's: rendered when `grab` takes it for the phone (the turn's last frame, `grab.clean`, without
+        the caption too: the phone fades it out itself and keeps that frame) and while the online cell shows it."""
         now: float = time.time()
         if new_line_due(sequence_type, self._credit_sequence):
             self._credit.new_visitor()
@@ -125,14 +140,32 @@ class SmileRender(RenderBase):
         shown: bool = caption_shown(sequence_type, self.settings.credit_camera)
         self._credit_alpha = fade_step(self._credit_alpha, shown, now - self._credit_time)
         self._credit_time = now
+        online: tuple[int, int, str, str] | None = self._online
         if self.settings.credit:
-            if grab:
+            if grab or (online is not None and online[2] == 'screen'):
                 self._credit.render(self._output, 0.0 if self.grab.clean else self._credit_alpha, qr_code=False)
-                self.grab.grab(self._credit.texture)
+            if grab:
+                self.grab.grab(self._credit.clean)
+            self._phone_view = self._credit.clean
             self._credit.render(self._output, self._credit_alpha)
             self._output = self._credit.texture
-        elif grab:
-            self.grab.grab(self._output)
+        else:
+            self._phone_view = self._output
+            if grab:
+                self.grab.grab(self._output)
+
+    def _update_walls(self) -> None:
+        """The walls after the main screen, so the online cell shows this frame; only the walls that have a
+        window (`secondary_list`) are composited."""
+        online: tuple[int, int, str, str] | None = self._online
+        shown: int = len(self.settings.window.secondary_list)
+        for index, wall in enumerate(self.walls):
+            if online is not None and online[0] == index:
+                wall.set_online(str(online[1]), online[2], self._phone_view if online[2] == 'screen' else None, online[3])
+            else:
+                wall.set_online(None)
+            if index < shown:
+                wall.update()
 
     def _play_grin(self) -> None:
         """Show the grin frame that is due. Its first frame arrives during DIFFUSION and blends in as
@@ -155,7 +188,15 @@ class SmileRender(RenderBase):
             self._draw_fit(self.inputs.camera, width, height)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
-        pass
+        """The wall of this monitor: the i-th entry of `secondary_list` is wall i (poser2's pattern)."""
+        clear_color(0, 0, 0, 1)
+        Style.reset_state()
+        try:
+            index: int = list(self.settings.window.secondary_list).index(MonitorId(monitor_id))
+        except ValueError:
+            return
+        if index < len(self.walls):
+            self._draw_fit(self.walls[index].texture, width, height)
 
     def on_main_window_resize(self, width: int, height: int) -> None:
         pass
@@ -192,6 +233,11 @@ class SmileRender(RenderBase):
 
     def set_faces(self, frame: FaceFrame) -> None:
         self.inputs.faces.set(frame)
+
+    def set_online_cell(self, wall: int, cell: int, mode: str, page: str) -> None:
+        """SMILE Online's cell on the walls: `mode` is `clip` (a cell like any), `qr` (the card with the code to
+        `page`) or `screen` (the main screen as the phone sees it); applied to the walls at the next frame."""
+        self._online = (wall, cell, mode, page) if mode != 'clip' else None
 
     def set_diffusion_message(self, message: GenMessage) -> None:
         # the image first, so it is uploaded no later than the frame the new state starts
