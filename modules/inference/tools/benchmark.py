@@ -124,8 +124,11 @@ def gpu_used_mb() -> float:
 
 
 def run_model(model: Model, settings: Any, crop_w: int, crop_h: int, warmup: int, iterations: int,
-              image: Path | None, seed: int) -> tuple[dict[str, np.ndarray], float]:
-    """Time one model; returns the last batch's outputs and the GPU memory its runner took (MB)."""
+              image: Path | None, seed: int) -> tuple[dict[str, np.ndarray], float, dict[str, dict[str, float]]]:
+    """Time one model; returns the last batch's outputs, the GPU memory its runner took (MB) and its timer stats.
+
+    The stats are read here, while the timers live: the session holds them weakly.
+    """
     runner_module = importlib.import_module(f"..{model.name}.runner_"
                                             f"{'onnx' if settings.model_type is ModelType.ONNX else 'trt'}", __package__)
     runner_class = getattr(runner_module, 'RunnerONNX' if settings.model_type is ModelType.ONNX else 'RunnerTRT')
@@ -174,7 +177,7 @@ def run_model(model: Model, settings: Any, crop_w: int, crop_h: int, warmup: int
         outputs = {f"{model.name}/{k}": v for k, v in model.read_output(result['output']).items()}
     finally:
         runner.stop()
-    return outputs, memory_mb
+    return outputs, memory_mb, PerformanceTimer.stop_session()
 
 
 def compare_outputs(outputs: dict[str, np.ndarray], reference: dict[str, np.ndarray]) -> dict[str, dict[str, float]]:
@@ -214,9 +217,9 @@ def main() -> None:
         settings = model_settings(group, model_type)
         logger.info("%s: %s, batch %d, crop %dx%d", model.name, settings.model, settings.max_poses,
                     crop.output_width, crop.output_height)
-        model_outputs, memory_mb = run_model(model, settings, crop.output_width, crop.output_height,
+        model_outputs, memory_mb, model_stats = run_model(model, settings, crop.output_width, crop.output_height,
                                              args.warmup, args.iterations, args.image, args.seed)
-        stats.update(PerformanceTimer.stop_session())
+        stats.update(model_stats)
         memory[model.name] = memory_mb
         outputs.update(model_outputs)
 
