@@ -24,7 +24,7 @@ jobs:
           uv export --locked --no-hashes --no-annotate --no-emit-project --format requirements-txt \
             | grep -v -E '^(-|torch|tensorrt|nvidia-)' > requirements-ci.txt
           uv pip install -r requirements-ci.txt
-          uv pip install torch==2.15.0 --index-url https://download.pytorch.org/whl/cpu
+          uv pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
 
       - name: Unit tests
         shell: bash
