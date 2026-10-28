@@ -42,7 +42,7 @@
     "connection": {
       "host": "127.0.0.1",
       "port": 8188,
-      "workflow": "data/comfy/smile_workflow.json",
+      "workflow": "apps/smile/data/comfy/smile_workflow.json",
       "job_timeout": 45.0
     },
     "style_a": {
@@ -179,7 +179,7 @@
     "destroy_bloom": 0.6,
     "credit": true,
     "credit_name": "Matthias Oostrik",
-    "credit_lines": "data/credit_lines.txt",
+    "credit_lines": "apps/smile/data/credit_lines.txt",
     "credit_url": "https://oostrik.net/smile",
     "credit_camera": false,
     "credit_players": false,
@@ -234,7 +234,7 @@
   "online": {
     "active": true,
     "relay": "ws://127.0.0.1:8800/ws/smile",
-    "token_file": "data/online_token.txt",
+    "token_file": "apps/smile/data/online_token.txt",
     "turn_window": 10.0,
     "eye_free_after": 3.0,
     "stream_fps": 10.0,
