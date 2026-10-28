@@ -11,12 +11,15 @@ logger = logging.getLogger(__name__)
 PRESET_SUFFIX = ".json"
 
 _current_app: str | None = None
+_default_startup: str = "studio"
 
 
-def set_app(app_name: str | None) -> None:
-    """Set the active app name.  All subsequent preset calls use this app's directory."""
-    global _current_app
+def set_app(app_name: str | None, default_startup: str = "studio") -> None:
+    """Set the active app name.  All subsequent preset calls use this app's directory;
+    `default_startup` is the preset loaded at startup while no .ui_preset.json names one."""
+    global _current_app, _default_startup
     _current_app = app_name
+    _default_startup = default_startup
 
 
 def _app_dir(app_name: str | None = None) -> Path:
@@ -44,12 +47,12 @@ def scan(app_name: str | None = None) -> list[str]:
 
 
 def get_startup(app_name: str | None = None) -> str:
-    """Return the preset name to load on startup (falls back to 'studio')."""
+    """Return the preset name to load on startup (falls back to the app's default, 'studio')."""
     try:
         data = json.loads((_app_dir(app_name) / ".ui_preset.json").read_text())
-        return data.get("startup_preset") or "studio"
+        return data.get("startup_preset") or _default_startup
     except (FileNotFoundError, json.JSONDecodeError):
-        return "studio"
+        return _default_startup
 
 
 def validate_name(name: str) -> None:

@@ -1,0 +1,38 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Bash(git diff *)",
+      "Bash(git show *)",
+      "Bash(git log *)",
+      "Bash(git status)",
+      "Bash(git status *)",
+      "Bash(git blame *)",
+      "Bash(git stash list)",
+      "Bash(echo *)",
+      "Bash(wc *)",
+      "Bash(sort *)",
+      "Bash(uniq *)",
+      "Bash(cut *)",
+      "Bash(awk *)",
+      "Bash(grep *)",
+      "Bash(head *)",
+      "Bash(tail *)",
+      "Bash(gh api *)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:arduino-pico.readthedocs.io)",
+      "WebFetch(domain:raw.githubusercontent.com)"
+    ],
+    "deny": [
+      "Bash(git commit)",
+      "Bash(git commit *)",
+      "Bash(git push)",
+      "Bash(git push *)",
+      "PowerShell(git commit)",
+      "PowerShell(git commit *)",
+      "PowerShell(git push)",
+      "PowerShell(git push *)"
+    ]
+  }
+}

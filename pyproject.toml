@@ -1,11 +1,12 @@
 [project]
 name = "poser2"
 version = "0.0.0"
-description = "Real-time pose installations: White Space, HD Trio, Deep Flow"
+description = "Real-time installations: White Space, HD Trio, Deep Flow, SMILE"
 requires-python = "==3.12.*"
 # Lower bounds only: `uv lock --upgrade` moves uv.lock to the newest versions that fit together.
 # Exact pins are the exceptions, each with its reason.
 dependencies = [
+    "aiohttp>=3.14",                # SMILE Online's relay, when it runs on the PC (apps/smile/relay)
     "depthai==2.30.0",              # depthai 3 does not work for White Space; 2.30 is more stable than 2.32
     "ffmpeg-python>=0.2",
     "freetype-py>=2.5",
@@ -23,8 +24,10 @@ dependencies = [
     "PyOpenGL-accelerate>=3.1.10",
     "python-osc>=1.10",
     "pytweening>=1.2",
+    "requests>=2.34",               # SMILE: ComfyUI's HTTP API
     "stupidArtnet>=1.6",
     "watchdog>=6.0",
+    "websocket-client>=1.9",        # SMILE: ComfyUI's events, the relay of SMILE Online
     # GPU stack (CUDA 13): moves only together with rebuilt TensorRT engines, never through `uv lock --upgrade`
     "torch==2.14.1",
     "tensorrt-cu13==11.4.0.106",

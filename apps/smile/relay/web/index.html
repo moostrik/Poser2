@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SMILE</title>
+  <link rel="preload" href="web/Bangers-Regular.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="stylesheet" href="web/style.css">
+</head>
+<body>
+  <canvas id="halftone"></canvas>
+  <div id="light"></div>
+  <pre id="debug" hidden></pre>
+  <div id="turn">TURN YOUR PHONE</div>
+  <main id="page">
+    <h1 id="title">SMILE<span class="ai">ai</span></h1>
+    <div id="window">
+      <video id="cam" playsinline muted autoplay></video>
+      <canvas id="view"></canvas>
+      <video id="grin" playsinline loop></video>
+      <div id="flash"></div>
+      <div id="terms">
+        <div id="terms-box">
+          <h2>TERMS OF YOUR SMILE<span class="ai">ai</span></h2>
+          <ol>
+            <li>SMILE<span class="ai">ai</span> owns your portrait</li>
+            <li>SMILE<span class="ai">ai</span> can do anything it wants with it</li>
+            <li>SMILE<span class="ai">ai</span> probably never will</li>
+            <li>SMILE<span class="ai">ai</span> will perfect you</li>
+            <li>SMILE<span class="ai">ai</span> is nothing personal</li>
+            <li>SMILE<span class="ai">ai</span> is statistics on steroids</li>
+            <li>You will SMILE<span class="ai">ai</span></li>
+          </ol>
+        </div>
+      </div>
+    </div>
+    <!-- the bar: a box, not a button (a button clips its contents, and the loud word grows past the bar's
+         edges); #label holds the text's room, the two copies are the text seen (app.js, THE BAR) -->
+    <div id="share" role="button" tabindex="0">
+      <span id="label">I AGREE TO SMILE<span class="ai">ai</span></span>
+      <span class="copy" id="label-white"><span class="text"></span></span>
+      <span class="copy" id="label-black"><span class="text"></span></span>
+    </div>
+    <!-- the artist's site: the name and the site are modules/credit.py's (NAME, URL) for the room; the page
+         links the site's root -->
+    <div id="credit"><a href="https://oostrik.net" target="_blank" rel="noopener">oostrik.net</a></div>
+  </main>
+
+  <script src="web/app.js"></script>
+</body>
+</html>
