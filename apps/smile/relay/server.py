@@ -49,7 +49,7 @@ from typing import Any
 
 from aiohttp import WSMsgType, web
 
-from relay.line import Line
+from .line import Line
 
 logger = logging.getLogger('relay')
 

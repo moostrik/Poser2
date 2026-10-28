@@ -41,7 +41,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path $PSScriptRoot -Parent
-$src = Join-Path $repo 'comfy'
+$src = Join-Path $repo 'data\comfy'
 
 function Step([string]$name) { Write-Host "`n== $name" -ForegroundColor Cyan }
 function Note([string]$text) { Write-Host "   $text" }

@@ -9,7 +9,7 @@ import unittest
 from aiohttp import ClientWebSocketResponse, web
 from aiohttp.test_utils import TestClient, TestServer
 
-from relay.server import FRAME, LAST, SHOW, Relay, make_app
+from apps.smile.relay.server import FRAME, LAST, SHOW, Relay, make_app
 
 TOKEN: str = 'test-token'
 

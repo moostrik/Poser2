@@ -2,7 +2,7 @@
 
 import unittest
 
-from relay.line import ASLEEP, BLOCKS, LOOKING, OUTSIDE, Line
+from apps.smile.relay.line import ASLEEP, BLOCKS, LOOKING, OUTSIDE, Line
 
 
 class TestLine(unittest.TestCase):
