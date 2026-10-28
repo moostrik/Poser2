@@ -7,9 +7,8 @@ depth cam pose synchony detection
 * Maybe it is necessary to instal visual studio with python and c++ modules (investigate on next clean install)
 * install latest Visual C++ Redistributable [download](https://aka.ms/vs/17/release/vc_redist.x86.exe) or [site](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170#latest-supported-redistributable-version) and RESTART
 
-### Python
-* ~~Install python 3.10 from Microsoft Store (or find a better method)~~
-* Install python 3.12 Windows Installer (64 bit) [download](https://www.python.org/ftp/python/3.12.10/python-3.12.10-amd64.exe) or [site](https://www.python.org/downloads/release/python-31210/)
+### uv
+* In a terminal run ```winget install astral-sh.uv``` and open a new terminal; uv installs Python 3.12 and the packages
 
 ### Git for Windows
 * Install latest version from [site](https://git-scm.com/download/win)
@@ -46,8 +45,12 @@ depth cam pose synchony detection
 * ```git clone https://github.com/moostrik/Poser2.git```
 
 ### Install Script
-* in the terminal run ```scripts\install.bat```
+* in the terminal run ```scripts\install.bat```: it pulls the LFS files and builds `.venv` from `uv.lock` (run it again after every pull that changes `uv.lock`)
 * and make the models for an app ```scripts/makemodels.bat <app_name>``` or all apps ```scripts/makemodels.bat all``` using the .venv environment
+
+### Upgrade Packages
+* ```uv lock --upgrade``` moves `uv.lock` to the newest versions that fit `pyproject.toml`; then ```scripts\install.bat```, the timing check below, and commit `uv.lock`
+* The exact pins in `pyproject.toml` (depthai, torch, TensorRT, cuda-python) never move this way; the GPU stack moves only together with rebuilt TensorRT engines
 
 ### Run Project
 * activate venv and run ```python launcher.py```

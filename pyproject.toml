@@ -1,0 +1,43 @@
+[project]
+name = "poser2"
+version = "0.0.0"
+description = "Real-time pose installations: White Space, HD Trio, Deep Flow"
+requires-python = "==3.12.*"
+# Lower bounds only: `uv lock --upgrade` moves uv.lock to the newest versions that fit together.
+# Exact pins are the exceptions, each with its reason.
+dependencies = [
+    "depthai==2.30.0",              # depthai 3 does not work for White Space; 2.30 is more stable than 2.32
+    "ffmpeg-python>=0.2",
+    "freetype-py>=2.5",
+    "glfw>=2.10",
+    "h5py>=3.16",
+    "nicegui>=3.11",
+    "numpy>=2.4",
+    "OneEuroFilter>=0.2.1",
+    "onnx>=1.21",                   # model export tools
+    "onnx_simplifier>=0.5",         # model export tools, optional there
+    "onnxruntime-gpu>=1.25",        # the ONNX runners, to benchmark the TensorRT ones against
+    "opencv-python>=4.13",
+    "psutil>=7.2",
+    "PyOpenGL>=3.1.10",
+    "PyOpenGL-accelerate>=3.1.10",
+    "python-osc>=1.10",
+    "pytweening>=1.2",
+    "stupidArtnet>=1.6",
+    "watchdog>=6.0",
+    # GPU stack: moves only together with rebuilt TensorRT engines, never through `uv lock --upgrade`
+    "torch==2.8.0",
+    "tensorrt-cu12==10.16.1.11",
+    "cuda-python==13.2.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu129" }
+
+[[tool.uv.index]]
+name = "pytorch-cu129"
+url = "https://download.pytorch.org/whl/cu129"
+explicit = true

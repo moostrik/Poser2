@@ -1,6 +1,5 @@
 @echo off
-set PYTHON=py -3.12
-set "VENV_DIR=%~dp0..\.venv"
+cd /d "%~dp0.."
 echo.
 
 echo [44m CUDA 12.9 [0m
@@ -42,24 +41,20 @@ if %errorlevel% neq 0 (
 )
 echo.
 
-echo [44m Virtual Environment [0m
-
-if exist "%VENV_DIR%" (
-    echo [91mvirtual environment already exists at %VENV_DIR%[0m
+echo [44m Packages [0m
+where uv >nul 2>nul
+if %errorlevel% neq 0 (
+    echo [91muv is not installed![0m
+    echo Install it with "winget install astral-sh.uv" and open a new terminal
     goto endofscript
 )
 
-:venv_create
-echo [33mCreating and activating virtual environment %VENV_DIR%[0m
-%PYTHON% -m venv "%VENV_DIR%"
-call "%VENV_DIR%\Scripts\activate"
-echo.
-
-echo [44m Requirements [0m
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-
-call "%VENV_DIR%\Scripts\deactivate"
+@REM Builds or updates .venv to match uv.lock exactly (Python 3.12 included)
+uv sync --locked
+if %errorlevel% neq 0 (
+    echo [91mPackage install failed![0m
+    goto endofscript
+)
 
 
 :success
