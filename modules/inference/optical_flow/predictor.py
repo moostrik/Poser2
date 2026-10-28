@@ -1,6 +1,6 @@
 from collections import deque
 from threading import Lock
-from typing import Callable, TypeAlias, Union
+from typing import TYPE_CHECKING, Callable, TypeAlias, Union
 
 import torch
 
@@ -14,9 +14,11 @@ from modules.utils import PerformanceTimer
 
 from .io import OpticalFlowInput, OpticalFlowOutput
 from .runner_onnx import RunnerONNX, OpticalFlowInput, OpticalFlowOutput
-from .runner_trt import RunnerTRT
 
-OpticalFlow = Union[RunnerONNX, RunnerTRT]
+if TYPE_CHECKING:
+    from .runner_trt import RunnerTRT
+
+OpticalFlow = Union[RunnerONNX, "RunnerTRT"]
 
 FlowDict: TypeAlias = dict[int, torch.Tensor]
 FlowCallback: TypeAlias = Callable[[FlowDict], None]
@@ -37,11 +39,13 @@ class Predictor:
     """
 
     def __init__(self, settings: Settings):
-        self._optical_flow: OpticalFlow = RunnerONNX(settings)
-        if settings.model_type is ModelType.ONNX:
-            self._optical_flow = RunnerONNX(settings)
-        elif settings.model_type is ModelType.TRT:
+        # One runner per model type; TensorRT is imported only when it is used.
+        self._optical_flow: OpticalFlow
+        if settings.model_type is ModelType.TRT:
+            from .runner_trt import RunnerTRT
             self._optical_flow = RunnerTRT(settings)
+        else:
+            self._optical_flow = RunnerONNX(settings)
         self._lock = Lock()
         self._batch_counter: int = 0
         self._verbose: bool = settings.verbose

@@ -1,5 +1,5 @@
 from threading import Lock
-from typing import Union
+from typing import TYPE_CHECKING, Union
 
 import torch
 
@@ -12,13 +12,15 @@ from modules.utils import PerformanceTimer
 
 from .io import SegmentationInput, SegmentationOutput
 from .runner_onnx import RunnerONNX
-from .runner_trt import RunnerTRT
+
+if TYPE_CHECKING:
+    from .runner_trt import RunnerTRT
 
 import logging
 logger = logging.getLogger(__name__)
 
 
-Segmentation = Union[RunnerONNX, RunnerTRT]
+Segmentation = Union[RunnerONNX, "RunnerTRT"]
 
 
 class Predictor:
@@ -36,11 +38,13 @@ class Predictor:
     """
 
     def __init__(self, settings: Settings):
-        self._segmentation: Segmentation = RunnerONNX(settings)
-        if settings.model_type is ModelType.ONNX:
-            self._segmentation = RunnerONNX(settings)
-        elif settings.model_type is ModelType.TRT:
+        # One runner per model type; TensorRT is imported only when it is used.
+        self._segmentation: Segmentation
+        if settings.model_type is ModelType.TRT:
+            from .runner_trt import RunnerTRT
             self._segmentation = RunnerTRT(settings)
+        else:
+            self._segmentation = RunnerONNX(settings)
         self._lock: Lock = Lock()
         self._batch_counter: int = 0
         self._verbose: bool = settings.verbose

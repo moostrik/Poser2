@@ -1,5 +1,5 @@
 from threading import Lock
-from typing import Union
+from typing import TYPE_CHECKING, Union
 from .. import crop, ModelType
 from modules.pose.features import Points2D
 from modules.pose.frame import FrameDictCallbackMixin, replace, FrameDict
@@ -8,12 +8,14 @@ from modules.utils import PerformanceTimer
 
 from .io import DetectionInput, DetectionOutput
 from .runner_onnx import RunnerONNX
-from .runner_trt import RunnerTRT
+
+if TYPE_CHECKING:
+    from .runner_trt import RunnerTRT
 
 import logging
 logger = logging.getLogger(__name__)
 
-Detection = Union[RunnerONNX, RunnerTRT]
+Detection = Union[RunnerONNX, "RunnerTRT"]
 
 class Predictor(FrameDictCallbackMixin):
     """GPU-based batch extractor for 2D pose points using RTMPose detection.
@@ -28,10 +30,12 @@ class Predictor(FrameDictCallbackMixin):
 
     def __init__(self, settings: Settings):
         super().__init__()
-        self._detection: Detection = RunnerTRT(settings)
+        # One runner per model type; TensorRT is imported only when it is used.
+        self._detection: Detection
         if settings.model_type is ModelType.ONNX:
             self._detection = RunnerONNX(settings)
-        elif settings.model_type is ModelType.TRT:
+        else:
+            from .runner_trt import RunnerTRT
             self._detection = RunnerTRT(settings)
 
         self._lock = Lock()

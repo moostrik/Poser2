@@ -14,7 +14,7 @@ from threading import Event, Thread
 import psutil
 
 from modules.log_config import setup_logging, install_thread_excepthook
-from apps import APP_REGISTRY
+from apps import APP_NAMES, load_app
 
 
 def _read_launcher_file() -> str:
@@ -22,14 +22,14 @@ def _read_launcher_file() -> str:
     try:
         data = json.loads(path.read_text())
         name = data.get("app", "")
-        if name in APP_REGISTRY:
+        if name in APP_NAMES:
             return name
-        logging.warning(".app_select.json: unknown app %r, falling back to first in registry", name)
+        logging.warning(".app_select.json: unknown app %r, falling back to first app", name)
     except FileNotFoundError:
         pass
     except json.JSONDecodeError as e:
-        logging.warning(".app_select.json: invalid JSON (%s), falling back to first in registry", e)
-    return next(iter(APP_REGISTRY))
+        logging.warning(".app_select.json: invalid JSON (%s), falling back to first app", e)
+    return APP_NAMES[0]
 
 
 if __name__ == '__main__':
@@ -50,7 +50,7 @@ if __name__ == '__main__':
         pass
 
     parser: ArgumentParser = ArgumentParser()
-    parser.add_argument('-app',     '--app',            type=str,   default=None, choices=list(APP_REGISTRY.keys()), help='app to launch (default: from .app_select.json or first in registry)')
+    parser.add_argument('-app',     '--app',            type=str,   default=None, choices=APP_NAMES, help='app to launch (default: from .app_select.json or first app)')
     parser.add_argument('-sim',     '--simulation',     action='store_true',        help='use prerecorded video with camera')
     parser.add_argument('-ni',      '--no-interface',   action='store_true',        help='do not open the settings interface in an Edge window')
     parser.add_argument('-v',       '--verbose',        action='store_true',        help='enable verbose (DEBUG) console output')
@@ -63,7 +63,7 @@ if __name__ == '__main__':
     logging.info("Starting  >>> %s <<<  pid: %s  simulation: %s", args.app, process_id, args.simulation)
     logging.info("Logging to: %s", log_file)
 
-    AppClass = APP_REGISTRY[args.app]
+    AppClass = load_app(args.app)
     app = AppClass(simulation=args.simulation, interface=not args.no_interface)
     app.start()
 
