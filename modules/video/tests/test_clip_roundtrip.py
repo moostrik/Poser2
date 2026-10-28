@@ -6,8 +6,7 @@ import unittest
 
 import numpy as np
 
-from apps.smile.video import ffmpeg
-from apps.smile.video.ffmpeg import ClipWriter, Encoder
+from modules import video
 
 WIDTH, HEIGHT, FRAMES, FPS = 896, 1120, 20, 13.0
 CELL = (512, 640)
@@ -22,26 +21,26 @@ def synthetic_frame(i: int) -> np.ndarray:
     return frame
 
 
-@unittest.skipUnless(ffmpeg.available(), 'ffmpeg not on the PATH')
+@unittest.skipUnless(video.available(), 'ffmpeg not on the PATH')
 class TestClipRoundTrip(unittest.TestCase):
 
     def test_roundtrip_on_every_working_encoder(self):
-        encoders = [e for e in (Encoder.QSV, Encoder.NVENC, Encoder.CPU) if ffmpeg.encoder_works(e)]
-        self.assertIn(Encoder.CPU, encoders)
+        encoders = [e for e in (video.Encoder.QSV, video.Encoder.NVENC, video.Encoder.CPU) if video.encoder_works(e)]
+        self.assertIn(video.Encoder.CPU, encoders)
         for encoder in encoders:
             with self.subTest(encoder=encoder.value):
                 self._roundtrip(encoder)
 
-    def _roundtrip(self, encoder: Encoder) -> None:
+    def _roundtrip(self, encoder: video.Encoder) -> None:
         with tempfile.TemporaryDirectory() as folder:
             path = os.path.join(folder, 'clip.mp4')
-            writer = ClipWriter(path, FPS, encoder)
+            writer = video.ClipWriter(path, FPS, encoder)
             for i in range(FRAMES):
                 writer.add(synthetic_frame(i))
             self.assertTrue(writer.close())
             self.assertEqual(writer.frames, FRAMES)
 
-            frames, fps = ffmpeg.decode_clip(path, CELL)
+            frames, fps = video.decode_clip(path, CELL)
             self.assertEqual(frames.shape, (FRAMES, CELL[1], CELL[0], 3))
             self.assertAlmostEqual(fps, FPS)
             for i in (0, FRAMES - 1):
@@ -52,20 +51,20 @@ class TestClipRoundTrip(unittest.TestCase):
     def test_odd_size_is_cropped_to_even(self):
         with tempfile.TemporaryDirectory() as folder:
             path = os.path.join(folder, 'odd.mp4')
-            writer = ClipWriter(path, 15.0, Encoder.CPU)
+            writer = video.ClipWriter(path, 15.0, video.Encoder.CPU)
             writer.add(np.full((33, 65, 3), 128, np.uint8))
             self.assertTrue(writer.close())
-            _, _, width, height = ffmpeg.probe(path)
+            _, _, width, height = video.probe(path)
             self.assertEqual((width, height), (64, 32))
 
     def test_size_change_raises(self):
         with tempfile.TemporaryDirectory() as folder:
-            writer = ClipWriter(os.path.join(folder, 'size.mp4'), 15.0, Encoder.CPU)
+            writer = video.ClipWriter(os.path.join(folder, 'size.mp4'), 15.0, video.Encoder.CPU)
             writer.add(np.zeros((64, 64, 3), np.uint8))
             with self.assertRaises(ValueError):
                 writer.add(np.zeros((32, 64, 3), np.uint8))
             writer.close()
 
     def test_pick_encoder_falls_back_to_cpu(self):
-        self.assertIn(ffmpeg.pick_encoder(Encoder.AUTO), (Encoder.QSV, Encoder.NVENC, Encoder.CPU))
-        self.assertEqual(ffmpeg.pick_encoder(Encoder.CPU), Encoder.CPU)
+        self.assertIn(video.pick_encoder(video.Encoder.AUTO), (video.Encoder.QSV, video.Encoder.NVENC, video.Encoder.CPU))
+        self.assertEqual(video.pick_encoder(video.Encoder.CPU), video.Encoder.CPU)

@@ -2,19 +2,19 @@
 and the grins of the visitors before play on the two walls of the sphere (README.md, CLAUDE.md)."""
 
 from apps.smile.cam.Camera import Camera
-from apps.smile.face.FaceFinder import FaceFinder, FaceFrame
+from modules.face import FaceFinder, FaceFrame
 from apps.smile.render.SmileRender import SmileRender
 from apps.smile.render.Sequencer import Sequencer, SeqenceMessage, SequenceType, AnimationType, AnimationTypeNames
 from apps.smile.comfy.Generator import Generator
 from apps.smile.render.GrinPlayer import GrinPlayer
 from apps.smile.comfy.messages import GenMessage, GenState
-from apps.smile.osc.Sender import Sender as Osc
+from modules.inout import OscSender
 from apps.smile.audio.DB import DB as AudioDB, laugh_files
 from apps.smile.audio.ScreenTest import ScreenTest
 from apps.smile.credit_scroll import CreditScroller
 from apps.smile.render.settings import RenderSettings
 from apps.smile.save.ClipSaver import ClipSaver
-from apps.smile.artnet.Sender import Sender as Artnet
+from apps.smile.lights import Lights
 from apps.smile.online.Online import Online
 from apps.smile.online.Link import http_base
 from apps.smile.player.Player import Player, online_cell_mode
@@ -108,7 +108,7 @@ class SmileMain():
         self.camera.setRotate90(self.portraitMode)
 
         self.audio: AudioDB = AudioDB(self.settings.audio, f'{DATA_PATH}/audio/music_map.json')
-        self.osc: Osc = Osc(self.settings.audio.osc)
+        self.osc: OscSender = OscSender(self.settings.audio.osc, events=('/test_bang',))
         # the laughter test, stepped from sequence_callback: it lights the walls' cells and bangs Max
         self.screen_test: ScreenTest = ScreenTest(self.settings.audio, send=self.clip_player.light, bang=self._test_bang)
         # the name going round the walls, planned here and handed to them every second
@@ -120,7 +120,7 @@ class SmileMain():
         self._face_frame_time: float = 0.0  # arrival of the camera frame the face finder got last
         self._visitor_start: float | None = None    # the capture of the visitor the generator is working on
         self._flash_time: float = 0.0       # when the flash started: the music starts then (Max, the phone, the clip's sound)
-        self.artnet = Artnet(self.settings.artnet, f'{DATA_PATH}/artnet.json')
+        self.lights: Lights = Lights(self.settings.artnet, f'{DATA_PATH}/artnet.json')
         # SMILE Online: a turn for someone outside when the room's eye is free, stepped from sequence_callback
         self.online: Online = Online(self.settings.online, self.camera, self.sequencer, self.face, self.render.grab,
                                      lambda: (self.settings.render.credit_name, self.settings.render.credit_line),
@@ -146,7 +146,7 @@ class SmileMain():
         self.face.start()
 
         self.osc.start()
-        self.artnet.start()
+        self.lights.start()
 
         self.settings_server.start()
 
@@ -169,7 +169,7 @@ class SmileMain():
 
         # first: stops the sequencer callbacks
         steps = (self.sequencer.clear_message_callbacks, self.render.stop, self.clip_player.stop, self.sequencer.close,
-                 self.online.stop, self.artnet.stop, self.osc.stop,
+                 self.online.stop, self.lights.stop, self.osc.stop,
                  self.camera.clearColorCallbacks, self.camera.close,
                  self.diffuse.clear_message_callbacks, self.diffuse.stop,
                  self.face.clear_frame_callbacks, self.face.stop,
@@ -212,7 +212,7 @@ class SmileMain():
         artnet_progress: float = message.progress
         if seq == SequenceType.TIMEOUT:
             artnet_progress = 1.0
-        self.artnet.set_progress(artnet_progress, ani)
+        self.lights.set_progress(artnet_progress, ani)
 
         if seq == SequenceType.CAMERA_DETECT:
             self.pick_style()

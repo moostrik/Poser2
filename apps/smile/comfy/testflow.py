@@ -4,7 +4,7 @@ plus previews and a video recorder. Generated, so it can't drift from the app:
     .venv\\Scripts\\python -m apps.smile.comfy.testflow [-p preset] [-s a|b] [-o file]
 
 The input is the app's own capture (SMILE uploads every capture as smile_capture.png); for any other
-photo, crop it first as SMILE would (python -m apps.smile.face.crop photo.jpg) and pick the crop in the
+photo, crop it first as SMILE would (python -m modules.face.crop photo.jpg) and pick the crop in the
 Load Image node. API format: drag the file into the page, which lays the nodes out itself.
 """
 
@@ -33,7 +33,7 @@ def make_test_workflow(workflow_path: str, settings: Settings, style: str = 'a')
     def title(node_id: str, text: str) -> None:
         workflow[node_id]['_meta'] = {'title': text}
 
-    title(wf.load_image, "Input (the app's capture, or a photo cropped with apps.smile.face.crop)")
+    title(wf.load_image, "Input (the app's capture, or a photo cropped with modules.face.crop)")
     workflow[PROMPT] = {'class_type': 'PreviewAny', 'inputs': {'source': [wf.suffix, 0]}, '_meta': {'title': 'Prompt'}}
     title(wf.description, 'Description')
     title(wf.capture_depth, 'Depth of capture')

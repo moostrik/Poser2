@@ -2,7 +2,7 @@ from threading import Lock
 
 import numpy as np
 
-from apps.smile.face.FaceFinder import FaceFrame
+from modules.face import FaceFrame
 from modules.gl import Image
 
 

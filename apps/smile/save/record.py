@@ -14,7 +14,7 @@ import json
 import os
 
 from modules.settings import presets
-from apps.smile.video import ffmpeg
+from modules import video
 
 SOI: bytes = b'\xff\xd8'
 COM: int = 0xFE
@@ -57,7 +57,7 @@ def read_jpeg(path: str) -> str | None:
 def read(path: str) -> dict | None:
     """The record in a clip or a portrait, or None when the file has none."""
     is_jpeg: bool = path.lower().endswith(JPEG_EXTENSIONS)
-    text: str | None = read_jpeg(path) if is_jpeg else ffmpeg.read_comment(path)
+    text: str | None = read_jpeg(path) if is_jpeg else video.read_comment(path)
     if not text:
         return None
     try:

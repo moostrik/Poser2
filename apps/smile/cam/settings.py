@@ -1,4 +1,4 @@
-from apps.smile.face.settings import FaceSettings
+from modules.face import FaceSettings
 from modules.settings import BaseSettings, Field, Group, Widget
 
 

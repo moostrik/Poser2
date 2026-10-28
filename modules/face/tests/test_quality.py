@@ -6,9 +6,8 @@ import unittest
 
 import numpy as np
 
-from apps.smile.face.FaceDetector import Face
-from apps.smile.face.FaceFinder import crop_edge, portrait_box, portrait_crop
-from apps.smile.face.quality import LEFT_EYE, RIGHT_EYE, NOSE_NEUTRAL, REJECTED_FLOOR, FaceObservation, Pose, Rejection, distance, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
+from modules.face import Face, crop_edge, portrait_box, portrait_crop, FaceObservation, Pose, Rejection, distance, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
+from ..quality import LEFT_EYE, RIGHT_EYE, NOSE_NEUTRAL, REJECTED_FLOOR
 
 
 def keypoints(nose_dx: float = 0.0, nose_ratio: float = NOSE_NEUTRAL, roll: float = 0.0) -> np.ndarray:

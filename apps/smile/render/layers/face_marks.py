@@ -5,8 +5,7 @@ turns to colour, and its mark when the face has left."""
 
 from dataclasses import dataclass
 
-from apps.smile.face.FaceFinder import FaceFrame
-from apps.smile.face.quality import FaceObservation, rejection_label
+from modules.face import FaceFrame, FaceObservation, rejection_label
 
 Color = tuple[float, float, float, float]
 

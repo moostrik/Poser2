@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from apps.smile import sphere
-from apps.smile.video import ffmpeg
+from modules import video
 
 logger = logging.getLogger(__name__)
 
@@ -217,14 +217,14 @@ class ClipPool:
 
     def _decode(self, id: str, path: str, style: str) -> Clip | None:
         try:
-            frames, fps = ffmpeg.decode_clip(path, self.cell_size, self.hwdecode)
+            frames, fps = video.decode_clip(path, self.cell_size, self.hwdecode)
         except Exception as e:
             if self.hwdecode is None:
                 logger.warning('Skipping %s: %s', id, e)
                 return None
             logger.warning('Hardware decode failed on %s, decoding in software: %s', id, e)
             try:
-                frames, fps = ffmpeg.decode_clip(path, self.cell_size, None)
+                frames, fps = video.decode_clip(path, self.cell_size, None)
             except Exception as e2:
                 logger.warning('Skipping %s: %s', id, e2)
                 return None

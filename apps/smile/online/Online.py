@@ -31,8 +31,7 @@ import cv2
 import numpy as np
 
 from apps.smile.cam.Camera import Camera
-from apps.smile.face.FaceFinder import FaceFinder, FaceFrame
-from apps.smile.face.quality import rejection_label
+from modules.face import FaceFinder, FaceFrame, rejection_label
 from apps.smile.online.Link import Link, read_token
 from apps.smile.online.settings import OnlineSettings
 from apps.smile.render.grab import ScreenGrab

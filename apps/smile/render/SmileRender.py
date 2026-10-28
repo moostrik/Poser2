@@ -8,7 +8,7 @@ from OpenGL.GL import GL_RGBA32F, glViewport  # type: ignore
 from apps.smile.render.GrinPlayer import GrinPlayer
 from apps.smile.render.grab import ScreenGrab
 from apps.smile.comfy.messages import GenMessage, GenState
-from apps.smile.face.FaceFinder import FaceFrame
+from modules.face import FaceFrame
 from apps.smile import sphere
 from modules.gl import Blit, Fbo, MonitorId, RenderBase, Shader, Style, Texture, clear_color
 from modules.gl.Utils import fit

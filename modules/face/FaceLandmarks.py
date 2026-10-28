@@ -3,7 +3,7 @@ import logging
 import numpy as np
 import onnxruntime as ort
 
-from apps.smile.face.FaceDetector import Face
+from .FaceDetector import Face
 
 logger = logging.getLogger(__name__)
 

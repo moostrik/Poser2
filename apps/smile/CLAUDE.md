@@ -52,7 +52,7 @@ drop more easily, and the log warns at open. The size is only negotiated at open
 
 ## Face
 
-`face/`: `FaceFinder` (own thread) detects every face of a camera frame (SCRFD,
+`modules/face` (Poser2's, promoted from SMILE): `FaceFinder` (own thread) detects every face of a camera frame (SCRFD,
 `data/models/scrfd_10g_bnkps.onnx`) and judges it in `quality.py`: detector confidence, size (the
 distance between the eyes, a minimum), the portrait crop's box at least `crop_margin` crop widths inside the image edge
 (`crop_edge`: the one check for too close and too near an edge; negative lets it reach past),
@@ -129,7 +129,7 @@ not ready until a warm-up gets its events again; a warm-up that fails is retried
 ready. Keep no ComfyUI tab open on the installation, or exclude `127.0.0.1:8188` from Edge's sleeping tabs.
 For tests in the ComfyUI page, `python -m apps.smile.comfy.testflow` writes `data/comfy/smile_test.json`
 (drag it into the page): what the app sends with a preset's values, plus an input switch (the
-app's last capture; any other photo is cropped first with `python -m apps.smile.face.crop`), previews and a video
+app's last capture; any other photo is cropped first with `python -m modules.face.crop`), previews and a video
 recorder from ComfyUI's own video nodes. Regenerate
 it after changing the workflow or the presets instead of editing a copy by hand.
 Our own ComfyUI nodes live in `data/comfy/aiia_grin/` (`ComfyUI/custom_nodes/aiia_grin` is a junction to it: restart ComfyUI after a change).
@@ -201,8 +201,8 @@ the grin as `grins/<style>/<id>.mp4` (silent h264 at the full portrait size, at 
 portrait as `portraits/<style>/<id>_capture.jpg` and `<id>_portrait.jpg`, and after the grin landed the phone's copy
 `shares/<style>/<id>.mp4` (`save/share.py`: the same grin re-encoded with the watermark, "SMILE", a circled "ai" and "by" the credit name, in the bottom
 right, no caption, built before the players' clip lands, and the visitor's track as its sound: `ClipSaver.set_share` from `Main` at DIFF_LOOP's start with the seconds
-since the flash, read with `ffmpeg.read_audio`, played on the tape of `audio/tape.py`, the Max patch's spin-up over
-the first half second and a wind-down over the last, muxed by `ffmpeg.make_share`; a share clip that fails is a warning and
+since the flash, read with `video.read_audio`, played on the tape of `audio/tape.py`, the Max patch's spin-up over
+the first half second and a wind-down over the last, muxed by `video.make_share`; a share clip that fails is a warning and
 the players' clip goes to the phone instead). `<style>` is the visitor's
 style, `A` (colourful and happy) or `B` (monochrome and dark); the players read it from the folder, the id is the time. Files are built in `output/temp/`
 and renamed into place when the grin is complete, so the players never see a partial file
@@ -213,7 +213,7 @@ as the workflow was filled with them, and the grin as it was drawn: each value's
 the ranges (`Generator.record`, handed to the saver with the final portrait). `save/record.py` reads it:
 `python -m apps.smile.save.record <file>` prints it, `--preset <name>` writes it as a preset to `data/settings/<name>.json` (the grin's
 ranges closed on the drawn values, so loading it repeats the pose); dropping a clip or portrait on `scripts/clip_info.bat` opens it.
-Encoding and decoding run `ffmpeg`/`ffprobe` subprocesses through `video/ffmpeg.py` (ffmpeg
+Encoding and decoding run `ffmpeg`/`ffprobe` subprocesses through `modules/video` (ffmpeg
 must be on the PATH: the gyan.dev full build); the encoder is picked at startup by a trial encode
 (Intel Quick Sync on the iGPU, then Nvidia, then libx264; `sequence.encoder` forces one). Never start
 those processes any other way: the apps run under pythonw, so they need `CREATE_NO_WINDOW` and no
@@ -245,7 +245,7 @@ restarts everything (ComfyUI, Max, SMILE with its walls).
 ## Music
 
 `audio/DB.py` picks the track of a visitor's movement from `data/audio/music_map.json` into
-`audio.music_id`. `osc/Sender.py` (`Settings.audio.osc`; the clip player builds an `OscSettings` of its
+`audio.music_id`. `modules.inout.OscSender` (`Settings.audio.osc`; the clip player builds an `OscSenderSettings` of its
 own per wall for the `/bang`) sends what `Main.sequence_callback` queues every frame, the newest value per address:
 `/music_id`, `/state`, `/progress` and the Audio tab's controls `/sound`, `/music_volume`, `/laughter`,
 `/laughter_volume` (both levels in dB; the laughter gets a `dbtoa` in front of its linear multipliers). The panel is

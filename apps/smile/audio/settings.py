@@ -1,5 +1,5 @@
 from modules.settings import BaseSettings, Field, Group, Widget
-from apps.smile.osc.settings import OscSettings
+from modules.inout import OscSenderSettings
 
 
 class AudioSettings(BaseSettings):
@@ -16,4 +16,4 @@ class AudioSettings(BaseSettings):
     laughter_test_sample: Field[str] = Field("", widget=Widget.text_select, options=laughter_samples, description="Laughter the test plays, a file of data/audio/laughter")
     laughter_test_screen: Field[int] = Field(0, access=Field.READ, description="Screen under test (1-48, table index + 1), 0 while off")
     music_id:        Field[str]   = Field("none", access=Field.READ, description="Music track sent to the Max patch")
-    osc:             Group[OscSettings] = Group(OscSettings)
+    osc:             Group[OscSenderSettings] = Group(OscSenderSettings)

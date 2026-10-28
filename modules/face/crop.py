@@ -1,8 +1,7 @@
-"""Crop a photo as SMILE crops a capture: the largest face, the eyes levelled, at the render's portrait size.
-For testing any photo in the ComfyUI page (the test workflow, data/comfy/smile_test.json, starts from a
-cropped image, as the app's workflow does).
+"""Crop a photo as the face finder crops a capture: the largest face, the eyes levelled, at the portrait size.
+For testing any photo in an image generator that starts from a cropped portrait (SMILE's test workflow, for one).
 
-    .venv\\Scripts\\python -m apps.smile.face.crop photo.jpg [more photos] [-o folder] [--zoom 1.2] [--offset 0.0] [--size 1024 1280]
+    .venv\\Scripts\\python -m modules.face.crop photo.jpg [more photos] [-o folder] [--zoom 1.2] [--offset 0.0] [--size 1024 1280]
 
 Writes <name>_crop.png next to each photo (or into -o). The zoom and offset default to the face settings'
 defaults (the panel's Portrait zoom and offset); pass the preset's values to match a capture exactly.
@@ -14,11 +13,11 @@ from pathlib import Path
 
 import cv2
 
-from apps.smile.face.FaceDetector import FaceDetector
-from apps.smile.face.FaceFinder import portrait_crop
-from apps.smile.face.settings import FaceSettings
+from .FaceDetector import FaceDetector
+from .FaceFinder import portrait_crop
+from .settings import FaceSettings
 
-DETECTOR: str = 'apps/smile/data/models/scrfd_10g_bnkps.onnx'
+DETECTOR: str = 'data/models/scrfd_10g_bnkps.onnx'
 
 
 def crop_file(detector: FaceDetector, path: Path, out: Path, zoom: float, offset: float, width: int, height: int) -> str:

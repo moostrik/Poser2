@@ -23,7 +23,7 @@ from apps.smile.online.Link import Link, encode, read_token
 
 logger = logging.getLogger('fake-smile')
 
-MODEL: str = 'apps/smile/data/models/scrfd_10g_bnkps.onnx'
+MODEL: str = 'data/models/scrfd_10g_bnkps.onnx'
 
 CHARGE_SECONDS: float = 3.0
 WINDOW: float = 15.0
@@ -35,7 +35,7 @@ class FakeSmile:
         self.link: Link = Link(link_url, token, self.on_message, self.on_frame, name='fake-smile')
         self.detector = None
         try:
-            from apps.smile.face.FaceDetector import FaceDetector
+            from modules.face import FaceDetector
             self.detector = FaceDetector(MODEL)
         except Exception as e:
             logger.warning('no face detector (%s): the middle of every frame counts as a face', e)
