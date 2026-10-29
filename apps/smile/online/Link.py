@@ -193,7 +193,7 @@ class Link(Thread):
         """The music tracks and laughter samples the relay has (its /api/library), so only the missing
         ones are uploaded: {'tracks': [ids], 'laughs': [file names]}."""
         try:
-            response = requests.get(f'{http_base(self.url)}/api/library', timeout=5)
+            response = requests.get(f'{http_base(self.url)}/api/library', headers={'Authorization': f'Bearer {self.token}'}, timeout=5)
             response.raise_for_status()
             library: dict = response.json()
             return {'tracks': [str(t) for t in library.get('tracks', [])], 'laughs': [str(t) for t in library.get('laughs', [])]}

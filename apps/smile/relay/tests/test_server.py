@@ -111,7 +111,11 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual((await client.get('/api/library')).status, 200)
         track = await self.upload('track', id='0001')
         self.assertEqual((await client.get(track)).status, 200)
-        self.assertEqual((await (await self.bare_client()).get(track)).status, 403)
+        bare = await self.bare_client()
+        self.assertEqual((await bare.get(track)).status, 403)
+        # SMILE reads the library with its token, without any pass
+        self.assertEqual((await bare.get('/api/library')).status, 403)
+        self.assertEqual((await bare.get('/api/library', headers=AUTH)).status, 200)
         phone = await self.phone(client)                # the websocket too
         await phone.close()
 

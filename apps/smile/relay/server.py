@@ -481,11 +481,11 @@ def make_app(relay: Relay, web_dir: str) -> web.Application:
     async def gate(request: web.Request, handler) -> web.StreamResponse:
         """The page, the phones' files and the library are for a phone with a pass: `/` takes it from the QR
         code's url and sets it as the cookie the rest comes with (the websocket checks it itself: it answers
-        in its own words)."""
+        in its own words). SMILE, with its token, reads the library too."""
         path: str = request.path
         if path == '/' or path.startswith('/files/') or path == '/api/library':
             value: str = relay.request_pass(request)
-            if not relay.valid_pass(value):
+            if not relay.valid_pass(value) and not relay.authorized(request):
                 if path == '/' and os.path.exists(expired_page):
                     return web.FileResponse(expired_page, status=403)
                 raise web.HTTPForbidden(text=EXPIRED_TEXT)

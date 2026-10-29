@@ -31,7 +31,8 @@
       "pitch_zero": 0.48,
       "zoom": 1.2,
       "offset": 0.0
-    }
+    },
+    "readings": {}
   },
   "pipeline": {
     "style_mode": "BOTH",
@@ -242,15 +243,15 @@
   },
   "online": {
     "active": true,
-    "relay": "ws://127.0.0.1:8800/ws/smile",
+    "relay": "wss://smile.oostrik.net/ws/smile",
     "token_file": "apps/smile/data/online_token.txt",
     "turn_window": 10.0,
     "eye_free_after": 3.0,
     "stream_fps": 10.0,
     "stream_width": 512,
     "music": true,
-    "screen": 3,
-    "page": "https://iaai.tail63e3df.ts.net/"
+    "screen": 15,
+    "page": ""
   },
   "panel": {
     "title": "SMILE",
