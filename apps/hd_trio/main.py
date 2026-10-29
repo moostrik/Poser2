@@ -7,12 +7,13 @@ from functools import partial
 from modules.utils import Broadcast
 from modules.camera import CameraSource, CameraCheck, Player, Sync, Recorder as VideoRecorder
 from modules.camera.oak import Camera, Simulator
+from modules.camera import replay
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict, Recorder as PoseRecorder, RecorderSettings as PoseRecorderSettings
-from modules.inference import source, crop, pose, segmentation
+from modules.inference import source, crop, pose, segmentation, detection
 from modules.session import Session, SessionSettings, SequencerState
 from modules.gl import WindowSettings
 
@@ -80,10 +81,18 @@ class HDTrioMain:
         # CAMERA
         self.cameras: list[CameraSource] = []
         self.player: Optional[Player] = None
+        self.detector: Optional[detection.Detector] = None      # the replay backend's, shared by its cameras
         if self.settings.camera.sim_enabled:
             self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH)
-            for i in range(num_players):
-                self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
+            if self.settings.camera.simulator.replay:
+                # the recordings on the host, without a device: the people found and followed here
+                if self.settings.camera.yolo:
+                    self.detector = detection.Detector(self.settings.camera.detector)
+                for i in range(num_players):
+                    self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.detector, replay.Tracker(), i))
+            else:
+                for i in range(num_players):
+                    self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:
             for i in range(num_players):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
@@ -262,6 +271,8 @@ class HDTrioMain:
     def start(self) -> None:
         self.panel_server.start()
 
+        if self.detector is not None:
+            self.detector.start()
         for camera in self.cameras:
             camera.start()
 
@@ -316,6 +327,8 @@ class HDTrioMain:
         self.session_osc.stop()
 
         self.pose_predictor.stop()
+        if self.detector is not None:
+            self.detector.stop()
         self.segmentation_predictor.stop()
         self.window_similator.stop()
         self.window_correlator.stop()

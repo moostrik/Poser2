@@ -350,8 +350,16 @@
       "apply_warp": false,
       "folder": "20260924-200758_2_person",
       "sim_passthrough": false,
+      "replay": false,
       "start_norm": 0.01,
       "end_norm": 1.0
+    },
+    "detector": {
+      "model": "yolov8n_coco_512x448.onnx",
+      "model_path": "data/models",
+      "confidence": 0.5,
+      "overlap": 0.5,
+      "verbose": false
     },
     "frame_sync": {},
     "tracklet_sync": {}
