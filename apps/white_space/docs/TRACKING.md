@@ -286,7 +286,7 @@ at the far edge and nothing mentions it). It is handled as a missed detection:
 | someone first seen past the edge                  | never started: not born, re-acquired or linked         |
 | a tracked person steps past briefly (jump, feet)  | nothing visible: posed from their last box             |
 | a tracked person walks out                        | leaves the show, then is forgotten (*Downstream*)      |
-| they step back inside before `lost_timeout`       | the same person, same colour, same id                  |
+| they step back inside before `lost_timeout`       | the same person, same color, same id                   |
 
 No new setting: the timeouts are the ones a missed detection already uses, and `zone_max_radius` is
 the edge. Raising it tracks further out, and also moves the overlap band and the parallax depth.

@@ -31,12 +31,12 @@ The measures (`POSE_INSTRUMENT.md`, *What each measure means*):
 
 The events and the place (`POSE_INSTRUMENT.md`, *Events*):
 
-| In the light instrument | Pose feature       | OSC address                  | Index | On the wire                    | The light reads it as                       |
-|-------------------------|--------------------|------------------------------|-------|--------------------------------|---------------------------------------------|
+| In the light instrument | Pose feature       | OSC address                  | Index | On the wire                    | The light reads it as                           |
+|-------------------------|--------------------|------------------------------|-------|--------------------------------|-------------------------------------------------|
 | sync                    | `Similarity`       | `/pose/{id}/similarity/pose` | other | 0..1 per live player           | the pair's mean, the sync strobe's band over it |
-| hit                     | `PlayheadOffset`   | `/pose/{id}/playhead/offset` | –     | −π..π; azimuth minus playhead  | the ticks closest to 0 (`PlayheadCrossing`) |
-| presence                | the pose itself    | `/pose/{id}/active`          | –     | 1 present, 0 gone              | the presence envelope's gate                |
-| where the person stands | `Azimuth`          | `/pose/{id}/azimuth`         | –     | radians                        | the center of the window and the mask       |
+| hit                     | `PlayheadOffset`   | `/pose/{id}/playhead/offset` | –     | −π..π; azimuth minus playhead  | the ticks closest to 0 (`PlayheadCrossing`)     |
+| presence                | the pose itself    | `/pose/{id}/active`          | –     | 1 present, 0 gone              | the presence envelope's gate                    |
+| where the player stands | `Azimuth`          | `/pose/{id}/azimuth`         | –     | radians                        | the center of the window and the mask           |
 
 The four arm entries of `angle/rad` are the joints' travel times π (`POSE_INSTRUMENT.md`, *The
 body*): the calibrated angle through the pipeline's dead zones, so a hanging arm sends exactly 0
@@ -53,11 +53,11 @@ pipeline's values (`POSE_INSTRUMENT.md`, *The body*), so Max reads exactly what 
 and the addresses already carry the documents' terms. An arm with a missing joint is sent NaN,
 as `angle/rad` sends a missing joint.
 
-The distance is how far the person stands from the fixture within the tracked zone: 0 at
+The distance is how far the player stands from the fixture within the tracked zone: 0 at
 `tracker.rig.zone_min_radius`, 1 at `tracker.rig.zone_max_radius`, clamped. The tracker reads it from
 where the feet meet the floor (`TRACKING.md`); it is NaN without a reading.
 
-The similarity is a row: index `n` is this person against live player `n`, `max_players` wide; a
+The similarity is a row: index `n` is this player against live player `n`, `max_players` wide; a
 pair that does not exist is sent as 0.
 What it measures and how it is smoothed is in `SIMILARITY.md`. The light takes the mean of both
 directions of a pair and strobes the room while every pair holds over `pose_instrument.sync_strobe.on_at`
@@ -79,7 +79,7 @@ interpolated as the light's is.
 
 ## Slots
 
-Every person is a slot `{id}` in `/pose/{id}/...`. With the preset `studio` (`max_players` 6):
+Every player is a slot `{id}` in `/pose/{id}/...`. With the preset `studio` (`max_players` 6):
 
 | Slots | Who                                             |
 |-------|-------------------------------------------------|
@@ -107,15 +107,15 @@ nothing. On shutdown one bundle resets every slot and sends `/global/state` −1
 | 7     | right knee               |                                     |
 | 8     | head                     |                                     |
 
-## The other per-person messages
+## The other per-player messages
 
-Sent with every person; the light instrument plays with none of them.
+Sent with every player; the light instrument plays with none of them.
 
 | Address                         | Values        | Range      | What it is                                      |
 |---------------------------------|---------------|------------|-------------------------------------------------|
 | `/pose/{id}/angle/vel`          | 9 floats      | radians/s  | the angles' velocities                          |
 | `/pose/{id}/time/motion`        | 1 float       | count      | motion time: rises about 1 per second of motion |
-| `/pose/{id}/time/age`           | 1 float       | seconds    | how long the person has been tracked            |
+| `/pose/{id}/time/age`           | 1 float       | seconds    | how long the player has been tracked            |
 | `/pose/{id}/bbox`               | 4 floats      | `BBox`     | center x, center y, width, height               |
 | `/pose/{id}/similarity/gate`    | `max_players` | 0..1       | the motion gate: both of the pair moving        |
 | `/pose/{id}/similarity/motion`  | `max_players` | 0..1       | the same row as `similarity/pose`               |

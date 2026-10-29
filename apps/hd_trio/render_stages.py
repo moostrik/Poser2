@@ -78,12 +78,12 @@ class StageLayer:
             if layer in self.layers
         ])
 
-    def set_geom_stage(self, stage: Stage) -> None:
-        """Select which pipeline stage the centre geometry reads poses from."""
-        cast(ls.CenterGeometry, self.layers[Layers.centre_geom]).settings.stage = stage
+    def set_geometry_stage(self, stage: Stage) -> None:
+        """Select which pipeline stage the center geometry reads poses from."""
+        cast(ls.CenterGeometry, self.layers[Layers.center_geometry]).settings.stage = stage
 
     def set_similarity_scale(self, value: float) -> None:
-        """Set how strongly other cameras contribute to the fluid and the colour mask.
+        """Set how strongly other cameras contribute to the fluid and the color mask.
 
         Shared from RenderSettings, so both layers follow one write. Settings values
         persist across stages, so every stage states its own.
@@ -113,30 +113,30 @@ class StageLayer:
 # ---------------------------------------------------------------------------
 
 class WelcomeInStage(StageLayer):
-    """Attract state fades away, the centre pose appears."""
+    """Attract state fades away, the center pose appears."""
 
     def enter(self) -> None:
-        self.set_geom_stage(Stage.LERP)
+        self.set_geometry_stage(Stage.LERP)
         self.set_similarity_scale(0.0)
 
     def update(self, progress: float) -> None:
         out_alpha = _fade_out(progress)
         self.compose([
-            (Layers.centre_pose, easeInOutSine(_fade_in(progress))),
+            (Layers.center_pose, easeInOutSine(_fade_in(progress))),
             (Layers.fluid, out_alpha),
             (Layers.color_mask, out_alpha),
         ])
 
 
 class WelcomeStage(StageLayer):
-    """Centre pose alone, while the welcome is spoken."""
+    """Center pose alone, while the welcome is spoken."""
 
     def enter(self) -> None:
-        self.set_geom_stage(Stage.LERP)
+        self.set_geometry_stage(Stage.LERP)
         self.set_similarity_scale(0.0)
 
     def update(self, progress: float) -> None:
-        self.compose([(Layers.centre_pose, 1.0)])
+        self.compose([(Layers.center_pose, 1.0)])
 
 
 class MovementStage(StageLayer):
@@ -144,7 +144,7 @@ class MovementStage(StageLayer):
 
     def enter(self) -> None:
         self.mark_motion_time()
-        self.set_geom_stage(Stage.LERP)
+        self.set_geometry_stage(Stage.LERP)
         self.set_similarity_scale(0.0)
 
     def update(self, progress: float) -> None:
@@ -160,7 +160,7 @@ class MovementStage(StageLayer):
         progress_alpha: float = _fade_in(progress, 0.0, 1.0)
         mask_alpha: float = easeInOutSine(max(progress_alpha, self._motion_alpha(motion_time_duration)))
         self.compose([
-            (Layers.centre_pose, 1.0),
+            (Layers.center_pose,1.0),
             (Layers.color_mask, mask_alpha),
         ])
 
@@ -169,12 +169,12 @@ class WhitePoseStage(StageLayer):
     """Brings in the white example figure. Intro playback starts here (see render.py)."""
 
     def enter(self) -> None:
-        self.set_geom_stage(Stage.LERP)
+        self.set_geometry_stage(Stage.LERP)
         self.set_similarity_scale(0.0)
 
     def update(self, progress: float) -> None:
         self.compose([
-            (Layers.centre_pose, 1.0),
+            (Layers.center_pose,1.0),
             (Layers.color_mask, 1.0),
             (Layers.intro_pose, _fade_in(progress)),
         ])
@@ -184,13 +184,13 @@ class FluidStage(StageLayer):
     """Brings in the fluid, alongside the white example figure."""
 
     def enter(self) -> None:
-        self.set_geom_stage(Stage.LERP)
+        self.set_geometry_stage(Stage.LERP)
         self.set_similarity_scale(0.0)
         cast(ls.FluidLayer, self.layers[Layers.fluid]).reset()
 
     def update(self, progress: float) -> None:
         self.compose([
-            (Layers.centre_pose, 1.0),
+            (Layers.center_pose,1.0),
             (Layers.color_mask, 1.0),
             (Layers.fluid, easeOutSine(_fade_in(progress))),
             (Layers.intro_pose, 1.0),
@@ -201,12 +201,12 @@ class PracticeStage(StageLayer):
     """Everything on — the visitor copies the white example."""
 
     def enter(self) -> None:
-        self.set_geom_stage(Stage.LERP)
+        self.set_geometry_stage(Stage.LERP)
         self.set_similarity_scale(0.0)
 
     def update(self, progress: float) -> None:
         self.compose([
-            (Layers.centre_pose, 1.0),
+            (Layers.center_pose,1.0),
             (Layers.color_mask, 1.0),
             (Layers.fluid, 1.0),
             (Layers.intro_pose, 1.0),
@@ -214,17 +214,17 @@ class PracticeStage(StageLayer):
 
 
 class EnjoyInStage(StageLayer):
-    """Guidance withdraws — centre pose and white example fade out."""
+    """Guidance withdraws — center pose and white example fade out."""
 
     def enter(self) -> None:
-        self.set_geom_stage(Stage.SMOOTH)
+        self.set_geometry_stage(Stage.SMOOTH)
         self.set_similarity_scale(0.0)
 
     def update(self, progress: float) -> None:
         progress_alpha: float = _fade_in(progress, 0.0, 1.0)
         out_alpha = easeOutQuad(1.0 - progress_alpha)
         self.compose([
-            (Layers.centre_pose, out_alpha),
+            (Layers.center_pose,out_alpha),
             (Layers.color_mask, 1.0),
             (Layers.fluid, 1.0),
             (Layers.intro_pose, out_alpha),
@@ -235,7 +235,7 @@ class EnjoyStage(StageLayer):
     """The cross-camera response reveals itself — moving in sync starts to show."""
 
     def enter(self) -> None:
-        self.set_geom_stage(Stage.SMOOTH)
+        self.set_geometry_stage(Stage.SMOOTH)
         # enter() runs before the layer updates and update() after, so the held
         # value is stated here too — otherwise the transition frame would still
         # carry the previous stage's scale.
@@ -253,7 +253,7 @@ class PlayStage(StageLayer):
     """Free play — fluid and mask at full cross-camera response."""
 
     def enter(self) -> None:
-        self.set_geom_stage(Stage.SMOOTH)
+        self.set_geometry_stage(Stage.SMOOTH)
         self.set_similarity_scale(1.0)
 
     def update(self, progress: float) -> None:
@@ -265,7 +265,7 @@ class PlayStage(StageLayer):
 
 class ConclusionStage(StageLayer):
     def enter(self) -> None:
-        self.set_geom_stage(Stage.SMOOTH)
+        self.set_geometry_stage(Stage.SMOOTH)
         self.set_similarity_scale(1.0)
 
     def update(self, progress: float) -> None:
@@ -289,7 +289,7 @@ class IdleStage(StageLayer):
     """Attract state — parked here whenever the show is stopped."""
 
     def enter(self) -> None:
-        self.set_geom_stage(Stage.SMOOTH)
+        self.set_geometry_stage(Stage.SMOOTH)
         self.set_similarity_scale(1.0)
 
     def update(self, progress: float) -> None:

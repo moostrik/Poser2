@@ -7,9 +7,9 @@ not part of it: the instrument, its measures, meanings, connections and events, 
 `POSE_INSTRUMENT.md`. The code is the package `light/synth`: `Oscillator`, `Envelope`, `Slot`,
 `Strobe` and `Voice`.
 
-The synth has three levels, and only the last knows of colour or of pose data:
+The synth has three levels, and only the last knows of color or of pose data:
 
-| Level                | What it is                                                         | Knows colour |
+| Level                | What it is                                                         | Knows color  |
 |----------------------|--------------------------------------------------------------------|--------------|
 | oscillator, envelope | the building blocks (*The oscillator*, *The envelope*)             | no           |
 | voice                | two oscillators, one time, one amp stage, its LFO; two outputs     | no           |
@@ -54,19 +54,19 @@ What belongs where:
 
 The design is a synthesizer's, part for part, so it can be reasoned about as one.
 
-| Synth                          | Here                                                          |
-|--------------------------------|---------------------------------------------------------------|
+| Synth                          | Here                                                            |
+|--------------------------------|-----------------------------------------------------------------|
 | oscillator, a pulse wave       | an oscillator (*Parameters*); its pitch in lines per revolution |
-| pulse width                    | pulse width                                                   |
-| LFO                            | an LFO: an oscillator used as a source (*Modulation*)         |
-| envelope with a gate           | the envelope: push, presence (*The envelope*)                 |
-| amp envelope and VCA           | the window, over distance, on the pulse width (*The window*)  |
-| modulation matrix              | the slot: `parameter = base + amount × curve(source)`         |
-| slew, lag                      | hardness                                                      |
-| a gate, a tremolo's square     | the strobe: whole lines on or off in time (*The strobe*)      |
-| clock                          | the time, which can run faster or slower                      |
-| a voice, its two oscillators   | a voice (*The voice*): one per person, while present          |
-| keyboard and controllers       | what plays the parameters: not in this document               |
+| pulse width                    | pulse width                                                     |
+| LFO                            | an LFO: an oscillator used as a source (*Modulation*)           |
+| envelope with a gate           | the envelope: push, presence (*The envelope*)                   |
+| amp envelope and VCA           | the window, over distance, on the pulse width (*The window*)    |
+| modulation matrix              | the slot: `parameter = base + amount × curve(source)`           |
+| slew, lag                      | hardness                                                        |
+| a gate, a tremolo's square     | the strobe: whole lines on or off in time (*The strobe*)        |
+| clock                          | the time, which can run faster or slower                        |
+| a voice, its two oscillators   | a voice (*The voice*): one per player, while present            |
+| keyboard and controllers       | what plays the parameters: not in this document                 |
 
 Where it is not a synth:
 
@@ -79,12 +79,12 @@ Where it is not a synth:
   synth's amp envelope, acts on the pulse width. The pulse width is therefore both the timbre and
   the level of an output.
 - **A voice has a place.** A synth mixes its voices into one output. Here a voice is drawn where
-  its person stands and moves with them, and two voices meet only where their windows overlap
+  its player stands and moves with them, and two voices meet only where their windows overlap
   (*The voice*).
 - **The outputs do not sum.** A synth adds its oscillators into one signal. A voice's two outputs
   stay two: white and blue, which meet as four tones (*In the pose instrument*).
 - **The highest pitch is low.** About 90 lines per revolution is where lines stop being lines
-  (*The rules*), as hearing ends a synth's range; it leaves a few lines each side of a person, not
+  (*The rules*), as hearing ends a synth's range; it leaves a few lines each side of a player, not
   thousands of cycles.
 - **Smooth in, smooth out, without exception.** A synth avoids clicks in its sound but steps
   freely in its control: square and sample-and-hold modulators, quantisers, hard sync. Here a step
@@ -94,13 +94,13 @@ Where it is not a synth:
 
 ## The voice
 
-A **voice** is one person's pattern, for as long as they are present. It knows nothing of colour:
+A **voice** is one player's pattern, for as long as they are present. It knows nothing of color:
 it has two outputs, and what each is projected in is the instrument's choice. There is one synth
 and it is polyphonic. The patch is shared: what is connected to which parameter, with what base
 and amount, is set once and holds for every voice. The values are each voice's own: what flows
-through a connection comes from that person, so each person's body drives their own pattern, and
-the same patch draws differently for every person. A voice also has its own time and its own
-presence. Put another way, each person gets their own instance of the light synth, and every
+through a connection comes from that player, so each player's body drives their own pattern, and
+the same patch draws differently for every player. A voice also has its own time and its own
+presence. Put another way, each player gets their own instance of the light synth, and every
 instance is given the same settings.
 
 | Part       | How many | What it is                                                          |
@@ -111,8 +111,8 @@ instance is given the same settings.
 | strobe     | 2        | one per oscillator: a gate in time on its lines (*The strobe*)      |
 | LFO        | 1        | in time; its output a source for the caller to wire (*Modulation*)  |
 
-An oscillator draws a line, a gap, a line, a gap, outward from the person, the same on both
-sides (or, unmirrored, one grid passing behind the person; *Distance and time*). A line is full
+An oscillator draws a line, a gap, a line, a gap, outward from the player, the same on both
+sides (or, unmirrored, one grid passing behind the player; *Distance and time*). A line is full
 and a gap is off. The two sides are not voices or oscillators: a mirrored oscillator is given each
 pixel's position without its sign, so it cannot tell left from right, and only the window knows
 the side.
@@ -135,35 +135,35 @@ source (*Modulation*). The hardness is a parameter like the others, its base 1, 
 |-------------|----------------------|---------------------------------------------------------|
 | pitch       | lines per revolution | how fine the lines are: 25.7 is a line every 14°        |
 | pulse width | fraction of interval | the thickness of a line: 0 none, 1 solid                |
-| phase       | intervals            | where the lines sit relative to the person              |
+| phase       | intervals            | where the lines sit relative to the player              |
 | speed       | degrees per second   | how fast the lines travel: positive outward, 0 still    |
 | hardness    | 0..1                 | the flanks of a line: 1 hard (default), 0 softest       |
 
 An oscillator also has its push (*Distance and time*): `push`, the speed a hit adds to it, and
 `push_release_seconds`, the release of its own push envelope; the amount and the time of an
 envelope, not a parameter, so no slot. And it has two switches: `enabled`, off, its output is
-dark whatever its slots say; and `mirror` (*Distance and time*), on, both sides of the person
+dark whatever its slots say; and `mirror` (*Distance and time*), on, both sides of the player
 draw the same, off, one pattern passes behind them. The switches and the bypasses are the
 panel's, not the body's, so flipping them is the one allowed step.
 
 **Pitch** is how many lines fit in a revolution, the site fact's own unit; the **interval** is the
 spacing it gives, `360° / pitch`, in which phase and pulse width are measured. The pitch never
 goes above the visual limit (`max_lines`) and never below 2, one line per half turn. A change of
-pitch moves a far line more than a near one, as an accordion opens from the person.
+pitch moves a far line more than a near one, as an accordion opens from the player.
 
 **Pulse width** is the thickness of every line, `pulse width × interval` wide. At 0 the output is
 dark, at 1 it is solid, and halfway line and gap are equal.
 
-**Phase** places the lines. At 0 a line is centerd on the person; at ½ a gap is. A whole interval
+**Phase** places the lines. At 0 a line is centered on the player; at ½ a gap is. A whole interval
 further the picture is the same.
 
 **Speed** is how fast the lines move across the projection. It is the same whatever the interval,
 so a change of interval changes the spacing and not the travel. At interval 10° and speed 2° per
-second the lines are centerd at 0°, 10°, 20°; a second later at 2°, 12°, 22°; after five seconds
-at 10°, 20°, 30°, the same picture, a new line having come out at the person.
+second the lines are centered at 0°, 10°, 20°; a second later at 2°, 12°, 22°; after five seconds
+at 10°, 20°, 30°, the same picture, a new line having come out at the player.
 
 **Hardness** shapes the flanks of the lines and nothing else. At 1 a line ends at its edge and
-every pixel of an output is off or full. Below 1 the flank is a smooth fall centerd on the edge,
+every pixel of an output is off or full. Below 1 the flank is a smooth fall centered on the edge,
 never wider than the line or the gap has room for: the center of a line stays full, the center of
 a gap stays off, pulse width 0 stays dark and 1 stays solid. At hardness 0 and pulse width ½ the
 lines are a sine. Levels between off and full exist only in these flanks.
@@ -174,16 +174,16 @@ Two more things go into every oscillator and are not played.
 
 | Goes in  | Unit    | What it is                                                         |
 |----------|---------|--------------------------------------------------------------------|
-| position | degrees | a pixel's angle from the person, signed: what the lines run along  |
+| position | degrees | a pixel's angle from the player, signed: what the lines run along  |
 | time     | seconds | what makes the lines travel: normally the clock                    |
 
-**Position** is each pixel's angle from the person's azimuth, negative on their left. It is the
-one thing the person's position feeds: when they walk, the picture goes with them. Mirrored
+**Position** is each pixel's angle from the player's azimuth, negative on their left. It is the
+one thing the player's position feeds: when they walk, the picture goes with them. Mirrored
 (`mirror` on, the default), the oscillator takes the position without its sign, so both sides
-draw the same and the lines come out of the person, or go in, on both sides. With `mirror` off it
-takes the signed position: one pattern across the person, the lines passing behind them, a
+draw the same and the lines come out of the player, or go in, on both sides. With `mirror` off it
+takes the signed position: one pattern across the player, the lines passing behind them, a
 positive speed moving every line toward the positive side. To the oscillator a position is a
-phase offset: the pixel at the person shows the wave as it is, the pixel one interval out shows
+phase offset: the pixel at the player shows the wave as it is, the pixel one interval out shows
 it one cycle late, which is the same. That is how a wave in time becomes lines along the wall.
 
 **Time** enters only through the speed: with the speed at 0 it has no effect and the lines stand
@@ -202,8 +202,8 @@ lines move outward: a pixel further out shows what a nearer pixel showed a momen
 
 ## The window
 
-Only a window of the lines shows each side of the person. The window is an envelope over distance
-(*The envelope*: rise 0, length the reach, fall the taper's part of it): 1 from the person on,
+Only a window of the lines shows each side of the player. The window is an envelope over distance
+(*The envelope*: rise 0, length the reach, fall the taper's part of it): 1 from the player on,
 falling smoothly to 0 over the last part of the **reach**. Every line's pulse width is multiplied
 by it, so the lines are alike over most of the window, thin out at its end and stop at nothing. No
 line is cut: a cut would leave a last line of a width no parameter asked for. A thin line is faint
@@ -211,8 +211,8 @@ line is cut: a cut would leave a last line of a width no parameter asked for. A 
 
 | Parameter   | Unit    | What it is                                                               |
 |-------------|---------|--------------------------------------------------------------------------|
-| reach left  | degrees | how far the lines extend on the person's left                            |
-| reach right | degrees | how far the lines extend on the person's right                           |
+| reach left  | degrees | how far the lines extend on the player's left                            |
+| reach right | degrees | how far the lines extend on the player's right                           |
 | taper       | 0..1    | the last part of a reach over which the lines thin out: 0.2 by default   |
 
 ```
@@ -222,11 +222,11 @@ pulse width of a line = pulse width × window(the line's center)    the window a
 
 The window is read once per line, at the line's center, and not per pixel: read per pixel it
 would thin the outer half of a line more than the inner, and a line in the taper would be lopsided
-and sit off its place. Read per line, a line in the taper is thinner, whole and still centerd. A
+and sit off its place. Read per line, a line in the taper is thinner, whole and still centered. A
 solid output is lines that touch, so its solid part ends at a line's boundary within half an
 interval of the taper and not exactly at it.
 
-The reach is the one thing that may differ between the two sides of a person: mirrored, the lines
+The reach is the one thing that may differ between the two sides of a player: mirrored, the lines
 are the same on both, the window need not be. With both reaches equal the picture is symmetric. The
 reaches have no slot: they are given to the voice as values, each tick, by whoever uses it. A
 reach that has to land on something, as sync's on a partner, cannot be reached through a base and
@@ -234,8 +234,8 @@ an amount without reading the patch back, so it is set whole.
 
 The window and **presence** are the amp stage, a synth's amp envelope, and sit after the slots
 and not in them, so the pulse width stays free to be connected. Presence is an envelope over time
-(*The envelope*) that multiplies both reaches: the window opens from the person when they arrive
-and closes to the person when they leave. While it opens or closes the taper widens to the whole
+(*The envelope*) that multiplies both reaches: the window opens from the player when they arrive
+and closes to the player when they leave. While it opens or closes the taper widens to the whole
 window and eases back to its knob as presence settles (`window.attack_curve`,
 `window.release_curve`, the slots' curves), so lines enter and leave thin at any resting taper.
 The pulse width is the most a line can be; the window
@@ -250,7 +250,7 @@ overhang of the outermost line is gone and any reach motion hugs the edge.
 A gate in time on an oscillator's lines: each tick, each line is on or off. The rule that a pixel
 is off or full holds; the strobe is the synth's one deliberate step in time (*The rules*). Each
 oscillator has its own, so white and blue can strobe apart. The gate is read once per line, at the
-line's count from the person, as the window is read at the line's center: a line is never half
+line's count from the player, as the window is read at the line's center: a line is never half
 strobed. It acts after the window, so a dark output stays dark and a thinned line strobes whole.
 
 | Parameter | Unit                | What it is                                                          |
@@ -271,7 +271,7 @@ on(tick, line k) = ((tick − offset(k)) mod T) < round(width · T)
 ```
 
 The lit ticks are the first `round(width · T)` of a cycle and the dark ticks the rest. `k` is a
-line's count from the person in intervals: whole for standing lines, and drifting smoothly as a
+line's count from the player in intervals: whole for standing lines, and drifting smoothly as a
 line travels, so a travelling line's timing drifts with it and nothing jumps.
 
 The shift is on the strobe's own cycle, so the wave it makes is `2 / shift` lines long and runs
@@ -390,7 +390,7 @@ time*).
 ## The oscillator
 
 The oscillators that draw and the LFOs are one building block, reusable elsewhere. It knows
-nothing of people, colours, mirroring or the mask: positions and a time step go in, values come
+nothing of people, colors, mirroring or the mask: positions and a time step go in, values come
 out.
 
 An ordinary LFO is a slow wave over time with a rate and a phase, giving one smooth value now. This
@@ -407,7 +407,7 @@ travelled += speed × dt / interval             each tick; how far the wave has 
 cycle      = position / interval − phase − travelled
 
 sine   value = level · cos(2π · cycle)                    highest at every whole cycle
-pulse  on where |frac(cycle + ½) − ½| ≤ pulse width / 2   centerd on every whole cycle
+pulse  on where |frac(cycle + ½) − ½| ≤ pulse width / 2   centered on every whole cycle
 ```
 
 - Interval, phase and speed are the core's parameters, in the units of the positions. The
@@ -437,7 +437,7 @@ level = full where d ≤ edge − ramp / 2, off where d ≥ edge + ramp / 2, a s
 ## The envelope
 
 The second building block, reusable as the oscillator is. An oscillator repeats; an envelope goes
-up once, holds and comes down once. It knows nothing of people or colours: positions or time steps
+up once, holds and comes down once. It knows nothing of people or colors: positions or time steps
 go in, values 0..1 come out, smoothly.
 
 An envelope gives a shape over time to something that has none of its own. A synth needs one for
@@ -445,7 +445,7 @@ every note, since a key is only down or up. Here the player is a body, which mov
 itself, so a played parameter needs no envelope: the arm's own motion is the shape, and an
 envelope on top of it would be a second motion (`POSE_INSTRUMENT.md`, *The instrument*: no
 smoothing but the pipeline's). Envelopes exist only where there is an event with no motion of its
-own: a person arriving or leaving, the playhead crossing, and the end of the window, an edge given
+own: a player arriving or leaving, the playhead crossing, and the end of the window, an edge given
 a shape along the wall. That is why there are three, and why there will be no more unless an event
 is added.
 
@@ -476,7 +476,7 @@ without a step. What opens a gate is not part of this document.
 ## In the pose instrument
 
 The pose instrument is the bridge between the pose data and the synth (`POSE_INSTRUMENT.md`). It
-gives every person a voice, sends the voice's two outputs to white and to blue, connects the
+gives every player a voice, sends the voice's two outputs to white and to blue, connects the
 body's measures to the parameters, triggers the events (presence, the hit, sync) and draws the
 mask.
 
@@ -491,7 +491,7 @@ oscillators' parameters, not a parameter of its own:
 | unequal intervals                              | they slide past each other with distance            |
 | unequal speeds                                 | they slide past each other over time                |
 
-At the person sits the instrument's **mask** (`POSE_INSTRUMENT.md`, *The instrument*), not part of
+At the player sits the instrument's **mask** (`POSE_INSTRUMENT.md`, *The instrument*), not part of
 the synth. The lines come out from under it, and it covers the place where the two mirrored sides
 meet.
 

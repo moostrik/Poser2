@@ -47,8 +47,8 @@ void main() {
     white = white / overlap;
     blue = blue / overlap;
 
-    // Four tones: dark, blue, white, and both. The fixture projects the two colours from separate
-    // lamps, so where both are on the overlap reads as a tone of its own; here a pale violet, so
+    // Four tones: dark, blue, white, and both. The fixture projects the two colors from separate
+    // beam lights, so where both are on the overlap reads as a tone of its own; here a pale violet, so
     // blue never disappears under white.
     vec3 color = vec3(white, white, white);
     color += vec3(blue * 0.05,  0.0, blue);

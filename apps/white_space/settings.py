@@ -318,7 +318,7 @@ class _DataLayerSettings(layers.DataLayerSettings):
 
 class PreviewGroup(BaseSettings):
     tracker: Group[_TrackerCompositorSettings] = Group(_TrackerCompositorSettings)
-    poser  : Group[_PoseCompositorSettings]    = Group(_PoseCompositorSettings)
+    pose   : Group[_PoseCompositorSettings]    = Group(_PoseCompositorSettings)
 
 
 class PlayheadFeatureSelect(IntEnum):

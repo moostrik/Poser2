@@ -94,18 +94,18 @@ class Layers(IntEnum):
     # source layers
     cam_image =     0
     cam_mask =      auto()
-    cam_frg=        auto()
+    cam_foreground = auto()
     cam_crop =      auto()
     # composite layers
     tracker =       auto()
-    poser =         auto()
+    pose =          auto()
     cam_readings =  auto()   # each camera's frame rate, tilt and roll error, over its own view
-    # centre layers
-    centre_geom=    auto()
-    centre_cam =    auto()
-    centre_mask =   auto()
-    centre_frg =    auto()
-    centre_pose =   auto()
+    # center layers
+    center_geometry = auto()
+    center_cam =    auto()
+    center_mask =   auto()
+    center_foreground = auto()
+    center_pose =   auto()
     # intro overlay
     intro_pose =    auto()
     # data layers
@@ -140,10 +140,10 @@ class OakGroup(BaseSettings):
     yolo              : Field[bool]            = Field(True, access=Field.INIT, description="Enable YOLO person detection")
     color             : Field[bool]            = Field(True, access=Field.INIT, description="Color camera (False = mono)")
     square            : Field[bool]            = Field(True, access=Field.INIT, description="Use square aspect ratio")
-    resolution        : Field[CameraResolution] = Field(CameraResolution.P1080, access=Field.INIT, description="Sensor mode. P720 and P800 on both sensors, P1080 colour only.")
-    sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
+    resolution        : Field[CameraResolution] = Field(CameraResolution.P1080, access=Field.INIT, description="Sensor mode. P720 and P800 on both sensors, P1080 color only.")
+    sim_enabled: Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
-    fov               : Field[float]           = Field(95.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-1 W, IMX378 colour, 16:9 modes. Quoted for the full frame width; the square crop keeps the same degrees per pixel.")
+    fov               : Field[float]           = Field(95.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-1 W, IMX378 color, 16:9 modes. Quoted for the full frame width; the square crop keeps the same degrees per pixel.")
 
     _cam_share: list = [fps, color, square, yolo, resolution, model_path, fov]
 
@@ -316,7 +316,7 @@ class SessionGroup(BaseSettings):
 
 
 # ---------------------------------------------------------------------------
-#  Render settings (layer configs, centre, flow, fluid, colors, window)
+#  Render settings (layer settings, center, flow, fluid, colors, window)
 # ---------------------------------------------------------------------------
 
 # Stage-aware subclasses — override Field[int] with Field[Stage] for dropdown UI
@@ -343,16 +343,16 @@ class DataGroup(BaseSettings):
 
 class PreviewGroup(BaseSettings):
     tracker: Group[_TrackerCompositorSettings] = Group(_TrackerCompositorSettings)
-    poser  : Group[_PoseCompositorSettings]    = Group(_PoseCompositorSettings)
+    pose   : Group[_PoseCompositorSettings]    = Group(_PoseCompositorSettings)
 
-class CentreGroup(BaseSettings):
-    # Received from RenderSettings and passed on to the colour mask.
+class CenterGroup(BaseSettings):
+    # Received from RenderSettings and passed on to the color mask.
     similarity_scale: Field[float] = Field(1.0, min=0.0, max=1.0, visible=False, description="Cross-camera response")
 
     geometry: Group[_CenterGeometrySettings]                = Group(_CenterGeometrySettings)
     mask    : Group[layers.CenterMaskLayerSettings]         = Group(layers.CenterMaskLayerSettings)
     cam     : Group[layers.CenterCamLayerSettings]          = Group(layers.CenterCamLayerSettings)
-    frg     : Group[layers.CenterForegroundLayerSettings]   = Group(layers.CenterForegroundLayerSettings)
+    foreground: Group[layers.CenterForegroundLayerSettings] = Group(layers.CenterForegroundLayerSettings)
     pose    : Group[layers.CenterPoseLayerSettings]         = Group(layers.CenterPoseLayerSettings)
     color   : Group[layers.MSColorMaskLayerSettings]        = Group(layers.MSColorMaskLayerSettings, share=[similarity_scale])
 
@@ -379,13 +379,13 @@ class IntroSequenceSettings(BaseSettings):
 
 class RenderSettings(BaseSettings):
     stage:       Field[Stage] = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")
-    similarity_scale: Field[float] = Field(1.0, min=0.0, max=1.0, description="Cross-camera response for fluid and colour mask (driven per show stage)")
+    similarity_scale: Field[float] = Field(1.0, min=0.0, max=1.0, description="Cross-camera response for fluid and color mask (driven per show stage)")
     num_cams:    Field[int]   = Field(3, access=Field.INIT, visible=False, description="Number of cameras")
     num_players: Field[int]   = Field(3, access=Field.INIT, visible=False, description="Number of players")
     layer  : Group[LayerGroup]                = Group(LayerGroup)
     data   : Group[DataGroup]                 = Group(DataGroup)
     preview: Group[PreviewGroup]              = Group(PreviewGroup)
-    centre : Group[CentreGroup]               = Group(CentreGroup, share=[similarity_scale])
+    center : Group[CenterGroup]               = Group(CenterGroup, share=[similarity_scale])
     intro_sequence: Group[IntroSequenceSettings] = Group(IntroSequenceSettings)
     flow   : Group[layers.FlowLayerSettings]  = Group(layers.FlowLayerSettings, share=[stage])
     fluid  : Group[layers.FluidLayerSettings] = Group(layers.FluidLayerSettings, share=[stage, similarity_scale])

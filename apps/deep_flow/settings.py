@@ -43,18 +43,18 @@ class Layers(IntEnum):
     # source layers
     cam_image =     0
     cam_mask =      auto()
-    cam_frg =       auto()
+    cam_foreground = auto()
     cam_crop =      auto()
     # composite layers
     tracker =       auto()
-    poser =         auto()
-    cam_readings =  auto()   # the camera's frame rate, tilt and roll error; draw it over poser
-    # centre layers
-    centre_geom =   auto()
-    centre_cam =    auto()
-    centre_mask =   auto()
-    centre_frg =    auto()
-    centre_pose =   auto()
+    pose =          auto()
+    cam_readings =  auto()   # the camera's frame rate, tilt and roll error; draw it over tracker
+    # center layers
+    center_geometry = auto()
+    center_cam =    auto()
+    center_mask =   auto()
+    center_foreground = auto()
+    center_pose =   auto()
     # data layers
     data_B_W =      auto()
     data_B_F =      auto()
@@ -74,7 +74,7 @@ class Layers(IntEnum):
 
 class LayerSettings(BaseSettings):
     left:      Field[list[Layers]] = Field([Layers.composite],                    description="Layers drawn in the left viewport",       widget=Widget.playlist)
-    right:     Field[list[Layers]] = Field([Layers.tracker],                      description="Layers drawn in the right viewport",      widget=Widget.playlist)
+    right:     Field[list[Layers]] = Field([Layers.pose],                         description="Layers drawn in the right viewport",      widget=Widget.playlist)
     composite: Field[list[Layers]] = Field([Layers.fluid3d, Layers.color_mask],   description="Layers composited into composite output", widget=Widget.playlist)
     final:     Field[list[Layers]] = Field([Layers.composite],                    description="Layers drawn on the output monitors",     widget=Widget.playlist)
 
@@ -90,10 +90,10 @@ class OakGroup(BaseSettings):
     yolo:               Field[bool]              = Field(True, access=Field.INIT, description="Enable YOLO person detection")
     color:              Field[bool]              = Field(True, access=Field.INIT, description="Enable color capture")
     square:             Field[bool]              = Field(True, access=Field.INIT, description="Use square aspect ratio")
-    resolution:         Field[CameraResolution]  = Field(CameraResolution.P1080, access=Field.INIT, description="Sensor mode. P720 and P800 on both sensors, P1080 colour only.")
+    resolution:         Field[CameraResolution]  = Field(CameraResolution.P1080, access=Field.INIT, description="Sensor mode. P720 and P800 on both sensors, P1080 color only.")
     sim_enabled:        Field[bool]              = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path:         Field[str]               = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
-    fov:                Field[float]             = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-D Pro W, OV9782 colour, 1280x800 native. 720p is a vertical crop, so the full width and this figure both hold.")
+    fov:                Field[float]             = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-D Pro W, OV9782 color, 1280x800 native. 720p is a vertical crop, so the full width and this figure both hold.")
 
     _cam_share = [fps, color, square, yolo, resolution, model_path, fov]
     cam_0         = Group(OakCameraSettings, share=_cam_share)
@@ -220,8 +220,8 @@ class _CenterGeometrySettings(layers.CenterGeometrySettings):
     stage: Field[Stage] = Field(Stage.SMOOTH, description="Pose data pipeline stage")
 
 class FluidInputSettings(BaseSettings):
-    flow:    Field[Layers] = Field(Layers.centre_mask, description="Texture used as optical flow input")
-    density: Field[Layers] = Field(Layers.centre_frg,  description="Texture used as density and temperature input")
+    flow:    Field[Layers] = Field(Layers.center_mask,       description="Texture used as optical flow input")
+    density: Field[Layers] = Field(Layers.center_foreground, description="Texture used as density and temperature input")
 
 class _FlowLayerSettings(layers.FlowLayerSettings):
     inputs = Group(FluidInputSettings)
@@ -237,13 +237,13 @@ class DataGroup(BaseSettings):
 
 class PreviewGroup(BaseSettings):
     tracker = Group(_TrackerCompositorSettings)
-    poser   = Group(_PoseCompositorSettings)
+    pose    = Group(_PoseCompositorSettings)
 
-class CentreGroup(BaseSettings):
+class CenterGroup(BaseSettings):
     geometry = Group(_CenterGeometrySettings)
     mask     = Group(layers.CenterMaskLayerSettings)
     cam      = Group(layers.CenterCamLayerSettings)
-    frg      = Group(layers.CenterForegroundLayerSettings)
+    foreground = Group(layers.CenterForegroundLayerSettings)
     pose     = Group(layers.CenterPoseLayerSettings)
     color    = Group(layers.MSColorMaskLayerSettings)
 
@@ -252,7 +252,7 @@ class RenderSettings(BaseSettings):
     layer   = Group(LayerGroup)
     data    = Group(DataGroup)
     preview = Group(PreviewGroup)
-    centre  = Group(CentreGroup)
+    center  = Group(CenterGroup)
     flow    = Group(_FlowLayerSettings, share=[stage])
     fluid3d = Group(layers.Fluid3DLayerSettings, share=[stage])
     colors  = Group(ColorSettings)

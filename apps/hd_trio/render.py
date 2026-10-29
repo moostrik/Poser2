@@ -18,13 +18,13 @@ from pathlib import Path
 UPDATE_LAYERS: list[Layers] = [
     Layers.cam_image,
     Layers.cam_mask,
-    Layers.cam_frg,
+    Layers.cam_foreground,
     Layers.cam_crop,
 
-    Layers.centre_geom,
-    Layers.centre_mask,
-    Layers.centre_frg,
-    Layers.centre_pose,
+    Layers.center_geometry,
+    Layers.center_mask,
+    Layers.center_foreground,
+    Layers.center_pose,
 
     Layers.color_mask,
     Layers.flow,
@@ -33,7 +33,7 @@ UPDATE_LAYERS: list[Layers] = [
 ]
 
 INTERFACE_LAYERS: list[Layers] = [
-    Layers.poser,
+    Layers.tracker,
     Layers.cam_readings,
 ]
 
@@ -71,32 +71,32 @@ class HDTrioRender(RenderBase):
         self._intro_proxy = SequenceDataProxy()
         self._intro_player = IntroSequencePlayer(settings.intro_sequence, self.num_cams, data_path=data_path)
         self._intro_color_proxy = FixedColorProxy(settings.intro_sequence)
-        self._intro_geoms: dict[int, ls.CenterGeometry] = {}
+        self._intro_geometries: dict[int, ls.CenterGeometry] = {}
 
         flows: dict[int, ls.FlowLayer] = {}
         cmt: dict[int, Texture] = {}
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.board)
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.board)
-            cam_frg =       self.L[Layers.cam_frg][i]=      ls.ForegroundSourceLayer(i, self.board)
+            cam_foreground = self.L[Layers.cam_foreground][i] = ls.ForegroundSourceLayer(i, self.board)
             cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.board)
 
-            cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.board,      cam_image.texture,          settings.preview.tracker,   settings.colors)
-            track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.board,      cam_image.texture,          settings.preview.poser,     settings.colors)
+            tracker_compositor = self.L[Layers.tracker][i] = ls.TrackerCompositor(  i, self.board,      cam_image.texture,          settings.preview.tracker,   settings.colors)
+            pose_compositor = self.L[Layers.pose][i] =      ls.PoseCompositor(      i, self.board,      cam_image.texture,          settings.preview.pose,      settings.colors)
             self.L[Layers.cam_readings][i] =                 ls.CameraReadingsLayer( cameras[i], camera_check)
 
-            centre_gmtry=   self.L[Layers.centre_geom][i] = ls.CenterGeometry(      i, self.board,                                  settings.centre.geometry)
-            centre_mask =   self.L[Layers.centre_mask][i] = ls.CenterMaskLayer(     i, centre_gmtry,    cam_mask.texture,           settings.centre.mask)
-            cmt[i] = centre_mask.texture
-            centre_cam =    self.L[Layers.centre_cam][i] =  ls.CenterCamLayer(      i, centre_gmtry,    cam_image.texture,  cmt[i], settings.centre.cam)
-            centre_frg =    self.L[Layers.centre_frg][i] =  ls.CenterForegroundLayer(i, centre_gmtry,   cam_frg.texture,    cmt[i], settings.centre.frg,        settings.colors)
-            centre_pose =   self.L[Layers.centre_pose][i] = ls.CenterPoseLayer(     i, centre_gmtry,                                settings.centre.pose,       settings.colors)
+            center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, self.board,                                  settings.center.geometry)
+            center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask.texture,           settings.center.mask)
+            cmt[i] = center_mask.texture
+            center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image.texture,  cmt[i], settings.center.cam)
+            center_foreground = self.L[Layers.center_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, cam_foreground.texture, cmt[i], settings.center.foreground, settings.colors)
+            center_pose =   self.L[Layers.center_pose][i] = ls.CenterPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
 
-            intro_geom =    self._intro_geoms[i] =           ls.CenterGeometry(      i, self._intro_proxy,                          settings.centre.geometry)  # type: ignore[arg-type]
-            self.L[Layers.intro_pose][i] =                   ls.CenterPoseLayer(     i, intro_geom,                                settings.intro_sequence.pose, self._intro_color_proxy)  # type: ignore[arg-type]
+            intro_geometry = self._intro_geometries[i] =     ls.CenterGeometry(      i, self._intro_proxy,                          settings.center.geometry)  # type: ignore[arg-type]
+            self.L[Layers.intro_pose][i] =                   ls.CenterPoseLayer(     i, intro_geometry,                             settings.intro_sequence.pose, self._intro_color_proxy)  # type: ignore[arg-type]
 
-            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,      centre_frg.texture, cmt,    settings.centre.color,      settings.colors)
-            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,      cam_mask,  centre_mask.texture, centre_frg.texture,     settings.flow)
+            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,      center_foreground.texture, cmt, settings.center.color,  settings.colors)
+            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,      cam_mask,  center_mask.texture, center_foreground.texture, settings.flow)
             fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.board,      flows,                      settings.fluid,             settings.colors)
 
             lut =           self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid, ms_mask],           settings.layer.composite)
@@ -118,7 +118,7 @@ class HDTrioRender(RenderBase):
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, False)
 
-        # Propagate window fps to fluid simulation configs
+        # Propagate window fps to fluid simulation settings
         def _propagate_fps(fps: int) -> None:
             settings.fluid.fluid_flow.fps = fps
         settings.window.bind(WindowSettings.avg_fps, _propagate_fps)
@@ -206,7 +206,7 @@ class HDTrioRender(RenderBase):
             frames = self._intro_player.update()
             self._intro_proxy.update(frames)
             for i in range(self.num_cams):
-                self._intro_geoms[i].update()
+                self._intro_geometries[i].update()
                 self.L[Layers.intro_pose][i].update()
         else:
             if self._intro_player.active:
@@ -239,11 +239,11 @@ class HDTrioRender(RenderBase):
         clear_color()
 
         try:
-            camera_id: int = self.settings.window.secondary_list.index(MonitorId(monitor_id))
+            cam_id: int = self.settings.window.secondary_list.index(MonitorId(monitor_id))
         except ValueError:
             return
 
-        if camera_id >= self.num_cams:
+        if cam_id >= self.num_cams:
             return
 
         Style.reset_state()
@@ -251,7 +251,7 @@ class HDTrioRender(RenderBase):
         Style.set_blend_mode(Style.BlendMode.ADD)
 
         for layer_type in self._draw_layers:
-            if camera_id in self.L[layer_type]:
-                self.L[layer_type][camera_id].draw()
+            if cam_id in self.L[layer_type]:
+                self.L[layer_type][cam_id].draw()
 
         Style.pop_style()

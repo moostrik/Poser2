@@ -58,7 +58,7 @@ shoulders' difference already live there (*Measures*).
 | blue pull  | −1..1 | blue's share: `difference × (1 − share × bend) / 2`, clamped            |
 
 The share (`pose_instrument.lean_share`, 2) scales the handover: at 1 a full lean hands over exactly the
-whole pull; above it the carrying colour overshoots the meeting and the pair stretches open
+whole pull; above it the carrying color overshoots the meeting and the pair stretches open
 again, the clamp a standstill, not a jump.
 
 ## Synth inputs
@@ -102,8 +102,8 @@ The shoulders' mean into both pulse widths, nothing else. The bases are the stud
 | blue       | hardness    |           | 1    |        |
 
 Hanging is full blue and raised full white (rules 1 and 2); between them the two widths sum to
-the interval and blue sits half an interval from white, so the colours tile: every pixel is one
-colour, trading blue for white as the shoulders rise. The lines stand still, so a held pose is a
+the interval and blue sits half an interval from white, so the colors tile: every pixel is one
+color, trading blue for white as the shoulders rise. The lines stand still, so a held pose is a
 still picture and every movement of the light is an arm moving. The strobes and the push have no
 source; the legs feed the LFO's level, but the LFO feeds no parameter. Rule 5 yields to rule 4:
 the elbows, the bend and the legs draw nothing, and which arm is up does not show.
@@ -111,7 +111,7 @@ Each connection added wins rule 5 back one combination at a time, at the price r
 
 ## Step 1 — the elbows
 
-The base matrix with each elbow on its own colour's pitch, the left the white and the right the
+The base matrix with each elbow on its own color's pitch, the left the white and the right the
 blue.
 
 | Oscillator | Parameter   | Source             | Base | Amount |
@@ -127,19 +127,19 @@ blue.
 | blue       | speed       |                    | 0    |        |
 | blue       | hardness    |                    | 1    |        |
 
-Folding an elbow makes its own colour's lines finer: a full fold triples them, 10 (one every
+Folding an elbow makes its own color's lines finer: a full fold triples them, 10 (one every
 36°) to 30 (one every 12°). The first build rested at 25.7 and folded to 72 (one every 5°), and
 those small lines lost the audience **(site fact)**: this step rests far coarser, and even
 folded the lines stay lines. Straight against folded is 1:3, a simple ratio, so the unequal
 elbows' moiré still repeats regularly along the wall. The relation between the arms is tuning: equal elbows keep white and blue sharing one
-interval, in tune; unequal elbows slide the colours past each other with distance, a standing
+interval, in tune; unequal elbows slide the colors past each other with distance, a standing
 moiré (`LIGHT_SYNTH.md`, *In the pose instrument*), so the elbows' symmetry shows without a
 connection of its own.
 
 The step keeps every rule above it for free. The elbow travel is 0 at both fixed points — hanging
-and raised arms are straight — and a pitch shows nothing on a solid or dark colour, so rules 1
+and raised arms are straight — and a pitch shows nothing on a solid or dark color, so rules 1
 and 2 hold twice over. The travel is continuous and a change of pitch opens the lines from the
-person as an accordion, so rule 3 holds. Nothing moves in time: a held pose is still a still
+player as an accordion, so rule 3 holds. Nothing moves in time: a held pose is still a still
 picture. The price to rule 4 is two rows, one measure each; the gain to rule 5 is every elbow
 combination, wherever the shoulders give lines to see it in.
 
@@ -160,24 +160,24 @@ Step 1 with the shoulders' difference on both phases, the amounts opposite.
 | blue       | speed       |                     | 0    |        |
 | blue       | hardness    |                     | 1    |        |
 
-The difference moves the two colours' lines opposite ways: level shoulders leave them
+The difference moves the two colors' lines opposite ways: level shoulders leave them
 alternating, blue half an interval from white; the left higher brings them a quarter interval
 closer on one side, the right higher on the other, so which arm is the higher shows — rule 5
 wins the shoulder pairs back. ⅛ each keeps those two furthest apart: at ¼ each, left higher and
 right higher would draw the same lines, as a phase repeats every interval. Pulled together the
-colours overlap on one flank and open dark on the other, so the shift reads as a change of tone,
+colors overlap on one flank and open dark on the other, so the shift reads as a change of tone,
 not only of place.
 
 The difference is 0 with level shoulders, so the fixed points, the T and the tiling are
 untouched, and it is large only with one arm up and the other not, where both widths are near
-half and both colours are lines. Nothing moves in time, and the phase is continuous in the
+half and both colors are lines. Nothing moves in time, and the phase is continuous in the
 difference, so rules 1, 2 and 3 hold.
 
 ## Step 3 — the arms
 
 Step 2 with the widths on the arms instead of the
 shoulders. Rules 1 and 2 speak of arms, but with the widths on the shoulders alone a fold of
-hanging arms drew nothing: the colours were solid and dark there, and the pitch had no note to
+hanging arms drew nothing: the colors were solid and dark there, and the pitch had no note to
 show on. The width axis must read the whole arm.
 
 | Oscillator | Parameter   | Source              | Base | Amount |
@@ -193,8 +193,8 @@ show on. The width axis must read the whole arm.
 | blue       | speed       |                     | 0    |        |
 | blue       | hardness    |                     | 1    |        |
 
-Folding an elbow from hanging arms now makes its colour appear, and appear finely lined: the
-fold lifts the arm and is its colour's pitch at once, so an arm folded in is half a raise with
+Folding an elbow from hanging arms now makes its color appear, and appear finely lined: the
+fold lifts the arm and is its color's pitch at once, so an arm folded in is half a raise with
 a finer voice. Hands folded to the shoulders from neutral give the T's tiling from the elbows
 alone. The widths stay complementary whatever lifts them, so the tiling holds at every arm
 value. The union is smooth in both travels (rule 3) and 0 only hanging and straight, so rule 1
@@ -221,18 +221,18 @@ Step 3 with the body bend on both speeds, base 0 and equal amounts.
 
 The bend is the flow: a straight body leaves the lines standing, and every movement of a held
 pose is an arm moving. The oscillators are mirrored, so a lean does not carry the lines
-sideways: it flows the whole pattern out of the person on both sides, or into them, one way per
+sideways: it flows the whole pattern out of the player on both sides, or into them, one way per
 lean side — the sideways drift, outward on the leaned side and inward on the other, needs a
 travel per side and stays parked (`MATRIX.md`, *Parked*). The bend rests at 0 upright through
 its dead zone and is continuous to full lean, so the fixed points stay still and nothing jumps
 (rules 1–3). One measure into both speeds with one amount keeps the mirror symmetry; the
-amounts are the knobs if the colours should ever counter-flow.
+amounts are the knobs if the colors should ever counter-flow.
 
 ## Step 5 — the bend shares the pull
 
 The wired matrix (`PoseInstrument.connect`): Step 3 with the shoulders' pull shared by the body
 bend. The bend leaves the speeds: a flowing pattern moves without the body moving, which read
-as the instrument's motion, not the person's **(site fact)** — the constraint any motion
+as the instrument's motion, not the player's **(site fact)** — the constraint any motion
 connection must answer.
 
 | Oscillator | Parameter   | Source             | Base | Amount |
@@ -248,12 +248,12 @@ connection must answer.
 | blue       | speed       |                    | 0    |        |
 | blue       | hardness    |                    | 1    |        |
 
-The difference is the tension between the colours; the bend is who gives in. The pulls split
-the shoulders' pull between the colours: upright each is `difference / 2`, so the picture is
-Step 3's exactly — both colours concede equally and meet in the middle, ⅛ interval each at full
-difference. Leaning hands the walk to one colour: at full lean one stands on its home grid and
+The difference is the tension between the colors; the bend is who gives in. The pulls split
+the shoulders' pull between the colors: upright each is `difference / 2`, so the picture is
+Step 3's exactly — both colors concede equally and meet in the middle, ⅛ interval each at full
+difference. Leaning hands the walk to one color: at full lean one stands on its home grid and
 the other walks the whole way. The relative pull is the difference's alone, a quarter interval
-at full whatever the bend — the arms say how far the colours merge, the lean only on whose
+at full whatever the bend — the arms say how far the colors merge, the lean only on whose
 ground they meet.
 
 The bend is a secondary measure (`POSE_INSTRUMENT.md`, *What each measure means*): it modulates
@@ -267,17 +267,17 @@ still picture.
 What holds the composition in balance, and what a next connection must keep:
 
 - **The widths are conserved.** Blue's slot inverts white's source, so the two widths sum to one
-  interval: a colour grows only by the other's loss, and the total light holds along the whole
+  interval: a color grows only by the other's loss, and the total light holds along the whole
   neutral–raised path. White and blue are the two ends of one axis, not two competing voices.
-- **One owner per dimension.** The arms own how much of each colour, the shoulder difference
-  how far the colours pull together, the body bend which colour carries the pull, each elbow
-  how fine its own colour. No slot is shared, and each parameter does one visible thing
+- **One owner per dimension.** The arms own how much of each color, the shoulder difference
+  how far the colors pull together, the body bend which color carries the pull, each elbow
+  how fine its own color. No slot is shared, and each parameter does one visible thing
   (`LIGHT_SYNTH.md`, *The rules*). Two hierarchies run through it, whole over part: the arm
-  says how much, its elbow how fine; the arms say how far the colours merge, the trunk on whose
+  says how much, its elbow how fine; the arms say how far the colors merge, the trunk on whose
   ground they meet.
 - **The patch is mirror-symmetric.** Swap left and right in the body and white and blue in the
   light and the matrix maps onto itself: the pitches are mirror-wired, the widths take one
-  source, and the pulls swap with the colours. The arms are counterweights; neither is the
+  source, and the pulls swap with the colors. The arms are counterweights; neither is the
   louder.
 - **Everything rests at the anchors, and nothing moves in time.** Every source is 0 at the
   fixed points, and none moves by itself, so the picture hangs from the two poses of rest and

@@ -1,7 +1,7 @@
 # White Space — Pose Instrument
 
-The instrument the participants play with their bodies. An instrument is what a player plays: a
-keyboard synth is its keyboard, its synth engine and the patch that ties them. Here a person's
+The instrument the players play with their bodies. An instrument is what a player plays: a
+keyboard synth is its keyboard, its synth engine and the patch that ties them. Here a player's
 body takes the place of the keyboard.
 
 | Part                           | In a keyboard synth      | Here                                                       |
@@ -25,12 +25,12 @@ The layer's place among the other layers is in `LAYERS.md`; the states that run 
 
 ## The instrument
 
-Each person makes light in the projection. At their azimuth sits a dim blue **mask**: it
-goes over everything at the person, the patterns of everyone and the light of the other layers;
-the playhead passes through it dimmed by a setting. Around the mask, mirrored about the person
+Each player makes light in the projection. At their azimuth sits a dim blue **mask**: it
+goes over everything at the player, the patterns of everyone and the light of the other layers;
+the playhead passes through it dimmed by a setting. Around the mask, mirrored about the player
 (or, per oscillator, passing behind them), their **pattern**: lines of full white and full blue,
 generated behind the mask and coming out from under it. Only a **window** of the pattern is
-visible each side of the person; sync shows as the sync strobe (*Events*).
+visible each side of the player; sync shows as the sync strobe (*Events*).
 
 The ground rules, as set:
 
@@ -40,7 +40,7 @@ The ground rules, as set:
 - Full on: every pixel of white and of blue is off or full, since the fixture projects on whatever
   is around it and subtle brightness is lost (`LIGHT_SYNTH.md`, *A light synth*). The mask is the
   one dim thing.
-- No blinding: the instrument never blinds a person with white; people must be able to see each
+- No blinding: the instrument never blinds a player with white; people must be able to see each
   other. The mask is how, so full white can fill a window and never fall on a face. This rule is
   the instrument's alone, not the other layers'.
 - White and blue are projected separately by the fixture **(site fact)**, so where both are on the
@@ -50,24 +50,24 @@ The ground rules, as set:
   of the body is a smooth change on the projection.
 - Lines follow the pose. On top of that they travel by themselves, slowly and peacefully, blue
   inward and white outward: a low speed that may be 0.
-- The output each side of a person is symmetric while its oscillators mirror (the default),
+- The output each side of a player is symmetric while its oscillators mirror (the default),
   except the window's reach: sync opens one side.
 - The pattern is the light synth's; the six measures play it; every combination of the six draws
   differently; the arms come first, legs and body bend second.
 - Arms down is neutral: full blue over the window. Arms up: full white. In between, the pattern.
   Full is solid over the window, thinning at its ends (`LIGHT_SYNTH.md`, *The window*).
 - Blue and white can behave differently; line thickness and interval can change.
-- A hit (the playhead crossing the person) marks that person. Neither wider lines nor a tint of
+- A hit (the playhead crossing the player) marks that player. Neither wider lines nor a tint of
   the lines reads as a mark **(site facts)**; the mark is the push and the mask's flash
-  (*Events*), with the playhead's marker passing the person; each mark is optional through its
+  (*Events*), with the playhead's marker passing the player; each mark is optional through its
   levels.
 - Sync shows as the **sync strobe**, at full sync only: while every pair is alike, the whole
   room's white and blue trade places on strobe frames, the lines staying what they are, the
   rate climbing in over the attack and stepping away over the release. Sync can also open the
   window toward the partner (off in the preset).
-- A person's pattern can be drawn half a turn from them (`opposite` ON) or in both places
+- A player's pattern can be drawn half a turn from them (`opposite` ON) or in both places
   (BOTH), their mask staying on them. Under BOTH the copies win the overlap: an own window
-  retreats to a copy's settled edge, and yields entirely to a copy reaching over its person —
+  retreats to a copy's settled edge, and yields entirely to a copy reaching over its player —
   two people exactly opposite each other swap patterns.
 
 ---
@@ -79,14 +79,14 @@ belongs where*): oscillator, parameter, slot, source, output, pitch, interval, p
 speed, hardness, LFO, envelope, window, reach, taper, push, voice. Standard synth terminology
 where the synth is a synth; our own word where the wall differs. The words of the bridge:
 
-| Word       | What it is                                                                            |
-|------------|---------------------------------------------------------------------------------------|
+| Word       | What it is                                                                                        |
+|------------|---------------------------------------------------------------------------------------------------|
 | measure    | a value of the body, measured by the pose pipeline (*The body*); ours: the body is the controller |
-| source     | what is plugged into a parameter's slot: a measure, an LFO's or an envelope's output  |
-| connection | a measure as the source in a slot: the measure, the parameter, the base, the amount   |
-| patch      | everything set for the synth, the connections among it; shared by all voices          |
-| voice      | one person's instance of the light synth                                              |
-| event      | what the instrument triggers in a voice: presence, the hit, sync (*Events*)           |
+| source     | what is plugged into a parameter's slot: a measure, an LFO's or an envelope's output              |
+| connection | a measure as the source in a slot: the measure, the parameter, the base, the amount               |
+| patch      | everything set for the synth, the connections among it; shared by all voices                      |
+| voice      | one player's instance of the light synth                                                          |
+| event      | what the instrument triggers in a voice: presence, the hit, sync (*Events*)                       |
 
 What is the instrument's and what is the synth's (`LIGHT_SYNTH.md` states the same split from the
 synth's side): the instrument decides what each source is, which measure, and the shaping of that
@@ -118,7 +118,7 @@ points is tied to a pose.
 3. Groups of measures (both arms, both elbows) and poses are consequences of the measures'
    meanings. They are read back in Part 3, never written here.
 4. Raising one arm never means the same as raising the other, and the two arms are connected by a
-   relation from the vocabulary of the light synth: not by a colour, and not by whatever two
+   relation from the vocabulary of the light synth: not by a color, and not by whatever two
    parameters were free.
 5. The same holds for every pair of joints: a pair acts through a musical relation, or through its
    symmetry.
@@ -133,36 +133,36 @@ The rules are aims, not gates. Two things are fixed: arms hanging is full blue a
 full white. Every combination drawing differently (rule 7) is the aim in the end, not a test of
 each step. A calculation on several measures may live in the instrument while it is tried; once
 the result is liked it moves into the pose pipeline (rule 1). The elbows depart
-from rule 4 as an experiment: each elbow plays its own colour's pitch.
+from rule 4 as an experiment: each elbow plays its own color's pitch.
 
 ## What each measure means
 
 Each measure is a musical term of the light synth: a parameter of an oscillator (pitch, pulse
 width, phase, speed), the level of an LFO, a reach. **Primary** measures make the note: the arms,
 worked out in `MATRIX_V2.md`. **Secondary** measures modulate a note that is already sounding: the
-legs and the body bend. The distance, how far the person stands from the fixture, is the one
+legs and the body bend. The distance, how far the player stands from the fixture, is the one
 measure that is not of the body's pose.
 
 | Measure             | Role      | Term                                                            |
 |---------------------|-----------|-----------------------------------------------------------------|
 | arms mean           | primary   | the balance of white and blue: both pulse widths                |
-| shoulders apart     | primary   | both phases: the colours pull together, one way per higher arm  |
+| shoulders apart     | primary   | both phases: the colors pull together, one way per higher arm   |
 | left elbow          | primary   | the white: its fold lifts the arm and is the pitch              |
 | right elbow         | primary   | the blue: its fold lifts the arm and is the pitch               |
 | leg deviation       | secondary | open                                                            |
-| body bend           | secondary | who yields: the lean hands the arms' pull to one colour         |
+| body bend           | secondary | who yields: the lean hands the arms' pull to one color          |
 | distance            | secondary | open                                                            |
-| elbow symmetry      | secondary | open: it shows unconnected, as the colours in or out of tune    |
+| elbow symmetry      | secondary | open: it shows unconnected, as the colors in or out of tune     |
 
 Two events sit over every measure: the **accent** of a hit and the **unison** of sync, the
-colours of everyone alike trading places on the same frames, the room one strobe (*Events*).
+colors of everyone alike trading places on the same frames, the room one strobe (*Events*).
 
 ## Composition
 
 The aim is a balanced composition that people recognise they influence. Not every parameter of
 the synth has to be used; they are there to be tried, because several may mean the same thing to
 the eye, or the pattern's own workings may already produce what a parameter would add. A
-connection earns its place when a person can find it with their body. Few connections, much
+connection earns its place when a player can find it with their body. Few connections, much
 meaning: a measure may drive more than one parameter, and a parameter may stay at its base.
 What holds the matrix in balance now, and the bar a next connection is judged against, is
 `MATRIX_V2.md`, *Balance*.
@@ -181,25 +181,25 @@ so each is one pick in the panel. The first two are the calibrator's reference p
 the calibrator's shoulder arc from neutral to raised. Every pose between the rows is unique and is
 not described.
 
-| Pose                                        | Result                                                           |
-|---------------------------------------------|------------------------------------------------------------------|
-| neutral                                     | full blue over the window: the blue ping                         |
-| raised                                      | full white over the window, no blue: the bass                    |
-| arms out level, a T                         | white and blue lines, each half the interval, touching           |
-| left arm up, right hanging                  | the T's widths, the colours a quarter interval closer one way   |
-| right arm up, left hanging                  | the T's widths, the colours a quarter interval closer the other |
+| Pose                                        | Result                                                              |
+|---------------------------------------------|---------------------------------------------------------------------|
+| neutral                                     | full blue over the window: the blue ping                            |
+| raised                                      | full white over the window, no blue: the bass                       |
+| arms out level, a T                         | white and blue lines, each half the interval, touching              |
+| left arm up, right hanging                  | the T's widths, the colors a quarter interval closer one way        |
+| right arm up, left hanging                  | the T's widths, the colors a quarter interval closer the other      |
 | neutral, both elbows folded                 | white appears from full blue, finely lined: the folds lift the arms |
-| a T, both elbows folded                     | the T's tiling, finer and whiter, white and blue still in tune   |
-| a T, left elbow folded                      | the white finer, the wall whiter: the colours slide apart        |
-| a T, right elbow folded                     | the blue finer, the wall whiter: the colours slide apart         |
-| a T, leaning left                           | the T, unchanged: a lean alone plays nothing                     |
-| a T, leaning right                          | the T, unchanged                                                 |
-| left arm up, leaning left                   | the pulled pair carried by one colour: it walks the whole pull   |
-| left arm up, leaning right                  | the same pull carried by the other colour                        |
-| a T, in a crouch                            | the T: the legs play nothing                                     |
-| \|__ (a T, the right forearm turned 90°)    | the blue finer against the white: a standing moiré               |
-| \_\_\| (a T, the left forearm turned 90°)   | the white finer against the blue: a standing moiré               |
-| \|_\| (a T, both forearms turned up)        | both colours finer equally, in tune: the T's tiling, finer, whiter |
+| a T, both elbows folded                     | the T's tiling, finer and whiter, white and blue still in tune      |
+| a T, left elbow folded                      | the white finer, the wall whiter: the colors slide apart            |
+| a T, right elbow folded                     | the blue finer, the wall whiter: the colors slide apart             |
+| a T, leaning left                           | the T, unchanged: a lean alone plays nothing                        |
+| a T, leaning right                          | the T, unchanged                                                    |
+| left arm up, leaning left                   | the pulled pair carried by one color: it walks the whole pull       |
+| left arm up, leaning right                  | the same pull carried by the other color                            |
+| a T, in a crouch                            | the T: the legs play nothing                                        |
+| \|__ (a T, the right forearm turned 90°)    | the blue finer against the white: a standing moiré                  |
+| \_\_\| (a T, the left forearm turned 90°)   | the white finer against the blue: a standing moiré                  |
+| \|_\| (a T, both forearms turned up)        | both colors finer equally, in tune: the T's tiling, finer, whiter   |
 
 ## The body
 
@@ -208,7 +208,7 @@ and publishes with every frame, smoothed. The pipeline also caps how fast the jo
 change (the LERP stage's rate limiter: `max_increase` and `max_decrease`, radians per second), so
 no angle-derived measure moves implausibly fast however fast the input jumps, and the light and
 the sound read the same capped values. The azimuth is not capped: the window and the mask track a
-walking person. The pipeline derives the leg deviation, the symmetry
+walking player. The pipeline derives the leg deviation, the symmetry
 of a pair, the whole arms and the shoulders' difference from the joint angles. The distance is
 the tracker's, read from where the feet meet the floor (`TRACKING.md`, *The pose's distance*).
 
@@ -266,7 +266,7 @@ which arm is which shows only as a different sound. The **symmetry** feature (`A
 holds the meaningful pairs, the four joints (shoulder, elbow, hip, knee) and the arm and the leg as
 a whole per side (`arms`: shoulder and elbow; `legs`: hip and knee, weighted as the leg deviation
 is), each signed, left minus right, −1..1, so that downstream the signed value or its absolute can
-be used. A person and their mirror image draw differently. `AngleSymmetryExtractor` makes it; it is
+be used. A player and their mirror image draw differently. `AngleSymmetryExtractor` makes it; it is
 windowed, graphed and sent to Max like the leg deviation. The shoulders' **difference**
 (`ShoulderDifference`, *The body*) is its travel-space sibling: left less right of the travels
 instead of the raw angles, so it rests exactly at 0 at both fixed points through the travels'
@@ -294,22 +294,22 @@ the visualization as simple as possible. The bases and amounts are the preset's:
 
 The arms' mean is both widths: an arm's travel is the weighted union of its shoulder's and its
 elbow's (the lift `pose.arm_travel_extractor.elbow_lift`; *The body*), so folded elbows draw with
-the shoulders down and a raised shoulder is a full arm. Each elbow plays its own colour's pitch,
+the shoulders down and a raised shoulder is a full arm. Each elbow plays its own color's pitch,
 the left the white and the right the blue. The pulls split the shoulders' pull between the
-colours (`MATRIX_V2.md`, *Made sources*): uneven arms pull white and blue a quarter interval
-together at full, and the body bend says which colour carries it — upright both concede equally,
+colors (`MATRIX_V2.md`, *Made sources*): uneven arms pull white and blue a quarter interval
+together at full, and the body bend says which color carries it — upright both concede equally,
 leaned one stands on its grid and the other walks, the share (`pose_instrument.lean_share`) setting how far
 a lean hands it over; a lean with level arms says nothing. Unconnected: the speeds, the
 hardness, the strobes, the LFO's output, the symmetries, the distance.
 
 ## Events
 
-What the instrument triggers in a person's voice, beside the measures:
+What the instrument triggers in a player's voice, beside the measures:
 
-| Event    | When                                                        | Acts on                                                     |
-|----------|-------------------------------------------------------------|-------------------------------------------------------------|
-| presence | the person is seen: a gate open while they are there        | the presence envelope, on both reaches                      |
-| hit      | the playhead crosses the person: the tick closest to it     | each oscillator's push, and the mask's flash                |
+| Event    | When                                                        | Acts on                                                                                                             |
+|----------|-------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
+| presence | the player is seen: a gate open while they are there        | the presence envelope, on both reaches                                                                              |
+| hit      | the playhead crosses the player: the tick closest to it     | each oscillator's push, and the mask's flash                                                                        |
 | sync     | full sync: every present pair alike over the band           | the sync strobe; the growth: every window toward the full circle; the blend: everyone's measures to the room's mean |
 
 Presence and the pushes are envelopes of the synth (`LIGHT_SYNTH.md`, *The envelope*). The
@@ -327,20 +327,20 @@ bridge's and not the synth's.
 What follows from the connections, before the machine has been judged **(deductions)**:
 
 - With level shoulders the wall tiles: white's width and blue's add up to the interval and blue
-  sits half an interval from white, so every pixel is one colour, from full blue through the T
+  sits half an interval from white, so every pixel is one color, from full blue through the T
   to full white, trading blue for white as the arms rise — the folds lift the widths too, so the
   tiling holds at every arm value.
 - Nothing moves in time, so a held pose — a held lean included — is a still picture, and every
   movement of the light is the body's, one to one.
 - A lean speaks only while the arms are uneven: it slides the pulled-together pair toward one
-  colour's grid or the other's, and with level arms it draws nothing, having no pull to share.
+  color's grid or the other's, and with level arms it draws nothing, having no pull to share.
 - Equal elbows keep white and blue sharing one interval, in tune; unequal elbows slide the
-  colours past each other with distance, a standing moiré, so the elbows' symmetry shows without
+  colors past each other with distance, a standing moiré, so the elbows' symmetry shows without
   a connection of its own (`LIGHT_SYNTH.md`, *In the pose instrument*).
-- An elbow's pitch shows only where its colour has lines, but its fold lifts the arm, so from
+- An elbow's pitch shows only where its color has lines, but its fold lifts the arm, so from
   neutral a fold makes the very lines that show it; only at raised does an elbow vanish, the
   arm already full.
-- Which arm is the higher shows as the colours pulling a quarter interval together, one way for
+- Which arm is the higher shows as the colors pulling a quarter interval together, one way for
   the left, the other for the right: overlapping on one flank, opening dark on the other.
 - The bend and the legs draw nothing: `MATRIX_V2.md`'s rule 5 yields to its temporary
   rule 4 until their connections earn their place.
@@ -354,7 +354,7 @@ each row draws, against what it should.
 
 ## Design
 
-The bridge gives every person a voice of the light synth, sends its two outputs to white and to
+The bridge gives every player a voice of the light synth, sends its two outputs to white and to
 blue, feeds the measures of *The body* into the slots of *The connections*, triggers the *Events*,
 and draws the mask over the result. The synth, its building blocks and its rules are
 `LIGHT_SYNTH.md`'s.
@@ -364,22 +364,22 @@ and draws the mask over the result. The synth, its building blocks and its rules
 ### The layer
 
 `pose_instrument` (`light/layers/projection/pose_instrument.py`) is the bridge. It gives each
-person a `Voice` of the light synth (`light/synth`), paints the voice's output 1 into white and its
-output 2 into blue over the person's window, and draws every mask over the result. Overlapping
+player a `Voice` of the light synth (`light/synth`), paints the voice's output 1 into white and its
+output 2 into blue over the player's window, and draws every mask over the result. Overlapping
 voices combine per channel, the fuller showing; two patterns of different intervals or centers
-make a moiré. Distances are taken from the person's own azimuth and not from their center pixel,
-so a walking person's lines move smoothly. With `opposite` ON the pattern is drawn half a turn
-from its person while the mask stays on them; with BOTH it is drawn in both places, the copy a
+make a moiré. Distances are taken from the player's own azimuth and not from their center pixel,
+so a walking player's lines move smoothly. With `opposite` ON the pattern is drawn half a turn
+from its player while the mask stays on them; with BOTH it is drawn in both places, the copy a
 second window of the same voice at the antipode. The masks still go over every pattern, so they
 cut the patterns that fall on them. Under BOTH the copies win the overlap: copies inherit the
 owns' symmetric clips (the copies' constellation is the owns' rotated half a turn) and never
 yield, while an own window clips with its boundary at a copy's settled edge and, once a copy's
-window reaches over its person, scales down with the penetration until it is gone — two people
+window reaches over its player, scales down with the penetration until it is gone — two people
 exactly opposite each other end in a full pattern swap, continuously, as they walk there.
 The instrument draws the playhead's marker over the
 masks (`PlayheadMarker`, `playhead_marker.py`), and the render shows the overlap of the two
-colours as a tone of its own (`render/shaders/lightsimulation.frag`). A tick costs about 0.2 ms
-per person at 3600 pixels. Its place in the states' mixes is in `LAYERS.md`, *pose_instrument*.
+colors as a tone of its own (`render/shaders/lightsimulation.frag`). A tick costs about 0.2 ms
+per player at 3600 pixels. Its place in the states' mixes is in `LAYERS.md`, *pose_instrument*.
 
 ### Sources and connections
 
@@ -387,7 +387,7 @@ The layer reads its sources from the LERP frames: the elements of `ArmTravel` (t
 and the two elbows, the absolute taken), `ShoulderDifference`, `LegDeviation`, `TorsoTilt`,
 `Distance` and `AngleSymmetry` (*The body*, *Symmetry*).
 
-The connections are code, not settings: `PoseInstrument.connect` takes a person's measures, the
+The connections are code, not settings: `PoseInstrument.connect` takes a player's measures, the
 dead zones already on them (*The body*), and returns the sources of the white and the blue
 oscillator's slots. It is *The connections* written out. `connect_lfo` beside it gives the LFO's
 level its source and runs first each tick, so `connect` can read the LFO's output. The bases and
@@ -396,7 +396,7 @@ values and the code keeps the routing.
 
 ### People
 
-A person is present while their pose exists (`LAYERS.md`, *Inputs*); a pose with a NaN azimuth
+A player is present while their pose exists (`LAYERS.md`, *Inputs*); a pose with a NaN azimuth
 has no place in the projection and counts as absent, the one presence test a layer adds.
 Presence opens the window from the mask over `window.attack_seconds` and closes it over
 `window.release_seconds`, the last pose held while it closes and the mask dimming with it.
@@ -417,7 +417,7 @@ toward the room's presence-weighted mean over `blend.attack_seconds` — every p
 one — and return to their own over `blend.release_seconds`. The blend reads the measures; it
 never writes them, and never touches similarity, positions, masks or hits, so everyone keeps
 their place and their marks while playing one pattern. With no speed connected the patterns
-are identical; a person's own pushes can offset their copy by a phase.
+are identical; a player's own pushes can offset their copy by a phase.
 
 `window.overlap` keeps neighbouring windows out of each other: each side's reach is clipped
 toward the midpoint of the arc to the neighbour — fully at 0, where windows meet as territories
@@ -428,25 +428,25 @@ The neighbour's presence scales their clip, so a neighbour leaving lets go smoot
 nearest present neighbour on each side is the binding one. The clip applies under the width
 bypass, and to the grown windows alike.
 
-The window **scale** compresses each person's whole picture — reach, line spacing, motion —
+The window **scale** compresses each player's whole picture — reach, line spacing, motion —
 without changing any other setting: the bridge divides the positions it hands the voices by the
 scale, so the voices draw the same pattern in pattern degrees (real degrees over the scale) and
 the synth's knobs keep their meaning relative to the pattern. The scale is `window.scale`, the
-master knob, times `window.crowd` for each participant beyond the first; the participation is the
+master knob, times `window.crowd` for each player beyond the first; the participation is the
 sum of presences, so the scale moves smoothly as people arrive and leave. The visual limit
 (`max_lines`) holds in real degrees: a deep shrink stops adding lines instead of exceeding it.
 The mask, its border and the marker keep their real size.
 
-The **mask** is a band `mask.width` wide at the person, each channel at its level (`mask.white`,
-`mask.blue`) times presence, and goes over everything at the person: the patterns of every voice.
+The **mask** is a band `mask.width` wide at the player, each channel at its level (`mask.white`,
+`mask.blue`) times presence, and goes over everything at the player: the patterns of every voice.
 A mask cuts a line where it falls, so lines slide out from under it; the window cuts nothing. In
 the preset the white is 0, so the mask is the dim blue band. The mask's **border** is a line
-centerd on each edge of the band, half over the blue (`mask.border_width`, with `mask.border_white`
+centered on each edge of the band, half over the blue (`mask.border_width`, with `mask.border_white`
 and `mask.border_blue` times presence); it cuts the patterns like the band and does not flash. The
 playhead's **marker**
 (`pose_instrument.playhead`: its width, its white and blue) is drawn by the instrument over the masks, dimmed
 to `playhead.at_mask` inside one, so the marker never blinds and no other layer shares a mix with
-the instrument at a person.
+the instrument at a player.
 
 ### The sync strobe
 
@@ -459,7 +459,7 @@ every pair reads `pose_instrument.on_at` and closes only when one falls below
 swaps the gate. The gate is the room's, computed once per tick (`PoseInstrument._set_full_sync`)
 and published as `pose_instrument.full_sync`: the show reads it in PLAY, where full sync held long enough is
 the sync end (`STATES.md`, S7 and S11), and the strobe, the growth and the blend each take it
-through their own bypass into their own envelope. A person at neutral holds the room off (the neutral weight is in the feature,
+through their own bypass into their own envelope. A player at neutral holds the room off (the neutral weight is in the feature,
 `SIMILARITY.md`), as does a pair that cannot be read; below two people there is no pair and
 no strobe.
 
@@ -477,13 +477,13 @@ outputs between the channels (or skips painting them), so no parameter, slot or 
 touched, the per-oscillator strobes stay independent, and the masks and the marker, painted
 after, hold steady through it. The steps are the point, as a strobe's are: a deliberate
 event, not jitter. At the sync end (`STATES.md`, S11) the strobe does not stop with the
-instrument: the wind-down's wall carries it on the lamps, same grid, same rate, this mode
+instrument: the wind-down's wall carries it on the beam lights, same grid, same rate, this mode
 (`LAYERS.md`, *beam_wind_down*).
 
 ### The hit
 
-On the tick the playhead is closest to a person (`PlayheadCrossing` in `pose/playhead_offset.py`,
-`PoseInstrument.HIT_TICKS`, the same rule as `beam_flash`), each of the person's oscillators is
+On the tick the playhead is closest to a player (`PlayheadCrossing` in `pose/playhead_offset.py`,
+`PoseInstrument.HIT_TICKS`, the same rule as `beam_flash`), each of the player's oscillators is
 pushed (its `push`, falling back over its `push_release_seconds`) and the mask goes to its flash
 levels (`mask.flash_white`, `mask.flash_blue`), falling back to its own over
 `mask.flash_release_seconds`. Every mark has a white and a blue level, and 0 is off. The crossing
@@ -495,25 +495,25 @@ is measured in playhead steps at `beam_rpm`, the rate the playhead free-runs at 
 (`PoseInstrumentSettings`, `light/layers/projection/pose_instrument.py`), grouped by what is
 tuned together, knobs throughout:
 
-| Group                         | What it holds                                                   |
-|-------------------------------|-----------------------------------------------------------------|
-| `max_lines`                   | the visual limit: the pitch ceiling                             |
-| `opposite`                    | draw the patterns at their people, half a turn away, or both (the copies winning) |
-| `lean_share`                  | how far a lean hands the arms' pull to one colour (*The connections*) |
-| `mask`                        | the mask's width, white and blue; the border's; the flash's levels, release |
-| `playhead`                    | the marker's width, white and blue; its level inside a mask     |
+| Group                         | What it holds                                                                                                           |
+|-------------------------------|-------------------------------------------------------------------------------------------------------------------------|
+| `max_lines`                   | the visual limit: the pitch ceiling                                                                                     |
+| `opposite`                    | draw the patterns at their people, half a turn away, or both (the copies winning)                                       |
+| `lean_share`                  | how far a lean hands the arms' pull to one color (*The connections*)                                                    |
+| `mask`                        | the mask's width, white and blue; the border's; the flash's levels, release                                             |
+| `playhead`                    | the marker's width, white and blue; its level inside a mask                                                             |
 | `window`                      | shape: taper, attack, release, their curves, the cap; reach: width, bypass; the scale, the crowd factor and the overlap |
-| `on_at`, `off_at`             | the full-sync band, shared into `sync_strobe`, `grow` and `blend` |
-| `full_sync`                   | read-only: the room's gate, open while every present pair holds the band (the show's sync end) |
-| `sync_strobe`                 | full sync's display: bypass, mode (invert or black), attack, release |
-| `grow`                        | full sync's reach: windows grow to the full circle; attack, release |
-| `blend`                       | full sync's union: everyone's measures to the room's mean; bypass, attack, release |
-| `white_lines`, `blue_lines`   | On, Mirror, Bypass All; a slot per parameter; the push          |
-| `white_strobe`, `blue_strobe` | Bypass All; a slot per parameter of the strobe (`LIGHT_SYNTH.md`, *The strobe*) |
-| `lfo`                         | the LFO: rate, phase, the level's slot                          |
-| `dummy`                       | *The dummy*                                                     |
+| `on_at`, `off_at`             | the full-sync band, shared into `sync_strobe`, `grow` and `blend`                                                       |
+| `full_sync`                   | read-only: the room's gate, open while every present pair holds the band (the show's sync end)                          |
+| `sync_strobe`                 | full sync's display: bypass, mode (invert or black), attack, release                                                    |
+| `grow`                        | full sync's reach: windows grow to the full circle; attack, release                                                     |
+| `blend`                       | full sync's union: everyone's measures to the room's mean; bypass, attack, release                                      |
+| `white_lines`, `blue_lines`   | On, Mirror, Bypass All; a slot per parameter; the push                                                                  |
+| `white_strobe`, `blue_strobe` | Bypass All; a slot per parameter of the strobe (`LIGHT_SYNTH.md`, *The strobe*)                                         |
+| `lfo`                         | the LFO: rate, phase, the level's slot                                                                                  |
+| `dummy`                       | *The dummy*                                                                                                             |
 
-The groups run from the person outward: the mask at the person, the marker that passes them, the
+The groups run from the player outward: the mask at the player, the marker that passes them, the
 window around them, then what fills the window, then the tool. The dead zones on what the body
 gives are the pipeline's settings (*The body*). Wherever a
 mark has a level per channel the two settings are `white` and `blue`.
@@ -546,11 +546,11 @@ slot has a **Bypass** (`pose_instrument.white_lines`, `pose_instrument.blue_line
 the parameter is its base while every other parameter keeps following the body, so a pose can be taken apart
 parameter by parameter; lifted, it follows again with its amount as it was. An oscillator's
 **Bypass All** button sets its five ticks at once, and pressed again with all set clears them, so
-the panel draws that colour for everyone, live people and the dummy alike, while the other colour
+the panel draws that color for everyone, live people and the dummy alike, while the other color
 and the LFO keep following the body; the ticks are the one state, and can be changed one by one
-after. An oscillator's **On** switch, off, draws nothing for that colour.
+after. An oscillator's **On** switch, off, draws nothing for that color.
 `window.width_bypass` holds both reaches at the width without a partner, presence still opening
-and closing them. What the body gives is read in the render's data graphs, per person.
+and closing them. What the body gives is read in the render's data graphs, per player.
 
 ### Tests
 
@@ -561,17 +561,17 @@ bridge in `test_pose_instrument.py`; the dummy in `test_dummy.py`.
 ### The pose results now
 
 Step 5's rows of *Pose results* draw what that table says, in the unit tests
-(`tests/test_pose_instrument.py`: the two fixed points, one shoulder moving both colours, level
+(`tests/test_pose_instrument.py`: the two fixed points, one shoulder moving both colors, level
 shoulders tiling, a held pose — lean included — still over many ticks, left and right up drawn
-differently with the phases pulled opposite ways, an elbow making its own colour finer, equal
+differently with the phases pulled opposite ways, an elbow making its own color finer, equal
 elbows in tune, a folded elbow lifting its arm and folded elbows drawing from hanging arms, the
-pull shared upright and handed to one colour by the lean, a lean alone playing nothing, the
+pull shared upright and handed to one color by the lean, a lean alone playing nothing, the
 fold's sign and the legs drawing nothing, and a small move of a shoulder or an elbow a small
 change of the picture). The rows beyond Step 5 wait on their connections (`MATRIX_V2.md`).
 
 ### The dummy
 
-The dummy (`pose/dummy.py`, settings `pose_instrument.dummy`) stands in for a person while the instrument is
+The dummy (`pose/dummy.py`, settings `pose_instrument.dummy`) stands in for a player while the instrument is
 judged: a figure whose joints and torso lean are set in the panel, each joint in degrees
 −180..180 from its rest (arms hanging, elbows and knees straight, standing). Its frame joins
 the poses before the LERP filters at its own id, `max_players`, so from there it is a pose like
@@ -598,7 +598,7 @@ Meaning and connections:
 - Which way is "right": a positive `TorsoTilt` is shoulders toward image right; which way that
   lean carries the lines on the wall is to be checked on the dummy
 - Which of the instrument's departures from the rules of meaning stay, once the result is liked
-- The lean moves the hips' reading by the lean, on the dummy as on a person, so at full lean the
+- The lean moves the hips' reading by the lean, on the dummy as on a player, so at full lean the
   leg deviation reads about 0.75 and whatever it plays sounds with the bend; whether the leg
   deviation should be taken against the vertical instead of the torso line
 - The symmetries: which of the four pairs earns a connection, and what it means
@@ -608,7 +608,7 @@ Meaning and connections:
 - The composition itself: which connections people find with their bodies
 - Whether the wiring of a connection is chosen in the panel or stays code, as `connect` is
 - Whether the sync strobe's inversion at every other frame fuses into one blended tone, the palette
-  collapsing at full room sync, or reads as flicker; and whether a colour-swap frame's seam on
+  collapsing at full room sync, or reads as flicker; and whether a color-swap frame's seam on
   the fixture is quieter or louder than a dark frame's — both to stand in front of
 
 Not yet in the design:
@@ -626,4 +626,4 @@ From the machine **(site facts)**:
   judged on location
 - Whether the 90-line limit holds with the moiré of two synced patterns
 - A pitched wide-FOV camera reads a small spurious body bend near the frame edges, a bend nobody
-  played; check a straight person at the edge
+  played; check a straight player at the edge

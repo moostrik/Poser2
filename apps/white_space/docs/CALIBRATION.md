@@ -123,8 +123,8 @@ The fixture puts light at an azimuth by two mechanisms. Both restart at the same
 sensor pulse, once per revolution, when a reflective line on the head passes the sensor.
 
 - **Beam mode** — commanded below `FIXTURE_PROJECTION_RPM` = 200 rpm (the firmware's `SLOW` flag).
-  The four lamps are seen as beams. The pulse says where the bar is; the playhead tracks it; the
-  playhead offset turns "angle since the pulse" into the front lamp's azimuth. It is tuned where it
+  The four beam lights are seen as beams. The pulse says where the bar is; the playhead tracks it; the
+  playhead offset turns "angle since the pulse" into the front beam light's azimuth. It is tuned where it
   is visible — the flash landing on a person — so it includes the loop's delay at that speed, which
   is correct because it is tuned at the speed it runs at.
 - **Projection mode** — commanded at or above 200 rpm. The bar is a blur and the image is painted
@@ -152,7 +152,7 @@ it is applied in the light sender. The two are independent; neither has to be tu
 
 ### The relation between the offsets
 
-A readout, not a step. With θ the front lamp's azimuth at the pulse and *d* the loop's output delay:
+A readout, not a step. With θ the front beam light's azimuth at the pulse and *d* the loop's output delay:
 
     projection offset = 90° − θ              (the 90° is the firmware's TEST = 900 px of 3600)
     playhead offset   = θ + d·rpm·6          (rpm·6 = degrees per second)
@@ -164,13 +164,13 @@ light tick and a frame on the wire cost.
 
 ### Interlacing
 
-In projection mode each channel is painted twice per revolution: by the lamp on one end of the bar
-and, half a turn later, by the lamp on the other end reading the pixel 1800 further on (`loop1`). The
+In projection mode each channel is painted twice per revolution: by the beam light on one end of the bar
+and, half a turn later, by the beam light on the other end reading the pixel 1800 further on (`loop1`). The
 two arms' LEDs are mounted out of phase, so one arm's LEDs fill the other's gaps (site fact) — the
-two halves interlace into one image. That only works if the lamps are exactly 180° apart and the blue
+two halves interlace into one image. That only works if the beam lights are exactly 180° apart and the blue
 pair exactly a quarter turn from the white; a degree off shows as a doubled line. The four interlace
 values (`inout.osc_light_sender.interlace`, sent as `/WS/o/0..3`, firmware `cor0..3`) shift each
-lamp's readout by a few pixels so the whites interlace, the blues interlace, and the blue image sits
+beam light's readout by a few pixels so the whites interlace, the blues interlace, and the blue image sits
 on the white. Projection mode only: below 200 rpm `loop1` writes pixels 0 and 1800 without them.
 
 ### Sound inherits the frame
@@ -198,7 +198,7 @@ machine).
 - **Speakers parallel to the faces, 10 cm off them**, pointing out, not touching the fixture (site
   fact). Speaker 0 on the connection side, then counter-clockwise, so Max needs no constant.
 - **Everything numbered from 0**, counter-clockwise from the connection side: `cam_0`…, `/pose/0`…,
-  `white_0` / `blue_0`. (The firmware's comments count lamps from 1; internal only.)
+  `white_0` / `blue_0`. (The firmware's comments count beam lights from 1; internal only.)
 
         face:   spk 0 (az 0) — connection side · seam cam 3 | cam 0    corner: cam 0 (→ 45)
         face:   spk 1 (az 90)                  · seam cam 0 | cam 1    corner: cam 1 (→ 135)
@@ -206,7 +206,7 @@ machine).
         face:   spk 3 (az 270)                 · seam cam 2 | cam 3    corner: cam 3 (→ 315)
 
 **What the layout buys:** the two offsets are not per-venue tunings. The playhead offset encodes where
-the reflective line sits on the head relative to the front lamp, plus the loop delay; the projection
+the reflective line sits on the head relative to the front beam light, plus the loop delay; the projection
 offset encodes the same plus the firmware's quarter turn. Both are properties of the build. Re-tune
 them only after the head, a strip or a lens has been remounted; in a new room, correct the placement,
 not the offsets.
@@ -459,8 +459,8 @@ The strip asks four questions, and reading them in order says which number to re
 |-----------------------------------------------------------------|--------------------------------------------------------------|
 | the two pictures coincide in an overlap                         | the lens and the mount: `lens_fov`, `fov`, `tilt`, roll      |
 | on taped R 1.5 and R 3.5, the foot tick lands on that zone edge | the distance chain: `camera_height`, the zone, `foot_offset` |
-| the gap between two lines of one colour at a seam               | how far that person is from R 2.1                            |
-| whether two fields of one colour overlap                        | the linking rules (*Reading the fields*)                     |
+| the gap between two lines of one color at a seam                | how far that person is from R 2.1                            |
+| whether two fields of one color overlap                         | the linking rules (*Reading the fields*)                     |
 
 The foot tick is the only metres on the strip, and exact (*Calibrating the metres*). The gap is a
 depth indicator, not an error: zero on the R 2.1 cylinder, up to 6.7° at the zone's edges
@@ -472,12 +472,12 @@ tick, which is the picture of the `R` beside it and the one thing on the strip t
 against a tape to the pixel. `H` is that person's height in metres (`TRACKING.md`, *The tracker's
 height*), and it is the one number on the strip that checks itself: a seam's two observations are at
 different distances and so have different box heights in pixels, but their `H` must agree — it is
-also what `seam.link_height` compares. Two labels of one colour showing different `H` means the
+also what `seam.link_height` compares. Two labels of one color showing different `H` means the
 distance model, the levelling or a camera's roll, before any of it reaches the azimuth. The primary
 view is opaque and 2 px; a passive view — another camera's view of the same person — is slightly
 dimmer and 1 px, its field only outlined, so at a seam the passive field's edges show inside or beyond
 the primary's fill. A label's height on the strip is a lane picked by its player slot — the same
-index its colour comes from, on the strip and in the pose row alike — so labels never collide and
+index its color comes from, on the strip and in the pose row alike — so labels never collide and
 never move as people do, and its x always sits on its own line. A person tracked but waiting for a
 free player slot is drawn in white with no lane, labelled `#- … waiting` at the top of their line.
 
@@ -511,8 +511,8 @@ So a person walking out keeps their own mark, fading, and when it has gone grey 
 | a constant sideways offset across the whole overlap       | `lens_fov` (the lens, not `fov`, which is the frame's span)  |
 | a residual on one camera's seams only                     | that unit's `lens_error`; F124 shows ≈ 1.4°                  |
 | a residual growing toward the frame edges on every camera | the lens is not equidistant — re-read the calibrations       |
-| two lines of one colour on a seam, opening and closing    | nothing — the depth indicator, 0 at R 2.1, 6.7° at the edges |
-| two lines of one colour further apart than 6.7°, anywhere | the azimuth chain — `fov`, `tilt` or `camera_radius`         |
+| two lines of one color on a seam, opening and closing     | nothing — the depth indicator, 0 at R 2.1, 6.7° at the edges |
+| two lines of one color further apart than 6.7°, anywhere  | the azimuth chain — `fov`, `tilt` or `camera_radius`         |
 | every line sits beside its own pixels                     | `focus_radius` differs from `tracker.rig.parallax_radius`    |
 | the strong line flips between two cameras at a seam       | `tracker.seam.hysteresis`, `tracker.seam.hold`               |
 
@@ -611,7 +611,7 @@ live slider, so this exercises the entire geometry in two drags.
 
 ### Reading the fields
 
-Each observation's line sits inside a translucent field of its own colour, the same height as the
+Each observation's line sits inside a translucent field of its own color, the same height as the
 line, as wide as the rule that decides what that observation may be joined to: `seam.link_angle`
 where a second camera also sees it, `reacquire_angle` where none does. So the width says which rule
 owns that part of the turn, and walking one person from mid-field to a seam visibly widens their field
@@ -620,8 +620,8 @@ as the second camera picks them up. The rules themselves are in `TRACKING.md`, *
 
 **Read it as a pair test.** The field is the rule's angle wide rather than that much either side of
 the line: both gates have the form `|Δ| ≤ angle`, so two fields each `angle` wide touch at exactly the
-difference the gate allows. Two fields of one colour that overlap are two observations the tracker
-will join; two colours that overlap are two people it might confuse. Fields of ±`angle` would overlap
+difference the gate allows. Two fields of one color that overlap are two observations the tracker
+will join; two colors that overlap are two people it might confuse. Fields of ±`angle` would overlap
 out to twice the gate and claim links that never happen — at `link_angle` 15 they would show a link
 for two views 30° apart. `modules/render/tests/test_marks.py` asserts that drawn overlap and
 `Seams._observations_match` agree case for case.
@@ -638,7 +638,7 @@ Two things the field does not say:
 The footer prints all of it — `dead 6.5°  link 15.0°/0.20  reacquire 7.0°` on the studio preset — so a
 width on screen can be checked against the number that produced it.
 
-**Setting the seam values.** One person crossing a seam keeps two overlapping fields of one colour with
+**Setting the seam values.** One person crossing a seam keeps two overlapping fields of one color with
 their arms down; two people a metre apart do not overlap at all. What `link_angle` has to cover —
 the body and the parallax residual — is tabled in `TRACKING.md`, *Linking on a seam*.
 
@@ -760,7 +760,7 @@ the measured motor phase while locked and adds it (`light/playhead.py`). (The pe
 - The hit that starts INTRO, and whose pose `HitSync` records, is the tick the playhead is closest to the
   person, the same tick the flash lights (`pose/playhead_offset.py`, `PlayheadCrossing`). A wrong offset
   fires the intro early or late.
-- The bar simulation on screen draws the four lamps at this heading.
+- The bar simulation on screen draws the four beam lights at this heading.
 - Max receives it as `/global/playhead`.
 
 Calibrating it aligns all three consumers at once. The flash lights the `frames` ticks closest to the
@@ -796,7 +796,7 @@ Across a spin-up and a spin-down the playhead is never reset; only its rate sour
 - `light.brightness` and the sender's `curve` / `lower_edge` / `upper_edge` — brightness, not
   position.
 
-**The four lamps**, relative to the front white in the bar's direction: back white +180°, `blue[0]`
+**The four beam lights**, relative to the front white in the bar's direction: back white +180°, `blue[0]`
 −90°, `blue[R/2]` +90° — what `BEAM_LIGHT_HEADINGS` (`light/frame.py`) encodes. Standing at the
 fixture facing along the front beam, `blue[0]` is on the right; the code and the fixture's labels call
 it "left" (site fact), reading from the wall looking at the fixture. Which physical strip is wired to
@@ -808,12 +808,12 @@ it "left" (site fact), reading from the wall looking at the fixture. Which physi
 
 **Beam layers** write the four beam lights by name — `front_white`, `back_white`, `left_blue`,
 `right_blue` on `LightFrame.beam_lights` — and nothing else (`layers/_base_layer.py`, `BeamLayer`). No
-calibration of their own: the lamp shines where the bar points, and where that is as an azimuth is the
+calibration of their own: the beam light shines where the bar points, and where that is as an azimuth is the
 playhead. The sender copies them into the pixels the firmware reads in beam mode (pixel 0 and 1800 of
 each channel, `FIRMWARE_LIGHT_SLOT_AZIMUTHS`), which the projection offset and interlace cannot reach. A
 beam layer that reacts to people (`beam_flash`) depends on `PlayheadOffset`.
 
-**Projection layers** draw the projection at normalized azimuths — `pose_instrument` at each person's
+**Projection layers** draw the projection at normalized azimuths — `pose_instrument` at each player's
 `Azimuth` and its playhead marker at the playhead (`ProjectionLayer`). No calibration of their own: they
 author in azimuth, and the sender applies the projection offset and interlace on the way out.
 
@@ -837,20 +837,20 @@ Neither is show state, so neither is zeroed on a blackout: a fader must read tru
 and a calibration must not snap to 0 between shows.
 
 **The return path:** `/WS/idle/blue/left` and `/WS/idle/blue/right` → `beam_blue_sound` → the left and right blue
-lamps (named after the fixture's blue-left / blue-right; nothing to do with stereo). No alignment; the
-lamps turn with the bar.
+beam lights (named after the fixture's blue-left / blue-right; nothing to do with stereo). No alignment; the
+beam lights turn with the bar.
 
 ---
 
 ## Screen
 
 Two simulations share the `ws_light` row, and the render draws whichever matches the fixture's mode
-(`render/render.py`): the beam view in beam mode draws the four lamps at the playhead heading; the projection
+(`render/render.py`): the beam view in beam mode draws the four beam lights at the playhead heading; the projection
 view in projection mode shows the projection as it leaves the compositor. Both are azimuth-true,
 because the projection offset is applied in the sender and never touches the frame on the board.
 
 **The check, no hardware needed:** in projection mode the projection view's playhead line must sit under the
-beam view's front lamp and the tracker row's person, and a spin-up must not move it. The screen shows
+beam view's front beam light and the tracker row's person, and a spin-up must not move it. The screen shows
 the room's angles; only the wall shows what the fixture makes of them.
 
 ---
@@ -942,7 +942,7 @@ to check against the parts.
 
     playhead offset:    262.8°                                   (tuned — re-check with the flash)
     projection offset:  198.0°                                   (tuned — re-check with the projected line)
-    front lamp at pulse: θ = 252°                                (derived from the two)
+    front beam light at pulse: θ = 252°                          (derived from the two)
     loop delay, beam:   ≈ 50 ms (42–58) at 36 rpm                (derived — the 10.8° residual)
     interlace:          white_1 +5, blue_0 −10, blue_1 +9 px     (tuned)
     resolution / tilt:  target P800, tilt 16°                    (the table under Camera; next recording)

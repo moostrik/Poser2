@@ -7,7 +7,7 @@ tunables live in the `states` settings group; each state returns its mix from `u
 Vocabulary:
 
 - **P** — the live player count: the LERP poses on the board (`LAYERS.md`, *Inputs*). Presence is the
-  pose itself; how long a person keeps one after their last detection is
+  pose itself; how long a player keeps one after their last detection is
   `pose.tracklets.detection_timeout` (`modules/tracker/poses_from_tracklets.py`)
 - **min_players** — `states.min_players`, the players the show needs (`studio.json`: 2): that many alike hits
   in a row spin it up, fewer present end it, and END winds back to PLAY once they are back
@@ -131,7 +131,7 @@ The graph is the stand-alone show; the exact conditions and their settings are i
 
 **A hit starts the intro, from every lit idle state.** S1 OFF_IDLE, S2 IDLE, S3 IDLE_INTRO and S5
 INTRO_IDLE each take the hit first, above their own timed or count condition: in all four the
-searchlight is the visible sweep and the playhead is locked, so the hit is an event the person sees
+searchlight is the visible sweep and the playhead is locked, so the hit is an event the player sees
 land on them, and waiting a bar for the next pass would read as the light ignoring them. The
 exclusions follow from the same sentence. **S0 OFF** is not idle, it is off — dark and possibly
 blackout-pinned. **S9 END_INTRO / S10 END_IDLE / S11 PLAY_INTRO** are the wind-downs: the wall of white
@@ -239,7 +239,7 @@ dropped into the middle of INTRO.
 ## S2 — IDLE
 
 The white searchlight (playhead) spins slowly through the empty space, supported by an atmospheric
-soundscape that evokes curiosity and plays on both blue lamps.
+soundscape that evokes curiosity and plays on both blue beam lights.
 
 - **Players**: 0 · **Duration**: ∞, or until hit · **Motor**: BEAM
 - **Transitions**
@@ -255,13 +255,13 @@ soundscape that evokes curiosity and plays on both blue lamps.
 
 Someone has entered. The searchlight keeps sweeping at full brightness, but the sound is already stirring:
 the pose instrument starts a little *before* the actual hit — this anticipation is the reason the state
-exists. When the bright beam strikes the person the intro begins: the line snaps to dim and the soundscape
+exists. When the bright beam strikes the player the intro begins: the line snaps to dim and the soundscape
 stops.
 
 - **Players**: > 0 · **Duration**: until hit · **Motor**: BEAM
 - **Transitions**
   1. hit by light → S4 INTRO
-  2. P == 0 → S5 INTRO_IDLE *(the person left before being hit; INTRO_IDLE ramps from its entry
+  2. P == 0 → S5 INTRO_IDLE *(the player left before being hit; INTRO_IDLE ramps from its entry
      brightness, so the pass-through causes no dip)*
 - **Mix**: `beam_playhead` 1.0 · `beam_blue_sound` 1.0
 - **White**: BRIGHT line — `beam_playhead` full
@@ -305,7 +305,7 @@ the soundscape fades back in.
   1. hit → S4 INTRO
   2. bars ≥ `intro_idle_bars` → S2 IDLE
 - **Mix**: `beam_playhead` ramp(entry level → 1.0) · `beam_blue_sound` ramp(entry level → 1.0)
-- **White**: fade DIM → BRIGHT, from wherever the lamp was on entry — no dip
+- **White**: fade DIM → BRIGHT, from wherever the beam light was on entry — no dip
 - **Blue**: fade-in sound visuals, also from the entry level (0 arriving from INTRO, already 1.0 on the
   IDLE_INTRO pass-through — no blink)
 - **Pose sound**: no
@@ -392,7 +392,7 @@ It is timed rather than driven by the measured deceleration because the sensor i
   `beam_wind_down` (reset on entry). The dim line sits underneath from the start and is *revealed* as the
   wall dies, so there is no splice and no seam into INTRO (the front sums past full and clips until the
   wall drops away; monotonic to DIM)
-- **White**: both white lamps fade BRIGHT → gone over `spin_down_seconds`; the front lands on the dim line
+- **White**: both white beam lights fade BRIGHT → gone over `spin_down_seconds`; the front lands on the dim line
   underneath, the back goes out
 - **Blue**: none
 - **Pose sound**: fade out distortion?
@@ -411,9 +411,9 @@ holds — landing on the BRIGHT line instead of the dim one.
 - **Transitions**
   1. fade complete (`progress` ≥ 1) and playhead lock → S2 IDLE
 - **Mix**: `beam_wind_down` 1.0 · `beam_playhead` 1.0 · `beam_blue_sound` p — the line at constant full
-  underneath the dying wall (the front lamp clips at full throughout: constant BRIGHT, no seam into IDLE);
+  underneath the dying wall (the front beam light clips at full throughout: constant BRIGHT, no seam into IDLE);
   the sound visuals fade in on p = the layer's fade readout
-- **White**: stays BRIGHT — the front is at full the whole way, while the back lamp rides the wall down and
+- **White**: stays BRIGHT — the front is at full the whole way, while the back beam light rides the wall down and
   goes out over `spin_down_seconds`
 - **Blue**: sound visuals fade in with the wall's fade
 - **Pose sound**: fade out distortion?
@@ -429,8 +429,8 @@ under the sync strobe. The same engine as S9 — the wall owns the timed fade ov
 is complete and the playhead lock holds — but the wall is `beam_sync_wind_down`, the **strobing wall**
 (`LAYERS.md`, *beam_wind_down*). BEAM is commanded at once and the fixture reads beam mode from the first
 packet, so the instrument's picture gives way to the wall in one frame, and the sync strobe carries
-across: on the lamps, on the strobes' shared tick grid at the top rung, in the instrument's mode
-(`pose_instrument.sync_strobe.mode`: INVERT swaps the wall to the blue lamps, BLACK blanks it), until the fade has
+across: on the beam lights, on the strobes' shared tick grid at the top rung, in the instrument's mode
+(`pose_instrument.sync_strobe.mode`: INVERT swaps the wall to the blue beam lights, BLACK blanks it), until the fade has
 taken the wall. The instrument is reset on entry: it is done, and `pose_instrument.full_sync` reads off from here
 until S6 starts the next one. The intro it lands in is disarmed (S4): the room is still posing, and the
 show spins up again only once the hits have been out of sync for `intro_grace_seconds`.
@@ -440,7 +440,7 @@ show spins up again only once the hits have been out of sync for `intro_grace_se
   1. fade complete (`progress` ≥ 1) and playhead lock → S4 INTRO
 - **Mix**: `beam_sync_wind_down` 1.0 · `beam_playhead` DIM — S9's mix with the strobing wall;
   `beam_sync_wind_down` and `pose_instrument` reset on entry
-- **White**: the wall from the first packet, both lamps fading to gone over `spin_down_seconds`, off on
+- **White**: the wall from the first packet, both beam lights fading to gone over `spin_down_seconds`, off on
   strobe frames; the front lands on the dim line underneath, which does not strobe
 - **Blue**: the wall on strobe frames (INVERT), fading with the white; none in BLACK
 - **Pose sound**: open

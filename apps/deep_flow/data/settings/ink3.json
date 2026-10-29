@@ -229,7 +229,7 @@
     "layer": {
       "select": {
         "left": [
-          "centre_frg"
+          "center_foreground"
         ],
         "right": [
           "fluid3d"
@@ -287,14 +287,14 @@
         "pose_line_width": 2.0,
         "bbox_line_width": 2
       },
-      "poser": {
+      "pose": {
         "stage": "LERP",
         "line_width": 2.0,
         "line_smooth": 0.0,
         "use_gpu_crop": true
       }
     },
-    "centre": {
+    "center": {
       "geometry": {
         "stage": "SMOOTH",
         "cam_aspect": 1.7778,
@@ -316,7 +316,7 @@
         "mask_opacity": 1.0,
         "use_mask": true
       },
-      "frg": {
+      "foreground": {
         "blend_factor": 0.2,
         "exposure": 0.99,
         "gamma": 1.0,
@@ -352,8 +352,8 @@
       "width": 896,
       "height": 1600,
       "inputs": {
-        "flow": "centre_frg",
-        "density": "centre_frg"
+        "flow": "center_foreground",
+        "density": "center_foreground"
       },
       "visualization": {
         "toggle_scalar": false,

@@ -22,7 +22,7 @@
         "pose_line_width": 2.0,
         "bbox_line_width": 2
       },
-      "poser": {
+      "pose": {
         "stage": "LERP",
         "line_width": 2.0,
         "line_smooth": 0.0,

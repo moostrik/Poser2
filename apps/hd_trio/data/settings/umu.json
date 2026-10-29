@@ -436,14 +436,14 @@
         "pose_line_width": 2.0,
         "bbox_line_width": 2
       },
-      "poser": {
+      "pose": {
         "stage": "LERP",
         "line_width": 2.0,
         "line_smooth": 0.0,
         "use_gpu_crop": true
       }
     },
-    "centre": {
+    "center": {
       "geometry": {
         "stage": "SMOOTH",
         "cam_aspect": 1.7778,
@@ -465,7 +465,7 @@
         "mask_opacity": 1.0,
         "use_mask": true
       },
-      "frg": {
+      "foreground": {
         "blend_factor": 0.2,
         "exposure": 1.2,
         "gamma": 1.0,

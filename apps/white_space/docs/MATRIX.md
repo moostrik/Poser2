@@ -53,7 +53,7 @@ Option 3 adds the breath, a source the instrument makes in time (*Option 3 Matri
 
 ## Option 1 Matrix
 
-The base matrix with each elbow on its colour's pitch. Speed is not the arms'. The pitch's base
+The base matrix with each elbow on its color's pitch. Speed is not the arms'. The pitch's base
 and amount are the preset's: 25.7 lines (one every 14°) straight, 72 (one every 5°) folded.
 
 | Oscillator | Parameter   | Source              | Base | Amount |
@@ -69,19 +69,19 @@ and amount are the preset's: 25.7 lines (one every 14°) straight, 72 (one every
 | blue       | speed       |                     |      |        |
 | blue       | hardness    |                     | 1    |        |
 
-Folding an elbow makes its own colour's lines finer; equal elbows keep white and blue in tune,
-unequal ones slide the colours apart. With both arms hanging or both raised the colours are
+Folding an elbow makes its own color's lines finer; equal elbows keep white and blue in tune,
+unequal ones slide the colors apart. With both arms hanging or both raised the colors are
 solid and dark, so a folded elbow does not show there: rules 1 and 2 rank above rule 4.
 
-The shoulder difference moves the two colours' lines opposite ways: level shoulders leave them
+The shoulder difference moves the two colors' lines opposite ways: level shoulders leave them
 alternating, blue half an interval from white; the left higher brings them a quarter interval
 closer on one side, the right higher on the other. ⅛ each keeps those two furthest apart: at ¼
 each, left higher and right higher would draw the same lines, as a phase repeats every interval.
-The difference is large only with one arm up and the other not, where both colours are lines.
+The difference is large only with one arm up and the other not, where both colors are lines.
 
 ## Option 2 Matrix
 
-Option 1 with each elbow's turn on its colour's speed: the elbow bent +90° flows its colour one
+Option 1 with each elbow's turn on its color's speed: the elbow bent +90° flows its color one
 way, −90° the other, straight and fully folded leave it at its base. The speed's base and amount
 are the preset's.
 
@@ -100,10 +100,10 @@ are the preset's.
 
 The turn is a sine so that the flow is still at full fold: there +180° and −180° are one pose,
 and a turn read straight from the angle would reverse the flow at once as the elbow crosses it.
-Each elbow plays its own colour whole: how fine its lines are and which way they flow. Unequal
-turns set the colours flowing at their own speeds, apart or opposite. The sign of the turn is the
+Each elbow plays its own color whole: how fine its lines are and which way they flow. Unequal
+turns set the colors flowing at their own speeds, apart or opposite. The sign of the turn is the
 side the forearm folds to, which the pitch, on the absolute angle, does not see; the extractor
-mirrors the right arm, so both forearms folded alike flow both colours alike, and which fold flows
+mirrors the right arm, so both forearms folded alike flow both colors alike, and which fold flows
 outward is the sign of the amount.
 
 ## Option 3 Matrix
@@ -111,12 +111,12 @@ outward is the sign of the amount.
 Option 2 with a breathing width. The instrument makes the breath as part of the source it hands
 to each pulse width slot, as it makes the mask's
 flash: the shoulders' mean sets where the width rests, and the higher shoulder makes its own
-colour's width swing around it. The synth is unchanged. The phases go: they showed the shoulder
+color's width swing around it. The synth is unchanged. The phases go: they showed the shoulder
 difference only while moving.
 
 | Source      | What it is                                                               |
 |-------------|--------------------------------------------------------------------------|
-| breath      | a sine in time, −1..1, at the breath's rate (0.5 Hz), one per person     |
+| breath      | a sine in time, −1..1, at the breath's rate (0.5 Hz), one per player     |
 | white width | shoulders + depth × left excess × breath                                 |
 | blue width  | shoulders + depth × right excess × breath                                |
 | white flow  | left elbow turn + body bend                                              |
@@ -137,7 +137,7 @@ The depth is a setting, 0.4; at most ½ (below).
 | blue       | speed       | blue flow        | −4.5°/s | 15°/s  |
 | blue       | hardness    |                  | 1       |        |
 
-One breath serves both colours: only one shoulder can be the higher, so only one colour breathes
+One breath serves both colors: only one shoulder can be the higher, so only one color breathes
 at a time. The body bend is not the arms', but shares the speed slots with the elbow turns: white
 drifts outward and blue inward, so a bend added to both with one sign makes the white faster and
 the blue slower one way, the reverse the other. A turn and a lean share the amount, so they add
@@ -154,7 +154,7 @@ or cancel.
 Level shoulders have no excess, so both widths are still at neutral, at raised and in a T. One
 shoulder can only be much higher than the other where the mean is well inside 0..1: the excess is
 at most twice the smaller of the mean and one less the mean, so with a depth of ½ or less a breath
-never passes full or none, and the width reaches both fixed points exactly. The breathing colour
+never passes full or none, and the width reaches both fixed points exactly. The breathing color
 no longer tiles with the still one: as it swells past the other's gap the overlap tone shows, as
 it thins, dark.
 
@@ -163,14 +163,14 @@ it thins, dark.
 The first build's last option, the one played on location: Option 3 with the breath symmetric,
 the turns on the phases and the speed the body bend's alone.
 
-Both colours breathe, as far as the shoulders are apart; which shoulder is the higher sets the
-relation between them, not which one breathes. One colour breathing while the other stood still
+Both colors breathe, as far as the shoulders are apart; which shoulder is the higher sets the
+relation between them, not which one breathes. One color breathing while the other stood still
 read as one arm doing much more than the other, since white breathing shows far stronger than
 blue.
 
 | Source      | What it is                                                               |
 |-------------|--------------------------------------------------------------------------|
-| breath      | a sine in time, −1..1, at the breath's rate (0.5 Hz), one per person     |
+| breath      | a sine in time, −1..1, at the breath's rate (0.5 Hz), one per player     |
 | gap         | how far apart the shoulders are: the difference, unsigned                |
 | swing       | depth × gap × breath                                                     |
 | white width | shoulders + swing                                                        |
@@ -199,7 +199,7 @@ The depth is a setting, 0.4; at most ½ (below).
 | left up, right hanging | ½, breathing        | ½, breathing in step          |
 | right up, left hanging | ½, breathing        | ½, breathing complementary    |
 
-Blue's slot inverts its source, so the same swing on both is the two colours breathing together,
+Blue's slot inverts its source, so the same swing on both is the two colors breathing together,
 between dark and the overlap tone, and the opposite swing keeps them complementary, the boundary
 between them sliding. The sign turns where the shoulders are level and the swing is 0 there, so
 nothing jumps. Level shoulders have no gap, so neutral, raised and a T are still; the gap is at
@@ -207,8 +207,8 @@ most twice the smaller of the mean and one less the mean, so a depth of ½ or le
 width past none or full and both fixed points stay exact.
 
 The speed is the body bend's alone, its base 0: a straight body leaves the lines standing and
-every movement of a still pose comes from moving the arms. A lean carries both colours the same
-way, the amounts being the knobs if they should ever counter-flow. A turn shifts its own colour's
+every movement of a still pose comes from moving the arms. A lean carries both colors the same
+way, the amounts being the knobs if they should ever counter-flow. A turn shifts its own color's
 lines a quarter interval at ±90° and holds them where they are.
 
 ## Parked
@@ -217,13 +217,13 @@ lines a quarter interval at ±90° and holds them where they are.
   side leaned to and inward on the other. Each mirrored oscillator then needs a travel per side,
   and a choice: after the lean the sides keep the offset they gained, or ease back into mirror.
 - The body bend as the voice's time rate, a multiplier on every tick's time step: both speeds,
-  their bases and the push scaled at once, the elbows still choosing each colour's direction.
+  their bases and the push scaled at once, the elbows still choosing each color's direction.
   Signed, base 1 and amount 1: a lean one way slows the lines to a standstill, the other way
   doubles them. A new parameter of the synth (`LIGHT_SYNTH.md`, *Distance and time*: the clock).
 - The spread, a relation knob of the voice: one parameter with a slot of its own, added half to
-  white's phase and half, negated, to blue's after their slots. Its source merges the colours
+  white's phase and half, negated, to blue's after their slots. Its source merges the colors
   from tiled (anti-phase) to stacked (in phase, the overlap tone with dark between) and back,
   without touching what the phase slots say. A new parameter of the synth.
 - The slide, the spread's sibling: the same shape added equally to both phases, so the whole
-  pattern is pushed out of the person or drawn in, springing back — a displacement, bounded
+  pattern is pushed out of the player or drawn in, springing back — a displacement, bounded
   under one interval since a phase wraps. A new parameter of the synth.

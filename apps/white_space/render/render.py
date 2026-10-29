@@ -77,7 +77,7 @@ class WhiteSpaceRender(RenderBase):
             self.L[Layers.pose][i]     = layers.PoseCompositor(
                 i, board,
                 fallback_cam_texture,
-                settings.preview.poser,
+                settings.preview.pose,
                 settings.colors,
             )
             self.L[Layers.data_W][i]    = layers.FeatureWindowLayer(i, board, settings.data, settings.colors) # type: ignore
@@ -92,8 +92,8 @@ class WhiteSpaceRender(RenderBase):
         d = self.dummy_id
         self.L[Layers.dummy_pose][d] = layers.PoseLineLayer(d, board, layers.PoseLineLayerSettings(
             stage=int(Stage.LERP),
-            line_width=settings.preview.poser.line_width,
-            line_smooth=settings.preview.poser.line_smooth,
+            line_width=settings.preview.pose.line_width,
+            line_smooth=settings.preview.pose.line_smooth,
             use_scores=True, use_bbox=False, color=Color(1.0, 1.0, 1.0),
         ))
         self.L[Layers.data_W][d]    = layers.FeatureWindowLayer(d, board, settings.data, settings.colors) # type: ignore

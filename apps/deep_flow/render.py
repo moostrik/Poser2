@@ -16,13 +16,13 @@ from .settings import Layers, RenderSettings
 UPDATE_LAYERS: list[Layers] = [
     Layers.cam_image,
     Layers.cam_mask,
-    Layers.cam_frg,
+    Layers.cam_foreground,
     Layers.cam_crop,
 
-    Layers.centre_geom,
-    Layers.centre_mask,
-    Layers.centre_frg,
-    Layers.centre_pose,
+    Layers.center_geometry,
+    Layers.center_mask,
+    Layers.center_foreground,
+    Layers.center_pose,
 
     Layers.color_mask,
     Layers.flow,
@@ -31,8 +31,8 @@ UPDATE_LAYERS: list[Layers] = [
 ]
 
 INTERFACE_LAYERS: list[Layers] = [
-    Layers.poser,
     Layers.tracker,
+    Layers.pose,
     Layers.cam_readings,
 ]
 
@@ -72,22 +72,22 @@ class DeepFlowRender(RenderBase):
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.board)
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.board)
-            cam_frg =       self.L[Layers.cam_frg][i] =     ls.ForegroundSourceLayer(i, self.board)
+            cam_foreground = self.L[Layers.cam_foreground][i] = ls.ForegroundSourceLayer(i, self.board)
             cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.board)
 
-            cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.board,   cam_image.texture,          settings.preview.tracker,   settings.colors)
-            track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.board,   cam_image.texture,          settings.preview.poser,     settings.colors)
+            tracker_compositor = self.L[Layers.tracker][i] = ls.TrackerCompositor(  i, self.board,   cam_image.texture,          settings.preview.tracker,   settings.colors)
+            pose_compositor = self.L[Layers.pose][i] =      ls.PoseCompositor(      i, self.board,   cam_image.texture,          settings.preview.pose,      settings.colors)
             self.L[Layers.cam_readings][i] =                 ls.CameraReadingsLayer( cameras[i], camera_check)
 
-            centre_gmtry =  self.L[Layers.centre_geom][i] = ls.CenterGeometry(      i, self.board,                               settings.centre.geometry)
-            centre_mask =   self.L[Layers.centre_mask][i] = ls.CenterMaskLayer(     i, centre_gmtry,    cam_mask.texture,           settings.centre.mask)
-            cmt[i] = centre_mask.texture
-            centre_cam =    self.L[Layers.centre_cam][i] =  ls.CenterCamLayer(      i, centre_gmtry,    cam_image.texture,  cmt[i], settings.centre.cam)
-            centre_frg =    self.L[Layers.centre_frg][i] =  ls.CenterForegroundLayer(i, centre_gmtry,   cam_frg.texture,    cmt[i], settings.centre.frg,        settings.colors)
-            centre_pose =   self.L[Layers.centre_pose][i] = ls.CenterPoseLayer(     i, centre_gmtry,                                settings.centre.pose,       settings.colors)
+            center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, self.board,                               settings.center.geometry)
+            center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask.texture,           settings.center.mask)
+            cmt[i] = center_mask.texture
+            center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image.texture,  cmt[i], settings.center.cam)
+            center_foreground = self.L[Layers.center_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, cam_foreground.texture, cmt[i], settings.center.foreground, settings.colors)
+            center_pose =   self.L[Layers.center_pose][i] = ls.CenterPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
 
-            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,   centre_frg.texture, cmt,    settings.centre.color,      settings.colors)
-            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,   cam_mask,  centre_mask.texture, centre_frg.texture,     settings.flow)
+            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,   center_foreground.texture, cmt, settings.center.color,     settings.colors)
+            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,   cam_mask,  center_mask.texture, center_foreground.texture, settings.flow)
             fluid3d =       self.L[Layers.fluid3d][i] =     ls.Fluid3DLayer(        i, self.board,   flows,                      settings.fluid3d,           settings.colors)
 
             composite =     self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid3d, ms_mask],         settings.layer.composite)
@@ -104,7 +104,7 @@ class DeepFlowRender(RenderBase):
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, False)
 
-        # Propagate window fps to fluid simulation config
+        # Propagate window fps to fluid simulation settings
         def _propagate_fps(fps: int) -> None:
             settings.fluid3d.fluid_flow.fps = fps
         settings.window.bind(WindowSettings.avg_fps, _propagate_fps)
@@ -155,9 +155,9 @@ class DeepFlowRender(RenderBase):
                 flow_layer.set_density_input(self.L[density_key][i].texture)
 
         composite_keys: list[Layers] = self.settings.layer.select.composite
-        for i, _comp_layer in self.L[Layers.composite].items():
-            comp_layer = cast(ls.CompositeLayer, _comp_layer)
-            comp_layer.set_layers([
+        for i, _composite_layer in self.L[Layers.composite].items():
+            composite_layer = cast(ls.CompositeLayer, _composite_layer)
+            composite_layer.set_layers([
                 self.L[key][i] for key in composite_keys
                 if key in self.L and i in self.L[key]
             ])
