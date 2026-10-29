@@ -44,7 +44,7 @@ class _RaisingInterpolator(InterpolatorNode):
             raise RuntimeError("boom")
         self._pose = pose
 
-    def update(self) -> Frame | None:
+    def update(self, now: float) -> Frame | None:
         if self._raise_in == 'update' and self._pose is not None and self._pose.track_id == self._track_id:
             raise RuntimeError("boom")
         return self._pose

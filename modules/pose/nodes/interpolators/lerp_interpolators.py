@@ -55,10 +55,10 @@ class FeatureLerpInterpolator(FeatureInterpolatorBase[LerpInterpolatorSettings])
 
     def _on_settings_changed(self, _=None) -> None:
         """Handle configuration changes by updating interpolator parameters."""
+        super()._on_settings_changed()
         with self._lock:
             # Cast to VectorLerp to access input_frequency property
             cast(Lerp, self._interpolator).input_frequency = self.settings.input_frequency
-            self._output_interval = 1.0 / self.settings.output_frequency
 
 
 # Convenience classes

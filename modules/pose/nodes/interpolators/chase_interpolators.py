@@ -65,11 +65,11 @@ class FeatureChaseInterpolator(FeatureInterpolatorBase[ChaseInterpolatorSettings
 
     def _on_settings_changed(self, _=None) -> None:
         """Handle configuration changes by updating interpolator parameters."""
+        super()._on_settings_changed()
         with self._lock:
             cast(Chase, self._interpolator).input_frequency = self.settings.input_frequency
             cast(Chase, self._interpolator).responsiveness = self.settings.responsiveness
             cast(Chase, self._interpolator).friction = self.settings.friction
-            self._output_interval = 1.0 / self.settings.output_frequency
 
 
 # Convenience classes

@@ -33,6 +33,7 @@ from .filters.rate_limiters import              RateLimiterSettings,  BBoxRateLi
 from .filters.easing_node import                EasingNodeSettings,   EasingNode,         AngleMotionEasingNode
 from .filters.temporal_stabilizers import       TemporalStabilizerSettings,   BBoxTemporalStabilizer, PointTemporalStabilizer,    AngleTemporalStabilizer,    AngleVelocityTemporalStabilizer, AngleSymmetryTemporalStabilizer
 
+from .interpolators.base_interpolator import    TickStep
 from .interpolators.chase_interpolators import  ChaseInterpolatorSettings,    BBoxChaseInterpolator,  PointChaseInterpolator, AngleChaseInterpolator, AngleVelocityChaseInterpolator,  AngleSymmetryChaseInterpolator,  SimilarityChaseInterpolator,    AzimuthChaseInterpolator,   DistanceChaseInterpolator
 from .interpolators.lerp_interpolators import   LerpInterpolatorSettings,     BBoxLerpInterpolator,   PointLerpInterpolator,  AngleLerpInterpolator,  AngleVelocityLerpInterpolator,   AngleSymmetryLerpInterpolator
 

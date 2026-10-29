@@ -62,12 +62,12 @@ class AzimuthChaseInterpolatorTest(unittest.TestCase):
     def test_chases_across_pi_the_short_way(self) -> None:
         interpolator = AzimuthChaseInterpolator(ChaseInterpolatorSettings())
         interpolator.set(_azimuth_frame(0, math.pi - 0.1))
-        interpolator.update()
+        interpolator.update(0.0)
         target = -math.pi + 0.1
         interpolator.set(_azimuth_frame(1, target))
         value = math.pi - 0.1
-        for _ in range(60):
-            out = interpolator.update()
+        for tick in range(1, 61):                                      # 60 Hz ticks
+            out = interpolator.update(tick / 60.0)
             assert out is not None
             value = out[Azimuth].value
             # The chase may overshoot a little; the long way round would pass through 0.
