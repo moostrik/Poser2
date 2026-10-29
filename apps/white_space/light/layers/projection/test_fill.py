@@ -1,4 +1,4 @@
-"""TestFill composition — uniform flat colour per channel."""
+"""TestFill composition — uniform flat color per channel."""
 
 import numpy as np
 

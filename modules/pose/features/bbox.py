@@ -97,8 +97,8 @@ BBoxFeature-Specific:
 
 BBoxProperty Enum (bounding box components):
 --------------------------------------------
-  • centre_x (0)  - Center X coordinate
-  • centre_y (1)  - Center Y coordinate
+  • center_x (0)  - Center X coordinate
+  • center_y (1)  - Center Y coordinate
   • width (2)     - Bounding box width
   • height (3)    - Bounding box height
 
@@ -118,7 +118,7 @@ Factory from Rect:
 Value Constraints:
 ------------------
   • Width and height cannot be 0.0 (use NaN for missing dimensions)
-  • Centre coordinates can be any value (unbounded)
+  • Center coordinates can be any value (unbounded)
   • All values are smoothed independently (aspect ratio may change)
 
 Use Cases:
@@ -129,8 +129,8 @@ Use Cases:
 
 2. Smoothing Over Time:
    >>> # Smooth each component independently
-   >>> smoothed_cx = smooth(bbox[BBoxProperty.centre_x])
-   >>> smoothed_cy = smooth(bbox[BBoxProperty.centre_y])
+   >>> smoothed_cx = smooth(bbox[BBoxProperty.center_x])
+   >>> smoothed_cy = smooth(bbox[BBoxProperty.center_y])
    >>> smoothed_w = smooth(bbox[BBoxProperty.width])
    >>> smoothed_h = smooth(bbox[BBoxProperty.height])
 
@@ -165,8 +165,8 @@ from modules.utils import Rect
 
 
 class BBoxElement(IntEnum):
-    centre_x = 0
-    centre_y = 1
+    center_x = 0
+    center_y = 1
     width = 2
     height = 3
 
@@ -186,7 +186,7 @@ class BBox(BaseScalarFeature[BBoxElement]):
         """Initialize BBoxFeature.
 
         Args:
-            values: [centre_x, centre_y, width, height]
+            values: [center_x, center_y, width, height]
             scores: Confidence scores for each value
         """
 
@@ -219,8 +219,8 @@ class BBox(BaseScalarFeature[BBoxElement]):
         Returns:
             Rect representing the bounding box
         """
-        cx = self[BBoxElement.centre_x]
-        cy = self[BBoxElement.centre_y]
+        cx = self[BBoxElement.center_x]
+        cy = self[BBoxElement.center_y]
         w = self[BBoxElement.width]
         h = self[BBoxElement.height]
 
@@ -272,10 +272,10 @@ class BBox(BaseScalarFeature[BBoxElement]):
 
     def __repr__(self) -> str:
         if self.valid_count == len(self):
-            cx = self[BBoxElement.centre_x]
-            cy = self[BBoxElement.centre_y]
+            cx = self[BBoxElement.center_x]
+            cy = self[BBoxElement.center_y]
             w = self[BBoxElement.width]
             h = self[BBoxElement.height]
-            return f"BBoxFeature(centre=({cx:.1f}, {cy:.1f}), size={w:.1f}x{h:.1f})"
+            return f"BBoxFeature(center=({cx:.1f}, {cy:.1f}), size={w:.1f}x{h:.1f})"
         else:
             return f"BBoxFeature(valid={self.valid_count}/{len(self)})"

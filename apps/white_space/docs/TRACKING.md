@@ -146,8 +146,8 @@ The tracker itself filters nothing on freshness; how stale is too stale is each 
 
 ### Why the azimuth does not use the measured distance
 
-The rig's cameras sit 0.36 m out from the centre (`camera_radius`), aimed radially outward. The same person is seen at different
-bearings by two neighbours, and turning a camera bearing into a rig-centre azimuth takes a triangle
+The rig's cameras sit 0.36 m out from the center (`camera_radius`), aimed radially outward. The same person is seen at different
+bearings by two neighbours, and turning a camera bearing into a rig-center azimuth takes a triangle
 that needs a distance (`camera_local_to_azimuth`, `modules/tracker/panoramic/projection.py`).
 
 The tracker can measure a person's distance, off their feet on the floor plane, and does not use it
@@ -167,7 +167,7 @@ A real body's own seam disagreement — one camera on the chest, the other on a 
 measured distance costs about 10° more. A bias could be calibrated away; the per-person variance of
 a box bottom could not, because it is not a physical landmark.
 
-So the tracker assumes one depth, `track.rig.parallax_radius`, derived and never set: the tracked
+So the tracker assumes one depth, `tracker.rig.parallax_radius`, derived and never set: the tracked
 zone's harmonic mean, `2·min·max/(min+max)` = R 2.1 for R 1.5 – R 3.5. The correction is linear in
 `1/d`, and the minimax of that over an interval sits at the midpoint of `1/d`. It is exact at R 2.1
 and bounded by 6.7° everywhere in the zone (`Rig._update_parallax_depth`).
@@ -261,7 +261,7 @@ person. The play zone starts at R 1.35 for a separate reason: the sectors stop m
 Floor plane, on tangent rows: `camera_height · focal / (foot_px − horizon_px)`. The rows below the
 horizon are the tangent of the depression, so nothing is converted. The row model is the frame's
 own (`frame_window`, derived by `RigSync._set_frame` from the camera fields the warp uses) and is
-published under `track.rig` as the frame's two edge angles, `angle_bottom` and `angle_top`, from
+published under `tracker.rig` as the frame's two edge angles, `angle_bottom` and `angle_top`, from
 which `projection.row_model` rebuilds the row form exactly. Two limits:
 
 - **It cannot see nearer than the picture reaches.** At the recommended tilt — 16° at P800 or 12° at
@@ -277,7 +277,7 @@ on this floor.
 
 ### The far edge
 
-Past `rig.zone_max_radius` the tracker does not count a person while `track.zone_filter` is on (the
+Past `rig.zone_max_radius` the tracker does not count a person while `tracker.zone_filter` is on (the
 switch sits with the other filters, `age_filter` and `height_filter`; off means nothing is filtered
 at the far edge and nothing mentions it). It is handled as a missed detection:
 
@@ -338,7 +338,7 @@ The pose pipeline smooths it (`pose.distance.smoother`) and interpolates it to t
 
 ### The box bottom is not the feet
 
-The detector puts its box bottom below the feet by a fixed pad in pixels. `track.foot_offset` is the
+The detector puts its box bottom below the feet by a fixed pad in pixels. `tracker.foot_offset` is the
 correction, in frame heights: **0.03** on the studio frame, ≈29 px of 960 rows, walked out on the
 rig **(site fact)**. Uncorrected, both read-outs read short. The bias is the box's, not the model's:
 nothing touches the ROI (`Tracklet.from_depthcam` is a field-for-field copy) and the floor-plane
@@ -379,7 +379,7 @@ tangents. Three properties follow:
 - **Scale-free.** The same person at 2 m and at 6 m reads the same metres from box heights that
   differ by more than a factor of two.
 - **Parallax-free.** One camera sees the feet and the head, so nothing is re-projected to the rig
-  centre. Two cameras at a seam therefore must agree, which is the check the label carries.
+  center. Two cameras at a seam therefore must agree, which is the check the label carries.
 - **It reads reach, not stature.** The box top is the highest pixel, so arms up read ≈2.2 m where the
   same person reads 1.8 m with arms down — the number the tilt table is built around.
 
@@ -400,7 +400,7 @@ nothing in the show consumes it.
   it. Shrink `link_angle` until one person's two fields still overlap with their arms down at R 3.5 —
   the body table in *Linking on a seam* says 8° should be enough — and two people a metre apart do
   not overlap at all.
-- **`track.height_filter` is a fraction of the frame**, so its meaning changes with every frame height
+- **`tracker.height_filter` is a fraction of the frame**, so its meaning changes with every frame height
   or tilt; in metres it would say what it means, "at least a 1 m person". It is a tuned value, so
   changing its unit takes a rig session.
 - **`flip_v` is not applied to the row model.** The warp mirrors the delivered rows

@@ -1,7 +1,7 @@
 """ProjectionPlayhead — the playhead's marker alone (debug-only, never in a state's mix).
 
 The show's marker is drawn by the pose instrument over its masks (``pose_instrument.py``); this
-layer draws the same ``PlayheadMarker``, with the same ``PI.playhead`` settings, on an otherwise
+layer draws the same ``PlayheadMarker``, with the same ``pose_instrument.playhead`` settings, on an otherwise
 dark projection, so the playhead can be looked at by itself (``docs/CALIBRATION.md``: the
 spin-up hands the beam over to it). It finds the masks from the LERP poses' azimuth and the mask
 width the instrument draws with.
@@ -44,6 +44,6 @@ class ProjectionPlayhead(ProjectionLayer):
             azimuth = pose[features.Azimuth].value
             if math.isnan(azimuth):
                 continue
-            centre = int(round(normalize_azimuth(azimuth) * R)) % R
-            masked[(centre + np.arange(-half, half + 1)) % R] = True
+            center = int(round(normalize_azimuth(azimuth) * R)) % R
+            masked[(center + np.arange(-half, half + 1)) % R] = True
         return masked

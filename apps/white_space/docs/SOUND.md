@@ -36,7 +36,7 @@ The events and the place (`POSE_INSTRUMENT.md`, *Events*):
 | sync                    | `Similarity`       | `/pose/{id}/similarity/pose` | other | 0..1 per live player           | the pair's mean, the sync strobe's band over it |
 | hit                     | `PlayheadOffset`   | `/pose/{id}/playhead/offset` | –     | −π..π; azimuth minus playhead  | the ticks closest to 0 (`PlayheadCrossing`) |
 | presence                | the pose itself    | `/pose/{id}/active`          | –     | 1 present, 0 gone              | the presence envelope's gate                |
-| where the person stands | `Azimuth`          | `/pose/{id}/azimuth`         | –     | radians                        | the centre of the window and the mask       |
+| where the person stands | `Azimuth`          | `/pose/{id}/azimuth`         | –     | radians                        | the center of the window and the mask       |
 
 The four arm entries of `angle/rad` are the joints' travel times π (`POSE_INSTRUMENT.md`, *The
 body*): the calibrated angle through the pipeline's dead zones, so a hanging arm sends exactly 0
@@ -54,13 +54,13 @@ and the addresses already carry the documents' terms. An arm with a missing join
 as `angle/rad` sends a missing joint.
 
 The distance is how far the person stands from the fixture within the tracked zone: 0 at
-`track.rig.zone_min_radius`, 1 at `track.rig.zone_max_radius`, clamped. The tracker reads it from
+`tracker.rig.zone_min_radius`, 1 at `tracker.rig.zone_max_radius`, clamped. The tracker reads it from
 where the feet meet the floor (`TRACKING.md`); it is NaN without a reading.
 
 The similarity is a row: index `n` is this person against live player `n`, `max_players` wide; a
 pair that does not exist is sent as 0.
 What it measures and how it is smoothed is in `SIMILARITY.md`. The light takes the mean of both
-directions of a pair and strobes the room while every pair holds over `PI.sync_strobe.on_at`
+directions of a pair and strobes the room while every pair holds over `pose_instrument.sync_strobe.on_at`
 (`PoseInstrument._set_sync_strobe`; `POSE_INSTRUMENT.md`, *The sync strobe*); Max gets the row
 to shape itself, and the light's own gate ready-made on `/global/sync` (*The global messages*):
 the strobe envelope's value, with the band's hysteresis and pair rules already applied.
@@ -116,7 +116,7 @@ Sent with every person; the light instrument plays with none of them.
 | `/pose/{id}/angle/vel`          | 9 floats      | radians/s  | the angles' velocities                          |
 | `/pose/{id}/time/motion`        | 1 float       | count      | motion time: rises about 1 per second of motion |
 | `/pose/{id}/time/age`           | 1 float       | seconds    | how long the person has been tracked            |
-| `/pose/{id}/bbox`               | 4 floats      | `BBox`     | centre x, centre y, width, height               |
+| `/pose/{id}/bbox`               | 4 floats      | `BBox`     | center x, center y, width, height               |
 | `/pose/{id}/similarity/gate`    | `max_players` | 0..1       | the motion gate: both of the pair moving        |
 | `/pose/{id}/similarity/motion`  | `max_players` | 0..1       | the same row as `similarity/pose`               |
 | `/pose/{id}/similarity/leader`  | `max_players` | −1..1      | zeros: White Space makes no leader scores       |

@@ -1,7 +1,7 @@
 """BeamTest — beam mode's direct test tool: four settings levels drive the four
 beam lights (front/back white, left/right blue) by name. Stateless; a debug layer
-(``beam_test``), never in a state's mix — and the immediate hardware check for the lamp
-wiring itself.
+(``beam_test``), never in a state's mix — and the immediate hardware check for the beam
+light wiring itself.
 """
 
 import numpy as np
@@ -13,10 +13,10 @@ from ...frame import LightFrame
 
 
 class BeamTestSettings(LayerSettings):
-    front_white: Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Front white lamp level")
-    back_white:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Back white lamp level")
-    left_blue:   Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Left blue lamp level")
-    right_blue:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Right blue lamp level")
+    front_white: Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Front white beam light level")
+    back_white:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Back white beam light level")
+    left_blue:   Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Left blue beam light level")
+    right_blue:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Right blue beam light level")
 
 
 class BeamTest(BeamLayer):

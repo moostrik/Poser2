@@ -45,7 +45,7 @@ class CameraView(IntEnum):
     """Which of the two camera-derived rows the window shows.
 
     They show the same pixels in two projections — the frames as each camera delivers them, and
-    all four stitched into one 360° strip at the rig centre — so which one you want depends on
+    all four stitched into one 360° strip at the rig center — so which one you want depends on
     what you are doing: aiming a camera, or reading the calibration. Hiding one gives its height
     to the other and skips its compositing entirely.
     """
@@ -71,14 +71,14 @@ class Layers(IntEnum):
     # composite
     tracker      = auto()
     cam_readings = auto()   # each camera's frame rate, tilt and roll error, over its own view
-    poser        = auto()
+    pose         = auto()
     dummy_pose   = auto()   # the dummy's skeleton at LERP, no crop; the pose row's last column
     # WS visualization
     cam_panorama = auto()   # the 360° calibration strip: the stitch with the tracker data over it
-    ws_light     = auto()   # the projection (fixture in projection mode)
-    ws_beam       = auto()   # the bar's four lights (fixture in beam mode); shares ws_light's row
-    ws_azimuth   = auto()   # eye and bbox azimuth lines, over whichever of the two is shown
-    ws_figures   = auto()   # each pose's figure at its azimuth, over the same
+    light_simulation      = auto()   # the projection (fixture in projection mode)
+    beam_light_simulation = auto()   # the bar's four lights (fixture in beam mode); shares light_simulation's row
+    azimuth_overlay       = auto()   # eye and bbox azimuth lines, over whichever of the two is shown
+    pose_figures          = auto()   # each pose's figure at its azimuth, over the same
     # data
     data_W       = auto()
     data_F       = auto()
@@ -271,11 +271,11 @@ class PoseGroup(BaseSettings):
 
 
 # ---------------------------------------------------------------------------
-#  Recording group (recording lifecycle — independent of the show state machine)
+#  Session group (recording lifecycle — independent of the show state machine)
 # ---------------------------------------------------------------------------
 
-class RecordingGroup(BaseSettings):
-    """App recording group — composes SessionSettings with app-specific recorders.
+class SessionGroup(BaseSettings):
+    """App session group — composes SessionSettings with app-specific recorders.
     Recording is decoupled from the show: it works stand-alone and during session mode,
     and nothing here touches the state machine."""
     num_cams:   Field[int]   = Field(4, access=Field.INIT, description="Number of cameras")
@@ -292,10 +292,10 @@ class RecordingGroup(BaseSettings):
     _recorder_share: list = [start, stop, split, name, output_path]
 
     osc:      Group[OscReceiverSettings]    = Group(OscReceiverSettings)
-    core:     Group[SessionSettings]        = Group(SessionSettings, share=_session_share)
+    control:  Group[SessionSettings]        = Group(SessionSettings, share=_session_share)
     video:    Group[RecorderSettings]       = Group(RecorderSettings, share=_recorder_share + [num_cams, fps])
     # The tracker diagnosis journal runs for the whole app run while enabled, so it deliberately
-    # does not share the record start/stop buttons.
+    # does not share the session start/stop buttons.
     journal:  Group[TrackerJournalSettings] = Group(TrackerJournalSettings)
 
 
@@ -397,18 +397,18 @@ class Settings(BaseSettings):
     # In panel order: what you look at, what you capture, the wires out, the sensors, what is made of
     # them, and what the show does with it.
     render : Group[RenderSettings]  = Group(RenderSettings, share=[max_players, num_cams, tilt])
-    record : Group[RecordingGroup]  = Group(RecordingGroup, share=[num_cams, input_fps.as_('fps')])
+    session: Group[SessionGroup]    = Group(SessionGroup, share=[num_cams, input_fps.as_('fps')])
     inout  : Group[InOutGroup]      = Group(InOutGroup, share=[max_players, light_resolution.as_('resolution')])
     camera : Group[OakGroup]        = Group(OakGroup, share=[num_cams, input_fps.as_('fps'), fov, tilt, resolution,
                                                              lens_fov, lens_center_x, lens_center_y])
     # Its own group, not under `camera`: the tracker fuses the cameras' output, as `pose` does, and
     # nothing in it is a camera setting. The frame's shape is shared in straight from the root.
-    track  : Group[PanoramicTrackerSettings] = Group(PanoramicTrackerSettings, share=[fov, resolution, tilt,
+    tracker: Group[PanoramicTrackerSettings] = Group(PanoramicTrackerSettings, share=[fov, resolution, tilt,
                                                                                       lens_fov, lens_center_x, lens_center_y])
     # The LERP stage is ticked by the light conductor, so its interpolators step at the light rate.
     pose   : Group[PoseGroup]       = Group(PoseGroup, share=[max_players, input_fps.as_('frequency'), light_rate.as_('output_frequency')])
     light  : Group[LightSettings]   = Group(LightSettings, share=[max_players, num_cams, light_rate, light_resolution.as_('light_resolution'), fov, spin_down_seconds])
     # The pose instrument's values: its own root group, not a layer group (POSE_INSTRUMENT.md, Settings).
-    PI     : Group[PoseInstrumentSettings] = Group(PoseInstrumentSettings)
+    pose_instrument: Group[PoseInstrumentSettings] = Group(PoseInstrumentSettings)
     states : Group[StateMachineSettings] = Group(StateMachineSettings, share=[spin_down_seconds])
     panel : Group[PanelSettings]    = Group(PanelSettings)

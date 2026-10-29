@@ -3,7 +3,7 @@
 An oscillator repeats; an envelope goes up once, holds and comes down once, 0..1, eased so its ends
 are smooth. Over positions it is a shape with a fixed length (the window). Over time it follows a
 gate that is opened and closed from outside (presence, the push). It knows nothing of people or
-colours.
+colors.
 """
 
 import math
@@ -19,7 +19,7 @@ Value = float | np.ndarray
 CURVE = 36                      # the Curve select's width: narrower than a select's own
 
 
-class WindowSettings(BaseSettings):
+class EnvelopeSettings(BaseSettings):
     """What the voice reads of the window: the taper of the envelope over distance on the pulse
     width, and presence, the envelope over time on the reaches. The reaches are the caller's.
     While the window opens or closes the taper widens to the whole window, so lines enter and

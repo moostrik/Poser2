@@ -93,7 +93,7 @@ class BeamLayersSettings(BaseSettings):
 class ProjectionLayersSettings(BaseSettings):
     """Per-layer composition settings — the projection-mode block of the pool.
     `fov` is a hidden relay (from the root) into the calibration layer. The pose instrument's
-    values are the root ``PI`` group; here it keeps only its blend."""
+    values are the root ``pose_instrument`` group; here it keeps only its blend."""
     fov: Field[float] = Field(110.0, access=Field.INIT, description="Camera horizontal FOV — relay to test_calibration")
     pose_instrument:    Group[LayerSettings]               = Group(LayerSettings)
     projection_playhead: Group[LayerSettings]          = Group(LayerSettings)
@@ -120,7 +120,7 @@ class LightSettings(BaseSettings):
     fov: Field[float] = Field(110.0, access=Field.INIT, description="Camera horizontal FOV — relay from root to test_calibration; its visible home is the camera panel")
     spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9–S11 wall-fade seconds — hidden relay from states (via the root) into wind_down")
 
-    brightness:     Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Main brightness — applied to the composite; the lamp gamma and floor live in the light sender", newline=True, pinned=True)
+    brightness:     Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Main brightness — applied to the composite; the beam light gamma and floor live in the light sender", newline=True, pinned=True)
 
     # Debug override — a first-class select ABOVE the state machine: choosing a layer IS
     # turning debug on. The Compositor draws that one layer solo (full weight) and the

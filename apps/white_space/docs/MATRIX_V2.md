@@ -12,7 +12,7 @@ above it.
 1. Neutral (arms hanging) is full blue.
 2. Raised (both arms up) is full white.
 3. No jumps: a small movement of an arm is a small change of the light.
-4. Keep the visualisation as simple as possible.
+4. Keep the visualization as simple as possible.
 5. Every combination of the arms draws differently.
 
 ## Measures
@@ -57,7 +57,7 @@ shoulders' difference already live there (*Measures*).
 | white pull | −1..1 | white's share of the shoulders' pull: `difference × (1 + share × bend) / 2`, clamped |
 | blue pull  | −1..1 | blue's share: `difference × (1 − share × bend) / 2`, clamped            |
 
-The share (`PI.lean_share`, 2) scales the handover: at 1 a full lean hands over exactly the
+The share (`pose_instrument.lean_share`, 2) scales the handover: at 1 a full lean hands over exactly the
 whole pull; above it the carrying colour overshoots the meeting and the pair stretches open
 again, the clamp a standstill, not a jump.
 

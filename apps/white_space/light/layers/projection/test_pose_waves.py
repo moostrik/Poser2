@@ -183,14 +183,14 @@ class TestPoseWaves(ProjectionLayer):
         for state in player_states.values():
             if not state.present:
                 continue
-            centre:     float = (state.world_position + np.pi) / (2 * np.pi)
+            center:     float = (state.world_position + np.pi) / (2 * np.pi)
             length:     float = state.pose_length
             age:        float = state.age
             strength:   float = pow(min(age * 1.8, 1.0), 1.5)
             void_width: float = P.void_width / 360.0 * 0.5
             width:      float = void_width + length * void_width
             edge:       int   = int(P.void_edge / 360.0 * len(array))
-            draw_field(array, centre, width, strength, edge, BlendType.MAX)
+            draw_field(array, center, width, strength, edge, BlendType.MAX)
 
     @staticmethod
     def _make_patterns(
@@ -217,7 +217,7 @@ class TestPoseWaves(ProjectionLayer):
             if not state.present:
                 continue
 
-            centre: float = (state.world_position + np.pi) / (2 * np.pi)
+            center: float = (state.world_position + np.pi) / (2 * np.pi)
             age:    float = state.age
             length: float = state.pose_length
 
@@ -252,7 +252,7 @@ class TestPoseWaves(ProjectionLayer):
             inner_edge: int   = int(void_width * resolution * 0.7)
 
             blend: BlendType = BlendType.MAX
-            draw_waves(W_L, centre,  patt_width, left_count, left_width, sharpness, left_time, 0,   inner_edge, outer_edge, blend)
-            draw_waves(W_L, centre, -patt_width, left_count, left_width, sharpness, left_time, 0,   outer_edge, inner_edge, blend)
-            draw_waves(W_R, centre,  patt_width, rigt_count, rigt_width, sharpness, rigt_time, 0.5, inner_edge, outer_edge, blend)
-            draw_waves(W_R, centre, -patt_width, rigt_count, rigt_width, sharpness, rigt_time, 0.5, outer_edge, inner_edge, blend)
+            draw_waves(W_L, center,  patt_width, left_count, left_width, sharpness, left_time, 0,   inner_edge, outer_edge, blend)
+            draw_waves(W_L, center, -patt_width, left_count, left_width, sharpness, left_time, 0,   outer_edge, inner_edge, blend)
+            draw_waves(W_R, center,  patt_width, rigt_count, rigt_width, sharpness, rigt_time, 0.5, inner_edge, outer_edge, blend)
+            draw_waves(W_R, center, -patt_width, rigt_count, rigt_width, sharpness, rigt_time, 0.5, outer_edge, inner_edge, blend)

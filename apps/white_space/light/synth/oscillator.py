@@ -3,7 +3,7 @@
 An ordinary LFO with one addition: it is given a set of positions, each a phase offset, and gives
 a value for every one of them. The **core** knows where each position is in the cycle; a
 **waveform** reads that and makes the output: the pulse draws lines, the sine is an LFO's. It knows
-nothing of people, colours, mirroring or the mask, and takes every parameter as an argument, so
+nothing of people, colors, mirroring or the mask, and takes every parameter as an argument, so
 what plays a parameter (a slot, a setting, another oscillator) is the caller's.
 """
 
@@ -31,7 +31,7 @@ class OscillatorSettings(BaseSettings):
     them)."""
     enabled:            Field[bool]  = Field(True,                                                label="On",         description="Off: this oscillator draws nothing", newline=True)
     bypass_all:         Field[bool]  = Field(False, widget=Widget.button,                         label="Bypass All", description="Bypass every slot, so the panel draws this oscillator; again to lift them all")
-    mirror:             Field[bool]  = Field(True,                                                label="Mirror",     description="On: lines come from the person both ways; off: one pattern passing behind the person")
+    mirror:             Field[bool]  = Field(True,                                                label="Mirror",     description="On: lines come from the player both ways; off: one pattern passing behind the player")
     pitch:              Field[float] = Field(25.7, min=2.0,    max=180.0, step=0.1,  widget=KNOB, label="Base",   description="Lines per revolution of the pattern: 25.7 is a 14° interval at scale 1", row_label="Pitch", newline=True)
     pitch_amount:       Field[float] = Field(0.0,  min=-90.0,  max=90.0,  step=0.5,  widget=KNOB, label="Amount", description="How far the source moves the pitch (lines per revolution)")
     pitch_curve:        Field[Curve] = Field(Curve.LINEAR,                           width=CURVE, label="Curve",  description="How the source's magnitude is eased")
@@ -40,7 +40,7 @@ class OscillatorSettings(BaseSettings):
     pulse_width_amount: Field[float] = Field(0.0,  min=-1.0,   max=1.0,   step=0.01, widget=KNOB, label="Amount", description="How far the source moves the pulse width")
     pulse_width_curve:  Field[Curve] = Field(Curve.LINEAR,                           width=CURVE, label="Curve",  description="How the source's magnitude is eased")
     pulse_width_bypass: Field[bool]  = Field(False,                                               label="Bypass", description="Switch the modulation off: the pulse width is its base")
-    phase:              Field[float] = Field(0.0,  min=-0.5,   max=0.5,   step=0.01, widget=KNOB, label="Base",   description="Where the lines sit: 0 a line at the person, 0.5 a gap (intervals)", row_label="Phase", newline=True)
+    phase:              Field[float] = Field(0.0,  min=-0.5,   max=0.5,   step=0.01, widget=KNOB, label="Base",   description="Where the lines sit: 0 a line at the player, 0.5 a gap (intervals)", row_label="Phase", newline=True)
     phase_amount:       Field[float] = Field(0.0,  min=-1.0,   max=1.0,   step=0.01, widget=KNOB, label="Amount", description="How far the source moves the phase (intervals)")
     phase_curve:        Field[Curve] = Field(Curve.LINEAR,                           width=CURVE, label="Curve",  description="How the source's magnitude is eased")
     phase_bypass:       Field[bool]  = Field(False,                                               label="Bypass", description="Switch the modulation off: the phase is its base")
@@ -87,10 +87,10 @@ class Oscillator:
 
     @staticmethod
     def pulse(cycle: np.ndarray, pulse_width: Value, hardness: Value) -> np.ndarray:
-        """The pulse wave, 0..1: on for ``pulse_width`` of every cycle, centred on the whole
+        """The pulse wave, 0..1: on for ``pulse_width`` of every cycle, centerd on the whole
         cycle. At ``hardness`` 1 every value is 0 or 1; below it the flank is a cosine fall
-        centred on the edge, never wider than the line or the gap has room for, so the centre of
-        a line stays 1, the centre of a gap 0, width 0 dark and width 1 solid."""
+        centerd on the edge, never wider than the line or the gap has room for, so the center of
+        a line stays 1, the center of a gap 0, width 0 dark and width 1 solid."""
         d = np.abs((cycle + 0.5) % 1.0 - 0.5)                      # distance from the nearest crest, 0..½
         width = np.clip(pulse_width, 0.0, 1.0)
         edge = width / 2.0

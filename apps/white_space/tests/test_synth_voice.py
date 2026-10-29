@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from apps.white_space.light.synth import Voice, Parameter, Curve, OscillatorSettings, WindowSettings, LfoSettings, StrobeSettings
+from apps.white_space.light.synth import Voice, Parameter, Curve, OscillatorSettings, EnvelopeSettings, LfoSettings, StrobeSettings
 
 STEP = 0.1                                              # degrees per pixel
 OFFSETS = np.arange(-600, 601) * STEP                   # a strip 60° each side of the person, signed
@@ -17,27 +17,27 @@ MIN_INTERVAL = 4.0
 
 
 def lines(output: np.ndarray, side: np.ndarray = RIGHT) -> list[tuple[float, float]]:
-    """(centre, width) in degrees of the whole lines on one side of the person (the right unless
+    """(center, width) in degrees of the whole lines on one side of the person (the right unless
     given): the half line a phase of 0 leaves at the person is not one."""
     lit = (output > 0.5) & side
     edges = np.flatnonzero(np.diff(np.concatenate(([False], lit, [False])).astype(int)))
     found = [(float((OFFSETS[s] + OFFSETS[e - 1]) / 2.0), float((e - s) * STEP)) for s, e in zip(edges[::2], edges[1::2])]
-    return [(centre, width) for centre, width in found if abs(centre) - width / 2.0 > 2 * STEP]
+    return [(center, width) for center, width in found if abs(center) - width / 2.0 > 2 * STEP]
 
 
-def centres(output: np.ndarray, side: np.ndarray = RIGHT) -> list[float]:
-    return [centre for centre, _ in lines(output, side)]
+def centers(output: np.ndarray, side: np.ndarray = RIGHT) -> list[float]:
+    return [center for center, _ in lines(output, side)]
 
 
 def has_line_at(output: np.ndarray, position: float) -> bool:
-    """A line centred at ``position`` (signed: negative on the left), to a pixel or two."""
-    return any(abs(centre - position) < 0.2 for centre in centres(output, LEFT if position < 0.0 else RIGHT))
+    """A line centerd at ``position`` (signed: negative on the left), to a pixel or two."""
+    return any(abs(center - position) < 0.2 for center in centers(output, LEFT if position < 0.0 else RIGHT))
 
 
 class VoiceTest(unittest.TestCase):
     def setUp(self) -> None:
         self.one, self.two = OscillatorSettings(), OscillatorSettings()
-        self.window, self.lfo = WindowSettings(), LfoSettings()
+        self.window, self.lfo = EnvelopeSettings(), LfoSettings()
         self.strobe_one, self.strobe_two = StrobeSettings(), StrobeSettings()
         self.window.attack_seconds = 0.0                # present at once, unless a test says otherwise
         self.one.pitch = self.two.pitch = 36.0        # 36 lines per turn: a 10° interval
@@ -93,11 +93,11 @@ class VoiceTest(unittest.TestCase):
         self.assertFalse(output[DISTANCE >= 40.0].any())
         found = lines(output)
         full = 0.3 * 4.0
-        for centre, width in found:
-            if centre < 30.0:
+        for center, width in found:
+            if center < 30.0:
                 self.assertAlmostEqual(width, full, delta=2 * STEP)        # whole before the taper
-        last_centre, last_width = found[-1]
-        self.assertAlmostEqual(last_centre, 36.0, delta=2 * STEP)          # still centred where it belongs,
+        last_center, last_width = found[-1]
+        self.assertAlmostEqual(last_center, 36.0, delta=2 * STEP)          # still centerd where it belongs,
         self.assertLess(last_width, 0.7 * full)                            # thinned, not cut
 
     def test_a_dark_output_stays_dark_and_a_solid_one_is_solid_up_to_the_taper(self) -> None:
@@ -112,7 +112,7 @@ class VoiceTest(unittest.TestCase):
         self.one.pitch = 180.0                          # a 2° interval, asked for; the limit is 4°
         self.one.pulse_width = 0.2
         voice = self._arrived()
-        found = centres(self._render(voice)[0])
+        found = centers(self._render(voice)[0])
         self.assertAlmostEqual(found[1] - found[0], MIN_INTERVAL, delta=2 * STEP)
 
     # -- presence --
@@ -171,10 +171,10 @@ class VoiceTest(unittest.TestCase):
         one, two = self._render(voice)
         self.assertTrue(has_line_at(one, 13.0))                            # 6 deg/s eased over a second: 3° out
         self.assertTrue(has_line_at(two, 7.0))                             # and 3° in
-        settled = centres(one)
+        settled = centers(one)
         for _ in range(100):
             voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL, 0, 32)
-        self.assertEqual(centres(self._render(voice)[0]), settled)         # settled: nothing comes back
+        self.assertEqual(centers(self._render(voice)[0]), settled)         # settled: nothing comes back
 
     def test_each_oscillator_releases_its_push_on_its_own_time(self) -> None:
         self.one.push = self.two.push = 6.0
@@ -183,9 +183,9 @@ class VoiceTest(unittest.TestCase):
         voice.update(0.01, True, True, NO_SOURCES, MIN_INTERVAL, 0, 32)           # the hit
         for _ in range(50):                                                # half a second on
             voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL, 0, 32)
-        one_before, two_before = (centres(o) for o in self._render(voice))
+        one_before, two_before = (centers(o) for o in self._render(voice))
         voice.update(0.01, True, False, NO_SOURCES, MIN_INTERVAL, 0, 32)
-        one_after, two_after = (centres(o) for o in self._render(voice))
+        one_after, two_after = (centers(o) for o in self._render(voice))
         self.assertEqual(one_after, one_before)                            # released: standing again
         self.assertNotEqual(two_after, two_before)                         # still being pushed
 
@@ -219,7 +219,7 @@ class VoiceTest(unittest.TestCase):
         self.one.pulse_width = 0.2
         voice = self._voice()
         voice.update(0.01, True, False, ({Parameter.PITCH: 1.0}, {}), MIN_INTERVAL, 0, 32)
-        found = centres(self._render(voice, 60.0, 60.0)[0])
+        found = centers(self._render(voice, 60.0, 60.0)[0])
         self.assertAlmostEqual(found[1] - found[0], 20.0, delta=2 * STEP)
 
     def test_one_source_into_two_pitches_keeps_their_difference(self) -> None:
@@ -228,7 +228,7 @@ class VoiceTest(unittest.TestCase):
         self.one.pulse_width = self.two.pulse_width = 0.2
         voice = self._voice()
         voice.update(0.01, True, False, ({Parameter.PITCH: 1.0}, {Parameter.PITCH: 1.0}), MIN_INTERVAL, 0, 32)
-        one, two = (centres(output) for output in self._render(voice, 60.0, 60.0))
+        one, two = (centers(output) for output in self._render(voice, 60.0, 60.0))
         self.assertAlmostEqual(one[1] - one[0], 360.0 / 54.0, delta=2 * STEP)      # 54 and 90 lines: the
         self.assertAlmostEqual(two[1] - two[0], 360.0 / 90.0, delta=2 * STEP)      # difference of 36 kept, not the ratio
 
@@ -273,13 +273,13 @@ class VoiceTest(unittest.TestCase):
         seen = []
         for _ in range(200):                                               # one cycle
             voice.update_lfo(0.01, 0.0)
-            found = centres(self._render(voice, sources=({Parameter.PHASE: voice.lfo}, {}))[0])
-            seen.append(min(found, key=lambda centre: abs(centre - 10.0)))   # the line that rests at 10°
+            found = centers(self._render(voice, sources=({Parameter.PHASE: voice.lfo}, {}))[0])
+            seen.append(min(found, key=lambda center: abs(center - 10.0)))   # the line that rests at 10°
         self.assertAlmostEqual(max(seen), 12.5, delta=0.2)                 # a quarter of 10° out,
         self.assertAlmostEqual(min(seen), 7.5, delta=0.2)                  # a quarter in,
         self.assertAlmostEqual(seen[-1], seen[0], delta=0.3)               # and back where it began
         self.assertLess(max(abs(b - a) for a, b in zip(seen, seen[1:])), 0.2)   # rocking, never stepping
-        still = centres(self._render(voice, sources=({Parameter.PHASE: voice.lfo}, {}))[1])
+        still = centers(self._render(voice, sources=({Parameter.PHASE: voice.lfo}, {}))[1])
         self.assertAlmostEqual(still[0], 10.0, delta=0.2)                  # the other output does not move
 
     # -- the holds --
@@ -308,7 +308,7 @@ class VoiceTest(unittest.TestCase):
         voice = self._voice()
         for _ in range(100):
             voice.update(0.01, True, False, ({Parameter.PITCH: 1.0, Parameter.SPEED: 1.0}, {}), MIN_INTERVAL, 0, 32)
-        found = centres(self._render(voice)[0])
+        found = centers(self._render(voice)[0])
         self.assertAlmostEqual(found[0], 10.0, delta=0.2)                       # not doubled, not travelled
 
     def test_a_held_lfo_level_is_silent_whatever_its_source_says(self) -> None:

@@ -27,8 +27,8 @@ def beam_profile(width: float, blur: float, resolution: int) -> np.ndarray:
     """The symmetric line profile in pixels: 1.0 across a ``width``-wide core, fading to 0.0
     over ``blur`` on each side (both angles in radians; ``blur`` 0 = a hard edge).
 
-    Always odd-length with a single centre pixel — integer pixel geometry throughout, so a
-    line's centre never lands a pixel off — and never longer than the full turn.
+    Always odd-length with a single center pixel — integer pixel geometry throughout, so a
+    line's center never lands a pixel off — and never longer than the full turn.
     """
     span_max: int = (resolution - 1) // 2
     core: int = min(max(0, round(width / 2.0 / math.tau * resolution)), span_max)
@@ -48,9 +48,9 @@ def _paint_beam_lights(beam_lights: np.ndarray, heading: float, profile: np.ndar
         level = float(beam_lights[light])
         if not level > 0.0:                                            # NaN and ≤ 0 paint nothing
             continue
-        centre = round(normalize_azimuth(heading + BEAM_LIGHT_HEADINGS[light]) * resolution)
+        center = round(normalize_azimuth(heading + BEAM_LIGHT_HEADINGS[light]) * resolution)
         channel = out[0, :, BEAM_LIGHT_CHANNEL[light]]
-        apply_circular(channel, (level * profile).astype(out.dtype), centre - half, BlendType.MAX)
+        apply_circular(channel, (level * profile).astype(out.dtype), center - half, BlendType.MAX)
 
 
 def project_beam_lights(beam_lights: np.ndarray, heading: float, width: float, blur: float,

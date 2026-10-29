@@ -202,7 +202,7 @@ class OscSound:
         msg_builder.add_arg(0, OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(msg_builder.build()) # type: ignore
 
-        # Reset bbox to 0 (centre_x, centre_y, width, height)
+        # Reset bbox to 0 (center_x, center_y, width, height)
         bbox_msg = OscMessageBuilder(address=f"/pose/{id}/bbox")
         for _ in range(4):
             bbox_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
@@ -283,7 +283,7 @@ class OscSound:
         active_msg.add_arg(1, OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(active_msg.build()) # type: ignore
 
-        # bbox: centre_x, centre_y, width, height
+        # bbox: center_x, center_y, width, height
         bbox_values: list[float] = frame[BBox].values.tolist() if BBox in frame else [np.nan] * 4
         bbox_msg = OscMessageBuilder(address=f"/pose/{id}/bbox")
         for val in bbox_values:

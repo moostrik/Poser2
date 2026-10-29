@@ -37,9 +37,9 @@ class PlayheadMarker:
         """Add the marker to both channels; ``masked`` is the pixels under a mask this tick."""
         if math.isnan(playhead):
             return
-        centre = int(normalize_azimuth(playhead) * resolution)          # [0, R)
+        center = int(normalize_azimuth(playhead) * resolution)          # [0, R)
         w = max(1, round(settings.width / 360.0 * resolution))           # deg → pixel count
-        start = centre - w // 2
+        start = center - w // 2
         idx = np.arange(start, start + w) % resolution
         dim = np.where(masked[idx], settings.at_mask, 1.0)
         for channel, level in ((white, settings.white), (blue, settings.blue)):

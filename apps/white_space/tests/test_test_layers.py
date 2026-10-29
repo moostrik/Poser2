@@ -50,8 +50,8 @@ class LinesTest(unittest.TestCase):
         f = frame()
         self.layer.render(f)
         interval = RES // 4
-        self.assertEqual(float(f.white[0]), 1.0)                         # a line centre stays full
-        self.assertEqual(float(f.white[interval // 2]), 0.0)             # a gap centre stays off
+        self.assertEqual(float(f.white[0]), 1.0)                         # a line center stays full
+        self.assertEqual(float(f.white[interval // 2]), 0.0)             # a gap center stays off
         self.assertTrue(((f.white > 0.0) & (f.white < 1.0)).any())
 
     def test_lines_travel(self) -> None:

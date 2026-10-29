@@ -5,7 +5,7 @@ A condition-driven state machine that plays the states designed in ``docs/STATES
 condition-driven *between* states. Each tick (on the Conductor's light thread) it builds a
 ``StateContext`` from the board (the players present, the hit streak ``HitSync`` publishes — this
 tick's hit and how many hits in a row struck alike poses — and the playhead's content clock and
-lock signals) and from the pose instrument's readout (``PI.full_sync``: the room in full sync, as
+lock signals) and from the pose instrument's readout (``pose_instrument.full_sync``: the room in full sync, as
 the instrument drew it last tick), lets the active state return its mix, evaluates that state's
 transition conditions, and emits a ``SequencerState`` snapshot for the board and OSC sound. It
 reads the board and that readout only; the hits and their poses are ``pose/hit_sync.py``'s, the
@@ -48,7 +48,7 @@ class StateContext:
     sync_hits: int          # hits in a row, within one round, that struck alike poses (HitSync's streak)
     hit:     bool           # this tick the playhead is closest to a live player (the flash tick)
     full_sync: bool         # the room in full sync: every present pair alike over the instrument's band
-                            # (PI.full_sync as the instrument drew it last tick — PLAY's sync end)
+                            # (pose_instrument.full_sync as the instrument drew it last tick — PLAY's sync end)
     session: bool           # session mode active — states consult it in needs_state_change()
     blackout: bool          # the pinned blackout toggle — OFF stays put while pinned and
                             # wakes through OFF_IDLE once released and the playhead lock holds

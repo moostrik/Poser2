@@ -62,7 +62,7 @@ class CompositorTest(unittest.TestCase):
     def test_absent_layer_is_not_reset_implicitly(self) -> None:
         self.comp.set_mix([(LayerId.beam_playhead, 1.0)])
         self.comp.render(frame())
-        self.comp.set_mix([(LayerId.test_pose_waves, 1.0)])   # lamp dropped from the look
+        self.comp.set_mix([(LayerId.test_pose_waves, 1.0)])   # beam light dropped from the look
         self.comp.render(frame())
         self.assertEqual(self.a.resets, 0)                 # resets are explicit only
 
@@ -144,11 +144,11 @@ class CompositorTest(unittest.TestCase):
         np.testing.assert_allclose(f.white, 2.0)   # only the debug layer, full weight
 
 
-class LampMappingTest(unittest.TestCase):
+class BeamLightMappingTest(unittest.TestCase):
     """BeamLayer's named writes land on the frame's explicit beam lights and touch no pixel —
     verified through beam_test, beam mode's direct test tool."""
 
-    def test_named_lamps_land_on_the_bar_lights(self) -> None:
+    def test_named_beam_lights_land_on_the_bar_lights(self) -> None:
         from apps.white_space.light.layers.beam.test import BeamTest, BeamTestSettings
         settings = BeamTestSettings()
         settings.front_white, settings.back_white = 0.9, 0.6

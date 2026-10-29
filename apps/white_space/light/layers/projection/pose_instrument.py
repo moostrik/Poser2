@@ -11,17 +11,17 @@ bridge is everything the synth does not know:
   already applied by the pipeline (``ArmTravel``, the body bend's and the leg deviation's
   extractors); ``connect`` is the wiring of the document's *The connections* written out, a
   person's measures into the sources of the synth's slots. The bases and amounts are settings of
-  the ``PI`` group; the wiring is code.
+  the ``pose_instrument`` group; the wiring is code.
 - the **events**: presence (a pose is seen), the hit (``PlayheadCrossing``, the tick closest to
   the crossing: each oscillator's push and the mask's flash), and **full sync**: the room's one
-  gate (``_set_full_sync``), every present pair alike over the band (on from ``PI.on_at``, off
-  below ``PI.off_at``), published on ``PI.full_sync`` for the show (``docs/STATES.md``, S7) and
+  gate (``_set_full_sync``), every present pair alike over the band (on from ``pose_instrument.on_at``, off
+  below ``pose_instrument.off_at``), published on ``pose_instrument.full_sync`` for the show (``docs/STATES.md``, S7) and
   taken by three mechanisms, each through its own bypass into its own envelope: the **sync
   strobe** — every drawn pattern's white and blue swap on strobe frames (or go dark,
   ``sync_strobe.mode``), the rate climbing the nested ladder over the attack and stepping back
-  down over the release — the **growth** (``PI.grow``), every window toward the full circle over
+  down over the release — the **growth** (``pose_instrument.grow``), every window toward the full circle over
   its attack, the overlap clip shaping how they meet, falling back over its release — and the
-  **blend** (``PI.blend``), everyone's measures eased toward the room's presence-weighted mean,
+  **blend** (``pose_instrument.blend``), everyone's measures eased toward the room's presence-weighted mean,
   one pattern for everyone; positions, masks and hits stay each person's own.
 - the **scale**: the voices work in pattern degrees, real degrees over ``window.scale`` shrunk
   by ``window.crowd`` per further participant (the sum of presences, so it moves smoothly), and
@@ -29,16 +29,16 @@ bridge is everything the synth does not know:
   compresses about its person as one picture, the synth none the wiser. ``window.overlap``
   clips neighbouring reaches toward their midpoints: windows meet as territories at 0.
 - the **mask**: a band at the person, over every pattern, lit at its levels by presence (dim blue
-  in the preset) and flashing to its flash levels on a hit; its **border**, a line centred on
+  in the preset) and flashing to its flash levels on a hit; its **border**, a line centerd on
   each edge of the band, half over the blue, that does not flash; and the playhead's **marker** over
-  it all (``PlayheadMarker``), dimmed inside the masks. With ``PI.opposite`` the patterns are
+  it all (``PlayheadMarker``), dimmed inside the masks. With ``pose_instrument.opposite`` the patterns are
   drawn half a turn from their people (ON) or in both places (BOTH) while the masks stay on
   them; under BOTH the copies win the overlap — own windows retreat to a copy's settled edge,
   and yield entirely to a copy reaching over their person (``_clip_against_copies``).
-- the colours: output 1 is white, output 2 is blue; where voices overlap the fuller one shows.
+- the colors: output 1 is white, output 2 is blue; where voices overlap the fuller one shows.
 
-Playing by hand: every parameter has its slot as a row in the panel (``PI.white_lines``,
-``PI.blue_lines``, ``PI.white_strobe``, ``PI.blue_strobe``, ``PI.lfo``): Base, Amount, Curve and
+Playing by hand: every parameter has its slot as a row in the panel (``pose_instrument.white_lines``,
+``pose_instrument.blue_lines``, ``pose_instrument.white_strobe``, ``pose_instrument.blue_strobe``, ``pose_instrument.lfo``): Base, Amount, Curve and
 Bypass. A bypassed parameter is its base while the others follow the body, so a pose can be taken
 apart parameter by parameter; an oscillator's Bypass All button sets its five at once, a strobe's
 its four, and clears them when all are set. ``window.width_bypass`` holds both reaches without a
@@ -63,24 +63,24 @@ from .._utilities import normalize_azimuth, mask_half_width
 from .playhead_marker import PlayheadMarker, PlayheadMarkerSettings
 from ...frame import LightFrame
 from ...synth import (Voice, Parameter, Sources, Envelope, Strobe,
-                      OscillatorSettings, WindowSettings as SynthWindowSettings, LfoSettings, StrobeSettings)
+                      OscillatorSettings, EnvelopeSettings, LfoSettings, StrobeSettings)
 from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step, DummySettings
 
 KNOB = Widget.knob
 
 
-# -- Settings: the PI root group, grouped by what is tuned together ------------------------------
+# -- Settings: the pose_instrument root group, grouped by what is tuned together -----------------
 
-class WindowSettings(SynthWindowSettings):
+class InstrumentWindowSettings(EnvelopeSettings):
     """The window: how far the pattern shows each side of a person, and when. The synth's part
     (taper, attack, release) with the bridge's: the reach at rest, its bypass, the scale,
     which compresses the whole pattern — reach, lines, motion — as one picture, and the overlap,
     which pulls neighbouring windows apart into territories. Sync's growth is its own mechanism
     (``GrowSettings``) and is switched off by the width's Bypass."""
-    width:          Field[float] = Field(45.0, min=0.0, max=180.0, step=0.5,  widget=KNOB, label="Width",          description="Reach each side of a person at rest (deg)", row_label="Reach", newline=True)
+    width:          Field[float] = Field(45.0, min=0.0, max=180.0, step=0.5,  widget=KNOB, label="Width",          description="Reach each side of a player at rest (deg)", row_label="Reach", newline=True)
     width_bypass:   Field[bool]  = Field(False,                                            label="Bypass",         description="Both reaches at the width: no sync growth")
     scale:          Field[float] = Field(1.0,  min=0.1, max=2.0,   step=0.01, widget=KNOB, label="Scale",          description="Overall window scale: the whole pattern compresses, nothing needs recalibrating", row_label="Scale", newline=True)
-    crowd:          Field[float] = Field(1.0,  min=0.5, max=1.0,   step=0.01, widget=KNOB, label="Crowd",          description="Each further participant multiplies the scale by this; 1 = off")
+    crowd:          Field[float] = Field(1.0,  min=0.5, max=1.0,   step=0.01, widget=KNOB, label="Crowd",          description="Each further player multiplies the scale by this; 1 = off")
     overlap:        Field[float] = Field(1.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Overlap",        description="How far a window may reach into a neighbour's: 1 full, 0 territories meeting at the midpoint, negative a gap between them")
 
 
@@ -98,7 +98,7 @@ class SyncStrobeMode(IntEnum):
 
 
 class SyncStrobeSettings(BaseSettings):
-    """The sync strobe, full sync's visualisation: while the room's gate is open (every present
+    """The sync strobe, full sync's visualization: while the room's gate is open (every present
     pair alike over the band, ``PoseInstrumentSettings``), every drawn pattern's white and blue
     swap on strobe frames (or go dark, the mode). The gate, through this bypass, drives an
     envelope whose value picks the rate from the nested powers of two: the strobe comes in
@@ -142,12 +142,12 @@ class BlendSettings(BaseSettings):
 
 class MaskSettings(BaseSettings):
     """The mask at the person: its width and its level per channel (0 is off); the border, a line
-    on each edge of the band, centred on it so half overlaps the blue; and the flash, the levels
+    on each edge of the band, centerd on it so half overlaps the blue; and the flash, the levels
     the band goes to on a hit and the release it falls back over. The border does not flash."""
     width:                 Field[float] = Field(3.0, min=0.5, max=20.0, step=0.1,  widget=KNOB, label="Width",   description="Mask width (deg)", row_label="Mask", newline=True)
     white:                 Field[float] = Field(0.0, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="White",   description="Mask white level")
     blue:                  Field[float] = Field(0.3, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Blue",    description="Mask blue level")
-    border_width:          Field[float] = Field(1.0, min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Width",   description="Border line width, centred on each mask edge (deg); 0 = off", row_label="Border", newline=True)
+    border_width:          Field[float] = Field(1.0, min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Width",   description="Border line width, centerd on each mask edge (deg); 0 = off", row_label="Border", newline=True)
     border_white:          Field[float] = Field(1.0, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="White",   description="Border white level")
     border_blue:           Field[float] = Field(0.0, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Blue",    description="Border blue level")
     flash_white:           Field[float] = Field(0.0, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="White",   description="Mask white level at a hit", row_label="Flash", newline=True)
@@ -156,20 +156,20 @@ class MaskSettings(BaseSettings):
 
 
 class PoseInstrumentSettings(BaseSettings):
-    """The ``PI`` root group, a group per concept: the mask, the playhead's marker, the window,
+    """The ``pose_instrument`` root group, a group per concept: the mask, the playhead's marker, the window,
     the sync strobe, the growth and the blend (the full-sync band declared here, shared into
     all three, and the room's gate it opens published as ``full_sync``, read by the show), the
     two oscillators, their strobes and the LFO (the synth's patch, a slot per parameter), the
     dummy. The wiring is ``connect``; the measures' dead zones are the pipeline's."""
     max_lines:    Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
-    opposite:     Field[Opposite] = Field(Opposite.OFF, widget=Widget.select, description="Draw each person's lines at them, half a turn away, or both (the copies win the overlap); the masks stay on the people")
-    lean_share:   Field[float] = Field(2.0, min=0.0, max=4.0, step=0.05, widget=KNOB, label="Lean Share", description="How far a lean hands the arms' pull to one colour: 0 off, 1 all of it at full lean, above overshooting")
+    opposite:     Field[Opposite] = Field(Opposite.OFF, widget=Widget.select, description="Draw each player's lines at them, half a turn away, or both (the copies win the overlap); the masks stay on the players")
+    lean_share:   Field[float] = Field(2.0, min=0.0, max=4.0, step=0.05, widget=KNOB, label="Lean Share", description="How far a lean hands the arms' pull to one color: 0 off, 1 all of it at full lean, above overshooting")
     on_at:        Field[float] = Field(0.95, min=0.0, max=1.0, step=0.01, widget=KNOB, label="On At",  description="Full sync comes on when every pair reads at least this", row_label="Sync", newline=True)
     off_at:       Field[float] = Field(0.90, min=0.0, max=1.0, step=0.01, widget=KNOB, label="Off At", description="Full sync goes off when any pair falls below this")
     full_sync:    Field[bool]  = Field(False, access=Field.READ, label="Full Sync", description="Every present pair alike over the band")
     mask:         Group[MaskSettings]           = Group(MaskSettings)
     playhead:     Group[PlayheadMarkerSettings] = Group(PlayheadMarkerSettings)
-    window:       Group[WindowSettings]         = Group(WindowSettings)
+    window:       Group[InstrumentWindowSettings] = Group(InstrumentWindowSettings)
     sync_strobe:  Group[SyncStrobeSettings]     = Group(SyncStrobeSettings, share=[on_at, off_at])
     grow:         Group[GrowSettings]           = Group(GrowSettings, share=[on_at, off_at])
     blend:        Group[BlendSettings]          = Group(BlendSettings, share=[on_at, off_at])
@@ -289,23 +289,23 @@ class PoseInstrument(ProjectionLayer):
             # compresses about its person and the synth stays scale-agnostic: its knobs keep
             # their meaning relative to the pattern.
             px_per_degree = R / 360.0 * self._scale
-            centres = [p.position * R + half_turn for p in players]
+            centers = [p.position * R + half_turn for p in players]
             reaches_left = [p.reach_left for p in players]
             reaches_right = [p.reach_right for p in players]
             if opposite == Opposite.BOTH:
-                centres += [p.position * R + R / 2.0 for p in players]
+                centers += [p.position * R + R / 2.0 for p in players]
                 reaches_left += [p.opposite_reach_left for p in players]
                 reaches_right += [p.opposite_reach_right for p in players]
-            centre_px = np.array(centres).reshape(-1, 1)
-            signed = (((self._pixels - centre_px + R / 2.0) % R) - R / 2.0) / px_per_degree
+            center_px = np.array(centers).reshape(-1, 1)
+            signed = (((self._pixels - center_px + R / 2.0) % R) - R / 2.0) / px_per_degree
             reach_left = np.array(reaches_left).reshape(-1, 1)
             reach_right = np.array(reaches_right).reshape(-1, 1)
             sources = [self._sources(p) for p in players]
             n = len(players)                                # row k belongs to players[k % n]
             # On a sync strobe frame the strobing patterns render as their own batch, so their
             # outputs swap channels (or stay dark); off the strobe everyone is one batch as ever.
-            steady = [k for k in range(len(centres)) if not players[k % n].sync_strobe]
-            strobing = [k for k in range(len(centres)) if players[k % n].sync_strobe]
+            steady = [k for k in range(len(centers)) if not players[k % n].sync_strobe]
+            strobing = [k for k in range(len(centers)) if players[k % n].sync_strobe]
             for idx, strobed in ((steady, False), (strobing, True)):
                 if not idx or (strobed and self._instrument.sync_strobe.mode == SyncStrobeMode.BLACK):
                     continue
@@ -397,26 +397,26 @@ class PoseInstrument(ProjectionLayer):
     def connect(self, p: _Player) -> tuple[Sources, Sources]:
         """The connections (``docs/POSE_INSTRUMENT.md``, *The connections*) written out: a person's
         measures into the sources of the white and the blue oscillator's slots. The bases and the
-        amounts, the range and the direction, are the ``PI.white_lines`` / ``PI.blue_lines``
+        amounts, the range and the direction, are the ``pose_instrument.white_lines`` / ``pose_instrument.blue_lines``
         settings.
 
         The arms are ``docs/MATRIX_V2.md``'s Step 5:
 
         - the arms' mean, of the two arm travels: both pulse widths (white's base 0 and amount
           1, blue's base 1 and amount −1: arms hanging is full blue, arms raised full white,
-          between them the two colours tile). An arm's travel is the weighted union of its
+          between them the two colors tile). An arm's travel is the weighted union of its
           shoulder's and its elbow's — the fold lifts the arm, so folded elbows draw with the
           shoulders down, and a raised shoulder is a full arm whatever the elbow
-        - each elbow its own colour's pitch, the left the white and the right the blue: folding an
-          elbow makes its colour's lines finer; equal elbows keep the colours in tune
-        - the shoulders' pull, shared by the body bend: each colour's phase takes its share,
+        - each elbow its own color's pitch, the left the white and the right the blue: folding an
+          elbow makes its color's lines finer; equal elbows keep the colors in tune
+        - the shoulders' pull, shared by the body bend: each color's phase takes its share,
           ``difference × (1 ± share × bend) / 2`` (white +, blue −, clamped to a source's −1..1;
-          the share ``PI.lean_share``), the amounts opposite (white +¼, blue −¼). The arms alone
-          say how far the colours pull together — the relative pull is the difference's, a
-          quarter interval at full, whatever the bend — and the lean says which colour carries
-          it: upright both concede equally, leaned one colour stands on its grid and the other
+          the share ``pose_instrument.lean_share``), the amounts opposite (white +¼, blue −¼). The arms alone
+          say how far the colors pull together — the relative pull is the difference's, a
+          quarter interval at full, whatever the bend — and the lean says which color carries
+          it: upright both concede equally, leaned one color stands on its grid and the other
           walks. At share 1 a full lean hands over exactly the whole pull; above it the carrying
-          colour overshoots the meeting and the pair stretches open again, the clamp a
+          color overshoots the meeting and the pair stretches open again, the clamp a
           standstill, not a jump. A lean with level arms says nothing
 
         Every other parameter sits at its base; connections are added one at a time, each earning
@@ -514,7 +514,7 @@ class PoseInstrument(ProjectionLayer):
         below ``off_at``, so a room hovering at one level never swaps it. A pair that cannot be
         read holds the room off, as does a person at neutral (the neutral weight is in the
         feature); below two people there is no pair. Computed once per tick, once the players'
-        presences and similarities are this tick's; published on ``PI.full_sync`` for the show
+        presences and similarities are this tick's; published on ``pose_instrument.full_sync`` for the show
         (``docs/STATES.md``, S7: PLAY winds down once its hold has built), and taken by the sync strobe,
         the growth and the blend, each through its own bypass into its own envelope."""
         P = self._instrument
@@ -649,15 +649,15 @@ class PoseInstrument(ProjectionLayer):
     # -- Drawing ---------------------------------------------------------------------
 
     def _draw_mask(self, mask: np.ndarray, mask_white: np.ndarray, mask_blue: np.ndarray, p: _Player,
-                   centre: int) -> None:
+                   center: int) -> None:
         """Mark the person's mask: it goes over every pattern, each channel lit at the mask's level
         by presence, raised to the flash's level as far as the flash is up. The border is a line
-        centred on each edge of the band, half over the blue: its own levels by presence, part of
+        centerd on each edge of the band, half over the blue: its own levels by presence, part of
         the mask like the band, and it does not flash."""
         P = self._instrument.mask
         R = self.resolution
         half = mask_half_width(P.width, R)
-        idx = (centre + np.arange(-half, half + 1)) % R
+        idx = (center + np.arange(-half, half + 1)) % R
         mask[idx] = True
         flash = p.flash.value
         presence = p.voice.presence
@@ -667,7 +667,7 @@ class PoseInstrument(ProjectionLayer):
         if P.border_width > 0.0 and (P.border_white > 0.0 or P.border_blue > 0.0):
             border_half = mask_half_width(P.border_width, R)
             offsets = np.arange(-border_half, border_half + 1)
-            edges = np.concatenate((centre - half + offsets, centre + half + offsets)) % R
+            edges = np.concatenate((center - half + offsets, center + half + offsets)) % R
             mask[edges] = True
             for levels, base in ((mask_white, P.border_white), (mask_blue, P.border_blue)):
                 levels[edges] = np.maximum(levels[edges], base * presence)

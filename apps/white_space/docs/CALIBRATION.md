@@ -27,7 +27,7 @@ Calibrate in this order. Cameras first: everything else is tuned against the fra
      `lens_center_y`) in the preset — `tilt` from the table under *Tilt — derived from the build*,
      the lens from *The lens* — and relaunch. All of them are baked in when the devices open, and
      the frame height is derived from them.
-   - Read the open log: per camera one `lens:` line (its field, centre offset and `lens_error`,
+   - Read the open log: per camera one `lens:` line (its field, center offset and `lens_error`,
      which must match the table under *The lens*) and one `frame:` line (the delivered size, the
      elevation window, the horizon row, the rows covered).
    - Read the pinned indicator (`camera.camera_check.mount`). It must be a green `Mount OK`. On a red
@@ -40,9 +40,9 @@ Calibrate in this order. Cameras first: everything else is tuned against the fra
      height. If not, see *Reading the panorama*.
    - Tape at 50 cm on the wall in front of each camera: it must sit on the green horizon line. See
      *The horizon check*.
-   - Set `render.panorama.focus_radius` to the `track.rig.parallax_radius` read-out.
+   - Set `render.panorama.focus_radius` to the `tracker.rig.parallax_radius` read-out.
    - The metres, last of the camera step and the only part needing a person to walk: turn
-     `track.foot_offset` until the label's `H` stops drifting as they walk out, then read `H`'s value
+     `tracker.foot_offset` until the label's `H` stops drifting as they walk out, then read `H`'s value
      to check `rig.camera_height`. Tape confirms it: standing on R 1.5 or R 3.5, the mark's foot tick
      must land on that edge of the zone band. See *Calibrating the metres*. The metres decide the far
      edge and the read-outs; no bearing or link depends on them.
@@ -61,12 +61,12 @@ Steps 2 and 3 may be done in either order.
 Re-check without re-tuning: a spin-up (the projected playhead line continues where the beam was);
 the flash on the first person at IDLE → INTRO; the sound on the beam.
 
-| step         | settings                                   | readout                                   | passes when                                   |
-|--------------|--------------------------------------------|-------------------------------------------|-----------------------------------------------|
-| 1 cameras    | frame constants, `track.*`, `focus_radius` | open log, *Mount*, camera row, panorama   | every check in step 1                         |
-| 2 playhead   | `light.playhead.pulse_offset`              | `beam_flash`, `/pose/N/playhead/offset`   | flash on the person; offset 0 at the crossing |
-| 3 projection | `projection_offset`, `interlace`           | projection mode, `pose_instrument`        | static line on the person; single line        |
-| 4 speakers   | `speaker_offset` (0)                       | IDLE, Max voicing `/global/playhead`      | sound follows the beam                        |
+| step         | settings                                     | readout                                   | passes when                                   |
+|--------------|----------------------------------------------|-------------------------------------------|-----------------------------------------------|
+| 1 cameras    | frame constants, `tracker.*`, `focus_radius` | open log, *Mount*, camera row, panorama   | every check in step 1                         |
+| 2 playhead   | `light.playhead.pulse_offset`                | `beam_flash`, `/pose/N/playhead/offset`   | flash on the person; offset 0 at the crossing |
+| 3 projection | `projection_offset`, `interlace`             | projection mode, `pose_instrument`        | static line on the person; single line        |
+| 4 speakers   | `speaker_offset` (0)                         | IDLE, Max voicing `/global/playhead`      | sound follows the beam                        |
 
 There is no gathered calibration panel. Each setting stays with the code that applies it: the pulse
 offset with the playhead under `light`, the projection offset and interlace with the sender under
@@ -84,7 +84,7 @@ interlace is not an angle: the firmware shifts an integer pixel index, so it sta
 ### One frame: azimuth
 
 Every position in the system is an azimuth, an angle around the room. There is one azimuth frame,
-and azimuth 0 is the centre of the connection side of the cube (see *Layout*).
+and azimuth 0 is the center of the connection side of the cube (see *Layout*).
 
 The cameras produce it:
 
@@ -96,7 +96,7 @@ connection side. Placing them carefully has to be done anyway, and a knob would 
 If the flash is off in a room, move a camera, don't turn an offset.
 
 That formula is the whole of it at `camera_radius = 0`. The cameras sit 0.36 m out, so the tracker
-adds a parallax term at one assumed depth, `track.rig.parallax_radius` (R 2.1, derived from the
+adds a parallax term at one assumed depth, `tracker.rig.parallax_radius` (R 2.1, derived from the
 zone); why a fixed depth and not the measured distance is in `TRACKING.md`, *Why the azimuth does
 not use the measured distance*.
 
@@ -189,10 +189,10 @@ connection side (site fact). It is the one physical reference the fixture carrie
 layout is defined from it. Drawing: `White Space Layout Sheet.pdf` in this folder (A the room, B the
 machine).
 
-- **Azimuth 0 is the centre of the connection side**, increasing counter-clockwise.
+- **Azimuth 0 is the center of the connection side**, increasing counter-clockwise.
 - **Cameras on the corners**, pointing diagonally outward, 15 cm beyond the cube's corner (lens
   0.36 m from the axis, 0.50 m up). Camera 0 at the corner counter-clockwise of the connection side,
-  then counter-clockwise. Camera *i* points at 90·*i* + 45, so every seam is a face centre. The 15 cm
+  then counter-clockwise. Camera *i* points at 90·*i* + 45, so every seam is a face center. The 15 cm
   keeps the speakers out of frame: the nearest speaker corner is ≈76° off a camera's axis, outside its
   63.5° half-field. The left lens sits 37.5 mm off the tripod thread — put the lens on the corner line.
 - **Speakers parallel to the faces, 10 cm off them**, pointing out, not touching the fixture (site
@@ -263,29 +263,29 @@ changed by editing the preset and relaunching:
   of 16 — 848 at P720 and tilt 0, 960 at P720 and tilt 15, 1152 at P800 and tilt 16. The rows are
   tangents, so the full reach needs more of them than the sensor has. Any other height costs, per
   direction: too many rows give a flat black bar of dead pixels across the top (113 rows at tilt 0
-  with 960); too few cut the centre of the top, the raised-arm zone on each camera's axis (4.5°,
+  with 960); too few cut the center of the top, the raised-arm zone on each camera's axis (4.5°,
   45 sensor rows, at tilt 15 with 848), while the sides, which never reach that high, lose nothing.
 - **`tilt`** — up-tilt in degrees, positive = aimed up, shared by all four. The warp re-aims the camera
   by it.
 
-**The window is pinned at the bottom.** The last row is the sensor's lowest reach on the centre column
-— `tilt − 35.1°` at P720, `tilt − 39.2°` at P800, with the lens centre 10.5 px low — and the rows run
+**The window is pinned at the bottom.** The last row is the sensor's lowest reach on the center column
+— `tilt − 35.1°` at P720, `tilt − 39.2°` at P800, with the lens center 10.5 px low — and the rows run
 upward from there for the frame's height. It is pinned there because the feet are what
 the tilt rule pins — the floor-plane distance reads off the feet — and because the tangent spends its
-rows at the top. At the full-reach height the top row is the sensor's top on the centre column:
+rows at the top. At the full-reach height the top row is the sensor's top on the center column:
 −20.1° to +52.3° at P720 and tilt 15 on 960 rows, −23.2° to +57.3° at P800 and tilt 16 on 1152. The
-horizon is therefore not the centre row: row 747 of 960 and row 894 of 1152 respectively
+horizon is therefore not the center row: row 747 of 960 and row 894 of 1152 respectively
 (`horizon_row` ≈ 0.78), and `frame_window` (`modules/camera/geometry.py`) is the one place that turns a row into
 an elevation or back. The open log prints the window per camera.
 
 **Black is where the sensor did not look.** The sensor is a rectangle in the lens's own projection,
 and that is not a rectangle in azimuth/elevation, so no rectangular window fills without cutting.
-Tilting up lifts the centre column by the full tilt but the edge columns by less, so the sensor's
+Tilting up lifts the center column by the full tilt but the edge columns by less, so the sensor's
 reach falls toward the sides (the table under *Tilt — derived from the build*), and the tangent rows
-magnify the difference at the top: at P720, tilt 15, 960 rows the centre column is covered top to
+magnify the difference at the top: at P720, tilt 15, 960 rows the center column is covered top to
 bottom, the seam columns (45° off axis) from row 139, the edge columns from row 256 — a black arch
 across the top, deepest at the sides. `frame_coverage` says exactly which rows each column carries,
-and the open log summarises it (centre, seams, edges). Downstream asks it rather than assuming the
+and the open log summarises it (center, seams, edges). Downstream asks it rather than assuming the
 frame's top row: a raised arm near a seam is judged against what the camera could see there.
 
 `keystone` is the other installations' full-frame correction; it stays 0 here, and is exclusive with
@@ -295,9 +295,9 @@ frame's top row: a raised arm near a seam is judged against what the camera coul
 
 Read off the four units' factory calibrations (mono CAM_B, 1280 × 800; the factory model is a pinhole
 with a rational distortion polynomial, and on these lenses that polynomial keeps radius linear in
-angle to 0.5 % out to 75°, so its focal and centre are the equidistant lens):
+angle to 0.5 % out to 75°, so its focal and center are the equidistant lens):
 
-| unit                  | focal px/rad | centre x | centre y | field across 1280 px | `lens_error` |
+| unit                  | focal px/rad | center x | center y | field across 1280 px | `lens_error` |
 |-----------------------|--------------|----------|----------|----------------------|--------------|
 | cam …F124D9D600       | 575.4        | 615.2    | 409.9    | 127.5°               | **1.4°**     |
 | cam …110AD3D200       | 567.2        | 634.3    | 407.6    | 129.3°               | 0.5°         |
@@ -310,14 +310,14 @@ in the overlap in the fault table under *Reading the panorama* — and puts the 
 high, which is ≈ 1 m of distance error at 5 m (`TRACKING.md`, *The tracker's distance*).
 
 One lens for all four, the mean, in the preset: `lens_fov` **128.9** (568.6 px/rad across 1280 px),
-`lens_center_x` **−10.5**, `lens_center_y` **+10.5** (px from the frame centre, at the full sensor
+`lens_center_x` **−10.5**, `lens_center_y` **+10.5** (px from the frame center, at the full sensor
 mode; the 720-row crop keeps the offset). A lens per unit would remove the residuals in the last
 column; a shared lens is the chosen trade, and the residual stays visible: at open each camera logs
 its own lens and `camera.cam_N.readings.lens_error`, the largest bearing error it has under the shared
-lens. Unit F124's optical centre sits 24 px left of the frame centre, so it keeps 1.4° at its azimuth
+lens. Unit F124's optical center sits 24 px left of the frame center, so it keeps 1.4° at its azimuth
 zero; the other three are within 0.6°. Re-read the numbers only after a lens or a unit is replaced.
 
-The tracker's other constants, under `track.rig`: `camera_radius` (R 0.36 m — how far each lens sits
+The tracker's other constants, under `tracker.rig`: `camera_radius` (R 0.36 m — how far each lens sits
 from the fixture axis, like every figure here), `camera_height` (0.50 m), and the tracked zone
 `zone_min_radius` / `zone_max_radius` (R 1.5 – R 3.5). The first two are measured with a tape, the
 zone is decided and then taped; none is tuned. The seam settings are in `TRACKING.md`, *Linking on a
@@ -332,7 +332,7 @@ the warp, and distance comes off the floor plane.
 The reference person is 1.8 m, with an overhead hand reach of 2.2 m — raised arms are content the pose
 reads. On the R 1.35 m circle, on a camera's axis, they stand 0.99 m from the lens, which puts their
 hands at +59.8°, head at +52.7° and feet at −26.8°. A camera aimed up by `tilt` sees from
-`tilt − 39.2°` to `tilt + 41.3°` on its centre column (P800 with the shared lens; 35.1° and 37.3° at
+`tilt − 39.2°` to `tilt + 41.3°` on its center column (P800 with the shared lens; 35.1° and 37.3° at
 P720 — the sensor's own vertical field, which the frame delivers in full at the derived
 height); fitting hands and feet at R 1.35 would need 120° of it, against 80°. So the tilt is a
 trade, and it is resolved in favour of the top: losing the feet degrades the distance estimate (it
@@ -373,7 +373,7 @@ rows at P800 and tilt 16); at the sensor's own 800 rows the tangent rows would c
 everywhere — hands from R 2.1, head from R 1.7 — which is why the frame is taller than the sensor.
 
 The panel shows this live, for the configuration actually running. The tables above are the design
-reference; `track.rig` is the check. After `hfov`, `vfov`, `tilt` and the frame's two edge angles it
+reference; `tracker.rig` is the check. After `hfov`, `vfov`, `tilt` and the frame's two edge angles it
 publishes, as radii from the fixture:
 
 | read-out     | what it is                                                              |
@@ -392,15 +392,15 @@ wider than the seam's own bearing, because the camera sits 0.36 m out.
 
 Three facts about what `tilt` moves. `angle_bottom` follows it 1:1: the frame is pinned at the
 sensor's lowest reach, a lens constant below the tilt. `angle_top` follows it too, since the derived
-height ends the frame at the sensor's top on the centre column. The row scale is `fov` and the
+height ends the frame at the sensor's top on the center column. The row scale is `fov` and the
 frame's shape; tilt reaches it through the derived height.
 
 ### What the horizontal field allows
 
 The vertical field decides whether a person fits; the horizontal field — `fov`, identical at P720 and
 P800 — decides whether they are inside any camera's sector at all. It binds at the seams, where a
-person is 45° off both neighbouring axes. Because each camera sits 0.36 m out from the centre, its
-127° covers less of the room as measured from the centre, worst up close:
+person is 45° off both neighbouring axes. Because each camera sits 0.36 m out from the center, its
+127° covers less of the room as measured from the center, worst up close:
 
 | R      | one camera's azimuth span | overlap at each seam                  |
 |--------|---------------------------|---------------------------------------|
@@ -410,10 +410,10 @@ person is 45° off both neighbouring axes. Because each camera sits 0.36 m out f
 | 2.1 m  | 109.3°                    | +19.3° — the focus and parallax depth |
 | 3.5 m  | 116.4°                    | +26.4°                                |
 
-- **R 1.015 m** — a seam person's centre enters one camera. Below it they are in the gap and
+- **R 1.015 m** — a seam person's center enters one camera. Below it they are in the gap and
   invisible, which is why R 1 m is the hard floor: a consequence of the camera radius, not a choice.
 - **R 1.765 m** — a whole body (50 cm shoulders) fits inside one camera. Between the two, a seam person
-  is cut on one side in each camera and the box centre leans toward the visible side, ≈3° at R 1.35 m
+  is cut on one side in each camera and the box center leans toward the visible side, ≈3° at R 1.35 m
   — a wobble at the handover, not a failure.
 
 On a camera's own axis the horizontal field never binds (a whole body fits from R 0.485 m), so these
@@ -422,9 +422,9 @@ are seam properties only.
 ### Reading the panorama
 
 The second row is the whole rig as one 360° strip: azimuth 0 at the left edge, linear in degrees,
-elevation up the side, both measured at the rig centre. The rows are the tangent of elevation, as the
+elevation up the side, both measured at the rig center. The rows are the tangent of elevation, as the
 camera frames' are, so a person or a ceiling edge has the same shape in the strip as in the frames
-above it, and the only difference between the two is the azimuth re-projection to the rig centre. A
+above it, and the only difference between the two is the azimuth re-projection to the rig center. A
 degree at the horizon is the same size either way; the grid's elevation lines spread toward the top.
 (The strip is stitched from the frames through the tracker's published row model; `strip.strip_y`
 owns the strip's own rows.) The four images are drawn on top of each other at the azimuth each camera
@@ -494,12 +494,12 @@ free player slot is drawn in white with no lane, labelled `#- … waiting` at th
 - A grey line with no field is a detection the tracker rejected, labelled with the rejection at its
   top:
 
-| label       | rejected because                               | the setting                                         |
-|-------------|------------------------------------------------|-----------------------------------------------------|
-| `young`     | the device has not held the track long enough  | `track.age_filter`                                  |
-| `small`     | the box is shorter than the minimum            | `track.height_filter`                               |
-| `dead zone` | a new person arriving at a camera's field edge | `track.seam.dead_zone`                              |
-| `past R3.5` | standing past the far edge                     | `track.zone_filter`, at `track.rig.zone_max_radius` |
+| label       | rejected because                               | the setting                                             |
+|-------------|------------------------------------------------|---------------------------------------------------------|
+| `young`     | the device has not held the track long enough  | `tracker.age_filter`                                    |
+| `small`     | the box is shorter than the minimum            | `tracker.height_filter`                                 |
+| `dead zone` | a new person arriving at a camera's field edge | `tracker.seam.dead_zone`                                |
+| `past R3.5` | standing past the far edge                     | `tracker.zone_filter`, at `tracker.rig.zone_max_radius` |
 
 So a person walking out keeps their own mark, fading, and when it has gone grey a grey line labelled
 `past R3.5` takes its place for as long as the camera still sees them.
@@ -513,37 +513,37 @@ So a person walking out keeps their own mark, fading, and when it has gone grey 
 | a residual growing toward the frame edges on every camera | the lens is not equidistant — re-read the calibrations       |
 | two lines of one colour on a seam, opening and closing    | nothing — the depth indicator, 0 at R 2.1, 6.7° at the edges |
 | two lines of one colour further apart than 6.7°, anywhere | the azimuth chain — `fov`, `tilt` or `camera_radius`         |
-| every line sits beside its own pixels                     | `focus_radius` differs from `track.rig.parallax_radius`      |
-| the strong line flips between two cameras at a seam       | `track.seam.hysteresis`, `track.seam.hold`                   |
+| every line sits beside its own pixels                     | `focus_radius` differs from `tracker.rig.parallax_radius`    |
+| the strong line flips between two cameras at a seam       | `tracker.seam.hysteresis`, `tracker.seam.hold`               |
 
 The image is stitched for one assumed depth, `render.panorama.focus_radius`, R 2.1 — the tracker's
 parallax depth, so marks and pixels agree. It is exact there and ghosts by a bounded amount elsewhere
 (+3.3° at R 1.5, −3.0° at R 3.5, per camera), so judge alignment with someone near the middle of the
 room. Nothing about a person feeds the image or the marks' x, so nothing about a person can fool
 either. `focus_radius` is a render setting and does not follow the zone: after changing the zone, set
-it to the new `track.rig.parallax_radius`.
+it to the new `tracker.rig.parallax_radius`.
 
 ### Two axes, and the depth that varies
 
 There is one space, with two axes, and everything on the strip uses them: x is azimuth at the rig
-centre, y is elevation at the rig centre (`strip_y`). There is no image space — the stitch starts from
+center, y is elevation at the rig center (`strip_y`). There is no image space — the stitch starts from
 a strip column, turns it into (azimuth, elevation), and works backwards into each camera's frame,
 which is what makes drawing data over pixels meaningful. Two things opt out of one axis each and
 neither is a measurement: the dead zone uses x only and runs the full height, and a label's y is a
 lane picked by the player slot.
 
 What varies is the depth assumed to get into that space. Both axes need an assumed distance to turn a
-camera's view into the centre's, and each thing drawn names its own:
+camera's view into the center's, and each thing drawn names its own:
 
 | drawn thing                            | x              | y                | depth                                          |
 |----------------------------------------|----------------|------------------|------------------------------------------------|
-| image (`image`)                        | centre azimuth | centre elevation | `focus_radius`                                 |
-| dead zone (`seams`)                    | centre azimuth | full height      | `focus_radius`                                 |
-| lattice, seam and axis lines (`grid`)  | centre azimuth | —                | exact                                          |
-| overlap verticals (`grid`)             | centre azimuth | —                | `parallax_radius`                              |
-| horizon, zone band (`grid`)            | —              | centre elevation | exact                                          |
-| mark: line, foot tick, field (`marks`) | centre azimuth | centre elevation | x: `parallax_radius`, y: the person's distance |
-| label (`labels`)                       | centre azimuth | lane by player   | `parallax_radius`                              |
+| image (`image`)                        | center azimuth | center elevation | `focus_radius`                                 |
+| dead zone (`seams`)                    | center azimuth | full height      | `focus_radius`                                 |
+| lattice, seam and axis lines (`grid`)  | center azimuth | —                | exact                                          |
+| overlap verticals (`grid`)             | center azimuth | —                | `parallax_radius`                              |
+| horizon, zone band (`grid`)            | —              | center elevation | exact                                          |
+| mark: line, foot tick, field (`marks`) | center azimuth | center elevation | x: `parallax_radius`, y: the person's distance |
+| label (`labels`)                       | center azimuth | lane by player   | `parallax_radius`                              |
 
 **The rule: two things on the strip are comparable only if they share an axis and a depth.** A
 misalignment on this display is a pair that shares the axis and not the depth — an overlap line off
@@ -570,7 +570,7 @@ against the zone band, because going through the person's own distance makes the
   overlap. It goes to zero below about R 1, where the sectors stop meeting (*What the horizontal field
   allows*), and the lines then vanish.
 - **The zone band**, the tracked floor: a translucent band between `rig.zone_min_radius` and
-  `rig.zone_max_radius`, at the depressions they subtend at the rig centre, `atan(camera_height / R)`
+  `rig.zone_max_radius`, at the depressions they subtend at the rig center, `atan(camera_height / R)`
   — R 1.5 is −18.4° and R 3.5 is −8.1°. A floor circle of constant radius is a constant depression,
   so the zone is a band of rows, the same at every azimuth. Tape the two circles on the floor and they
   must land on the band's two edges. It is also what a person's mark is read against: a mark's line
@@ -606,7 +606,7 @@ left camera. `STRIPE` is blind to exposure differences, so it is the mode for tw
 on brightness.
 
 **A free check of the whole azimuth chain:** at R 2.1 each camera spans 109.3° of the strip, not 127°.
-Set `track.rig.camera_radius` to 0 and every image snaps to exactly 127° with 37° overlaps. It is a
+Set `tracker.rig.camera_radius` to 0 and every image snaps to exactly 127° with 37° overlaps. It is a
 live slider, so this exercises the entire geometry in two drags.
 
 ### Reading the fields
@@ -692,7 +692,7 @@ tell them apart. The cameras can:
   under 0.6° on the others, and a different number means a unit was swapped.
 
 Roll matters more than it looks: it doubles at the seams. Neighbouring cameras see a seam on opposite
-sides of their own centres, so the same roll moves the shared content in opposite vertical directions
+sides of their own centers, so the same roll moves the shared content in opposite vertical directions
 — ≈2.2° of vertical mismatch per 1.2° of roll. A roll common to all four does not cancel. The offset
 corrects the reading, not the image.
 
@@ -702,7 +702,7 @@ Two stages that fix different things and do not interact: stage 1 removes the dr
 scale. Do them in order, with `image` + `grid` + `marks` + `labels` on the panorama. What the tracker
 measures and why `foot_offset` is the correction is in `TRACKING.md`, *Distance and height*.
 
-**1. Walk one person out and turn `track.foot_offset` until `H` stops drifting.** `H` is
+**1. Walk one person out and turn `tracker.foot_offset` until `H` stops drifting.** `H` is
 distance-invariant by construction, so any drift is the detector's pad and nothing else. On the studio
 frame, with the detector's pad at 0.03 of the frame height, a 1.8 m person prints:
 
@@ -879,7 +879,7 @@ sound and both screen views are self-consistent.
   the near one is below what the strip can show at P720 / tilt 15, so the band runs off the bottom
   there and R 1.5 has to be judged in the camera frames instead. If the room's usable area is
   different, change these rather than anything derived from them.
-- **The panorama counts the black arch as covered.** The stitch culls by the frame's window (the centre
+- **The panorama counts the black arch as covered.** The stitch culls by the frame's window (the center
   column's reach), not per column, so in the top corners of a camera's field the comparing blends
   (`AVERAGE`, `DIFFERENCE`, `SPLIT`, `STRIPE`) mix black into the count. `MAX`, the mode the procedure
   uses, is unaffected: black loses to the neighbour. Exact culling would take a per-column coverage
@@ -893,7 +893,7 @@ sound and both screen views are self-consistent.
   photograph the pose model could get. A per-crop warp in the crop extractor, no change to the shared
   frame. Worth an A/B on keypoint confidence at raised arms and close range.
 - **A placement aid** (maybe): since placement is the room-side calibration, projection layers that put
-  the sector boundaries and centres on the wall would make it easier. The IMU cannot help with azimuth
+  the sector boundaries and centers on the wall would make it easier. The IMU cannot help with azimuth
   — its magnetometer is useless next to the motor and the LED strips.
 
 Tracking's open questions are in `TRACKING.md`, *Open*.
@@ -910,7 +910,7 @@ to check against the parts.
 
     reference:        the connection side of the cube                            (site fact)
     direction:        counter-clockwise seen from above                          (site fact)
-    azimuth 0:        the centre of the connection side                          (rule — follows from the cameras)
+    azimuth 0:        the center of the connection side                          (rule — follows from the cameras)
     cameras:          on the corners, 15 cm beyond the cube, pointing diagonally;
                       camera 0 at the corner counter-clockwise of the connection
                       side, then counter-clockwise; camera R 0.36, height 0.50 m  (rule; taped)
@@ -930,10 +930,10 @@ to check against the parts.
     room:             8 × 8 m, machine in the middle                              (site fact)
     fixture:          cube 25 × 25 × 28 cm; rings Ø 25 / Ø 20 × 3.5 cm; tube Ø 20 × 154 cm;
                       head 9 × 9 cm; light from ≈ 32 cm                          (site fact)
-    speakers:         25 × 25 × 33 cm, centres 35 cm from the axis                (site fact)
+    speakers:         25 × 25 × 33 cm, centers 35 cm from the axis                (site fact)
     camera:           OAK-D Pro W left mono, 127° × 79.5°; 10 × 3.5 × 3.5 cm body on a
                       50 cm tripod; IR filter, does not see the light             (spec / site fact)
-    lens, shared:     lens_fov 128.9 (568.6 px/rad), centre (-10.5, +10.5) px    (mean of the four calibrations)
+    lens, shared:     lens_fov 128.9 (568.6 px/rad), center (-10.5, +10.5) px    (mean of the four calibrations)
     lens, per unit:   see the table under The lens; F124 is the outlier (1.4°)   (read 2026-09-12)
     frame height:     derived: 960 at P720 / tilt 15, 1152 at P800 / tilt 16 (the open log names it)
     drawing:          "White Space Layout Sheet.pdf", two A3 pages, to scale

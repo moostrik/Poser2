@@ -43,13 +43,13 @@ _CONNECT_RETRY_S: float = 5.0
 class OscLightInterlaceSettings(BaseSettings):
     """Interlace: the two arms' LEDs have gaps and are mounted out of phase, so one arm's LEDs
     fill the gaps of the other's and the two halves of a revolution interlace into one image.
-    Shift each lamp (pixels, 1 px = 0.1°) until the two sides paint one image: the whites
+    Shift each beam light (pixels, 1 px = 0.1°) until the two sides paint one image: the whites
     against each other, the blues against each other, then the blue image onto the white.
     Projection mode only — the firmware ignores these below FIXTURE_PROJECTION_RPM."""
-    white_0: Field[int] = Field(0, min=-10, max=10, description="Front white lamp shift (pixels)")
-    white_1: Field[int] = Field(0, min=-10, max=10, description="Back white lamp shift (pixels)")
-    blue_0:  Field[int] = Field(0, min=-10, max=10, description="Left blue lamp shift (pixels)")
-    blue_1:  Field[int] = Field(0, min=-10, max=10, description="Right blue lamp shift (pixels)")
+    white_0: Field[int] = Field(0, min=-10, max=10, description="Front white beam light shift (pixels)")
+    white_1: Field[int] = Field(0, min=-10, max=10, description="Back white beam light shift (pixels)")
+    blue_0:  Field[int] = Field(0, min=-10, max=10, description="Left blue beam light shift (pixels)")
+    blue_1:  Field[int] = Field(0, min=-10, max=10, description="Right blue beam light shift (pixels)")
 
 
 class OscLightSenderSettings(BaseSettings):

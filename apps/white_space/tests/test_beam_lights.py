@@ -43,11 +43,11 @@ class BeamProfileTest(unittest.TestCase):
     def test_core_is_solid_and_the_edges_fade_to_zero(self) -> None:
         profile = beam_profile(math.radians(20.0), math.radians(10.0), R)   # 20 px core, 10 px each side
         self.assertEqual(len(profile), 2 * (10 + 10) + 1)
-        centre = len(profile) // 2
-        np.testing.assert_allclose(profile[centre - 10:centre + 11], 1.0, rtol=1e-9)   # the core
+        center = len(profile) // 2
+        np.testing.assert_allclose(profile[center - 10:center + 11], 1.0, rtol=1e-9)   # the core
         self.assertAlmostEqual(profile[0], 0.0, places=9)                              # both ends dark
         self.assertAlmostEqual(profile[-1], 0.0, places=9)
-        self.assertAlmostEqual(profile[centre - 15], 0.5, places=6)                    # halfway down the fade
+        self.assertAlmostEqual(profile[center - 15], 0.5, places=6)                    # halfway down the fade
 
     def test_profile_is_symmetric(self) -> None:
         profile = beam_profile(math.radians(9.0), math.radians(7.0), R)
@@ -55,8 +55,8 @@ class BeamProfileTest(unittest.TestCase):
 
     def test_falloff_is_monotonic_and_smooth_at_both_joins(self) -> None:
         profile = beam_profile(math.radians(20.0), math.radians(20.0), R)
-        centre = len(profile) // 2
-        edge = profile[centre:]                                            # core out to darkness
+        center = len(profile) // 2
+        edge = profile[center:]                                            # core out to darkness
         self.assertTrue(np.all(np.diff(edge) <= 1e-12))                    # never rises
         # A raised cosine flattens into both the core and the darkness — no kink at either join.
         self.assertLess(abs(edge[10] - edge[11]), abs(edge[19] - edge[20]))
@@ -107,24 +107,24 @@ class ProjectionTest(unittest.TestCase):
 
     def test_lines_follow_the_heading(self) -> None:
         self._project(self._one(BeamLightId.FRONT_WHITE), math.radians(90.0))
-        lit = np.flatnonzero(self.out[0, :, 0] > 0.0)      # the core is a plateau — take its centre
+        lit = np.flatnonzero(self.out[0, :, 0] > 0.0)      # the core is a plateau — take its center
         self.assertEqual(int(round(float(lit.mean()))), R // 4)
 
-    def test_line_is_symmetric_around_its_centre(self) -> None:
+    def test_line_is_symmetric_around_its_center(self) -> None:
         self._project(self._one(BeamLightId.BACK_WHITE))
         white = self.out[0, :, 0]
-        centre = R // 2
+        center = R // 2
         for d in range(1, 31):
-            self.assertAlmostEqual(white[centre - d], white[centre + d], places=6, msg=f"offset {d}")
+            self.assertAlmostEqual(white[center - d], white[center + d], places=6, msg=f"offset {d}")
 
     def test_line_wraps_across_the_zero_azimuth_seam(self) -> None:
         self._project(self._one(BeamLightId.FRONT_WHITE), math.radians(-2.0))
         white = self.out[0, :, 0]
-        self.assertAlmostEqual(white[R - 2], 1.0, places=5)   # centre, just before the seam
+        self.assertAlmostEqual(white[R - 2], 1.0, places=5)   # center, just before the seam
         self.assertAlmostEqual(white[R - 1], 1.0, places=5)   # core carries on …
         self.assertAlmostEqual(white[0], 1.0, places=5)       # … across the seam
         self.assertGreater(white[12], 0.0)                    # into the fade on the far side
-        self.assertAlmostEqual(white[21], 0.0, places=6)      # and out (core 10 + blur 10 from centre)
+        self.assertAlmostEqual(white[21], 0.0, places=6)      # and out (core 10 + blur 10 from center)
 
     def test_core_and_fade_have_the_requested_widths(self) -> None:
         self._project(self._one(BeamLightId.FRONT_WHITE))

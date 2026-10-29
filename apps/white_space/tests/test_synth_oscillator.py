@@ -13,7 +13,7 @@ X = np.arange(0.0, 100.0, STEP)
 
 
 def runs(levels: np.ndarray) -> list[tuple[float, float]]:
-    """(centre, width) in degrees of every lit run of a hard output."""
+    """(center, width) in degrees of every lit run of a hard output."""
     lit = levels > 0.5
     edges = np.flatnonzero(np.diff(np.concatenate(([False], lit, [False])).astype(int)))
     return [((s + e - 1) / 2.0 * STEP, (e - s) * STEP) for s, e in zip(edges[::2], edges[1::2])]
@@ -26,8 +26,8 @@ def lines(oscillator: Oscillator, interval: float = 10.0, pulse_width: float = 0
 class PulseTest(unittest.TestCase):
     def test_a_line_is_the_pulse_width_of_the_interval_wide(self) -> None:
         for pulse_width in (0.1, 0.25, 0.5, 0.9):
-            centre, width = runs(lines(Oscillator(), 10.0, pulse_width))[1]
-            self.assertAlmostEqual(centre, 10.0, delta=2 * STEP)
+            center, width = runs(lines(Oscillator(), 10.0, pulse_width))[1]
+            self.assertAlmostEqual(center, 10.0, delta=2 * STEP)
             self.assertAlmostEqual(width, pulse_width * 10.0, delta=2 * STEP)
 
     def test_width_zero_is_dark_and_width_one_is_solid(self) -> None:
@@ -35,11 +35,11 @@ class PulseTest(unittest.TestCase):
         self.assertTrue((lines(Oscillator(), pulse_width=1.0) == 1.0).all())
 
     def test_a_thin_line_is_drawn_not_dropped(self) -> None:
-        centre, width = runs(lines(Oscillator(), 10.0, 0.005))[1]
+        center, width = runs(lines(Oscillator(), 10.0, 0.005))[1]
         self.assertAlmostEqual(width, 0.05, delta=2 * STEP)
 
     def test_phase_places_the_lines(self) -> None:
-        self.assertEqual(lines(Oscillator(), phase=0.0)[0], 1.0)          # a line centred on position 0
+        self.assertEqual(lines(Oscillator(), phase=0.0)[0], 1.0)          # a line centerd on position 0
         gap = lines(Oscillator(), phase=0.5)
         self.assertEqual(gap[0], 0.0)                                     # a gap there
         self.assertAlmostEqual(runs(gap)[0][0], 5.0, delta=2 * STEP)
@@ -51,8 +51,8 @@ class PulseTest(unittest.TestCase):
     def test_hardness_shapes_the_flanks_only(self) -> None:
         cycle = Oscillator().cycle(X, 10.0, 0.0)
         soft = Oscillator.pulse(cycle, 0.4, 0.3)
-        self.assertEqual(soft[0], 1.0)                                    # the centre of a line stays full
-        self.assertEqual(soft[int(5.0 / STEP)], 0.0)                      # the centre of a gap stays off
+        self.assertEqual(soft[0], 1.0)                                    # the center of a line stays full
+        self.assertEqual(soft[int(5.0 / STEP)], 0.0)                      # the center of a gap stays off
         self.assertTrue(((soft > 0.0) & (soft < 1.0)).any())
         self.assertFalse(Oscillator.pulse(cycle, 0.0, 0.0).any())         # width 0 stays dark
         self.assertTrue((Oscillator.pulse(cycle, 1.0, 0.0) == 1.0).all())  # width 1 stays solid

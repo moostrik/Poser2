@@ -18,7 +18,7 @@ states' exit and stage_progress (and S10's sound-visual reveal) ride.
 
 Two layers are instances of this class: ``beam_wind_down``, the plain wall of S9/S10, and
 ``beam_sync_wind_down``, the **strobing wall** of S11, built with the instrument's
-``PI.sync_strobe`` settings. The sync end leaves PLAY at full sync, the patterns strobing at the
+``pose_instrument.sync_strobe`` settings. The sync end leaves PLAY at full sync, the patterns strobing at the
 top rung, and the wall keeps that strobe on the lamps: on the strobes' shared tick grid at the
 same rate (``Strobe.rate`` at 16 per second, ``Strobe.period``: every other tick at 32 fps), a
 strobe frame swaps the wall to the two blue lamps (``SyncStrobeMode.INVERT``, as the patterns

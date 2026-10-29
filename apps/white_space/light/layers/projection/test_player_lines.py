@@ -1,7 +1,7 @@
-"""TestPlayerLines composition — visualises each tracked player as a coloured triplet in the projection.
+"""TestPlayerLines composition — visualizes each tracked player as a colored triplet in the projection.
 
 Each active player produces three lines at their world position:
-  - A centre line (blue by default, white when inverted)
+  - A center line (blue by default, white when inverted)
   - A left and right flank line (white by default, blue when inverted)
 
 Line width is modulated by the player's vertical position (BBox center_y) scaled by
@@ -28,11 +28,11 @@ if TYPE_CHECKING:
 
 
 class TestPlayerLinesSettings(LayerSettings):
-    center_width:  Field[float] = Field(7.2,   min=0.0, max=72.0,  step=0.5,  description="Centre line width (deg)")
+    center_width:  Field[float] = Field(7.2,   min=0.0, max=72.0,  step=0.5,  description="Center line width (deg)")
     flank_width:   Field[float] = Field(10.8,  min=0.0, max=72.0,  step=0.5,  description="Flank line width (deg)")
-    depth_scale:   Field[float] = Field(0.0,   min=0.0, max=1.0,   step=0.01, description="Depth scaling: 0=flat, 1=far player vanishes (centre_width is max)")
-    invert:        Field[bool]  = Field(False,                                 description="Swap centre/flank colours", newline=True)
-    level_center:  Field[float] = Field(1.0,   min=0.0, max=1.0,   step=0.01, description="Centre line level")
+    depth_scale:   Field[float] = Field(0.0,   min=0.0, max=1.0,   step=0.01, description="Depth scaling: 0=flat, 1=far player vanishes (center_width is max)")
+    invert:        Field[bool]  = Field(False,                                 description="Swap center/flank colors", newline=True)
+    level_center:  Field[float] = Field(1.0,   min=0.0, max=1.0,   step=0.01, description="Center line level")
     level_flank:   Field[float] = Field(1.0,   min=0.0, max=1.0,   step=0.01, description="Flank line level")
 
 
@@ -44,7 +44,7 @@ class _PlayerState:
 
 
 class TestPlayerLines(ProjectionLayer):
-    """Draws a centre line + two flanking lines for each tracked player."""
+    """Draws a center line + two flanking lines for each tracked player."""
 
     def __init__(self, resolution: int, settings: TestPlayerLinesSettings, board: RenderBoard, pose_stage: int) -> None:
         super().__init__(resolution, settings, board)
@@ -124,14 +124,14 @@ class TestPlayerLines(ProjectionLayer):
                 apply_circular(self._flank_buf, lv, l_start, BlendType.ADD)
                 apply_circular(self._flank_buf, lv, r_start, BlendType.ADD)
 
-        # --- punch holes at every centre so no flank can cover any centre ---
+        # --- punch holes at every center so no flank can cover any center ---
         for (pos_center, w_center, _, _, _) in players:
             cw: int = int(w_center * resolution)
             if cw > 0:
                 c_start: int = int((int(pos_center * resolution) - cw // 2) % resolution)
                 apply_circular(self._flank_buf, self._zeros_buf[:cw], c_start, BlendType.NONE)
 
-        # --- commit flanks, then draw centres on top ---
+        # --- commit flanks, then draw centers on top ---
         np.add(flank_arr, self._flank_buf, out=flank_arr)
         np.clip(flank_arr, 0.0, 1.0, out=flank_arr)
         for (pos_center, w_center, _, _, _) in players:

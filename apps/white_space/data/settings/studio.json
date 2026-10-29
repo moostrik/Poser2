@@ -159,7 +159,7 @@
       "fullscreen_mode": "WINDOWED"
     }
   },
-  "record": {
+  "session": {
     "output_path": "recordings",
     "name": "2_person",
     "split_seconds": 10,
@@ -170,7 +170,7 @@
       "ip_out": "127.0.0.1",
       "verbose": false
     },
-    "core": {},
+    "control": {},
     "video": {
       "keyframe_interval": 0,
       "temp_path": "temp",
@@ -364,7 +364,7 @@
     "frame_sync": {},
     "tracklet_sync": {}
   },
-  "track": {
+  "tracker": {
     "age_filter": 3,
     "height_filter": 0.3,
     "zone_filter": true,
@@ -667,13 +667,13 @@
         "blend": "ADD"
       },
       "test_calibration": {
-        "slice_centre": 0.5,
+        "slice_center": 0.5,
         "slice_height": 0.2,
         "threshold": 1.0,
         "detect": "BRIGHT",
         "method": "MAX",
         "show_overlap": false,
-        "show_centre": false,
+        "show_center": false,
         "white_markers": false,
         "blend": "ADD"
       },
@@ -829,7 +829,7 @@
       }
     }
   },
-  "PI": {
+  "pose_instrument": {
     "max_lines": 90,
     "opposite": "OFF",
     "lean_share": 2.0,

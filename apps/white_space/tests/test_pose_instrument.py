@@ -93,7 +93,7 @@ def _runs(values: np.ndarray) -> list[tuple[int, int]]:
 
 
 class PoseInstrumentTest(unittest.TestCase):
-    # Line centres a quarter pixel off the grid, so no line edge falls exactly on a pixel.
+    # Line centers a quarter pixel off the grid, so no line edge falls exactly on a pixel.
     QUARTER = 0.25 / INTERVAL
     HALFWAY = shoulder(0.5)             # both pulse widths a half: white and blue lines alternate
 
@@ -122,9 +122,9 @@ class PoseInstrumentTest(unittest.TestCase):
         self.layer.render(f)
         return f
 
-    def _outside_mask(self, centre: int = C) -> np.ndarray:
+    def _outside_mask(self, center: int = C) -> np.ndarray:
         keep = np.ones(IRES, dtype=bool)
-        keep[centre - MASK:centre + MASK + 1] = False
+        keep[center - MASK:center + MASK + 1] = False
         return keep
 
     @staticmethod
@@ -143,14 +143,14 @@ class PoseInstrumentTest(unittest.TestCase):
         return [(s, l) for s, l in cls._right(channel) if s + l < C + FULL]
 
     @staticmethod
-    def _centres(runs: list[tuple[int, int]]) -> list[float]:
+    def _centers(runs: list[tuple[int, int]]) -> list[float]:
         return [s + (l - 1) / 2 - C for s, l in runs]
 
     def _on_grid(self, runs: list[tuple[int, int]], spacing: float, offset: float = 0.0) -> None:
-        """Every run's centre sits at ``offset`` modulo ``spacing`` from the person, to a pixel."""
-        for c in self._centres(runs):
+        """Every run's center sits at ``offset`` modulo ``spacing`` from the person, to a pixel."""
+        for c in self._centers(runs):
             d = (c - offset) % spacing
-            self.assertLessEqual(min(d, spacing - d), 1.0, f"centre {c} off the grid of {spacing} at {offset}")
+            self.assertLessEqual(min(d, spacing - d), 1.0, f"center {c} off the grid of {spacing} at {offset}")
 
     # -- the connections --
 
@@ -262,7 +262,7 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertAlmostEqual(white[Parameter.PHASE], 1.0, places=5)       # clamped: a source stays within −1..1
         self.assertAlmostEqual(blue[Parameter.PHASE], -0.5, places=5)       # the other walks out the back: the pair opens
 
-    def test_a_lean_hands_the_pull_to_one_colour(self) -> None:
+    def test_a_lean_hands_the_pull_to_one_color(self) -> None:
         self.settings.lean_share = 1.0
         W, B = self.settings.white_lines, self.settings.blue_lines
         W.phase_amount, B.phase_amount = 0.25, -0.25
@@ -293,33 +293,33 @@ class PoseInstrumentTest(unittest.TestCase):
             drawn.append(self._render().light_img.copy())
         self.assertFalse(np.array_equal(drawn[0], drawn[1]))         # the phases pull opposite ways
 
-    def test_level_shoulders_tile_the_colours(self) -> None:
+    def test_level_shoulders_tile_the_colors(self) -> None:
         inner = slice(C + MASK + 1, C + FULL)
         self._people({0: _pose(0.5, left_shoulder=shoulder(0.3))})                   # level: complementary widths
         f = self._render()
         white, blue = f.white[inner] > 0.5, f.blue[inner] > 0.5
-        self.assertLessEqual(int(np.count_nonzero(white == blue)), 4 * len(_runs(f.white[inner])))   # every pixel one colour
+        self.assertLessEqual(int(np.count_nonzero(white == blue)), 4 * len(_runs(f.white[inner])))   # every pixel one color
 
-    def test_one_shoulder_moves_both_colours(self) -> None:
+    def test_one_shoulder_moves_both_colors(self) -> None:
         self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, right_shoulder=0.0)})   # the mean: a quarter
         f = self._render()
         self.assertEqual({l for _, l in self._inner(f.white)}, {INTERVAL // 4})
         self.assertEqual({l for _, l in self._inner(f.blue)}, {3 * INTERVAL // 4})
 
-    # -- the elbows: the pitch of their colour --
+    # -- the elbows: the pitch of their color --
 
     def _spacings(self, channel: np.ndarray) -> set[int]:
-        centres = self._centres(self._inner(channel))
-        return {round(b - a) for a, b in zip(centres, centres[1:])}
+        centers = self._centers(self._inner(channel))
+        return {round(b - a) for a, b in zip(centers, centers[1:])}
 
-    def test_an_elbow_makes_its_own_colour_finer_and_leaves_the_other(self) -> None:
+    def test_an_elbow_makes_its_own_color_finer_and_leaves_the_other(self) -> None:
         self.settings.white_lines.pitch_amount = self.settings.blue_lines.pitch_amount = 25.7     # folded: twice the lines
         self._people({0: _pose(0.5, left_shoulder=self.HALFWAY, left_elbow=shoulder(1.0))})
         f = self._render()
         self.assertEqual(self._spacings(f.white), {INTERVAL // 2})
         self.assertEqual(self._spacings(f.blue), {INTERVAL})
 
-    def test_equal_elbows_keep_the_colours_tuned(self) -> None:
+    def test_equal_elbows_keep_the_colors_tuned(self) -> None:
         W, B = self.settings.white_lines, self.settings.blue_lines
         W.pitch_amount = B.pitch_amount = 25.7
         W.pulse_width = B.pulse_width = 0.5                          # the widths by hand: the tuning alone,
@@ -362,7 +362,7 @@ class PoseInstrumentTest(unittest.TestCase):
         for channel in (f.white, f.blue):
             np.testing.assert_array_equal(channel[C + 1:C + span], channel[C - 1:C - span:-1])
 
-    def test_a_line_is_the_pulse_width_of_the_interval_and_the_colours_alternate(self) -> None:
+    def test_a_line_is_the_pulse_width_of_the_interval_and_the_colors_alternate(self) -> None:
         self._people({0: _pose(0.5, left_shoulder=self.HALFWAY)})
         f = self._render()
         white, blue = self._inner(f.white), self._inner(f.blue)
@@ -391,7 +391,7 @@ class PoseInstrumentTest(unittest.TestCase):
         self.settings.white_lines.pitch = 180.0                                      # the limit is 90 lines: 4°
         self._people({0: _pose(0.5, left_shoulder=self.HALFWAY)})
         white = self._inner(self._render().white)
-        self.assertEqual({round(b - a) for a, b in zip(self._centres(white), self._centres(white)[1:])}, {40})
+        self.assertEqual({round(b - a) for a, b in zip(self._centers(white), self._centers(white)[1:])}, {40})
 
     def test_a_still_pose_is_a_still_frame_and_a_small_move_a_small_change(self) -> None:
         self._people({0: _pose(0.5, left_shoulder=shoulder(0.9))})
@@ -625,7 +625,7 @@ class PoseInstrumentTest(unittest.TestCase):
         np.testing.assert_allclose(f.white[C - MASK:C + MASK + 1], 0.2, atol=1e-6)
         np.testing.assert_array_equal(f.white[C + MASK + 1:C + SOLID + 1], 1.0)
 
-    def test_the_hit_leaves_the_lines_colours_alone(self) -> None:
+    def test_the_hit_leaves_the_lines_colors_alone(self) -> None:
         outside = self._outside_mask()
         frames = self._sweep(left_shoulder=self.HALFWAY)
         np.testing.assert_array_equal(frames[3].white[outside], frames[2].white[outside])
@@ -636,15 +636,15 @@ class PoseInstrumentTest(unittest.TestCase):
         self.settings.blue_lines.push = -14.0
         self.settings.white_lines.push_release_seconds = self.settings.blue_lines.push_release_seconds = 0.1
         frames = self._sweep(left_shoulder=self.HALFWAY)
-        before_white = self._centres(self._inner(frames[2].white))
-        before_blue = self._centres(self._inner(frames[2].blue))
-        on_hit = self._centres(self._inner(frames[3].white))                # the hit tick moves by push × dt
+        before_white = self._centers(self._inner(frames[2].white))
+        before_blue = self._centers(self._inner(frames[2].blue))
+        on_hit = self._centers(self._inner(frames[3].white))                # the hit tick moves by push × dt
         self.assertAlmostEqual(on_hit[0] - before_white[0], INTERVAL * TICK, delta=1.0)
         for _ in range(30):
             settled = self._render()
         expected = INTERVAL * TICK * (1.0 + 0.75 + 0.25)                    # the release's eased levels, summed
-        self.assertAlmostEqual(self._centres(self._inner(settled.white))[0] - before_white[0], expected, delta=1.0)
-        self.assertAlmostEqual(before_blue[0] - self._centres(self._inner(settled.blue))[0], expected, delta=1.0)
+        self.assertAlmostEqual(self._centers(self._inner(settled.white))[0] - before_white[0], expected, delta=1.0)
+        self.assertAlmostEqual(before_blue[0] - self._centers(self._inner(settled.blue))[0], expected, delta=1.0)
         np.testing.assert_array_equal(self._render().light_img, settled.light_img)     # kept, nothing comes back
 
     def test_speed_moves_white_out_and_blue_in(self) -> None:
@@ -668,8 +668,8 @@ class PoseInstrumentTest(unittest.TestCase):
         for _ in range(31):                                     # a second in all
             f = self._render()
         self._on_grid(self._inner(f.white), INTERVAL, INTERVAL / 2)            # right: away from the person
-        before_left = self._centres(self._left(first.white))[-1]
-        after_left = self._centres(self._left(f.white))[-1]
+        before_left = self._centers(self._left(first.white))[-1]
+        after_left = self._centers(self._left(f.white))[-1]
         self.assertAlmostEqual(after_left - before_left, 31 * 7.0 * TICK * 10, delta=1.0)   # left: toward the person
         self._on_grid(self._inner(f.blue), INTERVAL, INTERVAL / 2)             # blue, mirrored: as before
 
@@ -688,8 +688,8 @@ class PoseInstrumentTest(unittest.TestCase):
         P = self.settings.playhead
         P.width = 1.0                                                     # 10 px
         f = self._render(playhead=0.25)
-        centre = IRES // 4
-        np.testing.assert_array_equal(f.white[centre - 5:centre + 5], P.white)
+        center = IRES // 4
+        np.testing.assert_array_equal(f.white[center - 5:center + 5], P.white)
         self.assertEqual(float(f.white.sum()), 10 * P.white)
         self.assertEqual(float(f.blue.sum()), 0.0)                        # blue at 0: untouched
 
@@ -698,9 +698,9 @@ class PoseInstrumentTest(unittest.TestCase):
         P.width, P.white, P.blue = 1.0, 0.8, 0.4
         self._people({0: _pose(0.5)})                                     # full blue, the mask at C
         f = self._render(playhead=0.25)                                   # beyond the reach: dark there
-        centre = IRES // 4
-        np.testing.assert_allclose(f.white[centre - 5:centre + 5], 0.8)
-        np.testing.assert_allclose(f.blue[centre - 5:centre + 5], 0.4)
+        center = IRES // 4
+        np.testing.assert_allclose(f.white[center - 5:center + 5], 0.8)
+        np.testing.assert_allclose(f.blue[center - 5:center + 5], 0.4)
         f = self._render(playhead=0.5)                                    # in the mask
         np.testing.assert_allclose(f.white[C - 5:C + 5], 0.8 * P.at_mask)
         np.testing.assert_allclose(f.blue[C - 5:C + 5], self.settings.mask.blue + 0.4 * P.at_mask)
@@ -894,7 +894,7 @@ class PoseInstrumentTest(unittest.TestCase):
         np.testing.assert_array_equal(f.white[a - 300:a + 301], f.white[b - 300:b + 301])   # one pattern
         np.testing.assert_array_equal(f.blue[a - 300:a + 301], f.blue[b - 300:b + 301])
         self.assertEqual(float(f.white[a + MASK + 1:a + 300].max()), 1.0)   # the mean is half-raised:
-        self.assertEqual(float(f.blue[a + MASK + 1:a + 300].max()), 1.0)    # both colours' lines at both people
+        self.assertEqual(float(f.blue[a + MASK + 1:a + 300].max()), 1.0)    # both colors' lines at both people
 
     def test_below_the_band_everyone_keeps_their_own_pattern(self) -> None:
         a, b = round(0.3 * IRES), round(0.7 * IRES)
@@ -966,7 +966,7 @@ class PoseInstrumentTest(unittest.TestCase):
             self._render()
         return self._render()
 
-    def test_full_sync_strobes_every_other_tick_swapping_the_colours(self) -> None:
+    def test_full_sync_strobes_every_other_tick_swapping_the_colors(self) -> None:
         self._sync_pair()
         blue = [float(self._render().blue[self.PROBE]) for _ in range(4)]
         self.assertEqual(blue, [0.0, 1.0, 0.0, 1.0])

@@ -26,7 +26,7 @@ projection block's generic patterns keep a `test_` prefix.
 
 Show layers and the state machine read pose frames from the board, never the tracker's tracklets. The
 state machine also reads the board's hit streak (`HitSync`, `STATES.md` *Vocabulary*: in sync) and the pose
-instrument's full-sync readout (`PI.full_sync`, `STATES.md` *Vocabulary*: full sync); the live `Similarity`
+instrument's full-sync readout (`pose_instrument.full_sync`, `STATES.md` *Vocabulary*: full sync); the live `Similarity`
 feature stays the instrument's (the window opening, the gate) and the sound's.
 A person is present while their pose exists: the pose pipeline stops posing a person
 `pose.tracklets.detection_timeout` (1.0 s) after their last detection, and every filter downstream
@@ -49,15 +49,15 @@ layers nothing. `HitSync` records in its streak only the hits on poses at least 
 
 ## Index — show layers
 
-| Layer                 | Mode       | Reads                         | Writes                                   | Used by                   |
-|-----------------------|------------|-------------------------------|------------------------------------------|---------------------------|
-| `beam_playhead`       | beam       | — (settings only)             | front white lamp                         | S1–S6, S9–S11             |
-| `beam_flash`          | beam       | LERP frames (PlayheadOffset)  | front white + blue lamps; board flashes  | S4                        |
-| `pose_instrument`     | projection | LERP frames                   | white and blue lines, masks, marker      | S6 (projecting), S7, S8   |
-| `flood`               | projection | — (settings only)             | whole projection white                   | S8                        |
-| `beam_wind_down`      | beam       | tick clock                    | both white lamps, fading                 | S9, S10                   |
-| `beam_sync_wind_down` | beam       | tick clock; `PI.sync_strobe`  | the wall strobing white ↔ blue, fading   | S11                       |
-| `beam_blue_sound`     | beam       | sound levels from Max (board) | left/right blue lamps                    | S1, S2, S3, S5, S10       |
+| Layer                 | Mode       | Reads                                      | Writes                                   | Used by                   |
+|-----------------------|------------|--------------------------------------------|------------------------------------------|---------------------------|
+| `beam_playhead`       | beam       | — (settings only)                          | front white lamp                         | S1–S6, S9–S11             |
+| `beam_flash`          | beam       | LERP frames (PlayheadOffset)               | front white + blue lamps; board flashes  | S4                        |
+| `pose_instrument`     | projection | LERP frames                                | white and blue lines, masks, marker      | S6 (projecting), S7, S8   |
+| `flood`               | projection | — (settings only)                          | whole projection white                   | S8                        |
+| `beam_wind_down`      | beam       | tick clock                                 | both white lamps, fading                 | S9, S10                   |
+| `beam_sync_wind_down` | beam       | tick clock; `pose_instrument.sync_strobe`  | the wall strobing white ↔ blue, fading   | S11                       |
+| `beam_blue_sound`     | beam       | sound levels from Max (board)              | left/right blue lamps                    | S1, S2, S3, S5, S10       |
 
 `beam_flash`'s blue lamps are zeroed in the presets: S4 runs blue-none by design.
 
@@ -70,7 +70,7 @@ layer turns debug on: it shows solo at full weight and the motor follows its
 mode, OFF returns the show): the beam tool `beam_test` (direct
 levels for the four physical lamps: front/back white, left/right blue — beam mode's
 hardware check), the projection `projection_playhead` (the playhead's marker alone, with the
-instrument's `PI.playhead` settings, for looking at the playhead by itself: `CALIBRATION.md`),
+instrument's `pose_instrument.playhead` settings, for looking at the playhead by itself: `CALIBRATION.md`),
 plus the projection `test_`-prefixed patterns: `test_pose_waves` (a wave/void
 instrument, a reference/montage visual), `test_harmonic`,
 `test_player_lines`, `test_calibration`, `test_fill`, `test_random`, and the waveform
@@ -123,7 +123,7 @@ when the bar is slow. The S8 → S9 hand-off is seamless at the DACs: `flood` at
 mode drives the same two white outputs as this layer at 1.0 in beam mode.
 
 Two layers are instances of it. `beam_sync_wind_down`, the **strobing wall** of S11, is built with
-the instrument's `PI.sync_strobe`: the sync end leaves PLAY with the patterns strobing at the top
+the instrument's `pose_instrument.sync_strobe`: the sync end leaves PLAY with the patterns strobing at the top
 rung, and the wall keeps that strobe on the lamps — on the strobes' shared tick grid
 (`LIGHT_SYNTH.md`, *The strobe*) at 16 per second, a strobe frame swaps the wall to the two blue
 lamps (INVERT, as the patterns swap white and blue) or blanks it (BLACK). The first S11 frame
@@ -136,7 +136,7 @@ fade, so the strobe dies with the wall into the dim line underneath. The wall ca
   DIM/BRIGHT, `beam_blue_sound`) — it is revealed as the wall dies, so nothing has to splice or
   match at the hand-off.
 - **Input**: the tick clock; no pose data, no playhead signals. The strobing wall reads
-  `PI.sync_strobe.mode`.
+  `pose_instrument.sync_strobe.mode`.
 - **Behavior**: both white lamps at `f × level`, `f = 1 − ease(elapsed / spin_down_seconds)`,
   hand-tuned to ride the physical spin-down (the sensor is silent above 200 rpm, so the
   deceleration is not measurable). The states exit once `progress` reaches 1 and the
@@ -159,7 +159,7 @@ and the light synth that draws the lines is `LIGHT_SYNTH.md`.
 - **Input**: from the LERP frames, `Azimuth`, `Angles`, `LegDeviation`, `TorsoTilt`, `Distance`,
   `AngleSymmetry`, `Similarity` and `PlayheadOffset` (`POSE_INSTRUMENT.md`, *The body*). The
   layer adds no smoothing.
-- **Settings**: the layer's own group holds only `blend`; everything else is the root `PI` group
+- **Settings**: the layer's own group holds only `blend`; everything else is the root `pose_instrument` group
   (`POSE_INSTRUMENT.md`, *Settings*), among them `opposite`, which draws the patterns half a turn
   from their people while the masks stay on them
 - **Strobe**: each oscillator's lines can be gated whole, on or off per tick, on the clock's shared

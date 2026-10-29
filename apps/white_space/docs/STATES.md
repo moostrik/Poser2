@@ -18,9 +18,9 @@ Vocabulary:
   old (its `Age`; `studio.json`: 2 s) has its hits recorded: a double or a false positive lives a moment, so
   its hits neither build nor break the streak, while the hit itself still starts the intro. `HitSync`
   (`pose/hit_sync.py`) records each hit's pose off the LERP frame and publishes the streak on the board
-- **full sync** — the room's gate in the pose instrument: every present pair alike over the band `PI.on_at` /
-  `PI.off_at`, with hysteresis (`POSE_INSTRUMENT.md`, *The sync strobe*). The instrument computes it once per
-  tick while it draws and publishes it as `PI.full_sync`; the machine reads it in PLAY, where its **hold** —
+- **full sync** — the room's gate in the pose instrument: every present pair alike over the band `pose_instrument.on_at` /
+  `pose_instrument.off_at`, with hysteresis (`POSE_INSTRUMENT.md`, *The sync strobe*). The instrument computes it once per
+  tick while it draws and publishes it as `pose_instrument.full_sync`; the machine reads it in PLAY, where its **hold** —
   built over `play_full_sync_seconds` while it holds, drained over `play_full_sync_release_seconds` by a
   break — is the sync end (S11) once full
 - **neutral** — arms hanging: the arm joint furthest from neutral within
@@ -430,8 +430,8 @@ is complete and the playhead lock holds — but the wall is `beam_sync_wind_down
 (`LAYERS.md`, *beam_wind_down*). BEAM is commanded at once and the fixture reads beam mode from the first
 packet, so the instrument's picture gives way to the wall in one frame, and the sync strobe carries
 across: on the lamps, on the strobes' shared tick grid at the top rung, in the instrument's mode
-(`PI.sync_strobe.mode`: INVERT swaps the wall to the blue lamps, BLACK blanks it), until the fade has
-taken the wall. The instrument is reset on entry: it is done, and `PI.full_sync` reads off from here
+(`pose_instrument.sync_strobe.mode`: INVERT swaps the wall to the blue lamps, BLACK blanks it), until the fade has
+taken the wall. The instrument is reset on entry: it is done, and `pose_instrument.full_sync` reads off from here
 until S6 starts the next one. The intro it lands in is disarmed (S4): the room is still posing, and the
 show spins up again only once the hits have been out of sync for `intro_grace_seconds`.
 

@@ -30,7 +30,7 @@ class TestLines(ProjectionLayer):
         B         = self._settings.blue
 
         adj_w    = W.speed * W.amount / 10.0
-        cycle_w  = self._indices * (W.amount / res) - t * adj_w + W.phase    # in cycles: whole numbers at line centres
+        cycle_w  = self._indices * (W.amount / res) - t * adj_w + W.phase    # in cycles: whole numbers at line centers
         white   += Oscillator.pulse(cycle_w, W.width, W.hardness) * W.level
 
         adj_b    = B.speed * B.amount / 10.0

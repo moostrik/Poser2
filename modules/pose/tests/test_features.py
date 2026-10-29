@@ -165,8 +165,8 @@ class VectorAndBoxTest(unittest.TestCase):
 
     def test_bbox_rect_round_trip(self) -> None:
         box = BBox.from_rect(Rect(0.2, 0.1, 0.4, 0.8))
-        self.assertAlmostEqual(box[BBoxElement.centre_x], 0.4, places=6)
-        self.assertAlmostEqual(box[BBoxElement.centre_y], 0.5, places=6)
+        self.assertAlmostEqual(box[BBoxElement.center_x], 0.4, places=6)
+        self.assertAlmostEqual(box[BBoxElement.center_y], 0.5, places=6)
         rect = box.to_rect()
         self.assertAlmostEqual(rect.x, 0.2, places=6)
         self.assertAlmostEqual(rect.height, 0.8, places=6)

@@ -2,7 +2,7 @@
 
 The dummy stands in for a person while the pose instrument is judged (``docs/POSE_INSTRUMENT.md``,
 *The dummy*): a standing figure of the pipeline's 17 landmarks whose joints are set by the
-``PI.dummy`` settings, each joint's degrees −180..180 from its rest (the shoulder 0 hanging, 90
+``pose_instrument.dummy`` settings, each joint's degrees −180..180 from its rest (the shoulder 0 hanging, 90
 across, ±180 up, −90 out; the elbow 0 straight, ±180 folded; the hip 0 standing, 90 leg out level;
 the knee 0 straight, 90 bent): the angle the angle extractor reads at it when the figure is
 upright, less the rest's reading (``REST``), and whose frame enters the LERP stage
@@ -97,7 +97,7 @@ def dummy_id(max_players: int) -> int:
     return max_players
 
 _P = PointLandmark
-# A standing figure in square-pixel units, centred on x = 0.5, its sides named as the pipeline
+# A standing figure in square-pixel units, centerd on x = 0.5, its sides named as the pipeline
 # names people's: the left landmarks on image-right. A person fills the crop as this does after
 # the aspect squeeze: four fifths of its height, the shoulders a quarter of its width.
 _FIGURE: dict[PointLandmark, tuple[float, float]] = {

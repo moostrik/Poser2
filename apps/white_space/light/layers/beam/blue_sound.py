@@ -1,12 +1,12 @@
-"""BeamBlueSound — the soundscape made visible: the left and right blue lamps follow the
+"""BeamBlueSound — the soundscape made visible: the left and right blue beam lights follow the
 actual levels Max is playing (``/WS/idle/blue/left`` and ``/WS/idle/blue/right`` → the
 board's sound-level store).
 
-Latency first: no envelope shaping — Max owns the envelope, the lamps follow. The only
+Latency first: no envelope shaping — Max owns the envelope, the beam lights follow. The only
 smoothing is a window of at most a few light frames (``smoothing_frames``), there purely
 to bridge OSC-arrival vs tick timing jitter. When no message has arrived for
 ``stale_seconds`` the layer falls back (off, or a gentle idle pulse) so a silent or
-disconnected Max never freezes the lamps at a stuck level.
+disconnected Max never freezes the beam lights at a stuck level.
 """
 
 from __future__ import annotations
@@ -32,16 +32,16 @@ _PULSE_HZ: float = 0.2
 
 
 class SoundFallback(IntEnum):
-    """What the blue lamps do when the sound input has gone stale."""
+    """What the blue beam lights do when the sound input has gone stale."""
     OFF   = 0
     PULSE = auto()
 
 
 class BeamBlueSoundSettings(LayerSettings):
-    gain:             Field[float]         = Field(1.0, min=0.0, max=2.0, step=0.01, description="Level → lamp gain")
+    gain:             Field[float]         = Field(1.0, min=0.0, max=2.0, step=0.01, description="Level → beam light gain")
     smoothing_frames: Field[int]           = Field(2,   min=0,   max=3,   step=1,    description="Jitter bridge only: average over at most this many light frames (0 = raw)")
     stale_seconds:    Field[float]         = Field(2.0, min=0.1, max=30.0, step=0.1, description="No message for this long → fall back", newline=True)
-    fallback:         Field[SoundFallback] = Field(SoundFallback.OFF, description="Stale input: lamps off, or a gentle idle pulse")
+    fallback:         Field[SoundFallback] = Field(SoundFallback.OFF, description="Stale input: beam lights off, or a gentle idle pulse")
     fallback_level:   Field[float]         = Field(0.15, min=0.0, max=1.0, step=0.01, description="Idle pulse peak level")
 
 

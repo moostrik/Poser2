@@ -26,7 +26,7 @@ class AzimuthOverlayBoard(HasFrames, Protocol):
 
 
 class AzimuthOverlayLayer(layers.LayerBase):
-    """Per person, in their track colour: a solid line at the eye azimuth, a faint line at the
+    """Per person, in their track color: a solid line at the eye azimuth, a faint line at the
     bbox azimuth, and a bar joining them at mid-height so a small offset still reads.
 
     Owns no FBO: it draws into whatever viewport is current when `draw()` is called, which must be

@@ -74,7 +74,7 @@ class StateMachineSettings(BaseSettings):
     end_bars:              Field[float] = Field(3.0,  min=0.5, max=20.0,  step=0.5, description="END: wind-down playhead bars (bidirectional ramp)")
 
     # Looks
-    dim_level: Field[float] = Field(0.4, min=0.0, max=1.0, step=0.01, description="DIM line level: the front white lamp in INTRO, and where INTRO_PLAY, END_INTRO and PLAY_INTRO hold it", newline=True)
+    dim_level: Field[float] = Field(0.4, min=0.0, max=1.0, step=0.01, description="DIM line level: the front white beam light in INTRO, and where INTRO_PLAY, END_INTRO and PLAY_INTRO hold it", newline=True)
 
     # Condition tunables
     min_players:        Field[int]   = Field(3, min=2, max=16, description="Players the show needs at least: present to play, alike hits in a row to start", newline=True)

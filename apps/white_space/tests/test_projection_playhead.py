@@ -45,32 +45,32 @@ class ProjectionPlayheadTest(unittest.TestCase):
     def test_the_marker_is_at_full_level_away_from_people(self) -> None:
         self.board.frames = {0: FakePose(0.5)}
         f = self._render(0.25)
-        centre = RES // 4
-        np.testing.assert_array_equal(f.white[centre - 5:centre + 5], self.settings.white)
+        center = RES // 4
+        np.testing.assert_array_equal(f.white[center - 5:center + 5], self.settings.white)
         self.assertEqual(float(f.white.sum()), 10 * self.settings.white)
         self.assertEqual(float(f.blue.sum()), 0.0)
 
     def test_the_marker_has_a_blue_level_too(self) -> None:
         self.settings.blue = 0.4
         f = self._render(0.25)
-        centre = RES // 4
-        np.testing.assert_allclose(f.blue[centre - 5:centre + 5], 0.4)
+        center = RES // 4
+        np.testing.assert_allclose(f.blue[center - 5:center + 5], 0.4)
         self.assertEqual(float(f.blue.sum()), 10 * 0.4)
 
     def test_the_marker_dims_inside_a_mask(self) -> None:
         self.board.frames = {0: FakePose(0.5)}
         f = self._render(0.5)
-        centre = RES // 2
-        np.testing.assert_allclose(f.white[centre - 5:centre + 5], self.settings.white * self.settings.at_mask)
+        center = RES // 2
+        np.testing.assert_allclose(f.white[center - 5:center + 5], self.settings.white * self.settings.at_mask)
 
     def test_the_marker_dims_pixel_by_pixel_at_the_mask_edge(self) -> None:
         # The default mask is 3°: 15 px each side of the person.
         self.board.frames = {0: FakePose(0.5)}
         f = self._render(0.5 + 15 / RES)                       # the marker straddles the mask's edge
-        centre = RES // 2 + 15
+        center = RES // 2 + 15
         dim = self.settings.white * self.settings.at_mask
-        np.testing.assert_allclose(f.white[centre - 5:centre + 1], dim)
-        np.testing.assert_allclose(f.white[centre + 1:centre + 5], self.settings.white)
+        np.testing.assert_allclose(f.white[center - 5:center + 1], dim)
+        np.testing.assert_allclose(f.white[center + 1:center + 5], self.settings.white)
 
     def test_the_mask_follows_its_width(self) -> None:
         self.instrument.mask.width = 6.0                       # 30 px each side

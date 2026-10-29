@@ -154,17 +154,17 @@ pitch moves a far line more than a near one, as an accordion opens from the pers
 **Pulse width** is the thickness of every line, `pulse width × interval` wide. At 0 the output is
 dark, at 1 it is solid, and halfway line and gap are equal.
 
-**Phase** places the lines. At 0 a line is centred on the person; at ½ a gap is. A whole interval
+**Phase** places the lines. At 0 a line is centerd on the person; at ½ a gap is. A whole interval
 further the picture is the same.
 
 **Speed** is how fast the lines move across the projection. It is the same whatever the interval,
 so a change of interval changes the spacing and not the travel. At interval 10° and speed 2° per
-second the lines are centred at 0°, 10°, 20°; a second later at 2°, 12°, 22°; after five seconds
+second the lines are centerd at 0°, 10°, 20°; a second later at 2°, 12°, 22°; after five seconds
 at 10°, 20°, 30°, the same picture, a new line having come out at the person.
 
 **Hardness** shapes the flanks of the lines and nothing else. At 1 a line ends at its edge and
-every pixel of an output is off or full. Below 1 the flank is a smooth fall centred on the edge,
-never wider than the line or the gap has room for: the centre of a line stays full, the centre of
+every pixel of an output is off or full. Below 1 the flank is a smooth fall centerd on the edge,
+never wider than the line or the gap has room for: the center of a line stays full, the center of
 a gap stays off, pulse width 0 stays dark and 1 stays solid. At hardness 0 and pulse width ½ the
 lines are a sine. Levels between off and full exist only in these flanks.
 
@@ -217,12 +217,12 @@ line is cut: a cut would leave a last line of a width no parameter asked for. A 
 
 ```
 reach at a side       = reach × presence
-pulse width of a line = pulse width × window(the line's centre)    the window after the pulse width's slot
+pulse width of a line = pulse width × window(the line's center)    the window after the pulse width's slot
 ```
 
-The window is read once per line, at the line's centre, and not per pixel: read per pixel it
+The window is read once per line, at the line's center, and not per pixel: read per pixel it
 would thin the outer half of a line more than the inner, and a line in the taper would be lopsided
-and sit off its place. Read per line, a line in the taper is thinner, whole and still centred. A
+and sit off its place. Read per line, a line in the taper is thinner, whole and still centerd. A
 solid output is lines that touch, so its solid part ends at a line's boundary within half an
 interval of the taper and not exactly at it.
 
@@ -242,7 +242,7 @@ The pulse width is the most a line can be; the window
 only thins it, so a dark output stays dark. A solid output is solid over most of the window and
 opens into thinning lines over the taper. A change of reach is smooth: the lines in the taper grow
 or thin a little, and nothing appears or disappears. With `window.cap` on, a line's width is also
-capped at twice what remains of the reach beyond its centre, so no line passes the reach: the
+capped at twice what remains of the reach beyond its center, so no line passes the reach: the
 overhang of the outermost line is gone and any reach motion hugs the edge.
 
 ## The strobe
@@ -250,7 +250,7 @@ overhang of the outermost line is gone and any reach motion hugs the edge.
 A gate in time on an oscillator's lines: each tick, each line is on or off. The rule that a pixel
 is off or full holds; the strobe is the synth's one deliberate step in time (*The rules*). Each
 oscillator has its own, so white and blue can strobe apart. The gate is read once per line, at the
-line's count from the person, as the window is read at the line's centre: a line is never half
+line's count from the person, as the window is read at the line's center: a line is never half
 strobed. It acts after the window, so a dark output stays dark and a thinned line strobes whole.
 
 | Parameter | Unit                | What it is                                                          |
@@ -407,7 +407,7 @@ travelled += speed × dt / interval             each tick; how far the wave has 
 cycle      = position / interval − phase − travelled
 
 sine   value = level · cos(2π · cycle)                    highest at every whole cycle
-pulse  on where |frac(cycle + ½) − ½| ≤ pulse width / 2   centred on every whole cycle
+pulse  on where |frac(cycle + ½) − ½| ≤ pulse width / 2   centerd on every whole cycle
 ```
 
 - Interval, phase and speed are the core's parameters, in the units of the positions. The
@@ -428,7 +428,7 @@ The hardness is not part of the core: the pulse waveform applies it as a slew on
 lag after an LFO softens a square.
 
 ```
-d     = |frac(cycle + ½) − ½|              the distance from the nearest line's centre, in intervals
+d     = |frac(cycle + ½) − ½|              the distance from the nearest line's center, in intervals
 edge  = pulse width / 2                    where a hard line ends
 ramp  = (1 − hardness) × 2 × min(edge, ½ − edge)
 level = full where d ≤ edge − ramp / 2, off where d ≥ edge + ramp / 2, a smooth fall between

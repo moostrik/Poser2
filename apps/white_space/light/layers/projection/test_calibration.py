@@ -38,13 +38,13 @@ class SampleMethod(IntEnum):
 
 class TestCalibrationSettings(LayerSettings):
     """Settings for the Calibration composition."""
-    slice_centre:  Field[float]        = Field(0.5,  min=0.0,  max=1.0,   step=0.01, description="Vertical centre of the sample band (0=top, 1=bottom)")
+    slice_center:  Field[float]        = Field(0.5,  min=0.0,  max=1.0,   step=0.01, description="Vertical center of the sample band (0=top, 1=bottom)")
     slice_height:  Field[float]        = Field(0.2,  min=0.01, max=1.0,   step=0.01, description="Height of the sample band as a fraction of frame height")
     threshold:     Field[float]        = Field(0.5,  min=0.0,  max=1.0,   step=0.01, description="BRIGHT: column value > threshold is ON. DARK: column value < threshold is ON")
     detect:        Field[DetectMode]   = Field(DetectMode.BRIGHT,                     description="Compare column value against threshold from above (BRIGHT) or below (DARK)")
     method:        Field[SampleMethod] = Field(SampleMethod.MAX,                      description="How to reduce each column to a single value: MAX, MIN or AVG")
     show_overlap:  Field[bool]         = Field(True,                                  description="Highlight geometric overlap zones", newline=True)
-    show_centre:   Field[bool]         = Field(False,                                 description="Highlight camera centre lines")
+    show_center:   Field[bool]         = Field(False,                                 description="Highlight camera center lines")
     white_markers: Field[bool]         = Field(False,                                 description="Show markers in white instead of blue")
     fov:           Field[float]        = Field(110.0, description="Camera horizontal FOV (shared from compositor)", access=Field.INIT)
 
@@ -90,8 +90,8 @@ class TestCalibration(ProjectionLayer):
             # Extract horizontal luminance slice
             # ----------------------------------------------------------
             h, w = img.shape[:2]
-            row_top    = max(0, int((settings.slice_centre - settings.slice_height * 0.5) * h))
-            row_bottom = min(h, int((settings.slice_centre + settings.slice_height * 0.5) * h))
+            row_top    = max(0, int((settings.slice_center - settings.slice_height * 0.5) * h))
+            row_bottom = min(h, int((settings.slice_center + settings.slice_height * 0.5) * h))
             if row_bottom <= row_top:
                 continue
 
@@ -143,20 +143,20 @@ class TestCalibration(ProjectionLayer):
             half_w = fov_overlap / 360.0
             for cam_id in range(nc):
                 for edge in (target_fov * cam_id, target_fov * (cam_id + 1)):
-                    centre = (edge / 360.0) % 1.0
-                    lo = int(((centre - half_w) % 1.0) * res) % res
-                    hi = int(((centre + half_w) % 1.0) * res) % res
+                    center = (edge / 360.0) % 1.0
+                    lo = int(((center - half_w) % 1.0) * res) % res
+                    hi = int(((center + half_w) % 1.0) * res) % res
                     if lo < hi:
                         marker[lo:hi] = np.maximum(marker[lo:hi], 1.0)
                     elif lo > hi:
                         marker[lo:] = np.maximum(marker[lo:], 1.0)
                         marker[:hi] = np.maximum(marker[:hi], 1.0)
 
-        if settings.show_centre:
+        if settings.show_center:
             half_c = 5
             for cam_id in range(nc):
-                centre_angle = (target_fov * cam_id + target_fov * 0.5) % 360.0
-                mid = int(centre_angle / 360.0 * res) % res
+                center_angle = (target_fov * cam_id + target_fov * 0.5) % 360.0
+                mid = int(center_angle / 360.0 * res) % res
                 lo  = (mid - half_c) % res
                 hi  = (mid + half_c) % res
                 if lo < hi:

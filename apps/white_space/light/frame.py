@@ -28,7 +28,7 @@ BUFFER_DTYPE = np.float32
 
 
 class BeamLightId(IntEnum):
-    """The four fixed lights on the bar, by heading and colour."""
+    """The four fixed lights on the bar, by heading and color."""
     FRONT_WHITE = 0
     BACK_WHITE  = auto()
     LEFT_BLUE   = auto()

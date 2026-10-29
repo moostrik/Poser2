@@ -257,7 +257,7 @@ leg deviation's zones are in their extractors.
 | leg deviation | at standing, degrees; full at each top     | `leg_deviation_extractor.neutral_dead_zone`, `hip_max_degrees`, `knee_max_degrees` |
 
 The distance and the symmetries get theirs with their connection; the similarity has its own
-gate, the full-sync band (`PI.on_at`, `PI.off_at`, shared into the sync strobe and the growth).
+gate, the full-sync band (`pose_instrument.on_at`, `pose_instrument.off_at`, shared into the sync strobe and the growth).
 
 ## Symmetry
 
@@ -280,7 +280,7 @@ the range and the direction. A measure may feed several parameters; a slot has o
 measures never sum into one parameter.
 
 The arms are `MATRIX_V2.md`'s Step 5, rebuilt one connection at a time under its rule 4: keep
-the visualisation as simple as possible. The bases and amounts are the preset's:
+the visualization as simple as possible. The bases and amounts are the preset's:
 
 | Source              | Range | Parameter         | Base | Amount     | At full                                         |
 |---------------------|-------|-------------------|------|------------|-------------------------------------------------|
@@ -298,7 +298,7 @@ the shoulders down and a raised shoulder is a full arm. Each elbow plays its own
 the left the white and the right the blue. The pulls split the shoulders' pull between the
 colours (`MATRIX_V2.md`, *Made sources*): uneven arms pull white and blue a quarter interval
 together at full, and the body bend says which colour carries it — upright both concede equally,
-leaned one stands on its grid and the other walks, the share (`PI.lean_share`) setting how far
+leaned one stands on its grid and the other walks, the share (`pose_instrument.lean_share`) setting how far
 a lean hands it over; a lean with level arms says nothing. Unconnected: the speeds, the
 hardness, the strobes, the LFO's output, the symmetries, the distance.
 
@@ -366,8 +366,8 @@ and draws the mask over the result. The synth, its building blocks and its rules
 `pose_instrument` (`light/layers/projection/pose_instrument.py`) is the bridge. It gives each
 person a `Voice` of the light synth (`light/synth`), paints the voice's output 1 into white and its
 output 2 into blue over the person's window, and draws every mask over the result. Overlapping
-voices combine per channel, the fuller showing; two patterns of different intervals or centres
-make a moiré. Distances are taken from the person's own azimuth and not from their centre pixel,
+voices combine per channel, the fuller showing; two patterns of different intervals or centers
+make a moiré. Distances are taken from the person's own azimuth and not from their center pixel,
 so a walking person's lines move smoothly. With `opposite` ON the pattern is drawn half a turn
 from its person while the mask stays on them; with BOTH it is drawn in both places, the copy a
 second window of the same voice at the antipode. The masks still go over every pattern, so they
@@ -402,7 +402,7 @@ Presence opens the window from the mask over `window.attack_seconds` and closes 
 `window.release_seconds`, the last pose held while it closes and the mask dimming with it.
 
 The bridge sets each side's **reach** every tick: `window.width`, grown toward the full circle
-by the sync **growth** (`PI.grow`). The growth is room-level: while full sync holds — the room's
+by the sync **growth** (`pose_instrument.grow`). The growth is room-level: while full sync holds — the room's
 gate (*The sync strobe*), the growth's own envelope —
 the envelope rises over `grow.attack_seconds` and every
 window grows toward half the circle each side, so at full sync lines are everywhere; when the
@@ -412,7 +412,7 @@ territories tiling at 0, interleaved at 1. `window.width_bypass` switches the gr
 voice multiplies the reach by presence and thins the lines to nothing over the taper
 (`LIGHT_SYNTH.md`, *The window*).
 
-The **blend** (`PI.blend`) is full sync's union: while the band holds, everyone's measures ease
+The **blend** (`pose_instrument.blend`) is full sync's union: while the band holds, everyone's measures ease
 toward the room's presence-weighted mean over `blend.attack_seconds` — every pattern becomes
 one — and return to their own over `blend.release_seconds`. The blend reads the measures; it
 never writes them, and never touches similarity, positions, masks or hits, so everyone keeps
@@ -441,23 +441,23 @@ The **mask** is a band `mask.width` wide at the person, each channel at its leve
 `mask.blue`) times presence, and goes over everything at the person: the patterns of every voice.
 A mask cuts a line where it falls, so lines slide out from under it; the window cuts nothing. In
 the preset the white is 0, so the mask is the dim blue band. The mask's **border** is a line
-centred on each edge of the band, half over the blue (`mask.border_width`, with `mask.border_white`
+centerd on each edge of the band, half over the blue (`mask.border_width`, with `mask.border_white`
 and `mask.border_blue` times presence); it cuts the patterns like the band and does not flash. The
 playhead's **marker**
-(`PI.playhead`: its width, its white and blue) is drawn by the instrument over the masks, dimmed
+(`pose_instrument.playhead`: its width, its white and blue) is drawn by the instrument over the masks, dimmed
 to `playhead.at_mask` inside one, so the marker never blinds and no other layer shares a mix with
 the instrument at a person.
 
 ### The sync strobe
 
-The **sync strobe** is full sync's visualisation: while the room holds full sync, every drawn
+The **sync strobe** is full sync's visualization: while the room holds full sync, every drawn
 pattern's white and blue trade places on strobe frames (`sync_strobe.mode` invert, the
 default) or go dark (black), whole patterns at once, returning on the frame between. The room
 is in full sync while its least alike present pair holds over the band: the gate opens when
-every pair reads `PI.on_at` and closes only when one falls below
-`PI.off_at` — the band is the hysteresis, so a room hovering at one level never
+every pair reads `pose_instrument.on_at` and closes only when one falls below
+`pose_instrument.off_at` — the band is the hysteresis, so a room hovering at one level never
 swaps the gate. The gate is the room's, computed once per tick (`PoseInstrument._set_full_sync`)
-and published as `PI.full_sync`: the show reads it in PLAY, where full sync held long enough is
+and published as `pose_instrument.full_sync`: the show reads it in PLAY, where full sync held long enough is
 the sync end (`STATES.md`, S7 and S11), and the strobe, the growth and the blend each take it
 through their own bypass into their own envelope. A person at neutral holds the room off (the neutral weight is in the feature,
 `SIMILARITY.md`), as does a pair that cannot be read; below two people there is no pair and
@@ -491,7 +491,7 @@ is measured in playhead steps at `beam_rpm`, the rate the playhead free-runs at 
 
 ### Settings
 
-`PI` is a root settings group of the app (`apps/white_space/settings.py`), not a layer group
+`pose_instrument` is a root settings group of the app (`apps/white_space/settings.py`), not a layer group
 (`PoseInstrumentSettings`, `light/layers/projection/pose_instrument.py`), grouped by what is
 tuned together, knobs throughout:
 
@@ -521,7 +521,7 @@ mark has a level per channel the two settings are `white` and `blue`.
 Every row of the panel is titled. A slot's row is titled with its parameter's name and reads
 Base · Amount · Curve · Bypass (`LIGHT_SYNTH.md`, *Modulation*).
 
-The synth's settings classes (`OscillatorSettings`, `StrobeSettings`, `LfoSettings`, `WindowSettings`) are extended
+The synth's settings classes (`OscillatorSettings`, `StrobeSettings`, `LfoSettings`, `EnvelopeSettings`) are extended
 by the bridge's where a concept spans both (`window`); the voice reads only its own fields. The
 layer keeps its `blend`. No setting routes anything: an amount does nothing until `connect` gives
 its parameter a source.
@@ -542,7 +542,7 @@ tuning of its numbers. Hence the rules:
 ### Playing by hand
 
 A parameter's base is already the hand's value, so playing by hand is bypassing modulation. Every
-slot has a **Bypass** (`PI.white_lines`, `PI.blue_lines`, and the level of `PI.lfo`): bypassed,
+slot has a **Bypass** (`pose_instrument.white_lines`, `pose_instrument.blue_lines`, and the level of `pose_instrument.lfo`): bypassed,
 the parameter is its base while every other parameter keeps following the body, so a pose can be taken apart
 parameter by parameter; lifted, it follows again with its amount as it was. An oscillator's
 **Bypass All** button sets its five ticks at once, and pressed again with all set clears them, so
@@ -571,7 +571,7 @@ change of the picture). The rows beyond Step 5 wait on their connections (`MATRI
 
 ### The dummy
 
-The dummy (`pose/dummy.py`, settings `PI.dummy`) stands in for a person while the instrument is
+The dummy (`pose/dummy.py`, settings `pose_instrument.dummy`) stands in for a person while the instrument is
 judged: a figure whose joints and torso lean are set in the panel, each joint in degrees
 −180..180 from its rest (arms hanging, elbows and knees straight, standing). Its frame joins
 the poses before the LERP filters at its own id, `max_players`, so from there it is a pose like

@@ -1,6 +1,6 @@
 """PoseFigureLayer — each pose as a small figure over the projection row, where it stands.
 
-Every LERP pose with an azimuth and keypoints is drawn as its skeleton in its track colour, its
+Every LERP pose with an azimuth and keypoints is drawn as its skeleton in its track color, its
 eyes at its azimuth on the row's 360° x axis (the azimuth is the eyes', `LAYERS.md` *Inputs*), so
 a person or the dummy can be seen where the light places them. The figure keeps
 the crop's aspect: its height is a fraction of the row, its width follows from the row's pixel
@@ -37,7 +37,7 @@ def figure_spans(x: float, width: float) -> list[float]:
 
 def eye_column(points: Points2D) -> float:
     """Where the eyes are across the crop (0..1): the eyes' mean, the nose when they are missing,
-    the centre when both are. The azimuth is the eyes', so this column is placed at it."""
+    the center when both are. The azimuth is the eyes', so this column is placed at it."""
     eyes = points.values[[PointLandmark.left_eye, PointLandmark.right_eye], 0]
     if not np.isnan(eyes).any():
         return float(eyes.mean())
@@ -85,7 +85,7 @@ class PoseFigureLayer(layers.LayerBase):
         aspect: float = float(self._angle_extractor.aspect_ratio)
         height: float = _HEIGHT
         width: float = _HEIGHT * self._height / self._width * aspect     # the figure keeps the crop's aspect
-        y: float = (1.0 - height) / 2.0                                  # centred, so the same from either edge
+        y: float = (1.0 - height) / 2.0                                  # centerd, so the same from either edge
         line_width: float = _LINE_PX / (height * self._height)
         line_smooth: float = _SMOOTH_PX / (height * self._height)
         colors = self._colors.track_color_tuples

@@ -5,7 +5,7 @@ after the slots; each oscillator's push on its speed, and its strobe on its line
 on the clock's tick index, so every voice's strobe sits on one grid); one LFO in time, whose
 output is a source for the caller to wire. The patch, the settings objects given to the constructor,
 is shared by every voice; what flows through it, the sources, is each voice's own. A voice knows
-nothing of colour or pose: what its outputs are projected in, what feeds its sources, what its
+nothing of color or pose: what its outputs are projected in, what feeds its sources, what its
 reaches are and when it is hit are the caller's. The caller gives each pixel's signed position
 from the person; each oscillator mirrors it (both sides the same) or runs through it (one pattern
 passing behind the person), by its ``mirror`` switch.
@@ -15,7 +15,7 @@ from enum import IntEnum, auto
 
 import numpy as np
 
-from .envelope import Envelope, WindowSettings
+from .envelope import Envelope, EnvelopeSettings
 from .oscillator import Oscillator, OscillatorSettings, LfoSettings, Value
 from .slot import Slot
 from .strobe import Strobe, StrobeSettings
@@ -43,7 +43,7 @@ class Voice:
     """One person's pattern; see the module docstring."""
 
     def __init__(self, oscillator_1: OscillatorSettings, oscillator_2: OscillatorSettings,
-                 window: WindowSettings, lfo: LfoSettings,
+                 window: EnvelopeSettings, lfo: LfoSettings,
                  strobe_1: StrobeSettings, strobe_2: StrobeSettings, turn: float = 360.0) -> None:
         """``turn`` is one revolution in the positions' units: a pitch of *n* lines per revolution
         is an interval of ``turn / n``."""
@@ -165,19 +165,19 @@ class Voice:
             hardness = Slot.unit(Slot.modulate(patch.hardness, patch.hardness_amount, hardness_source))
             positions = np.abs(position) if patch.mirror else position
             cycle = oscillator.cycle(positions, interval, phase)
-            # The window is read at the centre of the line a pixel belongs to, not at the pixel, so
-            # a line in the taper has one width: thinned, whole and still centred where it belongs.
+            # The window is read at the center of the line a pixel belongs to, not at the pixel, so
+            # a line in the taper has one width: thinned, whole and still centerd where it belongs.
             # The strobe is read there too, as the line's count from the person, so a line is
             # never half strobed.
-            centre = positions - ((cycle + 0.5) % 1.0 - 0.5) * interval
-            line_centre = np.abs(centre)
-            window = Envelope.over_positions(line_centre, 0.0, taper, reach)
+            center = positions - ((cycle + 0.5) % 1.0 - 0.5) * interval
+            line_center = np.abs(center)
+            window = Envelope.over_positions(line_center, 0.0, taper, reach)
             width = pulse_width * window
             if self._window.cap:
-                width = np.minimum(width, np.maximum(reach - line_centre, 0.0) * 2.0 / interval)
+                width = np.minimum(width, np.maximum(reach - line_center, 0.0) * 2.0 / interval)
             output = Oscillator.pulse(cycle, width, hardness)
             if strobe[0] > 0:
-                output *= Strobe.gate(self._tick, centre / interval, *strobe, self._ticks_per_second)
+                output *= Strobe.gate(self._tick, center / interval, *strobe, self._ticks_per_second)
             outputs.append(output)
         return outputs[0], outputs[1]
 
@@ -220,17 +220,17 @@ class Voice:
             travel_col = np.array([v._oscillators[i]._travelled for v in voices]).reshape(count, 1)
             positions = np.abs(position) if patch.mirror else position
             cycle = positions / interval_col - phase_col - travel_col       # Oscillator.cycle, per row
-            # The window and the strobe are read at line centres, as in ``render``.
-            centre = positions - ((cycle + 0.5) % 1.0 - 0.5) * interval_col
-            line_centre = np.abs(centre)
-            window = Envelope.over_positions(line_centre, 0.0, taper, reach)
+            # The window and the strobe are read at line centers, as in ``render``.
+            center = positions - ((cycle + 0.5) % 1.0 - 0.5) * interval_col
+            line_center = np.abs(center)
+            window = Envelope.over_positions(line_center, 0.0, taper, reach)
             width = width_col * window
             if v0._window.cap:
-                width = np.minimum(width, np.maximum(reach - line_centre, 0.0) * 2.0 / interval_col)
+                width = np.minimum(width, np.maximum(reach - line_center, 0.0) * 2.0 / interval_col)
             output = Oscillator.pulse(cycle, width, hard_col)               # (V, R)
             for k, v in enumerate(voices):                                  # strobes differ per voice and are usually off
                 strobe = v._strobes[i]
                 if strobe[0] > 0:
-                    output[k] *= Strobe.gate(v._tick, centre[k] / interval_col[k, 0], *strobe, v._ticks_per_second)
+                    output[k] *= Strobe.gate(v._tick, center[k] / interval_col[k, 0], *strobe, v._ticks_per_second)
             outputs.append(output.max(axis=0))
         return outputs[0], outputs[1]

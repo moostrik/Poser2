@@ -1,7 +1,7 @@
 """Tests for the show StateMachine — the CSV transition graph in both modes,
 bar-denominated durations, goto/hold, motor commands, and looks. The hits and the
 streak of alike ones come from the board (HitSync's, tested in test_hit_sync.py); the room's
-full sync from the pose instrument's readout (PI.full_sync, tested in test_pose_instrument.py)."""
+full sync from the pose instrument's readout (pose_instrument.full_sync, tested in test_pose_instrument.py)."""
 
 import unittest
 from types import SimpleNamespace

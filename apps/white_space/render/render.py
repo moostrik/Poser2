@@ -36,11 +36,11 @@ _BACKGROUND: tuple[float, float, float, float] = (0.15, 0.15, 0.15, 1.0)
 _SWITCHED_ROWS: dict[str, tuple[Layers, ...]] = {
     'track':     (Layers.tracker,),
     'panoramic': (Layers.cam_panorama,),
-    'ws_light':  (Layers.ws_light, Layers.ws_beam, Layers.ws_azimuth, Layers.ws_figures),
+    'ws_light':  (Layers.light_simulation, Layers.beam_light_simulation, Layers.azimuth_overlay, Layers.pose_figures),
 }
 
 
-class Render(RenderBase):
+class WhiteSpaceRender(RenderBase):
     def __init__(self, board: RenderBoard, settings: RenderSettings,
                  tracker: PanoramicTrackerSettings,
                  cameras: list[RigCameraSettings], camera_check: CameraCheckSettings,
@@ -74,7 +74,7 @@ class Render(RenderBase):
         # cam_image[0] texture used as fallback for non-GPU crop path (GPU crop is default)
         fallback_cam_texture = self.L[Layers.cam_image][0].texture
         for i in range(self.max_players):
-            self.L[Layers.poser][i]     = layers.PoseCompositor(
+            self.L[Layers.pose][i]     = layers.PoseCompositor(
                 i, board,
                 fallback_cam_texture,
                 settings.preview.poser,
@@ -110,10 +110,10 @@ class Render(RenderBase):
             [self.L[Layers.cam_image][i].texture for i in range(self.num_cams)],
             self.num_cams, settings.colors, tracker, settings.panorama,
         )
-        self.L[Layers.ws_light][0]   = LightSimulationLayer(board)
-        self.L[Layers.ws_beam][0]     = BeamLightSimulationLayer(board, settings.beam_light_sim)
-        self.L[Layers.ws_azimuth][0]  = AzimuthOverlayLayer(board, settings.colors)
-        self.L[Layers.ws_figures][0]  = PoseFigureLayer(board, settings.colors, angle_extractor)
+        self.L[Layers.light_simulation][0]      = LightSimulationLayer(board)
+        self.L[Layers.beam_light_simulation][0] = BeamLightSimulationLayer(board, settings.beam_light_sim)
+        self.L[Layers.azimuth_overlay][0]       = AzimuthOverlayLayer(board, settings.colors)
+        self.L[Layers.pose_figures][0]          = PoseFigureLayer(board, settings.colors, angle_extractor)
 
         self.subdivision_rows: list[SubdivisionRow] = self._build_rows()
         self._window_size: tuple[int, int] = (settings.window.width, settings.window.height)
@@ -123,7 +123,7 @@ class Render(RenderBase):
         )
 
         # The strip's height follows the focus depth: a nearer cylinder is seen over a narrower
-        # band of elevation from the centre, so dragging this reshapes the row — and reshaping means
+        # band of elevation from the center, so dragging this reshapes the row — and reshaping means
         # GL reallocation, which only the render thread may do. The callback arrives on whichever
         # thread wrote the setting, so it raises a flag and `update()` acts on it.
         self._layout_dirty: bool = False
@@ -161,7 +161,7 @@ class Render(RenderBase):
 
     def _skeleton(self, track_id: int) -> layers.LayerBase:
         """A pose's crop-and-skeleton layer: a player's compositor, or the dummy's lines."""
-        return self.L[Layers.dummy_pose if track_id == self.dummy_id else Layers.poser][track_id]
+        return self.L[Layers.dummy_pose if track_id == self.dummy_id else Layers.pose][track_id]
 
     def _track_row(self) -> SubdivisionRow:
         """Row 1: one view per camera, always — the raw frames the strip below is derived from.
@@ -179,7 +179,7 @@ class Render(RenderBase):
         """Row 2: the whole rig as one 360° strip, under the raw frames.
 
         The aspect is the compositor's own — 360 degrees of azimuth over the elevations it can
-        actually fill, both measured at the rig centre. It is not a preference: `tilt`, `fov` and
+        actually fill, both measured at the rig center. It is not a preference: `tilt`, `fov` and
         `focus_radius` all move it, and the compositor is the only thing that knows how.
         """
         panorama: layers.Compositor = self.L[Layers.cam_panorama][0]  # type: ignore[assignment]
@@ -224,13 +224,13 @@ class Render(RenderBase):
 
         if self.subdivision.has('ws_light'):
             w, h = self.subdivision.get_allocation_size('ws_light', 0)
-            self.L[Layers.ws_azimuth][0].allocate(w, h, GL_RGBA)
-            self.L[Layers.ws_figures][0].allocate(w, h, GL_RGBA)
+            self.L[Layers.azimuth_overlay][0].allocate(w, h, GL_RGBA)
+            self.L[Layers.pose_figures][0].allocate(w, h, GL_RGBA)
 
         if self.subdivision.has('pose'):
             for i in range(self.max_players):
                 w, h = self.subdivision.get_allocation_size('pose', i)
-                self.L[Layers.poser][i].allocate(w, h, GL_RGBA)
+                self.L[Layers.pose][i].allocate(w, h, GL_RGBA)
             w, h = self.subdivision.get_allocation_size('pose', self.max_players)
             self.L[Layers.dummy_pose][self.dummy_id].allocate(w, h, GL_RGBA)
 
@@ -312,11 +312,11 @@ class Render(RenderBase):
             light_frame = self.board.get_light_frame()
             beam_mode = light_frame is not None and light_frame.motor_command.target_rpm < FIXTURE_PROJECTION_RPM
             self._viewport(height, self.subdivision.get_rect('ws_light', 0))
-            self.L[Layers.ws_beam if beam_mode else Layers.ws_light][0].draw()
+            self.L[Layers.beam_light_simulation if beam_mode else Layers.light_simulation][0].draw()
             if self.settings.azimuth_overlay:
-                self.L[Layers.ws_azimuth][0].draw()
+                self.L[Layers.azimuth_overlay][0].draw()
             if self.settings.pose_figures:
-                self.L[Layers.ws_figures][0].draw()
+                self.L[Layers.pose_figures][0].draw()
 
         # Row 4 - pose cutouts with data overlays, one viewport per player, the dummy's last
         if self.subdivision.has('pose'):

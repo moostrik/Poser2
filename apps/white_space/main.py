@@ -23,7 +23,7 @@ from .render_board import RenderBoard
 from .pose import PlayheadOffset, PlayheadOffsetExtractor, Dummy, dummy_id, NeutralWeight, HitSync
 from .light import Conductor
 from .inout import OscLightSender, OscSoundSender, UdpLightReceiver
-from .render import Render as WindowRender
+from .render import WhiteSpaceRender
 from .settings import Settings, Stage
 from .statemachine import StateMachine
 from .tracker_journal import TrackerJournal
@@ -68,13 +68,13 @@ class WhiteSpaceMain:
         self.board = RenderBoard()
 
         # RECORDING (independent of the show — works stand-alone and during session mode)
-        self.session = Session(self.settings.record.core)
+        self.session = Session(self.settings.session.control)
         self.osc_sound_sender = OscSoundSender(self.settings.inout.osc_sound_sender)
         # The dummy has its own id above the live players; the LERP stage is built one id wider
         # for it, so it is a pose like any other from there.
-        self.dummy = Dummy(self.settings.PI.dummy, ps.angle_extractor, ps.angle_calibrator, dummy_id(max_players),
+        self.dummy = Dummy(self.settings.pose_instrument.dummy, ps.angle_extractor, ps.angle_calibrator, dummy_id(max_players),
                            Path(DATA_PATH) / "poses.json")
-        self.video_recorder = VideoRecorder(self.settings.record.video, data_path=DATA_PATH)
+        self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
 
         # CAMERA
         self.cameras: list[CameraSource] = []
@@ -97,7 +97,7 @@ class WhiteSpaceMain:
             for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
-        self.tracker = PanoramicTracker(self.settings.track, max_players, num_cams)
+        self.tracker = PanoramicTracker(self.settings.tracker, max_players, num_cams)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
         self.source_uploader = Uploader()
         self.crop_extractor = CropExtractor(ps.image_crop)
@@ -127,11 +127,11 @@ class WhiteSpaceMain:
 
         # DIAGNOSIS — a subscribe-only journal of the tracker's inputs, observations and emitted
         # primaries (JSONL under data/diagnosis), for dissecting identity incidents offline.
-        # Always wired; `record.journal.enabled` (panel, preset or `launcher.py -journal`) toggles
+        # Always wired; `session.journal.enabled` (panel, preset or `launcher.py -journal`) toggles
         # capture live, one folder per capture, and the taps return on a flag check while off.
-        self.tracker_journal = TrackerJournal(self.settings.record.journal, data_path=DATA_PATH,
+        self.tracker_journal = TrackerJournal(self.settings.session.journal, data_path=DATA_PATH,
                                               meta_provider=self._journal_meta,
-                                              track_provider=self.settings.track.to_dict)
+                                              track_provider=self.settings.tracker.to_dict)
         for camera in self.cameras:
             camera.add_tracklet_callback(self.tracker_journal.submit_cam_tracklets)
         self.tracker.add_observation_callback(self.tracker_journal.submit_observations)
@@ -161,7 +161,7 @@ class WhiteSpaceMain:
 
         # WS PIPELINE — light output
         # The show reads LERP poses: the stable eye azimuth, and the only stage with PlayheadOffset.
-        self.conductor = Conductor(self.settings.light, self.settings.PI, board=self.board, pose_stage=int(Stage.LERP))
+        self.conductor = Conductor(self.settings.light, self.settings.pose_instrument, board=self.board, pose_stage=int(Stage.LERP))
         # One receiver per domain, matching each source's actual transport: the fixture
         # firmware sends the fall as a plain UDP text packet (not OSC) to the light
         # receiver's port; Max sends /WS/idle/blue/left and /right as real OSC (the UDP
@@ -181,7 +181,7 @@ class WhiteSpaceMain:
         # STATE MACHINE — the show's single decision maker; commands the Conductor through
         # its three channels (look, layer resets, motor) and emits state to board + OSC.
         self.state_machine = StateMachine(
-            self.settings.states, self.settings.light, self.settings.PI, board=self.board,
+            self.settings.states, self.settings.light, self.settings.pose_instrument, board=self.board,
             set_mix=self.conductor.set_mix,
             reset_layers=self.conductor.reset_layers,
             set_motor=self.conductor.set_motor_mode,
@@ -330,8 +330,8 @@ class WhiteSpaceMain:
         self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
 
         # RENDER
-        self.render = WindowRender(self.board, self.settings.render, self.settings.track,
-                                   self.settings.camera.cameras, self.settings.camera.camera_check, ps.angle_extractor)
+        self.render = WhiteSpaceRender(self.board, self.settings.render, self.settings.tracker,
+                                       self.settings.camera.cameras, self.settings.camera.camera_check, ps.angle_extractor)
         self.render.add_update_callback(self.camera_check.update)
         # In order: LERP first, so the hit reads this tick's PlayheadOffset (the same the flash draws on);
         # then HitSync publishes the hit and the streak; then the state machine reads them.
@@ -396,7 +396,7 @@ class WhiteSpaceMain:
             'num_cams': self.settings.camera.num_cams,
             'max_players': self.settings.max_players,
             'fps': self.settings.camera.fps,
-            'track': self.settings.track.to_dict(),
+            'track': self.settings.tracker.to_dict(),
             'source': {'folder': sim.folder, 'start': sim.start_norm, 'end': sim.end_norm}
                       if self.player else None,
         }

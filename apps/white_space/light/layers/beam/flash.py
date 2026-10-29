@@ -1,7 +1,7 @@
 """BeamFlash — the INTRO flash: the beam lights strike on for the ticks the rotating playhead is
 closest to each player, driven by the continuous ``PlayheadOffset``.
 
-Each pass flashes exactly ``frames`` ticks (1–3) per person: the ticks closest to the crossing,
+Each pass flashes exactly ``frames`` ticks (1–3) per player: the ticks closest to the crossing,
 measured in playhead steps at ``beam_rpm`` (``ticks_to_crossing``: 1 = the closest, 2 = the pair
 straddling it, 3 = the closest and both neighbours). Which ticks light is ``PlayheadCrossing``'s
 rule (``pose/playhead_offset.py``): no history is needed for the closest tick, so the tick that starts
@@ -29,8 +29,8 @@ from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step
 
 
 class BeamFlashSettings(LayerSettings):
-    base_white: Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Base brightness of the front white lamp")
-    base_blue:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Base brightness of both blue lamps")
+    base_white: Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Base brightness of the front white beam light")
+    base_blue:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Base brightness of both blue beam lights")
     white:      Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="White flash brightness", newline=True)
     blue:       Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Blue flash brightness")
     frames:     Field[int]   = Field(1,   min=1,   max=3,   step=1,    description="Flash length: the ticks closest to the crossing, 1–3", newline=True)

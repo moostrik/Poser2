@@ -24,7 +24,7 @@ class EyeColumnTest(unittest.TestCase):
     def test_the_nose_when_an_eye_is_missing(self) -> None:
         self.assertAlmostEqual(eye_column(_points(left_eye=(0.7, 0.1), nose=(0.62, 0.2))), 0.62, places=6)
 
-    def test_the_centre_when_the_face_is_missing(self) -> None:
+    def test_the_center_when_the_face_is_missing(self) -> None:
         self.assertEqual(eye_column(_points(left_shoulder=(0.3, 0.3))), 0.5)
 
 

@@ -14,7 +14,7 @@ from ...frame import LightFrame
 
 
 class BeamPlayheadSettings(LayerSettings):
-    level: Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Front white lamp brightness")
+    level: Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Front white beam light brightness")
 
 
 class BeamPlayhead(BeamLayer):

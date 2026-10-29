@@ -26,9 +26,7 @@ BANNED: list[tuple[str, str]] = [
     ('AngleSymmetry, not AngleSym', r'AngleSym(?!metry)'),
     ('Confidence, not Conf', r'Conf(?=[A-Z_]|$)'),
     ('Ema, not EMA', r'EMA'),
-    # not BBoxElement.centre_x / centre_y: the data layers show the member names as row labels, so
-    # renaming them changes what the apps show; they wait for the apps' batch
-    ('center, not centre', r'[Cc]entre(?!_[xy]$)'),
+    ('center, not centre', r'[Cc]entre'),
     ('visualization, not visualisation', r'[Vv]isualis'),
     ('Foreground, not Frg', r'Frg|frg'),
     ('DenseFlow, not DFlow', r'DFlow|Dlow'),

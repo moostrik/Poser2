@@ -92,13 +92,13 @@ def draw_waves(
 
 
 def draw_field(
-    array: np.ndarray, centre: float, width: float, strength: float,
+    array: np.ndarray, center: float, width: float, strength: float,
     edge: int, blend: BlendType,
 ) -> None:
     resolution: int = len(array)
-    field_centre: int = int(centre * resolution)
+    field_center: int = int(center * resolution)
     field_width: int  = int(width * resolution)
-    idx_start = int((field_centre - field_width // 2) % resolution)
+    idx_start = int((field_center - field_width // 2) % resolution)
 
     values = np.full(field_width, strength, dtype=array.dtype)
     edge_width: int = int(min(edge, field_width // 2))

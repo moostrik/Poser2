@@ -21,7 +21,7 @@ class RegimeSwitchTest(unittest.TestCase):
 
     def setUp(self) -> None:
         settings = Settings()
-        self.conductor = Conductor(settings.light, settings.PI, board=RenderBoard(), pose_stage=int(Stage.LERP))
+        self.conductor = Conductor(settings.light, settings.pose_instrument, board=RenderBoard(), pose_stage=int(Stage.LERP))
         self.frames: list[LightFrame] = []
         self.conductor.add_light_frame_callback(self.frames.append)
         self.time: float = 0.0

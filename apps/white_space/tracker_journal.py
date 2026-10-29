@@ -244,7 +244,7 @@ class TrackerJournal:
     def mark(self) -> None:
         """Flag an incident at this moment; callable from any thread."""
         if not self._capturing:
-            logger.info("Mark pressed, but the journal is not capturing (record → journal → enabled)")
+            logger.info("Mark pressed, but the journal is not capturing (session → journal → enabled)")
             return
         self._mark_count += 1
         self._put(('mark', time.time(), self._mark_count))
