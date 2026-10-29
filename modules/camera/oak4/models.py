@@ -17,11 +17,15 @@ from pathlib import Path
 
 import depthai as dai
 
-from .definitions import POSE_MODEL, POSE_ARCHIVE
+from .definitions import POSE_MODEL, POSE_ARCHIVE, DETECTOR_MODEL, DETECTOR_ARCHIVE, TOP_DOWN_MODEL, TOP_DOWN_ARCHIVE
 
 logger = logging.getLogger(__name__)
 
-MODELS: dict[str, str] = {POSE_MODEL: POSE_ARCHIVE}     # zoo slug -> file name in data/models
+MODELS: dict[str, str] = {              # zoo slug -> file name in data/models
+    POSE_MODEL: POSE_ARCHIVE,
+    DETECTOR_MODEL: DETECTOR_ARCHIVE,
+    TOP_DOWN_MODEL: TOP_DOWN_ARCHIVE,
+}
 
 
 def fetch(models: Path) -> int:

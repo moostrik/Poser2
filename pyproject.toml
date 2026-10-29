@@ -37,12 +37,15 @@ dependencies = [
 # (modules/camera/oak4). `uv sync` installs `oak`; `scripts\install.bat oak4` installs `oak4` instead.
 [dependency-groups]
 oak = ["depthai==2.30.0"]
-oak4 = ["depthai>=3.11"]
+oak4 = ["depthai>=3.11", "depthai-nodes>=0.7"]
 
 [tool.uv]
 package = false
 default-groups = ["oak"]
 conflicts = [[{ group = "oak" }, { group = "oak4" }]]
+# depthai-nodes asks for its own OpenCV (opencv-python-headless 4.10) beside the workspace's; a marker
+# that is never true drops that one requirement, so one cv2 is installed.
+override-dependencies = ["opencv-python-headless ; sys_platform == 'never'"]
 
 [tool.uv.sources]
 torch = { index = "pytorch-cu130" }

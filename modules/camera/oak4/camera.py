@@ -4,8 +4,9 @@ Each camera opens its own device and builds its own pipeline on it (`build_pipel
 pipeline is bound to one device), reads the delivered frames, the tracklets and the IMU through
 queues on the node outputs, on depthai's callback thread, which is where the frames and tracklets
 become the contract's and get their host time. With `yolo` the device runs the pose model, so a
-tracklet carries its keypoints. The sensor controls are `SensorControl`'s for as long as the
-device is open.
+tracklet carries its keypoints: from its own detection in the one-model chain, or, in the two-model
+chain, from the pose of its crop, joined to it by frame (`PoseJoin`). The sensor controls are
+`SensorControl`'s for as long as the device is open.
 
 Docs: https://docs.luxonis.com/software-v3/depthai
 """
@@ -25,9 +26,10 @@ from modules.utils import FPS, Rect
 
 from .control import SensorControl
 from .definitions import SENSOR_SOCKET, requested_size, get_device_list, log_connected_sensors, \
-    read_lens_calibration, imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL, POSE_ARCHIVE, TRACKING_STATUS, \
-    tracklet_keypoints
+    read_lens_calibration, imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL, POSE_ARCHIVE, DETECTOR_ARCHIVE, \
+    TOP_DOWN_ARCHIVE, PoseChain, TRACKING_STATUS, tracklet_keypoints, keypoints_in_frame
 from .pipeline import build_pipeline, MountConfig, PipelineOutputs
+from .pose_join import PoseJoin, Box
 from .settings import Oak4CameraSettings
 
 logger = logging.getLogger(__name__)
@@ -71,7 +73,12 @@ class Camera(Thread):
         )
         self.frame_height: int = delivered_height(self.color, self.resolution, self.mount.fov_h, self.mount.tilt,
                                                   self.mount.lens_fov, self.mount.lens_center)
-        self.pose_archive: Path | None = Path(self.model_path) / POSE_ARCHIVE if self.yolo else None
+        self.pose_chain: PoseChain = settings.pose_chain
+        models = Path(self.model_path)
+        two_models: bool = self.yolo and self.pose_chain == PoseChain.TWO_MODELS
+        self.pose_archive: Path | None = models / (TOP_DOWN_ARCHIVE if two_models else POSE_ARCHIVE) if self.yolo else None
+        self.detector_archive: Path | None = models / DETECTOR_ARCHIVE if two_models else None
+        self.join: PoseJoin | None = PoseJoin() if two_models else None
 
         # DEVICE — its pipeline and queues are made in `_open` and closed with it.
         self.device: dai.Device | None = None
@@ -79,6 +86,7 @@ class Camera(Thread):
         self.queues: list[dai.MessageQueue] = []
         self.control: SensorControl | None = None
         self.num_tracklets: int = 0
+        self._frame_transformation: dai.ImgTransformation | None = None     # the delivered frame's, for the crops' keypoints
 
         # FPS
         self.video_fps: FPS = FPS(120)
@@ -128,7 +136,8 @@ class Camera(Thread):
             self.pipeline = dai.Pipeline(self.device)
             outputs: PipelineOutputs = build_pipeline(self.pipeline, self.fps, self.color, self.square, self.resolution,
                                                       self.mount, frame_height=self.frame_height,
-                                                      pose_archive=self.pose_archive)
+                                                      pose_archive=self.pose_archive,
+                                                      detector_archive=self.detector_archive)
             self._setup_queues(outputs)
             self.pipeline.start()
         except Exception as e:
@@ -175,6 +184,10 @@ class Camera(Thread):
             tracklets: dai.MessageQueue = outputs.tracklets.createOutputQueue(maxSize=QUEUE_SIZE, blocking=False)
             tracklets.addCallback(self._tracker_callback)
             self.queues.append(tracklets)
+        if outputs.poses is not None:
+            poses: dai.MessageQueue = outputs.poses.createOutputQueue(maxSize=QUEUE_SIZE, blocking=False)
+            poses.addCallback(self._poses_callback)
+            self.queues.append(poses)
         imu: dai.MessageQueue = outputs.imu.createOutputQueue(maxSize=QUEUE_SIZE, blocking=False)
         imu.addCallback(self._imu_callback)
         self.queues.append(imu)
@@ -223,22 +236,49 @@ class Camera(Thread):
         self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
         if self.control is not None:
             self.control.readback(msg)
+        if self.join is not None:
+            self._frame_transformation = msg.getTransformation()
         self._emit_frame(FrameType.VIDEO, msg.getCvFrame())
 
     def _tracker_callback(self, name: str, msg: dai.Tracklets) -> None:
         """The hand-over of the device's tracklets: the contract's, with the keypoints the pose model
-        found for each, and the message's host time."""
+        found for each, and the message's host time. In the two-model chain the keypoints come with
+        the poses (`_poses_callback`), and the tracklets wait in the join for them."""
         self.tracklet_fps.processed()
         self.settings.readings.tracker_fps = self.tracklet_fps.get_rate_average()
         now: float = time.perf_counter()
+        one_model: bool = self.join is None
         tracklets: list[CameraTracklet] = [
             CameraTracklet(cam_id=self.id, id=t.id, status=TRACKING_STATUS[t.status],
                            roi=Rect(t.roi.x, t.roi.y, t.roi.width, t.roi.height), age=t.age, timestamp=now,
-                           keypoints=tracklet_keypoints(t.srcImgDetection))
+                           keypoints=tracklet_keypoints(t.srcImgDetection) if one_model else None)
             for t in msg.tracklets]
         self.num_tracklets = len(tracklets)
         self.settings.readings.tracklets = self.num_tracklets
-        self._emit_tracklets(tracklets, now)
+        if self.join is None:
+            self._emit_tracklets(tracklets, now)
+            return
+        boxes: list[Box] = [(t.srcImgDetection.xmin, t.srcImgDetection.ymin, t.srcImgDetection.xmax,
+                             t.srcImgDetection.ymax) for t in msg.tracklets]
+        joined = self.join.put_tracklets(msg.getSequenceNum(), tracklets, boxes)
+        if joined is not None:
+            self._emit_tracklets(joined, now)
+
+    def _poses_callback(self, name: str, msg) -> None:
+        """The two-model chain's poses: depthai-nodes' `GatheredData`, the people's detections of one
+        frame (`reference_data`) with one keypoint message per person (`items`, in the same order),
+        each remapped from its crop into the delivered frame."""
+        if self.join is None:
+            return
+        detections = msg.reference_data
+        boxes: list[Box] = [(d.xmin, d.ymin, d.xmax, d.ymax) for d in detections.detections]
+        keypoints = [keypoints_in_frame(item, self._frame_transformation) for item in msg.items]
+        if len(keypoints) != len(boxes):
+            logger.debug(f'{self.device_id} frame {detections.getSequenceNum()}: {len(keypoints)} poses for {len(boxes)} people')
+            keypoints = (keypoints + [None] * len(boxes))[:len(boxes)]
+        joined = self.join.put_poses(detections.getSequenceNum(), boxes, keypoints)
+        if joined is not None:
+            self._emit_tracklets(joined, time.perf_counter())
 
     def _imu_callback(self, name: str, msg: dai.IMUData) -> None:
         for packet in msg.packets:
