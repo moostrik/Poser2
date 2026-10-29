@@ -79,7 +79,7 @@ class WhiteSpaceMain:
         # CAMERA
         self.cameras: list[CameraSource] = []
         self.player: Optional[Player] = None
-        self.detector: Optional[detection.Detector] = None      # the replay backend's, shared by its cameras
+        self.person_detector: Optional[detection.PersonDetector] = None      # the replay backend's, shared by its cameras
         if self.settings.camera.sim_enabled:
             # The rig is uniform: mono cameras decode their clips straight to gray
             gray = not self.settings.camera.cameras[0].color
@@ -87,9 +87,9 @@ class WhiteSpaceMain:
             if self.settings.camera.simulator.replay:
                 # the recordings on the host, without a device: the people found and followed here
                 if self.settings.camera.yolo:
-                    self.detector = detection.Detector(self.settings.camera.detector)
+                    self.person_detector = detection.PersonDetector(self.settings.camera.person_detector)
                 for i in range(num_cameras):
-                    self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.detector, replay.Tracker(), i))
+                    self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.person_detector, replay.Tracker(), i))
             else:
                 for i in range(num_cameras):
                     self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
@@ -344,8 +344,8 @@ class WhiteSpaceMain:
     def start(self) -> None:
         self.panel_server.start()
 
-        if self.detector is not None:
-            self.detector.start()
+        if self.person_detector is not None:
+            self.person_detector.start()
         for camera in self.cameras:
             camera.start()
 
@@ -431,8 +431,8 @@ class WhiteSpaceMain:
         self.conductor.stop()
 
         self.pose_predictor.stop()
-        if self.detector is not None:
-            self.detector.stop()
+        if self.person_detector is not None:
+            self.person_detector.stop()
 
         for camera in self.cameras:
             camera.join(timeout=10)

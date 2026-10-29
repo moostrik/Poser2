@@ -122,7 +122,7 @@
       "range_start": 0,
       "range_end": 22
     },
-    "detector": {
+    "person_detector": {
       "model": "yolov8n_coco_512x448.onnx",
       "model_path": "data/models",
       "confidence": 0.5,

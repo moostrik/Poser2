@@ -25,7 +25,7 @@ from .settings import Settings
 logger = logging.getLogger(__name__)
 
 
-class Detector(Thread):
+class PersonDetector(Thread):
     def __init__(self, settings: Settings) -> None:
         super().__init__(daemon=True)
         self.settings: Settings = settings
@@ -64,7 +64,7 @@ class Detector(Thread):
         if self.is_alive():
             logger.warning("Person detector thread did not stop cleanly")
 
-    def register_callback(self, callback: DetectionCallback) -> None:
+    def add_detection_callback(self, callback: DetectionCallback) -> None:
         with self._callback_lock:
             if callback not in self._callbacks:
                 self._callbacks.append(callback)

@@ -23,7 +23,7 @@ class FakePlayer:
             c(cam_id, frame_type, image)
 
 
-class FakeDetector:
+class FakePersonDetector:
     def __init__(self) -> None:
         self.submitted: list[tuple[int, np.ndarray]] = []
         self.callbacks = []
@@ -31,7 +31,7 @@ class FakeDetector:
     def submit(self, cam_id: int, image: np.ndarray) -> None:
         self.submitted.append((cam_id, image))
 
-    def register_callback(self, callback) -> None:
+    def add_detection_callback(self, callback) -> None:
         self.callbacks.append(callback)
 
     def report(self, cam_id: int, boxes: list[Rect]) -> None:
@@ -56,7 +56,7 @@ class ReplayCameraTest(unittest.TestCase):
         self.settings = RigCameraSettings()
         self.settings.initialize()
         self.player = FakePlayer()
-        self.detector = FakeDetector()
+        self.detector = FakePersonDetector()
         self.camera = Camera(self.player, self.settings, self.detector, FakeTracker(), id=1)
         self.frames = []
         self.messages = []
