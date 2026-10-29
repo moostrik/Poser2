@@ -40,7 +40,8 @@ class DeepFlowMain:
         self.settings.initialize()
         self.panel_server = PanelServer(self.settings, self.settings.panel, on_exit=self.stop)
 
-        num_players: int = self.settings.num_players
+        max_players: int = self.settings.max_players
+        num_cams: int = self.settings.num_cams
         p = self.settings.pose
 
         # BLACKBOARD
@@ -48,7 +49,7 @@ class DeepFlowMain:
         self.osc_sound = OscSound(self.settings.inout.osc_sound)
 
         # CAMERA
-        configure_features(num_players)
+        configure_features(max_players)
 
         self.cameras: list[CameraSource] = []
         self.recorder: Optional[Recorder] = None
@@ -60,17 +61,17 @@ class DeepFlowMain:
                 # the recordings on the host, without a device: the people found and followed here
                 if self.settings.camera.yolo:
                     self.person_detector = detection.PersonDetector(self.settings.camera.person_detector)
-                for i in range(num_players):
+                for i in range(num_cams):
                     self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.person_detector, replay.Tracker(), i))
             else:
-                for i in range(num_players):
+                for i in range(num_cams):
                     self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:
             self.recorder = Recorder(self.settings.camera.recorder, data_path=DATA_PATH)
-            for i in range(num_players):
+            for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
-        self.tracker = OnePerCamTracker(self.settings.camera.tracker, num_players)
+        self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
         self.image_uploader = Uploader()
         self.crop_extractor = CropExtractor(p.image_crop)
@@ -85,7 +86,7 @@ class DeepFlowMain:
             camera.add_tracklet_callback(self.tracklet_sync_bang.submit_tracklets)
 
         # DETECTION
-        self.poses_from_tracklets = PosesFromTracklets(p.tracklets, num_players)
+        self.poses_from_tracklets = PosesFromTracklets(p.tracklets, max_players)
         self.pose_predictor = pose.Predictor(p.pose)
         self.segmentation_predictor  = segmentation.Predictor(p.segmentation)
         self.optical_flow_predictor  = optical_flow.Predictor(p.optical_flow)
@@ -95,7 +96,7 @@ class DeepFlowMain:
                 nodes.BBoxEuroSmoother(p.bbox.smoother),
                 nodes.BBoxPredictor(p.bbox.prediction),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         }, name="Pose bbox")
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
@@ -114,7 +115,7 @@ class DeepFlowMain:
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
         self.stages: dict[Stage, Broadcast] = {}
         for stage in Stage:
-            wt = window.WindowTracker(num_players, getattr(p, f'window_{stage.name.lower()}'))
+            wt = window.WindowTracker(max_players, getattr(p, f'window_{stage.name.lower()}'))
             self.board.set_window_source(stage, wt)
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([
@@ -134,7 +135,7 @@ class DeepFlowMain:
                 nodes.AngleCalibrator(),
                 nodes.AngleVelocityExtractor(p.velocity.extractor),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         }, name="Pose clean")
         self.stages[Stage.RAW].add_callback(self.filters_clean.process)
         self.filters_clean.add_frames_callback(self.stages[Stage.CLEAN])
@@ -154,7 +155,7 @@ class DeepFlowMain:
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         }, name="Pose smooth")
         self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
         self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
@@ -167,7 +168,7 @@ class DeepFlowMain:
                 nodes.AngleVelocityPredictor(p.velocity.prediction),
                 nodes.AngleStickyFiller(p.angle.sticky),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         }, name="Pose predict")
         self.stages[Stage.SMOOTH].add_callback(self.filters_predict.process)
         self.filters_predict.add_frames_callback(self.stages[Stage.PREDICT])
@@ -182,7 +183,7 @@ class DeepFlowMain:
                 nodes.AngleChaseInterpolator(p.angle.interpolator),
                 nodes.AngleVelocityChaseInterpolator(p.velocity.interpolator),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         }, name="Pose interpolate")
         self.filters_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([
@@ -194,11 +195,11 @@ class DeepFlowMain:
                 nodes.AngleMotionExtractor(p.motion.extractor),
                 nodes.AngleMotionMovingAverageSmoother(p.motion.moving_average),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         }, name="Pose lerp")
         self.gate_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([self.motion_gate_applicator])
-            for i in range(num_players)
+            for i in range(max_players)
         }, name="Pose gate")
         self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.set)
         self.interpolators_lerp.add_frames_callback(self.filters_lerp.process)
@@ -211,7 +212,7 @@ class DeepFlowMain:
 
         # RENDER
         self.render = DeepFlowRender(self.board, self.settings.render, self.settings.camera.cameras,
-                                     self.settings.camera.camera_check, num_cams=len(self.cameras), num_players=num_players)
+                                     self.settings.camera.camera_check, num_cams=len(self.cameras), max_players=max_players)
         self.render.add_exit_callback(self.stop)
         self.render.add_update_callback(self.camera_check.update)
 

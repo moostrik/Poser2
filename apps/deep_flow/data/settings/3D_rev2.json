@@ -1,6 +1,7 @@
 {
-  "num_players": 1,
-  "fps": 30.0,
+  "max_players": 1,
+  "num_cams": 1,
+  "input_fps": 30.0,
   "camera": {
     "keyframe_interval": 1,
     "yolo": true,

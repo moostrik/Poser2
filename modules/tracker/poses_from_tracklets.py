@@ -29,7 +29,7 @@ class PosesFromTracklets(FrameDictCallbackMixin):
         # The incoming dict keys are used directly as slot indices below, so the feeding tracker
         # must key by a slot under `max_players` (the panoramic tracker's player slots; cam ids for
         # one-per-cam rigs): a key at or above it would vanish here without a trace. Both come from
-        # `num_players` in main.py — an invariant spanning two modules, so it is worth stating.
+        # `max_players` in main.py — an invariant spanning two modules, so it is worth stating.
         if max_players <= 0:
             raise ValueError(f"PosesFromTracklets needs at least one track slot, got {max_players}")
         self._max_players = max_players

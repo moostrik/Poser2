@@ -381,7 +381,7 @@ class RenderSettings(BaseSettings):
     stage:       Field[Stage] = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")
     similarity_scale: Field[float] = Field(1.0, min=0.0, max=1.0, description="Cross-camera response for fluid and color mask (driven per show stage)")
     num_cams:    Field[int]   = Field(3, access=Field.INIT, visible=False, description="Number of cameras")
-    num_players: Field[int]   = Field(3, access=Field.INIT, visible=False, description="Number of players")
+    max_players: Field[int]   = Field(3, access=Field.INIT, visible=False, description="Number of players")
     layer  : Group[LayerGroup]                = Group(LayerGroup)
     data   : Group[DataGroup]                 = Group(DataGroup)
     preview: Group[PreviewGroup]              = Group(PreviewGroup)
@@ -398,13 +398,14 @@ class RenderSettings(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class Settings(BaseSettings):
-    num_players: Field[int]   = Field(3, access=Field.INIT)
+    max_players: Field[int]   = Field(3, access=Field.INIT)
+    num_cams   : Field[int]   = Field(3, access=Field.INIT, description="Number of cameras")
     input_fps  : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
     render_fps : Field[float] = Field(60.0)
 
-    camera : Group[OakGroup]     = Group(OakGroup, share=[num_players.as_('num_cams'), input_fps.as_('fps')])
+    camera : Group[OakGroup]     = Group(OakGroup, share=[num_cams, input_fps.as_('fps')])
     inout  : Group[InOutGroup]   = Group(InOutGroup)
-    pose   : Group[PoseGroup]    = Group(PoseGroup, share=[num_players.as_('max_players'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
-    render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_players.as_('num_cams')])
+    pose   : Group[PoseGroup]    = Group(PoseGroup, share=[max_players, input_fps.as_('frequency'), render_fps.as_('output_frequency')])
+    render : Group[RenderSettings]  = Group(RenderSettings, share=[max_players, num_cams])
     panel : Group[PanelSettings] = Group(PanelSettings)
-    session: Group[SessionGroup] = Group(SessionGroup, share=[num_players.as_('num_cams'), input_fps.as_('fps')])
+    session: Group[SessionGroup] = Group(SessionGroup, share=[num_cams, input_fps.as_('fps')])

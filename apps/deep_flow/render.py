@@ -46,9 +46,9 @@ LARGE_LAYERS: list[Layers] = [
 class DeepFlowRender(RenderBase):
     def __init__(self, board: RenderBoard, settings: RenderSettings,
                  cameras: list[RigCameraSettings], camera_check: CameraCheckSettings,
-                 num_cams: int = 1, num_players: int = 1) -> None:
+                 num_cams: int = 1, max_players: int = 1) -> None:
         super().__init__(settings.window)
-        self.num_players: int = num_players
+        self.max_players: int = max_players
         self.num_cams: int = num_cams
         self.settings: RenderSettings = settings
 

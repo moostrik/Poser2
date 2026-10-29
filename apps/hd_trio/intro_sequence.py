@@ -29,7 +29,7 @@ class SequenceDataProxy:
     def __init__(self) -> None:
         self._frames: FrameDict = {}
 
-    def update(self, frames: FrameDict) -> None:
+    def set_frames(self, frames: FrameDict) -> None:
         """Replace the stored frame dict."""
         self._frames = frames
 

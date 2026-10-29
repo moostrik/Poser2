@@ -49,7 +49,8 @@ class HDTrioMain:
         self.settings.initialize()
         self.panel_server = PanelServer(self.settings, self.settings.panel, on_exit=self.stop)
 
-        num_players: int = self.settings.num_players
+        max_players: int = self.settings.max_players
+        num_cams: int = self.settings.num_cams
         ps = self.settings.pose
 
         # BLACKBOARD
@@ -75,7 +76,7 @@ class HDTrioMain:
         self.sequencer.add_state_callback(self._on_show_state)
         self.settings.render.intro_sequence.bind(IntroSequenceSettings.arm_record, self._on_arm_record)
         self.artnet_controllers: list[ArtNetBars] = []
-        for i in range(num_players):
+        for i in range(max_players):
             self.artnet_controllers.append(ArtNetBars(self.settings.inout.artnets[i]))
 
         # CAMERA
@@ -88,16 +89,16 @@ class HDTrioMain:
                 # the recordings on the host, without a device: the people found and followed here
                 if self.settings.camera.yolo:
                     self.person_detector = detection.PersonDetector(self.settings.camera.person_detector)
-                for i in range(num_players):
+                for i in range(num_cams):
                     self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.person_detector, replay.Tracker(), i))
             else:
-                for i in range(num_players):
+                for i in range(num_cams):
                     self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:
-            for i in range(num_players):
+            for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
-        self.tracker = OnePerCamTracker(self.settings.camera.tracker, num_players)
+        self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
         self.image_uploader = Uploader()
         self.crop_extractor = CropExtractor(ps.image_crop)
@@ -111,9 +112,9 @@ class HDTrioMain:
             camera.add_tracklet_callback(self.tracklet_sync_bang.submit_tracklets)
 
         # DETECTION
-        features.configure_features(num_players)
+        features.configure_features(max_players)
 
-        self.poses_from_tracklets = PosesFromTracklets(ps.tracklets, num_players)
+        self.poses_from_tracklets = PosesFromTracklets(ps.tracklets, max_players)
         self.pose_predictor = pose.Predictor(ps.pose)
         self.segmentation_predictor  = segmentation.Predictor(ps.segmentation)
 
@@ -122,7 +123,7 @@ class HDTrioMain:
                 nodes.BBoxEuroSmoother(ps.bbox.smoother),
                 nodes.BBoxPredictor(ps.bbox.prediction),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         }, name="Pose bbox")
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
@@ -141,7 +142,7 @@ class HDTrioMain:
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
         self.stages: dict[Stage, Broadcast] = {}
         for stage in Stage:
-            wt = window.WindowTracker(num_players, getattr(ps, f'window_{stage.name.lower()}'))
+            wt = window.WindowTracker(max_players, getattr(ps, f'window_{stage.name.lower()}'))
             self.board.set_window_source(stage, wt)
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([
@@ -163,7 +164,7 @@ class HDTrioMain:
                 nodes.AngleCalibrator(),
                 nodes.AngleVelocityExtractor(ps.velocity.extractor),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         }, name="Pose clean")
         self.stages[Stage.RAW].add_callback(self.filters_clean.process)
         self.filters_clean.add_frames_callback(self.stages[Stage.CLEAN])
@@ -189,20 +190,20 @@ class HDTrioMain:
                 self.leader_applicator,
                 nodes.SimilarityEuroSmoother(ps.similarity.smoother),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         }, name="Pose smooth")
         self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
         self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
 
-        self.window_similator  = analytics.WindowSimilarity(ps.similarity.window_similarity)
+        self.window_similarity  = analytics.WindowSimilarity(ps.similarity.window_similarity)
         self.window_correlator = analytics.WindowCorrelation(ps.similarity.window_correlation)
         # On the result, where presence is known: a present pair's gap is held, a departed player's slot stays NaN.
         self.similarity_sticky = analytics.SimilarityStickyFiller(ps.similarity.sticky)
         self.similarity_sticky.add_similarity_callback(self.similarity_applicator.set)
 
-        self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similator.submit)
-        self.window_similator.add_similarity_callback(self.similarity_sticky.process)
-        self.window_similator.add_similarity_callback(self.leader_applicator.set)
+        self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similarity.submit)
+        self.window_similarity.add_similarity_callback(self.similarity_sticky.process)
+        self.window_similarity.add_similarity_callback(self.leader_applicator.set)
 
         self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_correlator.submit)
         self.window_correlator.add_similarity_callback(self.similarity_sticky.process)
@@ -216,7 +217,7 @@ class HDTrioMain:
                 nodes.AngleVelocityPredictor(ps.velocity.prediction),
                 nodes.AngleStickyFiller(ps.angle.sticky),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         }, name="Pose predict")
         self.stages[Stage.SMOOTH].add_callback(self.filters_predict.process)
         self.filters_predict.add_frames_callback(self.stages[Stage.PREDICT])
@@ -232,7 +233,7 @@ class HDTrioMain:
                 nodes.AngleVelocityChaseInterpolator(ps.velocity.interpolator),
                 nodes.SimilarityChaseInterpolator(ps.similarity.interpolator),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         }, name="Pose interpolate")
         self.filters_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([
@@ -244,11 +245,11 @@ class HDTrioMain:
                 nodes.AngleMotionExtractor(ps.motion.extractor),
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
             ])
-            for i in range(num_players)
+            for i in range(max_players)
         }, name="Pose lerp")
         self.gate_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([self.motion_gate_applicator])
-            for i in range(num_players)
+            for i in range(max_players)
         }, name="Pose gate")
         self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.set)
         self.interpolators_lerp.add_frames_callback(self.filters_lerp.process)
@@ -279,7 +280,7 @@ class HDTrioMain:
         self.tracker.start()
         self.pose_predictor.start()
         self.segmentation_predictor.start()
-        self.window_similator.start()
+        self.window_similarity.start()
         self.window_correlator.start()
 
         self.osc_sound.start()
@@ -330,7 +331,7 @@ class HDTrioMain:
         if self.person_detector is not None:
             self.person_detector.stop()
         self.segmentation_predictor.stop()
-        self.window_similator.stop()
+        self.window_similarity.stop()
         self.window_correlator.stop()
 
         for camera in self.cameras:

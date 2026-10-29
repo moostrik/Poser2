@@ -95,15 +95,15 @@ class OakGroup(BaseSettings):
     model_path:         Field[str]               = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
     fov:                Field[float]             = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-D Pro W, OV9782 color, 1280x800 native. 720p is a vertical crop, so the full width and this figure both hold.")
 
-    _cam_share = [fps, color, square, yolo, resolution, model_path, fov]
-    cam_0         = Group(OakCameraSettings, share=_cam_share)
-    camera_check  = Group(CameraCheckSettings)
-    simulator     = Group(PlayerSettings, share=[num_cams, fps])
-    person_detector = Group(inference.detection.Settings)   # the replay backend's person detector
-    recorder      = Group(RecorderSettings, share=[num_cams, fps, keyframe_interval])
-    tracker       = Group(OnePerCamTrackerSettings)
-    frame_sync    = Group(SyncSettings, share=[num_cams, fps])
-    tracklet_sync = Group(SyncSettings, share=[num_cams, fps])
+    _cam_share: list = [fps, color, square, yolo, resolution, model_path, fov]
+    cam_0          : Group[OakCameraSettings]              = Group(OakCameraSettings, share=_cam_share)
+    camera_check   : Group[CameraCheckSettings]            = Group(CameraCheckSettings)
+    simulator      : Group[PlayerSettings]                 = Group(PlayerSettings, share=[num_cams, fps])
+    person_detector: Group[inference.detection.Settings]   = Group(inference.detection.Settings)   # the replay backend's person detector
+    recorder       : Group[RecorderSettings]               = Group(RecorderSettings, share=[num_cams, fps, keyframe_interval])
+    tracker        : Group[OnePerCamTrackerSettings]       = Group(OnePerCamTrackerSettings)
+    frame_sync     : Group[SyncSettings]                   = Group(SyncSettings, share=[num_cams, fps])
+    tracklet_sync  : Group[SyncSettings]                   = Group(SyncSettings, share=[num_cams, fps])
 
     @property
     def cameras(self) -> list[OakCameraSettings]:
@@ -119,8 +119,8 @@ class _OscSoundSettings(OscSoundSettings):
 
 
 class InOutGroup(BaseSettings):
-    osc_sound   = Group(_OscSoundSettings)
-    osc_control = Group(OscReceiverSettings)
+    osc_sound  : Group[_OscSoundSettings]   = Group(_OscSoundSettings)
+    osc_control: Group[OscReceiverSettings] = Group(OscReceiverSettings)
 
 
 # ---------------------------------------------------------------------------
@@ -131,41 +131,41 @@ class BboxFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0)
 
-    smoother     = Group(nodes.EuroSmootherSettings, share=[frequency])
-    prediction   = Group(nodes.PredictorSettings, share=[frequency])
-    interpolator = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
+    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
+    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
+    interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
 class PointFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0)
 
-    confidence_filter = Group(nodes.DualConfidenceFilterSettings)
-    smoother     = Group(nodes.EuroSmootherSettings, share=[frequency])
-    prediction   = Group(nodes.PredictorSettings, share=[frequency])
-    interpolator = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
+    confidence_filter: Group[nodes.DualConfidenceFilterSettings] = Group(nodes.DualConfidenceFilterSettings)
+    smoother         : Group[nodes.EuroSmootherSettings]         = Group(nodes.EuroSmootherSettings, share=[frequency])
+    prediction       : Group[nodes.PredictorSettings]            = Group(nodes.PredictorSettings, share=[frequency])
+    interpolator     : Group[nodes.ChaseInterpolatorSettings]    = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
 class AngleFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0)
 
-    smoother     = Group(nodes.EuroSmootherSettings, share=[frequency])
-    prediction   = Group(nodes.PredictorSettings, share=[frequency])
-    interpolator = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
-    sticky       = Group(nodes.StickyFillerSettings)
+    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
+    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
+    interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
+    sticky      : Group[nodes.StickyFillerSettings]      = Group(nodes.StickyFillerSettings)
 
 class VelocityFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0)
 
-    extractor     = Group(nodes.AngleVelocityExtractorSettings, share=[frequency])
-    smoother         = Group(nodes.EuroSmootherSettings, share=[frequency])
-    prediction          = Group(nodes.PredictorSettings, share=[frequency])
-    interpolator  = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
-    sticky           = Group(nodes.StickyFillerSettings)
+    extractor   : Group[nodes.AngleVelocityExtractorSettings] = Group(nodes.AngleVelocityExtractorSettings, share=[frequency])
+    smoother    : Group[nodes.EuroSmootherSettings]           = Group(nodes.EuroSmootherSettings, share=[frequency])
+    prediction  : Group[nodes.PredictorSettings]              = Group(nodes.PredictorSettings, share=[frequency])
+    interpolator: Group[nodes.ChaseInterpolatorSettings]      = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
+    sticky      : Group[nodes.StickyFillerSettings]           = Group(nodes.StickyFillerSettings)
 
 class MotionFeature(BaseSettings):
-    extractor       = Group(nodes.AngleMotionExtractorSettings)
-    moving_average  = Group(nodes.MovingAverageSmootherSettings)
+    extractor     : Group[nodes.AngleMotionExtractorSettings]  = Group(nodes.AngleMotionExtractorSettings)
+    moving_average: Group[nodes.MovingAverageSmootherSettings] = Group(nodes.MovingAverageSmootherSettings)
 
 
 # ---------------------------------------------------------------------------
@@ -180,26 +180,26 @@ class PoseGroup(BaseSettings):
     frequency:          Field[float]                = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float]                = Field(60.0)
 
-    _batch_share = [max_players, model_type, model_path, verbose]
-    _feature_share = [frequency, output_frequency]
+    _batch_share  : list = [max_players, model_type, model_path, verbose]
+    _feature_share: list = [frequency, output_frequency]
 
-    pose         = Group(inference.pose.Settings, share=_batch_share)
-    segmentation = Group(inference.segmentation.Settings, share=_batch_share)
-    optical_flow = Group(inference.optical_flow.Settings, share=_batch_share)
-    tracklets    = Group(PosesFromTrackletsSettings)
-    image_crop   = Group(inference.crop.Settings, share=[max_players])
-    angle_extractor = Group(nodes.AngleExtractorSettings)
-    bbox         = Group(BboxFeature, share=_feature_share)
-    point        = Group(PointFeature, share=_feature_share)
-    angle        = Group(AngleFeature, share=_feature_share)
-    velocity     = Group(VelocityFeature, share=_feature_share)
-    motion       = Group(MotionFeature)
-    motion_gate  = Group(nodes.MotionGateApplicatorSettings, share=[max_players])
-    window_raw   = Group(window.WindowNodeSettings)
-    window_clean = Group(window.WindowNodeSettings)
-    window_smooth = Group(window.WindowNodeSettings)
-    window_predict = Group(window.WindowNodeSettings)
-    window_lerp  = Group(window.WindowNodeSettings)
+    pose           : Group[inference.pose.Settings]          = Group(inference.pose.Settings, share=_batch_share)
+    segmentation   : Group[inference.segmentation.Settings]  = Group(inference.segmentation.Settings, share=_batch_share)
+    optical_flow   : Group[inference.optical_flow.Settings]  = Group(inference.optical_flow.Settings, share=_batch_share)
+    tracklets      : Group[PosesFromTrackletsSettings]       = Group(PosesFromTrackletsSettings)
+    image_crop     : Group[inference.crop.Settings]          = Group(inference.crop.Settings, share=[max_players])
+    angle_extractor: Group[nodes.AngleExtractorSettings]     = Group(nodes.AngleExtractorSettings)
+    bbox           : Group[BboxFeature]                      = Group(BboxFeature, share=_feature_share)
+    point          : Group[PointFeature]                     = Group(PointFeature, share=_feature_share)
+    angle          : Group[AngleFeature]                     = Group(AngleFeature, share=_feature_share)
+    velocity       : Group[VelocityFeature]                  = Group(VelocityFeature, share=_feature_share)
+    motion         : Group[MotionFeature]                    = Group(MotionFeature)
+    motion_gate    : Group[nodes.MotionGateApplicatorSettings] = Group(nodes.MotionGateApplicatorSettings, share=[max_players])
+    window_raw     : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
+    window_clean   : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
+    window_smooth  : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
+    window_predict : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
+    window_lerp    : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
 
 
 # ---------------------------------------------------------------------------
@@ -224,39 +224,39 @@ class FluidInputSettings(BaseSettings):
     density: Field[Layers] = Field(Layers.center_foreground, description="Texture used as density and temperature input")
 
 class _FlowLayerSettings(layers.FlowLayerSettings):
-    inputs = Group(FluidInputSettings)
+    inputs: Group[FluidInputSettings] = Group(FluidInputSettings)
 
 
 class LayerGroup(BaseSettings):
-    select = Group(LayerSettings)
-    composite = Group(layers.CompositeLayerSettings)
+    select   : Group[LayerSettings]                 = Group(LayerSettings)
+    composite: Group[layers.CompositeLayerSettings] = Group(layers.CompositeLayerSettings)
 
 class DataGroup(BaseSettings):
-    a = Group(_DataLayerSettings)
-    b = Group(_DataLayerSettings)
+    a: Group[_DataLayerSettings] = Group(_DataLayerSettings)
+    b: Group[_DataLayerSettings] = Group(_DataLayerSettings)
 
 class PreviewGroup(BaseSettings):
-    tracker = Group(_TrackerCompositorSettings)
-    pose    = Group(_PoseCompositorSettings)
+    tracker: Group[_TrackerCompositorSettings] = Group(_TrackerCompositorSettings)
+    pose   : Group[_PoseCompositorSettings]    = Group(_PoseCompositorSettings)
 
 class CenterGroup(BaseSettings):
-    geometry = Group(_CenterGeometrySettings)
-    mask     = Group(layers.CenterMaskLayerSettings)
-    cam      = Group(layers.CenterCamLayerSettings)
-    foreground = Group(layers.CenterForegroundLayerSettings)
-    pose     = Group(layers.CenterPoseLayerSettings)
-    color    = Group(layers.MSColorMaskLayerSettings)
+    geometry  : Group[_CenterGeometrySettings]              = Group(_CenterGeometrySettings)
+    mask      : Group[layers.CenterMaskLayerSettings]       = Group(layers.CenterMaskLayerSettings)
+    cam       : Group[layers.CenterCamLayerSettings]        = Group(layers.CenterCamLayerSettings)
+    foreground: Group[layers.CenterForegroundLayerSettings] = Group(layers.CenterForegroundLayerSettings)
+    pose      : Group[layers.CenterPoseLayerSettings]       = Group(layers.CenterPoseLayerSettings)
+    color     : Group[layers.MSColorMaskLayerSettings]      = Group(layers.MSColorMaskLayerSettings)
 
 class RenderSettings(BaseSettings):
-    stage   = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")
-    layer   = Group(LayerGroup)
-    data    = Group(DataGroup)
-    preview = Group(PreviewGroup)
-    center  = Group(CenterGroup)
-    flow    = Group(_FlowLayerSettings, share=[stage])
-    fluid3d = Group(layers.Fluid3DLayerSettings, share=[stage])
-    colors  = Group(ColorSettings)
-    window  = Group(WindowSettings)
+    stage  : Field[Stage]                        = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")
+    layer  : Group[LayerGroup]                   = Group(LayerGroup)
+    data   : Group[DataGroup]                    = Group(DataGroup)
+    preview: Group[PreviewGroup]                 = Group(PreviewGroup)
+    center : Group[CenterGroup]                  = Group(CenterGroup)
+    flow   : Group[_FlowLayerSettings]           = Group(_FlowLayerSettings, share=[stage])
+    fluid3d: Group[layers.Fluid3DLayerSettings]  = Group(layers.Fluid3DLayerSettings, share=[stage])
+    colors : Group[ColorSettings]                = Group(ColorSettings)
+    window : Group[WindowSettings]               = Group(WindowSettings)
 
 
 # ---------------------------------------------------------------------------
@@ -264,11 +264,12 @@ class RenderSettings(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class Settings(BaseSettings):
-    num_players:        Field[int]   = Field(1, access=Field.INIT, visible=False)
-    fps:                Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
+    max_players:        Field[int]   = Field(1, access=Field.INIT, visible=False)
+    num_cams:           Field[int]   = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
+    input_fps:          Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
 
-    camera  = Group(OakGroup, share=[num_players.as_('num_cams'), fps])
-    pose    = Group(PoseGroup, share=[num_players.as_('max_players'), fps.as_('frequency')])
-    render  = Group(RenderSettings)
-    inout   = Group(InOutGroup)
-    panel   = Group(PanelSettings)
+    camera: Group[OakGroup]       = Group(OakGroup, share=[num_cams, input_fps.as_('fps')])
+    pose  : Group[PoseGroup]      = Group(PoseGroup, share=[max_players, input_fps.as_('frequency')])
+    render: Group[RenderSettings] = Group(RenderSettings)
+    inout : Group[InOutGroup]     = Group(InOutGroup)
+    panel : Group[PanelSettings]  = Group(PanelSettings)

@@ -48,7 +48,7 @@ class HDTrioRender(RenderBase):
     def __init__(self, board: RenderBoard, settings: RenderSettings,
                  cameras: list[RigCameraSettings], camera_check: CameraCheckSettings, data_path: str = "") -> None:
         super().__init__(settings.window)
-        self.num_players: int = settings.num_players
+        self.max_players: int = settings.max_players
         self.num_cams: int = settings.num_cams
         self.settings: RenderSettings = settings
 
@@ -114,7 +114,7 @@ class HDTrioRender(RenderBase):
         # composition
         self.subdivision_rows: list[SubdivisionRow] = [
             SubdivisionRow(name='track',        columns=self.num_cams,    rows=1, src_aspect_ratio=1.0,  padding=Point2f(1.0, 1.0)),
-            SubdivisionRow(name='preview',      columns=self.num_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name='preview',      columns=self.max_players, rows=1, src_aspect_ratio=9/16, padding=Point2f(1.0, 1.0)),
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, False)
 
@@ -204,7 +204,7 @@ class HDTrioRender(RenderBase):
             if prev_stage not in _INTRO_STAGES:  # first frame of intro sequence
                 self._intro_player.start()
             frames = self._intro_player.update()
-            self._intro_proxy.update(frames)
+            self._intro_proxy.set_frames(frames)
             for i in range(self.num_cams):
                 self._intro_geometries[i].update()
                 self.L[Layers.intro_pose][i].update()

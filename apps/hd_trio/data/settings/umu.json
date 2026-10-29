@@ -1,5 +1,6 @@
 {
-  "num_players": 3,
+  "max_players": 3,
+  "num_cams": 3,
   "input_fps": 23.0,
   "render_fps": 122.0,
   "camera": {
@@ -383,7 +384,6 @@
   "render": {
     "stage": "LERP",
     "similarity_scale": 1.0,
-    "num_players": 3,
     "layer": {
       "select": {
         "preview": [
