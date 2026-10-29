@@ -29,8 +29,10 @@ In this order; each step's number is read off the data view (`render.layers.data
    directions, so the same pose reads some degrees apart for that reason alone; the tolerance absorbs it.
 4. **Set the forgiveness** only if one joint, usually an elbow, keeps breaking matches that look right:
    `pose.similarity.posture.forgiveness`. 1 is none.
-5. **Set the sync strobe's band**: `pose_instrument.sync_strobe.on_at` and `off_at`, in PLAY. The strobe too
-   rare, lower `on_at`; coming on for unlike poses, raise it; swapping in and out, widen the band.
+5. **Set group sync's band**: `pose.similarity.group_sync.on_at` and `off_at`, in PLAY (the `on` readout next to
+   them is the gate, `level` the group's similarity). The strobe too rare, lower `on_at`; coming on for unlike
+   poses, raise it; swapping in and out, widen the band. With three or more, `mode` ALL_BUT_ONE lets the group
+   sync while one person does not.
 
 Restart the app before saving a preset: the running app rewrites `studio.json`.
 
@@ -58,6 +60,15 @@ plateau, so "fully alike" is the similarity reading 1, and noise between two mat
 The arms are alike, then, when every arm joint is within the tolerance, allowing one joint to stray to
 `forgiveness` times the tolerance when the others are spot on.
 
+**Group sync**, the gate on the group: the last LERP step (`GroupSyncGate`, `pose.similarity.group_sync`) reads
+the interpolated rows as one matrix — a pair is the mean of its two directions, the one that reads when the other
+does not — and takes the group's **level**: by `mode`, the least alike pair of everyone (ALL), or the best level
+with the one person who drags the group down most left out (ALL_BUT_ONE, three or more; two read as ALL). The
+gate opens when the level reads `on_at` and closes only when it falls below `off_at`, the band being the
+hysteresis; a level that cannot be read (fewer than two poses, a pair with no reading, the dummy among them)
+closes it. The level and the gate go on the LERP group record as `GroupSimilarity` and `GroupSync`, and the
+panel's `level` and `on` readouts; the instrument and the state machine read the gate off the board.
+
 ## Two consumers
 
 | | Hit sync | `Similarity` feature |
@@ -67,8 +78,8 @@ The arms are alike, then, when every arm joint is within the tolerance, allowing
 | Reads                 | the distance, and the similarity's plateau               | the similarity, 0 to 1                                        |
 | Neutral               | a gate: every hit in the run has `ArmDeviation` 1        | a ramp: the pair times the smaller `ArmDeviation` (`pose/neutral_weight.py`) |
 | In time               | none: the poses as they were at the hits                 | `SimilarityStickyFiller`, `SimilarityEuroSmoother` (SMOOTH), `SimilarityChaseInterpolator` (LERP) |
-| Decision              | a run of hits is in sync when every pair's similarity is 1 and the gate holds; `min_players` in a row | the instrument's full-sync gate: every present pair over `pose_instrument.on_at` / `off_at` (`POSE_INSTRUMENT.md`, *The sync strobe*) drives the strobe, the growth, the blend, and PLAY's sync end once its hold has built over `states.play_full_sync_seconds` (`STATES.md`, S7) |
-| Output                | `HitStreak` on the board; `states.sync.hits`, `states.sync.distance` (°) | the rows on the LERP frames; `/pose/N/similarity/pose` to Max; `pose_instrument.full_sync` |
+| Decision              | a run of hits is in sync when every pair's similarity is 1 and the gate holds; `min_players` in a row | group sync (*Group sync* below): the group's level over `pose.similarity.group_sync.on_at` / `off_at` drives the strobe, the growth, the blend (`POSE_INSTRUMENT.md`, *The sync strobe*) and PLAY's sync end once its hold has built over `states.play_group_sync_seconds` (`STATES.md`, S7) |
+| Output                | `HitStreak` on the board; `states.sync.hits`, `states.sync.distance` (°) | the rows on the LERP frames; `/pose/N/similarity/pose` to Max; `GroupSimilarity` and `GroupSync` on the LERP group record, `pose.similarity.group_sync.level` / `on` |
 
 Both read one settings group, `pose.similarity.posture`, and one switch for neutral,
 `pose.similarity.neutral_weight.enabled`. The feature's chain is three group steps on the SMOOTH poses:
@@ -95,10 +106,11 @@ zeros.
 | `pose.similarity.interpolator` (`responsiveness`, `friction`) | feature    | 0.33, 0.05    | the chase at LERP |
 | `states.min_players`                                 | hit sync            | 2             | alike hits in a row to spin up |
 | `states.sync.min_age_seconds`                        | hit sync            | 2 s           | a pose this old (its `Age`) before its hits are recorded |
-| `states.play_full_sync_seconds`                      | the show (S7)       | 20 s          | PLAY winds down once the full-sync hold has built over this; 0 never |
-| `states.play_full_sync_release_seconds`              | the show (S7)       | 5 s           | a break in full sync drains the hold over this; 0 restarts it |
+| `states.play_group_sync_seconds`                      | the show (S7)       | 20 s          | PLAY winds down once the group-sync hold has built over this; 0 never |
+| `states.play_group_sync_release_seconds`              | the show (S7)       | 5 s           | a break in group sync drains the hold over this; 0 restarts it |
 | `states.intro_grace_seconds`                         | the show (S4)       | 20 s          | after the sync end, the hits out of sync this long before INTRO can spin up again |
-| `pose_instrument.sync_strobe.on_at`, `off_at`        | the sync strobe     | 0.95, 0.9     | full sync's band: on when every pair reads `on_at`, off below `off_at` |
+| `pose.similarity.group_sync.on_at`, `off_at`         | group sync          | 0.95, 0.9     | the band: the gate opens when the group's level reads `on_at`, closes below `off_at` |
+| `pose.similarity.group_sync.mode`                    | group sync          | ALL           | the group's level: the least alike pair of all, or with the one who drags it down most left out (ALL_BUT_ONE, 3 or more) |
 | `pose_instrument.sync_strobe.threshold`              | the reach growth    | 0.9           | where sync's reach growth begins (bypassed in the preset) |
 | `pose_instrument.window.width`                       | window              | 33°           | the window before it opens |
 

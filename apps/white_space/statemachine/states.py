@@ -184,16 +184,16 @@ class PlayState(StateBase):
 
     def __init__(self, *args) -> None:
         super().__init__(*args)
-        self._hold = Envelope()                       # the sync end's hold: builds while full sync holds, drains while not
+        self._hold = Envelope()                       # the sync end's hold: builds while group sync holds, drains while not
 
     def enter(self, ctx: StateContext) -> None:
         self._hold.reset()                            # no layer reset: PLAY inherits the running instrument
 
     def update(self, ctx: StateContext) -> Mix:
-        # A break in full sync drains the hold over the release instead of clearing it, so one pair
+        # A break in group sync drains the hold over the release instead of clearing it, so one pair
         # flickering under the band costs seconds, not the whole hold.
-        self._hold.update(ctx.full_sync, ctx.dt, self._settings.play_full_sync_seconds,
-                          self._settings.play_full_sync_release_seconds)
+        self._hold.update(ctx.group_sync, ctx.dt, self._settings.play_group_sync_seconds,
+                          self._settings.play_group_sync_release_seconds)
         return [(LayerId.pose_instrument, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
@@ -204,7 +204,7 @@ class PlayState(StateBase):
         if ctx.players < self._settings.min_players:
             return StateId.END
         # The hold has built: the sync end, the wind-down to the intro.
-        if self._settings.play_full_sync_seconds > 0.0 and self._hold.level >= _FULL:
+        if self._settings.play_group_sync_seconds > 0.0 and self._hold.level >= _FULL:
             return StateId.PLAY_INTRO
         return None
 
@@ -377,8 +377,8 @@ class PlayIntroState(WindDownStateBase):
 
     def enter(self, ctx: StateContext) -> None:
         # The strobing wall restarts full, and the instrument is done: PLAY_INTRO never returns to
-        # PLAY, and its full-sync readout clears with it (the layer is not drawn again before S6
-        # resets it).
+        # PLAY (the layer is not drawn again before S6 resets it). The gate is the pipeline's and
+        # keeps reading the room; PLAY's hold starts fresh at its next entry.
         self._reset_layers([LayerId.beam_sync_wind_down, LayerId.pose_instrument])
 
     def update(self, ctx: StateContext) -> Mix:

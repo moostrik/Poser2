@@ -4,12 +4,11 @@ A condition-driven state machine that plays the states designed in ``docs/STATES
 (the source of truth): a sequencer hybrid, progress-driven *within* a state and
 condition-driven *between* states. Each tick (on the Conductor's light thread) it builds a
 ``StateContext`` from the board (the players present, the hit streak ``HitSync`` publishes — this
-tick's hit and how many hits in a row struck alike poses — and the playhead's content clock and
-lock signals) and from the pose instrument's readout (``pose_instrument.full_sync``: the room in full sync, as
-the instrument drew it last tick), lets the active state return its mix, evaluates that state's
-transition conditions, and emits a ``SequencerState`` snapshot for the board and OSC sound. It
-reads the board and that readout only; the hits and their poses are ``pose/hit_sync.py``'s, the
-gate the instrument's.
+tick's hit and how many hits in a row struck alike poses — the group sync on the LERP group record,
+the pipeline's gate on the group's similarity as this tick wrote it, and the playhead's content clock
+and lock signals), lets the active state return its mix, evaluates that state's transition conditions,
+and emits a ``SequencerState`` snapshot for the board and OSC sound. It reads the board only; the hits
+and their poses are ``pose/hit_sync.py``'s, the gate the pipeline's (``pose.similarity.group_sync``).
 
 The machine is the only component that talks to the Conductor, through three explicit
 command callables: ``set_mix`` (the mix), ``reset_layers`` (explicit layer resets), and
@@ -27,10 +26,11 @@ from dataclasses import dataclass
 from typing import Callable
 
 from modules.board import HitStreak
+from modules.pose import GroupSync
 from modules.session import SequencerState
 
 from ..render_board import RenderBoard
-from ..light import LightSettings, LayerId, Mix, MotorMode, PoseInstrumentSettings, Tick
+from ..light import LightSettings, LayerId, Mix, MotorMode, Tick
 from .settings import StateId, StateMachineSettings, ManualSettings
 
 import logging
@@ -47,8 +47,8 @@ class StateContext:
     players: int            # live player count (the dummy excluded)
     sync_hits: int          # hits in a row, within one round, that struck alike poses (HitSync's streak)
     hit:     bool           # this tick the playhead is closest to a live player (the flash tick)
-    full_sync: bool         # the room in full sync: every present pair alike over the instrument's band
-                            # (pose_instrument.full_sync as the instrument drew it last tick — PLAY's sync end)
+    group_sync: bool        # the group in sync: the pipeline's gate on the group's similarity, this tick's
+                            # (GroupSync on the LERP group record — PLAY's sync end)
     session: bool           # session mode active — states consult it in needs_state_change()
     blackout: bool          # the pinned blackout toggle — OFF stays put while pinned and
                             # wakes through OFF_IDLE once released and the playhead lock holds
@@ -65,15 +65,13 @@ class StateMachine:
     ``conductor.add_update_callback`` — everything runs on the light thread and every input is
     read from the board there, so composing needs no locking."""
 
-    def __init__(self, settings: StateMachineSettings, light: LightSettings, instrument: PoseInstrumentSettings,
-                 board: RenderBoard,
+    def __init__(self, settings: StateMachineSettings, light: LightSettings, board: RenderBoard,
                  set_mix: Callable[[Mix], None],
                  reset_layers: Callable[[list[LayerId]], None],
                  set_motor: Callable[[MotorMode | None], None],
                  pose_stage: int) -> None:
         self._settings = settings
         self._light = light
-        self._instrument = instrument
         self._board = board
         self._set_mix = set_mix
         self._reset_layers = reset_layers
@@ -129,7 +127,7 @@ class StateMachine:
             players=players,
             sync_hits=self._streak.hits,
             hit=hit,
-            full_sync=self._instrument.full_sync,
+            group_sync=self._board.get_group(self._pose_stage)[GroupSync].on,
             session=self._settings.session.enabled,
             blackout=self._settings.blackout,
             prev=self._prev_state,

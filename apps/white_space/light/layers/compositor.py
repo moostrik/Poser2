@@ -106,7 +106,7 @@ class Compositor:
             except Exception:
                 logger.exception("Error in %s.render", layer.__class__.__name__)
                 continue
-            frame.sync = max(frame.sync, s.sync)   # full sync rides out only while its layer draws
+            frame.sync = max(frame.sync, s.sync)   # group sync rides out only while its layer draws
             if w_white > 0.0:
                 frame.white += w_white * s.white
             if w_blue > 0.0:

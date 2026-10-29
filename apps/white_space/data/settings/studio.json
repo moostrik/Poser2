@@ -574,6 +574,11 @@
       "interpolator": {
         "responsiveness": 0.33,
         "friction": 0.05
+      },
+      "group_sync": {
+        "mode": "ALL",
+        "on_at": 0.98,
+        "off_at": 0.93
       }
     },
     "window_raw": {
@@ -831,8 +836,6 @@
     "max_lines": 90,
     "opposite": "OFF",
     "lean_share": 2.0,
-    "on_at": 0.98,
-    "off_at": 0.93,
     "mask": {
       "width": 15.0,
       "white": 0.0,

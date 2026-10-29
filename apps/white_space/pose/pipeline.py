@@ -2,8 +2,9 @@
 
 The frame domain (the camera's frame bang) runs the tracklet poses through the pose model and the RAW,
 CLEAN, SMOOTH and PREDICT stages on the model's thread. The light tick drives LERP: the interpolated
-players and the dummy meet there, and everything a person has is stamped on both. ``docs/POSE_INSTRUMENT.md``
-says what the stages mean to the show and ``docs/SIMILARITY.md`` what the similarity steps compute.
+players and the dummy meet there, and everything a person has is stamped on both; the group sync, the gate on
+the group's similarity, goes to the LERP group record. ``docs/POSE_INSTRUMENT.md`` says what the stages mean to
+the show and ``docs/SIMILARITY.md`` what the similarity steps compute.
 """
 
 from __future__ import annotations
@@ -98,6 +99,9 @@ def pipeline_spec(ps: PoseGroup, tracklet_poses: FrameSource, pose_inference: As
             PoseStep(nodes.AngleMotionMovingAverageSmoother, ps.motion.moving_average),
             PoseStep(PlayheadOffsetExtractor, playhead_phase),
             GroupStep(nodes.MotionGateExtractor()),
+            # Last, on the interpolated similarity rows: the group's level and the gate on it (group sync), written
+            # to the LERP group record; the instrument and the state machine read it off the board.
+            GroupStep(nodes.GroupSyncGate(ps.similarity.group_sync)),
         ], domain=Domain.OUTPUT, interpolators=[
             PoseStep(nodes.PointChaseInterpolator, ps.point.interpolator),
             PoseStep(nodes.AngleChaseInterpolator, ps.angle.interpolator),

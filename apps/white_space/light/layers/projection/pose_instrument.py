@@ -13,9 +13,9 @@ bridge is everything the synth does not know:
   person's measures into the sources of the synth's slots. The bases and amounts are settings of
   the ``pose_instrument`` group; the wiring is code.
 - the **events**: presence (a pose is seen), the hit (``PlayheadCrossing``, the tick closest to
-  the crossing: each oscillator's push and the mask's flash), and **full sync**: the room's one
-  gate (``_set_full_sync``), every present pair alike over the band (on from ``pose_instrument.on_at``, off
-  below ``pose_instrument.off_at``), published on ``pose_instrument.full_sync`` for the show (``docs/STATES.md``, S7) and
+  the crossing: each oscillator's push and the mask's flash), and **group sync**: the pipeline's gate on
+  the group's similarity (``GroupSyncGate`` at LERP, its band and mode in ``pose.similarity.group_sync``),
+  read off the LERP group record on the board (``GroupSync``) as the state machine reads it (``docs/STATES.md``, S7) and
   taken by three mechanisms, each through its own bypass into its own envelope: the **sync
   strobe** — every drawn pattern's white and blue swap on strobe frames (or go dark,
   ``sync_strobe.mode``), the rate climbing the nested ladder over the attack and stepping back
@@ -98,45 +98,37 @@ class SyncStrobeMode(IntEnum):
 
 
 class SyncStrobeSettings(BaseSettings):
-    """The sync strobe, full sync's visualization: while the room's gate is open (every present
-    pair alike over the band, ``PoseInstrumentSettings``), every drawn pattern's white and blue
+    """The sync strobe, group sync's visualization: while the gate is open (the group alike over the
+    pipeline's band, ``pose.similarity.group_sync``), every drawn pattern's white and blue
     swap on strobe frames (or go dark, the mode). The gate, through this bypass, drives an
     envelope whose value picks the rate from the nested powers of two: the strobe comes in
     climbing 1 to 16 per second over the attack and fades out stepping back down over the
     release, every change a seamless infill. The bridge's, after the voices render; the
-    per-oscillator strobes are the patch's and independent. The band is the root's, shared
-    with the growth and the blend; each mechanism keeps its own bypass and envelope."""
-    bypass:          Field[bool]           = Field(False,                 label="Bypass", description="No sync strobe: full sync shows nothing", row_label="Sync Strobe", newline=True)
+    per-oscillator strobes are the patch's and independent. The growth and the blend take the
+    same gate; each mechanism keeps its own bypass and envelope."""
+    bypass:          Field[bool]           = Field(False,                 label="Bypass", description="No sync strobe: group sync shows nothing", row_label="Sync Strobe", newline=True)
     mode:            Field[SyncStrobeMode] = Field(SyncStrobeMode.INVERT, label="Mode",   description="A strobe frame swaps white and blue, or goes dark")
-    on_at:           Field[float]          = Field(0.95, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="On At",   description="Full sync comes on when every pair reads at least this", visible=False)
-    off_at:          Field[float]          = Field(0.90, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Off At",  description="Full sync goes off when any pair falls below this", visible=False)
     attack_seconds:  Field[float]          = Field(2.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Attack",  description="The rate climbs 1 to 16 per second over (s)")
     release_seconds: Field[float]          = Field(4.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Release", description="The rate steps back down to silence over (s)")
 
 
 class GrowSettings(BaseSettings):
-    """The growth, full sync's other reach: while the room's gate is open (the band is the
-    root's, shared with the sync strobe and the blend, each mechanism its own bypass and
-    envelope), every window grows toward the full circle over the attack — the overlap clip
-    shapes how the grown windows meet — and falls back over the release. ``window.width_bypass``
-    switches it off."""
-    on_at:           Field[float] = Field(0.95, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="On At",   description="Full sync comes on when every pair reads at least this", visible=False)
-    off_at:          Field[float] = Field(0.90, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Off At",  description="Full sync goes off when any pair falls below this", visible=False)
-    attack_seconds:  Field[float] = Field(3.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Attack",  description="Windows grow to fill the circle while full sync holds, over (s)", row_label="Grow", newline=True)
+    """The growth, group sync's other reach: while the gate is open (the pipeline's band, shared
+    with the sync strobe and the blend, each mechanism its own bypass and envelope), every
+    window grows toward the full circle over the attack — the overlap clip shapes how the grown
+    windows meet — and falls back over the release. ``window.width_bypass`` switches it off."""
+    attack_seconds:  Field[float] = Field(3.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Attack",  description="Windows grow to fill the circle while group sync holds, over (s)", row_label="Grow", newline=True)
     release_seconds: Field[float] = Field(3.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Release", description="The grown windows fall back to the width over (s)")
 
 
 class BlendSettings(BaseSettings):
-    """The blend, full sync's third effect: while the room's gate is open (the band is the
-    root's, shared with the strobe and the growth, each mechanism its own bypass and
-    envelope), everyone's measures ease toward the room's presence-weighted mean, so every
-    pattern becomes one; off the band everyone returns to their own. The blend is read-time
-    only — the stored measures stay each person's own — and positions, masks and hits are
-    never blended."""
+    """The blend, group sync's third effect: while the gate is open (the pipeline's band, shared
+    with the strobe and the growth, each mechanism its own bypass and envelope), everyone's
+    measures ease toward the room's presence-weighted mean, so every pattern becomes one; off
+    the band everyone returns to their own. The blend is read-time only — the stored measures
+    stay each person's own — and positions, masks and hits are never blended."""
     bypass:          Field[bool]  = Field(False,                                           label="Bypass",  description="No blend: everyone keeps their own pattern", row_label="Blend", newline=True)
-    on_at:           Field[float] = Field(0.95, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="On At",   description="Full sync comes on when every pair reads at least this", visible=False)
-    off_at:          Field[float] = Field(0.90, min=0.0, max=1.0,  step=0.01, widget=KNOB, label="Off At",  description="Full sync goes off when any pair falls below this", visible=False)
-    attack_seconds:  Field[float] = Field(2.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Attack",  description="Measures ease to the room's mean while full sync holds, over (s)")
+    attack_seconds:  Field[float] = Field(2.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Attack",  description="Measures ease to the room's mean while group sync holds, over (s)")
     release_seconds: Field[float] = Field(2.0,  min=0.0, max=10.0, step=0.1,  widget=KNOB, label="Release", description="Everyone returns to their own measures over (s)")
 
 
@@ -157,22 +149,19 @@ class MaskSettings(BaseSettings):
 
 class PoseInstrumentSettings(BaseSettings):
     """The ``pose_instrument`` root group, a group per concept: the mask, the playhead's marker, the window,
-    the sync strobe, the growth and the blend (the full-sync band declared here, shared into
-    all three, and the room's gate it opens published as ``full_sync``, read by the show), the
-    two oscillators, their strobes and the LFO (the synth's patch, a slot per parameter), the
-    dummy. The wiring is ``connect``; the measures' dead zones are the pipeline's."""
+    the sync strobe, the growth and the blend (what group sync does to the light; the gate itself
+    is the pipeline's, ``pose.similarity.group_sync``), the two oscillators, their strobes and the
+    LFO (the synth's patch, a slot per parameter), the dummy. The wiring is ``connect``; the
+    measures' dead zones are the pipeline's."""
     max_lines:    Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
     opposite:     Field[Opposite] = Field(Opposite.OFF, widget=Widget.select, description="Each player's lines at them, half a turn away, or both (copies win the overlap)")
     lean_share:   Field[float] = Field(2.0, min=0.0, max=4.0, step=0.05, widget=KNOB, label="Lean Share", description="Arms' pull a lean hands to one color: 0 off, 1 all at full lean, >1 overshoots")
-    on_at:        Field[float] = Field(0.95, min=0.0, max=1.0, step=0.01, widget=KNOB, label="On At",  description="Full sync comes on when every pair reads at least this", row_label="Sync", newline=True)
-    off_at:       Field[float] = Field(0.90, min=0.0, max=1.0, step=0.01, widget=KNOB, label="Off At", description="Full sync goes off when any pair falls below this")
-    full_sync:    Field[bool]  = Field(False, access=Field.READ, label="Full Sync", description="Every present pair alike over the band")
     mask:         Group[MaskSettings]           = Group(MaskSettings)
     playhead:     Group[PlayheadMarkerSettings] = Group(PlayheadMarkerSettings)
     window:       Group[InstrumentWindowSettings] = Group(InstrumentWindowSettings)
-    sync_strobe:  Group[SyncStrobeSettings]     = Group(SyncStrobeSettings, share=[on_at, off_at])
-    grow:         Group[GrowSettings]           = Group(GrowSettings, share=[on_at, off_at])
-    blend:        Group[BlendSettings]          = Group(BlendSettings, share=[on_at, off_at])
+    sync_strobe:  Group[SyncStrobeSettings]     = Group(SyncStrobeSettings)
+    grow:         Group[GrowSettings]           = Group(GrowSettings)
+    blend:        Group[BlendSettings]          = Group(BlendSettings)
     white_lines:  Group[OscillatorSettings]     = Group(OscillatorSettings)
     blue_lines:   Group[OscillatorSettings]     = Group(OscillatorSettings)
     white_strobe: Group[StrobeSettings]         = Group(StrobeSettings)
@@ -196,7 +185,6 @@ class _Player:
     body_bend:      float = 0.0     # TorsoTilt [-1, 1]
     distance:       float = 0.0     # Distance [0, 1]
     symmetry:      np.ndarray = field(default_factory=lambda: np.zeros(len(features.SymmetryElement), dtype=np.float32))
-    similarity:     np.ndarray = field(default_factory=lambda: np.zeros(0, dtype=np.float32))
     present:        bool  = False   # seen this tick
     hit:            bool  = False   # the playhead crosses this person this tick
     flash:          Envelope = field(default_factory=Envelope)   # the mask's flash: up on the hit, then its release
@@ -220,7 +208,7 @@ class PoseInstrument(ProjectionLayer):
         self._players: dict[int, _Player] = {}
         self._scale = 1.0                                                   # this tick's window scale
         self._ticks_per_second = 1                                          # this tick's grid, the strobes' and the pulse's
-        self._full_sync = False                                             # the room's gate: every present pair alike over the band
+        self._group_sync = False                                            # this tick's gate, read off the LERP group record
         self._sync_strobe = Envelope()                                      # the strobe's envelope: its value picks the rate
         self._grow = Envelope()                                             # the growth's envelope: the windows toward the full circle
         self._blend = Envelope()                                            # the blend's envelope: the measures toward the room's mean
@@ -236,11 +224,11 @@ class PoseInstrument(ProjectionLayer):
             strobe.bind(StrobeSettings.bypass_all, partial(self._strobe_bypass_all, strobe))
 
     def reset(self) -> None:
-        """A fresh instrument (S6 entry): forget every player, pass and sync."""
+        """A fresh instrument (S6 entry): forget every player, pass and sync envelope; the gate is the
+        pipeline's and keeps reading the room."""
         self._players.clear()
         self._crossing.reset()
-        self._full_sync = False
-        self._instrument.full_sync = False
+        self._group_sync = False
         self._sync_strobe.reset()
         self._grow.reset()
         self._blend.reset()
@@ -354,7 +342,6 @@ class PoseInstrument(ProjectionLayer):
             p.body_bend = self._value(pose[features.TorsoTilt].value, p.body_bend)
             p.distance = self._value(pose[features.Distance].value, p.distance)
             p.symmetry = np.where(np.isnan(pose[features.AngleSymmetry].values), p.symmetry, pose[features.AngleSymmetry].values)
-            p.similarity = pose[features.Similarity].values
             offsets[id] = pose[PlayheadOffset].value
 
         step = playhead_step(frame.motor_command.beam_rpm, frame.tick.interval)
@@ -369,7 +356,8 @@ class PoseInstrument(ProjectionLayer):
         W = P.window
         participation = max(sum(p.voice.presence for p in self._players.values()), 1.0)
         self._scale = W.scale * W.crowd ** (participation - 1.0)
-        self._set_full_sync()                                               # the room's gate, on this tick's presences and similarities
+        # The gate: this tick's, the pipeline wrote the LERP record on the tick before the layers draw.
+        self._group_sync = self._board.get_group(self._pose_stage)[features.GroupSync].on
         self._set_blend(frame.tick.dt)                                      # before the loop: connect reads through it
         gone: list[int] = []
         for id, p in self._players.items():
@@ -459,7 +447,7 @@ class PoseInstrument(ProjectionLayer):
         ``window.width_bypass`` gates it off), then clipped toward the midpoint to every
         neighbour as far as ``window.overlap`` allows (the neighbour's presence scales the
         clip, so a neighbour leaving lets go smoothly). Grown windows meet through the same
-        clip: at full sync the circle fills, lines everywhere, territories at overlap 0."""
+        clip: at group sync the circle fills, lines everywhere, territories at overlap 0."""
         W = self._instrument.window
         full = 180.0 / self._scale                          # pattern degrees: half the circle real
         base = min(W.width + (full - W.width) * self._grow.value, full)
@@ -508,39 +496,20 @@ class PoseInstrument(ProjectionLayer):
                     a.reach_right = min(a.reach_right, limits[2])
                     b.reach_left = min(b.reach_left, limits[3])
 
-    def _set_full_sync(self) -> None:
-        """Whether the room is in **full sync**: every present pair alike over the band. The gate
-        opens when the least alike present pair reads ``on_at`` and closes only when one falls
-        below ``off_at``, so a room hovering at one level never swaps it. A pair that cannot be
-        read holds the room off, as does a person at neutral (the neutral weight is in the
-        feature); below two people there is no pair. Computed once per tick, once the players'
-        presences and similarities are this tick's; published on ``pose_instrument.full_sync`` for the show
-        (``docs/STATES.md``, S7: PLAY winds down once its hold has built), and taken by the sync strobe,
-        the growth and the blend, each through its own bypass into its own envelope."""
-        P = self._instrument
-        present = [id for id, p in self._players.items() if p.present]
-        if len(present) < 2:
-            self._full_sync = False
-        else:
-            sims = [self._pair_similarity(a, b) for i, a in enumerate(present) for b in present[i + 1:]]
-            least = -1.0 if any(math.isnan(s) for s in sims) else min(sims)
-            self._full_sync = least >= (min(P.off_at, P.on_at) if self._full_sync else P.on_at)
-        P.full_sync = self._full_sync
-
     def _set_sync_strobe(self, frame: LightFrame) -> None:
-        """Whether this tick is a sync strobe frame. The room's gate (``_set_full_sync``), through
+        """Whether this tick is a sync strobe frame. The gate (group sync, off the board), through
         the strobe's bypass, drives an envelope whose value picks the rate from the nested powers
         of two (``Strobe.rate``, ``Strobe.period``): the strobe comes in climbing 1 to 16 per
         second over the attack — every other tick at a power-of-two tick rate — and fades out
         stepping back down over the release, every change a seamless infill on the strobes'
         shared grid, and a gate reopened mid-fade climbs from where it is. While it strobes,
-        every drawn pattern strobes: full sync is the whole room.
+        every drawn pattern strobes: group sync is the whole room.
 
         The envelope's value is also published on the frame (``frame.sync``) for the sound
         (``docs/SOUND.md``, /global/sync); the compositor carries it out only while this
         layer draws, so the wire reads 0 whenever the instrument is out of the mix."""
         P = self._instrument.sync_strobe
-        value = self._sync_strobe.update(self._full_sync and not P.bypass, frame.tick.dt,
+        value = self._sync_strobe.update(self._group_sync and not P.bypass, frame.tick.dt,
                                          P.attack_seconds, P.release_seconds)
         frame.sync = value
         strobe = False
@@ -592,13 +561,13 @@ class PoseInstrument(ProjectionLayer):
                     a.reach_right *= shrink
 
     def _set_grow(self, dt: float) -> None:
-        """Whether full sync grows the windows. The room's gate (``_set_full_sync``), with the
+        """Whether group sync grows the windows. The gate (off the board), with the
         growth's own envelope so the mechanisms stay apart: while the gate is open the envelope
         rises over ``grow.attack_seconds`` and ``_set_reaches`` grows every window toward the
         full circle; closed, it falls back over ``grow.release_seconds``.
         ``window.width_bypass`` holds the growth off."""
         P = self._instrument.grow
-        self._grow.update(self._full_sync and not self._instrument.window.width_bypass, dt,
+        self._grow.update(self._group_sync and not self._instrument.window.width_bypass, dt,
                           P.attack_seconds, P.release_seconds)
 
     # What the blend averages: never similarity or position. The derived measures (the arms' mean,
@@ -607,14 +576,14 @@ class PoseInstrument(ProjectionLayer):
                 'legs', 'body_bend', 'distance')
 
     def _set_blend(self, dt: float) -> None:
-        """Whether full sync blends the measures. The room's gate (``_set_full_sync``), through
+        """Whether group sync blends the measures. The gate (off the board), through
         the blend's bypass, with the blend's own envelope: while the gate is open the envelope
         rises over ``blend.attack_seconds`` and ``connect`` reads everyone's measures eased
         toward the room's presence-weighted mean (``_blended``), one pattern for everyone;
         closed, it falls back over ``blend.release_seconds``. The presences the mean weighs
         are last tick's, as the scale's participation is."""
         P = self._instrument.blend
-        self._blend.update(self._full_sync and not P.bypass, dt, P.attack_seconds, P.release_seconds)
+        self._blend.update(self._group_sync and not P.bypass, dt, P.attack_seconds, P.release_seconds)
         total = sum(p.voice.presence for p in self._players.values())
         if self._blend.level > 0.0 and total > 0.0:
             self._means = {name: sum(getattr(p, name) * p.voice.presence for p in self._players.values()) / total
@@ -631,15 +600,6 @@ class PoseInstrument(ProjectionLayer):
             return p
         return replace(p, **{name: getattr(p, name) + (self._means[name] - getattr(p, name)) * t
                              for name in self.MEASURES})
-
-    def _pair_similarity(self, id_a: int, id_b: int) -> float:
-        """Mean of both directions' pairwise similarity (one side may be NaN)."""
-        sims = []
-        for me, other in ((id_a, id_b), (id_b, id_a)):
-            row = self._players[me].similarity
-            if other < len(row) and not math.isnan(float(row[other])):
-                sims.append(float(row[other]))
-        return float(np.mean(sims)) if sims else float('nan')
 
     @staticmethod
     def _signed_offset(a: float, b: float) -> float:

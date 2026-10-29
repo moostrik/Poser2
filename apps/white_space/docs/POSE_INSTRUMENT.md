@@ -61,7 +61,7 @@ The ground rules, as set:
   the lines reads as a mark **(site facts)**; the mark is the push and the mask's flash
   (*Events*), with the playhead's marker passing the player; each mark is optional through its
   levels.
-- Sync shows as the **sync strobe**, at full sync only: while every pair is alike, the whole
+- Sync shows as the **sync strobe**, at group sync only: while every pair is alike, the whole
   room's white and blue trade places on strobe frames, the lines staying what they are, the
   rate climbing in over the attack and stepping away over the release. Sync can also open the
   window toward the partner (off in the preset).
@@ -257,7 +257,7 @@ leg deviation's zones are in their extractors.
 | leg deviation | at standing, degrees; full at each top     | `leg_deviation_extractor.neutral_dead_zone`, `hip_max_degrees`, `knee_max_degrees` |
 
 The distance and the symmetries get theirs with their connection; the similarity has its own
-gate, the full-sync band (`pose_instrument.on_at`, `pose_instrument.off_at`, shared into the sync strobe and the growth).
+gate, group sync (`pose.similarity.group_sync`: the mode and the band), taken by the sync strobe, the growth and the blend.
 
 ## Symmetry
 
@@ -310,7 +310,7 @@ What the instrument triggers in a player's voice, beside the measures:
 |----------|-------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------|
 | presence | the player is seen: a gate open while they are there        | the presence envelope, on both reaches                                                                              |
 | hit      | the playhead crosses the player: the tick closest to it     | each oscillator's push, and the mask's flash                                                                        |
-| sync     | full sync: every present pair alike over the band           | the sync strobe; the growth: every window toward the full circle; the blend: everyone's measures to the room's mean |
+| sync     | group sync: the pipeline's gate on the group's similarity   | the sync strobe; the growth: every window toward the full circle; the blend: everyone's measures to the room's mean |
 
 Presence and the pushes are envelopes of the synth (`LIGHT_SYNTH.md`, *The envelope*). The
 reaches are the bridge's: it gives each side's reach to the voice as a value, the rest width grown
@@ -402,17 +402,17 @@ Presence opens the window from the mask over `window.attack_seconds` and closes 
 `window.release_seconds`, the last pose held while it closes and the mask dimming with it.
 
 The bridge sets each side's **reach** every tick: `window.width`, grown toward the full circle
-by the sync **growth** (`pose_instrument.grow`). The growth is room-level: while full sync holds — the room's
+by the sync **growth** (`pose_instrument.grow`). The growth is room-level: while group sync holds — the room's
 gate (*The sync strobe*), the growth's own envelope —
 the envelope rises over `grow.attack_seconds` and every
-window grows toward half the circle each side, so at full sync lines are everywhere; when the
+window grows toward half the circle each side, so at group sync lines are everywhere; when the
 band closes, the windows fall back over `grow.release_seconds`. The grown windows
 meet through the overlap clip below, so the Overlap knob shapes the filled circle too:
 territories tiling at 0, interleaved at 1. `window.width_bypass` switches the growth off. The
 voice multiplies the reach by presence and thins the lines to nothing over the taper
 (`LIGHT_SYNTH.md`, *The window*).
 
-The **blend** (`pose_instrument.blend`) is full sync's union: while the band holds, everyone's measures ease
+The **blend** (`pose_instrument.blend`) is group sync's union: while the band holds, everyone's measures ease
 toward the room's presence-weighted mean over `blend.attack_seconds` — every pattern becomes
 one — and return to their own over `blend.release_seconds`. The blend reads the measures; it
 never writes them, and never touches similarity, positions, masks or hits, so everyone keeps
@@ -450,15 +450,15 @@ the instrument at a player.
 
 ### The sync strobe
 
-The **sync strobe** is full sync's visualization: while the room holds full sync, every drawn
+The **sync strobe** is group sync's visualization: while the room holds group sync, every drawn
 pattern's white and blue trade places on strobe frames (`sync_strobe.mode` invert, the
-default) or go dark (black), whole patterns at once, returning on the frame between. The room
-is in full sync while its least alike present pair holds over the band: the gate opens when
-every pair reads `pose_instrument.on_at` and closes only when one falls below
-`pose_instrument.off_at` — the band is the hysteresis, so a room hovering at one level never
-swaps the gate. The gate is the room's, computed once per tick (`PoseInstrument._set_full_sync`)
-and published as `pose_instrument.full_sync`: the show reads it in PLAY, where full sync held long enough is
-the sync end (`STATES.md`, S7 and S11), and the strobe, the growth and the blend each take it
+default) or go dark (black), whole patterns at once, returning on the frame between. Group sync is
+the pipeline's gate on the group's similarity (`SIMILARITY.md`, *Group sync*; the LERP step `GroupSyncGate`,
+its mode and band in `pose.similarity.group_sync`): the group's level — the least alike present pair, or with
+the one who drags it down most left out — opens the gate at `on_at` and closes it only below `off_at`, the band
+being the hysteresis, so a room hovering at one level never swaps the gate. The gate is written to the LERP
+group record every tick, and the instrument reads it off the board as the show does: in PLAY, group sync held
+long enough is the sync end (`STATES.md`, S7 and S11), and the strobe, the growth and the blend each take it
 through their own bypass into their own envelope. A player at neutral holds the room off (the neutral weight is in the feature,
 `SIMILARITY.md`), as does a pair that cannot be read; below two people there is no pair and
 no strobe.
@@ -469,7 +469,7 @@ flash) whose value picks the rate from the nested powers of two: the strobe come
 stepping back down to silence over `release_seconds`; a gate reopened mid-fade climbs from
 where it is. The powers nest on the strobes' shared tick grid (`LIGHT_SYNTH.md`, *The
 strobe*), so every change of rung only adds or removes strobe frames between the ones that
-stay. Full sync holds no graded middle state: rates graded by sync depth read as noise on the
+stay. Group sync holds no graded middle state: rates graded by sync depth read as noise on the
 wall **(site fact)**; the ladder is the strobe's attack and release, not a meter.
 
 The sync strobe acts after the synth: the voices render as ever and the bridge swaps their
@@ -503,11 +503,9 @@ tuned together, knobs throughout:
 | `mask`                        | the mask's width, white and blue; the border's; the flash's levels, release                                             |
 | `playhead`                    | the marker's width, white and blue; its level inside a mask                                                             |
 | `window`                      | shape: taper, attack, release, their curves, the cap; reach: width, bypass; the scale, the crowd factor and the overlap |
-| `on_at`, `off_at`             | the full-sync band, shared into `sync_strobe`, `grow` and `blend`                                                       |
-| `full_sync`                   | read-only: the room's gate, open while every present pair holds the band (the show's sync end)                          |
-| `sync_strobe`                 | full sync's display: bypass, mode (invert or black), attack, release                                                    |
-| `grow`                        | full sync's reach: windows grow to the full circle; attack, release                                                     |
-| `blend`                       | full sync's union: everyone's measures to the room's mean; bypass, attack, release                                      |
+| `sync_strobe`                 | group sync's display: bypass, mode (invert or black), attack, release (the gate itself: `pose.similarity.group_sync`)    |
+| `grow`                        | group sync's reach: windows grow to the full circle; attack, release                                                     |
+| `blend`                       | group sync's union: everyone's measures to the room's mean; bypass, attack, release                                      |
 | `white_lines`, `blue_lines`   | On, Mirror, Bypass All; a slot per parameter; the push                                                                  |
 | `white_strobe`, `blue_strobe` | Bypass All; a slot per parameter of the strobe (`LIGHT_SYNTH.md`, *The strobe*)                                         |
 | `lfo`                         | the LFO: rate, phase, the level's slot                                                                                  |

@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from modules.pose import features
+from modules.pose import features, GroupRecord, GroupSync
 
 from apps.white_space.light import Tick, MotorCommand, MotorMode, LayerSettings
 from apps.white_space.light.frame import LightFrame
@@ -79,10 +79,13 @@ def _pose(azimuth_pos: float, sims: dict[int, float] | None = None, left_shoulde
 
 
 class InstrumentBoard(SimpleNamespace):
-    """Poses only: the instrument never reads tracklets."""
+    """Poses and the LERP group record's gate: the instrument never reads tracklets."""
 
     def get_frames(self, stage: int):
         return self.frames
+
+    def get_group(self, stage: int) -> GroupRecord:
+        return GroupRecord(features={GroupSync: GroupSync.from_value(1.0 if self.group_sync else 0.0)})
 
 
 def _runs(values: np.ndarray) -> list[tuple[int, int]]:
@@ -105,13 +108,17 @@ class PoseInstrumentTest(unittest.TestCase):
         W, B = self.settings.white_lines, self.settings.blue_lines              # the placeholder's patch: white out, blue in
         W.pulse_width, W.pulse_width_amount, W.phase = 0.0, 1.0, self.QUARTER
         B.pulse_width, B.pulse_width_amount, B.phase = 1.0, -1.0, -0.5 + self.QUARTER
-        self.board = InstrumentBoard(frames={})
+        self.board = InstrumentBoard(frames={}, group_sync=False)
         self.layer = PoseInstrument(IRES, LayerSettings(), self.settings, self.board, pose_stage=4)
         self.dt = TICK                                    # the tick's interval, the show's 32 fps
         self.tick = 0                                     # the clock's tick index, counted by _render
 
     def _people(self, poses: dict[int, FakePose]) -> None:
         self.board.frames = poses
+
+    def _sync(self, on: bool) -> None:
+        """The pipeline's gate on the LERP group record (its band and hysteresis are its own tests')."""
+        self.board.group_sync = on
 
     def _render(self, playhead: float = float("nan")) -> LightFrame:
         """One tick; ``playhead`` is the content playhead as a normalized azimuth, none by
@@ -822,15 +829,16 @@ class PoseInstrumentTest(unittest.TestCase):
 
     # -- the sync growth --
 
-    def _grown_pair(self, sim: float = 1.0) -> None:
-        """A pair at neutral (full blue), its one pair reading ``sim``; the growth at once (no
-        Grow attack or release) — the envelope has its own tests. The strobe stays bypassed:
-        the growth is its own mechanism on the shared band."""
+    def _grown_pair(self, on: bool = True) -> None:
+        """A pair at neutral (full blue), the gate ``on``; the growth at once (no Grow attack or
+        release) — the envelope has its own tests. The strobe stays bypassed: the growth is its
+        own mechanism on the one gate."""
         G = self.settings.grow
         G.attack_seconds = G.release_seconds = 0.0
-        self._people({0: _pose(0.3, sims={1: sim}), 1: _pose(0.7, sims={0: sim})})
+        self._sync(on)
+        self._people({0: _pose(0.3), 1: _pose(0.7)})
 
-    def test_full_sync_fills_the_circle_through_the_overlap(self) -> None:
+    def test_group_sync_fills_the_circle_through_the_overlap(self) -> None:
         self.settings.window.overlap = 0.0
         self._grown_pair()
         f = self._render()
@@ -838,25 +846,8 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertEqual(float(f.blue[3100]), 1.0)                # the far side of the circle too
         np.testing.assert_array_equal(f.blue[1798:1803], 0.0)     # territories: a seam at the pair's midpoint
         self.layer.reset()
-        self._grown_pair(sim=0.5)                                 # below the band: the rest windows
+        self._grown_pair(on=False)                                # the gate closed: the rest windows
         self.assertEqual(float(self._render().blue[500]), 0.0)
-
-    def test_the_growth_follows_the_bands_hysteresis(self) -> None:
-        self._grown_pair()
-        self.assertEqual(float(self._render().blue[500]), 1.0)                            # on from on_at
-        self._people({0: _pose(0.3, sims={1: 0.92}), 1: _pose(0.7, sims={0: 0.92})})      # inside the band
-        self.assertEqual(float(self._render().blue[500]), 1.0)                            # held
-        self._people({0: _pose(0.3, sims={1: 0.5}), 1: _pose(0.7, sims={0: 0.5})})        # below off_at
-        self.assertEqual(float(self._render().blue[500]), 0.0)                            # released
-
-    def test_the_band_is_shared_from_the_root(self) -> None:
-        self.settings.on_at = 0.80                                             # one band, declared on the root
-        self.settings.off_at = 0.75
-        self.assertEqual(self.settings.grow.on_at, 0.80)                       # ...into the growth
-        self.assertEqual(self.settings.sync_strobe.off_at, 0.75)               # ...the strobe
-        self.assertEqual(self.settings.blend.on_at, 0.80)                      # ...and the blend
-        self._grown_pair(sim=0.85)                                        # over the lowered band
-        self.assertEqual(float(self._render().blue[500]), 1.0)
 
     def test_width_bypass_switches_the_growth_off(self) -> None:
         self.settings.window.width_bypass = True
@@ -870,23 +861,23 @@ class PoseInstrumentTest(unittest.TestCase):
         counts = [int(np.count_nonzero(self._render().blue)) for _ in range(40)]
         self.assertLess(counts[0], counts[15])                    # growing
         self.assertLess(counts[15], counts[35])                   # still growing, then full
-        self._people({0: _pose(0.3, sims={1: 0.5}), 1: _pose(0.7, sims={0: 0.5})})
+        self._sync(False)
         counts = [int(np.count_nonzero(self._render().blue)) for _ in range(40)]
         self.assertLess(max(abs(b - a) for a, b in zip(counts, counts[1:])), 800)   # falling, never snapping
         self.assertLessEqual(counts[-1], 4 * REACH + 2 * (2 * MASK + 1))            # back at the rest windows
 
     # -- the blend --
 
-    def _blend_pair(self, sim: float = 1.0) -> None:
-        """Arms-up A and hanging B, their one pair reading ``sim``; the blend at once (no
-        attack or release), the growth held off by the width bypass — the mechanisms are
-        independent."""
+    def _blend_pair(self, on: bool = True) -> None:
+        """Arms-up A and hanging B, the gate ``on``; the blend at once (no attack or release),
+        the growth held off by the width bypass — the mechanisms are independent."""
         self.settings.window.width_bypass = True
         B = self.settings.blend
         B.attack_seconds = B.release_seconds = 0.0
-        self._people({0: _pose(0.3, left_shoulder=shoulder(1.0), sims={1: sim}), 1: _pose(0.7, sims={0: sim})})
+        self._sync(on)
+        self._people({0: _pose(0.3, left_shoulder=shoulder(1.0)), 1: _pose(0.7)})
 
-    def test_full_sync_blends_everyone_to_one_pattern(self) -> None:
+    def test_group_sync_blends_everyone_to_one_pattern(self) -> None:
         a, b = round(0.3 * IRES), round(0.7 * IRES)
         self._blend_pair()
         self._render()                                                    # the means read last tick's presences
@@ -896,9 +887,9 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertEqual(float(f.white[a + MASK + 1:a + 300].max()), 1.0)   # the mean is half-raised:
         self.assertEqual(float(f.blue[a + MASK + 1:a + 300].max()), 1.0)    # both colors' lines at both people
 
-    def test_below_the_band_everyone_keeps_their_own_pattern(self) -> None:
+    def test_off_the_gate_everyone_keeps_their_own_pattern(self) -> None:
         a, b = round(0.3 * IRES), round(0.7 * IRES)
-        self._blend_pair(sim=0.5)
+        self._blend_pair(on=False)
         f = self._render()
         self.assertEqual(float(f.white[b + MASK + 1:b + 300].sum()), 0.0)   # B stays all blue
         self.assertEqual(float(f.blue[a + MASK + 1:a + 300].sum()), 0.0)    # A stays all white
@@ -910,55 +901,18 @@ class PoseInstrumentTest(unittest.TestCase):
         f = self._render()
         self.assertEqual(float(f.white[b + MASK + 1:b + 300].sum()), 0.0)
 
-    # -- the room's gate --
-
-    def test_full_sync_is_published_from_the_band_with_hysteresis(self) -> None:
-        # The room's one gate, read by the show (STATES.md, S7): on when every present pair reads
-        # on_at, held inside the band, off below off_at, and needing on_at again to re-enter.
-        self._sync_pair(sim=0.92)                                # inside the band from below: off
-        self._render()
-        self.assertFalse(self.settings.full_sync)
-        self._sync_pair()
-        self._render()
-        self.assertTrue(self.settings.full_sync)
-        self._sync_pair(sim=0.92)                                # hovering: held
-        self._render()
-        self.assertTrue(self.settings.full_sync)
-        self._sync_pair(sim=0.85)                                # below the band: off
-        self._render()
-        self.assertFalse(self.settings.full_sync)
-        self._sync_pair(sim=0.92)                                # back inside: stays off
-        self._render()
-        self.assertFalse(self.settings.full_sync)
-
-    def test_the_gate_is_the_rooms_not_the_strobes(self) -> None:
-        # A bypassed strobe shows nothing, but the room is in full sync all the same.
-        self._sync_pair()
-        self.settings.sync_strobe.bypass = True
-        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)   # no strobe
-        self.assertTrue(self.settings.full_sync)
-
-    def test_no_full_sync_alone_and_a_reset_clears_it(self) -> None:
-        self._sync_pair()
-        self._render()
-        self.assertTrue(self.settings.full_sync)
-        self.layer.reset()
-        self.assertFalse(self.settings.full_sync)
-        self._people({0: _pose(0.3)})                            # alone: full sync needs a pair
-        self._render()
-        self.assertFalse(self.settings.full_sync)
-
     # -- the sync strobe --
 
     PROBE = round(0.3 * IRES) + 300          # inside the 0.3 person's full window, clear of the mask
 
-    def _sync_pair(self, sim: float = 1.0) -> None:
-        """A pair at neutral (full blue), its one pair reading ``sim``; the strobe at once (no
-        attack or release) — the envelope has its own tests."""
+    def _sync_pair(self, on: bool = True) -> None:
+        """A pair at neutral (full blue), the gate ``on``; the strobe at once (no attack or
+        release) — the envelope has its own tests."""
         S = self.settings.sync_strobe
         S.bypass = False
         S.attack_seconds = S.release_seconds = 0.0
-        self._people({0: _pose(0.3, sims={1: sim}), 1: _pose(0.7, sims={0: sim})})
+        self._sync(on)
+        self._people({0: _pose(0.3), 1: _pose(0.7)})
 
     def _even_frame(self) -> LightFrame:
         """Render to the next even tick, where a strobe frame falls whenever the strobe is up."""
@@ -966,30 +920,11 @@ class PoseInstrumentTest(unittest.TestCase):
             self._render()
         return self._render()
 
-    def test_full_sync_strobes_every_other_tick_swapping_the_colors(self) -> None:
+    def test_group_sync_strobes_every_other_tick_swapping_the_colors(self) -> None:
         self._sync_pair()
         blue = [float(self._render().blue[self.PROBE]) for _ in range(4)]
         self.assertEqual(blue, [0.0, 1.0, 0.0, 1.0])
         self.assertEqual(float(self._even_frame().white[self.PROBE]), 1.0)   # a swap, not darkness
-
-    def test_the_band_holds_the_strobe_and_reentry_needs_full_sync(self) -> None:
-        self._sync_pair(sim=0.92)                                # inside the band from below: not full sync
-        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
-        self._sync_pair()                                        # every pair at on_at: on
-        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 0.0)
-        self._sync_pair(sim=0.92)                                # hovering: the band holds it on
-        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 0.0)
-        self._sync_pair(sim=0.85)                                # below the band: off
-        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
-        self._sync_pair(sim=0.92)                                # back inside: stays off
-        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
-
-    def test_one_unlike_pair_holds_the_room_off(self) -> None:
-        self.settings.sync_strobe.bypass = False
-        self.settings.sync_strobe.attack_seconds = 0.0
-        self._people({0: _pose(0.3, sims={1: 1.0, 2: 1.0}), 1: _pose(0.7, sims={0: 1.0, 2: 0.5}),
-                      2: _pose(0.1, sims={0: 1.0, 1: 0.5})})
-        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
 
     def test_black_mode_darkens_the_patterns_and_keeps_the_mask(self) -> None:
         self._sync_pair()
@@ -1000,31 +935,18 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertAlmostEqual(float(f.blue[round(0.3 * IRES)]), self.settings.mask.blue, places=6)   # the mask stays
         self.assertEqual(float(self._render().blue[self.PROBE]), 1.0)            # off the strobe, as ever
 
-    def test_no_strobe_short_of_the_band_alone_or_bypassed(self) -> None:
-        self._sync_pair(sim=0.5)
-        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
-        self.layer.reset()
-        self.settings.sync_strobe.bypass = False
-        self._people({0: _pose(0.3)})                            # alone: full sync needs a pair
+    def test_no_strobe_off_the_gate_or_bypassed(self) -> None:
+        self._sync_pair(on=False)
         self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
         self.layer.reset()
         self._sync_pair()
         self.settings.sync_strobe.bypass = True
         self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
 
-    def test_reset_forgets_the_sync(self) -> None:
-        self._sync_pair()
-        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 0.0)
-        self.layer.reset()
-        self._sync_pair(sim=0.92)                                # inside the band, but the hold was forgotten
-        self.assertEqual(float(self._even_frame().blue[self.PROBE]), 1.0)
-
-    def test_full_sync_rides_the_frame_for_the_sound(self) -> None:
+    def test_group_sync_rides_the_frame_for_the_sound(self) -> None:
         self._sync_pair()
         self.assertEqual(self._render().sync, 1.0)               # the envelope's value, for /global/sync
-        self._sync_pair(sim=0.5)                                 # below the band: released at once
-        self.assertEqual(self._render().sync, 0.0)
-        self._people({0: _pose(0.3)})                            # alone: no pair, no sync
+        self._sync_pair(on=False)                                # the gate closed: released at once
         self.assertEqual(self._render().sync, 0.0)
 
     def test_the_attack_climbs_the_ladder_on_the_grid(self) -> None:
@@ -1042,7 +964,7 @@ class PoseInstrumentTest(unittest.TestCase):
     def test_the_release_steps_the_strobe_down_to_silence(self) -> None:
         self._sync_pair()
         self.assertEqual(float(self._render().blue[self.PROBE]), 0.0)    # on at once
-        self._sync_pair(sim=0.5)                                 # sync lost
+        self._sync_pair(on=False)                                # sync lost
         self.settings.sync_strobe.release_seconds = 1.0               # the helper zeroes it; the fade is this test's
         ticks = []
         for _ in range(40):
@@ -1054,12 +976,12 @@ class PoseInstrumentTest(unittest.TestCase):
     def test_a_resync_mid_release_climbs_from_where_it_is(self) -> None:
         self._sync_pair()
         self._render()                                           # on, at once
-        self._sync_pair(sim=0.5)
+        self._sync_pair(on=False)
         S = self.settings.sync_strobe
         S.attack_seconds = S.release_seconds = 1.0               # the helper zeroed them
         for _ in range(4):
             self._render()                                       # falling, still near the top
-        self._people({0: _pose(0.3, sims={1: 1.0}), 1: _pose(0.7, sims={0: 1.0})})
+        self._sync(True)
         ticks = [1 for _ in range(8) if float(self._render().blue[self.PROBE]) == 0.0]
         self.assertGreaterEqual(len(ticks), 3)                   # back near the top at once, not from silence
 

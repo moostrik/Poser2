@@ -78,8 +78,8 @@ class StateMachineSettings(BaseSettings):
 
     # Condition tunables
     min_players:        Field[int]   = Field(3, min=2, max=16, description="Players the show needs at least: present to play, alike hits in a row to start", newline=True)
-    play_full_sync_seconds: Field[float] = Field(20.0, min=0.0, max=600.0, step=1.0, description="PLAY → PLAY_INTRO once the full-sync hold has built over this long (s); 0 never")
-    play_full_sync_release_seconds: Field[float] = Field(5.0, min=0.0, max=60.0, step=0.5, description="PLAY: a break in full sync drains the hold over this (s); 0 restarts it at once")
+    play_group_sync_seconds: Field[float] = Field(20.0, min=0.0, max=600.0, step=1.0, description="PLAY → PLAY_INTRO once the group-sync hold has built over this long (s); 0 never")
+    play_group_sync_release_seconds: Field[float] = Field(5.0, min=0.0, max=60.0, step=0.5, description="PLAY: a break in group sync drains the hold over this (s); 0 restarts it at once")
     intro_grace_seconds:    Field[float] = Field(20.0, min=0.0, max=300.0, step=1.0, description="Hits out of sync this long before INTRO spins up after PLAY_INTRO (s)")
 
     # The sync condition's group is HitSync's settings (pose/hit_sync.py): it fills the telemetry.

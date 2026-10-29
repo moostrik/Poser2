@@ -574,6 +574,11 @@
       "interpolator": {
         "responsiveness": 0.33,
         "friction": 0.05
+      },
+      "group_sync": {
+        "mode": "ALL",
+        "on_at": 0.85,
+        "off_at": 0.5
       }
     },
     "window_raw": {
@@ -835,8 +840,6 @@
     "max_lines": 132,
     "opposite": "BOTH",
     "lean_share": 2.0,
-    "on_at": 0.85,
-    "off_at": 0.5,
     "mask": {
       "width": 15.0,
       "white": 0.0,
@@ -1005,8 +1008,8 @@
     "end_bars": 4.0,
     "dim_level": 0.4,
     "min_players": 2,
-    "play_full_sync_seconds": 6.0,
-    "play_full_sync_release_seconds": 5.0,
+    "play_group_sync_seconds": 6.0,
+    "play_group_sync_release_seconds": 5.0,
     "intro_grace_seconds": 10.0,
     "sync": {
       "min_age_seconds": 2.0
