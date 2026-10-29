@@ -1,8 +1,8 @@
 """Deep Flow's pose pipeline: the stages, their steps and their clock domains.
 
 The frame domain (the camera's frame bang) smooths and predicts the tracklet boxes, runs the crops through
-the pose model and the RAW, CLEAN, SMOOTH and PREDICT stages on the model's thread; the render tick drives
-LERP.
+the pose model and the RAW, CLEAN and SMOOTH stages on the model's thread; the render tick drives LERP, where the
+predict interpolators show each feature where its fit puts it at the tick's time.
 """
 
 from __future__ import annotations
@@ -42,16 +42,10 @@ def pipeline_spec(ps: PoseGroup, tracklet_poses: FrameSource, pose_inference: As
             PoseStep(nodes.AngleSymmetryExtractor),
             PoseStep(nodes.MotionTimeExtractor),
             PoseStep(nodes.AgeExtractor),
+            PoseStep(nodes.AngleStickyFiller, ps.angle.sticky),
         ], window=ps.window_smooth),
 
-        StageSpec(Stage.PREDICT, Stage.SMOOTH, [
-            PoseStep(nodes.PointPredictor, ps.point.prediction),
-            PoseStep(nodes.AnglePredictor, ps.angle.prediction),
-            PoseStep(nodes.AngleVelocityPredictor, ps.velocity.prediction),
-            PoseStep(nodes.AngleStickyFiller, ps.angle.sticky),
-        ], window=ps.window_predict),
-
-        StageSpec(Stage.LERP, Stage.PREDICT, [
+        StageSpec(Stage.LERP, Stage.SMOOTH, [
             PoseStep(nodes.AngleSymmetryExtractor),
             PoseStep(nodes.MotionTimeExtractor),
             PoseStep(nodes.AgeExtractor),
@@ -61,9 +55,9 @@ def pipeline_spec(ps: PoseGroup, tracklet_poses: FrameSource, pose_inference: As
             PoseStep(nodes.AngleMotionMovingAverageSmoother, ps.motion.moving_average),
             GroupStep(nodes.MotionGateExtractor()),
         ], domain=Domain.OUTPUT, interpolators=[
-            PoseStep(nodes.BBoxChaseInterpolator, ps.bbox.interpolator),
-            PoseStep(nodes.PointChaseInterpolator, ps.point.interpolator),
-            PoseStep(nodes.AngleChaseInterpolator, ps.angle.interpolator),
-            PoseStep(nodes.AngleVelocityChaseInterpolator, ps.velocity.interpolator),
+            PoseStep(nodes.BBoxPredictInterpolator, ps.bbox.interpolator),
+            PoseStep(nodes.PointPredictInterpolator, ps.point.interpolator),
+            PoseStep(nodes.AnglePredictInterpolator, ps.angle.interpolator),
+            PoseStep(nodes.AngleVelocityPredictInterpolator, ps.velocity.interpolator),
         ], window=ps.window_lerp),
     ])
