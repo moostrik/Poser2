@@ -1,4 +1,5 @@
 from .blend import             Blend
+from .add_dodge_blend import   AddDodgeBlend
 from .tint import              Tint
 from .draw_roi import          DrawRoi
 from .draw_circles import      DrawCircles
