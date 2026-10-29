@@ -63,7 +63,7 @@ class WindowNode:
         self._values = np.zeros((window_size, feature_len), dtype=np.float32)
         self._mask = np.zeros((window_size, feature_len), dtype=bool)
 
-    def process(self, frame: Frame) -> None:
+    def set(self, frame: Frame) -> None:
         """Buffer the frame's feature: the ring-buffer append only.
 
         The ordered window is built on demand by ``get_window`` — building it here, for every

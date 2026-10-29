@@ -372,13 +372,13 @@ class RunnerTRT(Thread):
         return keypoints, scores, process_time_ms, lock_wait_ms
 
     # CALLBACK METHODS
-    def register_callback(self, callback: PoseDetectionOutputCallback) -> None:
+    def add_pose_callback(self, callback: PoseDetectionOutputCallback) -> None:
         """Register callback to receive results."""
         with self._callback_lock:
             if callback not in self._callbacks:
                 self._callbacks.append(callback)
 
-    def unregister_callback(self, callback: PoseDetectionOutputCallback) -> None:
+    def remove_pose_callback(self, callback: PoseDetectionOutputCallback) -> None:
         """Unregister previously registered callback."""
         with self._callback_lock:
             if callback in self._callbacks:

@@ -46,7 +46,7 @@ class MaskSourceLayer(LayerBase):
         self._dirty = False
         seg_image: segmentation.Image | None = self._board.get_segmentation_image(self._track_id)
         mask_tensor: torch.Tensor | None = seg_image.mask if seg_image else None
-        self._data_cache.update(mask_tensor)
+        self._data_cache.set(mask_tensor)
 
         if self._data_cache.lost:
             self._cuda_image.clear()

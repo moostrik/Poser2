@@ -64,7 +64,7 @@ class Predictor:
         self._wait_timer =      PerformanceTimer(name="RVM Wait        ", sample_count=1000, report_interval=100, color='cyan', omit_init=25)
         self._settings: Settings = settings
 
-        self._segmentation.register_callback(self._on_segmentation_result)
+        self._segmentation.add_segmentation_callback(self._on_segmentation_result)
 
     def start(self) -> None:
         """Start the segmentation processing thread."""
@@ -74,7 +74,7 @@ class Predictor:
         """Stop the segmentation processing thread."""
         self._segmentation.stop()
 
-    def process(self, poses: FrameDict, crop_frames: crop.ImageDict) -> None:
+    def submit(self, poses: FrameDict, crop_frames: crop.ImageDict) -> None:
         """Submit poses with GPU images for async processing. Results broadcast via callbacks.
 
         Args:
@@ -155,13 +155,13 @@ class Predictor:
                     callback(poses, mask_frames)
                 except Exception:
                     logger.exception("Error in callback")
-    def add_segmentation_image_callback(self, callback: ImageCallback) -> None:
+    def add_segmentation_callback(self, callback: ImageCallback) -> None:
         """Register callback to receive poses and segmentation images."""
         with self._callback_lock:
             if callback not in self._callbacks:
                 self._callbacks.append(callback)
 
-    def remove_segmentation_image_callback(self, callback: ImageCallback) -> None:
+    def remove_segmentation_callback(self, callback: ImageCallback) -> None:
         """Unregister callback."""
         with self._callback_lock:
             if callback in self._callbacks:

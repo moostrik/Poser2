@@ -187,7 +187,7 @@ class SmileMain():
 
     def _test_bang(self, index: int, sample: int) -> None:
         """The laughter test's bang to Max: the screen's index and the sample, past the patch's gates."""
-        self.osc.send('/test_bang', (index, sample))
+        self.osc.submit('/test_bang', (index, sample))
 
     def sequence_callback(self, message: SeqenceMessage) -> None:
         seq: SequenceType = message.sequence_type
@@ -226,19 +226,19 @@ class SmileMain():
         if audio.osc.enabled:
             progress: float = message.progress
             audio_id: str = self.audio.get_audio_id()
-            self.osc.send('/music_id', audio_id)
-            self.osc.send('/state', state)
-            self.osc.send('/progress', progress)
+            self.osc.submit('/music_id', audio_id)
+            self.osc.submit('/state', state)
+            self.osc.submit('/progress', progress)
             # the Max panel's controls: the panel is their source, sent every frame like the others
             # so a Max that restarted follows it within a frame. int(): python-osc sends a bool as
             # OSC True/False, which Max's toggles do not take
-            self.osc.send('/sound', int(audio.sound))
-            self.osc.send('/music_volume', audio.music_volume)
-            self.osc.send('/laughter', int(audio.laughter))
-            self.osc.send('/laughter_volume', audio.laughter_volume)
-            self.osc.send('/laughter_offset', audio.laughter_offset)
+            self.osc.submit('/sound', int(audio.sound))
+            self.osc.submit('/music_volume', audio.music_volume)
+            self.osc.submit('/laughter', int(audio.laughter))
+            self.osc.submit('/laughter_volume', audio.laughter_volume)
+            self.osc.submit('/laughter_offset', audio.laughter_offset)
             # the test closes the gate of the clips' laughs in the patch; its own bangs pass that gate
-            self.osc.send('/laughter_test', int(audio.laughter_test))
+            self.osc.submit('/laughter_test', int(audio.laughter_test))
         # the laughter test steps on the app clock too (the lights on the walls, the test bangs to Max); this app clock
         # is the wall clock: the scroller sends its times to the walls, which carry them onto perf_counter themselves
         now: float = time.time()

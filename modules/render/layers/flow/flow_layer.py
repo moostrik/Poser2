@@ -232,7 +232,7 @@ class FlowLayer(LayerBase):
 
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
-        self._visualizer.update(self._get_draw_texture())
+        self._visualizer.process(self._get_draw_texture())
         Style.pop_style()
 
     # ========== Rendering ==========

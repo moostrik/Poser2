@@ -173,7 +173,7 @@ class Player:
         if cell == self.online_cell:
             return
         wall, index = self._place(cell)
-        self.osc[wall].send('/bang', index)
+        self.osc[wall].submit('/bang', index)
         with self._lines_lock:
             line: str = self._lines.pick()
         self.walls[wall].set_caption(str(index), str(self._name.credit_name), line)

@@ -34,11 +34,11 @@ class TestSender(unittest.TestCase):
                                                            ('/test_bang', (0, 1)), ('/test_bang', (1, 1))])
 
     def test_a_tuple_goes_as_separate_arguments(self):
-        bundle = self.sender.process_data([('/test_bang', (5, 1)), ('/progress', 0.5)])
+        bundle = self.sender.build_bundle([('/test_bang', (5, 1)), ('/progress', 0.5)])
         self.assertEqual([(m.address, m.params) for m in bundle], [('/test_bang', [5, 1]), ('/progress', [0.5])])
 
     def test_nothing_is_queued_while_the_sender_does_not_run(self):
-        self.sender.send('/progress', 0.5)
+        self.sender.submit('/progress', 0.5)
         self.assertTrue(self.sender.queue.empty())
 
     def test_a_failed_send_does_not_stop_the_sender(self):
@@ -46,11 +46,11 @@ class TestSender(unittest.TestCase):
         client = FailingClient(failures=1)
         self.sender.client = client
         with self.assertLogs('modules.inout.osc_sender', 'ERROR'):
-            self.sender.send('/progress', 0.1)
+            self.sender.submit('/progress', 0.1)
             end = time.time() + 2.0
             while client.failures and time.time() < end:
                 time.sleep(0.01)
-        self.sender.send('/progress', 0.2)
+        self.sender.submit('/progress', 0.2)
         end = time.time() + 2.0
         while not client.sent and time.time() < end:
             time.sleep(0.01)

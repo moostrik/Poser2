@@ -366,13 +366,13 @@ class RunnerTRT(Thread):
         return flow_out, process_time_ms, lock_wait_ms
 
     # CALLBACK METHODS
-    def register_callback(self, callback: OpticalFlowOutputCallback) -> None:
+    def add_flow_callback(self, callback: OpticalFlowOutputCallback) -> None:
         """Register callback to receive optical flow results."""
         with self._callback_lock:
             if callback not in self._callbacks:
                 self._callbacks.append(callback)
 
-    def unregister_callback(self, callback: OpticalFlowOutputCallback) -> None:
+    def remove_flow_callback(self, callback: OpticalFlowOutputCallback) -> None:
         """Unregister previously registered callback."""
         with self._callback_lock:
             if callback in self._callbacks:

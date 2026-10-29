@@ -31,7 +31,7 @@ def is_valid_port(port: int) -> bool:
 
 
 class OscSender(Thread):
-    """Sends what `send` queued as one bundle per tick: of a state address only the newest value, of an
+    """Sends what `submit` queued as one bundle per tick: of a state address only the newest value, of an
     event address (`events`) every message, since each one counts."""
 
     def __init__(self, settings: OscSenderSettings, events: tuple[str, ...] = ()) -> None:
@@ -50,7 +50,7 @@ class OscSender(Thread):
     def start(self) -> None:
         if self.running:
             return
-        self.updateClient()
+        self._update_client()
         self.settings.bind(OscSenderSettings.ip, self._on_address)
         self.settings.bind(OscSenderSettings.port, self._on_address)
         self.running = True
@@ -79,7 +79,7 @@ class OscSender(Thread):
                 with self.mutex:
                     try:
                         if self.client:
-                            bundle = self.process_data(relevant_data)
+                            bundle = self.build_bundle(relevant_data)
                             self.client.send(bundle)
                             self.last_message_time = time()
                     except Exception:
@@ -107,7 +107,7 @@ class OscSender(Thread):
                 processed_data.append((address, args_list[-1]))
         return processed_data
 
-    def process_data(self, data_list: list[tuple[str, ArgValue]]) -> bytes:
+    def build_bundle(self, data_list: list[tuple[str, ArgValue]]) -> bytes:
         bundle = osc_bundle_builder.OscBundleBuilder(osc_bundle_builder.IMMEDIATELY)
         for address, args in data_list:
             msg = osc_message_builder.OscMessageBuilder(address=address)
@@ -117,15 +117,15 @@ class OscSender(Thread):
             bundle.add_content(msg.build()) # type: ignore
         return bundle.build()
 
-    def send(self, address: str, args: ArgValue) -> None:
+    def submit(self, address: str, args: ArgValue) -> None:
         # only while the thread takes them: nothing empties the queue otherwise
         if self.settings.enabled and self.running:
             self.queue.put((address, args))
 
     def _on_address(self, _=None) -> None:
-        self.updateClient()
+        self._update_client()
 
-    def updateClient(self) -> None:
+    def _update_client(self) -> None:
         ip: str = self.settings.ip
         port: int = self.settings.port
         if not is_valid_ip(ip) or not is_valid_port(port):

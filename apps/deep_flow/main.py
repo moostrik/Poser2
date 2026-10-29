@@ -99,16 +99,16 @@ class DeepFlowMain:
         }, name="Pose bbox")
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
-        self.tracklet_sync_bang.add_sync_callback(self.tracker.notify_update)
+        self.tracklet_sync_bang.add_sync_callback(self.tracker.update)
         self.frame_sync_bang.add_sync_callback(self.poses_from_tracklets.process)
 
-        self.crop_extractor.add_image_callback(self.pose_predictor.process)
-        self.crop_extractor.add_image_callback(self.segmentation_predictor.process)
-        self.crop_extractor.add_image_callback(self.optical_flow_predictor.process)
+        self.crop_extractor.add_image_callback(self.pose_predictor.submit)
+        self.crop_extractor.add_image_callback(self.segmentation_predictor.submit)
+        self.crop_extractor.add_image_callback(self.optical_flow_predictor.submit)
 
         self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
         self.bbox_filters.add_frames_callback(self._process_poses)
-        self.segmentation_predictor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
+        self.segmentation_predictor.add_segmentation_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
         # STAGE WINDOW TRACKERS & BROADCASTS
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
@@ -119,7 +119,7 @@ class DeepFlowMain:
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([
                 partial(self.board.set_frames, stage),
-                partial(self.osc_sound.set_frames, stage),
+                partial(self.osc_sound.submit_frames, stage),
                 wt.process,
             ])
 

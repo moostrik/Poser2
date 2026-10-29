@@ -138,7 +138,7 @@ class EmaSmooth:
         """Set the clamp range."""
         self._clamp_range = value
 
-    def setParameters(self, attack: float = 0.8, release: float = 0.5) -> None:
+    def set_parameters(self, attack: float = 0.8, release: float = 0.5) -> None:
         """Set all parameters at once.
 
         Args:

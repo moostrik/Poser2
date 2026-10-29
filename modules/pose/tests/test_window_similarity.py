@@ -25,7 +25,7 @@ def _window(per_frame: list[np.ndarray], feature: type = Angles, size: int = T) 
     for values in per_frame:
         v = values.astype(np.float32)
         s = np.where(np.isnan(v), 0.0, 1.0).astype(np.float32)
-        node.process(frame(features={feature: feature(v, s)}))
+        node.set(frame(features={feature: feature(v, s)}))
     return node.get_window()
 
 

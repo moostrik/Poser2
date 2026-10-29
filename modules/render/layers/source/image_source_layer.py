@@ -36,7 +36,7 @@ class ImageSourceLayer(LayerBase):
     def update(self) -> None:
         self._dirty = False
         gpu_frame: torch.Tensor | None = self._board.get_camera_image(self._cam_id)
-        self._data_cache.update(gpu_frame)
+        self._data_cache.set(gpu_frame)
 
         if self._data_cache.lost:
             self._cuda_image.clear()

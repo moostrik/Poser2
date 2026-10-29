@@ -46,9 +46,9 @@ class TestMaxControls(unittest.TestCase):
 
     def frame(self) -> dict:
         """One sequencer frame: what went to the OSC sender, by address."""
-        self.app.osc.send.reset_mock()
+        self.app.osc.submit.reset_mock()
         SmileMain.sequence_callback(self.app, SeqenceMessage(SequenceType.CAMERA_SHOW, 0.0))
-        return {c.args[0]: c.args[1] for c in self.app.osc.send.call_args_list}
+        return {c.args[0]: c.args[1] for c in self.app.osc.submit.call_args_list}
 
     def test_the_panel_controls_go_out_every_frame_in_max_units(self):
         sent = self.frame()
@@ -93,7 +93,7 @@ class TestMaxControls(unittest.TestCase):
 
     def test_the_test_bang_goes_to_max_with_the_screen_and_the_sample(self):
         SmileMain._test_bang(self.app, 3, 1)
-        self.app.osc.send.assert_called_once_with('/test_bang', (3, 1))
+        self.app.osc.submit.assert_called_once_with('/test_bang', (3, 1))
 
     def test_the_online_cell_follows_the_screen_setting_the_link_and_the_turn(self):
         online = self.settings.online

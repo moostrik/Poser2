@@ -58,7 +58,7 @@ class Predictor:
         self._callback_lock = Lock()
         self._settings: Settings = settings
 
-        self._optical_flow.register_callback(self._on_optical_flow_result)
+        self._optical_flow.add_flow_callback(self._on_optical_flow_result)
 
     def add_flow_callback(self, callback: FlowCallback) -> None:
         with self._callback_lock:
@@ -86,7 +86,7 @@ class Predictor:
         """Stop the optical flow processing thread."""
         self._optical_flow.stop()
 
-    def process(self, poses: FrameDict, crop_frames: crop.ImageDict) -> None:
+    def submit(self, poses: FrameDict, crop_frames: crop.ImageDict) -> None:
         """Submit batch for async processing. Results broadcast via callbacks.
 
         Args:

@@ -165,7 +165,7 @@ class SpringFilter:
         """Update the spring simulation with a new target value."""
         return self.__call__(x, timestamp)
 
-    def setFrequency(self, freq: float) -> None:
+    def set_frequency(self, freq: float) -> None:
         """ Sets the frequency of the input signal.
 
         :param freq: An estimate of the frequency in Hz of the signal (> 0), if timestamps are not available.
@@ -176,7 +176,7 @@ class SpringFilter:
         else:
             self.__freq = float(freq)
 
-    def setResponsiveness(self, responsiveness: float) -> None:
+    def set_responsiveness(self, responsiveness: float) -> None:
         """ Sets the natural responsiveness of the spring.
 
         :param responsiveness: Natural responsiveness (> 0). Higher = faster response.
@@ -187,7 +187,7 @@ class SpringFilter:
         else:
             self.__responsiveness = float(responsiveness)
 
-    def setDamping(self, damping: float) -> None:
+    def set_damping(self, damping: float) -> None:
         """ Sets the damping ratio.
 
         :param damping: Damping ratio (> 0)
@@ -201,7 +201,7 @@ class SpringFilter:
         else:
             self.__damping = float(damping)
 
-    def setParameters(self, freq: float, responsiveness: float = 2.0, damping: float = 0.8) -> None:
+    def set_parameters(self, freq: float, responsiveness: float = 2.0, damping: float = 0.8) -> None:
         """Sets all parameters of the spring-damper.
 
         :param freq: Update frequency in Hz (> 0)
@@ -209,9 +209,9 @@ class SpringFilter:
         :param damping: Damping ratio (> 0)
         :raises ValueError: If any parameter is not >0
         """
-        self.setFrequency(freq)
-        self.setResponsiveness(responsiveness)
-        self.setDamping(damping)
+        self.set_frequency(freq)
+        self.set_responsiveness(responsiveness)
+        self.set_damping(damping)
 
     def reset(self, initial_value: float = 0.0) -> None:
         """Resets the internal state of the spring-damper.
@@ -342,8 +342,8 @@ class EmaFilter:
         """
         return self.__call__(x, timestamp)
 
-    def setFrequency(self, freq: float) -> None:
-        """Sets the frequency (for compatibility with OneEuroFilter interface).
+    def set_frequency(self, freq: float) -> None:
+        """Sets the frequency.
 
         :param freq: Frequency in Hz (> 0)
         :raises ValueError: If frequency is not >0
@@ -353,7 +353,7 @@ class EmaFilter:
         else:
             self.__freq = float(freq)
 
-    def setAlpha(self, alpha: float) -> None:
+    def set_alpha(self, alpha: float) -> None:
         """Sets the smoothing factor.
 
         :param alpha: Smoothing factor per second (0-1). Higher = more responsive.
@@ -364,15 +364,15 @@ class EmaFilter:
         else:
             self.__alpha = float(alpha)
 
-    def setParameters(self, freq: float, alpha: float = 0.2) -> None:
+    def set_parameters(self, freq: float, alpha: float = 0.2) -> None:
         """Sets all parameters.
 
         :param freq: Update frequency in Hz (> 0)
         :param alpha: Smoothing factor per second (0-1)
         :raises ValueError: If any parameter is invalid
         """
-        self.setFrequency(freq)
-        self.setAlpha(alpha)
+        self.set_frequency(freq)
+        self.set_alpha(alpha)
 
     def reset(self, value: float = 0.0) -> None:
         """Resets the internal state.
@@ -479,7 +479,7 @@ class EmaFilterAttackRelease(EmaFilter):
         # Use parent's logic with selected alpha
         return super().__call__(x, timestamp)
 
-    def setAttack(self, attack: float) -> None:
+    def set_attack(self, attack: float) -> None:
         """Sets the attack smoothing factor.
 
         :param attack: Smoothing factor per second for rising values (0-1). Higher = more responsive.
@@ -490,9 +490,9 @@ class EmaFilterAttackRelease(EmaFilter):
         else:
             self.__attack = float(attack)
             # Also update parent's alpha (will be used for rising values)
-            super().setAlpha(attack)
+            super().set_alpha(attack)
 
-    def setRelease(self, release: float) -> None:
+    def set_release(self, release: float) -> None:
         """Sets the release smoothing factor.
 
         :param release: Smoothing factor per second for falling values (0-1). Higher = more responsive.
@@ -503,16 +503,16 @@ class EmaFilterAttackRelease(EmaFilter):
         else:
             self.__release = float(release)
 
-    def setAlpha(self, alpha: float) -> None:
+    def set_alpha(self, alpha: float) -> None:
         """Sets both attack and release to the same value.
 
         :param alpha: Smoothing factor per second (0-1). Higher = more responsive.
         :raises ValueError: If alpha is not in (0, 1]
         """
-        self.setAttack(alpha)
-        self.setRelease(alpha)
+        self.set_attack(alpha)
+        self.set_release(alpha)
 
-    def setParameters(self, freq: float, attack: float = 0.5, release: float = 0.2) -> None:
+    def set_parameters(self, freq: float, attack: float = 0.5, release: float = 0.2) -> None:
         """Sets all parameters.
 
         :param freq: Update frequency in Hz (> 0)
@@ -520,9 +520,9 @@ class EmaFilterAttackRelease(EmaFilter):
         :param release: Smoothing factor per second for falling values (0-1)
         :raises ValueError: If any parameter is invalid
         """
-        self.setFrequency(freq)
-        self.setAttack(attack)
-        self.setRelease(release)
+        self.set_frequency(freq)
+        self.set_attack(attack)
+        self.set_release(release)
 
 class EmaFilterAttackReleaseAngular(EmaFilterAttackRelease):
     """Angular version of EmaFilterAttackRelease, handles angle wrapping.

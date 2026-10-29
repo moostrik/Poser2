@@ -47,7 +47,7 @@ class MotionLayer(LayerBase):
 
     def update(self) -> None:
         pose: Frame | None = self._board.get_frame(self._stage, self._cam_id)
-        self._data_cache.update(pose)
+        self._data_cache.set(pose)
 
         if self._data_cache.lost:
             self._fbo.clear()

@@ -46,6 +46,7 @@ class Model:
     name: str
     make_input: Callable[[int, list[torch.Tensor], list[torch.Tensor]], Any]
     read_output: Callable[[Any], dict[str, np.ndarray]]
+    add_callback: Callable[[Any, Callable[[Any], None]], None]
 
 
 def _pose_output(output: Any) -> dict[str, np.ndarray]:
@@ -62,13 +63,16 @@ def _flow_output(output: Any) -> dict[str, np.ndarray]:
 
 MODELS: list[Model] = [
     Model('pose',
-          lambda batch_id, crops, _prev: DetectionInput(batch_id=batch_id, gpu_images=crops), _pose_output),
+          lambda batch_id, crops, _prev: DetectionInput(batch_id=batch_id, gpu_images=crops), _pose_output,
+          lambda runner, callback: runner.add_pose_callback(callback)),
     Model('segmentation',
           lambda batch_id, crops, _prev: SegmentationInput(batch_id=batch_id, gpu_images=crops,
-                                                           track_ids=list(range(len(crops)))), _segmentation_output),
+                                                           track_ids=list(range(len(crops)))), _segmentation_output,
+          lambda runner, callback: runner.add_segmentation_callback(callback)),
     Model('optical_flow',
           lambda batch_id, crops, prev: OpticalFlowInput(batch_id=batch_id, gpu_image_pairs=list(zip(prev, crops)),
-                                                         track_ids=list(range(len(crops)))), _flow_output),
+                                                         track_ids=list(range(len(crops)))), _flow_output,
+          lambda runner, callback: runner.add_flow_callback(callback)),
 ]
 
 
@@ -146,7 +150,7 @@ def run_model(model: Model, settings: Any, crop_w: int, crop_h: int, warmup: int
         result['output'] = output
         done.set()
 
-    runner.register_callback(on_output)
+    model.add_callback(runner, on_output)
     runner.start()
     deadline = time.monotonic() + READY_TIMEOUT
     while not runner.is_ready:

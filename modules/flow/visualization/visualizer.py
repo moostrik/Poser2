@@ -63,9 +63,9 @@ class Visualizer:
         elif self._current_texture is not None:
             return self._current_texture
         else:
-            raise RuntimeError("Visualizer: no texture available, call update() first")
+            raise RuntimeError("Visualizer: no texture available, call process() first")
 
-    def update(self, texture: Texture) -> None:
+    def process(self, texture: Texture) -> None:
         """Process texture for visualization (FBO operations happen here)."""
         if not self._allocated or not texture.allocated:
             self._current_texture = None
@@ -93,4 +93,4 @@ class Visualizer:
 
     def _on_settings_changed(self) -> None:
         """Handle settings changes."""
-        pass  # Settings changes are applied during update()
+        pass  # Settings changes are applied during process()

@@ -65,7 +65,7 @@ class OscSound:
     def running(self) -> bool:
         return self._running
 
-    def set_frames(self, stage: int, frames: FrameDict) -> None:
+    def submit_frames(self, stage: int, frames: FrameDict) -> None:
         """Push new pose data and trigger a send if stage matches."""
         if stage != self.settings.stage:
             return

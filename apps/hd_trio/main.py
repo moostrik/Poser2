@@ -126,16 +126,16 @@ class HDTrioMain:
         }, name="Pose bbox")
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
-        self.tracklet_sync_bang.add_sync_callback(self.tracker.notify_update)
+        self.tracklet_sync_bang.add_sync_callback(self.tracker.update)
         self.frame_sync_bang.add_sync_callback(self.poses_from_tracklets.process)
 
-        self.crop_extractor.add_image_callback(self.pose_predictor.process)
-        self.crop_extractor.add_image_callback(self.segmentation_predictor.process)
+        self.crop_extractor.add_image_callback(self.pose_predictor.submit)
+        self.crop_extractor.add_image_callback(self.segmentation_predictor.submit)
         self.crop_extractor.add_image_callback(lambda _f, crops: self.board.set_crop_images(crops))
 
         self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
         self.bbox_filters.add_frames_callback(self._process_poses)
-        self.segmentation_predictor.add_segmentation_image_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
+        self.segmentation_predictor.add_segmentation_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
         # STAGE WINDOW TRACKERS & BROADCASTS
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
@@ -148,7 +148,7 @@ class HDTrioMain:
                 partial(self.board.set_frames, stage),
                 partial(self.pose_recorder.submit_frames, stage),
                 partial(self._submit_intro_frames, stage),
-                partial(self.osc_sound.set_frames, stage),
+                partial(self.osc_sound.submit_frames, stage),
                 wt.process,
             ])
 

@@ -44,7 +44,7 @@ class PoseDotLayer(LayerBase):
 
     def update(self) -> None:
         pose: Frame | None = self._board.get_frame(self.settings.stage, self._track_id)
-        self._data_cache.update(pose)
+        self._data_cache.set(pose)
 
         if self._data_cache.lost:
             self._fbo.clear()

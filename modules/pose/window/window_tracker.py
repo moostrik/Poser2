@@ -52,7 +52,7 @@ class WindowTracker(FrameWindowDictCallbackMixin):
         for ft, ft_nodes in self._nodes.items():
             for track_id, pose in poses.items():
                 try:
-                    ft_nodes[track_id].process(pose)
+                    ft_nodes[track_id].set(pose)
                 except Exception as e:
                     logger.error(f"Error processing track {track_id} feature {ft.__name__}: {e}")
 

@@ -41,7 +41,7 @@ class CropSourceLayer(LayerBase):
     def update(self) -> None:
         self._dirty = False
         gpu_frame: crop.Image | None = self._board.get_crop_image(self._track_id)
-        self._data_cache.update(gpu_frame)
+        self._data_cache.set(gpu_frame)
 
         if self._data_cache.lost:
             self._cuda_image.clear()

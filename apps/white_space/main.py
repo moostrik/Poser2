@@ -122,7 +122,7 @@ class WhiteSpaceMain:
         # The unfused view, for the calibration display only — two observations of one person on
         # a seam, which the line above reduces to one.
         self.tracker.add_observation_callback(self.board.set_observations)
-        self.tracklet_sync_bang.add_sync_callback(self.tracker.notify_update)
+        self.tracklet_sync_bang.add_sync_callback(self.tracker.update)
         self.frame_sync_bang.add_sync_callback(self.poses_from_tracklets.process)
 
         # DIAGNOSIS — a subscribe-only journal of the tracker's inputs, observations and emitted
@@ -137,7 +137,7 @@ class WhiteSpaceMain:
         self.tracker.add_observation_callback(self.tracker_journal.submit_observations)
         self.tracker.add_tracklet_callback(self.tracker_journal.submit_tracklets)
 
-        self.crop_extractor.add_image_callback(self.pose_predictor.process)
+        self.crop_extractor.add_image_callback(self.pose_predictor.submit)
         self.crop_extractor.add_image_callback(lambda _f, gpu: self.board.set_crop_images(gpu))
 
         self.poses_from_tracklets.add_frames_callback(self._process_poses)
@@ -323,7 +323,7 @@ class WhiteSpaceMain:
         self.filters_lerp.add_frames_callback(self.gate_lerp.process)
         # The gated LERP poses fan out to the board (through the stage broadcast) and to the OSC sound.
         self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
-        self.gate_lerp.add_frames_callback(partial(self.osc_sound_sender.set_frames, int(Stage.LERP)))
+        self.gate_lerp.add_frames_callback(partial(self.osc_sound_sender.submit_frames, int(Stage.LERP)))
 
         # CAMERA CHECK — compares each camera's own IMU reading and frame rate against the preset,
         # and summarises them as pinned indicators. A setup aid; nothing downstream reads it.

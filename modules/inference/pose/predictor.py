@@ -47,7 +47,7 @@ class Predictor(FrameDictCallbackMixin):
         self._verbose: bool = settings.verbose
         self._settings: Settings = settings
 
-        self._detection.register_callback(self._on_detection_result)
+        self._detection.add_pose_callback(self._on_detection_result)
 
     def start(self) -> None:
         """Start the detection processing thread."""
@@ -57,7 +57,7 @@ class Predictor(FrameDictCallbackMixin):
         """Stop the detection processing thread."""
         self._detection.stop()
 
-    def process(self, poses: FrameDict, crop_frames: crop.ImageDict) -> None:
+    def submit(self, poses: FrameDict, crop_frames: crop.ImageDict) -> None:
         """Submit poses with GPU images for async processing. Results broadcast via callbacks.
 
         Args:

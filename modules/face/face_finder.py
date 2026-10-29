@@ -225,7 +225,7 @@ class FaceFinder(Thread):
         crops = [portrait_box(a.face, s.zoom, s.offset, self._composition_width, self._composition_height) for a in assessed]
         frame = FaceFrame(tuple(self._observation(a, a is subject, crop, image_width, image_height) for a, crop in zip(assessed, crops)), now)
         s.result = self._result(frame.subject)
-        self.frame_callback(frame)
+        self._notify_frame_callbacks(frame)
 
     @staticmethod
     def _observation(a: _Assessed, subject: bool, crop: tuple[float, float, float, float], width: int, height: int) -> FaceObservation:
@@ -281,7 +281,7 @@ class FaceFinder(Thread):
             image, self._image = self._image, None
             return image, self._image_time
 
-    def frame_callback(self, frame: FaceFrame) -> None:
+    def _notify_frame_callbacks(self, frame: FaceFrame) -> None:
         with self._input_mutex:
             for c in self._frame_callbacks: c(frame)
 

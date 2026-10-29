@@ -46,7 +46,7 @@ class DataCache(Generic[T]):
         self._changed: bool = False
         self._lost: bool = False
 
-    def update(self, new_data: T | None) -> None:
+    def set(self, new_data: T | None) -> None:
         if new_data is self._cached:
             self._changed = False
             self._lost = False

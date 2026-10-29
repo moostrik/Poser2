@@ -61,7 +61,7 @@ class DenseFlowSourceLayer(LayerBase):
         self._dirty = False
         flow_tensor: torch.Tensor | None = self.flow_tensors.get(self._track_id)
 
-        self._data_cache.update(flow_tensor)
+        self._data_cache.set(flow_tensor)
 
         if self._data_cache.lost:
             self._fbo.clear()

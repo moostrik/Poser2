@@ -152,7 +152,7 @@ class Playhead:
             # rate keeps the sweep steady; the low `tracking` gain then eases the phase onto the light.
             if not self._tracking_prev:
                 self._rpm_ema.reset(motor.measured_rpm)       # seed on (re)acquire → no ramp-in
-            self._rpm_ema.setAlpha(max(0.03, 1.0 - self._settings.speed_smoothing))   # 0=raw … 1=heavy
+            self._rpm_ema.set_alpha(max(0.03, 1.0 - self._settings.speed_smoothing))   # 0=raw … 1=heavy
             rpm = self._rpm_ema(motor.measured_rpm, self._time)
             self._internal += (rpm / 60.0) * math.tau * dt
             self._internal += self._settings.tracking * _wrap_to_pi(motor.phase - self._internal)

@@ -40,7 +40,7 @@ class ArtNetSender(Thread):
         self.sender: StupidArtnet | None = None
 
     def start(self) -> None:
-        self.updateSender()
+        self._update_sender()
         self.settings.bind(ArtNetSenderSettings.ip, self._on_address)
         self.settings.bind(ArtNetSenderSettings.universe, self._on_address)
         self.settings.bind(ArtNetSenderSettings.enabled, self._on_enabled)
@@ -77,12 +77,12 @@ class ArtNetSender(Thread):
                 self.sender.send(self.packet)
 
     def _on_address(self, _=None) -> None:
-        self.updateSender()
+        self._update_sender()
 
     def _on_enabled(self, _=None) -> None:
         self.flash()
 
-    def updateSender(self) -> None:
+    def _update_sender(self) -> None:
         ip: str = self.settings.ip
         universe: int = self.settings.universe
         if not is_valid_ip(ip) or not is_valid_universe(universe):

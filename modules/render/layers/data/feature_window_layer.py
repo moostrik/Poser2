@@ -101,7 +101,7 @@ class FeatureWindowLayer(LayerBase):
         window: FeatureWindow | None = self._board.get_window(
             self.settings.stage, self._track_id, feature_type
         )
-        self._data_cache.update(window)
+        self._data_cache.set(window)
 
         if self._data_cache.idle or window is None:
             return

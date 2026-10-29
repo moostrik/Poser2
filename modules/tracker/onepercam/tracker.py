@@ -57,7 +57,7 @@ class Tracker(Thread, BaseTracker):
             self._tracklet_callbacks.clear()
         self.join(timeout=1.0)
 
-    def notify_update(self, timestamp: float) -> None:
+    def update(self, timestamp: float) -> None:
         """The tracklet bang: a tick at the time of the message that triggered it."""
         if self._running:
             self._update_time = timestamp

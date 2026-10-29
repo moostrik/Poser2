@@ -123,7 +123,7 @@ class CenterGeometry(LayerBase):
         """Calculate anchor points and derived geometry from current pose."""
         # Get pose data
         pose: Frame | None = self._board.get_frame(self.settings.stage, self._cam_id)
-        self._data_cache.update(pose)
+        self._data_cache.set(pose)
         if self._data_cache.idle:
             return
 

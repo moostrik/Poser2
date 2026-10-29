@@ -51,7 +51,7 @@ class ElectricLayer(LayerBase):
         self._fbo.deallocate()
         self._shader.deallocate()
 
-    def setCenterPoints(self, points: Points2D) -> None:
+    def set_center_points(self, points: Points2D) -> None:
         self._points = points
 
     def draw(self) -> None:
@@ -60,7 +60,7 @@ class ElectricLayer(LayerBase):
 
     def update(self) -> None:
         pose: Frame | None = self._board.get_frame(self._stage, self._track_id)
-        self._data_cache.update(pose)
+        self._data_cache.set(pose)
         if self._data_cache.lost:
             self._fbo.clear()
         if self._data_cache.idle or pose is None:

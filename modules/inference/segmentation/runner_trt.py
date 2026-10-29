@@ -484,13 +484,13 @@ class RunnerTRT(Thread):
         return mask_scaled, foreground, process_time_ms, lock_wait_ms
 
     # CALLBACK METHODS
-    def register_callback(self, callback: SegmentationOutputCallback) -> None:
+    def add_segmentation_callback(self, callback: SegmentationOutputCallback) -> None:
         """Register callback to receive segmentation results (success and dropped batches)."""
         with self._callback_lock:
             if callback not in self._callbacks:
                 self._callbacks.append(callback)
 
-    def unregister_callback(self, callback: SegmentationOutputCallback) -> None:
+    def remove_segmentation_callback(self, callback: SegmentationOutputCallback) -> None:
         """Unregister previously registered callback."""
         with self._callback_lock:
             if callback in self._callbacks:

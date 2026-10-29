@@ -28,17 +28,17 @@ class TestPlaysOnTheOnlineCell(unittest.TestCase):
 
     def test_a_play_bangs_max_and_captions_the_cell_on_its_wall(self):
         self.player._on_play(30)                    # wall 1, cell 6
-        self.player.osc[1].send.assert_called_once_with('/bang', 6)
+        self.player.osc[1].submit.assert_called_once_with('/bang', 6)
         self.walls[1].set_caption.assert_called_once_with('6', 'Name', 'a line')
-        self.player.osc[0].send.assert_not_called()
+        self.player.osc[0].submit.assert_not_called()
 
     def test_the_online_cells_play_is_nobodys(self):
         self.player.online_cell = 30
         self.player._on_play(30)
-        self.player.osc[1].send.assert_not_called()
+        self.player.osc[1].submit.assert_not_called()
         self.walls[1].set_caption.assert_not_called()
         self.player._on_play(7)                     # another cell is as before
-        self.player.osc[0].send.assert_called_once_with('/bang', 7)
+        self.player.osc[0].submit.assert_called_once_with('/bang', 7)
 
 
 if __name__ == '__main__':
