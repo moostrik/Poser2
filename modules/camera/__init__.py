@@ -1,4 +1,4 @@
-from .source import         CameraSource, FrameCallback, TrackletCallback
+from .source import         CameraSource, CameraFrameCallback, TrackletCallback
 from .frame import          FrameType, CameraFrame
 from .tracklet import       TrackingStatus, CameraTracklet
 from .settings import       CameraSettings, CameraReadings, RigCameraSettings, RigCameraReadings, CameraCheckSettings

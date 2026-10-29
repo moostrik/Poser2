@@ -15,7 +15,7 @@ from threading import Thread, Event
 import depthai as dai
 from numpy import ndarray
 
-from .. import CameraResolution, CameraFrame, RigCameraReadings, CameraTracklet, FrameType, FrameCallback, \
+from .. import CameraResolution, CameraFrame, RigCameraReadings, CameraTracklet, FrameType, CameraFrameCallback, \
     TrackletCallback, orientation_from_gravity, mode_size, frame_size, frame_window, frame_coverage, coverage_summary, \
     delivered_height, lens_field, lens_deviation
 from modules.utils import FPS, Rect
@@ -78,7 +78,7 @@ class Camera(Thread):
         self.tracklet_fps: FPS = FPS(120)
 
         # CALLBACKS (run in registration order)
-        self.frame_callbacks: list[FrameCallback] = []
+        self.frame_callbacks: list[CameraFrameCallback] = []
         self.tracklet_callbacks: list[TrackletCallback] = []
 
         # MOUNT READOUT — the gravity vector, smoothed, and how to get it into the camera's frame.
@@ -294,7 +294,7 @@ class Camera(Thread):
 
     # ── CameraSource ───────────────────────────────────────────────────
 
-    def add_frame_callback(self, callback: FrameCallback) -> None:
+    def add_frame_callback(self, callback: CameraFrameCallback) -> None:
         if self.running:
             logger.warning('cannot add callback while camera is running')
             return

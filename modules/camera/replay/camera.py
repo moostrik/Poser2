@@ -15,7 +15,7 @@ import numpy as np
 
 from modules.utils import FPS, Rect
 
-from .. import CameraFrame, CameraTracklet, FrameCallback, FrameType, Player, RigCameraReadings, RigCameraSettings, TrackletCallback
+from .. import CameraFrame, CameraTracklet, CameraFrameCallback, FrameType, Player, RigCameraReadings, RigCameraSettings, TrackletCallback
 from .tracker import Track
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class Camera:
 
         self.video_fps: FPS = FPS(120)
         self.tracklet_fps: FPS = FPS(120)
-        self.frame_callbacks: list[FrameCallback] = []
+        self.frame_callbacks: list[CameraFrameCallback] = []
         self.tracklet_callbacks: list[TrackletCallback] = []
 
     # ── CameraSource ───────────────────────────────────────────────────
@@ -78,7 +78,7 @@ class Camera:
     def join(self, timeout: float | None = None) -> None:
         pass
 
-    def add_frame_callback(self, callback: FrameCallback) -> None:
+    def add_frame_callback(self, callback: CameraFrameCallback) -> None:
         if self.running:
             logger.warning('cannot add callback while camera is running')
             return

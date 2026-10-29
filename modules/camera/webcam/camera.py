@@ -9,7 +9,7 @@ from threading import Thread
 import cv2
 import numpy as np
 
-from .. import CameraFrame, CameraReadings, CameraSettings, FrameType, FrameCallback, TrackletCallback
+from .. import CameraFrame, CameraReadings, CameraSettings, FrameType, CameraFrameCallback, TrackletCallback
 from modules.utils import FPS
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ class Camera(Thread):
         self.rotate90: bool = rotate90
         self.index: int = index                 # the device's index for OpenCV
 
-        self.frame_callbacks: list[FrameCallback] = []
+        self.frame_callbacks: list[CameraFrameCallback] = []
         self.video_fps: FPS = FPS(120)
 
         self.running: bool = False
@@ -40,7 +40,7 @@ class Camera(Thread):
     def connected(self) -> bool:
         return self._capture is not None
 
-    def add_frame_callback(self, callback: FrameCallback) -> None:
+    def add_frame_callback(self, callback: CameraFrameCallback) -> None:
         self.frame_callbacks.append(callback)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:

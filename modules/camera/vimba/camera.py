@@ -16,7 +16,7 @@ from typing import Any
 import cv2
 import numpy as np
 
-from .. import CameraFrame, CameraReadings, FrameType, FrameCallback, TrackletCallback
+from .. import CameraFrame, CameraReadings, FrameType, CameraFrameCallback, TrackletCallback
 
 from .control import SensorControl
 from .settings import VimbaCameraSettings
@@ -130,7 +130,7 @@ class Camera(Thread):
         self._frame_new: bool = False
         self._frame_mutex: Lock = Lock()
 
-        self.frame_callbacks: list[FrameCallback] = []
+        self.frame_callbacks: list[CameraFrameCallback] = []
 
         # frame rate, exposure, white balance and colour: sent to the camera when the settings change, checked every frame
         self.control: SensorControl = SensorControl(settings)
@@ -151,7 +151,7 @@ class Camera(Thread):
     def connected(self) -> bool:
         return self.camera is not None
 
-    def add_frame_callback(self, callback: FrameCallback) -> None:
+    def add_frame_callback(self, callback: CameraFrameCallback) -> None:
         self.frame_callbacks.append(callback)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:

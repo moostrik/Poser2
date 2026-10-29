@@ -34,7 +34,7 @@ class FaceFrame:
         return subject is not None and subject.rejection is None
 
 
-FrameCallback = Callable[[FaceFrame], None]
+FaceFrameCallback = Callable[[FaceFrame], None]
 
 
 def largest(faces: list[Face]) -> Face | None:
@@ -137,7 +137,7 @@ class FaceFinder(Thread):
         self._image: np.ndarray | None = None
         self._image_time: float = 0.0               # when that camera frame arrived
         self._error_time: float = 0.0               # when a failed detection was last logged
-        self._frame_callbacks: list[FrameCallback] = []
+        self._frame_callbacks: list[FaceFrameCallback] = []
 
         self._composition_width: int = composition_width
         self._composition_height: int = composition_height
@@ -285,11 +285,11 @@ class FaceFinder(Thread):
         with self._input_mutex:
             for c in self._frame_callbacks: c(frame)
 
-    def add_frame_callback(self, callback: FrameCallback) -> None:
+    def add_frame_callback(self, callback: FaceFrameCallback) -> None:
         with self._input_mutex:
             self._frame_callbacks.append(callback)
 
-    def remove_frame_callback(self, callback: FrameCallback) -> None:
+    def remove_frame_callback(self, callback: FaceFrameCallback) -> None:
         with self._input_mutex:
             if callback in self._frame_callbacks:
                 self._frame_callbacks.remove(callback)
