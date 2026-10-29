@@ -1,5 +1,5 @@
 ---
-description: Settings consumer usage, preset maintenance, and Field/Group/Child authoring
+description: Settings consumer usage, preset maintenance, and Field/Group authoring
 paths:
   - "apps/**/*settings*.py"
   - "modules/**/*settings*.py"
@@ -9,13 +9,13 @@ paths:
 
 ## Architecture
 
-Each app has a **settings tree** defined in `apps/<app>/settings.py` using `BaseSettings` subclasses with `Field`, `Group`, and `Child` descriptors. The root class is named `Settings`.
+Each app has a **settings tree** defined in `apps/<app>/settings.py` using `BaseSettings` subclasses with `Field` and `Group` descriptors. The root class is named `Settings`.
 
 Preset JSON files in `apps/<app>/data/settings/` mirror the settings tree exactly. The startup preset (default: `studio.json`) is loaded via `presets.load()` which calls `update_from_dict()`.
 
 ## When changing settings Python code
 
-After renaming, adding, or removing a `Field`, `Group`, or `Child`:
+After renaming, adding, or removing a `Field` or `Group`:
 
 1. Find all `.json` files in `apps/<app>/data/settings/`
 2. For **renamed** fields: find the old key in each JSON and rename it to the new key, preserving the value
@@ -35,4 +35,4 @@ After renaming, adding, or removing a `Field`, `Group`, or `Child`:
 - `access=Field.INIT` fields are in the JSON but skipped by `update_from_dict()` — still keep them for documentation
 - Shared fields (`share=[...]`) appear in the **parent** JSON, not the child — the parent is the serialization source of truth
 - Fields using `.as_('child_name')` are serialized under the **parent's** field name, not the alias
-- `Group` and `Child` entries become nested JSON objects; the key is the Python attribute name
+- `Group` entries become nested JSON objects; the key is the Python attribute name

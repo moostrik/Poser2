@@ -11,7 +11,7 @@ Maintain the settings engine contract and reactive behavior in `modules/settings
 
 ## Backend rules
 
-- Preserve descriptor contracts for `Field`, `Group`, `Child`, and `FieldAlias`
+- Preserve descriptor contracts for `Field`, `Group`, and `FieldAlias`
 - Keep `initialize()`, `update_from_dict()`, and `to_dict()` semantics stable and documented
 - Maintain thread-safety guarantees around locks and callback dispatch
 - Keep callback fan-out fault-tolerant so one failure does not stop other callbacks

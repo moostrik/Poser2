@@ -22,14 +22,15 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 ## Naming
 
 - Name a concept after what it is in the domain, and use that one term everywhere it appears: file, class, method, setting, panel label, document
-- Name a module file after the class or domain noun it holds
+- Name a module file in snake_case after the class or domain noun it holds
+- Use the terms in `.claude/rules/glossary.md`
 - Use no synonyms for one concept across modules; when a term changes, rename it everywhere in the same change
 
 ## Settings
 
 - `BaseSettings` subclasses are pure data containers with no runtime side effects
 - Use `BaseSettings` for reactive configuration and `@dataclass` for plain value objects
-- Components take their settings object (or a `Group`/`Child` of it) in the constructor, never as a global, and read fields when they use them
+- Components take their settings object (or a `Group` of it) in the constructor, never as a global, and read fields when they use them
 - Never unpack setting values into constructor parameters; a copied value goes stale when the panel changes it
 - Cache only `Field.INIT` values, since they cannot change after `initialize()`
 - Use `bind()` only to react to configuration changes, never to relay runtime data between components

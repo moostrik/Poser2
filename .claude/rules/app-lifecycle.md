@@ -25,7 +25,7 @@ paths:
 
 ## Settings boundaries
 
-- `apps/*/settings.py` defines data only (Fields/Groups/Child)
+- `apps/*/settings.py` defines data only (Fields/Groups)
 - No runtime side effects in settings definitions
 - Keep settings schema synchronized with preset JSON files
 
