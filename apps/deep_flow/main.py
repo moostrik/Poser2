@@ -172,8 +172,6 @@ class DeepFlowMain:
         self.filters_predict.add_frames_callback(self.stages[Stage.PREDICT])
 
         # STAGE LERP
-        self.motion_gate_applicator = nodes.MotionGateApplicator(p.motion_gate)
-
         self.interpolators_lerp = trackers.InterpolatorTracker({
             i: trackers.InterpolatorPipeline([
                 nodes.BBoxChaseInterpolator(p.bbox.interpolator),
@@ -195,15 +193,10 @@ class DeepFlowMain:
             ])
             for i in range(max_players)
         }, name="Pose lerp")
-        self.gate_lerp = trackers.FilterTracker({
-            i: trackers.FilterPipeline([self.motion_gate_applicator])
-            for i in range(max_players)
-        }, name="Pose gate")
+        self.motion_gate = nodes.MotionGateExtractor()                               # the group step after the filters
         self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.set)
         self.interpolators_lerp.add_frames_callback(self.filters_lerp.process)
-        self.filters_lerp.add_frames_callback(self.motion_gate_applicator.set)
-        self.filters_lerp.add_frames_callback(self.gate_lerp.process)
-        self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
+        self.filters_lerp.add_frames_callback(self._process_motion_gate)
 
         # CAMERA CHECK — the camera's IMU reading and frame rate against the preset, as pinned indicators
         self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
@@ -244,6 +237,10 @@ class DeepFlowMain:
         images, prev_images = self.image_uploader.snapshot()
         self.board.set_camera_images(images)
         self.crop_extractor.process(poses, images, prev_images)
+
+    def _process_motion_gate(self, frames: FrameDict) -> None:
+        """The LERP group step, then the LERP stage output (the render thread)."""
+        self.stages[Stage.LERP](self.motion_gate.process(frames))
 
     def stop(self) -> None:
         if not self.is_running:

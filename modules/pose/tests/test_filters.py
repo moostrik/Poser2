@@ -1,4 +1,4 @@
-"""Tests for the filter and applicator nodes wired into the pose stages: a contract sweep plus per-node behaviour."""
+"""Tests for the filter and group nodes wired into the pose stages: a contract sweep plus per-node behaviour."""
 
 import math
 import unittest
@@ -15,9 +15,9 @@ from modules.pose.nodes import (
     AgeExtractor, AngleCalibrator, AngleEuroSmoother, AngleExtractor, AngleMotionExtractor, AngleMotionMovingAverageSmoother,
     AnglePredictor, AngleRateLimiter, AngleStickyFiller, AngleSymmetryExtractor, AngleVelocityEuroSmoother, AngleVelocityExtractor,
     AngleVelocityPredictor, AngleVelocityStickyFiller, AzimuthEuroSmoother, AzimuthExtractor, AzimuthPredictor,
-    DualConfidenceFilterSettings, EuroSmootherSettings, FilterNode, LeaderScoreApplicator, LegDeviationExtractor, MotionGateApplicator, MotionTimeExtractor,
+    DualConfidenceFilterSettings, EuroSmootherSettings, FilterNode, LegDeviationExtractor, MotionGateExtractor, MotionTimeExtractor, OneFrameHold,
     MovingAverageSmootherSettings, PointDualConfidenceFilter, PointEuroSmoother, PointPredictor, PointStickyFiller,
-    PredictionMethod, PredictorSettings, RateLimiterSettings, SimilarityApplicator, SimilarityEuroSmoother,
+    PredictionMethod, PredictorSettings, RateLimiterSettings, SimilarityEuroSmoother, SimilarityResultHold,
     StickyFillerSettings, TorsoTiltExtractor, WindowType,
 )
 from modules.utils import Rect
@@ -48,8 +48,6 @@ def _stage_nodes() -> list[FilterNode]:
         TorsoTiltExtractor(),
         MotionTimeExtractor(),
         AgeExtractor(),
-        SimilarityApplicator(),
-        LeaderScoreApplicator(),
         SimilarityEuroSmoother(EuroSmootherSettings()),
         PointPredictor(PredictorSettings()),
         AnglePredictor(PredictorSettings()),
@@ -58,7 +56,6 @@ def _stage_nodes() -> list[FilterNode]:
         AngleRateLimiter(RateLimiterSettings()),
         AngleStickyFiller(StickyFillerSettings()),
         AngleVelocityStickyFiller(StickyFillerSettings()),
-        MotionGateApplicator(),
     ]
 
 
@@ -351,56 +348,59 @@ def _similarity(values: dict[int, float]) -> Similarity:
     return scalar(Similarity, values)
 
 
-class ApplicatorTest(unittest.TestCase):
-    def test_similarity_applicator_stamps_own_row(self) -> None:
-        app = SimilarityApplicator()
+class GroupNodeTest(unittest.TestCase):
+    def test_result_hold_stamps_every_pose_its_rows(self) -> None:
+        hold = SimilarityResultHold()
         mine, theirs = _similarity({1: 0.7}), _similarity({0: 0.7})
-        app.set(SimilarityResult(similarity={0: mine, 1: theirs}, leader_score={}))
-        self.assertIs(app.process(frame(track_id=0))[Similarity], mine)
-        self.assertIs(app.process(frame(track_id=1))[Similarity], theirs)
-
-    def test_similarity_applicator_unknown_track_gets_no_data(self) -> None:
-        app = SimilarityApplicator()
-        app.set(SimilarityResult(similarity={0: _similarity({1: 0.7})}, leader_score={}))
-        out = app.process(frame(track_id=3))[Similarity]
-        self.assertTrue(np.all(np.isnan(out.values)))
-        self.assertTrue(np.all(out.scores == 0.0))
-
-    def test_similarity_applicator_replaces_stale_result(self) -> None:
-        app = SimilarityApplicator()
-        app.set(SimilarityResult(similarity={0: _similarity({1: 0.7})}, leader_score={}))
-        app.set(SimilarityResult(similarity={}, leader_score={}))
-        self.assertTrue(np.all(np.isnan(app.process(frame(track_id=0))[Similarity].values)))
-
-    def test_leader_applicator_stamps_own_row_or_leaves_frame(self) -> None:
-        app = LeaderScoreApplicator()
         leader = LeaderScore(np.array([0.0, 0.5, 0.0, 0.0], dtype=np.float32), np.array([0, 1, 0, 0], dtype=np.float32))
-        app.set(SimilarityResult(similarity={}, leader_score={0: leader}))
-        self.assertIs(app.process(frame(track_id=0))[LeaderScore], leader)
-        src = frame(track_id=2)
-        self.assertIs(app.process(src), src)
+        hold.set(SimilarityResult(similarity={0: mine, 1: theirs}, leader_score={0: leader}))
+        out = hold.process({0: frame(track_id=0), 1: frame(track_id=1), 3: frame(track_id=3)})
+        self.assertIs(out[0][Similarity], mine)
+        self.assertIs(out[1][Similarity], theirs)
+        self.assertIs(out[0][LeaderScore], leader)
+        self.assertNotIn(LeaderScore, out[1])
+
+    def test_result_hold_unknown_track_keeps_its_frame(self) -> None:
+        hold = SimilarityResultHold()
+        hold.set(SimilarityResult(similarity={0: _similarity({1: 0.7})}, leader_score={}))
+        src = frame(track_id=3)
+        out = hold.process({3: src})
+        self.assertIs(out[3], src)
+        self.assertTrue(np.all(np.isnan(out[3][Similarity].values)))
+
+    def test_result_hold_replaces_stale_result(self) -> None:
+        hold = SimilarityResultHold()
+        hold.set(SimilarityResult(similarity={0: _similarity({1: 0.7})}, leader_score={}))
+        hold.set(SimilarityResult(similarity={}, leader_score={}))
+        self.assertTrue(np.all(np.isnan(hold.process({0: frame(track_id=0)})[0][Similarity].values)))
 
     def test_motion_gate_is_self_motion_and_pairwise_products(self) -> None:
-        app = MotionGateApplicator()
         motions = {0: 0.5, 2: 0.4, 3: math.nan}
-        app.set({tid: frame(track_id=tid, features={AngleMotion: AngleMotion.from_value(m)}) for tid, m in motions.items()})
-        gate = app.process(frame(track_id=0))[MotionGate]
+        out = MotionGateExtractor().process({tid: frame(track_id=tid, features={AngleMotion: AngleMotion.from_value(m)}) for tid, m in motions.items()})
+        gate = out[0][MotionGate]
         np.testing.assert_allclose(gate.values, [0.5, 0.0, 0.2, 0.0], atol=1e-6)
         np.testing.assert_allclose(gate.scores, [1.0, 0.0, 1.0, 1.0])
 
-    def test_motion_gate_ignores_track_ids_beyond_max_players(self) -> None:
-        app = MotionGateApplicator()
-        app.set({0: frame(track_id=0, features={AngleMotion: AngleMotion.from_value(0.5)}),
-                 NUM_POSES: frame(track_id=NUM_POSES, features={AngleMotion: AngleMotion.from_value(0.5)})})
-        gate = app.process(frame(track_id=0))[MotionGate]
-        self.assertEqual(len(gate), NUM_POSES)
-        self.assertEqual(app.process(frame(track_id=NUM_POSES))[MotionGate].values[0], 0.25)
+    def test_motion_gate_ignores_track_ids_beyond_the_row(self) -> None:
+        out = MotionGateExtractor().process({0: frame(track_id=0, features={AngleMotion: AngleMotion.from_value(0.5)}),
+                                             NUM_POSES: frame(track_id=NUM_POSES, features={AngleMotion: AngleMotion.from_value(0.5)})})
+        self.assertEqual(len(out[0][MotionGate]), NUM_POSES)
+        self.assertEqual(out[NUM_POSES][MotionGate].values[0], 0.25)
 
-    def test_motion_gate_absent_track_leaves_frame(self) -> None:
-        app = MotionGateApplicator()
-        app.set({})
-        src = frame(track_id=1)
-        self.assertIs(app.process(src), src)
+    def test_motion_gate_of_no_poses_is_empty(self) -> None:
+        self.assertEqual(MotionGateExtractor().process({}), {})
+
+    def test_one_frame_hold_stamps_the_previous_frames_feature(self) -> None:
+        hold = OneFrameHold(Similarity)
+        first, second = _similarity({1: 0.7}), _similarity({1: 0.2})
+        out = hold.process({0: frame(track_id=0, features={Similarity: first})})
+        self.assertTrue(np.all(np.isnan(out[0][Similarity].values)))      # nothing held yet
+        out = hold.process({0: frame(track_id=0, features={Similarity: second}), 1: frame(track_id=1)})
+        self.assertIs(out[0][Similarity], first)
+        self.assertTrue(np.all(np.isnan(out[1][Similarity].values)))      # new this frame
+        hold.reset()
+        out = hold.process({0: frame(track_id=0)})
+        self.assertTrue(np.all(np.isnan(out[0][Similarity].values)))
 
 
 class AngleVelocityChainTest(unittest.TestCase):

@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, TYPE_CHECKING
-from ..frame import Frame
+from ..frame import Frame, FrameDict
 
 if TYPE_CHECKING:
     from ..features import BaseFeature
@@ -60,3 +60,22 @@ class InterpolatorNode(NodeBase):
     def feature_type(self) -> type[BaseFeature]:
         """Return the feature type this interpolator processes."""
         pass
+
+
+class GroupNode(NodeBase):
+    """Base class for group steps: every pose of a frame in, the same poses out, stamped with what
+    the step derives from the group. A group node is built once per stage and runs between the
+    per-pose steps, on the frame's thread; it never adds or removes a pose."""
+
+    @abstractmethod
+    def process(self, frames: FrameDict) -> FrameDict:
+        """Process all poses of one frame and return them, stamped."""
+        pass
+
+    def reset(self) -> None:
+        """most group nodes have no internal state to reset."""
+        pass
+
+    def is_ready(self) -> bool:
+        """most group nodes are always ready."""
+        return True

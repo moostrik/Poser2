@@ -219,17 +219,15 @@ class SimilarityFeature(BaseSettings):
     output_frequency: Field[float] = Field(32.0)
     max_players     : Field[int]   = Field(3, min=1, max=16, access=Field.INIT, description="Players tracked at most, the similarity row's width (shared from root)")
 
-    # In pipeline order. On the SMOOTH poses, synchronously: the posture similarity (distance in degrees →
-    # 0..1), a present pair's gap held, the pair weighted by the arm deviation out of neutral; then, per
-    # frame: stamped on the poses and smoothed.
+    # In pipeline order, group steps on the SMOOTH poses: the posture similarity (distance in degrees →
+    # 0..1) stamped on the poses, a present pair's gap held, the pair weighted by the arm deviation out of
+    # neutral; then smoothed.
     posture              : Group[analytics.PostureSimilaritySettings] = Group(analytics.PostureSimilaritySettings, share=[max_players])
-    sticky               : Group[analytics.SimilarityStickyFillerSettings] = Group(analytics.SimilarityStickyFillerSettings)
+    sticky               : Group[nodes.SimilarityStickyFillerSettings] = Group(nodes.SimilarityStickyFillerSettings)
     neutral_weight       : Group[NeutralWeightSettings]               = Group(NeutralWeightSettings)
-    similarity_applicator: Group[nodes.SimilarityApplicatorSettings]  = Group(nodes.SimilarityApplicatorSettings, share=[max_players])
     smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, share=[frequency])
-    # LERP: interpolated to the output rate, then the motion gate.
+    # LERP: interpolated to the output rate; the motion gate has no settings.
     interpolator         : Group[nodes.ChaseInterpolatorSettings]     = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
-    motion_gate          : Group[nodes.MotionGateApplicatorSettings]  = Group(nodes.MotionGateApplicatorSettings, share=[max_players])
 
 
 # ---------------------------------------------------------------------------

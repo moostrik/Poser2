@@ -343,8 +343,6 @@
         "enabled": true,
         "verbose": false
       },
-      "similarity_applicator": {},
-      "leader_applicator": {},
       "smoother": {
         "min_cutoff": 0.01,
         "cutoff_rise": 0.4,
@@ -357,8 +355,7 @@
       "sticky": {
         "enabled": true,
         "hold_scores": false
-      },
-      "motion_gate": {}
+      }
     },
     "window_raw": {
       "window_size": 180,

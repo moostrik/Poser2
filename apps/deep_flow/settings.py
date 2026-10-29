@@ -194,7 +194,6 @@ class PoseGroup(BaseSettings):
     angle          : Group[AngleFeature]                     = Group(AngleFeature, share=_feature_share)
     velocity       : Group[VelocityFeature]                  = Group(VelocityFeature, share=_feature_share)
     motion         : Group[MotionFeature]                    = Group(MotionFeature)
-    motion_gate    : Group[nodes.MotionGateApplicatorSettings] = Group(nodes.MotionGateApplicatorSettings, share=[max_players])
     window_raw     : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
     window_clean   : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
     window_smooth  : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)

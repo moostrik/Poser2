@@ -18,14 +18,14 @@ A joint missing on either side is not compared; the coverage — the fraction of
 — is returned beside the distance and becomes the ``Similarity`` score. How a consumer shapes the similarity
 further (a threshold, a curve) is the consumer's.
 
-``PostureSimilarity`` computes the pairwise similarity of the current poses synchronously, on the caller's
-thread; ``posture_distance`` and ``posture_similarity`` serve anything comparing two poses on their own.
+``posture_similarity_rows`` computes the pairwise similarity of a frame's poses as ``Similarity`` rows (the
+``PostureSimilarityExtractor`` group step stamps them); ``posture_distance`` and ``posture_similarity`` serve
+anything comparing two poses on their own.
 """
 
 from __future__ import annotations
 
 import math
-from typing import Callable
 
 import numpy as np
 
@@ -33,7 +33,6 @@ from modules.settings import BaseSettings, Field, Group
 from ..features import Angles, Similarity
 from ..frame import FrameDict
 from .joint_select import JointSelectSettings, joint_mask
-from .window_similarity import SimilarityResult
 
 _NO_FORGIVENESS = 1.1      # below this the distance is the plain maximum (see the module docstring)
 
@@ -101,52 +100,36 @@ def posture_similarity(distance: float, settings: PostureSimilaritySettings) -> 
     return float(_score(np.asarray(distance, dtype=np.float64), float(settings.angle_tolerance)))
 
 
-class PostureSimilarity:
-    """Pairwise posture similarity of the current poses: ``Similarity`` rows (0..1, score = coverage), indexed
-    by pose id, emitted as a ``SimilarityResult`` with no leader scores. Every present pose gets a row, so a
-    pose alone reads NaN toward everyone. Synchronous, on the caller's thread."""
-
-    def __init__(self, settings: PostureSimilaritySettings | None = None) -> None:
-        self.settings = settings if settings is not None else PostureSimilaritySettings()
-        self._callbacks: list[Callable[[SimilarityResult], None]] = []
-
-    def add_similarity_callback(self, callback: Callable[[SimilarityResult], None]) -> None:
-        self._callbacks.append(callback)
-
-    def process(self, frames: FrameDict) -> None:
-        """Compute the rows for ``frames`` and emit them."""
-        result = SimilarityResult(self._rows(frames), {})
-        for callback in self._callbacks:
-            callback(result)
-
-    def _rows(self, frames: FrameDict) -> dict[int, Similarity]:
-        length = Similarity.length()
-        ids = [id for id in frames if id < length]
-        rows: dict[int, Similarity] = {}
-        if not ids:
-            return rows
-
-        mask = joint_mask(self.settings.joints)
-        selected = int(mask.sum())
-        angles = [frames[id][Angles] for id in ids]
-        values = np.stack([a.values for a in angles]).astype(np.float64)           # (N, F)
-        seen = np.stack([a.scores > 0.0 for a in angles])                          # (N, F)
-        diff = values[:, None, :] - values[None, :, :]
-        distances = np.degrees(np.abs(np.arctan2(np.sin(diff), np.cos(diff))))     # wrapped, (N, N, F)
-        compared = seen[:, None, :] & seen[None, :, :] & ~np.isnan(distances) & mask[None, None, :]
-        distances = np.where(compared, distances, np.nan)
-
-        pair_distance = _soft_max(distances, float(self.settings.forgiveness))      # (N, N)
-        similarity = _score(pair_distance, float(self.settings.angle_tolerance))
-        coverage = compared.sum(axis=-1) / selected if selected > 0 else np.zeros_like(pair_distance)
-
-        for i, id in enumerate(ids):
-            row_values = np.full(length, np.nan, dtype=np.float32)
-            row_scores = np.zeros(length, dtype=np.float32)
-            for j, other in enumerate(ids):
-                if i == j or np.isnan(similarity[i, j]):
-                    continue
-                row_values[other] = similarity[i, j]
-                row_scores[other] = coverage[i, j]
-            rows[id] = Similarity(row_values, row_scores)
+def posture_similarity_rows(frames: FrameDict, settings: PostureSimilaritySettings) -> dict[int, Similarity]:
+    """The pairwise posture similarity of ``frames`` as ``Similarity`` rows (0..1, score = coverage), indexed by
+    pose id. Every pose whose id fits the row gets one, so a pose alone reads NaN toward everyone."""
+    length = Similarity.length()
+    ids = [id for id in frames if id < length]
+    rows: dict[int, Similarity] = {}
+    if not ids:
         return rows
+
+    mask = joint_mask(settings.joints)
+    selected = int(mask.sum())
+    angles = [frames[id][Angles] for id in ids]
+    values = np.stack([a.values for a in angles]).astype(np.float64)           # (N, F)
+    seen = np.stack([a.scores > 0.0 for a in angles])                          # (N, F)
+    diff = values[:, None, :] - values[None, :, :]
+    distances = np.degrees(np.abs(np.arctan2(np.sin(diff), np.cos(diff))))     # wrapped, (N, N, F)
+    compared = seen[:, None, :] & seen[None, :, :] & ~np.isnan(distances) & mask[None, None, :]
+    distances = np.where(compared, distances, np.nan)
+
+    pair_distance = _soft_max(distances, float(settings.forgiveness))           # (N, N)
+    similarity = _score(pair_distance, float(settings.angle_tolerance))
+    coverage = compared.sum(axis=-1) / selected if selected > 0 else np.zeros_like(pair_distance)
+
+    for i, id in enumerate(ids):
+        row_values = np.full(length, np.nan, dtype=np.float32)
+        row_scores = np.zeros(length, dtype=np.float32)
+        for j, other in enumerate(ids):
+            if i == j or np.isnan(similarity[i, j]):
+                continue
+            row_values[other] = similarity[i, j]
+            row_scores[other] = coverage[i, j]
+        rows[id] = Similarity(row_values, row_scores)
+    return rows

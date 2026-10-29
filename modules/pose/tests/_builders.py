@@ -9,7 +9,7 @@ from modules.pose.features import BaseScalarFeature, PointLandmark, Points2D, co
 from modules.pose.frame import Frame
 
 # Track-indexed features (Similarity, LeaderScore, MotionGate) are configured process-wide and the
-# first call wins, so every pose test must agree on one count. 4 matches the applicators' defaults.
+# first call wins, so every pose test must agree on one count.
 NUM_POSES = 4
 configure_features(NUM_POSES)
 
