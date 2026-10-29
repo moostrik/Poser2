@@ -70,6 +70,7 @@ let flashAt = 0;        // performance.now() of the flash: the track starts ther
 let streaming = false;  // the window shows the main screen: from full white on, the flash-in is the phone's own image going white
 let ended = false;      // the last frame came: the picture stands, frames after it are not drawn
 let lastStage = '';     // the last stage message, for the readout
+let expired = false;    // the relay said the pass of this page ran out: no reconnecting, the visitor scans again
 const timing = {};      // moments of the turn's end (ms since the page loaded): what took how long, for the relay's log
 
 function setState(next) {
@@ -343,6 +344,7 @@ const bar = (() => {
     wait(message) { if (performance.now() >= noticeUntil) tell(lineText(message)); },
     lost() { notice('lost you'); },
     missed() { notice('missed you'); },
+    expired() { tell('link expired, scan SMILE(ai) again'); },
     nocam() { tell('no camera, no SMILE(ai)'); },
     turn() {              // a new turn: everything of the previous one goes
       bullshitting = false; volumeAsked = false; volumeAskedAt = 0; preparing = false;
@@ -654,6 +656,7 @@ function connect() {
     else onImage(event.data);
   };
   ws.onclose = () => {
+    if (expired) return;
     if (state === 'you' || state === 'transform' || state === 'waiting') lostYou();
     setTimeout(connect, 2000);
   };
@@ -706,6 +709,13 @@ function onMessage(message) {
       break;
     case 'turn_end':
       onTurnEnd(message.reason);
+      break;
+    case 'expired':
+      // the pass this page was opened with ran out (a tab from hours ago): the relay closes the socket
+      expired = true;
+      stopCamera();
+      setState('lost');
+      bar.expired();
       break;
   }
 }
@@ -1044,10 +1054,16 @@ async function shareSmile() {
     if (!shareFile && fetched) await fetched;
     if (!shareFile) await prefetchShare(result);
     if (shareFile && navigator.canShare && navigator.canShare({ files: [shareFile] })) {
-      await navigator.share({ files: [shareFile], text });
+      try {
+        await navigator.share({ files: [shareFile], text });
+      } catch (error) {
+        // closed without sharing: nothing, the button stays for another try (a download here would put
+        // iOS's "download or view" in the way, and "view" leaves the page, which reloads)
+        if (error.name !== 'AbortError') throw error;
+      }
       return;
     }
-  } catch (error) { /* the share sheet was closed, or there is none: download instead */ }
+  } catch (error) { /* no share sheet, or one refused (opened too late after the tap): download instead */ }
   // from the copy on the phone when there is one: the relay deletes the file minutes after the turn
   const a = document.createElement('a');
   a.href = shareFile ? URL.createObjectURL(shareFile) : resultUrl(result);

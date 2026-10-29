@@ -22,17 +22,31 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
         self.folder = tempfile.TemporaryDirectory()
         self.addCleanup(self.folder.cleanup)
         self.relay = Relay(TOKEN, self.folder.name)
-        self.client = TestClient(TestServer(make_app(self.relay, os.path.join(self.folder.name, 'no-web'))))
-        await self.client.start_server()
-        self.addAsyncCleanup(self.client.close)
+        self.client = await self.start_client(os.path.join(self.folder.name, 'no-web'))
+        # the phone scanned the code: its pass is the cookie / set from the url, on every request from here
+        self.client.session.cookie_jar.update_cookies({'pass': self.relay.current_pass})
 
-    async def phone(self) -> ClientWebSocketResponse:
-        ws = await self.client.ws_connect('/ws/phone')
+    async def start_client(self, web_dir: str) -> TestClient:
+        client = TestClient(TestServer(make_app(self.relay, web_dir)))
+        await client.start_server()
+        self.addAsyncCleanup(client.close)
+        return client
+
+    async def bare_client(self) -> TestClient:
+        """A client without the pass: the same server, its own cookies."""
+        client = TestClient(self.client.server)
+        await client.start_server()
+        self.addAsyncCleanup(client.close)
+        return client
+
+    async def phone(self, client: TestClient | None = None) -> ClientWebSocketResponse:
+        ws = await (client or self.client).ws_connect('/ws/phone')
         self.assertEqual((await ws.receive_json())['type'], 'state')
         return ws
 
     async def smile(self) -> ClientWebSocketResponse:
         ws = await self.client.ws_connect('/ws/smile', headers=AUTH)
+        self.assertEqual((await ws.receive_json())['type'], 'pass')
         self.assertEqual((await ws.receive_json())['type'], 'line')
         return ws
 
@@ -66,18 +80,70 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
     async def test_the_page_is_not_cached(self):
         web_dir = os.path.join(self.folder.name, 'web')
         os.mkdir(web_dir)
-        for name in ('index.html', 'app.js'):
+        for name in ('index.html', 'app.js', 'expired.html'):
             with open(os.path.join(web_dir, name), 'w') as f:
                 f.write(name)
-        client = TestClient(TestServer(make_app(self.relay, web_dir)))
-        await client.start_server()
-        self.addAsyncCleanup(client.close)
+        client = await self.start_client(web_dir)
+        client.session.cookie_jar.update_cookies({'pass': self.relay.current_pass})
         for path in ('/', '/web/app.js'):
             response = await client.get(path)
             self.assertEqual(response.status, 200)
             self.assertEqual(response.headers.get('Cache-Control'), 'no-cache')
         response = await client.get('/api/library')
         self.assertIsNone(response.headers.get('Cache-Control'))
+
+    async def test_the_page_opens_with_the_codes_pass_and_keeps_it_as_a_cookie(self):
+        web_dir = os.path.join(self.folder.name, 'web')
+        os.mkdir(web_dir)
+        for name in ('index.html', 'expired.html'):
+            with open(os.path.join(web_dir, name), 'w') as f:
+                f.write(name)
+        client = await self.start_client(web_dir)       # a phone that scanned nothing yet
+        response = await client.get('/')
+        self.assertEqual((response.status, await response.text()), (403, 'expired.html'))
+        response = await client.get('/?pass=wrong')
+        self.assertEqual(response.status, 403)
+        self.assertEqual((await client.get('/api/library')).status, 403)
+        # the code's url: the page, and the pass as a cookie for everything after it
+        response = await client.get(f'/?pass={self.relay.current_pass}')
+        self.assertEqual((response.status, await response.text()), (200, 'index.html'))
+        self.assertIn('pass=', response.headers.get('Set-Cookie', ''))
+        self.assertEqual((await client.get('/api/library')).status, 200)
+        track = await self.upload('track', id='0001')
+        self.assertEqual((await client.get(track)).status, 200)
+        self.assertEqual((await (await self.bare_client()).get(track)).status, 403)
+        phone = await self.phone(client)                # the websocket too
+        await phone.close()
+
+    async def test_a_phone_whose_pass_ran_out_is_told_so_and_closed(self):
+        bare = await self.bare_client()
+        ws = await bare.ws_connect('/ws/phone')
+        self.assertEqual((await ws.receive_json())['type'], 'expired')
+        self.assertEqual((await ws.receive()).type, web.WSMsgType.CLOSE)
+        # a tab kept open: its pass runs out meanwhile, the join is refused
+        phone = await self.phone()
+        self.relay.rotate(time.time() + self.relay.pass_lifetime + 1)
+        await phone.send_json({'type': 'join'})
+        self.assertEqual((await phone.receive_json())['type'], 'expired')
+        self.assertEqual((await phone.receive()).type, web.WSMsgType.CLOSE)
+        self.assertEqual(self.relay.line.waiting, [])
+
+    async def test_passes_rotate_and_survive_a_restart(self):
+        first = self.relay.current_pass
+        second = self.relay.rotate()
+        self.assertTrue(self.relay.valid_pass(first) and self.relay.valid_pass(second))
+        self.assertNotEqual(first, second)
+        later = time.time() + self.relay.pass_lifetime + 1
+        self.assertFalse(self.relay.valid_pass(first, later))
+        third = self.relay.rotate(later)             # the old ones go at a rotation
+        self.assertEqual([v for v, _ in self.relay.passes], [third])
+        # a new relay on the same data folder knows the passes it issued
+        again = Relay(TOKEN, self.folder.name)
+        self.assertEqual(again.current_pass, third)
+        self.assertTrue(again.valid_pass(third, later))
+        # SMILE hears the newest at connect
+        smile = await self.smile()
+        await smile.close()
 
     async def test_smile_needs_the_token_in_the_header(self):
         response = await self.client.get('/ws/smile', headers={'Upgrade': 'websocket', 'Authorization': 'Bearer wrong'})

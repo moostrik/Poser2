@@ -401,6 +401,20 @@ class TestOnline(unittest.TestCase):
         self.step()
         self.assertFalse(self.link.last('eye')['laughter'])     # a change goes at once
 
+    def test_the_relays_pass_is_kept_for_the_qr_code_until_the_link_stops(self):
+        self.settings.active = True
+        self.step()
+        self.assertEqual(self.online.pass_value, '')
+        self.link.on_message({'type': 'pass', 'value': 'abc'})
+        self.step()
+        self.assertEqual(self.online.pass_value, 'abc')
+        self.link.on_message({'type': 'pass', 'value': 'def'})      # the relay made a new one
+        self.step()
+        self.assertEqual(self.online.pass_value, 'def')
+        self.settings.active = False
+        self.step()
+        self.assertEqual(self.online.pass_value, '')
+
     def test_the_result_is_delivered_as_soon_as_the_files_are_there(self):
         self.start_turn()
         self.step(seq=SequenceType.FLASH, initial=True)

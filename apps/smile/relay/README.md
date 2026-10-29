@@ -24,8 +24,12 @@ Where it runs and how it is reached, on the tailnet for a test and on the VPS, i
   (`phone … timing: result, play, playing, file; first byte, KB, KB at every second`: seconds after the turn's end that
   the result came, the video was started, played its first frame, and the file was on the phone; then the
   download itself: when its first byte came, its size, and the KB received at every second of it)
-* the page is at `http://<host>:8800/`. A phone only opens its camera over HTTPS, so a TLS proxy stands in
-  front (`data/documents/OnlineHosting.md`); without one the relay takes `--cert` and `--key`
+* the page is at `http://<host>:8800/?pass=<pass>`: the QR code on the wall carries the relay's pass, a random
+  value it makes every 10 minutes (`PASS_EVERY`; SMILE gets each as a `pass` message) and accepts for `--pass-hours`
+  (2) in `data/passes.json`, so a restart forgets none. The page sets it as a cookie; a phone can reload for
+  another picture for those hours, then `/` is `web/expired.html` and the files 403. A phone only opens its
+  camera over HTTPS, so a TLS proxy stands in front (`data/documents/OnlineHosting.md`); without one the relay
+  takes `--cert` and `--key`
 * tests: `relay/tests` covers the line, the server and the page's files (`test_web.py`: the stylesheet's structure, every
   id the script and the stylesheet name, no name declared twice in the script: what a browser would refuse silently)
 * without SMILE: `python -m apps.smile.online.fake` stands in for it (the SCRFD face detector, or the middle of the
