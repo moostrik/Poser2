@@ -30,7 +30,6 @@ from .filters.StickyFillers import              StickyFillerSettings, BBoxSticky
 from .filters.RateLimiters import               RateLimiterSettings,  BBoxRateLimiter,    PointRateLimiter,   AngleRateLimiter,   AngleVelRateLimiter,    AngleSymRateLimiter,    SimilarityRateLimiter,  AngleMotionRateLimiter
 from .filters.EasingNode import                 EasingSettings,       EasingNode,         AngleMotionEasingNode
 from .filters.TemporalFilters import            TemporalStabilizerSettings,   BBoxTemporalStabilizer, PointTemporalStabilizer,    AngleTemporalStabilizer,    AngleVelTemporalStabilizer, AngleSymTemporalStabilizer
-from .filters.Validators import                 ValidatorSettings,    BBoxValidator,      PointValidator,     AngleValidator,     AngleVelValidator,      AngleSymValidator,      PoseValidator
 
 from .interpolators.ChaseInterpolators import   ChaseInterpolatorSettings,    BBoxChaseInterpolator,  PointChaseInterpolator, AngleChaseInterpolator, AngleVelChaseInterpolator,  AngleSymChaseInterpolator,  SimilarityChaseInterpolator,    AzimuthChaseInterpolator,   DistanceChaseInterpolator
 from .interpolators.LerpInterpolators import    LerpInterpolatorSettings,     BBoxLerpInterpolator,   PointLerpInterpolator,  AngleLerpInterpolator,  AngleVelLerpInterpolator,   AngleSymLerpInterpolator
