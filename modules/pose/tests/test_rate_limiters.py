@@ -116,9 +116,8 @@ class FeatureRateLimiterTest(unittest.TestCase):
         node = AngleRateLimiter(_settings(1.0, 1.0))
         node.process(frame(t=0.0, features={Angles: scalar(Angles, {A.left_elbow: 0.0})}))
         out = node.process(frame(t=0.1, features={Angles: scalar(Angles, {A.left_elbow: 3.0})}))
-        # The node times itself by the wall clock: the two calls are far less than a second apart,
-        # so at 1 rad/s next to nothing of the 3 rad jump comes through.
-        self.assertLess(float(out[Angles].values[A.left_elbow]), 1.0)
+        # The node takes its time from the frames, never from a clock: 0.1 s at 1 rad/s lets 0.1 rad through.
+        self.assertAlmostEqual(float(out[Angles].values[A.left_elbow]), 0.1, places=5)
 
     def test_a_settings_change_takes_effect_live(self) -> None:
         settings = _settings(1.0, 1.0)

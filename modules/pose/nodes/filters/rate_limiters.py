@@ -52,7 +52,7 @@ class FeatureRateLimiter(FilterNode):
 
     def process(self, pose: Frame) -> Frame:
         feature_data = pose[self._feature_type]
-        self._limiter.update(feature_data.values)
+        self._limiter.update(feature_data.values, pose.timestamp)
         limited_values: np.ndarray = self._limiter.value
         limited_data = type(feature_data)(values=limited_values, scores=feature_data.scores)
         return replace(pose, {self._feature_type: limited_data})

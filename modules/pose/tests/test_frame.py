@@ -60,6 +60,11 @@ class ReplaceTest(unittest.TestCase):
         self.assertIs(out[Angles], angles)
         self.assertEqual((out.track_id, out.cam_id, out.timestamp), (3, 1, 7.0))
 
+    def test_a_new_stamp_replaces_the_sources(self) -> None:
+        src = Frame(track_id=3, cam_id=1, timestamp=7.0, features={Age: Age.from_value(1.0)})
+        self.assertEqual(replace(src, {}, timestamp=7.5).timestamp, 7.5)
+        self.assertEqual(replace(src, {}).timestamp, 7.0)
+
     def test_overwrites_existing_feature(self) -> None:
         src = Frame(0, 0, 0.0, {Age: Age.from_value(1.0)})
         out = replace(src, {Age: Age.from_value(2.0)})

@@ -10,6 +10,7 @@ applyTo: "modules/pose/**, modules/pose/trackers/**, modules/pose/window/**, mod
 - Only sources create poses; a stage's steps never add or remove one
 - A stage's interpolators are the one crossing from the frame domain to an output domain; a tick source joins at a stage the tick drives
 - A step entry is plain data: a node class with its settings object, or a node built once; no closures
+- A node takes time from the frame it processes; the crossing stamps a frame with the tick it was made on, so no node reads a clock
 
 ## Nodes
 

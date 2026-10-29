@@ -142,21 +142,27 @@ class InterpolatorPipelineTest(unittest.TestCase):
             })
 
         pipeline.set(target(0.0, 0.0))
-        pipeline.update()
+        pipeline.update(0.0)
         pipeline.set(target(1.0, 4.0))
-        out = pipeline.update()
+        out = pipeline.update(0.0)
         self.assertAlmostEqual(out[Angles][A.head], 0.5, places=5)
         self.assertAlmostEqual(out[AngleVelocity][A.head], 2.0, places=5)
         self.assertIs(out[Points2D], pts)
         self.assertEqual(out.track_id, 1)
 
+    def test_the_frame_carries_the_time_of_the_tick_it_was_made_on(self) -> None:
+        pipeline = InterpolatorPipeline([AngleLerpInterpolator(LerpInterpolatorSettings())])
+        pipeline.set(_angles(t=2.0, head=0.1))
+        self.assertEqual(pipeline.update(2.5).timestamp, 2.5)
+        self.assertEqual(pipeline.update(2.52).timestamp, 2.52)        # not the target's 2.0, not repeated
+
     def test_none_until_set_and_after_reset(self) -> None:
         pipeline = InterpolatorPipeline([AngleLerpInterpolator(LerpInterpolatorSettings())])
-        self.assertIsNone(pipeline.update())
+        self.assertIsNone(pipeline.update(0.0))
         pipeline.set(_angles(head=0.1))
-        self.assertIsNotNone(pipeline.update())
+        self.assertIsNotNone(pipeline.update(0.0))
         pipeline.reset()
-        self.assertIsNone(pipeline.update())
+        self.assertIsNone(pipeline.update(0.0))
 
     def test_empty_node_list_is_rejected(self) -> None:
         with self.assertRaises(ValueError):

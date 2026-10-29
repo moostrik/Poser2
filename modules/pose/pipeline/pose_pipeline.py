@@ -87,7 +87,7 @@ class PosePipeline:
     def update(self, domain: Domain, now: float) -> None:
         """One tick of an output domain at ``now`` (perf_counter): the stages the tick enters, in order."""
         for stage in self._ticked.get(domain, ()):
-            frames: FrameDict = stage.interpolators.update() if stage.interpolators is not None else {}
+            frames: FrameDict = stage.interpolators.update(now) if stage.interpolators is not None else {}
             if stage.sources:
                 frames = self._merge(frames, stage.sources, now)
             assert stage.entry is not None

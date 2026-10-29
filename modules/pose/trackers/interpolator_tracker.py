@@ -44,15 +44,15 @@ class InterpolatorTracker(TrackerBase):
                 # Some nodes may hold the new target and others not; don't emit a half-updated frame
                 self.reset_at(id)
 
-    def update(self) -> FrameDict:
-        """Get interpolated poses from all pipelines."""
+    def update(self, now: float) -> FrameDict:
+        """The interpolated poses of all pipelines, made on the tick at ``now`` and stamped with it."""
 
         start = perf_counter()
         interpolated_poses: FrameDict = {}
 
         for id, pipeline in self._pipelines.items():
             try:
-                pose = pipeline.update()
+                pose = pipeline.update(now)
             except Exception as e:
                 logger.error(f"Error updating pose {id}: {e}")
                 continue

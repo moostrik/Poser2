@@ -1,6 +1,3 @@
-# Standard library imports
-from time import perf_counter
-
 # Third-party imports
 import numpy as np
 
@@ -37,7 +34,7 @@ class EmaSmooth:
         self._target: np.ndarray = np.full(vector_size, np.nan)
         self._last_update_time: float | None = None
 
-    def update(self, values: np.ndarray, current_time: float | None = None) -> None:
+    def update(self, values: np.ndarray, current_time: float) -> None:
         """Apply EMA smoothing to the new input vector."""
         if values.shape[0] != self._vector_size:
             raise ValueError(f"Expected array of size {self._vector_size}, got {values.shape[0]}")
@@ -53,9 +50,6 @@ class EmaSmooth:
         self._smoothed[state_changed] = self._target[state_changed]
 
         # UPDATE
-        if current_time is None:
-            current_time = perf_counter()
-
         if self._last_update_time is None:
             self._last_update_time = current_time
             return
@@ -166,7 +160,7 @@ class AngleEmaSmooth(EmaSmooth):
         """
         super().__init__(vector_size, attack, release, clamp_range=None)
 
-    def update(self, values: np.ndarray, current_time: float | None = None) -> None:
+    def update(self, values: np.ndarray, current_time: float) -> None:
         """Apply EMA smoothing to angles, calculating shortest angular path."""
         if values.shape[0] != self._vector_size:
             raise ValueError(f"Expected array of size {self._vector_size}, got {values.shape[0]}")
@@ -207,7 +201,7 @@ class PointEmaSmooth(EmaSmooth):
         super().__init__(vector_size * 2, attack, release, clamp_range)
         self._num_points: int = vector_size
 
-    def update(self, points: np.ndarray, current_time: float | None = None) -> None:
+    def update(self, points: np.ndarray, current_time: float) -> None:
         """Apply EMA smoothing to points."""
         if points.shape != (self._num_points, 2):
             raise ValueError(f"Expected shape ({self._num_points}, 2), got {points.shape}")
