@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 class HasVideoImages(Protocol):
     """Raw camera VIDEO frame access keyed by cam_id (CPU numpy frames)."""
     def get_video_image(self, cam_id: int) -> "np.ndarray | None": ...
-    def set_video_image(self, cam_id: int, frame: "np.ndarray") -> None: ...
+    def set_video_image(self, cam_id: int, image: "np.ndarray") -> None: ...
 
 
 class VideoImageStoreMixin:
@@ -28,6 +28,6 @@ class VideoImageStoreMixin:
         with self._video_image_lock:
             return self._video_images.get(cam_id)
 
-    def set_video_image(self, cam_id: int, frame: "np.ndarray") -> None:
+    def set_video_image(self, cam_id: int, image: "np.ndarray") -> None:
         with self._video_image_lock:
-            self._video_images[cam_id] = frame
+            self._video_images[cam_id] = image

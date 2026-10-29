@@ -29,17 +29,17 @@ class SoundLevelStoreMixin:
     """Thread-safe sound-level storage; stamps the monotonic receive time on set."""
 
     def __init__(self) -> None:
-        self._sound_lock = Lock()
+        self._sound_level_lock = Lock()
         self._sound_levels = SoundLevels()
 
     def get_sound_levels(self) -> SoundLevels:
-        with self._sound_lock:
+        with self._sound_level_lock:
             return self._sound_levels
 
     def set_sound_level_left(self, level: float) -> None:
-        with self._sound_lock:
+        with self._sound_level_lock:
             self._sound_levels = replace(self._sound_levels, left=level, timestamp=monotonic())
 
     def set_sound_level_right(self, level: float) -> None:
-        with self._sound_lock:
+        with self._sound_level_lock:
             self._sound_levels = replace(self._sound_levels, right=level, timestamp=monotonic())

@@ -15,7 +15,7 @@ class WindowSource(Protocol):
 class HasWindows(Protocol):
     """Staged feature window access."""
     def get_window(self, stage: int, track_id: int, feature_type: type[BaseFeature]) -> FeatureWindow | None: ...
-    def set_window_tracker(self, stage: int, source: WindowSource) -> None: ...
+    def set_window_source(self, stage: int, source: WindowSource) -> None: ...
 
 
 class WindowStoreMixin:
@@ -34,6 +34,6 @@ class WindowStoreMixin:
             source = self._window_sources.get(stage)
         return source.get_window(feature_type, track_id) if source is not None else None
 
-    def set_window_tracker(self, stage: int, source: WindowSource) -> None:
+    def set_window_source(self, stage: int, source: WindowSource) -> None:
         with self._window_lock:
             self._window_sources[stage] = source

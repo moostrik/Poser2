@@ -25,13 +25,13 @@ class ObservationStoreMixin:
     """Thread-safe storage for the tracker's per-camera observations."""
 
     def __init__(self) -> None:
-        self._observation_store_lock = Lock()
+        self._observation_lock = Lock()
         self._observations: list[Tracklet] = []
 
     def get_observations(self) -> list[Tracklet]:
-        with self._observation_store_lock:
+        with self._observation_lock:
             return list(self._observations)
 
     def set_observations(self, observations: list[Tracklet]) -> None:
-        with self._observation_store_lock:
+        with self._observation_lock:
             self._observations = list(observations)

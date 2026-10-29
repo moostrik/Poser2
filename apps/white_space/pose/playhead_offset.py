@@ -99,7 +99,7 @@ class PlayheadOffsetExtractor(nodes.FilterNode):
     """Stamps ``PlayheadOffset`` from the pose azimuth and a live playhead provider.
 
     ``playhead`` returns the current playhead (radians [-π, π); NaN when not meaningful).
-    Wired in main to ``board.get_playhead`` — read live so there is no lag.
+    Wired in main to ``board.get_playhead_phase`` — read live so there is no lag.
     """
 
     def __init__(self, playhead: Callable[[], float]) -> None:

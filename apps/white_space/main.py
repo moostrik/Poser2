@@ -152,7 +152,7 @@ class WhiteSpaceMain:
             wt_features = lerp_features if stage == Stage.LERP else None
             tracks = max_players + 1 if stage == Stage.LERP else max_players      # LERP also holds the dummy's id
             wt = window.WindowTracker(tracks, getattr(ps, f'window_{stage.name.lower()}'), features=wt_features)
-            self.board.set_window_tracker(stage, wt)
+            self.board.set_window_source(stage, wt)
             self.window_trackers[stage] = wt
             self.stages[stage] = Broadcast([
                 partial(self.board.set_frames, stage),
@@ -306,7 +306,7 @@ class WhiteSpaceMain:
                 nodes.AngleVelocityEuroSmoother(ps.velocity.smoother),
                 nodes.AngleMotionExtractor(ps.motion.extractor),
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
-                PlayheadOffsetExtractor(self.board.get_playhead),
+                PlayheadOffsetExtractor(self.board.get_playhead_phase),
             ])
             for i in range(max_players + 1)                                       # the players and the dummy
         }, name="Pose lerp")

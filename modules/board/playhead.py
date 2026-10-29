@@ -19,7 +19,7 @@ class PlayheadSignals:
 
 class HasPlayhead(Protocol):
     """Rotating-light playhead access: the phase/bars shortcuts plus the full signal bundle."""
-    def get_playhead(self) -> float: ...
+    def get_playhead_phase(self) -> float: ...
     def get_playhead_bars(self) -> float: ...
     def get_playhead_signals(self) -> PlayheadSignals: ...
     def set_playhead(self, signals: PlayheadSignals) -> None: ...
@@ -33,7 +33,7 @@ class PlayheadStoreMixin:
         self._playhead_lock = Lock()
         self._playhead_signals = PlayheadSignals()
 
-    def get_playhead(self) -> float:
+    def get_playhead_phase(self) -> float:
         with self._playhead_lock:
             return self._playhead_signals.phase
 
