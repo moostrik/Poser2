@@ -281,7 +281,7 @@ class WindowNodeTest(unittest.TestCase):
 
 class WindowTrackerTest(unittest.TestCase):
     def test_emits_per_feature_per_track_windows(self) -> None:
-        tracker = WindowTracker(2, _window_settings(3), features=[Age])
+        tracker = WindowTracker(range(2),_window_settings(3), features=[Age])
         received: list = []
         tracker.add_windows_callback(lambda windows: received.append(windows))
         tracker.process({0: _age_frame(1.0, 0), 1: _age_frame(2.0, 1)})
@@ -289,7 +289,7 @@ class WindowTrackerTest(unittest.TestCase):
         self.assertEqual(set(received[0][Age]), {0, 1})
 
     def test_missing_track_window_is_reset(self) -> None:
-        tracker = WindowTracker(2, _window_settings(3), features=[Age])
+        tracker = WindowTracker(range(2),_window_settings(3), features=[Age])
         received: list = []
         tracker.add_windows_callback(lambda windows: received.append(windows))
         tracker.process({0: _age_frame(1.0, 0), 1: _age_frame(1.0, 1)})
@@ -301,7 +301,7 @@ class WindowTrackerTest(unittest.TestCase):
         self.assertNotIn(1, received[1][Age])
 
     def test_defaults_to_all_scalar_features(self) -> None:
-        tracker = WindowTracker(1, _window_settings(2))
+        tracker = WindowTracker(range(1),_window_settings(2))
         received: list = []
         tracker.add_windows_callback(lambda windows: received.append(windows))
         tracker.process({0: frame()})
@@ -310,13 +310,13 @@ class WindowTrackerTest(unittest.TestCase):
         self.assertTrue(math.isfinite(received[0][Angles][0].values.sum()))
 
     def test_pull_builds_only_present_tracks(self) -> None:
-        tracker = WindowTracker(2, _window_settings(3), features=[Age])
+        tracker = WindowTracker(range(2),_window_settings(3), features=[Age])
         tracker.process({0: _age_frame(1.0, 0)})
         self.assertIsNotNone(tracker.get_window(Age, 0))
         self.assertIsNone(tracker.get_window(Age, 1))       # never seen
 
     def test_pull_of_an_absent_track_is_reset(self) -> None:
-        tracker = WindowTracker(2, _window_settings(3), features=[Age])
+        tracker = WindowTracker(range(2),_window_settings(3), features=[Age])
         tracker.process({0: _age_frame(1.0, 0), 1: _age_frame(1.0, 1)})
         tracker.process({0: _age_frame(2.0, 0)})            # track 1 disappears
         self.assertIsNone(tracker.get_window(Age, 1))

@@ -42,7 +42,7 @@ class Sequencer:
 
     The ``stages`` list defines which stages to play and in what order.
     Each entry indexes into ``durations`` for that stage's length.
-    Call ``update()`` every frame (e.g. from the renderer's update callback).
+    Call ``update(now)`` every frame (the renderer's update callback hands it the frame time).
 
     Example::
 
@@ -200,12 +200,12 @@ class Sequencer:
 
     # -- Tick (called every render frame) ------------------------------------
 
-    def update(self) -> None:
-        """Advance sequencer state. Call once per frame."""
+    def update(self, now: float) -> None:
+        """Advance sequencer state. Call once per frame with the frame's time (perf_counter)."""
         if not self._active:
             return
 
-        elapsed = time.perf_counter() - self._stage_start
+        elapsed = now - self._stage_start
         duration = self._stage_durations[self._pos]
 
         # Stage progress

@@ -62,7 +62,7 @@ The arms are alike, then, when every arm joint is within the tolerance, allowing
 
 | | Hit sync | `Similarity` feature |
 |-----------------------|----------------------------------------------------------|---------------------------------------------------------------|
-| Component             | `HitSync` (`pose/hit_sync.py`)                           | `PostureSimilarityExtractor` (a group step), wired in `main.py` |
+| Component             | `HitSync` (`pose/hit_sync.py`)                           | `PostureSimilarityExtractor` (a group step of SMOOTH in `pose/pipeline.py`) |
 | Input                 | the hit player's LERP pose at the hit tick, once the pose is `sync.min_age_seconds` old | the current SMOOTH poses, every frame |
 | Reads                 | the distance, and the similarity's plateau               | the similarity, 0 to 1                                        |
 | Neutral               | a gate: every hit in the run has `ArmDeviation` 1        | a ramp: the pair times the smaller `ArmDeviation` (`pose/neutral_weight.py`) |
@@ -71,10 +71,9 @@ The arms are alike, then, when every arm joint is within the tolerance, allowing
 | Output                | `HitStreak` on the board; `states.sync.hits`, `states.sync.distance` (°) | the rows on the LERP frames; `/pose/N/similarity/pose` to Max; `pose_instrument.full_sync` |
 
 Both read one settings group, `pose.similarity.posture`, and one switch for neutral,
-`pose.similarity.neutral_weight.enabled`. The feature's chain is four group steps on the SMOOTH poses:
+`pose.similarity.neutral_weight.enabled`. The feature's chain is three group steps on the SMOOTH poses:
 `PostureSimilarityExtractor` stamps the rows, the sticky filler holds a present pair's gap (a departed
-player's slot is NaN), the neutral weight scales each pair, and `OneFrameHold` stamps them one frame late;
-then they are smoothed and chased at LERP. The hit sync reads none of that, so a change to the similarity smoothers changes the light
+player's slot is NaN), and the neutral weight scales each pair; then they are smoothed and chased at LERP. The hit sync reads none of that, so a change to the similarity smoothers changes the light
 and the sound, never the sync. White Space produces no leader scores; `/pose/N/similarity/leader` carries
 zeros.
 

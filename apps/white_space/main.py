@@ -7,20 +7,21 @@ from functools import partial
 import glfw
 import numpy as np
 
-from modules.utils import Broadcast
 from modules.camera import CameraSource, CameraFrame, FrameType, Player, Sync, Recorder as VideoRecorder, CameraCheck, replay
 from modules.camera.oak import Camera, Simulator
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, PosesFromTracklets
-from modules.pose import nodes, trackers, features, window, FrameDict
-from modules.inference import pose, detection, CropExtractor, Uploader
+from modules.pose import features
+from modules.pose.pipeline import Domain, PosePipeline
+from modules.inference import detection, PoseInference
 from modules.session import Session
 
 from .render_board import RenderBoard
-from .pose import PlayheadOffset, PlayheadOffsetExtractor, Dummy, dummy_id, NeutralWeight, HitSync
-from .light import Conductor
+from .pose import Dummy, dummy_id, HitSync
+from .pose.pipeline import pipeline_spec      # not through the package: it reads the settings, which read the package
+from .light import Conductor, Tick
 from .inout import OscLightSender, OscSoundSender, UdpLightReceiver
 from .render import WhiteSpaceRender
 from .settings import Settings, Stage
@@ -69,8 +70,8 @@ class WhiteSpaceMain:
         # RECORDING (independent of the show — works stand-alone and during session mode)
         self.session = Session(self.settings.session.control)
         self.osc_sound_sender = OscSoundSender(self.settings.inout.osc_sound_sender)
-        # The dummy has its own id above the live players; the LERP stage is built one id wider
-        # for it, so it is a pose like any other from there.
+        # The dummy has its own id above the live players: a source of the LERP stage, polled on the light
+        # tick, so it is a pose like any other from there.
         self.dummy = Dummy(self.settings.pose_instrument.dummy, ps.angle_extractor, ps.angle_calibrator, dummy_id(max_players),
                            Path(DATA_PATH) / "poses.json")
         self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
@@ -98,12 +99,11 @@ class WhiteSpaceMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = PanoramicTracker(self.settings.tracker, max_players, num_cams)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.source_uploader = Uploader()
-        self.crop_extractor = CropExtractor(ps.image_crop)
+        self.pose_inference = PoseInference(ps.image_crop, ps.pose)      # the crop and the pose model, the frame domain's async step
 
         for camera in self.cameras:
             camera.add_frame_callback(self.video_recorder.submit_frame)
-            camera.add_frame_callback(self.source_uploader.set_image)
+            camera.add_frame_callback(self.pose_inference.set_camera_frame)
             camera.add_frame_callback(self.frame_sync_bang.submit_frame)
             camera.add_tracklet_callback(self.tracker.submit_cam_tracklets)
             camera.add_tracklet_callback(self.board.set_camera_tracklets)
@@ -113,8 +113,6 @@ class WhiteSpaceMain:
         features.configure_features(max_players)
 
         self.poses_from_tracklets = PosesFromTracklets(ps.tracklets, max_players)
-
-        self.pose_predictor = pose.Predictor(ps.pose)
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         self.tracker.add_tracklet_callback(self.board.set_tracklets)
@@ -136,27 +134,18 @@ class WhiteSpaceMain:
         self.tracker.add_observation_callback(self.tracker_journal.submit_observations)
         self.tracker.add_tracklet_callback(self.tracker_journal.submit_tracklets)
 
-        self.crop_extractor.add_image_callback(self.pose_predictor.submit)
-        self.crop_extractor.add_image_callback(lambda _f, gpu: self.board.set_crop_images(gpu))
+        self.pose_inference.add_camera_images_callback(self.board.set_camera_images)
+        self.pose_inference.add_crop_callback(lambda _f, gpu: self.board.set_crop_images(gpu))
 
-        self.poses_from_tracklets.add_frames_callback(self._process_poses)
-
-        # STAGE WINDOW TRACKERS & BROADCASTS
-        # The LERP tracker also windows the app-local playhead offset (the only stage where it is
-        # stamped) so the data layers can graph it; other stages use the built-ins.
-        lerp_features = features.SCALAR_FEATURES + [PlayheadOffset]
-        self.window_trackers: dict[Stage, window.WindowTracker] = {}
-        self.stages: dict[Stage, Broadcast] = {}
+        # POSE PIPELINE — the stages are declared in pose/pipeline.py. The camera's frame bang drives the frame
+        # domain through the tracklet poses; the light tick drives the output domain (LERP, where the dummy joins).
+        # Every stage's frames go to the board, which also reads each stage's window; the sound reads LERP.
+        self.pipeline = PosePipeline(pipeline_spec(ps, self.poses_from_tracklets, self.pose_inference, self.dummy,
+                                                   self._column_to_azimuth, self.board.get_playhead_phase))
         for stage in Stage:
-            wt_features = lerp_features if stage == Stage.LERP else None
-            tracks = max_players + 1 if stage == Stage.LERP else max_players      # LERP also holds the dummy's id
-            wt = window.WindowTracker(tracks, getattr(ps, f'window_{stage.name.lower()}'), features=wt_features)
-            self.board.set_window_source(stage, wt)
-            self.window_trackers[stage] = wt
-            self.stages[stage] = Broadcast([
-                partial(self.board.set_frames, stage),
-                wt.process,
-            ])
+            self.pipeline.add_frames_callback(stage, partial(self.board.set_frames, stage))
+            self.board.set_window_source(stage, self.pipeline.window(stage))
+        self.pipeline.add_frames_callback(Stage.LERP, partial(self.osc_sound_sender.submit_frames, int(Stage.LERP)))
 
         # WS PIPELINE — light output
         # The show reads LERP poses: the stable eye azimuth, and the only stage with PlayheadOffset.
@@ -193,124 +182,6 @@ class WhiteSpaceMain:
         self.hit_sync = HitSync(self.settings.states.sync, ps.similarity.posture, ps.similarity.neutral_weight,
                                 self.settings.light, board=self.board, pose_stage=int(Stage.LERP))
 
-        # POSE STAGE RAW
-        self.pose_predictor.add_frames_callback(self.stages[Stage.RAW])
-
-        # POSE STAGE CLEAN
-        self.filters_clean = trackers.FilterTracker({
-            i: trackers.FilterPipeline([
-                nodes.PointDualConfidenceFilter(ps.point.confidence),
-                nodes.PointStickyFiller(ps.point.sticky),
-                # Here, not later: the keypoints are still normalised in the crop they came from, so
-                # the box's jitter cancels out of the eye azimuth. A held eye moves with the box.
-                nodes.AzimuthExtractor(self._column_to_azimuth),
-                nodes.AngleExtractor(ps.angle_extractor),
-                nodes.AngleCalibrator(ps.angle_calibrator),
-                nodes.AngleVelocityExtractor(ps.velocity.extractor),
-            ])
-            for i in range(max_players)
-        }, name="Pose clean")
-        self.stages[Stage.RAW].add_callback(self.filters_clean.process)
-        self.filters_clean.add_frames_callback(self.stages[Stage.CLEAN])
-
-        # POSE STAGE SMOOTH
-        self.filters_smooth = trackers.FilterTracker({
-            i: trackers.FilterPipeline([
-                nodes.PointEuroSmoother(ps.point.smoother),
-                nodes.AngleExtractor(ps.angle_extractor),
-                nodes.AngleCalibrator(ps.angle_calibrator),
-                nodes.AngleVelocityExtractor(ps.velocity.extractor),
-                nodes.AngleVelocityEuroSmoother(ps.velocity.smoother),
-                nodes.AngleEuroSmoother(ps.angle.smoother),
-                nodes.AzimuthEuroSmoother(ps.azimuth.smoother),
-                nodes.DistanceEuroSmoother(ps.distance.smoother),
-                nodes.AngleMotionExtractor(ps.motion.extractor),
-                nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
-                nodes.AngleSymmetryExtractor(ps.leg_deviation_extractor),
-                nodes.LegDeviationExtractor(ps.leg_deviation_extractor),
-                nodes.ArmDeviationExtractor(ps.arm_deviation_extractor),
-                nodes.ArmTravelExtractor(ps.arm_travel_extractor),
-                nodes.ShoulderDifferenceExtractor(),
-                nodes.TorsoTiltExtractor(ps.torso_tilt_extractor),
-                nodes.MotionTimeExtractor(),
-                nodes.AgeExtractor(),
-            ])
-            for i in range(max_players)
-        }, name="Pose smooth")
-        # Group steps on the SMOOTH poses, synchronously: the posture similarity (the pairwise distance of the
-        # poses as a 0..1 similarity) stamped on them; where presence is known, the sticky filler bridges a
-        # present pair's gap (a departed player's slot stays NaN), then the neutral weight scales a pair by
-        # how far both are out of neutral (their arm deviation, this frame's). The hold stamps the rows one
-        # frame late, the lag the show was tuned with; then they are smoothed, and the light show reads the LERP frames.
-        self.posture_similarity = nodes.PostureSimilarityExtractor(ps.similarity.posture)
-        self.similarity_sticky = nodes.SimilarityStickyFiller(ps.similarity.sticky)
-        self.neutral_weight = NeutralWeight(ps.similarity.neutral_weight)
-        self.similarity_hold = nodes.OneFrameHold(features.Similarity)
-        self.similarity_smooth = trackers.FilterTracker({
-            i: trackers.FilterPipeline([nodes.SimilarityEuroSmoother(ps.similarity.smoother)])
-            for i in range(max_players)
-        }, name="Pose smooth similarity")
-        self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
-        self.filters_smooth.add_frames_callback(self._process_similarity)
-        self.similarity_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
-
-        # POSE STAGE PREDICT
-        self.filters_predict = trackers.FilterTracker({
-            i: trackers.FilterPipeline([
-                nodes.PointPredictor(ps.point.prediction),
-                nodes.AnglePredictor(ps.angle.prediction),
-                nodes.AngleVelocityPredictor(ps.velocity.prediction),
-                nodes.AzimuthPredictor(ps.azimuth.prediction),
-                nodes.AngleStickyFiller(ps.angle.sticky),
-            ])
-            for i in range(max_players)
-        }, name="Pose predict")
-        self.stages[Stage.SMOOTH].add_callback(self.filters_predict.process)
-        self.filters_predict.add_frames_callback(self.stages[Stage.PREDICT])
-
-        # POSE STAGE LERP
-        self.interpolators_lerp = trackers.InterpolatorTracker({
-            i: trackers.InterpolatorPipeline([
-                nodes.PointChaseInterpolator(ps.point.interpolator),
-                nodes.AngleChaseInterpolator(ps.angle.interpolator),
-                nodes.AngleVelocityChaseInterpolator(ps.velocity.interpolator),
-                nodes.SimilarityChaseInterpolator(ps.similarity.interpolator),
-                nodes.AzimuthChaseInterpolator(ps.azimuth.interpolator),
-                nodes.DistanceChaseInterpolator(ps.distance.interpolator),
-            ])
-            for i in range(max_players)
-        }, name="Pose interpolate")
-        self.filters_lerp = trackers.FilterTracker({
-            i: trackers.FilterPipeline([
-                # First, before the extractors: every angle-derived measure (arm travel, leg
-                # deviation) inherits the cap, and the sound's angle messages read the same values.
-                nodes.AngleRateLimiter(ps.angle.rate_limiter),
-                nodes.AngleSymmetryExtractor(ps.leg_deviation_extractor),
-                nodes.LegDeviationExtractor(ps.leg_deviation_extractor),
-                nodes.ArmDeviationExtractor(ps.arm_deviation_extractor),
-                nodes.ArmTravelExtractor(ps.arm_travel_extractor),
-                nodes.ShoulderDifferenceExtractor(),
-                nodes.TorsoTiltExtractor(ps.torso_tilt_extractor),
-                nodes.MotionTimeExtractor(),
-                nodes.AgeExtractor(),
-                nodes.AngleVelocityStickyFiller(ps.velocity.sticky),
-                nodes.AngleVelocityEuroSmoother(ps.velocity.smoother),
-                nodes.AngleMotionExtractor(ps.motion.extractor),
-                nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
-                PlayheadOffsetExtractor(self.board.get_playhead_phase),
-            ])
-            for i in range(max_players + 1)                                       # the players and the dummy
-        }, name="Pose lerp")
-        self.motion_gate = nodes.MotionGateExtractor()                               # the group step after the filters
-        self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.set)
-        # The dummy joins the interpolated poses before the LERP filters, which stamp on it
-        # everything a person has (the playhead offset, the symmetries, the leg deviation, the bend).
-        self.interpolators_lerp.add_frames_callback(self.dummy.process)
-        self.dummy.add_frames_callback(self.filters_lerp.process)
-        self.filters_lerp.add_frames_callback(self._process_motion_gate)
-        # The gated LERP poses fan out to the board (through the stage broadcast) and to the OSC sound.
-        self.lerp_output = Broadcast([self.stages[Stage.LERP], partial(self.osc_sound_sender.submit_frames, int(Stage.LERP))])
-
         # CAMERA CHECK — compares each camera's own IMU reading and frame rate against the preset,
         # and summarises them as pinned indicators. A setup aid; nothing downstream reads it.
         self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
@@ -321,7 +192,7 @@ class WhiteSpaceMain:
         self.render.add_update_callback(self.camera_check.update)
         # In order: LERP first, so the hit reads this tick's PlayheadOffset (the same the flash draws on);
         # then HitSync publishes the hit and the streak; then the state machine reads them.
-        self.conductor.add_update_callback(self.interpolators_lerp.update)
+        self.conductor.add_update_callback(self._update_poses)
         self.conductor.add_update_callback(self.hit_sync.update)
         self.conductor.add_update_callback(self.state_machine.update)
         self.render.add_exit_callback(self.stop)
@@ -336,7 +207,7 @@ class WhiteSpaceMain:
             camera.start()
 
         self.tracker.start()
-        self.pose_predictor.start()
+        self.pose_inference.start()
         self.conductor.start()
         self.osc_light_sender.start()
         self.osc_sound_receiver.start()
@@ -387,22 +258,9 @@ class WhiteSpaceMain:
                       if self.player else None,
         }
 
-    def _process_poses(self, poses: FrameDict) -> None:
-        images, prev_images = self.source_uploader.snapshot()
-        self.board.set_camera_images(images)
-        self.crop_extractor.process(poses, images, prev_images)
-
-    def _process_similarity(self, frames: FrameDict) -> None:
-        """The SMOOTH group steps, then the similarity smoother (the pose thread)."""
-        frames = self.posture_similarity.process(frames)
-        frames = self.similarity_sticky.process(frames)
-        frames = self.neutral_weight.process(frames)
-        frames = self.similarity_hold.process(frames)
-        self.similarity_smooth.process(frames)
-
-    def _process_motion_gate(self, frames: FrameDict) -> None:
-        """The LERP group step, then the LERP output (the light thread)."""
-        self.lerp_output(self.motion_gate.process(frames))
+    def _update_poses(self, tick: Tick) -> None:
+        """The light tick drives the pipeline's output domain (LERP) at the tick's time."""
+        self.pipeline.update(Domain.OUTPUT, tick.now)
 
     def stop(self) -> None:
         if not self.is_running:
@@ -428,7 +286,7 @@ class WhiteSpaceMain:
         self.udp_light_receiver.stop()
         self.conductor.stop()
 
-        self.pose_predictor.stop()
+        self.pose_inference.stop()
         if self.person_detector is not None:
             self.person_detector.stop()
 

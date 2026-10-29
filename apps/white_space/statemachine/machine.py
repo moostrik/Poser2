@@ -30,7 +30,7 @@ from modules.board import HitStreak
 from modules.session import SequencerState
 
 from ..render_board import RenderBoard
-from ..light import LightSettings, LayerId, Mix, MotorMode, PoseInstrumentSettings
+from ..light import LightSettings, LayerId, Mix, MotorMode, PoseInstrumentSettings, Tick
 from .settings import StateId, StateMachineSettings, ManualSettings
 
 import logging
@@ -139,7 +139,9 @@ class StateMachine:
 
     # -- Tick (light thread, via conductor.add_update_callback) ---------------
 
-    def update(self) -> None:
+    def update(self, _tick: Tick) -> None:
+        """One light tick. The machine keeps its own wall clock for its dt until step 6 of the roadmap moves
+        the light domain onto the tick."""
         now = time.time()
         dt = now - self._prev_time if self._prev_time is not None else 0.0
         self._prev_time = now

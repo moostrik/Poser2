@@ -15,7 +15,7 @@ from modules.pose.nodes import (
     AgeExtractor, AngleCalibrator, AngleEuroSmoother, AngleExtractor, AngleMotionExtractor, AngleMotionMovingAverageSmoother,
     AnglePredictor, AngleRateLimiter, AngleStickyFiller, AngleSymmetryExtractor, AngleVelocityEuroSmoother, AngleVelocityExtractor,
     AngleVelocityPredictor, AngleVelocityStickyFiller, AzimuthEuroSmoother, AzimuthExtractor, AzimuthPredictor,
-    DualConfidenceFilterSettings, EuroSmootherSettings, FilterNode, LegDeviationExtractor, MotionGateExtractor, MotionTimeExtractor, OneFrameHold,
+    DualConfidenceFilterSettings, EuroSmootherSettings, FilterNode, LegDeviationExtractor, MotionGateExtractor, MotionTimeExtractor,
     MovingAverageSmootherSettings, PointDualConfidenceFilter, PointEuroSmoother, PointPredictor, PointStickyFiller,
     PredictionMethod, PredictorSettings, RateLimiterSettings, SimilarityEuroSmoother, SimilarityResultHold,
     StickyFillerSettings, TorsoTiltExtractor, WindowType,
@@ -389,18 +389,6 @@ class GroupNodeTest(unittest.TestCase):
 
     def test_motion_gate_of_no_poses_is_empty(self) -> None:
         self.assertEqual(MotionGateExtractor().process({}), {})
-
-    def test_one_frame_hold_stamps_the_previous_frames_feature(self) -> None:
-        hold = OneFrameHold(Similarity)
-        first, second = _similarity({1: 0.7}), _similarity({1: 0.2})
-        out = hold.process({0: frame(track_id=0, features={Similarity: first})})
-        self.assertTrue(np.all(np.isnan(out[0][Similarity].values)))      # nothing held yet
-        out = hold.process({0: frame(track_id=0, features={Similarity: second}), 1: frame(track_id=1)})
-        self.assertIs(out[0][Similarity], first)
-        self.assertTrue(np.all(np.isnan(out[1][Similarity].values)))      # new this frame
-        hold.reset()
-        out = hold.process({0: frame(track_id=0)})
-        self.assertTrue(np.all(np.isnan(out[0][Similarity].values)))
 
 
 class AngleVelocityChainTest(unittest.TestCase):

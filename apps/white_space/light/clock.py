@@ -47,15 +47,19 @@ class Tick:
     """Clock snapshot produced once per render tick. ``dt`` is measured and jitters; ``interval`` is the
     target the tick was paced at (``1 / light_rate``), the step anything advancing per tick uses — the
     layers' playhead step, never ``dt``. Left 0 it takes ``dt``. ``index`` counts the ticks from
-    the first: the one grid everything gated per tick (the strobe) shares."""
+    the first: the one grid everything gated per tick (the strobe) shares. ``now`` is the tick's stamp on
+    the host clock (``perf_counter``), the time a frame made on this tick carries; left 0 it is ``time``."""
     time:     float         # monotonic elapsed seconds since the first tick
     dt:       float         # seconds elapsed since the previous tick
     interval: float = 0.0   # the tick's target interval (s)
     index:    int   = 0     # the tick's number, 0 at the first
+    now:      float = 0.0   # the tick's perf_counter stamp
 
     def __post_init__(self) -> None:
         if self.interval <= 0.0:
             self.interval = self.dt
+        if self.now <= 0.0:
+            self.now = self.time
 
 
 class Clock:
@@ -120,7 +124,7 @@ class Clock:
 
         self._index += 1
         self._ticks += 1
-        t = Tick(time=now - self._start, dt=dt, interval=interval, index=self._index)
+        t = Tick(time=now - self._start, dt=dt, interval=interval, index=self._index, now=now)
         self._settings.time = t.time
         if now - self._stats_at >= _STATS_INTERVAL:
             self._publish_stats(now)

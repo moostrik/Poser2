@@ -225,8 +225,6 @@ class DummyTest(unittest.TestCase):
         self.settings = DummySettings()
         self.settings.morph = 1.0
         self.dummy = Dummy(self.settings, nodes.AngleExtractorSettings(), nodes.AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
-        self.out: list[dict] = []
-        self.dummy.add_frames_callback(self.out.append)
 
     def tearDown(self) -> None:
         self.tmp.cleanup()
@@ -244,15 +242,13 @@ class DummyTest(unittest.TestCase):
         settings = DummySettings()
         settings.left_shoulder = 90.0                                  # where a preset left it
         dummy = Dummy(settings, nodes.AngleExtractorSettings(), nodes.AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
-        out: list[dict] = []
-        dummy.add_frames_callback(out.append)
         self.assertEqual(settings.pose, 'neutral')
         self.assertEqual(settings.left_shoulder, -20.0)
         self.assertEqual(settings.left_hip, -10.0)
         settings.enabled = True
-        dummy.process({})
+        frames = dummy.update(0.0)
         points = Dummy.points(Measures(left_shoulder=-20.0, left_hip=-10.0), nodes.AngleExtractorSettings().aspect_ratio)
-        np.testing.assert_allclose(out[0][ID][Points2D].values, points.values, atol=1e-6)     # in neutral at once, no morph
+        np.testing.assert_allclose(frames[ID][Points2D].values, points.values, atol=1e-6)     # in neutral at once, no morph
 
     def test_picking_a_pose_sets_the_measures(self) -> None:
         self.settings.pose = 'up'
@@ -284,90 +280,93 @@ class DummyTest(unittest.TestCase):
     # -- the morph --
 
     def test_a_change_morphs_over_the_morph_time(self) -> None:
-        self.dummy.update(0.0)
+        self.dummy.advance(0.0)
         self.settings.left_shoulder = 90.0
-        self.assertAlmostEqual(self.dummy.update(0.0).left_shoulder, 0.0, places=6)      # the change starts a morph
-        self.assertAlmostEqual(self.dummy.update(0.5).left_shoulder, 45.0, places=6)     # half way at half time
-        self.assertAlmostEqual(self.dummy.update(0.5).left_shoulder, 90.0, places=6)
-        self.assertAlmostEqual(self.dummy.update(0.5).left_shoulder, 90.0, places=6)     # and stays
+        self.assertAlmostEqual(self.dummy.advance(0.0).left_shoulder, 0.0, places=6)      # the change starts a morph
+        self.assertAlmostEqual(self.dummy.advance(0.5).left_shoulder, 45.0, places=6)     # half way at half time
+        self.assertAlmostEqual(self.dummy.advance(0.5).left_shoulder, 90.0, places=6)
+        self.assertAlmostEqual(self.dummy.advance(0.5).left_shoulder, 90.0, places=6)     # and stays
 
     def test_morph_zero_snaps(self) -> None:
         self.settings.morph = 0.0
         self.settings.left_shoulder = 90.0
-        self.assertEqual(self.dummy.update(0.0).left_shoulder, 90.0)
+        self.assertEqual(self.dummy.advance(0.0).left_shoulder, 90.0)
 
     def test_circular_measures_take_the_shortest_route(self) -> None:
         self.settings.morph = 0.0
         self.settings.azimuth, self.settings.left_shoulder = 350.0, 30.0
-        self.dummy.update(0.0)                                           # settled at the start
+        self.dummy.advance(0.0)                                           # settled at the start
         self.settings.morph = 1.0
         self.settings.azimuth, self.settings.left_shoulder = 10.0, -30.0
-        self.dummy.update(0.0)
-        m = self.dummy.update(0.5)
+        self.dummy.advance(0.0)
+        m = self.dummy.advance(0.5)
         self.assertAlmostEqual(m.azimuth % 360.0, 0.0, places=6)          # through 0, not 180
         self.assertAlmostEqual(m.left_shoulder % 360.0, 0.0, places=6)    # through 0
 
     def test_the_distance_morphs_in_a_straight_line(self) -> None:
         self.settings.morph = 0.0
         self.settings.distance = 0.0
-        self.dummy.update(0.0)                                           # settled at the start
+        self.dummy.advance(0.0)                                           # settled at the start
         self.settings.morph = 1.0
         self.settings.distance = 1.0
-        self.dummy.update(0.0)
-        self.assertAlmostEqual(self.dummy.update(0.5).distance, 0.5, places=6)   # not a way round a circle
+        self.dummy.advance(0.0)
+        self.assertAlmostEqual(self.dummy.advance(0.5).distance, 0.5, places=6)   # not a way round a circle
 
     def test_a_tie_goes_up_through_the_front_on_both_sides(self) -> None:
-        self.dummy.update(0.0)
+        self.dummy.advance(0.0)
         self.settings.left_shoulder = self.settings.right_shoulder = 180.0
-        self.dummy.update(0.0)
-        m = self.dummy.update(0.5)
+        self.dummy.advance(0.0)
+        m = self.dummy.advance(0.5)
         self.assertAlmostEqual(m.left_shoulder, 90.0, places=6)
         self.assertAlmostEqual(m.right_shoulder, 90.0, places=6)
 
     def test_a_change_mid_morph_starts_from_where_it_is(self) -> None:
-        self.dummy.update(0.0)
+        self.dummy.advance(0.0)
         self.settings.left_shoulder = 90.0
-        self.dummy.update(0.0)
-        self.dummy.update(0.5)                                           # at 45
+        self.dummy.advance(0.0)
+        self.dummy.advance(0.5)                                           # at 45
         self.settings.left_shoulder = 0.0
-        self.assertAlmostEqual(self.dummy.update(0.0).left_shoulder, 45.0, places=6)
-        self.assertAlmostEqual(self.dummy.update(1.0).left_shoulder, 0.0, places=6)
+        self.assertAlmostEqual(self.dummy.advance(0.0).left_shoulder, 45.0, places=6)
+        self.assertAlmostEqual(self.dummy.advance(1.0).left_shoulder, 0.0, places=6)
 
-    # -- the step --
+    # -- the tick source --
 
-    def test_disabled_passes_the_frames_through(self) -> None:
-        frames = {0: Frame(0, 0, 0.0)}
-        self.dummy.process(frames)
-        self.assertIs(self.out[-1], frames)
+    def test_disabled_emits_nothing(self) -> None:
+        self.assertEqual(self.dummy.update(1.0), {})
+        self.assertEqual(self.dummy.track_ids, [ID])
+        self.assertFalse(self.dummy.solo)
 
-    def test_enabled_adds_the_dummy_at_its_id(self) -> None:
+    def test_enabled_emits_the_dummy_at_its_id_stamped_with_the_tick(self) -> None:
         self.settings.enabled = True
         self.settings.morph = 0.0
         self.settings.azimuth = 90.0
         self.settings.distance = 0.8
         self.settings.left_shoulder = 180.0
-        self.dummy.process({0: Frame(0, 0, 0.0)})
-        frames = self.out[-1]
-        self.assertEqual(set(frames), {0, ID})
+        frames = self.dummy.update(12.5)
+        self.assertEqual(set(frames), {ID})
         f = frames[ID]
         self.assertEqual(f.track_id, ID)
+        self.assertEqual(f.timestamp, 12.5)
         for ft in (Points2D, Azimuth, Distance, BBox, Angles):
             self.assertIn(ft, f)
         self.assertAlmostEqual(f[Azimuth].value, math.pi / 2, places=5)
         self.assertAlmostEqual(f[Distance].value, 0.8, places=5)
         self.assertGreater(abs(float(f[Angles].values[AngleLandmark.left_shoulder])), 0.8 * math.pi)   # raised, at the default calibration
 
-    def test_solo_leaves_the_live_players_out(self) -> None:
+    def test_the_morph_runs_on_the_ticks(self) -> None:
         self.settings.enabled = True
-        self.settings.solo = True
-        self.dummy.process({0: Frame(0, 0, 0.0)})
-        self.assertEqual(set(self.out[-1]), {ID})
+        self.dummy.update(10.0)
+        self.settings.left_shoulder = 90.0
+        self.dummy.update(10.0)                                                        # the change starts a morph
+        self.assertAlmostEqual(self.dummy.advance(0.0).left_shoulder, 0.0, places=6)
+        self.dummy.update(10.5)
+        self.assertAlmostEqual(self.dummy.advance(0.0).left_shoulder, 45.0, places=6)   # half way at half time
 
-    def test_solo_without_enabled_passes_the_frames_through(self) -> None:
+    def test_solo_is_enabled_and_solo(self) -> None:
         self.settings.solo = True
-        frames = {0: Frame(0, 0, 0.0)}
-        self.dummy.process(frames)
-        self.assertIs(self.out[-1], frames)
+        self.assertFalse(self.dummy.solo)                                  # solo without enabled: the live players stay
+        self.settings.enabled = True
+        self.assertTrue(self.dummy.solo)
 
     def test_the_lerp_filters_derive_the_rest(self) -> None:
         self.settings.enabled = True
@@ -375,10 +374,10 @@ class DummyTest(unittest.TestCase):
         self.settings.torso = 45.0
         self.settings.left_hip = self.settings.right_hip = -60.0
         self.settings.left_knee = self.settings.right_knee = -90.0
-        self.dummy.process({})
+        frames = self.dummy.update(0.0)
         filters = trackers.FilterPipeline([nodes.LegDeviationExtractor(nodes.LegDeviationExtractorSettings()),
                                   nodes.TorsoTiltExtractor(nodes.TorsoTiltExtractorSettings())])
-        f = filters.process(self.out[-1][ID])
+        f = filters.process(frames[ID])
         self.assertAlmostEqual(f[LegDeviation].value, 1.0, delta=1e-3)
         self.assertAlmostEqual(f[TorsoTilt].value, 1.0, delta=1e-3)
 

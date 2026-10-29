@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from threading import Lock
-from typing import Callable
+from typing import Any, Callable
 
 import logging
 
@@ -13,28 +13,30 @@ logger = logging.getLogger(__name__)
 
 class RenderBase(ABC):
     def __init__(self, window_settings: WindowSettings) -> None:
-        self._update_callbacks: list[Callable] = []     # run in registration order
+        self._update_callbacks: list[Callable[[float], Any]] = []     # run in registration order
         self._update_lock = Lock()
         self.window_manager: WindowManager = WindowManager(self, window_settings)
 
-    def add_update_callback(self, callback: Callable) -> None:
-        """Register a per-frame update callback."""
+    def add_update_callback(self, callback: Callable[[float], Any]) -> None:
+        """Register a per-frame update callback; it gets the frame's time (perf_counter, the stamp of the
+        frame's update), the clock of everything that advances on the render tick."""
         with self._update_lock:
             if callback not in self._update_callbacks:
                 self._update_callbacks.append(callback)
 
-    def remove_update_callback(self, callback: Callable) -> None:
+    def remove_update_callback(self, callback: Callable[[float], Any]) -> None:
         """Unregister a per-frame update callback."""
         with self._update_lock:
             if callback in self._update_callbacks:
                 self._update_callbacks.remove(callback)
 
     def _notify_update(self) -> None:
-        """Dispatch all registered update callbacks. Call from update()."""
+        """Dispatch all registered update callbacks with the frame's time. Call from update()."""
+        now = self.window_manager.frame_time
         with self._update_lock:
             for callback in self._update_callbacks:
                 try:
-                    callback()
+                    callback(now)
                 except Exception:
                     logger.exception("Error in update callback")
 

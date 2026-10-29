@@ -31,7 +31,7 @@ class RegimeSwitchTest(unittest.TestCase):
         self.time += DT
         return self.frames[-1]
 
-    def _enter_wind_down(self) -> None:
+    def _enter_wind_down(self, _tick: Tick) -> None:
         """What a show state's entry does: the new motor command and the new mix, together."""
         self.conductor.set_motor_mode(MotorMode.BEAM)
         self.conductor.set_mix([(LayerId.beam_wind_down, 1.0)])

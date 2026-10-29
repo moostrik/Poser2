@@ -2,17 +2,18 @@
 
 from functools import partial
 
-from modules.utils import Broadcast
 from modules.camera import CameraSource, CameraCheck, Player, Recorder, Sync, replay
 from modules.camera.oak import Camera, Simulator
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
-from modules.pose import nodes, trackers, window, FrameDict, configure_features
-from modules.inference import pose, segmentation, optical_flow, detection, CropExtractor, Uploader
+from modules.pose import configure_features
+from modules.pose.pipeline import Domain, PosePipeline
+from modules.inference import segmentation, optical_flow, detection, PoseInference
 
 from .render_board import RenderBoard
+from .pose.pipeline import pipeline_spec
 from .settings import Settings, Stage
 from .render import DeepFlowRender
 
@@ -71,13 +72,12 @@ class DeepFlowMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.image_uploader = Uploader()
-        self.crop_extractor = CropExtractor(p.image_crop)
+        self.pose_inference = PoseInference(p.image_crop, p.pose)        # the crop and the pose model, the frame domain's async step
 
         for camera in self.cameras:
             if self.recorder:
                 camera.add_frame_callback(self.recorder.submit_frame)
-            camera.add_frame_callback(self.image_uploader.set_image)
+            camera.add_frame_callback(self.pose_inference.set_camera_frame)
             camera.add_frame_callback(self.frame_sync_bang.submit_frame)
             camera.add_tracklet_callback(self.tracker.submit_cam_tracklets)
             camera.add_tracklet_callback(self.board.set_camera_tracklets)
@@ -85,118 +85,27 @@ class DeepFlowMain:
 
         # DETECTION
         self.poses_from_tracklets = PosesFromTracklets(p.tracklets, max_players)
-        self.pose_predictor = pose.Predictor(p.pose)
         self.segmentation_predictor  = segmentation.Predictor(p.segmentation)
         self.optical_flow_predictor  = optical_flow.Predictor(p.optical_flow)
-
-        self.bbox_filters = trackers.FilterTracker({
-            i: trackers.FilterPipeline([
-                nodes.BBoxEuroSmoother(p.bbox.smoother),
-                nodes.BBoxPredictor(p.bbox.prediction),
-            ])
-            for i in range(max_players)
-        }, name="Pose bbox")
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         self.tracklet_sync_bang.add_sync_callback(self.tracker.update)
         self.frame_sync_bang.add_sync_callback(self.poses_from_tracklets.process)
 
-        self.crop_extractor.add_image_callback(self.pose_predictor.submit)
-        self.crop_extractor.add_image_callback(self.segmentation_predictor.submit)
-        self.crop_extractor.add_image_callback(self.optical_flow_predictor.submit)
-
-        self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
-        self.bbox_filters.add_frames_callback(self._process_poses)
+        # The segmentation and the optical flow read the same crops the pose model gets.
+        self.pose_inference.add_camera_images_callback(self.board.set_camera_images)
+        self.pose_inference.add_crop_callback(self.segmentation_predictor.submit)
+        self.pose_inference.add_crop_callback(self.optical_flow_predictor.submit)
         self.segmentation_predictor.add_segmentation_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
-        # STAGE WINDOW TRACKERS & BROADCASTS
-        self.window_trackers: dict[Stage, window.WindowTracker] = {}
-        self.stages: dict[Stage, Broadcast] = {}
+        # POSE PIPELINE — the stages are declared in pose/pipeline.py. The camera's frame bang drives the frame
+        # domain through the tracklet poses; the render tick drives the output domain (LERP). Every stage's frames
+        # go to the board and the sound; the board also reads each stage's window.
+        self.pipeline = PosePipeline(pipeline_spec(p, self.poses_from_tracklets, self.pose_inference))
         for stage in Stage:
-            wt = window.WindowTracker(max_players, getattr(p, f'window_{stage.name.lower()}'))
-            self.board.set_window_source(stage, wt)
-            self.window_trackers[stage] = wt
-            self.stages[stage] = Broadcast([
-                partial(self.board.set_frames, stage),
-                partial(self.osc_sound.submit_frames, stage),
-                wt.process,
-            ])
-
-        # STAGE RAW
-        self.pose_predictor.add_frames_callback(self.stages[Stage.RAW])
-
-        # STAGE CLEAN
-        self.filters_clean = trackers.FilterTracker({
-            i: trackers.FilterPipeline([
-                nodes.PointDualConfidenceFilter(p.point.confidence_filter),
-                nodes.AngleExtractor(p.angle_extractor),
-                nodes.AngleCalibrator(),
-                nodes.AngleVelocityExtractor(p.velocity.extractor),
-            ])
-            for i in range(max_players)
-        }, name="Pose clean")
-        self.stages[Stage.RAW].add_callback(self.filters_clean.process)
-        self.filters_clean.add_frames_callback(self.stages[Stage.CLEAN])
-
-        # STAGE SMOOTH
-        self.filters_smooth = trackers.FilterTracker({
-            i: trackers.FilterPipeline([
-                nodes.PointEuroSmoother(p.point.smoother),
-                nodes.AngleExtractor(p.angle_extractor),
-                nodes.AngleCalibrator(),
-                nodes.AngleVelocityExtractor(p.velocity.extractor),
-                nodes.AngleVelocityEuroSmoother(p.velocity.smoother),
-                nodes.AngleEuroSmoother(p.angle.smoother),
-                nodes.AngleMotionExtractor(p.motion.extractor),
-                nodes.AngleMotionMovingAverageSmoother(p.motion.moving_average),
-                nodes.AngleSymmetryExtractor(),
-                nodes.MotionTimeExtractor(),
-                nodes.AgeExtractor(),
-            ])
-            for i in range(max_players)
-        }, name="Pose smooth")
-        self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
-        self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
-
-        # STAGE PREDICT
-        self.filters_predict = trackers.FilterTracker({
-            i: trackers.FilterPipeline([
-                nodes.PointPredictor(p.point.prediction),
-                nodes.AnglePredictor(p.angle.prediction),
-                nodes.AngleVelocityPredictor(p.velocity.prediction),
-                nodes.AngleStickyFiller(p.angle.sticky),
-            ])
-            for i in range(max_players)
-        }, name="Pose predict")
-        self.stages[Stage.SMOOTH].add_callback(self.filters_predict.process)
-        self.filters_predict.add_frames_callback(self.stages[Stage.PREDICT])
-
-        # STAGE LERP
-        self.interpolators_lerp = trackers.InterpolatorTracker({
-            i: trackers.InterpolatorPipeline([
-                nodes.BBoxChaseInterpolator(p.bbox.interpolator),
-                nodes.PointChaseInterpolator(p.point.interpolator),
-                nodes.AngleChaseInterpolator(p.angle.interpolator),
-                nodes.AngleVelocityChaseInterpolator(p.velocity.interpolator),
-            ])
-            for i in range(max_players)
-        }, name="Pose interpolate")
-        self.filters_lerp = trackers.FilterTracker({
-            i: trackers.FilterPipeline([
-                nodes.AngleSymmetryExtractor(),
-                nodes.MotionTimeExtractor(),
-                nodes.AgeExtractor(),
-                nodes.AngleVelocityStickyFiller(p.velocity.sticky),
-                nodes.AngleVelocityEuroSmoother(p.velocity.smoother),
-                nodes.AngleMotionExtractor(p.motion.extractor),
-                nodes.AngleMotionMovingAverageSmoother(p.motion.moving_average),
-            ])
-            for i in range(max_players)
-        }, name="Pose lerp")
-        self.motion_gate = nodes.MotionGateExtractor()                               # the group step after the filters
-        self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.set)
-        self.interpolators_lerp.add_frames_callback(self.filters_lerp.process)
-        self.filters_lerp.add_frames_callback(self._process_motion_gate)
+            self.pipeline.add_frames_callback(stage, partial(self.board.set_frames, stage))
+            self.pipeline.add_frames_callback(stage, partial(self.osc_sound.submit_frames, stage))
+            self.board.set_window_source(stage, self.pipeline.window(stage))
 
         # CAMERA CHECK — the camera's IMU reading and frame rate against the preset, as pinned indicators
         self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
@@ -207,8 +116,7 @@ class DeepFlowMain:
         self.render.add_exit_callback(self.stop)
         self.render.add_update_callback(self.camera_check.update)
 
-        # IN/OUT
-        self.render.add_update_callback(self.interpolators_lerp.update)
+        self.render.add_update_callback(self._update_poses)
 
     def start(self) -> None:
         self.panel_server.start()
@@ -219,7 +127,7 @@ class DeepFlowMain:
             camera.start()
 
         self.tracker.start()
-        self.pose_predictor.start()
+        self.pose_inference.start()
         self.segmentation_predictor.start()
         self.optical_flow_predictor.start()
 
@@ -233,14 +141,9 @@ class DeepFlowMain:
         self.is_running = True
         self.render.start()
 
-    def _process_poses(self, poses: FrameDict) -> None:
-        images, prev_images = self.image_uploader.snapshot()
-        self.board.set_camera_images(images)
-        self.crop_extractor.process(poses, images, prev_images)
-
-    def _process_motion_gate(self, frames: FrameDict) -> None:
-        """The LERP group step, then the LERP stage output (the render thread)."""
-        self.stages[Stage.LERP](self.motion_gate.process(frames))
+    def _update_poses(self, now: float) -> None:
+        """The render tick drives the pipeline's output domain (LERP) at the frame's time."""
+        self.pipeline.update(Domain.OUTPUT, now)
 
     def stop(self) -> None:
         if not self.is_running:
@@ -261,7 +164,7 @@ class DeepFlowMain:
         self.tracker.stop()
         self.osc_sound.stop()
 
-        self.pose_predictor.stop()
+        self.pose_inference.stop()
         if self.person_detector is not None:
             self.person_detector.stop()
         self.segmentation_predictor.stop()

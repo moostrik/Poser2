@@ -83,7 +83,7 @@ def _cameras(readings: list[tuple[float, float]], configured_tilt: float = 12.0)
 def _mount(readings: list[tuple[float, float]], tolerance: float = 2.0) -> bool:
     settings = CameraCheckSettings()
     settings.mount_tolerance = tolerance
-    CameraCheck(_cameras(readings), settings).update()
+    CameraCheck(_cameras(readings), settings).update(0.0)
     return settings.mount
 
 
@@ -95,7 +95,7 @@ def _camera_fps(rates: list[float], configured_fps: float = 30.0) -> bool:
         camera.readings.video_fps = rate
         cameras.append(camera)
     settings = CameraCheckSettings()
-    CameraCheck(cameras, settings).update()
+    CameraCheck(cameras, settings).update(0.0)
     return settings.camera_fps
 
 

@@ -104,6 +104,7 @@ class WindowManager():
         self._ordered_monitor_ids: list[int] = []
 
         self._render_thread: Thread | None = None
+        self.frame_time: float = 0.0        # the current frame's stamp (perf_counter), set before its update
         self._callback_lock = Lock()
         # Callbacks run in registration order
         self._exit_callbacks: list[Callable[[], None]] = []
@@ -345,13 +346,14 @@ class WindowManager():
             self.renderer.deallocate()
 
     def _update(self) -> None:
-        """Update renderer state. Called once per frame."""
+        """Update renderer state. Called once per frame; ``frame_time`` is the frame's stamp."""
         self._fps.tick()
         self._push_fps(self._fps.get_fps())
         start = perf_counter()
         if self._last_update:
             self._interval_timer.add_time((start - self._last_update) * 1000.0, report=False)
         self._last_update = start
+        self.frame_time = start
         try:
             self.renderer.update()
         except Exception:
