@@ -7,7 +7,7 @@ from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture
 
-from .BaseField import FieldBase, VisualisationFieldSettings
+from .BaseField import FieldBase, VisualizationFieldSettings
 from .shaders import VelocityDirectionMap, VelocityArrowField
 
 from modules.utils import HotReloadMethods
@@ -24,11 +24,11 @@ class VelocityField(FieldBase):
     scale acts as a general multiplier for both modes.
     """
 
-    def __init__(self, settings: VisualisationFieldSettings | None = None) -> None:
+    def __init__(self, settings: VisualizationFieldSettings | None = None) -> None:
         super().__init__()
 
         # Configuration with change notification
-        self.settings: VisualisationFieldSettings = settings or VisualisationFieldSettings()
+        self.settings: VisualizationFieldSettings = settings or VisualizationFieldSettings()
         self.settings.bind_all(lambda v: self._on_settings_changed())
 
         self._velocity_texture: Texture | None = None

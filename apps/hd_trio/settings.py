@@ -323,13 +323,13 @@ class SessionGroup(BaseSettings):
 class _DataLayerSettings(layers.DataLayerSettings):
     stage: Field[Stage] = Field(Stage.SMOOTH)
 
-class _TrackerCompSettings(layers.TrackerCompSettings):
+class _TrackerCompositorSettings(layers.TrackerCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
 
-class _PoseCompSettings(layers.PoseCompSettings):
+class _PoseCompositorSettings(layers.PoseCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for camera crop")
 
-class _CentreGeomSettings(layers.CentreGeomSettings):
+class _CenterGeometrySettings(layers.CenterGeometrySettings):
     stage: Field[Stage] = Field(Stage.SMOOTH, description="Pose data pipeline stage")
 
 
@@ -342,19 +342,19 @@ class DataGroup(BaseSettings):
     b: Group[_DataLayerSettings] = Group(_DataLayerSettings)
 
 class PreviewGroup(BaseSettings):
-    tracker: Group[_TrackerCompSettings] = Group(_TrackerCompSettings)
-    poser  : Group[_PoseCompSettings]    = Group(_PoseCompSettings)
+    tracker: Group[_TrackerCompositorSettings] = Group(_TrackerCompositorSettings)
+    poser  : Group[_PoseCompositorSettings]    = Group(_PoseCompositorSettings)
 
 class CentreGroup(BaseSettings):
     # Received from RenderSettings and passed on to the colour mask.
     similarity_scale: Field[float] = Field(1.0, min=0.0, max=1.0, visible=False, description="Cross-camera response")
 
-    geometry: Group[_CentreGeomSettings]            = Group(_CentreGeomSettings)
-    mask    : Group[layers.CentreMaskSettings]      = Group(layers.CentreMaskSettings)
-    cam     : Group[layers.CentreCamSettings]       = Group(layers.CentreCamSettings)
-    frg     : Group[layers.CentreFrgSettings]       = Group(layers.CentreFrgSettings)
-    pose    : Group[layers.CentrePoseSettings]      = Group(layers.CentrePoseSettings)
-    color   : Group[layers.ColorMaskLayerSettings]  = Group(layers.ColorMaskLayerSettings, share=[similarity_scale])
+    geometry: Group[_CenterGeometrySettings]                = Group(_CenterGeometrySettings)
+    mask    : Group[layers.CenterMaskLayerSettings]         = Group(layers.CenterMaskLayerSettings)
+    cam     : Group[layers.CenterCamLayerSettings]          = Group(layers.CenterCamLayerSettings)
+    frg     : Group[layers.CenterForegroundLayerSettings]   = Group(layers.CenterForegroundLayerSettings)
+    pose    : Group[layers.CenterPoseLayerSettings]         = Group(layers.CenterPoseLayerSettings)
+    color   : Group[layers.MSColorMaskLayerSettings]        = Group(layers.MSColorMaskLayerSettings, share=[similarity_scale])
 
 class IntroSequenceSettings(BaseSettings):
     """Settings for prerecorded pose overlay during INTRO stages."""
@@ -374,7 +374,7 @@ class IntroSequenceSettings(BaseSettings):
     recorder:          Group[_IntroRecorderSettings]     = Group(_IntroRecorderSettings)
 
     color:             Field[Color]     = Field(Color(1.0, 1.0, 1.0), description="Skeleton color for intro overlay")
-    pose:              Group[layers.CentrePoseSettings]  = Group(layers.CentrePoseSettings)
+    pose:              Group[layers.CenterPoseLayerSettings]  = Group(layers.CenterPoseLayerSettings)
 
 
 class RenderSettings(BaseSettings):

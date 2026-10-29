@@ -18,7 +18,7 @@ from .bridge import     DensityBridge, DensityBridgeSettings, Magnitude, Velocit
                         TemperatureBridge, TemperatureBridgeSettings
 
 # Visualization
-from .visualization import VisualisationFieldSettings, Visualizer, VelocityField
+from .visualization import VisualizationFieldSettings, Visualizer, VelocityField
 
 # 2D fluid simulation
 from .fluid import FluidFlow, FluidFlowSettings, DepthSettings

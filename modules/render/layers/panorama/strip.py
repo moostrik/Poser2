@@ -63,23 +63,23 @@ def camera_elevation(elevation: float, bearing: float, camera_radius: float,
     return math.degrees(math.atan(math.tan(math.radians(elevation)) * depth_radius / distance))
 
 
-def centre_elevation(cam_elevation: float, cam_distance: float, centre_dist: float) -> float:
+def center_elevation(cam_elevation: float, cam_distance: float, center_dist: float) -> float:
     """The elevation (degrees) the rig centre sees for a point a camera sees at `cam_elevation`.
 
     The inverse of `camera_elevation`, for a point whose distance is actually known — a *person*,
     measured by the tracker, rather than the focus cylinder an image has to assume. One height, two
     horizontal distances, so the height cancels exactly as it does there:
 
-        tan(e_centre) = tan(e_camera) * cam_distance / centre_dist
+        tan(e_centre) = tan(e_camera) * cam_distance / center_dist
 
     Drawing a person through this and the image through `camera_elevation` is deliberate: the data
     lands where the tracker believes the person is, the pixels where the cylinder says, and a
     vertical gap between the two is the distance model being wrong.
     """
-    if centre_dist <= 1e-9:
+    if center_dist <= 1e-9:
         return cam_elevation
     return math.degrees(math.atan(
-        math.tan(math.radians(cam_elevation)) * cam_distance / centre_dist))
+        math.tan(math.radians(cam_elevation)) * cam_distance / center_dist))
 
 
 def strip_y(elevation: float, elevation_window: tuple[float, float]) -> float:

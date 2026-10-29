@@ -14,7 +14,7 @@ from modules.board import HasFrames
 from modules.pose import Frame, Similarity, MotionGate, AngleMotion
 
 from modules.settings import Field, BaseSettings, Group
-from modules.flow import Visualizer, VisualisationFieldSettings, FluidFlow, FluidFlowSettings
+from modules.flow import Visualizer, VisualizationFieldSettings, FluidFlow, FluidFlowSettings
 from ...shaders import DensityColorize
 
 from modules.utils import HotReloadMethods
@@ -57,7 +57,7 @@ class FluidLayerSettings(BaseSettings):
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
 
     fluid_flow: Group[FluidFlowSettings]            = Group(FluidFlowSettings)
-    visualisation: Group[VisualisationFieldSettings]= Group(VisualisationFieldSettings)
+    visualization: Group[VisualizationFieldSettings]= Group(VisualizationFieldSettings)
 
 
 class FluidLayer(LayerBase):
@@ -102,7 +102,7 @@ class FluidLayer(LayerBase):
         self._color_settings: ColorSettings = color_settings
 
         self._fluid_flow: FluidFlow = FluidFlow(self.settings.fluid_flow)
-        self._visualizer: Visualizer = Visualizer(self.settings.visualisation)
+        self._visualizer: Visualizer = Visualizer(self.settings.visualization)
 
         # Colorization resources (rendering concern, not simulation)
         self._colorized_fbo: Fbo = Fbo()

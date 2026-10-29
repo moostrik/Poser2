@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from modules.inference import segmentation
 
 
-class FrgSourceLayer(LayerBase):
+class ForegroundSourceLayer(LayerBase):
 
     def __init__(self, track_id: int, board: HasSegmentationImages) -> None:
         self._track_id: int = track_id

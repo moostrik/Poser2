@@ -82,7 +82,7 @@ class Render(RenderBase):
             )
             self.L[Layers.data_W][i]    = layers.FeatureWindowLayer(i, board, settings.data, settings.colors) # type: ignore
             self.L[Layers.data_F][i]    = layers.FeatureFrameLayer( i, board, settings.data, settings.colors)   # type: ignore
-            self.L[Layers.data_time][i] = layers.MTimeRenderer(     i, board, settings.data_time)
+            self.L[Layers.data_time][i] = layers.MotionTimeRenderer(i, board, settings.data_time)
             self.L[Layers.data_playhead_W][i] = layers.FeatureWindowLayer(i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
             self.L[Layers.data_playhead_F][i] = layers.FeatureFrameLayer( i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
 
@@ -90,7 +90,7 @@ class Render(RenderBase):
         # (the pose compositor overlays CLEAN, SMOOTH and PREDICT over a crop it has neither of),
         # under the same data overlays as a player's. White: it is not a player.
         d = self.dummy_id
-        self.L[Layers.dummy_pose][d] = layers.PoseLineLayer(d, board, layers.PoseLineSettings(
+        self.L[Layers.dummy_pose][d] = layers.PoseLineLayer(d, board, layers.PoseLineLayerSettings(
             stage=int(Stage.LERP),
             line_width=settings.preview.poser.line_width,
             line_smooth=settings.preview.poser.line_smooth,
@@ -98,7 +98,7 @@ class Render(RenderBase):
         ))
         self.L[Layers.data_W][d]    = layers.FeatureWindowLayer(d, board, settings.data, settings.colors) # type: ignore
         self.L[Layers.data_F][d]    = layers.FeatureFrameLayer( d, board, settings.data, settings.colors)   # type: ignore
-        self.L[Layers.data_time][d] = layers.MTimeRenderer(     d, board, settings.data_time)
+        self.L[Layers.data_time][d] = layers.MotionTimeRenderer(d, board, settings.data_time)
         self.L[Layers.data_playhead_W][d] = layers.FeatureWindowLayer(d, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
         self.L[Layers.data_playhead_F][d] = layers.FeatureFrameLayer( d, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
 
@@ -170,7 +170,7 @@ class Render(RenderBase):
         camera derives it, so a change of sensor mode or tilt reshapes the row with it.
         """
         T = self.tracker_settings
-        rows = delivered_height(False, T.resolution, T.fov, T.tilt, T.lens_fov, (T.lens_centre_x, T.lens_centre_y))
+        rows = delivered_height(False, T.resolution, T.fov, T.tilt, T.lens_fov, (T.lens_center_x, T.lens_center_y))
         frame_w, frame_h = mono_frame_size(T.resolution, height=rows)
         return SubdivisionRow(name='track', columns=self.num_cams, rows=1,
                               src_aspect_ratio=frame_w / frame_h, padding=Point2f(1.0, 1.0))

@@ -210,13 +210,13 @@ class PoseGroup(BaseSettings):
 class _DataLayerSettings(layers.DataLayerSettings):
     stage: Field[Stage] = Field(Stage.SMOOTH)
 
-class _TrackerCompSettings(layers.TrackerCompSettings):
+class _TrackerCompositorSettings(layers.TrackerCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for pose data")
 
-class _PoseCompSettings(layers.PoseCompSettings):
+class _PoseCompositorSettings(layers.PoseCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for camera crop")
 
-class _CentreGeomSettings(layers.CentreGeomSettings):
+class _CenterGeometrySettings(layers.CenterGeometrySettings):
     stage: Field[Stage] = Field(Stage.SMOOTH, description="Pose data pipeline stage")
 
 class FluidInputSettings(BaseSettings):
@@ -236,16 +236,16 @@ class DataGroup(BaseSettings):
     b = Group(_DataLayerSettings)
 
 class PreviewGroup(BaseSettings):
-    tracker = Group(_TrackerCompSettings)
-    poser   = Group(_PoseCompSettings)
+    tracker = Group(_TrackerCompositorSettings)
+    poser   = Group(_PoseCompositorSettings)
 
 class CentreGroup(BaseSettings):
-    geometry = Group(_CentreGeomSettings)
-    mask     = Group(layers.CentreMaskSettings)
-    cam      = Group(layers.CentreCamSettings)
-    frg      = Group(layers.CentreFrgSettings)
-    pose     = Group(layers.CentrePoseSettings)
-    color    = Group(layers.ColorMaskLayerSettings)
+    geometry = Group(_CenterGeometrySettings)
+    mask     = Group(layers.CenterMaskLayerSettings)
+    cam      = Group(layers.CenterCamLayerSettings)
+    frg      = Group(layers.CenterForegroundLayerSettings)
+    pose     = Group(layers.CenterPoseLayerSettings)
+    color    = Group(layers.MSColorMaskLayerSettings)
 
 class RenderSettings(BaseSettings):
     stage   = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")

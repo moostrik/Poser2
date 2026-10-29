@@ -19,11 +19,11 @@ from modules.utils import HotReloadMethods
 
 class MotionLayer(LayerBase):
 
-    def __init__(self, cam_id: int, board: HasFrames, centre_mask: Texture, color_settings: ColorSettings, stage: int = 3) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, center_mask: Texture, color_settings: ColorSettings, stage: int = 3) -> None:
         self._cam_id: int = cam_id
         self._board: HasFrames = board
         self._stage: int = stage
-        self._centre_mask: Texture = centre_mask
+        self._center_mask: Texture = center_mask
         self._color_settings: ColorSettings = color_settings
         self._fbo: Fbo = Fbo()
         self._data_cache: DataCache[Frame]= DataCache[Frame]()
@@ -59,7 +59,7 @@ class MotionLayer(LayerBase):
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
-        mask = self._centre_mask  # MotionMultiply currently doesn't use mask separately
+        mask = self._center_mask  # MotionMultiply currently doesn't use mask separately
         # print("Motion value:", pose[AngleMotion].value)
 
         # Motion value is already normalized [0,1] and eased by pipeline

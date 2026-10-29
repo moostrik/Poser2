@@ -13,15 +13,15 @@ from .PoseRenderer import PoseRenderer, PoseRendererSettings
 from ...color_settings import ColorSettings
 
 
-class TrackerCompSettings(BaseSettings):
+class TrackerCompositorSettings(BaseSettings):
     stage:          Field[int] = Field(0, description="Pipeline stage for pose data")
     pose_line_width:Field[float] = Field(2.0, min=0.5, max=10.0, description="Pose line width")
     bbox_line_width:Field[int]   = Field(2, min=1, max=10, description="Bounding box line width in pixels")
 
 
 class TrackerCompositor(LayerBase):
-    def __init__(self, cam_id: int, board: Any, cam_texture: Texture, settings: TrackerCompSettings, color_settings: ColorSettings) -> None:
-        self.settings: TrackerCompSettings = settings
+    def __init__(self, cam_id: int, board: Any, cam_texture: Texture, settings: TrackerCompositorSettings, color_settings: ColorSettings) -> None:
+        self.settings: TrackerCompositorSettings = settings
         self._color_settings: ColorSettings = color_settings
         self._cam_id: int = cam_id
         self._fbo: Fbo = Fbo()

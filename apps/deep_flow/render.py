@@ -72,19 +72,19 @@ class DeepFlowRender(RenderBase):
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.board)
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.board)
-            cam_frg =       self.L[Layers.cam_frg][i] =     ls.FrgSourceLayer(      i, self.board)
+            cam_frg =       self.L[Layers.cam_frg][i] =     ls.ForegroundSourceLayer(i, self.board)
             cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.board)
 
             cam_comp =      self.L[Layers.poser][i] =       ls.TrackerCompositor(   i, self.board,   cam_image.texture,          settings.preview.tracker,   settings.colors)
             track_comp =    self.L[Layers.tracker][i] =     ls.PoseCompositor(      i, self.board,   cam_image.texture,          settings.preview.poser,     settings.colors)
             self.L[Layers.cam_readings][i] =                 ls.CameraReadingsLayer( cameras[i], camera_check)
 
-            centre_gmtry =  self.L[Layers.centre_geom][i] = ls.CentreGeometry(      i, self.board,                               settings.centre.geometry)
-            centre_mask =   self.L[Layers.centre_mask][i] = ls.CentreMaskLayer(     i, centre_gmtry,    cam_mask.texture,           settings.centre.mask)
+            centre_gmtry =  self.L[Layers.centre_geom][i] = ls.CenterGeometry(      i, self.board,                               settings.centre.geometry)
+            centre_mask =   self.L[Layers.centre_mask][i] = ls.CenterMaskLayer(     i, centre_gmtry,    cam_mask.texture,           settings.centre.mask)
             cmt[i] = centre_mask.texture
-            centre_cam =    self.L[Layers.centre_cam][i] =  ls.CentreCamLayer(      i, centre_gmtry,    cam_image.texture,  cmt[i], settings.centre.cam)
-            centre_frg =    self.L[Layers.centre_frg][i] =  ls.CentreFrgLayer(      i, centre_gmtry,    cam_frg.texture,    cmt[i], settings.centre.frg,        settings.colors)
-            centre_pose =   self.L[Layers.centre_pose][i] = ls.CentrePoseLayer(     i, centre_gmtry,                                settings.centre.pose,       settings.colors)
+            centre_cam =    self.L[Layers.centre_cam][i] =  ls.CenterCamLayer(      i, centre_gmtry,    cam_image.texture,  cmt[i], settings.centre.cam)
+            centre_frg =    self.L[Layers.centre_frg][i] =  ls.CenterForegroundLayer(i, centre_gmtry,   cam_frg.texture,    cmt[i], settings.centre.frg,        settings.colors)
+            centre_pose =   self.L[Layers.centre_pose][i] = ls.CenterPoseLayer(     i, centre_gmtry,                                settings.centre.pose,       settings.colors)
 
             ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,   centre_frg.texture, cmt,    settings.centre.color,      settings.colors)
             flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,   cam_mask,  centre_mask.texture, centre_frg.texture,     settings.flow)
@@ -96,7 +96,7 @@ class DeepFlowRender(RenderBase):
             self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.board, settings.data.a, settings.colors)
             self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.board, settings.data.b, settings.colors)
             self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.board, settings.data.b, settings.colors)
-            self.L[Layers.data_time][i] = ls.MTimeRenderer(     i, self.board)
+            self.L[Layers.data_time][i] = ls.MotionTimeRenderer(i, self.board)
 
         # Split-view composition: left panel + right panel side by side
         self.subdivision_rows: list[SubdivisionRow] = [

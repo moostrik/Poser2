@@ -13,7 +13,7 @@ from ...shaders import PosePointLines as shader
 from modules.utils import Color
 
 
-class PoseLineSettings(BaseSettings):
+class PoseLineLayerSettings(BaseSettings):
     stage:      Field[int] = Field(0, access=Field.INIT, description="Pipeline stage for pose data")
     line_width: Field[float] = Field(4.0, min=0.5, max=20.0, description="Line width in pixels")
     line_smooth:Field[float] = Field(2.0, min=0.0, max=10.0, description="Line smoothing/antialiasing width")
@@ -24,8 +24,8 @@ class PoseLineSettings(BaseSettings):
 
 class PoseLineLayer(LayerBase):
 
-    def __init__(self, track_id: int, board: HasFrames, settings: PoseLineSettings | None = None) -> None:
-        self.settings: PoseLineSettings = settings or PoseLineSettings()
+    def __init__(self, track_id: int, board: HasFrames, settings: PoseLineLayerSettings | None = None) -> None:
+        self.settings: PoseLineLayerSettings = settings or PoseLineLayerSettings()
         self._track_id: int = track_id
         self._board: HasFrames = board
         self._fbo: Fbo = Fbo()

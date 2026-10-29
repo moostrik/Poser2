@@ -12,15 +12,15 @@ from ..LayerBase import LayerBase, DataCache
 from ...shaders import PosePointDots as shader
 
 
-class PoseDotSettings(BaseSettings):
+class PoseDotLayerSettings(BaseSettings):
     stage:      Field[int] = Field(0, access=Field.INIT, description="Pipeline stage for pose data")
     dot_size:   Field[float] = Field(4.0, min=1.0, max=20.0, description="Dot size in pixels")
     dot_smooth: Field[float] = Field(2.0, min=0.0, max=10.0, description="Dot smoothing/antialiasing width")
 
 
 class PoseDotLayer(LayerBase):
-    def __init__(self, track_id: int, board: HasFrames, color: tuple[float, float, float, float] | None = None, settings: PoseDotSettings | None = None) -> None:
-        self.settings: PoseDotSettings = settings or PoseDotSettings()
+    def __init__(self, track_id: int, board: HasFrames, color: tuple[float, float, float, float] | None = None, settings: PoseDotLayerSettings | None = None) -> None:
+        self.settings: PoseDotLayerSettings = settings or PoseDotLayerSettings()
         self._track_id: int = track_id
         self._board: HasFrames = board
         self._fbo: Fbo = Fbo()

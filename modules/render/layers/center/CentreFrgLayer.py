@@ -3,7 +3,7 @@
 # Local application imports
 from modules.settings import Field, BaseSettings
 from ..LayerBase import LayerBase
-from .CentreGeometry import CentreGeometry
+from .CentreGeometry import CenterGeometry
 from ...shaders import DrawRoi, Blend, MaskApply, CelShade, HueShift
 from modules.gl import Fbo, SwapFbo, Texture, Style, shaders
 from ...color_settings import ColorSettings
@@ -11,8 +11,8 @@ from ...color_settings import ColorSettings
 
 from modules.utils import HotReloadMethods
 
-class CentreFrgSettings(BaseSettings):
-    """Configuration for CentreFrgLayer foreground rendering."""
+class CenterForegroundLayerSettings(BaseSettings):
+    """Configuration for CenterForegroundLayer foreground rendering."""
     blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Foreground temporal blending")
     exposure:       Field[float] = Field(1.2, min=0.1, max=3.0, description="Exposure multiplier")
     gamma:          Field[float] = Field(1.0, min=0.5, max=2.0, description="Gamma correction")
@@ -29,21 +29,21 @@ class CentreFrgSettings(BaseSettings):
     use_mask:       Field[bool]  = Field(True, description="Apply mask to foreground")
 
 
-class CentreFrgLayer(LayerBase):
+class CenterForegroundLayer(LayerBase):
     """Renders foreground image cropped and rotated with temporal blending.
 
     Uses bbox_geometry for rendering. Optionally applies mask texture for compositing.
     """
 
-    def __init__(self, cam_id: int, geometry: CentreGeometry, frg_texture: Texture, mask_texture: Texture, settings: CentreFrgSettings, color_settings: ColorSettings) -> None:
+    def __init__(self, cam_id: int, geometry: CenterGeometry, foreground_texture: Texture, mask_texture: Texture, settings: CenterForegroundLayerSettings, color_settings: ColorSettings) -> None:
         self._cam_id: int = cam_id
-        self._geometry: CentreGeometry = geometry
-        self._frg_texture: Texture = frg_texture
+        self._geometry: CenterGeometry = geometry
+        self._foreground_texture: Texture = foreground_texture
         self._mask_texture: Texture = mask_texture
         self._color_settings: ColorSettings = color_settings
 
         # Configuration
-        self.settings: CentreFrgSettings = settings
+        self.settings: CenterForegroundLayerSettings = settings
 
         # FBOs
         self._roi_fbo: Fbo = Fbo()
@@ -106,7 +106,7 @@ class CentreFrgLayer(LayerBase):
         # Render foreground with bbox ROI
         self._roi_fbo.begin()
         self._roi_shader.use(
-            self._frg_texture,
+            self._foreground_texture,
             self._geometry.bbox_geometry.crop_roi,
             self._geometry.bbox_geometry.rotation,
             self._geometry.bbox_geometry.rotation_center,

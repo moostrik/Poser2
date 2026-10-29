@@ -3,31 +3,31 @@
 # Local application imports
 from modules.settings import Field, BaseSettings
 from ..LayerBase import LayerBase
-from .CentreGeometry import CentreGeometry
+from .CentreGeometry import CenterGeometry
 from ...shaders import DrawRoi, MaskApply
 from modules.gl import Fbo, Texture, Style
 
 
-class CentreDlowSettings(BaseSettings):
-    """Configuration for CentreDenseFlowLayer optical flow visualization."""
+class CenterDenseFlowLayerSettings(BaseSettings):
+    """Configuration for CenterDenseFlowLayer optical flow visualization."""
     mask_opacity:   Field[float] = Field(1.0, min=0.0, max=1.0, description="Flow mask opacity")
     use_mask:       Field[bool]  = Field(True, description="Enable flow masking")
 
 
-class CentreDenseFlowLayer(LayerBase):
+class CenterDenseFlowLayer(LayerBase):
     """Renders optical flow visualization cropped and rotated around pose anchor points.
 
-    Reads anchor geometry from CentreGeometry and applies DrawRoi shader to flow visualization.
+    Reads anchor geometry from CenterGeometry and applies DrawRoi shader to flow visualization.
     Optionally applies mask texture for compositing.
     """
 
-    def __init__(self, geometry: CentreGeometry, flow_texture: Texture, mask_texture: Texture, settings: CentreDlowSettings) -> None:
-        self._geometry: CentreGeometry = geometry
+    def __init__(self, geometry: CenterGeometry, flow_texture: Texture, mask_texture: Texture, settings: CenterDenseFlowLayerSettings) -> None:
+        self._geometry: CenterGeometry = geometry
         self._flow_texture: Texture = flow_texture
         self._mask_texture: Texture = mask_texture
 
         # Configuration
-        self.settings: CentreDlowSettings = settings or CentreDlowSettings()
+        self.settings: CenterDenseFlowLayerSettings = settings or CenterDenseFlowLayerSettings()
 
         # FBOs
         self._flow_fbo: Fbo = Fbo()

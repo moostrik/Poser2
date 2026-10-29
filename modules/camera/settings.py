@@ -85,9 +85,9 @@ class RigCameraSettings(CameraSettings):
     # installation's cameras; 0 / 0 / 0 is the old model, the lens taken to be `fov`.
     lens_fov:       Field[float] = Field(0.0, access=Field.INIT, step=0.1,
                                          description="Field (°) the lens spans across the full sensor width; 0 = same as fov")
-    lens_centre_x:  Field[float] = Field(0.0, access=Field.INIT, step=0.5,
-                                         description="Optical centre offset from the frame centre (px), full sensor mode")
-    lens_centre_y:  Field[float] = Field(0.0, access=Field.INIT, step=0.5,
-                                         description="Optical centre offset from the frame centre (px), positive = down")
+    lens_center_x:  Field[float] = Field(0.0, access=Field.INIT, step=0.5,
+                                         description="Optical center offset from the frame center (px), full sensor mode")
+    lens_center_y:  Field[float] = Field(0.0, access=Field.INIT, step=0.5,
+                                         description="Optical center offset from the frame center (px), positive = down")
 
     readings:     Group[RigCameraReadings]  = Group(RigCameraReadings)

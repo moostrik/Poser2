@@ -17,8 +17,8 @@
       "tilt": 0.0,
       "keystone": 0.0,
       "lens_fov": 0.0,
-      "lens_centre_x": 0.0,
-      "lens_centre_y": 0.0,
+      "lens_center_x": 0.0,
+      "lens_center_y": 0.0,
       "mono_auto_exposure": true,
       "ir_flood_light": 0.0,
       "readings": {
@@ -79,8 +79,8 @@
     },
     "tracker": {
       "tracklet_min_age": 3,
-      "add_centre_threshold": 0.25,
-      "update_centre_threshold": 0.35,
+      "add_center_threshold": 0.25,
+      "update_center_threshold": 0.35,
       "timeout": 2.0,
       "add_height_threshold": 0.25,
       "update_height_threshold": 0.2,
@@ -355,7 +355,7 @@
         "flow": "centre_frg",
         "density": "centre_frg"
       },
-      "visualisation": {
+      "visualization": {
         "toggle_scalar": false,
         "scale": 1.0,
         "spacing": 20.0,

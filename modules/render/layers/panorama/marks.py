@@ -33,9 +33,9 @@ from dataclasses import dataclass
 # Local application imports
 from modules.camera import TrackingStatus
 from modules.tracker import PanoramicAnnotation, Rejection, Tracklet, camera_azimuth, \
-    camera_local_to_azimuth, centre_distance, elevation_from_row, focus_distance, wrap180
+    camera_local_to_azimuth, center_distance, elevation_from_row, focus_distance, wrap180
 
-from .strip import centre_elevation, strip_y
+from .strip import center_elevation, strip_y
 
 Color = tuple[float, float, float, float]
 
@@ -113,21 +113,21 @@ def _mark(tracklet: Tracklet, primaries: set[int],
 
     annotation: PanoramicAnnotation = tracklet.annotation
     roi_bottom: float = tracklet.roi.y + tracklet.roi.height
-    # The rows go through the person's own distance (module docstring); `centre_dist` is the radius
+    # The rows go through the person's own distance (module docstring); `center_dist` is the radius
     # the label prints as `R` and the foot tick is drawn at.
     has_foot: bool = math.isfinite(annotation.distance)
     if has_foot:
         cam_distance: float = max(1e-6, annotation.distance)
-        centre_dist: float = centre_distance(annotation.local_angle - c.cam_fov / 2.0,
+        center_dist: float = center_distance(annotation.local_angle - c.cam_fov / 2.0,
                                              cam_distance, c.camera_radius)
-        top_y: float = _row_y(tracklet.roi.y, c, cam_distance, centre_dist)
-        bottom_y: float = _foot_y(c, centre_dist)
+        top_y: float = _row_y(tracklet.roi.y, c, cam_distance, center_dist)
+        bottom_y: float = _foot_y(c, center_dist)
     else:
         # Feet at or above the horizon: no floor distance. Rows go through the parallax cylinder,
         # where the x already is, and there is no foot tick.
         phi: float = wrap180(annotation.world_angle - camera_azimuth(tracklet.cam_id, c.target_fov))
         cylinder: float = focus_distance(phi, c.camera_radius, c.parallax_radius)
-        centre_dist = math.inf
+        center_dist = math.inf
         top_y = _row_y(tracklet.roi.y, c, cylinder, c.parallax_radius)
         bottom_y = _row_y(roi_bottom, c, cylinder, c.parallax_radius)
 
@@ -166,7 +166,7 @@ def _mark(tracklet: Tracklet, primaries: set[int],
         field_outline=not is_primary or tracklet.status == TrackingStatus.LOST,
         is_primary=is_primary,
         rejected=rejected,
-        label=_label(tracklet, annotation, centre_dist, rejected, c),
+        label=_label(tracklet, annotation, center_dist, rejected, c),
     )
 
 
@@ -204,7 +204,7 @@ def rejection_label(reason: Rejection, zone_max_radius: float) -> str:
     return {Rejection.YOUNG: 'young', Rejection.SMALL: 'small', Rejection.DEAD_ZONE: 'dead zone'}[reason]
 
 
-def _label(tracklet: Tracklet, annotation: PanoramicAnnotation, centre_dist: float,
+def _label(tracklet: Tracklet, annotation: PanoramicAnnotation, center_dist: float,
            rejected: bool, c: MarkContext) -> str:
     """The label beside a mark: the rejection for a rejected detection, the readout otherwise,
     followed by the rejection for a tracked person a filter stopped counting.
@@ -215,7 +215,7 @@ def _label(tracklet: Tracklet, annotation: PanoramicAnnotation, centre_dist: flo
     reason: str = '' if annotation.rejected is None else rejection_label(annotation.rejected, c.zone_max_radius)
     if rejected:
         return reason
-    distance: str = f'R{centre_dist:.1f}m' if math.isfinite(centre_dist) else 'R-'
+    distance: str = f'R{center_dist:.1f}m' if math.isfinite(center_dist) else 'R-'
     height: str = f'H{annotation.height:.1f}m' if math.isfinite(annotation.height) else 'H-'
     player: str = '-' if annotation.player is None else str(annotation.player)
     readout: str = (f'#{player} c{tracklet.cam_id} '
@@ -241,8 +241,8 @@ def _field(annotation: PanoramicAnnotation, cam_id: int, c: MarkContext) -> tupl
     if annotation.overlap:
         # Symmetric about the mark, unclamped: its partner is in the neighbouring camera's field of view.
         half: float = c.link_angle / 2.0
-        centre: float = annotation.world_angle
-        return (centre - half, centre + half)
+        center: float = annotation.world_angle
+        return (center - half, center + half)
 
     # A local-angle rule, carried into azimuth through the tracker's own map (`parallax_radius`), so
     # positions and widths take the same map and the overlap still answers the rule exactly — and
@@ -257,19 +257,19 @@ def _field(annotation: PanoramicAnnotation, cam_id: int, c: MarkContext) -> tupl
     return (lo, hi)
 
 
-def _row_y(row: float, c: MarkContext, cam_distance: float, centre_dist: float) -> float:
+def _row_y(row: float, c: MarkContext, cam_distance: float, center_dist: float) -> float:
     """A normalised frame row to a normalised strip y, converted to the rig centre through the given
     distances. Not clamped — an extrapolated box may run past the frame — the renderer clips."""
     cam_elevation: float = elevation_from_row(row, *c.row_model)
-    return strip_y(centre_elevation(cam_elevation, cam_distance, centre_dist), c.elevation_window)
+    return strip_y(center_elevation(cam_elevation, cam_distance, center_dist), c.elevation_window)
 
 
-def _foot_y(c: MarkContext, centre_dist: float) -> float:
-    """The strip y of the floor at radius `centre_dist` — the foot tick.
+def _foot_y(c: MarkContext, center_dist: float) -> float:
+    """The strip y of the floor at radius `center_dist` — the foot tick.
 
     The same number as `_row_y` of the foot row through the person's own distance (the lens height
     cancels), written as `GridRenderer._zone_band`'s own formula so the tick and the zone edges
     cannot drift apart. Below the strip for a box extrapolated far below the frame; not drawn then.
     """
-    elevation: float = -math.degrees(math.atan(c.camera_height / max(1e-6, centre_dist)))
+    elevation: float = -math.degrees(math.atan(c.camera_height / max(1e-6, center_dist)))
     return strip_y(elevation, c.elevation_window)

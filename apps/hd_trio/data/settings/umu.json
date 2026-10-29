@@ -16,8 +16,8 @@
       "flip_v": true,
       "keystone": -0.22,
       "lens_fov": 0.0,
-      "lens_centre_x": 0.0,
-      "lens_centre_y": 0.0,
+      "lens_center_x": 0.0,
+      "lens_center_y": 0.0,
       "readings": {
         "roll_offset": 0.0
       },
@@ -48,8 +48,8 @@
       "flip_v": true,
       "keystone": -0.22,
       "lens_fov": 0.0,
-      "lens_centre_x": 0.0,
-      "lens_centre_y": 0.0,
+      "lens_center_x": 0.0,
+      "lens_center_y": 0.0,
       "readings": {
         "roll_offset": 0.0
       },
@@ -80,8 +80,8 @@
       "flip_v": true,
       "keystone": -0.22,
       "lens_fov": 0.0,
-      "lens_centre_x": 0.0,
-      "lens_centre_y": 0.0,
+      "lens_center_x": 0.0,
+      "lens_center_y": 0.0,
       "readings": {
         "roll_offset": 0.0
       },
@@ -131,8 +131,8 @@
     },
     "tracker": {
       "tracklet_min_age": 3,
-      "add_centre_threshold": 0.25,
-      "update_centre_threshold": 0.35,
+      "add_center_threshold": 0.25,
+      "update_center_threshold": 0.35,
       "timeout": 2.0,
       "add_height_threshold": 0.25,
       "update_height_threshold": 0.2,
@@ -532,7 +532,7 @@
       "blend_mode": "ADD",
       "width": 512,
       "height": 288,
-      "visualisation": {
+      "visualization": {
         "toggle_scalar": false,
         "scale": 1.0,
         "spacing": 20.0,
@@ -613,7 +613,7 @@
           "boundary": "OPEN"
         }
       },
-      "visualisation": {
+      "visualization": {
         "toggle_scalar": false,
         "scale": 1.0,
         "spacing": 20.0,

@@ -34,11 +34,11 @@ FOV = 127.0
 DPP = FOV / W
 TILT = 16.0
 LENS_FOV = 128.9
-LENS_CENTRE = (-10.5, 10.5)
+LENS_CENTER = (-10.5, 10.5)
 CAM_HEIGHT = 0.5                # lens above the floor, m
 
-FOCAL, LCX, LCY = source_lens((W, H), MODE_W, FOV, LENS_FOV, LENS_CENTRE)
-WINDOW = frame_window((W, H), (W, H), MODE_W, FOV, TILT, LENS_FOV, LENS_CENTRE)
+FOCAL, LCX, LCY = source_lens((W, H), MODE_W, FOV, LENS_FOV, LENS_CENTER)
+WINDOW = frame_window((W, H), (W, H), MODE_W, FOV, TILT, LENS_FOV, LENS_CENTER)
 
 BACKGROUND = 40                 # the sensor sees this everywhere; black (0) means "not imaged"
 SHIFT = 4                       # cv2 sub-pixel shift bits
@@ -164,12 +164,12 @@ class LensImageTest(unittest.TestCase):
         cls.scene = scene
 
         mesh = np.array(warp_mesh_points((W, H), (W, H), MODE_W, FOV, TILT, False, False,
-                                         WARP_MESH, WARP_MESH, LENS_FOV, LENS_CENTRE))
+                                         WARP_MESH, WARP_MESH, LENS_FOV, LENS_CENTER))
         map_x, map_y = densify(mesh, W, H)
         cls.warped = {layer: cv2.remap(raw, map_x, map_y, cv2.INTER_LINEAR,
                                        borderMode=cv2.BORDER_CONSTANT, borderValue=0)
                       for layer, raw in scene.raws.items()}
-        cls.coverage = frame_coverage((W, H), (W, H), MODE_W, FOV, TILT, False, False, LENS_FOV, LENS_CENTRE)
+        cls.coverage = frame_coverage((W, H), (W, H), MODE_W, FOV, TILT, False, False, LENS_FOV, LENS_CENTER)
 
         out_dir = os.environ.get('POSER_TEST_IMAGES')
         if out_dir:

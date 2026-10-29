@@ -23,8 +23,8 @@ Calibrate in this order. Cameras first: everything else is tuned against the fra
    it; all numbered counter-clockwise. Placement is the room-side calibration — there is no camera
    offset to turn instead. See *Layout*.
 1. **Cameras.**
-   - Set `fov`, `resolution`, `tilt` and the three lens numbers (`lens_fov`, `lens_centre_x`,
-     `lens_centre_y`) in the preset — `tilt` from the table under *Tilt — derived from the build*,
+   - Set `fov`, `resolution`, `tilt` and the three lens numbers (`lens_fov`, `lens_center_x`,
+     `lens_center_y`) in the preset — `tilt` from the table under *Tilt — derived from the build*,
      the lens from *The lens* — and relaunch. All of them are baked in when the devices open, and
      the frame height is derived from them.
    - Read the open log: per camera one `lens:` line (its field, centre offset and `lens_error`,
@@ -254,7 +254,7 @@ changed by editing the preset and relaunching:
   follow from it. Each camera owns `target_fov = 360 / num_cams`; the excess is overlap shared
   with its neighbours. It must not exceed the lens's field (`lens_fov`) or the edge columns read past
   the sensor and go black; the warp warns.
-- **`lens_fov`, `lens_centre_x`, `lens_centre_y`** — the lens itself; see *The lens*.
+- **`lens_fov`, `lens_center_x`, `lens_center_y`** — the lens itself; see *The lens*.
 - **`resolution`** — `P720` or `P800`. P720 is a pure vertical crop of the 800-row sensor, so the
   horizontal field and the whole column-to-azimuth mapping are identical; only the bottom of the
   window moves (4° higher, so the feet run out of frame sooner).
@@ -310,7 +310,7 @@ in the overlap in the fault table under *Reading the panorama* — and puts the 
 high, which is ≈ 1 m of distance error at 5 m (`TRACKING.md`, *The tracker's distance*).
 
 One lens for all four, the mean, in the preset: `lens_fov` **128.9** (568.6 px/rad across 1280 px),
-`lens_centre_x` **−10.5**, `lens_centre_y` **+10.5** (px from the frame centre, at the full sensor
+`lens_center_x` **−10.5**, `lens_center_y` **+10.5** (px from the frame centre, at the full sensor
 mode; the 720-row crop keeps the offset). A lens per unit would remove the residuals in the last
 column; a shared lens is the chosen trade, and the residual stays visible: at open each camera logs
 its own lens and `camera.cam_N.readings.lens_error`, the largest bearing error it has under the shared

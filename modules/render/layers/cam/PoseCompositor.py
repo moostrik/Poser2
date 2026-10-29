@@ -10,14 +10,14 @@ from modules.settings import Field, BaseSettings
 from modules.gl import Fbo, Texture, Blit
 from ..LayerBase import LayerBase
 
-from .CropLayer import CropLayer, CropSettings
+from .CropLayer import CropLayer, CropLayerSettings
 from ..source import CropSourceLayer
-from ..data import PoseLineLayer, PoseLineSettings
+from ..data import PoseLineLayer, PoseLineLayerSettings
 from ...color_settings import ColorSettings
 from modules.utils import Color
 
 
-class PoseCompSettings(BaseSettings):
+class PoseCompositorSettings(BaseSettings):
     stage:      Field[int] = Field(0, description="Pipeline stage for camera crop")
     line_width: Field[float] = Field(2.0, min=0.5, max=20.0, description="Base line width (multiplied per stage)")
     line_smooth:Field[float] = Field(0.0, min=0.0, max=10.0, description="Base line smoothing (multiplied per stage)")
@@ -25,19 +25,19 @@ class PoseCompSettings(BaseSettings):
 
 
 class PoseCompositor(LayerBase):
-    def __init__(self, track_id: int, board: Any, cam_texture: Texture, settings: PoseCompSettings, color_settings: ColorSettings) -> None:
+    def __init__(self, track_id: int, board: Any, cam_texture: Texture, settings: PoseCompositorSettings, color_settings: ColorSettings) -> None:
         self._track_id: int = track_id
-        self.settings: PoseCompSettings = settings or PoseCompSettings()
+        self.settings: PoseCompositorSettings = settings or PoseCompositorSettings()
         self._fbo: Fbo = Fbo()
 
         # Camera crop layers (one of these will be used based on settings)
-        crop_settings: CropSettings = CropSettings(stage=self.settings.stage)
+        crop_settings: CropLayerSettings = CropLayerSettings(stage=self.settings.stage)
         self._cam_crop_layer: CropLayer = CropLayer(track_id, board, cam_texture, crop_settings)
         self._gpu_crop_layer: CropSourceLayer = CropSourceLayer(track_id, board)
 
         # Pose line layers - RAW (black, thickest), SMOOTH (white, medium), LERP (color, thin)
         # RAW = 3x thickness, drawn first (back layer)
-        pose_raw_settings: PoseLineSettings = PoseLineSettings(
+        pose_raw_settings: PoseLineLayerSettings = PoseLineLayerSettings(
             stage=1,
             line_width=self.settings.line_width * 3.0,
             line_smooth=self.settings.line_smooth * 3.0,
@@ -48,7 +48,7 @@ class PoseCompositor(LayerBase):
         self._pose_raw_layer: PoseLineLayer = PoseLineLayer(track_id, board, pose_raw_settings)
 
         # SMOOTH = 2x thickness, drawn second (middle layer)
-        pose_smooth_settings: PoseLineSettings = PoseLineSettings(
+        pose_smooth_settings: PoseLineLayerSettings = PoseLineLayerSettings(
             stage=2,
             line_width=self.settings.line_width * 2.0,
             line_smooth=self.settings.line_smooth * 2.0,
@@ -59,7 +59,7 @@ class PoseCompositor(LayerBase):
         self._pose_smooth_layer: PoseLineLayer = PoseLineLayer(track_id, board, pose_smooth_settings)
 
         # LERP = 1x thickness, drawn last (top layer)
-        pose_lerp_settings: PoseLineSettings = PoseLineSettings(
+        pose_lerp_settings: PoseLineLayerSettings = PoseLineLayerSettings(
             stage=3,
             line_width=self.settings.line_width,
             line_smooth=self.settings.line_smooth,

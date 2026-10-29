@@ -21,7 +21,7 @@ HANDS_HEIGHT: float = 2.2
 
 @lru_cache(maxsize=8)
 def _coverage(src: tuple[int, int], rows: int, fov: float, tilt: float, lens_fov: float,
-              lens_centre: tuple[float, float]) -> np.ndarray:
+              lens_center: tuple[float, float]) -> np.ndarray:
     """`frame_coverage` for one frame configuration, computed once per process.
 
     It projects the whole output grid (≈0.1 s) and every input is an init field, so the running app
@@ -29,14 +29,14 @@ def _coverage(src: tuple[int, int], rows: int, fov: float, tilt: float, lens_fov
     Read-only, since every caller shares the one array.
     """
     coverage: np.ndarray = frame_coverage(src, (src[0], rows), src[0], fov, tilt,
-                                          lens_fov=lens_fov, lens_centre=lens_centre)
+                                          lens_fov=lens_fov, lens_center=lens_center)
     coverage.flags.writeable = False
     return coverage
 
 
-def reach_radius(height: float, centre_bearing: float, camera_height: float, camera_radius: float,
+def reach_radius(height: float, center_bearing: float, camera_height: float, camera_radius: float,
                  limit: Callable[[float], float], far: float = 50.0) -> float:
-    """The nearest radius (m) from the fixture, along the line `centre_bearing` off a camera's
+    """The nearest radius (m) from the fixture, along the line `center_bearing` off a camera's
     axis, at which a point `height` m above the floor is still inside that camera's picture.
 
     `height` 0 gives where the feet enter the frame, 2.2 m where raised hands do — the numbers the
@@ -52,11 +52,11 @@ def reach_radius(height: float, centre_bearing: float, camera_height: float, cam
     rise: float = height - camera_height
 
     def in_frame(radius: float) -> bool:
-        distance: float = focus_distance(centre_bearing, camera_radius, radius)
+        distance: float = focus_distance(center_bearing, camera_radius, radius)
         if distance <= 1e-9:
             return False
         angle: float = math.degrees(math.atan(rise / distance))
-        edge: float = limit(camera_bearing(centre_bearing, camera_radius, distance))
+        edge: float = limit(camera_bearing(center_bearing, camera_radius, distance))
         return angle <= edge if rise >= 0.0 else angle >= edge     # NaN edge: both False
 
     lo: float = max(0.0, camera_radius)
@@ -114,10 +114,10 @@ class RigSync:
         c: TrackerSettings = self.settings
         fov: float = c.fov
         self._rig.set_fov(fov)
-        lens_centre: tuple[float, float] = (c.lens_centre_x, c.lens_centre_y)
+        lens_center: tuple[float, float] = (c.lens_center_x, c.lens_center_y)
         src: tuple[int, int] = mode_size(False, c.resolution)
-        rows: int = delivered_height(False, c.resolution, fov, c.tilt, c.lens_fov, lens_centre)
-        window = frame_window(src, (src[0], rows), src[0], fov, c.tilt, c.lens_fov, lens_centre)
+        rows: int = delivered_height(False, c.resolution, fov, c.tilt, c.lens_fov, lens_center)
+        window = frame_window(src, (src[0], rows), src[0], fov, c.tilt, c.lens_fov, lens_center)
         self._rig.set_window(window, rows)
         p: RigSettings = c.rig
         p.hfov = fov
@@ -125,7 +125,7 @@ class RigSync:
         p.tilt = c.tilt
         p.angle_bottom = window.elevation_bottom
         p.angle_top = window.elevation_top
-        self._set_picture_edges(_coverage(src, rows, fov, c.tilt, c.lens_fov, lens_centre),
+        self._set_picture_edges(_coverage(src, rows, fov, c.tilt, c.lens_fov, lens_center),
                                 window, src[0], fov)
 
     def _set_picture_edges(self, coverage: np.ndarray, window: FrameWindow, width: int,
@@ -137,12 +137,12 @@ class RigSync:
         column with no picture. Columns are taken as `coverage_summary` takes them.
         """
         dpp: float = degrees_per_pixel(fov, width)
-        centre: float = (width - 1) / 2.0
+        center: float = (width - 1) / 2.0
 
         def edge(bearing: float, which: int) -> float:
             if dpp <= 0.0:
                 return math.nan
-            x: float = centre + bearing / dpp
+            x: float = center + bearing / dpp
             if x < -0.5 or x > width - 0.5:
                 return math.nan
             row: int = int(coverage[int(round(min(max(x, 0.0), width - 1.0))), which])

@@ -45,7 +45,7 @@ class WarpConfig:
     at the cost of the frame edges. `keystone` (fraction of the frame) squares up a person seen
     from a tilted camera while keeping the whole frame. They are exclusive per camera — see
     `build_warp_mesh`. `fov_h` is the azimuth span of the delivered frame, quoted for the
-    un-cropped sensor width. `lens_fov`, `lens_centre_x`, `lens_centre_y` are the lens itself
+    un-cropped sensor width. `lens_fov`, `lens_center_x`, `lens_center_y` are the lens itself
     (`geometry.source_lens`); at their defaults the lens is taken to be `fov_h`.
     """
     flip_h: bool
@@ -54,12 +54,12 @@ class WarpConfig:
     keystone: float
     fov_h: float
     lens_fov: float = 0.0
-    lens_centre_x: float = 0.0
-    lens_centre_y: float = 0.0
+    lens_center_x: float = 0.0
+    lens_center_y: float = 0.0
 
     @property
-    def lens_centre(self) -> tuple[float, float]:
-        return (self.lens_centre_x, self.lens_centre_y)
+    def lens_center(self) -> tuple[float, float]:
+        return (self.lens_center_x, self.lens_center_y)
 
 
 def model_path(models: str, square: bool, clips: bool) -> Path:
@@ -251,7 +251,7 @@ def find_warp(
     """
     return [dai.Point2f(float(x), float(y)) for x, y in warp_mesh_points(
         src_size, out_size, mode_width, mount.fov_h, mount.tilt,
-        mount.flip_h, mount.flip_v, mesh_w, mesh_h, mount.lens_fov, mount.lens_centre)]
+        mount.flip_h, mount.flip_v, mesh_w, mesh_h, mount.lens_fov, mount.lens_center)]
 
 
 def clip_warp_mesh(
@@ -286,8 +286,8 @@ def clip_warp_mesh(
                             keystone=0.0,           # a recording is already post-keystone
                             fov_h=mount.fov_h,
                             lens_fov=mount.lens_fov,
-                            lens_centre_x=-mount.lens_centre_x if mount.flip_h else mount.lens_centre_x,
-                            lens_centre_y=-mount.lens_centre_y if mount.flip_v else mount.lens_centre_y)
+                            lens_center_x=-mount.lens_center_x if mount.flip_h else mount.lens_center_x,
+                            lens_center_y=-mount.lens_center_y if mount.flip_v else mount.lens_center_y)
     mesh: list[dai.Point2f] = find_warp(src_size, out_size, mode_width, clip_mount)
     return mesh, WARP_MESH, WARP_MESH
 
@@ -399,7 +399,7 @@ def _report_lens_reach(src_size: tuple[int, int], mode_width: int, mount: WarpCo
     shared lens centre and is logged as information; more is a preset to fix, and warns."""
     if mount.lens_fov <= 0.0:
         return
-    focal, cx, _ = source_lens(src_size, mode_width, mount.fov_h, mount.lens_fov, mount.lens_centre)
+    focal, cx, _ = source_lens(src_size, mode_width, mount.fov_h, mount.lens_fov, mount.lens_center)
     if focal <= 0.0:
         return
     left: float = math.degrees(cx / focal)

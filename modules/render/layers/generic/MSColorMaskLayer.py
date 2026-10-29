@@ -21,7 +21,7 @@ from modules.utils import HotReloadMethods
 from ...color_settings import ColorSettings
 
 
-class ColorMaskLayerSettings(BaseSettings):
+class MSColorMaskLayerSettings(BaseSettings):
     """Configuration for MSColorMaskLayer."""
     stage:                  Field[int]   = Field(0, description="Pipeline stage for pose data")
     num_players:            Field[int]   = Field(3, access=Field.INIT)
@@ -44,12 +44,12 @@ class MSColorMaskLayer(LayerBase):
     Each camera's contribution is colored exactly once.
     """
 
-    def __init__(self, cam_id: int, board: HasFrames, frg_texture: Texture, mask_textures: dict[int, Texture], settings: ColorMaskLayerSettings, color_settings: ColorSettings) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, foreground_texture: Texture, mask_textures: dict[int, Texture], settings: MSColorMaskLayerSettings, color_settings: ColorSettings) -> None:
         self._cam_id: int = cam_id
         self._board: HasFrames = board
         self._mask_textures: dict[int, Texture] = mask_textures
-        self._frg_texture: Texture = frg_texture
-        self.settings: ColorMaskLayerSettings = settings
+        self._foreground_texture: Texture = foreground_texture
+        self.settings: MSColorMaskLayerSettings = settings
         self._color_settings: ColorSettings = color_settings
 
         self._tint_fbos: list[Fbo] = [Fbo() for _ in range(self.settings.num_players)]
@@ -131,8 +131,8 @@ class MSColorMaskLayer(LayerBase):
 
         # foreground_blend: float = (lowest_similarity - 0.25) * 2.0
         # foreground_blend = max(0.0, min(1.0, foreground_blend))
-        frg_threshold = 0.2
-        foreground_blend: float = (lowest_similarity - frg_threshold) / (1.0 - frg_threshold)
+        foreground_threshold = 0.2
+        foreground_blend: float = (lowest_similarity - foreground_threshold) / (1.0 - foreground_threshold)
         foreground_blend = max(0.0, min(1.0, foreground_blend))
         foreground_blend = easeInSine(foreground_blend)
 
@@ -162,7 +162,7 @@ class MSColorMaskLayer(LayerBase):
         self._blend_fbo.begin()
         self._add_dodge.use(
             self._tint_fbos[self._cam_id],
-            self._frg_texture,
+            self._foreground_texture,
             foreground_blend,
         )
         self._blend_fbo.end()

@@ -10,13 +10,13 @@ from ..LayerBase import LayerBase
 from modules.gl import Text
 
 
-class MTimeRendererSettings(BaseSettings):
+class MotionTimeRendererSettings(BaseSettings):
     stage: Field[int] = Field(0, description="Pipeline stage for pose data")
 
 
-class MTimeRenderer(LayerBase):
-    def __init__(self, track_id: int, board: HasFrames, settings: MTimeRendererSettings | None = None) -> None:
-        self.settings: MTimeRendererSettings = settings or MTimeRendererSettings()
+class MotionTimeRenderer(LayerBase):
+    def __init__(self, track_id: int, board: HasFrames, settings: MotionTimeRendererSettings | None = None) -> None:
+        self.settings: MotionTimeRendererSettings = settings or MotionTimeRendererSettings()
         self._board: HasFrames = board
         self._track_id: int = track_id
         self._motion_time: str | None = None

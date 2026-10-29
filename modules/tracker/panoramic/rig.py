@@ -5,7 +5,7 @@ from modules.utils import Rect
 
 from .annotation import Annotation
 from .projection import azimuth_to_camera_x, camera_azimuth, camera_local_to_azimuth, \
-    centre_distance, wrap180
+    center_distance, wrap180
 
 
 # Tallest reading `estimate_height` will report (m). Feet a pixel below the horizon divide by
@@ -149,7 +149,7 @@ class Rig:
 
     def _radius(self, local_angle: float, distance: float) -> float:
         """The radius from the fixture axis (m) of a person at this column and camera distance."""
-        return centre_distance(local_angle - self.cam_fov / 2.0, distance, self._camera_radius)
+        return center_distance(local_angle - self.cam_fov / 2.0, distance, self._camera_radius)
 
     def zone_distance(self, radius: float) -> float:
         """Where a radius from the fixture axis (m) falls in the zone: 0 at its near edge, 1 at its

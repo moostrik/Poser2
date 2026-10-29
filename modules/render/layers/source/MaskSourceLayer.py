@@ -18,7 +18,7 @@ class MaskSourceLayer(LayerBase):
     """Pure source layer for mask retrieval from DataHub.
 
     Retrieves mask tensor from GPUFrame and uploads to GPU texture.
-    No processing - dilation now handled by CentreMaskLayer.
+    No processing - dilation now handled by CenterMaskLayer.
     """
 
     def __init__(self, track_id: int, board: HasSegmentationImages) -> None:

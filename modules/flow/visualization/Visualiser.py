@@ -8,7 +8,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture
 
 from .. import FlowUtil
-from .BaseField import VisualisationFieldSettings
+from .BaseField import VisualizationFieldSettings
 from .VelocityField import VelocityField
 
 from modules.utils import HotReloadMethods
@@ -26,8 +26,8 @@ class Visualizer:
     RG textures are always visualized since raw output can contain negatives.
     """
 
-    def __init__(self, settings: VisualisationFieldSettings | None = None) -> None:
-        self.settings: VisualisationFieldSettings = settings or VisualisationFieldSettings()
+    def __init__(self, settings: VisualizationFieldSettings | None = None) -> None:
+        self.settings: VisualizationFieldSettings = settings or VisualizationFieldSettings()
         self.settings.bind_all(lambda v: self._on_settings_changed())
 
         # Velocity visualization for 2-channel data

@@ -21,7 +21,7 @@ from modules.flow import (
     Magnitude, VelocityMagnitude,
     TemperatureBridge, TemperatureBridgeSettings,
     DensityBridge, DensityBridgeSettings,
-    Visualizer, VisualisationFieldSettings
+    Visualizer, VisualizationFieldSettings
 )
 
 from modules.utils import HotReloadMethods
@@ -37,7 +37,7 @@ class FlowDrawMode(IntEnum):
         OPTICAL_OUTPUT - Raw optical flow velocity (RG32F)
         SMOOTH_VELOCITY_OUTPUT - Smoothed velocity (RG32F)
         DENSITY_BRIDGE_OUTPUT - Colored density (RGBA32F)
-        TEMP_BRIDGE_OUTPUT - Temperature field (R32F)
+        TEMPERATURE_BRIDGE_OUTPUT - Temperature field (R32F)
     """
     OPTICAL_INPUT = 0
     OPTICAL_OUTPUT = auto()
@@ -47,9 +47,9 @@ class FlowDrawMode(IntEnum):
     DENSITY_BRIDGE_INPUT_COLOR = auto()
     DENSITY_BRIDGE_INPUT_VELOCITY = auto()
     DENSITY_BRIDGE_OUTPUT = auto()
-    TEMP_BRIDGE_INPUT_COLOR = auto()
-    TEMP_BRIDGE_INPUT_MASK = auto()
-    TEMP_BRIDGE_OUTPUT = auto()
+    TEMPERATURE_BRIDGE_INPUT_COLOR = auto()
+    TEMPERATURE_BRIDGE_INPUT_MASK = auto()
+    TEMPERATURE_BRIDGE_OUTPUT = auto()
 
 
 class FlowLayerSettings(BaseSettings):
@@ -61,7 +61,7 @@ class FlowLayerSettings(BaseSettings):
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
 
-    visualisation      = Group(VisualisationFieldSettings)
+    visualization      = Group(VisualizationFieldSettings)
     optical_flow       = Group(OpticalFlowSettings)
     velocity_trail     = Group(SmoothTrailSettings)
     density_bridge     = Group(DensityBridgeSettings)
@@ -119,7 +119,7 @@ class FlowLayer(LayerBase):
         self._density_bridge: DensityBridge = DensityBridge(self.settings.density_bridge)
         self._temperature_bridge: TemperatureBridge = TemperatureBridge(self.settings.temperature_bridge)
 
-        self._visualizer: Visualizer = Visualizer(self.settings.visualisation)
+        self._visualizer: Visualizer = Visualizer(self.settings.visualization)
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -258,8 +258,8 @@ class FlowLayer(LayerBase):
             FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR: self._density_bridge.color_input,
             FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY: self._density_bridge.velocity_input,
             FlowDrawMode.DENSITY_BRIDGE_OUTPUT: self._density_bridge.density,
-            FlowDrawMode.TEMP_BRIDGE_INPUT_COLOR: self._temperature_bridge.color_input,
-            FlowDrawMode.TEMP_BRIDGE_INPUT_MASK: self._temperature_bridge.mask_input,
-            FlowDrawMode.TEMP_BRIDGE_OUTPUT: self._temperature_bridge.temperature,
+            FlowDrawMode.TEMPERATURE_BRIDGE_INPUT_COLOR: self._temperature_bridge.color_input,
+            FlowDrawMode.TEMPERATURE_BRIDGE_INPUT_MASK: self._temperature_bridge.mask_input,
+            FlowDrawMode.TEMPERATURE_BRIDGE_OUTPUT: self._temperature_bridge.temperature,
         }
         return textures.get(self.settings.draw_mode, self._density_input)

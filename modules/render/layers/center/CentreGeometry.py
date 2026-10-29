@@ -25,8 +25,8 @@ class SnapPoint(IntEnum):
     FEET      = 2
 
 
-class CentreGeomSettings(BaseSettings):
-    """Configuration for CentreGeometry anchor point positioning."""
+class CenterGeometrySettings(BaseSettings):
+    """Configuration for CenterGeometry anchor point positioning."""
     stage:              Field[int] = Field(0, description="Pose data pipeline stage")
     cam_aspect:         Field[float] = Field(1.7778, access=Field.INIT, description="Camera aspect ratio (16/9 = 1.7778)")
     target_x:           Field[float] = Field(0.5, min=0.0, max=1.0, description="Horizontal position of the pinned point in the output")
@@ -54,21 +54,21 @@ class BboxGeometry:
     aspect: float
 
 
-class CentreGeometry(LayerBase):
+class CenterGeometry(LayerBase):
     """Calculates anchor points (shoulder/hip midpoints) and derived geometry.
 
     This layer performs no rendering but computes shared geometry used by
-    CentreCamLayer, CentreMaskLayer, and CentrePoseLayer. Also transforms
+    CenterCamLayer, CenterMaskLayer, and CenterPoseLayer. Also transforms
     pose points to crop space.
     """
 
-    def __init__(self, cam_id: int, board: HasFrames, settings: CentreGeomSettings | None = None) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, settings: CenterGeometrySettings | None = None) -> None:
         self._cam_id: int = cam_id
         self._board: HasFrames = board
         self._data_cache: DataCache[Frame] = DataCache[Frame]()
 
         # Configuration
-        self.settings: CentreGeomSettings = settings or CentreGeomSettings()
+        self.settings: CenterGeometrySettings = settings or CenterGeometrySettings()
         self._cam_aspect: float = self.settings.cam_aspect
 
         # Geometry results
@@ -112,8 +112,8 @@ class CentreGeometry(LayerBase):
 
     @property
     def texture(self) -> Texture:
-        """CentreGeometry does not produce a texture output."""
-        raise NotImplementedError("CentreGeometry is a computation-only layer with no texture output")
+        """CenterGeometry does not produce a texture output."""
+        raise NotImplementedError("CenterGeometry is a computation-only layer with no texture output")
 
     def deallocate(self) -> None:
         """No resources to deallocate."""
@@ -136,10 +136,10 @@ class CentreGeometry(LayerBase):
         target = Point2f(self.settings.target_x, self.settings.target_y)
 
         # Get current body landmarks (bbox-relative coordinates)
-        shoulder_mid = CentreGeometry._get_midpoint(
+        shoulder_mid = CenterGeometry._get_midpoint(
             pose[Points2D], PointLandmark.left_shoulder, PointLandmark.right_shoulder
         )
-        hip_mid = CentreGeometry._get_midpoint(
+        hip_mid = CenterGeometry._get_midpoint(
             pose[Points2D], PointLandmark.left_hip, PointLandmark.right_hip
         )
 
@@ -149,7 +149,7 @@ class CentreGeometry(LayerBase):
 
         # Select the pinned point (bbox-relative). Scale & rotation always come from
         # the torso (shoulder-hip); only the pinned position changes here.
-        feet_mid = CentreGeometry._get_midpoint(
+        feet_mid = CenterGeometry._get_midpoint(
             pose[Points2D], PointLandmark.left_ankle, PointLandmark.right_ankle
         )
 
@@ -181,7 +181,7 @@ class CentreGeometry(LayerBase):
         pin_img = pin_mid * bbox.size + bbox.position
 
         # Convert pinned point to texture space (bottom-left origin)
-        pin_tex = CentreGeometry._image_to_texture_point(pin_img)
+        pin_tex = CenterGeometry._image_to_texture_point(pin_img)
 
         # Calculate camera-space geometry. Guard against a degenerate size
         # which would otherwise divide by zero when scaling.
@@ -189,7 +189,7 @@ class CentreGeometry(LayerBase):
         if abs(target_distance) < 1e-6:
             self._transformed_points = None
             return
-        cam_rotation_img, distance, cam_crop_roi_img = CentreGeometry._calculate_roi(
+        cam_rotation_img, distance, cam_crop_roi_img = CenterGeometry._calculate_roi(
             anchor_top_img, anchor_bot_img, pin_img, target, target_distance, self.settings.dst_aspectratio
         )
         if not self.settings.torso_upright:
@@ -199,11 +199,11 @@ class CentreGeometry(LayerBase):
         self._cam_geometry = CamGeometry(
             crop_roi=Rect(
                 cam_crop_roi_img.x,
-                CentreGeometry._image_to_texture_y(cam_crop_roi_img.y + cam_crop_roi_img.height),
+                CenterGeometry._image_to_texture_y(cam_crop_roi_img.y + cam_crop_roi_img.height),
                 cam_crop_roi_img.width,
                 cam_crop_roi_img.height
             ),
-            rotation=CentreGeometry._image_to_texture_rotation(cam_rotation_img),
+            rotation=CenterGeometry._image_to_texture_rotation(cam_rotation_img),
             rotation_center=pin_tex
         )
 
@@ -230,7 +230,7 @@ class CentreGeometry(LayerBase):
         )
 
         # Transform pose points using camera geometry (in image space)
-        self._transformed_points = CentreGeometry._transform_points(
+        self._transformed_points = CenterGeometry._transform_points(
             pose[Points2D], bbox, pin_img, self._cam_aspect, cam_rotation_img, cam_crop_roi_img
         )
 

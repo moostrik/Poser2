@@ -10,7 +10,7 @@ import unittest
 
 from modules.camera import frame_window
 from modules.tracker import azimuth_to_camera_x, camera_azimuth, camera_local_to_azimuth, \
-    centre_distance, elevation_from_row, focus_distance, row_from_elevation, row_model, wrap180
+    center_distance, elevation_from_row, focus_distance, row_from_elevation, row_model, wrap180
 from modules.tracker.panoramic.rig import Rig
 from modules.utils import Rect
 
@@ -146,32 +146,32 @@ class TestRoundTripAgainstRig(unittest.TestCase):
         self.assertAlmostEqual(self._seam_ghost(FOCUS_RADIUS), 0.0, places=9)
 
 
-class TestCentreDistance(unittest.TestCase):
+class TestCenterDistance(unittest.TestCase):
     """A person's distance from the rig centre, given their distance from a camera."""
 
     def test_straight_ahead_adds_the_camera_radius(self) -> None:
-        self.assertAlmostEqual(centre_distance(0.0, 3.0, CAMERA_RADIUS), 3.0 + CAMERA_RADIUS, places=12)
+        self.assertAlmostEqual(center_distance(0.0, 3.0, CAMERA_RADIUS), 3.0 + CAMERA_RADIUS, places=12)
 
     def test_symmetric_about_the_axis(self) -> None:
         for bearing in (5.0, 30.0, 63.5):
-            self.assertAlmostEqual(centre_distance(bearing, 2.0, CAMERA_RADIUS),
-                                   centre_distance(-bearing, 2.0, CAMERA_RADIUS), places=12)
+            self.assertAlmostEqual(center_distance(bearing, 2.0, CAMERA_RADIUS),
+                                   center_distance(-bearing, 2.0, CAMERA_RADIUS), places=12)
 
     def test_zero_camera_radius_changes_nothing(self) -> None:
         for bearing in (0.0, 45.0, 90.0):
-            self.assertAlmostEqual(centre_distance(bearing, 2.0, 0.0), 2.0, places=12)
+            self.assertAlmostEqual(center_distance(bearing, 2.0, 0.0), 2.0, places=12)
 
     def test_inverts_focus_distance_on_the_cylinder(self) -> None:
         """`focus_distance` goes centre-bearing -> camera-distance; this goes camera-bearing ->
         centre-distance. Feed one the other's answer and the focus radius must come back."""
         focus_radius: float = FOCUS_RADIUS
-        for centre_bearing in (0.0, 20.0, 55.0):
-            d: float = focus_distance(centre_bearing, CAMERA_RADIUS, focus_radius)
-            phi: float = math.radians(centre_bearing)
+        for center_bearing in (0.0, 20.0, 55.0):
+            d: float = focus_distance(center_bearing, CAMERA_RADIUS, focus_radius)
+            phi: float = math.radians(center_bearing)
             theta: float = phi + math.asin(
                 max(-1.0, min(1.0, CAMERA_RADIUS * math.sin(phi) / d)))
-            self.assertAlmostEqual(centre_distance(math.degrees(theta), d, CAMERA_RADIUS),
-                                   focus_radius, places=9, msg=f'bearing {centre_bearing}')
+            self.assertAlmostEqual(center_distance(math.degrees(theta), d, CAMERA_RADIUS),
+                                   focus_radius, places=9, msg=f'bearing {center_bearing}')
 
 
 class TestRowModel(unittest.TestCase):
@@ -309,13 +309,13 @@ class TestCameraAzimuth(unittest.TestCase):
             [camera_azimuth(i, TARGET_FOV) for i in range(NUM_CAMERAS)], [45.0, 135.0, 225.0, 315.0]
         )
 
-    def test_agrees_with_the_forward_model_at_frame_centre(self) -> None:
+    def test_agrees_with_the_forward_model_at_frame_center(self) -> None:
         # The frame centre is the camera's axis at any camera radius and any depth — the one bearing the
         # parallax triangle leaves alone.
         rig: Rig = _rig()
         for cam_id in range(NUM_CAMERAS):
-            _local, centre, _d = rig.calc_angle(Rect(0.5, 0.0, 0.0, 0.0), cam_id)
-            self.assertAlmostEqual(centre, camera_azimuth(cam_id, TARGET_FOV), places=9)
+            _local, center, _d = rig.calc_angle(Rect(0.5, 0.0, 0.0, 0.0), cam_id)
+            self.assertAlmostEqual(center, camera_azimuth(cam_id, TARGET_FOV), places=9)
 
     def test_three_and_six_cameras(self) -> None:
         self.assertAlmostEqual(camera_azimuth(0, 120.0), 60.0, places=12)

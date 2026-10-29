@@ -11,7 +11,7 @@ from modules.gl import Tensor, SwapFbo, Texture, Blit
 from ...shaders import DenseFlowFilter as shader
 
 
-class DFlowSourceLayer(LayerBase):
+class DenseFlowSourceLayer(LayerBase):
     """Renderer for optical flow visualization.
 
     Retrieves flow tensors from DataHub and converts them to OpenGL textures

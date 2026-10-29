@@ -80,7 +80,7 @@ class StageLayer:
 
     def set_geom_stage(self, stage: Stage) -> None:
         """Select which pipeline stage the centre geometry reads poses from."""
-        cast(ls.CentreGeometry, self.layers[Layers.centre_geom]).settings.stage = stage
+        cast(ls.CenterGeometry, self.layers[Layers.centre_geom]).settings.stage = stage
 
     def set_similarity_scale(self, value: float) -> None:
         """Set how strongly other cameras contribute to the fluid and the colour mask.

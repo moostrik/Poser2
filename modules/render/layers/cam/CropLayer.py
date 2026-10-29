@@ -12,13 +12,13 @@ from ..LayerBase import LayerBase, DataCache, Rect
 from ...shaders import DrawRoi
 
 
-class CropSettings(BaseSettings):
+class CropLayerSettings(BaseSettings):
     stage: Field[int] = Field(0, description="Pipeline stage for pose data")
 
 
 class CropLayer(LayerBase):
-    def __init__(self, track_id: int, board: HasFrames, cam_texture: Texture, settings: CropSettings | None = None) -> None:
-        self.settings: CropSettings = settings or CropSettings()
+    def __init__(self, track_id: int, board: HasFrames, cam_texture: Texture, settings: CropLayerSettings | None = None) -> None:
+        self.settings: CropLayerSettings = settings or CropLayerSettings()
         self._track_id: int = track_id
         self._board: HasFrames = board
         self._fbo: Fbo = Fbo()

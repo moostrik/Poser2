@@ -2,7 +2,7 @@
 
 Loads an HDF5 recording via :class:`Player` and provides pose frames
 through a lightweight :class:`SequenceDataProxy` that can be passed to
-:class:`CentreGeometry` in place of a full :class:`DataHub`.
+:class:`CenterGeometry` in place of a full :class:`DataHub`.
 """
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ class SequenceDataProxy:
     """Minimal duck-typed stand-in for the blackboard.
 
     Only implements :meth:`get_frame`, which is the sole method
-    :class:`CentreGeometry` calls on its ``board`` reference.
+    :class:`CenterGeometry` calls on its ``board`` reference.
     """
 
     def __init__(self) -> None:

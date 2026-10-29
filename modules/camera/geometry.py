@@ -144,22 +144,22 @@ def frame_size(color: bool, resolution: CameraResolution, square: bool = False,
 
 
 def delivered_height(color: bool, resolution: CameraResolution, fov_h: float, tilt: float,
-                     lens_fov: float = 0.0, lens_centre: tuple[float, float] = (0.0, 0.0)) -> int:
+                     lens_fov: float = 0.0, lens_center: tuple[float, float] = (0.0, 0.0)) -> int:
     """The delivered frame's rows: the sensor's full reach at this tilt (`full_frame_height`).
     Every consumer of the frame's shape (the camera, the tracker, the render) calls it with the
     same shared settings, so they agree without the number being stored anywhere."""
     src: tuple[int, int] = mode_size(color, resolution)
-    return full_frame_height(src, src[0], fov_h, tilt, lens_fov, lens_centre)
+    return full_frame_height(src, src[0], fov_h, tilt, lens_fov, lens_center)
 
 
 def full_frame_height(src_size: tuple[int, int], mode_width: int, fov_h: float, tilt: float,
                       lens_fov: float = 0.0,
-                      lens_centre: tuple[float, float] = (0.0, 0.0)) -> int:
+                      lens_center: tuple[float, float] = (0.0, 0.0)) -> int:
     """The frame height (aligned) at which the centre column carries every sensor row: the
     window pinned at the sensor's bottom reach needs this many tangent rows to reach its top.
     Logged at open so the number to put in the preset is never worked out by hand."""
     focal: float = output_focal(fov_h, mode_width)
-    lens_focal, _, cy = source_lens(src_size, mode_width, fov_h, lens_fov, lens_centre)
+    lens_focal, _, cy = source_lens(src_size, mode_width, fov_h, lens_fov, lens_center)
     if focal <= 0.0 or lens_focal <= 0.0:
         return src_size[1]
     bottom: float = math.radians(tilt) - (src_size[1] - 1 - cy) / lens_focal
@@ -211,8 +211,8 @@ def mode_size(color: bool, resolution: CameraResolution) -> tuple[int, int]:
 # Modelling the lens as `fov` read bearings ~1 deg short toward the seams and put the horizon
 # 10 px (1 deg) too high — a metre of distance error at 5 m. So the lens is its own three
 # settings, shared by all cameras of an installation: `lens_fov` (the field the lens spans
-# across the full sensor width; 0 means "same as fov", the old model), `lens_centre_x` and
-# `lens_centre_y` (optical centre offset from the frame centre, px, at the full sensor mode —
+# across the full sensor width; 0 means "same as fov", the old model), `lens_center_x` and
+# `lens_center_y` (optical centre offset from the frame centre, px, at the full sensor mode —
 # invariant under the 720-row centre crop). One shared lens rather than one per unit was a
 # deliberate trade: the mean leaves the outlier unit 1.4 deg off at its azimuth zero, and
 # `lens_deviation` reports each unit's residual at open so that stays visible.
@@ -243,7 +243,7 @@ def output_focal(fov_h: float, mode_width: int) -> float:
 
 def source_lens(src_size: tuple[int, int], mode_width: int, fov_h: float,
                 lens_fov: float = 0.0,
-                lens_centre: tuple[float, float] = (0.0, 0.0)) -> tuple[float, float, float]:
+                lens_center: tuple[float, float] = (0.0, 0.0)) -> tuple[float, float, float]:
     """The lens as the warp needs it: (focal px/rad, cx, cy) in source-pixel coordinates.
 
     Equidistant: a ray `phi` radians off the optical axis lands `focal * phi` px from
@@ -255,7 +255,7 @@ def source_lens(src_size: tuple[int, int], mode_width: int, fov_h: float,
     focal: float = mode_width / math.radians(field) if field > 0.0 and mode_width > 0 else 0.0
     # Pixel-index convention: a frame of width W spans 0..W-1, so its centre sits at (W-1)/2,
     # not W/2. The half pixel matters — it is what keeps the centre exactly on axis.
-    return focal, (src_w - 1) / 2.0 + lens_centre[0], (src_h - 1) / 2.0 + lens_centre[1]
+    return focal, (src_w - 1) / 2.0 + lens_center[0], (src_h - 1) / 2.0 + lens_center[1]
 
 
 # Mesh resolution for the warp. See `warp_mesh_points` for why 2 is not enough and why 32 is
@@ -303,12 +303,12 @@ class FrameWindow:
 
 def frame_window(src_size: tuple[int, int], out_size: tuple[int, int], mode_width: int,
                  fov_h: float, tilt: float, lens_fov: float = 0.0,
-                 lens_centre: tuple[float, float] = (0.0, 0.0)) -> FrameWindow:
+                 lens_center: tuple[float, float] = (0.0, 0.0)) -> FrameWindow:
     """The `FrameWindow` a configuration delivers. Pure; the same call the warp makes."""
     out_h: int = out_size[1]
     src_h: int = src_size[1]
     focal: float = output_focal(fov_h, mode_width)
-    lens_focal, _, cy = source_lens(src_size, mode_width, fov_h, lens_fov, lens_centre)
+    lens_focal, _, cy = source_lens(src_size, mode_width, fov_h, lens_fov, lens_center)
     if focal <= 0.0 or lens_focal <= 0.0:
         return FrameWindow(0.0, 0.0, (out_h - 1) / 2.0, 0.0)
     reach_below: float = math.degrees((src_h - 1 - cy) / lens_focal)
@@ -347,11 +347,11 @@ def lens_field(focal: float, width: int) -> float:
 
 def lens_deviation(focal: float, cx: float, cy: float, src_size: tuple[int, int],
                    mode_width: int, fov_h: float, lens_fov: float = 0.0,
-                   lens_centre: tuple[float, float] = (0.0, 0.0)) -> float:
+                   lens_center: tuple[float, float] = (0.0, 0.0)) -> float:
     """The largest bearing error (degrees) a unit with this calibration suffers under the
     shared lens: the larger of its optical-centre offset and the focal mismatch at the frame
     edge. A bound, for the open log and the panel, not a correction."""
-    shared_focal, shared_cx, shared_cy = source_lens(src_size, mode_width, fov_h, lens_fov, lens_centre)
+    shared_focal, shared_cx, shared_cy = source_lens(src_size, mode_width, fov_h, lens_fov, lens_center)
     if shared_focal <= 0.0 or focal <= 0.0:
         return float('nan')
     centre: float = math.hypot(cx - shared_cx, cy - shared_cy) / shared_focal
@@ -370,7 +370,7 @@ def _project_grid(
     xs: np.ndarray,
     ys: np.ndarray,
     lens_fov: float,
-    lens_centre: tuple[float, float],
+    lens_center: tuple[float, float],
 ) -> np.ndarray:
     """The source pixel each output pixel of the grid `ys x xs` reads: shape (len(ys), len(xs), 2).
 
@@ -380,8 +380,8 @@ def _project_grid(
     """
     src_w, src_h = src_size
     out_w, out_h = out_size
-    lens_focal, cx, cy = source_lens(src_size, mode_width, fov_h, lens_fov, lens_centre)
-    window: FrameWindow = frame_window(src_size, out_size, mode_width, fov_h, tilt, lens_fov, lens_centre)
+    lens_focal, cx, cy = source_lens(src_size, mode_width, fov_h, lens_fov, lens_center)
+    window: FrameWindow = frame_window(src_size, out_size, mode_width, fov_h, tilt, lens_fov, lens_center)
     X, Y = np.meshgrid(np.asarray(xs, dtype=np.float64), np.asarray(ys, dtype=np.float64))
     if window.focal <= 0.0 or lens_focal <= 0.0:
         # No field to speak of: hand the frame through, the square crop cut from the centre.
@@ -417,7 +417,7 @@ def warp_mesh_points(
     mesh_w: int = WARP_MESH,
     mesh_h: int = WARP_MESH,
     lens_fov: float = 0.0,
-    lens_centre: tuple[float, float] = (0.0, 0.0),
+    lens_center: tuple[float, float] = (0.0, 0.0),
 ) -> list[tuple[float, float]]:
     """Warp mesh that makes a column one azimuth, a row one tangent of elevation, and undoes
     the camera's up-tilt: the source pixel each output grid point reads, row-major.
@@ -470,7 +470,7 @@ def warp_mesh_points(
     grid: np.ndarray = _project_grid(
         src_size, out_size, mode_width, fov_h, tilt, flip_h, flip_v,
         np.linspace(0.0, out_w - 1.0, mesh_w), np.linspace(0.0, out_h - 1.0, mesh_h),
-        lens_fov, lens_centre)
+        lens_fov, lens_center)
     return [(float(x), float(y)) for x, y in grid.reshape(-1, 2)]
 
 
@@ -483,7 +483,7 @@ def frame_coverage(
     flip_h: bool = False,
     flip_v: bool = False,
     lens_fov: float = 0.0,
-    lens_centre: tuple[float, float] = (0.0, 0.0),
+    lens_center: tuple[float, float] = (0.0, 0.0),
 ) -> np.ndarray:
     """Per output column, the first and last row the sensor actually covers: shape (out_w, 2),
     int, `(-1, -1)` for a column with no picture at all.
@@ -499,7 +499,7 @@ def frame_coverage(
     out_w, out_h = out_size
     pts: np.ndarray = _project_grid(
         src_size, out_size, mode_width, fov_h, tilt, flip_h, flip_v,
-        np.arange(out_w), np.arange(out_h), lens_fov, lens_centre)
+        np.arange(out_w), np.arange(out_h), lens_fov, lens_center)
     # A pixel's footprint is half a pixel either side of its index; the edge rows and columns
     # count as covered up to that, which also keeps float noise on an exact edge from losing them.
     inside: np.ndarray = np.asarray((pts[..., 0] >= -0.5) & (pts[..., 0] <= src_w - 0.5)

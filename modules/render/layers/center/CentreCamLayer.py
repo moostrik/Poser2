@@ -3,34 +3,34 @@
 # Local application imports
 from modules.settings import Field, BaseSettings
 from ..LayerBase import LayerBase
-from .CentreGeometry import CentreGeometry
+from .CentreGeometry import CenterGeometry
 from ...shaders import Blend, DrawRoi, MaskApply
 
 # GL
 from modules.gl import Fbo, SwapFbo, Texture
 
 
-class CentreCamSettings(BaseSettings):
-    """Configuration for CentreCamLayer camera rendering."""
+class CenterCamLayerSettings(BaseSettings):
+    """Configuration for CenterCamLayer camera rendering."""
     blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Camera frame temporal blending")
     mask_opacity:   Field[float] = Field(1.0, min=0.0, max=1.0, description="Mask alpha strength")
     use_mask:       Field[bool]  = Field(True, description="Apply mask to camera output")
 
-class CentreCamLayer(LayerBase):
+class CenterCamLayer(LayerBase):
     """Renders camera image cropped and rotated around pose anchor points.
 
-    Reads anchor geometry from CentreGeometry and applies DrawRoi shader
+    Reads anchor geometry from CenterGeometry and applies DrawRoi shader
     followed by temporal blending. Optionally applies mask texture for compositing.
     """
 
-    def __init__(self, cam_id: int, geometry: CentreGeometry, cam_texture: Texture, mask_texture: Texture, settings: CentreCamSettings) -> None:
+    def __init__(self, cam_id: int, geometry: CenterGeometry, cam_texture: Texture, mask_texture: Texture, settings: CenterCamLayerSettings) -> None:
         self._cam_id: int = cam_id
-        self._geometry: CentreGeometry = geometry
+        self._geometry: CenterGeometry = geometry
         self._cam_texture: Texture = cam_texture
         self._mask_texture: Texture = mask_texture
 
         # Configuration
-        self.settings: CentreCamSettings = settings or CentreCamSettings()
+        self.settings: CenterCamLayerSettings = settings or CenterCamLayerSettings()
 
         # FBOs
         self._cam_fbo: Fbo = Fbo()

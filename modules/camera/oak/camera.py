@@ -61,11 +61,11 @@ class Camera(Thread):
             keystone=settings.keystone,
             fov_h=settings.fov,
             lens_fov=settings.lens_fov,
-            lens_centre_x=settings.lens_centre_x,
-            lens_centre_y=settings.lens_centre_y,
+            lens_center_x=settings.lens_center_x,
+            lens_center_y=settings.lens_center_y,
         )
         self.frame_height: int = delivered_height(self.color, self.resolution, self.mount.fov_h, self.mount.tilt,
-                                                  self.mount.lens_fov, self.mount.lens_centre)
+                                                  self.mount.lens_fov, self.mount.lens_center)
 
         # DEVICE — its queues are opened in `_setup_queues` and closed with it.
         self.device: dai.Device | None = None
@@ -208,10 +208,10 @@ class Camera(Thread):
         src: tuple[int, int] = mode_size(self.color, self.resolution)
         out: tuple[int, int] = frame_size(self.color, self.resolution, self.square, self.frame_height)
         window = frame_window(src, out, src[0], self.mount.fov_h, self.mount.tilt,
-                              self.mount.lens_fov, self.mount.lens_centre)
+                              self.mount.lens_fov, self.mount.lens_center)
         coverage = frame_coverage(src, out, src[0], self.mount.fov_h, self.mount.tilt,
                                   self.mount.flip_h, self.mount.flip_v,
-                                  self.mount.lens_fov, self.mount.lens_centre)
+                                  self.mount.lens_fov, self.mount.lens_center)
         logger.info(f'frame {out[0]}x{out[1]}: elevation {window.elevation_bottom:+.1f} to '
                     f'{window.elevation_top:+.1f} deg, horizon at row {window.horizon_px:.1f}, '
                     f'{window.focal:.1f} px/rad; '
@@ -227,7 +227,7 @@ class Camera(Thread):
             focal, cx, cy = lens
             field: float = lens_field(focal, src[0])
             error: float = lens_deviation(focal, cx, cy, src, src[0], self.mount.fov_h,
-                                          self.mount.lens_fov, self.mount.lens_centre)
+                                          self.mount.lens_fov, self.mount.lens_center)
             self.settings.readings.fov_factory = field
             self.settings.readings.lens_error = error
             logger.debug(f'{self.device_id} lens: field {field:.1f} deg across {src[0]} px, '

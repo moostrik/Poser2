@@ -8,9 +8,9 @@ import math
 import unittest
 
 from modules.camera import frame_window
-from modules.render.layers.panorama.strip import camera_elevation, centre_elevation, elevation_window, \
+from modules.render.layers.panorama.strip import camera_elevation, center_elevation, elevation_window, \
     panorama_coverage, strip_aspect_ratio, strip_elevation, strip_spans, strip_y
-from modules.tracker import azimuth_to_camera_x, camera_azimuth, centre_distance, focus_distance, \
+from modules.tracker import azimuth_to_camera_x, camera_azimuth, center_distance, focus_distance, \
     row_from_elevation
 
 
@@ -47,10 +47,10 @@ class TestCameraElevation(unittest.TestCase):
 
     def _direct(self, azimuth: float, height: float, cam_id: int,
                 focus_radius: float) -> tuple[float, float]:
-        centre: float = math.radians(camera_azimuth(cam_id, TARGET_FOV))
+        center: float = math.radians(camera_azimuth(cam_id, TARGET_FOV))
         a: float = math.radians(azimuth)
-        dx: float = focus_radius * math.cos(a) - CAMERA_RADIUS * math.cos(centre)
-        dy: float = focus_radius * math.sin(a) - CAMERA_RADIUS * math.sin(centre)
+        dx: float = focus_radius * math.cos(a) - CAMERA_RADIUS * math.cos(center)
+        dy: float = focus_radius * math.sin(a) - CAMERA_RADIUS * math.sin(center)
         horizontal: float = math.hypot(dx, dy)
         return (math.degrees(math.atan(height / focus_radius)),      # seen from the centre
                 math.degrees(math.atan(height / horizontal)))        # seen from the camera
@@ -61,10 +61,10 @@ class TestCameraElevation(unittest.TestCase):
             axis: float = camera_azimuth(cam_id, TARGET_FOV)
             for offset in (-50.0, -25.0, 0.0, 25.0, 50.0):
                 for height in (-0.5, 0.4, 1.4):
-                    from_centre, from_camera = self._direct(
+                    from_center, from_camera = self._direct(
                         axis + offset, height, cam_id, focus_radius)
                     self.assertAlmostEqual(
-                        camera_elevation(from_centre, offset, CAMERA_RADIUS, focus_radius),
+                        camera_elevation(from_center, offset, CAMERA_RADIUS, focus_radius),
                         from_camera, places=9,
                         msg=f'cam {cam_id} offset {offset} height {height}')
 
@@ -95,7 +95,7 @@ class TestCameraElevation(unittest.TestCase):
                 camera_elevation(elevation, 40.0, 0.0, FOCUS_RADIUS), elevation, places=12)
 
 
-class TestCentreElevation(unittest.TestCase):
+class TestCenterElevation(unittest.TestCase):
     """The vertical re-projection for a point whose distance is known, not assumed."""
 
     def test_round_trips_against_camera_elevation(self) -> None:
@@ -107,7 +107,7 @@ class TestCentreElevation(unittest.TestCase):
             for elevation in (-20.0, -5.0, 8.0, 31.0):
                 at_camera: float = camera_elevation(elevation, bearing, CAMERA_RADIUS, focus_radius)
                 self.assertAlmostEqual(
-                    centre_elevation(at_camera, cam_distance, focus_radius), elevation, places=9,
+                    center_elevation(at_camera, cam_distance, focus_radius), elevation, places=9,
                     msg=f'bearing {bearing} elevation {elevation}')
 
     def test_matches_a_point_projected_in_three_dimensions(self) -> None:
@@ -124,20 +124,20 @@ class TestCentreElevation(unittest.TestCase):
                     expected: float = math.degrees(
                         math.atan(h / math.hypot(px + CAMERA_RADIUS, py)))
                     self.assertAlmostEqual(
-                        centre_elevation(from_camera, d,
-                                         centre_distance(theta, d, CAMERA_RADIUS)),
+                        center_elevation(from_camera, d,
+                                         center_distance(theta, d, CAMERA_RADIUS)),
                         expected, places=9, msg=f'theta {theta} d {d} h {h}')
 
     def test_the_horizon_never_moves(self) -> None:
         for d in (1.2, 4.0):
             self.assertAlmostEqual(
-                centre_elevation(0.0, d, centre_distance(30.0, d, CAMERA_RADIUS)), 0.0, places=12)
+                center_elevation(0.0, d, center_distance(30.0, d, CAMERA_RADIUS)), 0.0, places=12)
 
     def test_zero_camera_radius_is_the_identity(self) -> None:
         d: float = 2.5
         for elevation in (-30.0, 0.0, 12.5, 39.0):
             self.assertAlmostEqual(
-                centre_elevation(elevation, d, centre_distance(40.0, d, 0.0)), elevation,
+                center_elevation(elevation, d, center_distance(40.0, d, 0.0)), elevation,
                 places=12)
 
 

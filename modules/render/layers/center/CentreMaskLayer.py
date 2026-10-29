@@ -6,29 +6,29 @@ from OpenGL.GL import GL_R16F
 # Local application imports
 from modules.settings import Field, BaseSettings
 from ..LayerBase import LayerBase
-from .CentreGeometry import CentreGeometry
+from .CentreGeometry import CenterGeometry
 from ...shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur, MaskDilate, MaskErode
 from modules.gl import Fbo, SwapFbo, Texture, Style
 
 
-class CentreMaskSettings(BaseSettings):
-    """Configuration for CentreMaskLayer temporal blending and blur."""
+class CenterMaskLayerSettings(BaseSettings):
+    """Configuration for CenterMaskLayer temporal blending and blur."""
     blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Temporal blending strength (0=static, 1=instant)")
     dilation_steps: Field[int]   = Field(0, min=-10, max=10, description="Mask dilation iterations (positive=expand, negative=shrink)")
     blur_steps:     Field[int]   = Field(0, min=0, max=10, description="Number of blur iterations")
     blur_radius:    Field[float] = Field(1.0, min=0.0, max=20.0, description="Blur kernel radius in pixels")
 
 
-class CentreMaskLayer(LayerBase):
+class CenterMaskLayer(LayerBase):
     """Renders mask image cropped and rotated with temporal blending and blur."""
 
-    def __init__(self, cam_id: int, geometry: CentreGeometry, mask_texture: Texture, settings: CentreMaskSettings | None = None) -> None:
+    def __init__(self, cam_id: int, geometry: CenterGeometry, mask_texture: Texture, settings: CenterMaskLayerSettings | None = None) -> None:
         self._cam_id: int = cam_id
-        self._geometry: CentreGeometry = geometry
+        self._geometry: CenterGeometry = geometry
         self._mask_src: Texture = mask_texture
 
         # Configuration
-        self.settings: CentreMaskSettings = settings or CentreMaskSettings()
+        self.settings: CenterMaskLayerSettings = settings or CenterMaskLayerSettings()
 
         # FBOs
         self._roi_fbo: Fbo = Fbo()  # Single temp buffer for ROI
@@ -73,7 +73,7 @@ class CentreMaskLayer(LayerBase):
         self._mask_blur_shader.deallocate()
 
     def update(self) -> None:
-        """Render mask crop using bbox geometry from CentreGeometry."""
+        """Render mask crop using bbox geometry from CenterGeometry."""
         if self._geometry.lost:
             self._blend_fbo.clear_all()
             self._mask_blur_fbo.clear_all()

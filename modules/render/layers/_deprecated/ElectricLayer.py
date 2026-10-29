@@ -51,7 +51,7 @@ class ElectricLayer(LayerBase):
         self._fbo.deallocate()
         self._shader.deallocate()
 
-    def setCentrePoints(self, points: Points2D) -> None:
+    def setCenterPoints(self, points: Points2D) -> None:
         self._points = points
 
     def draw(self) -> None:
@@ -66,11 +66,11 @@ class ElectricLayer(LayerBase):
         if self._data_cache.idle or pose is None:
             return
 
-        centre_pose: Frame = replace(pose, points=self._points)
+        center_pose: Frame = replace(pose, points=self._points)
 
         line_width: float = 1.0 / self._fbo.height * self.line_width * 2
         line_smooth: float = 1.0 / self._fbo.height * self.line_smooth * 2
 
         self._fbo.begin()
-        self._shader.use(centre_pose)
+        self._shader.use(center_pose)
         self._fbo.end()

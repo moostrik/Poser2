@@ -8,8 +8,8 @@
   "resolution": "P800",
   "tilt": 16.0,
   "lens_fov": 128.9,
-  "lens_centre_x": -10.5,
-  "lens_centre_y": 10.5,
+  "lens_center_x": -10.5,
+  "lens_center_y": 10.5,
   "spin_down_seconds": 6.0,
   "render": {
     "layout": "CAMERA",

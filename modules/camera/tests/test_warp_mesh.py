@@ -29,7 +29,7 @@ F_OUT = MONO_W / math.radians(MONO_FOV_H)       # 577.5 px/rad, the output's foc
 # The shared lens of the White Space rig, read off the four units' calibrations (see the lens
 # geometry notes in definitions.py). The four units themselves, at 1280 x 800:
 LENS_FOV = 128.9
-LENS_CENTRE = (-10.5, 10.5)
+LENS_CENTER = (-10.5, 10.5)
 UNITS = {                       # mxid tail: (focal px/rad, cx, cy)
     'F124D9D600': (575.4, 615.2, 409.9),
     '110AD3D200': (567.2, 634.3, 407.6),
@@ -45,14 +45,14 @@ def mesh(tilt: float, *, flip_h: bool = False, flip_v: bool = False,
          src: tuple[int, int] = (MONO_W, MONO_H), out: tuple[int, int] | None = None,
          mode_width: int = MONO_W, fov_h: float = MONO_FOV_H,
          mesh_w: int = WARP_MESH, mesh_h: int = WARP_MESH,
-         lens_fov: float = 0.0, lens_centre: tuple[float, float] = (0.0, 0.0)) -> np.ndarray:
+         lens_fov: float = 0.0, lens_center: tuple[float, float] = (0.0, 0.0)) -> np.ndarray:
     return np.array(warp_mesh_points(src, out or src, mode_width, fov_h, tilt,
-                                     flip_h, flip_v, mesh_w, mesh_h, lens_fov, lens_centre))
+                                     flip_h, flip_v, mesh_w, mesh_h, lens_fov, lens_center))
 
 
 def window(tilt: float, *, src: tuple[int, int] = (MONO_W, MONO_H), out: tuple[int, int] | None = None,
-           lens_fov: float = 0.0, lens_centre: tuple[float, float] = (0.0, 0.0)) -> FrameWindow:
-    return frame_window(src, out or src, MONO_W, MONO_FOV_H, tilt, lens_fov, lens_centre)
+           lens_fov: float = 0.0, lens_center: tuple[float, float] = (0.0, 0.0)) -> FrameWindow:
+    return frame_window(src, out or src, MONO_W, MONO_FOV_H, tilt, lens_fov, lens_center)
 
 
 def equidistant_pixel(bearing_deg: float, elevation_deg: float, tilt_deg: float = 0.0,
@@ -127,15 +127,15 @@ class SourceLensTest(unittest.TestCase):
         self.assertEqual((cx, cy), (CX, CY))
 
     def test_shared_lens_is_the_measured_one(self) -> None:
-        focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTRE)
+        focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTER)
         self.assertAlmostEqual(focal, 1280 / math.radians(128.9), places=9)
         self.assertAlmostEqual(focal, 568.9, delta=0.1)          # the four units' mean, 568.6, rounded to the step
         self.assertEqual((cx, cy), (CX - 10.5, CY + 10.5))
 
     def test_centre_offset_survives_the_720_crop(self) -> None:
         # The 720-row mode is a centre crop, so the offset from the frame centre is the same.
-        _, cx8, cy8 = source_lens((1280, 800), 1280, MONO_FOV_H, LENS_FOV, LENS_CENTRE)
-        _, cx7, cy7 = source_lens((1280, 720), 1280, MONO_FOV_H, LENS_FOV, LENS_CENTRE)
+        _, cx8, cy8 = source_lens((1280, 800), 1280, MONO_FOV_H, LENS_FOV, LENS_CENTER)
+        _, cx7, cy7 = source_lens((1280, 720), 1280, MONO_FOV_H, LENS_FOV, LENS_CENTER)
         self.assertEqual(cx8, cx7)
         self.assertAlmostEqual(cy8 - 399.5, cy7 - 359.5, places=9)
 
@@ -149,7 +149,7 @@ class SourceLensTest(unittest.TestCase):
     def test_lens_deviation_names_the_outlier(self) -> None:
         # Unit F124's optical centre sits 24 px left of the frame centre, 14 px from the shared
         # lens's — 1.4 deg of azimuth zero. The other three are within 0.6 deg.
-        errors = {tail: lens_deviation(*calib, (MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTRE)
+        errors = {tail: lens_deviation(*calib, (MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTER)
                   for tail, calib in UNITS.items()}
         self.assertAlmostEqual(errors['F124D9D600'], 1.4, delta=0.05)
         for tail in ('110AD3D200', '31DDD2D200', '1136D1D200'):
@@ -157,9 +157,9 @@ class SourceLensTest(unittest.TestCase):
                 self.assertLess(errors[tail], 0.6)
 
     def test_lens_deviation_is_zero_for_the_shared_lens_itself(self) -> None:
-        focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTRE)
+        focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTER)
         self.assertAlmostEqual(lens_deviation(focal, cx, cy, (MONO_W, MONO_H), MONO_W, MONO_FOV_H,
-                                              LENS_FOV, LENS_CENTRE), 0.0, places=9)
+                                              LENS_FOV, LENS_CENTER), 0.0, places=9)
 
 
 class FrameWindowTest(unittest.TestCase):
@@ -173,7 +173,7 @@ class FrameWindowTest(unittest.TestCase):
                 self.assertAlmostEqual(win.elevation_bottom, tilt - math.degrees(CY / F_OUT), places=9)
 
     def test_rows_are_tangents_of_elevation(self) -> None:
-        win = window(16.0, lens_fov=LENS_FOV, lens_centre=LENS_CENTRE)
+        win = window(16.0, lens_fov=LENS_FOV, lens_center=LENS_CENTER)
         self.assertAlmostEqual(win.row(win.elevation_bottom), MONO_H - 1, places=9)
         self.assertAlmostEqual(win.row(win.elevation_top), 0.0, places=9)
         self.assertAlmostEqual(win.row(0.0), win.horizon_px, places=9)
@@ -185,7 +185,7 @@ class FrameWindowTest(unittest.TestCase):
     def test_the_numbers_of_the_rig(self) -> None:
         # The shared lens at tilt 16 on 800 rows: the feet rule's -23.7 deg at the bottom
         # (-23.2 with the lens centre 10.5 px low), the tangent's 43.7 at the top.
-        win = window(16.0, lens_fov=LENS_FOV, lens_centre=LENS_CENTRE)
+        win = window(16.0, lens_fov=LENS_FOV, lens_center=LENS_CENTER)
         self.assertAlmostEqual(win.elevation_bottom, -23.2, delta=0.05)
         self.assertAlmostEqual(win.elevation_top, 43.7, delta=0.05)
         self.assertAlmostEqual(win.horizon_px, 551.8, delta=0.1)
@@ -211,7 +211,7 @@ class WarpMeshProjectionTest(unittest.TestCase):
     The safety property is what stays fixed: the lens centre and the centre column, and — the
     point of it all — a vertical pole lands in ONE column at every height."""
 
-    def test_the_lens_centre_is_the_fixed_point(self) -> None:
+    def test_the_lens_center_is_the_fixed_point(self) -> None:
         win = window(0.0)
         n = 129
         sx, sy = sample_mesh(mesh(0.0, mesh_w=n, mesh_h=n), n, n, CX, win.row(0.0))
@@ -268,15 +268,15 @@ class WarpMeshProjectionTest(unittest.TestCase):
 class WarpMeshGeometryTest(unittest.TestCase):
     """What makes the degrees mean degrees, with the tilt and the real lens in."""
 
-    def test_the_lens_centre_is_the_fixed_point_at_any_tilt(self) -> None:
+    def test_the_lens_center_is_the_fixed_point_at_any_tilt(self) -> None:
         # The output's centre column at the row of elevation `tilt` looks along the optical axis,
         # so it reads the lens centre — not the frame centre — whatever the tilt.
         n = 129
-        focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTRE)
+        focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTER)
         for tilt in (0.0, 5.0, 16.0, -7.5):
             with self.subTest(tilt=tilt):
-                win = window(tilt, lens_fov=LENS_FOV, lens_centre=LENS_CENTRE)
-                pts = mesh(tilt, mesh_w=n, mesh_h=n, lens_fov=LENS_FOV, lens_centre=LENS_CENTRE)
+                win = window(tilt, lens_fov=LENS_FOV, lens_center=LENS_CENTER)
+                pts = mesh(tilt, mesh_w=n, mesh_h=n, lens_fov=LENS_FOV, lens_center=LENS_CENTER)
                 sx, sy = sample_mesh(pts, n, n, CX, win.row(tilt))
                 # Sub-pixel, not places=6: the row of `tilt` falls between mesh rows, so the
                 # lookup is bilinear. What matters is that the point does not MOVE.
@@ -287,10 +287,10 @@ class WarpMeshGeometryTest(unittest.TestCase):
         # The window is pinned there: nothing is black at the bottom of the centre column, and
         # no sensor row below the axis is thrown away, at any tilt.
         n = 9
-        focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTRE)
+        focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTER)
         for tilt in (0.0, 8.0, 16.0, 30.0):
             with self.subTest(tilt=tilt):
-                g = mesh(tilt, mesh_w=n, mesh_h=n, lens_fov=LENS_FOV, lens_centre=LENS_CENTRE).reshape(n, n, 2)
+                g = mesh(tilt, mesh_w=n, mesh_h=n, lens_fov=LENS_FOV, lens_center=LENS_CENTER).reshape(n, n, 2)
                 self.assertAlmostEqual(float(g[-1, n // 2, 1]), MONO_H - 1, places=6)
                 np.testing.assert_allclose(g[:, n // 2, 0], cx, atol=1e-6)
 
@@ -299,11 +299,11 @@ class WarpMeshGeometryTest(unittest.TestCase):
         # lens puts it `focal * tilt` px below its centre. That is what must be found on the row
         # the window calls the horizon.
         n = 129
-        focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTRE)
+        focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTER)
         for tilt in (0.0, 8.0, 16.0):
             with self.subTest(tilt=tilt):
-                win = window(tilt, lens_fov=LENS_FOV, lens_centre=LENS_CENTRE)
-                pts = mesh(tilt, mesh_w=n, mesh_h=n, lens_fov=LENS_FOV, lens_centre=LENS_CENTRE)
+                win = window(tilt, lens_fov=LENS_FOV, lens_center=LENS_CENTER)
+                pts = mesh(tilt, mesh_w=n, mesh_h=n, lens_fov=LENS_FOV, lens_center=LENS_CENTER)
                 sx, sy = sample_mesh(pts, n, n, CX, win.horizon_px)
                 self.assertAlmostEqual(sx, cx, places=3)
                 self.assertAlmostEqual(sy, cy + focal * math.radians(tilt), delta=0.05)
@@ -314,9 +314,9 @@ class WarpMeshGeometryTest(unittest.TestCase):
         # join the two: a straight line in angle on one side, a tangent on the other.
         n = 129
         tilt = 16.0
-        focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTRE)
-        win = window(tilt, lens_fov=LENS_FOV, lens_centre=LENS_CENTRE)
-        pts = mesh(tilt, mesh_w=n, mesh_h=n, lens_fov=LENS_FOV, lens_centre=LENS_CENTRE)
+        focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTER)
+        win = window(tilt, lens_fov=LENS_FOV, lens_center=LENS_CENTER)
+        pts = mesh(tilt, mesh_w=n, mesh_h=n, lens_fov=LENS_FOV, lens_center=LENS_CENTER)
         for e in (-20.0, -10.0, 0.0, 10.0, 25.0, 40.0):
             with self.subTest(elevation=e):
                 _, sy = sample_mesh(pts, n, n, CX, win.row(e))
@@ -327,9 +327,9 @@ class WarpMeshGeometryTest(unittest.TestCase):
         # source pixel is where a camera aimed up by `tilt` with the REAL lens puts the ray.
         n = WARP_MESH
         tilt = 16.0
-        focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTRE)
-        win = window(tilt, lens_fov=LENS_FOV, lens_centre=LENS_CENTRE)
-        pts = mesh(tilt, mesh_w=n, mesh_h=n, lens_fov=LENS_FOV, lens_centre=LENS_CENTRE)
+        focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTER)
+        win = window(tilt, lens_fov=LENS_FOV, lens_center=LENS_CENTER)
+        pts = mesh(tilt, mesh_w=n, mesh_h=n, lens_fov=LENS_FOV, lens_center=LENS_CENTER)
         for bearing in (10.0, 45.0, 60.0):
             for dist in (1.35, 3.5):
                 with self.subTest(bearing=bearing, dist=dist):
@@ -359,8 +359,8 @@ class WarpMeshGeometryTest(unittest.TestCase):
         fine_n = (WARP_MESH - 1) * 4 + 1            # shares every 4th point with the coarse grid
         for tilt in (0.0, 16.0, 30.0):
             with self.subTest(tilt=tilt):
-                fine = mesh(tilt, mesh_w=fine_n, mesh_h=fine_n, lens_fov=LENS_FOV, lens_centre=LENS_CENTRE)
-                coarse = mesh(tilt, mesh_w=WARP_MESH, mesh_h=WARP_MESH, lens_fov=LENS_FOV, lens_centre=LENS_CENTRE)
+                fine = mesh(tilt, mesh_w=fine_n, mesh_h=fine_n, lens_fov=LENS_FOV, lens_center=LENS_CENTER)
+                coarse = mesh(tilt, mesh_w=WARP_MESH, mesh_h=WARP_MESH, lens_fov=LENS_FOV, lens_center=LENS_CENTER)
                 fine_grid = fine.reshape(fine_n, fine_n, 2)[::4, ::4, :].reshape(-1, 2)
                 self.assertLess(float(np.hypot(*(coarse - fine_grid).T).max()), 0.5)
 
@@ -374,9 +374,9 @@ class WarpMeshCropTest(unittest.TestCase):
         n = 9
         for tilt in (0.0, 8.0):
             with self.subTest(tilt=tilt):
-                full = mesh(tilt, mesh_w=n, mesh_h=n, lens_fov=LENS_FOV, lens_centre=LENS_CENTRE).reshape(n, n, 2)
+                full = mesh(tilt, mesh_w=n, mesh_h=n, lens_fov=LENS_FOV, lens_center=LENS_CENTER).reshape(n, n, 2)
                 crop = mesh(tilt, src=(MONO_W, MONO_H), out=(MONO_H, MONO_H), mesh_w=n, mesh_h=n,
-                            lens_fov=LENS_FOV, lens_centre=LENS_CENTRE).reshape(n, n, 2)
+                            lens_fov=LENS_FOV, lens_center=LENS_CENTER).reshape(n, n, 2)
                 np.testing.assert_allclose(crop[:, 4, :], full[:, 4, :], atol=1e-6)
 
     def test_square_crop_narrows_the_bearing_range(self) -> None:
@@ -398,13 +398,13 @@ class FrameCoverageTest(unittest.TestCase):
 
     def _coverage(self, tilt: float, flip_h: bool = False) -> np.ndarray:
         return frame_coverage((MONO_W, MONO_H), (MONO_W, MONO_H), MONO_W, MONO_FOV_H, tilt,
-                              flip_h, False, LENS_FOV, LENS_CENTRE)
+                              flip_h, False, LENS_FOV, LENS_CENTER)
 
     def _edge_row(self, tilt: float, bearing: float, source_row: float) -> float:
         """Brute force, through the forward model only: the output row at `bearing` where the
         source row `source_row` (0 = the sensor's top edge) is crossed."""
-        focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTRE)
-        win = window(tilt, lens_fov=LENS_FOV, lens_centre=LENS_CENTRE)
+        focal, cx, cy = source_lens((MONO_W, MONO_H), MONO_W, MONO_FOV_H, LENS_FOV, LENS_CENTER)
+        win = window(tilt, lens_fov=LENS_FOV, lens_center=LENS_CENTER)
         lo, hi = -80.0, 85.0                                     # elevation, degrees
         for _ in range(80):
             mid = (lo + hi) / 2.0
@@ -502,11 +502,11 @@ class FrameSizeTest(unittest.TestCase):
         # The rows the centre column needs to carry every sensor row: 1152 at P800 and tilt 16,
         # 960 at P720 and tilt 15, with the shared lens (its centre 10.5 px low gives the sensor
         # 41.3 deg above the axis and 39.2 below). Both multiples of 16.
-        self.assertEqual(full_frame_height((1280, 800), 1280, MONO_FOV_H, 16.0, LENS_FOV, LENS_CENTRE), 1152)
-        self.assertEqual(full_frame_height((1280, 720), 1280, MONO_FOV_H, 15.0, LENS_FOV, LENS_CENTRE), 960)
+        self.assertEqual(full_frame_height((1280, 800), 1280, MONO_FOV_H, 16.0, LENS_FOV, LENS_CENTER), 1152)
+        self.assertEqual(full_frame_height((1280, 720), 1280, MONO_FOV_H, 15.0, LENS_FOV, LENS_CENTER), 960)
         # And at that height the window's top IS the sensor's reach above the axis.
-        win = frame_window((1280, 800), (1280, 1152), 1280, MONO_FOV_H, 16.0, LENS_FOV, LENS_CENTRE)
-        focal, _, cy = source_lens((1280, 800), 1280, MONO_FOV_H, LENS_FOV, LENS_CENTRE)
+        win = frame_window((1280, 800), (1280, 1152), 1280, MONO_FOV_H, 16.0, LENS_FOV, LENS_CENTER)
+        focal, _, cy = source_lens((1280, 800), 1280, MONO_FOV_H, LENS_FOV, LENS_CENTER)
         reach_up = math.degrees(cy / focal)
         self.assertGreaterEqual(win.elevation_top, 16.0 + reach_up - 0.05)
         self.assertLess(win.elevation_top, 16.0 + reach_up + 1.0)         # at most the alignment's spare rows

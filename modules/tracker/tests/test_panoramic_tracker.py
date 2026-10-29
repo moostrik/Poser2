@@ -985,7 +985,7 @@ class TestRigParallax(unittest.TestCase):
         expected = (TARGET_FOV * 2 + local - fov_overlap) % 360.0
         self.assertAlmostEqual(world, expected, places=6)
 
-    def test_column_to_azimuth_is_the_box_centre_chain(self) -> None:
+    def test_column_to_azimuth_is_the_box_center_chain(self) -> None:
         # A keypoint's column goes through the same projection as a box centre, so the two are
         # comparable — the premise of shifting a pose's azimuth by their difference.
         g = self.make_rig()
@@ -996,7 +996,7 @@ class TestRigParallax(unittest.TestCase):
                     self.assertAlmostEqual(g.column_to_azimuth(cam_id, x), g.calc_angle(roi, cam_id)[1],
                                            places=9)
 
-    def test_column_to_azimuth_centre_is_the_camera_axis(self) -> None:
+    def test_column_to_azimuth_center_is_the_camera_axis(self) -> None:
         g = self.make_rig()
         for cam_id in range(4):
             self.assertAlmostEqual(g.column_to_azimuth(cam_id, 0.5), TARGET_FOV * (cam_id + 0.5), places=9)
@@ -1794,15 +1794,15 @@ class TestReachReadouts(unittest.TestCase):
     LENS_FOV = 128.9
 
     def make_settings(self, resolution: CameraResolution = CameraResolution.P720,
-                      lens_centre: tuple[float, float] = (0.0, 0.0)) -> PanoramicTrackerSettings:
+                      lens_center: tuple[float, float] = (0.0, 0.0)) -> PanoramicTrackerSettings:
         settings = PanoramicTrackerSettings(fov=PARALLAX_FOV, resolution=resolution,
                                             tilt=self.TILT, lens_fov=self.LENS_FOV,
-                                            lens_centre_x=lens_centre[0], lens_centre_y=lens_centre[1])
+                                            lens_center_x=lens_center[0], lens_center_y=lens_center[1])
         settings.rig.camera_radius = CAMERA_RADIUS
         settings.rig.camera_height = CAMERA_HEIGHT
         return settings
 
-    def brute_force(self, height: float, centre_bearing: float, camera_radius: float, lens_height: float,
+    def brute_force(self, height: float, center_bearing: float, camera_radius: float, lens_height: float,
                     edge: int) -> float:
         """The first radius, in 1 mm steps, at which a point on the line is inside the picture."""
         window = frame_window(self.SRC, (self.SRC[0], self.ROWS), self.SRC[0], PARALLAX_FOV,
@@ -1810,13 +1810,13 @@ class TestReachReadouts(unittest.TestCase):
         coverage = frame_coverage(self.SRC, (self.SRC[0], self.ROWS), self.SRC[0], PARALLAX_FOV,
                                   self.TILT, lens_fov=self.LENS_FOV)
         dpp: float = PARALLAX_FOV / self.SRC[0]
-        centre: float = (self.SRC[0] - 1) / 2.0
-        phi: float = math.radians(centre_bearing)
+        center: float = (self.SRC[0] - 1) / 2.0
+        phi: float = math.radians(center_bearing)
         for step in range(int(camera_radius * 1000) + 1, 10000):
             radius: float = step / 1000.0
             dx, dy = radius * math.cos(phi) - camera_radius, radius * math.sin(phi)     # camera at (camera_radius, 0)
             distance: float = math.hypot(dx, dy)
-            x: float = centre + math.degrees(math.atan2(dy, dx)) / dpp
+            x: float = center + math.degrees(math.atan2(dy, dx)) / dpp
             if distance <= 0.0 or x < -0.5 or x > self.SRC[0] - 0.5:
                 continue
             row: int = int(coverage[int(round(min(max(x, 0.0), self.SRC[0] - 1.0))), edge])
@@ -1912,9 +1912,9 @@ class TestInitialRigSync(unittest.TestCase):
         # the sensor's full reach at this tilt — and published as the frame's shape and two edge
         # angles, from which the row form is rebuilt exactly.
         rows = delivered_height(False, settings.resolution, PARALLAX_FOV, settings.tilt,
-                                settings.lens_fov, (settings.lens_centre_x, settings.lens_centre_y))
+                                settings.lens_fov, (settings.lens_center_x, settings.lens_center_y))
         window = frame_window((1280, 800), (1280, rows), 1280, PARALLAX_FOV, settings.tilt,
-                              settings.lens_fov, (settings.lens_centre_x, settings.lens_centre_y))
+                              settings.lens_fov, (settings.lens_center_x, settings.lens_center_y))
         self.assertAlmostEqual(tracker.rig._horizon_px, window.horizon_px, places=9)
         self.assertAlmostEqual(tracker.rig._focal, window.focal, places=9)
         self.assertEqual(tracker.rig._rows, rows)

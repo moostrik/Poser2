@@ -66,17 +66,17 @@ def focus_distance(bearing: float, camera_radius: float, depth_radius: float) ->
     return math.sqrt(max(0.0, d2))
 
 
-def camera_bearing(centre_bearing: float, camera_radius: float, distance: float) -> float:
-    """The bearing (degrees) off a camera's own axis of a point the centre sees `centre_bearing`
+def camera_bearing(center_bearing: float, camera_radius: float, distance: float) -> float:
+    """The bearing (degrees) off a camera's own axis of a point the centre sees `center_bearing`
     off that axis, `distance` m from the camera.
 
     Wider than the centre's, because the camera sits `camera_radius` out toward the point:
     `theta = phi + asin(r · sin(phi) / d)`, the law of sines on the centre/camera/point triangle.
     """
     if camera_radius <= 0.0 or distance <= 1e-9:
-        return centre_bearing
-    ratio: float = camera_radius * math.sin(math.radians(centre_bearing)) / distance
-    return centre_bearing + math.degrees(math.asin(max(-1.0, min(1.0, ratio))))
+        return center_bearing
+    ratio: float = camera_radius * math.sin(math.radians(center_bearing)) / distance
+    return center_bearing + math.degrees(math.asin(max(-1.0, min(1.0, ratio))))
 
 
 def azimuth_to_camera_x(azimuth: float, cam_id: int, cam_fov: float, target_fov: float,
@@ -129,7 +129,7 @@ def camera_local_to_azimuth(local: float, cam_id: int, cam_fov: float, target_fo
     return (camera_azimuth(cam_id, target_fov) + phi) % 360.0
 
 
-def centre_distance(bearing: float, cam_distance: float, camera_radius: float) -> float:
+def center_distance(bearing: float, cam_distance: float, camera_radius: float) -> float:
     """A person's horizontal distance from the RIG CENTRE (m).
 
     `bearing` is measured at the camera, off its own optical axis — what the tracker's

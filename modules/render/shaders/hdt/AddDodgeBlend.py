@@ -17,7 +17,7 @@ class AddDodgeBlend(Shader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, base: Texture, frg: Texture, blend: float) -> None:
+    def use(self, base: Texture, foreground: Texture, blend: float) -> None:
         glUseProgram(self.shader_program)
 
         glActiveTexture(GL_TEXTURE0)
@@ -25,7 +25,7 @@ class AddDodgeBlend(Shader):
         glUniform1i(self.get_uniform_loc("uTex0"), 0)
 
         glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, frg.tex_id)
+        glBindTexture(GL_TEXTURE_2D, foreground.tex_id)
         glUniform1i(self.get_uniform_loc("uTex1"), 1)
 
         glUniform1f(self.get_uniform_loc("uBlend"), blend)

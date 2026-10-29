@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 class TrackerSettings(BaseSettings):
     tracklet_min_age:         Field[int]   = Field(3,    min=0,   max=9,   step=1)
-    add_centre_threshold:     Field[float] = Field(0.15, min=0.0, max=1.0, step=0.05)
-    update_centre_threshold:  Field[float] = Field(0.3,  min=0.0, max=1.0, step=0.05)
+    add_center_threshold:     Field[float] = Field(0.15, min=0.0, max=1.0, step=0.05)
+    update_center_threshold:  Field[float] = Field(0.3,  min=0.0, max=1.0, step=0.05)
     timeout:                  Field[float] = Field(2.0,  min=1.0, max=5.0, step=0.1)
     add_height_threshold:     Field[float] = Field(0.5,  min=0.0, max=1.0, step=0.05)
     update_height_threshold:  Field[float] = Field(0.25, min=0.0, max=1.0, step=0.05)
@@ -95,11 +95,11 @@ class Tracker(Thread, BaseTracker):
                 self.store.retire_tracklet(update_tracklet.cam_id)
                 return
 
-            # if tracklet is LOST, too small or too far from centre, lose it
+            # if tracklet is LOST, too small or too far from center, lose it
             if (
                 update_tracklet.is_lost or
                 update_tracklet.roi.height < self.settings.update_height_threshold or
-                abs(update_tracklet.roi.center.x - 0.5) > self.settings.update_centre_threshold
+                abs(update_tracklet.roi.center.x - 0.5) > self.settings.update_center_threshold
             ):
                 self.store.lose_tracklet(update_tracklet.cam_id)
                 return
@@ -118,7 +118,7 @@ class Tracker(Thread, BaseTracker):
             if not t.is_active:
                 continue
 
-            if abs(t.roi.center.x - 0.5) > self.settings.add_centre_threshold:
+            if abs(t.roi.center.x - 0.5) > self.settings.add_center_threshold:
                 continue
 
             if t.roi.height < self.settings.add_height_threshold:

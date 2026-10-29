@@ -83,8 +83,8 @@ class TrackerSettings(BaseSettings):
                                                 description="Sensor mode, shared — the frame's shape")
     tilt: Field[float] = Field(0.0, access=Field.INIT, description="Camera up-tilt (°), shared")
     lens_fov: Field[float] = Field(0.0, access=Field.INIT, description="Lens field (°) across the sensor width, shared; 0 = fov")
-    lens_centre_x: Field[float] = Field(0.0, access=Field.INIT, description="Optical centre offset (px), shared")
-    lens_centre_y: Field[float] = Field(0.0, access=Field.INIT, description="Optical centre offset (px), shared")
+    lens_center_x: Field[float] = Field(0.0, access=Field.INIT, description="Optical center offset (px), shared")
+    lens_center_y: Field[float] = Field(0.0, access=Field.INIT, description="Optical center offset (px), shared")
     # The intake's filters. A detection one rejects is drawn grey on the panorama, labelled with the
     # filter; a person already tracked goes LOST instead, their own label naming it.
     age_filter: Field[int] = Field(5, min=0, max=9, step=1,
