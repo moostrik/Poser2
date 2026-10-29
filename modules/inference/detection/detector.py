@@ -6,6 +6,7 @@ nobody lost at the edges, boxes map 1:1 onto the frame). A newer frame of a came
 still waiting: the latest wins, as in the other runners.
 """
 
+import json
 import logging
 import time
 from threading import Event, Lock, Thread
@@ -105,11 +106,23 @@ class Detector(Thread):
             logger.warning("Person detector runs on %s: CUDA is not available to ONNX Runtime, expect dropped frames", provider)
         model_input = self._session.get_inputs()[0]
         self._input_name = model_input.name
-        shape = model_input.shape                   # (batch, 3, height, width); the batch dynamic
-        self.height, self.width = int(shape[2]), int(shape[3])
+        self.height, self.width = self._input_size(model_input.shape)
         self._infer(np.zeros((1, 3, self.height, self.width), dtype=np.float32))     # warm-up
         self._ready.set()
         logger.info("Person detector: %s ready, %dx%d on %s", self.settings.model, self.width, self.height, provider)
+
+    def _input_size(self, shape: list) -> tuple[int, int]:
+        """The model's input height and width: from its shape (batch, 3, height, width) when the
+        file fixes them, else from the `imgsz` the export wrote into the metadata, since
+        ultralytics exports every axis but the channels as a symbol."""
+        if isinstance(shape[2], int) and isinstance(shape[3], int):
+            return shape[2], shape[3]
+        assert self._session is not None
+        imgsz: str | None = self._session.get_modelmeta().custom_metadata_map.get('imgsz')
+        if imgsz is None:
+            raise ValueError(f"input shape {shape} has no fixed size and the model carries no imgsz metadata")
+        height, width = json.loads(imgsz)
+        return int(height), int(width)
 
     def _claim(self) -> dict[int, np.ndarray]:
         with self._lock:

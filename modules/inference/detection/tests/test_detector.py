@@ -18,9 +18,10 @@ from modules.utils import Rect
 WIDTH, HEIGHT = 512, 448
 
 
-def write_stub_model(path: str) -> None:
+def write_stub_model(path: str, symbolic: bool = False, imgsz: str | None = None) -> None:
     """input (N, 3, 448, 512) -> output (N, 84, 2): candidate 0 a person at the middle with score
-    0.9 (cx 256, cy 224, w 128, h 224), candidate 1 a person with score 0.2."""
+    0.9 (cx 256, cy 224, w 128, h 224), candidate 1 a person with score 0.2. `symbolic` gives the
+    input the shape ultralytics exports, (N, 3, height, width), with `imgsz` in the metadata."""
     rows = np.zeros((1, 84, 2), dtype=np.float32)
     rows[0, 0:5, 0] = (256, 224, 128, 224, 0.9)
     rows[0, 0:5, 1] = (100, 100, 50, 50, 0.2)
@@ -32,7 +33,7 @@ def write_stub_model(path: str) -> None:
     ]
     graph = helper.make_graph(
         nodes, 'stub_yolo',
-        [helper.make_tensor_value_info('images', TensorProto.FLOAT, ['N', 3, HEIGHT, WIDTH])],
+        [helper.make_tensor_value_info('images', TensorProto.FLOAT, ['N', 3, 'height', 'width'] if symbolic else ['N', 3, HEIGHT, WIDTH])],
         [helper.make_tensor_value_info('output0', TensorProto.FLOAT, ['N', 84, 2])],
         initializer=[
             numpy_helper.from_array(rows, 'rows'),
@@ -41,6 +42,8 @@ def write_stub_model(path: str) -> None:
         ])
     model = helper.make_model(graph, opset_imports=[helper.make_opsetid('', 17)])
     model.ir_version = 9
+    if imgsz is not None:
+        helper.set_model_props(model, {'imgsz': imgsz})
     onnx.save(model, path)
 
 
@@ -54,9 +57,12 @@ def wait_for(condition, timeout: float = 5.0) -> bool:
 
 
 class DetectorTest(unittest.TestCase):
+    symbolic: bool = False
+    imgsz: str | None = None
+
     def setUp(self) -> None:
         self.folder = tempfile.mkdtemp()
-        write_stub_model(os.path.join(self.folder, 'stub.onnx'))
+        write_stub_model(os.path.join(self.folder, 'stub.onnx'), self.symbolic, self.imgsz)
         self.settings = Settings(model='stub.onnx', model_path=self.folder)
         self.settings.initialize()
         self.detector = Detector(self.settings)
@@ -89,6 +95,26 @@ class DetectorTest(unittest.TestCase):
         self.detector.submit(0, np.zeros((448, 512, 3), dtype=np.uint8))
         self.assertTrue(wait_for(lambda: len(self.detections) == 1))
         self.assertEqual(len(self.detections[0].boxes), 2)
+
+
+class SymbolicInputTest(DetectorTest):
+    """The shape ultralytics exports: height and width as symbols, the size in the metadata."""
+    symbolic = True
+    imgsz = '[448, 512]'
+
+
+class NoSizeTest(unittest.TestCase):
+    def test_a_symbolic_input_without_metadata_fails_to_load_with_a_reason(self) -> None:
+        folder = tempfile.mkdtemp()
+        write_stub_model(os.path.join(folder, 'stub.onnx'), symbolic=True)
+        settings = Settings(model='stub.onnx', model_path=folder)
+        settings.initialize()
+        detector = Detector(settings)
+        with self.assertLogs('modules.inference.detection.detector', level='ERROR') as logs:
+            detector.start()
+            detector.join(timeout=5.0)
+        self.assertFalse(detector.is_ready)
+        self.assertIn('imgsz', logs.output[0])
 
 
 if __name__ == '__main__':
