@@ -52,7 +52,7 @@ class OscSoundSender(BaseOscSound):
     def _slot_count(self) -> int:
         """Live players (``max_players``) + the dummy's slot. The per-track array width stays
         ``max_players``; only the slot count grows."""
-        return self._config.max_players + 1
+        return self.settings.max_players + 1
 
     def set_composition(self, output: Frame) -> None:
         """Store the latest Frame; thread-safe."""
@@ -64,8 +64,8 @@ class OscSoundSender(BaseOscSound):
         bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
         self._add_global_messages(bundle, frames, seq_state)
 
-        track = self._config.max_players   # per-track (similarity/gate/leader) array width
-        self._config.active_players = sum(1 for id in range(self._slot_count) if id in frames)
+        track = self.settings.max_players   # per-track (similarity/gate/leader) array width
+        self.settings.active_players = sum(1 for id in range(self._slot_count) if id in frames)
 
         for id in range(self._slot_count):
             if id in frames:
@@ -82,8 +82,8 @@ class OscSoundSender(BaseOscSound):
         bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
         self._add_global_messages(bundle, {}, None)  # no frames, None → zeroed globals
         for id in range(self._slot_count):
-            self._add_inactive_frame_messages(bundle, id, self._config.max_players)
-        self._config.active_players = 0
+            self._add_inactive_frame_messages(bundle, id, self.settings.max_players)
+        self.settings.active_players = 0
         self._send_bundle(bundle)
 
     def _add_global_messages(self, bundle_builder: OscBundleBuilder, frames: FrameDict, seq_state: SequencerState | None) -> None:
@@ -113,7 +113,7 @@ class OscSoundSender(BaseOscSound):
 
         # Presence, not show state, so never zeroed on idle: the count of live players,
         # the dummy excluded — the same frames the active flags are built from.
-        players: int = sum(1 for id in range(self._config.max_players) if id in frames)
+        players: int = sum(1 for id in range(self.settings.max_players) if id in frames)
         players_msg = OscMessageBuilder(address="/global/players")
         players_msg.add_arg(players, OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(players_msg.build())  # type: ignore
@@ -121,12 +121,12 @@ class OscSoundSender(BaseOscSound):
         # Operator settings, not show state, so they are never zeroed on idle: the fader and
         # the speaker placement must read true whenever they are turned, show or no show.
         volume_msg = OscMessageBuilder(address="/global/volume")
-        volume_msg.add_arg(float(self._config.volume), OscMessageBuilder.ARG_TYPE_FLOAT)  # type: ignore[attr-defined]
+        volume_msg.add_arg(float(self.settings.volume), OscMessageBuilder.ARG_TYPE_FLOAT)  # type: ignore[attr-defined]
         bundle_builder.add_content(volume_msg.build())  # type: ignore
 
         # Degrees in the panel, radians on the wire — the contract every azimuth here keeps.
         speaker_msg = OscMessageBuilder(address="/global/speaker/offset")
-        speaker_msg.add_arg(math.radians(self._config.speaker_offset), OscMessageBuilder.ARG_TYPE_FLOAT)  # type: ignore[attr-defined]
+        speaker_msg.add_arg(math.radians(self.settings.speaker_offset), OscMessageBuilder.ARG_TYPE_FLOAT)  # type: ignore[attr-defined]
         bundle_builder.add_content(speaker_msg.build())  # type: ignore
 
     def _angle_values(self, frame: PoseFrame) -> list[float]:
