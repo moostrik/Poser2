@@ -5,8 +5,9 @@ the board's IMU, and the reads off an open device. The frame geometry every came
 import logging
 
 import depthai as dai
+import numpy as np
 
-from .. import CameraResolution, resolve_resolution, mode_size
+from .. import CameraResolution, resolve_resolution, mode_size, TrackingStatus
 
 logger = logging.getLogger(__name__)
 
@@ -118,3 +119,47 @@ def imu_rotation_to_camera(device: dai.Device, socket: dai.CameraBoardSocket, de
         logger.debug(f'{device_id} no IMU-to-camera extrinsics ({exc}): the board constant, '
                      f'roll offset {IMU_BOARD_ROLL:.0f} deg')
         return None
+
+
+# ---------------------------------------------------------------------------
+#  The pose model and the tracker
+# ---------------------------------------------------------------------------
+# The OAK4's chip takes a model compiled by Luxonis, fetched once from their zoo as an NN archive
+# (`python -m modules.camera.oak4.models`, a local file in `data/models`, not in git). One model finds the
+# people and their 17 body landmarks (COCO, the order of `modules.pose.PointLandmark`); the
+# archive's config tells `DetectionNetwork` how to decode both.
+POSE_MODEL: str = 'luxonis/yolov8-nano-pose-estimation:coco-512x288'
+POSE_ARCHIVE: str = 'yolov8n_pose_coco_512x288_rvc4.tar.xz'
+NUM_KEYPOINTS: int = 17
+POSE_CONFIDENCE_THRESHOLD: float = 0.5
+POSE_OVERLAP_THRESHOLD: float = 0.5
+
+# The device tracker's statuses, as the contract names them.
+TRACKING_STATUS: dict[dai.Tracklet.TrackingStatus, TrackingStatus] = {
+    dai.Tracklet.TrackingStatus.NEW: TrackingStatus.NEW,
+    dai.Tracklet.TrackingStatus.TRACKED: TrackingStatus.TRACKED,
+    dai.Tracklet.TrackingStatus.LOST: TrackingStatus.LOST,
+    dai.Tracklet.TrackingStatus.REMOVED: TrackingStatus.REMOVED,
+}
+TRACKER_PERSON_LABEL: int = 0
+TRACKER_TYPE: dai.TrackerType = dai.TrackerType.ZERO_TERM_IMAGELESS
+
+
+def nn_frame_type(archive: dai.NNArchive) -> dai.ImgFrame.Type:
+    """The frame type the archive's model takes, off its config; BGR888i when it does not say."""
+    try:
+        name: str = str(archive.getConfig().model.inputs[0].preprocessing.daiType)
+        return getattr(dai.ImgFrame.Type, name.split('.')[-1])
+    except Exception as exc:
+        logger.debug(f'archive names no frame type ({exc}): BGR888i')
+        return dai.ImgFrame.Type.BGR888i
+
+
+def tracklet_keypoints(detection: dai.ImgDetection) -> np.ndarray | None:
+    """The detection's landmarks as the contract carries them: (17, 3) float32, x and y normalised
+    to the frame the detector saw (the delivered frame, stretched into the model), and the score;
+    None when the detection carries none."""
+    points = detection.getKeypoints()
+    if len(points) != NUM_KEYPOINTS:
+        return None
+    return np.array([(p.imageCoordinates.x, p.imageCoordinates.y, p.confidence) for p in points], dtype=np.float32)

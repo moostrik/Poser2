@@ -2,6 +2,8 @@
 from dataclasses import dataclass, field
 from typing import Callable, TypeAlias
 
+import numpy as np
+
 # Local application imports
 from modules.camera import CameraTracklet, TrackingStatus
 from modules.utils import Rect
@@ -28,6 +30,7 @@ class Tracklet:
     annotation: TrackerAnnotation | None = field(default=None)
     external_id: int = field(default=-1)
     external_age_in_frames: int = field(default=0)
+    keypoints: np.ndarray | None = field(default=None)   # the camera's, as `CameraTracklet.keypoints` has them
 
     @property
     def is_lost(self) -> bool:
@@ -63,6 +66,7 @@ class Tracklet:
             roi=tracklet.roi,
             external_id=tracklet.id,
             external_age_in_frames=tracklet.age,
+            keypoints=tracklet.keypoints,
         )
 
 

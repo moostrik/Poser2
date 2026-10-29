@@ -2,8 +2,11 @@ import logging
 import math
 from threading import Lock
 
-from modules.pose import Frame, FrameDict, FrameDictCallbackMixin, BBox, BBoxAzimuth, Distance
+import numpy as np
+
+from modules.pose import Frame, FrameDict, FrameDictCallbackMixin, BBox, BBoxAzimuth, Distance, Points2D
 from modules.settings import BaseSettings, Field
+from modules.utils import Rect
 from .tracklet import Tracklet
 from .panoramic.annotation import Annotation as PanoramicAnnotation
 
@@ -18,14 +21,24 @@ class PosesFromTrackletsSettings(BaseSettings):
     # milliseconds old by the time the frame bang crops it, so at 0 nobody would ever be posed.
     detection_timeout: Field[float] = Field(2.0, min=0.1, max=5.0, step=0.05,
                                             description="Seconds after the last detection a person still gets a pose")
+    # A camera that runs the pose model itself (OAK4) hands its keypoints over in the frame; the pose
+    # carries them in the host crop's convention, normalised to a window of this aspect around the
+    # box, padded like the host crop, and the box becomes that window (`modules.inference.crop`).
+    crop_aspect:       Field[float] = Field(0.75, min=0.25, max=4.0, step=0.05,
+                                            description="Width over height of the window the camera's keypoints are normalised to (the host crop's 384/512)")
+    crop_padding:      Field[float] = Field(0.0, min=0.0, max=1.0, step=0.05,
+                                            description="Margin around the box before the window is fitted (fraction; the host crop's padding)")
 
 
 class PosesFromTracklets(FrameDictCallbackMixin):
     """Generates poses from tracklets, maintaining state per track."""
 
-    def __init__(self, settings: PosesFromTrackletsSettings, max_players: int) -> None:
+    def __init__(self, settings: PosesFromTrackletsSettings, max_players: int, frame_aspect: float = 1.0) -> None:
+        """`frame_aspect` is the delivered frame's width over its height, the one thing the keypoint
+        window needs to know about the image; it is 1.0 for the square frames of the rigs."""
         super().__init__()
         self.settings: PosesFromTrackletsSettings = settings
+        self.frame_aspect: float = frame_aspect
         # The incoming dict keys are used directly as slot indices below, so the feeding tracker
         # must key by a slot under `max_players` (the panoramic tracker's player slots; cam ids for
         # one-per-cam rigs): a key at or above it would vanish here without a trace. Both come from
@@ -90,6 +103,10 @@ class PosesFromTracklets(FrameDictCallbackMixin):
                 bounding_box = BBox.from_rect(tracklet.roi)
                 annotation = tracklet.annotation if isinstance(tracklet.annotation, PanoramicAnnotation) else None
                 features: dict = {BBox: bounding_box}
+                if tracklet.keypoints is not None:
+                    window, points = self.keypoint_window(tracklet.roi, tracklet.keypoints)
+                    features[BBox] = BBox.from_rect(window)
+                    features[Points2D] = points
                 if annotation is not None:
                     # SingleAngle.from_value wraps degrees-as-radians to [-π, π).
                     features[BBoxAzimuth] = BBoxAzimuth.from_value(math.radians(float(annotation.world_angle)))
@@ -111,6 +128,20 @@ class PosesFromTracklets(FrameDictCallbackMixin):
         self._notify_frames_callbacks(generated_poses)
 
         return generated_poses
+
+    def keypoint_window(self, roi: Rect, keypoints: np.ndarray) -> tuple[Rect, Points2D]:
+        """The window the host crop would cut for this box, normalised to the frame, and the camera's
+        keypoints normalised to it: the box padded, then grown to `crop_aspect` about its centre, the
+        aspect judged in the frame's own proportions (`frame_aspect`)."""
+        aspect: float = self.settings.crop_aspect
+        padding: float = self.settings.crop_padding
+        w: float = self.frame_aspect
+        box = Rect(roi.x * w, roi.y, roi.width * w, roi.height).zoom(1.0 + padding)
+        window = Rect(0.0, 0.0, aspect, 1.0).aspect_fill(box)
+        x = (keypoints[:, 0] * w - window.x) / window.width
+        y = (keypoints[:, 1] - window.y) / window.height
+        points = Points2D.from_xy_arrays(x, y, keypoints[:, 2].astype(np.float32))
+        return Rect(window.x / w, window.y, window.width / w, window.height), points
 
     def is_ready(self, now: float) -> bool:
         """Return True if at least one tracklet is ready for generation at `now`."""

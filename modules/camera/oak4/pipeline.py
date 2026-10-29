@@ -5,18 +5,21 @@ contract's, and the IMU. Two corrections, as on the OAK-D: `tilt` (and tilt 0, t
 reprojection that makes a column one azimuth) goes through the `Warp` node with the mesh from
 `geometry.warp_mesh_points`, which on this chip warps grey frames only; `keystone` (hd_trio,
 deep_flow) is a four-point transform in `ImageManip`, in colour or grey. The detector branch
-comes with the model archive (plan step 9.3). Nothing here is an XLink stream: the host reads a
-node's output through the queue `Camera` creates on it.
+is the pose model on the delivered frame, the device's object tracker on its detections, and the
+tracklets with their keypoints. Nothing here is an XLink stream: the host reads a node's output
+through the queue `Camera` creates on it.
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 import logging
 
 import depthai as dai
 
 from .. import CameraResolution, frame_size, WARP_MESH, warp_mesh_points, keystone_corners, square_crop
 
-from .definitions import SENSOR_SOCKET, frame_type, requested_size, IMU_RATE_HZ
+from .definitions import SENSOR_SOCKET, frame_type, requested_size, IMU_RATE_HZ, nn_frame_type, \
+    POSE_CONFIDENCE_THRESHOLD, POSE_OVERLAP_THRESHOLD, TRACKER_PERSON_LABEL, TRACKER_TYPE
 
 logger = logging.getLogger(__name__)
 
@@ -43,10 +46,12 @@ class MountConfig:
 
 @dataclass
 class PipelineOutputs:
-    """What the host reads and writes: the delivered frames, the sensor's control input, the IMU."""
+    """What the host reads and writes: the delivered frames, the sensor's control input, the IMU,
+    and with a pose model the tracklets."""
     video: dai.Node.Output
     control: dai.Node.Input
     imu: dai.Node.Output
+    tracklets: dai.Node.Output | None = None
 
 
 def build_pipeline(
@@ -57,24 +62,27 @@ def build_pipeline(
     resolution: CameraResolution,
     mount: MountConfig,
     frame_height: int = 0,
+    pose_archive: Path | None = None,
 ) -> PipelineOutputs:
     """Build the camera's pipeline into `pipeline`, the one bound to its device.
 
     `frame_height` is the delivered height the tilt correction produces (`delivered_height`),
-    0 for the sensor's rows. Raises `ValueError` for a colour frame with `tilt`, which the chip
-    cannot warp: the camera then does not open, rather than deliver a frame the tracker would
-    read wrong.
+    0 for the sensor's rows; `pose_archive` is the pose model's NN archive, None for frames only.
+    Raises `ValueError` for a colour frame with `tilt`, which the chip cannot warp: the camera then
+    does not open, rather than deliver a frame the tracker would read wrong.
     """
     src_size: tuple[int, int] = requested_size(color, resolution)
     out_size: tuple[int, int] = frame_size(color, resolution, square, frame_height)
-    logger.info("OAK4 pipeline: %s, %s, %s", 'square' if square else 'wide', 'color' if color else 'grey',
-                'keystone' if mount.keystone != 0.0 and mount.tilt == 0.0 else 'tilt')
+    logger.info("OAK4 pipeline: %s, %s, %s%s", 'square' if square else 'wide', 'color' if color else 'grey',
+                'keystone' if mount.keystone != 0.0 and mount.tilt == 0.0 else 'tilt',
+                f', pose model {pose_archive.name}' if pose_archive else '')
 
     camera: dai.node.Camera = pipeline.create(dai.node.Camera).build(SENSOR_SOCKET)
     source: dai.Node.Output = camera.requestOutput(src_size, frame_type(color), fps=fps)
     frames: dai.Node.Output = add_correction(pipeline, source, src_size, out_size, color, mount)
     imu: dai.Node.Output = add_imu(pipeline)
-    return PipelineOutputs(video=frames, control=camera.inputControl, imu=imu)
+    tracklets: dai.Node.Output | None = add_pose_detector(pipeline, frames, pose_archive) if pose_archive else None
+    return PipelineOutputs(video=frames, control=camera.inputControl, imu=imu, tracklets=tracklets)
 
 
 def add_correction(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tuple[int, int],
@@ -124,6 +132,45 @@ def add_keystone(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tupl
     manip.setMaxOutputFrameSize(out_size[0] * out_size[1] * (3 if color else 1))
     source.link(manip.inputImage)
     return manip.out
+
+
+def add_pose_detector(pipeline: dai.Pipeline, frames: dai.Node.Output, archive_path: Path) -> dai.Node.Output:
+    """The pose branch: the delivered frame sized for the model, the model, the device's object
+    tracker on its detections, and the tracklets out.
+
+    The frame is STRETCHED into the model's input, never cropped or letterboxed, as the OAK-D's
+    detector takes it (`oak.definitions.detector_input_size`): nothing is lost at the edges and the
+    normalised boxes and keypoints map 1:1 onto the delivered frame; an aspect mismatch costs
+    detection quality, never geometry. The archive's config tells the network how to decode the
+    boxes and the 17 keypoints, so no decode of ours; the tracker takes the network's passthrough
+    as its frame, so it only ever sees frames that were inferred.
+    """
+    archive = dai.NNArchive(str(archive_path))
+    size: tuple[int, int] | None = archive.getInputSize()
+    if size is None:
+        raise ValueError(f'{archive_path.name} names no input size')
+
+    manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
+    manip.initialConfig.setOutputSize(size[0], size[1], dai.ImageManipConfig.ResizeMode.STRETCH)
+    manip.initialConfig.setFrameType(nn_frame_type(archive))
+    manip.setMaxOutputFrameSize(size[0] * size[1] * 3)
+    frames.link(manip.inputImage)
+
+    network: dai.node.DetectionNetwork = pipeline.create(dai.node.DetectionNetwork)
+    network.setNNArchive(archive)
+    network.setConfidenceThreshold(POSE_CONFIDENCE_THRESHOLD)
+    network.detectionParser.setIouThreshold(POSE_OVERLAP_THRESHOLD)
+    network.input.setBlocking(False)
+    manip.out.link(network.input)
+
+    tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
+    tracker.setDetectionLabelsToTrack([TRACKER_PERSON_LABEL])
+    tracker.setTrackerType(TRACKER_TYPE)
+    tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
+    network.passthrough.link(tracker.inputTrackerFrame)
+    network.passthrough.link(tracker.inputDetectionFrame)
+    network.out.link(tracker.inputDetections)
+    return tracker.out
 
 
 def add_imu(pipeline: dai.Pipeline) -> dai.Node.Output:

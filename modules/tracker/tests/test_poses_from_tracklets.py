@@ -4,7 +4,9 @@ import math
 import time
 import unittest
 
-from modules.pose import Azimuth, BBox, BBoxAzimuth, Distance
+import numpy as np
+
+from modules.pose import Azimuth, BBox, BBoxAzimuth, Distance, Points2D
 from modules.tracker import PanoramicAnnotation, PosesFromTracklets, PosesFromTrackletsSettings, Tracklet
 from modules.utils import Rect
 
@@ -78,6 +80,26 @@ class TestFrameContents(PosesFromTrackletsCase):
                 self.assertNotIn(Distance, frames[id])
                 self.assertTrue(math.isnan(frames[id][Distance].value))
                 self.assertEqual(frames[id][Distance].score, 0.0)
+
+    def test_the_cameras_keypoints_are_normalised_to_the_host_crops_window(self) -> None:
+        # A frame twice as wide as high; the box is a square quarter of it. The crop window, aspect
+        # 1:2 about the box, is the frame's full height and a quarter of its width, and becomes the
+        # pose's box; a keypoint at the box's top-left corner lands at the window's left edge, a
+        # quarter down, and one at the box's centre in the window's centre.
+        self.settings.crop_aspect = 0.5
+        poses = PosesFromTracklets(self.settings, max_players=4, frame_aspect=2.0)
+        keypoints = np.full((17, 3), (0.375, 0.5, 0.9), dtype=np.float32)
+        keypoints[0, :2] = (0.25, 0.25)
+        poses.set_tracklets({0: Tracklet(cam_id=0, id=0, roi=Rect(x=0.25, y=0.25, width=0.25, height=0.5),
+                                         keypoints=keypoints, **stamps())})
+        frame = poses.process(time.perf_counter())[0]
+        box = frame[BBox].to_rect()
+        for got, want in zip((box.x, box.y, box.width, box.height), (0.25, 0.0, 0.25, 1.0)):
+            self.assertAlmostEqual(got, want, places=5)
+        points = frame[Points2D]
+        np.testing.assert_allclose(points.values[0], (0.0, 0.25), atol=1e-5)
+        np.testing.assert_allclose(points.values[1], (0.5, 0.5), atol=1e-5)
+        self.assertAlmostEqual(float(points.scores[0]), 0.9, places=5)
 
     def test_an_id_beyond_the_slots_warns_and_is_not_posed(self) -> None:
         with self.assertLogs('modules.tracker.poses_from_tracklets', level='WARNING'):
