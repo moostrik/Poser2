@@ -339,7 +339,7 @@
       },
       "color": {
         "stage": 3,
-        "num_players": 1,
+        "max_players": 1,
         "blend_mode": "ALPHA",
         "similarity_threshold": 0.1,
         "motion_exponent": 1.0,
@@ -386,7 +386,7 @@
       }
     },
     "fluid3d": {
-      "num_players": 1,
+      "max_players": 1,
       "sim_engine": "FLUID_3D",
       "draw_mode": "DENSITY",
       "blend_mode": "ADD",

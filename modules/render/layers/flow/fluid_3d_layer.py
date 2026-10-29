@@ -48,7 +48,7 @@ _ENGINE_CLASSES: dict[FluidSimEngine, type] = {
 class Fluid3DLayerSettings(BaseSettings):
     """Configuration for Fluid3DLayer (3D fluid simulation)."""
     stage: Field[int] =                     Field(0, description="Pipeline stage for pose data")
-    num_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
+    max_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
     sim_engine: Field[FluidSimEngine] =     Field(FluidSimEngine.FLUID_3D)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
 
@@ -187,11 +187,11 @@ class Fluid3DLayer(LayerBase):
         pose: Frame | None = self._board.get_frame(self.settings.stage, self._cam_id)
         similarities: np.ndarray = (
             np.nan_to_num(pose[Similarity].values) if pose is not None and Similarity in pose
-            else np.full((self.settings.num_players,), 0.0)
+            else np.full((self.settings.max_players,), 0.0)
         )
         motion_gates: np.ndarray = (
             pose[MotionGate].values if pose is not None and MotionGate in pose
-            else np.full((self.settings.num_players,), 0.0)
+            else np.full((self.settings.max_players,), 0.0)
         )
         motion: float = pose[AngleMotion].value if pose is not None and AngleMotion in pose else 0.0
         m_s = similarities

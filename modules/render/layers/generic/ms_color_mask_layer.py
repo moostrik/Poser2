@@ -24,7 +24,7 @@ from ...color_settings import ColorSettings
 class MSColorMaskLayerSettings(BaseSettings):
     """Configuration for MSColorMaskLayer."""
     stage:                  Field[int]   = Field(0, description="Pipeline stage for pose data")
-    num_players:            Field[int]   = Field(3, access=Field.INIT)
+    max_players:            Field[int]   = Field(3, access=Field.INIT)
     blend_mode:             Field[Style.BlendMode] = Field(Style.BlendMode.ALPHA)
     similarity_threshold:   Field[float] = Field(0.1, min=0.0, max=1.0, description="Similarity below this contributes nothing")
     motion_exponent:        Field[float] = Field(1.0, min=0.0, max=5.0, description="Similarity response curve")
@@ -52,7 +52,7 @@ class MSColorMaskLayer(LayerBase):
         self.settings: MSColorMaskLayerSettings = settings
         self._color_settings: ColorSettings = color_settings
 
-        self._tint_fbos: list[Fbo] = [Fbo() for _ in range(self.settings.num_players)]
+        self._tint_fbos: list[Fbo] = [Fbo() for _ in range(self.settings.max_players)]
         self._blend_fbo: SwapFbo = SwapFbo()
         self._output_fbo: Fbo = Fbo()
 
@@ -109,9 +109,9 @@ class MSColorMaskLayer(LayerBase):
         active_poses = len(self._board.get_frames(self.settings.stage))
 
         # Extract similarity and motion data
-        num_players = self.settings.num_players
-        similarities: np.ndarray = np.nan_to_num(pose[Similarity].values) if pose is not None else np.zeros(num_players, dtype=np.float32)
-        motion_gates: np.ndarray = pose[MotionGate].values if pose is not None else np.zeros(num_players, dtype=np.float32)
+        max_players = self.settings.max_players
+        similarities: np.ndarray = np.nan_to_num(pose[Similarity].values) if pose is not None else np.zeros(max_players, dtype=np.float32)
+        motion_gates: np.ndarray = pose[MotionGate].values if pose is not None else np.zeros(max_players, dtype=np.float32)
         motion: float = pose[AngleMotion].value if pose is not None else 0.0
         motion = easeInOutSine(motion)
 

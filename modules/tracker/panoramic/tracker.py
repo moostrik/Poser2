@@ -35,7 +35,7 @@ class Tracker(Thread, BaseTracker):
       azimuth, distance, height); `RigSync` keeps it and the published read-outs in step with
       `RigSettings`.
     - `ObservationStore` holds the per-camera observations — immutable, host-owned ids — grouped
-      into world ids (unbounded), and assigns up to `num_players` concurrent worlds to the player
+      into world ids (unbounded), and assigns up to `max_players` concurrent worlds to the player
       slots downstream is wired for (`PlayerSlots`).
     - `Seams` applies `SeamSettings`: linking a new view across a seam, splitting and collapsing
       worlds, handing the primary view over between cameras, and blending a world's azimuth.
@@ -48,7 +48,7 @@ class Tracker(Thread, BaseTracker):
     detection, for the panorama.
     """
 
-    def __init__(self, settings: TrackerSettings, num_players: int, num_cams: int) -> None:
+    def __init__(self, settings: TrackerSettings, max_players: int, num_cams: int) -> None:
         super().__init__()
 
         self._running: bool = False
@@ -59,7 +59,7 @@ class Tracker(Thread, BaseTracker):
         # One tick: the intake, the expiry and the emission (its callbacks only store)
         self._timer: PerformanceTimer = PerformanceTimer(name="Tracker", sample_count=200)
 
-        self.observations: ObservationStore = ObservationStore(num_players)
+        self.observations: ObservationStore = ObservationStore(max_players)
 
         self.settings: TrackerSettings = settings
         # Each camera owns 360/num_cams degrees of the turn; whatever its field has beyond

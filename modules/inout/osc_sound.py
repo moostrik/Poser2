@@ -147,9 +147,9 @@ class OscSound:
         """
         bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
         self._add_global_messages(bundle, {}, None)  # no frames, None → zeroed globals
-        num_players = self.settings.max_players
-        for id in range(num_players):
-            self._add_inactive_frame_messages(bundle, id, num_players)
+        max_players = self.settings.max_players
+        for id in range(max_players):
+            self._add_inactive_frame_messages(bundle, id, max_players)
         self.settings.active_players = 0
         self._send_bundle(bundle)
 
@@ -157,17 +157,17 @@ class OscSound:
         bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
         self._add_global_messages(bundle, frames, seq_state)
 
-        num_players = self.settings.max_players
-        self.settings.active_players = sum(1 for id in range(num_players) if id in frames)
+        max_players = self.settings.max_players
+        self.settings.active_players = sum(1 for id in range(max_players) if id in frames)
 
-        for id in range(num_players):
+        for id in range(max_players):
             if id in frames:
                 self._inactive_counts[id] = 0
-                self._add_active_frame_messages(bundle, frames[id], frames, num_players)
+                self._add_active_frame_messages(bundle, frames[id], frames, max_players)
             elif self._inactive_counts[id] < 2:
                 # Only send a player's inactive reset for the first 2 ticks after it disappears.
                 self._inactive_counts[id] += 1
-                self._add_inactive_frame_messages(bundle, id, num_players)
+                self._add_inactive_frame_messages(bundle, id, max_players)
 
         return bundle
 
@@ -196,7 +196,7 @@ class OscSound:
         progress_msg.add_arg(seq_state.progress if seq_state is not None else 0.0, arg_type=OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(progress_msg.build()) # type: ignore
 
-    def _add_inactive_frame_messages(self, bundle_builder: OscBundleBuilder, id: int, num_players: int) -> None:
+    def _add_inactive_frame_messages(self, bundle_builder: OscBundleBuilder, id: int, max_players: int) -> None:
         # Send active=0 message
         msg_builder = OscMessageBuilder(address=f"/pose/{id}/active")
         msg_builder.add_arg(0, OscMessageBuilder.ARG_TYPE_INT)
@@ -244,31 +244,31 @@ class OscSound:
 
         # Reset similarity values to 0
         similarity_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")
-        for _ in range(num_players):
+        for _ in range(max_players):
             similarity_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(similarity_reset_msg.build()) # type: ignore
 
         # Reset similarity/pose to 0
         pose_sim_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/pose")
-        for _ in range(num_players):
+        for _ in range(max_players):
             pose_sim_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(pose_sim_reset_msg.build()) # type: ignore
 
         # Reset similarity/gate to 0
         gate_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/gate")
-        for _ in range(num_players):
+        for _ in range(max_players):
             gate_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(gate_reset_msg.build()) # type: ignore
 
         # Reset similarity/motion to 0
         motion_sim_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/motion")
-        for _ in range(num_players):
+        for _ in range(max_players):
             motion_sim_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(motion_sim_reset_msg.build()) # type: ignore
 
         # Reset similarity/leader to 0
         leader_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/leader")
-        for _ in range(num_players):
+        for _ in range(max_players):
             leader_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(leader_reset_msg.build()) # type: ignore
 
@@ -277,7 +277,7 @@ class OscSound:
         shape some of them."""
         return frame[Angles].values.tolist()
 
-    def _add_active_frame_messages(self, bundle_builder: OscBundleBuilder, frame: Frame, frames: FrameDict, num_players: int) -> None:
+    def _add_active_frame_messages(self, bundle_builder: OscBundleBuilder, frame: Frame, frames: FrameDict, max_players: int) -> None:
         id: int = frame.track_id
         active_msg = OscMessageBuilder(address=f"/pose/{id}/active")
         active_msg.add_arg(1, OscMessageBuilder.ARG_TYPE_INT)
@@ -336,28 +336,28 @@ class OscSound:
         bundle_builder.add_content(tilt_msg.build()) # type: ignore
 
         # range [0, 1] - pose similarity per player; NaN (no pair, or no such player) is sent as 0
-        pose_sim_values: list[float] = np.nan_to_num(frame[Similarity].values, nan=0.0).tolist() if Similarity in frame else [0.0] * num_players
+        pose_sim_values: list[float] = np.nan_to_num(frame[Similarity].values, nan=0.0).tolist() if Similarity in frame else [0.0] * max_players
         pose_sim_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/pose")
         for val in pose_sim_values:
             pose_sim_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(pose_sim_msg.build()) # type: ignore
 
         # range [0, 1] - motion gate (both poses moving)
-        gate_values: list[float] = frame[MotionGate].values.tolist() if MotionGate in frame else [0.0] * num_players
+        gate_values: list[float] = frame[MotionGate].values.tolist() if MotionGate in frame else [0.0] * max_players
         gate_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/gate")
         for val in gate_values:
             gate_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(gate_msg.build()) # type: ignore
 
         # range [0, 1] - motion-gated similarity (similarity * motion_gate)
-        motion_sim_values: list[float] = np.nan_to_num(frame[Similarity].values, nan=0.0).tolist() if Similarity in frame else [0.0] * num_players
+        motion_sim_values: list[float] = np.nan_to_num(frame[Similarity].values, nan=0.0).tolist() if Similarity in frame else [0.0] * max_players
         motion_sim_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/motion")
         for val in motion_sim_values:
             motion_sim_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(motion_sim_msg.build()) # type: ignore
 
         # range [-1, 1] - leader scores (negative=this leads, positive=other leads)
-        leader_values: list[float] = frame[LeaderScore].values.tolist() if LeaderScore in frame else [0.0] * num_players
+        leader_values: list[float] = frame[LeaderScore].values.tolist() if LeaderScore in frame else [0.0] * max_players
         leader_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/leader")
         for val in leader_values:
             leader_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
@@ -365,7 +365,7 @@ class OscSound:
 
         # DEPRECATED: Compute motion-gated similarity using old method (backward compatibility)
 
-        similarity_values: list[float] = np.nan_to_num(frame[Similarity].values, nan=0.0).tolist() if Similarity in frame else [0.0] * num_players
+        similarity_values: list[float] = np.nan_to_num(frame[Similarity].values, nan=0.0).tolist() if Similarity in frame else [0.0] * max_players
 
         # range [0, 1] - DEPRECATED backward-compatible motion-gated similarity
         similarity_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")

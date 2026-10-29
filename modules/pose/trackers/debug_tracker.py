@@ -16,15 +16,15 @@ class DebugTracker(TrackerBase):
     - Updated (optional)
     """
 
-    def __init__(self, num_players: int, log_updates: bool = False) -> None:
+    def __init__(self, max_players: int, log_updates: bool = False) -> None:
         """Initialize debug tracker.
 
         Args:
-            num_players: Expected number of players/poses
+            max_players: Expected number of players/poses
             log_updates: If True, logs every update. If False, only logs new/reset events.
         """
         super().__init__()
-        self._num_players = num_players
+        self._max_players = max_players
         self._tracked_ids: set[int] = set()
         self._log_updates = log_updates
 
@@ -33,8 +33,8 @@ class DebugTracker(TrackerBase):
         current_ids = set(poses.keys())
 
         # Check if pose count exceeds expected number
-        if len(current_ids) > self._num_players:
-            logger.warning(f"WARNING - More poses than expected! Found {len(current_ids)}, expected {self._num_players}")
+        if len(current_ids) > self._max_players:
+            logger.warning(f"WARNING - More poses than expected! Found {len(current_ids)}, expected {self._max_players}")
 
         # Detect new poses
         new_ids = current_ids - self._tracked_ids

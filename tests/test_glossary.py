@@ -33,7 +33,7 @@ BANNED: list[tuple[str, str]] = [
     # not 'time_stamped': the verb, as in a motion time stamped from the first frame
     ('timestamp, not time_stamp', r'time_stamps?(?![a-z])'),
     ('num_cams, not num_cameras', r'num_cameras'),
-    ('max_players, not max_poses / num_tracks', r'max_poses|num_tracks'),
+    ('max_players, not max_poses / num_tracks / num_players', r'max_poses|num_tracks|num_players'),
     ('AngleVelocity, not AngleVel', r'AngleVel(?!ocity)'),
     ('AngleSymmetry, not AngleSym', r'AngleSym(?!metry)'),
     ('Confidence, not Conf', r'Conf(?=[A-Z_]|$)'),

@@ -486,7 +486,7 @@
       },
       "color": {
         "stage": 3,
-        "num_players": 3,
+        "max_players": 3,
         "blend_mode": "ALPHA",
         "similarity_threshold": 0.1,
         "motion_exponent": 1.0,
@@ -561,7 +561,7 @@
       }
     },
     "fluid": {
-      "num_players": 3,
+      "max_players": 3,
       "draw_mode": "DENSITY",
       "blend_mode": "ADD",
       "fluid_flow": {

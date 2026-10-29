@@ -314,7 +314,7 @@ class TestFieldsOverlapExactlyWhenTheTrackerLinks(unittest.TestCase):
         self.settings = PanoramicTrackerSettings(fov=CAM_FOV)
         self.settings.seam.link_angle = LINK_ANGLE
         self.settings.rig.camera_radius = CAMERA_RADIUS
-        self.tracker = PanoramicTracker(self.settings, num_players=8, num_cams=4)
+        self.tracker = PanoramicTracker(self.settings, max_players=8, num_cams=4)
 
     def fields_overlap(self, a: Mark, b: Mark) -> bool:
         """Do the two drawn fields share any strip, wrap included?"""

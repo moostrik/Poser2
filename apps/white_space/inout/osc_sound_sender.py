@@ -136,8 +136,8 @@ class OscSoundSender(BaseOscSound):
             values[:TravelElement.left_arm] = frame[ArmTravel].values[:TravelElement.left_arm] * math.pi
         return values.tolist()
 
-    def _add_active_frame_messages(self, bundle_builder: OscBundleBuilder, frame: Frame, frames: FrameDict, num_players: int) -> None:
-        super()._add_active_frame_messages(bundle_builder, frame, frames, num_players)
+    def _add_active_frame_messages(self, bundle_builder: OscBundleBuilder, frame: Frame, frames: FrameDict, max_players: int) -> None:
+        super()._add_active_frame_messages(bundle_builder, frame, frames, max_players)
         id: int = frame.track_id
 
         # range [0, 1] - the whole arms: left, right (each the union of its shoulder's and its
@@ -170,8 +170,8 @@ class OscSoundSender(BaseOscSound):
         offset_msg.add_arg(playhead_offset, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(offset_msg.build())  # type: ignore
 
-    def _add_inactive_frame_messages(self, bundle_builder: OscBundleBuilder, id: int, num_players: int) -> None:
-        super()._add_inactive_frame_messages(bundle_builder, id, num_players)
+    def _add_inactive_frame_messages(self, bundle_builder: OscBundleBuilder, id: int, max_players: int) -> None:
+        super()._add_inactive_frame_messages(bundle_builder, id, max_players)
         arm_msg = OscMessageBuilder(address=f"/pose/{id}/arm")
         for _ in range(3):
             arm_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
