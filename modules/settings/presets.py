@@ -22,7 +22,7 @@ def set_app(app_name: str | None, default_startup: str = "studio") -> None:
     _default_startup = default_startup
 
 
-def _app_dir(app_name: str | None = None) -> Path:
+def app_dir(app_name: str | None = None) -> Path:
     """Return the data directory for the given (or current) app."""
     name = app_name if app_name is not None else _current_app
     if name:
@@ -32,12 +32,12 @@ def _app_dir(app_name: str | None = None) -> Path:
 
 def path(name: str, app_name: str | None = None) -> Path:
     """Return the full file path for a preset by name."""
-    return _app_dir(app_name) / f"{name}{PRESET_SUFFIX}"
+    return app_dir(app_name) / f"{name}{PRESET_SUFFIX}"
 
 
 def scan(app_name: str | None = None) -> list[str]:
     """Return sorted list of preset names (without suffix) from the settings directory."""
-    d = _app_dir(app_name)
+    d = app_dir(app_name)
     d.mkdir(parents=True, exist_ok=True)
     return sorted(
         p.name.removesuffix(PRESET_SUFFIX)
@@ -49,7 +49,7 @@ def scan(app_name: str | None = None) -> list[str]:
 def get_startup(app_name: str | None = None) -> str:
     """Return the preset name to load on startup (falls back to the app's default, 'studio')."""
     try:
-        data = json.loads((_app_dir(app_name) / ".ui_preset.json").read_text())
+        data = json.loads((app_dir(app_name) / ".ui_preset.json").read_text())
         return data.get("startup_preset") or _default_startup
     except (FileNotFoundError, json.JSONDecodeError):
         return _default_startup
@@ -68,7 +68,7 @@ def validate_name(name: str) -> None:
 def set_startup(name: str, app_name: str | None = None) -> None:
     """Persist *name* as the preset to load on next startup."""
     validate_name(name)
-    d = _app_dir(app_name)
+    d = app_dir(app_name)
     d.mkdir(parents=True, exist_ok=True)
     (d / ".ui_preset.json").write_text(json.dumps({"startup_preset": name}, indent=2))
 

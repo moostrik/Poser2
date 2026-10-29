@@ -1,0 +1,72 @@
+/* The panel's stylesheet: the show/hide toggles, the wiring marks, the knob, the pinned bar and
+   the log drawer. The class names are those the page and the controls set. */
+
+html { overflow-y: scroll; }
+#popup.nicegui-error-popup { display: none !important; }
+
+/* The three toggles of a tab hide the fields of an access type, and a card that holds only hidden
+   types. */
+.hide-init .poser-init { display: none !important; }
+.hide-feedback .poser-feedback { display: none !important; }
+.hide-input .poser-input { display: none !important; }
+.hide-init .poser-only-init { display: none !important; }
+.hide-feedback .poser-only-feedback { display: none !important; }
+.hide-input .poser-only-input { display: none !important; }
+.hide-init.hide-feedback .poser-only-init-feedback { display: none !important; }
+.hide-init.hide-input .poser-only-init-input { display: none !important; }
+.hide-feedback.hide-input .poser-only-feedback-input { display: none !important; }
+.hide-init.hide-feedback.hide-input .poser-only-all { display: none !important; }
+
+/* A field that is the source of a share, or shared from another. */
+.poser-source { border-left: 2px solid #26a69a; padding-left: 6px; }
+.poser-synced { border-left: 2px solid #ffa726; padding-left: 6px; }
+
+/* A number list's inputs as low as the rows of a checklist beside it. */
+.poser-number-list .q-field--dense .q-field__control, .poser-number-list .q-field--dense .q-field__native,
+.poser-number-list .q-field--dense .q-field__marginal { height: 24px; min-height: 24px; padding-top: 0; padding-bottom: 0; }
+
+/* The knob (knob.js). */
+.poser-knob { display: flex; align-items: center; gap: 6px; }
+.poser-knob-caption { display: flex; flex-direction: column; align-items: flex-end; min-width: 56px; max-width: 110px; }
+.poser-knob-dial { width: 40px; height: 40px; flex: none; cursor: grab; touch-action: none; user-select: none; }
+.poser-knob-dragging .poser-knob-dial { cursor: grabbing; }
+.poser-knob-readonly .poser-knob-dial { cursor: default; }
+.poser-knob-track { fill: none; stroke: #424242; stroke-width: 8; stroke-linecap: round; }
+.poser-knob-value { fill: none; stroke: var(--q-primary); stroke-width: 8; stroke-linecap: round; }
+.poser-knob-body { stroke: #0e0e0e; stroke-width: 2; }
+.poser-knob-pointer { stroke: #e0e0e0; stroke-width: 5; stroke-linecap: round; }
+/* The value and its editor share one box (border, padding, font), so the digits do not move
+   when editing starts; the editor only lights the border. */
+.poser-knob-text { width: 100%; box-sizing: border-box; margin: 0; padding: 0 3px;
+                   border: 1px solid #424242; border-radius: 3px;
+                   font-family: inherit; font-size: 12px; line-height: 18px; text-align: right;
+                   font-variant-numeric: tabular-nums; cursor: text; }
+.poser-knob-readonly .poser-knob-text { cursor: default; border-color: transparent; }
+.poser-knob-value-box { position: relative; width: 100%; }
+.poser-knob-editor { position: absolute; inset: 0; min-width: 0; height: 100%;
+                     background: #2a2a2a; color: inherit; border-color: var(--q-primary); outline: none; }
+
+/* The pinned bar, scaled with transform, not zoom: zoom puts getBoundingClientRect and pointer
+   clientX in different spaces in some browsers, and Quasar sliders compare the two. A transform
+   keeps its layout size, so the bar is laid out wider and the frame is sized by script
+   (panel.watchPinnedFrame). */
+.poser-pinned-frame { --scale: 0.8; overflow: hidden; }
+.poser-pinned {
+    width: calc(100% / var(--scale));
+    transform: scale(var(--scale));
+    transform-origin: top left;
+}
+
+/* The log drawer. */
+.log-drawer { font-family: 'Roboto Mono', monospace; font-size: 13px; }
+.log-drawer .log-line {
+    padding: 1px 8px;
+    white-space: pre-wrap; word-break: break-all; line-height: 1.4;
+}
+.log-chip-active { opacity: 1.0 !important; }
+.log-chip-inactive { opacity: 0.35 !important; }
+.log-drag-handle {
+    height: 6px; cursor: ns-resize; background: #333;
+    flex-shrink: 0; transition: background 0.15s;
+}
+.log-drag-handle:hover, .log-drag-handle:active { background: #4af; }

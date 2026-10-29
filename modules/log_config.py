@@ -56,6 +56,12 @@ class LogRingBuffer(logging.Handler):
         except Exception:
             self.handleError(record)
 
+    @property
+    def cursor(self) -> int:
+        """The cursor past every entry so far: what ``get_entries_since`` returns as the new cursor."""
+        with self._lock:
+            return self._counter
+
     def get_entries_since(self, cursor: int) -> tuple[int, list[LogEntry]]:
         """Return (new_cursor, entries) added since *cursor*.
 

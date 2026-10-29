@@ -8,10 +8,11 @@ from typing import Callable
 from nicegui import ui, app as nicegui_app, Client
 
 from modules.log_config import get_log_buffer
-from modules.settings import BaseSettings, Field
+from modules.settings import BaseSettings, Field, presets
 
 from .app_window import APP_QUERY, SELF_CLOSE_SCRIPT, open_app_window
-from .page import build_page, local_ips
+from .page import STATIC_DIR, STATIC_URL, build_page, local_ips
+from .state import STATE_FILE, PanelState
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +52,11 @@ class PanelServer:
 
         if not self._page_registered:
             self._page_registered = True
+            # The page's stylesheet and script; a short cache age, so an edit shows at the next reload.
+            nicegui_app.add_static_files(STATIC_URL, STATIC_DIR, max_cache_age=10)
+            # One state per app, shared by every client, as the file is.
+            state = PanelState(presets.app_dir() / STATE_FILE)
+            state.load()
 
             @ui.page("/")
             def index(client: Client):
@@ -60,7 +66,7 @@ class PanelServer:
                 ui.dark_mode(True)   # the panel is dark; the client's preference is not asked
                 ui.add_head_html('<style>* { transition-duration: 0s !important; animation-duration: 0s !important; }</style>')
                 with ui.column().classes("w-full max-w-3xl mx-auto p-4"):
-                    controls = build_page(root, title=title, port=port, on_exit=on_exit, log_buffer=log_buffer)
+                    controls = build_page(root, state, title=title, port=port, on_exit=on_exit, log_buffer=log_buffer)
                 # The page is built on the event loop, which holds every other client's poll and
                 # commit meanwhile: the number says whether the build must get cheaper.
                 logger.info("Panel built in %.0f ms, %d polled controls", (time.perf_counter() - started) * 1000, controls)
