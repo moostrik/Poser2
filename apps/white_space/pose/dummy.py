@@ -5,10 +5,11 @@ The dummy stands in for a person while the pose instrument is judged (``docs/POS
 ``pose_instrument.dummy`` settings, each joint's degrees −180..180 from its rest (the shoulder 0 hanging, 90
 across, ±180 up, −90 out; the elbow 0 straight, ±180 folded; the hip 0 standing, 90 leg out level;
 the knee 0 straight, 90 bent): the angle the angle extractor reads at it when the figure is
-upright, less the rest's reading (``REST``), and whose frame enters the LERP stage
-before the filters, so it is extracted, drawn, heard in Max and lit exactly as a person is. With ``solo`` the live
-players' frames are left out at that merge, so from the LERP filters on the dummy is the only pose;
-the tracker and the earlier stages still see them.
+upright, less the rest's reading (``REST``), and whose frame is a source of the LERP stage: polled on the
+light tick (``update(now)``) and merged with the interpolated players before the LERP filters, so it is
+extracted, drawn, heard in Max and lit exactly as a person is. With ``solo`` the live players' frames
+are left out at that merge, so from the LERP filters on the dummy is the only pose; the tracker and the
+earlier stages still see them.
 The torso leans the upper body over standing legs, as a person leans: the arms still read as set,
 the hips read off by the lean. Only the joints and the torso are set: the leg deviation and the
 body bend are the pipeline's, derived from the figure as for a person, and the pipeline's readings
@@ -25,14 +26,13 @@ import json
 import logging
 import math
 import os
-import time
 from dataclasses import dataclass, fields
 from pathlib import Path
 
 import numpy as np
 import pytweening
 
-from modules.pose import Azimuth, BBox, Distance, Points2D, PointLandmark, Frame, FrameDict, FrameDictCallbackMixin, nodes
+from modules.pose import Azimuth, BBox, Distance, Points2D, PointLandmark, Frame, FrameDict, nodes
 from modules.settings import BaseSettings, Field, Widget
 from modules.utils import Rect
 
@@ -148,12 +148,11 @@ _ARMS: tuple[tuple[str, PointLandmark], ...] = (
 )
 
 
-class Dummy(FrameDictCallbackMixin):
-    """The dummy in the pose pipeline; see the module docstring."""
+class Dummy:
+    """The dummy in the pose pipeline, a tick source of the LERP stage; see the module docstring."""
 
     def __init__(self, settings: DummySettings, angle_extractor: nodes.AngleExtractorSettings,
                  angle_calibrator: nodes.AngleCalibratorSettings, track_id: int, poses_path: Path) -> None:
-        super().__init__()
         self._settings = settings
         self._extractor = nodes.AngleExtractor(angle_extractor)
         self._calibrator = nodes.AngleCalibrator(angle_calibrator)      # the dummy enters after the stages that run these
@@ -172,18 +171,26 @@ class Dummy(FrameDictCallbackMixin):
         settings.bind(DummySettings.pose, self._on_pose)
         settings.bind(DummySettings.save, self._on_save)
 
-    # -- The pipeline step ----------------------------------------------------------
+    # -- The tick source ----------------------------------------------------------------
 
-    def process(self, frames: FrameDict) -> None:
-        """The merge step before the LERP filters: the frames as they are, plus the dummy's; with
-        ``solo``, the dummy's alone."""
-        now = time.perf_counter()
+    @property
+    def track_ids(self) -> list[int]:
+        """The dummy's one id."""
+        return [self._track_id]
+
+    @property
+    def solo(self) -> bool:
+        """True while the dummy is to be the only pose past the LERP merge: enabled and solo."""
+        return bool(self._settings.enabled and self._settings.solo)
+
+    def update(self, now: float) -> FrameDict:
+        """The dummy's pose at the light tick ``now`` (perf_counter), morphed on since the previous tick;
+        nothing while it is not enabled."""
         dt = 0.0 if self._last is None else now - self._last
         self._last = now
         if not self._settings.enabled:
-            self._notify_frames_callbacks(frames)
-            return
-        m = self.update(dt)
+            return {}
+        m = self.advance(dt)
         points = self.points(m, self._aspect_ratio)
         low, high = points.values.min(axis=0), points.values.max(axis=0)
         tight = Rect(float(low[0]), float(low[1]), float(high[0] - low[0]), float(high[1] - low[1]))
@@ -194,13 +201,11 @@ class Dummy(FrameDictCallbackMixin):
             Distance: Distance.from_value(m.distance),
             BBox: BBox.from_rect(box),
         })
-        frame = self._calibrator.process(self._extractor.process(frame))
-        live = {} if self._settings.solo else frames
-        self._notify_frames_callbacks({**live, self._track_id: frame})
+        return {self._track_id: self._calibrator.process(self._extractor.process(frame))}
 
     # -- The morph --------------------------------------------------------------------
 
-    def update(self, dt: float) -> Measures:
+    def advance(self, dt: float) -> Measures:
         """The measures this tick: a change of the settings starts a morph from the measures being
         drawn, eased over ``morph`` seconds; circular measures take the shortest way round."""
         target = self._from_settings()

@@ -8,7 +8,7 @@ from types import SimpleNamespace
 
 from modules.board import HitStreak
 
-from apps.white_space.light import LayerId, LightSettings, MotorMode, PoseInstrumentSettings
+from apps.white_space.light import LayerId, LightSettings, MotorMode, PoseInstrumentSettings, Tick
 from apps.white_space.statemachine import StateId, StateMachine, StateMachineSettings, machine as machine_module
 
 POSE_STAGE = 4
@@ -71,7 +71,7 @@ class StateMachineTest(unittest.TestCase):
     def tick(self, dt: float = 0.1, dbar: float = 0.0) -> None:
         self.t += dt
         self.board.bars += dbar
-        self.machine.update()
+        self.machine.update(Tick(self.t, dt))
 
     def set_players(self, n: int) -> None:
         """Put this many poses on the board (no playhead offset yet) and tick once so the machine sees them."""

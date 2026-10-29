@@ -3,19 +3,20 @@
 import logging
 from functools import partial
 
-from modules.utils import Broadcast
 from modules.camera import CameraSource, CameraCheck, Player, Sync, Recorder as VideoRecorder, replay
 from modules.camera.oak import Camera, Simulator
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
-from modules.pose import nodes, trackers, features, window, analytics, FrameDict, Recorder as PoseRecorder, RecorderSettings as PoseRecorderSettings
-from modules.inference import pose, segmentation, detection, CropExtractor, Uploader
+from modules.pose import nodes, features, analytics, FrameDict, Recorder as PoseRecorder, RecorderSettings as PoseRecorderSettings
+from modules.pose.pipeline import Domain, PosePipeline
+from modules.inference import segmentation, detection, PoseInference
 from modules.session import Session, SessionSettings, SequencerState
 from modules.gl import WindowSettings
 
 from .render_board import RenderBoard
+from .pose.pipeline import pipeline_spec
 from .sequencer import Sequencer
 from .settings import Settings, Stage, ShowStage, IntroSequenceSettings
 from .render import HDTrioRender
@@ -98,12 +99,11 @@ class HDTrioMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.image_uploader = Uploader()
-        self.crop_extractor = CropExtractor(ps.image_crop)
+        self.pose_inference = PoseInference(ps.image_crop, ps.pose)      # the crop and the pose model, the frame domain's async step
 
         for camera in self.cameras:
             camera.add_frame_callback(self.video_recorder.submit_frame)
-            camera.add_frame_callback(self.image_uploader.set_image)
+            camera.add_frame_callback(self.pose_inference.set_camera_frame)
             camera.add_frame_callback(self.frame_sync_bang.submit_frame)
             camera.add_tracklet_callback(self.tracker.submit_cam_tracklets)
             camera.add_tracklet_callback(self.board.set_camera_tracklets)
@@ -113,137 +113,37 @@ class HDTrioMain:
         features.configure_features(max_players)
 
         self.poses_from_tracklets = PosesFromTracklets(ps.tracklets, max_players)
-        self.pose_predictor = pose.Predictor(ps.pose)
         self.segmentation_predictor  = segmentation.Predictor(ps.segmentation)
-
-        self.bbox_filters = trackers.FilterTracker({
-            i: trackers.FilterPipeline([
-                nodes.BBoxEuroSmoother(ps.bbox.smoother),
-                nodes.BBoxPredictor(ps.bbox.prediction),
-            ])
-            for i in range(max_players)
-        }, name="Pose bbox")
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         self.tracklet_sync_bang.add_sync_callback(self.tracker.update)
         self.frame_sync_bang.add_sync_callback(self.poses_from_tracklets.process)
 
-        self.crop_extractor.add_image_callback(self.pose_predictor.submit)
-        self.crop_extractor.add_image_callback(self.segmentation_predictor.submit)
-        self.crop_extractor.add_image_callback(lambda _f, crops: self.board.set_crop_images(crops))
-
-        self.poses_from_tracklets.add_frames_callback(self.bbox_filters.process)
-        self.bbox_filters.add_frames_callback(self._process_poses)
+        # The segmentation and the board read the same crops the pose model gets.
+        self.pose_inference.add_camera_images_callback(self.board.set_camera_images)
+        self.pose_inference.add_crop_callback(self.segmentation_predictor.submit)
+        self.pose_inference.add_crop_callback(lambda _f, crops: self.board.set_crop_images(crops))
         self.segmentation_predictor.add_segmentation_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
 
-        # STAGE WINDOW TRACKERS & BROADCASTS
-        self.window_trackers: dict[Stage, window.WindowTracker] = {}
-        self.stages: dict[Stage, Broadcast] = {}
+        # POSE PIPELINE — the stages are declared in pose/pipeline.py. The camera's frame bang drives the frame
+        # domain through the tracklet poses; the render tick drives the output domain (LERP). Every stage's frames
+        # go to the board, the recorders and the sound; the board also reads each stage's window.
+        self.similarity_hold = nodes.SimilarityResultHold()              # the threaded analytics' way back into SMOOTH
+        self.pipeline = PosePipeline(pipeline_spec(ps, self.poses_from_tracklets, self.pose_inference, self.similarity_hold))
         for stage in Stage:
-            wt = window.WindowTracker(max_players, getattr(ps, f'window_{stage.name.lower()}'))
-            self.board.set_window_source(stage, wt)
-            self.window_trackers[stage] = wt
-            self.stages[stage] = Broadcast([
-                partial(self.board.set_frames, stage),
-                partial(self.pose_recorder.submit_frames, stage),
-                partial(self._submit_intro_frames, stage),
-                partial(self.osc_sound.submit_frames, stage),
-                wt.process,
-            ])
+            self.pipeline.add_frames_callback(stage, partial(self.board.set_frames, stage))
+            self.pipeline.add_frames_callback(stage, partial(self.pose_recorder.submit_frames, stage))
+            self.pipeline.add_frames_callback(stage, partial(self._submit_intro_frames, stage))
+            self.pipeline.add_frames_callback(stage, partial(self.osc_sound.submit_frames, stage))
+            self.board.set_window_source(stage, self.pipeline.window(stage))
 
-        # POSE STAGE RAW
-        self.pose_predictor.add_frames_callback(self.stages[Stage.RAW])
-
-        # POSE STAGE CLEAN
-        self.filters_clean = trackers.FilterTracker({
-            i: trackers.FilterPipeline([
-                nodes.PointDualConfidenceFilter(ps.point.confidence_filter),
-                nodes.AngleExtractor(ps.angle_extractor),
-                nodes.AngleCalibrator(),
-                nodes.AngleVelocityExtractor(ps.velocity.extractor),
-            ])
-            for i in range(max_players)
-        }, name="Pose clean")
-        self.stages[Stage.RAW].add_callback(self.filters_clean.process)
-        self.filters_clean.add_frames_callback(self.stages[Stage.CLEAN])
-
-        # POSE STAGE SMOOTH
-        self.filters_smooth = trackers.FilterTracker({
-            i: trackers.FilterPipeline([
-                nodes.PointEuroSmoother(ps.point.smoother),
-                nodes.AngleExtractor(ps.angle_extractor),
-                nodes.AngleCalibrator(),
-                nodes.AngleVelocityExtractor(ps.velocity.extractor),
-                nodes.AngleVelocityEuroSmoother(ps.velocity.smoother),
-                nodes.AngleEuroSmoother(ps.angle.smoother),
-                nodes.AngleMotionExtractor(ps.motion.extractor),
-                nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
-                nodes.AngleSymmetryExtractor(),
-                nodes.MotionTimeExtractor(),
-                nodes.AgeExtractor(),
-            ])
-            for i in range(max_players)
-        }, name="Pose smooth")
-        # Group steps on the SMOOTH poses: the latest result of the threaded analytics (below) is held and
-        # stamped as Similarity and LeaderScore; where presence is known, the sticky filler bridges a present
-        # pair's gap (a departed player's slot stays NaN); then the rows are smoothed.
-        self.similarity_hold = nodes.SimilarityResultHold()
-        self.similarity_sticky = nodes.SimilarityStickyFiller(ps.similarity.sticky)
-        self.similarity_smooth = trackers.FilterTracker({
-            i: trackers.FilterPipeline([nodes.SimilarityEuroSmoother(ps.similarity.smoother)])
-            for i in range(max_players)
-        }, name="Pose smooth similarity")
-        self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
-        self.filters_smooth.add_frames_callback(self._process_similarity)
-        self.similarity_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
-
+        # The threaded analytics read the SMOOTH window and hand their result to the hold.
         self.window_similarity  = analytics.WindowSimilarity(ps.similarity.window_similarity)
         self.window_correlator = analytics.WindowCorrelation(ps.similarity.window_correlation)
-        self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similarity.submit)
+        self.pipeline.window(Stage.SMOOTH).add_windows_callback(self.window_similarity.submit)
         self.window_similarity.add_similarity_callback(self.similarity_hold.set)
-        self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_correlator.submit)
+        self.pipeline.window(Stage.SMOOTH).add_windows_callback(self.window_correlator.submit)
         self.window_correlator.add_similarity_callback(self.similarity_hold.set)
-
-        # POSE STAGE PREDICT
-        self.filters_predict = trackers.FilterTracker({
-            i: trackers.FilterPipeline([
-                nodes.PointPredictor(ps.point.prediction),
-                nodes.AnglePredictor(ps.angle.prediction),
-                nodes.AngleVelocityPredictor(ps.velocity.prediction),
-                nodes.AngleStickyFiller(ps.angle.sticky),
-            ])
-            for i in range(max_players)
-        }, name="Pose predict")
-        self.stages[Stage.SMOOTH].add_callback(self.filters_predict.process)
-        self.filters_predict.add_frames_callback(self.stages[Stage.PREDICT])
-
-        # POSE STAGE LERP
-        self.interpolators_lerp = trackers.InterpolatorTracker({
-            i: trackers.InterpolatorPipeline([
-                nodes.BBoxChaseInterpolator(ps.bbox.interpolator),
-                nodes.PointChaseInterpolator(ps.point.interpolator),
-                nodes.AngleChaseInterpolator(ps.angle.interpolator),
-                nodes.AngleVelocityChaseInterpolator(ps.velocity.interpolator),
-                nodes.SimilarityChaseInterpolator(ps.similarity.interpolator),
-            ])
-            for i in range(max_players)
-        }, name="Pose interpolate")
-        self.filters_lerp = trackers.FilterTracker({
-            i: trackers.FilterPipeline([
-                nodes.AngleSymmetryExtractor(),
-                nodes.MotionTimeExtractor(),
-                nodes.AgeExtractor(),
-                nodes.AngleVelocityStickyFiller(ps.velocity.sticky),
-                nodes.AngleVelocityEuroSmoother(ps.velocity.smoother),
-                nodes.AngleMotionExtractor(ps.motion.extractor),
-                nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
-            ])
-            for i in range(max_players)
-        }, name="Pose lerp")
-        self.motion_gate = nodes.MotionGateExtractor()                               # the group step after the filters
-        self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.set)
-        self.interpolators_lerp.add_frames_callback(self.filters_lerp.process)
-        self.filters_lerp.add_frames_callback(self._process_motion_gate)
 
         # CAMERA CHECK — each camera's IMU reading and frame rate against the preset, as pinned indicators
         self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
@@ -254,7 +154,7 @@ class HDTrioMain:
         self.settings.render.window.bind(WindowSettings.avg_fps, self._on_render_fps)
         self.render.add_update_callback(self.camera_check.update)
         self.render.add_update_callback(self.sequencer.update)
-        self.render.add_update_callback(self.interpolators_lerp.update)
+        self.render.add_update_callback(self._update_poses)
         self.render.add_exit_callback(self.stop)
 
     def start(self) -> None:
@@ -266,7 +166,7 @@ class HDTrioMain:
             camera.start()
 
         self.tracker.start()
-        self.pose_predictor.start()
+        self.pose_inference.start()
         self.segmentation_predictor.start()
         self.window_similarity.start()
         self.window_correlator.start()
@@ -283,20 +183,9 @@ class HDTrioMain:
         self.is_running = True
         self.render.start()
 
-    def _process_poses(self, poses: FrameDict) -> None:
-        images, prev_images = self.image_uploader.snapshot()
-        self.board.set_camera_images(images)
-        self.crop_extractor.process(poses, images, prev_images)
-
-    def _process_similarity(self, frames: FrameDict) -> None:
-        """The SMOOTH group steps, then the similarity smoother (the pose thread)."""
-        frames = self.similarity_hold.process(frames)
-        frames = self.similarity_sticky.process(frames)
-        self.similarity_smooth.process(frames)
-
-    def _process_motion_gate(self, frames: FrameDict) -> None:
-        """The LERP group step, then the LERP stage output (the render thread)."""
-        self.stages[Stage.LERP](self.motion_gate.process(frames))
+    def _update_poses(self, now: float) -> None:
+        """The render tick drives the pipeline's output domain (LERP) at the frame's time."""
+        self.pipeline.update(Domain.OUTPUT, now)
 
     def stop(self) -> None:
         if not self.is_running:
@@ -325,7 +214,7 @@ class HDTrioMain:
 
         self.session_osc.stop()
 
-        self.pose_predictor.stop()
+        self.pose_inference.stop()
         if self.person_detector is not None:
             self.person_detector.stop()
         self.segmentation_predictor.stop()

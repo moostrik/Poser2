@@ -1,8 +1,15 @@
 ---
-description: "Use when editing pose nodes, trackers, windows, or analytics"
-applyTo: "modules/pose/**, modules/pose/trackers/**, modules/pose/window/**, modules/pose/analytics/**"
+description: "Use when editing pose nodes, trackers, windows, analytics or the pipeline builder"
+applyTo: "modules/pose/**, modules/pose/trackers/**, modules/pose/window/**, modules/pose/analytics/**, modules/pose/pipeline/**, apps/*/pose/pipeline.py"
 ---
 # Pose Processing Guidelines
+
+## Pipeline
+
+- An app declares its stages in `apps/<app>/pose/pipeline.py` as a `PipelineSpec`; `main.py` builds the `PosePipeline`, connects the clocks and subscribes the board, the recorders and OSC
+- Only sources create poses; a stage's steps never add or remove one
+- A stage's interpolators are the one crossing from the frame domain to an output domain; a tick source joins at a stage the tick drives
+- A step entry is plain data: a node class with its settings object, or a node built once; no closures
 
 ## Nodes
 

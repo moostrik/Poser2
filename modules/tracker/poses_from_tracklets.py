@@ -40,6 +40,11 @@ class PosesFromTracklets(FrameDictCallbackMixin):
         self._lock = Lock()
         self._batch_id_counter = 0
 
+    @property
+    def track_ids(self) -> list[int]:
+        """The ids this source can emit: one slot per player."""
+        return list(range(self._max_players))
+
     def set_tracklets(self, tracklet_dict: dict[int, Tracklet]) -> None:
         """Set tracklets for pose generation.
 

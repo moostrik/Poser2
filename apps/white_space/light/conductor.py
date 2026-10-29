@@ -93,7 +93,7 @@ class Conductor(Thread):
                            DebugLayer(int(settings.debug)).name)
 
         self.fps_counter = FpsCounter()
-        self._update_callbacks: list[Callable[[], Any]] = []
+        self._update_callbacks: list[Callable[[Tick], Any]] = []
         self._light_frame_callbacks: list[LightFrameCallback] = []
 
 
@@ -167,7 +167,7 @@ class Conductor(Thread):
             phase=playhead, bars=self._playhead.bars, is_locked=self._playhead.is_locked,
             is_projecting=self._playhead.is_projecting))
 
-        self._notify_update()
+        self._notify_update(tick)
 
         # The state machine commands the motor from inside those callbacks, and on a state's
         # entry tick it also hands the Compositor that state's mix — so the frame takes the
@@ -192,9 +192,9 @@ class Conductor(Thread):
     # Callbacks
     # ------------------------------------------------------------------
 
-    def add_update_callback(self, callback: Callable[[], Any]) -> None:
-        """Register a callback fired at the start of each tick, before rendering.
-        Use for time-driven state advances (state machine, interpolators).
+    def add_update_callback(self, callback: Callable[[Tick], Any]) -> None:
+        """Register a callback fired with the tick at the start of each one, before rendering.
+        Use for time-driven state advances (the pose pipeline's output domain, the state machine).
         """
         self._update_callbacks.append(callback)
 
@@ -204,10 +204,10 @@ class Conductor(Thread):
         """
         self._light_frame_callbacks.append(callback)
 
-    def _notify_update(self) -> None:
+    def _notify_update(self, tick: Tick) -> None:
         for cb in self._update_callbacks:
             try:
-                cb()
+                cb(tick)
             except Exception:
                 logger.exception("Error in light conductor update callback")
 

@@ -1,5 +1,7 @@
 """Tracks feature windows for all scalar features across multiple tracks."""
 
+from typing import Iterable
+
 from .window_node import WindowNode, WindowNodeSettings
 from ..features import SCALAR_FEATURES, BaseFeature, BaseScalarFeature
 from ..frame import FeatureWindow, FrameDict, FrameWindowDict, FrameWindowDictCallbackMixin
@@ -16,8 +18,9 @@ class WindowTracker(FrameWindowDictCallbackMixin):
     Automatically resets buffers when a track disappears.
     """
 
-    def __init__(self, max_players: int, settings: WindowNodeSettings | None = None,
+    def __init__(self, track_ids: Iterable[int], settings: WindowNodeSettings | None = None,
                  features: list[type[BaseScalarFeature]] | None = None) -> None:
+        """``track_ids`` are the ids the tracker windows: the ids that reach its stage."""
         super().__init__()
 
         if settings is None:
@@ -28,11 +31,11 @@ class WindowTracker(FrameWindowDictCallbackMixin):
         if features is None:
             features = SCALAR_FEATURES
 
+        self._track_ids = set(track_ids)
         self._nodes: dict[type[BaseFeature], dict[int, WindowNode]] = {
-            ft: {i: WindowNode(ft, settings) for i in range(max_players)}
+            ft: {i: WindowNode(ft, settings) for i in self._track_ids}
             for ft in features
         }
-        self._track_ids = set(range(max_players))
 
     def process(self, poses: FrameDict) -> None:
         """Append poses to all window nodes; emit a FrameWindowDict only to registered callbacks.

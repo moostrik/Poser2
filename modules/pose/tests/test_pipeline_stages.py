@@ -1,14 +1,18 @@
-"""End-to-end test of the pose stage chain, built from module nodes the way apps/white_space/main.py wires it.
+"""End-to-end test of the pose stage chain, built by the pipeline builder from module nodes the way the apps'
+pipeline files declare it (apps/hd_trio/pose/pipeline.py with White Space's azimuth and posture steps).
 
-CLEAN → SMOOTH → PREDICT → chase-interpolate → LERP extractors → motion gate, driven tick by tick with a moving
-skeleton for two tracks: a confidence dropout on one wrist, and one track that leaves and comes back. App-local
-nodes (the playhead offset) are left out; similarity is fed into the result hold instead of through the
-threaded WindowSimilarity. Keep the node lists in step with main.py when its stages change.
+RAW → CLEAN → SMOOTH → PREDICT in the frame domain, then the crossing into LERP on the tick, driven tick by
+tick with a moving skeleton for two tracks: a confidence dropout on one wrist, and one track that leaves and
+comes back. App-local nodes (the playhead offset) are left out; similarity is fed into the result hold
+instead of through the threaded WindowSimilarity. Keep the node lists in step with the apps' pipeline files
+when their stages change.
 """
 
 import logging
 import math
 import unittest
+from enum import IntEnum
+from functools import partial
 
 import numpy as np
 
@@ -34,7 +38,8 @@ from modules.pose.nodes import (
     StickyFillerSettings, TorsoTiltExtractor,
     TorsoTiltExtractorSettings,
 )
-from modules.pose.trackers import FilterPipeline, FilterTracker, InterpolatorPipeline, InterpolatorTracker
+from modules.pose.pipeline import Domain, GroupStep, PipelineSpec, PosePipeline, PoseStep, StageSpec
+from modules.pose.window import WindowNodeSettings
 from modules.utils import Rect
 
 from ._builders import FPS, NUM_POSES, frame, points, skeleton_coords
@@ -42,7 +47,30 @@ from ._builders import FPS, NUM_POSES, frame, points, skeleton_coords
 TICKS = 90
 DROPOUT = range(30, 35)        # track 0's left wrist falls below the confidence threshold
 ABSENT = range(40, 50)         # track 1 is not detected
-STAGES = ('raw', 'clean', 'smooth', 'predict', 'lerp', 'gate')
+STAGES = ('raw', 'clean', 'smooth', 'predict', 'lerp')
+
+
+class Stage(IntEnum):
+    RAW = 0
+    CLEAN = 1
+    SMOOTH = 2
+    PREDICT = 3
+    LERP = 4
+
+
+class _Source:
+    """The camera source: pushes a tick's raw frames into the frame domain."""
+
+    def __init__(self, track_ids: list[int]) -> None:
+        self.track_ids = track_ids
+        self._callbacks: list = []
+
+    def add_frames_callback(self, callback) -> None:
+        self._callbacks.append(callback)
+
+    def emit(self, frames: FrameDict) -> None:
+        for callback in self._callbacks:
+            callback(frames)
 
 
 class _Settings:
@@ -82,91 +110,89 @@ class _Settings:
 class _Stages:
     def __init__(self) -> None:
         ps = self.settings = _Settings()
-        tracks = range(NUM_POSES)
-
-        self.clean = FilterTracker({i: FilterPipeline([
-            PointDualConfidenceFilter(ps.confidence),
-            PointStickyFiller(ps.point_sticky),
-            AzimuthExtractor(lambda _cam, x: x),
-            AngleExtractor(ps.angle_extractor),
-            AngleCalibrator(ps.angle_calibrator),
-            AngleVelocityExtractor(ps.velocity_extractor),
-        ]) for i in tracks})
-
-        self.smooth = FilterTracker({i: FilterPipeline([
-            PointEuroSmoother(ps.point_smoother),
-            AngleExtractor(ps.angle_extractor),
-            AngleCalibrator(ps.angle_calibrator),
-            AngleVelocityExtractor(ps.velocity_extractor),
-            AngleVelocityEuroSmoother(ps.velocity_smoother),
-            AngleEuroSmoother(ps.angle_smoother),
-            AzimuthEuroSmoother(ps.azimuth_smoother),
-            AngleMotionExtractor(ps.motion_extractor),
-            AngleMotionMovingAverageSmoother(ps.motion_average),
-            AngleSymmetryExtractor(ps.leg_deviation),
-            LegDeviationExtractor(ps.leg_deviation),
-            ArmDeviationExtractor(ps.arm_deviation),
-            ArmTravelExtractor(ps.arm_travel),
-            ShoulderDifferenceExtractor(),
-            TorsoTiltExtractor(ps.torso_tilt),
-            MotionTimeExtractor(),
-            AgeExtractor(),
-        ]) for i in tracks})
-        # The group steps: the held analytics result stamped, a present pair's gap bridged; then smoothed.
+        self.source = _Source(list(range(NUM_POSES)))
         self.similarity_hold = SimilarityResultHold()
-        self.similarity_sticky = SimilarityStickyFiller(ps.similarity_sticky)
-        self.similarity_smooth = FilterTracker({i: FilterPipeline([
-            SimilarityEuroSmoother(ps.similarity_smoother),
-        ]) for i in tracks})
+        self.pipeline = PosePipeline(PipelineSpec([
+            StageSpec(Stage.RAW, self.source, []),
 
-        self.predict = FilterTracker({i: FilterPipeline([
-            PointPredictor(ps.point_prediction),
-            AnglePredictor(ps.angle_prediction),
-            AngleVelocityPredictor(ps.velocity_prediction),
-            AzimuthPredictor(ps.azimuth_prediction),
-            AngleStickyFiller(ps.angle_sticky),
-        ]) for i in tracks})
+            StageSpec(Stage.CLEAN, Stage.RAW, [
+                PoseStep(PointDualConfidenceFilter, ps.confidence),
+                PoseStep(PointStickyFiller, ps.point_sticky),
+                PoseStep(AzimuthExtractor, lambda _cam, x: x),
+                PoseStep(AngleExtractor, ps.angle_extractor),
+                PoseStep(AngleCalibrator, ps.angle_calibrator),
+                PoseStep(AngleVelocityExtractor, ps.velocity_extractor),
+            ]),
 
-        self.interpolate = InterpolatorTracker({i: InterpolatorPipeline([
-            PointChaseInterpolator(ps.point_interpolator),
-            AngleChaseInterpolator(ps.angle_interpolator),
-            AngleVelocityChaseInterpolator(ps.velocity_interpolator),
-            SimilarityChaseInterpolator(ps.similarity_interpolator),
-            AzimuthChaseInterpolator(ps.azimuth_interpolator),
-        ]) for i in tracks})
+            StageSpec(Stage.SMOOTH, Stage.CLEAN, [
+                PoseStep(PointEuroSmoother, ps.point_smoother),
+                PoseStep(AngleExtractor, ps.angle_extractor),
+                PoseStep(AngleCalibrator, ps.angle_calibrator),
+                PoseStep(AngleVelocityExtractor, ps.velocity_extractor),
+                PoseStep(AngleVelocityEuroSmoother, ps.velocity_smoother),
+                PoseStep(AngleEuroSmoother, ps.angle_smoother),
+                PoseStep(AzimuthEuroSmoother, ps.azimuth_smoother),
+                PoseStep(AngleMotionExtractor, ps.motion_extractor),
+                PoseStep(AngleMotionMovingAverageSmoother, ps.motion_average),
+                PoseStep(AngleSymmetryExtractor, ps.leg_deviation),
+                PoseStep(LegDeviationExtractor, ps.leg_deviation),
+                PoseStep(ArmDeviationExtractor, ps.arm_deviation),
+                PoseStep(ArmTravelExtractor, ps.arm_travel),
+                PoseStep(ShoulderDifferenceExtractor),
+                PoseStep(TorsoTiltExtractor, ps.torso_tilt),
+                PoseStep(MotionTimeExtractor),
+                PoseStep(AgeExtractor),
+                # The group steps: the held analytics result stamped, a present pair's gap bridged; then smoothed.
+                GroupStep(self.similarity_hold),
+                GroupStep(SimilarityStickyFiller(ps.similarity_sticky)),
+                PoseStep(SimilarityEuroSmoother, ps.similarity_smoother),
+            ], window=WindowNodeSettings()),
 
-        self.lerp = FilterTracker({i: FilterPipeline([
-            AngleSymmetryExtractor(ps.leg_deviation),
-            LegDeviationExtractor(ps.leg_deviation),
-            ArmDeviationExtractor(ps.arm_deviation),
-            ArmTravelExtractor(ps.arm_travel),
-            ShoulderDifferenceExtractor(),
-            TorsoTiltExtractor(ps.torso_tilt),
-            MotionTimeExtractor(),
-            AgeExtractor(),
-            AngleVelocityStickyFiller(ps.velocity_sticky),
-            AngleVelocityEuroSmoother(ps.velocity_smoother),
-            AngleMotionExtractor(ps.motion_extractor),
-            AngleMotionMovingAverageSmoother(ps.motion_average),
-        ]) for i in tracks})
+            StageSpec(Stage.PREDICT, Stage.SMOOTH, [
+                PoseStep(PointPredictor, ps.point_prediction),
+                PoseStep(AnglePredictor, ps.angle_prediction),
+                PoseStep(AngleVelocityPredictor, ps.velocity_prediction),
+                PoseStep(AzimuthPredictor, ps.azimuth_prediction),
+                PoseStep(AngleStickyFiller, ps.angle_sticky),
+            ]),
 
-        self.motion_gate = MotionGateExtractor()
+            StageSpec(Stage.LERP, Stage.PREDICT, [
+                PoseStep(AngleSymmetryExtractor, ps.leg_deviation),
+                PoseStep(LegDeviationExtractor, ps.leg_deviation),
+                PoseStep(ArmDeviationExtractor, ps.arm_deviation),
+                PoseStep(ArmTravelExtractor, ps.arm_travel),
+                PoseStep(ShoulderDifferenceExtractor),
+                PoseStep(TorsoTiltExtractor, ps.torso_tilt),
+                PoseStep(MotionTimeExtractor),
+                PoseStep(AgeExtractor),
+                PoseStep(AngleVelocityStickyFiller, ps.velocity_sticky),
+                PoseStep(AngleVelocityEuroSmoother, ps.velocity_smoother),
+                PoseStep(AngleMotionExtractor, ps.motion_extractor),
+                PoseStep(AngleMotionMovingAverageSmoother, ps.motion_average),
+                GroupStep(MotionGateExtractor()),
+            ], domain=Domain.OUTPUT, interpolators=[
+                PoseStep(PointChaseInterpolator, ps.point_interpolator),
+                PoseStep(AngleChaseInterpolator, ps.angle_interpolator),
+                PoseStep(AngleVelocityChaseInterpolator, ps.velocity_interpolator),
+                PoseStep(SimilarityChaseInterpolator, ps.similarity_interpolator),
+                PoseStep(AzimuthChaseInterpolator, ps.azimuth_interpolator),
+            ]),
+        ]))
+        self.out: dict[str, list[FrameDict]] = {}
+        for stage in Stage:
+            self.pipeline.add_frames_callback(stage, partial(self._record, stage.name.lower()))
 
-    def tick(self, raw: FrameDict) -> dict[str, list[FrameDict]]:
-        """One input tick: the 30 Hz stages once, then two 60 Hz interpolation updates."""
-        out: dict[str, list[FrameDict]] = {'raw': [raw]}
+    def _record(self, name: str, frames: FrameDict) -> None:
+        self.out[name].append(frames)
+
+    def tick(self, raw: FrameDict, now: float) -> dict[str, list[FrameDict]]:
+        """One input tick: the 30 Hz stages once on the bang, then two 60 Hz ticks of the output domain."""
+        self.out = {name: [] for name in STAGES}
         self._feed_similarity(raw)
-        out['clean'] = [self.clean.process(raw)]
-        smooth = self.similarity_sticky.process(self.similarity_hold.process(self.smooth.process(out['clean'][0])))
-        out['smooth'] = [self.similarity_smooth.process(smooth)]
-        out['predict'] = [self.predict.process(out['smooth'][0])]
-        self.interpolate.set(out['predict'][0])
-        out['lerp'], out['gate'] = [], []
+        self.source.emit(raw)
         for _ in range(2):
-            lerp = self.lerp.process(self.interpolate.update())
-            out['lerp'].append(lerp)
-            out['gate'].append(self.motion_gate.process(lerp))
-        return out
+            self.pipeline.update(Domain.OUTPUT, now)
+        return self.out
 
     def _feed_similarity(self, raw: FrameDict) -> None:
         """What WindowSimilarity publishes: nothing for fewer than two tracks, else a row per track."""
@@ -217,7 +243,7 @@ class PipelineStagesTest(unittest.TestCase):
         logger.addHandler(handler)
         try:
             stages = _Stages()
-            cls.history = [stages.tick(_raw(i)) for i in range(TICKS)]
+            cls.history = [stages.tick(_raw(i), i / FPS) for i in range(TICKS)]
         finally:
             logger.removeHandler(handler)
         cls.errors = records
@@ -230,6 +256,11 @@ class PipelineStagesTest(unittest.TestCase):
 
     def test_no_errors_logged(self) -> None:
         self.assertEqual([r.getMessage() for r in self.errors], [])
+
+    def test_every_stage_emits_once_per_bang_and_lerp_once_per_tick(self) -> None:
+        for outputs in self.history:
+            for stage in STAGES:
+                self.assertEqual(len(outputs[stage]), 2 if stage == 'lerp' else 1, stage)
 
     def test_every_stage_emits_contract_valid_features(self) -> None:
         for stage in STAGES:
@@ -271,8 +302,8 @@ class PipelineStagesTest(unittest.TestCase):
                 for tick, tid, f in self._frames(stage):
                     self.assertAlmostEqual(f[Azimuth].value, 0.5 + tid, places=4, msg=f"tick {tick} track {tid}")
 
-    def test_gate_stage_adds_motion_gate(self) -> None:
-        _, _, f = list(self._frames('gate'))[-1]
+    def test_lerp_stage_adds_the_motion_gate(self) -> None:
+        _, _, f = list(self._frames('lerp'))[-1]
         self.assertIn(MotionGate, f)
 
     def test_sticky_fill_bridges_wrist_dropout(self) -> None:

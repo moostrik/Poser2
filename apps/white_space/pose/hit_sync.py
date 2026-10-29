@@ -39,7 +39,7 @@ from .playhead_offset import PlayheadCrossing, PlayheadOffset, playhead_step
 
 if TYPE_CHECKING:
     from ..render_board import RenderBoard
-    from ..light import LightSettings
+    from ..light import LightSettings, Tick
 
 _KEPT_HITS = 16          # more than a round of the largest room
 _FULL = 1.0 - 1e-6       # "reads 1" for a float: the similarity's plateau, the deviation's top
@@ -82,9 +82,10 @@ class HitSync:
         self._crossing.reset()
         self._streak = (0, 0.0)
 
-    def update(self) -> None:
+    def update(self, _tick: Tick) -> None:
         """One light tick: record this tick's hits on poses old enough, drop those older than a round, publish
-        the streak. The crossing runs on every pose, so a pose that comes of age mid-pass fires no second hit."""
+        the streak. The crossing runs on every pose, so a pose that comes of age mid-pass fires no second hit.
+        The playhead, not the tick's time, is the clock here."""
         signals = self._board.get_playhead_signals()
         frames = self._board.get_frames(self._pose_stage)
         step = playhead_step(self._light.motor.beam_rpm, 1.0 / self._light.light_rate)

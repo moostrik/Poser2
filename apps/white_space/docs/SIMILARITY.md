@@ -62,7 +62,7 @@ The arms are alike, then, when every arm joint is within the tolerance, allowing
 
 | | Hit sync | `Similarity` feature |
 |-----------------------|----------------------------------------------------------|---------------------------------------------------------------|
-| Component             | `HitSync` (`pose/hit_sync.py`)                           | `PostureSimilarityExtractor` (a group step), wired in `main.py` |
+| Component             | `HitSync` (`pose/hit_sync.py`)                           | `PostureSimilarityExtractor` (a group step of SMOOTH in `pose/pipeline.py`) |
 | Input                 | the hit player's LERP pose at the hit tick, once the pose is `sync.min_age_seconds` old | the current SMOOTH poses, every frame |
 | Reads                 | the distance, and the similarity's plateau               | the similarity, 0 to 1                                        |
 | Neutral               | a gate: every hit in the run has `ArmDeviation` 1        | a ramp: the pair times the smaller `ArmDeviation` (`pose/neutral_weight.py`) |

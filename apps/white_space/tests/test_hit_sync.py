@@ -9,7 +9,7 @@ import numpy as np
 from modules.board import HitStreak
 from modules.pose import analytics, Age, Angles, AngleLandmark, ArmDeviation
 
-from apps.white_space.light import LightSettings
+from apps.white_space.light import LightSettings, Tick
 from apps.white_space.pose import HitSync, HitSyncSettings, NeutralWeightSettings, PlayheadOffset
 
 POSE_STAGE = 4
@@ -75,7 +75,7 @@ class HitSyncTest(unittest.TestCase):
 
     def _tick(self, dbar: float = 0.0) -> HitStreak:
         self.board.bars += dbar
-        self.sync.update()
+        self.sync.update(Tick(0.0, 0.0))
         return self.board.streaks[-1]
 
     def hit(self, id: int, degrees: float = 60.0, arms: float = 1.0, age: float = 10.0) -> HitStreak:
