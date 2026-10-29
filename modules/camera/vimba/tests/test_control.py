@@ -152,6 +152,7 @@ class TestSensorControl(unittest.TestCase):
         self.control._read_next = 0.0
         self.control.update(self.camera)
         self.assertEqual(self.settings.readings.video_min_fps, 10.0)
+        self.control._frames_time -= 0.5                    # another interval, without frames
         self.control._read_next = 0.0
         self.control.update(self.camera)
         self.assertEqual(self.settings.readings.video_min_fps, 0.0)    # no frames since: no gap
