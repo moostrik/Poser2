@@ -5,7 +5,7 @@ from typing import cast
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId, WindowSettings
-from modules.camera import CameraSettings, CameraCheckSettings
+from modules.camera import RigCameraSettings, CameraCheckSettings
 from modules.render import layers as ls, make_subdivision, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
 
@@ -45,7 +45,7 @@ LARGE_LAYERS: list[Layers] = [
 
 class DeepFlowRender(RenderBase):
     def __init__(self, board: RenderBoard, settings: RenderSettings,
-                 cameras: list[CameraSettings], camera_check: CameraCheckSettings,
+                 cameras: list[RigCameraSettings], camera_check: CameraCheckSettings,
                  num_cams: int = 1, num_players: int = 1) -> None:
         super().__init__(settings.window)
         self.num_players: int = num_players

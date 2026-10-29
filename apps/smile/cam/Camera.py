@@ -1,23 +1,25 @@
-"""The app's image source: the frames of a camera device (Vimba or webcam), or, with `use_image` on,
-an image from `input/`, whether a device was found or not; or, during an online turn, the frames of a
-phone (`set_online`, `push_online`: SMILE Online, modules/online/). Every frame is fitted to the output size
-here (`cover`: scaled to fill it, the middle kept, no distortion); the device only rotates and flips.
-A missing device is a warning and the
-`device` readout says `none`; there is no automatic fallback to the image, so a failed camera on
-site stays visible. The device is kept when it did not open: one that keeps trying (Vimba) delivers
-when it is there, and the readout follows it. Every frame has the time it arrived (`frame()`), so
-a source that stopped is told from one that delivers (`stalled`)."""
+"""The app's image source: the frames of a camera device (a `CameraSource`: the Vimba camera or the
+webcam, `modules/camera/`), or, with `use_image` on, an image from `input/`, whether a device was
+found or not; or, during an online turn, the frames of a phone (`set_online`, `push_online`: SMILE
+Online, modules/online/). Every frame is fitted to the output size here (`cover`: scaled to fill it,
+the middle kept, no distortion); the device only rotates and flips. A missing device is a warning
+and the `device` readout says `none`; there is no automatic fallback to the image, so a failed
+camera on site stays visible. The device is kept when it did not connect: one that keeps trying
+(Vimba) delivers when it is there, and the readout follows it. Every frame has the time it arrived
+(`frame()`: a device frame the time its backend stamped), so a source that stopped is told from one
+that delivers (`stalled`)."""
 
 import logging
 import os
 from threading import Lock, Thread
 from time import sleep, time
-from typing import Any, Callable, Protocol
+from typing import Any, Callable
 
 import cv2
 import numpy as np
 
 from apps.smile.cam.settings import CameraSettings
+from modules.camera import CameraFrame, CameraSource
 
 logger = logging.getLogger(__name__)
 
@@ -27,17 +29,6 @@ IMAGE_FPS: float = 25.0
 STALLED_AFTER: float = 3.0      # s without a frame: the source has stopped
 
 FrameCallback = Callable[[np.ndarray], None]
-
-
-class Device(Protocol):
-    """A camera device: VimbaCam or WebCam. Frames come through the colour callback."""
-    def open(self) -> bool: ...
-    def isOpen(self) -> bool: ...
-    def close(self) -> None: ...
-    def startCapture(self) -> None: ...
-    def setColorCallback(self, callback: FrameCallback) -> None: ...
-    def clearColorCallbacks(self) -> None: ...
-    def setRotate90(self, rotate90: bool) -> None: ...
 
 
 def cover(image: np.ndarray, width: int, height: int) -> np.ndarray:
@@ -60,10 +51,10 @@ def list_images(folder: str) -> list[str]:
 
 
 class Camera:
-    def __init__(self, settings: CameraSettings, size: tuple[int, int], device: Device | None, device_name: str = 'none', folder: str = IMAGE_FOLDER) -> None:
+    def __init__(self, settings: CameraSettings, size: tuple[int, int], device: CameraSource | None, device_name: str = 'none', folder: str = IMAGE_FOLDER) -> None:
         self.settings: CameraSettings = settings
         self._width, self._height = size
-        self._device: Device | None = device
+        self._device: CameraSource | None = device
         self._device_name: str = device_name
         self._device_shown: str | None = None       # what the device readout says
         self._folder: str = folder
@@ -82,42 +73,32 @@ class Camera:
         self.settings.bind(CameraSettings.reload, self._on_reload)
 
     # LIFECYCLE
-    def open(self) -> bool:
+    def start(self) -> None:
         self.scan()
         self._load()
         if self._device is not None:
+            self._device.add_frame_callback(self._on_device_frame)
             try:
-                opened: bool = self._device.open()
+                self._device.start()
             except Exception as e:
-                logger.warning('Camera %s failed to open: %s', self._device_name, e)
-                opened = False
-            # also when it did not open: a device that keeps trying (Vimba) delivers when it is there
-            self._device.setColorCallback(self._on_device_frame)
-            if not opened:
+                logger.warning('Camera %s failed to start: %s', self._device_name, e)
+            # also when it did not connect: a device that keeps trying (Vimba) delivers when it is there
+            if not self._device.connected:
                 logger.warning('No camera device (%s): only the image source is available', self._device_name)
         self._show_device()
         self._running = True
         self._thread.start()
-        return True
 
-    def startCapture(self) -> None:
-        if self._device is not None:
-            self._device.startCapture()
-
-    def close(self) -> None:
+    def stop(self) -> None:
         self.settings.unbind(CameraSettings.image, self._on_image)
         self.settings.unbind(CameraSettings.reload, self._on_reload)
         if self._running:
             self._running = False
             self._thread.join()
         if self._device is not None:
-            self._device.clearColorCallbacks()
-            self._device.close()
-
-    def setRotate90(self, rotate90: bool) -> None:
-        # the image source is fitted to the output size as it is
-        if self._device is not None:
-            self._device.setRotate90(rotate90)
+            self._device.stop()
+            self._device.join()
+        self.clear_frame_callbacks()
 
     # FRAMES
     def getColorImg(self) -> np.ndarray:
@@ -135,19 +116,20 @@ class Camera:
         with self._mutex:
             return time() - self._frame_time > STALLED_AFTER
 
-    def setColorCallback(self, callback: FrameCallback) -> None:
+    def add_frame_callback(self, callback: FrameCallback) -> None:
         with self._mutex:
             self._callbacks.append(callback)
 
-    def clearColorCallbacks(self) -> None:
+    def clear_frame_callbacks(self) -> None:
         with self._mutex:
             self._callbacks = []
 
-    def _on_device_frame(self, frame: np.ndarray) -> None:
+    def _on_device_frame(self, frame: CameraFrame) -> None:
+        # on the device's thread
         if self.settings.use_image or self._online:
             return
         # the one fit of every source to the output size: the device sends its frames as they are
-        self._emit(cover(frame, self._width, self._height))
+        self._emit(cover(frame.image, self._width, self._height), frame.time)
 
     # ONLINE SOURCE: the frames of a phone during its turn (modules/online/), in place of the device
     # and the image; the device keeps running underneath and is back the moment the turn ends
@@ -163,7 +145,7 @@ class Camera:
         """A frame of the online source: fitted like any other; dropped while the source is off."""
         if not self._online:
             return
-        self._emit(cover(frame, self._width, self._height))
+        self._emit(cover(frame, self._width, self._height), time())
 
     def _run(self) -> None:
         # the image source: emitted at its own rate while it is in use
@@ -171,22 +153,22 @@ class Camera:
             self._show_device()
             image: np.ndarray | None = self._image
             if self.settings.use_image and image is not None and not self._online:
-                self._emit(image)
+                self._emit(image, time())
                 sleep(1.0 / IMAGE_FPS)
             else:
                 sleep(0.01)
 
     def _show_device(self) -> None:
-        """The device readout: its name while it is open, `none` while it is not (yet, or any more)."""
-        name: str = self._device_name if self._device is not None and self._device.isOpen() else 'none'
+        """The device readout: its name while it is connected, `none` while it is not (yet, or any more)."""
+        name: str = self._device_name if self._device is not None and self._device.connected else 'none'
         if name != self._device_shown:
             self._device_shown = name
             self.settings.device = name
 
-    def _emit(self, frame: np.ndarray) -> None:
+    def _emit(self, frame: np.ndarray, arrived: float) -> None:
         with self._mutex:
             self._frame = frame
-            self._frame_time = time()
+            self._frame_time = arrived
             callbacks: list[FrameCallback] = list(self._callbacks)
         for c in callbacks:
             c(frame)

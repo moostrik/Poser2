@@ -2,7 +2,7 @@
 
 import math
 
-from .settings import CameraSettings, CameraCheckSettings
+from .settings import RigCameraSettings, CameraCheckSettings
 
 # The fraction a camera's measured frame rate may drift from its configured `fps` before it warns.
 FPS_TOLERANCE: float = 0.05
@@ -12,7 +12,7 @@ FPS_TOLERANCE: float = 0.05
 MIN_RATE_FACTOR: float = 0.5
 
 
-def mount_deviation(camera: CameraSettings) -> tuple[float, float]:
+def mount_deviation(camera: RigCameraSettings) -> tuple[float, float]:
     """The camera's signed ``(tilt, roll)`` deviation in degrees; NaN where it has no reading.
 
     - **tilt** — ``tilt_measured - tilt``. `tilt` is the value the warp mesh was baked with, so
@@ -24,7 +24,7 @@ def mount_deviation(camera: CameraSettings) -> tuple[float, float]:
     return (camera.readings.tilt_measured - camera.tilt, camera.readings.roll_measured)
 
 
-def fps_deviation(camera: CameraSettings) -> float:
+def fps_deviation(camera: RigCameraSettings) -> float:
     """The camera's signed frame-rate deviation as a fraction of its configured `fps`."""
     return camera.readings.video_fps / camera.fps - 1.0
 
@@ -51,8 +51,8 @@ class CameraCheck:
     to teach someone to ignore warnings.
     """
 
-    def __init__(self, cameras: list[CameraSettings], settings: CameraCheckSettings) -> None:
-        self._cameras: list[CameraSettings] = cameras
+    def __init__(self, cameras: list[RigCameraSettings], settings: CameraCheckSettings) -> None:
+        self._cameras: list[RigCameraSettings] = cameras
         self._settings: CameraCheckSettings = settings
 
     def update(self) -> None:

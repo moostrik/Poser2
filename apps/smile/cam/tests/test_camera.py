@@ -10,36 +10,37 @@ import numpy as np
 
 from apps.smile.cam.Camera import Camera, cover, list_images
 from apps.smile.cam.settings import CameraSettings
+from modules.camera import CameraFrame, FrameType
 
 
 class FakeDevice:
-    def __init__(self, opens: bool = True) -> None:
-        self.opens = opens
+    """A `CameraSource` whose connection the test switches; the test pushes its frames."""
+
+    def __init__(self, connects: bool = True) -> None:
+        self.connects = connects
         self.callbacks = []
-        self.closed = False
+        self.started = False
+        self.stopped = False
+        self.joined = False
 
-    def open(self) -> bool:
-        return self.opens
+    @property
+    def connected(self) -> bool:
+        return self.connects
 
-    def isOpen(self) -> bool:
-        return self.opens
+    def start(self) -> None:
+        self.started = True
 
-    def close(self) -> None:
-        self.closed = True
+    def stop(self) -> None:
+        self.stopped = True
 
-    def startCapture(self) -> None:
-        pass
+    def join(self, timeout=None) -> None:
+        self.joined = True
 
-    def setColorCallback(self, callback) -> None:
+    def add_frame_callback(self, callback) -> None:
         self.callbacks.append(callback)
 
-    def clearColorCallbacks(self) -> None:
-        self.callbacks = []
-
-    def setRotate90(self, rotate90: bool) -> None:
-        pass
-
-    def push(self, frame: np.ndarray) -> None:
+    def push(self, image: np.ndarray) -> None:
+        frame = CameraFrame(cam_id=0, kind=FrameType.VIDEO, image=image, time=time.time())
         for c in self.callbacks:
             c(frame)
 
@@ -65,12 +66,12 @@ class TestCamera(unittest.TestCase):
 
     def tearDown(self):
         if self.camera is not None:
-            self.camera.close()
+            self.camera.stop()
 
     def make(self, device):
         self.camera = Camera(self.settings, (8, 6), device, 'fake', folder=self.folder)
-        self.camera.setColorCallback(self.frames.append)
-        self.camera.open()
+        self.camera.add_frame_callback(self.frames.append)
+        self.camera.start()
         return self.camera
 
     def test_lists_the_folder_and_selects_the_first_image(self):
@@ -116,22 +117,23 @@ class TestCamera(unittest.TestCase):
         self.assertEqual(self.camera.frame()[1], arrived)
 
     def test_a_missing_device_is_none_and_the_image_still_works(self):
-        self.make(FakeDevice(opens=False))
+        self.make(FakeDevice(connects=False))
         self.assertEqual(self.settings.device, 'none')
         self.assertEqual(self.frames, [])
         self.settings.use_image = True
         self.assertTrue(wait_for(lambda: len(self.frames) > 0))
 
-    def test_a_device_that_opens_later_delivers_and_shows(self):
-        device = FakeDevice(opens=False)
+    def test_a_device_that_connects_later_delivers_and_shows(self):
+        device = FakeDevice(connects=False)
         self.make(device)
+        self.assertTrue(device.started)         # kept: it keeps trying
         self.assertEqual(self.settings.device, 'none')
-        device.opens = True                     # found after all: it kept trying
+        device.connects = True                  # found after all
         self.assertTrue(wait_for(lambda: self.settings.device == 'fake'))
         frame = np.zeros((6, 8, 3), dtype=np.uint8)
         device.push(frame)
         self.assertIs(self.camera.frame()[0], frame)
-        device.opens = False                    # and gone again
+        device.connects = False                 # and gone again
         self.assertTrue(wait_for(lambda: self.settings.device == 'none'))
 
     def test_changing_the_image_loads_the_new_file(self):
@@ -169,13 +171,12 @@ class TestCamera(unittest.TestCase):
         self.camera.next_image()
         self.assertEqual(self.settings.image, 'a.jpg')
 
-    def test_close_closes_the_device(self):
+    def test_stop_stops_the_device(self):
         device = FakeDevice()
         self.make(device)
-        self.camera.close()
+        self.camera.stop()
         self.camera = None
-        self.assertTrue(device.closed)
-        self.assertEqual(device.callbacks, [])
+        self.assertTrue(device.stopped and device.joined)
 
 
 class TestHelpers(unittest.TestCase):

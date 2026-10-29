@@ -1,7 +1,7 @@
-"""One OAK camera's settings: the contract's `CameraSettings` plus what shapes its pipeline and
+"""One OAK camera's settings: the contract's `RigCameraSettings` plus what shapes its pipeline and
 the sensor controls. Pure data; `SensorControl` writes the sensor fields to the device."""
 
-from .. import CameraSettings, CameraResolution
+from .. import RigCameraSettings, CameraResolution
 from modules.settings import BaseSettings, Field, Group, Widget
 
 from .definitions import (
@@ -34,12 +34,12 @@ class MonoSensorSettings(BaseSettings):
     ir_flood_light: Field[float] = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
 
 
-class OakCameraSettings(CameraSettings):
+class OakCameraSettings(RigCameraSettings):
     """One OAK camera: the contract's rate, mount and readings, plus what shapes its pipeline.
 
     The tunables live in subgroups — `readings`, `color_sensor`, `mono_sensor` — because forty
     flat fields in one panel is not something anyone reads. What stays at this level is what
-    shapes the pipeline (`color`, `square`, `yolo`, `resolution`) and the mount (`CameraSettings`),
+    shapes the pipeline (`color`, `square`, `yolo`, `resolution`) and the mount (`RigCameraSettings`),
     which are the fields a person actually sets. The preset keys are flat: the same `cam_0.tilt`
     as every other backend.
     """

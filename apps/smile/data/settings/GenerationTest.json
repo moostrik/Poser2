@@ -5,7 +5,7 @@
     "image_next": false,
     "flip_h": false,
     "flip_v": false,
-    "target_frame_rate": 30.0,
+    "fps": 30.0,
     "target_brightness": 33,
     "manual_exposure": 33000.0,
     "auto_exposure": true,

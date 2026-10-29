@@ -1,7 +1,7 @@
 from .source import         CameraSource, FrameCallback, TrackletCallback
 from .frame import          FrameType, CameraFrame
 from .tracklet import       TrackingStatus, CameraTracklet
-from .settings import       CameraSettings, CameraReadings, CameraCheckSettings
+from .settings import       CameraSettings, CameraReadings, RigCameraSettings, RigCameraReadings, CameraCheckSettings
 from .camera_check import   CameraCheck, FPS_TOLERANCE, MIN_RATE_FACTOR, mount_deviation, fps_deviation
 from .geometry import       CameraResolution, RESOLUTION_SIZES, MONO_RESOLUTIONS, COLOR_RESOLUTIONS, resolve_resolution, \
                             WARP_ALIGNMENT, aligned_height, mono_frame_size, color_frame_size, frame_size, mode_size, \

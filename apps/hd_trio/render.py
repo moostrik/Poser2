@@ -3,7 +3,7 @@
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId, WindowSettings
-from modules.camera import CameraSettings, CameraCheckSettings
+from modules.camera import RigCameraSettings, CameraCheckSettings
 from modules.render import layers as ls, make_subdivision, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
 
@@ -46,7 +46,7 @@ LARGE_LAYERS: list[Layers] = [
 
 class HDTrioRender(RenderBase):
     def __init__(self, board: RenderBoard, settings: RenderSettings,
-                 cameras: list[CameraSettings], camera_check: CameraCheckSettings, data_path: str = "") -> None:
+                 cameras: list[RigCameraSettings], camera_check: CameraCheckSettings, data_path: str = "") -> None:
         super().__init__(settings.window)
         self.num_players: int = settings.num_players
         self.num_cams: int = settings.num_cams

@@ -45,6 +45,10 @@ class Simulator(Camera):
         else:
             super().run()
 
+    @property
+    def connected(self) -> bool:  # override
+        return self.running if self.passthrough else self.device is not None
+
     def _setup_pipeline(self, pipeline: dai.Pipeline) -> None:  # override
         build_pipeline(pipeline, self.model_path, self.fps, self.color, self.square, self.yolo, self.resolution,
                        self.mount, frame_height=self.frame_height, clips=True, warp_clips=self.warp_clips)

@@ -1,5 +1,6 @@
 """Tests for the Vimba frame path against a fake frame (no camera, no thread started), and for the
-thread that opens the camera again against a fake camera (no Vimba system started)."""
+thread that opens the camera again against a fake camera (no Vimba system started). They need the
+binding, so they run where the Vimba SDK is installed."""
 
 import contextlib
 import time
@@ -8,13 +9,12 @@ from unittest import mock
 
 import numpy as np
 
-from apps.smile.cam.settings import CameraSettings
+from modules.camera import CameraFrame
+from modules.camera.vimba import Camera, VimbaCameraSettings
+from modules.camera.vimba.camera import CameraSetup, NoCamera, VIMBA_ERROR
 
-try:
-    from apps.smile.cam.VimbaCam import CameraSetup, NoCamera, VimbaCam
-    from apps.smile.cam.vimba import FrameStatus
-except Exception:       # the Vimba library is not installed on this machine
-    VimbaCam = None
+if VIMBA_ERROR is None:
+    from modules.camera.vimba.vimbapython import FrameStatus
 
 
 class FakeFrame:
@@ -37,44 +37,45 @@ class FakeCamera:
         self.queued.append(frame)
 
 
-@unittest.skipIf(VimbaCam is None, 'Vimba is not installed')
+@unittest.skipIf(VIMBA_ERROR is not None, 'Vimba is not installed')
 class TestVimbaCam(unittest.TestCase):
     def setUp(self):
-        self.settings = CameraSettings()
+        self.settings = VimbaCameraSettings()
         self.settings.initialize()
-        self.cam = VimbaCam(self.settings)
-        self.cam.capturing = True
+        self.cam = Camera(self.settings)
+        self.cam.running = True
         self.camera = FakeCamera()
 
     def tearDown(self):
-        self.cam.close()
+        self.cam.stop()
+        self.cam.join()
 
     def test_a_complete_frame_is_copied_and_given_back(self):
         frame = FakeFrame(10)
-        self.cam.frameCallback(self.camera, frame)
+        self.cam._frame_handler(self.camera, frame)
         self.assertEqual(self.camera.queued, [frame])
         frame.buffer[:] = 99                                # the driver reuses the buffer
-        taken = self.cam._take_internal_frame()
+        taken = self.cam._take_frame()
         self.assertEqual(int(taken[0, 0, 0]), 10)
 
     def test_a_frame_is_taken_once(self):
-        self.cam.frameCallback(self.camera, FakeFrame(10))
-        self.assertIsNotNone(self.cam._take_internal_frame())
-        self.assertIsNone(self.cam._take_internal_frame())
+        self.cam._frame_handler(self.camera, FakeFrame(10))
+        self.assertIsNotNone(self.cam._take_frame())
+        self.assertIsNone(self.cam._take_frame())
 
     def test_an_incomplete_frame_is_skipped_counted_and_given_back(self):
         frame = FakeFrame(10, complete=False)
-        self.cam.frameCallback(self.camera, frame)
+        self.cam._frame_handler(self.camera, frame)
         self.assertEqual(self.camera.queued, [frame])
-        self.assertIsNone(self.cam._take_internal_frame())
-        self.assertEqual(self.cam._features._dropped, 1)
+        self.assertIsNone(self.cam._take_frame())
+        self.assertEqual(self.cam.control._dropped, 1)
 
-    def test_no_frame_is_kept_while_not_capturing(self):
-        self.cam.capturing = False
+    def test_no_frame_is_kept_while_stopped(self):
+        self.cam.running = False
         frame = FakeFrame(10)
-        self.cam.frameCallback(self.camera, frame)
+        self.cam._frame_handler(self.camera, frame)
         self.assertEqual(self.camera.queued, [frame])
-        self.assertIsNone(self.cam._take_internal_frame())
+        self.assertIsNone(self.cam._take_frame())
 
 
 class StreamingCamera(FakeCamera):
@@ -111,15 +112,15 @@ def wait_for(condition, timeout: float = 3.0) -> bool:
     return condition()
 
 
-@unittest.skipIf(VimbaCam is None, 'Vimba is not installed')
+@unittest.skipIf(VIMBA_ERROR is not None, 'Vimba is not installed')
 class TestVimbaCamReopen(unittest.TestCase):
     def setUp(self):
-        self.settings = CameraSettings()
+        self.settings = VimbaCameraSettings()
         self.settings.initialize()
-        self.cam = VimbaCam(self.settings)
-        self.cam._features.update = lambda camera: None     # no features on the fake camera
-        self.frames: list[np.ndarray] = []
-        self.cam.setColorCallback(self.frames.append)
+        self.cam = Camera(self.settings)
+        self.cam.control.update = lambda camera: None       # no features on the fake camera
+        self.frames: list[CameraFrame] = []
+        self.cam.add_frame_callback(self.frames.append)
         self.camera = StreamingCamera()
         self.found: bool = True
         self.searches: int = 0
@@ -135,12 +136,13 @@ class TestVimbaCamReopen(unittest.TestCase):
         setup = CameraSetup(1500, 1200, 960, 46, 2)
         for name, value in (('Vimba', vimba), ('get_camera', get_camera), ('setup_camera', lambda camera, user_set: setup),
                             ('FRAME_TIMEOUT', 0.1), ('RETRY_INTERVAL', 0.02), ('STREAM_PAUSE', 0.02)):
-            patcher = mock.patch(f'apps.smile.cam.VimbaCam.{name}', value)
+            patcher = mock.patch(f'modules.camera.vimba.camera.{name}', value)
             patcher.start()
             self.addCleanup(patcher.stop)
 
     def tearDown(self):
-        self.cam.close()
+        self.cam.stop()
+        self.cam.join()
 
     def push(self) -> bool:
         handler = self.camera.handler
@@ -150,29 +152,30 @@ class TestVimbaCamReopen(unittest.TestCase):
 
     def test_a_camera_that_is_found_later_delivers(self):
         self.found = False
-        self.assertFalse(self.cam.open())
-        self.cam.startCapture()
+        self.cam.start()
+        self.assertFalse(self.cam.connected)
         self.assertTrue(wait_for(lambda: self.searches > 2))        # it keeps looking
-        self.assertFalse(self.cam.isOpen())
+        self.assertFalse(self.cam.connected)
         self.found = True
         self.assertTrue(wait_for(self.push))
-        self.assertTrue(self.cam.isOpen())
+        self.assertTrue(self.cam.connected)
+        self.assertEqual(self.frames[0].image.shape, (4, 6, 3))
+        self.assertGreater(self.frames[0].time, 0.0)
 
     def test_a_camera_whose_frames_stop_is_opened_again(self):
-        self.assertTrue(self.cam.open())
-        self.cam.startCapture()
+        self.cam.start()
+        self.assertTrue(self.cam.connected)
         self.assertTrue(wait_for(self.push))
         self.assertEqual((self.searches, self.camera.streams), (1, 1))
         # no frames any more: searched for and streamed again, and the panel's values are sent again
-        with mock.patch.object(self.cam._features, 'reset') as reset:
+        with mock.patch.object(self.cam.control, 'reset') as reset:
             self.assertTrue(wait_for(lambda: self.camera.streams > 1))
             reset.assert_called()
         self.frames.clear()
         self.assertTrue(wait_for(self.push))
 
     def test_frames_that_keep_coming_keep_the_stream(self):
-        self.assertTrue(self.cam.open())
-        self.cam.startCapture()
+        self.cam.start()
         end = time.time() + 0.4                                     # four times the frame timeout
         while time.time() < end:
             self.push()

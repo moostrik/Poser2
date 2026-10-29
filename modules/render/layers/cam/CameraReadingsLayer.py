@@ -7,7 +7,7 @@ operator is already looking.
 import math
 
 from modules.gl import Text
-from modules.camera import CameraSettings, CameraCheckSettings, FPS_TOLERANCE, fps_deviation, mount_deviation
+from modules.camera import RigCameraSettings, CameraCheckSettings, FPS_TOLERANCE, fps_deviation, mount_deviation
 
 from ..LayerBase import LayerBase
 
@@ -30,8 +30,8 @@ class CameraReadingsLayer(LayerBase):
     this camera's view, sized by the last `allocate`.
     """
 
-    def __init__(self, camera: CameraSettings, check: CameraCheckSettings) -> None:
-        self._camera: CameraSettings = camera
+    def __init__(self, camera: RigCameraSettings, check: CameraCheckSettings) -> None:
+        self._camera: RigCameraSettings = camera
         self._check: CameraCheckSettings = check
         self._text: Text = Text()
         self._width: int = 1

@@ -21,18 +21,21 @@ alive and does nothing (the face finder: nobody is ever chosen; the generator: t
 
 ## Camera
 
-`cam/Camera.py` is the one source the app reads: it wraps the device (`VimbaCam` default,
-`WebCam` with `-wc`) and an image source from `data/input/` that the panel's `use_image` switch puts in
+`cam/Camera.py` is the one source the app reads: it wraps the device, a camera backend of `modules/camera/` on the
+camera contract (`modules.camera.vimba.Camera` default, `modules.camera.webcam.Camera` with `-wc`; both take
+`rotate90` for the portrait mode at construction), and an image source from `data/input/` that the panel's `use_image` switch puts in
 place of the device frames at any time. `Camera` fits every frame to the render size with `cover()`
-(scaled to fill it, the middle kept, no distortion); the devices only rotate and flip. A missing device is a warning and `device: none`, never an
-automatic switch to the image. `VimbaCam`'s thread keeps the camera: `open()` makes the first try, and
+(scaled to fill it, the middle kept, no distortion); the backends only rotate and flip. A missing device is a warning and `device: none`, never an
+automatic switch to the image. The Vimba backend's thread keeps the camera: `start()` makes the first try, and
 the thread searches again every 5 s while there is none and opens it again (user set, packet size, the
-panel's values) when no complete frame arrived for 5 s; the `device` readout follows it. Every frame
-has the time it arrived (`Camera.frame()`): the face finder gets new frames only and its faces carry
+panel's values) when no complete frame arrived for 5 s; the `device` readout follows its `connected`. Without the Vimba SDK
+the backend logs an error at start and stays unconnected. Every frame
+has the time it arrived (`Camera.frame()`, a device frame the time its backend stamped): the face finder gets new frames only and its faces carry
 that time, so a camera that stopped never charges on its last frame, and the render shows
-`no camera frames` as its status line after 3 s without one (`Camera.stalled`). The camera settings (`Settings.camera`) also hold the face settings
+`no camera frames` as its status line after 3 s without one (`Camera.stalled`). The camera settings (`Settings.camera`, `cam/settings.py`)
+are the Vimba backend's `VimbaCameraSettings` with the app's source fields and the face settings
 (`camera.face`). Exposure, gain, white balance and colour (saturation, hue, gamma) are panel settings that
-`FeatureWriter` writes to the Vimba camera (Mako G-125C) when they change, over what the camera's `UserSet2`
+the backend's `SensorControl` writes to the Vimba camera (Mako G-125C) when they change, over what the camera's `UserSet2`
 loaded; a feature the camera model lacks is a warning, and so is a write the camera refuses, which is
 tried again (it does not switch the feature off). Exposure and gain each have auto, a manual
 value (sent while auto is off), a limit for auto and a readout of what the camera uses now; both
@@ -41,7 +44,7 @@ once and takes the ratios it found into the panel.
 The camera is a GigE camera on the PC's Ethernet adapter. Its `UserSet2` holds the region of interest, 1200x960 of the
 1292x964 sensor, centred (OffsetX 46, OffsetY 2): the render's 4:5 turned, which `Camera.cover()` scales by exactly 16/15 to
 1024x1280 with nothing cropped; the log line at open shows the region the set loaded. It sends BGR, 3.5 MB per frame
-(104 MB/s at 30 fps, the panel's `target_frame_rate`, also written by `FeatureWriter`; `UserSet2` holds 20; `frame_rate` is the rate of the frames
+(104 MB/s at 30 fps, the panel's `fps`, also written by `SensorControl`; `UserSet2` holds 20; `readings.video_fps` is the rate of the frames
 that arrive complete; one that lost network packets arrives `Incomplete`, with part of an older image still in its buffer,
 and is skipped and counted in `dropped_frames`). At every open `setup_camera` runs
 `GVSPAdjustPacketSize` (after loading `UserSet2`, which holds a packet size of its own), which takes the largest packet the path accepts (`GevSCPSPacketSize`, up to

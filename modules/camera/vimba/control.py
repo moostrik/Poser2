@@ -1,6 +1,7 @@
-"""Writes the panel's camera settings (exposure, gain, white balance, colour) to the features of a
-Vimba camera when they change. The panel is the source of truth: everything is sent once after the
-camera opens, over what its user set loaded. A feature the camera model does not have is a warning,
+"""Writes the panel's camera settings (frame rate, exposure, gain, white balance, colour) to the
+features of a Vimba camera when they change, and reads back what the camera uses and the rate its
+frames arrive at. The panel is the source of truth: everything is sent once after the camera opens,
+over what its user set loaded. A feature the camera model does not have is a warning,
 once. A write the camera refuses (a value it does not take, a control channel that timed out) is a
 warning too, and is tried again: it does not switch the feature off. A failed read is the same kind
 of warning. Both are logged once per reason, not at every retry. Exposure and gain are the panel's
@@ -12,7 +13,7 @@ from threading import Event, Lock
 from time import monotonic
 from typing import Any, Callable
 
-from apps.smile.cam.settings import CameraSettings
+from .settings import VimbaCameraSettings
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +23,9 @@ READ_INTERVAL: float = 0.5      # seconds between reads of the actual exposure a
 RATE_SMOOTHING: float = 0.2     # share of the newest half second in the frame rate readout
 
 
-class FeatureWriter:
-    def __init__(self, settings: CameraSettings) -> None:
-        self.settings: CameraSettings = settings
+class SensorControl:
+    def __init__(self, settings: VimbaCameraSettings) -> None:
+        self.settings: VimbaCameraSettings = settings
         self._applied: dict[str, Any] = {}      # values last written to the camera, per setting
         self._missing: set[str] = set()         # features this camera does not have
         self._retry: dict[str, float] = {}      # per setting whose write failed: when it is tried again
@@ -38,11 +39,13 @@ class FeatureWriter:
         self._frames_lock: Lock = Lock()
         self._frames_time: float | None = None  # time of the last read
         self._frame_rate: float | None = None   # smoothed frames per second
+        self._frame_at: float | None = None     # when the last complete frame arrived
+        self._worst_gap: float = 0.0            # longest wait between two complete frames since the last read
 
-        self.settings.bind(CameraSettings.set_WB, self._on_wb_set)
+        self.settings.bind(VimbaCameraSettings.set_WB, self._on_wb_set)
 
     def close(self) -> None:
-        self.settings.unbind(CameraSettings.set_WB, self._on_wb_set)
+        self.settings.unbind(VimbaCameraSettings.set_WB, self._on_wb_set)
 
     def reset(self) -> None:
         """The camera was opened and its user set loaded (at the start, or again after its frames
@@ -58,16 +61,20 @@ class FeatureWriter:
     def count_frame(self, complete: bool = True) -> None:
         """A frame arrived from the camera (any thread): counted for the frame rate readout, or as
         dropped when it is incomplete (network packets lost) and skipped."""
+        now: float = monotonic()
         with self._frames_lock:
             if complete:
                 self._frames += 1
+                if self._frame_at is not None:
+                    self._worst_gap = max(self._worst_gap, now - self._frame_at)
+                self._frame_at = now
             else:
                 self._dropped += 1
 
     def update(self, camera: Any) -> None:
         """Send what changed. Call on the camera thread, with the camera open."""
-        s: CameraSettings = self.settings
-        self._sync('frame_rate', float(s.target_frame_rate), lambda v: self._set(camera, 'AcquisitionFrameRateAbs', v))
+        s: VimbaCameraSettings = self.settings
+        self._sync('frame_rate', float(s.fps), lambda v: self._set(camera, 'AcquisitionFrameRateAbs', v))
         self._sync('auto_target', int(s.target_brightness), lambda v: all([self._set(camera, 'ExposureAutoTarget', v), self._set(camera, 'GainAutoTarget', v)]))
         self._sync('exposure_max', float(s.exposure_max), lambda v: self._set(camera, 'ExposureAutoMax', v))
         self._sync('gain_max', float(s.gain_max), lambda v: self._set(camera, 'GainAutoMax', v))
@@ -88,21 +95,24 @@ class FeatureWriter:
             self._sync(key, value, lambda v: self._set(camera, feature, v))
 
     def _read_actual(self, camera: Any) -> None:
-        """The exposure, gain and white balance the camera uses now, for the panel."""
+        """The frame rate, and the exposure, gain and white balance the camera uses now, for the panel."""
         now: float = monotonic()
         if now < self._read_next:
             return
         self._read_next = now + READ_INTERVAL
-        s: CameraSettings = self.settings
+        s: VimbaCameraSettings = self.settings
 
         with self._frames_lock:
             frames: int = self._frames
+            worst_gap: float = self._worst_gap
             self._frames = 0
+            self._worst_gap = 0.0
             s.dropped_frames = self._dropped
         if self._frames_time is not None and now > self._frames_time:
             rate: float = frames / (now - self._frames_time)
             self._frame_rate = rate if self._frame_rate is None else self._frame_rate + RATE_SMOOTHING * (rate - self._frame_rate)
-            s.frame_rate = round(self._frame_rate, 1)
+            s.readings.video_fps = round(self._frame_rate, 1)
+            s.readings.video_min_fps = round(1.0 / worst_gap, 1) if worst_gap > 0.0 else 0.0
         self._frames_time = now
 
         try:
@@ -118,7 +128,7 @@ class FeatureWriter:
             s.WB_blue = round(blue, 2)
 
     def _white_balance(self, camera: Any) -> None:
-        s: CameraSettings = self.settings
+        s: VimbaCameraSettings = self.settings
         wb_auto: bool = s.auto_WB
         self._sync('wb_auto', wb_auto, lambda v: self._set(camera, 'BalanceWhiteAuto', 'Continuous' if v else 'Off'))
         if wb_auto:
@@ -155,7 +165,7 @@ class FeatureWriter:
             self._set(camera, 'BalanceWhiteAuto', 'Off')
         self._measure_end = None
 
-        s: CameraSettings = self.settings
+        s: VimbaCameraSettings = self.settings
         red: float | None = self._get_ratio(camera, 'Red')
         blue: float | None = self._get_ratio(camera, 'Blue')
         if red is not None:

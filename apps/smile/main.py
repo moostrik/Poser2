@@ -2,6 +2,7 @@
 and the grins of the visitors before play on the two walls of the sphere (README.md, CLAUDE.md)."""
 
 from apps.smile.cam.Camera import Camera
+from modules.camera import vimba, webcam
 from modules.face import FaceFinder, FaceFrame
 from apps.smile.render.SmileRender import SmileRender
 from apps.smile.render.Sequencer import Sequencer, SeqenceMessage, SequenceType, AnimationType, AnimationTypeNames
@@ -98,20 +99,13 @@ class SmileMain():
 
         # the camera device; the panel can switch to an image from input/ at any time
         if camType == CamType.VIMBA:
+            # without the Vimba 6 SDK (VIMBA_HOME, VimbaC) the backend logs an error at start: no device, the image still works
+            device = vimba.Camera(self.settings.camera, rotate90=self.portraitMode)
             device_name = 'vimba'
-            # without the Vimba 6 SDK (VIMBA_HOME, VimbaC) the binding cannot load: no device, the image still works
-            try:
-                from apps.smile.cam.VimbaCam import VimbaCam
-                device = VimbaCam(self.settings.camera)
-            except Exception as e:
-                logger.error('Vimba camera unavailable (is the Vimba 6 SDK installed? VIMBA_HOME): %s', e)
-                device = None
         else:
-            from apps.smile.cam.WebCam import WebCam
-            device = WebCam(self.settings.camera)
+            device = webcam.Camera(self.settings.camera, rotate90=self.portraitMode)
             device_name = 'webcam'
         self.camera: Camera = Camera(self.settings.camera, (self.width, self.height), device, device_name)
-        self.camera.setRotate90(self.portraitMode)
 
         self.audio: AudioDB = AudioDB(self.settings.audio, f'{DATA_PATH}/audio/music_map.json')
         self.osc: OscSender = OscSender(self.settings.audio.osc, events=('/test_bang',))
@@ -139,9 +133,8 @@ class SmileMain():
         self.laststate: str = ''
 
     def start(self) -> None:
-        self.camera.setColorCallback(self.render.set_cam_image)
-        self.camera.open()
-        self.camera.startCapture()
+        self.camera.add_frame_callback(self.render.set_cam_image)
+        self.camera.start()
 
         self.diffuse.add_message_callback(self.render.set_diffusion_message)
         self.diffuse.add_message_callback(self.diffusion_callback)
@@ -176,7 +169,7 @@ class SmileMain():
         # first: stops the sequencer callbacks
         steps = (self.sequencer.clear_message_callbacks, self.render.stop, self.clip_player.stop, self.sequencer.close,
                  self.online.stop, self.lights.stop, self.osc.stop,
-                 self.camera.clearColorCallbacks, self.camera.close,
+                 self.camera.stop,
                  self.diffuse.clear_message_callbacks, self.diffuse.stop,
                  self.face.clear_frame_callbacks, self.face.stop,
                  self.save.stop,

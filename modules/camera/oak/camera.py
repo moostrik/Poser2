@@ -15,7 +15,7 @@ from threading import Thread, Event
 import depthai as dai
 from numpy import ndarray
 
-from .. import CameraResolution, CameraFrame, CameraReadings, CameraTracklet, FrameType, FrameCallback, \
+from .. import CameraResolution, CameraFrame, RigCameraReadings, CameraTracklet, FrameType, FrameCallback, \
     TrackletCallback, orientation_from_gravity, mode_size, frame_size, frame_window, frame_coverage, coverage_summary, \
     delivered_height, lens_field, lens_deviation
 from modules.utils import FPS, Rect
@@ -88,8 +88,12 @@ class Camera(Thread):
         self._gravity: tuple[float, float, float] | None = None
 
     @property
-    def readings(self) -> CameraReadings:
+    def readings(self) -> RigCameraReadings:
         return self.settings.readings
+
+    @property
+    def connected(self) -> bool:
+        return self.device is not None
 
     def stop(self) -> None:
         self.running = False

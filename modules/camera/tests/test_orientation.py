@@ -9,7 +9,7 @@ the backend's (`modules/camera/oak/tests/test_imu.py`).
 import math
 import unittest
 
-from modules.camera import CameraCheck, CameraCheckSettings, CameraReadings, CameraSettings, \
+from modules.camera import CameraCheck, CameraCheckSettings, RigCameraReadings, RigCameraSettings, \
     orientation_from_gravity, mount_deviation, fps_deviation
 
 
@@ -69,10 +69,10 @@ class TestOrientationFromGravity(unittest.TestCase):
         self.assertTrue(math.isnan(tilt) and math.isnan(roll))
 
 
-def _cameras(readings: list[tuple[float, float]], configured_tilt: float = 12.0) -> list[CameraSettings]:
-    cameras: list[CameraSettings] = []
+def _cameras(readings: list[tuple[float, float]], configured_tilt: float = 12.0) -> list[RigCameraSettings]:
+    cameras: list[RigCameraSettings] = []
     for tilt_measured, roll_measured in readings:
-        camera = CameraSettings()
+        camera = RigCameraSettings()
         camera.tilt = configured_tilt
         camera.readings.tilt_measured = tilt_measured
         camera.readings.roll_measured = roll_measured
@@ -88,9 +88,9 @@ def _mount(readings: list[tuple[float, float]], tolerance: float = 2.0) -> bool:
 
 
 def _camera_fps(rates: list[float], configured_fps: float = 30.0) -> bool:
-    cameras: list[CameraSettings] = []
+    cameras: list[RigCameraSettings] = []
     for rate in rates:
-        camera = CameraSettings()
+        camera = RigCameraSettings()
         camera.fps = configured_fps
         camera.readings.video_fps = rate
         cameras.append(camera)
@@ -130,7 +130,7 @@ class TestMountCheck(unittest.TestCase):
 
 class TestCameraFpsCheck(unittest.TestCase):
     def test_deviation_is_a_signed_fraction(self) -> None:
-        camera = CameraSettings()
+        camera = RigCameraSettings()
         camera.fps = 30.0
         camera.readings.video_fps = 27.0
         self.assertAlmostEqual(fps_deviation(camera), -0.1)
@@ -154,20 +154,20 @@ class TestRollOffsetIsABox(unittest.TestCase):
 
     def test_it_resolves_to_a_number_box(self) -> None:
         from modules.settings import Widget
-        field = CameraReadings.roll_offset                       # type: ignore[attr-defined]
+        field = RigCameraReadings.roll_offset                       # type: ignore[attr-defined]
         self.assertEqual(Widget.resolve(field), Widget.number)
         self.assertIsNone(field.min)
         self.assertIsNone(field.max)
 
     def test_it_is_recorded_in_the_preset(self) -> None:
         """It is a measurement, so unlike the rest of `readings` it has to survive a save."""
-        camera = CameraSettings()
+        camera = RigCameraSettings()
         camera.readings.roll_offset = -2.2458989103710865
         self.assertIn('roll_offset', camera.to_dict()['readings'])
         self.assertEqual(camera.to_dict()['readings']['roll_offset'], -2.2458989103710865)
 
     def test_the_rest_of_readings_stays_out_of_the_preset(self) -> None:
-        stored = CameraSettings().to_dict()['readings']
+        stored = RigCameraSettings().to_dict()['readings']
         for read_only in ('video_fps', 'tilt_measured', 'roll_measured', 'fov_factory'):
             self.assertNotIn(read_only, stored)
 

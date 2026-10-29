@@ -1,9 +1,9 @@
-"""Tests for the camera feature writer against a fake camera (no Vimba)."""
+"""Tests for the Vimba sensor control against a fake camera (no Vimba)."""
 
 import unittest
+from unittest import mock
 
-from apps.smile.cam.FeatureWriter import FeatureWriter
-from apps.smile.cam.settings import CameraSettings
+from modules.camera.vimba import SensorControl, VimbaCameraSettings
 
 
 class FakeFeature:
@@ -62,37 +62,37 @@ class FakeCamera:
         return [v for n, v in self.writes if n == name]
 
 
-class TestFeatureWriter(unittest.TestCase):
+class TestSensorControl(unittest.TestCase):
     def setUp(self):
-        self.settings = CameraSettings()
+        self.settings = VimbaCameraSettings()
         self.settings.initialize()
-        self.writer = FeatureWriter(self.settings)
+        self.control = SensorControl(self.settings)
         self.camera = FakeCamera()
 
     def tearDown(self):
-        self.writer.close()
+        self.control.close()
 
     def test_sends_everything_once_then_only_what_changed(self):
         self.settings.manual_WB_red = 1.5
-        self.writer.update(self.camera)
+        self.control.update(self.camera)
         self.assertEqual(self.camera.written('GainAuto'), ['Off'])
-        self.assertEqual(self.camera.written('AcquisitionFrameRateAbs'), [30.0])
+        self.assertEqual(self.camera.written('AcquisitionFrameRateAbs'), [30.0])     # `fps`
         self.assertEqual(self.camera.written('Saturation'), [1.0])
         self.assertEqual(self.camera.written('BalanceWhiteAuto'), ['Off'])
         self.assertEqual(self.camera.ratios, {'Red': 1.5, 'Blue': 1.0})
 
         self.camera.writes.clear()
-        self.writer.update(self.camera)
+        self.control.update(self.camera)
         self.assertEqual(self.camera.writes, [])
 
         self.settings.saturation = 1.2
-        self.writer.update(self.camera)
+        self.control.update(self.camera)
         self.assertEqual(self.camera.writes, [('Saturation', 1.2)])
 
     def test_the_auto_target_goes_to_exposure_and_gain(self):
         self.settings.target_brightness = 30
         self.settings.exposure_max = 20000.0
-        self.writer.update(self.camera)
+        self.control.update(self.camera)
         self.assertEqual(self.camera.written('ExposureAutoTarget'), [30])
         self.assertEqual(self.camera.written('GainAutoTarget'), [30])
         written = self.camera.written('ExposureAutoMax')
@@ -104,7 +104,7 @@ class TestFeatureWriter(unittest.TestCase):
         self.settings.auto_exposure = True
         self.settings.manual_gain = 6.0
         self.settings.manual_exposure = 10000.0
-        self.writer.update(self.camera)
+        self.control.update(self.camera)
         self.assertEqual(self.camera.written('GainAuto'), ['Continuous'])
         self.assertEqual(self.camera.written('ExposureAuto'), ['Continuous'])
         self.assertEqual(self.camera.written('Gain'), [])
@@ -112,125 +112,137 @@ class TestFeatureWriter(unittest.TestCase):
 
         self.settings.auto_gain = False
         self.settings.auto_exposure = False
-        self.writer.update(self.camera)
+        self.control.update(self.camera)
         self.assertEqual(self.camera.written('Gain'), [6.0])
         self.assertEqual(self.camera.written('ExposureTimeAbs'), [10000.0])
 
     def test_the_actual_values_follow_the_camera(self):
         self.settings.auto_gain = True
-        self.writer.update(self.camera)
+        self.control.update(self.camera)
         self.assertEqual(self.settings.exposure, 33000.0)
         self.camera.features['Gain'].value = 7.26
-        self.writer._read_next = 0.0
-        self.writer.update(self.camera)
+        self.control._read_next = 0.0
+        self.control.update(self.camera)
         self.assertEqual(self.settings.gain, 7.3)
 
         self.camera.ratios = {'Red': 1.61, 'Blue': 2.04}
-        self.writer._read_next = 0.0
-        self.writer.update(self.camera)
+        self.control._read_next = 0.0
+        self.control.update(self.camera)
         self.assertEqual(self.settings.WB_red, 1.61)
         self.assertEqual(self.settings.WB_blue, 2.04)
 
     def test_the_frame_rate_and_the_dropped_frames_are_counted(self):
-        self.writer.update(self.camera)
-        self.assertEqual(self.settings.frame_rate, 0.0)     # no interval yet
+        self.control.update(self.camera)
+        self.assertEqual(self.settings.readings.video_fps, 0.0)     # no interval yet
         for _ in range(15):
-            self.writer.count_frame()
+            self.control.count_frame()
         for _ in range(3):
-            self.writer.count_frame(False)                  # incomplete: skipped
-        self.writer._frames_time -= 0.5                     # half a second ago
-        self.writer._read_next = 0.0
-        self.writer.update(self.camera)
-        self.assertAlmostEqual(self.settings.frame_rate, 30.0, delta=0.5)
+            self.control.count_frame(False)                  # incomplete: skipped
+        self.control._frames_time -= 0.5                     # half a second ago
+        self.control._read_next = 0.0
+        self.control.update(self.camera)
+        self.assertAlmostEqual(self.settings.readings.video_fps, 30.0, delta=0.5)
         self.assertEqual(self.settings.dropped_frames, 3)
+
+    def test_the_worst_gap_between_frames_is_the_minimum_rate(self):
+        with mock.patch('modules.camera.vimba.control.monotonic', side_effect=[0.0, 0.02, 0.12, 0.14]):
+            for _ in range(4):
+                self.control.count_frame()                   # gaps of 20, 100 and 20 ms
+        self.control._frames_time = 0.0                      # a read interval has passed
+        self.control._read_next = 0.0
+        self.control.update(self.camera)
+        self.assertEqual(self.settings.readings.video_min_fps, 10.0)
+        self.control._read_next = 0.0
+        self.control.update(self.camera)
+        self.assertEqual(self.settings.readings.video_min_fps, 0.0)    # no frames since: no gap
 
     def test_clamps_to_the_range_of_the_feature(self):
         self.settings.gamma = 3.0
         self.settings.manual_WB_blue = 0.5
-        self.writer.update(self.camera)
+        self.control.update(self.camera)
         self.assertEqual(self.camera.written('Gamma'), [1.5])
         self.assertEqual(self.camera.ratios['Blue'], 0.8)
 
     def test_a_missing_feature_is_skipped(self):
         camera = FakeCamera(without=('Hue', 'BalanceRatioAbs'))
         self.settings.hue = 10.0
-        self.writer.update(camera)
+        self.control.update(camera)
         self.assertEqual(camera.written('Saturation'), [1.0])
         self.settings.hue = 20.0
         self.settings.manual_WB_red = 2.0
-        self.writer.update(camera)
+        self.control.update(camera)
         self.assertEqual(camera.written('Hue'), [])
         self.assertEqual(camera.ratios['Red'], 1.0)
 
     def test_a_refused_write_is_tried_again_and_does_not_switch_the_feature_off(self):
         self.camera.refuses = {'Hue', 'BalanceRatioSelector'}
         self.settings.hue = 10.0
-        with self.assertLogs('apps.smile.cam.FeatureWriter', 'WARNING') as logs:
-            self.writer.update(self.camera)
-            self.writer.update(self.camera)                 # not again before the next read interval
+        with self.assertLogs('modules.camera.vimba.control', 'WARNING') as logs:
+            self.control.update(self.camera)
+            self.control.update(self.camera)                 # not again before the next read interval
         self.assertEqual(self.camera.written('Hue'), [])
         self.assertEqual(len([line for line in logs.output if 'Hue' in line]), 1)   # logged once
-        self.assertEqual(self.writer._missing, set())
+        self.assertEqual(self.control._missing, set())
 
         self.camera.refuses = set()                         # the camera takes it again
-        self.writer._retry = {key: 0.0 for key in self.writer._retry}
-        self.writer.update(self.camera)
+        self.control._retry = {key: 0.0 for key in self.control._retry}
+        self.control.update(self.camera)
         self.assertEqual(self.camera.written('Hue'), [10.0])
         self.settings.manual_WB_red = 2.0
-        self.writer.update(self.camera)
+        self.control.update(self.camera)
         self.assertEqual(self.camera.ratios['Red'], 2.0)
 
     def test_a_read_that_keeps_failing_is_logged_once(self):
-        self.writer.update(self.camera)
+        self.control.update(self.camera)
         self.camera.unreadable = {'BalanceRatioAbs'}
-        with self.assertLogs('apps.smile.cam.FeatureWriter', 'WARNING') as logs:
+        with self.assertLogs('modules.camera.vimba.control', 'WARNING') as logs:
             for _ in range(10):                             # twenty reads: five seconds of a camera that is away
-                self.writer._read_next = 0.0
-                self.writer.update(self.camera)
+                self.control._read_next = 0.0
+                self.control.update(self.camera)
         self.assertEqual(len(logs.output), 1)
         self.assertIn('BalanceRatioAbs not readable', logs.output[0])
 
         self.camera.unreadable = set()                      # back, then away again: logged again
-        self.writer._read_next = 0.0
-        self.writer.update(self.camera)
+        self.control._read_next = 0.0
+        self.control.update(self.camera)
         self.camera.unreadable = {'BalanceRatioAbs'}
-        with self.assertLogs('apps.smile.cam.FeatureWriter', 'WARNING') as logs:
-            self.writer._read_next = 0.0
-            self.writer.update(self.camera)
+        with self.assertLogs('modules.camera.vimba.control', 'WARNING') as logs:
+            self.control._read_next = 0.0
+            self.control.update(self.camera)
         self.assertEqual(len(logs.output), 1)
 
     def test_auto_owns_the_ratios_and_the_panel_takes_them_back(self):
         self.settings.auto_WB = True
         self.settings.manual_WB_red = 2.0
-        self.writer.update(self.camera)
+        self.control.update(self.camera)
         self.assertEqual(self.camera.written('BalanceWhiteAuto'), ['Continuous'])
         self.assertEqual(self.camera.written('BalanceRatioAbs'), [])
 
         self.settings.auto_WB = False
-        self.writer.update(self.camera)
+        self.control.update(self.camera)
         self.assertEqual(self.camera.written('BalanceWhiteAuto'), ['Continuous', 'Off'])
         self.assertEqual(self.camera.ratios['Red'], 2.0)
 
     def test_set_white_balance_measures_once_and_stores_the_ratios(self):
-        self.writer.update(self.camera)
-        CameraSettings.set_WB.fire(self.settings)
-        self.writer.update(self.camera)
+        self.control.update(self.camera)
+        VimbaCameraSettings.set_WB.fire(self.settings)
+        self.control.update(self.camera)
         self.assertEqual(self.camera.features['BalanceWhiteAuto'].value, 'Once')
 
         # still measuring: the panel's ratios are not sent
         self.settings.manual_WB_red = 2.5
-        self.writer.update(self.camera)
+        self.control.update(self.camera)
         self.assertEqual(self.camera.ratios['Red'], 1.0)
 
         # the camera is done
         self.camera.ratios = {'Red': 1.83, 'Blue': 2.41}
         self.camera.features['BalanceWhiteAuto'].value = 'Off'
-        self.writer.update(self.camera)
+        self.control.update(self.camera)
         self.assertEqual(self.settings.manual_WB_red, 1.83)
         self.assertEqual(self.settings.manual_WB_blue, 2.41)
 
         self.camera.writes.clear()
-        self.writer.update(self.camera)
+        self.control.update(self.camera)
         self.assertEqual(self.camera.written('BalanceRatioAbs'), [])
 
 

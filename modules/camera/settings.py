@@ -1,6 +1,7 @@
-"""What every camera has in the panel: its mount, its rate and what it reads back. A backend's
-settings class extends `CameraSettings` with the fields of its device, so the preset keys stay
-flat: `cam_0.tilt` and `cam_0.readings.roll_offset` are the same keys for every backend."""
+"""What every camera has in the panel: its rate, its flips and what it reads back; and what a
+rig camera has on top: its mount and lens. A backend's settings class extends one of the two with
+the fields of its device, so the preset keys stay flat: `cam_0.tilt` and `cam_0.readings.roll_offset`
+are the same keys for every rig backend."""
 
 from modules.settings import BaseSettings, Field, Group, Widget
 
@@ -8,7 +9,7 @@ from modules.settings import BaseSettings, Field, Group, Widget
 class CameraCheckSettings(BaseSettings):
     """Pinned verdicts saying whether the cameras are mounted and running the way the preset assumes.
 
-    The per-camera readings live on each `CameraSettings`, groups deep in the panel, which is
+    The per-camera readings live on each `RigCameraSettings`, groups deep in the panel, which is
     where a readout goes to be ignored. The pinned indicators say good or bad; which camera and
     which value is drawn on that camera's own view in the renderer.
     """
@@ -27,15 +28,19 @@ class CameraCheckSettings(BaseSettings):
 
 
 class CameraReadings(BaseSettings):
-    """What the camera reports back about itself, and the one number that corrects it.
+    """What every camera reports back: the rate its frames arrive at. Read-only; a backend fills it."""
+    video_fps:        Field[float] = Field(0.0, access=Field.READ, description="Video FPS")
+    video_min_fps:    Field[float] = Field(0.0, access=Field.READ, description="Lowest momentary video rate: 1 / the worst gap between frames (fps)")
+
+
+class RigCameraReadings(CameraReadings):
+    """What a rig camera reports back about itself, and the one number that corrects it.
 
     Nothing in the show reads any of this — it exists for whoever is setting the rig up. All of it
     is read-only except `roll_offset`, which lives here rather than with the mount constants
     because it is the thing you reach for while looking at the roll it corrects. A backend fills
     what its device can measure; the rest stays at its default (NaN for the angles).
     """
-    video_fps:        Field[float] = Field(0.0, access=Field.READ, description="Video FPS")
-    video_min_fps:    Field[float] = Field(0.0, access=Field.READ, description="Lowest momentary video rate: 1 / the worst gap between frames (fps)")
     tracker_fps:      Field[float] = Field(0.0, access=Field.READ, description="Tracker updates/s")
     tracklets:      Field[int]   = Field(0, access=Field.READ, description="Active tracklets")
     # How the camera is actually mounted, as the board reports it — NaN until measured, which is
@@ -50,15 +55,25 @@ class CameraReadings(BaseSettings):
 
 
 class CameraSettings(BaseSettings):
-    """The camera as the apps, the tracker and the render know it: its rate and its mount.
+    """The camera as every app knows it: its rate, its flips and its readings.
 
-    A backend's settings class extends this with what shapes its own pipeline (the sensor mode,
-    the device id, the sensor controls). The panel shows the backend's fields first and these
-    after them.
+    A backend's settings class extends this with what its device has (the sensor controls, the
+    device id). A backend whose device takes these live redeclares the field without `Field.INIT`;
+    the subclass's field is the one the panel shows.
     """
     fps:            Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera FPS")
     flip_h:         Field[bool]  = Field(False, access=Field.INIT, description="Flip horizontal")
     flip_v:         Field[bool]  = Field(False, access=Field.INIT, description="Flip vertical")
+
+    readings:     Group[CameraReadings]     = Group(CameraReadings)
+
+
+class RigCameraSettings(CameraSettings):
+    """A camera of a tracking rig, as the tracker and the render know it: a `CameraSettings` with
+    its mount and lens, and the readings of a camera that runs a detector and measures its mount.
+
+    The panel shows the backend's fields first and these after them.
+    """
     tilt:           Field[float] = Field(0.0, access=Field.INIT,
                                          description="Camera up-tilt (°), positive = aimed up. Exclusive with keystone")
     keystone:       Field[float] = Field(0.0, access=Field.INIT,
@@ -75,4 +90,4 @@ class CameraSettings(BaseSettings):
     lens_centre_y:  Field[float] = Field(0.0, access=Field.INIT, step=0.5,
                                          description="Optical centre offset from the frame centre (px), positive = down")
 
-    readings:     Group[CameraReadings]     = Group(CameraReadings)
+    readings:     Group[RigCameraReadings]  = Group(RigCameraReadings)
