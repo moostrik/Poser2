@@ -30,10 +30,10 @@ class Seams:
     tracker thread only.
     """
 
-    def __init__(self, observations: ObservationStore, rig: Rig, config: TrackerSettings) -> None:
+    def __init__(self, observations: ObservationStore, rig: Rig, settings: TrackerSettings) -> None:
         self._observations: ObservationStore = observations
         self._rig: Rig = rig
-        self._config: TrackerSettings = config
+        self.settings: TrackerSettings = settings
         # Last emitted primary per world id, as an observation id — for hysteresis — and when a
         # LOST primary was last replaced, for `seam.hold`.
         self._primary_for_world: dict[int, int] = {}
@@ -76,8 +76,8 @@ class Seams:
         the factor leaves room over the collapse gate, so a pair at the gate does not flap.
         Only active views count: a LOST anchor left behind by someone walking on is not a disagreement.
         """
-        limit: float = _SPLIT_FACTOR * self._config.seam.link_angle
-        same_cam: float = _SPLIT_FACTOR * self._config.same_cam_angle
+        limit: float = _SPLIT_FACTOR * self.settings.seam.link_angle
+        same_cam: float = _SPLIT_FACTOR * self.settings.same_cam_angle
         for world_id in self._observations.world_ids():
             while True:
                 active: list[Tracklet] = [t for t in self._observations.members(world_id)
@@ -144,7 +144,7 @@ class Seams:
             assert isinstance(t.annotation, Annotation)
             return self._rig.angle_from_edge(t.annotation.local_angle)
 
-        dead_zone: float = self._config.seam.dead_zone
+        dead_zone: float = self.settings.seam.dead_zone
 
         def weighted(views: list[Tracklet]) -> list[Tracklet]:
             """The views outside the dead zone, or all of them when none is."""
@@ -166,8 +166,8 @@ class Seams:
                     self._handed_over_at[world_id] = now
         else:
             best: Tracklet = max(active, key=edge)
-            held: bool = now - self._handed_over_at.get(world_id, -math.inf) < self._config.seam.hold
-            beaten: bool = edge(best) >= edge(current) / self._config.seam.hysteresis
+            held: bool = now - self._handed_over_at.get(world_id, -math.inf) < self.settings.seam.hold
+            beaten: bool = edge(best) >= edge(current) / self.settings.seam.hysteresis
             chosen = best if best is not current and beaten and not held else current
 
         self._primary_for_world[world_id] = chosen.obs_id
@@ -194,7 +194,7 @@ class Seams:
         assert isinstance(primary.annotation, Annotation)
         members: list[Tracklet] = [t for t in self._observations.members(world_id)
                                    if not t.is_removed and isinstance(t.annotation, Annotation)]
-        dead_zone: float = self._config.seam.dead_zone
+        dead_zone: float = self.settings.seam.dead_zone
         x: float = 0.0
         y: float = 0.0
         for t in members:
@@ -228,7 +228,7 @@ class Seams:
             return False
         if not isinstance(a.annotation, Annotation) or not isinstance(b.annotation, Annotation):
             return False
-        if self._rig.angle_diff(a.annotation.world_angle, b.annotation.world_angle) > self._config.seam.link_angle:
+        if self._rig.angle_diff(a.annotation.world_angle, b.annotation.world_angle) > self.settings.seam.link_angle:
             return False
         return self._heights_match(a.annotation.height, b.annotation.height)
 
@@ -238,7 +238,7 @@ class Seams:
         if not (height_is_measured(height_a) and height_is_measured(height_b)):
             return True
         largest: float = max(height_a, height_b)
-        return abs(height_a - height_b) / largest <= self._config.seam.link_height
+        return abs(height_a - height_b) / largest <= self.settings.seam.link_height
 
     def _same_camera_pairs(self) -> list[tuple[int, int]]:
         """(keep_id, drop_id) pairs of worlds that are one person seen twice by one camera.
@@ -260,7 +260,7 @@ class Seams:
             if a.id in used or b.id in used:
                 continue
             assert isinstance(a.annotation, Annotation) and isinstance(b.annotation, Annotation)
-            if abs(a.annotation.local_angle - b.annotation.local_angle) > self._config.same_cam_angle:
+            if abs(a.annotation.local_angle - b.annotation.local_angle) > self.settings.same_cam_angle:
                 continue
             smaller: float = min(a.roi.area, b.roi.area)
             if smaller <= 0.0 or a.roi.intersect(b.roi).area / smaller < _SAME_CAM_OVERLAP:

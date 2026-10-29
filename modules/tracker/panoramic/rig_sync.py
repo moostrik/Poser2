@@ -82,8 +82,8 @@ class RigSync:
     the tracker calls it on its own thread.
     """
 
-    def __init__(self, config: TrackerSettings, rig: Rig) -> None:
-        self._config: TrackerSettings = config
+    def __init__(self, settings: TrackerSettings, rig: Rig) -> None:
+        self.settings: TrackerSettings = settings
         self._rig: Rig = rig
         # Where the sensor's picture ends, per camera bearing: (top, bottom) in degrees from eye
         # level. The reach read-outs are measured against it.
@@ -93,7 +93,7 @@ class RigSync:
 
     def apply(self) -> None:
         """Push the live rig settings into the `Rig` and republish what they move."""
-        c: TrackerSettings = self._config
+        c: TrackerSettings = self.settings
         r: RigSettings = c.rig
         self._rig.set_camera_radius(r.camera_radius)
         self._rig.set_camera_height(r.camera_height)
@@ -111,7 +111,7 @@ class RigSync:
         for the columns, `frame_window` for the rows (tangents of elevation, so a window rather than
         a `vfov`). Published as the frame's two edge angles, from which `projection.row_model`
         rebuilds the row form exactly. Mono and landscape."""
-        c: TrackerSettings = self._config
+        c: TrackerSettings = self.settings
         fov: float = c.fov
         self._rig.set_fov(fov)
         lens_centre: tuple[float, float] = (c.lens_centre_x, c.lens_centre_y)
@@ -159,7 +159,7 @@ class RigSync:
         sensor's top edge falls toward the frame edges, and a seam is where people cross.
         """
         top, bottom = self._picture_edges
-        r: RigSettings = self._config.rig
+        r: RigSettings = self.settings.rig
         camera_radius: float = max(0.0, r.camera_radius)
         seam: float = self._rig.target_fov / 2.0
         r.feet_from = reach_radius(0.0, 0.0, r.camera_height, camera_radius, bottom)

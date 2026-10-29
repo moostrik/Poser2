@@ -26,9 +26,9 @@ def tracklet(world_id: int, seconds_ago: float = 0.0, world_angle: float | None 
 class PosesFromTrackletsCase(unittest.TestCase):
 
     def setUp(self) -> None:
-        self.config = PosesFromTrackletsSettings()
-        self.config.detection_timeout = 1.0
-        self.poses = PosesFromTracklets(self.config, num_tracks=4)
+        self.settings = PosesFromTrackletsSettings()
+        self.settings.detection_timeout = 1.0
+        self.poses = PosesFromTracklets(self.settings, num_tracks=4)
 
 
 class TestDetectionTimeout(PosesFromTrackletsCase):
@@ -49,7 +49,7 @@ class TestDetectionTimeout(PosesFromTrackletsCase):
         # for time passing with no new update from the tracker.
         self.poses.set_tracklets({0: tracklet(0, seconds_ago=0.5)})
         self.assertEqual(set(self.poses.process(time.perf_counter()).keys()), {0})
-        self.config.detection_timeout = 0.3
+        self.settings.detection_timeout = 0.3
         self.assertEqual(self.poses.process(time.perf_counter()), {})
         self.assertFalse(self.poses.is_ready(time.perf_counter()))
 

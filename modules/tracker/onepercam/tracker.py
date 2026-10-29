@@ -28,7 +28,7 @@ class TrackerSettings(BaseSettings):
 
 
 class Tracker(Thread, BaseTracker):
-    def __init__(self, config: TrackerSettings, num_trackers: int) -> None:
+    def __init__(self, settings: TrackerSettings, num_trackers: int) -> None:
         super().__init__()
 
         self._running: bool = False
@@ -41,7 +41,7 @@ class Tracker(Thread, BaseTracker):
         self._tracklet_callbacks: list[TrackletDictCallback] = []       # run in registration order
 
         self._num_cams: int = num_trackers
-        self.config: TrackerSettings = config
+        self.settings: TrackerSettings = settings
 
         self.store: TrackletStore = TrackletStore(self._num_cams)
 
@@ -98,8 +98,8 @@ class Tracker(Thread, BaseTracker):
             # if tracklet is LOST, too small or too far from centre, lose it
             if (
                 update_tracklet.is_lost or
-                update_tracklet.roi.height < self.config.update_height_threshold or
-                abs(update_tracklet.roi.center.x - 0.5) > self.config.update_centre_threshold
+                update_tracklet.roi.height < self.settings.update_height_threshold or
+                abs(update_tracklet.roi.center.x - 0.5) > self.settings.update_centre_threshold
             ):
                 self.store.lose_tracklet(update_tracklet.cam_id)
                 return
@@ -112,19 +112,19 @@ class Tracker(Thread, BaseTracker):
         add_tracklets: list[Tracklet] = []
         for t in tracklets:
 
-            if t.external_age_in_frames <= self.config.tracklet_min_age:
+            if t.external_age_in_frames <= self.settings.tracklet_min_age:
                 continue
 
             if not t.is_active:
                 continue
 
-            if abs(t.roi.center.x - 0.5) > self.config.add_centre_threshold:
+            if abs(t.roi.center.x - 0.5) > self.settings.add_centre_threshold:
                 continue
 
-            if t.roi.height < self.config.add_height_threshold:
+            if t.roi.height < self.settings.add_height_threshold:
                 continue
 
-            if t.roi.bottom < 1.0 - self.config.add_bottom_threshold:
+            if t.roi.bottom < 1.0 - self.settings.add_bottom_threshold:
                 continue
 
             add_tracklets.append(t)
@@ -139,7 +139,7 @@ class Tracker(Thread, BaseTracker):
     def _update_and_notify(self, now: float) -> None:
         # retire expired tracklets
         for tracklet in self.store.all_tracklets():
-            if tracklet.is_expired(now, self.config.timeout):
+            if tracklet.is_expired(now, self.settings.timeout):
                 self.store.retire_tracklet(tracklet.id)
 
         # Notify callbacks

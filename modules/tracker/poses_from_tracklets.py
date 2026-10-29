@@ -23,9 +23,9 @@ class PosesFromTrackletsSettings(BaseSettings):
 class PosesFromTracklets(FrameDictCallbackMixin):
     """Generates poses from tracklets, maintaining state per track."""
 
-    def __init__(self, config: PosesFromTrackletsSettings, num_tracks: int) -> None:
+    def __init__(self, settings: PosesFromTrackletsSettings, num_tracks: int) -> None:
         super().__init__()
-        self._config: PosesFromTrackletsSettings = config
+        self.settings: PosesFromTrackletsSettings = settings
         # The incoming dict keys are used directly as slot indices below, so the feeding tracker
         # must key by a slot under `num_tracks` (the panoramic tracker's player slots; cam ids for
         # one-per-cam rigs): a key at or above it would vanish here without a trace. Both come from
@@ -75,7 +75,7 @@ class PosesFromTracklets(FrameDictCallbackMixin):
         generated_poses: FrameDict = {}
         # Checked on every frame, not when the tracker last published: a latched box goes stale
         # between tracker ticks, and a stale one is left out so downstream filters reset for it.
-        detection_timeout: float = self._config.detection_timeout
+        detection_timeout: float = self.settings.detection_timeout
 
         for track_id, tracklet in tracklets_snapshot.items():
             if tracklet is None or tracklet.is_expired(now, detection_timeout):
@@ -109,7 +109,7 @@ class PosesFromTracklets(FrameDictCallbackMixin):
 
     def is_ready(self, now: float) -> bool:
         """Return True if at least one tracklet is ready for generation at `now`."""
-        detection_timeout: float = self._config.detection_timeout
+        detection_timeout: float = self.settings.detection_timeout
         with self._lock:
             return any(tracklet is not None and not tracklet.is_expired(now, detection_timeout)
                        for tracklet in self._tracklets.values())

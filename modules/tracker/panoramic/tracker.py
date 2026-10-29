@@ -48,7 +48,7 @@ class Tracker(Thread, BaseTracker):
     detection, for the panorama.
     """
 
-    def __init__(self, config: TrackerSettings, num_players: int, num_cameras: int) -> None:
+    def __init__(self, settings: TrackerSettings, num_players: int, num_cameras: int) -> None:
         super().__init__()
 
         self._running: bool = False
@@ -61,25 +61,25 @@ class Tracker(Thread, BaseTracker):
 
         self.observations: ObservationStore = ObservationStore(num_players)
 
-        self.config: TrackerSettings = config
+        self.settings: TrackerSettings = settings
         # Each camera owns 360/num_cameras degrees of the turn; whatever its field has beyond
         # that is the overlap it shares with its neighbours.
-        self.rig: Rig = Rig(config.fov, 360.0 / num_cameras)
-        self.rig_sync: RigSync = RigSync(config, self.rig)
-        self.seams: Seams = Seams(self.observations, self.rig, config)
+        self.rig: Rig = Rig(settings.fov, 360.0 / num_cameras)
+        self.rig_sync: RigSync = RigSync(settings, self.rig)
+        self.seams: Seams = Seams(self.observations, self.rig, settings)
 
         # A live rig change only raises this; the tracker thread applies it before its next tick, so
         # the `Rig` is never written while the intake reads it.
         self._rig_changed: Event = Event()
         self._rig_fields = (
-            (config.rig, RigSettings.camera_radius),
-            (config.rig, RigSettings.camera_height),
-            (config.rig, RigSettings.zone_min_radius),
-            (config.rig, RigSettings.zone_max_radius),
-            (config, TrackerSettings.foot_offset),
+            (settings.rig, RigSettings.camera_radius),
+            (settings.rig, RigSettings.camera_height),
+            (settings.rig, RigSettings.zone_min_radius),
+            (settings.rig, RigSettings.zone_max_radius),
+            (settings, TrackerSettings.foot_offset),
         )
-        for settings, field in self._rig_fields:
-            settings.bind(field, self._on_rig_changed)
+        for owner, field in self._rig_fields:
+            owner.bind(field, self._on_rig_changed)
 
         self._callback_lock = Lock()
         self._tracklet_callbacks: list[TrackletDictCallback] = []       # run in registration order
@@ -105,8 +105,8 @@ class Tracker(Thread, BaseTracker):
     def stop(self) -> None:
         self._running = False
 
-        for settings, field in self._rig_fields:
-            settings.unbind(field, self._on_rig_changed)
+        for owner, field in self._rig_fields:
+            owner.unbind(field, self._on_rig_changed)
 
         with self._callback_lock:
             self._tracklet_callbacks.clear()
@@ -193,11 +193,11 @@ class Tracker(Thread, BaseTracker):
         # that. Their latest box is kept with its rejection, so the panorama's mark follows them and says why it
         # is fading.
         reason: Rejection | None = None
-        if new_tracklet.external_age_in_frames <= self.config.age_filter:
+        if new_tracklet.external_age_in_frames <= self.settings.age_filter:
             reason = Rejection.YOUNG
-        elif new_tracklet.roi.height < self.config.height_filter:
+        elif new_tracklet.roi.height < self.settings.height_filter:
             reason = Rejection.SMALL
-        elif self.config.zone_filter and self.rig.beyond_zone(annotation.local_angle, annotation.distance):
+        elif self.settings.zone_filter and self.rig.beyond_zone(annotation.local_angle, annotation.distance):
             reason = Rejection.PAST_EDGE
         if reason is not None:
             if existing:
@@ -227,7 +227,7 @@ class Tracker(Thread, BaseTracker):
             return
 
         # Brand-new observations are ignored too close to the FOV edge
-        if self.rig.angle_in_edge(annotation.local_angle, self.config.seam.dead_zone):
+        if self.rig.angle_in_edge(annotation.local_angle, self.settings.seam.dead_zone):
             self._reject(new_tracklet, Rejection.DEAD_ZONE)
             return
         # The seam link is attempted for every arrival: the overlap band is geometry for the
@@ -264,7 +264,7 @@ class Tracker(Thread, BaseTracker):
             if not isinstance(t.annotation, Annotation):
                 continue
             diff: float = abs(t.annotation.local_angle - new_angle)
-            if diff > self.config.reacquire_angle:
+            if diff > self.settings.reacquire_angle:
                 continue
             if self._refound_elsewhere(new_tracklet, t.id):
                 continue                    # already re-found: this is someone else
@@ -284,7 +284,7 @@ class Tracker(Thread, BaseTracker):
                 continue
             if not isinstance(t.annotation, Annotation):
                 continue
-            if abs(t.annotation.local_angle - new_angle) > self.config.same_cam_angle:
+            if abs(t.annotation.local_angle - new_angle) > self.settings.same_cam_angle:
                 return True
         return False
 
@@ -309,7 +309,7 @@ class Tracker(Thread, BaseTracker):
     def _update_and_notify(self, now: float) -> None:
         # Expire timed-out observations
         for t in self.observations.all():
-            if t.is_expired(now, self.config.lost_timeout):
+            if t.is_expired(now, self.settings.lost_timeout):
                 self.observations.retire(t.obs_id)
 
         self.seams.split_worlds()
@@ -339,7 +339,7 @@ class Tracker(Thread, BaseTracker):
 
         # Dropped detections a camera has stopped reporting: a device track normally ends with LOST
         # or REMOVED, which clears its entry, but a camera that simply goes quiet does not.
-        lost_timeout: float = self.config.lost_timeout
+        lost_timeout: float = self.settings.lost_timeout
         for key in [k for k, t in self._rejected.items() if now - t.last_active > lost_timeout]:
             del self._rejected[key]
 
@@ -360,8 +360,8 @@ class Tracker(Thread, BaseTracker):
 
         # The panel's live read-outs, at end-of-tick truth: slots freed by the removals just above
         # have moved on to the oldest waiters.
-        self.config.players = self.observations.players.in_use
-        self.config.waiting = self.observations.players.waiting
+        self.settings.players = self.observations.players.in_use
+        self.settings.waiting = self.observations.players.waiting
 
     # CALLBACKS
     def _notify_callback(self, tracklets: TrackletDict) -> None:
