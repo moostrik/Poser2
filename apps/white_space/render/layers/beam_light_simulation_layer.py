@@ -19,13 +19,14 @@ import numpy as np
 from OpenGL.GL import * # type: ignore
 
 from modules.gl import Fbo, Texture, Image
-from modules.board import HasCompositionOutput, HasFlashes
+from modules.board import HasFlashes
 from modules.render import layers
 
 from apps.white_space.light import BUFFER_DTYPE
 from apps.white_space.render.shaders.light_simulation import LightSimulation
 
 from .beam_light_projection import project_beam_lights, paint_flashes
+from ...composition_output import HasCompositionOutput
 from ...settings import BeamLightSimSettings
 
 

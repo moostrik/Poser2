@@ -24,5 +24,3 @@ from .hit_streak import             HasHitStreak, HitStreakStoreMixin, HitStreak
 from .tracklets import              HasTracklets, TrackletStoreMixin
 from .observations import           HasObservations, ObservationStoreMixin
 from .video import                  HasVideoImages, VideoImageStoreMixin
-from .composition_output import     HasCompositionOutput, CompositionOutputStoreMixin, HasCompositionDebug, \
-                                    CompositionDebugStoreMixin

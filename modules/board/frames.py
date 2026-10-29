@@ -4,7 +4,7 @@ from threading import Lock
 from typing import Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from modules.pose.frame import Frame
+    from modules.pose import Frame
 
 
 class HasFrames(Protocol):

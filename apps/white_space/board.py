@@ -3,9 +3,11 @@
 from modules.board import (
     FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
     CameraTrackletStoreMixin, TrackletStoreMixin, ObservationStoreMixin,
-    VideoImageStoreMixin, CompositionOutputStoreMixin, SequenceStoreMixin,
+    VideoImageStoreMixin, SequenceStoreMixin,
     PlayheadStoreMixin, SoundLevelStoreMixin, FlashStoreMixin, HitStreakStoreMixin,
 )
+
+from .composition_output import CompositionOutputStoreMixin
 
 
 class Board(

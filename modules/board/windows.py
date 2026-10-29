@@ -4,8 +4,7 @@ from threading import Lock
 from typing import Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from modules.pose.frame import FeatureWindow
-    from modules.pose.features import BaseFeature
+    from modules.pose import FeatureWindow, BaseFeature
 
 
 class WindowSource(Protocol):

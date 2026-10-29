@@ -1,10 +1,11 @@
 from OpenGL.GL import * # type: ignore
 
 from modules.gl import Fbo, Texture, Image
-from modules.board import HasCompositionOutput
 from modules.render import layers
 
 from apps.white_space.render.shaders.light_simulation import LightSimulation
+
+from ...composition_output import HasCompositionOutput
 
 
 class LightSimulationLayer(layers.LayerBase):

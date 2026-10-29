@@ -106,6 +106,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Change files with Edit/Write, not scripts
 
 ```
+python -m unittest discover -s tests -t .                  # guard tests: import layering
 python -m unittest discover -s apps/white_space/tests -t .
 python -m unittest discover -s apps/smile/<pkg>/tests -t .  # tests, comfy, render, player, relay, ...
 python -m unittest discover -s modules/<pkg>/tests -t .    # camera, camera/oak, camera/replay, camera/vimba, camera/webcam, face, inference/detection, inout, pose, render, settings, tracker, video
