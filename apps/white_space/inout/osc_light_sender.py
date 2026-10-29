@@ -7,7 +7,7 @@ from pythonosc.udp_client import UDPClient
 from pythonosc.osc_message import OscMessage
 from pythonosc.osc_message_builder import OscMessageBuilder
 
-from ..light import Frame, Tick, BeamLightId, BEAM_LIGHT_CHANNEL, FIXTURE_PROJECTION_RPM, MotorSettings
+from ..light import LightFrame, Tick, BeamLightId, BEAM_LIGHT_CHANNEL, FIXTURE_PROJECTION_RPM, MotorSettings
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.inout import validate_connection
 
@@ -206,7 +206,7 @@ class OscLightSender:
                 settings.resolution, settings.mtu,
             )
 
-        self._latest_output: Optional[Frame] = None
+        self._latest_output: Optional[LightFrame] = None
         self._latch = FixtureSpeedLatch()   # when the fixture's speed latch needs a 0→target edge
         self._output_lock:   Lock  = Lock()
         self._client_lock:   Lock  = Lock()
@@ -250,16 +250,16 @@ class OscLightSender:
         self.settings.interlace.unbind_all(self._on_interlace_change)
 
         # Send AFTER the join: guaranteed to be the last thing on the wire (late
-        # send_message() calls only store into the dead thread's slot).
+        # submit_light_frame() calls only store into the dead thread's slot).
         if started:
             try:
                 self._send_blackout()
             except Exception as e:
                 logger.error(f"Error sending light blackout: {e}")
 
-    def send_message(self, output: Frame) -> None:
+    def submit_light_frame(self, frame: LightFrame) -> None:
         with self._output_lock:
-            self._latest_output = output
+            self._latest_output = frame
         self._update_event.set()
 
     def _run(self) -> None:
@@ -397,7 +397,7 @@ class OscLightSender:
         all-zero pixel chunks (`/WS/blue2` last commits the dark frame), and rpm 0 once
         more **last** — a lost single rpm datagram must not leave the motor spinning
         until the firmware watchdog."""
-        zero = Frame(settings.resolution, Tick(0.0, 0.0))
+        zero = LightFrame(settings.resolution, Tick(0.0, 0.0))
         chunks = OscLightSender._build_chunk_messages(zero, settings, chunk_size, num_chunks, slow=True) or []
         return [OscLightSender._build_rpm_message(0), *chunks, OscLightSender._build_rpm_message(0)]
 
@@ -418,7 +418,7 @@ class OscLightSender:
         return message_list
 
     @staticmethod
-    def _rebuild_fixture_pixels(output: Frame, slow: bool, shift: int) -> tuple[np.ndarray, np.ndarray]:
+    def _rebuild_fixture_pixels(output: LightFrame, slow: bool, shift: int) -> tuple[np.ndarray, np.ndarray]:
         """The (white, blue) pixel channels as the fixture will read them.
 
         In projection mode the projection is what the fixture paints, so it goes out rotated
@@ -449,7 +449,7 @@ class OscLightSender:
 
     @staticmethod
     def _build_chunk_messages(
-        output: Frame,
+        output: LightFrame,
         settings: OscLightSenderSettings,
         chunk_size: int,
         num_chunks: int,

@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from apps.white_space.light import Frame, Tick, BeamLightId, BEAM_LIGHT_HEADINGS, BUFFER_DTYPE
+from apps.white_space.light import LightFrame, Tick, BeamLightId, BEAM_LIGHT_HEADINGS, BUFFER_DTYPE
 from apps.white_space.light.layers import BeamTest, BeamTestSettings
 from modules.board import Flash, FlashStoreMixin
 from apps.white_space.render.layers.beam_light_projection import beam_profile, project_beam_lights, paint_flashes
@@ -14,8 +14,8 @@ from apps.white_space.render.layers.beam_light_projection import beam_profile, p
 R = 360   # one pixel per degree keeps the expected indices readable
 
 
-def _frame() -> Frame:
-    return Frame(R, Tick(0.0, 1.0 / 30.0))
+def _frame() -> LightFrame:
+    return LightFrame(R, Tick(0.0, 1.0 / 30.0))
 
 
 class LowLayerWritesTest(unittest.TestCase):

@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from apps.white_space.light import Tick, MotorCommand
-from apps.white_space.light.frame import Frame, BeamLightId
+from apps.white_space.light.frame import LightFrame, BeamLightId
 from apps.white_space.light.layers.beam.flash import BeamFlash, BeamFlashSettings
 from apps.white_space.pose import PlayheadOffset
 
@@ -47,9 +47,9 @@ class FlashTest(unittest.TestCase):
         self.board = FlashBoard(frames={}, flashes=[])
         self.layer = BeamFlash(RES, self.settings, self.board, pose_stage=4)
 
-    def _render(self, pose, playhead: float = 1.0) -> Frame:
+    def _render(self, pose, playhead: float = 1.0) -> LightFrame:
         self.board.frames = {} if pose is None else {pose.track_id: pose}
-        f = Frame(RES, Tick(0.0, self.INTERVAL), motor_command=MotorCommand(beam_rpm=36.0), playhead=playhead)
+        f = LightFrame(RES, Tick(0.0, self.INTERVAL), motor_command=MotorCommand(beam_rpm=36.0), playhead=playhead)
         self.layer.render(f)
         return f
 

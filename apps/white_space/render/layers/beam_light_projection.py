@@ -55,7 +55,7 @@ def _paint_beam_lights(beam_lights: np.ndarray, heading: float, profile: np.ndar
 
 def project_beam_lights(beam_lights: np.ndarray, heading: float, width: float, blur: float,
                         out: np.ndarray) -> None:
-    """Paint the beam lights into ``out`` (shape ``(1, R, 3)``, the Frame layout; zeroed first).
+    """Paint the beam lights into ``out`` (shape ``(1, R, 3)``, the LightFrame layout; zeroed first).
 
     ``beam_lights`` are the four levels (index = ``BeamLightId``), ``heading`` the front white's
     direction, ``width`` and ``blur`` the line's core width and edge falloff — all in radians.

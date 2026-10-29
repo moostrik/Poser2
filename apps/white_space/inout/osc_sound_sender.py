@@ -5,9 +5,9 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 from pythonosc.osc_message_builder import OscMessageBuilder
 
 from modules.inout import OscSound as BaseOscSound, OscSoundSettings
-from modules.pose import Frame as PoseFrame, FrameDict, Azimuth, Distance, Angles, ArmTravel, TravelElement, ShoulderDifference
+from modules.pose import Frame, FrameDict, Azimuth, Distance, Angles, ArmTravel, TravelElement, ShoulderDifference
 from modules.session import SequencerState
-from ..light import Frame
+from ..light import LightFrame
 from ..pose import PlayheadOffset
 
 import logging
@@ -44,7 +44,7 @@ class OscSoundSender(BaseOscSound):
 
     def __init__(self, settings: OscSoundSettings) -> None:
         super().__init__(settings)
-        self._composition: Frame | None = None
+        self._light_frame: LightFrame | None = None
         # Extend the base's inactive-reset throttle to cover the dummy's slot.
         self._inactive_counts = {id: 0 for id in range(self._slot_count)}
 
@@ -54,10 +54,10 @@ class OscSoundSender(BaseOscSound):
         ``max_players``; only the slot count grows."""
         return self.settings.max_players + 1
 
-    def set_composition(self, output: Frame) -> None:
-        """Store the latest Frame; thread-safe."""
+    def set_light_frame(self, frame: LightFrame) -> None:
+        """Store the latest LightFrame; thread-safe."""
         with self._input_lock:
-            self._composition = output
+            self._light_frame = frame
 
     def _build_bundle(self, frames: FrameDict, seq_state: SequencerState | None) -> OscBundleBuilder:
         """Live slots and the dummy's; per-track arrays stay ``max_players`` wide (see class doc)."""
@@ -88,25 +88,25 @@ class OscSoundSender(BaseOscSound):
 
     def _add_global_messages(self, bundle_builder: OscBundleBuilder, frames: FrameDict, seq_state: SequencerState | None) -> None:
         with self._input_lock:
-            composition = self._composition
+            light_frame = self._light_frame
 
         super()._add_global_messages(bundle_builder, frames, seq_state)
 
         # seq_state is None during idle/blackout → zero the playhead and motor.
         idle: bool = seq_state is None
-        playhead: float = 0.0 if (idle or composition is None) else float(composition.playhead)
+        playhead: float = 0.0 if (idle or light_frame is None) else float(light_frame.playhead)
         playhead_msg = OscMessageBuilder(address="/global/playhead")
         playhead_msg.add_arg(playhead, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(playhead_msg.build())  # type: ignore
 
-        motor_mode: int = 0 if (idle or composition is None) else int(composition.motor_command.mode)
+        motor_mode: int = 0 if (idle or light_frame is None) else int(light_frame.motor_command.mode)
         motor_msg = OscMessageBuilder(address="/global/motor")
         motor_msg.add_arg(motor_mode, OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(motor_msg.build())  # type: ignore
 
         # Full sync's envelope (0..1): the light's own gate, 0 while the pose instrument is
         # not drawn — the compositor only carries it out of a rendered frame.
-        sync: float = 0.0 if (idle or composition is None) else float(composition.sync)
+        sync: float = 0.0 if (idle or light_frame is None) else float(light_frame.sync)
         sync_msg = OscMessageBuilder(address="/global/sync")
         sync_msg.add_arg(sync, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(sync_msg.build())  # type: ignore
@@ -129,14 +129,14 @@ class OscSoundSender(BaseOscSound):
         speaker_msg.add_arg(math.radians(self.settings.speaker_offset), OscMessageBuilder.ARG_TYPE_FLOAT)  # type: ignore[attr-defined]
         bundle_builder.add_content(speaker_msg.build())  # type: ignore
 
-    def _angle_values(self, frame: PoseFrame) -> list[float]:
+    def _angle_values(self, frame: Frame) -> list[float]:
         """The angles, the four arm entries replaced by the joints' travel × π (see the class doc)."""
         values = frame[Angles].values.astype(np.float64)
         if ArmTravel in frame:
             values[:TravelElement.left_arm] = frame[ArmTravel].values[:TravelElement.left_arm] * math.pi
         return values.tolist()
 
-    def _add_active_frame_messages(self, bundle_builder: OscBundleBuilder, frame: PoseFrame, frames: FrameDict, num_players: int) -> None:
+    def _add_active_frame_messages(self, bundle_builder: OscBundleBuilder, frame: Frame, frames: FrameDict, num_players: int) -> None:
         super()._add_active_frame_messages(bundle_builder, frame, frames, num_players)
         id: int = frame.track_id
 

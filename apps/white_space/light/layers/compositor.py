@@ -25,7 +25,7 @@ import numpy as np
 
 from ._base_layer import BaseLayer
 from ..clock import Tick
-from ..frame import Frame, BEAM_LIGHT_CHANNEL
+from ..frame import LightFrame, BEAM_LIGHT_CHANNEL
 
 if TYPE_CHECKING:
     from ..settings import LightSettings, LayerId
@@ -62,7 +62,7 @@ class Compositor:
         self._settings = settings
         self._layers = layers
         self._entries: Mix = []
-        self._scratch = Frame(settings.light_resolution, Tick(0.0, 0.0))
+        self._scratch = LightFrame(settings.light_resolution, Tick(0.0, 0.0))
 
     # -- Mix input (light thread, same thread as render) ----------------------
 
@@ -82,7 +82,7 @@ class Compositor:
 
     # -- Per-tick mix ----------------------------------------------------------
 
-    def render(self, frame: Frame) -> None:
+    def render(self, frame: LightFrame) -> None:
         settings = self._settings
         entries: Mix = self._entries
         if int(settings.debug) != 0:                  # a debug layer is selected → solo it

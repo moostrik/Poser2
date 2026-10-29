@@ -19,7 +19,7 @@ from modules.pose import nodes, trackers, features, window, analytics, FrameDict
 from modules.inference import pose, detection, CropExtractor, Uploader
 from modules.session import Session
 
-from .board import Board
+from .render_board import RenderBoard
 from .pose import PlayheadOffset, PlayheadOffsetExtractor, Dummy, dummy_id, NeutralWeight, HitSync
 from .light import Conductor
 from .inout import OscLightSender, OscSoundSender, UdpLightReceiver
@@ -65,7 +65,7 @@ class WhiteSpaceMain:
         ps = self.settings.pose
 
         # BLACKBOARD
-        self.board = Board()
+        self.board = RenderBoard()
 
         # RECORDING (independent of the show — works stand-alone and during session mode)
         self.session = Session(self.settings.record.core)
@@ -175,8 +175,8 @@ class WhiteSpaceMain:
         self.osc_sound_receiver.bind("/WS/idle/blue/right", self._on_sound_level_right)
         for camera in self.cameras:
             camera.add_frame_callback(self._store_video_frame)
-        self.conductor.add_render_callback(self.osc_light_sender.send_message)
-        self.conductor.add_render_callback(self.osc_sound_sender.set_composition)
+        self.conductor.add_light_frame_callback(self.osc_light_sender.submit_light_frame)
+        self.conductor.add_light_frame_callback(self.osc_sound_sender.set_light_frame)
 
         # STATE MACHINE — the show's single decision maker; commands the Conductor through
         # its three channels (look, layer resets, motor) and emits state to board + OSC.

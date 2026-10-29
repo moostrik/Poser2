@@ -14,7 +14,7 @@ from modules.pose import nodes
 from modules.utils import Color, Rect, Point2f
 from modules.render import layers, make_subdivision, SubdivisionRow, Subdivision
 
-from ..board import Board
+from ..render_board import RenderBoard
 from ..pose import PlayheadOffset, dummy_id
 from ..settings import Layers, RenderSettings, PlayheadFeatureSelect, CameraView, Layout, Stage
 from .pose_slots import POSE_SLOTS, pose_slots
@@ -41,7 +41,7 @@ _SWITCHED_ROWS: dict[str, tuple[Layers, ...]] = {
 
 
 class Render(RenderBase):
-    def __init__(self, board: Board, settings: RenderSettings,
+    def __init__(self, board: RenderBoard, settings: RenderSettings,
                  tracker: PanoramicTrackerSettings,
                  cameras: list[RigCameraSettings], camera_check: CameraCheckSettings,
                  angle_extractor: nodes.AngleExtractorSettings) -> None:
@@ -54,7 +54,7 @@ class Render(RenderBase):
         # The tracker's own geometry, live. Anything drawing the tracker's world has to use the
         # numbers the tracker used, or the display invents an error of its own.
         self.tracker_settings: PanoramicTrackerSettings = tracker
-        self.board: Board = board
+        self.board: RenderBoard = board
 
         self.L: dict[Layers, dict[int, layers.LayerBase]] = {layer: {} for layer in Layers}
 
@@ -309,8 +309,8 @@ class Render(RenderBase):
         # fixture is in beam mode — the same rule the fixture applies to the same command (the
         # frame's target rpm).
         if self.subdivision.has('ws_light'):
-            output = self.board.get_composition_output()
-            beam_mode = output is not None and output.motor_command.target_rpm < FIXTURE_PROJECTION_RPM
+            light_frame = self.board.get_light_frame()
+            beam_mode = light_frame is not None and light_frame.motor_command.target_rpm < FIXTURE_PROJECTION_RPM
             self._viewport(height, self.subdivision.get_rect('ws_light', 0))
             self.L[Layers.ws_beam if beam_mode else Layers.ws_light][0].draw()
             if self.settings.azimuth_overlay:

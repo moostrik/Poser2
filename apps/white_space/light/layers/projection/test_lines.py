@@ -5,7 +5,7 @@ import numpy as np
 from modules.settings import Group
 
 from .._base_layer import ProjectionLayer, ChannelSettings, LayerSettings
-from ...frame import Frame
+from ...frame import LightFrame
 from ...synth import Oscillator
 
 
@@ -23,7 +23,7 @@ class TestLines(ProjectionLayer):
         self._settings: TestLinesSettings = settings
         self._indices: np.ndarray = np.arange(resolution, dtype=np.float32)
 
-    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, white: np.ndarray, blue: np.ndarray) -> None:
         t         = frame.tick.time         # plain seconds; `speed` scales the rate
         res       = self.resolution
         W         = self._settings.white

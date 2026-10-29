@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from apps.white_space.light import DebugLayer, LayerId, Tick, BeamLightId
-from apps.white_space.light.frame import Frame
+from apps.white_space.light.frame import LightFrame
 from apps.white_space.light.layers.compositor import Compositor
 
 RES = 8
@@ -27,15 +27,15 @@ class FakeLayer:
         self.value = value
         self.resets = 0
 
-    def render(self, frame: Frame) -> None:
+    def render(self, frame: LightFrame) -> None:
         frame.white += self.value
 
     def reset(self) -> None:
         self.resets += 1
 
 
-def frame() -> Frame:
-    return Frame(RES, Tick(0.0, 0.0))
+def frame() -> LightFrame:
+    return LightFrame(RES, Tick(0.0, 0.0))
 
 
 class CompositorTest(unittest.TestCase):
@@ -68,7 +68,7 @@ class CompositorTest(unittest.TestCase):
 
     def test_per_channel_weights(self) -> None:
         class Both(FakeLayer):
-            def render(self, frame: Frame) -> None:
+            def render(self, frame: LightFrame) -> None:
                 frame.white += 1.0
                 frame.blue += 1.0
 
@@ -88,7 +88,7 @@ class CompositorTest(unittest.TestCase):
         """The frame leaves the Compositor azimuth-true — a layer's pixel lands where it drew
         it, so the board and the screen agree with the tracker row."""
         class Marker(FakeLayer):
-            def render(self, frame: Frame) -> None:
+            def render(self, frame: LightFrame) -> None:
                 frame.white[0] += 1.0
 
         comp = Compositor(settings(),{LayerId.test_pose_waves: Marker(1.0)})
@@ -105,12 +105,12 @@ class CompositorTest(unittest.TestCase):
         seen: list[tuple[float, float]] = []
 
         class Reader(FakeLayer):
-            def render(self, frame: Frame) -> None:
+            def render(self, frame: LightFrame) -> None:
                 seen.append((frame.motor_command.beam_rpm, frame.playhead))
 
         comp = Compositor(settings(),{LayerId.test_pose_waves: Reader(0.0)})
         comp.set_mix([(LayerId.test_pose_waves, 1.0)])
-        f = Frame(RES, Tick(0.0, 0.0), motor_command=MotorCommand(mode=MotorMode.PROJECTION, beam_rpm=36.0), playhead=1.5)
+        f = LightFrame(RES, Tick(0.0, 0.0), motor_command=MotorCommand(mode=MotorMode.PROJECTION, beam_rpm=36.0), playhead=1.5)
         comp.render(f)
         self.assertEqual(seen, [(36.0, 1.5)])
 
@@ -118,7 +118,7 @@ class CompositorTest(unittest.TestCase):
         """The frame's sync (full sync's envelope, the pose instrument's) is carried out of the
         scratch only for a layer that rendered: out of the mix or at weight 0 it stays 0."""
         class Syncing(FakeLayer):
-            def render(self, frame: Frame) -> None:
+            def render(self, frame: LightFrame) -> None:
                 frame.sync = 0.8
 
         comp = Compositor(settings(),{LayerId.test_pose_waves: Syncing(0.0), LayerId.beam_playhead: FakeLayer(1.0)})
@@ -169,7 +169,7 @@ class BeamLightMixTest(unittest.TestCase):
 
     class BeamFakeLayer:
 
-        def render(self, f: Frame) -> None:
+        def render(self, f: LightFrame) -> None:
             f.beam_lights += np.array([1.0, 0.5, 1.0, 0.5], dtype=np.float32)
 
         def reset(self) -> None:

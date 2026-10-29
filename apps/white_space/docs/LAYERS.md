@@ -7,7 +7,7 @@ truth for behavior; `beam_blue_sound`, `flood` and `beam_wind_down` keep their f
 here; `pose_instrument`'s design (its voice, controls, patch and poses) is `POSE_INSTRUMENT.md`, and
 its section here covers the layer alone.
 
-Modes: **beam** layers write the four beam lights by name (`Frame.beam_lights`, indexed by
+Modes: **beam** layers write the four beam lights by name (`LightFrame.beam_lights`, indexed by
 `BeamLightId`: front/back white, left/right blue) and no pixels; **projection** layers draw the
 persistence-of-vision projection. The fixture's readout mode follows the *commanded* rpm — beam
 mode below 200, projection mode at or above, switching on receipt of the rpm regardless of the

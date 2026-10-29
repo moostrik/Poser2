@@ -6,7 +6,7 @@ fixture's readout mode follows the *commanded* rpm, switching on receipt of the 
 of the bar's actual speed (see ``inout/osc_light_sender.py`` for the wire contract) — so a
 spinning-down bar in beam mode shows its lamps smeared into a wall, not the projection.
 
-Layers in this package therefore write the four beam lights by name (``Frame.beam_lights``,
+Layers in this package therefore write the four beam lights by name (``LightFrame.beam_lights``,
 indexed by ``BeamLightId``) and nothing else; the light sender maps them to the firmware's
 pixel slots on the way out, and the render simulates them as beams on the walls. Commanded at
 or above the threshold the fixture paints the projection and the projection layers take

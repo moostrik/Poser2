@@ -5,7 +5,7 @@ import numpy as np
 from modules.settings import Group
 
 from .._base_layer import ProjectionLayer, ChannelSettings, LayerSettings
-from ...frame import Frame
+from ...frame import LightFrame
 
 
 class TestFillSettings(LayerSettings):
@@ -20,6 +20,6 @@ class TestFill(ProjectionLayer):
         super().__init__(resolution, settings, board)
         self._settings: TestFillSettings = settings
 
-    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, white: np.ndarray, blue: np.ndarray) -> None:
         white += self._settings.white.level
         blue  += self._settings.blue.level

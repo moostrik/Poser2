@@ -12,7 +12,7 @@ import numpy as np
 from modules.pose import features
 
 from apps.white_space.light import Tick, MotorCommand, MotorMode, LayerSettings
-from apps.white_space.light.frame import Frame
+from apps.white_space.light.frame import LightFrame
 from apps.white_space.light.layers import PoseInstrument, PoseInstrumentSettings, SyncStrobeMode, Opposite
 from apps.white_space.light.synth import Parameter, Curve
 from apps.white_space.pose import PlayheadOffset
@@ -113,10 +113,10 @@ class PoseInstrumentTest(unittest.TestCase):
     def _people(self, poses: dict[int, FakePose]) -> None:
         self.board.frames = poses
 
-    def _render(self, playhead: float = float("nan")) -> Frame:
+    def _render(self, playhead: float = float("nan")) -> LightFrame:
         """One tick; ``playhead`` is the content playhead as a normalized azimuth, none by
         default so the marker stays out of the picture."""
-        f = Frame(IRES, Tick(0.0, self.dt, index=self.tick), motor_command=MotorCommand(mode=MotorMode.PROJECTION, beam_rpm=36.0),
+        f = LightFrame(IRES, Tick(0.0, self.dt, index=self.tick), motor_command=MotorCommand(mode=MotorMode.PROJECTION, beam_rpm=36.0),
                   playhead=playhead * math.tau)
         self.tick += 1
         self.layer.render(f)
@@ -586,7 +586,7 @@ class PoseInstrumentTest(unittest.TestCase):
 
     STEADY = (23.4, 16.2, 9.0, 1.8, -5.4, -12.6)     # 36 rpm at 30 Hz: 7.2° a tick, closest at +1.8°
 
-    def _sweep(self, **pose) -> list[Frame]:
+    def _sweep(self, **pose) -> list[LightFrame]:
         frames = []
         for offset in self.STEADY:
             self._people({0: _pose(0.5, offset_deg=offset, **pose)})
@@ -960,7 +960,7 @@ class PoseInstrumentTest(unittest.TestCase):
         S.attack_seconds = S.release_seconds = 0.0
         self._people({0: _pose(0.3, sims={1: sim}), 1: _pose(0.7, sims={0: sim})})
 
-    def _even_frame(self) -> Frame:
+    def _even_frame(self) -> LightFrame:
         """Render to the next even tick, where a strobe frame falls whenever the strobe is up."""
         if self.tick % 2:
             self._render()

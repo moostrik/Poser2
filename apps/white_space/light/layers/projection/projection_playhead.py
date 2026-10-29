@@ -17,7 +17,7 @@ from .._base_layer import ProjectionLayer, LayerSettings
 from .._utilities import normalize_azimuth, mask_half_width
 from .playhead_marker import PlayheadMarker, PlayheadMarkerSettings
 from .pose_instrument import MaskSettings
-from ...frame import Frame
+from ...frame import LightFrame
 
 
 class ProjectionPlayhead(ProjectionLayer):
@@ -31,7 +31,7 @@ class ProjectionPlayhead(ProjectionLayer):
         self._pose_stage = pose_stage
         self._masked = np.zeros(resolution, dtype=bool)
 
-    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, white: np.ndarray, blue: np.ndarray) -> None:
         PlayheadMarker.draw(white, blue, self.resolution, frame.playhead, self._marker, self._in_masks())
 
     def _in_masks(self) -> np.ndarray:

@@ -9,8 +9,8 @@ while its mix wrote only beam lights would be a black one.
 
 import unittest
 
-from apps.white_space.board import Board
-from apps.white_space.light import Conductor, Frame, LayerId, MotorMode, FIXTURE_PROJECTION_RPM
+from apps.white_space.render_board import RenderBoard
+from apps.white_space.light import Conductor, LightFrame, LayerId, MotorMode, FIXTURE_PROJECTION_RPM
 from apps.white_space.light.clock import Tick
 from apps.white_space.settings import Settings, Stage
 
@@ -21,12 +21,12 @@ class RegimeSwitchTest(unittest.TestCase):
 
     def setUp(self) -> None:
         settings = Settings()
-        self.conductor = Conductor(settings.light, settings.PI, board=Board(), pose_stage=int(Stage.LERP))
-        self.frames: list[Frame] = []
-        self.conductor.add_render_callback(self.frames.append)
+        self.conductor = Conductor(settings.light, settings.PI, board=RenderBoard(), pose_stage=int(Stage.LERP))
+        self.frames: list[LightFrame] = []
+        self.conductor.add_light_frame_callback(self.frames.append)
         self.time: float = 0.0
 
-    def _tick(self) -> Frame:
+    def _tick(self) -> LightFrame:
         self.conductor._update(Tick(self.time, DT))
         self.time += DT
         return self.frames[-1]

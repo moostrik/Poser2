@@ -38,7 +38,7 @@ from .neutral_weight import NeutralWeightSettings
 from .playhead_offset import PlayheadCrossing, PlayheadOffset, playhead_step
 
 if TYPE_CHECKING:
-    from ..board import Board
+    from ..render_board import RenderBoard
     from ..light import LightSettings
 
 _KEPT_HITS = 16          # more than a round of the largest room
@@ -65,7 +65,7 @@ class HitSync:
     """Records the hits' poses and publishes the streak; see the module docstring."""
 
     def __init__(self, settings: HitSyncSettings, posture: analytics.PostureSimilaritySettings, neutral: NeutralWeightSettings,
-                 light: LightSettings, board: Board, pose_stage: int) -> None:
+                 light: LightSettings, board: RenderBoard, pose_stage: int) -> None:
         self._settings = settings
         self._posture = posture
         self._neutral = neutral

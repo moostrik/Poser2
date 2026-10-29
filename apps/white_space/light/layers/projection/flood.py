@@ -10,7 +10,7 @@ import numpy as np
 from modules.settings import Field
 
 from .._base_layer import ProjectionLayer, LayerSettings
-from ...frame import Frame
+from ...frame import LightFrame
 
 
 class FloodSettings(LayerSettings):
@@ -24,5 +24,5 @@ class Flood(ProjectionLayer):
         super().__init__(resolution, settings, board)
         self._settings: FloodSettings = settings
 
-    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, white: np.ndarray, blue: np.ndarray) -> None:
         white += self._settings.level

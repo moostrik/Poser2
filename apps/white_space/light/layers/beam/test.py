@@ -9,7 +9,7 @@ import numpy as np
 from modules.settings import Field
 
 from .._base_layer import BeamLayer, LayerSettings
-from ...frame import Frame
+from ...frame import LightFrame
 
 
 class BeamTestSettings(LayerSettings):
@@ -26,7 +26,7 @@ class BeamTest(BeamLayer):
         super().__init__(resolution, settings, board)
         self._settings: BeamTestSettings = settings
 
-    def _draw(self, frame: Frame, beam_lights: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, beam_lights: np.ndarray) -> None:
         P = self._settings
         self._add_beam_lights(beam_lights, front_white=P.front_white, back_white=P.back_white,
                              left_blue=P.left_blue, right_blue=P.right_blue)

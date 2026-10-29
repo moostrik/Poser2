@@ -29,7 +29,7 @@ from typing import Callable
 from modules.board import HitStreak
 from modules.session import SequencerState
 
-from ..board import Board
+from ..render_board import RenderBoard
 from ..light import LightSettings, LayerId, Mix, MotorMode, PoseInstrumentSettings
 from .settings import StateId, StateMachineSettings, ManualSettings
 
@@ -66,7 +66,7 @@ class StateMachine:
     read from the board there, so composing needs no locking."""
 
     def __init__(self, settings: StateMachineSettings, light: LightSettings, instrument: PoseInstrumentSettings,
-                 board: Board,
+                 board: RenderBoard,
                  set_mix: Callable[[Mix], None],
                  reset_layers: Callable[[list[LayerId]], None],
                  set_motor: Callable[[MotorMode | None], None],

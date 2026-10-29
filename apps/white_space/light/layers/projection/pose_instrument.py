@@ -61,7 +61,7 @@ from modules.settings import BaseSettings, Field, Group, Widget
 from .._base_layer import ProjectionLayer, LayerSettings
 from .._utilities import normalize_azimuth, mask_half_width
 from .playhead_marker import PlayheadMarker, PlayheadMarkerSettings
-from ...frame import Frame
+from ...frame import LightFrame
 from ...synth import (Voice, Parameter, Sources, Envelope, Strobe,
                       OscillatorSettings, WindowSettings as SynthWindowSettings, LfoSettings, StrobeSettings)
 from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step, DummySettings
@@ -264,7 +264,7 @@ class PoseInstrument(ProjectionLayer):
 
     # -- Per tick --------------------------------------------------------------
 
-    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, white: np.ndarray, blue: np.ndarray) -> None:
         self._update_players(frame)
         self._set_grow(frame.tick.dt)                                      # first: the reaches read its envelope
         self._set_reaches()
@@ -330,7 +330,7 @@ class PoseInstrument(ProjectionLayer):
 
     # -- Players ------------------------------------------------------------
 
-    def _update_players(self, frame: Frame) -> None:
+    def _update_players(self, frame: LightFrame) -> None:
         P = self._instrument
         for p in self._players.values():
             p.present = False
@@ -527,7 +527,7 @@ class PoseInstrument(ProjectionLayer):
             self._full_sync = least >= (min(P.off_at, P.on_at) if self._full_sync else P.on_at)
         P.full_sync = self._full_sync
 
-    def _set_sync_strobe(self, frame: Frame) -> None:
+    def _set_sync_strobe(self, frame: LightFrame) -> None:
         """Whether this tick is a sync strobe frame. The room's gate (``_set_full_sync``), through
         the strobe's bypass, drives an envelope whose value picks the rate from the nested powers
         of two (``Strobe.rate``, ``Strobe.period``): the strobe comes in climbing 1 to 16 per

@@ -1,4 +1,4 @@
-"""White Space app-wide blackboard."""
+"""White Space render board — thread-safe shared data store for the White Space app."""
 
 from modules.board import (
     FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
@@ -7,13 +7,13 @@ from modules.board import (
     PlayheadStoreMixin, SoundLevelStoreMixin, FlashStoreMixin, HitStreakStoreMixin,
 )
 
-from .composition_output import CompositionOutputStoreMixin
+from .light_frame_store import LightFrameStoreMixin
 
 
-class Board(
+class RenderBoard(
     FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
     CameraTrackletStoreMixin, TrackletStoreMixin, ObservationStoreMixin,
-    VideoImageStoreMixin, CompositionOutputStoreMixin, SequencerStateStoreMixin,
+    VideoImageStoreMixin, LightFrameStoreMixin, SequencerStateStoreMixin,
     PlayheadStoreMixin, SoundLevelStoreMixin, FlashStoreMixin, HitStreakStoreMixin,
 ):
     """Thread-safe blackboard for the White Space app.
@@ -31,7 +31,7 @@ class Board(
         TrackletStoreMixin.__init__(self)
         ObservationStoreMixin.__init__(self)
         VideoImageStoreMixin.__init__(self)
-        CompositionOutputStoreMixin.__init__(self)
+        LightFrameStoreMixin.__init__(self)
         SequencerStateStoreMixin.__init__(self)
         PlayheadStoreMixin.__init__(self)
         SoundLevelStoreMixin.__init__(self)

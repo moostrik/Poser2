@@ -9,15 +9,15 @@ from types import SimpleNamespace
 from modules.board import SoundLevels
 
 from apps.white_space.light import Tick, BeamLightId
-from apps.white_space.light.frame import Frame
+from apps.white_space.light.frame import LightFrame
 from apps.white_space.light.layers import SyncStrobeMode
 from apps.white_space.light.layers.beam.blue_sound import BeamBlueSound, BeamBlueSoundSettings, SoundFallback
 
 RES = 200
 
 
-def frame(time: float = 0.0) -> Frame:
-    return Frame(RES, Tick(time, 1 / 30))
+def frame(time: float = 0.0) -> LightFrame:
+    return LightFrame(RES, Tick(time, 1 / 30))
 
 
 # -- beam_blue_sound -----------------------------------------------------------------
@@ -141,9 +141,9 @@ class BeamSyncWindDownTest(unittest.TestCase):
         self.layer = BeamWindDown(RES, self.settings, board=None, strobe=self.strobe)
         self.index = 0
 
-    def _next(self) -> Frame:
+    def _next(self) -> LightFrame:
         """Render the next tick at 32 fps; tick 0 is a strobe frame."""
-        f = Frame(RES, Tick(self.index / 32, 1 / 32, 1 / 32, self.index))
+        f = LightFrame(RES, Tick(self.index / 32, 1 / 32, 1 / 32, self.index))
         self.index += 1
         self.layer.render(f)
         self.assertEqual(float(f.light_img.sum()), 0.0)                        # no pixels written
@@ -173,7 +173,7 @@ class BeamSyncWindDownTest(unittest.TestCase):
         self.settings.spin_down_seconds = plain_settings.spin_down_seconds = 1.0
         for i in range(10):
             self._next()
-            plain.render(Frame(RES, Tick(i / 32, 1 / 32, 1 / 32, i)))
+            plain.render(LightFrame(RES, Tick(i / 32, 1 / 32, 1 / 32, i)))
         self.assertAlmostEqual(self.settings.progress, plain_settings.progress, places=6)
 
     def test_the_wall_fades_through_the_strobe_and_carries_no_sync(self) -> None:

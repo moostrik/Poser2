@@ -13,12 +13,12 @@ import unittest
 
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
-from modules.pose import Frame as PoseFrame, FrameDict
+from modules.pose import Frame, FrameDict
 from modules.session import SequencerState
 
 from apps.white_space.inout.osc_sound_sender import OscSoundSender
 from apps.white_space.light import Tick
-from apps.white_space.light.frame import Frame
+from apps.white_space.light.frame import LightFrame
 from apps.white_space.settings import _OscSoundSettings
 
 
@@ -61,12 +61,12 @@ class SoundGlobalsTest(unittest.TestCase):
         self.assertAlmostEqual(messages["/global/volume"], 0.8, places=6)
         self.assertAlmostEqual(messages["/global/speaker/offset"], math.radians(45.0), places=6)
 
-    def test_sync_is_the_compositions_and_zeroed_on_idle(self) -> None:
+    def test_sync_is_the_light_frames_and_zeroed_on_idle(self) -> None:
         """/global/sync carries the frame's full-sync envelope while a show runs; it is show
         state, so idle (no sequencer state) zeroes it like the playhead and the motor."""
-        composition = Frame(360, Tick(0.0, 1 / 32, index=0))
-        composition.sync = 0.7
-        self.sender.set_composition(composition)
+        light_frame = LightFrame(360, Tick(0.0, 1 / 32, index=0))
+        light_frame.sync = 0.7
+        self.sender.set_light_frame(light_frame)
         seq = SequencerState(stage=4, stage_progress=0.5, progress=0.5, elapsed=10.0, active=True)
         self.assertAlmostEqual(_globals(self.sender, seq)["/global/sync"], 0.7, places=6)
         self.assertEqual(_globals(self.sender, None)["/global/sync"], 0.0)
@@ -74,13 +74,13 @@ class SoundGlobalsTest(unittest.TestCase):
     def test_players_counts_only_live_slots(self) -> None:
         """/global/players counts the occupied live slots; the dummy doesn't count."""
         dummy = self.settings.max_players
-        frames = {id: PoseFrame(id, 0, 0.0) for id in (0, 2, dummy, dummy + 1)}
+        frames = {id: Frame(id, 0, 0.0) for id in (0, 2, dummy, dummy + 1)}
         seq = SequencerState(stage=4, stage_progress=0.5, progress=0.5, elapsed=10.0, active=True)
         self.assertEqual(_globals(self.sender, seq, frames)["/global/players"], 2)
 
     def test_players_is_presence_and_survives_idle(self) -> None:
         """The count is presence data, not show state: no sequencer state leaves it true."""
-        frames = {0: PoseFrame(0, 0, 0.0)}
+        frames = {0: Frame(0, 0, 0.0)}
         self.assertEqual(_globals(self.sender, None, frames)["/global/players"], 1)
 
     def test_players_is_zero_without_frames(self) -> None:

@@ -9,7 +9,7 @@ import numpy as np
 from modules.pose import features
 
 from apps.white_space.light import Tick, LayerSettings
-from apps.white_space.light.frame import Frame
+from apps.white_space.light.frame import LightFrame
 from apps.white_space.light.layers import ProjectionPlayhead, PoseInstrumentSettings
 
 RES = 3600
@@ -37,8 +37,8 @@ class ProjectionPlayheadTest(unittest.TestCase):
         self.board = PlayheadBoard(frames={})
         self.layer = ProjectionPlayhead(RES, LayerSettings(), self.settings, self.instrument.mask, self.board, pose_stage=4)
 
-    def _render(self, playhead_pos: float) -> Frame:
-        f = Frame(RES, Tick(0.0, 1 / 30), playhead=playhead_pos * math.tau)
+    def _render(self, playhead_pos: float) -> LightFrame:
+        f = LightFrame(RES, Tick(0.0, 1 / 30), playhead=playhead_pos * math.tau)
         self.layer.render(f)
         return f
 

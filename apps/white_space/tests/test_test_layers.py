@@ -8,15 +8,15 @@ from types import SimpleNamespace
 import numpy as np
 
 from apps.white_space.light import Tick
-from apps.white_space.light.frame import Frame
+from apps.white_space.light.frame import LightFrame
 from apps.white_space.light.layers import (TestLines, TestLinesSettings, TestChase, TestChaseSettings,
                                            TestPulse, TestPulseSettings)
 
 RES = 400
 
 
-def frame(time: float = 0.0) -> Frame:
-    return Frame(RES, Tick(time, 1 / 30))
+def frame(time: float = 0.0) -> LightFrame:
+    return LightFrame(RES, Tick(time, 1 / 30))
 
 
 def runs(levels: np.ndarray) -> list[tuple[int, int]]:

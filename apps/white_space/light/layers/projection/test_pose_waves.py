@@ -11,11 +11,11 @@ from modules.pose import features
 from modules.settings import Field
 
 from .._base_layer import ProjectionLayer, LayerSettings
-from ...frame import Frame, BUFFER_DTYPE
+from ...frame import LightFrame, BUFFER_DTYPE
 from .._utilities import BlendType, draw_waves, draw_field, normalize_azimuth
 
 if TYPE_CHECKING:
-    from ....board import Board
+    from ....render_board import RenderBoard
 
 import logging
 logger = logging.getLogger(__name__)
@@ -80,7 +80,7 @@ class TestPoseWaves(ProjectionLayer):
         resolution: int,
         max_players: int,
         settings: TestPoseWavesSettings,
-        board: Board,
+        board: RenderBoard,
         pose_stage: int,
     ) -> None:
         super().__init__(resolution, settings, board)
@@ -107,7 +107,7 @@ class TestPoseWaves(ProjectionLayer):
         for state in self._player_states.values():
             state.reset()
 
-    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, white: np.ndarray, blue: np.ndarray) -> None:
         P = self._settings
         dt: float = frame.tick.dt
 

@@ -807,7 +807,7 @@ it "left" (site fact), reading from the wall looking at the fixture. Which physi
 ## Layers
 
 **Beam layers** write the four beam lights by name — `front_white`, `back_white`, `left_blue`,
-`right_blue` on `Frame.beam_lights` — and nothing else (`layers/_base_layer.py`, `BeamLayer`). No
+`right_blue` on `LightFrame.beam_lights` — and nothing else (`layers/_base_layer.py`, `BeamLayer`). No
 calibration of their own: the lamp shines where the bar points, and where that is as an azimuth is the
 playhead. The sender copies them into the pixels the firmware reads in beam mode (pixel 0 and 1800 of
 each channel, `FIRMWARE_LIGHT_SLOT_AZIMUTHS`), which the projection offset and interlace cannot reach. A

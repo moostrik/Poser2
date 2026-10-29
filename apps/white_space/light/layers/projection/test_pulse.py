@@ -7,7 +7,7 @@ import numpy as np
 from modules.settings import Group
 
 from .._base_layer import ProjectionLayer, ChannelSettings, LayerSettings
-from ...frame import Frame
+from ...frame import LightFrame
 from ...synth import Oscillator
 
 
@@ -24,7 +24,7 @@ class TestPulse(ProjectionLayer):
         super().__init__(resolution, settings, board)
         self._settings: TestPulseSettings = settings
 
-    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, white: np.ndarray, blue: np.ndarray) -> None:
         t = frame.tick.time                 # plain seconds; `speed` is the rate in Hz
         W = self._settings.white
         B = self._settings.blue

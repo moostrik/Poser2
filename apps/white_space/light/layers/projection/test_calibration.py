@@ -19,10 +19,10 @@ import numpy as np
 from modules.settings import Field
 
 from .._base_layer import ProjectionLayer, LayerSettings
-from ...frame import Frame
+from ...frame import LightFrame
 
 if TYPE_CHECKING:
-    from ....board import Board
+    from ....render_board import RenderBoard
 
 
 class DetectMode(IntEnum):
@@ -58,7 +58,7 @@ class TestCalibration(ProjectionLayer):
         resolution:  int,
         settings:    TestCalibrationSettings,
         num_cams:    int,
-        board:       Board,
+        board:       RenderBoard,
     ) -> None:
         super().__init__(resolution, settings, board)
         self._settings: TestCalibrationSettings = settings
@@ -68,7 +68,7 @@ class TestCalibration(ProjectionLayer):
     # Layer interface
     # ------------------------------------------------------------------
 
-    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, white: np.ndarray, blue: np.ndarray) -> None:
         settings = self._settings
         fov  = settings.fov
         nc   = self._num_cams

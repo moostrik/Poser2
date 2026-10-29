@@ -24,7 +24,7 @@ import numpy as np
 from modules.settings import Field
 
 from .._base_layer import BeamLayer, LayerSettings
-from ...frame import Frame
+from ...frame import LightFrame
 from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step
 
 
@@ -49,7 +49,7 @@ class BeamFlash(BeamLayer):
     def reset(self) -> None:
         self._crossing.reset()
 
-    def _draw(self, frame: Frame, beam_lights: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, beam_lights: np.ndarray) -> None:
         P = self._settings
         step: float = playhead_step(frame.motor_command.beam_rpm, frame.tick.interval)
         offsets = {pose.track_id: pose[PlayheadOffset].value

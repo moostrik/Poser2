@@ -18,11 +18,11 @@ import numpy as np
 from modules.settings import BaseSettings, Field
 
 from ._utilities import BlendType, blend_values
-from ..frame import Frame, BeamLightId, BUFFER_DTYPE
+from ..frame import LightFrame, BeamLightId, BUFFER_DTYPE
 from ..motor import MotorMode
 
 if TYPE_CHECKING:
-    from ...board import Board
+    from ...render_board import RenderBoard
 
 
 class LayerSettings(BaseSettings):
@@ -56,13 +56,13 @@ class BaseLayer(ABC):
 
     MODE: MotorMode = MotorMode.STOPPED   # the fixture mode this layer draws for
 
-    def __init__(self, resolution: int, settings: LayerSettings, board: Board) -> None:
+    def __init__(self, resolution: int, settings: LayerSettings, board: RenderBoard) -> None:
         self.resolution: int           = resolution
         self._settings:  LayerSettings = settings
         self._board                    = board  # full blackboard — layers pull the slices they need
 
     @abstractmethod
-    def render(self, frame: Frame) -> None:
+    def render(self, frame: LightFrame) -> None:
         """Draw this tick into ``frame`` (the mode base's template method)."""
         ...
 
@@ -78,17 +78,17 @@ class BeamLayer(BaseLayer):
 
     MODE = MotorMode.BEAM
 
-    def __init__(self, resolution: int, settings: LayerSettings, board: Board) -> None:
+    def __init__(self, resolution: int, settings: LayerSettings, board: RenderBoard) -> None:
         super().__init__(resolution, settings, board)
         self._scratch_beam_lights: np.ndarray = np.zeros(len(BeamLightId), dtype=BUFFER_DTYPE)
 
-    def render(self, frame: Frame) -> None:
+    def render(self, frame: LightFrame) -> None:
         self._scratch_beam_lights.fill(0.0)
         self._draw(frame, self._scratch_beam_lights)
         blend_values(frame.beam_lights, self._scratch_beam_lights, 0, self._settings.blend)
 
     @abstractmethod
-    def _draw(self, frame: Frame, beam_lights: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, beam_lights: np.ndarray) -> None:
         """Additively write the four beam lights (pre-zeroed, indexed by ``BeamLightId``)."""
         ...
 
@@ -112,12 +112,12 @@ class ProjectionLayer(BaseLayer):
 
     MODE = MotorMode.PROJECTION
 
-    def __init__(self, resolution: int, settings: LayerSettings, board: Board) -> None:
+    def __init__(self, resolution: int, settings: LayerSettings, board: RenderBoard) -> None:
         super().__init__(resolution, settings, board)
         self._scratch_white: np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
         self._scratch_blue:  np.ndarray = np.zeros(resolution, dtype=BUFFER_DTYPE)
 
-    def render(self, frame: Frame) -> None:
+    def render(self, frame: LightFrame) -> None:
         self._scratch_white.fill(0.0)
         self._scratch_blue.fill(0.0)
         self._draw(frame, self._scratch_white, self._scratch_blue)
@@ -125,6 +125,6 @@ class ProjectionLayer(BaseLayer):
         blend_values(frame.blue,  self._scratch_blue,  0, self._settings.blend)
 
     @abstractmethod
-    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, white: np.ndarray, blue: np.ndarray) -> None:
         """Additively write into the white and blue scratch arrays."""
         ...

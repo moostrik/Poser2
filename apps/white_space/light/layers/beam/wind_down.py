@@ -35,7 +35,7 @@ from modules.settings import Field, Widget
 
 from .._base_layer import BeamLayer, LayerSettings
 from ..projection.pose_instrument import SyncStrobeSettings, SyncStrobeMode
-from ...frame import Frame
+from ...frame import LightFrame
 from ...synth import Strobe
 
 _TOP_RUNG = 16.0     # the sync strobe's rate at full sync (2 ** round(4 × 1)), strobes per second
@@ -62,7 +62,7 @@ class BeamWindDown(BeamLayer):
         self._elapsed = 0.0
         self._settings.progress = 0.0
 
-    def _draw(self, frame: Frame, beam_lights: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, beam_lights: np.ndarray) -> None:
         self._elapsed += frame.tick.dt
         t = min(self._elapsed / max(self._settings.spin_down_seconds, 1e-6), 1.0)
         f = 1.0 - pytweening.easeInOutSine(t)

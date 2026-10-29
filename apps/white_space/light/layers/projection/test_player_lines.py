@@ -20,11 +20,11 @@ from modules.settings import BaseSettings, Field
 from modules.pose import frame as pose_frame, features
 
 from .._base_layer import ProjectionLayer, LayerSettings
-from ...frame import Frame
+from ...frame import LightFrame
 from .._utilities import BlendType, apply_circular, normalize_azimuth
 
 if TYPE_CHECKING:
-    from ....board import Board
+    from ....render_board import RenderBoard
 
 
 class TestPlayerLinesSettings(LayerSettings):
@@ -46,7 +46,7 @@ class _PlayerState:
 class TestPlayerLines(ProjectionLayer):
     """Draws a centre line + two flanking lines for each tracked player."""
 
-    def __init__(self, resolution: int, settings: TestPlayerLinesSettings, board: Board, pose_stage: int) -> None:
+    def __init__(self, resolution: int, settings: TestPlayerLinesSettings, board: RenderBoard, pose_stage: int) -> None:
         super().__init__(resolution, settings, board)
         self._settings: TestPlayerLinesSettings = settings
         self._pose_stage = pose_stage
@@ -79,7 +79,7 @@ class TestPlayerLines(ProjectionLayer):
             if track_id not in seen:
                 state.active = False
 
-    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, white: np.ndarray, blue: np.ndarray) -> None:
         frames = list(self._board.get_frames(self._pose_stage).values())
         self._update_states(frames)
 

@@ -22,10 +22,10 @@ import numpy as np
 from modules.settings import Field
 
 from .._base_layer import BeamLayer, LayerSettings
-from ...frame import Frame
+from ...frame import LightFrame
 
 if TYPE_CHECKING:
-    from ....board import Board
+    from ....render_board import RenderBoard
 
 # The gentle idle pulse's rate while input is stale (slow breath, ~12 cycles/minute).
 _PULSE_HZ: float = 0.2
@@ -48,7 +48,7 @@ class BeamBlueSoundSettings(LayerSettings):
 class BeamBlueSound(BeamLayer):
     """Left level → left blue lamp, right level → right blue lamp; see the module docstring."""
 
-    def __init__(self, resolution: int, settings: BeamBlueSoundSettings, board: Board) -> None:
+    def __init__(self, resolution: int, settings: BeamBlueSoundSettings, board: RenderBoard) -> None:
         super().__init__(resolution, settings, board)
         self._settings: BeamBlueSoundSettings = settings
         self._window: deque[tuple[float, float]] = deque(maxlen=3)
@@ -57,7 +57,7 @@ class BeamBlueSound(BeamLayer):
         """Clear the smoothing window — the lamps re-attack from the live levels."""
         self._window.clear()
 
-    def _draw(self, frame: Frame, beam_lights: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, beam_lights: np.ndarray) -> None:
         P = self._settings
         levels = self._board.get_sound_levels()
 

@@ -12,7 +12,7 @@ import numpy as np
 from apps.white_space.inout.osc_light_sender import (
     FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS, OscLightSender, OscLightSenderSettings,
 )
-from apps.white_space.light import Frame, Tick, BeamLightId
+from apps.white_space.light import LightFrame, Tick, BeamLightId
 
 # The firmware reads a fixed-size OSC preamble before the pixel body: 12-byte padded address,
 # 4-byte typetag, 4-byte blob length.
@@ -20,8 +20,8 @@ OSC_PREAMBLE = 20
 RESOLUTION = 3600
 
 
-def _frame() -> Frame:
-    frame = Frame(RESOLUTION, Tick(0.0, 0.0))
+def _frame() -> LightFrame:
+    frame = LightFrame(RESOLUTION, Tick(0.0, 0.0))
     frame.white = np.linspace(0.0, 1.0, RESOLUTION, dtype=np.float32)
     frame.blue = np.linspace(1.0, 0.0, RESOLUTION, dtype=np.float32)
     return frame
@@ -146,14 +146,14 @@ class FixtureSlotTest(unittest.TestCase):
               BeamLightId.LEFT_BLUE: 0.4, BeamLightId.RIGHT_BLUE: 0.2}
     HALF = RESOLUTION // 2
 
-    def _lit_frame(self) -> Frame:
+    def _lit_frame(self) -> LightFrame:
         frame = _frame()
         for light, level in self.LEVELS.items():
             frame.beam_lights[light] = level
         return frame
 
     @staticmethod
-    def _bodies(frame: Frame, slow: bool) -> list[bytes]:
+    def _bodies(frame: LightFrame, slow: bool) -> list[bytes]:
         messages = OscLightSender._build_chunk_messages(
             frame, OscLightSenderSettings(), FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS, slow
         )
@@ -197,7 +197,7 @@ class FixtureSlotTest(unittest.TestCase):
         self.assertEqual(self._bodies(explicit, slow=True), self._bodies(baked, slow=False))
 
     def test_blackout_is_dark_in_beam_mode_too(self) -> None:
-        zero = Frame(RESOLUTION, Tick(0.0, 0.0))
+        zero = LightFrame(RESOLUTION, Tick(0.0, 0.0))
         for body in self._bodies(zero, slow=True):
             self.assertEqual(body, bytes(FIRMWARE_CHUNK_SIZE))
 
@@ -216,9 +216,9 @@ class ProjectionOffsetTest(unittest.TestCase):
         return settings
 
     @staticmethod
-    def _one_lit_pixel() -> Frame:
+    def _one_lit_pixel() -> LightFrame:
         """A dark projection with a single lit pixel at azimuth 0 — the rotation is visible as a move."""
-        frame = Frame(RESOLUTION, Tick(0.0, 0.0))
+        frame = LightFrame(RESOLUTION, Tick(0.0, 0.0))
         frame.white[0], frame.blue[0] = 1.0, 1.0
         return frame
 
@@ -243,7 +243,7 @@ class ProjectionOffsetTest(unittest.TestCase):
         np.testing.assert_array_equal(frame.light_img, before)
 
     def test_beam_mode_slots_are_never_rotated(self) -> None:
-        frame = Frame(RESOLUTION, Tick(0.0, 0.0))
+        frame = LightFrame(RESOLUTION, Tick(0.0, 0.0))
         for light, level in ((BeamLightId.FRONT_WHITE, 0.9), (BeamLightId.BACK_WHITE, 0.6),
                              (BeamLightId.LEFT_BLUE, 0.4), (BeamLightId.RIGHT_BLUE, 0.2)):
             frame.beam_lights[light] = level

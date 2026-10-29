@@ -10,7 +10,7 @@ import numpy as np
 from modules.settings import Field
 
 from .._base_layer import BeamLayer, LayerSettings
-from ...frame import Frame
+from ...frame import LightFrame
 
 
 class BeamPlayheadSettings(LayerSettings):
@@ -24,5 +24,5 @@ class BeamPlayhead(BeamLayer):
         super().__init__(resolution, settings, board)
         self._settings: BeamPlayheadSettings = settings
 
-    def _draw(self, frame: Frame, beam_lights: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, beam_lights: np.ndarray) -> None:
         self._add_beam_lights(beam_lights, front_white=self._settings.level)

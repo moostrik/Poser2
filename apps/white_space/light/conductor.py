@@ -4,7 +4,7 @@ fixed per-tick order (motor → playhead → update callbacks → command → co
 It draws nothing and decides nothing itself: the state machine (an update callback) decides
 looks and motor commands, the layers draw, the Compositor mixes. The Conductor guarantees
 that every tick those happen exactly once, in exactly that order, on one thread — and
-forwards the finished Frame to the board and the output callbacks (UDP sender, audio, render).
+forwards the finished LightFrame to the board and the output callbacks (UDP sender, audio, render).
 """
 
 from threading import Event, Thread
@@ -13,7 +13,7 @@ from typing import Any, Callable
 from modules.gl import FpsCounter
 
 from .clock import Clock, Tick
-from .frame import Frame, FrameCallback
+from .frame import LightFrame, LightFrameCallback
 from .motor import MotorController, MotorMode
 from .playhead import Playhead
 from .settings import LightSettings, LayerId, DebugLayer
@@ -24,7 +24,7 @@ from .layers import (BaseLayer, Compositor, Mix,
                      TestRandom, TestPoseWaves, TestHarmonic)
 from modules.board import PlayheadSignals
 
-from ..board import Board
+from ..render_board import RenderBoard
 
 import logging
 logger = logging.getLogger(__name__)
@@ -46,13 +46,13 @@ def _debug_motor_mode(selection: DebugLayer, layers: dict[LayerId, BaseLayer]) -
 class Conductor(Thread):
     """Runs the light loop at a fixed rate (light_rate Hz); see the module docstring."""
 
-    def __init__(self, settings: LightSettings, instrument: PoseInstrumentSettings, board: Board, pose_stage: int) -> None:
+    def __init__(self, settings: LightSettings, instrument: PoseInstrumentSettings, board: RenderBoard, pose_stage: int) -> None:
         super().__init__(daemon=True, name="LightConductor")
 
         self._stop_event = Event()
 
         self._settings: LightSettings = settings
-        self._board: Board            = board
+        self._board: RenderBoard      = board
         self._motor_controller      = MotorController(settings.motor)
         self._playhead              = Playhead(settings.playhead)
         self._clock                 = Clock(settings.clock)
@@ -94,7 +94,7 @@ class Conductor(Thread):
 
         self.fps_counter = FpsCounter()
         self._update_callbacks: list[Callable[[], Any]] = []
-        self._render_callbacks: list[FrameCallback] = []
+        self._light_frame_callbacks: list[LightFrameCallback] = []
 
 
     # ------------------------------------------------------------------
@@ -174,7 +174,7 @@ class Conductor(Thread):
         # command as it stands now: the rpm it is sent with is the rpm its content is drawn for.
         command = self._motor_controller.command
 
-        frame = Frame(self._settings.light_resolution, tick, motor, command, playhead=playhead)
+        frame = LightFrame(self._settings.light_resolution, tick, motor, command, playhead=playhead)
         self._compositor.render(frame)
 
         # Main brightness — the projection and the beam lights alike
@@ -184,8 +184,8 @@ class Conductor(Thread):
             frame.blue       *= m
             frame.beam_lights *= m
 
-        self._board.set_composition_output(frame)
-        self._notify_render(frame)
+        self._board.set_light_frame(frame)
+        self._notify_light_frame(frame)
         self.fps_counter.tick()
 
     # ------------------------------------------------------------------
@@ -198,11 +198,11 @@ class Conductor(Thread):
         """
         self._update_callbacks.append(callback)
 
-    def add_render_callback(self, callback: FrameCallback) -> None:
-        """Register a callback fired after each tick with the new Frame.
+    def add_light_frame_callback(self, callback: LightFrameCallback) -> None:
+        """Register a callback fired after each tick with the new LightFrame.
         Use for output consumers (hardware sender, audio).
         """
-        self._render_callbacks.append(callback)
+        self._light_frame_callbacks.append(callback)
 
     def _notify_update(self) -> None:
         for cb in self._update_callbacks:
@@ -211,12 +211,12 @@ class Conductor(Thread):
             except Exception:
                 logger.exception("Error in light conductor update callback")
 
-    def _notify_render(self, frame: Frame) -> None:
-        for cb in self._render_callbacks:
+    def _notify_light_frame(self, frame: LightFrame) -> None:
+        for cb in self._light_frame_callbacks:
             try:
                 cb(frame)
             except Exception:
-                logger.exception("Error in light conductor render callback")
+                logger.exception("Error in light conductor light frame callback")
 
     # ------------------------------------------------------------------
     # Diagnostics

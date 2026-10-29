@@ -7,7 +7,7 @@ import numpy as np
 from modules.settings import BaseSettings, Field, Group
 
 from .._base_layer import ProjectionLayer, LayerSettings
-from ...frame import Frame
+from ...frame import LightFrame
 
 
 _TABLE_SIZE = 256
@@ -58,7 +58,7 @@ class TestRandom(ProjectionLayer):
         self._perm_b: np.ndarray = rng.permutation(_TABLE_SIZE).astype(np.int32)
         self._vals_b: np.ndarray = rng.random(_TABLE_SIZE)
 
-    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, white: np.ndarray, blue: np.ndarray) -> None:
         t = frame.tick.time                 # plain seconds; `speed` scales the rate
         W = self._settings.white
         B = self._settings.blue

@@ -7,7 +7,7 @@ import numpy as np
 from modules.settings import BaseSettings, Field, Group
 
 from .._base_layer import ProjectionLayer, LayerSettings
-from ...frame import Frame
+from ...frame import LightFrame
 
 
 class TestHarmonicSourceSettings(BaseSettings):
@@ -52,7 +52,7 @@ class TestHarmonic(ProjectionLayer):
         # Normalized azimuth per pixel: 0.0 → 1.0 (exclusive)
         self._x: np.ndarray = np.linspace(0.0, 1.0, resolution, endpoint=False, dtype=np.float32)
 
-    def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
+    def _draw(self, frame: LightFrame, white: np.ndarray, blue: np.ndarray) -> None:
         sources = (
             self._settings.source_0,
             self._settings.source_1,

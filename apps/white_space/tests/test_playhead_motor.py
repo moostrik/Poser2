@@ -482,11 +482,11 @@ class DebugOverrideTest(unittest.TestCase):
         # Nothing in the preset is forced at start: a debug layer saved as selected is selected
         # after construction (a projection layer with a real motor is warned about in the log).
         from apps.white_space.light import Conductor, DebugLayer, LightSettings, PoseInstrumentSettings
-        from apps.white_space.board import Board
+        from apps.white_space.render_board import RenderBoard
         settings = LightSettings()
         settings.debug = DebugLayer.test_pose_waves
         with self.assertLogs("apps.white_space.light.conductor", level="WARNING"):
-            Conductor(settings, PoseInstrumentSettings(), Board(), pose_stage=4)
+            Conductor(settings, PoseInstrumentSettings(), RenderBoard(), pose_stage=4)
         self.assertEqual(DebugLayer(int(settings.debug)), DebugLayer.test_pose_waves)
 
 

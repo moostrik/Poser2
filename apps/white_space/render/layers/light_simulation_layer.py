@@ -5,13 +5,13 @@ from modules.render import layers
 
 from apps.white_space.render.shaders.light_simulation import LightSimulation
 
-from ...composition_output import HasCompositionOutput
+from ...light_frame_store import HasLightFrame
 
 
 class LightSimulationLayer(layers.LayerBase):
 
-    def __init__(self, board: HasCompositionOutput) -> None:
-        self.board: HasCompositionOutput = board
+    def __init__(self, board: HasLightFrame) -> None:
+        self.board: HasLightFrame = board
         self.fbo_angles: Fbo = Fbo()
         self.image: Image = Image()
         self._shader: LightSimulation = LightSimulation()
@@ -30,11 +30,11 @@ class LightSimulationLayer(layers.LayerBase):
         self._shader.deallocate()
 
     def update(self) -> None:
-        output = self.board.get_composition_output()
-        if output is None:
+        frame = self.board.get_light_frame()
+        if frame is None:
             return
 
-        self.image.set_image(output.light_img)
+        self.image.set_image(frame.light_img)
         self.image.update()
 
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)

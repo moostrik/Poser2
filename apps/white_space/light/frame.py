@@ -1,4 +1,4 @@
-"""Frame — the full per-tick render context and output.
+"""LightFrame — the full per-tick render context and output.
 
 Carries the clock snapshot (`tick`), the motor's two halves (`motor`, the measurement the
 playhead advanced under; `motor_command`, the command this frame is sent with — read after
@@ -47,7 +47,7 @@ BEAM_LIGHT_HEADINGS: np.ndarray = np.array([0.0, math.pi, -math.pi / 2.0, math.p
 
 
 @dataclass
-class Frame:
+class LightFrame:
     """Per-tick render context + light output. `white`/`blue` are views into `light_img`
     (the projection); `beam_lights` holds the four lamp levels, indexed by `BeamLightId`."""
     resolution:    int
@@ -83,4 +83,4 @@ class Frame:
         self.light_img[0, :, 1] = value
 
 
-FrameCallback = Callable[[Frame], None]
+LightFrameCallback = Callable[[LightFrame], None]
