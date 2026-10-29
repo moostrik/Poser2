@@ -224,7 +224,7 @@ Luxonis OAK-D Pro W; the app runs `color = false` and uses the left mono camera 
 spec, a little more by the units' own calibrations (see *The lens*). The lens maps angle linearly to
 radius (equidistant): the factory calibrations confirm it to 0.5 % out to 75° off axis, and the warp
 relies on it. The sensor table for every OAK variant in use, with Luxonis links, lives beside the
-resolution tables in `modules/oak/camera/definitions.py`; opening a device logs the sensor behind
+resolution tables in `modules/camera/geometry.py`; opening a device logs the sensor behind
 each socket and its lens.
 
 The mono sensors carry an IR filter and do not see the light show (site fact); they use the 940 nm
@@ -233,7 +233,7 @@ all four.
 
 ### The camera frame
 
-The warp (`warp_mesh_points`, `modules/oak/camera/definitions.py`) delivers a levelled, cylindrical
+The warp (`warp_mesh_points`, `modules/camera/geometry.py`) delivers a levelled, cylindrical
 frame: a column is one azimuth at every height, a row is one elevation at every column, and the rows
 are spaced by the tangent of the elevation. Column = azimuth is what the tracker assumes. Tangent rows
 are for the pose: a narrow band of columns is then exactly a level pinhole camera panned to that
@@ -259,7 +259,7 @@ changed by editing the preset and relaunching:
   horizontal field and the whole column-to-azimuth mapping are identical; only the bottom of the
   window moves (4° higher, so the feet run out of frame sooner).
 - **The frame height** is derived, not set: the camera, the tracker and the render each compute the
-  sensor's full reach for the mode, tilt and lens (`delivered_height` in `modules/oak`), a multiple
+  sensor's full reach for the mode, tilt and lens (`delivered_height` in `modules/camera`), a multiple
   of 16 — 848 at P720 and tilt 0, 960 at P720 and tilt 15, 1152 at P800 and tilt 16. The rows are
   tangents, so the full reach needs more of them than the sensor has. Any other height costs, per
   direction: too many rows give a flat black bar of dead pixels across the top (113 rows at tilt 0
@@ -275,7 +275,7 @@ the tilt rule pins — the floor-plane distance reads off the feet — and becau
 rows at the top. At the full-reach height the top row is the sensor's top on the centre column:
 −20.1° to +52.3° at P720 and tilt 15 on 960 rows, −23.2° to +57.3° at P800 and tilt 16 on 1152. The
 horizon is therefore not the centre row: row 747 of 960 and row 894 of 1152 respectively
-(`horizon_row` ≈ 0.78), and `frame_window` (`definitions.py`) is the one place that turns a row into
+(`horizon_row` ≈ 0.78), and `frame_window` (`modules/camera/geometry.py`) is the one place that turns a row into
 an elevation or back. The open log prints the window per camera.
 
 **Black is where the sensor did not look.** The sensor is a rectangle in the lens's own projection,

@@ -2,18 +2,25 @@
 # https://oak-web.readthedocs.io/
 # https://docs.luxonis.com/software/depthai/examples/depth_post_processing/
 
+"""The oak backend: one OAK camera on depthai 2, implementing `modules.camera.CameraSource`."""
+
 import logging
+import time
 from threading import Thread, Event
 
 import depthai as dai
 from cv2 import applyColorMap, COLORMAP_JET
 from numpy import ndarray
 
-from modules.utils import FPS
+from modules.camera import CameraResolution, CameraFrame, CameraReadings, CameraTracklet, FrameType, FrameCallback, \
+    TrackletCallback, orientation_from_gravity, mode_size, frame_size, frame_window, frame_coverage, coverage_summary, \
+    delivered_height, lens_field, lens_deviation
+from modules.utils import FPS, Rect
 
-from .definitions import CameraResolution, FrameType, Input, Output, Tracklet, FrameCallback, SyncCallback, TrackerCallback, get_device_list, log_connected_sensors, read_lens_calibration, imu_rotation_to_camera, imu_to_camera, unroll_imu_frame, orientation_from_gravity, IMU_SMOOTHING, mode_size, frame_size, frame_window, frame_coverage, coverage_summary, delivered_height, lens_field, lens_deviation
+from .definitions import Input, Output, TRACKING_STATUS, get_device_list, log_connected_sensors, read_lens_calibration, \
+    imu_rotation_to_camera, imu_to_camera, unroll_imu_frame, IMU_SMOOTHING
 from .pipeline import setup_pipeline, get_frame_types, WarpConfig
-from .settings import CameraSettings
+from .settings import OakCameraSettings
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +28,7 @@ class Camera(Thread):
     _id_counter = 0
     _pipeline: dai.Pipeline | None = None
 
-    def __init__(self, core_settings: CameraSettings) -> None:
+    def __init__(self, core_settings: OakCameraSettings) -> None:
         super().__init__()
         self.stop_event = Event()
         self.running: bool = False
@@ -32,7 +39,7 @@ class Camera(Thread):
         self.id_string: str =           str(self.id)
 
         # SETTINGS (reactive)
-        self.settings: CameraSettings =   core_settings
+        self.settings: OakCameraSettings = core_settings
 
         # FIXED SETTINGS (read from INIT fields once)
         self.device_id: str =           core_settings.device_id
@@ -73,10 +80,8 @@ class Camera(Thread):
         self.frame_types.sort(key=lambda x: x.value)
 
         # CALLBACKS (run in registration order)
-        self.preview_callbacks: list[FrameCallback] = []
         self.frame_callbacks: list[FrameCallback] = []
-        self.sync_callbacks: list[SyncCallback] = []
-        self.tracker_callbacks: list[TrackerCallback] = []
+        self.tracklet_callbacks: list[TrackletCallback] = []
 
         # MOUNT READOUT — the gravity vector, smoothed, and how to get it into the camera's frame.
         # A tripod does not move, so a single sample is almost all noise; the average is the
@@ -84,10 +89,11 @@ class Camera(Thread):
         self._imu_rotation: list[list[float]] | None = None
         self._gravity: tuple[float, float, float] | None = None
 
-        # PREVIEW
-        self.preview_type =             FrameType.VIDEO
-
         self.cntr: int = 0
+
+    @property
+    def readings(self) -> CameraReadings:
+        return self.settings.readings
 
     def stop(self) -> None:
         self.running = False
@@ -246,9 +252,7 @@ class Camera(Thread):
             value.close()
 
         self.frame_callbacks.clear()
-        self.preview_callbacks.clear()
-        self.sync_callbacks.clear()
-        self.tracker_callbacks.clear()
+        self.tracklet_callbacks.clear()
 
         logger.info(f'{self.device_id} CLOSED')
 
@@ -261,26 +265,26 @@ class Camera(Thread):
             self.settings.update_mono_readback(msg)
 
         frame: ndarray = msg.getCvFrame()
-        self._update_frame_callbacks(FrameType.VIDEO, frame)
+        self._emit_frame(FrameType.VIDEO, frame)
         return frame
 
     def _left_callback(self, msg: dai.ImgFrame) -> ndarray:
         self._update_fps(FrameType.LEFT_)
         frame: ndarray = msg.getCvFrame()
-        self._update_frame_callbacks(FrameType.LEFT_, frame)
+        self._emit_frame(FrameType.LEFT_, frame)
         return frame
 
     def _right_callback(self, msg: dai.ImgFrame) -> ndarray:
         self._update_fps(FrameType.RIGHT)
         frame: ndarray = msg.getCvFrame()
-        self._update_frame_callbacks(FrameType.RIGHT, frame)
+        self._emit_frame(FrameType.RIGHT, frame)
         return frame
 
     def _stereo_callback(self, msg: dai.ImgFrame) -> None:
         self._update_fps(FrameType.DEPTH)
         frame: ndarray = msg.getCvFrame()
         frame = applyColorMap(frame, COLORMAP_JET)
-        self._update_frame_callbacks(FrameType.DEPTH, frame)
+        self._emit_frame(FrameType.DEPTH, frame)
 
     def _sync_callback(self, message_group: dai.MessageGroup) -> None:
         frames = dict[FrameType, ndarray]()
@@ -300,17 +304,21 @@ class Camera(Thread):
                     self._stereo_callback(msg)
                 else:
                     logger.info('unknown message', name)
-        self._update_sync_callbacks(frames, self.fps)
 
         self.cntr = self.cntr + 1
 
     def _tracker_callback(self, msg: dai.RawTracklets) -> None:
-        # print('RT', msg.getTimestamp()) # type: ignore
+        """The output queue's callback: the hand-over, where depthai's tracklets become the
+        contract's and the message gets its host time."""
         self._update_tps()
-        Ts: list[Tracklet] = msg.tracklets
-        self.num_tracklets = len(Ts)
+        now: float = time.time()
+        tracklets: list[CameraTracklet] = [
+            CameraTracklet(cam_id=self.id, id=t.id, status=TRACKING_STATUS[t.status],
+                           roi=Rect(t.roi.x, t.roi.y, t.roi.width, t.roi.height), age=t.age, time=now)
+            for t in msg.tracklets]
+        self.num_tracklets = len(tracklets)
         self.settings.readings.tracklets = self.num_tracklets
-        self._update_tracker_callbacks(Ts)
+        self._emit_tracklets(tracklets)
 
     # FPS
     def _update_fps(self, fps_type: FrameType) -> None:
@@ -324,29 +332,16 @@ class Camera(Thread):
         self.settings.readings.tracker_fps = self.tps_counter.get_rate_average()
 
     # CALLBACKS
-    def _update_frame_callbacks(self, frame_type: FrameType, frame: ndarray) -> None:
-        # if not self.running:
-        #     return
+    def _emit_frame(self, kind: FrameType, image: ndarray) -> None:
+        """The hand-over: the frame gets its host time here and goes to every callback."""
+        frame = CameraFrame(cam_id=self.id, kind=kind, image=image, time=time.time())
         for c in self.frame_callbacks:
-            c(self.id, frame_type, frame)
-        if self.preview_type == frame_type:
-            for c in self.preview_callbacks:
-                c(self.id, frame_type, frame)
-        if not self.do_stereo and frame_type == FrameType.VIDEO:
-            frames: dict[FrameType, ndarray] = {}
-            frames[frame_type] = frame
-            self._update_sync_callbacks(frames, self.fps)
+            c(frame)
 
-    def _update_sync_callbacks(self, frames: dict[FrameType, ndarray], fps: float) -> None:
-        # if not self.running:
-        #     return
-        for c in self.sync_callbacks:
-            c(self.id, frames, fps)
-
-    def _update_tracker_callbacks(self, tracklets: list[Tracklet]) -> None:
+    def _emit_tracklets(self, tracklets: list[CameraTracklet]) -> None:
         if not self.running:
             return
-        for c in self.tracker_callbacks:
+        for c in self.tracklet_callbacks:
             c(self.id, tracklets)
 
     def add_frame_callback(self, callback: FrameCallback) -> None:
@@ -356,26 +351,12 @@ class Camera(Thread):
         if callback not in self.frame_callbacks:
             self.frame_callbacks.append(callback)
 
-    def add_sync_callback(self, callback: SyncCallback) -> None:
+    def add_tracklet_callback(self, callback: TrackletCallback) -> None:
         if self.running:
             logger.warning('cannot add callback while camera is running')
             return
-        if callback not in self.sync_callbacks:
-            self.sync_callbacks.append(callback)
-
-    def add_preview_callback(self, callback: FrameCallback) -> None:
-        if self.running:
-            logger.warning('cannot add callback while camera is running')
-            return
-        if callback not in self.preview_callbacks:
-            self.preview_callbacks.append(callback)
-
-    def add_tracker_callback(self, callback: TrackerCallback) -> None:
-        if self.running:
-            logger.warning('cannot add callback while camera is running')
-            return
-        if callback not in self.tracker_callbacks:
-            self.tracker_callbacks.append(callback)
+        if callback not in self.tracklet_callbacks:
+            self.tracklet_callbacks.append(callback)
 
     @staticmethod
     def _try_device(device_id: str, pipeline: dai.Pipeline, num_tries: int) -> dai.Device:

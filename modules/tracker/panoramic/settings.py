@@ -1,4 +1,4 @@
-from modules.oak import CameraResolution
+from modules.camera import CameraResolution
 from modules.settings import BaseSettings, Field, Group, Widget
 
 

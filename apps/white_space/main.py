@@ -9,7 +9,8 @@ import glfw
 import numpy as np
 
 from modules.utils import Broadcast
-from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder, FrameType, CameraCheck
+from modules.camera import CameraSource, CameraFrame, FrameType, Player, Sync, Recorder as VideoRecorder, CameraCheck
+from modules.oak import Camera, Simulator
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscReceiver
@@ -76,7 +77,7 @@ class WhiteSpaceMain:
         self.video_recorder = VideoRecorder(self.settings.record.video, data_path=DATA_PATH)
 
         # CAMERA
-        self.cameras: list[Camera | Simulator] = []
+        self.cameras: list[CameraSource] = []
         self.player: Optional[Player] = None
         if self.settings.camera.sim_enabled:
             # The rig is uniform: mono cameras decode their clips straight to gray
@@ -94,12 +95,12 @@ class WhiteSpaceMain:
         self.crop_extractor = crop.Extractor(ps.image_crop)
 
         for camera in self.cameras:
-            camera.add_sync_callback(self.video_recorder.submit_synced_frames)
+            camera.add_frame_callback(self.video_recorder.submit_frame)
             camera.add_frame_callback(self.source_uploader.set_image)
             camera.add_frame_callback(self.frame_sync_bang.submit_frame)
-            camera.add_tracker_callback(self.tracker.submit_cam_tracklets)
-            camera.add_tracker_callback(self.board.set_depth_tracklets)
-            camera.add_tracker_callback(self.tracklet_sync_bang.submit_frame)
+            camera.add_tracklet_callback(self.tracker.submit_cam_tracklets)
+            camera.add_tracklet_callback(self.board.set_camera_tracklets)
+            camera.add_tracklet_callback(self.tracklet_sync_bang.submit_tracklets)
 
         # DETECTION
         features.configure_features(max_players)
@@ -124,7 +125,7 @@ class WhiteSpaceMain:
                                               meta_provider=self._journal_meta,
                                               track_provider=self.settings.track.to_dict)
         for camera in self.cameras:
-            camera.add_tracker_callback(self.tracker_journal.submit_cam_tracklets)
+            camera.add_tracklet_callback(self.tracker_journal.submit_cam_tracklets)
         self.tracker.add_observation_callback(self.tracker_journal.submit_observations)
         self.tracker.add_tracklet_callback(self.tracker_journal.submit_tracklets)
 
@@ -363,9 +364,9 @@ class WhiteSpaceMain:
         """OSC callback for /WS/idle/blue/right — store the Max soundscape's right level."""
         self.board.set_sound_level_right(float(level))
 
-    def _store_video_frame(self, cam_id: int, frame_type: FrameType, frame: np.ndarray) -> None:
+    def _store_video_frame(self, frame: CameraFrame) -> None:
         """Camera frame callback — store raw VIDEO frames on the board for the light renderer."""
-        if frame_type == FrameType.VIDEO:
+        if frame.kind == FrameType.VIDEO:
             self.board.set_video_image(cam_id, frame)
 
     def _column_to_azimuth(self, cam_id: int, x: float) -> float:

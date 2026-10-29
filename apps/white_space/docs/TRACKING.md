@@ -404,7 +404,7 @@ nothing in the show consumes it.
   or tilt; in metres it would say what it means, "at least a 1 m person". It is a tuned value, so
   changing its unit takes a rig session.
 - **`flip_v` is not applied to the row model.** The warp mirrors the delivered rows
-  (`definitions.py`, `warp_mesh_points`), and `FrameWindow`'s docstring says a caller must then read
+  (`modules/camera/geometry.py`, `warp_mesh_points`), and `FrameWindow`'s docstring says a caller must then read
   the horizon at `out_h − 1 − horizon_px`. `RigSync._set_frame` never does, and never receives
   `flip_v`, so with it on the `Rig` would compare an un-flipped horizon against delivered box rows:
   every distance and height would go wrong at once, and `link_height` would silently stop vetoing.

@@ -1,6 +1,6 @@
 """Tests for the warp mesh and the lens-geometry helpers it rests on.
 
-These cover `modules/oak/camera/definitions.py` only, which has no OpenCV dependency and opens
+These cover `modules/camera/geometry.py` only, which has no OpenCV dependency and opens
 no device, so the whole warp model is testable without hardware. The forward model of the real
 lens (`equidistant_pixel`) is written independently here, in the plain form of the maths, so a
 mistake in the module cannot pass by agreeing with itself.
@@ -11,11 +11,11 @@ import unittest
 
 import numpy as np
 
-from modules.oak import (
+from modules.camera import (
     WARP_MESH, degrees_per_pixel, frame_fov, warp_mesh_points, horizon_row,
     FrameWindow, frame_window, frame_coverage, coverage_summary,
     output_focal, source_lens, lens_field, lens_deviation,
-    CameraResolution, resolve_resolution, mono_mode, color_mode,
+    CameraResolution, resolve_resolution,
     mono_frame_size, color_frame_size, mode_size, frame_size, full_frame_height, aligned_height,
 )
 
@@ -490,9 +490,9 @@ class FrameSizeTest(unittest.TestCase):
         self.assertEqual(frame_size(False, CameraResolution.P800, square=True, height=1136), (800, 800))
 
     def test_frame_height_is_aligned_to_the_warp(self) -> None:
-        from modules.oak.camera.definitions import _warned_heights
+        from modules.camera.geometry import _warned_heights
         _warned_heights.discard(1130)
-        with self.assertLogs('modules.oak.camera.definitions', level='WARNING') as captured:
+        with self.assertLogs('modules.camera.geometry', level='WARNING') as captured:
             self.assertEqual(aligned_height(1130), 1136)
         self.assertIn('1130', captured.output[0])
         self.assertEqual(aligned_height(1136), 1136)
@@ -519,13 +519,11 @@ class ResolutionTest(unittest.TestCase):
         for label in (CameraResolution.P720, CameraResolution.P800):
             self.assertEqual(resolve_resolution(color=False, resolution=label), label)
             self.assertEqual(resolve_resolution(color=True, resolution=label), label)
-            self.assertIsNotNone(mono_mode(label))
-            self.assertIsNotNone(color_mode(label))
 
     def test_mono_falls_back_from_a_colour_only_label(self) -> None:
-        from modules.oak.camera.definitions import _warned_resolutions
+        from modules.camera.geometry import _warned_resolutions
         _warned_resolutions.discard((False, CameraResolution.P1080))
-        with self.assertLogs('modules.oak.camera.definitions', level='WARNING') as captured:
+        with self.assertLogs('modules.camera.geometry', level='WARNING') as captured:
             resolved = resolve_resolution(color=False, resolution=CameraResolution.P1080)
         self.assertEqual(resolved, CameraResolution.P800)
         self.assertIn('P1080', captured.output[0])
@@ -533,9 +531,9 @@ class ResolutionTest(unittest.TestCase):
 
     def test_the_fallback_warns_once_not_once_a_frame(self) -> None:
         """`frame_size` is called per frame by the simulator's size check."""
-        from modules.oak.camera.definitions import _warned_resolutions
+        from modules.camera.geometry import _warned_resolutions
         _warned_resolutions.discard((False, CameraResolution.P1080))
-        with self.assertLogs('modules.oak.camera.definitions', level='WARNING') as captured:
+        with self.assertLogs('modules.camera.geometry', level='WARNING') as captured:
             for _ in range(50):
                 frame_size(False, CameraResolution.P1080)
         self.assertEqual(len(captured.output), 1)

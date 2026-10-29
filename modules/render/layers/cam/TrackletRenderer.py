@@ -8,18 +8,17 @@ from OpenGL.GL import * # type: ignore
 from modules.gl import Text
 from ...shaders import DrawColoredRectangle
 
-from modules.oak import DepthTracklet
-
-from modules.board import HasDepthTracklets
+from modules.camera import CameraTracklet, TrackingStatus
+from modules.board import HasCameraTracklets
 from ..LayerBase import LayerBase
 
 
 
 class TrackletRenderer(LayerBase):
-    def __init__(self, cam_id: int, board: HasDepthTracklets) -> None:
-        self._board: HasDepthTracklets = board
+    def __init__(self, cam_id: int, board: HasCameraTracklets) -> None:
+        self._board: HasCameraTracklets = board
         self._cam_id: int = cam_id
-        self._tracklets: list[DepthTracklet] = []
+        self._tracklets: list[CameraTracklet] = []
         self._shader: DrawColoredRectangle = DrawColoredRectangle()
         self._text_renderer: Text = Text()
 
@@ -34,19 +33,19 @@ class TrackletRenderer(LayerBase):
         self._text_renderer.deallocate()
 
     def draw(self) -> None:
-        for depth_tracklet in self._tracklets:
-            self.draw_depth_tracklet(depth_tracklet, self._shader, self._text_renderer, self._width, self._height)
+        for tracklet in self._tracklets:
+            self.draw_tracklet(tracklet, self._shader, self._text_renderer, self._width, self._height)
 
     def update(self) -> None:
-        tracklets: list[DepthTracklet] | None = self._board.get_depth_tracklets(self._cam_id)
+        tracklets: list[CameraTracklet] | None = self._board.get_camera_tracklets(self._cam_id)
         if tracklets is None:
             self._tracklets = []
         else:
             self._tracklets = tracklets
 
-    def draw_depth_tracklet(self, tracklet: DepthTracklet, shader: DrawColoredRectangle,
-                           text_renderer: Text, width: int, height: int) -> None:
-        if tracklet.status == DepthTracklet.TrackingStatus.REMOVED:
+    def draw_tracklet(self, tracklet: CameraTracklet, shader: DrawColoredRectangle,
+                      text_renderer: Text, width: int, height: int) -> None:
+        if tracklet.status == TrackingStatus.REMOVED:
             return
 
         t_x: float = tracklet.roi.x
@@ -58,13 +57,13 @@ class TrackletRenderer(LayerBase):
         g: float = 1.0
         b: float = 1.0
         a: float = min(tracklet.age / 100.0, 0.33)
-        if tracklet.status == DepthTracklet.TrackingStatus.NEW:
+        if tracklet.status == TrackingStatus.NEW:
             r, g, b, a = (1.0, 1.0, 1.0, 1.0)
-        if tracklet.status == DepthTracklet.TrackingStatus.TRACKED:
+        if tracklet.status == TrackingStatus.TRACKED:
             r, g, b, a = (0.0, 1.0, 0.0, a)
-        if tracklet.status == DepthTracklet.TrackingStatus.LOST:
+        if tracklet.status == TrackingStatus.LOST:
             r, g, b, a = (1.0, 0.0, 0.0, a)
-        if tracklet.status == DepthTracklet.TrackingStatus.REMOVED:
+        if tracklet.status == TrackingStatus.REMOVED:
             r, g, b, a = (1.0, 0.0, 0.0, 1.0)
 
         shader.use(t_x, t_y, t_w, t_h, r, g, b, a)

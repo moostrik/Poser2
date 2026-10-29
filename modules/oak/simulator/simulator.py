@@ -1,23 +1,29 @@
 
+"""An OAK camera fed from recordings: the `Player`'s clips go through the real device's pipeline, so
+the detector and the tracker run as on the rig, and come out as the contract's frames and tracklets."""
+
 import logging
 
+import depthai as dai
 import numpy as np
-from depthai import Pipeline
-from ..camera.camera import *
-from ..camera import frame_size, mode_size
-from ..camera.settings import CameraSettings
-from .settings import SimulatorSettings
-from .player import Player
 from cv2 import resize, COLOR_BGR2GRAY, cvtColor
 from time import process_time
 from datetime import timedelta
+
+from modules.camera import FrameType, Player, SimulatorSettings, frame_size, mode_size
+from modules.utils import FPS
+
+from ..camera.camera import Camera
+from ..camera.definitions import Input, Output
+from ..camera.pipeline import setup_pipeline
+from ..camera.settings import OakCameraSettings
 
 logger = logging.getLogger(__name__)
 
 
 class Simulator(Camera):
 
-    def __init__(self, syncplayer: Player, core_settings: CameraSettings, player_settings: SimulatorSettings) -> None:
+    def __init__(self, syncplayer: Player, core_settings: OakCameraSettings, player_settings: SimulatorSettings) -> None:
 
         if core_settings.stereo and not core_settings.yolo:
             core_settings.depth.show = True  # stereo pipeline needs to be connected (in case of no person detection)
@@ -37,9 +43,9 @@ class Simulator(Camera):
 
     def start(self) -> None: # override
         if self.passthrough:
-            self.sync_player.addFrameCallback(self._passthrough_frame_callback)
+            self.sync_player.add_frame_callback(self._passthrough_frame_callback)
         else:
-            self.sync_player.addFrameCallback(self._video_frame_callback)
+            self.sync_player.add_frame_callback(self._video_frame_callback)
         super().start()
 
     def run(self) -> None: # override
@@ -48,7 +54,7 @@ class Simulator(Camera):
         else:
             super().run()
 
-    def _setup_pipeline(self, pipeline: Pipeline) -> None: # override
+    def _setup_pipeline(self, pipeline: dai.Pipeline) -> None: # override
         setup_pipeline(pipeline, self.model_path, self.fps, self.square, self.do_color, self.do_stereo, self.do_yolo, self.resolution, self.show_stereo, self.mount, simulate=True, warp_clips=self.warp_clips, frame_height=self.frame_height)
 
 
@@ -148,7 +154,7 @@ class Simulator(Camera):
     def _passthrough_frame_callback(self, id: int, frame_type: FrameType, frame: np.ndarray) -> None:
         if id != self.id:
             return
-        self._update_frame_callbacks(frame_type, frame)
+        self._emit_frame(frame_type, frame)
 
     @staticmethod
     def to_planar(arr: np.ndarray, shape: tuple) -> np.ndarray:

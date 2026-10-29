@@ -7,7 +7,7 @@ is checked by. The projection it builds on is tested against the tracker in `tes
 import math
 import unittest
 
-from modules.oak import frame_window
+from modules.camera import frame_window
 from modules.render.layers.panorama.strip import camera_elevation, centre_elevation, elevation_window, \
     panorama_coverage, strip_aspect_ratio, strip_elevation, strip_spans, strip_y
 from modules.tracker import azimuth_to_camera_x, camera_azimuth, centre_distance, focus_distance, \

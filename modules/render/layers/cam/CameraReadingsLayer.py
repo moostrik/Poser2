@@ -7,7 +7,7 @@ operator is already looking.
 import math
 
 from modules.gl import Text
-from modules.oak import CameraSettings, CameraCheckSettings, FPS_TOLERANCE, fps_deviation, mount_deviation
+from modules.camera import CameraSettings, CameraCheckSettings, FPS_TOLERANCE, fps_deviation, mount_deviation
 
 from ..LayerBase import LayerBase
 

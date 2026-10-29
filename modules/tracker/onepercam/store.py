@@ -4,7 +4,9 @@ from dataclasses import replace
 from threading import Lock
 
 # Local application imports
-from .. import Tracklet, TrackingStatus
+from modules.camera import TrackingStatus
+
+from .. import Tracklet
 
 logger = logging.getLogger(__name__)
 

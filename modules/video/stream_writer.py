@@ -1,8 +1,9 @@
+"""One ffmpeg encoder process fed raw frames from a queue: the writer of one camera recording stream."""
+
 from threading import Thread
 import ffmpeg
 import numpy as np
 from queue import Queue, Empty
-from enum import Enum
 from time import sleep
 
 

@@ -1,18 +1,58 @@
+"""Plays a folder of camera recordings: every camera's chunks in step, frames of one round handed
+over together, with a range on the timeline and the panel's playback readouts. It feeds a source
+(the oak `Simulator` today, the replay backend of step 4.6), which stamps the frames at hand-over."""
+
 from threading import Thread, Event, Lock
 from pathlib import Path
 from numpy import ndarray
-from typing import Dict
+from typing import Callable, Dict, TypeAlias
 from enum import Enum, auto
 from queue import Queue
 from time import sleep, monotonic
 
-from ..camera.definitions import CoderType, CoderFormat, FrameType, FrameCallback
-from .settings import SimulatorSettings
-from .stream_reader import StreamReader
-from ..recorder.recorder import make_file_name
+from modules.settings import BaseSettings, Field, Widget
+from modules.video import CoderType, CoderFormat, hwaccel, StreamReader
+
+from .frame import FrameType
+from .recorder import make_file_name
 
 import logging
 logger = logging.getLogger(__name__)
+
+
+class SimulatorSettings(BaseSettings):
+
+    # ── Initial settings ───────────────────────────────────────────────
+    num_cameras:        Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
+    fps:                Field[float]            = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Simulation FPS")
+    video_path:         Field[str]              = Field("recordings", access=Field.INIT, description="Video recordings directory")
+    video_decoder:      Field[CoderType]        = Field(CoderType.iGPU, access=Field.INIT, description="Video decoder type")
+    video_format:       Field[CoderFormat]      = Field(CoderFormat.H264, access=Field.INIT, description="Video format")
+    video_frame_types:  Field[list[FrameType]]  = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record", visible=False)
+    apply_warp:         Field[bool]             = Field(False, access=Field.INIT,
+                                                        description="Run recordings through the camera's warp — the equirectangular reprojection plus the tilt — to see what the cameras will deliver. ONLY valid for RAW clips: recordings made before the reprojection existed, at tilt 0. Anything recorded since is already warped and would be warped twice.")
+
+    # ── Playback controls ─────────────────────────────────────────────
+    start:              Field[bool]             = Field(False, widget=Widget.button, description="Start playback", newline=True)
+    stop:               Field[bool]             = Field(False, widget=Widget.button, description="Stop playback")
+    available_folders:  Field[list[str]]        = Field([""], access=Field.READ, visible=False, description="Available recording folders")
+    folder:             Field[str]              = Field("", widget=Widget.text_select, options=available_folders, description="Recording folder")
+    refresh:            Field[bool]             = Field(False, widget=Widget.button, description="Refresh recording folders")
+    sim_passthrough:    Field[bool]             = Field(False, description="Passthrough", visible=False)
+    start_norm:         Field[float]            = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="Range start", newline=True)
+    end_norm:           Field[float]            = Field(1.0, min=0.0, max=1.0, widget=Widget.slider, description="Range end")
+    playback_norm:      Field[float]            = Field(0.0, min=0.0, max=1.0, access=Field.READ, widget=Widget.slider, description="Playback head (normalized)")
+    start_time:         Field[str]              = Field("0:00.0", access=Field.READ, description="Start time", newline=True)
+    end_time:           Field[str]              = Field("0:00.0", access=Field.READ, description="End time")
+    playback_time:      Field[str]              = Field("0:00.0", access=Field.READ, description="Playback head")
+    current_chunk:      Field[int]              = Field(0, access=Field.READ, description="Current chunk", newline=True)
+    max_chunks:         Field[int]              = Field(0, access=Field.READ, description="Total chunks")
+
+
+# A clip frame as the player decodes it: (cam_id, frame_type, image). The source it feeds makes
+# the `CameraFrame`, since the arrival time is its hand-over, not the decode.
+ClipFrameCallback: TypeAlias = Callable[[int, FrameType, ndarray], None]
+
 
 class State(Enum):
     IDLE = auto()
@@ -22,18 +62,6 @@ class State(Enum):
     STOP = auto()
     STOPPING = auto()
     NEXT = auto()
-
-HwaccelString: dict[CoderType, str] = {
-    CoderType.CPU:  '',
-    CoderType.GPU:  'd3d12va',
-    CoderType.iGPU: 'd3d12va'
-}
-
-HwaccelDeviceString: dict[CoderType, str] = {
-    CoderType.CPU:  '',
-    CoderType.GPU:  '0',
-    CoderType.iGPU: '1'
-}
 
 class MessageType(Enum):
     START = auto()
@@ -86,8 +114,7 @@ class Player(Thread):
         self.folders: FolderDict = self._get_video_folders(settings, data_path)
         self.settings.available_folders = list(self.folders.keys())
 
-        self.hwt: str = HwaccelString[settings.video_decoder]
-        self.hwd: str = HwaccelDeviceString[settings.video_decoder]
+        self.hwt, self.hwd = hwaccel(settings.video_decoder)
 
         self.players: list[StreamReader] = []
         self.loaders: list[StreamReader] = []
@@ -103,7 +130,7 @@ class Player(Thread):
         self.drift:int = 0
 
         self.playback_lock: Lock = Lock()
-        self.frameCallbacks: list[FrameCallback] = []
+        self.frame_callbacks: list[ClipFrameCallback] = []
         self._gui_update_time: float = 0.0
 
         # Bind player settings callbacks
@@ -197,8 +224,8 @@ class Player(Thread):
                 path: Path = folder.path / make_file_name(c, t, self.load_chunk, self.suffix)
                 if path.is_file():
 
-                    player: StreamReader = StreamReader(c, t, self._frame_sync_callback, self.hwt, self.hwd, self.fps,
-                                                        gray=self.gray)
+                    color: bool = t == FrameType.VIDEO and not self.gray
+                    player: StreamReader = StreamReader(c, t, self._frame_sync_callback, color, self.hwt, self.hwd, self.fps)
                     player.load(str(path), self.load_chunk, lo, hi)
                     self.loaders.append(player)
                 else:
@@ -290,7 +317,7 @@ class Player(Thread):
         self._calcuate_drift(cam_id, frame_id)
 
         for ft in sync_frames.keys():
-            for callback in self.frameCallbacks:
+            for callback in self.frame_callbacks:
                 callback(cam_id, ft, sync_frames[ft])
 
     def _clear_frame_sync(self) -> None:
@@ -394,12 +421,12 @@ class Player(Thread):
             return self.drift
 
     # CALLBACKS
-    def addFrameCallback(self, callback: FrameCallback) -> None:
+    def add_frame_callback(self, callback: ClipFrameCallback) -> None:
         if self.running:
-            logger.warning('Camera: cannot add callback while player is running')
+            logger.warning('Player: cannot add callback while it is running')
             return
-        if callback not in self.frameCallbacks:
-            self.frameCallbacks.append(callback)
+        if callback not in self.frame_callbacks:
+            self.frame_callbacks.append(callback)
 
     # STATIC METHODS
     @staticmethod

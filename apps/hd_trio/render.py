@@ -3,7 +3,7 @@
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId, WindowSettings
-from modules.oak import CameraSettings, CameraCheckSettings
+from modules.camera import CameraSettings, CameraCheckSettings
 from modules.render import layers as ls, make_subdivision, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
 

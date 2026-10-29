@@ -1,5 +1,5 @@
 from .tracker_base import TrackerAnnotation, BaseTracker
-from .tracklet import Tracklet, TrackingStatus, TrackletCallback, TrackletDict, TrackletDictCallback, TrackletListCallback
+from .tracklet import Tracklet, TrackletCallback, TrackletDict, TrackletDictCallback, TrackletListCallback
 from .panoramic.annotation import Annotation as PanoramicAnnotation, Rejection
 from .panoramic.tracker import Tracker as PanoramicTracker
 from .panoramic.settings import TrackerSettings as PanoramicTrackerSettings

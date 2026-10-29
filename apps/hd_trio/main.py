@@ -5,7 +5,8 @@ from typing import Optional
 from functools import partial
 
 from modules.utils import Broadcast
-from modules.oak import Camera, CameraCheck, Simulator, Player, Sync, Recorder as VideoRecorder
+from modules.camera import CameraSource, CameraCheck, Player, Sync, Recorder as VideoRecorder
+from modules.oak import Camera, Simulator
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound, ArtNetBars, OscReceiver
@@ -77,7 +78,7 @@ class HDTrioMain:
             self.artnet_controllers.append(ArtNetBars(self.settings.inout.artnets[i]))
 
         # CAMERA
-        self.cameras: list[Camera | Simulator] = []
+        self.cameras: list[CameraSource] = []
         self.player: Optional[Player] = None
         if self.settings.camera.sim_enabled:
             self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH)
@@ -93,12 +94,12 @@ class HDTrioMain:
         self.crop_extractor = crop.Extractor(ps.image_crop)
 
         for camera in self.cameras:
-            camera.add_sync_callback(self.video_recorder.submit_synced_frames)
+            camera.add_frame_callback(self.video_recorder.submit_frame)
             camera.add_frame_callback(self.image_uploader.set_image)
             camera.add_frame_callback(self.frame_sync_bang.submit_frame)
-            camera.add_tracker_callback(self.tracker.submit_cam_tracklets)
-            camera.add_tracker_callback(self.board.set_depth_tracklets)
-            camera.add_tracker_callback(self.tracklet_sync_bang.submit_frame)
+            camera.add_tracklet_callback(self.tracker.submit_cam_tracklets)
+            camera.add_tracklet_callback(self.board.set_camera_tracklets)
+            camera.add_tracklet_callback(self.tracklet_sync_bang.submit_tracklets)
 
         # DETECTION
         features.configure_features(num_players)

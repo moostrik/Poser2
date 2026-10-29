@@ -13,7 +13,8 @@ from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.panel import PanelSettings
-from modules.oak import CameraSettings, CameraCheckSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.camera import CameraCheckSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.oak import OakCameraSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings, PosesFromTrackletsSettings
@@ -96,7 +97,7 @@ class OakGroup(BaseSettings):
     fov:                Field[float]             = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-D Pro W, OV9782 colour, 1280x800 native. 720p is a vertical crop, so the full width and this figure both hold.")
 
     _cam_share = [fps, color, square, stereo, yolo, resolution, model_path, fov]
-    cam_0         = Group(CameraSettings, share=_cam_share)
+    cam_0         = Group(OakCameraSettings, share=_cam_share)
     camera_check  = Group(CameraCheckSettings)
     simulator     = Group(SimulatorSettings, share=[num_cameras, fps])
     recorder      = Group(RecorderSettings, share=[num_cameras, fps, keyframe_interval])
@@ -105,7 +106,7 @@ class OakGroup(BaseSettings):
     tracklet_sync = Group(SyncSettings, share=[num_cameras, fps])
 
     @property
-    def cameras(self) -> list[CameraSettings]:
+    def cameras(self) -> list[OakCameraSettings]:
         return [self.cam_0]
 
 

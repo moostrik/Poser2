@@ -14,7 +14,7 @@ class ShortNameFormatter(logging.Formatter):
     """Formatter that shortens logger names to last dotted segment."""
 
     def format(self, record):
-        # "modules.oak.camera.camera" → "camera"
+        # "modules.camera.sync" → "sync"
         short = record.name.rsplit('.', 1)[-1]
         record.short_name = short.ljust(16, '.')
         return super().format(record)

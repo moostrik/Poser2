@@ -2,7 +2,7 @@
 
 from modules.board import (
     FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
-    DepthTrackletStoreMixin, TrackletStoreMixin, ObservationStoreMixin,
+    CameraTrackletStoreMixin, TrackletStoreMixin, ObservationStoreMixin,
     VideoImageStoreMixin, CompositionOutputStoreMixin, SequenceStoreMixin,
     PlayheadStoreMixin, SoundLevelStoreMixin, FlashStoreMixin, HitStreakStoreMixin,
 )
@@ -10,7 +10,7 @@ from modules.board import (
 
 class Board(
     FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
-    DepthTrackletStoreMixin, TrackletStoreMixin, ObservationStoreMixin,
+    CameraTrackletStoreMixin, TrackletStoreMixin, ObservationStoreMixin,
     VideoImageStoreMixin, CompositionOutputStoreMixin, SequenceStoreMixin,
     PlayheadStoreMixin, SoundLevelStoreMixin, FlashStoreMixin, HitStreakStoreMixin,
 ):
@@ -25,7 +25,7 @@ class Board(
         WindowStoreMixin.__init__(self)
         CameraImageStoreMixin.__init__(self)
         CropImageStoreMixin.__init__(self)
-        DepthTrackletStoreMixin.__init__(self)
+        CameraTrackletStoreMixin.__init__(self)
         TrackletStoreMixin.__init__(self)
         ObservationStoreMixin.__init__(self)
         VideoImageStoreMixin.__init__(self)

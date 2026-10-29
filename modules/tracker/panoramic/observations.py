@@ -3,7 +3,9 @@ import logging
 from dataclasses import replace
 
 # Local application imports
-from ..tracklet import Tracklet, TrackingStatus
+from modules.camera import TrackingStatus
+
+from ..tracklet import Tracklet
 from .players import PlayerSlots
 
 logger = logging.getLogger(__name__)

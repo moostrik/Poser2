@@ -1,6 +1,6 @@
 """End-to-end: a synthetic room through the real lens, then through the warp, judged as pixels.
 
-Everything else in `modules/oak/tests` checks the mesh point by point. This one does what the
+Everything else in `modules/camera/tests` checks the mesh point by point. This one does what the
 rig does: renders a scene into a raw sensor frame with an INDEPENDENT forward model of the lens
 (equidistant, the shared focal and centre, the camera aimed up by the tilt), warps it with the
 32 x 32 mesh bilinearly densified — exactly how the Warp node reads a mesh — and measures the
@@ -25,7 +25,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from modules.oak import WARP_MESH, warp_mesh_points, frame_window, frame_coverage, source_lens
+from modules.camera import WARP_MESH, warp_mesh_points, frame_window, frame_coverage, source_lens
 
 
 W, H = 1280, 800

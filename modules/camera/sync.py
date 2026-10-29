@@ -1,16 +1,28 @@
-from threading import Lock
-from typing import Callable, Any
-import numpy as np
-import time
-from collections import deque
+"""The sync bang: one callback per round of frames (or tracklet messages) from all cameras."""
 
-from .settings import SyncSettings
+from collections import deque
+from threading import Lock
+from typing import Any, Callable
+import time
+
+from modules.settings import BaseSettings, Field
+
+from .frame import CameraFrame
+from .tracklet import CameraTracklet
 
 import logging
 logger = logging.getLogger(__name__)
 
 
+class SyncSettings(BaseSettings):
+    num_cameras:    Field[int]   = Field(1, access=Field.INIT, visible=False)
+    fps:            Field[float] = Field(30.0, access=Field.INIT, visible=False)
+
+
 class Sync:
+    """Bangs once per round: when the camera with the largest gap to the next frame submits, every
+    camera's newest frame is as close together as it gets. Frames and tracklet messages are two
+    separate instances with the same rule (`frame_sync`, `tracklet_sync`)."""
 
     def __init__(self, settings: SyncSettings, verbose: bool = False, stream_name: str = '') -> None:
         num_cams: int = settings.num_cameras
@@ -24,8 +36,13 @@ class Sync:
         self._callbacks: list[Callable[[], None]] = []      # run in registration order
         self._lock = Lock()
 
-    def submit_frame(self, *args) -> None:
-        cam_id: int = args[0]
+    def submit_frame(self, frame: CameraFrame) -> None:
+        self._submit(frame.cam_id)
+
+    def submit_tracklets(self, cam_id: int, tracklets: list[CameraTracklet]) -> None:
+        self._submit(cam_id)
+
+    def _submit(self, cam_id: int) -> None:
         timestamp: float = time.time()
 
         with self._lock:
@@ -33,9 +50,6 @@ class Sync:
             trigger_cam_id: int = Sync._find_sync_trigger_camera(self._timestamp_history, self.max_gap_s)
 
             if cam_id == trigger_cam_id:
-                # if self.verbose:
-                #     print(f"{self.stream_name}Max time diff: {Sync._get_max_time_diff(self._timestamp_history):.3f}, from cam {cam_id}")
-
                 current_time_s: float = time.time()
                 time_since_last_bang: float = current_time_s - self.last_bang_time_s
                 self.last_bang_time_s = current_time_s
@@ -45,7 +59,6 @@ class Sync:
                 else:
                     if self.verbose:
                         logger.info(f"{self.stream_name}Skipped bang (only {time_since_last_bang:.3f}s since last, from cam {cam_id})")
-
     @staticmethod
     def _find_sync_trigger_camera(timestamp_history: deque[tuple[int, float]], max_gap_s: float) -> int:
         """

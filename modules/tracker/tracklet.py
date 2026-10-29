@@ -1,34 +1,18 @@
 # Standard library imports
 import time
-import warnings
 from dataclasses import dataclass, field
-from enum import Enum
 from typing import Callable, TypeAlias
 
 # Local application imports
-from modules.oak import DepthTracklet
+from modules.camera import CameraTracklet, TrackingStatus
 from modules.utils import Rect
 from .tracker_base import TrackerAnnotation
 
 
-class TrackingStatus(Enum):
-    NEW = 0
-    TRACKED = 1
-    LOST = 2
-    REMOVED = 3
-    NONE = 4  # ?
-
-
-DEPTHAI_TO_TRACKINGSTATUS: dict[DepthTracklet.TrackingStatus, TrackingStatus] = {
-    DepthTracklet.TrackingStatus.NEW: TrackingStatus.NEW,
-    DepthTracklet.TrackingStatus.TRACKED: TrackingStatus.TRACKED,
-    DepthTracklet.TrackingStatus.LOST: TrackingStatus.LOST,
-    DepthTracklet.TrackingStatus.REMOVED: TrackingStatus.REMOVED,
-}
-
-
 @dataclass(frozen=True)
 class Tracklet:
+    """A person as a host tracker knows them: the world identity it decides on top of what the
+    camera reports (`CameraTracklet`), with its own timing and annotation."""
     cam_id: int
     id: int = field(default=-1)          # world identity in a tracker's store; the player slot on its emitted copies
     obs_id: int = field(default=-1)      # this observation's identity, assigned by a store
@@ -66,35 +50,14 @@ class Tracklet:
         return (time.time() - self.last_active) > threshold
 
     @classmethod
-    def from_depthcam(cls, cam_id: int, dct: 'DepthTracklet') -> 'Tracklet | None':
-        """
-        Initialize a Tracklet from a DepthCamTracklet instance.
-        """
-        status: TrackingStatus = TrackingStatus.NONE
-        if hasattr(dct, 'status'):
-            status = DEPTHAI_TO_TRACKINGSTATUS.get(dct.status, TrackingStatus.NONE)
-        else:
-            warnings.warn("Missing 'status' in DepthCamTracklet, defaulting to None.")
-            return None
-
-        roi: Rect | None = None
-        if hasattr(dct, 'roi'):
-            roi = Rect(
-                x=dct.roi.x,
-                y=dct.roi.y,
-                width=dct.roi.width,
-                height=dct.roi.height
-            )
-        else:
-            warnings.warn("Missing 'roi' in DepthCamTracklet, setting to None.")
-            return None
-
+    def from_camera(cls, tracklet: CameraTracklet) -> 'Tracklet':
+        """The tracklet a camera reports, as the tracker takes it in."""
         return cls(
-            cam_id=cam_id,
-            status=status,
-            roi=roi,
-            external_id=dct.id,
-            external_age_in_frames=dct.age,
+            cam_id=tracklet.cam_id,
+            status=tracklet.status,
+            roi=tracklet.roi,
+            external_id=tracklet.id,
+            external_age_in_frames=tracklet.age,
         )
 
 
