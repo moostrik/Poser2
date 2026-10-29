@@ -376,6 +376,10 @@ def build_page(root: BaseSettings, *, title: str, port: int, on_exit, log_buffer
     .poser-source { border-left: 2px solid #26a69a; padding-left: 6px; }
     .poser-synced { border-left: 2px solid #ffa726; padding-left: 6px; }
 
+    /* A number list's inputs as low as the rows of a checklist beside it. */
+    .poser-number-list .q-field--dense .q-field__control, .poser-number-list .q-field--dense .q-field__native,
+    .poser-number-list .q-field--dense .q-field__marginal { height: 24px; min-height: 24px; padding-top: 0; padding-bottom: 0; }
+
     .poser-knob { display: flex; align-items: center; gap: 6px; }
     .poser-knob-caption { display: flex; flex-direction: column; align-items: flex-end; min-width: 56px; max-width: 110px; }
     .poser-knob-dial { width: 40px; height: 40px; flex: none; cursor: grab; touch-action: none; user-select: none; }

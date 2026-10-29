@@ -824,7 +824,8 @@ class NumberList(Control):
         step = self.field.step if self.field.step is not None else (1 if self.elem_type is int else 0.01)
         fmt = "%.0f" if self.elem_type is int else "%.2f"
         self.inputs: list = []
-        with ui.column().classes("w-72 max-w-full gap-1"):
+        # poser-number-list: the inputs as low as a list row, so the list stands beside a checklist
+        with ui.column().classes("poser-number-list w-72 max-w-full gap-1"):
             self.title()
             with ui.column().classes("w-full gap-0 border rounded p-1"):
                 for i, v in enumerate(self.shown):
@@ -833,7 +834,7 @@ class NumberList(Control):
                     ):
                         num = ui.number(
                             value=v, step=step, format=fmt, min=self.field.min, max=self.field.max,
-                        ).props("dense borderless" + self.lock()).classes("flex-1")
+                        ).props("dense borderless hide-bottom-space" + self.lock()).classes("flex-1")
                         self.inputs.append(num)
                         if not self.locked:
                             _commit_typed(num, lambda val, i=i: self._commit_item(i, val))
