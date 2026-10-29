@@ -12,10 +12,6 @@ class FPS:
         self.frame_at: None | float = None
         self.mutex = threading.Lock()
 
-    def set_sample_count(self, sample_count) -> None:
-        with self.mutex:
-            self.count_samples = sample_count
-
     def get_rate_minimum(self) -> float:
         with self.mutex:
             if self.count_processed < 1:

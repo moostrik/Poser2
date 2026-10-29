@@ -2,5 +2,4 @@ from .data_layer_settings import DataLayerSettings, ScalarFeatureSelect, LayerMo
 from .feature_frame_layer import FeatureFrameLayer
 from .feature_window_layer import FeatureWindowLayer
 from .motion_time_renderer import MotionTimeRenderer, MotionTimeRendererSettings
-from .pose_dot_layer import      PoseDotLayer, PoseDotLayerSettings
 from .pose_line_layer import     PoseLineLayer, PoseLineLayerSettings

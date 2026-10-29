@@ -68,9 +68,6 @@ class FlowLayerSettings(BaseSettings):
     temperature_bridge = Group(TemperatureBridgeSettings)
 
 
-# Keep FlowSettings as alias for backward compatibility
-FlowSettings = FlowLayerSettings
-
 class FlowLayer(LayerBase):
     """Flow processing layer with optical flow and bridges.
 
@@ -110,8 +107,6 @@ class FlowLayer(LayerBase):
         self._flow_input: Texture = flow_input
         self._density_input: Texture = density_input
         self.settings: FlowLayerSettings = settings or FlowLayerSettings()
-
-        self._delta_time: float = 1 / self.settings.fps
 
         self._optical_flow: OpticalFlow = OpticalFlow(self.settings.optical_flow)
         self._velocity_trail: VelocitySmoothTrail = VelocitySmoothTrail(self.settings.velocity_trail)

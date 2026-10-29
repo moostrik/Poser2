@@ -1,15 +1,7 @@
-from enum import IntEnum
 import math
 from dataclasses import dataclass, field, replace
 
 from modules.utils import Rect, Point2f
-
-class SubdivisionType(IntEnum):
-    TOT = 0
-    CAM = 1
-    SIM = 2
-    PSN = 3
-    VIS = 4
 
 
 @dataclass (frozen=True)

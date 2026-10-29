@@ -2,7 +2,6 @@ from .blend import             Blend
 from .tint import              Tint
 from .draw_roi import          DrawRoi
 from .draw_circles import      DrawCircles
-from .dense_flow_filter import DenseFlowFilter
 from .density_colorize import  DensityColorize
 from .edge_sketch import       EdgeSketch
 from .detail_threshold import  DetailThreshold
