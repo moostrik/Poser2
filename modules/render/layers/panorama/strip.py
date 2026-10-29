@@ -4,7 +4,7 @@ x is centre azimuth, linear in degrees; y is the TANGENT of centre elevation, li
 rows. The projection between a camera's frame and the world — azimuth to column and back — is the
 tracker's (`modules/tracker/panoramic/projection.py`), since the tracker's azimuths and the stitch's
 placement must be one arithmetic. What is here only the display needs. `strip_y`, `camera_elevation` and `panorama_coverage` are transcribed
-into `panoramicstitch.frag`; keep them in step.
+into `panoramic_stitch.frag`; keep them in step.
 
 `elevation_window` is the one function that names its depth, `focus_radius`: it sets the strip's
 *single* y scale, at the picture's depth, for everything drawn on it.
@@ -89,7 +89,7 @@ def strip_y(elevation: float, elevation_window: tuple[float, float]) -> float:
     not a degree scale — so a person or a ceiling edge has the same shape in the strip as in the
     frames, and the vertical parallax term is a plain scale per column. `elevation_window` is the
     strip's (top, bottom) at the rig centre (`elevation_window`). Transcribed into
-    `panoramicstitch.frag`; keep the two in step.
+    `panoramic_stitch.frag`; keep the two in step.
     """
     top, bottom = elevation_window
     tan_top, tan_bottom = math.tan(math.radians(top)), math.tan(math.radians(bottom))

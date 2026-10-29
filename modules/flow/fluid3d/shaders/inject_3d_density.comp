@@ -4,7 +4,7 @@
  * Inject3D Density - Inject 2D input into a density volume stored as
  *                    GL_TEXTURE_2D_ARRAY.
  *
- * Identical logic to inject3d.comp but uses image2DArray for the volume.
+ * Identical logic to inject_3d.comp but uses image2DArray for the volume.
  * imageLoad/imageStore with ivec3 work the same for image2DArray.
  */
 

@@ -57,12 +57,12 @@ class ComputeShader(Shader):
         self._ref_count: int = 0
         self._uniform_cache: dict[str, int] = {}
 
-        # Discover compute shader file
+        # Discover compute shader file named after the class's module file, in the same directory
         import inspect
-        shader_name_normalized = self.shader_name.lower()
+        source_stem = type(self).__module__.rsplit('.', 1)[-1]
         self.shader_dir = Path(inspect.getfile(self.__class__)).parent
 
-        compute_path = self.shader_dir / f"{shader_name_normalized}{self.COMPUTE_SUFFIX}"
+        compute_path = self.shader_dir / f"{source_stem}{self.COMPUTE_SUFFIX}"
         self.compute_file_path: Path | None = compute_path if compute_path.exists() else None
 
         # Clear parent's vertex/fragment paths (not used for compute)

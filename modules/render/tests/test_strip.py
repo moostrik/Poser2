@@ -1,6 +1,6 @@
 """The strip's own geometry — its rows, extent, vertical re-projection, coverage and 0/360 join.
 
-Pure arithmetic with no GL, transcribed into `panoramicstitch.frag`, so these are what that shader
+Pure arithmetic with no GL, transcribed into `panoramic_stitch.frag`, so these are what that shader
 is checked by. The projection it builds on is tested against the tracker in `test_projection`.
 """
 

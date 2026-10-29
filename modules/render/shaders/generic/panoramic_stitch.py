@@ -6,7 +6,7 @@ from modules.gl import Shader, draw_quad, Texture
 import logging
 logger = logging.getLogger(__name__)
 
-MAX_CAMS: int = 8  # must match the #define in panoramicstitch.frag
+MAX_CAMS: int = 8  # must match the #define in panoramic_stitch.frag
 
 
 class PanoramicStitch(Shader):

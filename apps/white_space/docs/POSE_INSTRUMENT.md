@@ -378,7 +378,7 @@ window reaches over its player, scales down with the penetration until it is gon
 exactly opposite each other end in a full pattern swap, continuously, as they walk there.
 The instrument draws the playhead's marker over the
 masks (`PlayheadMarker`, `playhead_marker.py`), and the render shows the overlap of the two
-colors as a tone of its own (`render/shaders/lightsimulation.frag`). A tick costs about 0.2 ms
+colors as a tone of its own (`render/shaders/light_simulation.frag`). A tick costs about 0.2 ms
 per player at 3600 pixels. Its place in the states' mixes is in `LAYERS.md`, *pose_instrument*.
 
 ### Sources and connections

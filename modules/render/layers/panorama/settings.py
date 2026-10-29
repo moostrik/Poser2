@@ -9,7 +9,7 @@ class PanoramaBlend(IntEnum):
     """How the two cameras' pixels combine where their fields overlap.
 
     The value **is** the stitch shader's `blendMode` uniform, so these must stay in step with the
-    `#define`s at the top of `panoramicstitch.frag`, the way `MAX_CAMS` already does. `MAX` stays
+    `#define`s at the top of `panoramic_stitch.frag`, the way `MAX_CAMS` already does. `MAX` stays
     first and default: it is the plain picture, and the procedure in CALIBRATION.md is written
     around reading it.
 

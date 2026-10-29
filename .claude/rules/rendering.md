@@ -24,7 +24,7 @@ paths:
 - Keep shader contracts stable and documented by uniform/buffer naming
 - Treat hot-reload as a development aid, not runtime control flow
 - Validate render-state assumptions locally (blend, depth, viewport)
-- Shader `.frag`/`.vert` files are resolved by `ClassName.lower()` with no separator — `MyShader` → `myshader.frag`. Name the class and file as one unbroken lowercase word (e.g. `LightSimulation` + `lightsimulation.frag`), or use a style where lowercasing matches the filename (e.g. `WS_Lines` → `ws_lines.frag`).
+- Name a shader's `.frag`/`.vert`/`.comp` source after the `.py` file that holds its class, beside it; the loader resolves it by that module name
 
 ## Layered rendering
 

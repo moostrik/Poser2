@@ -151,7 +151,7 @@ def row_from_elevation(elevation: float, horizon_row: float, focal_rows: float) 
     The delivered frame's rows are the tangent of elevation: `row = horizon_row - focal_rows *
     tan(e)`, with `horizon_row` the normalised row of elevation 0 (which may fall outside 0..1)
     and `focal_rows` the focal length in frame heights. Both come off the tracker's published
-    window (`RigSettings`). Transcribed into `panoramicstitch.frag`; keep the two in step.
+    window (`RigSettings`). Transcribed into `panoramic_stitch.frag`; keep the two in step.
     """
     return horizon_row - focal_rows * math.tan(math.radians(elevation))
 

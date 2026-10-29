@@ -5,7 +5,7 @@
  *                           channel of a density volume stored as
  *                           GL_TEXTURE_2D_ARRAY.
  *
- * Identical logic to InjectChannel3D.comp but uses image2DArray.
+ * Identical logic to inject_channel_3d.comp but uses image2DArray.
  */
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;

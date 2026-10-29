@@ -72,7 +72,7 @@ and one older than half a second counts as nobody. CAMERA_SHOW is an empty charg
 start charges without a face; one that gets blocked before it is full is dropped, it does not wait. The capture is the last frame in which the subject qualified (the
 last frame at all when none did), cropped by
 `portrait_crop` (eyes levelled, at the workflow's portrait size). Every frame's faces go to the render
-(`Inputs.faces`): `CameraLayer` draws the camera in black and white (`facecolor.frag`). Every face's
+(`Inputs.faces`): `CameraLayer` draws the camera in black and white (`face_color.frag`). Every face's
 box (the portrait crop's, upright: `FaceObservation.crop`) shows the face's distance from good
 (`render.face_effect`: dark, pixels, blur or fog, at `render.face_amount`), so a visitor sees
 whether they get closer; the subject's box turns to colour as the charge fills (`render.face_fill`:
@@ -155,7 +155,7 @@ its timings in the sequence settings. At the capture the diffusion layer starts 
 a generation that fails shows the capture as its result and nothing of the previous visitor.
 `render.show_camera` draws the raw camera on top and starts
 no new sequence while it is on (`Sequencer.blocked`). Shaders are
-`classname.frag` next to their `.py` and hot-reload while running.
+`.frag` files named after their `.py`, beside it, and hot-reload while running.
 The two **walls** of the sphere are secondary windows of the same `WindowManager` (`render.window.secondary_list`, read at
 the start: the first entry is wall 0, screens 1-24, the second wall 1; `secondary_fullscreen` borderless on that monitor,
 forced on by `-fs` like the main window; a monitor that is missing gets a small window on the primary one, and back when

@@ -74,12 +74,12 @@ class Shader():
         self._ref_count: int = 0
         self._uniform_cache: dict[str, int] = {}  # Cached uniform locations
 
-        # Discover shader files in same directory as the class file
-        shader_name_normalized = self.shader_name.lower()
+        # Discover shader files named after the class's module file, in the same directory
+        source_stem = type(self).__module__.rsplit('.', 1)[-1]
         self.shader_dir = Path(inspect.getfile(self.__class__)).parent
 
-        vertex_path = self.shader_dir / f"{shader_name_normalized}{self.VERTEX_SUFFIX}"
-        fragment_path = self.shader_dir / f"{shader_name_normalized}{self.FRAGMENT_SUFFIX}"
+        vertex_path = self.shader_dir / f"{source_stem}{self.VERTEX_SUFFIX}"
+        fragment_path = self.shader_dir / f"{source_stem}{self.FRAGMENT_SUFFIX}"
 
         self.vertex_file_path = vertex_path if vertex_path.exists() else None
         self.fragment_file_path = fragment_path if fragment_path.exists() else None
