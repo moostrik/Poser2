@@ -4,185 +4,185 @@ from enum import IntEnum
 # Third-party imports
 import numpy as np
 
+
 class PredictionMethod(IntEnum):
     NONE = 0
     LINEAR = 1
     QUADRATIC = 2
 
+
 class Predict:
-    """Predictor for arbitrary vector data (positions, coordinates, etc.)."""
+    """A motion fit on the last samples of a vector and their stamps, evaluated at any time.
 
-    def __init__(self, vector_size: int, input_frequency: float, method: PredictionMethod,
+    ``add_sample(values, timestamp)`` keeps the newest ``fit_frames`` samples; ``at(time)`` evaluates the fit
+    there. LINEAR is the least-squares velocity over the window, through the newest sample; QUADRATIC adds
+    the acceleration (three samples or more, else linear); NONE holds the newest sample. The fit is per
+    component: a component's window reaches back to its last NaN, a component with one sample holds it, and
+    a NaN newest sample gives NaN. Not thread-safe by design."""
+
+    def __init__(self, vector_size: int, method: PredictionMethod, fit_frames: int = 3,
                  clamp_range: tuple[float, float] | None = None) -> None:
-        """Initialize the vectorized predictor."""
-
         if vector_size <= 0:
             raise ValueError("Vector size must be positive.")
-        if input_frequency <= 0.0:
-            raise ValueError("Frequency must be positive.")
         if clamp_range is not None:
             if len(clamp_range) != 2 or clamp_range[0] >= clamp_range[1]:
                 raise ValueError("clamp_range must be (min, max) with min < max")
 
         self._vector_size: int = vector_size
-        self._input_interval: float = 1.0 / input_frequency
         self._method: PredictionMethod = method
+        self._fit_frames: int = max(2, int(fit_frames))
         self._clamp_range: tuple[float, float] | None = clamp_range
 
-        self.p_prev: np.ndarray = np.full(vector_size, np.nan)
-        self.p_curr: np.ndarray = np.full(vector_size, np.nan)
-        self.p_predicted: np.ndarray = np.full(vector_size, np.nan)
-
-        self.v_prev: np.ndarray = np.zeros(vector_size)
-
-    @property
-    def input_frequency(self) -> float:
-        """Get the input frequency."""
-        return 1.0 / self._input_interval
-
-    @input_frequency.setter
-    def input_frequency(self, value: float) -> None:
-        """Set the input frequency."""
-        if value <= 0.0:
-            raise ValueError("Frequency must be positive.")
-        self._input_interval = 1.0 / value
+        # The window, newest last: samples (frames x vector) and their stamps.
+        self._samples: np.ndarray = np.full((0, vector_size), np.nan)
+        self._stamps: np.ndarray = np.zeros(0)
+        # The fit through the newest sample: value, velocity and half the acceleration per component.
+        self._p: np.ndarray = np.full(vector_size, np.nan)
+        self._v: np.ndarray = np.zeros(vector_size)
+        self._a: np.ndarray = np.zeros(vector_size)
+        self._t: float = 0.0
 
     @property
     def method(self) -> PredictionMethod:
-        """Get the current prediction method."""
         return self._method
 
     @method.setter
     def method(self, value: PredictionMethod) -> None:
-        """Set the prediction method."""
         if not isinstance(value, PredictionMethod):
             raise TypeError(f"Expected PredictionMethod, got {type(value).__name__}")
         self._method = value
 
     @property
+    def fit_frames(self) -> int:
+        return self._fit_frames
+
+    @fit_frames.setter
+    def fit_frames(self, value: int) -> None:
+        self._fit_frames = max(2, int(value))
+
+    @property
     def clamp_range(self) -> tuple[float, float] | None:
-        """Get the clamping range."""
         return self._clamp_range
 
     @clamp_range.setter
     def clamp_range(self, value: tuple[float, float] | None) -> None:
-        """Set the clamping range."""
         if value is not None:
             if len(value) != 2 or value[0] >= value[1]:
                 raise ValueError("clamp_range must be (min, max) with min < max")
         self._clamp_range = value
 
     @property
-    def value(self) -> np.ndarray:
-        """Get the predicted values for the next frame."""
-        return self.p_predicted.copy()
+    def timestamp(self) -> float:
+        """The newest sample's stamp."""
+        return self._t
 
-    def add_sample(self, values: np.ndarray) -> None:
-        """Add a new sample and calculate prediction."""
-
+    def add_sample(self, values: np.ndarray, timestamp: float) -> None:
+        """Add a sample with its stamp and refit."""
         if values.shape[0] != self._vector_size:
             raise ValueError(f"Expected array of size {self._vector_size}, got {values.shape[0]}")
+        keep = self._fit_frames - 1
+        self._samples = np.vstack((self._samples[-keep:] if keep else self._samples[:0], values[np.newaxis, :]))
+        self._stamps = np.append(self._stamps[-keep:] if keep else self._stamps[:0], float(timestamp))
+        self._fit()
 
-        # Shift samples
-        self.p_prev = self.p_curr.copy()
-        self.p_curr = values.copy()
-
-        newly_valid = np.isnan(self.p_prev) & np.isfinite(self.p_curr)
-        if np.any(newly_valid):
-            self.v_prev[newly_valid] = 0.0
-
-        # Calculate velocity and acceleration
-        v_measured: np.ndarray = self._calculate_velocity(self.p_prev, self.p_curr, self._input_interval)
-
-        # Predict next position
-        if self._method == PredictionMethod.NONE:
-            self.p_predicted = self.p_curr.copy()
-        elif self._method == PredictionMethod.LINEAR:
-            self.p_predicted = self._predict_linear(self.p_curr, v_measured, self._input_interval)
-        else:  # QUADRATIC
-            acceleration: np.ndarray = self._calculate_velocity(self.v_prev, v_measured, self._input_interval)
-            self.p_predicted = self._predict_quadratic(self.p_curr, v_measured, acceleration, self._input_interval)
-
-        self.v_prev = v_measured
-
-        if self._clamp_range is not None:
-            np.clip(self.p_predicted, self._clamp_range[0], self._clamp_range[1], out=self.p_predicted)
+    def at(self, time: float) -> np.ndarray:
+        """The fit evaluated at ``time`` (the same clock as the stamps)."""
+        dt = time - self._t
+        result = self._p + self._v * dt + self._a * dt * dt
+        return self._constrain(result)
 
     def reset(self) -> None:
-        """Reset the predictor's internal state (clear sample history)."""
-        self.p_prev = np.full(self._vector_size, np.nan)
-        self.p_curr = np.full(self._vector_size, np.nan)
-        self.p_predicted = np.full(self._vector_size, np.nan)
-        self.v_prev = np.zeros(self._vector_size)
+        """Forget the window."""
+        self._samples = np.full((0, self._vector_size), np.nan)
+        self._stamps = np.zeros(0)
+        self._p = np.full(self._vector_size, np.nan)
+        self._v = np.zeros(self._vector_size)
+        self._a = np.zeros(self._vector_size)
+        self._t = 0.0
+
+    # -- The fit ---------------------------------------------------------------------
+
+    def _fit(self) -> None:
+        newest = self._samples[-1]
+        self._t = float(self._stamps[-1])
+        self._p = newest.copy()
+        self._v = np.zeros(self._vector_size)
+        self._a = np.zeros(self._vector_size)
+        n = self._samples.shape[0]
+        if self._method == PredictionMethod.NONE or n < 2:
+            return
+
+        # Per component, the window reaches back from the newest sample to its last NaN.
+        valid = np.isfinite(self._samples)                                   # frames x vector
+        run = np.flipud(np.cumprod(np.flipud(valid), axis=0)).astype(bool)  # True while valid back from the newest
+        weights = run[:-1].astype(float)                                     # the older samples that take part
+        t = (self._stamps[:-1] - self._t)[:, np.newaxis]                     # their time before the newest, < 0
+        d = self._difference(self._samples[:-1], newest)                     # their value relative to the newest
+        d = np.where(run[:-1], d, 0.0)
+
+        # Least squares through the newest sample: d = v t (+ a t²), weighted by the window.
+        st2 = np.sum(weights * t * t, axis=0)
+        std = np.sum(weights * t * d, axis=0)
+        if self._method == PredictionMethod.QUADRATIC:
+            st3 = np.sum(weights * t ** 3, axis=0)
+            st4 = np.sum(weights * t ** 4, axis=0)
+            st2d = np.sum(weights * t * t * d, axis=0)
+            det = st2 * st4 - st3 * st3
+            quadratic = (np.sum(weights, axis=0) >= 2) & (np.abs(det) > 1e-18)
+            with np.errstate(divide='ignore', invalid='ignore'):
+                v_q = (std * st4 - st2d * st3) / det
+                a_q = (st2d * st2 - std * st3) / det
+                v_l = std / st2
+            self._v = np.where(quadratic, v_q, np.where(st2 > 0.0, v_l, 0.0))
+            self._a = np.where(quadratic, a_q, 0.0)
+        else:
+            with np.errstate(divide='ignore', invalid='ignore'):
+                self._v = np.where(st2 > 0.0, std / st2, 0.0)
+        self._v = np.nan_to_num(self._v, nan=0.0, posinf=0.0, neginf=0.0)
+        self._a = np.nan_to_num(self._a, nan=0.0, posinf=0.0, neginf=0.0)
 
     @staticmethod
-    def _calculate_velocity(p_prev: np.ndarray, p_curr: np.ndarray, interval: float) -> np.ndarray:
-        """Calculate instantaneous velocity from two samples."""
-        delta = p_curr - p_prev
-        v = delta / interval
-        return np.nan_to_num(v, nan=0.0)
+    def _difference(older: np.ndarray, newest: np.ndarray) -> np.ndarray:
+        """The older samples relative to the newest."""
+        return older - newest[np.newaxis, :]
 
-    @staticmethod
-    def _predict_linear(p_curr: np.ndarray, v_curr: np.ndarray, interval: float) -> np.ndarray:
-        """Predict next position based on current velocity."""
-        return p_curr + v_curr * interval
-
-    @staticmethod
-    def _predict_quadratic(p_curr: np.ndarray, v_curr: np.ndarray, accel: np.ndarray, interval: float) -> np.ndarray:
-        """Predict next position using quadratic extrapolation (constant acceleration model)."""
-        return p_curr + v_curr * interval + 0.5 * accel * (interval ** 2)
+    def _constrain(self, values: np.ndarray) -> np.ndarray:
+        if self._clamp_range is not None:
+            np.clip(values, self._clamp_range[0], self._clamp_range[1], out=values)
+        return values
 
 
 class AnglePredict(Predict):
-    """Predictor for angular/circular data with proper wrapping."""
+    """The fit for angles: differences take the short way round and the result wraps to [-π, π]."""
 
-    def __init__(self, vector_size: int, input_frequency: float, method: PredictionMethod,
+    def __init__(self, vector_size: int, method: PredictionMethod, fit_frames: int = 3,
                  clamp_range: tuple[float, float] | None = None) -> None:
-        """Initialize the angle predictor.
-
-        Note: clamp_range is not supported for angles (automatic wrapping to [-π, π]).
-        """
-        super().__init__(vector_size, input_frequency, method, clamp_range=None)
+        super().__init__(vector_size, method, fit_frames, clamp_range=None)
 
     @staticmethod
-    def _calculate_velocity(p_prev: np.ndarray, p_curr: np.ndarray, interval: float) -> np.ndarray:
-        """Calculate instantaneous angular velocity from two samples."""
-        delta = p_curr - p_prev
-        delta = np.arctan2(np.sin(delta), np.cos(delta))  # Wrap to shortest path
-        v = delta / interval
-        return np.nan_to_num(v, nan=0.0)
+    def _difference(older: np.ndarray, newest: np.ndarray) -> np.ndarray:
+        delta = older - newest[np.newaxis, :]
+        return np.arctan2(np.sin(delta), np.cos(delta))
 
-    @staticmethod
-    def _predict_linear(p_curr: np.ndarray, v_curr: np.ndarray, interval: float) -> np.ndarray:
-        """Predict next angle position based on current velocity."""
-        p_pred_raw = p_curr + v_curr * interval
-        return np.arctan2(np.sin(p_pred_raw), np.cos(p_pred_raw))  # Wrap to [-π, π]
-
-    @staticmethod
-    def _predict_quadratic(p_curr: np.ndarray, v_curr: np.ndarray, accel: np.ndarray, interval: float) -> np.ndarray:
-        """Predict next angle position using quadratic extrapolation (constant acceleration model)."""
-        p_pred_raw = p_curr + v_curr * interval + 0.5 * accel * (interval ** 2)
-        return np.arctan2(np.sin(p_pred_raw), np.cos(p_pred_raw))  # Wrap to [-π, π]
+    def _constrain(self, values: np.ndarray) -> np.ndarray:
+        return np.arctan2(np.sin(values), np.cos(values))
 
 
 class PointPredict(Predict):
-    """Predictor for 2D points with (x, y) coordinates."""
+    """The fit for 2D points, (x, y) flattened."""
 
-    def __init__(self, vector_size: int, input_frequency: float, method: PredictionMethod,
+    def __init__(self, vector_size: int, method: PredictionMethod, fit_frames: int = 3,
                  clamp_range: tuple[float, float] | None = None) -> None:
-        """Initialize the point predictor."""
-        super().__init__(vector_size * 2, input_frequency, method, clamp_range)
+        super().__init__(vector_size * 2, method, fit_frames, clamp_range)
         self._num_points: int = vector_size
 
-    def add_sample(self, points: np.ndarray) -> None:
-        """Add new point samples."""
+    def add_sample(self, points: np.ndarray, timestamp: float) -> None:
         if points.shape != (self._num_points, 2):
             raise ValueError(f"Expected shape ({self._num_points}, 2), got {points.shape}")
-        super().add_sample(points.flatten())
+        super().add_sample(points.flatten(), timestamp)
 
-    @property
-    def value(self) -> np.ndarray:
-        """Get predicted points for the next frame."""
-        return super().value.reshape(self._num_points, 2).copy()
+    def at(self, time: float) -> np.ndarray:
+        return super().at(time).reshape(self._num_points, 2)
+
 
 ArrayPredict = Predict | AnglePredict | PointPredict

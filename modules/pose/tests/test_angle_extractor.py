@@ -7,7 +7,7 @@ import numpy as np
 
 from modules.pose.features import AngleLandmark, Angles, AngleVelocity, PointLandmark, Points2D
 from modules.pose.frame import Frame
-from modules.pose.nodes import AngleExtractor, AngleExtractorSettings, AngleVelocityExtractor, AngleVelocityExtractorSettings
+from modules.pose.nodes import AngleExtractor, AngleExtractorSettings, AngleVelocityExtractor
 
 from ._builders import FPS, frame, points, scalar, skeleton, skeleton_coords, wrap
 
@@ -101,19 +101,22 @@ class AngleVelocityExtractorTest(unittest.TestCase):
         self.assertIn(AngleVelocity, out)
         self.assertEqual(out[AngleVelocity].valid_count, 0)
 
-    def test_velocity_is_delta_times_frequency(self) -> None:
+    def test_velocity_is_delta_over_the_stamps(self) -> None:
         ex = AngleVelocityExtractor()
         ex.process(_vel_frame(0.0, left_knee=0.10))
         out = ex.process(_vel_frame(1 / FPS, left_knee=0.13))
         self.assertAlmostEqual(out[AngleVelocity][A.left_knee], 0.03 * 30.0, places=4)
 
-    def test_uses_configured_frequency_not_timestamps(self) -> None:
-        settings = AngleVelocityExtractorSettings()
-        settings.frequency = 60.0
-        ex = AngleVelocityExtractor(settings)
+    def test_dropped_frame_leaves_the_velocity_unchanged(self) -> None:
+        ex = AngleVelocityExtractor()
         ex.process(_vel_frame(0.0, head=0.0))
-        out = ex.process(_vel_frame(5.0, head=0.01))
-        self.assertAlmostEqual(out[AngleVelocity][A.head], 0.6, places=4)
+        out = ex.process(_vel_frame(2 / FPS, head=0.02))
+        self.assertAlmostEqual(out[AngleVelocity][A.head], 0.01 * 30.0, places=4)
+
+    def test_same_stamp_gives_no_velocity(self) -> None:
+        ex = AngleVelocityExtractor()
+        ex.process(_vel_frame(1.0, head=0.0))
+        self.assertEqual(ex.process(_vel_frame(1.0, head=0.01))[AngleVelocity].valid_count, 0)
 
     def test_velocity_wraps_across_pi(self) -> None:
         ex = AngleVelocityExtractor()
