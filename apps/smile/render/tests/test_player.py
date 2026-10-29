@@ -26,7 +26,7 @@ class TestGrinPlayer(unittest.TestCase):
         self.settings.grin_delay = 1.0
         self.player = GrinPlayer(self.settings)
         self.now = 0.0
-        patcher = mock.patch('apps.smile.render.GrinPlayer.time.time', lambda: self.now)
+        patcher = mock.patch('apps.smile.render.GrinPlayer.time.perf_counter', lambda: self.now)
         patcher.start()
         self.addCleanup(patcher.stop)
 

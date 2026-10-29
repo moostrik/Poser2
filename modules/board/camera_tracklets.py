@@ -10,7 +10,7 @@ if TYPE_CHECKING:
 class HasCameraTracklets(Protocol):
     """The tracklets each camera reports, as it reports them."""
     def get_camera_tracklets(self, cam_id: int) -> list[CameraTracklet] | None: ...
-    def set_camera_tracklets(self, cam_id: int, tracklets: list[CameraTracklet]) -> None: ...
+    def set_camera_tracklets(self, cam_id: int, tracklets: list[CameraTracklet], time: float) -> None: ...
 
 
 class CameraTrackletStoreMixin:
@@ -24,6 +24,6 @@ class CameraTrackletStoreMixin:
         with self._tracklet_lock:
             return self._camera_tracklets.get(cam_id)
 
-    def set_camera_tracklets(self, cam_id: int, tracklets: list[CameraTracklet]) -> None:
+    def set_camera_tracklets(self, cam_id: int, tracklets: list[CameraTracklet], time: float) -> None:
         with self._tracklet_lock:
             self._camera_tracklets[cam_id] = tracklets

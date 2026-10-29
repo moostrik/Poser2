@@ -222,7 +222,7 @@ class TrackerJournal:
             self._dropped += 1
 
     # INTAKE — wired beside the board's taps; one flag check when idle, one queue put capturing
-    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[CameraTracklet]) -> None:
+    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[CameraTracklet], time: float) -> None:
         """The raw camera tracklets, converted exactly as the tracker converts them."""
         if not self._capturing:
             return

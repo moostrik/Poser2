@@ -1,5 +1,5 @@
 # Standard library imports
-from time import monotonic
+from time import perf_counter
 from typing import Union
 
 # Third-party imports
@@ -55,7 +55,7 @@ class EMASmooth:
 
         # UPDATE
         if current_time is None:
-            current_time = monotonic()
+            current_time = perf_counter()
 
         if self._last_update_time is None:
             self._last_update_time = current_time

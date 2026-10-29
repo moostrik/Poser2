@@ -82,7 +82,7 @@ class Camera(Thread):
             capture.release()
 
     def _emit(self, image: np.ndarray) -> None:
-        """The frame becomes the contract's: rotated and flipped, with its host time."""
+        """The frame becomes the contract's: rotated and flipped, with its host time on the one clock."""
         if self.rotate90:
             image = cv2.transpose(image)
         if self.settings.flip_v:
@@ -92,6 +92,6 @@ class Camera(Thread):
         self.video_fps.processed()
         self.settings.readings.video_fps = self.video_fps.get_rate_average()
         self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
-        frame = CameraFrame(cam_id=self.id, kind=FrameType.VIDEO, image=image, time=time.time())
+        frame = CameraFrame(cam_id=self.id, kind=FrameType.VIDEO, image=image, time=time.perf_counter())
         for callback in self.frame_callbacks:
             callback(frame)

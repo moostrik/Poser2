@@ -141,7 +141,7 @@ class Recorder:
         if stage != self.settings.stage:
             return
         if self._active.is_set():
-            self._queue.put((time.time(), dict(frame_dict)))
+            self._queue.put((time.perf_counter(), dict(frame_dict)))   # the one clock, as the frames' own stamps
 
     # ── Background thread ────────────────────────────────────────────────
 

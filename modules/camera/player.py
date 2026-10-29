@@ -8,7 +8,7 @@ from numpy import ndarray
 from typing import Callable, Dict, TypeAlias
 from enum import Enum, auto
 from queue import Queue
-from time import sleep, monotonic
+from time import perf_counter, sleep
 
 from modules.settings import BaseSettings, Field, Widget
 from modules.video import CoderType, CoderFormat, hwaccel, StreamReader
@@ -478,7 +478,7 @@ class Player(Thread):
     def update_gui(self, frame_id: int = 0) -> None:
         # Settings writes run share propagation and callbacks on this (reader) thread; a GUI
         # readout needs no more than 4 Hz
-        now: float = monotonic()
+        now: float = perf_counter()
         if now - self._gui_update_time < 0.25:
             return
         self._gui_update_time = now

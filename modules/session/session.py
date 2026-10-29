@@ -64,7 +64,7 @@ class Session:
             self._timer_thread = None
 
     def _timer_loop(self) -> None:
-        chunk_start = time.time()
+        chunk_start = time.perf_counter()
         while not self._timer_stop.is_set():
             chunk_length = self.settings.split_seconds
             if chunk_length <= 0:
@@ -72,7 +72,7 @@ class Session:
                 self._timer_stop.wait(0.1)
                 continue
 
-            elapsed = time.time() - chunk_start
+            elapsed = time.perf_counter() - chunk_start
             remaining = chunk_length - elapsed
             if remaining > 0:
                 self._timer_stop.wait(remaining)

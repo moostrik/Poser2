@@ -1,7 +1,7 @@
 # Standard library imports
 from collections import deque
 import math
-from time import time
+from time import perf_counter
 import warnings
 
 # Third-party imports
@@ -60,14 +60,14 @@ class ScalarPredictiveHermite:
         Args:
             value: New input sample.
             sample_time: Timestamp in seconds when the sample was captured.
-                If None, uses time() (not recommended for best accuracy).
+                If None, uses perf_counter() (not recommended for best accuracy).
 
         Note:
             For accurate interpolation, always provide the actual capture timestamp,
             not the arrival time. This accounts for processing delays.
         """
         if sample_time is None:
-            sample_time = time()
+            sample_time = perf_counter()
 
         self.buffer.append(value)
         self.last_sample_time: float = sample_time
@@ -89,7 +89,7 @@ class ScalarPredictiveHermite:
         Updates self.interpolated_value based on elapsed time since the last sample.
 
         Args:
-            current_time: Optional timestamp in seconds. If None, uses time().
+            current_time: Optional timestamp in seconds. If None, uses perf_counter().
         """
         if not self._initialized:
             return  # No data yet
@@ -99,7 +99,7 @@ class ScalarPredictiveHermite:
             return
 
         if current_time is None:
-            current_time = time()
+            current_time = perf_counter()
 
         # Validate time ordering and clamp to prevent negative elapsed time
         if current_time < self.last_sample_time:
@@ -245,7 +245,7 @@ class VectorPredictiveHermite:
         Args:
             value: New input sample (NumPy array).
             sample_time: Timestamp in seconds when the sample was captured.
-                If None, uses time() (not recommended for best accuracy).
+                If None, uses perf_counter() (not recommended for best accuracy).
 
         Note:
             For accurate interpolation, always provide the actual capture timestamp,
@@ -258,7 +258,7 @@ class VectorPredictiveHermite:
             raise ValueError(f"Expected array of size {self.vector_size}, got {value.shape[0]}")
 
         if sample_time is None:
-            sample_time = time()
+            sample_time = perf_counter()
 
         self.buffer.append(value)
         self.last_sample_time = sample_time
@@ -280,7 +280,7 @@ class VectorPredictiveHermite:
         Updates self.interpolated_value based on elapsed time since the last sample.
 
         Args:
-            current_time: Optional timestamp in seconds. If None, uses time().
+            current_time: Optional timestamp in seconds. If None, uses perf_counter().
         """
         if not self._initialized:
             return  # No data yet
@@ -290,7 +290,7 @@ class VectorPredictiveHermite:
             return
 
         if current_time is None:
-            current_time = time()
+            current_time = perf_counter()
 
         # Validate time ordering and clamp to prevent negative elapsed time
         if current_time < self.last_sample_time:
@@ -557,7 +557,7 @@ class VectorPredictiveAngleHermite:
         Args:
             value: New input sample (NumPy array of angles in radians).
             sample_time: Timestamp in seconds when the sample was captured.
-                If None, uses time() (not recommended for best accuracy).
+                If None, uses perf_counter() (not recommended for best accuracy).
 
         Note:
             Does NOT reset interpolated position. Calculates target velocity
@@ -571,7 +571,7 @@ class VectorPredictiveAngleHermite:
             raise ValueError(f"Expected array of size {self.vector_size}, got {value.shape[0]}")
 
         if sample_time is None:
-            sample_time = time()
+            sample_time = perf_counter()
             # print(sample_time)
 
         # Add to history
@@ -624,13 +624,13 @@ class VectorPredictiveAngleHermite:
         Gradually steers velocity toward target calculated from last sample.
 
         Args:
-            current_time: Optional timestamp in seconds. If None, uses time().
+            current_time: Optional timestamp in seconds. If None, uses perf_counter().
         """
         if not self._initialized:
             return
 
         if current_time is None:
-            current_time = time()
+            current_time = perf_counter()
 
         # Validate time ordering
         if current_time < self.last_update_time:

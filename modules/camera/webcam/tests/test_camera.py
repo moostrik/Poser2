@@ -60,7 +60,7 @@ class TestWebCamera(unittest.TestCase):
     def test_delivers_frames_with_their_time_and_rate(self):
         self.camera = Camera(self.settings)
         self.camera.add_frame_callback(self.frames.append)
-        before = time.time()
+        before = time.perf_counter()
         self.camera.start()
         self.assertTrue(self.camera.connected)
         self.assertTrue(wait_for(lambda: len(self.frames) > 3))

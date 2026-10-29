@@ -27,6 +27,12 @@ from modules.utils import Rect
 FOV = 110.0
 
 
+def stamps(seconds_ago: float = 0.0) -> dict[str, float]:
+    """A tracklet's three times, `seconds_ago` before now."""
+    t: float = time.perf_counter() - seconds_ago
+    return {'time_stamp': t, 'created_at': t, 'last_active': t}
+
+
 def make_tracklet(cam_id: int, ext_id: int, local_angle: float, *,
                   status: TrackingStatus = TrackingStatus.TRACKED,
                   height: float = 0.5, age: int = 10, top: float = 0.1) -> Tracklet:
@@ -34,7 +40,7 @@ def make_tracklet(cam_id: int, ext_id: int, local_angle: float, *,
     center_x = local_angle / FOV
     roi = Rect(x=center_x - width / 2.0, y=top, width=width, height=height)
     return Tracklet(cam_id=cam_id, status=status, roi=roi,
-                    external_id=ext_id, external_age_in_frames=age)
+                    external_id=ext_id, external_age_in_frames=age, **stamps())
 
 
 class PanoramicTrackerCase(unittest.TestCase):
@@ -75,7 +81,7 @@ class PanoramicTrackerCase(unittest.TestCase):
     def submit(self, *tracklets: Tracklet) -> TrackletDict:
         for t in tracklets:
             self.tracker._add_tracklet(t)
-        self.tracker._update_and_notify()
+        self.tracker._update_and_notify(time.perf_counter())
         return self.emitted[-1]
 
 
@@ -163,7 +169,7 @@ class TestDeviceIdReuse(PanoramicTrackerCase):
     # seen 1.5 s ago: remembered at `lost_timeout` 2.0; lowering it to 1.0 stands in for time passing.
 
     def test_re_found_under_the_same_id_survives_the_old_anchor_retiring(self) -> None:
-        self.submit(replace(make_tracklet(0, 1, 50.0), last_active=time.time() - 1.5))
+        self.submit(replace(make_tracklet(0, 1, 50.0), last_active=time.perf_counter() - 1.5))
         self.submit(make_tracklet(0, 1, 50.0, status=TrackingStatus.REMOVED))
         self.submit(make_tracklet(0, 1, 52.0))                       # the same person, id 1 again
         self.config.lost_timeout = 1.0
@@ -173,7 +179,7 @@ class TestDeviceIdReuse(PanoramicTrackerCase):
         self.assertEqual(set(out.keys()), {0})
 
     def test_someone_else_on_the_id_survives_the_old_anchor_retiring(self) -> None:
-        self.submit(replace(make_tracklet(0, 1, 50.0), last_active=time.time() - 1.5))
+        self.submit(replace(make_tracklet(0, 1, 50.0), last_active=time.perf_counter() - 1.5))
         self.submit(make_tracklet(0, 1, 50.0, status=TrackingStatus.REMOVED))
         self.submit(make_tracklet(0, 1, 80.0))                       # a different person, id 1
         self.config.lost_timeout = 1.0
@@ -188,7 +194,7 @@ class TestEmitsWhatItRemembers(PanoramicTrackerCase):
     a box may be before it stops counting is the consumer's call (pose's `detection_timeout`)."""
 
     def test_a_stale_world_is_still_emitted_and_keeps_anchoring(self) -> None:
-        stale = replace(make_tracklet(0, 1, 50.0), last_active=time.time() - 1.0)
+        stale = replace(make_tracklet(0, 1, 50.0), last_active=time.perf_counter() - 1.0)
         out = self.submit(stale)
         self.assertEqual(set(out.keys()), {0})                         # 1.0 s < lost_timeout 2.0
         self.assertEqual(self.tracker.observations.world_of(0, 1), 0)
@@ -196,10 +202,10 @@ class TestEmitsWhatItRemembers(PanoramicTrackerCase):
     def test_a_forgotten_world_is_not_emitted(self) -> None:
         # Last seen 1.5 s ago: remembered at 2.0. Lowering `lost_timeout` below that stands in for
         # time passing; the tick that retires the world must not emit it one last time.
-        out = self.submit(replace(make_tracklet(0, 1, 50.0), last_active=time.time() - 1.5))
+        out = self.submit(replace(make_tracklet(0, 1, 50.0), last_active=time.perf_counter() - 1.5))
         self.assertEqual(set(out.keys()), {0})
         self.config.lost_timeout = 1.2
-        self.tracker._update_and_notify()
+        self.tracker._update_and_notify(time.perf_counter())
         self.assertEqual(self.emitted[-1], {})
 
     def test_a_fresh_world_is_emitted(self) -> None:
@@ -318,7 +324,7 @@ class TestPrimaryHysteresis(PanoramicTrackerCase):
         self.crossed_to_the_edge()
         # cam0 last seen 1.5 s ago, then LOST: held at `lost_timeout` 2.0; lowering it below that
         # stands in for time passing, and the sliver is all that is left.
-        self.submit(replace(make_tracklet(0, 1, 95.0), last_active=time.time() - 1.5))
+        self.submit(replace(make_tracklet(0, 1, 95.0), last_active=time.perf_counter() - 1.5))
         out = self.submit(make_tracklet(0, 1, 95.0, status=TrackingStatus.LOST), make_tracklet(1, 1, 2.0))
         self.assertEqual(out[0].cam_id, 0)
         self.config.lost_timeout = 1.2
@@ -507,7 +513,7 @@ class TestCrossCameraLinking(PanoramicTrackerCase):
         # 33% apart in height kept them apart; now both read the same and the
         # per-tick collapse merges the younger world into the older.
         self.tracker._add_tracklet(self.person(0, 1, 98.0, height_m=1.8, distance=2.5))
-        self.tracker._update_and_notify()
+        self.tracker._update_and_notify(time.perf_counter())
         out = self.emitted[-1]
         self.assertEqual(set(out.keys()), {0})
         self.assertEqual(self.tracker.observations.world_of(1, 1), 0)
@@ -1088,8 +1094,8 @@ class TestSeamBirths(unittest.TestCase):
             roi, _distance = synth_observation(cam_id, world_azimuth=90.0, radius=radius)
             self.tracker._add_tracklet(
                 Tracklet(cam_id=cam_id, status=TrackingStatus.TRACKED, roi=roi,
-                         external_id=1, external_age_in_frames=10))
-        self.tracker._update_and_notify()
+                         external_id=1, external_age_in_frames=10, **stamps()))
+        self.tracker._update_and_notify(time.perf_counter())
         return self.emitted[-1]
 
     def test_no_birth_on_a_seam_inside_the_dead_zone(self) -> None:
@@ -1135,9 +1141,8 @@ class RigTrackerCase(unittest.TestCase):
         if height is not None:
             roi = replace(roi, y=roi.y + roi.height - height, height=height)
         self.tracker._add_tracklet(Tracklet(cam_id=0, status=status, roi=roi, external_id=ext_id,
-                                            external_age_in_frames=age,
-                                            last_active=time.time() - seconds_ago))
-        self.tracker._update_and_notify()
+                                            external_age_in_frames=age, **stamps(seconds_ago)))
+        self.tracker._update_and_notify(time.perf_counter())
         return self.emitted[-1]
 
 
@@ -1246,8 +1251,8 @@ class TestRejectedDetections(RigTrackerCase):
         for cam_id in (0, 1):
             roi, _d = synth_observation(cam_id, world_azimuth=90.0, radius=1.35)
             self.tracker._add_tracklet(Tracklet(cam_id=cam_id, status=TrackingStatus.TRACKED, roi=roi,
-                                                external_id=1, external_age_in_frames=10))
-        self.tracker._update_and_notify()
+                                                external_id=1, external_age_in_frames=10, **stamps()))
+        self.tracker._update_and_notify(time.perf_counter())
         self.assertEqual(self.emitted[-1], {})
         self.assertEqual(self.rejected(), {Rejection.DEAD_ZONE: 2})
 
@@ -1268,7 +1273,7 @@ class TestRejectedDetections(RigTrackerCase):
         self.seen(4.0, seconds_ago=1.5)
         self.assertEqual(self.rejected(), {Rejection.PAST_EDGE: 1})
         self.config.lost_timeout = 1.2
-        self.tracker._update_and_notify()
+        self.tracker._update_and_notify(time.perf_counter())
         self.assertEqual(self.rejected(), {})
 
     def test_off_means_off(self) -> None:
@@ -1439,8 +1444,8 @@ class TestNoStepAtHandover(RigTrackerCase):
                 in_field: bool = 0.0 < roi.x + roi.width / 2.0 < 1.0
                 self.tracker._add_tracklet(Tracklet(
                     cam_id=cam_id, roi=roi, external_id=1, external_age_in_frames=10,
-                    status=TrackingStatus.TRACKED if in_field else TrackingStatus.LOST))
-            self.tracker._update_and_notify()
+                    status=TrackingStatus.TRACKED if in_field else TrackingStatus.LOST, **stamps()))
+            self.tracker._update_and_notify(time.perf_counter())
             out = self.emitted[-1]
             self.assertEqual(set(out.keys()), {0})
             annotation = out[0].annotation

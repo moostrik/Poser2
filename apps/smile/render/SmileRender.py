@@ -55,7 +55,7 @@ class SmileRender(RenderBase):
         # the artist's credit: the QR code always, the caption over the grin and the result
         self._credit: CreditLayer = CreditLayer(settings)
         self._credit_alpha: float = 0.0
-        self._credit_time: float = time.time()
+        self._credit_time: float = time.perf_counter()
         self._credit_sequence: SequenceType = SequenceType.NONE
         # the operator's status line, drawn over the output while there is something to say
         self._status: StatusLayer = StatusLayer()
@@ -117,7 +117,7 @@ class SmileRender(RenderBase):
         stage.update(message)
 
         self._output = stage.output
-        self._render_credit(message.sequence_type, self.grab.due(time.time()))
+        self._render_credit(message.sequence_type, self.grab.due(time.perf_counter()))
         status: str | None = self._status_text
         if status:
             self._status.render(self._output, status)
@@ -133,7 +133,7 @@ class SmileRender(RenderBase):
         """The credit over the output; the copy without the QR code (`CreditLayer.clean`) is the phone's and the
         online cell's: rendered when `grab` takes it for the phone (the turn's last frame, `grab.clean`, without
         the caption too: the phone fades it out itself and keeps that frame) and while the online cell shows it."""
-        now: float = time.time()
+        now: float = time.perf_counter()
         if new_line_due(sequence_type, self._credit_sequence):
             self._credit.new_visitor()
         self._credit_sequence = sequence_type
@@ -170,7 +170,7 @@ class SmileRender(RenderBase):
     def _play_grin(self) -> None:
         """Show the grin frame that is due. Its first frame arrives during DIFFUSION and blends in as
         a generation step; DIFF_LOOP starts when the player starts playing."""
-        frame: np.ndarray | None = self.player.update(time.time())
+        frame: np.ndarray | None = self.player.update(time.perf_counter())
         if frame is not None:
             self.inputs.diffusion.set_image(frame)
         started: bool = self.player.plays != self._plays

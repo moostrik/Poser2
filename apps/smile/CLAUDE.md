@@ -30,7 +30,7 @@ automatic switch to the image. The Vimba backend's thread keeps the camera: `sta
 the thread searches again every 5 s while there is none and opens it again (user set, packet size, the
 panel's values) when no complete frame arrived for 5 s; the `device` readout follows its `connected`. Without the Vimba SDK
 the backend logs an error at start and stays unconnected. Every frame
-has the time it arrived (`Camera.frame()`, a device frame the time its backend stamped): the face finder gets new frames only and its faces carry
+has the time it arrived (`Camera.frame()`, on `time.perf_counter()` like every stamp and timer of the sequence; a device frame the time its backend stamped): the face finder gets new frames only and its faces carry
 that time, so a camera that stopped never charges on its last frame, and the render shows
 `no camera frames` as its status line after 3 s without one (`Camera.stalled`). The camera settings (`Settings.camera`, `cam/settings.py`)
 are the Vimba backend's `VimbaCameraSettings` with the app's source fields and the face settings

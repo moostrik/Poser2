@@ -40,7 +40,7 @@ class FakeDevice:
         self.callbacks.append(callback)
 
     def push(self, image: np.ndarray) -> None:
-        frame = CameraFrame(cam_id=0, kind=FrameType.VIDEO, image=image, time=time.time())
+        frame = CameraFrame(cam_id=0, kind=FrameType.VIDEO, image=image, time=time.perf_counter())
         for c in self.callbacks:
             c(frame)
 
@@ -107,7 +107,7 @@ class TestCamera(unittest.TestCase):
         self.assertEqual(self.camera.frame()[1], 0.0)      # no frame yet
         self.assertTrue(self.camera.stalled)
         frame = np.zeros((6, 8, 3), dtype=np.uint8)
-        before = time.time()
+        before = time.perf_counter()
         device.push(frame)
         image, arrived = self.camera.frame()
         self.assertIs(image, frame)

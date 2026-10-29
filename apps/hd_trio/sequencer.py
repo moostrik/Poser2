@@ -150,7 +150,7 @@ class Sequencer:
         self._notify_state(0.0)
 
     def _enter_stage(self) -> None:
-        self._stage_start = time.time()
+        self._stage_start = time.perf_counter()
         self.config.stage_progress = 0.0
         stage = self._playlist[self._pos]
         self.config.stage = stage
@@ -205,7 +205,7 @@ class Sequencer:
         if not self._active:
             return
 
-        elapsed = time.time() - self._stage_start
+        elapsed = time.perf_counter() - self._stage_start
         duration = self._stage_durations[self._pos]
 
         # Stage progress

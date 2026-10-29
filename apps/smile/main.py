@@ -217,10 +217,10 @@ class SmileMain():
             self.pick_style()
         if seq == SequenceType.FLASH and message.initial:
             self._style_picked = False
-            self._flash_time = time.time()
+            self._flash_time = time.perf_counter()
         if seq == SequenceType.DIFF_LOOP and message.initial:
             # the grin starts playing: the share clip gets the track from the point the room hears now
-            self.save.set_share(self.audio.track_path(), time.time() - self._flash_time)
+            self.save.set_share(self.audio.track_path(), time.perf_counter() - self._flash_time)
 
         audio = self.settings.audio
         if audio.osc.active:
@@ -239,7 +239,8 @@ class SmileMain():
             self.osc.send('/laughter_offset', audio.laughter_offset)
             # the test closes the gate of the clips' laughs in the patch; its own bangs pass that gate
             self.osc.send('/laughter_test', int(audio.laughter_test))
-        # the laughter test steps on the app clock too (the lights on the walls, the test bangs to Max)
+        # the laughter test steps on the app clock too (the lights on the walls, the test bangs to Max); this app clock
+        # is the wall clock: the scroller sends its times to the walls, which carry them onto perf_counter themselves
         now: float = time.time()
         self.screen_test.update(now)
         # and the scrolling name's passes, timed on the app clock too; not while the test lights the screens
@@ -267,7 +268,7 @@ class SmileMain():
 
             if ready:
                 self.diffuse.set_image(cap_image)
-                self._visitor_start = time.time()
+                self._visitor_start = time.perf_counter()
             else:
                 # ComfyUI went away during the flash: nobody would end it. The capture is the result
                 logger.warning('Generator not ready at the capture, ending the visitor')
@@ -317,7 +318,7 @@ class SmileMain():
         this only acts when its thread is stuck. Without it the flash, or the portrait, would stay."""
         if self._visitor_start is None:
             return
-        now: float = time.time()
+        now: float = time.perf_counter()
         grin = self.settings.pipeline.grin
         if not (SequenceType.CAPTURE <= seq <= SequenceType.DIFF_LOOP):
             self._visitor_start = None      # ended

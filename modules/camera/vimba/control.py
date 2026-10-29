@@ -10,7 +10,7 @@ value with auto off and the camera's with auto on; the values in use are read ba
 
 import logging
 from threading import Event, Lock
-from time import monotonic
+from time import perf_counter
 from typing import Any, Callable
 
 from .settings import VimbaCameraSettings
@@ -61,7 +61,7 @@ class SensorControl:
     def count_frame(self, complete: bool = True) -> None:
         """A frame arrived from the camera (any thread): counted for the frame rate readout, or as
         dropped when it is incomplete (network packets lost) and skipped."""
-        now: float = monotonic()
+        now: float = perf_counter()
         with self._frames_lock:
             if complete:
                 self._frames += 1
@@ -96,7 +96,7 @@ class SensorControl:
 
     def _read_actual(self, camera: Any) -> None:
         """The frame rate, and the exposure, gain and white balance the camera uses now, for the panel."""
-        now: float = monotonic()
+        now: float = perf_counter()
         if now < self._read_next:
             return
         self._read_next = now + READ_INTERVAL
@@ -142,7 +142,7 @@ class SensorControl:
         if self._measure.is_set():
             self._measure.clear()
             if self._set(camera, 'BalanceWhiteAuto', 'Once'):
-                self._measure_end = monotonic() + MEASURE_TIMEOUT
+                self._measure_end = perf_counter() + MEASURE_TIMEOUT
         if self._measure_end is not None:
             self._measuring(camera)
             return
@@ -159,7 +159,7 @@ class SensorControl:
             self._problem('BalanceWhiteAuto', f'not readable: {e}')
             done = True
         if not done:
-            if self._measure_end is None or monotonic() < self._measure_end:
+            if self._measure_end is None or perf_counter() < self._measure_end:
                 return
             logger.warning('Camera white balance did not settle in %.0f s', MEASURE_TIMEOUT)
             self._set(camera, 'BalanceWhiteAuto', 'Off')
@@ -180,7 +180,7 @@ class SensorControl:
         not counted as applied: it is tried again, at the pace of the reads."""
         if self._applied.get(key) == value:
             return
-        now: float = monotonic()
+        now: float = perf_counter()
         if now < self._retry.get(key, 0.0):
             return
         if write(value):

@@ -59,6 +59,12 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Treat callback registration and dispatch as thread-sensitive
 - Avoid heavy pure-Python loops in hot paths; they hold the GIL, while numpy, ONNX Runtime, OpenGL and depthai release it
 
+## Time
+
+- Read `time.perf_counter()` for every stamp and duration; `time.time()` and `monotonic()` step 15.6 ms on Windows, coarser than a frame
+- Stamp a frame once, where the backend hands it over, and take time from the frame or the tick downstream instead of reading a clock
+- Use the wall clock only for file names and log lines
+
 ## Performance
 
 - Treat latency as a first-order concern

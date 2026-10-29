@@ -205,16 +205,16 @@ class Camera(Thread):
             with camera:
                 camera.start_streaming(handler=self._frame_handler, buffer_count=5, allocation_mode=AllocationMode.AllocAndAnnounceFrame)
                 try:
-                    last_frame: float = time.monotonic()
+                    last_frame: float = time.perf_counter()
                     while self.running:
                         frame: np.ndarray | None = self._take_frame()
                         if frame is not None:
-                            last_frame = time.monotonic()
+                            last_frame = time.perf_counter()
                             if self._problem:
                                 logger.info('Vimba camera delivers frames again (packet size %d)', self._packet_size)
                                 self._problem = ''
                             self._emit(frame)
-                        elif time.monotonic() - last_frame > FRAME_TIMEOUT:
+                        elif time.perf_counter() - last_frame > FRAME_TIMEOUT:
                             self._warn(f'no complete frame for {FRAME_TIMEOUT:.0f} s, opening the camera again')
                             return
 
@@ -270,8 +270,8 @@ class Camera(Thread):
                 self._frame = image
                 self._frame_new = True
         except Exception as e:
-            if time.monotonic() - self._grab_error_time > GRAB_LOG_INTERVAL:
-                self._grab_error_time = time.monotonic()
+            if time.perf_counter() - self._grab_error_time > GRAB_LOG_INTERVAL:
+                self._grab_error_time = time.perf_counter()
                 logger.warning('Vimba camera: failed to grab a frame: %s', e)
         finally:
             try:
@@ -295,6 +295,6 @@ class Camera(Thread):
             image = cv2.flip(image, 0)
         if self.settings.flip_h:
             image = cv2.flip(image, 1)
-        frame = CameraFrame(cam_id=self.id, kind=FrameType.VIDEO, image=image, time=time.time())
+        frame = CameraFrame(cam_id=self.id, kind=FrameType.VIDEO, image=image, time=time.perf_counter())
         for callback in self.frame_callbacks:
             callback(frame)

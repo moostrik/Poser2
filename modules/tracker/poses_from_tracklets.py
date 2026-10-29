@@ -60,8 +60,9 @@ class PosesFromTracklets(FrameDictCallbackMixin):
                 else:
                     self._tracklets[track_id] = None
 
-    def process(self) -> FrameDict:
-        """Generate poses from all ready tracklets.
+    def process(self, now: float) -> FrameDict:
+        """Generate poses from all ready tracklets; `now` is the time of the frame bang that asks,
+        the clock a latched box's age is judged on.
 
         Returns:
             Dictionary of track_id -> Frame for tracks with valid tracklets
@@ -77,7 +78,7 @@ class PosesFromTracklets(FrameDictCallbackMixin):
         detection_timeout: float = self._config.detection_timeout
 
         for track_id, tracklet in tracklets_snapshot.items():
-            if tracklet is None or tracklet.is_expired(detection_timeout):
+            if tracklet is None or tracklet.is_expired(now, detection_timeout):
                 continue
 
             try:
@@ -106,11 +107,11 @@ class PosesFromTracklets(FrameDictCallbackMixin):
 
         return generated_poses
 
-    def is_ready(self) -> bool:
-        """Return True if at least one tracklet is ready for generation."""
+    def is_ready(self, now: float) -> bool:
+        """Return True if at least one tracklet is ready for generation at `now`."""
         detection_timeout: float = self._config.detection_timeout
         with self._lock:
-            return any(tracklet is not None and not tracklet.is_expired(detection_timeout)
+            return any(tracklet is not None and not tracklet.is_expired(now, detection_timeout)
                        for tracklet in self._tracklets.values())
 
     def reset(self) -> None:

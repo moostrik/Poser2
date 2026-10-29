@@ -6,13 +6,13 @@ the middle kept, no distortion); the device only rotates and flips. A missing de
 and the `device` readout says `none`; there is no automatic fallback to the image, so a failed
 camera on site stays visible. The device is kept when it did not connect: one that keeps trying
 (Vimba) delivers when it is there, and the readout follows it. Every frame has the time it arrived
-(`frame()`: a device frame the time its backend stamped), so a source that stopped is told from one
-that delivers (`stalled`)."""
+(`frame()`, on `time.perf_counter()`, the one clock of the frames and the sequence: a device frame the time
+its backend stamped), so a source that stopped is told from one that delivers (`stalled`)."""
 
 import logging
 import os
 from threading import Lock, Thread
-from time import sleep, time
+from time import perf_counter, sleep
 from typing import Any, Callable
 
 import cv2
@@ -114,7 +114,7 @@ class Camera:
     def stalled(self) -> bool:
         """No frame for a while (or none yet): no device, a camera that stopped, or no image to show."""
         with self._mutex:
-            return time() - self._frame_time > STALLED_AFTER
+            return perf_counter() - self._frame_time > STALLED_AFTER
 
     def add_frame_callback(self, callback: FrameCallback) -> None:
         with self._mutex:
@@ -145,7 +145,7 @@ class Camera:
         """A frame of the online source: fitted like any other; dropped while the source is off."""
         if not self._online:
             return
-        self._emit(cover(frame, self._width, self._height), time())
+        self._emit(cover(frame, self._width, self._height), perf_counter())
 
     def _run(self) -> None:
         # the image source: emitted at its own rate while it is in use
@@ -153,7 +153,7 @@ class Camera:
             self._show_device()
             image: np.ndarray | None = self._image
             if self.settings.use_image and image is not None and not self._online:
-                self._emit(image, time())
+                self._emit(image, perf_counter())
                 sleep(1.0 / IMAGE_FPS)
             else:
                 sleep(0.01)

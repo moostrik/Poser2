@@ -251,7 +251,7 @@ class Compositor(LayerBase):
             reacquire_angle=self._tracker.reacquire_angle,
             zone_max_radius=self._tracker.rig.zone_max_radius,
             lost_timeout=self._tracker.lost_timeout,
-            now=time.time(),
+            now=time.perf_counter(),
         )
         marks: list[Mark] = build_marks(
             observations, primaries, self._color_settings.track_color_tuples, REJECTED_COLOR,

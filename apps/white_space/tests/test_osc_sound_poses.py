@@ -36,20 +36,20 @@ class SoundPosesTest(unittest.TestCase):
         return _messages(lambda b: self.sender._add_active_frame_messages(b, frame, {ID: frame}, self.settings.max_players))
 
     def test_the_distance_is_sent_as_it_is_on_the_frame(self) -> None:
-        frame = Frame(ID, 0, features={Azimuth: Azimuth.from_value(1.0), Distance: Distance.from_value(0.25)})
+        frame = Frame(ID, 0, 0.0, features={Azimuth: Azimuth.from_value(1.0), Distance: Distance.from_value(0.25)})
         messages = self._active(frame)
         self.assertAlmostEqual(messages[f"/pose/{ID}/distance"][0], 0.25, places=6)
         self.assertAlmostEqual(messages[f"/pose/{ID}/azimuth"][0], 1.0, places=6)
 
     def test_without_a_reading_the_distance_is_nan(self) -> None:
-        messages = self._active(Frame(ID, 0))
+        messages = self._active(Frame(ID, 0, 0.0))
         self.assertTrue(math.isnan(messages[f"/pose/{ID}/distance"][0]))     # as the azimuth is without one
 
     def test_the_arm_entries_of_the_angles_are_the_joints_travel_times_pi(self) -> None:
         angles = np.full(len(AngleLandmark), 0.3, dtype=np.float32)
         travel = np.array([0.0, 1.0, -0.5, np.nan, 0.6, np.nan, np.nan], dtype=np.float32)
         scores = np.array([1.0, 1.0, 1.0, 0.0, 1.0, 0.0, 0.0], dtype=np.float32)
-        frame = Frame(ID, 0, features={
+        frame = Frame(ID, 0, 0.0, features={
             Angles: Angles(angles, np.ones(len(AngleLandmark), dtype=np.float32)),
             ArmTravel: ArmTravel(travel, scores),
         })
@@ -64,7 +64,7 @@ class SoundPosesTest(unittest.TestCase):
 
     def test_the_arms_and_the_difference_are_sent_as_on_the_frame(self) -> None:
         travel = np.array([0.0, 0.5, 0.0, 1.0, 0.25, 0.5, 0.375], dtype=np.float32)
-        frame = Frame(ID, 0, features={
+        frame = Frame(ID, 0, 0.0, features={
             ArmTravel: ArmTravel(travel, np.ones(len(TravelElement), dtype=np.float32)),
             ShoulderDifference: ShoulderDifference.from_value(-0.5),
         })
@@ -73,7 +73,7 @@ class SoundPosesTest(unittest.TestCase):
         self.assertAlmostEqual(messages[f"/pose/{ID}/shoulder/difference"][0], -0.5, places=6)
 
     def test_without_the_features_the_arms_and_the_difference_are_zero(self) -> None:
-        messages = self._active(Frame(ID, 0))
+        messages = self._active(Frame(ID, 0, 0.0))
         self.assertEqual(messages[f"/pose/{ID}/arm"], (0.0, 0.0, 0.0))
         self.assertEqual(messages[f"/pose/{ID}/shoulder/difference"], (0.0,))
 
@@ -84,7 +84,7 @@ class SoundPosesTest(unittest.TestCase):
 
     def test_without_a_travel_the_angles_go_out_as_they_are(self) -> None:
         angles = np.full(len(AngleLandmark), 0.3, dtype=np.float32)
-        frame = Frame(ID, 0, features={Angles: Angles(angles, np.ones(len(AngleLandmark), dtype=np.float32))})
+        frame = Frame(ID, 0, 0.0, features={Angles: Angles(angles, np.ones(len(AngleLandmark), dtype=np.float32))})
         sent = self._active(frame)[f"/pose/{ID}/angle/rad"]
         self.assertAlmostEqual(sent[0], 0.3, places=6)
 
