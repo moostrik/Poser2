@@ -20,7 +20,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class SimulatorSettings(BaseSettings):
+class PlayerSettings(BaseSettings):
 
     # ── Initial settings ───────────────────────────────────────────────
     num_cams:        Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
@@ -84,10 +84,10 @@ class Folder():
 FolderDict = Dict[str, Folder]
 
 class Player(Thread):
-    def __init__(self, settings: SimulatorSettings, data_path: str = "", gray: bool = False) -> None:
+    def __init__(self, settings: PlayerSettings, data_path: str = "", gray: bool = False) -> None:
         """``gray``: the consuming pipeline is mono, so video decodes straight to gray."""
         super().__init__()
-        self.settings: SimulatorSettings = settings
+        self.settings: PlayerSettings = settings
         self.data_path: str = data_path
         self.gray: bool = gray
         self.num_cams: int = settings.num_cams
@@ -135,13 +135,13 @@ class Player(Thread):
         self._gui_update_time: float = 0.0
 
         # Bind player settings callbacks
-        self.settings.bind(SimulatorSettings.start, self._on_start)
-        self.settings.bind(SimulatorSettings.stop, self._on_stop)
-        self.settings.bind(SimulatorSettings.folder, self._on_folder_changed)
-        self.settings.bind(SimulatorSettings.start_norm, self._on_range_changed)
-        self.settings.bind(SimulatorSettings.end_norm, self._on_range_changed)
-        self.settings.bind(SimulatorSettings.refresh, self._on_refresh_path)
-        self.settings.bind(SimulatorSettings.video_path, self._on_refresh_path)
+        self.settings.bind(PlayerSettings.start, self._on_start)
+        self.settings.bind(PlayerSettings.stop, self._on_stop)
+        self.settings.bind(PlayerSettings.folder, self._on_folder_changed)
+        self.settings.bind(PlayerSettings.start_norm, self._on_range_changed)
+        self.settings.bind(PlayerSettings.end_norm, self._on_range_changed)
+        self.settings.bind(PlayerSettings.refresh, self._on_refresh_path)
+        self.settings.bind(PlayerSettings.video_path, self._on_refresh_path)
 
     def stop(self) -> None:
         self._set_play_chunk(-1)
@@ -431,7 +431,7 @@ class Player(Thread):
 
     # STATIC METHODS
     @staticmethod
-    def _get_video_folders(settings: SimulatorSettings, data_path: str = "") -> FolderDict:
+    def _get_video_folders(settings: PlayerSettings, data_path: str = "") -> FolderDict:
         folders: FolderDict = {}
         video_path: Path = Path(data_path) / settings.video_path
         if not video_path.is_dir():

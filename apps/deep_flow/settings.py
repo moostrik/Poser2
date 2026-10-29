@@ -13,7 +13,7 @@ from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.panel import PanelSettings
-from modules.camera import CameraCheckSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.camera import CameraCheckSettings, CameraResolution, PlayerSettings, RecorderSettings, SyncSettings
 from modules.camera.oak import OakCameraSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
@@ -98,7 +98,7 @@ class OakGroup(BaseSettings):
     _cam_share = [fps, color, square, yolo, resolution, model_path, fov]
     cam_0         = Group(OakCameraSettings, share=_cam_share)
     camera_check  = Group(CameraCheckSettings)
-    simulator     = Group(SimulatorSettings, share=[num_cams, fps])
+    simulator     = Group(PlayerSettings, share=[num_cams, fps])
     person_detector = Group(inference.detection.Settings)   # the replay backend's person detector
     recorder      = Group(RecorderSettings, share=[num_cams, fps, keyframe_interval])
     tracker       = Group(OnePerCamTrackerSettings)

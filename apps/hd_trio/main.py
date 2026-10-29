@@ -13,7 +13,7 @@ from modules.panel import PanelServer
 from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict, Recorder as PoseRecorder, RecorderSettings as PoseRecorderSettings
-from modules.inference import source, crop, pose, segmentation, detection
+from modules.inference import pose, segmentation, detection, CropExtractor, Uploader
 from modules.session import Session, SessionSettings, SequencerState
 from modules.gl import WindowSettings
 
@@ -99,8 +99,8 @@ class HDTrioMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.image_uploader = source.Uploader()
-        self.crop_extractor = crop.Extractor(ps.image_crop)
+        self.image_uploader = Uploader()
+        self.crop_extractor = CropExtractor(ps.image_crop)
 
         for camera in self.cameras:
             camera.add_frame_callback(self.video_recorder.submit_frame)

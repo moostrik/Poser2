@@ -20,7 +20,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-Segmentation = Union[RunnerONNX, "RunnerTRT"]
+SegmentationRunner = Union[RunnerONNX, "RunnerTRT"]
 
 
 class Predictor:
@@ -39,12 +39,12 @@ class Predictor:
 
     def __init__(self, settings: Settings):
         # One runner per model type; TensorRT is imported only when it is used.
-        self._segmentation: Segmentation
+        self._runner: SegmentationRunner
         if settings.model_type is ModelType.TRT:
             from .runner_trt import RunnerTRT
-            self._segmentation = RunnerTRT(settings)
+            self._runner = RunnerTRT(settings)
         else:
-            self._segmentation = RunnerONNX(settings)
+            self._runner = RunnerONNX(settings)
         self._lock: Lock = Lock()
         self._batch_counter: int = 0
         self._verbose: bool = settings.verbose
@@ -54,7 +54,7 @@ class Predictor:
         self._callback_lock: Lock = Lock()
 
         # Pending frames awaiting segmentation results, keyed by batch_id
-        self._pending_frames: dict[int, tuple[FrameDict, crop.ImageDict]] = {}
+        self._pending_frames: dict[int, tuple[FrameDict, crop.CropImageDict]] = {}
 
         # Active track ids, for detecting removed tracks
         self._previous_track_ids: set[int] = set()
@@ -64,24 +64,24 @@ class Predictor:
         self._wait_timer =      PerformanceTimer(name="RVM Wait        ", sample_count=1000, report_interval=100, color='cyan', omit_init=25)
         self._settings: Settings = settings
 
-        self._segmentation.add_segmentation_callback(self._on_segmentation_result)
+        self._runner.add_segmentation_callback(self._on_segmentation_result)
 
     def start(self) -> None:
         """Start the segmentation processing thread."""
-        self._segmentation.start()
+        self._runner.start()
 
     def stop(self) -> None:
         """Stop the segmentation processing thread."""
-        self._segmentation.stop()
+        self._runner.stop()
 
-    def submit(self, poses: FrameDict, crop_frames: crop.ImageDict) -> None:
+    def submit(self, poses: FrameDict, crops: crop.CropImageDict) -> None:
         """Submit poses with GPU images for async processing. Results broadcast via callbacks.
 
         Args:
             poses: Dictionary of poses keyed by track id
-            crop_frames: Crop frames with crops already on GPU, keyed by track id
+            crops: Crop images already on GPU, keyed by track id
         """
-        if not self._segmentation.is_ready:
+        if not self._runner.is_ready:
             return
         if not self._settings.enabled:
             return
@@ -90,9 +90,9 @@ class Predictor:
         gpu_image_list: list = []  # list[cp.ndarray]
 
         for track_id in poses.keys():
-            if track_id in crop_frames:
+            if track_id in crops:
                 track_ids.append(track_id)
-                gpu_image_list.append(crop_frames[track_id].crop)
+                gpu_image_list.append(crops[track_id].crop)
 
         # If no crops available, forward frames without segmentation to maintain data flow
         if not gpu_image_list:
@@ -102,9 +102,9 @@ class Predictor:
         with self._lock:
             self._batch_counter += 1
             batch_id: int = self._batch_counter
-            self._pending_frames[batch_id] = (poses, crop_frames)
+            self._pending_frames[batch_id] = (poses, crops)
 
-        self._segmentation.submit(SegmentationInput(
+        self._runner.submit(SegmentationInput(
             batch_id=batch_id,
             gpu_images=gpu_image_list,
             track_ids=track_ids
@@ -123,7 +123,7 @@ class Predictor:
         if pending is None:
             return
 
-        poses, crop_frames = pending
+        poses, crops = pending
 
         # If batch was dropped or no masks, forward empty dict to maintain data flow
         if not output.processed or output.mask_tensor is None or output.fgr_tensor is None:

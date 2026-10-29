@@ -30,7 +30,7 @@ from modules.utils import PerformanceTimer, timing
 
 from .. import ModelType
 from ..optical_flow.io import OpticalFlowInput
-from ..pose.io import DetectionInput
+from ..pose.io import PoseInput
 from ..segmentation.io import SegmentationInput
 
 logger = logging.getLogger(__name__)
@@ -63,7 +63,7 @@ def _flow_output(output: Any) -> dict[str, np.ndarray]:
 
 MODELS: list[Model] = [
     Model('pose',
-          lambda batch_id, crops, _prev: DetectionInput(batch_id=batch_id, gpu_images=crops), _pose_output,
+          lambda batch_id, crops, _prev: PoseInput(batch_id=batch_id, gpu_images=crops), _pose_output,
           lambda runner, callback: runner.add_pose_callback(callback)),
     Model('segmentation',
           lambda batch_id, crops, _prev: SegmentationInput(batch_id=batch_id, gpu_images=crops,

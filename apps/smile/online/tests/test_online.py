@@ -8,7 +8,7 @@ from unittest import mock
 
 import numpy as np
 
-from modules.face import FaceFrame, FaceObservation, Pose, Rejection
+from modules.face import FaceFrame, FaceObservation, HeadPose, Rejection
 from apps.smile.online.Online import ASK_TIMEOUT, INSIDE, LOOKING, SAVE_TIMEOUT, Online, Phase, face_message
 from apps.smile.online.settings import OnlineSettings
 from apps.smile.render.Sequencer import SeqenceMessage, SequenceType
@@ -86,7 +86,7 @@ class FakeCamera:
 
 def observation(distance: float = 0.0, rejection: Rejection | None = None, subject: bool = True) -> FaceObservation:
     return FaceObservation(bbox=(0.3, 0.3, 0.7, 0.7), crop=(0.2, 0.1, 0.8, 0.85), kps=(), score=0.9, eye_dist=0.1, edge=0.1,
-                           pose=Pose(0.0, 0.0, 0.0, 0.5), eyes=0.3, rejection=rejection, limit=20.0 if rejection else 0.0,
+                           pose=HeadPose(0.0, 0.0, 0.0, 0.5), eyes=0.3, rejection=rejection, limit=20.0 if rejection else 0.0,
                            distance=distance, subject=subject)
 
 

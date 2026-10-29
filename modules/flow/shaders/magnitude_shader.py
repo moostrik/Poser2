@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class Magnitude(Shader):
+class MagnitudeShader(Shader):
     """Compute vector magnitude from texture."""
 
     def use(self, src: Texture) -> None:

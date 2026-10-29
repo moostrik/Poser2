@@ -18,7 +18,7 @@ from .runner_onnx import RunnerONNX, OpticalFlowInput, OpticalFlowOutput
 if TYPE_CHECKING:
     from .runner_trt import RunnerTRT
 
-OpticalFlow = Union[RunnerONNX, "RunnerTRT"]
+OpticalFlowRunner = Union[RunnerONNX, "RunnerTRT"]
 
 FlowDict: TypeAlias = dict[int, torch.Tensor]
 FlowCallback: TypeAlias = Callable[[FlowDict], None]
@@ -40,12 +40,12 @@ class Predictor:
 
     def __init__(self, settings: Settings):
         # One runner per model type; TensorRT is imported only when it is used.
-        self._optical_flow: OpticalFlow
+        self._runner: OpticalFlowRunner
         if settings.model_type is ModelType.TRT:
             from .runner_trt import RunnerTRT
-            self._optical_flow = RunnerTRT(settings)
+            self._runner = RunnerTRT(settings)
         else:
-            self._optical_flow = RunnerONNX(settings)
+            self._runner = RunnerONNX(settings)
         self._lock = Lock()
         self._batch_counter: int = 0
         self._verbose: bool = settings.verbose
@@ -58,7 +58,7 @@ class Predictor:
         self._callback_lock = Lock()
         self._settings: Settings = settings
 
-        self._optical_flow.add_flow_callback(self._on_optical_flow_result)
+        self._runner.add_flow_callback(self._on_optical_flow_result)
 
     def add_flow_callback(self, callback: FlowCallback) -> None:
         with self._callback_lock:
@@ -80,20 +80,20 @@ class Predictor:
 
     def start(self) -> None:
         """Start the optical flow processing thread."""
-        self._optical_flow.start()
+        self._runner.start()
 
     def stop(self) -> None:
         """Stop the optical flow processing thread."""
-        self._optical_flow.stop()
+        self._runner.stop()
 
-    def submit(self, poses: FrameDict, crop_frames: crop.ImageDict) -> None:
+    def submit(self, poses: FrameDict, crops: crop.CropImageDict) -> None:
         """Submit batch for async processing. Results broadcast via callbacks.
 
         Args:
             poses: Dictionary of poses keyed by track id
-            crop_frames: Crop frames with crop and prev_crop tensors, keyed by track id
+            crops: Crop images with crop and prev_crop tensors, keyed by track id
         """
-        if not self._optical_flow.is_ready:
+        if not self._runner.is_ready:
             return
         if not self._settings.enabled:
             return
@@ -102,8 +102,8 @@ class Predictor:
         pair_list: list[tuple[torch.Tensor, torch.Tensor]] = []
 
         for track_id in poses.keys():
-            if track_id in crop_frames:
-                crop_frame = crop_frames[track_id]
+            if track_id in crops:
+                crop_frame = crops[track_id]
                 # Only add if prev_crop and crop exist (need both frames for optical flow)
                 if crop_frame.prev_crop is not None:
                     track_id_list.append(track_id)
@@ -118,7 +118,7 @@ class Predictor:
             self._batch_counter += 1
             batch_id: int = self._batch_counter
 
-        self._optical_flow.submit(OpticalFlowInput(
+        self._runner.submit(OpticalFlowInput(
             batch_id=batch_id,
             gpu_image_pairs=pair_list,
             track_ids=track_id_list

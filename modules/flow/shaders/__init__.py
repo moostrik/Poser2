@@ -11,7 +11,7 @@ from .clamp import Clamp
 from .dampen import Dampen
 from .gaussian_blur import GaussianBlur
 from .hsv import HSV
-from .magnitude import Magnitude
+from .magnitude_shader import MagnitudeShader
 from .normalize import Normalize
 from .set import Set
 from .set_region import SetRegion

@@ -9,7 +9,7 @@ import depthai as dai
 import numpy as np
 from cv2 import resize, COLOR_BGR2GRAY, cvtColor
 
-from .. import FrameType, Player, SimulatorSettings, frame_size, mode_size
+from .. import FrameType, Player, PlayerSettings, frame_size, mode_size
 
 from .camera import Camera
 from .pipeline import build_pipeline, CLIPS_STREAM
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 class Simulator(Camera):
 
-    def __init__(self, player: Player, settings: OakCameraSettings, player_settings: SimulatorSettings) -> None:
+    def __init__(self, player: Player, settings: OakCameraSettings, player_settings: PlayerSettings) -> None:
         super().__init__(settings)
 
         self.player: Player = player

@@ -1,4 +1,4 @@
-"""Does a detected face qualify for a portrait? Pose from the detector's 5 keypoints, eye openness
+"""Does a detected face qualify for a portrait? Head pose from the detector's 5 keypoints, eye openness
 from the 106 landmarks; the first failing check is the face's rejection. Pure arithmetic: no model,
 no thread, no settings object, so it is testable with synthetic points."""
 
@@ -21,7 +21,7 @@ class Rejection(IntEnum):
 
 
 @dataclass(frozen=True)
-class Pose:
+class HeadPose:
     yaw: float          # degrees, positive when the nose moves to the image right
     pitch: float        # degrees, positive when looking up
     roll: float         # degrees, the eye line's angle, positive clockwise in the image
@@ -37,7 +37,7 @@ class FaceObservation:
     score: float
     eye_dist: float                             # distance between the eyes relative to the image width
     edge: float                                 # distance of the portrait crop from the nearest image edge, relative to the crop width; negative past it
-    pose: Pose
+    pose: HeadPose
     eyes: float | None                          # openness of the less open eye, None if not measured
     rejection: Rejection | None
     limit: float                                # the setting the failed check compared to; 0 when accepted
@@ -51,7 +51,7 @@ class FaceObservation:
 
 def readout(face: FaceObservation) -> str:
     """The measured values, in the panel's names: `conf 0.92 eyes 0.06 edge 0.05 yaw 4 pitch -6 roll 2 open 0.34`."""
-    p: Pose = face.pose
+    p: HeadPose = face.pose
     open_: str = '-' if face.eyes is None else f'{face.eyes:.2f}'
     return f'conf {face.score:.2f} eyes {face.eye_dist:.2f} edge {face.edge:.2f} yaw {p.yaw:.0f} pitch {p.pitch:.0f} roll {p.roll:.0f} open {open_}'
 
@@ -59,7 +59,7 @@ def readout(face: FaceObservation) -> str:
 def rejection_label(face: FaceObservation) -> str:
     """Why the face was rejected, in the panel's names: the value measured and the limit it missed,
     e.g. `yaw 32 > 20` (an angle keeps its sign: `yaw -32 > 20` is beyond 20 the other way)."""
-    p: Pose = face.pose
+    p: HeadPose = face.pose
     if face.rejection is None:
         return ''
     if face.rejection == Rejection.LOW_SCORE:
@@ -100,7 +100,7 @@ def _derolled(points: np.ndarray, roll: float, origin: np.ndarray) -> np.ndarray
     return (points - origin) @ matrix.T + origin
 
 
-def head_pose(kps: np.ndarray, neutral: float = NOSE_NEUTRAL) -> Pose:
+def head_pose(kps: np.ndarray, neutral: float = NOSE_NEUTRAL) -> HeadPose:
     """Yaw, pitch and roll from the 5 keypoints: the eye line gives the roll; with the roll undone,
     the nose tip's offset between the eyes gives the yaw and its height between the eye line and
     the mouth line gives the pitch, zero at `neutral`. Approximate degrees: the face proportions
@@ -122,7 +122,7 @@ def head_pose(kps: np.ndarray, neutral: float = NOSE_NEUTRAL) -> Pose:
     face_height: float = max(1e-6, float(mouth_mid[1] - eye_mid[1]))
     nose_ratio: float = float(nose[1] - eye_mid[1]) / face_height
     pitch: float = math.degrees(math.atan((neutral - nose_ratio) / NOSE_DEPTH_PITCH))
-    return Pose(yaw, pitch, roll, nose_ratio)
+    return HeadPose(yaw, pitch, roll, nose_ratio)
 
 
 def eye_openness(landmarks: np.ndarray, roll: float) -> float:
@@ -142,7 +142,7 @@ def eye_distance(kps: np.ndarray) -> float:
     return float(np.linalg.norm(np.asarray(kps[1], dtype=np.float64) - np.asarray(kps[0], dtype=np.float64)))
 
 
-def gate(score: float, eye_dist: float, edge: float, pose: Pose, confidence: float, eye_min: float, crop_margin: float,
+def gate(score: float, eye_dist: float, edge: float, pose: HeadPose, confidence: float, eye_min: float, crop_margin: float,
          max_yaw: float, max_pitch: float, max_roll: float) -> Rejection | None:
     """The checks before the eyes, in order; None when the face passes them all."""
     if score < confidence:
@@ -164,7 +164,7 @@ def gate(score: float, eye_dist: float, edge: float, pose: Pose, confidence: flo
 REJECTED_FLOOR: float = 0.2
 
 
-def distance(score: float, eye_dist: float, edge: float, pose: Pose, eyes: float | None, confidence: float, eye_min: float,
+def distance(score: float, eye_dist: float, edge: float, pose: HeadPose, eyes: float | None, confidence: float, eye_min: float,
              crop_margin: float, max_yaw: float, max_pitch: float, max_roll: float, eye_open: float, falloff: float) -> float:
     """How far a face is from qualifying: 0 when it passes every check, REJECTED_FLOOR just past a
     limit, 1 when its worst check is `falloff` times the limit past it (1: twice a maximum, or zero

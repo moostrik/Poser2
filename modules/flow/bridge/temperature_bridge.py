@@ -18,7 +18,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture, SwapFbo
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil
-from .shaders.temperature_bridge import TemperatureBridge as TemperatureBridgeShader
+from .shaders import TemperatureBridgeShader
 
 
 class TemperatureBridgeSettings(BaseSettings):

@@ -9,7 +9,7 @@ from modules.gl import Fbo, Texture, Blit
 
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil
-from .shaders import Luminance, MergeRGB, OpticalFlow as OpticalFlowShader, OpticalFlowMM as OpticalFlowMMShader
+from .shaders import Luminance, MergeRGB, OpticalFlowShader, OpticalFlowMM as OpticalFlowMMShader
 
 from modules.utils import HotReloadMethods
 

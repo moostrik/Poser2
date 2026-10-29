@@ -10,4 +10,4 @@ from .geometry import       CameraResolution, RESOLUTION_SIZES, MONO_RESOLUTIONS
                             warp_mesh_points, frame_coverage, coverage_summary, orientation_from_gravity
 from .sync import           Sync, SyncSettings
 from .recorder import       Recorder, RecorderSettings, make_file_name, make_folder_name
-from .player import         Player, SimulatorSettings, ClipFrameCallback
+from .player import         Player, PlayerSettings, ClipFrameCallback

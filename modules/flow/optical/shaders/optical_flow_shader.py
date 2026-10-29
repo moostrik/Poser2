@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class OpticalFlow(Shader):
+class OpticalFlowShader(Shader):
     """Compute optical flow velocity field between two luminance frames."""
 
     def use(self, curr_tex: Texture, prev_tex: Texture,

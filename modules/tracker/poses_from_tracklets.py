@@ -100,7 +100,7 @@ class PosesFromTracklets(FrameDictCallbackMixin):
                 )
             except Exception as e:
                 logger.error(
-                    f"PoseFromTrackletGenerator: Error generating pose "
+                    f"PosesFromTracklets: Error generating pose "
                     f"{track_id}: {e}"
                 )
         self._notify_frames_callbacks(generated_poses)

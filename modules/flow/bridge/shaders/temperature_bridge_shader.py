@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class TemperatureBridge(Shader):
+class TemperatureBridgeShader(Shader):
     """Temperature bridge: interprets RGB as warm/neutral/cold × mask."""
 
     def use(self, color: Texture, mask: Texture, scale: float) -> None:

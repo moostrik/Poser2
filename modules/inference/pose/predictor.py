@@ -5,7 +5,7 @@ from modules.pose import Points2D, FrameDictCallbackMixin, replace, FrameDict
 from .settings import Settings
 from modules.utils import PerformanceTimer
 
-from .io import DetectionInput, DetectionOutput
+from .io import PoseInput, PoseOutput
 from .runner_onnx import RunnerONNX
 
 if TYPE_CHECKING:
@@ -14,13 +14,13 @@ if TYPE_CHECKING:
 import logging
 logger = logging.getLogger(__name__)
 
-Detection = Union[RunnerONNX, "RunnerTRT"]
+PoseRunner = Union[RunnerONNX, "RunnerTRT"]
 
 class Predictor(FrameDictCallbackMixin):
     """GPU-based batch extractor for 2D pose points using RTMPose detection.
 
     Batches are processed asynchronously on GPU. Under load, pending batches may
-    be dropped by the Detection queue to maintain real-time performance. Dropped
+    be dropped by the runner's queue to maintain real-time performance. Dropped
     batches do not emit callbacks - only successfully processed batches are broadcast.
 
     This design prioritizes low latency over data completeness, making it suitable
@@ -30,12 +30,12 @@ class Predictor(FrameDictCallbackMixin):
     def __init__(self, settings: Settings):
         super().__init__()
         # One runner per model type; TensorRT is imported only when it is used.
-        self._detection: Detection
+        self._runner: PoseRunner
         if settings.model_type is ModelType.ONNX:
-            self._detection = RunnerONNX(settings)
+            self._runner = RunnerONNX(settings)
         else:
             from .runner_trt import RunnerTRT
-            self._detection = RunnerTRT(settings)
+            self._runner = RunnerTRT(settings)
 
         self._lock = Lock()
         self._batch_counter: int = 0
@@ -47,24 +47,24 @@ class Predictor(FrameDictCallbackMixin):
         self._verbose: bool = settings.verbose
         self._settings: Settings = settings
 
-        self._detection.add_pose_callback(self._on_detection_result)
+        self._runner.add_pose_callback(self._on_pose_result)
 
     def start(self) -> None:
         """Start the detection processing thread."""
-        self._detection.start()
+        self._runner.start()
 
     def stop(self) -> None:
         """Stop the detection processing thread."""
-        self._detection.stop()
+        self._runner.stop()
 
-    def submit(self, poses: FrameDict, crop_frames: crop.ImageDict) -> None:
+    def submit(self, poses: FrameDict, crops: crop.CropImageDict) -> None:
         """Submit poses with GPU images for async processing. Results broadcast via callbacks.
 
         Args:
             poses: Dictionary of poses keyed by track id
-            crop_frames: Crop frames with crops already on GPU, keyed by track id
+            crops: Crop images already on GPU, keyed by track id
         """
-        if not self._detection.is_ready:
+        if not self._runner.is_ready:
             return
         if not self._settings.enabled:
             return
@@ -73,19 +73,19 @@ class Predictor(FrameDictCallbackMixin):
         gpu_image_list: list = []  # list[cp.ndarray]
 
         for track_id in poses.keys():
-            if track_id in crop_frames:
+            if track_id in crops:
                 track_ids.append(track_id)
-                gpu_image_list.append(crop_frames[track_id].crop)
+                gpu_image_list.append(crops[track_id].crop)
 
         with self._lock:
             self._batch_counter += 1
             batch_id: int = self._batch_counter
             self._waiting_batches[batch_id] = (poses, track_ids)
 
-        self._detection.submit(DetectionInput(batch_id=batch_id, gpu_images=gpu_image_list))
+        self._runner.submit(PoseInput(batch_id=batch_id, gpu_images=gpu_image_list))
 
-    def _on_detection_result(self, output: DetectionOutput) -> None:
-        """Callback from Detection thread when results are ready or dropped.
+    def _on_pose_result(self, output: PoseOutput) -> None:
+        """Callback from the runner thread when results are ready or dropped.
 
         Only successful batches (processed=True) emit callbacks. Dropped batches
         are silently ignored to prioritize real-time performance over completeness.
@@ -94,7 +94,7 @@ class Predictor(FrameDictCallbackMixin):
             batch_data: tuple[FrameDict, list[int]] | None = self._waiting_batches.pop(output.batch_id, None)
 
         if not batch_data:
-            logger.warning(f"Point2DExtractor Warning: No waiting batch for batch_id {output.batch_id} (possible reset during processing)")
+            logger.warning(f"Pose Predictor: No waiting batch for batch_id {output.batch_id} (possible reset during processing)")
             return
 
         original_poses, track_ids = batch_data

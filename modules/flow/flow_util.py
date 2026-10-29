@@ -120,8 +120,8 @@ class FlowUtil:
         """
         # Lazy init shader
         if not hasattr(FlowUtil, '_magnitude_shader'):
-            from .shaders import Magnitude
-            FlowUtil._magnitude_shader = Magnitude()
+            from .shaders import MagnitudeShader
+            FlowUtil._magnitude_shader = MagnitudeShader()
             FlowUtil._magnitude_shader.allocate()
 
         dst_fbo.begin()

@@ -8,7 +8,7 @@ import torch
 
 
 @dataclass
-class DetectionInput:
+class PoseInput:
     """Batch of GPU images for pose detection.
 
     GPU images will be resized to model dimensions on GPU.
@@ -17,7 +17,7 @@ class DetectionInput:
     gpu_images: list[torch.Tensor] = field(default_factory=list)  # GPU tensors (H, W, 3) RGB uint8
 
 @dataclass
-class DetectionOutput:
+class PoseOutput:
     """Results from pose detection. processed=False indicates batch was dropped."""
     batch_id: int
     point_batch: list[np.ndarray] = field(default_factory=list)   # List of (num_keypoints, 2) arrays, normalized [0, 1]
@@ -26,4 +26,4 @@ class DetectionOutput:
     inference_time_ms: float = 0.0  # For monitoring
     lock_time_ms: float = 0.0       # Time spent waiting for lock
 
-PoseDetectionOutputCallback = Callable[[DetectionOutput], None]
+PoseOutputCallback = Callable[[PoseOutput], None]

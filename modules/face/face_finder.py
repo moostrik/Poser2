@@ -8,7 +8,7 @@ from typing import Callable
 
 from .face_detector import FaceDetector, Face
 from .face_landmarks import FaceLandmarks
-from .quality import FaceObservation, Pose, Rejection, distance, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
+from .quality import FaceObservation, HeadPose, Rejection, distance, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
 from .settings import FaceSettings
 
 logger = logging.getLogger(__name__)
@@ -107,7 +107,7 @@ class _Assessed:
     face: Face
     eye_dist: float
     edge: float
-    pose: Pose
+    pose: HeadPose
     eyes: float | None
     rejection: Rejection | None
     limit: float
@@ -189,7 +189,7 @@ class FaceFinder(Thread):
         for face in detector.detect(image, DETECT_THRESHOLD):
             eye_dist: float = eye_distance(face.kps) / float(image_width)
             edge: float = crop_edge(face, s.zoom, s.offset, self._composition_width, self._composition_height, image_width, image_height)
-            pose: Pose = head_pose(face.kps, s.pitch_zero)
+            pose: HeadPose = head_pose(face.kps, s.pitch_zero)
             rejection: Rejection | None = gate(face.score, eye_dist, edge, pose, s.confidence, s.eye_min, s.crop_margin,
                                                s.max_yaw, s.max_pitch, s.max_roll)
             eyes: float | None = None

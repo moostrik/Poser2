@@ -14,7 +14,7 @@ from typing import Any
 
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.panel import PanelSettings
-from modules.camera import CameraCheckSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.camera import CameraCheckSettings, CameraResolution, PlayerSettings, RecorderSettings, SyncSettings
 from modules.camera.oak import OakCameraSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, ArtNetBarsSettings, OscReceiverSettings
@@ -151,7 +151,7 @@ class OakGroup(BaseSettings):
     cam_1        : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)
     cam_2        : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)
     camera_check : Group[CameraCheckSettings]       = Group(CameraCheckSettings)
-    simulator    : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cams, fps])
+    simulator    : Group[PlayerSettings]         = Group(PlayerSettings, share=[num_cams, fps])
     person_detector     : Group[inference.detection.Settings] = Group(inference.detection.Settings)     # the replay backend's person detector
     tracker      : Group[OnePerCamTrackerSettings]  = Group(OnePerCamTrackerSettings)
     frame_sync   : Group[SyncSettings]              = Group(SyncSettings, share=[num_cams, fps])

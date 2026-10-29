@@ -16,7 +16,7 @@ from modules.panel import PanelServer
 from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict
-from modules.inference import source, crop, pose, detection
+from modules.inference import pose, detection, CropExtractor, Uploader
 from modules.session import Session
 
 from .board import Board
@@ -99,8 +99,8 @@ class WhiteSpaceMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = PanoramicTracker(self.settings.track, max_players, num_cams)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.source_uploader = source.Uploader()
-        self.crop_extractor = crop.Extractor(ps.image_crop)
+        self.source_uploader = Uploader()
+        self.crop_extractor = CropExtractor(ps.image_crop)
 
         for camera in self.cameras:
             camera.add_frame_callback(self.video_recorder.submit_frame)

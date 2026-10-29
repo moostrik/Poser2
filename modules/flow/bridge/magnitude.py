@@ -9,7 +9,7 @@ from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture
 from .. import FlowBase, FlowUtil
-from ..shaders import Magnitude as MagnitudeShader
+from ..shaders import MagnitudeShader
 
 
 class Magnitude(FlowBase):

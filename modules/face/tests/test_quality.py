@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from modules.face import Face, crop_edge, portrait_box, portrait_crop, FaceObservation, Pose, Rejection, distance, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
+from modules.face import Face, crop_edge, portrait_box, portrait_crop, FaceObservation, HeadPose, Rejection, distance, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
 from ..quality import LEFT_EYE, RIGHT_EYE, NOSE_NEUTRAL, REJECTED_FLOOR
 
 
@@ -34,7 +34,7 @@ def landmarks(left_height: float, right_height: float, roll: float = 0.0) -> np.
     return points @ matrix.T
 
 
-class TestHeadPose(unittest.TestCase):
+class TestHeadHeadPose(unittest.TestCase):
     def test_frontal_face_has_no_angles(self):
         pose = head_pose(keypoints())
         self.assertAlmostEqual(pose.yaw, 0.0, places=5)
@@ -80,7 +80,7 @@ class TestEyeDistance(unittest.TestCase):
 
 class TestGate(unittest.TestCase):
     def check(self, score=0.9, eye_dist=0.1, edge=0.1, yaw=0.0, pitch=0.0, roll=0.0, crop_margin=0.0):
-        return gate(score, eye_dist, edge, Pose(yaw, pitch, roll, 0.48), confidence=0.7, eye_min=0.05, crop_margin=crop_margin,
+        return gate(score, eye_dist, edge, HeadPose(yaw, pitch, roll, 0.48), confidence=0.7, eye_min=0.05, crop_margin=crop_margin,
                     max_yaw=20.0, max_pitch=25.0, max_roll=30.0)
 
     def test_a_good_face_passes(self):
@@ -107,7 +107,7 @@ class TestGate(unittest.TestCase):
 
 class TestDistance(unittest.TestCase):
     def far(self, score=0.9, eye_dist=0.1, edge=0.1, yaw=0.0, pitch=0.0, roll=0.0, eyes=None, falloff=1.0, crop_margin=0.0):
-        return distance(score, eye_dist, edge, Pose(yaw, pitch, roll, 0.48), eyes, confidence=0.7, eye_min=0.05, crop_margin=crop_margin,
+        return distance(score, eye_dist, edge, HeadPose(yaw, pitch, roll, 0.48), eyes, confidence=0.7, eye_min=0.05, crop_margin=crop_margin,
                         max_yaw=20.0, max_pitch=25.0, max_roll=30.0, eye_open=0.2, falloff=falloff)
 
     def test_a_good_face_is_at_zero(self):
@@ -198,21 +198,21 @@ class TestCropEdge(unittest.TestCase):
 
 
 class TestLabels(unittest.TestCase):
-    def face(self, rejection, limit, pose=Pose(0.0, 0.0, 0.0, 0.48), eyes=None, score=0.9, eye_dist=0.06, edge=0.05):
+    def face(self, rejection, limit, pose=HeadPose(0.0, 0.0, 0.0, 0.48), eyes=None, score=0.9, eye_dist=0.06, edge=0.05):
         return FaceObservation(bbox=(0, 0, 1, 1), crop=(0, 0, 1, 1), kps=(), score=score, eye_dist=eye_dist, edge=edge, pose=pose, eyes=eyes,
                                rejection=rejection, limit=limit, distance=0.0, subject=False)
 
     def test_the_readout_shows_every_filtered_value(self):
-        self.assertEqual(readout(self.face(None, 0.0, pose=Pose(4.4, -6.0, 2.0, 0.48), eyes=0.34)), 'conf 0.90 eyes 0.06 edge 0.05 yaw 4 pitch -6 roll 2 open 0.34')
+        self.assertEqual(readout(self.face(None, 0.0, pose=HeadPose(4.4, -6.0, 2.0, 0.48), eyes=0.34)), 'conf 0.90 eyes 0.06 edge 0.05 yaw 4 pitch -6 roll 2 open 0.34')
         self.assertEqual(readout(self.face(None, 0.0)), 'conf 0.90 eyes 0.06 edge 0.05 yaw 0 pitch 0 roll 0 open -')
 
     def test_every_reason_names_the_check_the_value_and_the_limit(self):
         self.assertEqual(rejection_label(self.face(Rejection.LOW_SCORE, 0.7, score=0.55)), 'conf 0.55 < 0.70')
         self.assertEqual(rejection_label(self.face(Rejection.SMALL, 0.05, eye_dist=0.03)), 'eyes 0.03 < 0.05')
         self.assertEqual(rejection_label(self.face(Rejection.OUTSIDE, -0.1, edge=-0.12)), 'edge -0.12 < -0.10')
-        self.assertEqual(rejection_label(self.face(Rejection.TURNED, 20.0, pose=Pose(32.0, 0.0, 0.0, 0.48))), 'yaw 32 > 20')
-        self.assertEqual(rejection_label(self.face(Rejection.PITCHED, 25.0, pose=Pose(0.0, -41.0, 0.0, 0.48))), 'pitch -41 > 25')
-        self.assertEqual(rejection_label(self.face(Rejection.TILTED, 30.0, pose=Pose(0.0, 0.0, 35.0, 0.48))), 'roll 35 > 30')
+        self.assertEqual(rejection_label(self.face(Rejection.TURNED, 20.0, pose=HeadPose(32.0, 0.0, 0.0, 0.48))), 'yaw 32 > 20')
+        self.assertEqual(rejection_label(self.face(Rejection.PITCHED, 25.0, pose=HeadPose(0.0, -41.0, 0.0, 0.48))), 'pitch -41 > 25')
+        self.assertEqual(rejection_label(self.face(Rejection.TILTED, 30.0, pose=HeadPose(0.0, 0.0, 35.0, 0.48))), 'roll 35 > 30')
         self.assertEqual(rejection_label(self.face(Rejection.EYES, 0.2, eyes=0.12)), 'open 0.12 < 0.20')
         self.assertEqual(rejection_label(self.face(None, 0.0)), '')
 

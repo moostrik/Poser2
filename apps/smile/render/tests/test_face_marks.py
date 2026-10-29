@@ -2,12 +2,12 @@
 
 import unittest
 
-from modules.face import FaceFrame, FaceObservation, Pose, Rejection
+from modules.face import FaceFrame, FaceObservation, HeadPose, Rejection
 from apps.smile.render.layers.face_marks import ACCEPTED_COLOR, FACES_STALE, REJECTED_COLOR, SUBJECT_COLOR, SUBJECT_LINE_PX, LINE_PX, SubjectMark, build_marks, face_fields, fit_box, mix
 
 
 def observation(rejection: Rejection | None = None, subject: bool = False, eyes: float | None = 0.3, bbox=(0.1, 0.2, 0.5, 0.7),
-                limit: float = 0.0, pose: Pose = Pose(4.4, -6.0, 2.0, 0.48), distance: float = 0.0) -> FaceObservation:
+                limit: float = 0.0, pose: HeadPose = HeadPose(4.4, -6.0, 2.0, 0.48), distance: float = 0.0) -> FaceObservation:
     # the marks use the portrait box (crop), not the detector's
     return FaceObservation(bbox=(0.0, 0.0, 0.0, 0.0), crop=bbox, kps=((0.2, 0.3),) * 5, score=0.9, eye_dist=0.06, edge=0.1, pose=pose,
                            eyes=eyes, rejection=rejection, limit=limit, distance=distance, subject=subject)
@@ -82,7 +82,7 @@ class TestLabels(unittest.TestCase):
         self.assertEqual(self.label(observation(subject=True)), '')
 
     def test_a_rejected_face_shows_the_check_its_value_and_the_limit(self):
-        turned = observation(Rejection.TURNED, eyes=None, limit=20.0, pose=Pose(-32.4, 0.0, 0.0, 0.48))
+        turned = observation(Rejection.TURNED, eyes=None, limit=20.0, pose=HeadPose(-32.4, 0.0, 0.0, 0.48))
         self.assertEqual(self.label(turned), 'yaw -32 > 20')
         self.assertEqual(self.label(observation(Rejection.EYES, eyes=0.12, limit=0.2)), 'open 0.12 < 0.20')
         self.assertEqual(self.label(observation(Rejection.SMALL, eyes=None, limit=0.08)), 'eyes 0.06 < 0.08')

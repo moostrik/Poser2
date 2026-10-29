@@ -10,7 +10,7 @@ import onnxruntime as ort
 
 from ..ort_runtime import preload_cuda
 
-from .io import DetectionInput, DetectionOutput, PoseDetectionOutputCallback
+from .io import PoseInput, PoseOutput, PoseOutputCallback
 
 from .settings import Settings
 
@@ -49,14 +49,14 @@ class RunnerONNX(Thread):
 
         # Input queue (single slot)
         self._input_lock: Lock = Lock()
-        self._pending_batch: DetectionInput | None = None
+        self._pending_batch: PoseInput | None = None
         self._input_timestamp: float = time.perf_counter()
         self._last_dropped_batch_id: int = 0
 
         # Callbacks
         self._callback_lock: Lock = Lock()
-        self._callbacks: list[PoseDetectionOutputCallback] = []     # run in registration order
-        self._callback_queue: Queue[DetectionOutput | None] = Queue(maxsize=2)
+        self._callbacks: list[PoseOutputCallback] = []     # run in registration order
+        self._callback_queue: Queue[PoseOutput | None] = Queue(maxsize=2)
         self._callback_thread: Thread = Thread(target=self._dispatch_callbacks, daemon=True)
 
         # ONNX session (initialized in run thread)
@@ -108,7 +108,7 @@ class RunnerONNX(Thread):
                 self._process()
             except Exception as e:
                 logger.error(f"Pose: {str(e)}")
-    def submit(self, input_batch: DetectionInput) -> None:
+    def submit(self, input_batch: PoseInput) -> None:
         """Submit batch for processing. Identical to MMDetection."""
         if self._shutdown_event.is_set():
             return
@@ -120,7 +120,7 @@ class RunnerONNX(Thread):
         if len(input_batch.gpu_images) > self._max_batch:
             logger.warning(f"Pose Batch size {len(input_batch.gpu_images)} exceeds max {self._max_batch}, will process only first {self._max_batch} images")
 
-        dropped_batch: DetectionInput | None = None
+        dropped_batch: PoseInput | None = None
 
         with self._input_lock:
             if self._pending_batch is not None:
@@ -134,7 +134,7 @@ class RunnerONNX(Thread):
             self._input_timestamp = time.perf_counter()
 
         if dropped_batch is not None:
-            dropped_output = DetectionOutput(batch_id=dropped_batch.batch_id, processed=False)
+            dropped_output = PoseOutput(batch_id=dropped_batch.batch_id, processed=False)
             try:
                 self._callback_queue.put_nowait(dropped_output)
             except:
@@ -231,7 +231,7 @@ class RunnerONNX(Thread):
 
         except Exception as e:
             logger.error(f"Pose: Failed to load model - {str(e)}")
-    def _claim(self) -> DetectionInput | None:
+    def _claim(self) -> PoseInput | None:
         """Atomically get and clear pending batch."""
         with self._input_lock:
             batch = self._pending_batch
@@ -239,7 +239,7 @@ class RunnerONNX(Thread):
             return batch
 
     def _process(self) -> None:
-        batch: DetectionInput | None = self._claim()
+        batch: PoseInput | None = self._claim()
 
         if batch is None:
             return
@@ -247,7 +247,7 @@ class RunnerONNX(Thread):
         gpu_images = batch.gpu_images[:self._max_batch]
 
         if not gpu_images:
-            output = DetectionOutput(batch_id=batch.batch_id, processed=True)
+            output = PoseOutput(batch_id=batch.batch_id, processed=True)
         else:
             batch_start = time.perf_counter()
             keypoints, scores = self._infer(gpu_images)
@@ -259,7 +259,7 @@ class RunnerONNX(Thread):
             point_list = [keypoints[i] for i in range(len(keypoints))]
             score_list = [scores[i] for i in range(len(scores))]
 
-            output = DetectionOutput(
+            output = PoseOutput(
                 batch_id=batch.batch_id,
                 point_batch=point_list,
                 score_batch=score_list,
@@ -381,13 +381,13 @@ class RunnerONNX(Thread):
         except Exception as e:
             logger.info(f"Pose: Warmup failed (non-critical) - {str(e)}")
     # CALLBACK METHODS
-    def add_pose_callback(self, callback: PoseDetectionOutputCallback) -> None:
+    def add_pose_callback(self, callback: PoseOutputCallback) -> None:
         """Register callback to receive results."""
         with self._callback_lock:
             if callback not in self._callbacks:
                 self._callbacks.append(callback)
 
-    def remove_pose_callback(self, callback: PoseDetectionOutputCallback) -> None:
+    def remove_pose_callback(self, callback: PoseOutputCallback) -> None:
         """Unregister previously registered callback."""
         with self._callback_lock:
             if callback in self._callbacks:
@@ -397,7 +397,7 @@ class RunnerONNX(Thread):
         """Dispatch results to callbacks. Identical to MMDetection."""
         while not self._shutdown_event.is_set():
             try:
-                output: DetectionOutput | None = self._callback_queue.get(timeout=0.5)
+                output: PoseOutput | None = self._callback_queue.get(timeout=0.5)
 
                 if output is None:
                     break

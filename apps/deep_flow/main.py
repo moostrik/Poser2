@@ -12,7 +12,7 @@ from modules.panel import PanelServer
 from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, window, FrameDict, configure_features
-from modules.inference import source, crop, pose, segmentation, optical_flow, detection
+from modules.inference import pose, segmentation, optical_flow, detection, CropExtractor, Uploader
 
 from .render_board import RenderBoard
 from .settings import Settings, Stage
@@ -72,8 +72,8 @@ class DeepFlowMain:
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, num_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
-        self.image_uploader = source.Uploader()
-        self.crop_extractor = crop.Extractor(p.image_crop)
+        self.image_uploader = Uploader()
+        self.crop_extractor = CropExtractor(p.image_crop)
 
         for camera in self.cameras:
             if self.recorder:
