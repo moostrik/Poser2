@@ -34,7 +34,7 @@ resets a track the moment its pose is missing. A layer adds no presence test of 
 azimuth is the pose's `Azimuth`, at their eyes: raw from CLEAN, smoothed at SMOOTH, predicted at
 PREDICT and interpolated at LERP. The LERP stage runs inside the light tick at `light_rate`, one live root
 field that the conductor's clock, the layers' playhead step (`Tick.interval`) and the LERP interpolators all
-read. Show layers and the state machine read LERP poses, the stable eye azimuth and its `PlayheadOffset`. Their angles are the calibrator's (`POSE_INSTRUMENT.md`, *The
+read, at the time the tick was paced for (`Tick.deadline`), so a LERP frame's stamp is regular whatever the tick's lateness. Show layers and the state machine read LERP poses, the stable eye azimuth and its `PlayheadOffset`. Their angles are the calibrator's (`POSE_INSTRUMENT.md`, *The
 body*): 0 at neutral, π at raised. Their age is the pose's `Age`. The dummy (`POSE_INSTRUMENT.md`, *The dummy*)
 joins the poses before the LERP filters at its own id, `max_players`, so to every layer it is a
 player. The render draws every LERP pose as a figure over the
