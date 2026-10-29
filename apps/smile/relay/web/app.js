@@ -1048,10 +1048,12 @@ async function shareSmile() {
       return;
     }
   } catch (error) { /* the share sheet was closed, or there is none: download instead */ }
+  // from the copy on the phone when there is one: the relay deletes the file minutes after the turn
   const a = document.createElement('a');
-  a.href = resultUrl(result);
-  a.download = fileName(result, a.href);
+  a.href = shareFile ? URL.createObjectURL(shareFile) : resultUrl(result);
+  a.download = fileName(result, resultUrl(result));
   a.click();
+  if (shareFile) setTimeout(() => URL.revokeObjectURL(a.href), 60000);
 }
 
 // THE JOINING: the page asks for the camera as it opens (THE BOOT) and shows it in the frame, in pixels,

@@ -72,12 +72,16 @@ first use of every track.
 | one turn's portrait and grin          | about 1.6 MB (152 turns: 246 MB)        |
 | the relay's upload limit              | 64 MB (`MAX_UPLOAD`)                    |
 
-The relay keeps every turn's portrait and grin (`KINDS`) in `relay/data` without end; see Open.
+A turn's portrait and grin (`KINDS`) are stored under names nobody can guess (the id is the time, which a 30-minute
+window would leave 1800 guesses) and deleted `KEEP_AFTER_LEAVE` (5 minutes) after the visitor's phone left or
+`KEEP_AT_MOST` (30 minutes) after the upload, whichever comes first (`Delivery`, `Relay.sweep`): the phone has the
+video as a copy of its own once the download is through, so nothing on the relay is needed after that, and a
+download cut by a dark screen has its minutes to try again. The sweep also takes whatever else in `portraits/`
+and `grins/` is older than 30 minutes (a restart between upload and result; an older relay's files), so the
+folders hold at most the last half hour of turns.
 
 ## Open
 
-- What the relay keeps of a turn, and for how long: the grid shows the newest stills only, and a grin is
-  needed until its phone has downloaded it. Today everything stays.
 - SMILE through the TLS proxy (step 4 of the test) has not run yet; the proxy's limit on an upload's size
   is not checked against the 2 MB tracks and grins.
 - The relay on another machine of the tailnet, to put a network between SMILE and the relay in the test.

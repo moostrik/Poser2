@@ -9,6 +9,10 @@ one for SMILE (`/ws/smile`), uploads from SMILE (`POST /api/upload?kind=&id=`) a
 `Authorization: Bearer <token>` (never in the URL, which logs would keep). It keeps the line (relay/line.py)
 and passes messages; it decides nothing about a turn: SMILE starts and ends every turn.
 
+A visitor's files (the portrait and the grin, a `Delivery`) are stored under names nobody can guess, told to
+the phone in its `result` and deleted KEEP_AFTER_LEAVE after that phone left or KEEP_AT_MOST after the
+upload, whichever comes first; the library (tracks, laughs) stays.
+
 Messages are JSON text, images are binary with one leading byte: FRAME (0) a phone's camera frame to
 SMILE, SHOW (1) an image from SMILE for the phone's window, LAST (2) the turn's last one, which the phone
 keeps. The phone with the turn is the only one whose frames are passed on, and only while SMILE is connected.
@@ -44,7 +48,8 @@ import ssl
 import time
 import sys
 import uuid
-from typing import Any
+from dataclasses import dataclass, field
+from typing import Any, AsyncIterator
 
 from aiohttp import WSMsgType, web
 
@@ -63,6 +68,22 @@ MAX_FRAME: int = 512 * 1024             # bytes; a phone frame larger than this 
 MAX_UPLOAD: int = 64 * 1024 * 1024
 HEARTBEAT: float = 20.0                 # s; a websocket ping, so a dead phone leaves the line
 FRAME_PATIENCE: float = 2.0             # s a screen frame may stay unanswered before the next goes anyway
+KEEP_AFTER_LEAVE: float = 300.0         # s a visitor's files stay after their phone left: a download cut by a dark screen gets its retry
+KEEP_AT_MOST: float = 1800.0            # s a visitor's files stay at the most, from the upload
+SWEEP_EVERY: float = 60.0               # s between sweeps of the deliveries and the visitors' folders
+
+
+@dataclass
+class Delivery:
+    """A turn's files on their way to its phone (SMILE's `Delivery` is the other end of it)."""
+    id: str
+    uploaded: float
+    files: dict[str, str] = field(default_factory=dict)     # kind -> file name
+    phone: str = ''
+    left: float | None = None                               # when its phone left, or the result found it gone
+
+    def expired(self, now: float) -> bool:
+        return now - self.uploaded > KEEP_AT_MOST or (self.left is not None and now - self.left > KEEP_AFTER_LEAVE)
 
 
 class Relay:
@@ -71,6 +92,7 @@ class Relay:
         self.data: str = data
         self.line: Line = Line()
         self.phones: dict[str, web.WebSocketResponse] = {}
+        self.deliveries: dict[str, Delivery] = {}
         self.smile: web.WebSocketResponse | None = None
         self._frame_pending: bytes | None = None                # the newest screen frame not sent yet
         self._frame_in_flight: float | None = None              # when the frame the phone has not seen yet was sent
@@ -129,6 +151,10 @@ class Relay:
         finally:
             self.phones.pop(phone, None)
             await self.phone_left(phone)
+            now: float = time.time()
+            for delivery in self.deliveries.values():
+                if delivery.phone == phone and delivery.left is None:
+                    delivery.left = now     # its files have their last minutes
             logger.info('phone %s left (%d online)', phone[:8], len(self.phones))
         return ws
 
@@ -247,15 +273,61 @@ class Relay:
 
     async def result(self, message: dict) -> None:
         """The visitor's files are uploaded (or were not): the phone of that turn gets their urls. The turn
-        may be over, so the phone is named; the turn's phone is the fallback."""
+        may be over, so the phone is named; the turn's phone is the fallback. A phone that is gone already
+        starts the files' last minutes now."""
         id: str = self.safe_id(str(message.get('id', '')))
+        delivery: Delivery | None = self.deliveries.get(id)
         result: dict = {'type': 'result', 'id': id, 'ok': bool(message.get('ok', True)),
                         'name': str(message.get('name', '')), 'caption': str(message.get('caption', ''))}
-        for kind, ext in KINDS.items():
-            path: str = os.path.join(self.data, kind + 's', id + ext) if id else ''
-            result[kind] = f'/files/{kind}s/{id}{ext}' if path and os.path.exists(path) else None
-        phone: str = str(message.get('phone', ''))
-        await self.send(self.phones.get(phone) if phone else self.turn_ws, result)
+        for kind in KINDS:
+            name: str | None = delivery.files.get(kind) if delivery else None
+            result[kind] = f'/files/{kind}s/{name}' if name else None
+        phone: str = str(message.get('phone', '')) or self.line.turn or ''
+        await self.send(self.phones.get(phone), result)
+        if delivery is not None:
+            delivery.phone = phone
+            if phone not in self.phones:
+                delivery.left = time.time()
+
+    def sweep(self, now: float | None = None) -> None:
+        """Deletes the deliveries past their time, and whatever else in the visitors' folders is older than
+        KEEP_AT_MOST (uploads of a relay that restarted before the result, files of an older relay)."""
+        now = time.time() if now is None else now
+        for id, delivery in list(self.deliveries.items()):
+            if delivery.expired(now):
+                # a file that could not go (still being sent) stays in the delivery for the next sweep
+                for kind, name in list(delivery.files.items()):
+                    if self._remove(os.path.join(self.data, kind + 's', name)):
+                        del delivery.files[kind]
+                if not delivery.files:
+                    del self.deliveries[id]
+                    logger.info('delivery %s deleted', id)
+        for kind in KINDS:
+            folder: str = os.path.join(self.data, kind + 's')
+            for name in os.listdir(folder):
+                path: str = os.path.join(folder, name)
+                try:
+                    old: bool = now - os.path.getmtime(path) > KEEP_AT_MOST
+                except OSError:
+                    continue
+                if old:
+                    self._remove(path)
+
+    async def sweep_loop(self) -> None:
+        while True:
+            self.sweep()
+            await asyncio.sleep(SWEEP_EVERY)
+
+    @staticmethod
+    def _remove(path: str) -> bool:
+        try:
+            os.remove(path)
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            logger.warning('could not delete %s: %s', path, e)
+            return False
+        return True
 
     # HTTP
     async def upload(self, request: web.Request) -> web.Response:
@@ -274,12 +346,18 @@ class Relay:
         data: bytes = await request.read()
         if not data or len(data) > MAX_UPLOAD:
             raise web.HTTPBadRequest(text='size')
-        path: str = os.path.join(self.data, kind + 's', id + ext)
+        name: str = id + ext
+        if kind in KINDS:
+            # a visitor's file: a name nobody can guess (the id is the time), and a delivery that will delete it
+            name = f'{id}-{secrets.token_urlsafe(12)}{ext}'
+            delivery: Delivery = self.deliveries.setdefault(id, Delivery(id, time.time()))
+            delivery.files[kind] = name
+        path: str = os.path.join(self.data, kind + 's', name)
         temp: str = path + '.part'
         with open(temp, 'wb') as f:
             f.write(data)
         os.replace(temp, path)
-        return web.json_response({'ok': True, 'url': f'/files/{kind}s/{id}{ext}'})
+        return web.json_response({'ok': True, 'url': f'/files/{kind}s/{name}'})
 
     async def library_json(self, request: web.Request) -> web.Response:
         """The music tracks (ids) and laughter samples (file names) here: SMILE uploads what is missing,
@@ -313,6 +391,16 @@ async def no_cache(request: web.Request, handler) -> web.StreamResponse:
 
 def make_app(relay: Relay, web_dir: str) -> web.Application:
     app = web.Application(client_max_size=MAX_UPLOAD, middlewares=[no_cache])
+
+    async def sweeping(app: web.Application) -> AsyncIterator[None]:
+        task = asyncio.create_task(relay.sweep_loop())
+        yield
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+    app.cleanup_ctx.append(sweeping)
     app.router.add_get('/ws/phone', relay.phone)
     app.router.add_get('/ws/smile', relay.smile_socket)
     app.router.add_post('/api/upload', relay.upload)

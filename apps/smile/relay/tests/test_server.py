@@ -4,15 +4,17 @@ import asyncio
 import json
 import os
 import tempfile
+import time
 import unittest
 
 from aiohttp import ClientWebSocketResponse, web
 from aiohttp.test_utils import TestClient, TestServer
 
-from apps.smile.relay.server import FRAME, LAST, SHOW, Relay, make_app
+from apps.smile.relay.server import FRAME, KEEP_AFTER_LEAVE, KEEP_AT_MOST, LAST, SHOW, Relay, make_app
 
 TOKEN: str = 'test-token'
 AUTH: dict[str, str] = {'Authorization': f'Bearer {TOKEN}'}
+RANDOM_NAME: str = r'^/files/{}s/v1-[A-Za-z0-9_-]{{16}}\.{}$'       # a visitor's file: the id, a random part, the extension
 
 
 class RelayTest(unittest.IsolatedAsyncioTestCase):
@@ -49,6 +51,17 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
             if message.type == web.WSMsgType.BINARY:
                 return message.data
         self.fail('no binary message')
+
+    async def upload(self, kind: str, id: str = 'v1', data: bytes = b'x') -> str:
+        """SMILE's upload of a file; its url."""
+        response = await self.client.post(f'/api/upload?kind={kind}&id={id}', headers=AUTH, data=data)
+        self.assertEqual(response.status, 200)
+        return (await response.json())['url']
+
+    async def exists(self, url: str) -> bool:
+        async with self.client.get(url) as response:
+            await response.read()       # the file is closed again (Windows refuses to delete an open one)
+            return response.status == 200
 
     async def test_the_page_is_not_cached(self):
         web_dir = os.path.join(self.folder.name, 'web')
@@ -117,14 +130,14 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
         await smile.send_json({'type': 'turn_end', 'reason': 'done'})
         self.assertEqual((await self.receive(phone, 'turn_end'))['reason'], 'done')
         self.assertIsNone(self.relay.line.turn)
-        response = await self.client.post('/api/upload?kind=portrait&id=v1', headers=AUTH, data=b'portrait')
-        self.assertEqual(response.status, 200)
+        portrait = await self.upload('portrait', data=b'portrait')
+        self.assertRegex(portrait, RANDOM_NAME.format('portrait', 'jpg'))
         await smile.send_json({'type': 'result', 'id': 'v1', 'phone': turn['id'], 'name': 'Name', 'caption': 'hi', 'ok': True})
         result = await self.receive(phone, 'result')
         self.assertEqual((result['name'], result['caption'], result['ok']), ('Name', 'hi', True))
-        self.assertEqual(result['portrait'], '/files/portraits/v1.jpg')
+        self.assertEqual(result['portrait'], portrait)
         self.assertIsNone(result['grin'])
-        response = await self.client.get('/files/portraits/v1.jpg')
+        response = await self.client.get(portrait)
         self.assertEqual(await response.read(), b'portrait')
         # a result without files (the visitor was not kept) still reaches the phone, so it stops waiting
         await smile.send_json({'type': 'result', 'id': '', 'phone': turn['id'], 'name': 'Name', 'caption': 'hi', 'ok': False})
@@ -178,6 +191,57 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(await response.json(), {'tracks': ['0001'], 'laughs': ['Hehe-2.wav']})
         response = await self.client.get('/files/tracks/0001.m4a')
         self.assertEqual(await response.read(), b'aac')
+
+    async def test_a_visitors_files_go_minutes_after_their_phone_left(self):
+        phone = await self.phone()
+        smile = await self.smile()
+        await phone.send_json({'type': 'join'})
+        await smile.send_json({'type': 'turn_start'})
+        turn = await self.receive(smile, 'turn')
+        portrait = await self.upload('portrait')
+        grin = await self.upload('grin')
+        self.assertRegex(grin, RANDOM_NAME.format('grin', 'mp4'))
+        await smile.send_json({'type': 'result', 'id': 'v1', 'phone': turn['id'], 'ok': True})
+        result = await self.receive(phone, 'result')
+        self.assertEqual((result['portrait'], result['grin']), (portrait, grin))
+        # the phone stays: its files stay, however often the sweep runs
+        now = time.time()
+        self.relay.sweep(now + KEEP_AFTER_LEAVE + 1)
+        self.assertTrue(await self.exists(grin))
+        # the phone leaves (the tab closed): the files have their last minutes, then go
+        await phone.close()
+        await self.receive(smile, 'gone')
+        self.relay.sweep(now + KEEP_AFTER_LEAVE - 10)
+        self.assertTrue(await self.exists(grin))
+        self.relay.sweep(now + KEEP_AFTER_LEAVE + 1)
+        self.assertFalse(await self.exists(grin))
+        self.assertFalse(await self.exists(portrait))
+        self.assertEqual(self.relay.deliveries, {})
+
+    async def test_a_result_for_a_phone_that_is_gone_starts_the_last_minutes_at_once(self):
+        smile = await self.smile()
+        grin = await self.upload('grin')
+        await smile.send_json({'type': 'result', 'id': 'v1', 'phone': 'gone', 'ok': True})
+        await smile.send_json({'type': 'turn_start'})
+        await self.receive(smile, 'turn')       # answered after the result: the result has been handled
+        now = time.time()
+        self.relay.sweep(now + KEEP_AFTER_LEAVE + 1)
+        self.assertFalse(await self.exists(grin))
+
+    async def test_the_sweep_takes_old_files_and_leaves_the_library(self):
+        smile = await self.smile()
+        grin = await self.upload('grin')        # a delivery whose phone never leaves: KEEP_AT_MOST ends it
+        track = await self.upload('track', id='0001')
+        old = os.path.join(self.folder.name, 'portraits', 'older-relay.jpg')      # a file no delivery knows
+        with open(old, 'wb') as f:
+            f.write(b'x')
+        os.utime(old, (time.time() - KEEP_AT_MOST - 1, time.time() - KEEP_AT_MOST - 1))
+        self.relay.sweep()
+        self.assertFalse(os.path.exists(old))
+        self.assertTrue(await self.exists(grin))
+        self.relay.sweep(time.time() + KEEP_AT_MOST + 1)
+        self.assertFalse(await self.exists(grin))
+        self.assertTrue(await self.exists(track))
 
     async def test_an_upload_needs_a_safe_id_and_kind(self):
         response = await self.client.post('/api/upload?kind=portrait&id=../x', headers=AUTH, data=b'x')
