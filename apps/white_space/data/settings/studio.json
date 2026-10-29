@@ -1004,7 +1004,6 @@
     "end_bars": 4.0,
     "dim_level": 0.4,
     "min_players": 3,
-    "sync": {},
     "manual": {
       "select": "PLAY",
       "hold": true

@@ -8,7 +8,7 @@ from modules.pose import Age, Angles, FrameDict, GroupRecord, GroupSync, LegDevi
                          configure_features
 from modules.pose.pipeline import Domain, PosePipeline
 
-from apps.white_space.pose import Dummy, PlayheadOffset, dummy_id
+from apps.white_space.pose import Dummy, Hit, HitStreak, PlayheadOffset, dummy_id
 from apps.white_space.pose.pipeline import pipeline_spec
 from apps.white_space.settings import Settings, Stage
 
@@ -42,8 +42,8 @@ class PipelineSpecTest(unittest.TestCase):
         configure_features(self.players)                     # the track features' width, as main.py sets it
         self.dummy = Dummy(self.settings.pose_instrument.dummy, ps.angle_extractor, ps.angle_calibrator,
                            dummy_id(self.players), Path(self.tmp.name) / 'poses.json')
-        self.pipeline = PosePipeline(pipeline_spec(ps, _Source(list(range(self.players))), _Async(), self.dummy,
-                                                   lambda _cam, x: x, lambda: 0.25))
+        self.pipeline = PosePipeline(pipeline_spec(ps, self.settings.light, _Source(list(range(self.players))), _Async(),
+                                                   self.dummy, lambda _cam, x: x, lambda: 0.25, lambda: 0.0))
 
     def tearDown(self) -> None:
         self.tmp.cleanup()
@@ -68,9 +68,10 @@ class PipelineSpecTest(unittest.TestCase):
         self.pipeline.update(Domain.OUTPUT, 1.5)             # the age counts from the second tick
         self.assertEqual(set(out[-1]), {dummy_id(self.players)})
         f = out[-1][dummy_id(self.players)]
-        for ft in (Angles, LegDeviation, TorsoTilt, Age, MotionGate, PlayheadOffset):
+        for ft in (Angles, LegDeviation, TorsoTilt, Age, MotionGate, PlayheadOffset, Hit):
             self.assertIn(ft, f)
-        self.assertIn(GroupSync, groups[-1])                 # the gate is on the LERP record (closed: the dummy alone)
+        for ft in (GroupSync, HitStreak):                     # the gate and the streak are on the LERP record
+            self.assertIn(ft, groups[-1])
 
 
 if __name__ == "__main__":

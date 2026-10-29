@@ -23,8 +23,8 @@ In this order; each step's number is read off the data view (`render.layers.data
    1 at a T. With `n_top` 1 the single furthest joint decides, so a relaxed elbow usually sets the neutral
    edge. `max_degrees` is also the hit sync's gate: below it a hit does not count.
 3. **Set how alike**: `pose.similarity.posture.angle_tolerance`, in degrees. Two players fully out of
-   neutral hold the same arm pose; `states.sync.distance` reads the degrees between their hits and
-   `states.sync.hits` counts. Too eager, lower the tolerance by 3°; too strict, raise it. The sync is the test
+   neutral hold the same arm pose; `pose.hit_sync.distance` reads the degrees between their hits and
+   `pose.hit_sync.hits` counts. Too eager, lower the tolerance by 3°; too strict, raise it. The sync is the test
    of it: too strict and the show never spins up. Two people at different positions are seen from different
    directions, so the same pose reads some degrees apart for that reason alone; the tolerance absorbs it.
 4. **Set the forgiveness** only if one joint, usually an elbow, keeps breaking matches that look right:
@@ -73,13 +73,13 @@ panel's `level` and `on` readouts; the instrument and the state machine read the
 
 | | Hit sync | `Similarity` feature |
 |-----------------------|----------------------------------------------------------|---------------------------------------------------------------|
-| Component             | `HitSync` (`pose/hit_sync.py`)                           | `PostureSimilarityExtractor` (a group step of SMOOTH in `pose/pipeline.py`) |
-| Input                 | the hit player's LERP pose at the hit tick, once the pose is `sync.min_age_seconds` old | the current SMOOTH poses, every frame |
+| Component             | `HitSync` (`pose/hit_sync.py`, a group step of LERP after the hit) | `PostureSimilarityExtractor` (a group step of SMOOTH in `pose/pipeline.py`) |
+| Input                 | the hit player's LERP pose at the hit tick, once the pose is `pose.hit_sync.min_age_seconds` old | the current SMOOTH poses, every frame |
 | Reads                 | the distance, and the similarity's plateau               | the similarity, 0 to 1                                        |
 | Neutral               | a gate: every hit in the run has `ArmDeviation` 1        | a ramp: the pair times the smaller `ArmDeviation` (`pose/neutral_weight.py`) |
 | In time               | none: the poses as they were at the hits                 | `SimilarityStickyFiller`, `SimilarityEuroSmoother` (SMOOTH), `SimilarityChaseInterpolator` (LERP) |
 | Decision              | a run of hits is in sync when every pair's similarity is 1 and the gate holds; `min_players` in a row | group sync (*Group sync* below): the group's level over `pose.similarity.group_sync.on_at` / `off_at` drives the strobe, the growth, the blend (`POSE_INSTRUMENT.md`, *The sync strobe*) and PLAY's sync end once its hold has built over `states.play_group_sync_seconds` (`STATES.md`, S7) |
-| Output                | `HitStreak` on the board; `states.sync.hits`, `states.sync.distance` (°) | the rows on the LERP frames; `/pose/N/similarity/pose` to Max; `GroupSimilarity` and `GroupSync` on the LERP group record, `pose.similarity.group_sync.level` / `on` |
+| Output                | `HitStreak` on the LERP group record; `pose.hit_sync.hits`, `pose.hit_sync.distance` (°) | the rows on the LERP frames; `/pose/N/similarity/pose` to Max; `GroupSimilarity` and `GroupSync` on the LERP group record, `pose.similarity.group_sync.level` / `on` |
 
 Both read one settings group, `pose.similarity.posture`, and one switch for neutral,
 `pose.similarity.neutral_weight.enabled`. The feature's chain is three group steps on the SMOOTH poses:
@@ -105,7 +105,7 @@ zeros.
 | `pose.similarity.smoother` (`min_cutoff`, `cutoff_rise`) | feature          | 0.3, 1.0      | the Euro smoother on the stamped rows |
 | `pose.similarity.interpolator` (`responsiveness`, `friction`) | feature    | 0.33, 0.05    | the chase at LERP |
 | `states.min_players`                                 | hit sync            | 2             | alike hits in a row to spin up |
-| `states.sync.min_age_seconds`                        | hit sync            | 2 s           | a pose this old (its `Age`) before its hits are recorded |
+| `pose.hit_sync.min_age_seconds`                      | hit sync            | 2 s           | a pose this old (its `Age`) before its hits are recorded |
 | `states.play_group_sync_seconds`                      | the show (S7)       | 20 s          | PLAY winds down once the group-sync hold has built over this; 0 never |
 | `states.play_group_sync_release_seconds`              | the show (S7)       | 5 s           | a break in group sync drains the hold over this; 0 restarts it |
 | `states.intro_grace_seconds`                         | the show (S4)       | 20 s          | after the sync end, the hits out of sync this long before INTRO can spin up again |

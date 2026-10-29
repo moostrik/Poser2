@@ -19,7 +19,7 @@ from modules.inference import detection, PoseInference
 from modules.session import Session
 
 from .render_board import RenderBoard
-from .pose import Dummy, dummy_id, HitSync
+from .pose import Dummy, dummy_id
 from .pose.pipeline import pipeline_spec      # not through the package: it reads the settings, which read the package
 from .light import Conductor, Tick
 from .inout import OscLightSender, OscSoundSender, UdpLightReceiver
@@ -141,8 +141,9 @@ class WhiteSpaceMain:
         # domain through the tracklet poses; the light tick drives the output domain (LERP, where the dummy joins).
         # Every stage's frames and group record go to the board, which also reads each stage's window; the sound
         # reads LERP, and so do the instrument and the state machine (the group sync on the LERP record).
-        self.pipeline = PosePipeline(pipeline_spec(ps, self.poses_from_tracklets, self.pose_inference, self.dummy,
-                                                   self._column_to_azimuth, self.board.get_playhead_phase))
+        self.pipeline = PosePipeline(pipeline_spec(ps, self.settings.light, self.poses_from_tracklets, self.pose_inference,
+                                                   self.dummy, self._column_to_azimuth, self.board.get_playhead_phase,
+                                                   self.board.get_playhead_bars))
         for stage in Stage:
             self.pipeline.add_frames_callback(stage, partial(self.board.set_frames, stage))
             self.pipeline.add_group_callback(stage, partial(self.board.set_group, stage))
@@ -179,10 +180,6 @@ class WhiteSpaceMain:
         )
         self.state_machine.add_state_callback(self.board.set_sequencer_state)
         self.state_machine.add_state_callback(self.osc_sound_sender.set_sequencer_state)
-        # HIT SYNC — the hits' poses and the streak of alike ones, published on the board for the machine. It
-        # compares the hit poses with the posture module's own distance, on the posture settings.
-        self.hit_sync = HitSync(self.settings.states.sync, ps.similarity.posture, ps.similarity.neutral_weight,
-                                self.settings.light, board=self.board, pose_stage=int(Stage.LERP))
 
         # CAMERA CHECK — compares each camera's own IMU reading and frame rate against the preset,
         # and summarises them as pinned indicators. A setup aid; nothing downstream reads it.
@@ -192,10 +189,9 @@ class WhiteSpaceMain:
         self.render = WhiteSpaceRender(self.board, self.settings.render, self.settings.tracker,
                                        self.settings.camera.cameras, self.settings.camera.camera_check, ps.angle_extractor)
         self.render.add_update_callback(self.camera_check.update)
-        # In order: LERP first, so the hit reads this tick's PlayheadOffset (the same the flash draws on);
-        # then HitSync publishes the hit and the streak; then the state machine reads them.
+        # In order: LERP first, which stamps this tick's hit on the poses and writes the streak and the group
+        # sync to the board; then the state machine reads them; then the layers draw on the same.
         self.conductor.add_update_callback(self._update_poses)
-        self.conductor.add_update_callback(self.hit_sync.update)
         self.conductor.add_update_callback(self.state_machine.update)
         self.render.add_exit_callback(self.stop)
         self.render.window_manager.add_keyboard_callback(self._on_key)

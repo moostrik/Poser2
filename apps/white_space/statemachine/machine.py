@@ -3,12 +3,12 @@
 A condition-driven state machine that plays the states designed in ``docs/STATES.md``
 (the source of truth): a sequencer hybrid, progress-driven *within* a state and
 condition-driven *between* states. Each tick (on the Conductor's light thread) it builds a
-``StateContext`` from the board (the players present, the hit streak ``HitSync`` publishes — this
-tick's hit and how many hits in a row struck alike poses — the group sync on the LERP group record,
-the pipeline's gate on the group's similarity as this tick wrote it, and the playhead's content clock
-and lock signals), lets the active state return its mix, evaluates that state's transition conditions,
-and emits a ``SequencerState`` snapshot for the board and OSC sound. It reads the board only; the hits
-and their poses are ``pose/hit_sync.py``'s, the gate the pipeline's (``pose.similarity.group_sync``).
+``StateContext`` from the board (the LERP poses: the players present and this tick's hit on them; the LERP
+group record: the hit streak ``HitSync`` writes — how many hits in a row struck alike poses — and the group
+sync, the pipeline's gate on the group's similarity, both as this tick wrote them; and the playhead's content
+clock and lock signals), lets the active state return its mix, evaluates that state's transition conditions,
+and emits a ``SequencerState`` snapshot for the board and OSC sound. It reads the board only; the hit, the
+streak and the gate are the pipeline's (``pose/hit.py``, ``pose/hit_sync.py``, ``pose.similarity.group_sync``).
 
 The machine is the only component that talks to the Conductor, through three explicit
 command callables: ``set_mix`` (the mix), ``reset_layers`` (explicit layer resets), and
@@ -25,12 +25,12 @@ import time
 from dataclasses import dataclass
 from typing import Callable
 
-from modules.board import HitStreak
 from modules.pose import GroupSync
 from modules.session import SequencerState
 
 from ..render_board import RenderBoard
 from ..light import LightSettings, LayerId, Mix, MotorMode, Tick
+from ..pose import Hit, HitStreak
 from .settings import StateId, StateMachineSettings, ManualSettings
 
 import logging
@@ -45,8 +45,8 @@ class StateContext:
     dt:      float          # this tick's wall-clock delta (bidirectional ramps integrate these)
     dbar:    float          # this tick's bar delta
     players: int            # live player count (the dummy excluded)
-    sync_hits: int          # hits in a row, within one round, that struck alike poses (HitSync's streak)
-    hit:     bool           # this tick the playhead is closest to a live player (the flash tick)
+    sync_hits: int          # hits in a row, within one round, that struck alike poses (HitSync's streak, on the record)
+    hit:     bool           # this tick the playhead is closest to a live player (a pose's Hit: the flash tick)
     group_sync: bool        # the group in sync: the pipeline's gate on the group's similarity, this tick's
                             # (GroupSync on the LERP group record — PLAY's sync end)
     session: bool           # session mode active — states consult it in needs_state_change()
@@ -98,7 +98,7 @@ class StateMachine:
         self._prev_state: StateId | None = None   # where the current state was entered from
 
         # Condition inputs
-        self._streak: HitStreak = HitStreak()       # this tick's hit and hit streak, from the board
+        self._sync_hits = 0                         # this tick's hit streak, from the LERP group record
 
         self._goto_requested: bool = False
         settings.manual.bind(ManualSettings.goto, self._on_goto)
@@ -125,7 +125,7 @@ class StateMachine:
             dt=dt,
             dbar=signals.bars - self._prev_bars,
             players=players,
-            sync_hits=self._streak.hits,
+            sync_hits=self._sync_hits,
             hit=hit,
             group_sync=self._board.get_group(self._pose_stage)[GroupSync].on,
             session=self._settings.session.enabled,
@@ -148,9 +148,9 @@ class StateMachine:
         # The people present are the people with a pose: `pose.tracklets.detection_timeout` decides.
         frames = self._board.get_frames(self._pose_stage)
         players = len(frames)
-        # This tick's hit and the hit streak: HitSync's, published on the board just before this tick.
-        self._streak = self._board.get_hit_streak()
-        hit = self._streak.hit
+        # This tick's hit and the hit streak: the pipeline's, on the LERP poses and group record just written.
+        hit = any(frame[Hit].on for frame in frames.values())
+        self._sync_hits = self._board.get_group(self._pose_stage)[HitStreak].hits
 
         if not self._entered:
             # Start: always enter OFF (see __init__) — `manual.select` is not consulted; OFF

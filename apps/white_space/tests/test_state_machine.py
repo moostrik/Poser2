@@ -1,23 +1,31 @@
 """Tests for the show StateMachine — the CSV transition graph in both modes,
 bar-denominated durations, goto/hold, motor commands, and looks. The hits and the
-streak of alike ones come from the board (HitSync's, tested in test_hit_sync.py); the room's
+streak of alike ones come from the LERP poses and group record (the pipeline's, tested in test_hit.py and test_hit_sync.py); the room's
 group sync from the board (the pipeline's gate on the LERP group record, tested in modules/pose/tests/test_group_sync_gate.py)."""
 
 import unittest
 from types import SimpleNamespace
 
-from modules.board import HitStreak
+import numpy as np
 
 from modules.pose import GroupRecord, GroupSync
 
 from apps.white_space.light import LayerId, LightSettings, MotorMode, Tick
+from apps.white_space.pose import Hit, HitStreak
 from apps.white_space.statemachine import StateId, StateMachine, StateMachineSettings, machine as machine_module
 
 POSE_STAGE = 4
 
 
 class FakeFrame:
-    """A pose frame is a present player; the machine reads nothing else from it."""
+    """A pose frame is a present player; the machine reads nothing else from it but its Hit."""
+
+    def __init__(self, hit: bool = False) -> None:
+        self.hit = hit
+
+    def __getitem__(self, feature_type):
+        assert feature_type is Hit
+        return Hit.from_value(1.0 if self.hit else 0.0)
 
 
 class FakeBoard:
@@ -26,7 +34,7 @@ class FakeBoard:
         self.is_locked: bool = False       # the playhead lock at BEAM
         self.is_projecting: bool = False   # fast enough for the projection to show
         self.frames: dict[int, FakeFrame] = {}
-        self.hit_streak: HitStreak = HitStreak()
+        self.sync_hits: int = 0            # HitSync's streak on the LERP group record
         self.group_sync: bool = False      # the pipeline's gate on the LERP group record
 
     def get_playhead_signals(self):
@@ -39,10 +47,8 @@ class FakeBoard:
 
     def get_group(self, stage: int) -> GroupRecord:
         assert stage == POSE_STAGE
-        return GroupRecord(features={GroupSync: GroupSync.from_value(1.0 if self.group_sync else 0.0)})
-
-    def get_hit_streak(self) -> HitStreak:
-        return self.hit_streak
+        return GroupRecord(features={GroupSync: GroupSync.from_value(1.0 if self.group_sync else 0.0),
+                                     HitStreak: HitStreak.from_values(np.array([self.sync_hits, 0.0], dtype=np.float32))})
 
 
 class StateMachineTest(unittest.TestCase):
@@ -85,14 +91,15 @@ class StateMachineTest(unittest.TestCase):
         self.tick()
 
     def hit(self, dbar: float = 0.0) -> None:
-        """This tick the playhead crosses a player (HitSync's hit flag on the board), then the pass is over."""
-        self.board.hit_streak = HitStreak(hit=True, hits=self.board.hit_streak.hits)
+        """This tick the playhead crosses a player (their pose's Hit), then the pass is over."""
+        frame = next(iter(self.board.frames.values()))
+        frame.hit = True
         self.tick(dbar=dbar)
-        self.board.hit_streak = HitStreak(hit=False, hits=self.board.hit_streak.hits)
+        frame.hit = False
 
     def set_streak(self, hits: int) -> None:
-        """HitSync's streak on the board: this many hits in a row struck alike poses."""
-        self.board.hit_streak = HitStreak(hit=False, hits=hits)
+        """HitSync's streak on the LERP group record: this many hits in a row struck alike poses."""
+        self.board.sync_hits = hits
 
     def set_group_sync(self, on: bool) -> None:
         """The pipeline's gate on the board: the group in sync."""
