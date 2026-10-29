@@ -21,7 +21,7 @@ from modules.settings import BaseSettings, Field, Widget
 class EuroSmootherSettings(BaseSettings):
     """Configuration for the One Euro smoother: two low-pass filters and one rule.
 
-        difference = (raw - previous smoothed) * frame rate
+        difference = (raw - previous smoothed) / dt           # dt: the time between the frames' stamps
         difference = low-pass(difference, d_cutoff)      # signed: jitter cancels, a move stays
         cutoff     = min_cutoff + cutoff_rise * |difference|
         smoothed   = low-pass(raw, cutoff)
@@ -35,10 +35,8 @@ class EuroSmootherSettings(BaseSettings):
 
     Tuning: stand still and lower min_cutoff until the jitter is gone, then move fast and
     raise cutoff_rise until it stops trailing. d_cutoff 1.0 is the One Euro default and
-    measured near-optimal. min_cutoff is frame-rate independent; check cutoff_rise after
-    changing the frame rate.
+    measured near-optimal. Both are in Hz, so they hold at any frame rate.
     """
-    frequency:   Field[float] = Field(30.0,  access=Field.INIT)
     min_cutoff:  Field[float] = Field(1.0,   min=0.001, max=10.0,  widget=Widget.log_slider, description="Minimum low-pass cutoff (Hz). Lower = more smooth, more lag")
     cutoff_rise: Field[float] = Field(0.025, min=0.001, max=100.0, widget=Widget.log_slider, description="Cutoff rise per raw-smoothed difference per second (Hz); lower = smoother")
     d_cutoff:    Field[float] = Field(1.0,   min=0.1,   max=10.0,  visible=False,            description="Low-pass on the raw-smoothed difference (Hz); lower = smoother when still")
@@ -63,7 +61,6 @@ class FeatureEuroSmoother(FilterNode):
         smoother_cls = self._SMOOTH_MAP[feature_type]
         self._smoother = smoother_cls(
             vector_size=feature_type.length(),
-            frequency=settings.frequency,
             min_cutoff=settings.min_cutoff,
             cutoff_rise=settings.cutoff_rise,
             d_cutoff=settings.d_cutoff,
@@ -79,14 +76,13 @@ class FeatureEuroSmoother(FilterNode):
             pass  # Settings already cleaned up or listener not found
 
     def _on_settings_changed(self, _=None) -> None:
-        self._smoother.frequency = self.settings.frequency
         self._smoother.min_cutoff = self.settings.min_cutoff
         self._smoother.cutoff_rise = self.settings.cutoff_rise
         self._smoother.d_cutoff = self.settings.d_cutoff
 
     def process(self, pose: Frame) -> Frame:
         feature_data = pose[self._feature_type]
-        self._smoother.add_sample(feature_data.values)
+        self._smoother.add_sample(feature_data.values, pose.timestamp)
         smoothed_values: np.ndarray = self._smoother.value
         smoothed_data = type(feature_data)(values=smoothed_values, scores=feature_data.scores)
         return replace(pose, {self._feature_type: smoothed_data})

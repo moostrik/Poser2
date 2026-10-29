@@ -271,36 +271,48 @@ class PredictorTest(unittest.TestCase):
         out = self._predictor(PredictionMethod.LINEAR).process(_angle_frame(head=0.4))
         self.assertAlmostEqual(out[Angles][A.head], 0.4, places=6)
 
-    def test_linear_extrapolates_one_step(self) -> None:
+    def test_linear_extrapolates_one_lead(self) -> None:
         p = self._predictor(PredictionMethod.LINEAR)
-        p.process(_angle_frame(head=0.0))
-        p.process(_angle_frame(head=0.1))
-        self.assertAlmostEqual(p.process(_angle_frame(head=0.2))[Angles][A.head], 0.3, places=5)
+        p.process(_angle_frame(0 / FPS, head=0.0))
+        p.process(_angle_frame(1 / FPS, head=0.1))
+        self.assertAlmostEqual(p.process(_angle_frame(2 / FPS, head=0.2))[Angles][A.head], 0.3, places=5)
+
+    def test_dropped_frame_leaves_the_velocity_unchanged(self) -> None:
+        p = self._predictor(PredictionMethod.LINEAR)
+        p.process(_angle_frame(0 / FPS, head=0.0))
+        p.process(_angle_frame(1 / FPS, head=0.1))
+        self.assertAlmostEqual(p.process(_angle_frame(3 / FPS, head=0.3))[Angles][A.head], 0.4, places=5)
 
     def test_quadratic_is_exact_on_a_ramp_once_settled(self) -> None:
         p = self._predictor(PredictionMethod.QUADRATIC)
-        for v in (0.0, 0.1, 0.2):
-            p.process(_angle_frame(head=v))
-        self.assertAlmostEqual(p.process(_angle_frame(head=0.3))[Angles][A.head], 0.4, places=5)
+        for i, v in enumerate((0.0, 0.1, 0.2)):
+            p.process(_angle_frame(i / FPS, head=v))
+        self.assertAlmostEqual(p.process(_angle_frame(3 / FPS, head=0.3))[Angles][A.head], 0.4, places=5)
+
+    def test_quadratic_follows_an_acceleration(self) -> None:
+        p = self._predictor(PredictionMethod.QUADRATIC)
+        for i in range(4):
+            p.process(_angle_frame(i / FPS, head=0.01 * i * i))
+        self.assertAlmostEqual(p.process(_angle_frame(4 / FPS, head=0.16))[Angles][A.head], 0.25, places=4)
 
     def test_prediction_wraps_across_pi(self) -> None:
         p = self._predictor(PredictionMethod.LINEAR)
-        p.process(_angle_frame(head=math.pi - 0.2))
-        out = p.process(_angle_frame(head=math.pi - 0.05))[Angles][A.head]
+        p.process(_angle_frame(0 / FPS, head=math.pi - 0.2))
+        out = p.process(_angle_frame(1 / FPS, head=math.pi - 0.05))[Angles][A.head]
         self.assertAlmostEqual(out, wrap(math.pi + 0.1), places=5)
 
     def test_missing_value_predicts_nan_with_zero_score(self) -> None:
         p = self._predictor(PredictionMethod.QUADRATIC)
-        p.process(_angle_frame(head=0.1, left_knee=0.1))
-        out = p.process(_angle_frame(left_knee=0.2))[Angles]
+        p.process(_angle_frame(0 / FPS, head=0.1, left_knee=0.1))
+        out = p.process(_angle_frame(1 / FPS, left_knee=0.2))[Angles]
         self.assertTrue(math.isnan(out[A.head]))
         self.assertEqual(out.get_score(A.head), 0.0)
 
     def test_reset_clears_history(self) -> None:
         p = self._predictor(PredictionMethod.LINEAR)
-        p.process(_angle_frame(head=0.0))
+        p.process(_angle_frame(0 / FPS, head=0.0))
         p.reset()
-        self.assertAlmostEqual(p.process(_angle_frame(head=0.5))[Angles][A.head], 0.5, places=6)
+        self.assertAlmostEqual(p.process(_angle_frame(1 / FPS, head=0.5))[Angles][A.head], 0.5, places=6)
 
 
 class MovingAverageSmootherTest(unittest.TestCase):

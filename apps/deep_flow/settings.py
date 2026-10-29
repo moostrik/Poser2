@@ -131,8 +131,8 @@ class BboxFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0)
 
-    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
-    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
+    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings)
+    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings)
     interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
 class PointFeature(BaseSettings):
@@ -140,16 +140,16 @@ class PointFeature(BaseSettings):
     output_frequency:   Field[float] = Field(60.0)
 
     confidence_filter: Group[nodes.DualConfidenceFilterSettings] = Group(nodes.DualConfidenceFilterSettings)
-    smoother         : Group[nodes.EuroSmootherSettings]         = Group(nodes.EuroSmootherSettings, share=[frequency])
-    prediction       : Group[nodes.PredictorSettings]            = Group(nodes.PredictorSettings, share=[frequency])
+    smoother         : Group[nodes.EuroSmootherSettings]         = Group(nodes.EuroSmootherSettings)
+    prediction       : Group[nodes.PredictorSettings]            = Group(nodes.PredictorSettings)
     interpolator     : Group[nodes.ChaseInterpolatorSettings]    = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
 class AngleFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0)
 
-    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
-    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
+    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings)
+    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings)
     interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
     sticky      : Group[nodes.StickyFillerSettings]      = Group(nodes.StickyFillerSettings)
 
@@ -157,9 +157,9 @@ class VelocityFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0)
 
-    extractor   : Group[nodes.AngleVelocityExtractorSettings] = Group(nodes.AngleVelocityExtractorSettings, share=[frequency])
-    smoother    : Group[nodes.EuroSmootherSettings]           = Group(nodes.EuroSmootherSettings, share=[frequency])
-    prediction  : Group[nodes.PredictorSettings]              = Group(nodes.PredictorSettings, share=[frequency])
+    extractor   : Group[nodes.AngleVelocityExtractorSettings] = Group(nodes.AngleVelocityExtractorSettings)
+    smoother    : Group[nodes.EuroSmootherSettings]           = Group(nodes.EuroSmootherSettings)
+    prediction  : Group[nodes.PredictorSettings]              = Group(nodes.PredictorSettings)
     interpolator: Group[nodes.ChaseInterpolatorSettings]      = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
     sticky      : Group[nodes.StickyFillerSettings]           = Group(nodes.StickyFillerSettings)
 

@@ -165,8 +165,8 @@ class PointFeature(BaseSettings):
     sticky          : Group[nodes.StickyFillerSettings]      = Group(nodes.StickyFillerSettings)
 
 
-    smoother         : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
-    prediction       : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
+    smoother         : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings)
+    prediction       : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings)
     interpolator     : Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
 
@@ -174,8 +174,8 @@ class AngleFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
     output_frequency: Field[float] = Field(32.0)
 
-    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
-    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
+    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings)
+    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings)
     interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
     rate_limiter: Group[nodes.RateLimiterSettings]       = Group(nodes.RateLimiterSettings)
     sticky      : Group[nodes.StickyFillerSettings]      = Group(nodes.StickyFillerSettings)
@@ -185,8 +185,8 @@ class AzimuthFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
     output_frequency: Field[float] = Field(32.0)
 
-    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
-    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
+    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings)
+    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings)
     interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
 
@@ -194,7 +194,7 @@ class DistanceFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
     output_frequency: Field[float] = Field(32.0)
 
-    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
+    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings)
     interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
 
@@ -202,9 +202,9 @@ class VelocityFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
     output_frequency: Field[float] = Field(32.0)
 
-    extractor   : Group[nodes.AngleVelocityExtractorSettings] = Group(nodes.AngleVelocityExtractorSettings, share=[frequency])
-    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings, share=[frequency])
-    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings, share=[frequency])
+    extractor   : Group[nodes.AngleVelocityExtractorSettings] = Group(nodes.AngleVelocityExtractorSettings)
+    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings)
+    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings)
     interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
     sticky      : Group[nodes.StickyFillerSettings]      = Group(nodes.StickyFillerSettings)
 
@@ -225,7 +225,7 @@ class SimilarityFeature(BaseSettings):
     posture              : Group[analytics.PostureSimilaritySettings] = Group(analytics.PostureSimilaritySettings, share=[max_players])
     sticky               : Group[nodes.SimilarityStickyFillerSettings] = Group(nodes.SimilarityStickyFillerSettings)
     neutral_weight       : Group[NeutralWeightSettings]               = Group(NeutralWeightSettings)
-    smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, share=[frequency])
+    smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings)
     # LERP: interpolated to the output rate (the motion gate has no settings), then the group sync: the group's
     # level by its mode and the gate on it, with hysteresis, written to the LERP group record for the show.
     interpolator         : Group[nodes.ChaseInterpolatorSettings]     = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])

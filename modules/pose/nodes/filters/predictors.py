@@ -1,7 +1,7 @@
-"""Pose prediction filters for extrapolating future pose states.
+"""Pose prediction filters: a feature extrapolated ``lead`` seconds past its frame's stamp.
 
-Provides prediction for angles, points, and deltas using linear or quadratic
-extrapolation with proper handling of circular values and coordinate clamping.
+The fit (linear or quadratic) is on the last ``fit_frames`` frames and their stamps, so a dropped camera frame
+leaves the velocity as it is; angles wrap and points clamp.
 """
 
 # Standard library imports
@@ -15,14 +15,14 @@ from ...features import Angles, Azimuth, BBox, Points2D, AngleVelocity, AngleSym
 from .._utils.array_predict import AnglePredict, PointPredict, Predict, PredictionMethod
 from ..nodes import FilterNode
 from ...frame import Frame, replace
-from .rate_limiters import RateLimiterSettings
 from modules.settings import BaseSettings, Field
 
 
 class PredictorSettings(BaseSettings):
     """Configuration for pose prediction."""
-    frequency: Field[float] = Field(30.0, access=Field.INIT)
-    method:    Field[PredictionMethod] = Field(PredictionMethod.QUADRATIC)
+    method:     Field[PredictionMethod] = Field(PredictionMethod.QUADRATIC)
+    fit_frames: Field[int]   = Field(3, min=2, max=10, description="Frames the fit spans")
+    lead:       Field[float] = Field(1.0 / 30.0, min=0.0, max=0.5, step=0.001, description="Seconds past the frame's stamp the pose is extrapolated to")
 
 
 class FeaturePredictor(FilterNode):
@@ -43,8 +43,8 @@ class FeaturePredictor(FilterNode):
         predictor_cls = self._PREDICT_MAP[feature_type]
         self._predictor = predictor_cls(
             vector_size=feature_type.length(),
-            input_frequency=settings.frequency,
             method=settings.method,
+            fit_frames=settings.fit_frames,
             clamp_range=feature_type.range()
         )
         self.settings.bind_all(self._on_settings_changed)
@@ -72,12 +72,11 @@ class FeaturePredictor(FilterNode):
         return type(original_data)(values=predicted_values, scores=interpolated_scores)
 
     def process(self, pose: Frame) -> Frame:
-        """Add current feature data to predictor and return pose with predicted values."""
+        """Add the frame's feature to the fit and return the pose with the feature ``lead`` seconds ahead."""
         feature_data = pose[self._feature_type]
 
-        # Add sample and get prediction
-        self._predictor.add_sample(feature_data.values)
-        predicted_values: np.ndarray = self._predictor.value
+        self._predictor.add_sample(feature_data.values, pose.timestamp)
+        predicted_values: np.ndarray = self._predictor.at(pose.timestamp + self.settings.lead)
 
         # Create new feature data with predicted values
         predicted_data = self._create_predicted_data(feature_data, predicted_values)
@@ -91,8 +90,8 @@ class FeaturePredictor(FilterNode):
 
     def _on_settings_changed(self, _=None) -> None:
         """Handle configuration changes by updating predictor parameters."""
-        self._predictor.input_frequency = self.settings.frequency
         self._predictor.method = self.settings.method
+        self._predictor.fit_frames = self.settings.fit_frames
 
 
 # Convenience classes
