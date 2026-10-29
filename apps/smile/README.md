@@ -37,8 +37,9 @@ not in git, safe to delete); the app's own logs are in Poser2's `logs\`.
 * open PowerShell as administrator and type ```Set-ExecutionPolicy -ExecutionPolicy RemoteSigned```, so that PowerShell scripts run
 
 ### Allied Vision camera
-* download the Vimba SDK from [site](https://www.alliedvision.com/en/products/vimba-sdk/) (Vimba, not Vimba X: the app brings VimbaPython, which needs Vimba's VmbC)
-* run the installer as administrator and restart
+* download the Vimba 6 SDK from [site](https://www.alliedvision.com/en/products/vimba-sdk/) (Vimba, not Vimba X: the app brings VimbaPython, which needs Vimba's C API, `VimbaC`; the Viewer and the drivers alone are not enough)
+* run the installer as administrator and restart: it sets `VIMBA_HOME`, where VimbaPython finds `VimbaC\Bin\Win64\VimbaC.dll`; `apps\smile\scripts\install.bat` says whether it is there
+* without it SMILE starts with no camera device (`device: none`, an error line in the log): `-wc` for a webcam, or the panel's `use_image`
 * the camera's `UserSet2` holds its base configuration (format, the region of interest 1200 x 960 centred on the sensor, the 4:5 of the display, frame rate, packet size); the app loads it at every open and writes the panel's camera settings over it; the log line at open shows the region and the packet size it got
 * Ethernet adapter: Device Manager → the adapter → Advanced → **Jumbo Packet → 9014 Bytes** (it is off on a new PC and after a driver reinstall), and every switch between camera and PC must pass jumbo frames too. Otherwise the packet size stays 1500 and frames drop more easily. The SMILE log says at start which size the camera got: `packet size 8228` or more is good, `packet size 1500` means something on the path does not pass them and the log warns (the panel's `dropped_frames` shows how much that costs)
 

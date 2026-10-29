@@ -98,9 +98,14 @@ class SmileMain():
 
         # the camera device; the panel can switch to an image from input/ at any time
         if camType == CamType.VIMBA:
-            from apps.smile.cam.VimbaCam import VimbaCam
-            device = VimbaCam(self.settings.camera)
             device_name = 'vimba'
+            # without the Vimba 6 SDK (VIMBA_HOME, VimbaC) the binding cannot load: no device, the image still works
+            try:
+                from apps.smile.cam.VimbaCam import VimbaCam
+                device = VimbaCam(self.settings.camera)
+            except Exception as e:
+                logger.error('Vimba camera unavailable (is the Vimba 6 SDK installed? VIMBA_HOME): %s', e)
+                device = None
         else:
             from apps.smile.cam.WebCam import WebCam
             device = WebCam(self.settings.camera)

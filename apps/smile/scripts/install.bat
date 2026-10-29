@@ -26,13 +26,24 @@ if not exist "%VENV_DIR%\Scripts\python.exe" (
     echo [91mNo venv at %VENV_DIR%: run scripts\install.bat at the Poser2 root first[0m
     goto fail
 )
+echo [92mgit, git lfs and the venv found[0m
 where ffmpeg >nul 2>nul
 if %errorlevel% neq 0 (
     echo [93mffmpeg is not on the PATH: visitors cannot be saved as clips and the players cannot play them.[0m
     echo Download the "release full" build from https://www.gyan.dev/ffmpeg/builds/ , extract it and add its bin folder to the PATH.
 ) else (
-    echo [92mgit, git lfs, the venv and ffmpeg found[0m
+    echo [92mffmpeg found[0m
 )
+set "VIMBA_DLL="
+if defined VIMBA_HOME set "VIMBA_DLL=%VIMBA_HOME%\VimbaC\Bin\Win64\VimbaC.dll"
+if defined VIMBA_DLL if exist "%VIMBA_DLL%" (
+    echo [92mVimba SDK found: %VIMBA_HOME%[0m
+    goto vimba_done
+)
+echo [93mVimba SDK not found ^(VIMBA_HOME, VimbaC^): the Mako camera cannot open; SMILE runs with -wc or the panel's use_image.[0m
+echo Install the Vimba 6 SDK ^(not Vimba X, with its C API, not the Viewer alone^) as administrator from
+echo https://www.alliedvision.com/en/products/vimba-sdk/ and open a new terminal.
+:vimba_done
 echo.
 
 echo [44m ComfyUI [0m
