@@ -13,7 +13,7 @@ TAU = math.tau
 
 def _frame(azimuth: float) -> Frame:
     features = {} if math.isnan(azimuth) else {Azimuth: Azimuth.from_value(azimuth)}
-    return Frame(track_id=0, cam_id=0, time_stamp=0.0, features=features)
+    return Frame(track_id=0, cam_id=0, timestamp=0.0, features=features)
 
 
 class SingleAngleTest(unittest.TestCase):

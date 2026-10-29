@@ -102,7 +102,7 @@ class SubjectMark:
     def update(self, frame: FaceFrame | None, now: float, charge: float, active_color: Color = SUBJECT_COLOR, pad: Pad = NO_PAD) -> Mark | None:
         """The mark for this frame, its box `pad` inside the image."""
         subject: FaceObservation | None = None
-        if frame is not None and now - frame.time <= FACES_STALE:
+        if frame is not None and now - frame.timestamp <= FACES_STALE:
             subject = frame.subject
         self._far = 1.0
         if subject is not None:

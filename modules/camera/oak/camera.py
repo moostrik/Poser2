@@ -253,7 +253,7 @@ class Camera(Thread):
         now: float = time.perf_counter()
         tracklets: list[CameraTracklet] = [
             CameraTracklet(cam_id=self.id, id=t.id, status=TRACKING_STATUS[t.status],
-                           roi=Rect(t.roi.x, t.roi.y, t.roi.width, t.roi.height), age=t.age, time=now)
+                           roi=Rect(t.roi.x, t.roi.y, t.roi.width, t.roi.height), age=t.age, timestamp=now)
             for t in msg.tracklets]
         self.num_tracklets = len(tracklets)
         self.settings.readings.tracklets = self.num_tracklets
@@ -282,15 +282,15 @@ class Camera(Thread):
 
     def _emit_frame(self, kind: FrameType, image: ndarray) -> None:
         """The hand-over: the frame gets its host time here and goes to every callback."""
-        frame = CameraFrame(cam_id=self.id, kind=kind, image=image, time=time.perf_counter())
+        frame = CameraFrame(cam_id=self.id, kind=kind, image=image, timestamp=time.perf_counter())
         for c in self.frame_callbacks:
             c(frame)
 
-    def _emit_tracklets(self, tracklets: list[CameraTracklet], time: float) -> None:
+    def _emit_tracklets(self, tracklets: list[CameraTracklet], timestamp: float) -> None:
         if not self.running:
             return
         for c in self.tracklet_callbacks:
-            c(self.id, tracklets, time)
+            c(self.id, tracklets, timestamp)
 
     # ── CameraSource ───────────────────────────────────────────────────
 

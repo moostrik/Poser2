@@ -16,7 +16,7 @@ N = Similarity.length()
 def _frame(id: int, arms: float | None) -> Frame:
     """A present person; ``arms`` is their ArmDeviation (0 neutral .. 1 fully out), None leaves it absent (NaN)."""
     feats = {} if arms is None else {ArmDeviation: ArmDeviation.from_value(arms)}
-    return Frame(track_id=id, cam_id=0, time_stamp=0.0, features=feats)
+    return Frame(track_id=id, cam_id=0, timestamp=0.0, features=feats)
 
 
 def _row(**pairs: float) -> Similarity:

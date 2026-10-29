@@ -16,7 +16,7 @@ class FrameType(Enum):
 class CameraFrame:
     """One frame from one camera.
 
-    `time` is the host's arrival time on the one clock, `time.perf_counter()`, stamped by the
+    `timestamp` is the host's arrival time on the one clock, `time.perf_counter()`, stamped by the
     backend at hand-over; camera timestamps are not used, and everything downstream takes its
     time from the frame instead of reading a clock (the wall clock is for file names only).
     `image` is BGR uint8 (H, W, 3) or gray uint8 (H, W), as the backend delivers it.
@@ -24,4 +24,4 @@ class CameraFrame:
     cam_id: int
     kind: FrameType
     image: np.ndarray
-    time: float
+    timestamp: float

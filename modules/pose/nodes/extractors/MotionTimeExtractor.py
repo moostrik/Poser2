@@ -22,23 +22,23 @@ class MotionTimeExtractor(FilterNode):
 
     def __init__(self) -> None:
         self.motion_time: float = 0.0
-        self.prev_time_stamp: float | None = None
+        self.prev_timestamp: float | None = None
 
     def process(self, pose: Frame) -> Frame:
         """Accumulate finite angular motion since the previous frame and stamp ``MotionTime``."""
 
-        if self.prev_time_stamp is not None:
-            dt: float = pose.time_stamp - self.prev_time_stamp
+        if self.prev_timestamp is not None:
+            dt: float = pose.timestamp - self.prev_timestamp
             if math.isfinite(dt) and dt > 0.0:
                 velocities = pose[AngleVelocity].values
                 finite = np.isfinite(velocities)              # drop inf and NaN, not just NaN
                 total_delta: float = float(np.abs(velocities[finite]).sum()) / np.pi * dt
                 if math.isfinite(total_delta):
                     self.motion_time += total_delta
-        self.prev_time_stamp = pose.time_stamp
+        self.prev_timestamp = pose.timestamp
 
         return replace(pose, {MotionTime: MotionTime.from_value(self.motion_time)})
 
     def reset(self) -> None:
         self.motion_time = 0.0
-        self.prev_time_stamp = None
+        self.prev_timestamp = None

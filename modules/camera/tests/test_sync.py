@@ -15,9 +15,9 @@ class _Recorder:
         self._name = name
         self._calls = calls
 
-    def bang(self, time: float) -> None:
+    def bang(self, timestamp: float) -> None:
         self._calls.append(self._name)
-        self.time = time
+        self.timestamp = timestamp
 
 
 class SyncCallbackTest(unittest.TestCase):
@@ -30,7 +30,7 @@ class SyncCallbackTest(unittest.TestCase):
         sync.add_sync_callback(recorders[1].bang)                 # registered twice: called once, first position
         sync.submit_frame(CameraFrame(0, FrameType.VIDEO, np.zeros((2, 2), np.uint8), 12.5))   # one camera: its first frame bangs
         self.assertEqual(calls, list(range(16)))
-        self.assertEqual(recorders[0].time, 12.5)       # the bang carries the frame's time
+        self.assertEqual(recorders[0].timestamp, 12.5)       # the bang carries the frame's time
 
 
 if __name__ == '__main__':

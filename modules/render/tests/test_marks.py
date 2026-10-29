@@ -61,7 +61,7 @@ def observation(cam_id: int, local_angle: float, world_angle: float, *, overlap:
         annotation=PanoramicAnnotation(local_angle=local_angle, world_angle=world_angle,
                                        overlap=overlap, distance=distance, height=1.8,
                                        player=player),
-        time_stamp=0.0, created_at=0.0, last_active=0.0,
+        timestamp=0.0, created_at=0.0, last_active=0.0,
     )
 
 

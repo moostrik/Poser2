@@ -18,7 +18,7 @@ def _frame(**joints: float) -> Frame:
     for name, angle in joints.items():
         values[AngleLandmark[name]] = angle
         scores[AngleLandmark[name]] = 1.0
-    return Frame(track_id=0, cam_id=0, time_stamp=0.0, features={Angles: Angles(values, scores)})
+    return Frame(track_id=0, cam_id=0, timestamp=0.0, features={Angles: Angles(values, scores)})
 
 
 def _settings() -> LegDeviationExtractorSettings:
@@ -80,7 +80,7 @@ class AngleSymExtractorTest(unittest.TestCase):
         f = _frame(left_shoulder=0.5, right_shoulder=0.5)
         scores = f[Angles].scores.copy()
         scores[AngleLandmark.right_shoulder] = 0.4
-        f = Frame(track_id=0, cam_id=0, time_stamp=0.0, features={Angles: Angles(f[Angles].values.copy(), scores)})
+        f = Frame(track_id=0, cam_id=0, timestamp=0.0, features={Angles: Angles(f[Angles].values.copy(), scores)})
         self.assertAlmostEqual(self._sym(f).get_score(SymmetryElement.shoulder), 0.4, places=5)
 
 

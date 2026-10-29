@@ -72,7 +72,7 @@ class ReplayCameraTest(unittest.TestCase):
         self.assertEqual(len(self.frames), 1)
         self.assertEqual(self.frames[0].cam_id, 1)
         self.assertIs(self.frames[0].image, image)
-        self.assertGreaterEqual(self.frames[0].time, before)
+        self.assertGreaterEqual(self.frames[0].timestamp, before)
         self.assertEqual(self.detector.submitted, [(1, image)])
         self.assertTrue(self.camera.connected)
 
@@ -87,7 +87,7 @@ class ReplayCameraTest(unittest.TestCase):
         self.assertEqual(tracklets[0].roi, Rect(0.1, 0.2, 0.3, 0.4))
         self.assertEqual(tracklets[0].cam_id, 1)
         self.assertGreaterEqual(t, before)
-        self.assertTrue(all(tr.time == t for tr in tracklets))
+        self.assertTrue(all(tr.timestamp == t for tr in tracklets))
         self.assertEqual(self.settings.readings.tracklets, 2)
 
     def test_nobody_is_a_message_too(self) -> None:

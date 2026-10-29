@@ -13,7 +13,7 @@ from ._builders import scalar
 
 class FrameAccessTest(unittest.TestCase):
     def test_missing_feature_is_nan_dummy_with_zero_scores(self) -> None:
-        f = Frame(track_id=1, cam_id=2, time_stamp=3.0)
+        f = Frame(track_id=1, cam_id=2, timestamp=3.0)
         angles = f[Angles]
         self.assertIsInstance(angles, Angles)
         self.assertTrue(np.all(np.isnan(angles.values)))
@@ -28,11 +28,11 @@ class FrameAccessTest(unittest.TestCase):
         self.assertEqual(len(f), 1)
 
     def test_identity_slots(self) -> None:
-        f = Frame(track_id=4, cam_id=2, time_stamp=12.5)
-        self.assertEqual((f.track_id, f.cam_id, f.time_stamp), (4, 2, 12.5))
+        f = Frame(track_id=4, cam_id=2, timestamp=12.5)
+        self.assertEqual((f.track_id, f.cam_id, f.timestamp), (4, 2, 12.5))
 
     def test_timestamp_is_the_one_given(self) -> None:
-        self.assertEqual(Frame(0, 0, 7.5).time_stamp, 7.5)
+        self.assertEqual(Frame(0, 0, 7.5).timestamp, 7.5)
 
 
 class FrameImmutabilityTest(unittest.TestCase):
@@ -53,12 +53,12 @@ class FrameImmutabilityTest(unittest.TestCase):
 class ReplaceTest(unittest.TestCase):
     def test_merges_updates_and_keeps_identity(self) -> None:
         age = Age.from_value(1.0)
-        src = Frame(track_id=3, cam_id=1, time_stamp=7.0, features={Age: age})
+        src = Frame(track_id=3, cam_id=1, timestamp=7.0, features={Age: age})
         angles = scalar(Angles, {AngleLandmark.head: 0.2})
         out = replace(src, {Angles: angles})
         self.assertIs(out[Age], age)
         self.assertIs(out[Angles], angles)
-        self.assertEqual((out.track_id, out.cam_id, out.time_stamp), (3, 1, 7.0))
+        self.assertEqual((out.track_id, out.cam_id, out.timestamp), (3, 1, 7.0))
 
     def test_overwrites_existing_feature(self) -> None:
         src = Frame(0, 0, 0.0, {Age: Age.from_value(1.0)})

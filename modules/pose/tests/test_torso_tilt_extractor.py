@@ -30,7 +30,7 @@ def _frame(hip_mid: tuple[float, float], shoulder_mid: tuple[float, float],
     if drop is not None:
         values[drop] = (np.nan, np.nan)
         scores[drop] = 0.0
-    return Frame(track_id=0, cam_id=0, time_stamp=0.0, features={Points2D: Points2D(values, scores)})
+    return Frame(track_id=0, cam_id=0, timestamp=0.0, features={Points2D: Points2D(values, scores)})
 
 
 def _lean(angle: float, spine: float = 0.4) -> Frame:

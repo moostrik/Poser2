@@ -101,7 +101,7 @@ class Camera:
         self.video_fps.processed()
         self.settings.readings.video_fps = self.video_fps.get_rate_average()
         self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
-        frame = CameraFrame(cam_id=self.id, kind=frame_type, image=image, time=time.perf_counter())
+        frame = CameraFrame(cam_id=self.id, kind=frame_type, image=image, timestamp=time.perf_counter())
         for c in self.frame_callbacks:
             c(frame)
         if self.detector is not None:
@@ -116,7 +116,7 @@ class Camera:
         self.tracklet_fps.processed()
         self.settings.readings.tracker_fps = self.tracklet_fps.get_rate_average()
         tracklets: list[CameraTracklet] = [
-            CameraTracklet(cam_id=self.id, id=t.id, status=t.status, roi=t.roi, age=t.age, time=now)
+            CameraTracklet(cam_id=self.id, id=t.id, status=t.status, roi=t.roi, age=t.age, timestamp=now)
             for t in self.tracker.update(detection.boxes)]
         self.settings.readings.tracklets = len(tracklets)
         for c in self.tracklet_callbacks:

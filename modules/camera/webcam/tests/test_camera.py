@@ -67,7 +67,7 @@ class TestWebCamera(unittest.TestCase):
         frame = self.frames[0]
         self.assertEqual(frame.cam_id, 0)
         self.assertEqual(frame.image.shape, (4, 6, 3))
-        self.assertGreaterEqual(frame.time, before)
+        self.assertGreaterEqual(frame.timestamp, before)
         self.assertGreater(self.settings.readings.video_fps, 0.0)
         self.assertGreater(self.settings.readings.video_min_fps, 0.0)
 

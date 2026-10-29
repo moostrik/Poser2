@@ -66,7 +66,7 @@ is the face's `Rejection`, and `distance()` says how far the face is from qualif
 just past a limit, 1 when its worst check is `falloff` times the limit past it). Gaze is not checked: the "looking at viewer" LoRA corrects it. The subject of a frame is its largest qualifying face.
 The flash is earned: the `Sequencer` keeps a **charge** that rises while the newest detector frame
 has a qualifying subject (`sequence.charge` seconds to fill) and drains while it has none
-(`sequence.drain` seconds, slower); a detector frame is as old as its camera frame (`FaceFrame.time`),
+(`sequence.drain` seconds, slower); a detector frame is as old as its camera frame (`FaceFrame.timestamp`),
 and one older than half a second counts as nobody. CAMERA_SHOW is an empty charge, CAMERA_DETECT a partial one
 (its progress is the charge, also for OSC and Art-Net), and a full one starts the flash. A manual
 start charges without a face; one that gets blocked before it is full is dropped, it does not wait. The capture is the last frame in which the subject qualified (the

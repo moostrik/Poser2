@@ -92,6 +92,6 @@ class Camera(Thread):
         self.video_fps.processed()
         self.settings.readings.video_fps = self.video_fps.get_rate_average()
         self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
-        frame = CameraFrame(cam_id=self.id, kind=FrameType.VIDEO, image=image, time=time.perf_counter())
+        frame = CameraFrame(cam_id=self.id, kind=FrameType.VIDEO, image=image, timestamp=time.perf_counter())
         for callback in self.frame_callbacks:
             callback(frame)

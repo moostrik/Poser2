@@ -20,7 +20,7 @@ def _frame(**arms: float) -> Frame:
     for name, degrees in arms.items():
         values[AngleLandmark[name]] = math.radians(degrees)
         scores[AngleLandmark[name]] = 1.0
-    return Frame(track_id=0, cam_id=0, time_stamp=0.0, features={Angles: Angles(values, scores)})
+    return Frame(track_id=0, cam_id=0, timestamp=0.0, features={Angles: Angles(values, scores)})
 
 
 def _settings(n_top: int = 1) -> ArmDeviationExtractorSettings:

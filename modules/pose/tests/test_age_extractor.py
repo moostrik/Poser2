@@ -8,7 +8,7 @@ from modules.pose.nodes import AgeExtractor
 
 
 def _frame(t: float) -> Frame:
-    return Frame(track_id=0, cam_id=0, time_stamp=t, features={})
+    return Frame(track_id=0, cam_id=0, timestamp=t, features={})
 
 
 class AgeExtractorTest(unittest.TestCase):

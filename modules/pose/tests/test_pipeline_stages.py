@@ -248,7 +248,7 @@ class PipelineStagesTest(unittest.TestCase):
                 for tick, tid, f in self._frames(stage):
                     self.assertEqual(f.track_id, tid)
                     self.assertEqual(f.cam_id, tid)
-                    self.assertAlmostEqual(f.time_stamp, tick / FPS, places=9)
+                    self.assertAlmostEqual(f.timestamp, tick / FPS, places=9)
 
     def test_every_present_track_comes_out_of_every_stage(self) -> None:
         for tick, outputs in enumerate(self.history):

@@ -21,7 +21,7 @@ def _frame(left: float = float("nan"), right: float = float("nan"),
         if not math.isnan(value):
             values[element] = value
             scores[element] = score
-    return Frame(track_id=0, cam_id=0, time_stamp=0.0, features={ArmTravel: ArmTravel(values, scores)})
+    return Frame(track_id=0, cam_id=0, timestamp=0.0, features={ArmTravel: ArmTravel(values, scores)})
 
 
 class ShoulderDifferenceExtractorTest(unittest.TestCase):

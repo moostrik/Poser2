@@ -99,7 +99,7 @@ class CameraLayer(LayerBase):
         r, g, b, a = self.settings.face_color
         now: float = time.perf_counter()
         frame: FaceFrame | None = self._faces.get()
-        if frame is not None and now - frame.time > FACES_STALE:
+        if frame is not None and now - frame.timestamp > FACES_STALE:
             frame = None
         # not ready: the image in pixels that halve per step, and no face (nobody can start)
         warmup: int | None = self.warmup

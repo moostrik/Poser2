@@ -129,7 +129,7 @@ class Camera:
         if self.settings.use_image or self._online:
             return
         # the one fit of every source to the output size: the device sends its frames as they are
-        self._emit(cover(frame.image, self._width, self._height), frame.time)
+        self._emit(cover(frame.image, self._width, self._height), frame.timestamp)
 
     # ONLINE SOURCE: the frames of a phone during its turn (modules/online/), in place of the device
     # and the image; the device keeps running underneath and is back the moment the turn ends

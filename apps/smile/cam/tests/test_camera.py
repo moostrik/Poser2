@@ -40,7 +40,7 @@ class FakeDevice:
         self.callbacks.append(callback)
 
     def push(self, image: np.ndarray) -> None:
-        frame = CameraFrame(cam_id=0, kind=FrameType.VIDEO, image=image, time=time.perf_counter())
+        frame = CameraFrame(cam_id=0, kind=FrameType.VIDEO, image=image, timestamp=time.perf_counter())
         for c in self.callbacks:
             c(frame)
 

@@ -14,7 +14,7 @@ keyed by feature class.
 Identity (fixed slots):
   • track_id: int          — Tracked object ID
   • cam_id: int            — Camera source ID
-  • time_stamp: float      — The host time of the camera frame it came from (`CameraFrame.time`, perf_counter)
+  • timestamp: float       — The host time of the camera frame it came from (`CameraFrame.timestamp`, perf_counter)
 
 Feature Access:
   • frame[FeatureType]           → feature instance (NaN dummy if not yet set)
@@ -31,7 +31,7 @@ Immutability:
 
 Construction:
   • Frame(track_id, cam_id)
-  • Frame(track_id, cam_id, time_stamp=t, features={Angles: angles, BBox: bbox})
+  • Frame(track_id, cam_id, timestamp=t, features={Angles: angles, BBox: bbox})
 
 Feature Authoring Guide:
 ========================
@@ -68,18 +68,18 @@ T = TypeVar('T')
 class Frame:
     """Immutable pose data container — identity slots + feature dict."""
 
-    __slots__ = ('_track_id', '_cam_id', '_time_stamp', '_features')
+    __slots__ = ('_track_id', '_cam_id', '_timestamp', '_features')
 
     def __init__(
         self,
         track_id: int,
         cam_id: int,
-        time_stamp: float,
+        timestamp: float,
         features: dict[type[BaseFeature], BaseFeature] | None = None,
     ) -> None:
         object.__setattr__(self, '_track_id', track_id)
         object.__setattr__(self, '_cam_id', cam_id)
-        object.__setattr__(self, '_time_stamp', time_stamp)
+        object.__setattr__(self, '_timestamp', timestamp)
         object.__setattr__(self, '_features', dict(features) if features else {})
 
     # ========== IDENTITY ==========
@@ -93,8 +93,8 @@ class Frame:
         return self._cam_id
 
     @property
-    def time_stamp(self) -> float:
-        return self._time_stamp
+    def timestamp(self) -> float:
+        return self._timestamp
 
     # ========== FEATURE ACCESS ==========
 
@@ -143,7 +143,7 @@ def replace(frame: Frame, updates: dict[type[BaseFeature], BaseFeature]) -> Fram
     return Frame(
         track_id=frame._track_id,
         cam_id=frame._cam_id,
-        time_stamp=frame._time_stamp,
+        timestamp=frame._timestamp,
         features=merged,
     )
 

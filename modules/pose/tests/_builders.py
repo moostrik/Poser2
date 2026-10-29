@@ -18,7 +18,7 @@ FPS = 30.0
 
 def frame(track_id: int = 0, t: float = 0.0, cam_id: int = 0, features: dict | None = None) -> Frame:
     """A pose frame with an explicit timestamp."""
-    return Frame(track_id=track_id, cam_id=cam_id, time_stamp=t, features=features)
+    return Frame(track_id=track_id, cam_id=cam_id, timestamp=t, features=features)
 
 
 def scalar(feature_type: type[BaseScalarFeature], values: dict[int, float], score: float = 1.0) -> BaseScalarFeature:

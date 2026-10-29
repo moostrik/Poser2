@@ -57,10 +57,10 @@ class Tracker(Thread, BaseTracker):
             self._tracklet_callbacks.clear()
         self.join(timeout=1.0)
 
-    def notify_update(self, time: float) -> None:
+    def notify_update(self, timestamp: float) -> None:
         """The tracklet bang: a tick at the time of the message that triggered it."""
         if self._running:
-            self._update_time = time
+            self._update_time = timestamp
             self._update_event.set()
 
     def run(self) -> None:
@@ -163,7 +163,7 @@ class Tracker(Thread, BaseTracker):
             if callback not in self._tracklet_callbacks:
                 self._tracklet_callbacks.append(callback)
 
-    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[CameraTracklet], time: float) -> None:
+    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[CameraTracklet], timestamp: float) -> None:
         tracklet_list: list[Tracklet] = [Tracklet.from_camera(t) for t in cam_tracklets]
         if tracklet_list:
             self._input_queue.put(tracklet_list)

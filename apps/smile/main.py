@@ -341,7 +341,7 @@ class SmileMain():
 
     def face_callback(self, frame: FaceFrame) -> None:
         # the sequencer charges toward the flash while the face qualifies
-        self.sequencer.set_face(frame.qualified, frame.time)
+        self.sequencer.set_face(frame.qualified, frame.timestamp)
         self.online.on_face(frame)
 
     def diffusion_callback(self, message: GenMessage) -> None:

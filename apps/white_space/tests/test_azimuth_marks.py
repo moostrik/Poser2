@@ -11,7 +11,7 @@ def _frame(track_id: int, azimuth: float, bbox_azimuth: float | None = None) -> 
     features: dict = {Azimuth: Azimuth.from_value(azimuth)}
     if bbox_azimuth is not None:
         features[BBoxAzimuth] = BBoxAzimuth.from_value(bbox_azimuth)
-    return Frame(track_id=track_id, cam_id=0, time_stamp=0.0, features=features)
+    return Frame(track_id=track_id, cam_id=0, timestamp=0.0, features=features)
 
 
 class BuildAzimuthMarksTest(unittest.TestCase):

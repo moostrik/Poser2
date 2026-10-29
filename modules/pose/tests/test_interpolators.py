@@ -96,7 +96,7 @@ class ChaseInterpolatorTest(unittest.TestCase):
         node = AngleChaseInterpolator(ChaseInterpolatorSettings())
         node.set(frame(track_id=2, t=4.0, features={Angles: scalar(Angles, {A.head: 0.1})}))
         out = node.update()
-        self.assertEqual((out.track_id, out.time_stamp), (2, 4.0))
+        self.assertEqual((out.track_id, out.timestamp), (2, 4.0))
 
     def test_reset_returns_to_not_ready(self) -> None:
         node = AngleChaseInterpolator(ChaseInterpolatorSettings())

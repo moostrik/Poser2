@@ -14,13 +14,13 @@ from modules.pose.nodes import MotionTimeExtractor
 def _vel_frame(velocity: float, t: float) -> Frame:
     n = len(AngleVelocity.enum())
     vel = AngleVelocity(np.full(n, velocity, dtype=np.float32), np.full(n, 1.0, dtype=np.float32))
-    return Frame(track_id=0, cam_id=0, time_stamp=t, features={AngleVelocity: vel})
+    return Frame(track_id=0, cam_id=0, timestamp=t, features={AngleVelocity: vel})
 
 
 class MotionTimeRobustnessTest(unittest.TestCase):
     def test_inf_velocity_zero_dt_never_poisons(self) -> None:
         ex = MotionTimeExtractor()
-        ex.process(_vel_frame(0.0, t=1.0))                     # establishes prev_time_stamp
+        ex.process(_vel_frame(0.0, t=1.0))                     # establishes prev_timestamp
         out = ex.process(_vel_frame(np.inf, t=1.0))            # inf velocity on a dt==0 tick
         self.assertFalse(math.isnan(out[MotionTime].value))
         later = ex.process(_vel_frame(1.0, t=2.0))             # normal tick still accumulates finitely

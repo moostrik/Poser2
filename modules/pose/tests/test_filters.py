@@ -88,7 +88,7 @@ class FilterContractTest(unittest.TestCase):
                 for i in range(3):
                     src = frame(track_id=2, cam_id=1, t=i / FPS)
                     out = node.process(src)
-                    self.assertEqual((out.track_id, out.cam_id, out.time_stamp), (2, 1, i / FPS))
+                    self.assertEqual((out.track_id, out.cam_id, out.timestamp), (2, 1, i / FPS))
                     _assert_features_valid(self, out)
 
     def test_populated_frames_keep_identity_and_input(self) -> None:
@@ -98,7 +98,7 @@ class FilterContractTest(unittest.TestCase):
                     src = _full_frame(i)
                     pts, n = src[Points2D], len(src)
                     out = node.process(src)
-                    self.assertEqual((out.track_id, out.cam_id, out.time_stamp), (1, 0, i / FPS))
+                    self.assertEqual((out.track_id, out.cam_id, out.timestamp), (1, 0, i / FPS))
                     self.assertIs(src[Points2D], pts)
                     self.assertEqual(len(src), n)
                     _assert_features_valid(self, out)

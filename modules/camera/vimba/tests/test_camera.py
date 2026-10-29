@@ -160,7 +160,7 @@ class TestVimbaCamReopen(unittest.TestCase):
         self.assertTrue(wait_for(self.push))
         self.assertTrue(self.cam.connected)
         self.assertEqual(self.frames[0].image.shape, (4, 6, 3))
-        self.assertGreater(self.frames[0].time, 0.0)
+        self.assertGreater(self.frames[0].timestamp, 0.0)
 
     def test_a_camera_whose_frames_stop_is_opened_again(self):
         self.cam.start()

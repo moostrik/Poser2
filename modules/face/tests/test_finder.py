@@ -33,7 +33,7 @@ class TestFaceFinder(unittest.TestCase):
         # not the time of the detection: a camera that stopped must go stale
         self.finder._process(self.image, 12.5, NoFaces(), None)
         self.assertEqual(len(self.frames), 1)
-        self.assertEqual(self.frames[0].time, 12.5)
+        self.assertEqual(self.frames[0].timestamp, 12.5)
         self.assertFalse(self.frames[0].qualified)
 
 

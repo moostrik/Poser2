@@ -21,7 +21,7 @@ class CameraTracklet:
     """Device-neutral: what a camera's object tracker says about one track, in its own frame.
 
     `id` is the device tracker's id for the track and `age` its age in frames; `roi` is normalised
-    to the delivered frame; `time` is the host arrival time of the message (`time.perf_counter()`,
+    to the delivered frame; `timestamp` is the host arrival time of the message (`time.perf_counter()`,
     stamped by the backend at hand-over, the same for every tracklet of one message). `keypoints`
     is empty until a backend fills it (OAK4).
     """
@@ -30,5 +30,5 @@ class CameraTracklet:
     status: TrackingStatus
     roi: Rect
     age: int
-    time: float
+    timestamp: float
     keypoints: np.ndarray | None = None

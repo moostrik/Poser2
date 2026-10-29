@@ -30,7 +30,7 @@ FOV = 110.0
 def stamps(seconds_ago: float = 0.0) -> dict[str, float]:
     """A tracklet's three times, `seconds_ago` before now."""
     t: float = time.perf_counter() - seconds_ago
-    return {'time_stamp': t, 'created_at': t, 'last_active': t}
+    return {'timestamp': t, 'created_at': t, 'last_active': t}
 
 
 def make_tracklet(cam_id: int, ext_id: int, local_angle: float, *,

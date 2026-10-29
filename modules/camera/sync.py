@@ -36,10 +36,10 @@ class Sync:
         self._lock = Lock()
 
     def submit_frame(self, frame: CameraFrame) -> None:
-        self._submit(frame.cam_id, frame.time)
+        self._submit(frame.cam_id, frame.timestamp)
 
-    def submit_tracklets(self, cam_id: int, tracklets: list[CameraTracklet], time: float) -> None:
-        self._submit(cam_id, time)
+    def submit_tracklets(self, cam_id: int, tracklets: list[CameraTracklet], timestamp: float) -> None:
+        self._submit(cam_id, timestamp)
 
     def _submit(self, cam_id: int, timestamp: float) -> None:
         """A message with its host time; the bang carries the time of the message that triggered it."""

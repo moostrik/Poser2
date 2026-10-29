@@ -18,7 +18,7 @@ class Tracklet:
     id: int = field(default=-1)          # world identity in a tracker's store; the player slot on its emitted copies
     obs_id: int = field(default=-1)      # this observation's identity, assigned by a store
 
-    time_stamp: float = field(kw_only=True)     # the message this observation came with
+    timestamp: float = field(kw_only=True)     # the message this observation came with
     created_at: float = field(kw_only=True)
     last_active: float = field(kw_only=True)    # Last time person was actually detected (NEW/TRACKED)
 
@@ -56,9 +56,9 @@ class Tracklet:
         """The tracklet a camera reports, as the tracker takes it in."""
         return cls(
             cam_id=tracklet.cam_id,
-            time_stamp=tracklet.time,
-            created_at=tracklet.time,
-            last_active=tracklet.time,
+            timestamp=tracklet.timestamp,
+            created_at=tracklet.timestamp,
+            last_active=tracklet.timestamp,
             status=tracklet.status,
             roi=tracklet.roi,
             external_id=tracklet.id,

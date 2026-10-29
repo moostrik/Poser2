@@ -14,7 +14,7 @@ DUMMY = dummy_id(PLAYERS)
 
 def _frame(track_id: int, age: float | None) -> Frame:
     features = {} if age is None else {Age: Age.from_value(age)}
-    return Frame(track_id, 0, time_stamp=0.0, features=features)
+    return Frame(track_id, 0, timestamp=0.0, features=features)
 
 
 def _frames(**ages: float | None) -> dict[int, Frame]:

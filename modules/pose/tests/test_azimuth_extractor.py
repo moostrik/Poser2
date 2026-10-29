@@ -31,7 +31,7 @@ def _frame(bbox_azimuth: float = 0.5, rect: Rect | None = Rect(0.2, 0.1, 0.4, 0.
     features: dict = {Points2D: Points2D(values, scores), BBoxAzimuth: BBoxAzimuth.from_value(bbox_azimuth, score)}
     if rect is not None:
         features[BBox] = BBox.from_rect(rect)
-    return Frame(track_id=0, cam_id=cam_id, time_stamp=0.0, features=features)
+    return Frame(track_id=0, cam_id=cam_id, timestamp=0.0, features=features)
 
 
 class AzimuthExtractorTest(unittest.TestCase):

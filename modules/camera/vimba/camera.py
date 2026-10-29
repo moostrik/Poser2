@@ -295,6 +295,6 @@ class Camera(Thread):
             image = cv2.flip(image, 0)
         if self.settings.flip_h:
             image = cv2.flip(image, 1)
-        frame = CameraFrame(cam_id=self.id, kind=FrameType.VIDEO, image=image, time=time.perf_counter())
+        frame = CameraFrame(cam_id=self.id, kind=FrameType.VIDEO, image=image, timestamp=time.perf_counter())
         for callback in self.frame_callbacks:
             callback(frame)

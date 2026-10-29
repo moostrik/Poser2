@@ -199,6 +199,6 @@ class IntroSequencePlayer:
         result: FrameDict = {}
         for cam_id in range(self._num_cams):
             result[cam_id] = Frame(
-                cam_id, cam_id, frame.time_stamp, dict(frame._features)
+                cam_id, cam_id, frame.timestamp, dict(frame._features)
             )
         return result

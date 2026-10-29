@@ -19,14 +19,14 @@ def make_observation(obs_id: int = 7, world_id: int = 3, player: int | None = 1)
     annotation = PanoramicAnnotation(50.0, 95.0, False, 2.5, 1.8, player=player)
     return Tracklet(cam_id=0, id=world_id, obs_id=obs_id, status=TrackingStatus.TRACKED,
                     roi=Rect(0.4, 0.1, 0.1, 0.5), annotation=annotation,
-                    external_id=2, external_age_in_frames=10, time_stamp=1.0, created_at=1.0, last_active=1.0)
+                    external_id=2, external_age_in_frames=10, timestamp=1.0, created_at=1.0, last_active=1.0)
 
 
 class TestLineCodec(unittest.TestCase):
 
     def test_items_match_their_legend(self) -> None:
         raw = Tracklet(cam_id=0, status=TrackingStatus.TRACKED, roi=Rect(0.4, 0.1, 0.1, 0.5),
-                       external_id=2, external_age_in_frames=10, time_stamp=1.0, created_at=1.0, last_active=1.0)
+                       external_id=2, external_age_in_frames=10, timestamp=1.0, created_at=1.0, last_active=1.0)
         observation = make_observation()
         self.assertEqual(len(in_item(raw)), len(LEGEND['in']))
         self.assertEqual(len(obs_item(observation)), len(LEGEND['obs']))
@@ -90,7 +90,7 @@ class TestJournalWriter(unittest.TestCase):
     def test_camera_tracklets_write_an_in_line(self) -> None:
         settings = TrackerJournalSettings()
         settings.enabled = True
-        raw = CameraTracklet(cam_id=2, id=7, status=TrackingStatus.TRACKED, roi=Rect(0.1, 0.2, 0.3, 0.4), age=12, time=1.5)
+        raw = CameraTracklet(cam_id=2, id=7, status=TrackingStatus.TRACKED, roi=Rect(0.1, 0.2, 0.3, 0.4), age=12, timestamp=1.5)
         with tempfile.TemporaryDirectory() as tmp:
             journal = TrackerJournal(settings, data_path=tmp)
             journal.start()

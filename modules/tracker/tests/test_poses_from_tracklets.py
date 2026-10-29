@@ -12,7 +12,7 @@ from modules.utils import Rect
 def stamps(seconds_ago: float = 0.0) -> dict[str, float]:
     """A tracklet's three times, `seconds_ago` before now."""
     t: float = time.perf_counter() - seconds_ago
-    return {'time_stamp': t, 'created_at': t, 'last_active': t}
+    return {'timestamp': t, 'created_at': t, 'last_active': t}
 
 
 def tracklet(world_id: int, seconds_ago: float = 0.0, world_angle: float | None = None,

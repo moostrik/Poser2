@@ -95,7 +95,7 @@ class PosesFromTracklets(FrameDictCallbackMixin):
                 generated_poses[track_id] = Frame(
                     track_id=tracklet.id,
                     cam_id=tracklet.cam_id,
-                    time_stamp=tracklet.time_stamp,
+                    timestamp=tracklet.timestamp,
                     features=features,
                 )
             except Exception as e:

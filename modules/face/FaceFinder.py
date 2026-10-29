@@ -21,7 +21,7 @@ ERROR_LOG_INTERVAL: float = 10.0    # s between the log lines of a detection tha
 class FaceFrame:
     """Every face of one camera frame, for the overlay and the sequencer's charge."""
     faces: tuple[FaceObservation, ...]
-    time: float     # when the camera frame arrived, not when it was detected: a camera that stopped goes stale
+    timestamp: float     # when the camera frame arrived, not when it was detected: a camera that stopped goes stale
 
     @property
     def subject(self) -> FaceObservation | None:

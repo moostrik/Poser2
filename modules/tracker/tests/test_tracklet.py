@@ -9,7 +9,7 @@ from modules.utils import Rect
 
 class FromCameraTest(unittest.TestCase):
     def test_the_camera_facts_are_kept(self) -> None:
-        reported = CameraTracklet(cam_id=2, id=7, status=TrackingStatus.LOST, roi=Rect(0.1, 0.2, 0.3, 0.4), age=12, time=1.5)
+        reported = CameraTracklet(cam_id=2, id=7, status=TrackingStatus.LOST, roi=Rect(0.1, 0.2, 0.3, 0.4), age=12, timestamp=1.5)
         tracklet = Tracklet.from_camera(reported)
         self.assertEqual(tracklet.cam_id, 2)
         self.assertEqual(tracklet.external_id, 7)
