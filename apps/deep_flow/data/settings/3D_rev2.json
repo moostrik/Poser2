@@ -130,8 +130,12 @@
         "method": "QUADRATIC"
       },
       "interpolator": {
-        "responsiveness": 0.16,
-        "friction": 0.05
+        "method": "NONE",
+        "fit_frames": 3,
+        "output_delay": 0.0,
+        "blend_mode": "RAMP",
+        "blend": 0.0,
+        "max_horizon": 0.1
       }
     },
     "point": {
@@ -145,12 +149,13 @@
         "cutoff_rise": 5.0,
         "d_cutoff": 1.0
       },
-      "prediction": {
-        "method": "QUADRATIC"
-      },
       "interpolator": {
-        "responsiveness": 0.5,
-        "friction": 0.05
+        "method": "LINEAR",
+        "fit_frames": 3,
+        "output_delay": 0.0,
+        "blend_mode": "RAMP",
+        "blend": 0.0,
+        "max_horizon": 0.1
       }
     },
     "angle": {
@@ -159,12 +164,13 @@
         "cutoff_rise": 0.7,
         "d_cutoff": 1.0
       },
-      "prediction": {
-        "method": "QUADRATIC"
-      },
       "interpolator": {
-        "responsiveness": 0.33,
-        "friction": 0.05
+        "method": "LINEAR",
+        "fit_frames": 3,
+        "output_delay": 0.0,
+        "blend_mode": "RAMP",
+        "blend": 0.0,
+        "max_horizon": 0.1
       },
       "sticky": {
         "enabled": true,
@@ -179,12 +185,13 @@
         "cutoff_rise": 2.5,
         "d_cutoff": 1.0
       },
-      "prediction": {
-        "method": "QUADRATIC"
-      },
       "interpolator": {
-        "responsiveness": 0.33,
-        "friction": 0.05
+        "method": "LINEAR",
+        "fit_frames": 3,
+        "output_delay": 0.0,
+        "blend_mode": "RAMP",
+        "blend": 0.0,
+        "max_horizon": 0.1
       },
       "sticky": {
         "enabled": true,
@@ -212,10 +219,6 @@
       "emit_partial": true
     },
     "window_smooth": {
-      "window_size": 180,
-      "emit_partial": true
-    },
-    "window_predict": {
       "window_size": 180,
       "emit_partial": true
     },

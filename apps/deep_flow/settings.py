@@ -31,7 +31,6 @@ class Stage(IntEnum):
     RAW =       0
     CLEAN =     auto()
     SMOOTH =    auto()
-    PREDICT =   auto()
     LERP =      auto()
 
 
@@ -131,9 +130,9 @@ class BboxFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0)
 
-    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings)
-    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings)
-    interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
+    smoother    : Group[nodes.EuroSmootherSettings]        = Group(nodes.EuroSmootherSettings)
+    prediction  : Group[nodes.PredictorSettings]           = Group(nodes.PredictorSettings)
+    interpolator: Group[nodes.PredictInterpolatorSettings] = Group(nodes.PredictInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
 class PointFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
@@ -141,17 +140,15 @@ class PointFeature(BaseSettings):
 
     confidence_filter: Group[nodes.DualConfidenceFilterSettings] = Group(nodes.DualConfidenceFilterSettings)
     smoother         : Group[nodes.EuroSmootherSettings]         = Group(nodes.EuroSmootherSettings)
-    prediction       : Group[nodes.PredictorSettings]            = Group(nodes.PredictorSettings)
-    interpolator     : Group[nodes.ChaseInterpolatorSettings]    = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
+    interpolator     : Group[nodes.PredictInterpolatorSettings]  = Group(nodes.PredictInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
 
 class AngleFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0)
 
-    smoother    : Group[nodes.EuroSmootherSettings]      = Group(nodes.EuroSmootherSettings)
-    prediction  : Group[nodes.PredictorSettings]         = Group(nodes.PredictorSettings)
-    interpolator: Group[nodes.ChaseInterpolatorSettings] = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
-    sticky      : Group[nodes.StickyFillerSettings]      = Group(nodes.StickyFillerSettings)
+    smoother    : Group[nodes.EuroSmootherSettings]        = Group(nodes.EuroSmootherSettings)
+    interpolator: Group[nodes.PredictInterpolatorSettings] = Group(nodes.PredictInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
+    sticky      : Group[nodes.StickyFillerSettings]        = Group(nodes.StickyFillerSettings)
 
 class VelocityFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
@@ -159,8 +156,7 @@ class VelocityFeature(BaseSettings):
 
     extractor   : Group[nodes.AngleVelocityExtractorSettings] = Group(nodes.AngleVelocityExtractorSettings)
     smoother    : Group[nodes.EuroSmootherSettings]           = Group(nodes.EuroSmootherSettings)
-    prediction  : Group[nodes.PredictorSettings]              = Group(nodes.PredictorSettings)
-    interpolator: Group[nodes.ChaseInterpolatorSettings]      = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
+    interpolator: Group[nodes.PredictInterpolatorSettings]    = Group(nodes.PredictInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
     sticky      : Group[nodes.StickyFillerSettings]           = Group(nodes.StickyFillerSettings)
 
 class MotionFeature(BaseSettings):
@@ -197,7 +193,6 @@ class PoseGroup(BaseSettings):
     window_raw     : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
     window_clean   : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
     window_smooth  : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
-    window_predict : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
     window_lerp    : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
 
 
