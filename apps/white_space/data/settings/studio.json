@@ -566,7 +566,6 @@
       "neutral_weight": {
         "enabled": true
       },
-      "similarity_applicator": {},
       "smoother": {
         "min_cutoff": 0.3,
         "cutoff_rise": 1.0,
@@ -575,8 +574,7 @@
       "interpolator": {
         "responsiveness": 0.33,
         "friction": 0.05
-      },
-      "motion_gate": {}
+      }
     },
     "window_raw": {
       "window_size": 180,

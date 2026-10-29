@@ -2,8 +2,8 @@
 
 CLEAN → SMOOTH → PREDICT → chase-interpolate → LERP extractors → motion gate, driven tick by tick with a moving
 skeleton for two tracks: a confidence dropout on one wrist, and one track that leaves and comes back. App-local
-nodes (the playhead offset) are left out; similarity is fed straight into the applicators instead of through
-the threaded WindowSimilarity. Keep the node lists in step with main.py when its stages change.
+nodes (the playhead offset) are left out; similarity is fed into the result hold instead of through the
+threaded WindowSimilarity. Keep the node lists in step with main.py when its stages change.
 """
 
 import logging
@@ -12,7 +12,7 @@ import unittest
 
 import numpy as np
 
-from modules.pose.analytics import SimilarityResult, SimilarityStickyFiller, SimilarityStickyFillerSettings
+from modules.pose.analytics import SimilarityResult
 from modules.pose.features import (
     FEATURES, Age, AngleLandmark, AngleMotion, Angles, AngleSymmetry, AngleVelocity, ArmDeviation, ArmTravel,
     Azimuth, BBox, BBoxAzimuth, LeaderScore, LegDeviation, MotionGate, MotionTime, PointLandmark, Points2D,
@@ -26,11 +26,12 @@ from modules.pose.nodes import (
     AngleVelocityExtractorSettings, AngleVelocityPredictor, AngleVelocityStickyFiller, ArmDeviationExtractor,
     ArmDeviationExtractorSettings, ArmTravelExtractor, ArmTravelExtractorSettings, AzimuthChaseInterpolator,
     AzimuthEuroSmoother, AzimuthExtractor, AzimuthPredictor, ChaseInterpolatorSettings,
-    DualConfidenceFilterSettings, EuroSmootherSettings, LeaderScoreApplicator,
-    LegDeviationExtractor, LegDeviationExtractorSettings, MotionGateApplicator, MotionTimeExtractor,
+    DualConfidenceFilterSettings, EuroSmootherSettings,
+    LegDeviationExtractor, LegDeviationExtractorSettings, MotionGateExtractor, MotionTimeExtractor,
     MovingAverageSmootherSettings, PointChaseInterpolator, PointDualConfidenceFilter, PointEuroSmoother, PointPredictor,
-    PointStickyFiller, PredictorSettings, ShoulderDifferenceExtractor, SimilarityApplicator,
-    SimilarityChaseInterpolator, SimilarityEuroSmoother, StickyFillerSettings, TorsoTiltExtractor,
+    PointStickyFiller, PredictorSettings, ShoulderDifferenceExtractor, SimilarityChaseInterpolator,
+    SimilarityEuroSmoother, SimilarityResultHold, SimilarityStickyFiller, SimilarityStickyFillerSettings,
+    StickyFillerSettings, TorsoTiltExtractor,
     TorsoTiltExtractorSettings,
 )
 from modules.pose.trackers import FilterPipeline, FilterTracker, InterpolatorPipeline, InterpolatorTracker
@@ -92,11 +93,6 @@ class _Stages:
             AngleVelocityExtractor(ps.velocity_extractor),
         ]) for i in tracks})
 
-        self.similarity_applicator = SimilarityApplicator()
-        self.leader_applicator = LeaderScoreApplicator()
-        self.similarity_sticky = SimilarityStickyFiller(ps.similarity_sticky)     # on the result, before the stamping
-        self.similarity_sticky.add_similarity_callback(self.similarity_applicator.set)
-        self.similarity_sticky.add_similarity_callback(self.leader_applicator.set)
         self.smooth = FilterTracker({i: FilterPipeline([
             PointEuroSmoother(ps.point_smoother),
             AngleExtractor(ps.angle_extractor),
@@ -115,8 +111,11 @@ class _Stages:
             TorsoTiltExtractor(ps.torso_tilt),
             MotionTimeExtractor(),
             AgeExtractor(),
-            self.similarity_applicator,
-            self.leader_applicator,
+        ]) for i in tracks})
+        # The group steps: the held analytics result stamped, a present pair's gap bridged; then smoothed.
+        self.similarity_hold = SimilarityResultHold()
+        self.similarity_sticky = SimilarityStickyFiller(ps.similarity_sticky)
+        self.similarity_smooth = FilterTracker({i: FilterPipeline([
             SimilarityEuroSmoother(ps.similarity_smoother),
         ]) for i in tracks})
 
@@ -151,23 +150,22 @@ class _Stages:
             AngleMotionMovingAverageSmoother(ps.motion_average),
         ]) for i in tracks})
 
-        self.motion_gate = MotionGateApplicator()
-        self.gate = FilterTracker({i: FilterPipeline([self.motion_gate]) for i in tracks})
+        self.motion_gate = MotionGateExtractor()
 
     def tick(self, raw: FrameDict) -> dict[str, list[FrameDict]]:
         """One input tick: the 30 Hz stages once, then two 60 Hz interpolation updates."""
         out: dict[str, list[FrameDict]] = {'raw': [raw]}
         self._feed_similarity(raw)
         out['clean'] = [self.clean.process(raw)]
-        out['smooth'] = [self.smooth.process(out['clean'][0])]
+        smooth = self.similarity_sticky.process(self.similarity_hold.process(self.smooth.process(out['clean'][0])))
+        out['smooth'] = [self.similarity_smooth.process(smooth)]
         out['predict'] = [self.predict.process(out['smooth'][0])]
         self.interpolate.set(out['predict'][0])
         out['lerp'], out['gate'] = [], []
         for _ in range(2):
             lerp = self.lerp.process(self.interpolate.update())
-            self.motion_gate.set(lerp)
             out['lerp'].append(lerp)
-            out['gate'].append(self.gate.process(lerp))
+            out['gate'].append(self.motion_gate.process(lerp))
         return out
 
     def _feed_similarity(self, raw: FrameDict) -> None:
@@ -182,7 +180,7 @@ class _Stages:
                     values[other], scores[other] = 0.6, 1.0
             similarity[tid] = Similarity(values, scores)
             leader[tid] = LeaderScore(lead, scores.copy())
-        self.similarity_sticky.process(SimilarityResult(similarity, leader))
+        self.similarity_hold.set(SimilarityResult(similarity, leader))
 
 
 def _raw(tick: int) -> FrameDict:

@@ -14,7 +14,7 @@ from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, PosesFromTracklets
-from modules.pose import nodes, trackers, features, window, analytics, FrameDict
+from modules.pose import nodes, trackers, features, window, FrameDict
 from modules.inference import pose, detection, CropExtractor, Uploader
 from modules.session import Session
 
@@ -214,8 +214,6 @@ class WhiteSpaceMain:
         self.filters_clean.add_frames_callback(self.stages[Stage.CLEAN])
 
         # POSE STAGE SMOOTH
-        self.similarity_applicator = nodes.SimilarityApplicator(ps.similarity.similarity_applicator)
-
         self.filters_smooth = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 nodes.PointEuroSmoother(ps.point.smoother),
@@ -236,29 +234,25 @@ class WhiteSpaceMain:
                 nodes.TorsoTiltExtractor(ps.torso_tilt_extractor),
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),
-                self.similarity_applicator,
-                nodes.SimilarityEuroSmoother(ps.similarity.smoother),
             ])
             for i in range(max_players)
         }, name="Pose smooth")
-        self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
-        self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
-
-        # Posture similarity: the pairwise distance of the current SMOOTH poses, as a 0..1 similarity, computed
-        # synchronously on this broadcast. On the result, where presence is known: the sticky filler bridges a
+        # Group steps on the SMOOTH poses, synchronously: the posture similarity (the pairwise distance of the
+        # poses as a 0..1 similarity) stamped on them; where presence is known, the sticky filler bridges a
         # present pair's gap (a departed player's slot stays NaN), then the neutral weight scales a pair by
-        # how far both are out of neutral (their arm deviation). Then the rows are stamped on the next SMOOTH
-        # frames and smoothed; the light show reads the LERP frames. The neutral weight's frames come off the
-        # same broadcast, registered first so its deviations are this frame's.
-        self.posture_similarity = analytics.PostureSimilarity(ps.similarity.posture)
-        self.similarity_sticky = analytics.SimilarityStickyFiller(ps.similarity.sticky)
+        # how far both are out of neutral (their arm deviation, this frame's). The hold stamps the rows one
+        # frame late, the lag the show was tuned with; then they are smoothed, and the light show reads the LERP frames.
+        self.posture_similarity = nodes.PostureSimilarityExtractor(ps.similarity.posture)
+        self.similarity_sticky = nodes.SimilarityStickyFiller(ps.similarity.sticky)
         self.neutral_weight = NeutralWeight(ps.similarity.neutral_weight)
-
-        self.stages[Stage.SMOOTH].add_callback(self.neutral_weight.set_frames)
-        self.stages[Stage.SMOOTH].add_callback(self.posture_similarity.process)
-        self.posture_similarity.add_similarity_callback(self.similarity_sticky.process)
-        self.similarity_sticky.add_similarity_callback(self.neutral_weight.process)
-        self.neutral_weight.add_similarity_callback(self.similarity_applicator.set)
+        self.similarity_hold = nodes.OneFrameHold(features.Similarity)
+        self.similarity_smooth = trackers.FilterTracker({
+            i: trackers.FilterPipeline([nodes.SimilarityEuroSmoother(ps.similarity.smoother)])
+            for i in range(max_players)
+        }, name="Pose smooth similarity")
+        self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
+        self.filters_smooth.add_frames_callback(self._process_similarity)
+        self.similarity_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
 
         # POSE STAGE PREDICT
         self.filters_predict = trackers.FilterTracker({
@@ -275,8 +269,6 @@ class WhiteSpaceMain:
         self.filters_predict.add_frames_callback(self.stages[Stage.PREDICT])
 
         # POSE STAGE LERP
-        self.motion_gate_applicator = nodes.MotionGateApplicator(ps.similarity.motion_gate)
-
         self.interpolators_lerp = trackers.InterpolatorTracker({
             i: trackers.InterpolatorPipeline([
                 nodes.PointChaseInterpolator(ps.point.interpolator),
@@ -309,20 +301,15 @@ class WhiteSpaceMain:
             ])
             for i in range(max_players + 1)                                       # the players and the dummy
         }, name="Pose lerp")
-        self.gate_lerp = trackers.FilterTracker({
-            i: trackers.FilterPipeline([self.motion_gate_applicator])
-            for i in range(max_players + 1)
-        }, name="Pose gate")
+        self.motion_gate = nodes.MotionGateExtractor()                               # the group step after the filters
         self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.set)
         # The dummy joins the interpolated poses before the LERP filters, which stamp on it
         # everything a person has (the playhead offset, the symmetries, the leg deviation, the bend).
         self.interpolators_lerp.add_frames_callback(self.dummy.process)
         self.dummy.add_frames_callback(self.filters_lerp.process)
-        self.filters_lerp.add_frames_callback(self.motion_gate_applicator.set)
-        self.filters_lerp.add_frames_callback(self.gate_lerp.process)
+        self.filters_lerp.add_frames_callback(self._process_motion_gate)
         # The gated LERP poses fan out to the board (through the stage broadcast) and to the OSC sound.
-        self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
-        self.gate_lerp.add_frames_callback(partial(self.osc_sound_sender.submit_frames, int(Stage.LERP)))
+        self.lerp_output = Broadcast([self.stages[Stage.LERP], partial(self.osc_sound_sender.submit_frames, int(Stage.LERP))])
 
         # CAMERA CHECK — compares each camera's own IMU reading and frame rate against the preset,
         # and summarises them as pinned indicators. A setup aid; nothing downstream reads it.
@@ -404,6 +391,18 @@ class WhiteSpaceMain:
         images, prev_images = self.source_uploader.snapshot()
         self.board.set_camera_images(images)
         self.crop_extractor.process(poses, images, prev_images)
+
+    def _process_similarity(self, frames: FrameDict) -> None:
+        """The SMOOTH group steps, then the similarity smoother (the pose thread)."""
+        frames = self.posture_similarity.process(frames)
+        frames = self.similarity_sticky.process(frames)
+        frames = self.neutral_weight.process(frames)
+        frames = self.similarity_hold.process(frames)
+        self.similarity_smooth.process(frames)
+
+    def _process_motion_gate(self, frames: FrameDict) -> None:
+        """The LERP group step, then the LERP output (the light thread)."""
+        self.lerp_output(self.motion_gate.process(frames))
 
     def stop(self) -> None:
         if not self.is_running:

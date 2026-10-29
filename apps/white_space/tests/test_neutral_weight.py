@@ -5,18 +5,12 @@ import unittest
 
 import numpy as np
 
-from modules.pose import features, analytics, ArmDeviation, Similarity, Frame
+from modules.pose import features, ArmDeviation, Similarity, Frame
 
 from apps.white_space.pose import NeutralWeight, NeutralWeightSettings
 
 features.configure_features(4)
 N = Similarity.length()
-
-
-def _frame(id: int, arms: float | None) -> Frame:
-    """A present person; ``arms`` is their ArmDeviation (0 neutral .. 1 fully out), None leaves it absent (NaN)."""
-    feats = {} if arms is None else {ArmDeviation: ArmDeviation.from_value(arms)}
-    return Frame(track_id=id, cam_id=0, timestamp=0.0, features=feats)
 
 
 def _row(**pairs: float) -> Similarity:
@@ -29,24 +23,29 @@ def _row(**pairs: float) -> Similarity:
     return Similarity(values, scores)
 
 
+ROWS = {0: _row(_1=0.9, _2=0.8), 1: _row(_0=0.9, _2=0.7), 2: _row(_0=0.8, _1=0.7)}
+
+
+def _frame(id: int, arms: float | None) -> Frame:
+    """A present person with their row; ``arms`` is their ArmDeviation (0 neutral .. 1 fully out), None leaves
+    it absent (NaN)."""
+    feats: dict = {Similarity: ROWS[id]}
+    if arms is not None:
+        feats[ArmDeviation] = ArmDeviation.from_value(arms)
+    return Frame(track_id=id, cam_id=0, timestamp=0.0, features=feats)
+
+
 class NeutralWeightTest(unittest.TestCase):
     def setUp(self) -> None:
         self.settings = NeutralWeightSettings()
         self.weight = NeutralWeight(self.settings)
-        self.out: list[analytics.SimilarityResult] = []
-        self.weight.add_similarity_callback(self.out.append)
-        self.result = analytics.SimilarityResult(
-            {0: _row(_1=0.9, _2=0.8), 1: _row(_0=0.9, _2=0.7), 2: _row(_0=0.8, _1=0.7)},
-            {0: "lead"})
 
     def _run(self, frames: dict[int, Frame]) -> dict[int, Similarity]:
-        self.weight.set_frames(frames)
-        self.weight.process(self.result)
-        return self.out[-1].similarity
+        return {id: f[Similarity] for id, f in self.weight.process(frames).items()}
 
     def test_everyone_fully_out_of_neutral_passes_the_rows_unchanged(self) -> None:
         rows = self._run({0: _frame(0, 1.0), 1: _frame(1, 1.0), 2: _frame(2, 1.0)})
-        for id, row in self.result.similarity.items():
+        for id, row in ROWS.items():
             np.testing.assert_allclose(rows[id].values, row.values, equal_nan=True)
             np.testing.assert_array_equal(rows[id].scores, row.scores)
 
@@ -73,14 +72,10 @@ class NeutralWeightTest(unittest.TestCase):
         self.assertEqual(rows[0][1], 0.0)
         self.assertAlmostEqual(rows[0][2], 0.8, places=6)
 
-    def test_disabled_passes_the_result_through(self) -> None:
+    def test_disabled_passes_the_frames_through(self) -> None:
         self.settings.enabled = False
-        self._run({0: _frame(0, 0.0), 1: _frame(1, 0.0), 2: _frame(2, 0.0)})
-        self.assertIs(self.out[-1], self.result)
-
-    def test_leader_scores_pass_through(self) -> None:
-        self._run({0: _frame(0, 1.0), 1: _frame(1, 0.0), 2: _frame(2, 0.0)})
-        self.assertIs(self.out[-1].leader_score, self.result.leader_score)
+        frames = {0: _frame(0, 0.0), 1: _frame(1, 0.0), 2: _frame(2, 0.0)}
+        self.assertIs(self.weight.process(frames), frames)
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ paths:
 
 - Extractors derive new features from existing pose features and return enriched frames
 - Filters preserve frame identity while refining feature values over time
-- Applicators should compute explicit pose-domain outputs rather than introducing hidden side channels
+- Group nodes see every pose of a frame and stamp what they derive from the group; they never add or remove a pose
 - Interpolators and window nodes own internal temporal state and must reset cleanly
 
 ## Trackers

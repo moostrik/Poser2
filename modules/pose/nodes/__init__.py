@@ -1,6 +1,6 @@
 """Pose filter modules for processing and enriching pose data."""
 
-from .nodes import                              NodeBase, FilterNode, InterpolatorNode
+from .nodes import                              NodeBase, FilterNode, GroupNode, InterpolatorNode
 
 from .extractors.angle_extractor import         AngleExtractor, AngleExtractorSettings
 from .extractors.angle_velocity_extractor import AngleVelocityExtractor, AngleVelocityExtractorSettings
@@ -15,9 +15,11 @@ from .extractors.shoulder_difference_extractor import ShoulderDifferenceExtracto
 from .extractors.torso_tilt_extractor import    TorsoTiltExtractor, TorsoTiltExtractorSettings
 from .extractors.azimuth_extractor import       AzimuthExtractor
 
-from .applicators.similarity_applicator import  SimilarityApplicator, SimilarityApplicatorSettings
-from .applicators.leader_score_applicator import LeaderScoreApplicator, LeaderScoreApplicatorSettings
-from .applicators.motion_gate_applicator import MotionGateApplicator, MotionGateApplicatorSettings
+from .group.posture_similarity_extractor import PostureSimilarityExtractor
+from .group.similarity_sticky_filler import     SimilarityStickyFiller, SimilarityStickyFillerSettings
+from .group.motion_gate_extractor import        MotionGateExtractor
+from .group.similarity_result_hold import       SimilarityResultHold
+from .group.one_frame_hold import               OneFrameHold
 
 from .filters.angle_calibrator import           AngleCalibrator, AngleCalibratorSettings
 from .filters.confidence_filters import         ConfidenceFilterSettings,     BBoxConfidenceFilter,   PointConfidenceFilter,  AngleConfidenceFilter,  AngleVelocityConfidenceFilter,   AngleSymmetryConfidenceFilter

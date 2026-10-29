@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True, slots=True)
 class SimilarityResult:
-    """Output of WindowSimilarity / WindowCorrelation / PostureSimilarity."""
+    """Output of WindowSimilarity / WindowCorrelation, held into the frames by SimilarityResultHold."""
     similarity: dict[int, Similarity]
     leader_score: dict[int, LeaderScore]
 

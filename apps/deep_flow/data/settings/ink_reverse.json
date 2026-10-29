@@ -203,7 +203,6 @@
         "window_type": "UNIFORM"
       }
     },
-    "motion_gate": {},
     "window_raw": {
       "window_size": 180,
       "emit_partial": true

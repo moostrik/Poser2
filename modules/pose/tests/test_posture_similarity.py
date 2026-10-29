@@ -5,9 +5,10 @@ import unittest
 
 import numpy as np
 
-from modules.pose.analytics import (PostureSimilarity, PostureSimilaritySettings, SimilarityResult,
-                                    joint_distances, joint_mask, posture_distance, posture_similarity)
+from modules.pose.analytics import (PostureSimilaritySettings, joint_distances, joint_mask, posture_distance,
+                                    posture_similarity, posture_similarity_rows)
 from modules.pose.features import Angles, AngleLandmark, Similarity
+from modules.pose.nodes import PostureSimilarityExtractor
 
 from ._builders import NUM_POSES, frame
 
@@ -111,14 +112,8 @@ class PostureSimilarityScoreTest(unittest.TestCase):
 
 
 class PostureSimilarityRowsTest(unittest.TestCase):
-    def setUp(self) -> None:
-        self.out: list[SimilarityResult] = []
-        self.node = PostureSimilarity(_settings())
-        self.node.add_similarity_callback(self.out.append)
-
     def _rows(self, poses: dict[int, Angles]) -> dict[int, Similarity]:
-        self.node.process({id: frame(track_id=id, features={Angles: a}) for id, a in poses.items()})
-        return self.out[-1].similarity
+        return posture_similarity_rows({id: frame(track_id=id, features={Angles: a}) for id, a in poses.items()}, _settings())
 
     def test_rows_are_indexed_by_id_and_the_self_slot_is_empty(self) -> None:
         rows = self._rows({1: _angles(0.0), 3: _angles(10.0)})
@@ -128,7 +123,14 @@ class PostureSimilarityRowsTest(unittest.TestCase):
         self.assertEqual(rows[1].get_score(3), 1.0)
         for slot in (0, 1, 2):
             self.assertTrue(math.isnan(rows[1][slot]))
-        self.assertEqual(self.out[-1].leader_score, {})
+
+    def test_the_extractor_stamps_the_rows_on_the_frames(self) -> None:
+        frames = {0: frame(track_id=0, features={Angles: _angles(0.0)}), 1: frame(track_id=1, features={Angles: _angles(90.0)}),
+                  NUM_POSES: frame(track_id=NUM_POSES, features={Angles: _angles(0.0)})}
+        out = PostureSimilarityExtractor(_settings()).process(frames)
+        self.assertEqual(set(out), set(frames))
+        self.assertAlmostEqual(out[0][Similarity][1], 0.5, places=5)
+        self.assertIs(out[NUM_POSES], frames[NUM_POSES])              # past the row's width: no row
 
     def test_the_rows_carry_the_graded_similarity(self) -> None:
         rows = self._rows({0: _angles(0.0), 1: _angles(90.0)})

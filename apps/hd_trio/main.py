@@ -168,9 +168,6 @@ class HDTrioMain:
         self.filters_clean.add_frames_callback(self.stages[Stage.CLEAN])
 
         # POSE STAGE SMOOTH
-        self.similarity_applicator = nodes.SimilarityApplicator(ps.similarity.similarity_applicator)
-        self.leader_applicator     = nodes.LeaderScoreApplicator(ps.similarity.leader_applicator)
-
         self.filters_smooth = trackers.FilterTracker({
             i: trackers.FilterPipeline([
                 nodes.PointEuroSmoother(ps.point.smoother),
@@ -184,28 +181,28 @@ class HDTrioMain:
                 nodes.AngleSymmetryExtractor(),
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),
-                self.similarity_applicator,
-                self.leader_applicator,
-                nodes.SimilarityEuroSmoother(ps.similarity.smoother),
             ])
             for i in range(max_players)
         }, name="Pose smooth")
+        # Group steps on the SMOOTH poses: the latest result of the threaded analytics (below) is held and
+        # stamped as Similarity and LeaderScore; where presence is known, the sticky filler bridges a present
+        # pair's gap (a departed player's slot stays NaN); then the rows are smoothed.
+        self.similarity_hold = nodes.SimilarityResultHold()
+        self.similarity_sticky = nodes.SimilarityStickyFiller(ps.similarity.sticky)
+        self.similarity_smooth = trackers.FilterTracker({
+            i: trackers.FilterPipeline([nodes.SimilarityEuroSmoother(ps.similarity.smoother)])
+            for i in range(max_players)
+        }, name="Pose smooth similarity")
         self.stages[Stage.CLEAN].add_callback(self.filters_smooth.process)
-        self.filters_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
+        self.filters_smooth.add_frames_callback(self._process_similarity)
+        self.similarity_smooth.add_frames_callback(self.stages[Stage.SMOOTH])
 
         self.window_similarity  = analytics.WindowSimilarity(ps.similarity.window_similarity)
         self.window_correlator = analytics.WindowCorrelation(ps.similarity.window_correlation)
-        # On the result, where presence is known: a present pair's gap is held, a departed player's slot stays NaN.
-        self.similarity_sticky = analytics.SimilarityStickyFiller(ps.similarity.sticky)
-        self.similarity_sticky.add_similarity_callback(self.similarity_applicator.set)
-
         self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_similarity.submit)
-        self.window_similarity.add_similarity_callback(self.similarity_sticky.process)
-        self.window_similarity.add_similarity_callback(self.leader_applicator.set)
-
+        self.window_similarity.add_similarity_callback(self.similarity_hold.set)
         self.window_trackers[Stage.SMOOTH].add_windows_callback(self.window_correlator.submit)
-        self.window_correlator.add_similarity_callback(self.similarity_sticky.process)
-        self.window_correlator.add_similarity_callback(self.leader_applicator.set)
+        self.window_correlator.add_similarity_callback(self.similarity_hold.set)
 
         # POSE STAGE PREDICT
         self.filters_predict = trackers.FilterTracker({
@@ -221,8 +218,6 @@ class HDTrioMain:
         self.filters_predict.add_frames_callback(self.stages[Stage.PREDICT])
 
         # POSE STAGE LERP
-        self.motion_gate_applicator = nodes.MotionGateApplicator(ps.similarity.motion_gate)
-
         self.interpolators_lerp = trackers.InterpolatorTracker({
             i: trackers.InterpolatorPipeline([
                 nodes.BBoxChaseInterpolator(ps.bbox.interpolator),
@@ -245,15 +240,10 @@ class HDTrioMain:
             ])
             for i in range(max_players)
         }, name="Pose lerp")
-        self.gate_lerp = trackers.FilterTracker({
-            i: trackers.FilterPipeline([self.motion_gate_applicator])
-            for i in range(max_players)
-        }, name="Pose gate")
+        self.motion_gate = nodes.MotionGateExtractor()                               # the group step after the filters
         self.stages[Stage.PREDICT].add_callback(self.interpolators_lerp.set)
         self.interpolators_lerp.add_frames_callback(self.filters_lerp.process)
-        self.filters_lerp.add_frames_callback(self.motion_gate_applicator.set)
-        self.filters_lerp.add_frames_callback(self.gate_lerp.process)
-        self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
+        self.filters_lerp.add_frames_callback(self._process_motion_gate)
 
         # CAMERA CHECK — each camera's IMU reading and frame rate against the preset, as pinned indicators
         self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
@@ -297,6 +287,16 @@ class HDTrioMain:
         images, prev_images = self.image_uploader.snapshot()
         self.board.set_camera_images(images)
         self.crop_extractor.process(poses, images, prev_images)
+
+    def _process_similarity(self, frames: FrameDict) -> None:
+        """The SMOOTH group steps, then the similarity smoother (the pose thread)."""
+        frames = self.similarity_hold.process(frames)
+        frames = self.similarity_sticky.process(frames)
+        self.similarity_smooth.process(frames)
+
+    def _process_motion_gate(self, frames: FrameDict) -> None:
+        """The LERP group step, then the LERP stage output (the render thread)."""
+        self.stages[Stage.LERP](self.motion_gate.process(frames))
 
     def stop(self) -> None:
         if not self.is_running:

@@ -1,20 +1,19 @@
 """SimilarityStickyFiller — holds a present pair's last similarity across a frame without one.
 
-Runs on the analytics result, before the rows are stamped on the poses, because that is where presence is
-known: the result's tracks are the poses the analytics saw. A slot is held only while its player is in the
-result; a departed player's slot is NaN (no data) and its memory is dropped, so nothing downstream carries a
+A group step on the frames' ``Similarity`` rows, placed before they are smoothed, because that is where
+presence is known: the frame's poses are the people present. A slot is held only while its player is in the
+frame; a departed player's slot is NaN (no data) and its memory is dropped, so nothing downstream carries a
 similarity toward someone who is gone, and a track that leaves and returns starts clean. The self slot stays
-NaN. Runs on the analytics thread only.
+NaN. Runs on the frame's thread only.
 """
 
 from __future__ import annotations
 
-from typing import Callable
-
 import numpy as np
 
-from ..features import Similarity
-from .window_similarity import SimilarityResult
+from ...features import Similarity
+from ...frame import FrameDict, replace
+from ..nodes import GroupNode
 from modules.settings import BaseSettings, Field
 
 
@@ -24,43 +23,39 @@ class SimilarityStickyFillerSettings(BaseSettings):
     hold_scores: Field[bool] = Field(False, description="A held value keeps its last score (else 0)")
 
 
-class SimilarityStickyFiller:
+class SimilarityStickyFiller(GroupNode):
     """Fills a present pair's NaN slot from its last valid value; see the module docstring."""
 
     def __init__(self, settings: SimilarityStickyFillerSettings | None = None) -> None:
         self.settings = settings if settings is not None else SimilarityStickyFillerSettings()
         self._values: dict[int, np.ndarray] = {}      # per track: the last valid value per slot (NaN: none)
         self._scores: dict[int, np.ndarray] = {}
-        self._callbacks: list[Callable[[SimilarityResult], None]] = []
 
-    def add_similarity_callback(self, callback: Callable[[SimilarityResult], None]) -> None:
-        self._callbacks.append(callback)
-
-    def process(self, result: SimilarityResult) -> None:
-        """Fill the rows' gaps and emit the result."""
-        if self.settings.enabled:
-            result = self._fill(result)
-        for callback in self._callbacks:
-            callback(result)
+    def process(self, frames: FrameDict) -> FrameDict:
+        """Fill the rows' gaps and return the frames, stamped."""
+        if not self.settings.enabled:
+            return frames
+        return self._fill(frames)
 
     def reset(self) -> None:
         """Forget every held value."""
         self._values.clear()
         self._scores.clear()
 
-    def _fill(self, result: SimilarityResult) -> SimilarityResult:
+    def _fill(self, frames: FrameDict) -> FrameDict:
         length = Similarity.length()
         present = np.zeros(length, dtype=bool)
-        for tid in result.similarity:
+        for tid in frames:
             if tid < length:
                 present[tid] = True
         for tid in list(self._values):                 # a track that left starts clean when it returns
-            if tid not in result.similarity:
+            if tid not in frames:
                 del self._values[tid], self._scores[tid]
 
         hold_scores = self.settings.hold_scores
-        rows: dict[int, Similarity] = {}
-        for tid, row in result.similarity.items():
+        out: FrameDict = {}
+        for tid, frame in frames.items():
+            row = frame[Similarity]
             last_values = self._values.get(tid)
             last_scores = self._scores.get(tid)
             if last_values is None or last_scores is None:
@@ -82,5 +77,5 @@ class SimilarityStickyFiller:
             new_scores[~present] = 0.0
             self._values[tid] = new_values
             self._scores[tid] = new_scores
-            rows[tid] = Similarity(values, scores)
-        return SimilarityResult(rows, result.leader_score)
+            out[tid] = replace(frame, {Similarity: Similarity(values, scores)})
+        return out
