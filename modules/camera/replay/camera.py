@@ -27,9 +27,9 @@ class Detection(Protocol):
     boxes: list[Rect]
 
 
-class Detector(Protocol):
+class PersonDetector(Protocol):
     """A person detector the camera submits frames to and hears back from, on the detector's
-    thread: `modules.inference.detection.Detector`. Named here so the contract does not import
+    thread: `modules.inference.detection.PersonDetector`. Named here so the contract does not import
     the inference package."""
     def submit(self, cam_id: int, image: np.ndarray) -> None: ...
     def register_callback(self, callback) -> None: ...
@@ -41,11 +41,11 @@ class BoxTracker(Protocol):
 
 
 class Camera:
-    def __init__(self, player: Player, settings: RigCameraSettings, detector: Detector | None, tracker: BoxTracker | None, id: int = 0) -> None:
+    def __init__(self, player: Player, settings: RigCameraSettings, detector: PersonDetector | None, tracker: BoxTracker | None, id: int = 0) -> None:
         self.id: int = id
         self.settings: RigCameraSettings = settings
         self.player: Player = player
-        self.detector: Detector | None = detector
+        self.detector: PersonDetector | None = detector
         self.tracker: BoxTracker | None = tracker if detector is not None else None
         self.running: bool = False
 

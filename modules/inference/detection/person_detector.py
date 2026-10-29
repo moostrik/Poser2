@@ -25,7 +25,7 @@ from .settings import Settings
 logger = logging.getLogger(__name__)
 
 
-class Detector(Thread):
+class PersonDetector(Thread):
     def __init__(self, settings: Settings) -> None:
         super().__init__(daemon=True)
         self.settings: Settings = settings

@@ -12,7 +12,7 @@ import numpy as np
 import onnx
 from onnx import TensorProto, helper, numpy_helper
 
-from modules.inference.detection import Detector, Settings
+from modules.inference.detection import PersonDetector, Settings
 from modules.utils import Rect
 
 WIDTH, HEIGHT = 512, 448
@@ -56,7 +56,7 @@ def wait_for(condition, timeout: float = 5.0) -> bool:
     return condition()
 
 
-class DetectorTest(unittest.TestCase):
+class PersonDetectorTest(unittest.TestCase):
     symbolic: bool = False
     imgsz: str | None = None
 
@@ -65,7 +65,7 @@ class DetectorTest(unittest.TestCase):
         write_stub_model(os.path.join(self.folder, 'stub.onnx'), self.symbolic, self.imgsz)
         self.settings = Settings(model='stub.onnx', model_path=self.folder)
         self.settings.initialize()
-        self.detector = Detector(self.settings)
+        self.detector = PersonDetector(self.settings)
         self.detections = []
         self.detector.register_callback(self.detections.append)
         logging.disable(logging.WARNING)        # the CPU-provider warning
@@ -97,7 +97,7 @@ class DetectorTest(unittest.TestCase):
         self.assertEqual(len(self.detections[0].boxes), 2)
 
 
-class SymbolicInputTest(DetectorTest):
+class SymbolicInputTest(PersonDetectorTest):
     """The shape ultralytics exports: height and width as symbols, the size in the metadata."""
     symbolic = True
     imgsz = '[448, 512]'
@@ -109,8 +109,8 @@ class NoSizeTest(unittest.TestCase):
         write_stub_model(os.path.join(folder, 'stub.onnx'), symbolic=True)
         settings = Settings(model='stub.onnx', model_path=folder)
         settings.initialize()
-        detector = Detector(settings)
-        with self.assertLogs('modules.inference.detection.detector', level='ERROR') as logs:
+        detector = PersonDetector(settings)
+        with self.assertLogs('modules.inference.detection.person_detector', level='ERROR') as logs:
             detector.start()
             detector.join(timeout=5.0)
         self.assertFalse(detector.is_ready)

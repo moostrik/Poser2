@@ -59,7 +59,7 @@
       "start_norm": 0.0,
       "end_norm": 1.0
     },
-    "detector": {
+    "person_detector": {
       "model": "yolov8n_coco_512x448.onnx",
       "model_path": "data/models",
       "confidence": 0.5,

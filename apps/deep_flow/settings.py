@@ -99,7 +99,7 @@ class OakGroup(BaseSettings):
     cam_0         = Group(OakCameraSettings, share=_cam_share)
     camera_check  = Group(CameraCheckSettings)
     simulator     = Group(SimulatorSettings, share=[num_cameras, fps])
-    detector      = Group(inference.detection.Settings)     # the replay backend's person detector
+    person_detector = Group(inference.detection.Settings)   # the replay backend's person detector
     recorder      = Group(RecorderSettings, share=[num_cameras, fps, keyframe_interval])
     tracker       = Group(OnePerCamTrackerSettings)
     frame_sync    = Group(SyncSettings, share=[num_cameras, fps])
