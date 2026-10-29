@@ -57,7 +57,7 @@ use root paths, so no code knows the name. Only the relay folder goes there, nev
 | its code               | the repo                                 | `scripts\deploy_relay.bat`            |
 | TLS                    | `tailscale serve`, the ts.net certificate | Caddy, a Let's Encrypt certificate   |
 | the name               | `iaai.tail63e3df.ts.net`                 | `smile.oostrik.net`                   |
-| who reaches the page   | the tailnet (`funnel`: anyone)           | anyone with a pass (the QR code)      |
+| who reaches the page   | the tailnet (`funnel`: anyone)           | anyone with a pass: the QR code, or the invite link |
 | SMILE's `online.relay` | `wss://iaai.tail63e3df.ts.net/ws/smile`  | `wss://smile.oostrik.net/ws/smile`    |
 | the QR code on the walls | `https://iaai.tail63e3df.ts.net/?pass=…` (`online.page` empty: the relay's host) | `https://smile.oostrik.net/?pass=…` |
 | SMILE to the relay     | one PC                                   | the venue's uplink                    |

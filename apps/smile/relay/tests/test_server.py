@@ -7,7 +7,7 @@ import tempfile
 import time
 import unittest
 
-from aiohttp import ClientWebSocketResponse, web
+from aiohttp import ClientSession, ClientWebSocketResponse, DummyCookieJar, web
 from aiohttp.test_utils import TestClient, TestServer
 
 from apps.smile.relay.server import FRAME, KEEP_AFTER_LEAVE, KEEP_AT_MOST, LAST, SHOW, Relay, make_app
@@ -32,14 +32,14 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
         self.addAsyncCleanup(client.close)
         return client
 
-    async def bare_client(self) -> TestClient:
-        """A client without the pass: the same server, its own cookies."""
-        client = TestClient(self.client.server)
-        await client.start_server()
-        self.addAsyncCleanup(client.close)
-        return client
+    async def bare_client(self) -> ClientSession:
+        """A client without the pass: a plain session on the same server, no cookies (not a second TestClient:
+        closing one closes the server under the other's open websockets, which waits the shutdown out)."""
+        session = ClientSession(base_url=self.client.make_url('/'), cookie_jar=DummyCookieJar())
+        self.addAsyncCleanup(session.close)
+        return session
 
-    async def phone(self, client: TestClient | None = None) -> ClientWebSocketResponse:
+    async def phone(self, client: TestClient | ClientSession | None = None) -> ClientWebSocketResponse:
         ws = await (client or self.client).ws_connect('/ws/phone')
         self.assertEqual((await ws.receive_json())['type'], 'state')
         return ws
@@ -47,6 +47,7 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
     async def smile(self) -> ClientWebSocketResponse:
         ws = await self.client.ws_connect('/ws/smile', headers=AUTH)
         self.assertEqual((await ws.receive_json())['type'], 'pass')
+        self.assertEqual((await ws.receive_json())['type'], 'invite')
         self.assertEqual((await ws.receive_json())['type'], 'line')
         return ws
 
@@ -73,9 +74,14 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
         return (await response.json())['url']
 
     async def exists(self, url: str) -> bool:
-        async with self.client.get(url) as response:
-            await response.read()       # the file is closed again (Windows refuses to delete an open one)
-            return response.status == 200
+        return await self.status(url) == 200
+
+    async def status(self, url: str, client: TestClient | ClientSession | None = None, **kwargs) -> int:
+        """A GET's status, the response read and released (an unread one keeps a file open, which Windows
+        then refuses to delete, and a connection busy, which the client's close waits for)."""
+        async with (client or self.client).get(url, **kwargs) as response:
+            await response.read()
+            return response.status
 
     async def test_the_page_is_not_cached(self):
         web_dir = os.path.join(self.folder.name, 'web')
@@ -112,10 +118,10 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
         track = await self.upload('track', id='0001')
         self.assertEqual((await client.get(track)).status, 200)
         bare = await self.bare_client()
-        self.assertEqual((await bare.get(track)).status, 403)
+        self.assertEqual(await self.status(track, bare), 403)
         # SMILE reads the library with its token, without any pass
-        self.assertEqual((await bare.get('/api/library')).status, 403)
-        self.assertEqual((await bare.get('/api/library', headers=AUTH)).status, 200)
+        self.assertEqual(await self.status('/api/library', bare), 403)
+        self.assertEqual(await self.status('/api/library', bare, headers=AUTH), 200)
         phone = await self.phone(client)                # the websocket too
         await phone.close()
 
@@ -141,13 +147,31 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.relay.valid_pass(first, later))
         third = self.relay.rotate(later)             # the old ones go at a rotation
         self.assertEqual([v for v, _ in self.relay.passes], [third])
-        # a new relay on the same data folder knows the passes it issued
+        # a new relay on the same data folder knows the passes it issued, and its invite
         again = Relay(TOKEN, self.folder.name)
         self.assertEqual(again.current_pass, third)
         self.assertTrue(again.valid_pass(third, later))
+        self.assertEqual(again.invite, self.relay.invite)
         # SMILE hears the newest at connect
         smile = await self.smile()
         await smile.close()
+
+    async def test_the_invite_is_a_pass_without_an_end_until_a_new_one(self):
+        bare = await self.bare_client()
+        invite = self.relay.invite
+        self.assertEqual(await self.status(f'/api/library?pass={invite}', bare), 200)
+        self.assertEqual(await self.status('/api/library?pass=wrong', bare), 403)
+        later = time.time() + self.relay.pass_lifetime + 1
+        self.assertTrue(self.relay.valid_pass(invite, later))                   # the wall's passes end, the invite does not
+        self.assertFalse(self.relay.valid_pass(self.relay.current_pass, later))
+        # SMILE asks for a new one: the old link is dead, SMILE hears the new
+        smile = await self.smile()
+        await smile.send_json({'type': 'new_invite'})
+        new = (await self.receive(smile, 'invite'))['value']
+        self.assertNotEqual(new, invite)
+        self.assertEqual(await self.status(f'/api/library?pass={invite}', bare), 403)
+        self.assertEqual(await self.status(f'/api/library?pass={new}', bare), 200)
+        self.assertEqual(Relay(TOKEN, self.folder.name).invite, new)
 
     async def test_smile_needs_the_token_in_the_header(self):
         response = await self.client.get('/ws/smile', headers={'Upgrade': 'websocket', 'Authorization': 'Bearer wrong'})

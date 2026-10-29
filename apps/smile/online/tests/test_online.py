@@ -415,6 +415,27 @@ class TestOnline(unittest.TestCase):
         self.step()
         self.assertEqual(self.online.pass_value, '')
 
+    def test_the_invite_link_shows_in_the_panel_and_the_button_asks_for_a_new_one(self):
+        self.settings.active = True
+        self.settings.relay = 'wss://smile.example/ws/smile'
+        self.step()
+        self.assertEqual(self.settings.invite_link, '')
+        self.link.on_message({'type': 'invite', 'value': 'abc'})
+        self.step()
+        self.assertEqual(self.settings.invite_link, 'https://smile.example/?pass=abc')
+        self.settings.new_invite = True
+        self.step()
+        self.assertFalse(self.settings.new_invite)                              # the button is reset
+        self.assertEqual(self.link.types().count('new_invite'), 1)
+        self.step()
+        self.assertEqual(self.link.types().count('new_invite'), 1)              # once per press
+        self.link.on_message({'type': 'invite', 'value': 'def'})
+        self.step()
+        self.assertEqual(self.settings.invite_link, 'https://smile.example/?pass=def')
+        self.settings.active = False
+        self.step()
+        self.assertEqual(self.settings.invite_link, '')
+
     def test_the_result_is_delivered_as_soon_as_the_files_are_there(self):
         self.start_turn()
         self.step(seq=SequenceType.FLASH, initial=True)

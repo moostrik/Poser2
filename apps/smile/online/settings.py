@@ -12,6 +12,8 @@ class OnlineSettings(BaseSettings):
     music:          Field[bool]  = Field(True, widget=Widget.switch, description="Play the visitor's track on the phone (uploaded to the relay once per track)")
     screen:         Field[int]   = Field(0, min=0, max=48, newline=True, description="Screen of the sphere (1-48) with the QR code to the phone page, showing the turn meanwhile; 0 = none")
     page:           Field[str]   = Field("", description="Page the QR code opens; empty = the relay's host")
+    new_invite:     Field[bool]  = Field(False, widget=Widget.button, description="A new invite link; the old one stops working")
+    invite_link:    Field[str]   = Field("", access=Field.READ, description="Link for someone not at the machine: copy it to your phone")
     connected:      Field[bool]  = Field(False, access=Field.READ, newline=True, description="Connected to the relay")
     status:         Field[str]   = Field("off", access=Field.READ, description="What the online side does now")
     waiting:        Field[int]   = Field(0, access=Field.READ, description="People in line at the relay")

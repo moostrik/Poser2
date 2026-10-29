@@ -19,6 +19,9 @@ newest as `pass {value}` at every connect and every change and puts it in the QR
 `/` with a valid one serves the page and sets it as a cookie, which the phone's websocket and its fetches of
 `/files/` and `/api/library` then carry by themselves; without a valid pass `/` is the expired page and
 the rest 403. A phone whose pass has run out gets `expired` and is closed, at connect or at `join`.
+The invite is one more pass, without an end: a link SMILE's operator sends to someone not at the machine
+(SMILE shows it in its panel). `new_invite` from SMILE replaces it, so the old link dies; it is kept with
+the passes (`passes.json`: `{"passes": [[value, issued], ...], "invite": value}`).
 
 Messages are JSON text, images are binary with one leading byte: FRAME (0) a phone's camera frame to
 SMILE, SHOW (1) an image from SMILE for the phone's window, LAST (2) the turn's last one, which the phone
@@ -31,9 +34,9 @@ Relay -> phone: state (see Line.state: eye, status, place, waiting, block, laugh
     caption, portrait, grin: the urls, None for a file that is not there}, turn_end {reason: done, missed, lost or
     reset; `lost` also from the relay itself when SMILE goes}, expired (the pass ran out: the socket closes);
     SHOW and LAST images.
-Relay -> SMILE: pass {value} (at connect and at every change), line {waiting}, turn {id}, gone (the phone with the
-    turn left); frames.
-SMILE -> relay: eye {free, status, laughter}, turn_start, face, stage {flash, in, out} then stage {stage, progress}
+Relay -> SMILE: pass {value} (at connect and at every change), invite {value} (at connect and after `new_invite`),
+    line {waiting}, turn {id}, gone (the phone with the turn left); frames.
+SMILE -> relay: new_invite, eye {free, status, laughter}, turn_start, face, stage {flash, in, out} then stage {stage, progress}
     through the sequence (the flash stages with `value`, the room's eased progress), music {id, url, offset} (the visitor's track, which SMILE uploaded as kind `track` the
     first time; the laughter samples as kind `laugh` with `ext`; `GET /api/library` lists what the relay has),
     turn_end {reason}, and after the turn
@@ -110,6 +113,7 @@ class Relay:
         self.phone_passes: dict[str, str] = {}                  # the pass each phone came with, checked again at join
         self.deliveries: dict[str, Delivery] = {}
         self.passes: list[tuple[str, float]] = []               # (value, issued), the newest last
+        self.invite: str = ''                                   # the pass without an end, for the operator's link
         self.smile: web.WebSocketResponse | None = None
         self._frame_pending: bytes | None = None                # the newest screen frame not sent yet
         self._frame_in_flight: float | None = None              # when the frame the phone has not seen yet was sent
@@ -117,8 +121,10 @@ class Relay:
         for kind in UPLOAD_KINDS:
             os.makedirs(os.path.join(data, kind + 's'), exist_ok=True)
         self._read_passes()
+        if not self.invite:
+            self.invite = secrets.token_urlsafe(8)
         if not self.passes:
-            self.rotate()
+            self.rotate()       # writes the file, the invite with it
 
     # THE PASS
     @property
@@ -127,7 +133,20 @@ class Relay:
 
     def valid_pass(self, value: str, now: float | None = None) -> bool:
         now = time.time() if now is None else now
-        return bool(value) and any(v == value and now - issued <= self.pass_lifetime for v, issued in self.passes)
+        if not value:
+            return False
+        if secrets.compare_digest(value, self.invite):
+            return True
+        return any(v == value and now - issued <= self.pass_lifetime for v, issued in self.passes)
+
+    def new_invite(self) -> str:
+        """A new invite; the old link is dead from here."""
+        self.invite = secrets.token_urlsafe(8)
+        self._write_passes()
+        return self.invite
+
+    def invite_message(self) -> dict:
+        return {'type': 'invite', 'value': self.invite}
 
     def rotate(self, now: float | None = None) -> str:
         """A new pass; the ones past their lifetime go. The newest is the QR code's from now on."""
@@ -143,18 +162,19 @@ class Relay:
     def _read_passes(self) -> None:
         try:
             with open(os.path.join(self.data, PASSES_FILE), encoding='utf-8') as f:
-                saved: list = json.load(f)
+                saved: dict = json.load(f)
             now: float = time.time()
-            self.passes = [(str(v), float(issued)) for v, issued in saved if now - float(issued) <= self.pass_lifetime]
+            self.passes = [(str(v), float(issued)) for v, issued in saved['passes'] if now - float(issued) <= self.pass_lifetime]
+            self.invite = str(saved.get('invite', ''))
         except FileNotFoundError:
             pass
-        except (OSError, ValueError, TypeError) as e:
+        except (OSError, ValueError, TypeError, KeyError) as e:
             logger.warning('%s unreadable, starting without the old passes: %s', PASSES_FILE, e)
 
     def _write_passes(self) -> None:
         try:
             with open(os.path.join(self.data, PASSES_FILE), 'w', encoding='utf-8') as f:
-                json.dump(self.passes, f)
+                json.dump({'passes': self.passes, 'invite': self.invite}, f)
         except OSError as e:
             logger.warning('could not write %s: %s', PASSES_FILE, e)
 
@@ -284,6 +304,7 @@ class Relay:
         self.line.set_eye(True)
         logger.info('SMILE connected')
         await self.send(ws, self.pass_message())
+        await self.send(ws, self.invite_message())
         await self.send_line()
         await self.send_states()
         try:
@@ -336,6 +357,10 @@ class Relay:
         if kind == 'eye':
             self.line.set_eye(True, bool(message.get('free', False)), str(message.get('status', '')), bool(message.get('laughter', True)))
             await self.send_states()
+        elif kind == 'new_invite':
+            self.new_invite()
+            logger.info('a new invite; the old link is dead')
+            await self.send(self.smile, self.invite_message())
         elif kind == 'turn_start':
             self._reset_frames()
             phone: str | None = self.line.start_turn()

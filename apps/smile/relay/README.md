@@ -29,7 +29,9 @@ Where it runs and how it is reached, on the tailnet for a test and on the VPS, i
 * the page is at `http://<host>:8800/?pass=<pass>`: the QR code on the wall carries the relay's pass, a random
   value it makes every 10 minutes (`PASS_EVERY`; SMILE gets each as a `pass` message) and accepts for `--pass-hours`
   (2) in `data/passes.json`, so a restart forgets none. The page sets it as a cookie; a phone can reload for
-  another picture for those hours, then `/` is `web/expired.html` and the files 403. A phone only opens its
+  another picture for those hours, then `/` is `web/expired.html` and the files 403. The invite is one more
+  pass, without an end, for a link SMILE's operator sends to someone not at the machine (SMILE's panel shows it;
+  `new_invite` from SMILE replaces it and kills the old link); it is in `passes.json` too. A phone only opens its
   camera over HTTPS, so a TLS proxy stands in front (`data/documents/OnlineHosting.md`); without one the relay
   takes `--cert` and `--key`
 * tests: `relay/tests` covers the line, the server and the page's files (`test_web.py`: the stylesheet's structure, every

@@ -117,7 +117,9 @@ A phone that is not the turn's gets `state` and, after its own turn, its `result
 itself sends `turn_end {lost}` when SMILE goes, and `expired` (then closes the socket) to a page whose pass ran
 out: the QR code's url carries the relay's pass (`?pass=`, renewed every 10 minutes, accepted for 2 hours,
 `relay/README.md`), the page keeps it as a cookie, so a reload within those hours is another picture and a
-page opened later shows LINK EXPIRED, SCAN SMILE AGAIN (a fresh open gets the relay's `expired.html`).
+page opened later shows LINK EXPIRED, SCAN SMILE AGAIN (a fresh open gets the relay's `expired.html`). The
+relay's invite is a pass without an end, for the link the operator sends to someone not at the machine (the
+panel's `invite_link`; `new_invite` replaces it, and the old link is dead).
 
 ### The judging
 

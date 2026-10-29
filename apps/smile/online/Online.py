@@ -32,7 +32,7 @@ import numpy as np
 
 from apps.smile.cam.Camera import Camera
 from modules.face import FaceFinder, FaceFrame, rejection_label
-from apps.smile.online.Link import Link, read_token
+from apps.smile.online.Link import Link, http_base, read_token
 from apps.smile.online.settings import OnlineSettings
 from apps.smile.render.grab import ScreenGrab
 from apps.smile.render.Sequencer import CAMERA_STATES, SeqenceMessage, Sequencer, SequenceType
@@ -134,6 +134,7 @@ class Online:
         self._timed_out: bool = False   # the sequence reached TIMEOUT: the RESET after it is its natural end
         self._showing: bool = False     # the turn is on the room's screens: from the judging to the last frame
         self._pass: str = ''            # the relay's pass for the phone page's url, '' until the relay sent one
+        self._invite: str = ''          # the relay's invite, the pass without an end, for the panel's link
         self._delivery: Delivery | None = None
         self._no_token_warned: bool = False
         # the switch is saved with the presets: the readouts start clean
@@ -187,6 +188,8 @@ class Online:
             self._note(gone=True)
         elif kind == 'pass':
             self._note(pass_value=str(message.get('value') or ''))
+        elif kind == 'invite':
+            self._note(invite=str(message.get('value') or ''))
         elif kind == 'library':
             self._note(library=(set(str(t) for t in message.get('tracks', [])), set(str(t) for t in message.get('laughs', []))))
 
@@ -222,6 +225,8 @@ class Online:
             s.waiting = self._waiting
         if 'pass_value' in notes:
             self._pass = notes['pass_value']
+        if 'invite' in notes:
+            self._invite = notes['invite']
         if 'saved' in notes and self._delivery is not None:
             id, style, kept, grin, portrait, shared = notes['saved']
             self._delivery.saved = (id, kept, grin, portrait, shared)
@@ -241,6 +246,14 @@ class Online:
         connected: bool = link.connected
         if s.connected != connected:
             s.connected = connected
+        # the invite link for the panel, and the button that replaces it
+        invite_link: str = f'{http_base(str(s.relay))}/?pass={self._invite}' if connected and self._invite else ''
+        if s.invite_link != invite_link:
+            s.invite_link = invite_link
+        if s.new_invite:
+            s.new_invite = False
+            if connected:
+                link.send({'type': 'new_invite'})
         if self._phase == Phase.OFF:
             self._phase = Phase.IDLE
         if 'library' in notes:
@@ -518,5 +531,7 @@ class Online:
         if link is not None:
             link.stop()
         self.settings.connected = False
+        self.settings.invite_link = ''
         self._eye_last = None
         self._pass = ''
+        self._invite = ''
