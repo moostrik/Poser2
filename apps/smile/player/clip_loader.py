@@ -2,8 +2,9 @@ import random
 from threading import Thread, Lock, Event
 import time
 import numpy as np
-from typing import Any, Callable
+from typing import Callable
 from .clip_pool import ClipPool, Clip
+from .settings import WallsSettings
 
 ImageCallback= Callable[[str, np.ndarray, bool], None]
 
@@ -22,7 +23,7 @@ class ClipLoader(Thread):
     on its own clock, one after the other, at the speed the settings say at each play (`fps`, `spread`).
     `sector` is the cell's third of the sphere, which the pool keeps every recent recording on."""
 
-    def __init__(self, id: str, pool: ClipPool, settings: Any, sector: int = 0) -> None:
+    def __init__(self, id: str, pool: ClipPool, settings: WallsSettings, sector: int = 0) -> None:
         super().__init__()
         self._callback_mutex: Lock = Lock()
         self._stop_event: Event = Event()
@@ -31,7 +32,7 @@ class ClipLoader(Thread):
 
         self._id: str = id
         self.pool: ClipPool = pool
-        self.settings: Any = settings   # fps (0 plays each clip at its own rate) and spread (a fraction)
+        self.settings: WallsSettings = settings   # fps (0 plays each clip at its own rate) and spread (a fraction)
         self.sector: int = sector
         self._end_time: float = 0.0
         self._first: Clip | None = None

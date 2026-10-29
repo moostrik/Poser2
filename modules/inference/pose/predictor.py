@@ -1,5 +1,5 @@
 from threading import Lock
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, TypeAlias
 from .. import crop, ModelType
 from modules.pose import Points2D, FrameDictCallbackMixin, replace, FrameDict
 from .settings import Settings
@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 import logging
 logger = logging.getLogger(__name__)
 
-PoseRunner = Union[RunnerONNX, "RunnerTRT"]
+PoseRunner: TypeAlias = "RunnerONNX | RunnerTRT"
 
 class Predictor(FrameDictCallbackMixin):
     """GPU-based batch extractor for 2D pose points using RTMPose detection.

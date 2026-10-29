@@ -7,7 +7,7 @@ and the time the loop began; the walls know nothing of the sphere and draw the w
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import cv2
 import freetype
@@ -15,6 +15,9 @@ import numpy as np
 
 from . import sphere
 from .credit import FONT
+
+if TYPE_CHECKING:
+    from .render import RenderSettings
 
 logger = logging.getLogger(__name__)
 
@@ -175,8 +178,8 @@ class CreditScroller:
     start time so the word goes on from where it is. Off, or blocked, nothing is sent and the walls' loops
     time out. `credit_scroll_last` shows what goes round."""
 
-    def __init__(self, settings: Any, send: Send) -> None:
-        self.settings: Any = settings
+    def __init__(self, settings: 'RenderSettings', send: Send) -> None:
+        self.settings: RenderSettings = settings
         self._send: Send = send
         self._words: dict[int, tuple[float, float]] = {}    # per word: when its loop began, at what speed (px/s)
         self._sent: float = 0.0

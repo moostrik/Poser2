@@ -11,9 +11,6 @@ from point A to point B over a fixed time period determined by the input frequen
 Note: These classes are NOT thread-safe by design.
 """
 
-# Standard library imports
-from typing import Union
-
 # Third-party imports
 import numpy as np
 
@@ -237,4 +234,4 @@ class PointLerp(Lerp):
         return self._interpolated.reshape(self._num_points, 2).copy()
 
 
-ArrayLerp = Union[Lerp, AngleLerp, PointLerp]
+ArrayLerp = Lerp | AngleLerp | PointLerp

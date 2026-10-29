@@ -2,7 +2,6 @@
 
 import math
 from pathlib import Path
-from typing import Optional
 from functools import partial
 
 import glfw
@@ -78,8 +77,8 @@ class WhiteSpaceMain:
 
         # CAMERA
         self.cameras: list[CameraSource] = []
-        self.player: Optional[Player] = None
-        self.person_detector: Optional[detection.PersonDetector] = None      # the replay backend's, shared by its cameras
+        self.player: Player | None = None
+        self.person_detector: detection.PersonDetector | None = None      # the replay backend's, shared by its cameras
         if self.settings.camera.sim_enabled:
             # The rig is uniform: mono cameras decode their clips straight to gray
             gray = not self.settings.camera.cameras[0].color

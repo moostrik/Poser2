@@ -3,7 +3,7 @@
 from queue import Queue, Empty
 from threading import Thread, Lock
 from time import time, sleep
-from typing import Any, Union
+from typing import Any
 import logging
 
 from pythonosc.udp_client import SimpleUDPClient
@@ -14,7 +14,7 @@ from .net_probe import is_valid_ip
 
 logger = logging.getLogger(__name__)
 
-ArgValue = Union[str, bytes, bool, int, float, list, tuple]
+ArgValue = str | bytes | bool | int | float | list | tuple
 
 ERROR_LOG_INTERVAL: float = 10.0    # s between the log lines of a send that keeps failing
 

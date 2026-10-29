@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import math
 from enum import Enum
-from typing import Any, Callable, ClassVar, get_args
+from typing import Any, Callable, ClassVar, TypeVar, get_args
 
 from nicegui import ui
 
@@ -46,6 +46,8 @@ from modules.utils import Color, Point2f, Rect
 from .knob import Knob, CHANGE_THROTTLE
 
 SLIDER_WIDTH: int = 48      # Tailwind width step of a slider without a `width` hint
+
+ElementT = TypeVar('ElementT', bound=ui.element)
 
 
 # -- Shared helpers ----------------------------------------------------------
@@ -213,7 +215,7 @@ class Control:
             return f"{description}\n({label})"
         return label
 
-    def title(self, *, classes: str = ""):
+    def title(self, *, classes: str = "") -> ui.label:
         """A title label with the description as its hover tooltip."""
         title = ui.label(self.label).classes(classes)
         if self.description:
@@ -221,7 +223,7 @@ class Control:
                 ui.tooltip(self.description).props('delay=500')
         return title
 
-    def tooltip(self, element):
+    def tooltip(self, element: ElementT) -> ElementT:
         """Attach the description as a tooltip to a control that carries its own label."""
         return _attach_tooltip(element, self.description)
 

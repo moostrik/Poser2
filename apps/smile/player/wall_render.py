@@ -3,7 +3,7 @@ from math import ceil
 import random
 from threading import Lock
 import time
-from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TEST, glClear, glClearColor,  # type: ignore
@@ -13,7 +13,11 @@ from ..credit import FONT, qr_image, quiet_px, wrap_balanced
 from ..credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_offset
 from modules.gl import Blit, Fbo, Image, Shader, Style, SwapFbo, Text, Texture
 from ..render.shaders import Blend
+from .settings import WallsSettings
 from .shaders import BlitRotated
+
+if TYPE_CHECKING:
+    from ..render import RenderSettings
 
 logger = logging.getLogger(__name__)
 
@@ -111,9 +115,9 @@ class WallRender:
     CELL_WIDTH: int = 640
     CELL_HEIGHT: int = 512
 
-    def __init__(self, settings: Any, walls_settings: Any, ids: list[str]) -> None:
-        self.settings: Any = settings       # RenderSettings: the credit fields
-        self.walls_settings: Any = walls_settings   # WallsSettings: the trail
+    def __init__(self, settings: 'RenderSettings', walls_settings: WallsSettings, ids: list[str]) -> None:
+        self.settings: RenderSettings = settings       # the credit fields
+        self.walls_settings: WallsSettings = walls_settings   # the trail
 
         self.width: int = self.COLUMNS * self.CELL_WIDTH
         self.height: int = ceil(len(ids) / self.COLUMNS) * self.CELL_HEIGHT

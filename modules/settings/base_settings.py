@@ -28,6 +28,7 @@ Group children nest related fields into scopes::
 import copy
 import logging
 import threading
+from typing import Any
 
 from .field import Field, Access
 from .group import Group
@@ -131,12 +132,12 @@ class BaseSettings:
     # -- Field access --------------------------------------------------------
 
     @property
-    def fields(self):
+    def fields(self) -> dict[str, Field]:
         """Read-only view of all Field descriptors, keyed by name."""
         return dict(self._fields)
 
     @property
-    def actions(self):
+    def actions(self) -> dict[str, Field]:
         """Read-only view of all Widget.button fields, keyed by name."""
         return {n: f for n, f in self._fields.items() if f.widget == Widget.button}
 
@@ -146,7 +147,7 @@ class BaseSettings:
         return self._parent
 
     @property
-    def children(self):
+    def children(self) -> dict[str, 'BaseSettings']:
         """Read-only view of all child instances, keyed by name."""
         return dict(self._children)
 
@@ -214,7 +215,7 @@ class BaseSettings:
 
     # -- Serialization -------------------------------------------------------
 
-    def to_dict(self, *, _exclude: set[str] | None = None):
+    def to_dict(self, *, _exclude: set[str] | None = None) -> dict[str, Any]:
         """Serialize mutable fields to a dict.
 
         Excludes ``Access.READ`` fields and ``Widget.button`` fields.
@@ -239,7 +240,7 @@ class BaseSettings:
             result[name] = child.to_dict(_exclude=shared)
         return result
 
-    def initialize(self):
+    def initialize(self) -> None:
         """Lock INIT fields.  Call once after the startup preset is loaded.
 
         After this call, ``Access.INIT`` fields can no longer be written
@@ -249,7 +250,7 @@ class BaseSettings:
         for child in self._children.values():
             child.initialize()
 
-    def update_from_dict(self, data):
+    def update_from_dict(self, data) -> None:
         """Restore fields from a dict.
 
         ``Access.INIT`` fields are included only while ``_initialized``

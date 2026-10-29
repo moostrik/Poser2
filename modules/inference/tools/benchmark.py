@@ -25,7 +25,7 @@ from typing import Any, Callable
 import numpy as np
 import torch
 
-from modules.settings import presets
+from modules.settings import BaseSettings, presets
 from modules.utils import PerformanceTimer, timing
 
 from .. import ModelType
@@ -76,7 +76,7 @@ MODELS: list[Model] = [
 ]
 
 
-def load_app_settings(app: str) -> Any:
+def load_app_settings(app: str) -> BaseSettings:
     """The app's settings with its startup preset loaded, as the app's main builds them."""
     presets.set_app(app)
     settings = importlib.import_module(f"apps.{app}.settings").Settings()
@@ -89,7 +89,7 @@ def load_app_settings(app: str) -> Any:
     return settings
 
 
-def model_settings(app_group: Any, model_type: ModelType) -> Any:
+def model_settings(app_group: BaseSettings, model_type: ModelType) -> BaseSettings:
     """A standalone copy of a model's settings group with the requested model type.
 
     The ONNX models are named from the repo root (`data/models/...`), the TensorRT engines from the app's
@@ -127,7 +127,7 @@ def gpu_used_mb() -> float:
     return (total - free) / 1024 / 1024
 
 
-def run_model(model: Model, settings: Any, crop_w: int, crop_h: int, warmup: int, iterations: int,
+def run_model(model: Model, settings: BaseSettings, crop_w: int, crop_h: int, warmup: int, iterations: int,
               image: Path | None, seed: int) -> tuple[dict[str, np.ndarray], float, dict[str, dict[str, float]]]:
     """Time one model; returns the last batch's outputs, the GPU memory its runner took (MB) and its timer stats.
 

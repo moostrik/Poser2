@@ -1,6 +1,5 @@
 # Standard library imports
 from enum import IntEnum
-from typing import Optional
 
 # Third-party imports
 import numpy as np
@@ -69,7 +68,7 @@ class MovingAverage:
         vector_size: int,
         window_size: int = 30,
         window_type: WindowType = WindowType.TRIANGULAR,
-        clamp_range: Optional[tuple[float, float]] = None
+        clamp_range: tuple[float, float] | None = None
     ) -> None:
         """
         Args:
@@ -189,11 +188,11 @@ class MovingAverage:
             self._compute_average()
 
     @property
-    def clamp_range(self) -> Optional[tuple[float, float]]:
+    def clamp_range(self) -> tuple[float, float] | None:
         """Get the clamp range."""
         return self._clamp_range
 
     @clamp_range.setter
-    def clamp_range(self, value: Optional[tuple[float, float]]) -> None:
+    def clamp_range(self, value: tuple[float, float] | None) -> None:
         """Set the clamp range."""
         self._clamp_range = value

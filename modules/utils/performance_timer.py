@@ -1,7 +1,7 @@
 import threading
 import weakref
 import numpy as np
-from typing import ClassVar, Optional
+from typing import ClassVar
 
 import logging
 logger = logging.getLogger(__name__)
@@ -36,8 +36,8 @@ class PerformanceTimer:
         name: str = "Performance",
         sample_count: int = 100,
         omit_init: int = 0,
-        report_interval: Optional[int] = None,
-        color: Optional[str] = None,
+        report_interval: int | None = None,
+        color: str | None = None,
     ) -> None:
         """Initialize performance timer.
 

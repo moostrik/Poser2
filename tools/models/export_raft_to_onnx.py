@@ -46,7 +46,7 @@ class RAFTModelWrapper(torch.nn.Module):
         self.raft = raft_model
         self.iters = iters
 
-    def forward(self, image1, image2):
+    def forward(self, image1, image2) -> torch.Tensor:
         """Forward pass for optical flow.
 
         Args:

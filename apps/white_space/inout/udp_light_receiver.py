@@ -1,7 +1,7 @@
 import socket
 from threading import Thread
 from time import time
-from typing import Callable, Optional
+from typing import Callable
 
 from modules.settings import BaseSettings, Field, Widget
 
@@ -33,7 +33,7 @@ class UdpLightReceiver:
         self.settings: UdpLightReceiverSettings = settings
         self._bindings: dict[str, list[Callable]] = {}
         self._running  = False
-        self._thread: Optional[Thread] = None
+        self._thread: Thread | None = None
 
     @property
     def running(self) -> bool:

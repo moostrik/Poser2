@@ -101,7 +101,6 @@ Notes:
 =============================================================================
 """
 from abc import abstractmethod
-from typing import Optional
 
 import numpy as np
 from typing import Self
@@ -286,7 +285,7 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
 
     # ========== FACTORY METHODS ==========
 
-    _empty_instance: Optional[Self] = None  # Class-level cache for the empty instance
+    _empty_instance: Self | None = None  # Class-level cache for the empty instance
 
     @classmethod
     def create_dummy(cls) -> Self:
@@ -301,7 +300,7 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
         return cls._empty_instance
 
     @classmethod # KEEP FOR NOW FOR BACKWARDS COMPATIBILITY
-    def from_values(cls, values: np.ndarray, scores: Optional[np.ndarray] = None) -> Self:
+    def from_values(cls, values: np.ndarray, scores: np.ndarray | None = None) -> Self:
         """Create instance from values, generating default scores if needed."""
         if scores is None:
             scores = np.where(np.isnan(values), 0.0, 1.0).astype(np.float32)
@@ -309,7 +308,7 @@ class BaseScalarFeature(BaseFeature[FeatureEnum]):
 
     # ========= VALIDATION ==========
 
-    def validate(self, check_ranges: bool = True) -> tuple[bool, Optional[str]]:
+    def validate(self, check_ranges: bool = True) -> tuple[bool, str | None]:
         """Validate array properties (use for debugging/testing).
 
         Checks all invariants that should hold for a valid ScalarFeature.

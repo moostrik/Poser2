@@ -2,7 +2,7 @@
 from enum import IntEnum
 import threading
 import time
-from typing import Callable, Optional, cast
+from typing import Callable, cast
 import warnings
 
 # Third-party imports

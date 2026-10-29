@@ -1,7 +1,6 @@
 """HD Trio — 3-camera interactive installation with fluid rendering."""
 
 import logging
-from typing import Optional
 from functools import partial
 
 from modules.utils import Broadcast
@@ -81,8 +80,8 @@ class HDTrioMain:
 
         # CAMERA
         self.cameras: list[CameraSource] = []
-        self.player: Optional[Player] = None
-        self.person_detector: Optional[detection.PersonDetector] = None      # the replay backend's, shared by its cameras
+        self.player: Player | None = None
+        self.person_detector: detection.PersonDetector | None = None      # the replay backend's, shared by its cameras
         if self.settings.camera.sim_enabled:
             self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH)
             if self.settings.camera.simulator.replay:

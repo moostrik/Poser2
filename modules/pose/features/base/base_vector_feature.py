@@ -104,7 +104,6 @@ Notes:
 """
 
 from abc import abstractmethod
-from typing import Optional
 
 import numpy as np
 from typing import Self
@@ -282,7 +281,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
 
     # ========== CONSTRUCTORS ==========
 
-    _empty_instance: Optional[Self] = None  # Class-level cache for the empty instance
+    _empty_instance: Self | None = None  # Class-level cache for the empty instance
 
     @classmethod
     def create_dummy(cls) -> Self:
@@ -297,7 +296,7 @@ class BaseVectorFeature(BaseFeature[FeatureEnum]):
 
     # ========= VALIDATION ==========
 
-    def validate(self, check_ranges: bool = True) -> tuple[bool, Optional[str]]:
+    def validate(self, check_ranges: bool = True) -> tuple[bool, str | None]:
         """Validate array properties (use for debugging/testing).
 
         Checks all invariants that should hold for a valid VectorFeature.

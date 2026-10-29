@@ -1,5 +1,4 @@
 import time
-from typing import Any
 
 import glfw
 import numpy as np
@@ -11,7 +10,7 @@ from ..comfy.messages import GeneratorMessage, GeneratorState
 from modules.face import FaceFrame
 from .. import sphere
 from modules.gl import Blit, Fbo, MonitorId, RenderBase, Shader, Style, Texture, clear_color, fit
-from ..player import WallRender
+from ..player import WallRender, WallsSettings
 from .inputs import Inputs
 from .layers import (BloomLayer, CameraLayer, CreditLayer, DiffusionLayer, FlashLayer, LayerBase, RevealLayer, StatusLayer,
                      caption_shown, copy, fade_step, new_line_due)
@@ -32,7 +31,7 @@ class SmileRender(RenderBase):
     the online cell of one of them shows the output as the phone sees it during an online turn.
     Keys: Enter starts a sequence; f fullscreen, w borderless, Esc quit (the window manager)."""
 
-    def __init__(self, settings: RenderSettings, walls_settings: Any, sequencer: Sequencer, grin_player: GrinPlayer, width: int, height: int) -> None:
+    def __init__(self, settings: RenderSettings, walls_settings: WallsSettings, sequencer: Sequencer, grin_player: GrinPlayer, width: int, height: int) -> None:
         super().__init__(settings.window)
         self.settings: RenderSettings = settings
         self.sequencer: Sequencer = sequencer

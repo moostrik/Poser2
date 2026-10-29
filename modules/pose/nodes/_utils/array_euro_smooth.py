@@ -1,6 +1,5 @@
 # Standard library imports
 import math
-from typing import Union
 
 # Third-party imports
 import numpy as np
@@ -233,4 +232,4 @@ class PointEuroSmooth(EuroSmooth):
         return super().value.reshape(self._num_points, 2)
 
 
-ArraySmooth = Union[EuroSmooth, AngleEuroSmooth, PointEuroSmooth]
+ArraySmooth = EuroSmooth | AngleEuroSmooth | PointEuroSmooth

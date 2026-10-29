@@ -1,6 +1,6 @@
 from collections import deque
 from threading import Lock
-from typing import TYPE_CHECKING, Callable, TypeAlias, Union
+from typing import TYPE_CHECKING, Callable, TypeAlias
 
 import torch
 
@@ -18,7 +18,7 @@ from .runner_onnx import RunnerONNX, OpticalFlowInput, OpticalFlowOutput
 if TYPE_CHECKING:
     from .runner_trt import RunnerTRT
 
-OpticalFlowRunner = Union[RunnerONNX, "RunnerTRT"]
+OpticalFlowRunner: TypeAlias = "RunnerONNX | RunnerTRT"
 
 FlowDict: TypeAlias = dict[int, torch.Tensor]
 FlowCallback: TypeAlias = Callable[[FlowDict], None]

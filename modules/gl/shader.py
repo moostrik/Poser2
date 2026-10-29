@@ -22,14 +22,14 @@ class FileModifiedHandler(FileSystemEventHandler):
         self.callback = callback
         self.last_modified: float = time.time()
 
-    def on_modified(self, event):
+    def on_modified(self, event) -> None:
         if time.time() - self.last_modified < 0.5:
             return
         self.last_modified = time.time()
         if not event.is_directory:
             self.callback(event.src_path)
 
-def monitor_path(path, callback):
+def monitor_path(path, callback) -> Observer:
     event_handler = FileModifiedHandler(callback)
     observer = Observer()
     observer.schedule(event_handler, path=path, recursive=False)

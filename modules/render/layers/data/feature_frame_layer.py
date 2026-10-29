@@ -1,7 +1,6 @@
 # Standard library imports
 from dataclasses import dataclass
 from enum import IntEnum
-from typing import Tuple
 
 # Third-party imports
 from OpenGL.GL import *  # type: ignore

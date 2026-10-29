@@ -3,7 +3,7 @@ from enum import IntEnum
 import math
 import threading
 import time
-from typing import Callable, Optional, TYPE_CHECKING, cast
+from typing import Callable, TYPE_CHECKING, cast
 import warnings
 from dataclasses import dataclass
 

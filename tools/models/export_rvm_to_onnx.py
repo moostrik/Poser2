@@ -34,7 +34,7 @@ def export_rvm_to_onnx(
     downsample_ratio: float = 1.0,
     fp32: bool = False,  # FP32 seems to be faster in ONNX, but we want to build a FP16 TensorRT engine from it
     simplify: bool = True
-):
+) -> bool:
     """Export RVM model to ONNX with fixed resolution (TensorRT-compatible).
 
     Args:

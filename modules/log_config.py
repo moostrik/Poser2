@@ -13,7 +13,7 @@ LogEntry = namedtuple('LogEntry', ['timestamp', 'level', 'source', 'message'])
 class ShortNameFormatter(logging.Formatter):
     """Formatter that shortens logger names to last dotted segment."""
 
-    def format(self, record):
+    def format(self, record: logging.LogRecord) -> str:
         # "modules.camera.sync" → "sync"
         short = record.name.rsplit('.', 1)[-1]
         record.short_name = short.ljust(16, '.')
@@ -23,7 +23,7 @@ class ShortNameFormatter(logging.Formatter):
 class FlushFileHandler(logging.FileHandler):
     """FileHandler that flushes after every record for crash safety."""
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         super().emit(record)
         self.flush()
 
@@ -41,7 +41,7 @@ class LogRingBuffer(logging.Handler):
         self._lock = Lock()
         self._counter: int = 0  # total records ever appended
 
-    def emit(self, record):
+    def emit(self, record: logging.LogRecord) -> None:
         try:
             short_name = record.name.rsplit('.', 1)[-1]
             entry = LogEntry(

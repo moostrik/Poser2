@@ -5,7 +5,7 @@ over together, with a range on the timeline and the panel's playback readouts. I
 from threading import Thread, Event, Lock
 from pathlib import Path
 from numpy import ndarray
-from typing import Callable, Dict, TypeAlias
+from typing import Callable, TypeAlias
 from enum import Enum, auto
 from queue import Queue
 from time import perf_counter, sleep
@@ -81,7 +81,7 @@ class Folder():
         self.path: Path = path
         self.chunks: int = chunks
 
-FolderDict = Dict[str, Folder]
+FolderDict = dict[str, Folder]
 
 class Player(Thread):
     def __init__(self, settings: PlayerSettings, data_path: str = "", gray: bool = False) -> None:
@@ -122,12 +122,12 @@ class Player(Thread):
         self.closers: list[StreamReader] = []
 
         self.sync_lock: Lock = Lock()
-        self.frame_sync_dict: Dict[int, Dict[int, Dict[FrameType, ndarray]]] = {}
+        self.frame_sync_dict: dict[int, dict[int, dict[FrameType, ndarray]]] = {}
         for i in range(self.num_cams):
             self.frame_sync_dict[i] = {}
 
         self.drift_lock: Lock = Lock()
-        self.drift_ids: Dict[int, int] = {}
+        self.drift_ids: dict[int, int] = {}
         self.drift:int = 0
 
         self.playback_lock: Lock = Lock()
@@ -291,9 +291,9 @@ class Player(Thread):
         if cam_id == 0 and frame_type == FrameType.VIDEO:
             self.update_gui(frame_id)
 
-        sync_frames:Dict[FrameType, ndarray] = {}
+        sync_frames:dict[FrameType, ndarray] = {}
         with self.sync_lock:
-            cam_frames: Dict[int, Dict[FrameType, ndarray]] = self.frame_sync_dict[cam_id]
+            cam_frames: dict[int, dict[FrameType, ndarray]] = self.frame_sync_dict[cam_id]
             if frame_id not in cam_frames:
                 cam_frames[frame_id] = {}
             cam_frames[frame_id][frame_type] = frame
@@ -328,7 +328,7 @@ class Player(Thread):
 
     # DRIFT CALCULATION
     def _calcuate_drift(self, cam_id, frame_id: int) -> None:
-        drift_ids: Dict[int, int] = {}
+        drift_ids: dict[int, int] = {}
         with self.drift_lock:
             self.drift_ids[cam_id] = frame_id
             drift_ids = self.drift_ids.copy()

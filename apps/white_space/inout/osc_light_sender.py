@@ -1,6 +1,5 @@
 from threading import Thread, Event, Lock
 from time import monotonic, perf_counter, sleep
-from typing import Optional
 
 import numpy as np
 from pythonosc.udp_client import UDPClient
@@ -206,7 +205,7 @@ class OscLightSender:
                 settings.resolution, settings.mtu,
             )
 
-        self._latest_output: Optional[LightFrame] = None
+        self._latest_output: LightFrame | None = None
         self._latch = FixtureSpeedLatch()   # when the fixture's speed latch needs a 0→target edge
         self._output_lock:   Lock  = Lock()
         self._client_lock:   Lock  = Lock()
@@ -216,11 +215,11 @@ class OscLightSender:
         # Config (interlace + rpm) is sent on change instead of every frame; `None` rpm forces the
         # first send. `_config_dirty` is set from the settings callback on whichever thread edits.
         self._config_dirty:   bool = True
-        self._sent_rpm:       Optional[int] = None
+        self._sent_rpm:       int | None = None
         self._last_config_at: float = 0.0
 
         self._running = False
-        self._thread: Optional[Thread] = None
+        self._thread: Thread | None = None
 
         self.settings.bind(OscLightSenderSettings.ip, self._on_connection_change)  # type: ignore[arg-type]
         self.settings.bind(OscLightSenderSettings.port,         self._on_connection_change)  # type: ignore[arg-type]
@@ -454,7 +453,7 @@ class OscLightSender:
         chunk_size: int,
         num_chunks: int,
         slow: bool,
-    ) -> Optional[OscMessageList]:
+    ) -> OscMessageList | None:
         """The pixel payload: all white chunks, then all blue.
 
         Grouping each channel keeps its chunks adjacent on the wire, and leaves `/WS/blue{n-1}`

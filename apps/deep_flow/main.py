@@ -1,6 +1,5 @@
 """Deep Flow — single-camera 3D volumetric fluid installation."""
 
-from typing import Optional
 from functools import partial
 
 from modules.utils import Broadcast
@@ -52,9 +51,9 @@ class DeepFlowMain:
         configure_features(max_players)
 
         self.cameras: list[CameraSource] = []
-        self.recorder: Optional[Recorder] = None
-        self.player: Optional[Player] = None
-        self.person_detector: Optional[detection.PersonDetector] = None      # the replay backend's, shared by its cameras
+        self.recorder: Recorder | None = None
+        self.player: Player | None = None
+        self.person_detector: detection.PersonDetector | None = None      # the replay backend's, shared by its cameras
         if self.settings.camera.sim_enabled:
             self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH)
             if self.settings.camera.simulator.replay:

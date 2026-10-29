@@ -8,7 +8,7 @@ import os
 import random
 import threading
 import time
-from typing import Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -18,8 +18,12 @@ from .clip_loader import ClipLoader
 from .wall_render import WallRender
 from .clip_pool import Clip, ClipPool, next_start
 from .folder_scanner import FolderScanner
+from .settings import WallsSettings
 
 from modules.inout import OscSender, OscSenderSettings
+
+if TYPE_CHECKING:
+    from ..render import RenderSettings
 
 logger = logging.getLogger(__name__)
 
@@ -40,10 +44,10 @@ def online_cell_mode(active: bool, connected: bool, showing: bool) -> str:
 
 
 class Player:
-    def __init__(self, settings: Any, walls: list[WallRender], render_settings: Any, root: str = 'apps/smile/output/') -> None:
-        self.settings: Any = settings           # WallsSettings
+    def __init__(self, settings: WallsSettings, walls: list[WallRender], render_settings: 'RenderSettings', root: str = 'apps/smile/output/') -> None:
+        self.settings: WallsSettings = settings
         self.walls: list[WallRender] = walls
-        self._name: Any = render_settings       # its credit_name goes over the captions
+        self._name: RenderSettings = render_settings       # its credit_name goes over the captions
         # the Max patch places a clip's laugh by the cell its play starts in: `/bang <cell>` to the wall's port
         self.osc: list[OscSender] = []
         for wall in range(len(walls)):

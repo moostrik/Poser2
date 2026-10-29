@@ -1,6 +1,5 @@
 # Standard library imports
 from time import perf_counter
-from typing import Union
 
 # Third-party imports
 import numpy as np
@@ -220,4 +219,4 @@ class PointEmaSmooth(EmaSmooth):
         return self._smoothed.reshape(self._num_points, 2).copy()
 
 
-ArrayEmaSmooth = Union[EmaSmooth, AngleEmaSmooth, PointEmaSmooth]
+ArrayEmaSmooth = EmaSmooth | AngleEmaSmooth | PointEmaSmooth

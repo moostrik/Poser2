@@ -22,7 +22,6 @@ Usage:
 import argparse
 import sys
 from pathlib import Path
-from typing import Dict, Tuple
 
 import numpy as np
 import torch
@@ -35,7 +34,7 @@ IMAGENET_MEAN = np.array([0.485, 0.456, 0.406], dtype=np.float32).reshape(1, 3, 
 IMAGENET_STD = np.array([0.229, 0.224, 0.225], dtype=np.float32).reshape(1, 3, 1, 1)
 
 
-def get_onnx_precision(model_path: str) -> Tuple[str, np.dtype]:
+def get_onnx_precision(model_path: str) -> tuple[str, np.dtype]:
     """Detect ONNX model precision from input tensor type."""
     session = ort.InferenceSession(
         model_path,
@@ -49,7 +48,7 @@ def get_onnx_precision(model_path: str) -> Tuple[str, np.dtype]:
         return "FP32", np.float32
 
 
-def get_trt_precision(engine_path: str) -> Tuple[str, np.dtype]:
+def get_trt_precision(engine_path: str) -> tuple[str, np.dtype]:
     """Detect TRT engine precision from input tensor type."""
     logger = trt.Logger(trt.Logger.WARNING)
     runtime = trt.Runtime(logger)
@@ -85,7 +84,7 @@ def get_model_type(model_path: str) -> str:
         raise ValueError(f"Unknown model type for file: {model_path}")
 
 
-def get_model_precision(model_path: str) -> Tuple[str, np.dtype]:
+def get_model_precision(model_path: str) -> tuple[str, np.dtype]:
     """Detect model precision based on model type."""
     model_type = get_model_type(model_path)
     if model_type == 'onnx':
@@ -94,7 +93,7 @@ def get_model_precision(model_path: str) -> Tuple[str, np.dtype]:
         return get_trt_precision(model_path)
 
 
-def get_model_input_shape(model_path: str) -> Tuple[int, int, int, int]:
+def get_model_input_shape(model_path: str) -> tuple[int, int, int, int]:
     """Get input shape from model (batch, channels, height, width)."""
     model_type = get_model_type(model_path)
     
@@ -130,7 +129,7 @@ def get_model_input_shape(model_path: str) -> Tuple[int, int, int, int]:
         return -1, 3, 256, 192
 
 
-def run_inference(model_path: str, input_data: np.ndarray) -> Dict[str, np.ndarray]:
+def run_inference(model_path: str, input_data: np.ndarray) -> dict[str, np.ndarray]:
     """Run inference on any supported model type, converting input dtype as needed."""
     model_type = get_model_type(model_path)
     
@@ -144,7 +143,7 @@ def run_inference(model_path: str, input_data: np.ndarray) -> Dict[str, np.ndarr
         return run_trt_inference(model_path, input_converted)
 
 
-def run_onnx_inference(model_path: str, input_data: np.ndarray) -> Dict[str, np.ndarray]:
+def run_onnx_inference(model_path: str, input_data: np.ndarray) -> dict[str, np.ndarray]:
     """Run ONNX Runtime inference and capture all outputs."""
     
     sess_options = ort.SessionOptions()
@@ -163,7 +162,7 @@ def run_onnx_inference(model_path: str, input_data: np.ndarray) -> Dict[str, np.
     return {name: out for name, out in zip(output_names, outputs)}
 
 
-def run_trt_inference(engine_path: str, input_data: np.ndarray) -> Dict[str, np.ndarray]:
+def run_trt_inference(engine_path: str, input_data: np.ndarray) -> dict[str, np.ndarray]:
     """Run TensorRT inference and capture outputs."""
     
     logger = trt.Logger(trt.Logger.WARNING)
@@ -228,7 +227,7 @@ def run_trt_inference(engine_path: str, input_data: np.ndarray) -> Dict[str, np.
     return outputs
 
 
-def decode_simcc(simcc_x: np.ndarray, simcc_y: np.ndarray, split_ratio: float = 2.0) -> Tuple[np.ndarray, np.ndarray]:
+def decode_simcc(simcc_x: np.ndarray, simcc_y: np.ndarray, split_ratio: float = 2.0) -> tuple[np.ndarray, np.ndarray]:
     """Decode SimCC format to keypoints and scores."""
     # simcc_x: (B, K, W*2), simcc_y: (B, K, H*2)
     
@@ -278,8 +277,8 @@ def check_numerical_stability(arr: np.ndarray, name: str) -> Dict:
 
 
 def compare_simcc_outputs(
-    outputs1: Dict[str, np.ndarray],
-    outputs2: Dict[str, np.ndarray],
+    outputs1: dict[str, np.ndarray],
+    outputs2: dict[str, np.ndarray],
     name1: str = "Model1",
     name2: str = "Model2",
     split_ratio: float = 2.0
@@ -479,7 +478,7 @@ def compare_simcc_outputs(
         print("   4. Try building TRT from FP32 ONNX with FP16 flag (auto mixed-precision)")
 
 
-def main():
+def main() -> int:
     print(f"\n{'='*80}")
     print("🔬 RTMPose Model Precision DIAGNOSTIC")
     print(f"{'='*80}")

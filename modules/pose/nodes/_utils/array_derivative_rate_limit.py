@@ -1,5 +1,4 @@
 # Standard library imports
-from typing import Union
 from time import perf_counter
 
 # Third-party imports

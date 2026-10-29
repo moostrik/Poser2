@@ -1,6 +1,5 @@
 # Standard library imports
 from enum import IntEnum
-from typing import Union
 
 # Third-party imports
 import numpy as np
@@ -186,4 +185,4 @@ class PointPredict(Predict):
         """Get predicted points for the next frame."""
         return super().value.reshape(self._num_points, 2).copy()
 
-ArrayPredict = Union[Predict, AnglePredict, PointPredict]
+ArrayPredict = Predict | AnglePredict | PointPredict

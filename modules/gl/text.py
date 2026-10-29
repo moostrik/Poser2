@@ -6,7 +6,6 @@ Uses freetype-py to generate a font atlas at allocation time.
 
 import ctypes
 from pathlib import Path
-from typing import Tuple
 
 import numpy as np
 from OpenGL.GL import *  # type: ignore
@@ -109,7 +108,7 @@ class Text:
         self._box_shader.deallocate()
         self._allocated = False
 
-    def measure_text(self, text: str) -> Tuple[int, int]:
+    def measure_text(self, text: str) -> tuple[int, int]:
         """Measure text dimensions in pixels.
 
         Args:
@@ -121,7 +120,7 @@ class Text:
         return self._atlas.measure_text(text)
 
     def draw_text(self, x: float, y: float, text: str,
-                  color: Tuple[float, float, float, float],
+                  color: tuple[float, float, float, float],
                   screen_width: int, screen_height: int) -> None:
         """Render text at screen position.
 
@@ -181,8 +180,8 @@ class Text:
         glBindVertexArray(previous_vao)
 
     def draw_box_text(self, x: float, y: float, text: str,
-                      color: Tuple[float, float, float, float],
-                      bg_color: Tuple[float, float, float, float],
+                      color: tuple[float, float, float, float],
+                      bg_color: tuple[float, float, float, float],
                       screen_width: int, screen_height: int) -> None:
         """Render text with a background box.
 

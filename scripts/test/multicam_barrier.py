@@ -28,7 +28,6 @@ os.environ["DEPTHAI_RECONNECT_TIMEOUT"] = "0"
 
 
 from threading import Thread, Barrier, BrokenBarrierError, Event, Lock
-from typing import Optional
 import cv2
 import depthai as dai
 
@@ -66,7 +65,7 @@ QUEUE_MAX = 4
 # Helpers
 # ---------------------------------------------------------------------------
 
-def lookup_devices(ids: list[str]) -> dict[str, Optional[dai.DeviceInfo]]:
+def lookup_devices(ids: list[str]) -> dict[str, dai.DeviceInfo | None]:
     """Resolve DeviceInfo for all IDs once in the main thread."""
     available = {info.getDeviceId(): info for info in dai.Device.getAllAvailableDevices()}
     result = {}
@@ -99,13 +98,13 @@ def build_pipeline(device: dai.Device, use_camb: bool) -> tuple[dai.Pipeline, da
 #   Phase B (sequential under lock): pipeline.start().
 # ---------------------------------------------------------------------------
 
-def run(device_infos: dict[str, Optional[dai.DeviceInfo]], use_camb: bool) -> None:
+def run(device_infos: dict[str, dai.DeviceInfo | None], use_camb: bool) -> None:
     n = len(device_infos)
     barrier = Barrier(n)
     start_lock = Lock()
-    results: dict[str, Optional[tuple]] = {d: None for d in device_infos}
+    results: dict[str, tuple | None] = {d: None for d in device_infos}
 
-    def open_camera(device_id: str, info: Optional[dai.DeviceInfo], index: int) -> None:
+    def open_camera(device_id: str, info: dai.DeviceInfo | None, index: int) -> None:
         short = device_id[-8:]
         if info is None:
             log.info("[%s] %s  NOT AVAILABLE", short, _t())

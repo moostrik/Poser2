@@ -16,6 +16,7 @@ Typical usage::
 from __future__ import annotations
 
 from bisect import bisect_left
+from collections.abc import Iterator
 from pathlib import Path
 
 import numpy as np
@@ -75,7 +76,7 @@ class Player:
         local_idx = idx - self._chunk_offsets[chunk_idx]
         return self._reconstruct(self._chunks[chunk_idx], local_idx)
 
-    def iter_chunks(self):
+    def iter_chunks(self) -> Iterator[list[tuple[float, FrameDict]]]:
         """Yield ``list[tuple[float, FrameDict]]`` for each recorded chunk."""
         for chunk in self._chunks:
             entries: list[tuple[float, FrameDict]] = []

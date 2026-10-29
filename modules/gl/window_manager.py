@@ -6,7 +6,7 @@ from enum import IntEnum
 from queue import SimpleQueue
 from threading import Thread, Lock, current_thread
 from time import perf_counter, sleep, time_ns
-from typing import Callable, Optional, TYPE_CHECKING
+from typing import Callable, TYPE_CHECKING
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +100,7 @@ class WindowManager():
         self._mouse_px: float = 0.0
         self._mouse_py: float = 0.0
 
-        self._monitor: Optional[glfw._GLFWmonitor] = None
+        self._monitor: glfw._GLFWmonitor | None = None
         self._ordered_monitor_ids: list[int] = []
 
         self._render_thread: Thread | None = None
@@ -113,7 +113,7 @@ class WindowManager():
 
         # Secondary windows sharing the main context: logical_id → window
 
-        self._main_window: Optional[glfw._GLFWwindow] = None
+        self._main_window: glfw._GLFWwindow | None = None
         self._secondary_windows: dict[int, glfw._GLFWwindow] = {}
         self._secondary_fallback: set[int] = set()
         self._monitor_cb = None  # strong ref to monitor callback (prevents GC)
@@ -391,7 +391,7 @@ class WindowManager():
 
         self._notify_exit_callbacks()
 
-    def _framebuffer_size_callback(self, window: Optional[glfw._GLFWwindow], width: int, height: int) -> None:
+    def _framebuffer_size_callback(self, window: glfw._GLFWwindow | None, width: int, height: int) -> None:
         """Framebuffer resize (pixels) — used for viewport and renderer."""
         if not window or width <= 0 or height <= 0:
             return
@@ -399,7 +399,7 @@ class WindowManager():
         self._actual_height = height
         self.renderer.on_main_window_resize(width, height)
 
-    def _window_size_callback(self, window: Optional[glfw._GLFWwindow], width: int, height: int) -> None:
+    def _window_size_callback(self, window: glfw._GLFWwindow | None, width: int, height: int) -> None:
         """Window resize (screen coordinates) — write back to settings."""
         if not window or width <= 0 or height <= 0:
             return
@@ -409,7 +409,7 @@ class WindowManager():
             self.settings.width = width
             self.settings.height = height
 
-    def _window_pos_callback(self, window: Optional[glfw._GLFWwindow], x: int, y: int) -> None:
+    def _window_pos_callback(self, window: glfw._GLFWwindow | None, x: int, y: int) -> None:
         """Window move — write back to settings (relative to current monitor)."""
         if not window:
             return
@@ -452,12 +452,12 @@ class WindowManager():
         glfw.swap_buffers(self._main_window)
 
     # SECONDARY WINDOWS
-    def _create_secondary_window(self, name: str) -> Optional[glfw._GLFWwindow]:
+    def _create_secondary_window(self, name: str) -> glfw._GLFWwindow | None:
         if self._main_window is None:
             logger.error("Main window must be created before secondary windows")
             return None
 
-        win: Optional[glfw._GLFWwindow] = glfw.create_window(100, 100, name, None, self._main_window)
+        win: glfw._GLFWwindow | None = glfw.create_window(100, 100, name, None, self._main_window)
         if not win:
             logger.error("Failed to create secondary window")
             return None
@@ -483,7 +483,7 @@ class WindowManager():
     def _setup_secondary_window(self, window: glfw._GLFWwindow, monitor_id: int, fullscreen: bool) -> None:
         """Setup a secondary window with the given monitor ID and fullscreen mode"""
         monitors: list[glfw._GLFWmonitor] = glfw.get_monitors()
-        monitor: Optional[glfw._GLFWmonitor] = monitors[monitor_id] if monitor_id < len(monitors) else None
+        monitor: glfw._GLFWmonitor | None = monitors[monitor_id] if monitor_id < len(monitors) else None
         if not monitor:
             logger.warning("Monitor %s not found", monitor_id)
             return

@@ -216,7 +216,7 @@ class Field(Generic[T]):
 
     # -- Public set (respects Access.INIT) ----------------------------------
 
-    def set(self, obj, value):
+    def set(self, obj, value) -> None:
         """Set value. Only enforces Access.INIT after initialization."""
         if self.access is Access.INIT and obj._initialized:
             raise AttributeError(
@@ -350,7 +350,7 @@ class Field(Generic[T]):
 
     # -- Callbacks -----------------------------------------------------------
 
-    def fire(self, obj):
+    def fire(self, obj) -> None:
         """Invoke all registered callbacks (for Widget.button actions).
 
         Unlike set(), fire() does not change the value — it triggers every
@@ -386,12 +386,12 @@ class Field(Generic[T]):
                 if parent_name in parent._fields:
                     parent._fields[parent_name].fire(parent)
 
-    def bind(self, obj, callback):
+    def bind(self, obj, callback) -> None:
         with obj._locks[self.name]:
             if callback not in obj._callbacks[self.name]:
                 obj._callbacks[self.name].append(callback)
 
-    def unbind(self, obj, callback):
+    def unbind(self, obj, callback) -> None:
         with obj._locks[self.name]:
             try:
                 obj._callbacks[self.name].remove(callback)
@@ -400,7 +400,7 @@ class Field(Generic[T]):
 
     # -- Serialization -------------------------------------------------------
 
-    def to_json_value(self, obj):
+    def to_json_value(self, obj) -> Any:
         """Return a JSON-serializable representation of the current value."""
         value = obj._values[self.name]
         if hasattr(value, "to_dict"):
@@ -426,7 +426,7 @@ class Field(Generic[T]):
             return result
         return value
 
-    def from_json_value(self, obj, raw):
+    def from_json_value(self, obj, raw) -> None:
         """Restore value from JSON, bypassing the INIT guard.
 
         Callers (``update_from_dict``) decide whether INIT fields should

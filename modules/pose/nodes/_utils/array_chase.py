@@ -23,9 +23,6 @@ Note: These classes are NOT thread-safe by design.
 """
 
 
-# Standard library imports
-from typing import Union
-
 # Third-party imports
 import numpy as np
 
@@ -289,4 +286,4 @@ class PointChase(Chase):
         return self._interpolated.reshape(self._num_points, 2).copy()
 
 
-ArrayChase = Union[Chase, AngleChase, PointChase]
+ArrayChase = Chase | AngleChase | PointChase

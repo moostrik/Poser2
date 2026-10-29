@@ -1,5 +1,5 @@
 from threading import Lock
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, TypeAlias
 
 import torch
 
@@ -20,7 +20,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-SegmentationRunner = Union[RunnerONNX, "RunnerTRT"]
+SegmentationRunner: TypeAlias = "RunnerONNX | RunnerTRT"
 
 
 class Predictor:

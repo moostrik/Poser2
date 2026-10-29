@@ -7,7 +7,6 @@ characters. Glyph metrics are stored for text rendering.
 from dataclasses import dataclass
 import logging
 from pathlib import Path
-from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,7 @@ class FontAtlas:
         self.texture_id: int = 0
         self.atlas_width: int = 0
         self.atlas_height: int = 0
-        self.glyphs: Dict[str, GlyphMetrics] = {}
+        self.glyphs: dict[str, GlyphMetrics] = {}
         self.line_height: int = 0
         self.ascent: int = 0  # Maximum bearing_y (distance from baseline to top)
         self.allocated: bool = False

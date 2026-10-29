@@ -1,5 +1,4 @@
 # Standard library imports
-from typing import Union
 from time import perf_counter
 
 # Third-party imports
@@ -208,4 +207,4 @@ class PointRateLimit(RateLimit):
         """Get the current limited points (returns a copy)."""
         return self._limited.reshape(self._num_points, 2).copy()
 
-ArrayRateLimit = Union[RateLimit, AngleRateLimit, PointRateLimit]
+ArrayRateLimit = RateLimit | AngleRateLimit | PointRateLimit
