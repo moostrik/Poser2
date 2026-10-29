@@ -13,10 +13,9 @@ from ...frame import Frame, replace
 class MotionTimeExtractor(FilterNode):
     """Integrates absolute joint angular velocity over time into a cumulative ``MotionTime``.
 
-    Accumulates only on ticks with a real, positive ``dt`` and ignores non-finite velocity
-    components (``inf``/``NaN``). Interpolated frames often repeat a timestamp (``dt == 0``)
-    and ``AngleVelocity`` is unbounded, so without these guards an ``inf * 0`` would poison the
-    accumulator to ``NaN`` permanently. ``MotionTime`` is stamped every frame — ``0.0`` from the
+    Accumulates only on frames with a real, positive ``dt`` and ignores non-finite velocity
+    components (``inf``/``NaN``): ``AngleVelocity`` is unbounded, so without these guards an
+    ``inf * 0`` would poison the accumulator to ``NaN`` permanently. ``MotionTime`` is stamped every frame — ``0.0`` from the
     first — so the feature is never absent downstream.
     """
 

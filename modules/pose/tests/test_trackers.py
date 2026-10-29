@@ -154,30 +154,30 @@ class InterpolatorTrackerTest(unittest.TestCase):
     def test_interpolates_each_present_track(self) -> None:
         tracker = self._tracker()
         tracker.set({0: _angle(0, 0.1), 1: _angle(1, 0.2)})
-        out = tracker.update()
+        out = tracker.update(1.0)
         self.assertAlmostEqual(out[0][Angles][0], 0.1, places=5)
         self.assertAlmostEqual(out[1][Angles][0], 0.2, places=5)
 
     def test_missing_track_is_reset_and_dropped(self) -> None:
         tracker = self._tracker()
         tracker.set({0: _angle(0, 0.1), 1: _angle(1, 0.2)})
-        tracker.update()
+        tracker.update(1.0)
         tracker.set({0: _angle(0, 0.1)})
-        self.assertEqual(set(tracker.update()), {0})
+        self.assertEqual(set(tracker.update(1.0)), {0})
 
     def test_callbacks_receive_the_returned_dict(self) -> None:
         tracker = self._tracker()
         received: list[FrameDict] = []
         tracker.add_frames_callback(lambda frames: received.append(frames))
         tracker.set({0: _angle(0, 0.1)})
-        out = tracker.update()
+        out = tracker.update(1.0)
         self.assertIs(received[0], out)
 
     def test_failing_set_does_not_skip_later_tracks(self) -> None:
         tracker = InterpolatorTracker({i: InterpolatorPipeline([_RaisingInterpolator(0, 'set')]) for i in range(2)})
         with self.assertLogs('modules.pose.trackers', level='ERROR'):
             tracker.set({0: _angle(0, 0.1), 1: _angle(1, 0.2)})
-        self.assertIn(1, tracker.update())
+        self.assertIn(1, tracker.update(1.0))
 
     def test_failing_set_does_not_emit_a_half_updated_frame(self) -> None:
         # The lerp node takes the new target before the second node raises; the failed track is reset so it
@@ -187,13 +187,13 @@ class InterpolatorTrackerTest(unittest.TestCase):
         ]) for i in range(2)})
         with self.assertLogs('modules.pose.trackers', level='ERROR'):
             tracker.set({0: _angle(0, 0.1), 1: _angle(1, 0.2)})
-        self.assertEqual(set(tracker.update()), {1})
+        self.assertEqual(set(tracker.update(1.0)), {1})
 
     def test_failing_update_does_not_drop_later_tracks(self) -> None:
         tracker = InterpolatorTracker({i: InterpolatorPipeline([_RaisingInterpolator(0, 'update')]) for i in range(2)})
         tracker.set({0: _angle(0, 0.1), 1: _angle(1, 0.2)})
         with self.assertLogs('modules.pose.trackers', level='ERROR'):
-            out = tracker.update()
+            out = tracker.update(1.0)
         self.assertIn(1, out)
 
 

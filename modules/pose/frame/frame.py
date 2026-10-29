@@ -14,7 +14,8 @@ keyed by feature class.
 Identity (fixed slots):
   • track_id: int          — Tracked object ID
   • cam_id: int            — Camera source ID
-  • timestamp: float       — The host time of the camera frame it came from (`CameraFrame.timestamp`, perf_counter)
+  • timestamp: float       — When the frame was made, on the one clock (perf_counter): in the frame domain the host time
+                             of the camera frame it came from (`CameraFrame.timestamp`), in an output domain the tick
 
 Feature Access:
   • frame[FeatureType]           → feature instance (NaN dummy if not yet set)
@@ -128,12 +129,13 @@ class Frame:
         return f"Frame(id={self._track_id}, features=[{feature_names}])"
 
 
-def replace(frame: Frame, updates: dict[type[BaseFeature], BaseFeature]) -> Frame:
+def replace(frame: Frame, updates: dict[type[BaseFeature], BaseFeature], timestamp: float | None = None) -> Frame:
     """Create a new Frame with merged features (same identity).
 
     Args:
         frame: Source frame.
         updates: Feature dict to merge on top of existing features.
+        timestamp: A new stamp, for a frame made on a tick; the source frame's when None.
 
     Returns:
         New Frame with same identity and merged features.
@@ -143,7 +145,7 @@ def replace(frame: Frame, updates: dict[type[BaseFeature], BaseFeature]) -> Fram
     return Frame(
         track_id=frame._track_id,
         cam_id=frame._cam_id,
-        timestamp=frame._timestamp,
+        timestamp=frame._timestamp if timestamp is None else timestamp,
         features=merged,
     )
 

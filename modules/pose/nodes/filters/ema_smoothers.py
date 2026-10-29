@@ -61,7 +61,7 @@ class FeatureEmaSmoother(FilterNode):
 
     def process(self, pose: Frame) -> Frame:
         feature_data = pose[self._feature_type]
-        self._smoother.update(feature_data.values)
+        self._smoother.update(feature_data.values, pose.timestamp)
         smoothed_values: np.ndarray = self._smoother.value
         smoothed_data = type(feature_data)(values=smoothed_values, scores=feature_data.scores)
         return replace(pose, {self._feature_type: smoothed_data})
