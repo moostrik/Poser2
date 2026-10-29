@@ -257,8 +257,9 @@ class WhiteSpaceMain:
         }
 
     def _update_poses(self, tick: Tick) -> None:
-        """The light tick drives the pipeline's output domain (LERP) at the tick's time."""
-        self.pipeline.update(Domain.OUTPUT, tick.now)
+        """The light tick drives the pipeline's output domain (LERP) at the time the tick was paced for, so the
+        LERP frames carry a regular stamp whatever the tick's lateness."""
+        self.pipeline.update(Domain.OUTPUT, tick.deadline)
 
     def stop(self) -> None:
         if not self.is_running:

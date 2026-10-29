@@ -32,6 +32,16 @@ class ClockRateTest(unittest.TestCase):
         self.assertAlmostEqual(second.interval, 0.005, places=9)
         self.assertGreater(second.dt, 0.0)
 
+    def test_the_deadline_is_the_paced_time_not_the_late_moment(self) -> None:
+        settings = ClockSettings()
+        settings.light_rate = 100.0
+        clock = Clock(settings)
+        first = clock.next_tick()
+        self.assertAlmostEqual(first.deadline, first.now, places=9)
+        second = clock.next_tick()
+        self.assertAlmostEqual(second.deadline, first.deadline + 0.01, places=9)
+        self.assertGreaterEqual(second.now, second.deadline)
+
 
 if __name__ == "__main__":
     unittest.main()
