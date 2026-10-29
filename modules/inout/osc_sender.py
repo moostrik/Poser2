@@ -1,6 +1,5 @@
 """OSC sender: a thread that bundles what was queued since its last tick and sends it at the settings' rate."""
 
-from ipaddress import ip_address
 from queue import Queue, Empty
 from threading import Thread, Lock
 from time import time, sleep
@@ -11,6 +10,7 @@ from pythonosc.udp_client import SimpleUDPClient
 from pythonosc import osc_bundle_builder, osc_message_builder
 
 from modules.settings import BaseSettings, Field, Widget
+from .net_probe import is_valid_ip
 
 logger = logging.getLogger(__name__)
 
@@ -20,18 +20,10 @@ ERROR_LOG_INTERVAL: float = 10.0    # s between the log lines of a send that kee
 
 
 class OscSenderSettings(BaseSettings):
-    active: Field[bool]  = Field(True, widget=Widget.switch, description="Send OSC messages")
-    ip:     Field[str]   = Field("127.0.0.1", widget=Widget.ip_field, description="Target OSC IP address")
-    port:   Field[int]   = Field(9000, min=1024, max=65535, widget=Widget.number_field, description="Target OSC port")
-    fps:    Field[float] = Field(30.0, min=1.0, max=120.0, step=1.0, description="Bundles sent per second")
-
-
-def is_valid_ip_address(ip: str) -> bool:
-    try:
-        ip_address(ip)
-        return True
-    except ValueError:
-        return False
+    enabled: Field[bool]  = Field(True, widget=Widget.switch, description="Send OSC messages")
+    ip:      Field[str]   = Field("127.0.0.1", widget=Widget.ip_field, description="Target OSC IP address")
+    port:    Field[int]   = Field(9000, min=1024, max=65535, widget=Widget.number_field, description="Target OSC port")
+    fps:     Field[float] = Field(30.0, min=1.0, max=120.0, step=1.0, description="Bundles sent per second")
 
 
 def is_valid_port(port: int) -> bool:
@@ -127,7 +119,7 @@ class OscSender(Thread):
 
     def send(self, address: str, args: ArgValue) -> None:
         # only while the thread takes them: nothing empties the queue otherwise
-        if self.settings.active and self.running:
+        if self.settings.enabled and self.running:
             self.queue.put((address, args))
 
     def _on_address(self, _=None) -> None:
@@ -136,7 +128,7 @@ class OscSender(Thread):
     def updateClient(self) -> None:
         ip: str = self.settings.ip
         port: int = self.settings.port
-        if not is_valid_ip_address(ip) or not is_valid_port(port):
+        if not is_valid_ip(ip) or not is_valid_port(port):
             logger.warning('Invalid OSC address %s:%s, keeping the current client', ip, port)
             return
         with self.mutex:

@@ -285,7 +285,7 @@ def read_comment(path: str) -> str | None:
     return json.loads(out).get('format', {}).get('tags', {}).get('comment')
 
 
-def hwdecode_args(adapter: int | None) -> list[str]:
+def hwaccel_args(adapter: int | None) -> list[str]:
     """Input options for a D3D11 hardware decode on the DXGI adapter with that index (tested on the Intel iGPU)."""
     if adapter is None:
         return []
@@ -304,12 +304,12 @@ def _read_exactly(file: BinaryIO, size: int) -> bytes:
     return b''.join(parts)
 
 
-def decode_clip(path: str, size: tuple[int, int], hwdecode: int | None = None) -> tuple[np.ndarray, float]:
+def decode_clip(path: str, size: tuple[int, int], hwaccel: int | None = None) -> tuple[np.ndarray, float]:
     """The whole clip as a (frames, height, width, 3) bgr uint8 array scaled to size (width, height), and its fps."""
     frames, fps, _, _ = probe(path)
     width, height = size
     frame_bytes = width * height * 3
-    args = ['-nostdin', '-threads', str(DECODE_THREADS), *hwdecode_args(hwdecode), '-i', path,
+    args = ['-nostdin', '-threads', str(DECODE_THREADS), *hwaccel_args(hwaccel), '-i', path,
             '-filter_threads', str(DECODE_THREADS), '-vf', f'scale={width}:{height}',
             '-an', '-f', 'rawvideo', '-pix_fmt', 'bgr24', 'pipe:1']
     out, write_fd = _big_pipe()

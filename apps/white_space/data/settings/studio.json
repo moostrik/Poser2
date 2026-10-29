@@ -167,7 +167,7 @@
       "port_in": 9000,
       "return_messages": true,
       "port_out": 9001,
-      "ip_address_out": "127.0.0.1",
+      "ip_out": "127.0.0.1",
       "verbose": false
     },
     "core": {},
@@ -188,7 +188,7 @@
   },
   "inout": {
     "osc_light_sender": {
-      "ip_addresses": "192.168.1.177",
+      "ip": "192.168.1.177",
       "port": 6454,
       "use_signed": false,
       "mtu": 1500,
@@ -214,14 +214,14 @@
       "stage": "LERP",
       "volume": 0.93,
       "speaker_offset": 0.0,
-      "ip_addresses": "192.168.1.40",
+      "ip": "192.168.1.40",
       "port": 8000
     },
     "osc_sound_receiver": {
       "port_in": 8001,
       "return_messages": false,
       "port_out": 8002,
-      "ip_address_out": "192.168.0.0",
+      "ip_out": "192.168.0.0",
       "verbose": false
     }
   },

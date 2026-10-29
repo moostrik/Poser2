@@ -216,14 +216,14 @@
     "laughter_test_step": 2.0,
     "laughter_test_sample": "Deep_dutch_laugh-2.mp3",
     "osc": {
-      "active": true,
+      "enabled": true,
       "ip": "127.0.0.1",
       "port": 4114,
       "fps": 30.0
     }
   },
   "artnet": {
-    "active": true,
+    "enabled": true,
     "ip": "192.168.0.111",
     "universe": 1,
     "fps": 40.0

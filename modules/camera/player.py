@@ -115,7 +115,7 @@ class Player(Thread):
         self.folders: FolderDict = self._get_video_folders(settings, data_path)
         self.settings.available_folders = list(self.folders.keys())
 
-        self.hwt, self.hwd = hwaccel(settings.video_decoder)
+        self.hwaccel, self.hwaccel_device = hwaccel(settings.video_decoder)
 
         self.players: list[StreamReader] = []
         self.loaders: list[StreamReader] = []
@@ -226,7 +226,7 @@ class Player(Thread):
                 if path.is_file():
 
                     color: bool = t == FrameType.VIDEO and not self.gray
-                    player: StreamReader = StreamReader(c, t, self._frame_sync_callback, color, self.hwt, self.hwd, self.fps)
+                    player: StreamReader = StreamReader(c, t, self._frame_sync_callback, color, self.hwaccel, self.hwaccel_device, self.fps)
                     player.load(str(path), self.load_chunk, lo, hi)
                     self.loaders.append(player)
                 else:

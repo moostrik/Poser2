@@ -30,7 +30,7 @@ class UdpLightReceiver:
     """
 
     def __init__(self, settings: UdpLightReceiverSettings) -> None:
-        self._config   = settings
+        self.settings: UdpLightReceiverSettings = settings
         self._bindings: dict[str, list[Callable]] = {}
         self._running  = False
         self._thread: Optional[Thread] = None
@@ -62,9 +62,9 @@ class UdpLightReceiver:
         # packets, but a boost cannot jump the GIL queue — it only preempts the rest of the app.
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         try:
-            sock.bind(("0.0.0.0", self._config.port))
+            sock.bind(("0.0.0.0", self.settings.port))
             sock.settimeout(0.5)
-            logger.info(f"listening on port {self._config.port}")
+            logger.info(f"listening on port {self.settings.port}")
 
             prev_time: float = 0.0
             while self._running:
@@ -76,21 +76,21 @@ class UdpLightReceiver:
                 try:
                     address = data.split(b"\x00")[0].decode("utf-8").strip()
                 except UnicodeDecodeError:
-                    if self._config.verbose:
+                    if self.settings.verbose:
                         logger.warning(f"non-UTF-8 data ({len(data)} bytes) from {_}")
                     continue
 
-                if self._config.verbose:
+                if self.settings.verbose:
                     bound = address in self._bindings
                     logger.info(f"'{address}'"
                                 + ("" if bound else " (no binding)"))
 
                 now = time()
-                self._config.counter      = (self._config.counter + 1) % 100000
-                self._config.last_address = address
+                self.settings.counter      = (self.settings.counter + 1) % 100000
+                self.settings.last_address = address
                 if prev_time:
-                    self._config.interval = now - prev_time
-                self._config.last_time    = now
+                    self.settings.interval = now - prev_time
+                self.settings.last_time    = now
                 prev_time = now
                 for callback in self._bindings.get(address, []):
                     try:
@@ -99,7 +99,7 @@ class UdpLightReceiver:
                         logger.warning(f"UdpLightReceiver callback error for '{address}': {e}")
 
         except OSError as e:
-            logger.error(f"socket error on port {self._config.port}: {e}")
+            logger.error(f"socket error on port {self.settings.port}: {e}")
             self._running = False
         finally:
             sock.close()

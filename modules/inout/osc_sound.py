@@ -24,7 +24,7 @@ _NO_STATE = -1
 
 class OscSoundSettings(BaseSettings):
     max_players: Field[int]  = Field(4,    min=1,    max=16,    access=Field.INIT,         description="Max number of player poses to send (IDs 0 to N-1)")
-    ip_addresses: Field[str] = Field("127.0.0.1",               widget=Widget.ip_field,     description="Target OSC IP address")
+    ip: Field[str]           = Field("127.0.0.1",               widget=Widget.ip_field,     description="Target OSC IP address")
     port: Field[int]         = Field(9000, min=1024, max=65535, widget=Widget.number_field, description="Target OSC port")
     stage: Field[int]        = Field(0,                                                     description="Pipeline stage to read poses from")
     active_players: Field[int] = Field(0, access=Field.READ,                                description="Current number of active players being sent")
@@ -40,15 +40,15 @@ class OscSound:
     def __init__(self, settings: OscSoundSettings) -> None:
 
         self.settings: OscSoundSettings = settings
-        self._poses: FrameDict = {}
+        self._frames: FrameDict = {}
         self._seq_state: SequencerState | None = None
         self._input_lock: Lock = Lock()
         self._client_lock: Lock = Lock()
-        self._client: SimpleUDPClient = SimpleUDPClient(self.settings.ip_addresses, self.settings.port)
+        self._client: SimpleUDPClient = SimpleUDPClient(self.settings.ip, self.settings.port)
 
-        logger.info(f"SoundOSC client initialized to {self.settings.ip_addresses}:{self.settings.port}")
+        logger.info(f"OscSound client initialized to {self.settings.ip}:{self.settings.port}")
 
-        self.settings.bind(OscSoundSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
+        self.settings.bind(OscSoundSettings.ip, self._on_connection_change)  # type: ignore[arg-type]
         self.settings.bind(OscSoundSettings.port, self._on_connection_change)          # type: ignore[arg-type]
 
         # Send-interval measurement (rolling window of inter-send gaps).
@@ -65,12 +65,12 @@ class OscSound:
     def running(self) -> bool:
         return self._running
 
-    def set_frames(self, stage: int, poses: FrameDict) -> None:
+    def set_frames(self, stage: int, frames: FrameDict) -> None:
         """Push new pose data and trigger a send if stage matches."""
         if stage != self.settings.stage:
             return
         with self._input_lock:
-            self._poses = dict(poses)
+            self._frames = dict(frames)
         self._update_event.set()
 
     def set_sequencer_state(self, state: SequencerState) -> None:
@@ -97,12 +97,12 @@ class OscSound:
         try:
             self._send_blackout()
         except Exception as e:
-            logger.error(f"Error sending SoundOSC blackout: {e}")
+            logger.error(f"Error sending OscSound blackout: {e}")
 
     def _run(self) -> None:
         """Main loop for sending OSC data at regular intervals"""
         # Validate network and IP before starting
-        if not validate_connection(self.settings.ip_addresses, self.settings.port, "OscSound"):
+        if not validate_connection(self.settings.ip, self.settings.port, "OscSound"):
             self._running = False
             return
 
@@ -115,11 +115,11 @@ class OscSound:
                 try:
                     self._send_data()
                 except socket.error as e:
-                    logger.error(f"SoundOSC Socket error with exception: {e}")
+                    logger.error(f"OscSound Socket error with exception: {e}")
                     self._running = False
                     break
                 except Exception as e:
-                    logger.error(f"Error sending SoundOSC data: {e}")
+                    logger.error(f"Error sending OscSound data: {e}")
 
     def _record_interval(self) -> None:
         """Track the gap between consecutive sends and publish mean/deviation (ms)."""
@@ -135,7 +135,7 @@ class OscSound:
 
     def _send_data(self) -> None:
         with self._input_lock:
-            frames = self._poses
+            frames = self._frames
             seq_state = self._seq_state
         self._send_bundle(self._build_bundle(frames, seq_state))
 
@@ -178,8 +178,8 @@ class OscSound:
 
     def _on_connection_change(self, _=None) -> None:
         with self._client_lock:
-            self._client = SimpleUDPClient(self.settings.ip_addresses, self.settings.port)
-        logger.info(f"Reconnected to {self.settings.ip_addresses}:{self.settings.port}")
+            self._client = SimpleUDPClient(self.settings.ip, self.settings.port)
+        logger.info(f"Reconnected to {self.settings.ip}:{self.settings.port}")
 
     def _add_global_messages(self, bundle_builder: OscBundleBuilder, frames: FrameDict, seq_state: SequencerState | None) -> None:
         """Tick-wide messages, built from the tick's frames and sequencer state. A None

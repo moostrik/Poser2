@@ -17,7 +17,7 @@ StreamFrameCallback = Callable[[int, object, np.ndarray, int, int], None]
 
 class StreamReader:
     def __init__(self, cam_id: int, frame_type: object, frame_callback: StreamFrameCallback, color: bool,
-                 hw_acceleration_type: str = '', hw_acceleration_device: str = '', fps: float = 0.0) -> None:
+                 hwaccel: str = '', hwaccel_device: str = '', fps: float = 0.0) -> None:
         """``color``: decode to BGR; otherwise to gray, so a mono pipeline gets the luma straight from
         ffmpeg, saving the colour conversion and two thirds of the pipe."""
         self.frame_callback: StreamFrameCallback = frame_callback
@@ -26,14 +26,14 @@ class StreamReader:
         self.frame_type: object = frame_type
         self.color: bool = color
         self.channels: int = 1
-        self.hw_acceleration_type: str = hw_acceleration_type
-        self.hw_acceleration_device: str = hw_acceleration_device
+        self.hwaccel: str = hwaccel
+        self.hwaccel_device: str = hwaccel_device
 
         self.ffmpeg_process = None
         self.bytes_per_frame: int = 0
         self.frame_width: int = 0
         self.frame_height: int = 0
-        self.frame_rate: float = fps
+        self.fps: float = fps
 
         self._load_lock: Lock = Lock()
         self._load_thread: Thread | None = None
@@ -88,9 +88,9 @@ class StreamReader:
 
     def _load(self, video_file: str, chunk_id: int, start_frame: int = 0, end_frame: int | None = None) -> None:
         try:
-            self.frame_width, self.frame_height, frame_rate = self._get_video_dimensions(video_file)
-            if self.frame_rate == 0.0:
-                self.frame_rate = frame_rate
+            self.frame_width, self.frame_height, fps = self._get_video_dimensions(video_file)
+            if self.fps == 0.0:
+                self.fps = fps
         except Exception as e:
             logger.error('Error getting video dimensions of %s: %s', video_file, e)
             self.ffmpeg_process = None
@@ -102,7 +102,7 @@ class StreamReader:
 
         ffmpeg_process = None
         try:
-            if self.hw_acceleration_type == '' or self.hw_acceleration_device == '':
+            if self.hwaccel == '' or self.hwaccel_device == '':
                 ffmpeg_process = (
                     ffmpeg
                     .input(video_file)
@@ -113,7 +113,7 @@ class StreamReader:
             else:
                 ffmpeg_process = (
                     ffmpeg
-                    .input(video_file, hwaccel=self.hw_acceleration_type, hwaccel_device=self.hw_acceleration_device)
+                    .input(video_file, hwaccel=self.hwaccel, hwaccel_device=self.hwaccel_device)
                     .output('pipe:', format='rawvideo', pix_fmt=pix_fmt)
                     .global_args('-loglevel', 'quiet')
                     .run_async(pipe_stdout=True)
@@ -133,7 +133,7 @@ class StreamReader:
         if self.ffmpeg_process is None:
             logger.warning('video not loaded')
             return
-        frame_interval: float = 1.0 / self.frame_rate
+        frame_interval: float = 1.0 / self.fps
 
         start_frame: int = self.start_frame
         end_frame: int | None = self.end_frame
@@ -230,6 +230,6 @@ class StreamReader:
 
         frame_rate_str: str = video_stream.get('r_frame_rate', '30/1')
         num, denom = map(int, frame_rate_str.split('/'))
-        frame_rate: float = num / denom if denom != 0 else 0
+        fps: float = num / denom if denom != 0 else 0
 
-        return width, height, frame_rate
+        return width, height, fps

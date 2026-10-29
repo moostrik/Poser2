@@ -17,7 +17,7 @@ class OscReceiverSettings(BaseSettings):
     port_in         = Field(9000,        min=1024, max=65535, widget=Widget.number,   description="Incoming OSC port")
     return_messages = Field(True,                                                     description="Echo received messages back to sender")
     port_out        = Field(9001,        min=1024, max=65535, widget=Widget.number,   description="Outgoing OSC port")
-    ip_address_out  = Field("127.0.0.1",                      widget=Widget.ip_field, description="Outgoing OSC IP address")
+    ip_out          = Field("127.0.0.1",                     widget=Widget.ip_field, description="Outgoing OSC IP address")
     verbose         = Field(False,                                                    description="Log received messages")
     counter         = Field(0,           min=0,    max=99999, widget=Widget.number,   access=Field.READ, description="Message activity")
     last_address    = Field("",                                                       access=Field.READ, description="Last received OSC address")
@@ -33,10 +33,10 @@ class OscReceiver:
         self._bindings: dict[str, list[Callable]] = {}
         self._warned_unbound: set[str] = set()
         self.client_lock = Lock()
-        self.osc_return_client = SimpleUDPClient(settings.ip_address_out, settings.port_out)
+        self.osc_return_client = SimpleUDPClient(settings.ip_out, settings.port_out)
         self.server: BlockingOSCUDPServer | None = None
 
-        settings.bind(OscReceiverSettings.ip_address_out, self._on_out_change)
+        settings.bind(OscReceiverSettings.ip_out,         self._on_out_change)
         settings.bind(OscReceiverSettings.port_out,       self._on_out_change)
         settings.bind(OscReceiverSettings.port_in,        self._on_in_change)
 
@@ -91,8 +91,8 @@ class OscReceiver:
 
     def _on_out_change(self, _=None) -> None:
         with self.client_lock:
-            self.osc_return_client = SimpleUDPClient(self.settings.ip_address_out, self.settings.port_out)
-        logger.info(f"Return address updated to {self.settings.ip_address_out}:{self.settings.port_out}")
+            self.osc_return_client = SimpleUDPClient(self.settings.ip_out, self.settings.port_out)
+        logger.info(f"Return address updated to {self.settings.ip_out}:{self.settings.port_out}")
 
     def _on_in_change(self, _=None) -> None:
         if self.server is None:

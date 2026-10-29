@@ -90,7 +90,7 @@ not in git, safe to delete); the app's own logs are in Poser2's `logs\`.
 * open http://localhost:667 in a browser (also reachable from other devices on the network, the log says the address)
 * presets live in `data\settings\`; `smile.json` loads at startup (the star in the panel picks the startup preset; it is kept in `data\settings\.ui_preset.json`)
 * monitors are numbered primary first, then left to right: SMILE uses the one in its preset (`render.window.monitor`) and the walls the two of `render.window.secondary_list` (the first is wall 1, screens 1-24; read at the start, so restart after changing it); a wall whose monitor is not connected opens in a small window on the primary one and moves to its monitor when that is plugged in
-* **Players** tab: `pool` (clips kept decoded in RAM, about 200 MB each), `recent` (the last recordings, always playing on every third of the sphere), `recycle_every`, `hwdecode` (read at the start); `fps`, `spread` and `trail` (live)
+* **Players** tab: `pool` (clips kept decoded in RAM, about 200 MB each), `recent` (the last recordings, always playing on every third of the sphere), `recycle_every`, `hwaccel` (read at the start); `fps`, `spread` and `trail` (live)
 
 ### Keys
 * in the SMILE window: Enter starts a sequence, F fullscreen, W borderless fullscreen, Esc quits (the panel's Exit button does the same); fullscreen hides the mouse pointer unless the panel's window setting `fullscreen_mouse` is on (a window always shows it)

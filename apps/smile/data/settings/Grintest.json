@@ -160,14 +160,14 @@
   },
   "audio": {
     "osc": {
-      "active": true,
+      "enabled": true,
       "ip": "127.0.0.1",
       "port": 4114,
       "fps": 30.0
     }
   },
   "artnet": {
-    "active": true,
+    "enabled": true,
     "ip": "10.0.0.11",
     "universe": 1,
     "fps": 40.0

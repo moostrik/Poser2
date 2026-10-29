@@ -74,7 +74,7 @@ class TestMaxControls(unittest.TestCase):
             self.assertIs(type(sent[address]), float, address)
 
     def test_nothing_goes_out_while_osc_is_off(self):
-        self.settings.audio.osc.active = False
+        self.settings.audio.osc.enabled = False
         self.assertEqual(self.frame(), {})
 
     def test_the_laughter_test_runs_every_frame_holds_new_visitors_and_tells_max(self):

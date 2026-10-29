@@ -67,15 +67,15 @@ the strobe envelope's value, with the band's hysteresis and pair rules already a
 
 ## The wire
 
-One OSC bundle per LERP frame, over UDP, to `ip_addresses`:`port`. The frames are the LERP-stage
+One OSC bundle per LERP frame, over UDP, to `ip`:`port`. The frames are the LERP-stage
 poses as the motion gate emits them (`main.py`, `gate_lerp`), so every value is smoothed and
 interpolated as the light's is.
 
-| Setting        | Preset `studio` | What it is                      |
-|----------------|-----------------|---------------------------------|
-| `ip_addresses` | 192.168.1.40    | the Max machine                 |
-| `port`         | 8000            | the port Max listens on         |
-| `stage`        | LERP            | the pipeline stage that is sent |
+| Setting | Preset `studio` | What it is                      |
+|---------|-----------------|---------------------------------|
+| `ip`    | 192.168.1.40    | the Max machine                 |
+| `port`  | 8000            | the port Max listens on         |
+| `stage` | LERP            | the pipeline stage that is sent |
 
 ## Slots
 

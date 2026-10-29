@@ -8,14 +8,14 @@ from time import sleep
 
 
 class StreamWriter:
-    def __init__(self, encoder_string: str, keyframe_interval: int = 0) -> None:
+    def __init__(self, vcodec: str, keyframe_interval: int = 0) -> None:
         self.output_file: str = ''
         self.fps: float = 30.0
         self.is_recording = False
         self.is_receiving = False
         self.frames = Queue()
         self.thread = None
-        self.vcodec: str = encoder_string
+        self.vcodec: str = vcodec
         self.keyframe_interval: int = keyframe_interval
 
     def start(self, output_file: str, fps: float) -> None:

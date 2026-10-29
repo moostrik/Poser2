@@ -53,7 +53,7 @@ class OscLightInterlaceSettings(BaseSettings):
 
 
 class OscLightSenderSettings(BaseSettings):
-    ip_addresses: Field[str]  = Field("127.0.0.1", widget=Widget.ip_field,      description="Target LED receiver IP address")
+    ip:           Field[str]  = Field("127.0.0.1", widget=Widget.ip_field,      description="Target LED receiver IP address")
     port:         Field[int]  = Field(8000, min=1024, max=65535, widget=Widget.number_field, description="Target UDP port")
     use_signed:   Field[bool] = Field(False,                                     description="Send signed int8 instead of uint8")
     resolution:   Field[int]  = Field(3600, min=256, max=4096, step=16, access=Field.INIT, visible=False, description="Projection resolution (pixels per turn)")
@@ -192,11 +192,11 @@ class OscLightSender:
     """
 
     def __init__(self, settings: OscLightSenderSettings, motor: MotorSettings) -> None:
-        self._config = settings
+        self.settings: OscLightSenderSettings = settings
         self._motor = motor             # while the motor is simulated, nothing is sent
         self._chunk_size, self._num_chunks = self._calculate_optimal_chunks(settings.resolution, settings.mtu)
-        self._config.chunk_size = self._chunk_size
-        self._config.num_chunks = self._num_chunks
+        self.settings.chunk_size = self._chunk_size
+        self.settings.num_chunks = self._num_chunks
 
         if (self._chunk_size, self._num_chunks) != (FIRMWARE_CHUNK_SIZE, FIRMWARE_NUM_CHUNKS):
             logger.error(
@@ -211,7 +211,7 @@ class OscLightSender:
         self._output_lock:   Lock  = Lock()
         self._client_lock:   Lock  = Lock()
         self._update_event:  Event = Event()
-        self._client: UDPClient = UDPClient(settings.ip_addresses, settings.port)
+        self._client: UDPClient = UDPClient(settings.ip, settings.port)
 
         # Config (interlace + rpm) is sent on change instead of every frame; `None` rpm forces the
         # first send. `_config_dirty` is set from the settings callback on whichever thread edits.
@@ -222,9 +222,9 @@ class OscLightSender:
         self._running = False
         self._thread: Optional[Thread] = None
 
-        self._config.bind(OscLightSenderSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
-        self._config.bind(OscLightSenderSettings.port,         self._on_connection_change)  # type: ignore[arg-type]
-        self._config.interlace.bind_all(self._on_interlace_change)
+        self.settings.bind(OscLightSenderSettings.ip, self._on_connection_change)  # type: ignore[arg-type]
+        self.settings.bind(OscLightSenderSettings.port,         self._on_connection_change)  # type: ignore[arg-type]
+        self.settings.interlace.bind_all(self._on_interlace_change)
 
     @property
     def running(self) -> bool:
@@ -245,9 +245,9 @@ class OscLightSender:
             self._thread.join(timeout=1.0)
             self._thread = None
 
-        self._config.unbind(OscLightSenderSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
-        self._config.unbind(OscLightSenderSettings.port,         self._on_connection_change)  # type: ignore[arg-type]
-        self._config.interlace.unbind_all(self._on_interlace_change)
+        self.settings.unbind(OscLightSenderSettings.ip, self._on_connection_change)  # type: ignore[arg-type]
+        self.settings.unbind(OscLightSenderSettings.port,         self._on_connection_change)  # type: ignore[arg-type]
+        self.settings.interlace.unbind_all(self._on_interlace_change)
 
         # Send AFTER the join: guaranteed to be the last thing on the wire (late
         # send_message() calls only store into the dead thread's slot).
@@ -269,7 +269,7 @@ class OscLightSender:
         # sender that exits here would never send, and the fixture's watchdog would park the
         # motor (dark, stopped) for the whole session. The endpoint is read live, so a settings
         # change mid-retry is picked up.
-        while self._running and not validate_connection(self._config.ip_addresses, self._config.port, "OscLightSender"):
+        while self._running and not validate_connection(self.settings.ip, self.settings.port, "OscLightSender"):
             retry_at = monotonic() + _CONNECT_RETRY_S
             while self._running and monotonic() < retry_at:
                 self._update_event.wait(0.5)   # frames keep setting the event; the deadline paces the probe
@@ -278,12 +278,12 @@ class OscLightSender:
             return
 
         logger.info(
-            f"{self._config.ip_addresses}:{self._config.port}, "
-            f"resolution={self._config.resolution}, "
+            f"{self.settings.ip}:{self.settings.port}, "
+            f"resolution={self.settings.resolution}, "
             f"{self._num_chunks} chunks of {self._chunk_size} bytes each."
         )
 
-        self._latch.begin_hold(self._config.startup_delay)   # boot edge; anchored at the first send
+        self._latch.begin_hold(self.settings.startup_delay)   # boot edge; anchored at the first send
 
         while self._running:
             self._update_event.wait()
@@ -308,14 +308,14 @@ class OscLightSender:
                 # 0, then release: the 0→target edge is the only speed command the firmware acts on.
                 now = monotonic()
                 motor_rpm = self._latch.rpm_to_send(int(output.motor_command.target_rpm),
-                                                    self._config.resync_hold, now)
+                                                    self.settings.resync_hold, now)
                 sent = self._send_config(motor_rpm)
 
                 # The fixture's readout mode follows the rpm we just sent — so does the slot rebuild.
                 slow = motor_rpm < FIXTURE_PROJECTION_RPM
-                chunks = self._build_chunk_messages(output, self._config, self._chunk_size, self._num_chunks, slow)
+                chunks = self._build_chunk_messages(output, self.settings, self._chunk_size, self._num_chunks, slow)
                 if chunks:
-                    self._send_paced(chunks, self._config.chunk_interval)
+                    self._send_paced(chunks, self.settings.chunk_interval)
                     sent = True
                 if sent:   # a pass that put nothing on the wire must not reset the latch's gap clock
                     self._latch.note_sent(motor_rpm, now)
@@ -336,7 +336,7 @@ class OscLightSender:
         self._config_dirty   = False
         self._sent_rpm       = motor_rpm
         self._last_config_at = now
-        for message in self._build_config_messages(self._config, motor_rpm):
+        for message in self._build_config_messages(self.settings, motor_rpm):
             self._send(message)
         return True
 
@@ -366,16 +366,16 @@ class OscLightSender:
     def _send_blackout(self) -> None:
         """Leave the fixture dark and stopped on a clean quit; see the class docstring.
         Paced like the live burst so the final frame is not the one datagram that drops."""
-        self._send_paced(self._build_blackout_messages(self._config, self._chunk_size, self._num_chunks),
-                         self._config.chunk_interval)
+        self._send_paced(self._build_blackout_messages(self.settings, self._chunk_size, self._num_chunks),
+                         self.settings.chunk_interval)
 
     def _on_connection_change(self, _=None) -> None:
         with self._client_lock:
-            self._client = UDPClient(self._config.ip_addresses, self._config.port)
+            self._client = UDPClient(self.settings.ip, self.settings.port)
         self._config_dirty = True   # the new endpoint has not seen the interlace or rpm yet
         self._sent_rpm     = None
         self._latch.invalidate()    # nor do we know the speed its latch holds
-        logger.info(f"reconnected to {self._config.ip_addresses}:{self._config.port}")
+        logger.info(f"reconnected to {self.settings.ip}:{self.settings.port}")
 
     def _on_interlace_change(self, _=None) -> None:
         self._config_dirty = True

@@ -223,7 +223,7 @@ class SmileMain():
             self.save.set_share(self.audio.track_path(), time.perf_counter() - self._flash_time)
 
         audio = self.settings.audio
-        if audio.osc.active:
+        if audio.osc.enabled:
             progress: float = message.progress
             audio_id: str = self.audio.get_audio_id()
             self.osc.send('/music_id', audio_id)

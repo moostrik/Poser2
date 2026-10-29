@@ -65,11 +65,11 @@ class ClipPool:
     its own reference. The scanner decides which files to load and adds them; one decode thread
     works through them, the last added first, so a new recording never waits behind a reload."""
 
-    def __init__(self, size: int, cell_size: tuple[int, int], hwdecode: int | None = None, recent: int = 0) -> None:
+    def __init__(self, size: int, cell_size: tuple[int, int], hwaccel: int | None = None, recent: int = 0) -> None:
         self.size: int = size
         self.recent: int = recent           # how many of the last recordings are kept in `recent`
         self.cell_size: tuple[int, int] = cell_size
-        self.hwdecode: int | None = hwdecode
+        self.hwaccel: int | None = hwaccel
         self.style: str | None = None       # None: any style
 
         self._recent: list[Clip] = []
@@ -217,9 +217,9 @@ class ClipPool:
 
     def _decode(self, id: str, path: str, style: str) -> Clip | None:
         try:
-            frames, fps = video.decode_clip(path, self.cell_size, self.hwdecode)
+            frames, fps = video.decode_clip(path, self.cell_size, self.hwaccel)
         except Exception as e:
-            if self.hwdecode is None:
+            if self.hwaccel is None:
                 logger.warning('Skipping %s: %s', id, e)
                 return None
             logger.warning('Hardware decode failed on %s, decoding in software: %s', id, e)

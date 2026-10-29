@@ -61,10 +61,10 @@ class Player:
 
         # the clips are decoded once into RAM at the size the cells show them (the portrait is turned a quarter)
         cell_size: tuple[int, int] = (PlayerRender.CELL_HEIGHT, PlayerRender.CELL_WIDTH)
-        hwdecode: int | None = int(settings.hwdecode) if int(settings.hwdecode) >= 0 else None
+        hwaccel: int | None = int(settings.hwaccel) if int(settings.hwaccel) >= 0 else None
         pool_size: int = int(settings.pool)
         recent: int = int(settings.recent)
-        self.pool: ClipPool = ClipPool(pool_size, cell_size, hwdecode, recent)
+        self.pool: ClipPool = ClipPool(pool_size, cell_size, hwaccel, recent)
         self.scanner: FolderScanner = FolderScanner(os.path.join(root, 'grins'), self.pool, pool_size, recent, float(settings.recycle_every))
 
         self.loaders: list[LoadImages] = []
@@ -85,7 +85,7 @@ class Player:
         logger.info('Player: %d cells on %d walls, pool %d (last %d always on every third of the sphere), %s, root %s, %s',
                     len(ids), len(walls), pool_size, recent,
                     f'a clip from disk after {float(settings.recycle_every):g} s without a new one' if float(settings.recycle_every) > 0 else 'no recycling',
-                    root, f'GPU decode on adapter {hwdecode}' if hwdecode is not None else 'software decode')
+                    root, f'GPU decode on adapter {hwaccel}' if hwaccel is not None else 'software decode')
 
     def start(self) -> None:
         self.pool.start()

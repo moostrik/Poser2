@@ -542,14 +542,14 @@
     "osc_sound": {
       "stage": "LERP",
       "max_players": 1,
-      "ip_addresses": "127.0.0.1",
+      "ip": "127.0.0.1",
       "port": 9000
     },
     "osc_control": {
       "port_in": 9000,
       "return_messages": true,
       "port_out": 9001,
-      "ip_address_out": "127.0.0.1",
+      "ip_out": "127.0.0.1",
       "verbose": false
     }
   },

@@ -59,16 +59,16 @@ class ArtNetBarsSettings(BaseSettings):
     """Configuration for a single ArtNet LED bar controller.
 
     Init fields (set via preset, then locked after initialize()):
-        ip_address, base_universe, fps, r, g, b, num_pixels, channel_order, verbose
+        ip, base_universe, fps, pixels, channel_order, verbose
 
     Runtime fields (adjustable at any time):
-        enabled, white, color, bar
+        enabled, white_strength, color_strength, color, bar
     """
 
     enabled: Field[bool]            = Field(True, widget=Widget.switch,  description="Enable ArtNet output")
     verbose: Field[bool]            = Field(True, widget=Widget.switch,  description="Enable detailed logging (warnings always shown)")
 
-    ip_address: Field[str]          = Field("192.168.1.100", widget=Widget.ip_field,     description="Controller IP address")
+    ip: Field[str]                  = Field("192.168.1.100", widget=Widget.ip_field,     description="Controller IP address")
     base_universe: Field[int]       = Field(0, min=0, max=14, description="First ArtNet universe (second bar uses +1)", visible=False)
     channel_order: Field[ChannelOrder] = Field(ChannelOrder.RGBW, description="DMX channel order (e.g., RGBW, GRBW, WRGB)")
     fps: Field[int]                 = Field(40, min=1, max=44, widget=Widget.knob, description="Update rate (frames per second)")
@@ -93,18 +93,18 @@ class ArtNetBars:
     Uses threading for continuous updates at configured FPS.
 
     Example:
-        >>> settings = ArtNetLedConfig(
-        ...     ip_address="192.168.1.100",
-        ...     num_pixels=90,
+        >>> settings = ArtNetBarsSettings(
+        ...     ip="192.168.1.100",
+        ...     pixels=90,
         ...     base_universe=0,  # Uses universes 0 and 1
         ...     channel_order=ChannelOrder.GRBW,
         ... )
-        >>> controller = ArtNetLed(settings)
+        >>> controller = ArtNetBars(settings)
         >>> controller.start()
         >>>
         >>> # Runtime adjustments
-        >>> settings.bar = 0.5    # Half-filled bar
-        >>> settings.white = 0.2  # Dim white base
+        >>> settings.bar = 0.5             # Half-filled bar
+        >>> settings.white_strength = 0.2  # Dim white base
         >>>
         >>> controller.stop()
     """
@@ -123,7 +123,7 @@ class ArtNetBars:
 
         # Initialize ArtNet
         self._artnet: StupidArtnet = StupidArtnet(
-            settings.ip_address,
+            settings.ip,
             settings.base_universe,
             self._total_channels,
             settings.fps,
@@ -148,7 +148,7 @@ class ArtNetBars:
         self._setup_watchers()
 
         logger.info("Initialized for %s universes %s/%s, %s pixels/bar",
-                    settings.ip_address, settings.base_universe, settings.base_universe + 1, settings.pixels)
+                    settings.ip, settings.base_universe, settings.base_universe + 1, settings.pixels)
 
     def start(self) -> None:
         """Start the ArtNet output thread.
@@ -159,10 +159,10 @@ class ArtNetBars:
             return
 
         self._running = True
-        self._thread = Thread(target=self._update_loop, daemon=True, name=f"ArtNetLed-{self.settings.ip_address}")
+        self._thread = Thread(target=self._update_loop, daemon=True, name=f"ArtNetBars-{self.settings.ip}")
         self._thread.start()
         if self.settings.verbose:
-            logger.info(f"Starting output to {self.settings.ip_address}...")
+            logger.info(f"Starting output to {self.settings.ip}...")
 
     def stop(self) -> None:
         """Stop the ArtNet output thread and blackout."""
@@ -184,7 +184,7 @@ class ArtNetBars:
         self.settings.unbind(ArtNetBarsSettings.enabled, self._on_enabled_change)  # type: ignore[arg-type]
 
         if self.settings.verbose:
-            logger.info(f"Stopped output to {self.settings.ip_address}")
+            logger.info(f"Stopped output to {self.settings.ip}")
 
     def set_bar(self, value: float) -> None:
         """Set the bar fill level.
@@ -216,8 +216,8 @@ class ArtNetBars:
     def _validate_and_reinit_artnet(self) -> None:
         """Reinitialize ArtNet connection after IP change with validation."""
         # Validate the new IP before reinitializing
-        if not validate_connection(self.settings.ip_address, 5568, "ArtNetLed"):
-            logger.warning(f"ArtNetLed WARNING: New IP {self.settings.ip_address} is not reachable. Changes saved but output may fail.")
+        if not validate_connection(self.settings.ip, 5568, "ArtNetBars"):
+            logger.warning(f"ArtNetBars WARNING: New IP {self.settings.ip} is not reachable. Changes saved but output may fail.")
             # Don't return - still reinit so user can fix it later
 
         self._reinit_artnet()
@@ -266,7 +266,7 @@ class ArtNetBars:
 
             # Recreate ArtNet instance
             self._artnet = StupidArtnet(
-                self.settings.ip_address,
+                self.settings.ip,
                 self.settings.base_universe,
                 self._total_channels,
                 self.settings.fps,
@@ -276,13 +276,13 @@ class ArtNetBars:
 
             if self.settings.verbose:
                 logger.info("Recreated instance for %s universes %s/%s, %s pixels/bar, %s channels, %s fps",
-                            self.settings.ip_address, self.settings.base_universe, self.settings.base_universe + 1,
+                            self.settings.ip, self.settings.base_universe, self.settings.base_universe + 1,
                             self.settings.pixels, self._total_channels, self.settings.fps)
 
         # Restart if it was running
         if was_running:
             self._running = True
-            self._thread = Thread(target=self._update_loop, daemon=True, name=f"ArtNetLed-{self.settings.ip_address}")
+            self._thread = Thread(target=self._update_loop, daemon=True, name=f"ArtNetBars-{self.settings.ip}")
             self._thread.start()
             if self.settings.verbose:
                 logger.info(f"Restarted output thread")
@@ -380,7 +380,7 @@ class ArtNetBars:
     def _update_loop(self) -> None:
         """Background thread loop for continuous updates."""
         # Validate network and IP before starting
-        if not validate_connection(self.settings.ip_address, 5568, "ArtNetLed"):
+        if not validate_connection(self.settings.ip, 5568, "ArtNetBars"):
             self._running = False
             return
 
@@ -407,7 +407,7 @@ class ArtNetBars:
                 self._update_event.wait(timeout=frame_time)
                 self._update_event.clear()
             except socket.error as e:
-                logger.error(f"ArtNetLed ERROR: Socket error with exception: {e}")
+                logger.error(f"ArtNetBars ERROR: Socket error with exception: {e}")
                 self._running = False
                 break
             except Exception as e:

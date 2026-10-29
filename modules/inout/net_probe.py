@@ -8,11 +8,11 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def validate_network(ip_address: str, port: int) -> bool:
+def validate_network(ip: str, port: int) -> bool:
     """Validate network connectivity by attempting socket connection.
 
     Args:
-        ip_address: IP address to test
+        ip: IP address to test
         port: Port number to test
 
     Returns:
@@ -23,7 +23,7 @@ def validate_network(ip_address: str, port: int) -> bool:
         test_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         test_socket.settimeout(1.0)
         # For UDP, connect() doesn't actually send packets but validates routing
-        test_socket.connect((ip_address, port))
+        test_socket.connect((ip, port))
         test_socket.close()
         return True
     except socket.error:
@@ -32,34 +32,34 @@ def validate_network(ip_address: str, port: int) -> bool:
         return False
 
 
-def validate_ip(ip_address: str) -> bool:
+def is_valid_ip(ip: str) -> bool:
     """Validate IP address format.
 
     Args:
-        ip_address: IP address string to validate
+        ip: IP address string to validate
 
     Returns:
         True if IP format is valid, False otherwise
     """
     try:
-        ipaddress.ip_address(ip_address)
+        ipaddress.ip_address(ip)
         return True
     except ValueError:
         return False
 
 
-def ping_ip(ip_address: str) -> bool:
+def ping_ip(ip: str) -> bool:
     """Ping IP address to check if host is reachable.
 
     Args:
-        ip_address: IP address to ping
+        ip: IP address to ping
 
     Returns:
         True if ping successful, False otherwise
     """
     try:
         result = subprocess.run(
-            ['ping', '-n', '1', '-w', '500', ip_address],
+            ['ping', '-n', '1', '-w', '500', ip],
             capture_output=True,
             timeout=2.0
         )
@@ -68,7 +68,7 @@ def ping_ip(ip_address: str) -> bool:
         return False
 
 
-def validate_connection(ip_address: str, port: int, class_name: str) -> bool:
+def validate_connection(ip: str, port: int, class_name: str) -> bool:
     """Validate network connectivity, IP format, and host reachability.
 
     Performs validation in order:
@@ -77,7 +77,7 @@ def validate_connection(ip_address: str, port: int, class_name: str) -> bool:
     3. Ping test (WARNING if fails, but continues)
 
     Args:
-        ip_address: Target IP address
+        ip: Target IP address
         port: Target port number
         class_name: Name of calling class for error messages
 
@@ -85,17 +85,17 @@ def validate_connection(ip_address: str, port: int, class_name: str) -> bool:
         False if network or IP validation fails, True otherwise
     """
     # Check network first - if no network, nothing else matters
-    if not validate_network(ip_address, port):
-        logger.error(f"{class_name} Network unreachable to {ip_address}:{port}.")
+    if not validate_network(ip, port):
+        logger.error(f"{class_name} Network unreachable to {ip}:{port}.")
         return False
 
     # Check IP format
-    if not validate_ip(ip_address):
-        logger.error(f"{class_name} Invalid IP address format: {ip_address}")
+    if not is_valid_ip(ip):
+        logger.error(f"{class_name} Invalid IP address format: {ip}")
         return False
 
     # Ping is optional - warn but don't fail
-    if not ping_ip(ip_address):
-        logger.warning(f"{class_name} IP {ip_address} is not reachable (ping failed). Device may appear later.")
+    if not ping_ip(ip):
+        logger.warning(f"{class_name} IP {ip} is not reachable (ping failed). Device may appear later.")
 
     return True

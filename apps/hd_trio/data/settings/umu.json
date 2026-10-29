@@ -145,13 +145,13 @@
     "osc_sound": {
       "stage": "LERP",
       "max_players": 3,
-      "ip_addresses": "127.0.0.1",
+      "ip": "127.0.0.1",
       "port": 8000
     },
     "artnet_0": {
       "enabled": true,
       "verbose": false,
-      "ip_address": "10.0.0.4",
+      "ip": "10.0.0.4",
       "base_universe": 0,
       "channel_order": "GRBW",
       "fps": 40,
@@ -169,7 +169,7 @@
     "artnet_1": {
       "enabled": true,
       "verbose": false,
-      "ip_address": "10.0.0.5",
+      "ip": "10.0.0.5",
       "base_universe": 0,
       "channel_order": "GRBW",
       "fps": 40,
@@ -187,7 +187,7 @@
     "artnet_2": {
       "enabled": true,
       "verbose": false,
-      "ip_address": "10.0.0.6",
+      "ip": "10.0.0.6",
       "base_universe": 0,
       "channel_order": "GRBW",
       "fps": 40,
@@ -724,7 +724,7 @@
       "port_in": 8601,
       "return_messages": true,
       "port_out": 8600,
-      "ip_address_out": "127.0.0.1",
+      "ip_out": "127.0.0.1",
       "verbose": true
     },
     "control": {},
