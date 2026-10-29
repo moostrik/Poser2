@@ -1,25 +1,25 @@
 from enum import IntEnum
 
 from .base import           BaseFeature, BaseScalarFeature, BaseVectorFeature, NormalizedScalarFeature, AggregationMethod, NormalizedSingleValue, SingleValue, SingleAngle, SYMMETRIC_PI_RANGE
-from .BBox import           BBox, BBoxElement
-from .Points2D import       Points2D, PointLandmark
-from .Angles import         Angles, AngleLandmark
-from .AngleVelocity import  AngleVelocity
-from .AngleMotion import    AngleMotion
-from .AngleSymmetry import  AngleSymmetry, SymmetryElement
-from .ArmDeviation import   ArmDeviation
-from .ArmTravel import      ArmTravel, TravelElement
-from .ShoulderDifference import ShoulderDifference
-from .Similarity import     Similarity
-from .LeaderScore import    LeaderScore
-from .MotionGate import     MotionGate
-from .MotionTime import     MotionTime
-from .Age import            Age
-from .Azimuth import        Azimuth
-from .BBoxAzimuth import    BBoxAzimuth
-from .Distance import       Distance
-from .LegDeviation import   LegDeviation
-from .TorsoTilt import      TorsoTilt
+from .bbox import           BBox, BBoxElement
+from .points_2d import      Points2D, PointLandmark
+from .angles import         Angles, AngleLandmark
+from .angle_velocity import AngleVelocity
+from .angle_motion import   AngleMotion
+from .angle_symmetry import AngleSymmetry, SymmetryElement
+from .arm_deviation import  ArmDeviation
+from .arm_travel import     ArmTravel, TravelElement
+from .shoulder_difference import ShoulderDifference
+from .similarity import     Similarity
+from .leader_score import   LeaderScore
+from .motion_gate import    MotionGate
+from .motion_time import    MotionTime
+from .age import            Age
+from .azimuth import        Azimuth
+from .bbox_azimuth import   BBoxAzimuth
+from .distance import       Distance
+from .leg_deviation import  LegDeviation
+from .torso_tilt import     TorsoTilt
 
 
 FEATURES: list[type[BaseFeature]] = [

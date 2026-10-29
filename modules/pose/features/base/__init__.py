@@ -1,7 +1,7 @@
-from .BaseFeature import BaseFeature, SYMMETRIC_PI_RANGE
-from .BaseScalarFeature import BaseScalarFeature
-from .BaseVectorFeature import BaseVectorFeature
-from .NormalizedScalarFeature import NormalizedScalarFeature, AggregationMethod
-from .NormalizedSingleValue import NormalizedSingleValue
-from .SingleValue import SingleValue
-from .SingleAngle import SingleAngle
+from .base_feature import BaseFeature, SYMMETRIC_PI_RANGE
+from .base_scalar_feature import BaseScalarFeature
+from .base_vector_feature import BaseVectorFeature
+from .normalized_scalar_feature import NormalizedScalarFeature, AggregationMethod
+from .normalized_single_value import NormalizedSingleValue
+from .single_value import SingleValue
+from .single_angle import SingleAngle

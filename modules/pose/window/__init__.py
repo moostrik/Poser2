@@ -1,4 +1,4 @@
 """Window subsystem — ring buffers and multi-track window tracking."""
 
-from .WindowNode import WindowNode, WindowNodeSettings
-from .WindowTracker import WindowTracker
+from .window_node import WindowNode, WindowNodeSettings
+from .window_tracker import WindowTracker

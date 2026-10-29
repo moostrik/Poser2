@@ -1,3 +1,3 @@
-from .SimilarityApplicator import SimilarityApplicator, SimilarityApplicatorSettings
-from .LeaderScoreApplicator import LeaderScoreApplicator, LeaderScoreApplicatorSettings
-from .MotionGateApplicator import MotionGateApplicator
+from .similarity_applicator import SimilarityApplicator, SimilarityApplicatorSettings
+from .leader_score_applicator import LeaderScoreApplicator, LeaderScoreApplicatorSettings
+from .motion_gate_applicator import MotionGateApplicator

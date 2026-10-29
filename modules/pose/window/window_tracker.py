@@ -1,0 +1,83 @@
+"""Tracks feature windows for all scalar features across multiple tracks."""
+
+from .window_node import WindowNode, WindowNodeSettings
+from ..features import SCALAR_FEATURES, BaseFeature, BaseScalarFeature
+from ..frame import FeatureWindow, FrameDict, FrameWindowDict, FrameWindowDictCallbackMixin
+
+import logging
+logger = logging.getLogger(__name__)
+
+
+class WindowTracker(FrameWindowDictCallbackMixin):
+    """Maintains independent WindowNode ring buffers per (feature_type, track_id).
+
+    Fans out each incoming FrameDict across all scalar feature types,
+    collects per-track FeatureWindows, and emits FrameWindowDict.
+    Automatically resets buffers when a track disappears.
+    """
+
+    def __init__(self, max_players: int, settings: WindowNodeSettings | None = None,
+                 features: list[type[BaseScalarFeature]] | None = None) -> None:
+        super().__init__()
+
+        if settings is None:
+            settings = WindowNodeSettings()
+
+        # Default to all module-registered scalar features; callers can pass an explicit set
+        # (e.g. app-local features in addition to the built-ins) without touching the registry.
+        if features is None:
+            features = SCALAR_FEATURES
+
+        self._nodes: dict[type[BaseFeature], dict[int, WindowNode]] = {
+            ft: {i: WindowNode(ft, settings) for i in range(max_players)}
+            for ft in features
+        }
+        self._track_ids = set(range(max_players))
+
+    def process(self, poses: FrameDict) -> None:
+        """Append poses to all window nodes; emit a FrameWindowDict only to registered callbacks.
+
+        The appends are cheap ring-buffer writes. Building every window is paid only by callers
+        that registered a windows callback (per-frame consumers like analytics); pull consumers
+        read single windows on demand through ``get_window``.
+        """
+
+        # Reset buffers for tracks that are no longer present
+        missing = self._track_ids - poses.keys()
+        if missing:
+            for ft_nodes in self._nodes.values():
+                for track_id in missing:
+                    ft_nodes[track_id].reset()
+
+        for ft, ft_nodes in self._nodes.items():
+            for track_id, pose in poses.items():
+                try:
+                    ft_nodes[track_id].process(pose)
+                except Exception as e:
+                    logger.error(f"Error processing track {track_id} feature {ft.__name__}: {e}")
+
+        if not self._frame_window_callbacks:
+            return
+        result: FrameWindowDict = {}
+        for ft, ft_nodes in self._nodes.items():
+            windows = {}
+            for track_id in poses:
+                window = ft_nodes[track_id].get_window()
+                if window is not None:
+                    windows[track_id] = window
+            result[ft] = windows
+        self._notify_windows_callbacks(result)
+
+    def get_window(self, feature_type: type[BaseFeature], track_id: int) -> 'FeatureWindow | None':
+        """The current window of one feature and track, built on demand (None when absent)."""
+        ft_nodes = self._nodes.get(feature_type)
+        if ft_nodes is None:
+            return None
+        node = ft_nodes.get(track_id)
+        return node.get_window() if node is not None else None
+
+    def reset(self) -> None:
+        """Reset all window buffers."""
+        for ft_nodes in self._nodes.values():
+            for node in ft_nodes.values():
+                node.reset()
