@@ -20,7 +20,7 @@ from OpenGL.GL import * # type: ignore
 
 from modules.gl import Fbo, Texture, Image
 from modules.board import HasCompositionOutput, HasFlashes
-from modules.render.layers.LayerBase import LayerBase
+from modules.render import layers
 
 from apps.white_space.light import BUFFER_DTYPE
 from apps.white_space.render.shaders.light_simulation import LightSimulation
@@ -33,7 +33,7 @@ class BeamLightSimulationBoard(HasCompositionOutput, HasFlashes, Protocol):
     ...
 
 
-class BeamLightSimulationLayer(LayerBase):
+class BeamLightSimulationLayer(layers.LayerBase):
 
     def __init__(self, board: BeamLightSimulationBoard, config: BeamLightSimSettings) -> None:
         self.board: BeamLightSimulationBoard = board

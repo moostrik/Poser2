@@ -10,8 +10,7 @@ from OpenGL.GL import *  # type: ignore
 from modules.gl import Texture, Style
 from ..LayerBase import LayerBase, Blit
 from modules.board import HasFrames
-from modules.pose.frame import Frame
-from modules.pose.features import AngleMotion
+from modules.pose import Frame, AngleMotion
 
 from ..source import MaskSourceLayer
 

@@ -1,23 +1,13 @@
-"""Sequencer — stage-based sequencer with config-driven control, ticked by the render loop."""
+"""Sequencer — HD Trio's stage-based show sequencer with config-driven control, ticked by the render loop."""
 
 import time
-from dataclasses import dataclass
 from typing import Callable
 
 from modules.settings import BaseSettings, Field, Widget
+from modules.session import SequencerState
 
 import logging
 logger = logging.getLogger(__name__)
-
-
-@dataclass(frozen=True, slots=True)
-class SequencerState:
-    """Immutable snapshot of the sequencer's current state."""
-    stage: int
-    stage_progress: float
-    progress: float
-    elapsed: float
-    active: bool
 
 
 class SequencerSettings(BaseSettings):

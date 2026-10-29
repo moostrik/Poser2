@@ -17,8 +17,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from modules.settings import BaseSettings, Field
-from modules.pose import frame as pose_frame
-from modules.pose import features
+from modules.pose import frame as pose_frame, features
 
 from .._base_layer import ProjectionLayer, LayerSettings
 from ...frame import Frame

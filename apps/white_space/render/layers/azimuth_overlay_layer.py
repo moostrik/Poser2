@@ -10,9 +10,7 @@ import math
 from typing import Protocol
 
 from modules.board import HasFrames
-from modules.render import ColorSettings
-from modules.render.layers import LayerBase, strip_spans
-from modules.render.shaders import DrawColoredRectangle
+from modules.render import ColorSettings, layers, shaders
 
 from .azimuth_marks import AzimuthMark, build_azimuth_marks, signed_azimuth_gap
 from ...settings import Stage
@@ -27,7 +25,7 @@ class AzimuthOverlayBoard(HasFrames, Protocol):
     ...
 
 
-class AzimuthOverlayLayer(LayerBase):
+class AzimuthOverlayLayer(layers.LayerBase):
     """Per person, in their track colour: a solid line at the eye azimuth, a faint line at the
     bbox azimuth, and a bar joining them at mid-height so a small offset still reads.
 
@@ -38,7 +36,7 @@ class AzimuthOverlayLayer(LayerBase):
     def __init__(self, board: AzimuthOverlayBoard, colors: ColorSettings) -> None:
         self._board: AzimuthOverlayBoard = board
         self._colors: ColorSettings = colors
-        self._rect: DrawColoredRectangle = DrawColoredRectangle()
+        self._rect: shaders.DrawColoredRectangle = shaders.DrawColoredRectangle()
         self._width: int = 1
         self._height: int = 1
 
@@ -83,6 +81,6 @@ class AzimuthOverlayLayer(LayerBase):
 
     def _spans(self, x: float, width: float, y: float, height: float,
                color: tuple[float, float, float, float]) -> None:
-        """One quad, or two when it runs off the row's 0/360 join (`strip_spans`)."""
-        for span_x, span_w in strip_spans(x, width):
+        """One quad, or two when it runs off the row's 0/360 join (`layers.strip_spans`)."""
+        for span_x, span_w in layers.strip_spans(x, width):
             self._rect.use(span_x, y, span_w, height, *color)

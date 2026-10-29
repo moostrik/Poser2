@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.pose.features import Points2D, PointLandmark as P
+from modules.pose import Points2D, PointLandmark as P
 
 from apps.white_space.render.layers.pose_figure_layer import eye_column, figure_spans
 

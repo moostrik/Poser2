@@ -2,8 +2,7 @@
 
 import math
 
-from modules.pose.features import Age
-from modules.pose.frame import Frame
+from modules.pose import Age, Frame
 
 POSE_SLOTS: int = 3
 

@@ -12,7 +12,6 @@ need.  Render layers declare the protocol slice they require (e.g.
 """
 
 from .frames import                 HasFrames, FrameStoreMixin
-from .ghosts import                 HasGhosts, GhostStoreMixin
 from .windows import                HasWindows, WindowSource, WindowStoreMixin
 from .inference import                 HasCameraImages, CameraImageStoreMixin, HasCropImages, CropImageStoreMixin, \
                                     HasSegmentationImages, SegmentationImageStoreMixin

@@ -8,7 +8,7 @@ import numpy as np
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from modules.pose.features import SCALAR_FEATURES, TRACK_FEATURES, BaseScalarFeature, SYMMETRIC_PI_RANGE
+from modules.pose import SCALAR_FEATURES, TRACK_FEATURES, BaseScalarFeature, SYMMETRIC_PI_RANGE
 
 
 # ---------------------------------------------------------------------------

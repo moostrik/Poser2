@@ -9,7 +9,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.settings import Field, BaseSettings
 from modules.gl import Fbo, Texture, clear_color
-from modules.pose.features import PointLandmark
+from modules.pose import PointLandmark
 from ..LayerBase import LayerBase
 from .CentreGeometry import CentreGeometry
 from ...shaders import PosePointLines, DrawCircles

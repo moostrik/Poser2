@@ -4,7 +4,7 @@ import math
 import time
 import unittest
 
-from modules.pose.features import Azimuth, BBox, BBoxAzimuth, Distance
+from modules.pose import Azimuth, BBox, BBoxAzimuth, Distance
 from modules.tracker import PanoramicAnnotation, PosesFromTracklets, PosesFromTrackletsSettings, Tracklet
 from modules.utils import Rect
 

@@ -18,7 +18,7 @@ from .motor import MotorController, MotorMode
 from .playhead import Playhead
 from .settings import LightSettings, LayerId, DebugLayer
 from .layers import (BaseLayer, Compositor, Mix,
-                     BeamBlueSound, BeamPlayhead, BeamFlash, BeamWindDown, BeamHaunted, BeamTest,
+                     BeamBlueSound, BeamPlayhead, BeamFlash, BeamWindDown, BeamTest,
                      PoseInstrument, PoseInstrumentSettings, ProjectionPlayhead, Flood,
                      TestPlayerLines, TestCalibration, TestFill, TestPulse, TestChase, TestLines,
                      TestRandom, TestPoseWaves, TestHarmonic)
@@ -70,7 +70,6 @@ class Conductor(Thread):
             LayerId.beam_flash:          BeamFlash          (resolution, LO.beam_flash,          board, pose_stage),
             LayerId.beam_wind_down:      BeamWindDown       (resolution, LO.beam_wind_down,      board),
             LayerId.beam_sync_wind_down: BeamWindDown       (resolution, LO.beam_sync_wind_down, board, strobe=instrument.sync_strobe),
-            LayerId.beam_haunted:        BeamHaunted        (resolution, LO.beam_haunted,        board, pose_stage),
             LayerId.beam_test:           BeamTest           (resolution, LO.beam_test,           board),
             LayerId.pose_instrument:     PoseInstrument     (resolution, HI.pose_instrument,     instrument, board, pose_stage),
             LayerId.projection_playhead: ProjectionPlayhead (resolution, HI.projection_playhead, instrument.playhead, instrument.mask, board, pose_stage),

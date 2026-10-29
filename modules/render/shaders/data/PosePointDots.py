@@ -3,7 +3,7 @@ import numpy as np
 from OpenGL.GL import * # type: ignore
 from modules.gl import Shader, draw_quad
 
-from modules.pose.features import Points2D
+from modules.pose import Points2D
 
 import logging
 logger = logging.getLogger(__name__)

@@ -1,5 +1,4 @@
-from modules.gl import Fbo, Image, Texture
-from modules.gl.shaders.convenience.FlashIn import FlashIn
+from modules.gl import Fbo, Image, Texture, shaders
 
 from .LayerBase import LayerBase
 
@@ -11,7 +10,7 @@ class FlashLayer(LayerBase):
         self._camera: LayerBase = camera
         self._white: Image = white
         self._fbo: Fbo = Fbo()
-        self._flash_in: FlashIn = FlashIn()
+        self._flash_in: shaders.FlashIn = shaders.FlashIn()
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         assert width and height and internal_format

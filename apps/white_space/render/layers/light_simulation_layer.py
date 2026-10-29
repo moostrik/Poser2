@@ -2,12 +2,12 @@ from OpenGL.GL import * # type: ignore
 
 from modules.gl import Fbo, Texture, Image
 from modules.board import HasCompositionOutput
-from modules.render.layers.LayerBase import LayerBase
+from modules.render import layers
 
 from apps.white_space.render.shaders.light_simulation import LightSimulation
 
 
-class LightSimulationLayer(LayerBase):
+class LightSimulationLayer(layers.LayerBase):
 
     def __init__(self, board: HasCompositionOutput) -> None:
         self.board: HasCompositionOutput = board

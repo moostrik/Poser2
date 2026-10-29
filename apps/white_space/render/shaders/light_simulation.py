@@ -1,6 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from modules.gl.Shader import Shader, draw_quad
-from modules.gl import Fbo, Texture
+from modules.gl import Shader, draw_quad, Fbo, Texture
 
 class LightSimulation(Shader):
     def use(self, fbo: Fbo, tex0: Texture, width: float) -> None:

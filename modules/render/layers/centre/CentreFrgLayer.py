@@ -5,8 +5,7 @@ from modules.settings import Field, BaseSettings
 from ..LayerBase import LayerBase
 from .CentreGeometry import CentreGeometry
 from ...shaders import DrawRoi, Blend, MaskApply, CelShade, HueShift
-from modules.gl import Fbo, SwapFbo, Texture, Style
-from modules.gl.shaders import Sharpen
+from modules.gl import Fbo, SwapFbo, Texture, Style, shaders
 from ...color_settings import ColorSettings
 
 
@@ -56,7 +55,7 @@ class CentreFrgLayer(LayerBase):
         self._blend_shader = Blend()
         self._cel_shade_shader = CelShade()
         self._hue_shift_shader = HueShift()
-        self._sharpen_shader = Sharpen()
+        self._sharpen_shader = shaders.Sharpen()
         self._mask_shader = MaskApply()
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)

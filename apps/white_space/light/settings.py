@@ -7,8 +7,7 @@ from .motor import MotorSettings
 from .playhead import PlayheadSettings
 from .layers import (
     LayerSettings,
-    BeamBlueSoundSettings, BeamPlayheadSettings, BeamFlashSettings, BeamWindDownSettings,
-    BeamHauntedSettings, BeamTestSettings,
+    BeamBlueSoundSettings, BeamPlayheadSettings, BeamFlashSettings, BeamWindDownSettings, BeamTestSettings,
     FloodSettings,
     TestPlayerLinesSettings, TestCalibrationSettings, TestFillSettings, TestPulseSettings,
     TestChaseSettings, TestLinesSettings, TestRandomSettings, TestPoseWavesSettings,
@@ -31,7 +30,6 @@ class LayerId(IntEnum):
     beam_flash          = auto()   # beam: flash as the playhead crosses a player
     beam_wind_down      = auto()   # beam: flood's ending — the two white lamps fading over the spin-down (the wall while fast)
     beam_sync_wind_down = auto()   # beam: the sync end's wall — the dying wall under the sync strobe (S11)
-    beam_haunted        = auto()   # beam: player/ghost flash (debug/experimentation)
     beam_test           = auto()   # beam: direct levels for the four physical lamps (debug)
     # projection mode — the projection
     pose_instrument     = auto()   # projection: the pose instrument — each person's pose-patched line pattern (see LAYERS.md)
@@ -63,7 +61,6 @@ class DebugLayer(IntEnum):
     beam_flash          = auto()
     beam_wind_down      = auto()
     beam_sync_wind_down = auto()
-    beam_haunted        = auto()
     beam_test           = auto()
     # projection mode — the projection
     pose_instrument     = auto()
@@ -90,7 +87,6 @@ class BeamLayersSettings(BaseSettings):
     beam_flash:         Group[BeamFlashSettings]        = Group(BeamFlashSettings)
     beam_wind_down:     Group[BeamWindDownSettings]     = Group(BeamWindDownSettings, share=[spin_down_seconds.as_('spin_down_seconds')])
     beam_sync_wind_down: Group[BeamWindDownSettings]    = Group(BeamWindDownSettings, share=[spin_down_seconds.as_('spin_down_seconds')])
-    beam_haunted:       Group[BeamHauntedSettings]      = Group(BeamHauntedSettings)
     beam_test:          Group[BeamTestSettings]         = Group(BeamTestSettings)
 
 

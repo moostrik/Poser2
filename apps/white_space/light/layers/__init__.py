@@ -7,7 +7,6 @@ from .beam.blue_sound               import BeamBlueSound,       BeamBlueSoundSet
 from .beam.playhead                 import BeamPlayhead,        BeamPlayheadSettings
 from .beam.flash                    import BeamFlash,           BeamFlashSettings
 from .beam.wind_down                import BeamWindDown,        BeamWindDownSettings
-from .beam.haunted                  import BeamHaunted,         BeamHauntedSettings
 from .beam.test                     import BeamTest,            BeamTestSettings
 from .projection.pose_instrument    import PoseInstrument,      PoseInstrumentSettings, SyncStrobeMode, Opposite
 from .projection.playhead_marker    import PlayheadMarker,      PlayheadMarkerSettings

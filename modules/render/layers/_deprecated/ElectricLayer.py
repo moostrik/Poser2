@@ -9,8 +9,8 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.board import HasFrames
 from modules.gl import Fbo, Texture, Blit, Style, clear_color
-from modules.pose.features import Points2D
-from modules.pose.frame import Frame
+from modules.pose import Points2D
+from modules.pose import Frame
 from ..LayerBase import LayerBase, DataCache
 from ...shaders import PoseElectric as shader
 

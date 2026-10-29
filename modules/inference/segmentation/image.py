@@ -3,7 +3,7 @@ from typing import Callable, TypeAlias
 
 import torch
 
-from modules.pose.frame import FrameDict
+from modules.pose import FrameDict
 
 
 @dataclass(frozen=True)

@@ -35,10 +35,9 @@ azimuth is the pose's `Azimuth`, at their eyes: raw from CLEAN, smoothed at SMOO
 PREDICT and interpolated at LERP. The LERP stage runs inside the light tick at `light_rate`, one live root
 field that the conductor's clock, the layers' playhead step (`Tick.interval`) and the LERP interpolators all
 read. Show layers and the state machine read LERP poses, the stable eye azimuth and its `PlayheadOffset`. Their angles are the calibrator's (`POSE_INSTRUMENT.md`, *The
-body*): 0 at neutral, π at raised. Their age is the pose's `Age`. Ghosts are published to their own
-board store (`get_ghosts`), not among the poses. The dummy (`POSE_INSTRUMENT.md`, *The dummy*)
+body*): 0 at neutral, π at raised. Their age is the pose's `Age`. The dummy (`POSE_INSTRUMENT.md`, *The dummy*)
 joins the poses before the LERP filters at its own id, `max_players`, so to every layer it is a
-person; the ghosts' ids start above it. The render draws every LERP pose as a figure over the
+person. The render draws every LERP pose as a figure over the
 projection row at its azimuth (`render.pose_figures`). How the tracker produces the poses is in
 `TRACKING.md`, *Downstream*.
 
@@ -68,8 +67,7 @@ spinning. See its section below.
 
 Debug layers (never in a state's mix; reached via the `light.debug` select — choosing a
 layer turns debug on: it shows solo at full weight and the motor follows its
-mode, OFF returns the show): the two beam tools `beam_haunted` (the ghost flash;
-pairs with `pose.ghoster.enabled` for solo experimentation) and `beam_test` (direct
+mode, OFF returns the show): the beam tool `beam_test` (direct
 levels for the four physical lamps: front/back white, left/right blue — beam mode's
 hardware check), the projection `projection_playhead` (the playhead's marker alone, with the
 instrument's `PI.playhead` settings, for looking at the playhead by itself: `CALIBRATION.md`),
@@ -176,10 +174,8 @@ and the light synth that draws the lines is `LIGHT_SYNTH.md`.
 - **beam_blue_sound**: fallback choice (off vs idle pulse); exact `/WS/idle/blue/left` and `/right` scaling agreed
   with Max (linear 0..1 vs dB)
 - **pose_instrument**: see `POSE_INSTRUMENT.md`, *Open*
-- **Ghosts and the playhead boundary**: the Ghoster is deprecated (off in `studio.json`; a nice-to-have).
-  It is what keeps `PlayheadOffset` a pose feature (its beat reads it, it stamps it on ghosts) and is the
-  pose package's one playhead dependency. Removing the Ghoster removes `beam_haunted`, `GhostFeature`,
-  `GhostState`, the ghost store, the sound's ghost slots and the `playhead_data` dropdown with it; the
-  playhead offset (azimuth − playhead, stateless) can then be computed by its consumers — the flash, the
-  instrument, `HitSync`, the sound sender when its frames arrive — and leave the frame, and the pose
-  pipeline takes the light's clock (the LERP stage runs inside the light tick) and none of its data
+- **The playhead boundary**: `PlayheadOffset` is a pose feature stamped at LERP, the pose package's one
+  playhead dependency. The playhead offset (azimuth − playhead, stateless) can be computed by its consumers
+  — the flash, the instrument, `HitSync`, the sound sender when its frames arrive — and leave the frame, so
+  the pose pipeline takes the light's clock (the LERP stage runs inside the light tick) and none of its data
+  (roadmap step 6, light to pose)

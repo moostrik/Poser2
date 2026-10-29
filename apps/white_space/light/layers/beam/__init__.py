@@ -11,14 +11,12 @@ indexed by ``BeamLightId``) and nothing else; the light sender maps them to the 
 pixel slots on the way out, and the render simulates them as beams on the walls. Commanded at
 or above the threshold the fixture paints the projection and the projection layers take
 over — the states choose per mode. Show layers and debug layers live side by side; each layer's
-docstring states its role (``beam_haunted`` and ``beam_test`` are debug tools, never in a state's
-mix). A class is named after its folder and file (``beam/flash.py`` → ``BeamFlash``), which is
-also its ``LayerId``.
+docstring states its role (``beam_test`` is a debug tool, never in a state's mix). A class is
+named after its folder and file (``beam/flash.py`` → ``BeamFlash``), which is also its ``LayerId``.
 """
 
 from .blue_sound    import BeamBlueSound, BeamBlueSoundSettings
 from .playhead      import BeamPlayhead,  BeamPlayheadSettings
 from .flash         import BeamFlash,     BeamFlashSettings
 from .wind_down     import BeamWindDown,  BeamWindDownSettings
-from .haunted       import BeamHaunted,   BeamHauntedSettings
 from .test          import BeamTest,      BeamTestSettings

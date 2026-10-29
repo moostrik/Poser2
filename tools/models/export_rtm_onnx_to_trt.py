@@ -1,24 +1,23 @@
 # type: ignore
-"""Convert RAFT ONNX models to TensorRT engines.
+"""Convert RTMPose ONNX models to TensorRT engines.
 
 Usage:
-    # Convert RAFT Sintel 256x192 (auto-detects dimensions and precision)
-    python modules/inference/tools/export_raft_onnx_to_trt.py --onnx data/models/raft-sintel_256x192_i12.onnx --output data/models/raft-sintel_256x192_i12_b3.trt
+    # Convert RTMPose-L 256x192 (auto-detects dimensions and precision)
+    python tools/models/export_rtm_onnx_to_trt.py --onnx data/models/rtmpose-l_256x192.onnx --output data/models/rtmpose-l_256x192_b3.trt
+    python tools/models/export_rtm_onnx_to_trt.py --onnx data/models/rtmpose-l_256x192.onnx --output data/models/rtmpose-l_256x192_b8.trt --opt-batch 6 --max-batch 8
 
     # Convert 384x288 model
-    python modules/inference/tools/export_raft_onnx_to_trt.py --onnx data/models/raft-sintel_384x288_i12.onnx --output data/models/raft-sintel_384x288_i12_b3.trt
-
-    # Convert 512x384 model
-    python modules/inference/tools/export_raft_onnx_to_trt.py --onnx data/models/raft-sintel_512x384_i12.onnx --output data/models/raft-sintel_512x384_i12_b3.trt
+    python tools/models/export_rtm_onnx_to_trt.py --onnx data/models/rtmpose-l_384x288.onnx --output data/models/rtmpose-l_384x288_b3.trt
 """
 
 import tensorrt as trt
 import os
 import argparse
 from pathlib import Path
+import sys
 
 
-def convert_raft_to_tensorrt(
+def convert_rtmpose_to_tensorrt(
     onnx_path: str,
     output_path: str | None = None,
     min_batch: int = 1,
@@ -26,7 +25,7 @@ def convert_raft_to_tensorrt(
     max_batch: int = 4,
     workspace_gb: int = 8
 ) -> bool:
-    """Convert RAFT ONNX model to TensorRT engine.
+    """Convert RTMPose ONNX model to TensorRT engine.
 
     The engine's precision is the ONNX model's (TensorRT builds strongly typed); an FP32 model is
     made FP16 beforehand with `convert_onnx_to_fp16.py`.
@@ -46,8 +45,9 @@ def convert_raft_to_tensorrt(
     if output_path is None:
         onnx_path_obj = Path(onnx_path)
         output_path = str(onnx_path_obj.with_suffix('.trt'))
+
     print(f"\n{'═'*70}")
-    print(f"🔄 RAFT ONNX → TensorRT Conversion")
+    print(f"🔄 RTMPose ONNX → TensorRT Conversion")
     print(f"{'═'*70}")
     print(f"  Input:      {onnx_path}")
     print(f"  Output:     {output_path}")
@@ -91,7 +91,7 @@ def convert_raft_to_tensorrt(
     width = None
     for i in range(network.num_inputs):
         inp = network.get_input(i)
-        if inp.name == "image1":  # RAFT uses 'image1' and 'image2' for inputs
+        if inp.name == "input":  # RTMPose uses 'input' for the image input
             shape = inp.shape
             # Shape is (batch, channels, height, width)
             if len(shape) >= 4:
@@ -104,7 +104,7 @@ def convert_raft_to_tensorrt(
     # Validate dimensions were found
     if height is None or width is None:
         print("\n❌ ERROR: Could not auto-detect dimensions from ONNX model!")
-        print("   The 'image1' input tensor must have a fixed shape [batch, 3, height, width].")
+        print("   The 'input' tensor must have a fixed shape [batch, 3, height, width].")
         return False
 
     # Print input/output info
@@ -112,10 +112,69 @@ def convert_raft_to_tensorrt(
     print(f"  Resolution: {height}×{width}")
     for i in range(network.num_inputs):
         inp = network.get_input(i)
-        print(f"  Input {i}:  {inp.name} {inp.shape}")
+        print(f"  Input {i}:  {inp.name} {inp.shape} dtype={inp.dtype}")
     for i in range(network.num_outputs):
         out = network.get_output(i)
-        print(f"  Output {i}: {out.name} {out.shape}")
+        print(f"  Output {i}: {out.name} {out.shape} dtype={out.dtype}")
+
+    # Print layer precision information
+    print(f"\n🔍 Layer Precision Analysis ({network.num_layers} layers):")
+
+    # Count layers by type and precision
+    layer_types = {}
+    precision_stats = {"FLOAT": 0, "HALF": 0, "INT32": 0, "INT64": 0, "INT8": 0, "UINT8": 0, "BOOL": 0, "UNKNOWN": 0}
+
+    for i in range(network.num_layers):
+        layer = network.get_layer(i)
+        layer_type = str(layer.type).split('.')[-1]
+
+        # Track layer types
+        if layer_type not in layer_types:
+            layer_types[layer_type] = 0
+        layer_types[layer_type] += 1
+
+        # Get output precision
+        output_dtypes = []
+        if layer.num_outputs > 0:
+            for j in range(layer.num_outputs):
+                output_tensor = layer.get_output(j)
+                dtype_str = str(output_tensor.dtype).split('.')[-1]
+                output_dtypes.append(dtype_str)
+
+                # Count precision
+                if dtype_str in precision_stats:
+                    precision_stats[dtype_str] += 1
+                else:
+                    precision_stats["UNKNOWN"] += 1
+
+    # Print summary
+    print(f"\n  Layer Type Distribution:")
+    for layer_type, count in sorted(layer_types.items(), key=lambda x: x[1], reverse=True):
+        print(f"    {layer_type:20s}: {count:3d}")
+
+    print(f"\n  Output Precision Distribution:")
+    for precision, count in sorted(precision_stats.items(), key=lambda x: x[1], reverse=True):
+        if count > 0:
+            print(f"    {precision:10s}: {count:3d}")
+
+    # Optional: Print detailed layer-by-layer info (commented out by default for brevity)
+    # Uncomment this section if you want to see every single layer
+    print(f"\n  Detailed Layer Information (first 20 layers):")
+    for i in range(min(20, network.num_layers)):
+        layer = network.get_layer(i)
+        layer_type = str(layer.type).split('.')[-1]
+
+        output_info = []
+        if layer.num_outputs > 0:
+            for j in range(layer.num_outputs):
+                output_tensor = layer.get_output(j)
+                dtype_str = str(output_tensor.dtype).split('.')[-1]
+                output_info.append(f"{output_tensor.name}:{dtype_str}")
+
+        print(f"    Layer {i:3d}: {layer_type:20s} → {', '.join(output_info) if output_info else 'no outputs'}")
+
+    if network.num_layers > 20:
+        print(f"    ... ({network.num_layers - 20} more layers)")
 
     # Detect ONNX model precision
     print("\n🔍 Detecting ONNX Model Precision:")
@@ -140,7 +199,7 @@ def convert_raft_to_tensorrt(
             detected_precision = ", ".join(sorted(weight_dtypes))
 
         print(f"  ONNX weights: {', '.join(sorted(weight_dtypes))}")
-        print(f"  ✓ Will build TensorRT engine with: {detected_precision}")
+        print(f"  ✓ Detected precision: {detected_precision}")
     else:
         print("  ⚠️  ONNX weights: No initializers found")
         print("  Defaulting to FP32")
@@ -157,15 +216,9 @@ def convert_raft_to_tensorrt(
     print(f"  ├─ Workspace: {workspace_gb} GB")
 
     # Create optimization profile for dynamic batch size
-    # RAFT has 2 inputs: image1 and image2, both (batch, 3, height, width)
+    # RTMPose input: (batch, 3, height, width)
     profile = builder.create_optimization_profile()
-
-    # Set shapes for both inputs
-    profile.set_shape("image1",
-                      (min_batch, 3, height, width),
-                      (opt_batch, 3, height, width),
-                      (max_batch, 3, height, width))
-    profile.set_shape("image2",
+    profile.set_shape("input",
                       (min_batch, 3, height, width),
                       (opt_batch, 3, height, width),
                       (max_batch, 3, height, width))
@@ -174,7 +227,7 @@ def convert_raft_to_tensorrt(
     print(f"  └─ Optimization profile: batch {min_batch}/{opt_batch}/{max_batch}, shape {height}×{width}")
 
     # Build engine
-    print(f"\n🔨 Building TensorRT engine ({detected_precision})...")
+    print("\n🔨 Building TensorRT engine...")
     print("   ⏱️  This may take 2-5 minutes, please wait...")
     serialized_engine = builder.build_serialized_network(network, config)
 
@@ -196,25 +249,6 @@ def convert_raft_to_tensorrt(
         f.write(engine_bytes)
     print(f" ✓")
 
-    # Verify built engine precision (same method as TRTDetection._setup)
-    print("🔍 Verifying built precision...", end='', flush=True)
-    runtime_verify = trt.Runtime(logger)
-    with open(output_path, 'rb') as f:
-        built_engine = runtime_verify.deserialize_cuda_engine(f.read())
-
-    # Get input tensor dtype
-    input_name = built_engine.get_tensor_name(0)
-    input_dtype = built_engine.get_tensor_dtype(input_name)
-
-    precision_map = {
-        trt.DataType.FLOAT: "FP32",
-        trt.DataType.HALF: "FP16",
-        trt.DataType.INT8: "INT8",
-    }
-    actual_precision = precision_map.get(input_dtype, "UNKNOWN")
-
-    print(f" ✓ (Built as {actual_precision})")
-
     print(f"\n{'═'*70}")
     print(f"✅ CONVERSION COMPLETE")
     print(f"{'═'*70}")
@@ -226,16 +260,14 @@ def convert_raft_to_tensorrt(
 
 
 if __name__ == '__main__':
-    import sys
-
     print(f"\n{'═'*70}")
-    print(f"🚀 RAFT TensorRT CONVERSION TOOL")
+    print(f"🚀 RTMPose TensorRT CONVERSION TOOL")
     print(f"{'═'*70}")
     print(f"  TensorRT: {trt.__version__}")
     print(f"{'═'*70}\n")
 
     parser = argparse.ArgumentParser(
-        description='Convert RAFT ONNX model to TensorRT engine',
+        description='Convert RTMPose ONNX model to TensorRT engine',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
 
@@ -257,7 +289,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    success = convert_raft_to_tensorrt(
+    success = convert_rtmpose_to_tensorrt(
         args.onnx,
         args.output,
         args.min_batch,

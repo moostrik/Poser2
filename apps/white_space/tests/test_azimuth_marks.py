@@ -3,8 +3,7 @@
 import math
 import unittest
 
-from modules.pose.frame import Frame
-from modules.pose.features import Azimuth, BBoxAzimuth
+from modules.pose import Frame, Azimuth, BBoxAzimuth
 from apps.white_space.render.layers.azimuth_marks import build_azimuth_marks, signed_azimuth_gap
 
 

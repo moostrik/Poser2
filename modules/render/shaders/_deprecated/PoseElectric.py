@@ -4,8 +4,8 @@ import time as pytime
 from OpenGL.GL import * # type: ignore
 from modules.gl import Shader, draw_quad
 
-from modules.pose.frame import Frame
-from modules.pose.features import Points2D
+from modules.pose import Frame
+from modules.pose import Points2D
 
 import logging
 logger = logging.getLogger(__name__)

@@ -3,7 +3,7 @@ from modules.gl import Shader, draw_quad
 
 import numpy as np
 
-from modules.pose.features import BaseFeature
+from modules.pose import BaseFeature
 
 import logging
 logger = logging.getLogger(__name__)

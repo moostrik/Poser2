@@ -1,6 +1,4 @@
-from modules.gl import Image, SwapFbo, Texture
-from modules.gl.shaders.convenience.BlurH import BlurH
-from modules.gl.shaders.convenience.BlurV import BlurV
+from modules.gl import Image, SwapFbo, Texture, shaders
 
 from ..shaders.Blend import Blend
 from .LayerBase import LayerBase
@@ -14,8 +12,8 @@ class DiffusionLayer(LayerBase):
         self._image: Image = image
         self._fbo: SwapFbo = SwapFbo()
         self._blend: Blend = Blend()
-        self._blur_h: BlurH = BlurH()
-        self._blur_v: BlurV = BlurV()
+        self._blur_h: shaders.BlurH = shaders.BlurH()
+        self._blur_v: shaders.BlurV = shaders.BlurV()
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         assert width and height and internal_format

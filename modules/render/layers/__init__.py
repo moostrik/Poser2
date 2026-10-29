@@ -13,7 +13,7 @@ from .flow import     FlowLayer, FlowLayerSettings, FlowSettings, FlowDrawMode, 
                       FluidLayer, FluidLayerSettings, FluidDrawMode, \
                       Fluid3DLayer, Fluid3DLayerSettings
 from .generic import  CompositeLayer, CompositeLayerSettings, LutSettings, \
-                      HDTPrepare, HDTBlend, MotionLayer, \
+                      MotionLayer, \
                       MSColorMaskLayer, ColorMaskLayerSettings
 from .panorama import Compositor, PanoramaLayerSettings, PanoramaBlend, Part, \
                       GridRenderer, LabelRenderer, MarkRenderer, SeamRenderer, \

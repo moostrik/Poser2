@@ -1,19 +1,15 @@
 # type: ignore
-"""Convert RVM ONNX models to TensorRT engines.
+"""Convert RAFT ONNX models to TensorRT engines.
 
 Usage:
-    # Convert RVM mobilenetv3 256x192 (STANDARD)
-    python modules/inference/tools/export_rvm_onnx_to_trt.py --onnx data/models/rvm_mobilenetv3_256x192.onnx --output data/models/rvm_mobilenetv3_256x192_b3.trt
-    python modules/inference/tools/export_rvm_onnx_to_trt.py --onnx data/models/rvm_mobilenetv3_256x192.onnx --output data/models/rvm_mobilenetv3_256x192_b8.trt --opt-batch 6 --max-batch 8
+    # Convert RAFT Sintel 256x192 (auto-detects dimensions and precision)
+    python tools/models/export_raft_onnx_to_trt.py --onnx data/models/raft-sintel_256x192_i12.onnx --output data/models/raft-sintel_256x192_i12_b3.trt
 
-    # Convert 384x288 (HIGH)
-    python modules/inference/tools/export_rvm_onnx_to_trt.py --onnx data/models/rvm_mobilenetv3_384x288.onnx --output data/models/rvm_mobilenetv3_384x288_b3.trt
+    # Convert 384x288 model
+    python tools/models/export_raft_onnx_to_trt.py --onnx data/models/raft-sintel_384x288_i12.onnx --output data/models/raft-sintel_384x288_i12_b3.trt
 
-    # Convert 512x384 (ULTRA)
-    python modules/inference/tools/export_rvm_onnx_to_trt.py --onnx data/models/rvm_mobilenetv3_512x384.onnx --output data/models/rvm_mobilenetv3_512x384_b3.trt
-
-    # Convert 1024x768 (EXTREME)
-    python modules/inference/tools/export_rvm_onnx_to_trt.py --onnx data/models/rvm_mobilenetv3_1024x768.onnx --output data/models/rvm_mobilenetv3_1024x768_b3.trt
+    # Convert 512x384 model
+    python tools/models/export_raft_onnx_to_trt.py --onnx data/models/raft-sintel_512x384_i12.onnx --output data/models/raft-sintel_512x384_i12_b3.trt
 """
 
 import tensorrt as trt
@@ -22,7 +18,7 @@ import argparse
 from pathlib import Path
 
 
-def convert_rvm_to_tensorrt(
+def convert_raft_to_tensorrt(
     onnx_path: str,
     output_path: str | None = None,
     min_batch: int = 1,
@@ -30,7 +26,7 @@ def convert_rvm_to_tensorrt(
     max_batch: int = 4,
     workspace_gb: int = 8
 ) -> bool:
-    """Convert RVM ONNX model to TensorRT engine.
+    """Convert RAFT ONNX model to TensorRT engine.
 
     The engine's precision is the ONNX model's (TensorRT builds strongly typed); an FP32 model is
     made FP16 beforehand with `convert_onnx_to_fp16.py`.
@@ -50,9 +46,8 @@ def convert_rvm_to_tensorrt(
     if output_path is None:
         onnx_path_obj = Path(onnx_path)
         output_path = str(onnx_path_obj.with_suffix('.trt'))
-
     print(f"\n{'═'*70}")
-    print(f"🔄 RVM ONNX → TensorRT Conversion")
+    print(f"🔄 RAFT ONNX → TensorRT Conversion")
     print(f"{'═'*70}")
     print(f"  Input:      {onnx_path}")
     print(f"  Output:     {output_path}")
@@ -96,7 +91,7 @@ def convert_rvm_to_tensorrt(
     width = None
     for i in range(network.num_inputs):
         inp = network.get_input(i)
-        if inp.name == "src":  # RVM uses 'src' for the image input
+        if inp.name == "image1":  # RAFT uses 'image1' and 'image2' for inputs
             shape = inp.shape
             # Shape is (batch, channels, height, width)
             if len(shape) >= 4:
@@ -109,7 +104,7 @@ def convert_rvm_to_tensorrt(
     # Validate dimensions were found
     if height is None or width is None:
         print("\n❌ ERROR: Could not auto-detect dimensions from ONNX model!")
-        print("   The 'src' input tensor must have a fixed shape [batch, 3, height, width].")
+        print("   The 'image1' input tensor must have a fixed shape [batch, 3, height, width].")
         return False
 
     # Print input/output info
@@ -162,30 +157,18 @@ def convert_rvm_to_tensorrt(
     print(f"  ├─ Workspace: {workspace_gb} GB")
 
     # Create optimization profile for dynamic batch size
-    # RVM ONNX: src (image), r1i-r4i (recurrent states)
+    # RAFT has 2 inputs: image1 and image2, both (batch, 3, height, width)
     profile = builder.create_optimization_profile()
 
-    # Image input: (batch, 3, height, width) - dynamic batch dimension
-    profile.set_shape("src",
+    # Set shapes for both inputs
+    profile.set_shape("image1",
                       (min_batch, 3, height, width),
                       (opt_batch, 3, height, width),
                       (max_batch, 3, height, width))
-
-    # Recurrent states: Fixed batch=1, channels fixed, spatial dims based on input resolution
-    # RVM downsamples by 2, 4, 8, 16 for r1, r2, r3, r4 respectively
-    # ALL tensors have dynamic batch dimension for true batching
-    profile.set_shape("r1i", (min_batch, 16, height // 2, width // 2),
-                              (opt_batch, 16, height // 2, width // 2),
-                              (max_batch, 16, height // 2, width // 2))
-    profile.set_shape("r2i", (min_batch, 20, height // 4, width // 4),
-                              (opt_batch, 20, height // 4, width // 4),
-                              (max_batch, 20, height // 4, width // 4))
-    profile.set_shape("r3i", (min_batch, 40, height // 8, width // 8),
-                              (opt_batch, 40, height // 8, width // 8),
-                              (max_batch, 40, height // 8, width // 8))
-    profile.set_shape("r4i", (min_batch, 64, height // 16, width // 16),
-                              (opt_batch, 64, height // 16, width // 16),
-                              (max_batch, 64, height // 16, width // 16))
+    profile.set_shape("image2",
+                      (min_batch, 3, height, width),
+                      (opt_batch, 3, height, width),
+                      (max_batch, 3, height, width))
 
     config.add_optimization_profile(profile)
     print(f"  └─ Optimization profile: batch {min_batch}/{opt_batch}/{max_batch}, shape {height}×{width}")
@@ -213,6 +196,25 @@ def convert_rvm_to_tensorrt(
         f.write(engine_bytes)
     print(f" ✓")
 
+    # Verify built engine precision (same method as TRTDetection._setup)
+    print("🔍 Verifying built precision...", end='', flush=True)
+    runtime_verify = trt.Runtime(logger)
+    with open(output_path, 'rb') as f:
+        built_engine = runtime_verify.deserialize_cuda_engine(f.read())
+
+    # Get input tensor dtype
+    input_name = built_engine.get_tensor_name(0)
+    input_dtype = built_engine.get_tensor_dtype(input_name)
+
+    precision_map = {
+        trt.DataType.FLOAT: "FP32",
+        trt.DataType.HALF: "FP16",
+        trt.DataType.INT8: "INT8",
+    }
+    actual_precision = precision_map.get(input_dtype, "UNKNOWN")
+
+    print(f" ✓ (Built as {actual_precision})")
+
     print(f"\n{'═'*70}")
     print(f"✅ CONVERSION COMPLETE")
     print(f"{'═'*70}")
@@ -227,13 +229,13 @@ if __name__ == '__main__':
     import sys
 
     print(f"\n{'═'*70}")
-    print(f"🚀 RVM TensorRT CONVERSION TOOL")
+    print(f"🚀 RAFT TensorRT CONVERSION TOOL")
     print(f"{'═'*70}")
     print(f"  TensorRT: {trt.__version__}")
     print(f"{'═'*70}\n")
 
     parser = argparse.ArgumentParser(
-        description='Convert RVM ONNX model to TensorRT engine',
+        description='Convert RAFT ONNX model to TensorRT engine',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
 
@@ -241,7 +243,7 @@ if __name__ == '__main__':
     parser.add_argument('--onnx', required=True,
                         help='Path to input ONNX file')
     parser.add_argument('--output', default=None,
-                        help='Path to output TensorRT engine file (default: replaces .onnx with .trt)')
+                        help='Path to output TensorRT engine file (default: replace .onnx with .trt)')
 
     # Optional arguments with defaults
     parser.add_argument('--min-batch', type=int, default=1,
@@ -255,7 +257,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    success = convert_rvm_to_tensorrt(
+    success = convert_raft_to_tensorrt(
         args.onnx,
         args.output,
         args.min_batch,
@@ -263,4 +265,5 @@ if __name__ == '__main__':
         args.max_batch,
         args.workspace
     )
+
     sys.exit(0 if success else 1)

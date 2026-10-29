@@ -9,8 +9,7 @@ azimuth is also the row's x.
 import math
 from dataclasses import dataclass
 
-from modules.pose.frame import Frame
-from modules.pose.features import Azimuth, BBoxAzimuth
+from modules.pose import Frame, Azimuth, BBoxAzimuth
 
 from apps.white_space.light.layers import normalize_azimuth
 

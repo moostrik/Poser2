@@ -44,7 +44,7 @@ class StateContext:
     bars:    float          # playhead bars since state entry (one-way bar ramps)
     dt:      float          # this tick's wall-clock delta (bidirectional ramps integrate these)
     dbar:    float          # this tick's bar delta
-    players: int            # live player count (ghosts excluded)
+    players: int            # live player count (the dummy excluded)
     sync_hits: int          # hits in a row, within one round, that struck alike poses (HitSync's streak)
     hit:     bool           # this tick the playhead is closest to a live player (the flash tick)
     full_sync: bool         # the room in full sync: every present pair alike over the instrument's band

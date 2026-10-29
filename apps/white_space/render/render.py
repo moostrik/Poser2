@@ -3,11 +3,6 @@
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, clear_color, Style
-from modules.render.layers import LayerBase
-from modules.render.layers import ImageSourceLayer, CropSourceLayer
-from modules.render.layers import TrackerCompositor, PoseCompositor
-from modules.render.layers import FeatureWindowLayer, FeatureFrameLayer, MTimeRenderer, PoseLineLayer, PoseLineSettings
-from modules.render.layers import Compositor, PanoramaLayerSettings, CameraReadingsLayer
 from modules.oak import CameraSettings, CameraCheckSettings, mono_frame_size, delivered_height
 from modules.tracker import PanoramicTrackerSettings
 from apps.white_space.render.layers.light_simulation_layer import LightSimulationLayer
@@ -15,21 +10,19 @@ from apps.white_space.render.layers.beam_light_simulation_layer import BeamLight
 from apps.white_space.render.layers.azimuth_overlay_layer import AzimuthOverlayLayer
 from apps.white_space.render.layers.pose_figure_layer import PoseFigureLayer
 from apps.white_space.light import FIXTURE_PROJECTION_RPM
-from modules.pose.nodes import AngleExtractorSettings
-from modules.utils import Color
-from modules.utils.PointsAndRects import Rect, Point2f
-from modules.render.composition_subdivider import make_subdivision, SubdivisionRow, Subdivision
+from modules.pose import nodes
+from modules.utils import Color, Rect, Point2f
+from modules.render import layers, make_subdivision, SubdivisionRow, Subdivision
 
 from ..board import Board
-from ..pose import PlayheadOffset, GhostFeature, dummy_id
+from ..pose import PlayheadOffset, dummy_id
 from ..settings import Layers, RenderSettings, PlayheadFeatureSelect, CameraView, Layout, Stage
 from .pose_slots import POSE_SLOTS, pose_slots
 
-# Maps the app-local feature dropdown to the concrete app features. Kept here (not in
-# settings, which stays data-only) and handed to the generic data layers via feature_map.
+# Maps the app-local feature enum to the concrete app feature. Kept here (not in settings,
+# which stays data-only) and handed to the generic data layers via feature_map.
 PLAYHEAD_FEATURE_MAP = {
     PlayheadFeatureSelect.PlayheadOffset: PlayheadOffset,
-    PlayheadFeatureSelect.GhostFeature:   GhostFeature,
 }
 
 # The window's ground, behind and between the rows. Dark grey rather than black so a row's own
@@ -51,7 +44,7 @@ class Render(RenderBase):
     def __init__(self, board: Board, settings: RenderSettings,
                  tracker: PanoramicTrackerSettings,
                  cameras: list[CameraSettings], camera_check: CameraCheckSettings,
-                 angle_extractor: AngleExtractorSettings) -> None:
+                 angle_extractor: nodes.AngleExtractorSettings) -> None:
         super().__init__(settings.window)
         self.max_players: int = settings.max_players
         self.num_cams: int = settings.num_cams
@@ -63,56 +56,56 @@ class Render(RenderBase):
         self.tracker_settings: PanoramicTrackerSettings = tracker
         self.board: Board = board
 
-        self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
+        self.L: dict[Layers, dict[int, layers.LayerBase]] = {layer: {} for layer in Layers}
 
         # Row 1 — per-camera: source layers + tracker compositor
         for i in range(self.num_cams):
-            self.L[Layers.cam_image][i] = ImageSourceLayer(i, board)
-            self.L[Layers.cam_crop][i]  = CropSourceLayer(i, board)
-            self.L[Layers.tracker][i]   = TrackerCompositor(
+            self.L[Layers.cam_image][i] = layers.ImageSourceLayer(i, board)
+            self.L[Layers.cam_crop][i]  = layers.CropSourceLayer(i, board)
+            self.L[Layers.tracker][i]   = layers.TrackerCompositor(
                 i, board,
                 self.L[Layers.cam_image][i].texture,
                 settings.preview.tracker,
                 settings.colors,
             )
-            self.L[Layers.cam_readings][i] = CameraReadingsLayer(cameras[i], camera_check)
+            self.L[Layers.cam_readings][i] = layers.CameraReadingsLayer(cameras[i], camera_check)
 
         # Row 5 — per-player: pose compositor + data overlays
         # cam_image[0] texture used as fallback for non-GPU crop path (GPU crop is default)
         fallback_cam_texture = self.L[Layers.cam_image][0].texture
         for i in range(self.max_players):
-            self.L[Layers.poser][i]     = PoseCompositor(
+            self.L[Layers.poser][i]     = layers.PoseCompositor(
                 i, board,
                 fallback_cam_texture,
                 settings.preview.poser,
                 settings.colors,
             )
-            self.L[Layers.data_W][i]    = FeatureWindowLayer(i, board, settings.data, settings.colors) # type: ignore
-            self.L[Layers.data_F][i]    = FeatureFrameLayer( i, board, settings.data, settings.colors)   # type: ignore
-            self.L[Layers.data_time][i] = MTimeRenderer(     i, board, settings.data_time)
-            self.L[Layers.data_playhead_W][i] = FeatureWindowLayer(i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
-            self.L[Layers.data_playhead_F][i] = FeatureFrameLayer( i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
+            self.L[Layers.data_W][i]    = layers.FeatureWindowLayer(i, board, settings.data, settings.colors) # type: ignore
+            self.L[Layers.data_F][i]    = layers.FeatureFrameLayer( i, board, settings.data, settings.colors)   # type: ignore
+            self.L[Layers.data_time][i] = layers.MTimeRenderer(     i, board, settings.data_time)
+            self.L[Layers.data_playhead_W][i] = layers.FeatureWindowLayer(i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
+            self.L[Layers.data_playhead_F][i] = layers.FeatureFrameLayer( i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
 
         # The dummy's column, last in the same row: its skeleton at LERP, the only stage it is in
         # (the pose compositor overlays CLEAN, SMOOTH and PREDICT over a crop it has neither of),
         # under the same data overlays as a player's. White: it is not a player.
         d = self.dummy_id
-        self.L[Layers.dummy_pose][d] = PoseLineLayer(d, board, PoseLineSettings(
+        self.L[Layers.dummy_pose][d] = layers.PoseLineLayer(d, board, layers.PoseLineSettings(
             stage=int(Stage.LERP),
             line_width=settings.preview.poser.line_width,
             line_smooth=settings.preview.poser.line_smooth,
             use_scores=True, use_bbox=False, color=Color(1.0, 1.0, 1.0),
         ))
-        self.L[Layers.data_W][d]    = FeatureWindowLayer(d, board, settings.data, settings.colors) # type: ignore
-        self.L[Layers.data_F][d]    = FeatureFrameLayer( d, board, settings.data, settings.colors)   # type: ignore
-        self.L[Layers.data_time][d] = MTimeRenderer(     d, board, settings.data_time)
-        self.L[Layers.data_playhead_W][d] = FeatureWindowLayer(d, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
-        self.L[Layers.data_playhead_F][d] = FeatureFrameLayer( d, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
+        self.L[Layers.data_W][d]    = layers.FeatureWindowLayer(d, board, settings.data, settings.colors) # type: ignore
+        self.L[Layers.data_F][d]    = layers.FeatureFrameLayer( d, board, settings.data, settings.colors)   # type: ignore
+        self.L[Layers.data_time][d] = layers.MTimeRenderer(     d, board, settings.data_time)
+        self.L[Layers.data_playhead_W][d] = layers.FeatureWindowLayer(d, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
+        self.L[Layers.data_playhead_F][d] = layers.FeatureFrameLayer( d, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
 
         # Rows 2–4 — shared panoramic layers; constructed after cam layers so textures are ready.
         # The calibration strip owns row 2 by itself: it consumes all four camera images at once and
         # draws the tracker's own view of the same people over them, on one vertical scale.
-        self.L[Layers.cam_panorama][0] = Compositor(
+        self.L[Layers.cam_panorama][0] = layers.Compositor(
             board,
             [self.L[Layers.cam_image][i].texture for i in range(self.num_cams)],
             self.num_cams, settings.colors, tracker, settings.panorama,
@@ -134,7 +127,7 @@ class Render(RenderBase):
         # GL reallocation, which only the render thread may do. The callback arrives on whichever
         # thread wrote the setting, so it raises a flag and `update()` acts on it.
         self._layout_dirty: bool = False
-        settings.panorama.bind(PanoramaLayerSettings.focus_radius, self._on_layout_setting)
+        settings.panorama.bind(layers.PanoramaLayerSettings.focus_radius, self._on_layout_setting)
         RenderSettings.camera_view.bind(settings, self._on_layout_setting)
         RenderSettings.layout.bind(settings, self._on_layout_setting)
 
@@ -166,7 +159,7 @@ class Render(RenderBase):
         """The layers belonging to rows this layout leaves out — neither composited nor drawn."""
         return {layer for name, layers in _SWITCHED_ROWS.items() if not self.subdivision.has(name) for layer in layers}
 
-    def _skeleton(self, track_id: int) -> LayerBase:
+    def _skeleton(self, track_id: int) -> layers.LayerBase:
         """A pose's crop-and-skeleton layer: a player's compositor, or the dummy's lines."""
         return self.L[Layers.dummy_pose if track_id == self.dummy_id else Layers.poser][track_id]
 
@@ -189,7 +182,7 @@ class Render(RenderBase):
         actually fill, both measured at the rig centre. It is not a preference: `tilt`, `fov` and
         `focus_radius` all move it, and the compositor is the only thing that knows how.
         """
-        panorama: Compositor = self.L[Layers.cam_panorama][0]  # type: ignore[assignment]
+        panorama: layers.Compositor = self.L[Layers.cam_panorama][0]  # type: ignore[assignment]
         return SubdivisionRow(name='panoramic', columns=1, rows=1,
                               src_aspect_ratio=panorama.aspect_ratio,
                               padding=Point2f(0.0, 1.0))
@@ -248,7 +241,7 @@ class Render(RenderBase):
                 self._skeleton(track_id).allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
-        self.settings.panorama.unbind(PanoramaLayerSettings.focus_radius, self._on_layout_setting)
+        self.settings.panorama.unbind(layers.PanoramaLayerSettings.focus_radius, self._on_layout_setting)
         RenderSettings.camera_view.unbind(self.settings, self._on_layout_setting)
         RenderSettings.layout.unbind(self.settings, self._on_layout_setting)
         for cam_dict in self.L.values():

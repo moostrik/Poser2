@@ -1,23 +1,28 @@
 # type: ignore
-"""Convert RTMPose ONNX models to TensorRT engines.
+"""Convert RVM ONNX models to TensorRT engines.
 
 Usage:
-    # Convert RTMPose-L 256x192 (auto-detects dimensions and precision)
-    python modules/inference/tools/export_rtm_onnx_to_trt.py --onnx data/models/rtmpose-l_256x192.onnx --output data/models/rtmpose-l_256x192_b3.trt
-    python modules/inference/tools/export_rtm_onnx_to_trt.py --onnx data/models/rtmpose-l_256x192.onnx --output data/models/rtmpose-l_256x192_b8.trt --opt-batch 6 --max-batch 8
+    # Convert RVM mobilenetv3 256x192 (STANDARD)
+    python tools/models/export_rvm_onnx_to_trt.py --onnx data/models/rvm_mobilenetv3_256x192.onnx --output data/models/rvm_mobilenetv3_256x192_b3.trt
+    python tools/models/export_rvm_onnx_to_trt.py --onnx data/models/rvm_mobilenetv3_256x192.onnx --output data/models/rvm_mobilenetv3_256x192_b8.trt --opt-batch 6 --max-batch 8
 
-    # Convert 384x288 model
-    python modules/inference/tools/export_rtm_onnx_to_trt.py --onnx data/models/rtmpose-l_384x288.onnx --output data/models/rtmpose-l_384x288_b3.trt
+    # Convert 384x288 (HIGH)
+    python tools/models/export_rvm_onnx_to_trt.py --onnx data/models/rvm_mobilenetv3_384x288.onnx --output data/models/rvm_mobilenetv3_384x288_b3.trt
+
+    # Convert 512x384 (ULTRA)
+    python tools/models/export_rvm_onnx_to_trt.py --onnx data/models/rvm_mobilenetv3_512x384.onnx --output data/models/rvm_mobilenetv3_512x384_b3.trt
+
+    # Convert 1024x768 (EXTREME)
+    python tools/models/export_rvm_onnx_to_trt.py --onnx data/models/rvm_mobilenetv3_1024x768.onnx --output data/models/rvm_mobilenetv3_1024x768_b3.trt
 """
 
 import tensorrt as trt
 import os
 import argparse
 from pathlib import Path
-import sys
 
 
-def convert_rtmpose_to_tensorrt(
+def convert_rvm_to_tensorrt(
     onnx_path: str,
     output_path: str | None = None,
     min_batch: int = 1,
@@ -25,7 +30,7 @@ def convert_rtmpose_to_tensorrt(
     max_batch: int = 4,
     workspace_gb: int = 8
 ) -> bool:
-    """Convert RTMPose ONNX model to TensorRT engine.
+    """Convert RVM ONNX model to TensorRT engine.
 
     The engine's precision is the ONNX model's (TensorRT builds strongly typed); an FP32 model is
     made FP16 beforehand with `convert_onnx_to_fp16.py`.
@@ -47,7 +52,7 @@ def convert_rtmpose_to_tensorrt(
         output_path = str(onnx_path_obj.with_suffix('.trt'))
 
     print(f"\n{'═'*70}")
-    print(f"🔄 RTMPose ONNX → TensorRT Conversion")
+    print(f"🔄 RVM ONNX → TensorRT Conversion")
     print(f"{'═'*70}")
     print(f"  Input:      {onnx_path}")
     print(f"  Output:     {output_path}")
@@ -91,7 +96,7 @@ def convert_rtmpose_to_tensorrt(
     width = None
     for i in range(network.num_inputs):
         inp = network.get_input(i)
-        if inp.name == "input":  # RTMPose uses 'input' for the image input
+        if inp.name == "src":  # RVM uses 'src' for the image input
             shape = inp.shape
             # Shape is (batch, channels, height, width)
             if len(shape) >= 4:
@@ -104,7 +109,7 @@ def convert_rtmpose_to_tensorrt(
     # Validate dimensions were found
     if height is None or width is None:
         print("\n❌ ERROR: Could not auto-detect dimensions from ONNX model!")
-        print("   The 'input' tensor must have a fixed shape [batch, 3, height, width].")
+        print("   The 'src' input tensor must have a fixed shape [batch, 3, height, width].")
         return False
 
     # Print input/output info
@@ -112,69 +117,10 @@ def convert_rtmpose_to_tensorrt(
     print(f"  Resolution: {height}×{width}")
     for i in range(network.num_inputs):
         inp = network.get_input(i)
-        print(f"  Input {i}:  {inp.name} {inp.shape} dtype={inp.dtype}")
+        print(f"  Input {i}:  {inp.name} {inp.shape}")
     for i in range(network.num_outputs):
         out = network.get_output(i)
-        print(f"  Output {i}: {out.name} {out.shape} dtype={out.dtype}")
-
-    # Print layer precision information
-    print(f"\n🔍 Layer Precision Analysis ({network.num_layers} layers):")
-
-    # Count layers by type and precision
-    layer_types = {}
-    precision_stats = {"FLOAT": 0, "HALF": 0, "INT32": 0, "INT64": 0, "INT8": 0, "UINT8": 0, "BOOL": 0, "UNKNOWN": 0}
-
-    for i in range(network.num_layers):
-        layer = network.get_layer(i)
-        layer_type = str(layer.type).split('.')[-1]
-
-        # Track layer types
-        if layer_type not in layer_types:
-            layer_types[layer_type] = 0
-        layer_types[layer_type] += 1
-
-        # Get output precision
-        output_dtypes = []
-        if layer.num_outputs > 0:
-            for j in range(layer.num_outputs):
-                output_tensor = layer.get_output(j)
-                dtype_str = str(output_tensor.dtype).split('.')[-1]
-                output_dtypes.append(dtype_str)
-
-                # Count precision
-                if dtype_str in precision_stats:
-                    precision_stats[dtype_str] += 1
-                else:
-                    precision_stats["UNKNOWN"] += 1
-
-    # Print summary
-    print(f"\n  Layer Type Distribution:")
-    for layer_type, count in sorted(layer_types.items(), key=lambda x: x[1], reverse=True):
-        print(f"    {layer_type:20s}: {count:3d}")
-
-    print(f"\n  Output Precision Distribution:")
-    for precision, count in sorted(precision_stats.items(), key=lambda x: x[1], reverse=True):
-        if count > 0:
-            print(f"    {precision:10s}: {count:3d}")
-
-    # Optional: Print detailed layer-by-layer info (commented out by default for brevity)
-    # Uncomment this section if you want to see every single layer
-    print(f"\n  Detailed Layer Information (first 20 layers):")
-    for i in range(min(20, network.num_layers)):
-        layer = network.get_layer(i)
-        layer_type = str(layer.type).split('.')[-1]
-
-        output_info = []
-        if layer.num_outputs > 0:
-            for j in range(layer.num_outputs):
-                output_tensor = layer.get_output(j)
-                dtype_str = str(output_tensor.dtype).split('.')[-1]
-                output_info.append(f"{output_tensor.name}:{dtype_str}")
-
-        print(f"    Layer {i:3d}: {layer_type:20s} → {', '.join(output_info) if output_info else 'no outputs'}")
-
-    if network.num_layers > 20:
-        print(f"    ... ({network.num_layers - 20} more layers)")
+        print(f"  Output {i}: {out.name} {out.shape}")
 
     # Detect ONNX model precision
     print("\n🔍 Detecting ONNX Model Precision:")
@@ -199,7 +145,7 @@ def convert_rtmpose_to_tensorrt(
             detected_precision = ", ".join(sorted(weight_dtypes))
 
         print(f"  ONNX weights: {', '.join(sorted(weight_dtypes))}")
-        print(f"  ✓ Detected precision: {detected_precision}")
+        print(f"  ✓ Will build TensorRT engine with: {detected_precision}")
     else:
         print("  ⚠️  ONNX weights: No initializers found")
         print("  Defaulting to FP32")
@@ -216,18 +162,36 @@ def convert_rtmpose_to_tensorrt(
     print(f"  ├─ Workspace: {workspace_gb} GB")
 
     # Create optimization profile for dynamic batch size
-    # RTMPose input: (batch, 3, height, width)
+    # RVM ONNX: src (image), r1i-r4i (recurrent states)
     profile = builder.create_optimization_profile()
-    profile.set_shape("input",
+
+    # Image input: (batch, 3, height, width) - dynamic batch dimension
+    profile.set_shape("src",
                       (min_batch, 3, height, width),
                       (opt_batch, 3, height, width),
                       (max_batch, 3, height, width))
+
+    # Recurrent states: Fixed batch=1, channels fixed, spatial dims based on input resolution
+    # RVM downsamples by 2, 4, 8, 16 for r1, r2, r3, r4 respectively
+    # ALL tensors have dynamic batch dimension for true batching
+    profile.set_shape("r1i", (min_batch, 16, height // 2, width // 2),
+                              (opt_batch, 16, height // 2, width // 2),
+                              (max_batch, 16, height // 2, width // 2))
+    profile.set_shape("r2i", (min_batch, 20, height // 4, width // 4),
+                              (opt_batch, 20, height // 4, width // 4),
+                              (max_batch, 20, height // 4, width // 4))
+    profile.set_shape("r3i", (min_batch, 40, height // 8, width // 8),
+                              (opt_batch, 40, height // 8, width // 8),
+                              (max_batch, 40, height // 8, width // 8))
+    profile.set_shape("r4i", (min_batch, 64, height // 16, width // 16),
+                              (opt_batch, 64, height // 16, width // 16),
+                              (max_batch, 64, height // 16, width // 16))
 
     config.add_optimization_profile(profile)
     print(f"  └─ Optimization profile: batch {min_batch}/{opt_batch}/{max_batch}, shape {height}×{width}")
 
     # Build engine
-    print("\n🔨 Building TensorRT engine...")
+    print(f"\n🔨 Building TensorRT engine ({detected_precision})...")
     print("   ⏱️  This may take 2-5 minutes, please wait...")
     serialized_engine = builder.build_serialized_network(network, config)
 
@@ -260,14 +224,16 @@ def convert_rtmpose_to_tensorrt(
 
 
 if __name__ == '__main__':
+    import sys
+
     print(f"\n{'═'*70}")
-    print(f"🚀 RTMPose TensorRT CONVERSION TOOL")
+    print(f"🚀 RVM TensorRT CONVERSION TOOL")
     print(f"{'═'*70}")
     print(f"  TensorRT: {trt.__version__}")
     print(f"{'═'*70}\n")
 
     parser = argparse.ArgumentParser(
-        description='Convert RTMPose ONNX model to TensorRT engine',
+        description='Convert RVM ONNX model to TensorRT engine',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
 
@@ -275,7 +241,7 @@ if __name__ == '__main__':
     parser.add_argument('--onnx', required=True,
                         help='Path to input ONNX file')
     parser.add_argument('--output', default=None,
-                        help='Path to output TensorRT engine file (default: replace .onnx with .trt)')
+                        help='Path to output TensorRT engine file (default: replaces .onnx with .trt)')
 
     # Optional arguments with defaults
     parser.add_argument('--min-batch', type=int, default=1,
@@ -289,7 +255,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    success = convert_rtmpose_to_tensorrt(
+    success = convert_rvm_to_tensorrt(
         args.onnx,
         args.output,
         args.min_batch,
@@ -297,5 +263,4 @@ if __name__ == '__main__':
         args.max_batch,
         args.workspace
     )
-
     sys.exit(0 if success else 1)

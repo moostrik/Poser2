@@ -1,7 +1,4 @@
-from modules.gl import Fbo, Image, SwapFbo, Texture
-from modules.gl.shaders.convenience.BlurH import BlurH
-from modules.gl.shaders.convenience.BlurV import BlurV
-from modules.gl.shaders.convenience.FlashOut import FlashOut
+from modules.gl import Fbo, Image, SwapFbo, Texture, shaders
 
 from .LayerBase import LayerBase
 from .passes import blur, copy
@@ -15,9 +12,9 @@ class RevealLayer(LayerBase):
         self._white: Image = white
         self._fbo: Fbo = Fbo()
         self._mask: SwapFbo = SwapFbo()
-        self._flash_out: FlashOut = FlashOut()
-        self._blur_h: BlurH = BlurH()
-        self._blur_v: BlurV = BlurV()
+        self._flash_out: shaders.FlashOut = shaders.FlashOut()
+        self._blur_h: shaders.BlurH = shaders.BlurH()
+        self._blur_v: shaders.BlurV = shaders.BlurV()
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         assert width and height and internal_format

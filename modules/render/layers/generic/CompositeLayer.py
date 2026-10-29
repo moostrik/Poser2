@@ -6,8 +6,7 @@ from pathlib import Path
 
 from OpenGL.GL import *  # type: ignore
 
-from modules.gl import Fbo, Texture, Style
-from modules.gl.shaders import Blit, Lut
+from modules.gl import Fbo, Texture, Style, shaders
 from ..LayerBase import LayerBase
 from modules.settings import Field, BaseSettings, Widget, Group
 
@@ -73,11 +72,11 @@ class CompositeLayer(LayerBase):
         self._composite_fbo: Fbo = Fbo()
 
         # LUT shader
-        self._lut_shader: Lut = Lut()
+        self._lut_shader: shaders.Lut = shaders.Lut()
         self._current_lut: str = ""
 
         # Blit shader for passthrough when no LUT
-        self._blit: Blit = Blit()
+        self._blit: shaders.Blit = shaders.Blit()
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 

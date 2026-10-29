@@ -33,32 +33,32 @@ goto endofscript
 :section_hd_trio
 echo.
 echo hd_trio
-call :build "python modules\inference\tools\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192.onnx --output apps\hd_trio\data\models\rtmpose-l_256x192.trt --opt-batch 3 --max-batch 3"
-call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_256x192.trt --opt-batch 3 --max-batch 3"
-call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_384x288.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_384x288.trt --opt-batch 3 --max-batch 3"
-call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_512x384.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_512x384.trt --opt-batch 3 --max-batch 3"
-call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_1024x768.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_1024x768.trt --opt-batch 3 --max-batch 3"
+call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192.onnx --output apps\hd_trio\data\models\rtmpose-l_256x192.trt --opt-batch 3 --max-batch 3"
+call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_256x192.trt --opt-batch 3 --max-batch 3"
+call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_384x288.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_384x288.trt --opt-batch 3 --max-batch 3"
+call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_512x384.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_512x384.trt --opt-batch 3 --max-batch 3"
+call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_1024x768.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_1024x768.trt --opt-batch 3 --max-batch 3"
 exit /b 0
 
 :section_white_space
 echo.
 echo white_space
-call :build "python modules\inference\tools\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192.onnx --output apps\white_space\data\models\rtmpose-l_256x192.trt --opt-batch 6 --max-batch 8"
+call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192.onnx --output apps\white_space\data\models\rtmpose-l_256x192.trt --opt-batch 6 --max-batch 8"
 exit /b 0
 
 :section_deep_flow
 echo.
 echo deep_flow
-call :build "python modules\inference\tools\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192.onnx --output apps\deep_flow\data\models\rtmpose-l_256x192.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192.onnx --output apps\deep_flow\data\models\rtmpose-l_256x192.trt --opt-batch 1 --max-batch 1"
 
-call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192.onnx --output apps\deep_flow\data\models\rvm_mobilenetv3_256x192.trt --opt-batch 1 --max-batch 1"
-call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_384x288.onnx --output apps\deep_flow\data\models\rvm_mobilenetv3_384x288.trt --opt-batch 1 --max-batch 1"
-call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_512x384.onnx --output apps\deep_flow\data\models\rvm_mobilenetv3_512x384.trt --opt-batch 1 --max-batch 1"
-call :build "python modules\inference\tools\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_1024x768.onnx --output apps\deep_flow\data\models\rvm_mobilenetv3_1024x768.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_256x192.onnx --output apps\deep_flow\data\models\rvm_mobilenetv3_256x192.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_384x288.onnx --output apps\deep_flow\data\models\rvm_mobilenetv3_384x288.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_512x384.onnx --output apps\deep_flow\data\models\rvm_mobilenetv3_512x384.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_1024x768.onnx --output apps\deep_flow\data\models\rvm_mobilenetv3_1024x768.trt --opt-batch 1 --max-batch 1"
 
-call :build "python modules\inference\tools\export_raft_onnx_to_trt.py --onnx data\models\raft-sintel_256x192_i12.onnx --output apps\deep_flow\data\models\raft-sintel_256x192_i12.trt --opt-batch 1 --max-batch 1"
-call :build "python modules\inference\tools\export_raft_onnx_to_trt.py --onnx data\models\raft-sintel_384x288_i12.onnx --output apps\deep_flow\data\models\raft-sintel_384x288_i12.trt --opt-batch 1 --max-batch 1"
-call :build "python modules\inference\tools\export_raft_onnx_to_trt.py --onnx data\models\raft-sintel_512x384_i12.onnx --output apps\deep_flow\data\models\raft-sintel_512x384_i12.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_raft_onnx_to_trt.py --onnx data\models\raft-sintel_256x192_i12.onnx --output apps\deep_flow\data\models\raft-sintel_256x192_i12.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_raft_onnx_to_trt.py --onnx data\models\raft-sintel_384x288_i12.onnx --output apps\deep_flow\data\models\raft-sintel_384x288_i12.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_raft_onnx_to_trt.py --onnx data\models\raft-sintel_512x384_i12.onnx --output apps\deep_flow\data\models\raft-sintel_512x384_i12.trt --opt-batch 1 --max-batch 1"
 exit /b 0
 
 :build

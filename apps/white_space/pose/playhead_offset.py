@@ -14,9 +14,7 @@ from typing import Callable
 
 import numpy as np
 
-from modules.pose.features import Azimuth, SingleAngle
-from modules.pose.frame import Frame, replace
-from modules.pose.nodes import FilterNode
+from modules.pose import Azimuth, SingleAngle, Frame, replace, nodes
 
 # Only the near half of the sweep has a crossing; the far side (|offset| → π) never does.
 _HALF_PI: float = math.pi / 2.0
@@ -97,7 +95,7 @@ class PlayheadOffset(SingleAngle):
     """
 
 
-class PlayheadOffsetExtractor(FilterNode):
+class PlayheadOffsetExtractor(nodes.FilterNode):
     """Stamps ``PlayheadOffset`` from the pose azimuth and a live playhead provider.
 
     ``playhead`` returns the current playhead (radians [-π, π); NaN when not meaningful).

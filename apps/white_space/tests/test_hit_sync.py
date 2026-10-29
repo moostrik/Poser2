@@ -7,8 +7,7 @@ from types import SimpleNamespace
 import numpy as np
 
 from modules.board import HitStreak
-from modules.pose.analytics import PostureSimilaritySettings
-from modules.pose.features import Age, Angles, AngleLandmark, ArmDeviation
+from modules.pose import analytics, Age, Angles, AngleLandmark, ArmDeviation
 
 from apps.white_space.light import LightSettings
 from apps.white_space.pose import HitSync, HitSyncSettings, NeutralWeightSettings, PlayheadOffset
@@ -65,7 +64,7 @@ class FakeBoard:
 class HitSyncTest(unittest.TestCase):
     def setUp(self) -> None:
         self.config = HitSyncSettings()
-        posture = PostureSimilaritySettings()
+        posture = analytics.PostureSimilaritySettings()
         posture.angle_tolerance = 45.0
         self.neutral = NeutralWeightSettings()
         self.board = FakeBoard()
