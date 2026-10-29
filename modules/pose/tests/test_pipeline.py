@@ -4,8 +4,8 @@ import unittest
 from enum import IntEnum
 from functools import partial
 
-from modules.pose.features import Age, BaseFeature
-from modules.pose.frame import Frame, FrameDict, replace
+from modules.pose.features import Age, BaseFeature, MotionTime
+from modules.pose.frame import Frame, FrameDict, GroupRecord, replace, replace_group
 from modules.pose.nodes import FilterNode, GroupNode, InterpolatorNode
 from modules.pose.pipeline import AsyncStep, Domain, GroupStep, Merge, PipelineSpec, PosePipeline, PoseStep, StageSpec
 from modules.pose.window import WindowNodeSettings
@@ -91,6 +91,21 @@ class _Group(GroupNode):
     def process(self, frames: FrameDict) -> FrameDict:
         self.log.append(('group', tuple(sorted(frames)), id(self)))
         return frames
+
+    def reset(self) -> None:
+        self.resets += 1
+
+
+class _Count(GroupNode):
+    """A group step that writes the number of poses it saw as ``Age`` on the record and logs what it ran on."""
+
+    def __init__(self, log: list) -> None:
+        self.log = log
+        self.resets = 0
+
+    def record(self, frames: FrameDict, group: GroupRecord) -> GroupRecord:
+        self.log.append(('record', tuple(sorted(frames)), id(self)))
+        return replace_group(group, {Age: Age.from_value(float(len(frames)))})
 
     def reset(self) -> None:
         self.resets += 1
@@ -256,6 +271,111 @@ class BuildTest(unittest.TestCase):
         pipeline.update(Domain.OUTPUT, 1.0)
         self.assertEqual(group.resets, 1)
         self.assertEqual(out.events, [('lerp', set())])        # the interpolators forgot their targets
+
+
+class GroupRecordTest(unittest.TestCase):
+    """The group record: written by a group step, emitted after the frames, carried to the readers."""
+
+    def test_a_group_step_writes_the_record_from_the_stamped_poses(self) -> None:
+        log: list = []
+        source = _Source([0, 1])
+        pipeline = PosePipeline(PipelineSpec([
+            StageSpec(S.RAW, source, [PoseStep(_Tag, 'a', log), GroupStep(_Count(log)), GroupStep(_Group(log))]),
+        ]))
+        frames_out: list[FrameDict] = []
+        groups: list[GroupRecord] = []
+        pipeline.add_frames_callback(S.RAW, frames_out.append)
+        pipeline.add_group_callback(S.RAW, groups.append)
+        source.emit(_frames(0, 1, t=2.5))
+        self.assertEqual([entry[0] for entry in log], ['a', 'a', 'record', 'group'])
+        self.assertEqual(groups[-1][Age].value, 2.0)
+        self.assertEqual(groups[-1].timestamp, 2.5)                    # stamped with the frames it came with
+        self.assertEqual(set(frames_out[-1]), {0, 1})
+        self.assertEqual(frames_out[-1][0][Age].value, 1.0)           # the tag's stamp, not the record's count
+
+    def test_the_record_leaves_after_the_frames_and_reaches_the_next_stage(self) -> None:
+        order: list[str] = []
+        source = _Source([0])
+        pipeline = PosePipeline(PipelineSpec([
+            StageSpec(S.RAW, source, [GroupStep(_Count([]))]),
+            StageSpec(S.CLEAN, S.RAW, []),
+        ]))
+        groups: list[GroupRecord] = []
+        pipeline.add_frames_callback(S.RAW, lambda _f: order.append('frames'))
+        pipeline.add_group_callback(S.RAW, lambda _g: order.append('record'))
+        pipeline.add_group_callback(S.CLEAN, groups.append)
+        source.emit(_frames(0))
+        self.assertEqual(order, ['frames', 'record'])
+        self.assertEqual(groups[-1][Age].value, 1.0)                   # CLEAN got RAW's record
+
+    def test_a_source_stage_starts_a_fresh_record_on_every_push(self) -> None:
+        source = _Source([0])
+        pipeline = PosePipeline(PipelineSpec([StageSpec(S.RAW, source, [])]))
+        groups: list[GroupRecord] = []
+        pipeline.add_group_callback(S.RAW, groups.append)
+        source.emit(_frames(0))
+        source.emit({})
+        self.assertEqual([len(group) for group in groups], [0, 0])
+
+    def test_the_record_crosses_the_domain_held_and_stamped_with_the_tick(self) -> None:
+        source = _Source([0])
+        pipeline = PosePipeline(PipelineSpec([
+            StageSpec(S.RAW, source, [GroupStep(_Count([]))]),
+            StageSpec(S.LERP, S.RAW, [], domain=Domain.OUTPUT, interpolators=[PoseStep(_Hold)]),
+        ]))
+        groups: list[GroupRecord] = []
+        pipeline.add_group_callback(S.LERP, groups.append)
+        pipeline.update(Domain.OUTPUT, 1.0)
+        self.assertNotIn(Age, groups[-1])                               # nothing has crossed yet
+        self.assertEqual(groups[-1].timestamp, 1.0)
+        source.emit(_frames(0, t=0.5))
+        self.assertEqual(len(groups), 1)                                # the frame domain runs no output stage
+        pipeline.update(Domain.OUTPUT, 2.0)
+        pipeline.update(Domain.OUTPUT, 3.0)
+        self.assertEqual([group[Age].value for group in groups[1:]], [1.0, 1.0])   # held until the next frame
+        self.assertEqual([group.timestamp for group in groups[1:]], [2.0, 3.0])
+
+    def test_an_output_stage_writes_its_own_record_over_the_held_one(self) -> None:
+        source = _Source([0])
+        pipeline = PosePipeline(PipelineSpec([
+            StageSpec(S.RAW, source, [GroupStep(_Count([]))]),
+            StageSpec(S.LERP, S.RAW, [GroupStep(_Count([]))], domain=Domain.OUTPUT, interpolators=[PoseStep(_Hold)]),
+        ]))
+        groups: list[GroupRecord] = []
+        pipeline.add_group_callback(S.LERP, groups.append)
+        source.emit(_frames(0))
+        pipeline.update(Domain.OUTPUT, 1.0)
+        self.assertEqual(groups[-1][Age].value, 1.0)
+        self.assertEqual(groups[-1].timestamp, 1.0)
+
+    def test_the_record_waits_for_the_frames_at_an_async_step(self) -> None:
+        source = _Source([0])
+        node = _Async()
+        pipeline = PosePipeline(PipelineSpec([
+            StageSpec(S.RAW, source, [GroupStep(_Count([])), AsyncStep(node)]),
+        ]))
+        groups: list[GroupRecord] = []
+        pipeline.add_group_callback(S.RAW, groups.append)
+        source.emit(_frames(0, t=4.0))
+        self.assertEqual(groups, [])
+        node.release()
+        self.assertEqual(groups[-1][Age].value, 1.0)
+        self.assertEqual(groups[-1].timestamp, 4.0)
+
+    def test_reset_reaches_the_group_steps_and_forgets_the_held_record(self) -> None:
+        source = _Source([0])
+        count = _Count([])
+        pipeline = PosePipeline(PipelineSpec([
+            StageSpec(S.RAW, source, [GroupStep(count)]),
+            StageSpec(S.LERP, S.RAW, [], domain=Domain.OUTPUT, interpolators=[PoseStep(_Hold)]),
+        ]))
+        groups: list[GroupRecord] = []
+        pipeline.add_group_callback(S.LERP, groups.append)
+        source.emit(_frames(0))
+        pipeline.reset()
+        pipeline.update(Domain.OUTPUT, 1.0)
+        self.assertEqual(count.resets, 1)
+        self.assertNotIn(Age, groups[-1])
 
 
 class RefusalTest(unittest.TestCase):

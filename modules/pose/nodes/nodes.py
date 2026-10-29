@@ -1,7 +1,7 @@
 from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Any, TYPE_CHECKING
-from ..frame import Frame, FrameDict
+from ..frame import Frame, FrameDict, GroupRecord
 
 if TYPE_CHECKING:
     from ..features import BaseFeature
@@ -63,14 +63,20 @@ class InterpolatorNode(NodeBase):
 
 
 class GroupNode(NodeBase):
-    """Base class for group steps: every pose of a frame in, the same poses out, stamped with what
-    the step derives from the group. A group node is built once per stage and runs between the
-    per-pose steps, on the frame's thread; it never adds or removes a pose."""
+    """Base class for group steps: every pose of a frame in, the same poses out, and the group's record.
+    ``process`` stamps the poses with what the step derives from the group (a row per pose); ``record``
+    writes the group record with what belongs to nobody in particular (a level, a gate, this tick's hits).
+    A group node is built once per stage and runs between the per-pose steps, on the frame's thread; it
+    never adds or removes a pose. Override either or both."""
 
-    @abstractmethod
     def process(self, frames: FrameDict) -> FrameDict:
-        """Process all poses of one frame and return them, stamped."""
-        pass
+        """Process all poses of one frame and return them, stamped; unchanged by default."""
+        return frames
+
+    def record(self, frames: FrameDict, group: GroupRecord) -> GroupRecord:
+        """Read the frame's poses (as ``process`` left them) and return the group record, written; unchanged
+        by default."""
+        return group
 
     def reset(self) -> None:
         """most group nodes have no internal state to reset."""
