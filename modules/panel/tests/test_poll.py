@@ -1,4 +1,4 @@
-"""The poll tick: changed values reach their controls, a failing control is logged once and skipped."""
+"""The poll tick: every control is polled, a failing control is logged once and skipped, the others go on."""
 
 import logging
 import unittest
@@ -6,71 +6,55 @@ import unittest
 from ..poll import tick
 
 
-class Source:
-    def __init__(self) -> None:
-        self.a = 1
-        self.b = "x"
+class FakeControl:
+    def __init__(self, name: str, fail: bool = False) -> None:
+        self.settings = self
+        self.name = name
+        self.fail = fail
+        self.polled = 0
+
+    def poll(self) -> None:
+        if self.fail:
+            raise RuntimeError("client gone")
+        self.polled += 1
 
 
 class TestTick(unittest.TestCase):
-    def setUp(self):
-        self.source = Source()
-        self.shown: list[tuple[str, object]] = []
-        self.polls = [
-            (self.source, "a", [self.source.a], lambda v: self.shown.append(("a", v))),
-            (self.source, "b", [self.source.b], lambda v: self.shown.append(("b", v))),
-        ]
-        self.failed: set[int] = set()
-
-    def test_unchanged_values_are_not_shown(self):
-        tick(self.polls, self.failed)
-        self.assertEqual(self.shown, [])
-
-    def test_changed_value_is_shown_once(self):
-        self.source.a = 2
-        tick(self.polls, self.failed)
-        tick(self.polls, self.failed)
-        self.assertEqual(self.shown, [("a", 2)])
-        self.assertEqual(self.polls[0][2], [2])
-
-    def test_a_committed_value_is_not_pushed_back(self):
-        self.source.a = 3
-        self.polls[0][2][0] = 3     # the control recorded what it wrote
-        tick(self.polls, self.failed)
-        self.assertEqual(self.shown, [])
+    def test_every_control_is_polled(self):
+        a, b = FakeControl("a"), FakeControl("b")
+        failed: set[int] = set()
+        tick([a, b], failed)
+        tick([a, b], failed)
+        self.assertEqual((a.polled, b.polled), (2, 2))
+        self.assertEqual(failed, set())
 
     def test_failing_control_is_logged_once_and_the_others_go_on(self):
-        def broken(_v):
-            raise RuntimeError("client gone")
-        self.polls[0] = (self.source, "a", [self.source.a], broken)
-        self.source.a = 2
-        self.source.b = "y"
+        a, b = FakeControl("a", fail=True), FakeControl("b")
+        failed: set[int] = set()
         with self.assertLogs("modules.panel.poll", level=logging.ERROR) as logs:
-            tick(self.polls, self.failed)
+            tick([a, b], failed)
         self.assertEqual(len(logs.records), 1)
-        self.assertIn("Source.a", logs.output[0])
-        self.assertEqual(self.shown, [("b", "y")])
-        self.assertEqual(self.failed, {0})
+        self.assertIn("FakeControl.a", logs.output[0])
+        self.assertEqual(b.polled, 1)
+        self.assertEqual(failed, {0})
 
-        self.source.a = 3
         with self.assertNoLogs("modules.panel.poll", level=logging.ERROR):
-            tick(self.polls, self.failed)
-        self.assertEqual(self.failed, {0})
+            tick([a, b], failed)
+        self.assertEqual(b.polled, 2)
 
     def test_recovered_control_logs_again_on_its_next_failure(self):
-        calls = {"n": 0}
-
-        def flaky(_v):
-            calls["n"] += 1
-            if calls["n"] != 2:
-                raise RuntimeError("client gone")
-        self.polls[0] = (self.source, "a", [self.source.a], flaky)
-        for value in (2, 3, 4):
-            self.source.a = value
-            with self.assertLogs("modules.panel.poll", level=logging.ERROR) if value != 3 \
-                    else self.assertNoLogs("modules.panel.poll", level=logging.ERROR):
-                tick(self.polls, self.failed)
-        self.assertEqual(self.failed, {0})
+        a = FakeControl("a", fail=True)
+        failed: set[int] = set()
+        with self.assertLogs("modules.panel.poll", level=logging.ERROR):
+            tick([a], failed)
+        a.fail = False
+        with self.assertNoLogs("modules.panel.poll", level=logging.ERROR):
+            tick([a], failed)
+        self.assertEqual(failed, set())
+        a.fail = True
+        with self.assertLogs("modules.panel.poll", level=logging.ERROR):
+            tick([a], failed)
+        self.assertEqual(failed, {0})
 
 
 if __name__ == "__main__":

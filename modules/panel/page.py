@@ -12,10 +12,9 @@ from nicegui import ui
 from modules.log_config import LogRingBuffer
 from modules.settings import BaseSettings, Field, Access, Widget, presets
 
-from .controls import (access_css_class, build_action_button, build_control, build_entry,
-                       build_pinned_readout, generate_label)
+from .controls import ActionButton, Control, PinnedReadout, access_css_class, build_control, build_entry, generate_label
 from .log_drawer import LOG_DRAWER_DEFAULT_HEIGHT, build_log_drawer
-from .poll import POLL_INTERVAL, PollEntry, tick
+from .poll import POLL_INTERVAL, tick
 
 logger = logging.getLogger(__name__)
 
@@ -88,17 +87,17 @@ _ACCESS_CLASS_MAP: dict[frozenset, str] = {
     frozenset({Access.INIT, Access.READ, Access.WRITE}): "poser-only-all",
 }
 
-def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=""):
+def _build_settings_body(settings, controls: list[Control], *, depth=0, expansions=None, path=""):
     """Emit the controls for a single Settings instance (no wrapper).
 
     Renders fields strictly in **declaration order** inside a single flex-wrap
     container.  ``field.newline`` inserts a full-width zero-height break element
     that carries the field's access CSS class so it hides with the field.
 
+    *controls* collects the polled controls for the page's timer.
     *depth* tracks nesting level (0 = top, 1+ = child of child).
     *expansions* collects ``ui.expansion`` elements for expand/collapse-all.
     """
-    polls: list[tuple] = []
 
     visible_fields = [
         (field_name, field)
@@ -117,14 +116,14 @@ def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=
             if field.row_label is not None:
                 # The row's title: a fixed width, so the controls of successive rows line up.
                 ui.label(field.row_label).classes(f"{access_css_class(field)} w-24 font-bold")
-            build_entry(settings, field_name, field, polls)
-
-    all_polls.extend(polls)
+            control = build_entry(settings, field_name, field)
+            if control.polled:
+                controls.append(control)
 
     # Children (recursive)
     for child_name, child in settings.children.items():
         if _has_visible_content(child):
-            _build_settings_card(child_name, child, all_polls, depth=depth, expansions=expansions, path=path)
+            _build_settings_card(child_name, child, controls, depth=depth, expansions=expansions, path=path)
 
 
 # Depth-based Quasar background classes (dark mode: increasingly lighter).
@@ -132,7 +131,7 @@ def _build_settings_body(settings, all_polls, *, depth=0, expansions=None, path=
 _DEPTH_BG = ["bg-grey-9", "bg-grey-8", "bg-grey-7", "bg-grey-6", "bg-grey-5"]  # extended for deeper nesting
 
 
-def _build_settings_card(name, settings, all_polls, *, depth=0, expansions=None, path=""):
+def _build_settings_card(name, settings, controls: list[Control], *, depth=0, expansions=None, path=""):
     """Build a card for one Settings instance.
 
     Always renders as a collapsible ``ui.expansion`` at any depth.
@@ -191,7 +190,7 @@ def _build_settings_card(name, settings, all_polls, *, depth=0, expansions=None,
         child_expansions: list = []
 
         _build_settings_body(
-            settings, all_polls,
+            settings, controls,
             depth=depth + 1, expansions=child_expansions, path=key,
         )
 
@@ -357,7 +356,7 @@ def build_page(root: BaseSettings, *, title: str, port: int, on_exit, log_buffer
     # Load UI state (expansion, active tab) from app-scoped file
     _load_expansion_state()
 
-    all_polls: list[PollEntry] = []
+    controls: list[Control] = []    # the polled controls of this client
 
     # -- Responsive CSS via @media (works on all browsers) -----------------
     ui.add_css('''
@@ -376,6 +375,10 @@ def build_page(root: BaseSettings, *, title: str, port: int, on_exit, log_buffer
 
     .poser-source { border-left: 2px solid #26a69a; padding-left: 6px; }
     .poser-synced { border-left: 2px solid #ffa726; padding-left: 6px; }
+
+    /* A number list's inputs as low as the rows of a checklist beside it. */
+    .poser-number-list .q-field--dense .q-field__control, .poser-number-list .q-field--dense .q-field__native,
+    .poser-number-list .q-field--dense .q-field__marginal { height: 24px; min-height: 24px; padding-top: 0; padding-bottom: 0; }
 
     .poser-knob { display: flex; align-items: center; gap: 6px; }
     .poser-knob-caption { display: flex; flex-direction: column; align-items: flex-end; min-width: 56px; max-width: 110px; }
@@ -507,7 +510,8 @@ def build_page(root: BaseSettings, *, title: str, port: int, on_exit, log_buffer
 
         def _collect_pinned(settings: BaseSettings) -> None:
             for field_name, field in settings.fields.items():
-                if field.pinned and field.visible:
+                # a button is in `fields` too; it goes to the actions only
+                if field.pinned and field.visible and field.widget is not Widget.button:
                     pinned_fields.append((settings, field_name, field))
             for action_name, action_field in settings.actions.items():
                 if action_field.pinned and action_field.visible:
@@ -520,8 +524,7 @@ def build_page(root: BaseSettings, *, title: str, port: int, on_exit, log_buffer
         # Render pinned fields above the tabs, scaled down: a controls row (what can be changed)
         # and a status row (what can only be read), status indicators first.
         if pinned_fields or pinned_actions:
-            pinned_polls: list[tuple] = []
-            controls = [p for p in pinned_fields if p[2].access in (Access.WRITE, Access.READWRITE)]
+            pinned_controls = [p for p in pinned_fields if p[2].access in (Access.WRITE, Access.READWRITE)]
             readouts = [p for p in pinned_fields if p[2].access in (Access.READ, Access.INIT)]
             readouts.sort(key=lambda p: p[2].widget is not Widget.status)   # stable: tree order otherwise
             # The frame follows the bar's scaled height (see .poser-pinned in the CSS above).
@@ -539,20 +542,21 @@ def build_page(root: BaseSettings, *, title: str, port: int, on_exit, log_buffer
             })();</script>''')
             with ui.element("div").classes("poser-pinned-frame w-full mt-2"), \
                     ui.column().classes("poser-pinned gap-2 bg-grey-9 rounded px-3 py-2"):
-                if controls or pinned_actions:
+                if pinned_controls or pinned_actions:
                     with ui.row().classes("w-full gap-4 flex-wrap items-end"):
-                        for settings, field_name, field in controls:
-                            build_control(settings, field_name, field, pinned_polls)
+                        for settings, field_name, field in pinned_controls:
+                            control = build_control(settings, field_name, field)
+                            if control.polled:
+                                controls.append(control)
                         for settings, action_name, action_field in pinned_actions:
-                            build_action_button(settings, action_name, action_field)
+                            ActionButton(settings, action_name, action_field)
                 if readouts:
                     with ui.row().classes("w-full gap-3 flex-wrap items-center"):
                         for settings, field_name, field in readouts:
                             if field.widget is Widget.status:
-                                build_control(settings, field_name, field, pinned_polls)
+                                controls.append(build_control(settings, field_name, field))
                             else:
-                                build_pinned_readout(settings, field_name, field, pinned_polls)
-            all_polls.extend(pinned_polls)
+                                controls.append(PinnedReadout(settings, field_name, field))
 
         # Tabs inside the sticky header
         if not tab_entries:
@@ -659,10 +663,10 @@ def build_page(root: BaseSettings, *, title: str, port: int, on_exit, log_buffer
 
     # One timer per client; NiceGUI stops it when the client is gone.
     failed: set[int] = set()
-    ui.timer(POLL_INTERVAL, lambda: tick(all_polls, failed))
+    ui.timer(POLL_INTERVAL, lambda: tick(controls, failed))
 
     if not tab_entries:
-        return len(all_polls)
+        return len(controls)
 
     with ui.tab_panels(tabs, value=tab_map[initial_tab_label]).classes("w-full bg-grey-10 rounded ").style("padding-bottom: 320px;"):
         for label, root_settings in tab_entries:
@@ -675,10 +679,10 @@ def build_page(root: BaseSettings, *, title: str, port: int, on_exit, log_buffer
                 expansions: list = []
 
                 _build_settings_body(
-                    root_settings, all_polls,
+                    root_settings, controls,
                     depth=0, expansions=expansions, path=label,
                 )
 
                 _tab_data[label] = {"panel": panel, "expansions": expansions}
 
-    return len(all_polls)
+    return len(controls)
