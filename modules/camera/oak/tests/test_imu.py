@@ -5,8 +5,8 @@ turn the board mounts it at (`IMU_BOARD_ROLL`). The angles themselves are the co
 import math
 import unittest
 
-from modules.camera import orientation_from_gravity
-from modules.camera.oak.definitions import imu_to_camera, unroll_imu_frame
+from modules.camera import orientation_from_gravity, imu_to_camera, unroll_imu_frame
+from modules.camera.oak.definitions import IMU_BOARD_ROLL
 
 
 def gravity(tilt: float, roll: float) -> tuple[float, float, float]:
@@ -66,13 +66,13 @@ class TestUnrollImuFrame(unittest.TestCase):
     def test_correction_recovers_the_camera_frame(self) -> None:
         for tilt_in in (0.0, 12.0, 16.0):
             for roll_in in (-3.0, 0.0, 3.0, 7.5):
-                tilt, roll = orientation_from_gravity(*unroll_imu_frame(as_imu(gravity(tilt_in, roll_in))))
+                tilt, roll = orientation_from_gravity(*unroll_imu_frame(as_imu(gravity(tilt_in, roll_in)), IMU_BOARD_ROLL))
                 self.assertAlmostEqual(tilt, tilt_in, places=6, msg=f'{tilt_in}/{roll_in}')
                 self.assertAlmostEqual(roll, roll_in, places=6, msg=f'{tilt_in}/{roll_in}')
 
     def test_a_real_tripod_roll_is_not_swallowed(self) -> None:
         """The point of the correction: what is left after the quarter turn is the actual roll."""
-        _, roll = orientation_from_gravity(*unroll_imu_frame(as_imu(gravity(12.0, 4.0))))
+        _, roll = orientation_from_gravity(*unroll_imu_frame(as_imu(gravity(12.0, 4.0)), IMU_BOARD_ROLL))
         self.assertAlmostEqual(roll, 4.0, places=6)
 
     def test_no_offset_is_the_identity(self) -> None:
