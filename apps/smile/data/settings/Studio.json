@@ -225,6 +225,15 @@
       "fps": 30.0
     }
   },
+  "players": {
+    "pool": 30,
+    "recent": 4,
+    "recycle_every": 20.0,
+    "hwdecode": -1,
+    "fps": 20.0,
+    "spread": 0.1,
+    "trail": 0.0
+  },
   "artnet": {
     "active": true,
     "ip": "192.168.0.111",
@@ -240,10 +249,16 @@
     "stream_fps": 10.0,
     "stream_width": 512,
     "music": true,
-    "screen": 3
+    "screen": 3,
+    "page": "https://iaai.tail63e3df.ts.net/"
   },
   "panel": {
     "title": "SMILE",
-    "port": 667
+    "port": 667,
+    "browser": false,
+    "browser_x": 0,
+    "browser_y": 0,
+    "browser_width": 900,
+    "browser_height": 1100
   }
 }
