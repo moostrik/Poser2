@@ -93,40 +93,40 @@ class ArtNetBars:
     Uses threading for continuous updates at configured FPS.
 
     Example:
-        >>> config = ArtNetLedConfig(
+        >>> settings = ArtNetLedConfig(
         ...     ip_address="192.168.1.100",
         ...     num_pixels=90,
         ...     base_universe=0,  # Uses universes 0 and 1
         ...     channel_order=ChannelOrder.GRBW,
         ... )
-        >>> controller = ArtNetLed(config)
+        >>> controller = ArtNetLed(settings)
         >>> controller.start()
         >>>
         >>> # Runtime adjustments
-        >>> config.bar = 0.5    # Half-filled bar
-        >>> config.white = 0.2  # Dim white base
+        >>> settings.bar = 0.5    # Half-filled bar
+        >>> settings.white = 0.2  # Dim white base
         >>>
         >>> controller.stop()
     """
 
-    def __init__(self, config: ArtNetBarsSettings) -> None:
-        self._config: ArtNetBarsSettings = config
+    def __init__(self, settings: ArtNetBarsSettings) -> None:
+        self.settings: ArtNetBarsSettings = settings
         self._lock: Lock = Lock()
 
         # Parse channel order
-        self._channel_indices: tuple[int, int, int, int] = _parse_channel_order(config.channel_order)
+        self._channel_indices: tuple[int, int, int, int] = _parse_channel_order(settings.channel_order)
 
         # Calculate DMX size: single bar × num_pixels × 4 channels (RGBW)
         # Both bars receive the same data on consecutive universes
         self._channels_per_pixel: int = 4
-        self._total_channels: int = config.pixels * self._channels_per_pixel
+        self._total_channels: int = settings.pixels * self._channels_per_pixel
 
         # Initialize ArtNet
         self._artnet: StupidArtnet = StupidArtnet(
-            config.ip_address,
-            config.base_universe,
+            settings.ip_address,
+            settings.base_universe,
             self._total_channels,
-            config.fps,
+            settings.fps,
             True,  # even_packet_size
             False   # broadcast
         )
@@ -144,11 +144,11 @@ class ArtNetBars:
         self._last_periodic_time: float = 0.0
         self._periodic_interval: float = 1.0  # Send at least once per second
 
-        # Bind config changes to trigger immediate update
+        # Bind settings changes to trigger immediate update
         self._setup_watchers()
 
         logger.info("Initialized for %s universes %s/%s, %s pixels/bar",
-                    config.ip_address, config.base_universe, config.base_universe + 1, config.pixels)
+                    settings.ip_address, settings.base_universe, settings.base_universe + 1, settings.pixels)
 
     def start(self) -> None:
         """Start the ArtNet output thread.
@@ -159,10 +159,10 @@ class ArtNetBars:
             return
 
         self._running = True
-        self._thread = Thread(target=self._update_loop, daemon=True, name=f"ArtNetLed-{self._config.ip_address}")
+        self._thread = Thread(target=self._update_loop, daemon=True, name=f"ArtNetLed-{self.settings.ip_address}")
         self._thread.start()
-        if self._config.verbose:
-            logger.info(f"Starting output to {self._config.ip_address}...")
+        if self.settings.verbose:
+            logger.info(f"Starting output to {self.settings.ip_address}...")
 
     def stop(self) -> None:
         """Stop the ArtNet output thread and blackout."""
@@ -180,11 +180,11 @@ class ArtNetBars:
         self._blackout()
 
         # Clean up bindings
-        self._config.unbind_all(self._on_config_change)
-        self._config.unbind(ArtNetBarsSettings.enabled, self._on_enabled_change)  # type: ignore[arg-type]
+        self.settings.unbind_all(self._on_settings_change)
+        self.settings.unbind(ArtNetBarsSettings.enabled, self._on_enabled_change)  # type: ignore[arg-type]
 
-        if self._config.verbose:
-            logger.info(f"Stopped output to {self._config.ip_address}")
+        if self.settings.verbose:
+            logger.info(f"Stopped output to {self.settings.ip_address}")
 
     def set_bar(self, value: float) -> None:
         """Set the bar fill level.
@@ -192,32 +192,32 @@ class ArtNetBars:
         Args:
             value: Bar fill level (0.0-1.0), where 0=empty, 1=full
         """
-        self._config.bar = max(0.0, min(1.0, value))
+        self.settings.bar = max(0.0, min(1.0, value))
 
     def _setup_watchers(self) -> None:
-        """Bind config fields to trigger updates on change."""
+        """Bind settings fields to trigger updates on change."""
         # Bind all fields: mark dirty and wake thread on any change
-        self._config.bind_all(self._on_config_change)
+        self.settings.bind_all(self._on_settings_change)
         # Specific handler for enabled: blackout when disabled
-        self._config.bind(ArtNetBarsSettings.enabled, self._on_enabled_change)  # type: ignore[arg-type]
+        self.settings.bind(ArtNetBarsSettings.enabled, self._on_enabled_change)  # type: ignore[arg-type]
 
     def _on_enabled_change(self, enabled: bool) -> None:
         """Called when enabled state changes."""
         if not enabled:
             self._blackout()
-            if self._config.verbose:
+            if self.settings.verbose:
                 logger.info(f"Output disabled, LEDs blacked out")
 
-    def _on_config_change(self, _=None) -> None:
-        """Called on any config change - mark dirty and wake thread."""
+    def _on_settings_change(self, _=None) -> None:
+        """Called on any settings change - mark dirty and wake thread."""
         self._dirty = True
         self._update_event.set()
 
     def _validate_and_reinit_artnet(self) -> None:
         """Reinitialize ArtNet connection after IP change with validation."""
         # Validate the new IP before reinitializing
-        if not validate_connection(self._config.ip_address, 5568, "ArtNetLed"):
-            logger.warning(f"ArtNetLed WARNING: New IP {self._config.ip_address} is not reachable. Changes saved but output may fail.")
+        if not validate_connection(self.settings.ip_address, 5568, "ArtNetLed"):
+            logger.warning(f"ArtNetLed WARNING: New IP {self.settings.ip_address} is not reachable. Changes saved but output may fail.")
             # Don't return - still reinit so user can fix it later
 
         self._reinit_artnet()
@@ -225,19 +225,19 @@ class ArtNetBars:
     def _update_packet_size(self) -> None:
         """Update packet size when num_pixels changes."""
         with self._lock:
-            self._total_channels = self._config.pixels * self._channels_per_pixel
+            self._total_channels = self.settings.pixels * self._channels_per_pixel
             self._artnet.set_packet_size(self._total_channels)
             self._artnet.clear()  # Sync internal buffer to new packet_size
             self._buffer = bytearray(self._total_channels)
-            if self._config.verbose:
-                logger.info(f"Updated packet size to {self._total_channels} channels ({self._config.pixels} pixels/bar)")
+            if self.settings.verbose:
+                logger.info(f"Updated packet size to {self._total_channels} channels ({self.settings.pixels} pixels/bar)")
 
     def _update_universe(self) -> None:
         """Update universe when it changes."""
         with self._lock:
-            self._artnet.set_universe(self._config.base_universe)
-            if self._config.verbose:
-                logger.info(f"Updated base universe to {self._config.base_universe}/{self._config.base_universe + 1}")
+            self._artnet.set_universe(self.settings.base_universe)
+            if self.settings.verbose:
+                logger.info(f"Updated base universe to {self.settings.base_universe}/{self.settings.base_universe + 1}")
 
     def _reinit_artnet(self) -> None:
         """Full reinitialize for IP or FPS changes (requires new instance)."""
@@ -261,39 +261,39 @@ class ArtNetBars:
                     pass
 
             # Recalculate DMX size (single bar)
-            self._total_channels = self._config.pixels * self._channels_per_pixel
+            self._total_channels = self.settings.pixels * self._channels_per_pixel
             self._buffer = bytearray(self._total_channels)
 
             # Recreate ArtNet instance
             self._artnet = StupidArtnet(
-                self._config.ip_address,
-                self._config.base_universe,
+                self.settings.ip_address,
+                self.settings.base_universe,
                 self._total_channels,
-                self._config.fps,
+                self.settings.fps,
                 True,  # even_packet_size
                 False   # broadcast
             )
 
-            if self._config.verbose:
+            if self.settings.verbose:
                 logger.info("Recreated instance for %s universes %s/%s, %s pixels/bar, %s channels, %s fps",
-                            self._config.ip_address, self._config.base_universe, self._config.base_universe + 1,
-                            self._config.pixels, self._total_channels, self._config.fps)
+                            self.settings.ip_address, self.settings.base_universe, self.settings.base_universe + 1,
+                            self.settings.pixels, self._total_channels, self.settings.fps)
 
         # Restart if it was running
         if was_running:
             self._running = True
-            self._thread = Thread(target=self._update_loop, daemon=True, name=f"ArtNetLed-{self._config.ip_address}")
+            self._thread = Thread(target=self._update_loop, daemon=True, name=f"ArtNetLed-{self.settings.ip_address}")
             self._thread.start()
-            if self._config.verbose:
+            if self.settings.verbose:
                 logger.info(f"Restarted output thread")
 
     def _reinit_channel_order(self) -> None:
         """Update channel order parsing."""
         with self._lock:
             try:
-                self._channel_indices = _parse_channel_order(self._config.channel_order)
-                if self._config.verbose:
-                    logger.info(f"Channel order updated to {self._config.channel_order.name}")
+                self._channel_indices = _parse_channel_order(self.settings.channel_order)
+                if self.settings.verbose:
+                    logger.info(f"Channel order updated to {self.settings.channel_order.name}")
             except ValueError as e:
                 logger.warning(f"Invalid channel order - {e}")
 
@@ -305,10 +305,10 @@ class ArtNetBars:
                 self._buffer[i] = 0
 
         # Send black frame to both universes
-        self._artnet.set_universe(self._config.base_universe)
+        self._artnet.set_universe(self.settings.base_universe)
         self._artnet.set(self._buffer)
         self._artnet.show()
-        self._artnet.set_universe(self._config.base_universe + 1)
+        self._artnet.set_universe(self.settings.base_universe + 1)
         self._artnet.show()
 
     def _set_pixel(self, pixel_index: int, r: int, g: int, b: int, w: int) -> None:
@@ -332,13 +332,13 @@ class ArtNetBars:
         Both bars receive identical data (sent to consecutive universes).
         Bar fills from bottom (pixel 0) upward.
         """
-        num_pixels: int = self._config.pixels
-        bar_value: float = self._config.bar
-        white_intensity: float = self._config.white_strength
-        color_intensity: float = self._config.color_strength
+        num_pixels: int = self.settings.pixels
+        bar_value: float = self.settings.bar
+        white_intensity: float = self.settings.white_strength
+        color_intensity: float = self.settings.color_strength
 
         # Get accent color RGB (0-255 range)
-        c = self._config.color
+        c = self.settings.color
         accent_r = int(c.r * 255)
         accent_g = int(c.g * 255)
         accent_b = int(c.b * 255)
@@ -368,19 +368,19 @@ class ArtNetBars:
 
     def _send_frame(self) -> None:
         """Send current buffer via ArtNet to both universes."""
-        if self._config.enabled:
+        if self.settings.enabled:
             # Send to first universe (left bar)
-            self._artnet.set_universe(self._config.base_universe)
+            self._artnet.set_universe(self.settings.base_universe)
             self._artnet.set(self._buffer)
             self._artnet.show()
             # Send to second universe (right bar) - same data
-            self._artnet.set_universe(self._config.base_universe + 1)
+            self._artnet.set_universe(self.settings.base_universe + 1)
             self._artnet.show()
 
     def _update_loop(self) -> None:
         """Background thread loop for continuous updates."""
         # Validate network and IP before starting
-        if not validate_connection(self._config.ip_address, 5568, "ArtNetLed"):
+        if not validate_connection(self.settings.ip_address, 5568, "ArtNetLed"):
             self._running = False
             return
 
@@ -399,11 +399,11 @@ class ArtNetBars:
                     with self._lock:
                         self._compute_frame()
                     self._dirty = False
-                    # Send outside lock to avoid blocking config updates during I/O
+                    # Send outside lock to avoid blocking settings updates during I/O
                     self._send_frame()
 
-                # Wait for next frame or config change
-                frame_time: float = 1.0 / self._config.fps
+                # Wait for next frame or settings change
+                frame_time: float = 1.0 / self.settings.fps
                 self._update_event.wait(timeout=frame_time)
                 self._update_event.clear()
             except socket.error as e:
@@ -421,10 +421,5 @@ class ArtNetBars:
         if self._running:
             self.stop()
         else:
-            self._config.unbind_all(self._on_config_change)
-            self._config.unbind(ArtNetBarsSettings.enabled, self._on_enabled_change)  # type: ignore[arg-type]
-
-    @property
-    def config(self) -> ArtNetBarsSettings:
-        """Access the configuration object."""
-        return self._config
+            self.settings.unbind_all(self._on_settings_change)
+            self.settings.unbind(ArtNetBarsSettings.enabled, self._on_enabled_change)  # type: ignore[arg-type]

@@ -57,8 +57,8 @@ class Extractor:
     All tensors are float16 RGB CHW [0, 1] at a fixed output resolution.
     """
 
-    def __init__(self, config: Settings) -> None:
-        self._config = config
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
         self._callbacks: list[ImageCallback] = []       # run in registration order
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
 
@@ -79,7 +79,7 @@ class Extractor:
         crop_images: ImageDict = {}
         pose_count = 0
         # Live settings, read once so every pose in this batch is cropped with the same padding.
-        zoom: float = 1.0 + self._config.padding
+        zoom: float = 1.0 + self.settings.padding
 
         with torch.cuda.stream(self._stream):
             for pose_id, pose in poses.items():
@@ -87,9 +87,9 @@ class Extractor:
                 if cam_id not in images:
                     continue
 
-                if pose_count >= self._config.max_poses:
+                if pose_count >= self.settings.max_poses:
                     logger.warning(
-                        f"Exceeded max poses ({self._config.max_poses}), skipping {pose_id}"
+                        f"Exceeded max poses ({self.settings.max_poses}), skipping {pose_id}"
                     )
                     continue
 
@@ -101,7 +101,7 @@ class Extractor:
                     crop_tensor = self._gpu_crop_resize(gpu_image, crop_roi, img_width, img_height)
 
                     prev_crop: torch.Tensor | None = None
-                    if self._config.enable_prev_crop and cam_id in prev_images:
+                    if self.settings.enable_prev_crop and cam_id in prev_images:
                         prev_img = prev_images[cam_id]
                         prev_h, prev_w = prev_img.shape[1:3]
                         prev_crop = self._gpu_crop_resize(prev_img, crop_roi, prev_w, prev_h)
@@ -128,7 +128,7 @@ class Extractor:
     def _calculate_crop_roi(self, bbox_rect: Rect, img_width: int, img_height: int) -> Rect:
         image_rect = Rect(0.0, 0.0, float(img_width), float(img_height))
         roi = bbox_rect.affine_transform(image_rect)
-        crop_roi = Rect(0, 0, self._config.output_width, self._config.output_height)
+        crop_roi = Rect(0, 0, self.settings.output_width, self.settings.output_height)
         return crop_roi.aspect_fill(roi)
 
     def _gpu_crop_resize(self, src: torch.Tensor, roi: Rect, src_w: int, src_h: int) -> torch.Tensor:
@@ -139,7 +139,7 @@ class Extractor:
 
         if x1 >= x2 or y1 >= y2:
             return torch.zeros(
-                (3, self._config.output_height, self._config.output_width),
+                (3, self.settings.output_height, self.settings.output_width),
                 device='cuda', dtype=torch.float16,
             )
 
@@ -154,12 +154,12 @@ class Extractor:
             crop_chw = F.pad(crop_chw, (pad_left, pad_right, pad_top, pad_bottom), mode='constant', value=0)
 
         crop_h, crop_w = crop_chw.shape[1], crop_chw.shape[2]
-        if crop_h != self._config.output_height or crop_w != self._config.output_width:
+        if crop_h != self.settings.output_height or crop_w != self.settings.output_width:
             # Antialiased: a crop is usually larger than the output, and plain bilinear would sample
             # only a 2×2 neighbourhood of each output pixel and alias. No effect when enlarging.
             crop_chw = F.interpolate(
                 crop_chw.unsqueeze(0),
-                size=(self._config.output_height, self._config.output_width),
+                size=(self.settings.output_height, self.settings.output_width),
                 mode='bilinear',
                 align_corners=False,
                 antialias=True,

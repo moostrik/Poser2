@@ -39,17 +39,17 @@ class OscSound:
     """
     def __init__(self, settings: OscSoundSettings) -> None:
 
-        self._config: OscSoundSettings = settings
+        self.settings: OscSoundSettings = settings
         self._poses: FrameDict = {}
         self._seq_state: SequencerState | None = None
         self._input_lock: Lock = Lock()
         self._client_lock: Lock = Lock()
-        self._client: SimpleUDPClient = SimpleUDPClient(self._config.ip_addresses, self._config.port)
+        self._client: SimpleUDPClient = SimpleUDPClient(self.settings.ip_addresses, self.settings.port)
 
-        logger.info(f"SoundOSC client initialized to {self._config.ip_addresses}:{self._config.port}")
+        logger.info(f"SoundOSC client initialized to {self.settings.ip_addresses}:{self.settings.port}")
 
-        self._config.bind(OscSoundSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
-        self._config.bind(OscSoundSettings.port, self._on_connection_change)          # type: ignore[arg-type]
+        self.settings.bind(OscSoundSettings.ip_addresses, self._on_connection_change)  # type: ignore[arg-type]
+        self.settings.bind(OscSoundSettings.port, self._on_connection_change)          # type: ignore[arg-type]
 
         # Send-interval measurement (rolling window of inter-send gaps).
         self._last_send_time: float | None = None
@@ -59,7 +59,7 @@ class OscSound:
         self._update_event: Event = Event()
         self._thread: Thread | None = None
         # Throttle: only send a player's inactive reset for the first 2 ticks after it disappears.
-        self._inactive_counts: dict[int, int] = {id: 0 for id in range(self._config.max_players)}
+        self._inactive_counts: dict[int, int] = {id: 0 for id in range(self.settings.max_players)}
 
     @property
     def running(self) -> bool:
@@ -67,7 +67,7 @@ class OscSound:
 
     def set_frames(self, stage: int, poses: FrameDict) -> None:
         """Push new pose data and trigger a send if stage matches."""
-        if stage != self._config.stage:
+        if stage != self.settings.stage:
             return
         with self._input_lock:
             self._poses = dict(poses)
@@ -102,7 +102,7 @@ class OscSound:
     def _run(self) -> None:
         """Main loop for sending OSC data at regular intervals"""
         # Validate network and IP before starting
-        if not validate_connection(self._config.ip_addresses, self._config.port, "OscSound"):
+        if not validate_connection(self.settings.ip_addresses, self.settings.port, "OscSound"):
             self._running = False
             return
 
@@ -129,9 +129,9 @@ class OscSound:
         self._last_send_time = now
         if self._interval_samples:
             samples = np.fromiter(self._interval_samples, dtype=float)
-            self._config.interval_mean_ms = float(samples.mean() * 1000.0)
-            self._config.interval_min_ms = float(samples.min() * 1000.0)
-            self._config.interval_max_ms = float(samples.max() * 1000.0)
+            self.settings.interval_mean_ms = float(samples.mean() * 1000.0)
+            self.settings.interval_min_ms = float(samples.min() * 1000.0)
+            self.settings.interval_max_ms = float(samples.max() * 1000.0)
 
     def _send_data(self) -> None:
         with self._input_lock:
@@ -147,18 +147,18 @@ class OscSound:
         """
         bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
         self._add_global_messages(bundle, {}, None)  # no frames, None → zeroed globals
-        num_players = self._config.max_players
+        num_players = self.settings.max_players
         for id in range(num_players):
             self._add_inactive_frame_messages(bundle, id, num_players)
-        self._config.active_players = 0
+        self.settings.active_players = 0
         self._send_bundle(bundle)
 
     def _build_bundle(self, frames: FrameDict, seq_state: SequencerState | None) -> OscBundleBuilder:
         bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
         self._add_global_messages(bundle, frames, seq_state)
 
-        num_players = self._config.max_players
-        self._config.active_players = sum(1 for id in range(num_players) if id in frames)
+        num_players = self.settings.max_players
+        self.settings.active_players = sum(1 for id in range(num_players) if id in frames)
 
         for id in range(num_players):
             if id in frames:
@@ -178,8 +178,8 @@ class OscSound:
 
     def _on_connection_change(self, _=None) -> None:
         with self._client_lock:
-            self._client = SimpleUDPClient(self._config.ip_addresses, self._config.port)
-        logger.info(f"Reconnected to {self._config.ip_addresses}:{self._config.port}")
+            self._client = SimpleUDPClient(self.settings.ip_addresses, self.settings.port)
+        logger.info(f"Reconnected to {self.settings.ip_addresses}:{self.settings.port}")
 
     def _add_global_messages(self, bundle_builder: OscBundleBuilder, frames: FrameDict, seq_state: SequencerState | None) -> None:
         """Tick-wide messages, built from the tick's frames and sequencer state. A None
