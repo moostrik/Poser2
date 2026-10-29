@@ -13,6 +13,7 @@ Uses a lock to serialize all access, preventing concurrent set_target() and upda
 
 # Standard library imports
 from abc import ABC, abstractmethod
+from enum import IntEnum
 from threading import Lock
 from typing import TypeVar, Generic, Protocol
 from collections import defaultdict
@@ -27,10 +28,19 @@ from ...frame import Frame, replace
 from modules.settings import BaseSettings, Field
 
 
+class TickStep(IntEnum):
+    """How far an interpolator advances on a tick."""
+    FIXED    = 0     # one output interval, whenever the tick comes: steady on a regular output clock
+    MEASURED = 1     # the time since the previous tick: a late tick moves further, a stall all the way
+    CAPPED   = 2     # the time since the previous tick, at most one input frame: a stall moves one frame
+
+
 class InterpolatorSettingsBase(BaseSettings):
-    """Base config for interpolators with input/output frequency settings."""
+    """Base config for interpolators: the input rate (the horizon the chase aims at), the output rate of a fixed
+    step and the step mode."""
     input_frequency:  Field[float] = Field(30.0, access=Field.INIT)
     output_frequency: Field[float] = Field(60.0)
+    step: Field[TickStep] = Field(TickStep.FIXED, description="A tick's step: one output interval, the time since the previous tick, or that capped at one input frame")
 
 
 # Generic type variable for settings
@@ -71,7 +81,11 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[SettingsType]):
         self._feature_type: type[BaseFeature] = feature_type
         self._lock: Lock = Lock()
         self._last_pose: Frame | None = None
+        self._last_now: float | None = None                           # the previous tick's stamp; None before the first
+        self._max_dt: float = 1.0 / settings.input_frequency          # one input frame: the cap of a CAPPED step
+        self._step: TickStep = TickStep.FIXED
         self._output_interval: float = 1.0 / settings.output_frequency
+        self._read_step()
         self._interpolator: InterpolatorProtocol = self._create_interpolator()
         self.settings.bind_all(self._on_settings_changed)
 
@@ -87,10 +101,25 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[SettingsType]):
         """Create the underlying interpolator instance."""
         pass
 
-    @abstractmethod
     def _on_settings_changed(self, _=None) -> None:
-        """Handle configuration changes by updating interpolator parameters."""
-        pass
+        """Handle configuration changes by updating interpolator parameters; subclasses extend it."""
+        with self._lock:
+            self._read_step()
+
+    def _read_step(self) -> None:
+        """Cache the step mode and the fixed step's interval; called under the lock after construction."""
+        self._step = TickStep(int(self.settings.step))
+        self._output_interval = 1.0 / self.settings.output_frequency
+
+    def _dt(self, now: float) -> float:
+        """The step of the tick ``now`` by the step mode; records the tick for the next."""
+        previous, self._last_now = self._last_now, now
+        if self._step == TickStep.FIXED:
+            return self._output_interval
+        if previous is None:                                           # the first tick after a set or a reset
+            return 0.0                                                 # moves nothing: the target was taken at once
+        dt = now - previous
+        return min(dt, self._max_dt) if self._step == TickStep.CAPPED else dt
 
     def is_ready(self) -> bool:
         """Check if the generator is ready to produce a pose."""
@@ -109,20 +138,20 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[SettingsType]):
             self._interpolator.set_target(feature_data.values)
             self._last_pose = pose
 
-    def update(self) -> Frame | None:
-        """Update and return interpolated pose. Call at render frequency (e.g., 60+ FPS).
-
-        Uses the configured output_frequency to determine the time delta.
+    def update(self, now: float) -> Frame | None:
+        """The interpolated pose at the tick ``now``, advanced by the step of the settings' ``step`` mode: one output
+        interval (FIXED), the time since the previous tick (MEASURED) or that capped at one input frame (CAPPED).
+        Call on the output clock.
 
         Returns:
-            Interpolated pose, or None if submit() has not been called yet.
+            Interpolated pose, or None if set() has not been called yet.
         """
         with self._lock:
             if self._last_pose is None:
                 return None
             last_pose = self._last_pose
 
-            self._interpolator.update(self._output_interval)
+            self._interpolator.update(self._dt(now))
             interpolated_values: np.ndarray = self._interpolator.value
 
         feature_data = last_pose[self._feature_type]
@@ -144,4 +173,5 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[SettingsType]):
         """Reset the interpolator's internal state."""
         with self._lock:
             self._last_pose = None
+            self._last_now = None
             self._interpolator.reset()

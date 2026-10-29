@@ -31,7 +31,7 @@ class InterpolatorPipeline:
         """Collect and merge interpolated features from all nodes into one frame stamped ``now``."""
         pose: Frame | None = None
         for node in self._nodes:
-            interpolated: Frame | None = node.update()
+            interpolated: Frame | None = node.update(now)
             if interpolated is not None:
                 if pose is None:
                     pose = interpolated

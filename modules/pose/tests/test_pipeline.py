@@ -120,7 +120,7 @@ class _Hold(InterpolatorNode):
     def set(self, pose: Frame | None) -> None:
         self._pose = pose
 
-    def update(self) -> Frame | None:
+    def update(self, now: float) -> Frame | None:
         return self._pose
 
     def reset(self) -> None:

@@ -51,8 +51,10 @@ class InterpolatorNode(NodeBase):
         pass
 
     @abstractmethod
-    def update(self) -> Frame | None:
-        """Get interpolated pose. Called at render frequency (~60+ FPS). Returns None if not ready."""
+    def update(self, now: float) -> Frame | None:
+        """The interpolated pose at the tick ``now`` (the tick's stamp, ``perf_counter``): the node advances by
+        its step, a fixed output interval or the time since its previous tick, as its settings say. Called on the
+        output clock. Returns None if not ready."""
         pass
 
     @property
