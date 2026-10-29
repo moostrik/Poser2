@@ -76,7 +76,7 @@ class Fluid3DLayer(LayerBase):
     Usage:
         # In RenderManager:
         flow_layers = {i: FlowLayer(...) for i in range(num_cams)}
-        fluid3d = Fluid3DLayer(cam_id, board, flow_layers, colors, config)
+        fluid3d = Fluid3DLayer(cam_id, board, flow_layers, colors, settings)
 
         # Each frame:
         fluid3d.update()
@@ -96,7 +96,7 @@ class Fluid3DLayer(LayerBase):
         self._cam_id: int = cam_id
         self._board: HasFrames = board
         self._flow_layers: dict[int, FlowLayer] = flow_layers
-        self.config: Fluid3DLayerSettings = settings or Fluid3DLayerSettings()
+        self.settings: Fluid3DLayerSettings = settings or Fluid3DLayerSettings()
         self._color_settings: ColorSettings = color_settings
 
         # Simulation engine (swappable at runtime)
@@ -113,14 +113,14 @@ class Fluid3DLayer(LayerBase):
         self._eye_y: float = 0.0
 
         # Defer engine swap to GL thread (callbacks fire from websocket thread)
-        self.config.bind(Fluid3DLayerSettings.sim_engine, lambda _: self._request_swap_engine())
+        self.settings.bind(Fluid3DLayerSettings.sim_engine, lambda _: self._request_swap_engine())
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     def _create_engine(self) -> FluidFlow | FluidFlow3D:
-        """Instantiate the selected simulation engine with the shared config."""
-        cls = _ENGINE_CLASSES[self.config.sim_engine]
-        return cls(self.config.fluid_flow)
+        """Instantiate the selected simulation engine with the shared settings."""
+        cls = _ENGINE_CLASSES[self.settings.sim_engine]
+        return cls(self.settings.fluid_flow)
 
     def _request_swap_engine(self) -> None:
         """Request engine swap (deferred to next update on GL thread)."""
@@ -184,19 +184,19 @@ class Fluid3DLayer(LayerBase):
             self._swap_engine()
 
         # Get motion data from pose
-        pose: Frame | None = self._board.get_frame(self.config.stage, self._cam_id)
+        pose: Frame | None = self._board.get_frame(self.settings.stage, self._cam_id)
         similarities: np.ndarray = (
             np.nan_to_num(pose[Similarity].values) if pose is not None and Similarity in pose
-            else np.full((self.config.num_players,), 0.0)
+            else np.full((self.settings.num_players,), 0.0)
         )
         motion_gates: np.ndarray = (
             pose[MotionGate].values if pose is not None and MotionGate in pose
-            else np.full((self.config.num_players,), 0.0)
+            else np.full((self.settings.num_players,), 0.0)
         )
         motion: float = pose[AngleMotion].value if pose is not None and AngleMotion in pose else 0.0
         m_s = similarities
 
-        # self.config.fluid_flow.density.fade_time = 18.0 - (pow(motion, 2.0) * 14.0)
+        # self.settings.fluid_flow.density.fade_time = 18.0 - (pow(motion, 2.0) * 14.0)
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
@@ -250,7 +250,7 @@ class Fluid3DLayer(LayerBase):
                 target_x = (float(head[0]) - 0.5) * 2.0
                 target_y = float(head[1]) - 0.5
         # ~0.4 s ease keeps keypoint jitter out of the eye (render thread only)
-        dt = 1.0 / max(1, self.config.fluid_flow.fps)
+        dt = 1.0 / max(1, self.settings.fluid_flow.fps)
         k = 1.0 - 0.01 ** (dt / 0.4)
         self._eye_x += (target_x - self._eye_x) * k
         self._eye_y += (target_y - self._eye_y) * k
@@ -261,10 +261,10 @@ class Fluid3DLayer(LayerBase):
     def draw(self) -> None:
         """Draw with configured blend mode."""
         Style.push_style()
-        Style.set_blend_mode(self.config.blend_mode)
+        Style.set_blend_mode(self.settings.blend_mode)
         if self.texture.allocated:
             Blit.use(self.texture)
-        if self.config.fluid_flow.depth.debug_depth and self._legend_text.allocated:
+        if self.settings.fluid_flow.depth.debug_depth and self._legend_text.allocated:
             self._draw_depth_legend()
         Style.pop_style()
 

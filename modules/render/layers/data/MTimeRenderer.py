@@ -15,8 +15,8 @@ class MTimeRendererSettings(BaseSettings):
 
 
 class MTimeRenderer(LayerBase):
-    def __init__(self, track_id: int, board: HasFrames, config: MTimeRendererSettings | None = None) -> None:
-        self._config: MTimeRendererSettings = config or MTimeRendererSettings()
+    def __init__(self, track_id: int, board: HasFrames, settings: MTimeRendererSettings | None = None) -> None:
+        self.settings: MTimeRendererSettings = settings or MTimeRendererSettings()
         self._board: HasFrames = board
         self._track_id: int = track_id
         self._motion_time: str | None = None
@@ -53,7 +53,7 @@ class MTimeRenderer(LayerBase):
         )
 
     def update(self) -> None:
-        pose: Frame | None = self._board.get_frame(self._config.stage, self._track_id)
+        pose: Frame | None = self._board.get_frame(self.settings.stage, self._track_id)
 
         if pose is None:
             self._motion_time = None

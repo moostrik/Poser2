@@ -49,10 +49,10 @@ class MSColorMaskLayer(LayerBase):
         self._board: HasFrames = board
         self._mask_textures: dict[int, Texture] = mask_textures
         self._frg_texture: Texture = frg_texture
-        self.config: ColorMaskLayerSettings = settings
+        self.settings: ColorMaskLayerSettings = settings
         self._color_settings: ColorSettings = color_settings
 
-        self._tint_fbos: list[Fbo] = [Fbo() for _ in range(self.config.num_players)]
+        self._tint_fbos: list[Fbo] = [Fbo() for _ in range(self.settings.num_players)]
         self._blend_fbo: SwapFbo = SwapFbo()
         self._output_fbo: Fbo = Fbo()
 
@@ -105,22 +105,22 @@ class MSColorMaskLayer(LayerBase):
             Step 3: MSColorMask(own styled, other masks, colors, weights) → _fbo
         """
         # Get pose data for this camera
-        pose: Frame | None = self._board.get_frame(self.config.stage, self._cam_id)
-        active_poses = len(self._board.get_frames(self.config.stage))
+        pose: Frame | None = self._board.get_frame(self.settings.stage, self._cam_id)
+        active_poses = len(self._board.get_frames(self.settings.stage))
 
         # Extract similarity and motion data
-        num_players = self.config.num_players
+        num_players = self.settings.num_players
         similarities: np.ndarray = np.nan_to_num(pose[Similarity].values) if pose is not None else np.zeros(num_players, dtype=np.float32)
         motion_gates: np.ndarray = pose[MotionGate].values if pose is not None else np.zeros(num_players, dtype=np.float32)
         motion: float = pose[AngleMotion].value if pose is not None else 0.0
         motion = easeInOutSine(motion)
 
         # Apply similarity threshold and exponent
-        threshold = self.config.similarity_threshold
-        exponent = self.config.motion_exponent
+        threshold = self.settings.similarity_threshold
+        exponent = self.settings.motion_exponent
         similarities = np.clip((similarities - threshold) / (1.0 - threshold), 0.0, 1.0)
         similarities = np.power(similarities, exponent)
-        motion_similarities = similarities * self.config.similarity_scale
+        motion_similarities = similarities * self.settings.similarity_scale
         # print(motion)
 
         # Foreground blend: 0 if single person, otherwise Nth highest similarity
@@ -181,7 +181,7 @@ class MSColorMaskLayer(LayerBase):
 
         self._output_fbo.begin()
         # Blit.use(self._blend_fbo)
-        self._shader.use(styled_textures, weights, self.config.layered)
+        self._shader.use(styled_textures, weights, self.settings.layered)
         self._output_fbo.end()
 
         Style.pop_style()
@@ -191,6 +191,6 @@ class MSColorMaskLayer(LayerBase):
     def draw(self) -> None:
         """Draw with configured blend mode."""
         Style.push_style()
-        Style.set_blend_mode(self.config.blend_mode)
+        Style.set_blend_mode(self.settings.blend_mode)
         Blit.use(self._output_fbo)
         Style.pop_style()

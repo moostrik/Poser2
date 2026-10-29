@@ -78,7 +78,7 @@ class FluidLayer(LayerBase):
     Usage:
         # In RenderManager:
         flow_layers = {i: FlowLayer(...) for i in range(num_cams)}
-        fluid = FluidLayer(cam_id, board, flow_layers, colors, config)
+        fluid = FluidLayer(cam_id, board, flow_layers, colors, settings)
 
         # Each frame:
         fluid.update()
@@ -93,7 +93,7 @@ class FluidLayer(LayerBase):
             board: Board for pose data
             flow_layers: Dict of all FlowLayers (cam_id -> FlowLayer)
             color_settings: Shared color settings for density colorization
-            config: Layer configuration
+            settings: Layer configuration
         """
         self._cam_id: int = cam_id
         self._board: HasFrames = board

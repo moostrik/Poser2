@@ -78,8 +78,8 @@ class LayerMode(IntEnum):
     WINDOW =    auto()
 
 
-class DataLayerConfig(Protocol):
-    """Structural config a data layer reads. `DataLayerSettings` satisfies it, and so can an
+class DataLayerSettingsProtocol(Protocol):
+    """Structural settings a data layer reads. `DataLayerSettings` satisfies it, and so can an
     app-local settings class whose `feature_field` is a different IntEnum (keys into the
     layer's `feature_map`). Lets the generic layers serve app-owned dropdowns without
     depending on the module-global feature enum."""

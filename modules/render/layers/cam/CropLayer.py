@@ -17,8 +17,8 @@ class CropSettings(BaseSettings):
 
 
 class CropLayer(LayerBase):
-    def __init__(self, track_id: int, board: HasFrames, cam_texture: Texture, config: CropSettings | None = None) -> None:
-        self._config: CropSettings = config or CropSettings()
+    def __init__(self, track_id: int, board: HasFrames, cam_texture: Texture, settings: CropSettings | None = None) -> None:
+        self.settings: CropSettings = settings or CropSettings()
         self._track_id: int = track_id
         self._board: HasFrames = board
         self._fbo: Fbo = Fbo()
@@ -41,7 +41,7 @@ class CropLayer(LayerBase):
         self._roi_shader.deallocate()
 
     def update(self) -> None:
-        pose: Frame | None = self._board.get_frame(self._config.stage, self._track_id)
+        pose: Frame | None = self._board.get_frame(self.settings.stage, self._track_id)
         self._data_cache.update(pose)
 
         if self._data_cache.lost:

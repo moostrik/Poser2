@@ -17,7 +17,7 @@ class VorticityForce(Shader):
         Args:
             curl: Curl magnitude field (R32F)
             obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
-            grid_scale: Grid spacing (derived from config width / output width)
+            grid_scale: Grid spacing (derived from settings width / output width)
             aspect: Aspect ratio (width/height) for isotropic derivatives
             timestep: Vorticity timestep (controls turbulence strength)
             has_obstacles: When False, skip obstacle texture reads for performance

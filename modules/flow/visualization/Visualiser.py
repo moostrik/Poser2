@@ -22,27 +22,22 @@ class Visualizer:
     - RG (2 channels): Velocity field visualization
     - R (1 channel): Direct draw (or temperature field in future)
 
-    For RG textures, access velocity_field.config.toggle_scalar to switch modes.
+    For RG textures, access velocity_field.settings.toggle_scalar to switch modes.
     RG textures are always visualized since raw output can contain negatives.
     """
 
-    def __init__(self, config: VisualisationFieldSettings | None = None) -> None:
-        self._config: VisualisationFieldSettings = config or VisualisationFieldSettings()
-        self._config.bind_all(lambda v: self._on_config_changed())
+    def __init__(self, settings: VisualisationFieldSettings | None = None) -> None:
+        self.settings: VisualisationFieldSettings = settings or VisualisationFieldSettings()
+        self.settings.bind_all(lambda v: self._on_settings_changed())
 
         # Velocity visualization for 2-channel data
-        self.velocity_field: VelocityField = VelocityField(self._config)
+        self.velocity_field: VelocityField = VelocityField(self.settings)
 
         self._allocated: bool = False
         self._current_texture: Texture | None = None
         self._use_velocity_field: bool = False
 
         # hot_reload = HotReloadMethods(self.__class__, True, True)
-
-    @property
-    def config(self) -> VisualisationFieldSettings:
-        """Get visualization configuration."""
-        return self._config
 
     def allocate(self, width: int, height: int) -> None:
         """Allocate visualization resources.
@@ -87,7 +82,7 @@ class Visualizer:
         if num_channels <= 2:
             self._use_velocity_field = True
             # Sync scale with velocity visualization
-            self.velocity_field.config.scale = self._config.scale
+            self.velocity_field.settings.scale = self.settings.scale
 
             # Render visualization to FBO
             self.velocity_field.set(texture)
@@ -96,6 +91,6 @@ class Visualizer:
             # RGB/RGBA (3-4 channels): passthrough, no FBO needed
             self._use_velocity_field = False
 
-    def _on_config_changed(self) -> None:
-        """Handle config changes."""
-        pass  # Config changes are applied during update()
+    def _on_settings_changed(self) -> None:
+        """Handle settings changes."""
+        pass  # Settings changes are applied during update()

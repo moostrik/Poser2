@@ -24,7 +24,7 @@ from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture, SwapFbo, Fbo, Profiler
 from .. import FlowUtil
-from .fluid_config import FluidFlowSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings, BoundaryMode
+from .fluid_settings import FluidFlowSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings, BoundaryMode
 from .shaders import (
     Advect, Divergence, Gradient,
     JacobiPressure, JacobiPressureCompute, JacobiDiffusion, JacobiDiffusionCompute,
@@ -65,8 +65,8 @@ class FluidFlow:
         buoyancy:         Fbo RG16F
     """
 
-    def __init__(self, config: FluidFlowSettings | None = None) -> None:
-        self.config: FluidFlowSettings = config or FluidFlowSettings()
+    def __init__(self, settings: FluidFlowSettings | None = None) -> None:
+        self.settings: FluidFlowSettings = settings or FluidFlowSettings()
 
         # ---- Simulation dimensions and state ---
         self._simulation_width: int = 0
@@ -130,14 +130,14 @@ class FluidFlow:
         )
 
         # Bind settings actions
-        self.config.bind(FluidFlowSettings.reset_sim, lambda _: self._request_reset())
-        self.config.bind(FluidFlowSettings.width, lambda _: self._request_reallocate())
-        self.config.bind(FluidFlowSettings.height, lambda _: self._request_reallocate())
-        self.config.bind(FluidFlowSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
+        self.settings.bind(FluidFlowSettings.reset_sim, lambda _: self._request_reset())
+        self.settings.bind(FluidFlowSettings.width, lambda _: self._request_reallocate())
+        self.settings.bind(FluidFlowSettings.height, lambda _: self._request_reallocate())
+        self.settings.bind(FluidFlowSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
         mark_boundary = lambda _: setattr(self, '_boundary_dirty', True)
-        self.config.density.bind(DensitySettings.boundary, mark_boundary)
-        self.config.temperature.bind(TemperatureSettings.boundary, mark_boundary)
-        self.config.pressure.bind(PressureSettings.boundary, mark_boundary)
+        self.settings.density.bind(DensitySettings.boundary, mark_boundary)
+        self.settings.temperature.bind(TemperatureSettings.boundary, mark_boundary)
+        self.settings.pressure.bind(PressureSettings.boundary, mark_boundary)
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -173,9 +173,9 @@ class FluidFlow:
         self._allocated = True
 
     def _update_simulation_dimensions(self) -> None:
-        """Recompute simulation dimensions from current config."""
-        self._simulation_width = self._align32(self.config.width)
-        self._simulation_height = self._align32(self.config.height)
+        """Recompute simulation dimensions from current settings."""
+        self._simulation_width = self._align32(self.settings.width)
+        self._simulation_height = self._align32(self.settings.height)
         self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
         self._grid_scale = self._simulation_width / self._density_width if self._density_width > 0 else 1.0
 
@@ -265,10 +265,10 @@ class FluidFlow:
         self._handle_deferred_actions()
 
         # Per-frame state
-        self._dt = 1.0 / max(1, self.config.fps)
+        self._dt = 1.0 / max(1, self.settings.fps)
 
         # Dampen velocity (clean input for all steps)
-        vel: VelocitySettings = self.config.velocity
+        vel: VelocitySettings = self.settings.velocity
         self._profiler.begin("dampen_vel")
         self._dampen(self._velocity_fbo, vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
         self._profiler.end("dampen_vel")
@@ -307,7 +307,7 @@ class FluidFlow:
         self._profiler.end("advect_den")
 
         # Dampen density (clean output)
-        den: DensitySettings = self.config.density
+        den: DensitySettings = self.settings.density
         self._profiler.begin("dampen_den")
         self._dampen(self._density_fbo, den.dampen_threshold, den.dampen_time, self._dt, include_alpha=True)
         self._profiler.end("dampen_den")
@@ -322,8 +322,8 @@ class FluidFlow:
 
     def _advect_velocity(self) -> None:
         """Self-advect & dissipate velocity field."""
-        advect_step = self._dt * self.config.velocity.self_advection
-        dissipation = self._calculate_dissipation(self._dt, self.config.velocity.fade_time)
+        advect_step = self._dt * self.settings.velocity.self_advection
+        dissipation = self._calculate_dissipation(self._dt, self.settings.velocity.fade_time)
 
         self._velocity_fbo.swap()
         self._velocity_fbo.begin()
@@ -340,11 +340,11 @@ class FluidFlow:
 
     def _apply_viscosity(self) -> None:
         """Diffuse velocity via Jacobi viscosity solver."""
-        if self.config.velocity.viscosity <= 0.0:
+        if self.settings.velocity.viscosity <= 0.0:
             return
 
-        viscosity_dt = self.config.velocity.viscosity * (self._grid_scale ** 2) * self._dt
-        iterations = self._scale_iterations(self.config.velocity.viscosity_iter)
+        viscosity_dt = self.settings.velocity.viscosity * (self._grid_scale ** 2) * self._dt
+        iterations = self._scale_iterations(self.settings.velocity.viscosity_iter)
 
         if self._use_compute_diffusion:
             result = self._jacobi_diffusion_compute.solve(
@@ -376,11 +376,11 @@ class FluidFlow:
 
     def _confine_vorticity(self) -> None:
         """Vorticity confinement (curl → force → add to velocity)."""
-        if self.config.velocity.vorticity <= 0.0 or self.config.velocity.vorticity_radius <= 0.0:
+        if self.settings.velocity.vorticity <= 0.0 or self.settings.velocity.vorticity_radius <= 0.0:
             return
 
-        vorticity_radius = self.config.velocity.vorticity_radius * self._grid_scale
-        vorticity_force = self.config.velocity.vorticity * self._dt
+        vorticity_radius = self.settings.velocity.vorticity_radius * self._grid_scale
+        vorticity_force = self.settings.velocity.vorticity * self._dt
 
         # a. Compute curl
         self._vorticity_curl_fbo.begin()
@@ -411,12 +411,12 @@ class FluidFlow:
 
     def _advect_temperature(self) -> None:
         """Advect & dissipate the temperature scalar field."""
-        if self.config.temperature.buoyancy == 0.0:
+        if self.settings.temperature.buoyancy == 0.0:
             self._temperature_fbo.clear_all()
             return
 
-        advect_step = self._dt * self.config.speed
-        dissipation = self._calculate_dissipation(self._dt, self.config.temperature.fade_time)
+        advect_step = self._dt * self.settings.speed
+        dissipation = self._calculate_dissipation(self._dt, self.settings.temperature.fade_time)
 
         self._temperature_fbo.swap()
         self._temperature_fbo.begin()
@@ -433,11 +433,11 @@ class FluidFlow:
 
     def _apply_buoyancy(self) -> None:
         """Apply buoyancy force to velocity: F = σ(T − T_ambient) − κρ."""
-        if self.config.temperature.buoyancy == 0.0:
+        if self.settings.temperature.buoyancy == 0.0:
             return
 
-        sigma = self._dt * self._grid_scale * self.config.temperature.buoyancy
-        kappa = self._dt * self._grid_scale * self.config.temperature.weight
+        sigma = self._dt * self._grid_scale * self.settings.temperature.buoyancy
+        kappa = self._dt * self._grid_scale * self.settings.temperature.weight
 
         self._buoyancy_fbo.begin()
         self._buoyancy_shader.use(
@@ -447,7 +447,7 @@ class FluidFlow:
             self._simulation_obstacle_fbo.texture,
             sigma,
             kappa,
-            self.config.temperature.ambient,
+            self.settings.temperature.ambient,
             has_obstacles=self._has_obstacles
         )
         self._buoyancy_fbo.end()
@@ -456,11 +456,11 @@ class FluidFlow:
 
     def _advect_pressure(self) -> None:
         """Advect & dissipate pressure (optional, non-physical)."""
-        if self.config.pressure.speed <= 0.0:
+        if self.settings.pressure.speed <= 0.0:
             return
 
-        advect_step = self._dt * self.config.pressure.speed
-        dissipation = self._calculate_dissipation(self._dt, self.config.pressure.fade_time)
+        advect_step = self._dt * self.settings.pressure.speed
+        dissipation = self._calculate_dissipation(self._dt, self.settings.pressure.fade_time)
 
         self._pressure_fbo.swap()
         self._pressure_fbo.begin()
@@ -489,7 +489,7 @@ class FluidFlow:
         self._divergence_fbo.end()
 
         # b. Solve Poisson equation for pressure
-        iterations = self._scale_iterations(self.config.pressure.iterations)
+        iterations = self._scale_iterations(self.settings.pressure.iterations)
 
         if self._use_compute_pressure:
             result = self._jacobi_pressure_compute.solve(
@@ -534,8 +534,8 @@ class FluidFlow:
 
     def _advect_density(self) -> None:
         """Advect & dissipate density field."""
-        advect_step = self._dt * (self.config.speed + self.config.density.speed_offset)
-        dissipation = self._calculate_dissipation(self._dt, self.config.density.fade_time)
+        advect_step = self._dt * (self.settings.speed + self.settings.density.speed_offset)
+        dissipation = self._calculate_dissipation(self._dt, self.settings.density.fade_time)
 
         self._density_fbo.swap()
         self._density_fbo.begin()
@@ -569,10 +569,10 @@ class FluidFlow:
     # ========== Deferred ==========
 
     def _apply_boundary_modes(self) -> None:
-        """Apply current boundary mode config to all field FBOs (GL thread only)."""
-        self._density_fbo.set_wrap(*_BOUNDARY_GL[self.config.density.boundary])
-        self._temperature_fbo.set_wrap(*_BOUNDARY_GL[self.config.temperature.boundary])
-        self._pressure_fbo.set_wrap(*_BOUNDARY_GL[self.config.pressure.boundary])
+        """Apply current boundary mode settings to all field FBOs (GL thread only)."""
+        self._density_fbo.set_wrap(*_BOUNDARY_GL[self.settings.density.boundary])
+        self._temperature_fbo.set_wrap(*_BOUNDARY_GL[self.settings.temperature.boundary])
+        self._pressure_fbo.set_wrap(*_BOUNDARY_GL[self.settings.pressure.boundary])
 
     def _handle_deferred_actions(self) -> None:
         """Process reset and reallocation requests queued from the UI thread."""
@@ -637,11 +637,11 @@ class FluidFlow:
         FlowUtil.set_region(self._velocity_fbo, texture, x, y, w, h, strength)
 
     def add_velocity(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add to velocity field. Applies config velocity.input_strength and delta_time."""
+        """Add to velocity field. Applies settingsvelocity.input_strength and delta_time."""
         if not self._allocated:
             return
-        dt = 1.0 / max(1, self.config.fps)
-        effective = strength * self.config.velocity.input_strength * dt
+        dt = 1.0 / max(1, self.settings.fps)
+        effective = strength * self.settings.velocity.input_strength * dt
         FlowUtil.add(self._velocity_fbo, texture, effective)
 
     def add_velocity_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
@@ -676,11 +676,11 @@ class FluidFlow:
         FlowUtil.set_channel_region(self._density_fbo, texture, channel, x, y, w, h, strength)
 
     def add_density(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add to density field. Applies config density.input_strength and delta_time."""
+        """Add to density field. Applies settingsdensity.input_strength and delta_time."""
         if not self._allocated:
             return
-        dt = 1.0 / max(1, self.config.fps)
-        effective = strength * self.config.density.input_strength * dt
+        dt = 1.0 / max(1, self.settings.fps)
+        effective = strength * self.settings.density.input_strength * dt
         FlowUtil.add(self._density_fbo, texture, effective)
 
     def add_density_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
@@ -690,11 +690,11 @@ class FluidFlow:
         FlowUtil.add_region(self._density_fbo, texture, x, y, w, h, strength)
 
     def add_density_channel(self, texture: Texture, channel: int, strength: float = 1.0) -> None:
-        """Add single-channel texture to one of the density channels. Applies config density.input_strength and delta_time."""
+        """Add single-channel texture to one of the density channels. Applies settingsdensity.input_strength and delta_time."""
         if not self._allocated:
             return
-        dt = 1.0 / max(1, self.config.fps)
-        effective = strength * self.config.density.input_strength * dt
+        dt = 1.0 / max(1, self.settings.fps)
+        effective = strength * self.settings.density.input_strength * dt
         FlowUtil.add_channel(self._density_fbo, texture, channel, effective)
 
     def add_density_channel_region(self, texture: Texture, channel: int, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
@@ -717,11 +717,11 @@ class FluidFlow:
         FlowUtil.set_region(self._temperature_fbo, texture, x, y, w, h, strength)
 
     def add_temperature(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add to temperature field. Applies config temperature.input_strength and delta_time."""
+        """Add to temperature field. Applies settingstemperature.input_strength and delta_time."""
         if not self._allocated:
             return
-        dt = 1.0 / max(1, self.config.fps)
-        effective = strength * self.config.temperature.input_strength * dt
+        dt = 1.0 / max(1, self.settings.fps)
+        effective = strength * self.settings.temperature.input_strength * dt
         FlowUtil.add(self._temperature_fbo, texture, effective)
 
     def add_temperature_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:

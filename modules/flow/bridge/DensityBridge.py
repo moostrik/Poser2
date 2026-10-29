@@ -36,10 +36,10 @@ class DensityBridge(FlowBase):
         HSV adjust → output_fbo (in-place)
     """
 
-    def __init__(self, config: DensityBridgeSettings | None = None) -> None:
+    def __init__(self, settings: DensityBridgeSettings | None = None) -> None:
         super().__init__()
 
-        self.config: DensityBridgeSettings = config or DensityBridgeSettings()
+        self.settings: DensityBridgeSettings = settings or DensityBridgeSettings()
 
         # Define internal formats
         self._input_internal_format = GL_RGBA16F   # RGB density input
@@ -125,7 +125,7 @@ class DensityBridge(FlowBase):
         self._hsv_shader.use(
             self._output_fbo.back_texture,
             hue=0.0,
-            saturation=self.config.saturation,
-            value=self.config.brightness
+            saturation=self.settings.saturation,
+            value=self.settings.brightness
         )
         self._output_fbo.end()

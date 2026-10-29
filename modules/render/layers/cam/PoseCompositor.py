@@ -30,14 +30,14 @@ class PoseCompositor(LayerBase):
         self.settings: PoseCompSettings = settings or PoseCompSettings()
         self._fbo: Fbo = Fbo()
 
-        # Camera crop layers (one of these will be used based on config)
-        crop_config: CropSettings = CropSettings(stage=self.settings.stage)
-        self._cam_crop_layer: CropLayer = CropLayer(track_id, board, cam_texture, crop_config)
+        # Camera crop layers (one of these will be used based on settings)
+        crop_settings: CropSettings = CropSettings(stage=self.settings.stage)
+        self._cam_crop_layer: CropLayer = CropLayer(track_id, board, cam_texture, crop_settings)
         self._gpu_crop_layer: CropSourceLayer = CropSourceLayer(track_id, board)
 
         # Pose line layers - RAW (black, thickest), SMOOTH (white, medium), LERP (color, thin)
         # RAW = 3x thickness, drawn first (back layer)
-        pose_raw_config: PoseLineSettings = PoseLineSettings(
+        pose_raw_settings: PoseLineSettings = PoseLineSettings(
             stage=1,
             line_width=self.settings.line_width * 3.0,
             line_smooth=self.settings.line_smooth * 3.0,
@@ -45,10 +45,10 @@ class PoseCompositor(LayerBase):
             use_bbox=False,
             color=Color(0.0, 0.0, 0.0)
         )
-        self._pose_raw_layer: PoseLineLayer = PoseLineLayer(track_id, board, pose_raw_config)
+        self._pose_raw_layer: PoseLineLayer = PoseLineLayer(track_id, board, pose_raw_settings)
 
         # SMOOTH = 2x thickness, drawn second (middle layer)
-        pose_smooth_config: PoseLineSettings = PoseLineSettings(
+        pose_smooth_settings: PoseLineSettings = PoseLineSettings(
             stage=2,
             line_width=self.settings.line_width * 2.0,
             line_smooth=self.settings.line_smooth * 2.0,
@@ -56,10 +56,10 @@ class PoseCompositor(LayerBase):
             use_bbox=False,
             color=Color(1.0, 1.0, 1.0)
         )
-        self._pose_smooth_layer: PoseLineLayer = PoseLineLayer(track_id, board, pose_smooth_config)
+        self._pose_smooth_layer: PoseLineLayer = PoseLineLayer(track_id, board, pose_smooth_settings)
 
         # LERP = 1x thickness, drawn last (top layer)
-        pose_lerp_config: PoseLineSettings = PoseLineSettings(
+        pose_lerp_settings: PoseLineSettings = PoseLineSettings(
             stage=3,
             line_width=self.settings.line_width,
             line_smooth=self.settings.line_smooth,
@@ -67,7 +67,7 @@ class PoseCompositor(LayerBase):
             use_bbox=False,
             color=color_settings.track_colors[track_id]
         )
-        self._pose_lerp_layer: PoseLineLayer = PoseLineLayer(track_id, board, pose_lerp_config)
+        self._pose_lerp_layer: PoseLineLayer = PoseLineLayer(track_id, board, pose_lerp_settings)
 
     @property
     def texture(self) -> Texture:

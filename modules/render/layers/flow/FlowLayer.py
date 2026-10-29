@@ -86,7 +86,7 @@ class FlowLayer(LayerBase):
         - temperature: Temperature field (R16F)
 
     Usage:
-        flow = FlowLayer(cam_id, board, mask, motion, colors, config)
+        flow = FlowLayer(cam_id, board, mask, motion, colors, settings)
         flow.update()
         # Access outputs for fluid simulation:
         fluid.add_velocity(flow.velocity)
@@ -102,24 +102,24 @@ class FlowLayer(LayerBase):
             board: Board for pose data
             mask_source: Mask source layer for optical flow update
             mask: Mask texture for optical flow input
-            config: Layer configuration
+            settings: Layer configuration
         """
         self._cam_id: int = cam_id
         self._board: HasFrames = board
         self._mask_source: MaskSourceLayer = mask_source
         self._flow_input: Texture = flow_input
         self._density_input: Texture = density_input
-        self.config: FlowLayerSettings = settings or FlowLayerSettings()
+        self.settings: FlowLayerSettings = settings or FlowLayerSettings()
 
-        self._delta_time: float = 1 / self.config.fps
+        self._delta_time: float = 1 / self.settings.fps
 
-        self._optical_flow: OpticalFlow = OpticalFlow(self.config.optical_flow)
-        self._velocity_trail: VelocitySmoothTrail = VelocitySmoothTrail(self.config.velocity_trail)
+        self._optical_flow: OpticalFlow = OpticalFlow(self.settings.optical_flow)
+        self._velocity_trail: VelocitySmoothTrail = VelocitySmoothTrail(self.settings.velocity_trail)
         self._velocity_magnitude: VelocityMagnitude = VelocityMagnitude()
-        self._density_bridge: DensityBridge = DensityBridge(self.config.density_bridge)
-        self._temperature_bridge: TemperatureBridge = TemperatureBridge(self.config.temperature_bridge)
+        self._density_bridge: DensityBridge = DensityBridge(self.settings.density_bridge)
+        self._temperature_bridge: TemperatureBridge = TemperatureBridge(self.settings.temperature_bridge)
 
-        self._visualizer: Visualizer = Visualizer(self.config.visualisation)
+        self._visualizer: Visualizer = Visualizer(self.settings.visualisation)
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -168,8 +168,8 @@ class FlowLayer(LayerBase):
             height: Processing height
             internal_format: Ignored (formats determined by each stage)
         """
-        sim_width = self.config.width
-        sim_height = self.config.height
+        sim_width = self.settings.width
+        sim_height = self.settings.height
 
         self._optical_flow.allocate(sim_width, sim_height)
         self._velocity_trail.allocate(sim_width, sim_height, width, height)
@@ -199,7 +199,7 @@ class FlowLayer(LayerBase):
     def update(self) -> None:
         """Update optical flow and bridges."""
         # Get motion data from pose
-        pose: Frame | None = self._board.get_frame(self.config.stage, self._cam_id)
+        pose: Frame | None = self._board.get_frame(self.settings.stage, self._cam_id)
         motion = pose[AngleMotion].value if pose is not None and AngleMotion in pose else 0.0
 
         Style.push_style()
@@ -240,7 +240,7 @@ class FlowLayer(LayerBase):
     def draw(self) -> None:
         """Draw with configured blend mode."""
         Style.push_style()
-        Style.set_blend_mode(self.config.blend_mode)
+        Style.set_blend_mode(self.settings.blend_mode)
         if self.texture.allocated:
             Blit.use(self.texture)
         Style.pop_style()
@@ -262,4 +262,4 @@ class FlowLayer(LayerBase):
             FlowDrawMode.TEMP_BRIDGE_INPUT_MASK: self._temperature_bridge.mask_input,
             FlowDrawMode.TEMP_BRIDGE_OUTPUT: self._temperature_bridge.temperature,
         }
-        return textures.get(self.config.draw_mode, self._density_input)
+        return textures.get(self.settings.draw_mode, self._density_input)

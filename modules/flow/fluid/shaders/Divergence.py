@@ -20,7 +20,7 @@ class Divergence(Shader):
         Args:
             velocity: Velocity field (RG32F)
             obstacle: Obstacle mask (R8, CLAMP_TO_BORDER=1)
-            grid_scale: Grid scaling factor (derived from config width / output width)
+            grid_scale: Grid scaling factor (derived from settings width / output width)
             aspect: Aspect ratio (width/height) for isotropic derivatives
             has_obstacles: When False, skip obstacle texture reads for performance
         """

@@ -19,8 +19,8 @@ class PoseDotSettings(BaseSettings):
 
 
 class PoseDotLayer(LayerBase):
-    def __init__(self, track_id: int, board: HasFrames, color: tuple[float, float, float, float] | None = None, config: PoseDotSettings | None = None) -> None:
-        self._config: PoseDotSettings = config or PoseDotSettings()
+    def __init__(self, track_id: int, board: HasFrames, color: tuple[float, float, float, float] | None = None, settings: PoseDotSettings | None = None) -> None:
+        self.settings: PoseDotSettings = settings or PoseDotSettings()
         self._track_id: int = track_id
         self._board: HasFrames = board
         self._fbo: Fbo = Fbo()
@@ -43,7 +43,7 @@ class PoseDotLayer(LayerBase):
         self._shader.deallocate()
 
     def update(self) -> None:
-        pose: Frame | None = self._board.get_frame(self._config.stage, self._track_id)
+        pose: Frame | None = self._board.get_frame(self.settings.stage, self._track_id)
         self._data_cache.update(pose)
 
         if self._data_cache.lost:
@@ -52,8 +52,8 @@ class PoseDotLayer(LayerBase):
         if self._data_cache.idle or pose is None:
             return
 
-        dot_size: float = 1.0 / self._fbo.height * self._config.dot_size * 2
-        dot_smooth: float = 1.0 / self._fbo.height * self._config.dot_smooth * 2
+        dot_size: float = 1.0 / self._fbo.height * self.settings.dot_size * 2
+        dot_smooth: float = 1.0 / self._fbo.height * self.settings.dot_smooth * 2
 
         self._fbo.begin()
         clear_color()

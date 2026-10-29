@@ -62,14 +62,14 @@ class CentreGeometry(LayerBase):
     pose points to crop space.
     """
 
-    def __init__(self, cam_id: int, board: HasFrames, config: CentreGeomSettings | None = None) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, settings: CentreGeomSettings | None = None) -> None:
         self._cam_id: int = cam_id
         self._board: HasFrames = board
         self._data_cache: DataCache[Frame] = DataCache[Frame]()
 
         # Configuration
-        self.config: CentreGeomSettings = config or CentreGeomSettings()
-        self._cam_aspect: float = self.config.cam_aspect
+        self.settings: CentreGeomSettings = settings or CentreGeomSettings()
+        self._cam_aspect: float = self.settings.cam_aspect
 
         # Geometry results
         self._cam_geometry: CamGeometry = CamGeometry(
@@ -122,7 +122,7 @@ class CentreGeometry(LayerBase):
     def update(self) -> None:
         """Calculate anchor points and derived geometry from current pose."""
         # Get pose data
-        pose: Frame | None = self._board.get_frame(self.config.stage, self._cam_id)
+        pose: Frame | None = self._board.get_frame(self.settings.stage, self._cam_id)
         self._data_cache.update(pose)
         if self._data_cache.idle:
             return
@@ -132,8 +132,8 @@ class CentreGeometry(LayerBase):
             self._last_pin_mid = None
             return
 
-        # Reconstruct the target (where the pinned point lands) from config
-        target = Point2f(self.config.target_x, self.config.target_y)
+        # Reconstruct the target (where the pinned point lands) from settings
+        target = Point2f(self.settings.target_x, self.settings.target_y)
 
         # Get current body landmarks (bbox-relative coordinates)
         shoulder_mid = CentreGeometry._get_midpoint(
@@ -154,17 +154,17 @@ class CentreGeometry(LayerBase):
         )
 
         # Raw midpoint for the selected snap point (feet may be None this frame)
-        if self.config.snap_point == SnapPoint.HIPS:
+        if self.settings.snap_point == SnapPoint.HIPS:
             raw_pin = hip_mid
-        elif self.config.snap_point == SnapPoint.FEET:
+        elif self.settings.snap_point == SnapPoint.FEET:
             raw_pin = feet_mid
         else:
             raw_pin = shoulder_mid
 
         # Reset the held value when the user switches snap point
-        if self.config.snap_point != self._last_snap_point:
+        if self.settings.snap_point != self._last_snap_point:
             self._last_pin_mid = None
-            self._last_snap_point = self.config.snap_point
+            self._last_snap_point = self.settings.snap_point
 
         if raw_pin is not None:
             pin_mid = raw_pin
@@ -185,14 +185,14 @@ class CentreGeometry(LayerBase):
 
         # Calculate camera-space geometry. Guard against a degenerate size
         # which would otherwise divide by zero when scaling.
-        target_distance: float = self.config.target_size
+        target_distance: float = self.settings.target_size
         if abs(target_distance) < 1e-6:
             self._transformed_points = None
             return
         cam_rotation_img, distance, cam_crop_roi_img = CentreGeometry._calculate_roi(
-            anchor_top_img, anchor_bot_img, pin_img, target, target_distance, self.config.dst_aspectratio
+            anchor_top_img, anchor_bot_img, pin_img, target, target_distance, self.settings.dst_aspectratio
         )
-        if not self.config.torso_upright:
+        if not self.settings.torso_upright:
             cam_rotation_img = 0.0
 
         # Store camera geometry (texture space)
@@ -210,7 +210,7 @@ class CentreGeometry(LayerBase):
         # Calculate bbox-space geometry (aspect-corrected for mask)
         bbox_aspect = bbox.width / bbox.height if bbox.height > 0 else 1.0
         mask_delta = hip_mid - shoulder_mid
-        mask_rotation = -math.atan2(mask_delta.x * bbox_aspect, mask_delta.y) if self.config.torso_upright else 0.0
+        mask_rotation = -math.atan2(mask_delta.x * bbox_aspect, mask_delta.y) if self.settings.torso_upright else 0.0
         mask_distance = math.hypot(mask_delta.x * bbox_aspect, mask_delta.y)
 
         mask_height = mask_distance / target_distance

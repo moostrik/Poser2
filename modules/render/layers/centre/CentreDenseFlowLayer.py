@@ -27,7 +27,7 @@ class CentreDenseFlowLayer(LayerBase):
         self._mask_texture: Texture = mask_texture
 
         # Configuration
-        self.config: CentreDlowSettings = settings or CentreDlowSettings()
+        self.settings: CentreDlowSettings = settings or CentreDlowSettings()
 
         # FBOs
         self._flow_fbo: Fbo = Fbo()
@@ -59,7 +59,7 @@ class CentreDenseFlowLayer(LayerBase):
         """Render flow crop using anchor geometry, optionally with mask."""
         if self._geometry.lost:
             self._flow_fbo.clear()
-            if self.config.use_mask:
+            if self.settings.use_mask:
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             return
 
@@ -79,13 +79,13 @@ class CentreDenseFlowLayer(LayerBase):
         self._flow_fbo.end()
 
         # Apply mask if provided and enabled
-        if self.config.use_mask:
+        if self.settings.use_mask:
             self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._masked_fbo.begin()
             self._mask_shader.use(
                 self._flow_fbo.texture,
                 self._mask_texture,
-                self.config.mask_opacity
+                self.settings.mask_opacity
             )
             self._masked_fbo.end()
             self._output_fbo = self._masked_fbo

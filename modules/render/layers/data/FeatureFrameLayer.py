@@ -12,7 +12,7 @@ from modules.gl import Fbo, Texture, Blit, clear_color, Text
 from modules.pose import AngleVelocity, Angles, BaseScalarFeature, Frame
 from ..LayerBase import LayerBase, DataCache, Rect
 from ...shaders import FeatureShader
-from .DataLayerSettings import DataLayerConfig, LayerMode, FEATURE_MAP, TRACK_COLOR_FEATURES, AngleOffset, has_pi_range, offset_angles
+from .DataLayerSettings import DataLayerSettingsProtocol, LayerMode, FEATURE_MAP, TRACK_COLOR_FEATURES, AngleOffset, has_pi_range, offset_angles
 from ...color_settings import ColorSettings
 
 
@@ -24,11 +24,11 @@ class FeatureFrameLayer(LayerBase):
     """
     LAYER_MODE: LayerMode = LayerMode.FRAME
 
-    def __init__(self, track_id: int, board: HasFrames, config: DataLayerConfig, color_settings: ColorSettings,
+    def __init__(self, track_id: int, board: HasFrames, settings: DataLayerSettingsProtocol, color_settings: ColorSettings,
                  feature_map: dict[IntEnum, type[BaseScalarFeature]] = FEATURE_MAP) -> None:
         self._track_id: int = track_id
         self._board: HasFrames = board
-        self._config: DataLayerConfig = config
+        self.settings: DataLayerSettingsProtocol = settings
         self._color_settings: ColorSettings = color_settings
         self._feature_map: dict[IntEnum, type[BaseScalarFeature]] = feature_map
         self._was_active: bool = False
@@ -45,7 +45,7 @@ class FeatureFrameLayer(LayerBase):
 
     @property
     def _is_active(self) -> bool:
-        return self._config.mode == self.LAYER_MODE
+        return self.settings.mode == self.LAYER_MODE
 
     @property
     def texture(self) -> Texture:
@@ -73,7 +73,7 @@ class FeatureFrameLayer(LayerBase):
             return
         if self._fbo.allocated:
             Blit.use(self._fbo.texture)
-            if self.draw_labels and self._config.render_labels:
+            if self.draw_labels and self.settings.render_labels:
                 Blit.use(self._label_fbo.texture)
 
     def update(self) -> None:
@@ -84,7 +84,7 @@ class FeatureFrameLayer(LayerBase):
         self._was_active = active
         if not active:
             return
-        pose: Frame | None = self._board.get_frame(self._config.stage, self._track_id)
+        pose: Frame | None = self._board.get_frame(self.settings.stage, self._track_id)
         self._data_cache.update(pose)
 
         if self._data_cache.lost:
@@ -94,9 +94,9 @@ class FeatureFrameLayer(LayerBase):
             return
 
         # Extract feature from frame
-        feature_type = self._feature_map[self._config.feature_field]
+        feature_type = self._feature_map[self.settings.feature_field]
         feature = pose[feature_type]
-        offset = self._config.angle_offset
+        offset = self.settings.angle_offset
         if offset != AngleOffset.NONE and has_pi_range(feature_type):
             feature = feature_type(offset_angles(feature.values, offset), feature.scores)
 
@@ -106,17 +106,17 @@ class FeatureFrameLayer(LayerBase):
 
         colors = self._resolve_colors()
 
-        line_width = 1.0 / self._fbo.height * self._config.line_width
-        line_smooth = 1.0 / self._fbo.height * self._config.line_smooth
+        line_width = 1.0 / self._fbo.height * self.settings.line_width
+        line_smooth = 1.0 / self._fbo.height * self.settings.line_smooth
         display_range = feature.display_range()
 
         self._fbo.begin()
         clear_color()
-        self._shader.use(feature, colors, line_width, line_smooth, self._config.use_scores, display_range, deltas=deltas)
+        self._shader.use(feature, colors, line_width, line_smooth, self.settings.use_scores, display_range, deltas=deltas)
         self._fbo.end()
 
         # Render labels if changed
-        if self._config.render_labels:
+        if self.settings.render_labels:
             joint_enum_type = feature.__class__.enum()
             num_joints: int = len(feature)
             labels: list[str] = [joint_enum_type(i).name for i in range(num_joints)]
@@ -154,9 +154,9 @@ class FeatureFrameLayer(LayerBase):
         fbo.end()
 
     def _resolve_colors(self) -> list[tuple[float, float, float, float]]:
-        if self._config.use_history_color:
+        if self.settings.use_history_color:
             return [self._color_settings.history.to_tuple()]
-        feature_type = self._feature_map[self._config.feature_field]
+        feature_type = self._feature_map[self.settings.feature_field]
         if feature_type in TRACK_COLOR_FEATURES:
             return self._color_settings.track_color_tuples
         return self._color_settings.default_color_tuples

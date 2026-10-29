@@ -22,13 +22,13 @@ class CentreMaskSettings(BaseSettings):
 class CentreMaskLayer(LayerBase):
     """Renders mask image cropped and rotated with temporal blending and blur."""
 
-    def __init__(self, cam_id: int, geometry: CentreGeometry, mask_texture: Texture, config: CentreMaskSettings | None = None) -> None:
+    def __init__(self, cam_id: int, geometry: CentreGeometry, mask_texture: Texture, settings: CentreMaskSettings | None = None) -> None:
         self._cam_id: int = cam_id
         self._geometry: CentreGeometry = geometry
         self._mask_src: Texture = mask_texture
 
         # Configuration
-        self.config: CentreMaskSettings = config or CentreMaskSettings()
+        self.settings: CentreMaskSettings = settings or CentreMaskSettings()
 
         # FBOs
         self._roi_fbo: Fbo = Fbo()  # Single temp buffer for ROI
@@ -102,7 +102,7 @@ class CentreMaskLayer(LayerBase):
         self._mask_blend_shader.use(
             self._blend_fbo.back_texture,
             self._roi_fbo.texture,
-            self.config.blend_factor
+            self.settings.blend_factor
         )
         self._blend_fbo.end()
 
@@ -112,7 +112,7 @@ class CentreMaskLayer(LayerBase):
         self._mask_blur_fbo.end()
 
         # Multi-pass dilation or erosion
-        steps = self.config.dilation_steps
+        steps = self.settings.dilation_steps
         if steps > 0:
             for _ in range(steps):
                 self._mask_blur_fbo.swap()
@@ -127,13 +127,13 @@ class CentreMaskLayer(LayerBase):
                 self._mask_blur_fbo.end()
 
         # Multi-pass blur
-        for i in range(self.config.blur_steps):
+        for i in range(self.settings.blur_steps):
             self._mask_blur_fbo.swap()
             self._mask_blur_fbo.begin()
             self._mask_blur_shader.use(
                 self._mask_blur_fbo.back_texture,
                 True,
-                self.config.blur_radius
+                self.settings.blur_radius
             )
             self._mask_blur_fbo.end()
 
@@ -142,7 +142,7 @@ class CentreMaskLayer(LayerBase):
             self._mask_blur_shader.use(
                 self._mask_blur_fbo.back_texture,
                 False,
-                self.config.blur_radius
+                self.settings.blur_radius
             )
             self._mask_blur_fbo.end()
 

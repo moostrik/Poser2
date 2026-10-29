@@ -28,7 +28,7 @@ class OpticalFlow(FlowBase):
     Uses input_fbo as SwapFbo to store current and previous frames.
     """
 
-    def __init__(self, config: OpticalFlowSettings | None = None) -> None:
+    def __init__(self, settings: OpticalFlowSettings | None = None) -> None:
         super().__init__()
 
         # Define internal formats
@@ -36,8 +36,8 @@ class OpticalFlow(FlowBase):
         self._output_internal_format = GL_RG16F  # Velocity output
 
         # Configuration with change notification
-        self.config: OpticalFlowSettings = config or OpticalFlowSettings()
-        self.config.bind_all(lambda v: self._on_config_changed())
+        self.settings: OpticalFlowSettings = settings or OpticalFlowSettings()
+        self.settings.bind_all(lambda v: self._on_settings_changed())
 
         # State
         self._frame_count: int = 0  # 0=no frames, 1=first frame, 2+=can compute flow
@@ -106,8 +106,8 @@ class OpticalFlow(FlowBase):
         curr_frame = self._input_fbo.texture      # Current buffer (Fbo)
         prev_frame = self._input_fbo.back_texture # Previous buffer (Fbo)
 
-        # Compute optical flow using config values
-        power = 1.0 - self.config.boost
+        # Compute optical flow using settings values
+        power = 1.0 - self.settings.boost
 
         self._optical_flow_shader.reload()
         self._optical_flow_shader_mm.reload()
@@ -117,10 +117,10 @@ class OpticalFlow(FlowBase):
         self._optical_flow_shader_mm.use(
             prev_frame,
             curr_frame,
-            offset=self.config.offset,
-            threshold=self.config.threshold,
-            strength_x=self.config.strength_x,
-            strength_y=self.config.strength_y,
+            offset=self.settings.offset,
+            threshold=self.settings.threshold,
+            strength_x=self.settings.strength_x,
+            strength_y=self.settings.strength_y,
             power=power
         )
         self._output_fbo.end()
@@ -162,6 +162,6 @@ class OpticalFlow(FlowBase):
         self._frame_count = 0
         self._needs_update = False
 
-    def _on_config_changed(self) -> None:
-        """Called when config values change - trigger recompute if we have frames."""
+    def _on_settings_changed(self) -> None:
+        """Called when settings values change - trigger recompute if we have frames."""
         self._needs_update = True

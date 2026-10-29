@@ -36,7 +36,7 @@ class SmoothTrail(FlowBase):
         - output_fbo: Stores smoothed output
     """
 
-    def __init__(self, format: int = GL_RGBA16F, config: SmoothTrailSettings | None = None) -> None:
+    def __init__(self, format: int = GL_RGBA16F, settings: SmoothTrailSettings | None = None) -> None:
         """Initialize trail processor."""
         super().__init__()
 
@@ -44,7 +44,7 @@ class SmoothTrail(FlowBase):
         self._input_internal_format = format
         self._output_internal_format = format
 
-        self.config: SmoothTrailSettings = config or SmoothTrailSettings()
+        self.settings: SmoothTrailSettings = settings or SmoothTrailSettings()
 
         # Shaders
         self._trail_shader: Trail = Trail()
@@ -94,21 +94,21 @@ class SmoothTrail(FlowBase):
         self._trail_shader.use(
             self._output_fbo.back_texture,  # Previous trail
             self._input_fbo.texture,        # New input
-            self.config.trail_weight,
-            self.config.scale                # Apply scaling on new input
+            self.settings.trail_weight,
+            self.settings.scale                # Apply scaling on new input
         )
         self._output_fbo.end()
 
         # Stage 2: Spatial smoothing (Gaussian blur)
-        if self.config.blur_steps > 0 and self.config.blur_radius > 0:
+        if self.settings.blur_steps > 0 and self.settings.blur_radius > 0:
             # In-place blur using swap operations
-            for _ in range(self.config.blur_steps):
+            for _ in range(self.settings.blur_steps):
                 # Horizontal pass
                 self._output_fbo.swap()
                 self._output_fbo.begin()
                 self._blur_shader.use(
                     self._output_fbo.back_texture,
-                    self.config.blur_radius,
+                    self.settings.blur_radius,
                     horizontal=True
                 )
                 self._output_fbo.end()
@@ -118,7 +118,7 @@ class SmoothTrail(FlowBase):
                 self._output_fbo.begin()
                 self._blur_shader.use(
                     self._output_fbo.back_texture,
-                    self.config.blur_radius,
+                    self.settings.blur_radius,
                     horizontal=False
                 )
                 self._output_fbo.end()
@@ -127,14 +127,14 @@ class SmoothTrail(FlowBase):
 class VelocitySmoothTrail(SmoothTrail):
     """Convenience class: Trail preset for velocity fields with scaling."""
 
-    def __init__(self, config: SmoothTrailSettings | None = None) -> None:
+    def __init__(self, settings: SmoothTrailSettings | None = None) -> None:
         """Initialize velocity smoothing.
 
         Args:
             scale: Velocity scale (converts optical flow to simulation velocity)
-            config: Optional trail configuration
+            settings: Optional trail configuration
         """
-        super().__init__(GL_RG16F, config)
+        super().__init__(GL_RG16F, settings)
 
     # Convenience aliases for velocity-specific usage
     @property

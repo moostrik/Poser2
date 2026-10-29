@@ -46,7 +46,7 @@ class CompositeLayer(LayerBase):
 
     Usage:
         layers = [fluid_layer, ms_mask_layer]
-        composite = CompositeLayer(layers, config)
+        composite = CompositeLayer(layers, settings)
         composite.allocate(width, height, GL_RGBA16F)
 
         # Each frame:
@@ -57,16 +57,16 @@ class CompositeLayer(LayerBase):
     def __init__(
         self,
         layers: list[LayerBase],
-        config: CompositeLayerSettings | None = None
+        settings: CompositeLayerSettings | None = None
     ) -> None:
         """Initialize CompositeLayer.
 
         Args:
             layers: List of layers to composite (uses their .texture property)
-            config: Layer configuration
+            settings: Layer configuration
         """
         self._layers: list[LayerBase] = layers
-        self.config: CompositeLayerSettings = config or CompositeLayerSettings()
+        self.settings: CompositeLayerSettings = settings or CompositeLayerSettings()
 
         # Composition FBO (before LUT)
         self._composite_fbo: Fbo = Fbo()
@@ -82,8 +82,8 @@ class CompositeLayer(LayerBase):
 
         # Scan LUTs now and whenever folder changes or rescan is pressed
         self._scan_luts()
-        self.config.lut.bind(LutSettings.folder, lambda _: self._scan_luts())
-        self.config.lut.bind(LutSettings.rescan, lambda v: self._scan_luts() if v else None)
+        self.settings.lut.bind(LutSettings.folder, lambda _: self._scan_luts())
+        self.settings.lut.bind(LutSettings.rescan, lambda v: self._scan_luts() if v else None)
 
     @property
     def texture(self) -> Texture:
@@ -111,22 +111,22 @@ class CompositeLayer(LayerBase):
 
     def _scan_luts(self) -> None:
         """Scan lut folder for .cube files and update files list. Resets selection if no longer valid."""
-        lut_dir = Path(self.config.lut.folder)
+        lut_dir = Path(self.settings.lut.folder)
         if lut_dir.exists():
             filenames = [f.name for f in sorted(lut_dir.glob("*.cube"))]
         else:
             logger.warning("LUT directory not found: %s", lut_dir)
             filenames = []
-        self.config.lut.files = [""] + filenames
-        if self.config.lut.file and self.config.lut.file not in filenames:
-            self.config.lut.file = ""
+        self.settings.lut.files = [""] + filenames
+        if self.settings.lut.file and self.settings.lut.file not in filenames:
+            self.settings.lut.file = ""
 
     def _load_lut_if_changed(self) -> None:
         """Load LUT file if selection changed."""
-        if self.config.lut.file != self._current_lut:
-            self._current_lut = self.config.lut.file
-            if self.config.lut.file:
-                lut_path = Path(self.config.lut.folder) / self.config.lut.file
+        if self.settings.lut.file != self._current_lut:
+            self._current_lut = self.settings.lut.file
+            if self.settings.lut.file:
+                lut_path = Path(self.settings.lut.folder) / self.settings.lut.file
                 self._lut_shader.load_cube(str(lut_path))
 
     def compose(self, entries: list[tuple[Texture, float]]) -> None:
@@ -147,7 +147,7 @@ class CompositeLayer(LayerBase):
         glClear(GL_COLOR_BUFFER_BIT)
 
         Style.push_style()
-        Style.set_blend_mode(self.config.blend_mode)
+        Style.set_blend_mode(self.settings.blend_mode)
 
         for tex, opacity in entries:
             if tex.allocated and opacity > 0:
@@ -170,7 +170,7 @@ class CompositeLayer(LayerBase):
             return
 
         # Apply LUT if loaded, otherwise just blit
-        if self._lut_shader.lut_loaded and self.config.lut.file and self.config.lut.strength > 0:
-            self._lut_shader.use(self._composite_fbo.texture, self.config.lut.strength)
+        if self._lut_shader.lut_loaded and self.settings.lut.file and self.settings.lut.strength > 0:
+            self._lut_shader.use(self._composite_fbo.texture, self.settings.lut.strength)
         else:
             self._blit.use(self._composite_fbo.texture)

@@ -48,10 +48,10 @@ class TemperatureBridge(FlowBase):
         Interpret → TemperatureBridgeShader → output_fbo (R32F)
     """
 
-    def __init__(self, config: TemperatureBridgeSettings | None = None) -> None:
+    def __init__(self, settings: TemperatureBridgeSettings | None = None) -> None:
         super().__init__()
 
-        self.config: TemperatureBridgeSettings = config or TemperatureBridgeSettings()
+        self.settings: TemperatureBridgeSettings = settings or TemperatureBridgeSettings()
 
         # Define internal formats
         self._input_internal_format = GL_RGB16F   # RGB color interpretation
@@ -129,7 +129,7 @@ class TemperatureBridge(FlowBase):
         self._temperature_bridge_shader.use(
             self._input,                    # RGB color (R=warm, G=neutral, B=cold)
             self._mask_fbo.texture,        # Velocity magnitude mask
-            self.config.scale
+            self.settings.scale
         )
         self._output_fbo.end()
 

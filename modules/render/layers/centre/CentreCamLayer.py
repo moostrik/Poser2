@@ -23,14 +23,14 @@ class CentreCamLayer(LayerBase):
     followed by temporal blending. Optionally applies mask texture for compositing.
     """
 
-    def __init__(self, cam_id: int, geometry: CentreGeometry, cam_texture: Texture, mask_texture: Texture, config: CentreCamSettings) -> None:
+    def __init__(self, cam_id: int, geometry: CentreGeometry, cam_texture: Texture, mask_texture: Texture, settings: CentreCamSettings) -> None:
         self._cam_id: int = cam_id
         self._geometry: CentreGeometry = geometry
         self._cam_texture: Texture = cam_texture
         self._mask_texture: Texture = mask_texture
 
         # Configuration
-        self.config: CentreCamSettings = config or CentreCamSettings()
+        self.settings: CentreCamSettings = settings or CentreCamSettings()
 
         # FBOs
         self._cam_fbo: Fbo = Fbo()
@@ -71,7 +71,7 @@ class CentreCamLayer(LayerBase):
             self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._cam_blend_fbo.swap()
             self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
-            if self._mask_texture and self.config.use_mask:
+            if self._mask_texture and self.settings.use_mask:
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             return
 
@@ -96,18 +96,18 @@ class CentreCamLayer(LayerBase):
         self._blend_shader.use(
             self._cam_blend_fbo.back_texture,
             self._cam_fbo.texture,
-            self.config.blend_factor
+            self.settings.blend_factor
         )
         self._cam_blend_fbo.end()
 
         # Apply mask if provided and enabled
-        if self.config.use_mask:
+        if self.settings.use_mask:
             self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._masked_fbo.begin()
             self._mask_shader.use(
                 self._cam_blend_fbo.texture,
                 self._mask_texture,
-                self.config.mask_opacity
+                self.settings.mask_opacity
             )
             self._masked_fbo.end()
             self._output_fbo = self._masked_fbo

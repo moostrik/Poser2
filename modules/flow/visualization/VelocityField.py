@@ -24,12 +24,12 @@ class VelocityField(FieldBase):
     scale acts as a general multiplier for both modes.
     """
 
-    def __init__(self, config: VisualisationFieldSettings | None = None) -> None:
+    def __init__(self, settings: VisualisationFieldSettings | None = None) -> None:
         super().__init__()
 
         # Configuration with change notification
-        self.config: VisualisationFieldSettings = config or VisualisationFieldSettings()
-        self.config.bind_all(lambda v: self._on_config_changed())
+        self.settings: VisualisationFieldSettings = settings or VisualisationFieldSettings()
+        self.settings.bind_all(lambda v: self._on_settings_changed())
 
         self._velocity_texture: Texture | None = None
 
@@ -65,19 +65,19 @@ class VelocityField(FieldBase):
 
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._fbo.begin()
-        if self.config.toggle_scalar:
+        if self.settings.toggle_scalar:
             # Direction map mode
             self._direction_shader.reload()
-            self._direction_shader.use(self._velocity_texture, self.config.scale)
+            self._direction_shader.use(self._velocity_texture, self.settings.scale)
         else:
             # Arrow field mode
             self._arrow_shader.reload()
             self._arrow_shader.use(
                 self._velocity_texture,
-                self.config.scale,
-                self.config.spacing,
-                self.config.element_length,
-                self.config.element_width
+                self.settings.scale,
+                self.settings.spacing,
+                self.settings.element_length,
+                self.settings.element_width
             )
         self._fbo.end()
 
@@ -86,6 +86,6 @@ class VelocityField(FieldBase):
         self._velocity_texture = texture
         self._needs_update = True
 
-    def _on_config_changed(self) -> None:
-        """Called when config values change."""
+    def _on_settings_changed(self) -> None:
+        """Called when settings values change."""
         self._needs_update = True

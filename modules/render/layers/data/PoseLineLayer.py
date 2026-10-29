@@ -24,8 +24,8 @@ class PoseLineSettings(BaseSettings):
 
 class PoseLineLayer(LayerBase):
 
-    def __init__(self, track_id: int, board: HasFrames, config: PoseLineSettings | None = None) -> None:
-        self._config: PoseLineSettings = config or PoseLineSettings()
+    def __init__(self, track_id: int, board: HasFrames, settings: PoseLineSettings | None = None) -> None:
+        self.settings: PoseLineSettings = settings or PoseLineSettings()
         self._track_id: int = track_id
         self._board: HasFrames = board
         self._fbo: Fbo = Fbo()
@@ -50,7 +50,7 @@ class PoseLineLayer(LayerBase):
             Blit.use(self._fbo.texture)
 
     def update(self) -> None:
-        pose: Frame | None = self._board.get_frame(self._config.stage, self._track_id)
+        pose: Frame | None = self._board.get_frame(self.settings.stage, self._track_id)
         self._data_cache.update(pose)
 
         if self._data_cache.lost:
@@ -61,15 +61,15 @@ class PoseLineLayer(LayerBase):
 
         # Transform points to image space if use_bbox is enabled
         points = pose[Points2D]
-        if self._config.use_bbox:
+        if self.settings.use_bbox:
             points = PoseLineLayer._transform_to_image_space(points, pose[BBox].to_rect())
 
-        line_width: float = 1.0 / self._fbo.height * self._config.line_width
-        line_smooth: float = 1.0 / self._fbo.height * self._config.line_smooth
+        line_width: float = 1.0 / self._fbo.height * self.settings.line_width
+        line_smooth: float = 1.0 / self._fbo.height * self.settings.line_smooth
 
         self._fbo.begin()
         clear_color()
-        self._shader.use(points, line_width=line_width, line_smooth=line_smooth, color=self._config.color.to_tuple(), use_scores=self._config.use_scores)
+        self._shader.use(points, line_width=line_width, line_smooth=line_smooth, color=self.settings.color.to_tuple(), use_scores=self.settings.use_scores)
         self._fbo.end()
 
     @staticmethod
