@@ -1,6 +1,6 @@
 """The ComfyUI workflow (API format), adapted for SMILE and filled in per run.
 
-SMILE crops and rotates the face itself (modules/face/FaceFinder.py), so the export starts from the
+SMILE crops and rotates the face itself (modules/face/face_finder.py), so the export starts from the
 uploaded image; an older export's face crop subgraph and video recorder are removed and their consumers
 rewired to the image. The overlay check is removed too, and the saved portrait becomes a preview (nothing
 piles up in ComfyUI's output folder). The crop and scale in front of the grin are removed as well: the grin

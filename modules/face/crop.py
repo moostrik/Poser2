@@ -13,8 +13,8 @@ from pathlib import Path
 
 import cv2
 
-from .FaceDetector import FaceDetector
-from .FaceFinder import portrait_crop
+from .face_detector import FaceDetector
+from .face_finder import portrait_crop
 from .settings import FaceSettings
 
 DETECTOR: str = 'data/models/scrfd_10g_bnkps.onnx'

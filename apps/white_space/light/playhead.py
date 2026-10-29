@@ -38,7 +38,7 @@ not break continuity). The projection offset that aligns the projection lives in
 import math
 
 from modules.settings import BaseSettings, Field, Widget
-from modules.utils import EMAFilter
+from modules.utils import EmaFilter
 
 from .motor import MotorMeasurement, MotorCommand, MotorMode, FIXTURE_PROJECTION_RPM
 
@@ -87,7 +87,7 @@ class Playhead:
         self._prev_mode: MotorMode = MotorMode.STOPPED
         self._resyncing: bool = False                # left PROJECTION → free-running until the motor slows to content speed
         self._live:     bool  = False                # is there a real playhead this tick (locked, PROJECTION, or re-syncing)
-        self._rpm_ema = EMAFilter(freq=30.0)         # averages the per-revolution measured speed (feed-forward)
+        self._rpm_ema = EmaFilter(freq=30.0)         # averages the per-revolution measured speed (feed-forward)
         self._time:    float = 0.0                   # accumulated time for the EMA's dt-correction
         self._tracking_prev: bool = False            # was the previous tick the locked-tracking branch (to seed the EMA)
         self._is_projecting: bool = False            # mode signal: the bar spins fast enough for the projection to show

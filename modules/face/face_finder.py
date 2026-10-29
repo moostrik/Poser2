@@ -6,8 +6,8 @@ from dataclasses import dataclass
 from threading import Thread, Lock
 from typing import Callable
 
-from .FaceDetector import FaceDetector, Face
-from .FaceLandmarks import FaceLandmarks
+from .face_detector import FaceDetector, Face
+from .face_landmarks import FaceLandmarks
 from .quality import FaceObservation, Pose, Rejection, distance, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
 from .settings import FaceSettings
 

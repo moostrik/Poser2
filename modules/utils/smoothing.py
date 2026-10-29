@@ -281,7 +281,7 @@ class SpringFilterAngular(SpringFilter):
         super().reset(wrapped)
         self.__last_input = wrapped
 
-class EMAFilter:
+class EmaFilter:
     """Simple exponential smoothing (EMA/LERP).
 
     :freq: Update frequency in Hz (fallback when timestamp not provided)
@@ -383,7 +383,7 @@ class EMAFilter:
         self.__lastvalue = None
         self.__lasttime = None
 
-class EMAFilterAngular(EMAFilter):
+class EmaFilterAngular(EmaFilter):
     """Angular version of ExponentialSmoothing, handles angle wrapping.
 
     :freq: Update frequency in Hz (fallback when timestamp not provided)
@@ -444,9 +444,9 @@ class EMAFilterAngular(EMAFilter):
         super().reset(wrapped)
         self.__last_input = wrapped
 
-class EMAFilterAttackRelease(EMAFilter):
+class EmaFilterAttackRelease(EmaFilter):
     """Exponential smoothing with separate attack and release rates.
-    Inherits from EMAFilter and overrides direction-based alpha selection.
+    Inherits from EmaFilter and overrides direction-based alpha selection.
 
     :freq: Update frequency in Hz (fallback when timestamp not provided)
     :attack: Smoothing factor per second when value is increasing (0-1). Higher = more responsive.
@@ -472,9 +472,9 @@ class EMAFilterAttackRelease(EMAFilter):
         """
         # Select alpha based on direction of change
         if x > self.value:
-            self._EMAFilter__alpha = self.__attack
+            self._EmaFilter__alpha = self.__attack
         else:
-            self._EMAFilter__alpha = self.__release
+            self._EmaFilter__alpha = self.__release
 
         # Use parent's logic with selected alpha
         return super().__call__(x, timestamp)
@@ -524,8 +524,8 @@ class EMAFilterAttackRelease(EMAFilter):
         self.setAttack(attack)
         self.setRelease(release)
 
-class EMAFilterAttackReleaseAngular(EMAFilterAttackRelease):
-    """Angular version of EMAFilterAttackRelease, handles angle wrapping.
+class EmaFilterAttackReleaseAngular(EmaFilterAttackRelease):
+    """Angular version of EmaFilterAttackRelease, handles angle wrapping.
 
     :freq: Update frequency in Hz (fallback when timestamp not provided)
     :attack: Smoothing factor per second when angle is increasing (0-1). Higher = more responsive.

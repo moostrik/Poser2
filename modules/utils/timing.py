@@ -14,7 +14,7 @@ from importlib import metadata
 from pathlib import Path
 from threading import Event
 
-from .PerformanceTimer import PerformanceTimer
+from .performance_timer import PerformanceTimer
 
 logger = logging.getLogger(__name__)
 

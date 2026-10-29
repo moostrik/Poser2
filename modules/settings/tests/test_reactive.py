@@ -1056,7 +1056,7 @@ class TestListSetting(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class TestColorClass(unittest.TestCase):
-    """Tests for the Color utility class from modules.utils.Color."""
+    """Tests for the Color utility class from modules.utils.color."""
 
     # -- Construction --------------------------------------------------------
 
