@@ -61,9 +61,9 @@ class WindowCorrelation:
     than similarity-based approaches.
     """
 
-    def __init__(self, config: WindowCorrelationSettings | None = None) -> None:
+    def __init__(self, settings: WindowCorrelationSettings | None = None) -> None:
 
-        self._config = config if config is not None else WindowCorrelationSettings()
+        self.settings = settings if settings is not None else WindowCorrelationSettings()
 
         self._correlation_thread = threading.Thread(target=self.run, daemon=True)
         self._stop_event = threading.Event()
@@ -102,7 +102,7 @@ class WindowCorrelation:
         Args:
              all_windows: Combined dict {type[BaseFeature]: {track_id: FeatureWindow}}
         """
-        if not self._config.enabled:
+        if not self.settings.enabled:
             return
 
         angle_windows: FeatureWindowDict = all_windows.get(Angles, {})
@@ -129,7 +129,7 @@ class WindowCorrelation:
                 start_time: float = time.perf_counter()
                 similarity_dict, leader_dict = self._process(windows, motion_windows)
                 elapsed_time: float = (time.perf_counter() - start_time) * 1000.0
-                self.Timer.add_time(elapsed_time, self._config.verbose)
+                self.Timer.add_time(elapsed_time, self.settings.verbose)
 
                 result = SimilarityResult(similarity_dict, leader_dict)
                 with self._output_lock:
@@ -150,7 +150,7 @@ class WindowCorrelation:
             return {}, {}
 
         track_ids = list(windows.keys())
-        window_length = self._config.window_length
+        window_length = self.settings.window_length
 
         # Stack angle windows (N, T, F)
         values = np.stack([w.values[-window_length:] for w in windows.values()], axis=0)
@@ -160,7 +160,7 @@ class WindowCorrelation:
 
         # Stack motion windows if enabled (N, T)
         motion_values: np.ndarray | None = None
-        if self._config.use_motion_weighting and motion_windows:
+        if self.settings.use_motion_weighting and motion_windows:
             motion_values = np.stack([w.values[-window_length:, 0] for w in motion_windows.values()], axis=0)
 
         # Compute correlation tensor
@@ -170,12 +170,12 @@ class WindowCorrelation:
         similarity_dict = self._build_similarity_dict(track_ids, corr_matrix, confidence_matrix)
         leader_dict = self._build_leader_dict(track_ids, lag_matrix)
 
-        if self._config.verbose:
+        if self.settings.verbose:
             results = []
             for track_id in track_ids:
                 sim_feature = similarity_dict[track_id]
                 leader_feature = leader_dict[track_id]
-                for other_id in range(self._config.max_poses):
+                for other_id in range(self.settings.max_poses):
                     if not np.isnan(sim_feature.values[other_id]):
                         sim_val = sim_feature.values[other_id]
                         lead_val = leader_feature.values[other_id]
@@ -201,8 +201,8 @@ class WindowCorrelation:
             confidence_matrix: Confidence scores (N, N, F)
         """
         N, T, F = values.shape
-        max_lag = min(self._config.max_lag, T - 1)
-        min_var = self._config.min_variance
+        max_lag = min(self.settings.max_lag, T - 1)
+        min_var = self.settings.min_variance
         fft_size = 2 * T
 
         # Compute variance per joint (N, F)
@@ -293,7 +293,7 @@ class WindowCorrelation:
         """Build per-pose Similarity dict from correlation matrix."""
 
         N = len(track_ids)
-        max_poses = self._config.max_poses
+        max_poses = self.settings.max_poses
         result: dict[int, Similarity] = {}
 
         for i in range(N):
@@ -310,12 +310,12 @@ class WindowCorrelation:
                 )
 
                 aggregated = temp_feature.aggregate(
-                    method=self._config.method,
+                    method=self.settings.method,
                     min_confidence=0.0
                 )
 
                 # Apply remap
-                low, high = self._config.remap_low, self._config.remap_high
+                low, high = self.settings.remap_low, self.settings.remap_high
                 if high > low and not np.isnan(aggregated):
                     aggregated = (aggregated - (low + 1) / 2) / ((high - low) / 2)
                     aggregated = float(np.clip(aggregated, 0.0, 1.0))
@@ -339,7 +339,7 @@ class WindowCorrelation:
         """Build per-pose LeaderScore dict from lag matrix."""
 
         N = len(track_ids)
-        max_poses = self._config.max_poses
+        max_poses = self.settings.max_poses
         result: dict[int, LeaderScore] = {}
 
         for i in range(N):

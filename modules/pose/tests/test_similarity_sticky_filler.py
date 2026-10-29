@@ -16,8 +16,8 @@ def _rows(*pairs: dict[int, float]) -> SimilarityResult:
 
 class SimilarityStickyFillerTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.config = SimilarityStickyFillerSettings()
-        self.filler = SimilarityStickyFiller(self.config)
+        self.settings = SimilarityStickyFillerSettings()
+        self.filler = SimilarityStickyFiller(self.settings)
         self.out: list[SimilarityResult] = []
         self.filler.add_similarity_callback(self.out.append)
 
@@ -33,7 +33,7 @@ class SimilarityStickyFillerTest(unittest.TestCase):
         self.assertEqual(rows[0].get_score(1), 0.0)
 
     def test_hold_scores_keeps_the_last_score(self) -> None:
-        self.config.hold_scores = True
+        self.settings.hold_scores = True
         self._run(_rows({1: 0.7}, {0: 0.7}))
         rows = self._run(_rows({}, {}))
         self.assertEqual(rows[0].get_score(1), 1.0)
@@ -65,11 +65,11 @@ class SimilarityStickyFillerTest(unittest.TestCase):
         self.assertTrue(math.isnan(rows[0][0]))
 
     def test_disabled_and_leader_pass_through(self) -> None:
-        self.config.enabled = False
+        self.settings.enabled = False
         result = _rows({1: 0.7}, {0: 0.7})
         self.filler.process(result)
         self.assertIs(self.out[-1], result)
-        self.config.enabled = True
+        self.settings.enabled = True
         self.filler.process(result)
         self.assertIs(self.out[-1].leader_score, result.leader_score)
 

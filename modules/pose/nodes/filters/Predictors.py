@@ -37,28 +37,24 @@ class FeaturePredictor(FilterNode):
         }
     )
 
-    def __init__(self, config: PredictorSettings, feature_type: type[BaseFeature]) -> None:
-        self._config = config
+    def __init__(self, settings: PredictorSettings, feature_type: type[BaseFeature]) -> None:
+        self.settings = settings
         self._feature_type = feature_type
         predictor_cls = self._PREDICT_MAP[feature_type]
         self._predictor = predictor_cls(
             vector_size=feature_type.length(),
-            input_frequency=config.frequency,
-            method=config.method,
+            input_frequency=settings.frequency,
+            method=settings.method,
             clamp_range=feature_type.range()
         )
-        self._config.bind_all(self._on_config_changed)
+        self.settings.bind_all(self._on_settings_changed)
 
     def __del__(self):
-        """Cleanup config listener to prevent memory leaks."""
+        """Cleanup settings listener to prevent memory leaks."""
         try:
-            self._config.unbind_all(self._on_config_changed)
+            self.settings.unbind_all(self._on_settings_changed)
         except (AttributeError, ValueError):
             pass
-
-    @property
-    def config(self) -> PredictorSettings:
-        return self._config
 
     def _create_predicted_data(self, original_data, predicted_values: np.ndarray):
         """Create feature data with predicted values and adjusted scores.
@@ -93,39 +89,39 @@ class FeaturePredictor(FilterNode):
         """Reset the predictor's internal state (clear sample history)."""
         self._predictor.reset()
 
-    def _on_config_changed(self, _=None) -> None:
+    def _on_settings_changed(self, _=None) -> None:
         """Handle configuration changes by updating predictor parameters."""
-        self._predictor.input_frequency = self._config.frequency
-        self._predictor.method = self._config.method
+        self._predictor.input_frequency = self.settings.frequency
+        self._predictor.method = self.settings.method
 
 
 # Convenience classes
 
 class BBoxPredictor(FeaturePredictor):
-    def __init__(self, config: PredictorSettings) -> None:
-        super().__init__(config, BBox)
+    def __init__(self, settings:PredictorSettings) -> None:
+        super().__init__(settings,BBox)
 
 
 class PointPredictor(FeaturePredictor):
-    def __init__(self, config: PredictorSettings) -> None:
-        super().__init__(config, Points2D)
+    def __init__(self, settings:PredictorSettings) -> None:
+        super().__init__(settings,Points2D)
 
 
 class AnglePredictor(FeaturePredictor):
-    def __init__(self, config: PredictorSettings) -> None:
-        super().__init__(config, Angles)
+    def __init__(self, settings:PredictorSettings) -> None:
+        super().__init__(settings,Angles)
 
 
 class AngleVelPredictor(FeaturePredictor):
-    def __init__(self, config: PredictorSettings) -> None:
-        super().__init__(config, AngleVelocity)
+    def __init__(self, settings:PredictorSettings) -> None:
+        super().__init__(settings,AngleVelocity)
 
 
 class AngleSymPredictor(FeaturePredictor):
-    def __init__(self, config: PredictorSettings) -> None:
-        super().__init__(config, AngleSymmetry)
+    def __init__(self, settings:PredictorSettings) -> None:
+        super().__init__(settings,AngleSymmetry)
 
 
 class AzimuthPredictor(FeaturePredictor):
-    def __init__(self, config: PredictorSettings) -> None:
-        super().__init__(config, Azimuth)
+    def __init__(self, settings:PredictorSettings) -> None:
+        super().__init__(settings,Azimuth)

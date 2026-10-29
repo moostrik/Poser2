@@ -27,8 +27,8 @@ class MotionGateApplicator(FilterNode):
     Thread-safe: Uses lock to protect stored motion gate dict.
     """
 
-    def __init__(self, config: MotionGateApplicatorSettings | None = None) -> None:
-        self._config = config if config is not None else MotionGateApplicatorSettings()
+    def __init__(self, settings: MotionGateApplicatorSettings | None = None) -> None:
+        self.settings = settings if settings is not None else MotionGateApplicatorSettings()
         self._motion_gate_dict: dict[int, MotionGate] = {}
         self._lock: Lock = Lock()
 
@@ -38,7 +38,7 @@ class MotionGateApplicator(FilterNode):
         Args:
             frames: Dictionary mapping track_id -> Frame
         """
-        max_poses = self._config.max_poses
+        max_poses = self.settings.max_poses
 
         # Step 1: Extract motion values for each pose
         motion_values: dict[int, float] = {}

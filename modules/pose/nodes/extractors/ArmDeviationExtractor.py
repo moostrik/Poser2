@@ -43,8 +43,8 @@ class ArmDeviationExtractor(FilterNode):
     angle is valid.
     """
 
-    def __init__(self, config: ArmDeviationExtractorSettings | None = None) -> None:
-        self._config = config if config is not None else ArmDeviationExtractorSettings()
+    def __init__(self, settings: ArmDeviationExtractorSettings | None = None) -> None:
+        self.settings = settings if settings is not None else ArmDeviationExtractorSettings()
 
     def process(self, pose: Frame) -> Frame:
         angles = pose[Angles]
@@ -54,8 +54,8 @@ class ArmDeviationExtractor(FilterNode):
             return pose
 
         distance = values[valid]                                   # each joint's angle from neutral
-        n = min(int(self._config.n_top), int(distance.size))
+        n = min(int(self.settings.n_top), int(distance.size))
         top = np.partition(distance, -n)[-n:]
-        deviation = range_position(math.degrees(float(np.mean(top))), self._config.min_degrees, self._config.max_degrees)
+        deviation = range_position(math.degrees(float(np.mean(top))), self.settings.min_degrees, self.settings.max_degrees)
         score = float(np.mean(angles.scores[_ARM_JOINTS][valid]))
         return replace(pose, {ArmDeviation: ArmDeviation.from_value(deviation, score)})

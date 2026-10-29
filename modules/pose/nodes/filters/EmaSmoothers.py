@@ -36,32 +36,28 @@ class FeatureEmaSmoother(FilterNode):
         }
     )
 
-    def __init__(self, config: EmaSmootherSettings, feature_type: type[BaseFeature]) -> None:
-        self._config: EmaSmootherSettings = config
+    def __init__(self, settings: EmaSmootherSettings, feature_type: type[BaseFeature]) -> None:
+        self.settings: EmaSmootherSettings = settings
         self._feature_type: type[BaseFeature] = feature_type
         smoother_cls = self._SMOOTH_MAP[feature_type]
         self._smoother = smoother_cls(
             vector_size=feature_type.length(),
-            attack=config.attack,
-            release=config.release,
+            attack=settings.attack,
+            release=settings.release,
             clamp_range=feature_type.range()
         )
-        self._config.bind_all(self._on_config_changed)
+        self.settings.bind_all(self._on_settings_changed)
 
     def __del__(self):
-        """Cleanup config listener to prevent memory leaks."""
+        """Cleanup settings listener to prevent memory leaks."""
         try:
-            self._config.unbind_all(self._on_config_changed)
+            self.settings.unbind_all(self._on_settings_changed)
         except (AttributeError, ValueError):
-            pass  # Config already cleaned up or listener not found
+            pass  # Settings already cleaned up or listener not found
 
-    def _on_config_changed(self, _=None) -> None:
-        self._smoother.attack = self._config.attack
-        self._smoother.release = self._config.release
-
-    @property
-    def config(self) -> EmaSmootherSettings:
-        return self._config
+    def _on_settings_changed(self, _=None) -> None:
+        self._smoother.attack = self.settings.attack
+        self._smoother.release = self.settings.release
 
     def process(self, pose: Frame) -> Frame:
         feature_data = pose[self._feature_type]
@@ -76,35 +72,35 @@ class FeatureEmaSmoother(FilterNode):
 
 # Convenience classes
 class BBoxEmaSmoother(FeatureEmaSmoother):
-    def __init__(self, config: EmaSmootherSettings) -> None:
-        super().__init__(config, BBox)
+    def __init__(self, settings:EmaSmootherSettings) -> None:
+        super().__init__(settings,BBox)
 
 
 class PointEmaSmoother(FeatureEmaSmoother):
-    def __init__(self, config: EmaSmootherSettings) -> None:
-        super().__init__(config, Points2D)
+    def __init__(self, settings:EmaSmootherSettings) -> None:
+        super().__init__(settings,Points2D)
 
 
 class AngleEmaSmoother(FeatureEmaSmoother):
-    def __init__(self, config: EmaSmootherSettings) -> None:
-        super().__init__(config, Angles)
+    def __init__(self, settings:EmaSmootherSettings) -> None:
+        super().__init__(settings,Angles)
 
 
 class AngleVelEmaSmoother(FeatureEmaSmoother):
-    def __init__(self, config: EmaSmootherSettings) -> None:
-        super().__init__(config, AngleVelocity)
+    def __init__(self, settings:EmaSmootherSettings) -> None:
+        super().__init__(settings,AngleVelocity)
 
 
 class AngleSymEmaSmoother(FeatureEmaSmoother):
-    def __init__(self, config: EmaSmootherSettings) -> None:
-        super().__init__(config, AngleSymmetry)
+    def __init__(self, settings:EmaSmootherSettings) -> None:
+        super().__init__(settings,AngleSymmetry)
 
 
 class SimilarityEmaSmoother(FeatureEmaSmoother):
-    def __init__(self, config: EmaSmootherSettings) -> None:
-        super().__init__(config, Similarity)
+    def __init__(self, settings:EmaSmootherSettings) -> None:
+        super().__init__(settings,Similarity)
 
 
 class AngleMotionEmaSmoother(FeatureEmaSmoother):
-    def __init__(self, config: EmaSmootherSettings) -> None:
-        super().__init__(config, AngleMotion)
+    def __init__(self, settings:EmaSmootherSettings) -> None:
+        super().__init__(settings,AngleMotion)

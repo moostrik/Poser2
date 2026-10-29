@@ -77,15 +77,15 @@ def joint_distances(a: Angles, b: Angles, mask: np.ndarray | None = None) -> np.
     return np.where(compared, distances, np.nan)
 
 
-def posture_distance(a: Angles, b: Angles, config: PostureSimilaritySettings) -> tuple[float, float]:
+def posture_distance(a: Angles, b: Angles, settings: PostureSimilaritySettings) -> tuple[float, float]:
     """``(distance in degrees, coverage)`` of two poses; ``(NaN, 0.0)`` when they share no selected joint."""
-    mask = joint_mask(config.joints)
+    mask = joint_mask(settings.joints)
     distances = joint_distances(a, b, mask)
     selected = int(mask.sum())
     compared = int(np.sum(~np.isnan(distances)))
     if selected == 0 or compared == 0:
         return math.nan, 0.0
-    return float(_soft_max(distances, float(config.forgiveness))), compared / selected
+    return float(_soft_max(distances, float(settings.forgiveness))), compared / selected
 
 
 def _score(distances: np.ndarray, tolerance: float) -> np.ndarray:
@@ -95,10 +95,10 @@ def _score(distances: np.ndarray, tolerance: float) -> np.ndarray:
     return np.clip((180.0 - tolerance - distances) / span, 0.0, 1.0)      # NaN stays NaN
 
 
-def posture_similarity(distance: float, config: PostureSimilaritySettings) -> float:
+def posture_similarity(distance: float, settings: PostureSimilaritySettings) -> float:
     """The similarity of a distance: exactly 1.0 up to ``angle_tolerance``, 0.0 from ``180 − tolerance``,
     linear between; NaN for NaN."""
-    return float(_score(np.asarray(distance, dtype=np.float64), float(config.angle_tolerance)))
+    return float(_score(np.asarray(distance, dtype=np.float64), float(settings.angle_tolerance)))
 
 
 class PostureSimilarity:
@@ -106,8 +106,8 @@ class PostureSimilarity:
     by pose id, emitted as a ``SimilarityResult`` with no leader scores. Every present pose gets a row, so a
     pose alone reads NaN toward everyone. Synchronous, on the caller's thread."""
 
-    def __init__(self, config: PostureSimilaritySettings | None = None) -> None:
-        self._config = config if config is not None else PostureSimilaritySettings()
+    def __init__(self, settings: PostureSimilaritySettings | None = None) -> None:
+        self.settings = settings if settings is not None else PostureSimilaritySettings()
         self._callbacks: list[Callable[[SimilarityResult], None]] = []
 
     def add_similarity_callback(self, callback: Callable[[SimilarityResult], None]) -> None:
@@ -126,7 +126,7 @@ class PostureSimilarity:
         if not ids:
             return rows
 
-        mask = joint_mask(self._config.joints)
+        mask = joint_mask(self.settings.joints)
         selected = int(mask.sum())
         angles = [frames[id][Angles] for id in ids]
         values = np.stack([a.values for a in angles]).astype(np.float64)           # (N, F)
@@ -136,8 +136,8 @@ class PostureSimilarity:
         compared = seen[:, None, :] & seen[None, :, :] & ~np.isnan(distances) & mask[None, None, :]
         distances = np.where(compared, distances, np.nan)
 
-        pair_distance = _soft_max(distances, float(self._config.forgiveness))      # (N, N)
-        similarity = _score(pair_distance, float(self._config.angle_tolerance))
+        pair_distance = _soft_max(distances, float(self.settings.forgiveness))      # (N, N)
+        similarity = _score(pair_distance, float(self.settings.angle_tolerance))
         coverage = compared.sum(axis=-1) / selected if selected > 0 else np.zeros_like(pair_distance)
 
         for i, id in enumerate(ids):

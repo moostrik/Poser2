@@ -56,58 +56,58 @@ class FeatureChaseInterpolator(FeatureInterpolatorBase[ChaseInterpolatorSettings
         clamp_range = self._feature_type.range()
         return interpolator_cls(
             vector_size=vector_size,
-            input_frequency=self._config.input_frequency,
-            responsiveness=self._config.responsiveness,
-            friction=self._config.friction,
+            input_frequency=self.settings.input_frequency,
+            responsiveness=self.settings.responsiveness,
+            friction=self.settings.friction,
             clamp_range=clamp_range
         )
 
 
-    def _on_config_changed(self, _=None) -> None:
+    def _on_settings_changed(self, _=None) -> None:
         """Handle configuration changes by updating interpolator parameters."""
         with self._lock:
-            cast(Chase, self._interpolator).input_frequency = self._config.input_frequency
-            cast(Chase, self._interpolator).responsiveness = self._config.responsiveness
-            cast(Chase, self._interpolator).friction = self._config.friction
-            self._output_interval = 1.0 / self._config.output_frequency
+            cast(Chase, self._interpolator).input_frequency = self.settings.input_frequency
+            cast(Chase, self._interpolator).responsiveness = self.settings.responsiveness
+            cast(Chase, self._interpolator).friction = self.settings.friction
+            self._output_interval = 1.0 / self.settings.output_frequency
 
 
 # Convenience classes
 class BBoxChaseInterpolator(FeatureChaseInterpolator):
-    def __init__(self, config: ChaseInterpolatorSettings) -> None:
-        super().__init__(config, BBox)
+    def __init__(self, settings:ChaseInterpolatorSettings) -> None:
+        super().__init__(settings,BBox)
 
 
 class PointChaseInterpolator(FeatureChaseInterpolator):
-    def __init__(self, config: ChaseInterpolatorSettings) -> None:
-        super().__init__(config, Points2D)
+    def __init__(self, settings:ChaseInterpolatorSettings) -> None:
+        super().__init__(settings,Points2D)
 
 
 class AngleChaseInterpolator(FeatureChaseInterpolator):
-    def __init__(self, config: ChaseInterpolatorSettings) -> None:
-        super().__init__(config, Angles)
+    def __init__(self, settings:ChaseInterpolatorSettings) -> None:
+        super().__init__(settings,Angles)
 
 
 class AngleVelChaseInterpolator(FeatureChaseInterpolator):
-    def __init__(self, config: ChaseInterpolatorSettings) -> None:
-        super().__init__(config, AngleVelocity)
+    def __init__(self, settings:ChaseInterpolatorSettings) -> None:
+        super().__init__(settings,AngleVelocity)
 
 
 class AngleSymChaseInterpolator(FeatureChaseInterpolator):
-    def __init__(self, config: ChaseInterpolatorSettings) -> None:
-        super().__init__(config, AngleSymmetry)
+    def __init__(self, settings:ChaseInterpolatorSettings) -> None:
+        super().__init__(settings,AngleSymmetry)
 
 
 class SimilarityChaseInterpolator(FeatureChaseInterpolator):
-    def __init__(self, config: ChaseInterpolatorSettings) -> None:
-        super().__init__(config, Similarity)
+    def __init__(self, settings:ChaseInterpolatorSettings) -> None:
+        super().__init__(settings,Similarity)
 
 
 class AzimuthChaseInterpolator(FeatureChaseInterpolator):
-    def __init__(self, config: ChaseInterpolatorSettings) -> None:
-        super().__init__(config, Azimuth)
+    def __init__(self, settings:ChaseInterpolatorSettings) -> None:
+        super().__init__(settings,Azimuth)
 
 
 class DistanceChaseInterpolator(FeatureChaseInterpolator):
-    def __init__(self, config: ChaseInterpolatorSettings) -> None:
-        super().__init__(config, Distance)
+    def __init__(self, settings:ChaseInterpolatorSettings) -> None:
+        super().__init__(settings,Distance)

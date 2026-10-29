@@ -61,14 +61,14 @@ def _wrap1(value: float) -> float:
 class AngleCalibrator(FilterNode):
     """Maps the angles from the calibration's reference poses; see the module docstring."""
 
-    def __init__(self, config: AngleCalibratorSettings | None = None) -> None:
-        self._config = config if config is not None else AngleCalibratorSettings()
+    def __init__(self, settings: AngleCalibratorSettings | None = None) -> None:
+        self.settings = settings if settings is not None else AngleCalibratorSettings()
 
     def process(self, pose: Frame) -> Frame:
         angles = pose[Angles]
         if angles.valid_count == 0:
             return pose
-        C = self._config
+        C = self.settings
         neutral, scale = self._tables()
         raw = angles.values.astype(np.float64)
         values = _wrap(_wrap(raw - neutral) * scale)
@@ -85,7 +85,7 @@ class AngleCalibrator(FilterNode):
 
     def _tables(self) -> tuple[np.ndarray, np.ndarray]:
         """Per landmark: the neutral to subtract and the scale to apply (radians), from the live settings."""
-        C = self._config
+        C = self.settings
         neutral = np.zeros(len(AngleLandmark), dtype=np.float64)
         scale = np.ones(len(AngleLandmark), dtype=np.float64)
         if C.neutral:

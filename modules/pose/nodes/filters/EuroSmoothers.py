@@ -57,36 +57,32 @@ class FeatureEuroSmoother(FilterNode):
         }
     )
 
-    def __init__(self, config: EuroSmootherSettings, feature_type: type[BaseFeature]) -> None:
-        self._config: EuroSmootherSettings = config
+    def __init__(self, settings: EuroSmootherSettings, feature_type: type[BaseFeature]) -> None:
+        self.settings: EuroSmootherSettings = settings
         self._feature_type: type[BaseFeature] = feature_type
         smoother_cls = self._SMOOTH_MAP[feature_type]
         self._smoother = smoother_cls(
             vector_size=feature_type.length(),
-            frequency=config.frequency,
-            min_cutoff=config.min_cutoff,
-            cutoff_rise=config.cutoff_rise,
-            d_cutoff=config.d_cutoff,
+            frequency=settings.frequency,
+            min_cutoff=settings.min_cutoff,
+            cutoff_rise=settings.cutoff_rise,
+            d_cutoff=settings.d_cutoff,
             clamp_range=feature_type.range()
         )
-        self._config.bind_all(self._on_config_changed)
+        self.settings.bind_all(self._on_settings_changed)
 
     def __del__(self):
-        """Cleanup config listener to prevent memory leaks."""
+        """Cleanup settings listener to prevent memory leaks."""
         try:
-            self._config.unbind_all(self._on_config_changed)
+            self.settings.unbind_all(self._on_settings_changed)
         except (AttributeError, ValueError):
-            pass  # Config already cleaned up or listener not found
+            pass  # Settings already cleaned up or listener not found
 
-    def _on_config_changed(self, _=None) -> None:
-        self._smoother.frequency = self._config.frequency
-        self._smoother.min_cutoff = self._config.min_cutoff
-        self._smoother.cutoff_rise = self._config.cutoff_rise
-        self._smoother.d_cutoff = self._config.d_cutoff
-
-    @property
-    def config(self) -> EuroSmootherSettings:
-        return self._config
+    def _on_settings_changed(self, _=None) -> None:
+        self._smoother.frequency = self.settings.frequency
+        self._smoother.min_cutoff = self.settings.min_cutoff
+        self._smoother.cutoff_rise = self.settings.cutoff_rise
+        self._smoother.d_cutoff = self.settings.d_cutoff
 
     def process(self, pose: Frame) -> Frame:
         feature_data = pose[self._feature_type]
@@ -101,40 +97,40 @@ class FeatureEuroSmoother(FilterNode):
 
 # Convenience classes
 class BBoxEuroSmoother(FeatureEuroSmoother):
-    def __init__(self, config: EuroSmootherSettings) -> None:
-        super().__init__(config, BBox)
+    def __init__(self, settings:EuroSmootherSettings) -> None:
+        super().__init__(settings,BBox)
 
 
 class PointEuroSmoother(FeatureEuroSmoother):
-    def __init__(self, config: EuroSmootherSettings) -> None:
-        super().__init__(config, Points2D)
+    def __init__(self, settings:EuroSmootherSettings) -> None:
+        super().__init__(settings,Points2D)
 
 
 class AngleEuroSmoother(FeatureEuroSmoother):
-    def __init__(self, config: EuroSmootherSettings) -> None:
-        super().__init__(config, Angles)
+    def __init__(self, settings:EuroSmootherSettings) -> None:
+        super().__init__(settings,Angles)
 
 
 class AngleVelEuroSmoother(FeatureEuroSmoother):
-    def __init__(self, config: EuroSmootherSettings) -> None:
-        super().__init__(config, AngleVelocity)
+    def __init__(self, settings:EuroSmootherSettings) -> None:
+        super().__init__(settings,AngleVelocity)
 
 
 class AngleSymEuroSmoother(FeatureEuroSmoother):
-    def __init__(self, config: EuroSmootherSettings) -> None:
-        super().__init__(config, AngleSymmetry)
+    def __init__(self, settings:EuroSmootherSettings) -> None:
+        super().__init__(settings,AngleSymmetry)
 
 
 class SimilarityEuroSmoother(FeatureEuroSmoother):
-    def __init__(self, config: EuroSmootherSettings) -> None:
-        super().__init__(config, Similarity)
+    def __init__(self, settings:EuroSmootherSettings) -> None:
+        super().__init__(settings,Similarity)
 
 
 class AzimuthEuroSmoother(FeatureEuroSmoother):
-    def __init__(self, config: EuroSmootherSettings) -> None:
-        super().__init__(config, Azimuth)
+    def __init__(self, settings:EuroSmootherSettings) -> None:
+        super().__init__(settings,Azimuth)
 
 
 class DistanceEuroSmoother(FeatureEuroSmoother):
-    def __init__(self, config: EuroSmootherSettings) -> None:
-        super().__init__(config, Distance)
+    def __init__(self, settings:EuroSmootherSettings) -> None:
+        super().__init__(settings,Distance)

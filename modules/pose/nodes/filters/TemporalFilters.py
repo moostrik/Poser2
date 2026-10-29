@@ -37,19 +37,19 @@ class TemporalStabilizer(FilterNode):
     This filter operates on the valid_mask, not raw scores.
 
     Args:
-        config: Temporal stability filter configuration
+        settings: Temporal stability filter configuration
         feature_type: Feature type specifying which feature to filter
 
     Example:
-        config = TemporalStabilityConfig(
+        settings = TemporalStabilityConfig(
             min_consecutive_frames=3,
             max_gap_frames=1
         )
-        filter = TemporalStabilityFilter(config, Points2D)
+        filter = TemporalStabilityFilter(settings, Points2D)
     """
 
-    def __init__(self, config: TemporalStabilizerSettings, feature_type: type[BaseFeature]):
-        self._config = config
+    def __init__(self, settings: TemporalStabilizerSettings, feature_type: type[BaseFeature]):
+        self.settings = settings
         self._feature_type = feature_type
         # Get number of elements from feature type
         n_elements = feature_type.length()
@@ -61,10 +61,6 @@ class TemporalStabilizer(FilterNode):
         self._gap_count: np.ndarray = np.zeros(n_elements, dtype=np.int32)
         # State: tracks which elements are currently visible
         self._visible: np.ndarray = np.zeros(n_elements, dtype=bool)
-
-    @property
-    def config(self) -> TemporalStabilizerSettings:
-        return self._config
 
     def reset(self) -> None:
         """Reset filter state. Called when pose track is lost."""
@@ -95,7 +91,7 @@ class TemporalStabilizer(FilterNode):
                 self._gap_count[i] = 0  # Reset gap counter
             else:
                 # Element is invalid (NaN)
-                if self._visible[i] and self._gap_count[i] < self._config.max_gap_frames:
+                if self._visible[i] and self._gap_count[i] < self.settings.max_gap_frames:
                     # In grace period - allow brief dropout
                     self._gap_count[i] += 1
                 else:
@@ -104,7 +100,7 @@ class TemporalStabilizer(FilterNode):
                     self._gap_count[i] = 0
 
         # Update visibility: visible when consecutive count meets minimum
-        self._visible = self._consecutive_count >= self._config.min_consecutive_frames
+        self._visible = self._consecutive_count >= self.settings.min_consecutive_frames
 
         # Apply the visibility mask
         # For 2D data (points), broadcast mask to match shape (17,) -> (17, 2)
@@ -126,25 +122,25 @@ class TemporalStabilizer(FilterNode):
 
 # Convenience classes for temporal stability filtering
 class BBoxTemporalStabilizer(TemporalStabilizer):
-    def __init__(self, config: TemporalStabilizerSettings) -> None:
-        super().__init__(config, BBox)
+    def __init__(self, settings:TemporalStabilizerSettings) -> None:
+        super().__init__(settings,BBox)
 
 
 class PointTemporalStabilizer(TemporalStabilizer):
-    def __init__(self, config: TemporalStabilizerSettings) -> None:
-        super().__init__(config, Points2D)
+    def __init__(self, settings:TemporalStabilizerSettings) -> None:
+        super().__init__(settings,Points2D)
 
 
 class AngleTemporalStabilizer(TemporalStabilizer):
-    def __init__(self, config: TemporalStabilizerSettings) -> None:
-        super().__init__(config, Angles)
+    def __init__(self, settings:TemporalStabilizerSettings) -> None:
+        super().__init__(settings,Angles)
 
 
 class AngleVelTemporalStabilizer(TemporalStabilizer):
-    def __init__(self, config: TemporalStabilizerSettings) -> None:
-        super().__init__(config, AngleVelocity)
+    def __init__(self, settings:TemporalStabilizerSettings) -> None:
+        super().__init__(settings,AngleVelocity)
 
 
 class AngleSymTemporalStabilizer(TemporalStabilizer):
-    def __init__(self, config: TemporalStabilizerSettings) -> None:
-        super().__init__(config, AngleSymmetry)
+    def __init__(self, settings:TemporalStabilizerSettings) -> None:
+        super().__init__(settings,AngleSymmetry)

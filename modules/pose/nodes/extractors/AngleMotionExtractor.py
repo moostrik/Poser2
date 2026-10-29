@@ -22,9 +22,9 @@ class AngleMotionExtractor(FilterNode):
     joint-specific weights, then averages the top N highest motions to produce a single [0, 1] value.
     """
 
-    def __init__(self, config: AngleMotionExtractorSettings | None = None) -> None:
+    def __init__(self, settings: AngleMotionExtractorSettings | None = None) -> None:
         super().__init__()
-        self._config = config if config is not None else AngleMotionExtractorSettings()
+        self.settings = settings if settings is not None else AngleMotionExtractorSettings()
         self._normalisation_factors: np.ndarray = np.array(
             [ANGLE_MOTION_NORMALISATION[landmark] for landmark in AngleLandmark],
             dtype=np.float32
@@ -36,19 +36,19 @@ class AngleMotionExtractor(FilterNode):
         motions: np.ndarray = np.abs(angle_vel.values)
 
         # Remove noise: subtract threshold and clip negative values to 0 (the settings are °/s, the velocities rad/s)
-        motions = np.maximum(motions - np.radians(self._config.noise_threshold), 0.0)
+        motions = np.maximum(motions - np.radians(self.settings.noise_threshold), 0.0)
 
         # Normalize by joint-specific factors (gives motion semantic meaning)
         motions *= self._normalisation_factors
 
         # Scale to [0, 1] range based on max_threshold
-        motions /= np.radians(self._config.max_threshold)
+        motions /= np.radians(self.settings.max_threshold)
 
         # Get top N motions and average them
         valid_motions = motions[~np.isnan(motions)]
         if len(valid_motions) > 0:
             # Sort and get top n values
-            n = min(self._config.n_top_motions, len(valid_motions))
+            n = min(self.settings.n_top_motions, len(valid_motions))
             top_n_motions = np.partition(valid_motions, -n)[-n:]
             # Clamp each motion to [0, 1] before averaging
             top_n_motions = np.clip(top_n_motions, 0.0, 1.0)

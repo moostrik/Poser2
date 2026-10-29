@@ -37,8 +37,8 @@ class LegDeviationExtractor(FilterNode):
     Leaves the frame unchanged when no leg angle is valid.
     """
 
-    def __init__(self, config: LegDeviationExtractorSettings | None = None) -> None:
-        self._config = config if config is not None else LegDeviationExtractorSettings()
+    def __init__(self, settings: LegDeviationExtractorSettings | None = None) -> None:
+        self.settings = settings if settings is not None else LegDeviationExtractorSettings()
 
     def process(self, pose: Frame) -> Frame:
         angles = pose[Angles]
@@ -47,7 +47,7 @@ class LegDeviationExtractor(FilterNode):
         if not np.any(valid):
             return pose
 
-        C = self._config
+        C = self.settings
         tops = np.array([C.hip_max_degrees, C.hip_max_degrees, C.knee_max_degrees, C.knee_max_degrees], dtype=np.float32)
         bend = np.degrees(values[valid])
         span = np.maximum(tops[valid] - C.neutral_dead_zone, 1e-6)      # a zero-width range is a step at the zone

@@ -28,31 +28,27 @@ class FeatureRateLimiter(FilterNode):
         }
     )
 
-    def __init__(self, config: RateLimiterSettings, feature_type: type[BaseFeature]) -> None:
-        self._config: RateLimiterSettings = config
+    def __init__(self, settings:RateLimiterSettings, feature_type: type[BaseFeature]) -> None:
+        self.settings: RateLimiterSettings = settings
         self._feature_type: type[BaseFeature] = feature_type
         limiter_cls = self._FEATURE_LIMIT_MAP[feature_type]
         self._limiter: ArrayRateLimit = limiter_cls(
             vector_size=feature_type.length(),
-            max_increase=config.max_increase,
-            max_decrease=config.max_decrease,
+            max_increase=settings.max_increase,
+            max_decrease=settings.max_decrease,
             clamp_range= feature_type.range()
         )
-        self._config.bind_all(self._on_config_changed)
+        self.settings.bind_all(self._on_settings_changed)
 
     def __del__(self):
         try:
-            self._config.unbind_all(self._on_config_changed)
+            self.settings.unbind_all(self._on_settings_changed)
         except (AttributeError, ValueError):
             pass
 
-    def _on_config_changed(self, _=None) -> None:
-        self._limiter.max_increase = self._config.max_increase
-        self._limiter.max_decrease = self._config.max_decrease
-
-    @property
-    def config(self) -> RateLimiterSettings:
-        return self._config
+    def _on_settings_changed(self, _=None) -> None:
+        self._limiter.max_increase = self.settings.max_increase
+        self._limiter.max_decrease = self.settings.max_decrease
 
     def process(self, pose: Frame) -> Frame:
         feature_data = pose[self._feature_type]
@@ -67,34 +63,34 @@ class FeatureRateLimiter(FilterNode):
 
 # Convenience classes
 class BBoxRateLimiter(FeatureRateLimiter):
-    def __init__(self, config: RateLimiterSettings) -> None:
-        super().__init__(config, BBox)
+    def __init__(self, settings:RateLimiterSettings) -> None:
+        super().__init__(settings,BBox)
 
 
 class PointRateLimiter(FeatureRateLimiter):
-    def __init__(self, config: RateLimiterSettings) -> None:
-        super().__init__(config, Points2D)
+    def __init__(self, settings:RateLimiterSettings) -> None:
+        super().__init__(settings,Points2D)
 
 
 class AngleRateLimiter(FeatureRateLimiter):
-    def __init__(self, config: RateLimiterSettings) -> None:
-        super().__init__(config, Angles)
+    def __init__(self, settings:RateLimiterSettings) -> None:
+        super().__init__(settings,Angles)
 
 
 class AngleVelRateLimiter(FeatureRateLimiter):
-    def __init__(self, config: RateLimiterSettings) -> None:
-        super().__init__(config, AngleVelocity)
+    def __init__(self, settings:RateLimiterSettings) -> None:
+        super().__init__(settings,AngleVelocity)
 
 
 class AngleSymRateLimiter(FeatureRateLimiter):
-    def __init__(self, config: RateLimiterSettings) -> None:
-        super().__init__(config, AngleSymmetry)
+    def __init__(self, settings:RateLimiterSettings) -> None:
+        super().__init__(settings,AngleSymmetry)
 
 
 class SimilarityRateLimiter(FeatureRateLimiter):
-    def __init__(self, config: RateLimiterSettings) -> None:
-        super().__init__(config, Similarity)
+    def __init__(self, settings:RateLimiterSettings) -> None:
+        super().__init__(settings,Similarity)
 
 class AngleMotionRateLimiter(FeatureRateLimiter):
-    def __init__(self, config: RateLimiterSettings) -> None:
-        super().__init__(config, AngleMotion)
+    def __init__(self, settings:RateLimiterSettings) -> None:
+        super().__init__(settings,AngleMotion)

@@ -32,31 +32,27 @@ class MovingAverageSettings(BaseSettings):
 class FeatureMovingAverageSmoother(FilterNode):
     """Generic pose feature smoother using weighted moving average."""
 
-    def __init__(self, config: MovingAverageSettings, feature_type: type[BaseFeature]) -> None:
-        self._config: MovingAverageSettings = config
+    def __init__(self, settings: MovingAverageSettings, feature_type: type[BaseFeature]) -> None:
+        self.settings: MovingAverageSettings = settings
         self._feature_type: type[BaseFeature] = feature_type
         self._smoother = MovingAverage(
             vector_size=feature_type.length(),
-            window_size=config.window_size,
-            window_type=config.window_type,
+            window_size=settings.window_size,
+            window_type=settings.window_type,
             clamp_range=feature_type.range()
         )
-        self._config.bind_all(self._on_config_changed)
+        self.settings.bind_all(self._on_settings_changed)
 
     def __del__(self):
-        """Cleanup config listener to prevent memory leaks."""
+        """Cleanup settings listener to prevent memory leaks."""
         try:
-            self._config.unbind_all(self._on_config_changed)
+            self.settings.unbind_all(self._on_settings_changed)
         except (AttributeError, ValueError):
-            pass  # Config already cleaned up or listener not found
+            pass  # Settings already cleaned up or listener not found
 
-    def _on_config_changed(self, _=None) -> None:
-        self._smoother.window_size = self._config.window_size
-        self._smoother.window_type = self._config.window_type
-
-    @property
-    def config(self) -> MovingAverageSettings:
-        return self._config
+    def _on_settings_changed(self, _=None) -> None:
+        self._smoother.window_size = self.settings.window_size
+        self._smoother.window_type = self.settings.window_type
 
     def process(self, pose: Frame) -> Frame:
         feature_data = pose[self._feature_type]
@@ -72,35 +68,35 @@ class FeatureMovingAverageSmoother(FilterNode):
 # Convenience classes for specific features
 class AngleMotionMovingAverageSmoother(FeatureMovingAverageSmoother):
     """Moving average smoother for angle motion feature."""
-    def __init__(self, config: MovingAverageSettings) -> None:
-        super().__init__(config, AngleMotion)
+    def __init__(self, settings:MovingAverageSettings) -> None:
+        super().__init__(settings,AngleMotion)
 
 
 class SimilarityMovingAverageSmoother(FeatureMovingAverageSmoother):
     """Moving average smoother for similarity feature."""
-    def __init__(self, config: MovingAverageSettings) -> None:
-        super().__init__(config, Similarity)
+    def __init__(self, settings:MovingAverageSettings) -> None:
+        super().__init__(settings,Similarity)
 
 
 class BBoxMovingAverageSmoother(FeatureMovingAverageSmoother):
     """Moving average smoother for bounding box."""
-    def __init__(self, config: MovingAverageSettings) -> None:
-        super().__init__(config, BBox)
+    def __init__(self, settings:MovingAverageSettings) -> None:
+        super().__init__(settings,BBox)
 
 
 class PointMovingAverageSmoother(FeatureMovingAverageSmoother):
     """Moving average smoother for points."""
-    def __init__(self, config: MovingAverageSettings) -> None:
-        super().__init__(config, Points2D)
+    def __init__(self, settings:MovingAverageSettings) -> None:
+        super().__init__(settings,Points2D)
 
 
 class AngleMovingAverageSmoother(FeatureMovingAverageSmoother):
     """Moving average smoother for angles."""
-    def __init__(self, config: MovingAverageSettings) -> None:
-        super().__init__(config, Angles)
+    def __init__(self, settings:MovingAverageSettings) -> None:
+        super().__init__(settings,Angles)
 
 
 class AngleVelMovingAverageSmoother(FeatureMovingAverageSmoother):
     """Moving average smoother for angle velocity."""
-    def __init__(self, config: MovingAverageSettings) -> None:
-        super().__init__(config, AngleVelocity)
+    def __init__(self, settings:MovingAverageSettings) -> None:
+        super().__init__(settings,AngleVelocity)

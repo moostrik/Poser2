@@ -39,8 +39,8 @@ class FeatureLerpInterpolator(FeatureInterpolatorBase[LerpInterpolatorSettings])
         }
     )
 
-    def __init__(self, config: LerpInterpolatorSettings, feature_type: type[BaseFeature]):
-        super().__init__(config, feature_type)
+    def __init__(self, settings:LerpInterpolatorSettings, feature_type: type[BaseFeature]):
+        super().__init__(settings,feature_type)
 
     def _create_interpolator(self):
         """Create the underlying lerp interpolator instance."""
@@ -49,39 +49,39 @@ class FeatureLerpInterpolator(FeatureInterpolatorBase[LerpInterpolatorSettings])
         clamp_range = self._feature_type.range()
         return interp_class(
             vector_size=vector_size,
-            input_frequency=self._config.input_frequency,
+            input_frequency=self.settings.input_frequency,
             clamp_range=clamp_range
         )
 
-    def _on_config_changed(self, _=None) -> None:
+    def _on_settings_changed(self, _=None) -> None:
         """Handle configuration changes by updating interpolator parameters."""
         with self._lock:
             # Cast to VectorLerp to access input_frequency property
-            cast(Lerp, self._interpolator).input_frequency = self._config.input_frequency
-            self._output_interval = 1.0 / self._config.output_frequency
+            cast(Lerp, self._interpolator).input_frequency = self.settings.input_frequency
+            self._output_interval = 1.0 / self.settings.output_frequency
 
 
 # Convenience classes
 class BBoxLerpInterpolator(FeatureLerpInterpolator):
-    def __init__(self, config: LerpInterpolatorSettings) -> None:
-        super().__init__(config, BBox)
+    def __init__(self, settings:LerpInterpolatorSettings) -> None:
+        super().__init__(settings,BBox)
 
 
 class PointLerpInterpolator(FeatureLerpInterpolator):
-    def __init__(self, config: LerpInterpolatorSettings) -> None:
-        super().__init__(config, Points2D)
+    def __init__(self, settings:LerpInterpolatorSettings) -> None:
+        super().__init__(settings,Points2D)
 
 
 class AngleLerpInterpolator(FeatureLerpInterpolator):
-    def __init__(self, config: LerpInterpolatorSettings) -> None:
-        super().__init__(config, Angles)
+    def __init__(self, settings:LerpInterpolatorSettings) -> None:
+        super().__init__(settings,Angles)
 
 
 class AngleVelLerpInterpolator(FeatureLerpInterpolator):
-    def __init__(self, config: LerpInterpolatorSettings) -> None:
-        super().__init__(config, AngleVelocity)
+    def __init__(self, settings:LerpInterpolatorSettings) -> None:
+        super().__init__(settings,AngleVelocity)
 
 
 class AngleSymLerpInterpolator(FeatureLerpInterpolator):
-    def __init__(self, config: LerpInterpolatorSettings) -> None:
-        super().__init__(config, AngleSymmetry)
+    def __init__(self, settings:LerpInterpolatorSettings) -> None:
+        super().__init__(settings,AngleSymmetry)

@@ -27,8 +27,8 @@ class AngleSymExtractor(FilterNode):
     pairs'. Leaves the frame unchanged when no pair is valid.
     """
 
-    def __init__(self, config: LegDeviationExtractorSettings | None = None) -> None:
-        self._config = config if config is not None else LegDeviationExtractorSettings()
+    def __init__(self, settings: LegDeviationExtractorSettings | None = None) -> None:
+        self.settings = settings if settings is not None else LegDeviationExtractorSettings()
 
     def process(self, pose: Frame) -> Frame:
         angles = pose[Angles]
@@ -45,8 +45,8 @@ class AngleSymExtractor(FilterNode):
         scores[:4] = pair_scores
         values[SymmetryElement.arms] = (values[SymmetryElement.shoulder] + values[SymmetryElement.elbow]) / 2.0
         scores[SymmetryElement.arms] = min(pair_scores[SymmetryElement.shoulder], pair_scores[SymmetryElement.elbow])
-        legs = (diff[SymmetryElement.hip] / math.radians(self._config.hip_max_degrees)
-                + diff[SymmetryElement.knee] / math.radians(self._config.knee_max_degrees)) / 2.0
+        legs = (diff[SymmetryElement.hip] / math.radians(self.settings.hip_max_degrees)
+                + diff[SymmetryElement.knee] / math.radians(self.settings.knee_max_degrees)) / 2.0
         values[SymmetryElement.legs] = min(max(legs, -1.0), 1.0) if not math.isnan(legs) else math.nan
         scores[SymmetryElement.legs] = min(pair_scores[SymmetryElement.hip], pair_scores[SymmetryElement.knee])
         scores[np.isnan(values)] = 0.0

@@ -25,16 +25,16 @@ class StickyFillerSettings(BaseSettings):
 class FeatureStickyFiller(FilterNode):
     """Generic sticky filler for pose features."""
 
-    def __init__(self, config: StickyFillerSettings, feature_type: type[BaseFeature]) -> None:
+    def __init__(self, settings:StickyFillerSettings, feature_type: type[BaseFeature]) -> None:
 
-        self._config: StickyFillerSettings = config
+        self.settings: StickyFillerSettings = settings
         self._feature_type: type[BaseFeature] = feature_type
         self._last_valid = self._initialize_last_valid()
 
     def _initialize_last_valid(self) -> BaseFeature:
-        """Initialize last valid state based on config."""
+        """Initialize last valid state based on settings."""
         empty_data = self._feature_type.create_dummy()
-        if self._config.init_to_zero:
+        if self.settings.init_to_zero:
             values = np.zeros_like(empty_data.values)
             scores = np.ones_like(empty_data.scores)
             return type(empty_data)(values=values, scores=scores)
@@ -45,13 +45,9 @@ class FeatureStickyFiller(FilterNode):
         """Broadcast 1D mask to match values shape if needed."""
         return mask[:, np.newaxis] if values.ndim > 1 else mask
 
-    @property
-    def config(self) -> StickyFillerSettings:
-        return self._config
-
     def process(self, pose: Frame) -> Frame:
         """Replace invalid values with last valid, update state with new valid values."""
-        if not self._config.enabled:
+        if not self.settings.enabled:
             return pose
 
         feature_data = pose[self._feature_type]
@@ -64,7 +60,7 @@ class FeatureStickyFiller(FilterNode):
 
         # Create output with held values
         held_values = np.where(invalid_values_mask, self._last_valid.values, feature_data.values)
-        score_replacement = self._last_valid.scores if self._config.hold_scores else 0.0
+        score_replacement = self._last_valid.scores if self.settings.hold_scores else 0.0
         held_scores = np.where(invalid_mask, score_replacement, feature_data.scores).astype(np.float32)
 
         # Update internal state (only valid values)
@@ -83,25 +79,25 @@ class FeatureStickyFiller(FilterNode):
 
 # Convenience classes
 class BBoxStickyFiller(FeatureStickyFiller):
-    def __init__(self, config: StickyFillerSettings) -> None:
-        super().__init__(config, BBox)
+    def __init__(self, settings:StickyFillerSettings) -> None:
+        super().__init__(settings,BBox)
 
 
 class PointStickyFiller(FeatureStickyFiller):
-    def __init__(self, config: StickyFillerSettings) -> None:
-        super().__init__(config, Points2D)
+    def __init__(self, settings:StickyFillerSettings) -> None:
+        super().__init__(settings,Points2D)
 
 
 class AngleStickyFiller(FeatureStickyFiller):
-    def __init__(self, config: StickyFillerSettings) -> None:
-        super().__init__(config, Angles)
+    def __init__(self, settings:StickyFillerSettings) -> None:
+        super().__init__(settings,Angles)
 
 
 class AngleVelStickyFiller(FeatureStickyFiller):
-    def __init__(self, config: StickyFillerSettings) -> None:
-        super().__init__(config, AngleVelocity)
+    def __init__(self, settings:StickyFillerSettings) -> None:
+        super().__init__(settings,AngleVelocity)
 
 
 class AngleSymStickyFiller(FeatureStickyFiller):
-    def __init__(self, config: StickyFillerSettings) -> None:
-        super().__init__(config, AngleSymmetry)
+    def __init__(self, settings:StickyFillerSettings) -> None:
+        super().__init__(settings,AngleSymmetry)

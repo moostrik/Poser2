@@ -27,8 +27,8 @@ class SimilarityStickyFillerSettings(BaseSettings):
 class SimilarityStickyFiller:
     """Fills a present pair's NaN slot from its last valid value; see the module docstring."""
 
-    def __init__(self, config: SimilarityStickyFillerSettings | None = None) -> None:
-        self._config = config if config is not None else SimilarityStickyFillerSettings()
+    def __init__(self, settings: SimilarityStickyFillerSettings | None = None) -> None:
+        self.settings = settings if settings is not None else SimilarityStickyFillerSettings()
         self._values: dict[int, np.ndarray] = {}      # per track: the last valid value per slot (NaN: none)
         self._scores: dict[int, np.ndarray] = {}
         self._callbacks: list[Callable[[SimilarityResult], None]] = []
@@ -38,7 +38,7 @@ class SimilarityStickyFiller:
 
     def process(self, result: SimilarityResult) -> None:
         """Fill the rows' gaps and emit the result."""
-        if self._config.enabled:
+        if self.settings.enabled:
             result = self._fill(result)
         for callback in self._callbacks:
             callback(result)
@@ -58,7 +58,7 @@ class SimilarityStickyFiller:
             if tid not in result.similarity:
                 del self._values[tid], self._scores[tid]
 
-        hold_scores = self._config.hold_scores
+        hold_scores = self.settings.hold_scores
         rows: dict[int, Similarity] = {}
         for tid, row in result.similarity.items():
             last_values = self._values.get(tid)

@@ -48,8 +48,8 @@ class ArmTravelExtractor(FilterNode):
     when no arm angle is valid.
     """
 
-    def __init__(self, config: ArmTravelExtractorSettings | None = None) -> None:
-        self._config = config if config is not None else ArmTravelExtractorSettings()
+    def __init__(self, settings: ArmTravelExtractorSettings | None = None) -> None:
+        self.settings = settings if settings is not None else ArmTravelExtractorSettings()
 
     def process(self, pose: Frame) -> Frame:
         angles = pose[Angles]
@@ -57,7 +57,7 @@ class ArmTravelExtractor(FilterNode):
         if not np.any(~np.isnan(values)):
             return pose
 
-        C = self._config
+        C = self.settings
         low = np.radians([C.shoulder_neutral_dead_zone, C.shoulder_neutral_dead_zone, C.elbow_neutral_dead_zone, C.elbow_neutral_dead_zone])
         high = math.pi - np.radians([C.shoulder_raised_dead_zone, C.shoulder_raised_dead_zone, C.elbow_folded_dead_zone, C.elbow_folded_dead_zone])
         magnitude = np.clip((np.abs(values) - low) / np.maximum(high - low, 1e-6), 0.0, 1.0)

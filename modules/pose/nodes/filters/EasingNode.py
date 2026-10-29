@@ -54,13 +54,9 @@ class EasingNode(FilterNode):
     (e.g., AngleMotion, LeaderScore).
     """
 
-    def __init__(self, config: EasingSettings, feature_type: type[NormalizedSingleValue]) -> None:
-        self._config: EasingSettings = config
+    def __init__(self, settings: EasingSettings, feature_type: type[NormalizedSingleValue]) -> None:
+        self.settings: EasingSettings = settings
         self._feature_type: type[NormalizedSingleValue] = feature_type
-
-    @property
-    def config(self) -> EasingSettings:
-        return self._config
 
     def process(self, pose: Frame) -> Frame:
         feature = pose[self._feature_type]
@@ -72,7 +68,7 @@ class EasingNode(FilterNode):
 
         # Clamp to [0, 1] before applying easing
         clamped = max(0.0, min(1.0, original_value))
-        eased_value = self._config.easing_function(clamped)
+        eased_value = self.settings.easing_function(clamped)
 
         # Create new feature with eased value
         feature_type = type(feature)
@@ -92,5 +88,5 @@ class EasingNode(FilterNode):
 class AngleMotionEasingNode(EasingNode):
     """Convenience class for easing angle_motion."""
 
-    def __init__(self, config: EasingSettings) -> None:
-        super().__init__(config, AngleMotion)
+    def __init__(self, settings: EasingSettings) -> None:
+        super().__init__(settings, AngleMotion)

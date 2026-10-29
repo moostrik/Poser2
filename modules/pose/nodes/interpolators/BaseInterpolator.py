@@ -3,7 +3,7 @@
 Provides shared functionality for both chase and lerp interpolators:
 - Feature class registry and validation
 - Thread-safe pose management
-- Config listener management
+- Settings listener management
 - Interpolated data creation
 
 Thread Safety:
@@ -33,8 +33,8 @@ class InterpolatorSettingsBase(BaseSettings):
     output_frequency: Field[float] = Field(60.0)
 
 
-# Generic type variable for config
-ConfigType = TypeVar('ConfigType', bound=InterpolatorSettingsBase)
+# Generic type variable for settings
+SettingsType = TypeVar('SettingsType', bound=InterpolatorSettingsBase)
 
 
 class InterpolatorProtocol(Protocol):
@@ -58,27 +58,27 @@ class InterpolatorProtocol(Protocol):
         ...
 
 
-class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
+class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[SettingsType]):
     """Base class for pose feature interpolators."""
 
     # Registry mapping feature types to interpolator classes
     # Subclasses must override this with their specific interpolator types
     _INTERP_MAP: defaultdict[type[BaseFeature], type]
 
-    def __init__(self, config: ConfigType, feature_type: type[BaseFeature]):
+    def __init__(self, settings: SettingsType, feature_type: type[BaseFeature]):
         """Initialize the feature interpolator."""
-        self._config: ConfigType = config
+        self.settings: SettingsType = settings
         self._feature_type: type[BaseFeature] = feature_type
         self._lock: Lock = Lock()
         self._last_pose: Frame | None = None
-        self._output_interval: float = 1.0 / config.output_frequency
+        self._output_interval: float = 1.0 / settings.output_frequency
         self._interpolator: InterpolatorProtocol = self._create_interpolator()
-        self._config.bind_all(self._on_config_changed)
+        self.settings.bind_all(self._on_settings_changed)
 
     def __del__(self):
-        """Cleanup config listener to prevent memory leaks."""
+        """Cleanup settings listener to prevent memory leaks."""
         try:
-            self._config.unbind_all(self._on_config_changed)
+            self.settings.unbind_all(self._on_settings_changed)
         except (AttributeError, ValueError):
             pass
 
@@ -88,18 +88,13 @@ class FeatureInterpolatorBase(InterpolatorNode, ABC, Generic[ConfigType]):
         pass
 
     @abstractmethod
-    def _on_config_changed(self, _=None) -> None:
+    def _on_settings_changed(self, _=None) -> None:
         """Handle configuration changes by updating interpolator parameters."""
         pass
 
     def is_ready(self) -> bool:
         """Check if the generator is ready to produce a pose."""
         return self._last_pose is not None
-
-    @property
-    def config(self) -> ConfigType:
-        """Get the configuration object."""
-        return self._config
 
     @property
     def feature_type(self) -> type[BaseFeature]:

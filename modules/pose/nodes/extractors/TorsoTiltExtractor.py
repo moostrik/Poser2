@@ -41,15 +41,15 @@ class TorsoTiltExtractor(FilterNode):
     Assumes a level camera: the image vertical stands in for gravity.
     """
 
-    def __init__(self, config: TorsoTiltExtractorSettings | None = None) -> None:
-        self._config = config if config is not None else TorsoTiltExtractorSettings()
+    def __init__(self, settings: TorsoTiltExtractorSettings | None = None) -> None:
+        self.settings = settings if settings is not None else TorsoTiltExtractorSettings()
 
     def process(self, pose: Frame) -> Frame:
         points = pose[Points2D]
         if not points.are_valid(_SPINE):
             return pose
 
-        ar_scale = np.array([1.0, 1.0 / self._config.aspect_ratio], dtype=np.float32)
+        ar_scale = np.array([1.0, 1.0 / self.settings.aspect_ratio], dtype=np.float32)
         shoulders = np.mean(points.values[_SHOULDERS], axis=0) * ar_scale
         hips      = np.mean(points.values[_HIPS],      axis=0) * ar_scale
         spine = shoulders - hips                     # image y grows downward: upright → dy < 0
@@ -57,8 +57,8 @@ class TorsoTiltExtractor(FilterNode):
             return pose
 
         angle = math.atan2(float(spine[0]), float(-spine[1]))   # 0 upright, +x = image right
-        neutral = math.radians(self._config.neutral_dead_zone)
-        span = max(math.radians(self._config.tilt_degrees) - neutral, 1e-6)    # a zero-width range is a step at neutral
+        neutral = math.radians(self.settings.neutral_dead_zone)
+        span = max(math.radians(self.settings.tilt_degrees) - neutral, 1e-6)    # a zero-width range is a step at neutral
         lean = math.copysign(max(abs(angle) - neutral, 0.0), angle)
         tilt = max(-1.0, min(1.0, lean / span))
         score = float(min(points.get_scores(_SPINE)))

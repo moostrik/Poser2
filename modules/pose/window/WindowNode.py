@@ -21,16 +21,16 @@ class WindowNode:
     Uses a preallocated numpy ring buffer for performance.
     Always returns full window_size buffer with oldest samples first.
     Unfilled slots have mask=False to indicate no data is present.
-    Thread-safe: config changes and buffer operations are protected by lock.
+    Thread-safe: settings changes and buffer operations are protected by lock.
 
     Output:
         FeatureWindow with values and mask arrays, both shape (window_size, feature_len), oldest first.
         Unfilled slots have mask=False.
     """
 
-    def __init__(self, feature_type: type[BaseScalarFeature], config: WindowNodeSettings | None = None) -> None:
+    def __init__(self, feature_type: type[BaseScalarFeature], settings: WindowNodeSettings | None = None) -> None:
         self._feature_type: type[BaseScalarFeature] = feature_type
-        self._config: WindowNodeSettings = config if config is not None else WindowNodeSettings()
+        self.settings: WindowNodeSettings = settings if settings is not None else WindowNodeSettings()
         self._lock: Lock = Lock()
         self._head: int = 0  # Next insertion index
         self._count: int = 0  # Number of filled slots
@@ -38,8 +38,8 @@ class WindowNode:
         # Preallocate buffers
         self._allocate_buffers()
 
-        # Listen for config changes
-        self._config.bind_all(self._on_config_change)
+        # Listen for settings changes
+        self.settings.bind_all(self._on_settings_change)
 
     @property
     def feature_type(self) -> type[BaseScalarFeature]:
@@ -57,8 +57,8 @@ class WindowNode:
         return len(self.feature_enum)
 
     def _allocate_buffers(self) -> None:
-        """Allocate numpy buffers based on config."""
-        window_size = self._config.window_size
+        """Allocate numpy buffers based on settings."""
+        window_size = self.settings.window_size
         feature_len = self.feature_length
         self._values = np.zeros((window_size, feature_len), dtype=np.float32)
         self._mask = np.zeros((window_size, feature_len), dtype=bool)
@@ -78,10 +78,10 @@ class WindowNode:
             self._mask[self._head] = feature.valid_mask
 
             # Advance head
-            self._head = (self._head + 1) % self._config.window_size
+            self._head = (self._head + 1) % self.settings.window_size
 
             # Track fill count
-            if self._count < self._config.window_size:
+            if self._count < self.settings.window_size:
                 self._count += 1
 
     def get_window(self) -> FeatureWindow | None:
@@ -95,7 +95,7 @@ class WindowNode:
         with self._lock:
             if self._count == 0:
                 return None
-            if not self._config.emit_partial and self._count < self._config.window_size:
+            if not self.settings.emit_partial and self._count < self.settings.window_size:
                 return None
             return self._get_ordered_window()
 
@@ -136,10 +136,10 @@ class WindowNode:
         """Window nodes are always ready to process."""
         return True
 
-    def _on_config_change(self, _=None) -> None:
-        """Handle config changes - reallocate buffer if size changed."""
+    def _on_settings_change(self, _=None) -> None:
+        """Handle settings changes - reallocate buffer if size changed."""
         with self._lock:
-            if self._values.shape[0] != self._config.window_size:
+            if self._values.shape[0] != self.settings.window_size:
                 self._allocate_buffers()
                 self._reset_buffer()
 
@@ -147,8 +147,3 @@ class WindowNode:
     def current_size(self) -> int:
         """Current number of frames in buffer."""
         return self._count
-
-    @property
-    def config(self) -> WindowNodeSettings:
-        """Access the node configuration."""
-        return self._config

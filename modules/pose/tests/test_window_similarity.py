@@ -72,7 +72,7 @@ class WindowSimilarityTest(unittest.TestCase):
         # similar, and the coverage (the score) is over the four arm joints.
         similarity = _similarity()
         for landmark in AngleLandmark:
-            setattr(similarity._config.joints, landmark.name, landmark.value < 4)
+            setattr(similarity.settings.joints, landmark.name, landmark.value < 4)
         legs_apart = [np.concatenate([v[:4], v[4:] + 3.0]) for v in _ramp()]
         sim, _ = similarity._process({0: _window(_ramp()), 1: _window(legs_apart)})
         self.assertAlmostEqual(sim[0][1], 1.0, places=5)
@@ -162,7 +162,7 @@ class WindowSimilarityTest(unittest.TestCase):
         ws = _similarity(window_length=1, use_motion_weighting=False, use_velocity_similarity=False,
                          remap_low=0.0, remap_high=1.0)
         sim, lead = ws._process({0: _window(_ramp()), 1: _window(_ramp(lag=T - 1))})
-        expected = math.exp(-((STEP * (T - 1)) / math.radians(ws._config.angle_tolerance)) ** 2)
+        expected = math.exp(-((STEP * (T - 1)) / math.radians(ws.settings.angle_tolerance)) ** 2)
         self.assertAlmostEqual(sim[1][0], expected, places=5)
         self.assertAlmostEqual(sim[0][1], expected, places=5)
         self.assertEqual(lead[1][0], 0.0)

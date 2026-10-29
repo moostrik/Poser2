@@ -113,9 +113,9 @@ class WindowSimilarity:
     similarities are aggregated, and the coverage is the fraction of the selected joints both people have.
     """
 
-    def __init__(self, config: WindowSimilaritySettings | None = None) -> None:
+    def __init__(self, settings: WindowSimilaritySettings | None = None) -> None:
 
-        self._config = config if config is not None else WindowSimilaritySettings()
+        self.settings = settings if settings is not None else WindowSimilaritySettings()
 
         self._correlation_thread = threading.Thread(target=self.run, daemon=True)
         self._stop_event = threading.Event()
@@ -159,7 +159,7 @@ class WindowSimilarity:
         Args:
              all_windows: Combined dict {type[BaseFeature]: {track_id: FeatureWindow}}
         """
-        if not self._config.enabled:
+        if not self.settings.enabled:
             return
 
         # Extract per-field window dicts
@@ -194,7 +194,7 @@ class WindowSimilarity:
                     windows, motion_windows, velocity_windows
                 )
                 elapsed_time: float = (time.perf_counter() - start_time) * 1000.0
-                self.Timer.add_time(elapsed_time, self._config.verbose)
+                self.Timer.add_time(elapsed_time, self.settings.verbose)
 
                 result = SimilarityResult(similarity_dict, leader_dict)
                 with self._output_lock:
@@ -223,7 +223,7 @@ class WindowSimilarity:
 
         # Extract track IDs (same order as dict iteration)
         track_ids = list(windows.keys())
-        window_length = self._config.window_length
+        window_length = self.settings.window_length
 
         # Step 1: Stack angle windows (N, T, F); missing joints and unfilled slots are NaN
         values = np.stack([w.masked_values()[-window_length:] for w in windows.values()], axis=0)
@@ -235,30 +235,30 @@ class WindowSimilarity:
         # Step 1b: Stack motion windows if enabled (N, T); missing motion stays 0 (no motion), as NaN would
         # blank the whole body at that frame
         motion_values: np.ndarray | None = None
-        if self._config.use_motion_weighting and motion_windows:
+        if self.settings.use_motion_weighting and motion_windows:
             motion_values = np.stack([w.values[-window_length:, 0] for w in motion_windows.values()], axis=0)
 
         # Step 1c: Stack velocity windows if enabled (N, T, F)
         velocity_values: np.ndarray | None = None
-        if self._config.use_velocity_similarity and velocity_windows:
+        if self.settings.use_velocity_similarity and velocity_windows:
             velocity_values = np.stack([w.masked_values()[-window_length:] for w in velocity_windows.values()], axis=0)
 
         # Step 2: Compute similarity tensor over the selected joints
-        mask = joint_mask(self._config.joints)
+        mask = joint_mask(self.settings.joints)
         best_sim, coverage, leader_scores = self._compute_similarity_tensor(values, motion_values, velocity_values, mask)
         # Step 3: Build per-pose dicts
         similarity_dict = self._build_similarity_dict(track_ids, best_sim, coverage, mask)
         leader_dict = self._build_leader_dict(track_ids, leader_scores, coverage)
 
         # Debug: Print per-pose similarities and leader scores
-        if self._config.verbose:
+        if self.settings.verbose:
             results = []
             for track_id in track_ids:
                 sim_feature = similarity_dict[track_id]
                 leader_feature = leader_dict[track_id]
 
                 # Show similarities to other poses
-                for other_id in range(self._config.max_poses):
+                for other_id in range(self.settings.max_poses):
                     if not np.isnan(sim_feature.values[other_id]):
                         sim_val = sim_feature.values[other_id]
                         conf_val = sim_feature.scores[other_id]
@@ -296,8 +296,8 @@ class WindowSimilarity:
             coverage: Fraction of selected joints compared at the best-matching frame (N, N), 0 when nothing overlapped
             leader_scores: Leader score [0, 1] (N, N) - 0=sync, 1=j leads by full window
         """
-        angle_tolerance = np.radians(self._config.angle_tolerance)          # the settings are degrees, the angles radians
-        velocity_tolerance = np.radians(self._config.velocity_tolerance)
+        angle_tolerance = np.radians(self.settings.angle_tolerance)          # the settings are degrees, the angles radians
+        velocity_tolerance = np.radians(self.settings.velocity_tolerance)
         N, T, F = values.shape
         included = F if mask is None else int(np.sum(mask))
 
@@ -310,7 +310,7 @@ class WindowSimilarity:
         raw_diff = current[:, None, None, :] - values[None, :, :, :]
 
         # Compute angle similarity if enabled: the shared posture kernel (posture_similarity.py)
-        if self._config.use_angle_similarity:
+        if self.settings.use_angle_similarity:
             similarity = joint_similarity(raw_diff, angle_tolerance)
         else:
             # Start with ones (neutral), NaN where input is NaN
@@ -344,10 +344,10 @@ class WindowSimilarity:
             whole_body_sim = np.nanmean(similarity, axis=3) * confidence_penalty  # (N, N, T)
 
         # Apply time penalty: favor recent matches (t close to T-1)
-        if self._config.use_time_penalty and T > 1:
+        if self.settings.use_time_penalty and T > 1:
             # t=0 oldest → t=T-1 newest (current)
             t_normalized = np.arange(T) / (T - 1)  # [0, 1]
-            time_weight = np.power(t_normalized, self._config.time_decay_exp)  # (T,)
+            time_weight = np.power(t_normalized, self.settings.time_decay_exp)  # (T,)
             whole_body_sim = whole_body_sim * time_weight  # broadcast (N, N, T)
 
         # Apply motion weighting: motion_i[current] × motion_j[t]
@@ -409,7 +409,7 @@ class WindowSimilarity:
         """
 
         N = len(track_ids)
-        max_poses = self._config.max_poses
+        max_poses = self.settings.max_poses
         result: dict[int, Similarity] = {}
 
         # For each pose i, build its Similarity array
@@ -424,8 +424,8 @@ class WindowSimilarity:
 
                 # The shared posture kernel's aggregation (posture_similarity.py): the joints both have,
                 # remapped, times the coverage; NaN joints are skipped
-                value, _ = aggregate_joints(best_sim[i, j], self._config.method,
-                                            self._config.remap_low, self._config.remap_high, mask)
+                value, _ = aggregate_joints(best_sim[i, j], self.settings.method,
+                                            self.settings.remap_low, self.settings.remap_high, mask)
 
                 # Store at absolute pose ID index; the score is the fraction of joints compared
                 pose_id_j = track_ids[j]
@@ -458,7 +458,7 @@ class WindowSimilarity:
         """
 
         N = len(track_ids)
-        max_poses = self._config.max_poses
+        max_poses = self.settings.max_poses
         result: dict[int, LeaderScore] = {}
 
         # For each pose i, build its LeaderScore array

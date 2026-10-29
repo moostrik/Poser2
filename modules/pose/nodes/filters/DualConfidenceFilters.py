@@ -27,24 +27,20 @@ class DualConfidenceFilter(FilterNode):
     fluctuate around a threshold boundary.
 
     Args:
-        config: Hysteresis filter configuration
+        settings: Hysteresis filter configuration
         feature_type: Feature type specifying which feature to filter
 
     Example:
-        config = HysteresisFilterConfig(threshold_low=0.3, threshold_high=0.5)
-        filter = FeatureHysteresisFilter(config, Points2D)
+        settings = HysteresisFilterConfig(threshold_low=0.3, threshold_high=0.5)
+        filter = FeatureHysteresisFilter(settings, Points2D)
     """
 
-    def __init__(self, config: DualConfFilterSettings, feature_type: type[BaseFeature]):
-        self._config = config
+    def __init__(self, settings: DualConfFilterSettings, feature_type: type[BaseFeature]):
+        self.settings = settings
         self._feature_type = feature_type
         # State: tracks which elements are currently "on" (visible)
         n_elements = feature_type.length()
         self._state_on: np.ndarray = np.zeros(n_elements, dtype=bool)
-
-    @property
-    def config(self) -> DualConfFilterSettings:
-        return self._config
 
     def reset(self) -> None:
         """Reset filter state. Called when pose track is lost."""
@@ -67,8 +63,8 @@ class DualConfidenceFilter(FilterNode):
         # - Turn ON if score >= threshold_high
         # - Turn OFF if score < threshold_low
         # - Otherwise maintain current state
-        turn_on = scores >= self._config.threshold_high
-        turn_off = scores < self._config.threshold_low
+        turn_on = scores >= self.settings.threshold_high
+        turn_off = scores < self.settings.threshold_low
 
         # Update state: turn on takes priority, then turn off, else maintain
         self._state_on = np.where(turn_on, True, np.where(turn_off, False, self._state_on))
@@ -82,13 +78,13 @@ class DualConfidenceFilter(FilterNode):
 
         filtered_values: np.ndarray = np.where(filtered_mask, values, np.nan)
 
-        # Handle scores based on rescale_scores config
-        if self._config.rescale_scores:
+        # Handle scores based on rescale_scores setting
+        if self.settings.rescale_scores:
             # Rescale visible scores to [0, 1] range based on high threshold
             # Division by (1 - threshold_high) remaps [threshold_high, 1.0] -> [0, 1.0]
             filtered_scores: np.ndarray = np.where(
                 self._state_on,
-                (scores - self._config.threshold_low) / (1.0 - self._config.threshold_low),
+                (scores - self.settings.threshold_low) / (1.0 - self.settings.threshold_low),
                 0.0
             ).astype(np.float32)
         else:
@@ -104,25 +100,25 @@ class DualConfidenceFilter(FilterNode):
 
 # Convenience classes for hysteresis filtering
 class BBoxDualConfFilter(DualConfidenceFilter):
-    def __init__(self, config: DualConfFilterSettings) -> None:
-        super().__init__(config, BBox)
+    def __init__(self, settings:DualConfFilterSettings) -> None:
+        super().__init__(settings,BBox)
 
 
 class PointDualConfFilter(DualConfidenceFilter):
-    def __init__(self, config: DualConfFilterSettings) -> None:
-        super().__init__(config, Points2D)
+    def __init__(self, settings:DualConfFilterSettings) -> None:
+        super().__init__(settings,Points2D)
 
 
 class AngleDualConfFilter(DualConfidenceFilter):
-    def __init__(self, config: DualConfFilterSettings) -> None:
-        super().__init__(config, Angles)
+    def __init__(self, settings:DualConfFilterSettings) -> None:
+        super().__init__(settings,Angles)
 
 
 class AngleVelDualConfFilter(DualConfidenceFilter):
-    def __init__(self, config: DualConfFilterSettings) -> None:
-        super().__init__(config, AngleVelocity)
+    def __init__(self, settings:DualConfFilterSettings) -> None:
+        super().__init__(settings,AngleVelocity)
 
 
 class AngleSymDualConfidenceFilter(DualConfidenceFilter):
-    def __init__(self, config: DualConfFilterSettings) -> None:
-        super().__init__(config, AngleSymmetry)
+    def __init__(self, settings:DualConfFilterSettings) -> None:
+        super().__init__(settings,AngleSymmetry)

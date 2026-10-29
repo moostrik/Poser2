@@ -22,10 +22,10 @@ class AngleExtractor(FilterNode):
     rotation offsets and symmetric mirroring for right-side joints.
     """
 
-    def __init__(self, config: AngleExtractorSettings | None = None) -> None:
-        self._config = config if config is not None else AngleExtractorSettings()
+    def __init__(self, settings: AngleExtractorSettings | None = None) -> None:
+        self.settings = settings if settings is not None else AngleExtractorSettings()
 
     def process(self, pose: Frame) -> Frame:
         """Compute angles for all poses and emit enriched results."""
-        angles: Angles = AngleUtils.from_points(pose[Points2D], aspect_ratio=self._config.aspect_ratio)
+        angles: Angles = AngleUtils.from_points(pose[Points2D], aspect_ratio=self.settings.aspect_ratio)
         return replace(pose, {Angles: angles})

@@ -28,22 +28,18 @@ class ConfidenceFilter(FilterNode):
     2. Optionally rescaling remaining scores to [0, 1] range
 
     Args:
-        config: Confidence filter configuration
+        settings: Confidence filter configuration
         feature_class: Feature class type (e.g., AngleFeature, Point2DFeature)
         attr_name: Name of the pose attribute to filter
 
     Example:
-        filter = FeatureConfidenceFilter(config, AngleFeature, "angles")
-        filter = FeatureConfidenceFilter(config, Point2DFeature, "points")
+        filter = FeatureConfidenceFilter(settings, AngleFeature, "angles")
+        filter = FeatureConfidenceFilter(settings, Point2DFeature, "points")
     """
 
-    def __init__(self, config: ConfidenceFilterSettings, feature_type: type[BaseFeature]):
-        self._config = config
+    def __init__(self, settings: ConfidenceFilterSettings, feature_type: type[BaseFeature]):
+        self.settings = settings
         self._feature_type = feature_type
-
-    @property
-    def config(self) -> ConfidenceFilterSettings:
-        return self._config
 
     def process(self, pose: Frame) -> Frame:
         """Filter values based on confidence threshold."""
@@ -57,7 +53,7 @@ class ConfidenceFilter(FilterNode):
         scores: np.ndarray = feature_data.scores
 
         # Mask for values meeting confidence threshold
-        filtered = scores >= self._config.confidence_threshold
+        filtered = scores >= self.settings.confidence_threshold
 
         # Replace low-confidence values with NaN
         # For 2D data (points), broadcast mask to match shape (17,) -> (17, 2)
@@ -68,13 +64,13 @@ class ConfidenceFilter(FilterNode):
 
         filtered_values: np.ndarray = np.where(filtered_mask, values, np.nan)
 
-        # Handle scores based on rescale_scores config
-        if self._config.rescale_scores:
+        # Handle scores based on rescale_scores setting
+        if self.settings.rescale_scores:
             # Rescale remaining scores to [0, 1] range
             # Division by (1 - threshold) remaps [threshold, 1.0] -> [0, 1.0]
             filtered_scores: np.ndarray = np.where(
                 filtered,
-                (scores - self._config.confidence_threshold) / (1.0 - self._config.confidence_threshold),
+                (scores - self.settings.confidence_threshold) / (1.0 - self.settings.confidence_threshold),
                 0.0
             ).astype(np.float32)
         else:
@@ -90,25 +86,25 @@ class ConfidenceFilter(FilterNode):
 
 # Convenience classes
 class BBoxConfidenceFilter(ConfidenceFilter):
-    def __init__(self, config: ConfidenceFilterSettings) -> None:
-        super().__init__(config, BBox)
+    def __init__(self, settings:ConfidenceFilterSettings) -> None:
+        super().__init__(settings,BBox)
 
 
 class PointConfidenceFilter(ConfidenceFilter):
-    def __init__(self, config: ConfidenceFilterSettings) -> None:
-        super().__init__(config, Points2D)
+    def __init__(self, settings:ConfidenceFilterSettings) -> None:
+        super().__init__(settings,Points2D)
 
 
 class AngleConfidenceFilter(ConfidenceFilter):
-    def __init__(self, config: ConfidenceFilterSettings) -> None:
-        super().__init__(config, Angles)
+    def __init__(self, settings:ConfidenceFilterSettings) -> None:
+        super().__init__(settings,Angles)
 
 
 class AngleVelConfidenceFilter(ConfidenceFilter):
-    def __init__(self, config: ConfidenceFilterSettings) -> None:
-        super().__init__(config, AngleVelocity)
+    def __init__(self, settings:ConfidenceFilterSettings) -> None:
+        super().__init__(settings,AngleVelocity)
 
 
 class AngleSymConfFilter(ConfidenceFilter):
-    def __init__(self, config: ConfidenceFilterSettings) -> None:
-        super().__init__(config, AngleSymmetry)
+    def __init__(self, settings:ConfidenceFilterSettings) -> None:
+        super().__init__(settings,AngleSymmetry)
