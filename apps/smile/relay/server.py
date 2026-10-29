@@ -1,7 +1,7 @@
 """The relay of SMILE Online: one small server between the phones and SMILE.
 
     python -m relay.server --port 8800 --token-file relay/token.txt [--data relay/data] [--web relay/web]
-                           [--cert cert.pem --key key.pem]
+                           [--pass-hours 2] [--cert cert.pem --key key.pem]
 
 It serves the phone page (`--web`, the files of relay/web), a websocket for every phone (`/ws/phone`),
 one for SMILE (`/ws/smile`), uploads from SMILE (`POST /api/upload?kind=&id=`) and the visitors' files
@@ -13,6 +13,13 @@ A visitor's files (the portrait and the grin, a `Delivery`) are stored under nam
 the phone in its `result` and deleted KEEP_AFTER_LEAVE after that phone left or KEEP_AT_MOST after the
 upload, whichever comes first; the library (tracks, laughs) stays.
 
+The page is behind a pass: a random value the relay makes every PASS_EVERY seconds and accepts for
+`--pass-hours` (the values are kept in `data/passes.json`, so a restart forgets none). SMILE gets the
+newest as `pass {value}` at every connect and every change and puts it in the QR code's url (`/?pass=…`);
+`/` with a valid one serves the page and sets it as a cookie, which the phone's websocket and its fetches of
+`/files/` and `/api/library` then carry by themselves; without a valid pass `/` is the expired page and
+the rest 403. A phone whose pass has run out gets `expired` and is closed, at connect or at `join`.
+
 Messages are JSON text, images are binary with one leading byte: FRAME (0) a phone's camera frame to
 SMILE, SHOW (1) an image from SMILE for the phone's window, LAST (2) the turn's last one, which the phone
 keeps. The phone with the turn is the only one whose frames are passed on, and only while SMILE is connected.
@@ -22,8 +29,10 @@ Phone -> relay: join (on the tap, after a missed or lost turn, at a reconnect), 
 Relay -> phone: state (see Line.state: eye, status, place, waiting, block, laughter; at every change of the line
     and at every `eye` from SMILE, about once a second), turn {window}, music, face, stage, result {id, ok, name,
     caption, portrait, grin: the urls, None for a file that is not there}, turn_end {reason: done, missed, lost or
-    reset; `lost` also from the relay itself when SMILE goes}; SHOW and LAST images.
-Relay -> SMILE: line {waiting}, turn {id}, gone (the phone with the turn left); frames.
+    reset; `lost` also from the relay itself when SMILE goes}, expired (the pass ran out: the socket closes);
+    SHOW and LAST images.
+Relay -> SMILE: pass {value} (at connect and at every change), line {waiting}, turn {id}, gone (the phone with the
+    turn left); frames.
 SMILE -> relay: eye {free, status, laughter}, turn_start, face, stage {flash, in, out} then stage {stage, progress}
     through the sequence (the flash stages with `value`, the room's eased progress), music {id, url, offset} (the visitor's track, which SMILE uploaded as kind `track` the
     first time; the laughter samples as kind `laugh` with `ext`; `GET /api/library` lists what the relay has),
@@ -71,6 +80,11 @@ FRAME_PATIENCE: float = 2.0             # s a screen frame may stay unanswered b
 KEEP_AFTER_LEAVE: float = 300.0         # s a visitor's files stay after their phone left: a download cut by a dark screen gets its retry
 KEEP_AT_MOST: float = 1800.0            # s a visitor's files stay at the most, from the upload
 SWEEP_EVERY: float = 60.0               # s between sweeps of the deliveries and the visitors' folders
+PASS_EVERY: float = 600.0               # s between new passes (the QR code on the wall changes with each)
+PASS_LIFETIME: float = 2 * 3600.0       # s a pass is accepted: a visitor can reload for another picture that long
+PASS_COOKIE: str = 'pass'
+PASSES_FILE: str = 'passes.json'        # in the data folder: the passes with their times, for a restart
+EXPIRED_TEXT: str = 'This link has expired. Scan the code at SMILE again.'
 
 
 @dataclass
@@ -87,18 +101,73 @@ class Delivery:
 
 
 class Relay:
-    def __init__(self, token: str, data: str) -> None:
+    def __init__(self, token: str, data: str, pass_lifetime: float = PASS_LIFETIME) -> None:
         self.token: str = token
         self.data: str = data
+        self.pass_lifetime: float = pass_lifetime
         self.line: Line = Line()
         self.phones: dict[str, web.WebSocketResponse] = {}
+        self.phone_passes: dict[str, str] = {}                  # the pass each phone came with, checked again at join
         self.deliveries: dict[str, Delivery] = {}
+        self.passes: list[tuple[str, float]] = []               # (value, issued), the newest last
         self.smile: web.WebSocketResponse | None = None
         self._frame_pending: bytes | None = None                # the newest screen frame not sent yet
         self._frame_in_flight: float | None = None              # when the frame the phone has not seen yet was sent
         self._flights: list[float] = []                         # the flight times of the turn's frames, for the log
         for kind in UPLOAD_KINDS:
             os.makedirs(os.path.join(data, kind + 's'), exist_ok=True)
+        self._read_passes()
+        if not self.passes:
+            self.rotate()
+
+    # THE PASS
+    @property
+    def current_pass(self) -> str:
+        return self.passes[-1][0]
+
+    def valid_pass(self, value: str, now: float | None = None) -> bool:
+        now = time.time() if now is None else now
+        return bool(value) and any(v == value and now - issued <= self.pass_lifetime for v, issued in self.passes)
+
+    def rotate(self, now: float | None = None) -> str:
+        """A new pass; the ones past their lifetime go. The newest is the QR code's from now on."""
+        now = time.time() if now is None else now
+        value: str = secrets.token_urlsafe(8)
+        self.passes = [(v, issued) for v, issued in self.passes if now - issued <= self.pass_lifetime] + [(value, now)]
+        self._write_passes()
+        return value
+
+    def pass_message(self) -> dict:
+        return {'type': 'pass', 'value': self.current_pass}
+
+    def _read_passes(self) -> None:
+        try:
+            with open(os.path.join(self.data, PASSES_FILE), encoding='utf-8') as f:
+                saved: list = json.load(f)
+            now: float = time.time()
+            self.passes = [(str(v), float(issued)) for v, issued in saved if now - float(issued) <= self.pass_lifetime]
+        except FileNotFoundError:
+            pass
+        except (OSError, ValueError, TypeError) as e:
+            logger.warning('%s unreadable, starting without the old passes: %s', PASSES_FILE, e)
+
+    def _write_passes(self) -> None:
+        try:
+            with open(os.path.join(self.data, PASSES_FILE), 'w', encoding='utf-8') as f:
+                json.dump(self.passes, f)
+        except OSError as e:
+            logger.warning('could not write %s: %s', PASSES_FILE, e)
+
+    async def pass_loop(self) -> None:
+        while True:
+            await asyncio.sleep(PASS_EVERY)
+            self.rotate()
+            await self.send(self.smile, self.pass_message())
+
+    @staticmethod
+    def request_pass(request: web.Request) -> str:
+        """The pass a request carries: in the url (the QR code's) or the cookie `/` set from it."""
+        return request.query.get('pass', '') or request.cookies.get(PASS_COOKIE, '')
 
     # SENDING
     async def send(self, ws: web.WebSocketResponse | None, message: dict) -> None:
@@ -133,8 +202,15 @@ class Relay:
     async def phone(self, request: web.Request) -> web.StreamResponse:
         ws = web.WebSocketResponse(heartbeat=HEARTBEAT, max_msg_size=MAX_FRAME + 1024)
         await ws.prepare(request)
+        value: str = self.request_pass(request)
+        if not self.valid_pass(value):
+            # a tab opened again long after the scan: the page says so and stops
+            await self.send(ws, {'type': 'expired'})
+            await ws.close()
+            return ws
         phone: str = uuid.uuid4().hex
         self.phones[phone] = ws
+        self.phone_passes[phone] = value
         logger.info('phone %s connected (%d online)', phone[:8], len(self.phones))
         await self.send(ws, self.line.state(phone))
         try:
@@ -150,6 +226,7 @@ class Relay:
                     break
         finally:
             self.phones.pop(phone, None)
+            self.phone_passes.pop(phone, None)
             await self.phone_left(phone)
             now: float = time.time()
             for delivery in self.deliveries.values():
@@ -161,6 +238,13 @@ class Relay:
     async def phone_message(self, phone: str, message: dict) -> None:
         kind: str = str(message.get('type', ''))
         if kind == 'join':
+            if not self.valid_pass(self.phone_passes.get(phone, '')):
+                # a tab kept open past its pass: it does not outlive it
+                ws = self.phones.get(phone)
+                await self.send(ws, {'type': 'expired'})
+                if ws is not None:
+                    await ws.close()
+                return
             self.line.join(phone)
             await self.send_states()
             await self.send_line()
@@ -199,6 +283,7 @@ class Relay:
         self.smile = ws
         self.line.set_eye(True)
         logger.info('SMILE connected')
+        await self.send(ws, self.pass_message())
         await self.send_line()
         await self.send_states()
         try:
@@ -390,17 +475,38 @@ async def no_cache(request: web.Request, handler) -> web.StreamResponse:
 
 
 def make_app(relay: Relay, web_dir: str) -> web.Application:
-    app = web.Application(client_max_size=MAX_UPLOAD, middlewares=[no_cache])
+    expired_page: str = os.path.join(web_dir, 'expired.html')
 
-    async def sweeping(app: web.Application) -> AsyncIterator[None]:
-        task = asyncio.create_task(relay.sweep_loop())
+    @web.middleware
+    async def gate(request: web.Request, handler) -> web.StreamResponse:
+        """The page, the phones' files and the library are for a phone with a pass: `/` takes it from the QR
+        code's url and sets it as the cookie the rest comes with (the websocket checks it itself: it answers
+        in its own words)."""
+        path: str = request.path
+        if path == '/' or path.startswith('/files/') or path == '/api/library':
+            value: str = relay.request_pass(request)
+            if not relay.valid_pass(value):
+                if path == '/' and os.path.exists(expired_page):
+                    return web.FileResponse(expired_page, status=403)
+                raise web.HTTPForbidden(text=EXPIRED_TEXT)
+            response: web.StreamResponse = await handler(request)
+            if path == '/':
+                response.set_cookie(PASS_COOKIE, value, max_age=int(relay.pass_lifetime), httponly=True, samesite='Lax')
+            return response
+        return await handler(request)
+
+    app = web.Application(client_max_size=MAX_UPLOAD, middlewares=[no_cache, gate])
+
+    async def running(app: web.Application) -> AsyncIterator[None]:
+        tasks = [asyncio.create_task(relay.sweep_loop()), asyncio.create_task(relay.pass_loop())]
         yield
-        task.cancel()
-        try:
-            await task
-        except asyncio.CancelledError:
-            pass
-    app.cleanup_ctx.append(sweeping)
+        for task in tasks:
+            task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+    app.cleanup_ctx.append(running)
     app.router.add_get('/ws/phone', relay.phone)
     app.router.add_get('/ws/smile', relay.smile_socket)
     app.router.add_post('/api/upload', relay.upload)
@@ -430,6 +536,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--token-file', default=os.path.join(here, 'token.txt'), help='file with the token SMILE connects with')
     parser.add_argument('--data', default=os.path.join(here, 'data'), help="folder of the visitors' files")
     parser.add_argument('--web', default=os.path.join(here, 'web'), help='folder of the phone page')
+    parser.add_argument('--pass-hours', type=float, default=PASS_LIFETIME / 3600, help='how long the QR code a phone scanned keeps working')
     parser.add_argument('--cert', default='', help='TLS certificate (else plain HTTP, for a proxy)')
     parser.add_argument('--key', default='')
     parser.add_argument('-v', '--verbose', action='store_true')
@@ -443,7 +550,7 @@ def main(argv: list[str] | None = None) -> int:
     if not token:
         logger.error('no token in %s: write one line into it (any long random text) and give SMILE the same', args.token_file)
         return 1
-    relay = Relay(token, args.data)
+    relay = Relay(token, args.data, pass_lifetime=args.pass_hours * 3600)
     app = make_app(relay, args.web)
     context: ssl.SSLContext | None = None
     if args.cert:

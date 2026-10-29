@@ -308,11 +308,15 @@ class SmileMain():
         screen: int = int(online.screen)
         mode: str = 'clip'
         wall = cell = 0
+        pass_value: str = self.online.pass_value
         if 1 <= screen <= sphere.SCREENS:
             wall, cell = sphere.cell_of_screen(screen)
-            mode = online_cell_mode(bool(online.active), bool(online.connected), self.online.showing)
+            # the card waits for the relay's pass: a code without one would open the expired page
+            mode = online_cell_mode(bool(online.active), bool(online.connected) and bool(pass_value), self.online.showing)
         self.clip_player.online_cell = wall * sphere.CELLS + cell if mode != 'clip' else None
         page: str = str(online.page).strip() or http_base(str(online.relay)) + '/'
+        if pass_value:
+            page += ('&' if '?' in page else '?') + 'pass=' + pass_value
         self.render.set_online_cell(wall, cell, mode, page)
 
     def _limit_visitor(self, seq: SequenceType) -> None:

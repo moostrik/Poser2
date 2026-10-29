@@ -31,8 +31,9 @@ CELLS: int = sphere.CELLS       # per wall
 
 
 def online_cell_mode(active: bool, connected: bool, showing: bool) -> str:
-    """What the online cell shows: a clip like any cell while SMILE Online is off or the relay is not there,
-    the QR card to the phone page while it waits for someone, the main screen during a turn."""
+    """What the online cell shows: a clip like any cell while SMILE Online is off or the relay is not there
+    (`connected`: with its pass for the code's url), the QR card to the phone page while it waits for someone,
+    the main screen during a turn."""
     if not active or not connected:
         return 'clip'
     return 'screen' if showing else 'qr'

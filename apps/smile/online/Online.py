@@ -133,6 +133,7 @@ class Online:
         self._music_sent: str = ''      # the track the phone was told this turn
         self._timed_out: bool = False   # the sequence reached TIMEOUT: the RESET after it is its natural end
         self._showing: bool = False     # the turn is on the room's screens: from the judging to the last frame
+        self._pass: str = ''            # the relay's pass for the phone page's url, '' until the relay sent one
         self._delivery: Delivery | None = None
         self._no_token_warned: bool = False
         # the switch is saved with the presets: the readouts start clean
@@ -156,6 +157,12 @@ class Online:
         result, the phone's last frame; the bloom and the fade after it are the room's."""
         return self._showing
 
+    @property
+    def pass_value(self) -> str:
+        """The relay's current pass, which the QR code's url carries (`?pass=`): the page works for the
+        relay's pass lifetime after the scan. '' until the relay sent one: no code without it."""
+        return self._pass
+
     def stop(self) -> None:
         self._end_turn(None)
         self._stop_link()
@@ -178,6 +185,8 @@ class Online:
             self._note(turn=str(message.get('id') or ''))
         elif kind == 'gone':
             self._note(gone=True)
+        elif kind == 'pass':
+            self._note(pass_value=str(message.get('value') or ''))
         elif kind == 'library':
             self._note(library=(set(str(t) for t in message.get('tracks', [])), set(str(t) for t in message.get('laughs', []))))
 
@@ -211,6 +220,8 @@ class Online:
         if 'waiting' in notes:
             self._waiting = notes['waiting']
             s.waiting = self._waiting
+        if 'pass_value' in notes:
+            self._pass = notes['pass_value']
         if 'saved' in notes and self._delivery is not None:
             id, style, kept, grin, portrait, shared = notes['saved']
             self._delivery.saved = (id, kept, grin, portrait, shared)
@@ -508,3 +519,4 @@ class Online:
             link.stop()
         self.settings.connected = False
         self._eye_last = None
+        self._pass = ''

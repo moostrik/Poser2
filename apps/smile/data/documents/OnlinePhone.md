@@ -71,7 +71,8 @@ wound down at the end) and a small watermark bottom right, SMILE with its mark a
 has no caption. The bar under the frame says PREPARING YOUR SMILE through the timeout; once the turn is over
 and the file is here it reads SHARE YOUR SMILE and is the button: it opens the share sheet at once, with the file,
 named `smile_by_matthias_oostrik.mp4` (the credit's name), and the text (the name, the line, the tags), which goes
-to the clipboard too; a browser without a share sheet downloads the file instead. A browser that will not
+to the clipboard too; a sheet closed without sharing changes nothing, the button is there for another try; a
+browser without a share sheet downloads the file instead (from the phone's own copy). A browser that will not
 start the video's sound by itself plays it silent; a tap on the video turns the sound on. A turn that left no
 video (the visitor was not kept, or nothing was saved in time) ends with NO SMILE THIS TIME.
 
@@ -113,7 +114,10 @@ The messages of a turn, in order, as the page sees them (`relay/server.py` has t
 | page  | `timing`                                  | the file is here, the video plays              | the relay logs it (with the download)         |
 
 A phone that is not the turn's gets `state` and, after its own turn, its `result`, addressed by id. The relay
-itself sends `turn_end {lost}` when SMILE goes.
+itself sends `turn_end {lost}` when SMILE goes, and `expired` (then closes the socket) to a page whose pass ran
+out: the QR code's url carries the relay's pass (`?pass=`, renewed every 10 minutes, accepted for 2 hours,
+`relay/README.md`), the page keeps it as a cookie, so a reload within those hours is another picture and a
+page opened later shows LINK EXPIRED, SCAN SMILE AGAIN (a fresh open gets the relay's `expired.html`).
 
 ### The judging
 
