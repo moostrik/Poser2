@@ -6,12 +6,13 @@ from functools import partial
 from modules.utils import Broadcast
 from modules.camera import CameraSource, CameraCheck, Player, Recorder, Sync
 from modules.camera.oak import Camera, Simulator
+from modules.camera import replay
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, window, FrameDict, configure_features
-from modules.inference import source, crop, pose, segmentation, optical_flow
+from modules.inference import source, crop, pose, segmentation, optical_flow, detection
 
 from .render_board import RenderBoard
 from .settings import Settings, Stage
@@ -52,10 +53,18 @@ class DeepFlowMain:
         self.cameras: list[CameraSource] = []
         self.recorder: Optional[Recorder] = None
         self.player: Optional[Player] = None
+        self.detector: Optional[detection.Detector] = None      # the replay backend's, shared by its cameras
         if self.settings.camera.sim_enabled:
             self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH)
-            for i in range(num_players):
-                self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
+            if self.settings.camera.simulator.replay:
+                # the recordings on the host, without a device: the people found and followed here
+                if self.settings.camera.yolo:
+                    self.detector = detection.Detector(self.settings.camera.detector)
+                for i in range(num_players):
+                    self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.detector, replay.Tracker(), i))
+            else:
+                for i in range(num_players):
+                    self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:
             self.recorder = Recorder(self.settings.camera.recorder, data_path=DATA_PATH)
             for i in range(num_players):
@@ -212,6 +221,8 @@ class DeepFlowMain:
     def start(self) -> None:
         self.panel_server.start()
 
+        if self.detector is not None:
+            self.detector.start()
         for camera in self.cameras:
             camera.start()
 
@@ -255,6 +266,8 @@ class DeepFlowMain:
         self.osc_sound.stop()
 
         self.pose_predictor.stop()
+        if self.detector is not None:
+            self.detector.stop()
         self.segmentation_predictor.stop()
         self.optical_flow_predictor.stop()
 

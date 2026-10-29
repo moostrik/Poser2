@@ -9,14 +9,14 @@ import glfw
 import numpy as np
 
 from modules.utils import Broadcast
-from modules.camera import CameraSource, CameraFrame, FrameType, Player, Sync, Recorder as VideoRecorder, CameraCheck
+from modules.camera import CameraSource, CameraFrame, FrameType, Player, Sync, Recorder as VideoRecorder, CameraCheck, replay
 from modules.camera.oak import Camera, Simulator
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict
-from modules.inference import source, crop, pose
+from modules.inference import source, crop, pose, detection
 from modules.session import Session
 
 from .board import Board
@@ -79,12 +79,20 @@ class WhiteSpaceMain:
         # CAMERA
         self.cameras: list[CameraSource] = []
         self.player: Optional[Player] = None
+        self.detector: Optional[detection.Detector] = None      # the replay backend's, shared by its cameras
         if self.settings.camera.sim_enabled:
             # The rig is uniform: mono cameras decode their clips straight to gray
             gray = not self.settings.camera.cameras[0].color
             self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH, gray=gray)
-            for i in range(num_cameras):
-                self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
+            if self.settings.camera.simulator.replay:
+                # the recordings on the host, without a device: the people found and followed here
+                if self.settings.camera.yolo:
+                    self.detector = detection.Detector(self.settings.camera.detector)
+                for i in range(num_cameras):
+                    self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.detector, replay.Tracker(), i))
+            else:
+                for i in range(num_cameras):
+                    self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:
             for i in range(num_cameras):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
@@ -336,6 +344,8 @@ class WhiteSpaceMain:
     def start(self) -> None:
         self.panel_server.start()
 
+        if self.detector is not None:
+            self.detector.start()
         for camera in self.cameras:
             camera.start()
 
@@ -421,6 +431,8 @@ class WhiteSpaceMain:
         self.conductor.stop()
 
         self.pose_predictor.stop()
+        if self.detector is not None:
+            self.detector.stop()
 
         for camera in self.cameras:
             camera.join(timeout=10)
