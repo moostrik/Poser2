@@ -1,1 +1,1 @@
-from .BlitRotated import BlitRotated
+from .blit_rotated import BlitRotated

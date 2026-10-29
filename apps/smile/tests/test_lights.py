@@ -8,7 +8,7 @@ import unittest
 import numpy as np
 
 from apps.smile.lights import Lights, CAMERA_LEDS
-from apps.smile.render.Sequencer import AnimationType
+from apps.smile.render.sequencer import AnimationType
 from modules.inout import ArtNetSenderSettings
 
 

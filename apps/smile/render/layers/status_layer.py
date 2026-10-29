@@ -1,6 +1,6 @@
 from modules.gl import Blit, Fbo, Style, Text, Texture
 
-from .LayerBase import LayerBase
+from .layer_base import LayerBase
 
 FONT_SIZE: int = 18
 MARGIN_PX: float = 16.0

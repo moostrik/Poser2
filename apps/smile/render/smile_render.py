@@ -5,19 +5,19 @@ import glfw
 import numpy as np
 from OpenGL.GL import GL_RGBA32F, glViewport  # type: ignore
 
-from apps.smile.render.GrinPlayer import GrinPlayer
-from apps.smile.render.grab import ScreenGrab
+from apps.smile.render.grin_player import GrinPlayer
+from apps.smile.render.screen_grab import ScreenGrab
 from apps.smile.comfy.messages import GeneratorMessage, GeneratorState
 from modules.face import FaceFrame
 from apps.smile import sphere
 from modules.gl import Blit, Fbo, MonitorId, RenderBase, Shader, Style, Texture, clear_color
 from modules.gl import fit
-from apps.smile.player.Render import WallRender
+from apps.smile.player.wall_render import WallRender
 from apps.smile.render.inputs import Inputs
 from apps.smile.render.layers import BloomLayer, CameraLayer, CreditLayer, DiffusionLayer, FlashLayer, LayerBase, RevealLayer, StatusLayer
-from apps.smile.render.layers.CreditLayer import caption_shown, fade_step, new_line_due
+from apps.smile.render.layers.credit_layer import caption_shown, fade_step, new_line_due
 from apps.smile.render.layers.passes import copy
-from apps.smile.render.Sequencer import SequenceType, Sequencer
+from apps.smile.render.sequencer import SequenceType, Sequencer
 from apps.smile.render.settings import RenderSettings
 from apps.smile.render.stages import STAGES, Layers, Stage
 

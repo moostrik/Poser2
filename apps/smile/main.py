@@ -1,24 +1,24 @@
 """SMILE: a camera captures a face, an image generator turns it into a portrait, shown with music and lights,
 and the grins of the visitors before play on the two walls of the sphere (README.md, CLAUDE.md)."""
 
-from apps.smile.cam.Camera import Camera
+from apps.smile.cam.camera import Camera
 from modules.camera import vimba, webcam
 from modules.face import FaceFinder, FaceFrame
-from apps.smile.render.SmileRender import SmileRender
-from apps.smile.render.Sequencer import Sequencer, SequenceMessage, SequenceType, AnimationType, AnimationTypeNames
-from apps.smile.comfy.Generator import Generator
-from apps.smile.render.GrinPlayer import GrinPlayer
+from apps.smile.render.smile_render import SmileRender
+from apps.smile.render.sequencer import Sequencer, SequenceMessage, SequenceType, AnimationType, AnimationTypeNames
+from apps.smile.comfy.generator import Generator
+from apps.smile.render.grin_player import GrinPlayer
 from apps.smile.comfy.messages import GeneratorMessage, GeneratorState
 from modules.inout import OscSender
-from apps.smile.audio.DB import DB as AudioDB, laugh_files
+from apps.smile.audio.music_map import MusicMap, laugh_files
 from apps.smile.audio.laughter_test import LaughterTest
 from apps.smile.credit_scroll import CreditScroller
 from apps.smile.render.settings import RenderSettings
-from apps.smile.save.ClipSaver import ClipSaver
+from apps.smile.save.clip_saver import ClipSaver
 from apps.smile.lights import Lights
-from apps.smile.online.Online import Online
-from apps.smile.online.Link import http_base
-from apps.smile.player.Player import Player, online_cell_mode
+from apps.smile.online.online import Online
+from apps.smile.online.link import http_base
+from apps.smile.player.player import Player, online_cell_mode
 from apps.smile import sphere
 from modules.settings import presets
 from modules.panel import PanelServer
@@ -107,7 +107,7 @@ class SmileMain():
             device_name = 'webcam'
         self.camera: Camera = Camera(self.settings.camera, (self.width, self.height), device, device_name)
 
-        self.audio: AudioDB = AudioDB(self.settings.audio, f'{DATA_PATH}/audio/music_map.json')
+        self.music_map: MusicMap = MusicMap(self.settings.audio, f'{DATA_PATH}/audio/music_map.json')
         self.osc: OscSender = OscSender(self.settings.audio.osc, events=('/test_bang',))
         # the laughter test, stepped from sequence_callback: it lights the walls' cells and bangs Max
         self.laughter_test: LaughterTest = LaughterTest(self.settings.audio, send=self.clip_player.light, bang=self._test_bang)
@@ -124,7 +124,7 @@ class SmileMain():
         # SMILE Online: a turn for someone outside when the room's eye is free, stepped from sequence_callback
         self.online: Online = Online(self.settings.online, self.camera, self.sequencer, self.face, self.render.grab,
                                      lambda: (self.settings.render.credit_name, self.settings.render.credit_line),
-                                     lambda: (self.audio.get_music_id(), self.audio.track_path()),
+                                     lambda: (self.music_map.get_music_id(), self.music_map.track_path()),
                                      laughs=laugh_files, laughter=lambda: self.settings.audio.laughter, pick=self.pick_style)
         self.save.set_saved_callback(self.online.on_saved)
 
@@ -218,12 +218,12 @@ class SmileMain():
             self._flash_time = time.perf_counter()
         if seq == SequenceType.DIFF_LOOP and message.initial:
             # the grin starts playing: the share clip gets the track from the point the room hears now
-            self.save.set_share(self.audio.track_path(), time.perf_counter() - self._flash_time)
+            self.save.set_share(self.music_map.track_path(), time.perf_counter() - self._flash_time)
 
         audio = self.settings.audio
         if audio.osc.enabled:
             progress: float = message.progress
-            music_id: str = self.audio.get_music_id()
+            music_id: str = self.music_map.get_music_id()
             self.osc.submit('/music_id', music_id)
             self.osc.submit('/state', state)
             self.osc.submit('/progress', progress)
@@ -335,7 +335,7 @@ class SmileMain():
         if not self._style_picked:
             self._style_picked = True
             style_id: str = self.generator.next_style()
-            self.audio.update(style_id)
+            self.music_map.update(style_id)
 
     def face_callback(self, frame: FaceFrame) -> None:
         # the sequencer charges toward the flash while the face qualifies

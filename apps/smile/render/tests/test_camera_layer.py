@@ -2,7 +2,7 @@
 
 import unittest
 
-from apps.smile.render.layers.CameraLayer import warmup_block
+from apps.smile.render.layers.camera_layer import warmup_block
 
 
 class TestWarmupBlock(unittest.TestCase):

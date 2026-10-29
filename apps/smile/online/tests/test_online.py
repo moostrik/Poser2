@@ -9,9 +9,9 @@ from unittest import mock
 import numpy as np
 
 from modules.face import FaceFrame, FaceObservation, HeadPose, Rejection
-from apps.smile.online.Online import ASK_TIMEOUT, INSIDE, LOOKING, SAVE_TIMEOUT, Online, Phase, face_message
+from apps.smile.online.online import ASK_TIMEOUT, INSIDE, LOOKING, SAVE_TIMEOUT, Online, Phase, face_message
 from apps.smile.online.settings import OnlineSettings
-from apps.smile.render.Sequencer import SequenceMessage, SequenceType
+from apps.smile.render.sequencer import SequenceMessage, SequenceType
 
 
 class FakeLink:

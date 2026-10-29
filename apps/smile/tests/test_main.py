@@ -7,7 +7,7 @@ from unittest import mock
 
 from apps.smile.comfy.settings import GeneratorSettings
 from apps.smile.main import VISITOR_MARGIN, SmileMain
-from apps.smile.render.Sequencer import SequenceType
+from apps.smile.render.sequencer import SequenceType
 
 
 class TestVisitorLimit(unittest.TestCase):

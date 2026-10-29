@@ -6,8 +6,8 @@ import unittest
 
 import numpy as np
 
-from apps.smile.player.ClipPool import Clip, ClipPool
-from apps.smile.player.FolderScanner import FolderScanner, clip_style, find_clips, pick_clips
+from apps.smile.player.clip_pool import Clip, ClipPool
+from apps.smile.player.folder_scanner import FolderScanner, clip_style, find_clips, pick_clips
 
 
 def clip(id: str, style: str) -> Clip:

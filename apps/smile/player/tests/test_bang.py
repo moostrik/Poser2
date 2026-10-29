@@ -6,15 +6,15 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from apps.smile.player.ClipPool import Clip, ClipPool
-from apps.smile.player.ImgLoader import LoadImages
+from apps.smile.player.clip_pool import Clip, ClipPool
+from apps.smile.player.clip_loader import ClipLoader
 
 
 class TestBang(unittest.TestCase):
     def test_a_play_reports_the_cell_it_starts_in(self):
         pool = ClipPool(1, (512, 640))
         cells: list[int] = []
-        loader = LoadImages('7', pool, SimpleNamespace(fps=100.0, spread=0.0))
+        loader = ClipLoader('7', pool, SimpleNamespace(fps=100.0, spread=0.0))
         loader.add_loader_callback(cells.append)
         # the first frame ends the play
         loader.add_image_callback(lambda id, image, initial: loader._stop_event.set())

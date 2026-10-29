@@ -1,6 +1,6 @@
 from modules.gl import Fbo, Image, Texture, shaders
 
-from .LayerBase import LayerBase
+from .layer_base import LayerBase
 
 
 class FlashLayer(LayerBase):

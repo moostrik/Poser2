@@ -3,7 +3,7 @@ from threading import Thread, Lock, Event
 import time
 import numpy as np
 from typing import Any, Callable
-from apps.smile.player.ClipPool import ClipPool, Clip
+from apps.smile.player.clip_pool import ClipPool, Clip
 
 ImageCallback= Callable[[str, np.ndarray, bool], None]
 
@@ -17,7 +17,7 @@ def play_rate(fps: float, clip_fps: float, spread: float) -> float:
     return rate * random.uniform(1.0 - spread, 1.0 + spread)
 
 
-class LoadImages(Thread):
+class ClipLoader(Thread):
     """One cell: stays empty until the player assigns its first clip, then plays clips from the pool
     on its own clock, one after the other, at the speed the settings say at each play (`fps`, `spread`).
     `sector` is the cell's third of the sphere, which the pool keeps every recent recording on."""

@@ -14,10 +14,10 @@ import numpy as np
 
 from apps.smile import sphere
 from apps.smile.credit import CreditLines
-from apps.smile.player.ImgLoader import LoadImages
-from apps.smile.player.Render import WallRender
-from apps.smile.player.ClipPool import Clip, ClipPool, next_start
-from apps.smile.player.FolderScanner import FolderScanner
+from apps.smile.player.clip_loader import ClipLoader
+from apps.smile.player.wall_render import WallRender
+from apps.smile.player.clip_pool import Clip, ClipPool, next_start
+from apps.smile.player.folder_scanner import FolderScanner
 
 from modules.inout import OscSender, OscSenderSettings
 
@@ -67,10 +67,10 @@ class Player:
         self.pool: ClipPool = ClipPool(pool_size, cell_size, hwaccel, recent)
         self.scanner: FolderScanner = FolderScanner(os.path.join(root, 'grins'), self.pool, pool_size, recent, float(settings.recycle_every))
 
-        self.loaders: list[LoadImages] = []
+        self.loaders: list[ClipLoader] = []
         for id in ids:
             wall, cell = divmod(int(id), CELLS)
-            loader = LoadImages(id, self.pool, settings, sphere.sector_of_cell(wall, cell))
+            loader = ClipLoader(id, self.pool, settings, sphere.sector_of_cell(wall, cell))
             loader.add_image_callback(self._on_image)
             loader.add_loader_callback(self._on_play)
             self.loaders.append(loader)
@@ -101,14 +101,14 @@ class Player:
     def _start_loop(self) -> None:
         """Give every cell its first clip: each clip as it is loaded, in a random cell. With fewer
         clips than cells, go round the loaded clips again, START_DELAY apart."""
-        empty: list[LoadImages] = list(self.loaders)
+        empty: list[ClipLoader] = list(self.loaders)
         random.shuffle(empty)
         started: set[str] = set()
         last_start: float = 0.0
         while empty and not self._stats_stop.is_set():
             clip: Clip | None = next_start(self.pool.clips(), started)
             if clip is not None and (not started or time.time() - last_start >= MIN_START_GAP):
-                loader: LoadImages = empty.pop()
+                loader: ClipLoader = empty.pop()
                 self.pool.use(clip, loader.sector)
                 loader.assign(clip)
                 started.add(clip.id)

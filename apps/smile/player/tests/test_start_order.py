@@ -4,8 +4,8 @@ import unittest
 
 import numpy as np
 
-from apps.smile.player.ClipPool import Clip, ClipPool, next_start
-from apps.smile.player.ImgLoader import play_rate
+from apps.smile.player.clip_pool import Clip, ClipPool, next_start
+from apps.smile.player.clip_loader import play_rate
 
 
 def clip(id: str) -> Clip:

@@ -19,7 +19,7 @@ from threading import Lock, Thread
 import cv2
 import numpy as np
 
-from apps.smile.online.Link import Link, encode, read_token
+from apps.smile.online.link import Link, encode, read_token
 
 logger = logging.getLogger('fake-smile')
 

@@ -2,7 +2,7 @@
 
 import unittest
 
-from apps.smile.player.Render import lit_cells
+from apps.smile.player.wall_render import lit_cells
 
 
 class TestLitCells(unittest.TestCase):

@@ -8,8 +8,8 @@ from unittest import mock
 import cv2
 
 from apps.smile.credit import LINE, LINES, QUIET_MODULES, URL, CreditLines, qr_image, quiet_px, wrap_balanced
-from apps.smile.render.layers.CreditLayer import FADE_S, SHOWN, caption_shown, fade_step, new_line_due
-from apps.smile.render.Sequencer import SequenceType
+from apps.smile.render.layers.credit_layer import FADE_S, SHOWN, caption_shown, fade_step, new_line_due
+from apps.smile.render.sequencer import SequenceType
 
 
 class TestQr(unittest.TestCase):

@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from apps.smile.player.ClipPool import Clip, ClipPool
+from apps.smile.player.clip_pool import Clip, ClipPool
 from apps.smile.player.tests.test_even_spread import turns
 
 

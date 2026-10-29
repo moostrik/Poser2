@@ -14,7 +14,7 @@ import numpy as np
 from apps.smile.comfy.settings import GeneratorSettings
 from apps.smile.render.settings import SequencerSettings
 from apps.smile.save import record
-from apps.smile.save.ClipSaver import ClipSaver
+from apps.smile.save.clip_saver import ClipSaver
 from modules import video
 
 

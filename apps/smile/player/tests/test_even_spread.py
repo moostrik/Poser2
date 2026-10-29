@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from apps.smile.player.ClipPool import Clip, ClipPool, choose
+from apps.smile.player.clip_pool import Clip, ClipPool, choose
 
 
 def clip(id: str, plays: int = 0, active: int = 0) -> Clip:

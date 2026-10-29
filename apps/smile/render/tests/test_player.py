@@ -5,7 +5,7 @@ from unittest import mock
 
 import numpy as np
 
-from apps.smile.render.GrinPlayer import MARGIN, MIN_FRAMES, GrinPlayer
+from apps.smile.render.grin_player import MARGIN, MIN_FRAMES, GrinPlayer
 from apps.smile.render.settings import SequencerSettings
 
 TICK: float = 1 / 60    # the render's frame time
@@ -26,7 +26,7 @@ class TestGrinPlayer(unittest.TestCase):
         self.settings.grin_delay = 1.0
         self.grin_player = GrinPlayer(self.settings)
         self.now = 0.0
-        patcher = mock.patch('apps.smile.render.GrinPlayer.time.perf_counter', lambda: self.now)
+        patcher = mock.patch('apps.smile.render.grin_player.time.perf_counter', lambda: self.now)
         patcher.start()
         self.addCleanup(patcher.stop)
 

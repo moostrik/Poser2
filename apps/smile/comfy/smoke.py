@@ -25,7 +25,7 @@ from pathlib import Path
 import cv2
 
 from apps.smile.comfy.client import ComfyClient, Event
-from apps.smile.comfy.Generator import WARMUP_IMAGE, WARMUP_TIMEOUT
+from apps.smile.comfy.generator import WARMUP_IMAGE, WARMUP_TIMEOUT
 from apps.smile.comfy.workflow import NO_LORA, Workflow
 from apps.smile.settings import Settings
 from modules.settings import presets

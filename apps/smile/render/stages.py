@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from modules.gl import Texture
 from apps.smile.render.inputs import Inputs
 from apps.smile.render.layers import BloomLayer, CameraLayer, DiffusionLayer, FlashLayer, RevealLayer
-from apps.smile.render.Sequencer import CAPTURE_AT, SequenceMessage, SequenceType
+from apps.smile.render.sequencer import CAPTURE_AT, SequenceMessage, SequenceType
 from apps.smile.render.settings import RenderSettings
 
 

@@ -26,7 +26,7 @@ import websocket
 from requests import RequestException
 
 from apps.smile.comfy.client import ComfyClient, Event as ComfyEvent
-from apps.smile.render.GrinPlayer import GrinPlayer
+from apps.smile.render.grin_player import GrinPlayer
 from apps.smile.comfy.messages import GeneratorMessage, GeneratorState, MessageCallback
 from apps.smile.comfy.settings import GeneratorSettings, StyleSettings
 from apps.smile.comfy.styles import Styles

@@ -7,9 +7,9 @@ import unittest
 from unittest import mock
 
 from apps.smile.comfy.client import Event
-from apps.smile.comfy.Generator import NO_EVENTS, SILENT_AFTER, Generator, NoEvents
+from apps.smile.comfy.generator import NO_EVENTS, SILENT_AFTER, Generator, NoEvents
 from apps.smile.comfy.settings import GeneratorSettings
-from apps.smile.render.GrinPlayer import GrinPlayer
+from apps.smile.render.grin_player import GrinPlayer
 from apps.smile.render.settings import SequencerSettings
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))     # apps/smile
@@ -56,7 +56,7 @@ class TestGenerator(unittest.TestCase):
         self.settings.connection.workflow = WORKFLOW
         self.generator = Generator(self.settings, GrinPlayer(SequencerSettings()))
         self.clock = FakeClock()
-        patcher = mock.patch('apps.smile.comfy.Generator.time', self.clock)
+        patcher = mock.patch('apps.smile.comfy.generator.time', self.clock)
         patcher.start()
         self.addCleanup(patcher.stop)
         self.workflow = self.generator.workflow.build('x.png', self.settings.style_a, self.settings)
@@ -113,7 +113,7 @@ class TestGenerator(unittest.TestCase):
 
     def test_a_failed_warm_up_is_not_ready(self):
         self.generator._stop_event.set()        # no wait before the retry
-        with mock.patch('apps.smile.comfy.Generator.WARMUP_IMAGE', WARMUP):
+        with mock.patch('apps.smile.comfy.generator.WARMUP_IMAGE', WARMUP):
             with mock.patch.object(self.generator, '_generate', return_value='timed out'):
                 self.generator._warm_up()
             self.assertFalse(self.generator._warmed_up)
@@ -135,7 +135,7 @@ class TestGenerator(unittest.TestCase):
     def test_an_interrupted_warm_up_is_not_ready(self):
         self.generator._stop_event.set()        # what interrupts a warm-up: the app stops
         self.generator.client = FakeClient(self.clock, [], busy=False)
-        with mock.patch('apps.smile.comfy.Generator.WARMUP_IMAGE', WARMUP):
+        with mock.patch('apps.smile.comfy.generator.WARMUP_IMAGE', WARMUP):
             self.generator._warm_up()
         self.assertFalse(self.generator._warmed_up)
 
@@ -165,7 +165,7 @@ class TestGenerator(unittest.TestCase):
     def test_a_new_warm_up_starts_at_zero(self):
         self.generator._warmup_steps = {'describe', 'depth'}
         self.generator._stop_event.set()
-        with mock.patch('apps.smile.comfy.Generator.WARMUP_IMAGE', WARMUP):
+        with mock.patch('apps.smile.comfy.generator.WARMUP_IMAGE', WARMUP):
             with mock.patch.object(self.generator, '_generate', return_value='timed out'):
                 self.generator._warm_up()
         self.assertEqual(self.generator.warmup, 0)

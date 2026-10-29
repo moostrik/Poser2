@@ -21,7 +21,7 @@ alive and does nothing (the face finder: nobody is ever chosen; the generator: t
 
 ## Camera
 
-`cam/Camera.py` is the one source the app reads: it wraps the device, a camera backend of `modules/camera/` on the
+`cam/camera.py` is the one source the app reads: it wraps the device, a camera backend of `modules/camera/` on the
 camera contract (`modules.camera.vimba.Camera` default, `modules.camera.webcam.Camera` with `-wc`; both take
 `rotate90` for the portrait mode at construction), and an image source from `data/input/` that the panel's `use_image` switch puts in
 place of the device frames at any time. `Camera` fits every frame to the render size with `cover()`
@@ -145,11 +145,11 @@ OpenGL engine: Poser2's `modules/gl/` (glfw, GL 4.6 core, render thread owned by
 a deferred settings call raises: it is logged, and a monitor that is unplugged does not close the app
 (`modules/render/tests/test_window.py`). The render is the display's 1024 x 1280 (`main.py` defaults, swapped by the
 default portrait mode): the same 4:5 as the workflow's 896 x 1120 portrait, which stays at the size SDXL is best at and fills
-the render as a texture. `render/SmileRender.py` runs the `Sequencer` once per frame (it is the app clock:
+the render as a texture. `render/smile_render.py` runs the `Sequencer` once per frame (it is the app clock:
 Art-Net, OSC and saving hang off its messages), then the stage for the current `SequenceType`
 (`stages.py`) renders the layers (`layers/`) and picks the one to show. Images from other threads go
 through `inputs.py` (`Image.set_image`, uploaded on the render thread); the grin frames go
-through `GrinPlayer.py`, a buffer the generator fills and the render plays on its own clock, with
+through `grin_player.py`, a buffer the generator fills and the render plays on its own clock, with
 its timings in the sequence settings. At the capture the diffusion layer starts over from it
 (`FlashStage` seeds it, and the capture is the diffusion input until the generator sends an image), so
 a generation that fails shows the capture as its result and nothing of the previous visitor.
@@ -159,7 +159,7 @@ no new sequence while it is on (`Sequencer.blocked`). Shaders are
 The two **walls** of the sphere are secondary windows of the same `WindowManager` (`render.window.secondary_list`, read at
 the start: the first entry is wall 0, screens 1-24, the second wall 1; `secondary_fullscreen` borderless on that monitor,
 forced on by `-fs` like the main window; a monitor that is missing gets a small window on the primary one, and back when
-it is plugged in). `SmileRender.walls` are two `WallRender`s (`player/Render.py`, no window of their own)
+it is plugged in). `SmileRender.walls` are two `WallRender`s (`player/wall_render.py`, no window of their own)
 composited in `update()` after the main screen, and `draw_secondary` blits the wall of the monitor's index in the list
 (poser2's pattern, hd_trio). The secondary windows share the main context (textures yes, FBOs and VAOs no), so the
 render loop makes the main context current at the start of every frame and before `deallocate` (`WindowManager._render_loop`;
@@ -199,7 +199,7 @@ texture, over the clips and the credit card, under the lit test cells. Nothing o
 
 ## Recordings
 
-`save/ClipSaver.py` saves each finished visitor for the players under `output/` (git-ignored):
+`save/clip_saver.py` saves each finished visitor for the players under `output/` (git-ignored):
 the grin as `grins/<style>/<id>.mp4` (silent h264 at the full portrait size, at `grin_fps`), the capture and the
 portrait as `portraits/<style>/<id>_capture.jpg` and `<id>_portrait.jpg`, and after the grin landed the phone's copy
 `shares/<style>/<id>.mp4` (`save/share.py`: the same grin re-encoded with the watermark, "SMILE", a circled "ai" and "by" the credit name, in the bottom
@@ -247,7 +247,7 @@ restarts everything (ComfyUI, Max, SMILE with its walls).
 
 ## Music
 
-`audio/DB.py` picks the track of a visitor's movement from `data/audio/music_map.json` into
+`audio/music_map.py` picks the track of a visitor's movement from `data/audio/music_map.json` into
 `audio.music_id`. `modules.inout.OscSender` (`Settings.audio.osc`; the clip player builds an `OscSenderSettings` of its
 own per wall for the `/bang`) sends what `Main.sequence_callback` queues every frame, the newest value per address:
 `/music_id`, `/state`, `/progress` and the Audio tab's controls `/sound`, `/music_volume`, `/laughter`,
@@ -290,7 +290,7 @@ after a turn are a `Delivery` record beside the phase) and
 `fake.py`, a stand-in for SMILE at the relay. A turn puts the phone's frames into `Camera` as a third source
 (`set_online`, `push_online`; the device and the image are muted meanwhile and back once the capture is taken) and the face finder,
 the charge, the flash and the generation run unchanged; `Online.on_face` sends the judging, and from the flash to the
-end of the timeout the phone gets the main screen as rendered (`ScreenGrab` in `render/grab.py`, taken in
+end of the timeout the phone gets the main screen as rendered (`ScreenGrab` in `render/screen_grab.py`, taken in
 `SmileRender._render_credit` from a credit pass without the QR code and before the status line, `stream_fps` x `stream_width`,
 encoded on the link's thread as `SHOW` frames, paced by the relay to one in flight per phone (`seen` from the page); the phone's own judging is the whole image in pixels while the face is not right and the
 page's white as the charge). The phone plays the visitor's track from the flash (`music` message; the relay keeps the
@@ -310,7 +310,7 @@ The **online cell**: the screen `online.screen` (1-48, 0 = none; pick one off th
 QR code to the phone page (`online.page`, empty = the relay's host, `Link.http_base`) and a line under it while SMILE Online is on
 and the relay connected, and the main screen as the phone sees it (`CreditLayer.clean`: the caption, no QR code, no status line)
 from the judging to the phone's last frame (`Online.showing`), then the card again; off or disconnected it is a clip cell like any
-(`online_cell_mode` in `Player.py`). `Main._online_cell` sets it every frame: `Player.online_cell` (no bang, no caption: its clip plays
+(`online_cell_mode` in `player.py`). `Main._online_cell` sets it every frame: `Player.online_cell` (no bang, no caption: its clip plays
 unseen) and `SmileRender.set_online_cell`, which the walls take in `update()` (`WallRender.set_online`).
 Tests: `relay/tests` (the line, the server on aiohttp's test server, the page's files: `test_web.py`) and `online/tests`
 (a fake link and camera).

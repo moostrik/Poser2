@@ -7,8 +7,8 @@ from apps.smile.render.inputs import Faces
 from apps.smile.render.settings import FaceEffect, FaceFill, RenderSettings
 from apps.smile.render.shaders import FaceColor
 
-from .LayerBase import LayerBase
-from .MarkDrawer import MarkDrawer
+from .layer_base import LayerBase
+from .mark_drawer import MarkDrawer
 from .face_marks import BOX_PAD_PX, FACES_STALE, LABEL_BG, REJECTED_COLOR, Mark, SubjectMark, build_marks, face_fields
 from .passes import blur, copy
 

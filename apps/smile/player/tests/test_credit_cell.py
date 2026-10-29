@@ -2,7 +2,7 @@
 
 import unittest
 
-from apps.smile.player.Render import next_credit_cell
+from apps.smile.player.wall_render import next_credit_cell
 
 
 class TestCreditCell(unittest.TestCase):

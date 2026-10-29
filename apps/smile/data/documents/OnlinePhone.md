@@ -228,7 +228,7 @@ download after the wind-down and uses the same bytes for the share sheet, as a f
 from the credit's name (`fileName`), with the file's extension; the completed download is what shows the
 share button. The video element is shown only once it plays (it is black before), so the last
 frame of the screen stands until then. A visitor who was not kept, or whose files are not there `SAVE_TIMEOUT`
-(20 s, `Online.py`) after the turn, gets a `result` without files: the bar says NO SMILE THIS TIME, nothing to
+(20 s, `online.py`) after the turn, gets a `result` without files: the bar says NO SMILE THIS TIME, nothing to
 play or share.
 
 ### Time

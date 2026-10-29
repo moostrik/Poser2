@@ -10,7 +10,7 @@ from unittest import mock
 from apps.smile.main import SmileMain
 from apps.smile.settings import Settings
 from modules.inout import OscSenderSettings
-from apps.smile.render.Sequencer import SequenceMessage, SequenceType
+from apps.smile.render.sequencer import SequenceMessage, SequenceType
 from modules.settings import presets
 
 
@@ -38,7 +38,7 @@ class TestMaxControls(unittest.TestCase):
             # a Mock attribute is truthy: the camera must really not be stalled
             camera=SimpleNamespace(frame=lambda: (None, 0.0), stalled=False, next_image=mock.Mock()),
             render=mock.Mock(), lights=mock.Mock(), face=mock.Mock(), save=mock.Mock(), sequencer=mock.Mock(),
-            audio=mock.Mock(get_music_id=lambda: '0001'), osc=mock.Mock(), laughter_test=mock.Mock(),
+            music_map=mock.Mock(get_music_id=lambda: '0001'), osc=mock.Mock(), laughter_test=mock.Mock(),
             _limit_visitor=lambda seq: None,
             _style_picked=False, _face_frame_time=0.0, _visitor_start=None, _saving=False, _grin_saved=False,
             credit_scroller=mock.Mock(), online=mock.Mock(showing=False, pass_value=''), clip_player=mock.Mock())

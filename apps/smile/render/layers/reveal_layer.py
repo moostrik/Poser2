@@ -1,17 +1,18 @@
 from modules.gl import Fbo, Image, SwapFbo, Texture, shaders
 
-from .LayerBase import LayerBase
+from .layer_base import LayerBase
 from .passes import blur, copy
 
 
-class BloomLayer(LayerBase):
-    """The last image blooms and dissolves into the camera, masked by the depth of that image."""
+class RevealLayer(LayerBase):
+    """The flash out: an image appears from white, masked by the depth of the capture."""
 
-    def __init__(self, depth: Image) -> None:
+    def __init__(self, depth: Image, white: Image) -> None:
         self._depth: Image = depth
+        self._white: Image = white
         self._fbo: Fbo = Fbo()
         self._mask: SwapFbo = SwapFbo()
-        self._omission: shaders.Omission = shaders.Omission()
+        self._flash_out: shaders.FlashOut = shaders.FlashOut()
         self._blur_h: shaders.BlurH = shaders.BlurH()
         self._blur_v: shaders.BlurV = shaders.BlurV()
 
@@ -19,19 +20,19 @@ class BloomLayer(LayerBase):
         assert width and height and internal_format
         self._fbo.allocate(width, height, internal_format)
         self._mask.allocate(width, height, internal_format)
-        self._omission.allocate()
+        self._flash_out.allocate()
         self._blur_h.allocate()
         self._blur_v.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._mask.deallocate()
-        self._omission.deallocate()
+        self._flash_out.deallocate()
         self._blur_h.deallocate()
         self._blur_v.deallocate()
 
     def update(self) -> None:
-        self._omission.reload()
+        self._flash_out.reload()
         self._blur_h.reload()
         self._blur_v.reload()
 
@@ -40,16 +41,16 @@ class BloomLayer(LayerBase):
         return self._fbo
 
     def set_mask(self) -> None:
-        """Take the newest depth of the last image as the mask, softened."""
+        """Take the newest capture depth as the mask, softened."""
         if not self._depth.allocated:
             return
         copy(self._depth, self._mask)
         blur(self._mask, self._blur_h, self._blur_v, 1.0)
 
-    def render(self, image: Texture, camera: Texture, bloom: float, omission: float) -> None:
-        """bloom brightens the image, omission 0..1 dissolves it into the camera."""
-        if not image.allocated or not camera.allocated:
+    def render(self, image: Texture, flash: float) -> None:
+        """flash 1 is all white, 0 is all image."""
+        if not self._white.allocated or not image.allocated:
             return
         self._fbo.begin()
-        self._omission.use(image, camera, self._mask.texture, bloom, omission)
+        self._flash_out.use(image, self._white, self._mask.texture, flash)
         self._fbo.end()

@@ -9,7 +9,7 @@ from watchdog.events import FileSystemEvent, FileSystemEventHandler
 from watchdog.observers import Observer
 from watchdog.observers.api import BaseObserver
 
-from apps.smile.player.ClipPool import ClipPool
+from apps.smile.player.clip_pool import ClipPool
 
 logger = logging.getLogger(__name__)
 

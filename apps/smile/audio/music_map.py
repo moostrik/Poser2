@@ -34,7 +34,7 @@ def load_json(file_path: str) -> dict:
         return data_dict
 
 
-class DB():
+class MusicMap():
     def __init__(self, settings: AudioSettings, file_path: str) -> None:
         self.settings: AudioSettings = settings
         self._file_path: str = file_path

@@ -8,7 +8,7 @@ import unittest
 import cv2
 import numpy as np
 
-from apps.smile.cam.Camera import Camera, cover, list_images
+from apps.smile.cam.camera import Camera, cover, list_images
 from apps.smile.cam.settings import CameraSettings
 from modules.camera import CameraFrame, FrameType
 

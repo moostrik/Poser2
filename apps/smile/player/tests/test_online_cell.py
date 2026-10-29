@@ -3,7 +3,7 @@
 import unittest
 from unittest import mock
 
-from apps.smile.player.Player import Player, online_cell_mode
+from apps.smile.player.player import Player, online_cell_mode
 
 
 class TestOnlineCellMode(unittest.TestCase):
