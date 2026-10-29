@@ -1,5 +1,5 @@
 """The camera in black and white. Every detected face's box shows how far the face is from good
-(darker, pixelated, blurred or fogged), and the chosen face's box turns to colour with its charge."""
+(darker, pixelated, blurred or fogged), and the chosen face's box turns to color with its charge."""
 
 from typing import Sequence
 
@@ -22,7 +22,7 @@ class FaceColor(Shader):
 
         fields: the faces' boxes with their distance from good, shown by `effect` (index in FaceEffect)
         at strength `amount`; `blurred` is a blurred tex0 for the blur effect.
-        rect: the chosen face's box, turned to colour by `charge` (0..1) as `fill` (index in FaceFill)
+        rect: the chosen face's box, turned to color by `charge` (0..1) as `fill` (index in FaceFill)
         says; `color` is the traced outline's. A rect of width or height 0 is no rect.
         Boxes are normalised 0..1, top left origin (as DrawRectangleOutline).
         mosaic: block size in pixels of the whole image; 1 or less is none.

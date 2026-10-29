@@ -32,7 +32,7 @@ def list_samples(folder: str) -> list[str]:
     return sorted(names, key=str.upper)
 
 
-class ScreenTest:
+class LaughterTest:
     """While `laughter_test` is on, every `laughter_test_step` seconds the next of the 48 screens is lit, in
     the sphere's order (1 to 5 down the first rib, 6 to 8 the next ...), on the cell the wiring gives it
     (`sphere.cell_of_screen`): `send(wall, cell, seconds, number)` lights it on the wall with the number

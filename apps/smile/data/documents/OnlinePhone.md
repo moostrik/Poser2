@@ -217,7 +217,7 @@ a media element: browsers silence one at the tape's low speeds, and Safari refus
 
 ### The video
 
-The recording closes when the last grin frame is saved (`Main.diffusion_callback`), while the grin still
+The recording closes when the last grin frame is saved (`Main.generator_callback`), while the grin still
 plays on the screens: the last frame exists before the sequence ends (see [Time](#time)). The saver builds the
 phone's clip first (`modules/save/share.py`: the grin re-encoded lighter, the track from the second the room
 heard at the grin's start, on the tape, spun up over its first half second and wound down over its last

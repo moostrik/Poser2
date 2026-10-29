@@ -48,7 +48,7 @@ def fade_step(alpha: float, shown: bool, dt: float) -> float:
 
 class CreditLayer(LayerBase):
     """A QR code to the project page in the bottom right corner, always, and the artist's credit as a meme
-    caption over the top of the image (white with a black edge, centred): the name, and under it the
+    caption over the top of the image (white with a black edge, centered): the name, and under it the
     visitor's line, drawn from the lines file at every capture (`new_visitor`), at the opacity `render`
     gets. People film the result, so the credit is in their videos."""
 

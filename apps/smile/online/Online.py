@@ -35,7 +35,7 @@ from modules.face import FaceFinder, FaceFrame, rejection_label
 from apps.smile.online.Link import Link, http_base, read_token
 from apps.smile.online.settings import OnlineSettings
 from apps.smile.render.grab import ScreenGrab
-from apps.smile.render.Sequencer import CAMERA_STATES, SeqenceMessage, Sequencer, SequenceType
+from apps.smile.render.Sequencer import CAMERA_STATES, SequenceMessage, Sequencer, SequenceType
 
 logger = logging.getLogger(__name__)
 
@@ -210,7 +210,7 @@ class Online:
         self._note(saved=(id, style, kept, grin, portrait, share))
 
     # THE APP CLOCK
-    def update(self, now: float, message: SeqenceMessage, ready: bool, room_busy: bool) -> None:
+    def update(self, now: float, message: SequenceMessage, ready: bool, room_busy: bool) -> None:
         """Once per render frame. `ready` is the generator, `room_busy` the operator's states that
         block the room too (the raw camera shown, the laughter test)."""
         s: OnlineSettings = self.settings
@@ -366,7 +366,7 @@ class Online:
             fps = min(fps, STILL_FPS)
         self.grab.set(True, int(s.stream_width), max(1.0, fps))
 
-    def _send_stage(self, now: float, link: Link, message: SeqenceMessage) -> None:
+    def _send_stage(self, now: float, link: Link, message: SequenceMessage) -> None:
         """The stage and its progress to the phone: at every change of stage, else a few times a second
         while the progress moves (the phone's tape follows them as the Max patch follows the room's). The
         flash stages carry the room's eased value too, the white as the room draws it."""
@@ -440,7 +440,7 @@ class Online:
             delivery.started = True
             result['id'] = id
             if kept:
-                # the phone's video is the share clip (the track on the tape, the watermark); the players' clip without one
+                # the phone's video is the share clip (the track on the tape, the watermark); the walls' clip without one
                 files: list[tuple[str, str, str]] = [('portrait', id, portrait), ('grin', id, shared or grin)]
                 link.upload(files, lambda ok: link.send({**result, 'ok': ok}))
             else:

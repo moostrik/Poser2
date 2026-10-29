@@ -4,7 +4,7 @@ from typing import Callable
 import numpy as np
 
 
-class GenState(Enum):
+class GeneratorState(Enum):
     NONE        = 0
     IDLE        = 1     # generation finished (image: depth of the last frame, the bloom mask) or failed
     CAM_DEPTH   = 2     # depth of the capture, starts the flash out
@@ -17,9 +17,9 @@ class GenState(Enum):
     DIF_DEPTH   = 9
 
 
-class GenMessage():
-    def __init__(self, state: GenState, progress: float = 0, image: np.ndarray | None = None, prompt: str = '', negative: str = '', final: bool = False) -> None:
-        self.state: GenState = state
+class GeneratorMessage():
+    def __init__(self, state: GeneratorState, progress: float = 0, image: np.ndarray | None = None, prompt: str = '', negative: str = '', final: bool = False) -> None:
+        self.state: GeneratorState = state
         self.progress: float = progress
         self.image: np.ndarray | None = image
         self.prompt: str = prompt
@@ -27,4 +27,4 @@ class GenMessage():
         self.final: bool = final
 
 
-MessageCallback = Callable[[GenMessage], None]
+MessageCallback = Callable[[GeneratorMessage], None]

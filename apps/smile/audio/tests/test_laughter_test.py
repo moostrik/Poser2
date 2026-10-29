@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from apps.smile.audio.ScreenTest import SCREENS, ScreenTest, list_samples
+from apps.smile.audio.laughter_test import SCREENS, LaughterTest, list_samples
 from apps.smile.audio.settings import AudioSettings
 
 SAMPLES: tuple[str, ...] = ('Angry.mp3', 'v004_1.wav', 'v004_10.wav', 'V005_12.wav', 'v005_11.wav')
@@ -22,7 +22,7 @@ class TestListSamples(unittest.TestCase):
         self.assertEqual(list_samples('no/such/folder'), [])
 
 
-class TestScreenTest(unittest.TestCase):
+class TestLaughterTest(unittest.TestCase):
     def setUp(self):
         self.folder = tempfile.TemporaryDirectory()
         self.addCleanup(self.folder.cleanup)
@@ -33,8 +33,8 @@ class TestScreenTest(unittest.TestCase):
         self.banged: list[tuple[int, int]] = []
         self.test = self.make(self.settings)
 
-    def make(self, settings: AudioSettings) -> ScreenTest:
-        return ScreenTest(settings,
+    def make(self, settings: AudioSettings) -> LaughterTest:
+        return LaughterTest(settings,
                           send=lambda wall, cell, seconds, number: self.sent.append((wall, cell, seconds, number)),
                           bang=lambda index, sample: self.banged.append((index, sample)),
                           folder=self.folder.name)
@@ -117,9 +117,9 @@ class TestScreenTest(unittest.TestCase):
         for failing in ({'send': fail}, {'bang': fail}):
             with self.subTest(**failing):
                 settings = AudioSettings()
-                test = ScreenTest(settings, folder=self.folder.name, **failing)
+                test = LaughterTest(settings, folder=self.folder.name, **failing)
                 settings.laughter_test = True
-                with self.assertLogs('apps.smile.audio.ScreenTest', 'WARNING') as logs:
+                with self.assertLogs('apps.smile.audio.laughter_test', 'WARNING') as logs:
                     test.update(0.0)
                     test.update(2.0)
                 self.assertEqual(len(logs.records), 1)

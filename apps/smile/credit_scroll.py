@@ -18,13 +18,13 @@ from apps.smile.credit import FONT
 
 logger = logging.getLogger(__name__)
 
-# the sphere and the wiring of its screens to the players' cells are in `apps.smile.sphere`; here a screen
+# the sphere and the wiring of its screens to the walls' cells are in `apps.smile.sphere`; here a screen
 # is counted from 0 (the sphere's number minus 1)
 ROWS: int = sphere.HEIGHTS
 SCREENS: int = sphere.SCREENS
 CELLS: int = sphere.CELLS
-PLAYERS: int = sphere.PLAYERS
-SCREEN_PX: int = 512            # a screen's width, in the player's pixels (the clip's upright 512 x 640)
+WALLS: int = sphere.WALLS
+SCREEN_PX: int = 512            # a screen's width, in the wall's pixels (the clip's upright 512 x 640)
 SCREEN_HEIGHT_PX: int = 640
 
 DEFAULT_ROWS: str = "1,3"       # the rings with 12 screens, leaving the middle one to the clips
@@ -39,7 +39,7 @@ def row_screens(row: int) -> list[int]:
 
 
 def screen_cell(screen: int) -> tuple[int, int]:
-    """The player (0 or 1) and its cell of a screen (from 0), by the wiring."""
+    """The wall (0 or 1) and its cell of a screen (from 0), by the wiring."""
     return sphere.cell_of_screen(screen + 1)
 
 
@@ -74,10 +74,10 @@ class RingPath:
     def count(self) -> int:
         return len(row_screens(self.row))
 
-    def cells(self, player: int) -> list[tuple[int, int]]:
-        """The cells of `player` on the ring, each with its place round it (0: the rib at the camera)."""
+    def cells(self, wall: int) -> list[tuple[int, int]]:
+        """The cells of `wall` on the ring, each with its place round it (0: the rib at the camera)."""
         return [(cell, place) for place, screen in enumerate(self.screens)
-                for p, cell in [screen_cell(screen)] if p == player]
+                for w, cell in [screen_cell(screen)] if w == wall]
 
 
 def plan_loops(rows: list[int], words: list[str], reverse: bool) -> list[tuple[str, RingPath]]:
@@ -214,7 +214,7 @@ class CreditScroller:
         for index, (word, path) in enumerate(loops):
             speed: float = max(1.0, speeds[min(index, 1)] * SCREEN_PX)
             start: float = self.word_start(index, speed, now)
-            for wall in range(PLAYERS):
+            for wall in range(WALLS):
                 cells: list[tuple[int, int]] = path.cells(wall)
                 if cells:
                     try:

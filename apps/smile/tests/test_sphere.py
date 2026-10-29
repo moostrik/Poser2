@@ -1,4 +1,4 @@
-"""Tests for the sphere's wiring: which screen a player's cell is, the rows and the angles."""
+"""Tests for the sphere's wiring: which screen a wall's cell is, the rows and the angles."""
 
 import unittest
 from pathlib import Path
@@ -10,11 +10,11 @@ class TestWiring(unittest.TestCase):
     def test_every_screen_is_one_cell_and_back(self):
         seen = set()
         for screen in range(1, sphere.SCREENS + 1):
-            player, cell = sphere.cell_of_screen(screen)
-            self.assertIn(player, (0, 1))
+            wall, cell = sphere.cell_of_screen(screen)
+            self.assertIn(wall, (0, 1))
             self.assertTrue(0 <= cell < sphere.CELLS)
-            self.assertEqual(sphere.screen_of_cell(player, cell), screen)
-            seen.add((player, cell))
+            self.assertEqual(sphere.screen_of_cell(wall, cell), screen)
+            seen.add((wall, cell))
         self.assertEqual(len(seen), sphere.SCREENS)
 
     def test_the_readme_wiring(self):

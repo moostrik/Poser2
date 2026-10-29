@@ -3,9 +3,9 @@
 import unittest
 from unittest import mock
 
-from apps.smile.render.Sequencer import SeqenceMessage, Sequencer, SequenceType
+from apps.smile.render.Sequencer import SequenceMessage, Sequencer, SequenceType
 from apps.smile.render.settings import SequencerSettings
-from apps.smile.render.stages import STAGES, CameraStage, DestructStage, DiffusionStage, FlashStage, RevealStage
+from apps.smile.render.stages import STAGES, CameraStage, BloomStage, DiffusionStage, FlashStage, RevealStage
 
 
 class TestStages(unittest.TestCase):
@@ -18,16 +18,16 @@ class TestStages(unittest.TestCase):
         self.assertIs(STAGES[SequenceType.CAPTURE], FlashStage)
         self.assertIs(STAGES[SequenceType.CONTROL_0], RevealStage)
         self.assertIs(STAGES[SequenceType.DIFF_LOOP], DiffusionStage)
-        self.assertIs(STAGES[SequenceType.FADE], DestructStage)
+        self.assertIs(STAGES[SequenceType.FADE], BloomStage)
 
     def test_the_capture_seeds_the_diffusion_layer(self):
         # at the capture, not at the flash out: a generation that fails before its depth skips that
         inputs, layers = mock.Mock(), mock.Mock()
         stage = FlashStage(inputs, layers, mock.Mock())
-        stage.update(SeqenceMessage(SequenceType.FLASH, 0.2))
-        stage.update(SeqenceMessage(SequenceType.ASK, 0.8))
+        stage.update(SequenceMessage(SequenceType.FLASH, 0.2))
+        stage.update(SequenceMessage(SequenceType.ASK, 0.8))
         layers.diffusion.seed.assert_not_called()
-        stage.update(SeqenceMessage(SequenceType.CAPTURE, 0.5))
+        stage.update(SequenceMessage(SequenceType.CAPTURE, 0.5))
         layers.diffusion.seed.assert_called_once_with(inputs.capture)
 
 
@@ -157,8 +157,8 @@ class TestSequencer(unittest.TestCase):
     def test_the_first_fade_message_keeps_the_bloom(self):
         clock = [100.0]
         settings = self.sequencer.settings
-        settings.destroy_in = 0.4
-        settings.destroy_out = 1.1
+        settings.bloom = 0.4
+        settings.fade = 1.1
         with mock.patch('apps.smile.render.Sequencer.time.perf_counter', lambda: clock[0]):
             self.sequencer.set_sequence(SequenceType.BLOOM)
             self.sequencer.update()

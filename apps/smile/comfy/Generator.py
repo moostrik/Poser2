@@ -1,4 +1,4 @@
-"""Image generator: sends each capture to ComfyUI and turns its output into GenMessages.
+"""Image generator: sends each capture to ComfyUI and turns its output into GeneratorMessages.
 
 Per capture: depth of the capture (CAM_DEPTH, starts the flash out) -> sampler previews and the
 finished portrait (DIFFUSION) -> the grin frames as ComfyUI makes them (DIFF_LOOP, for saving; the
@@ -27,8 +27,8 @@ from requests import RequestException
 
 from apps.smile.comfy.client import ComfyClient, Event as ComfyEvent
 from apps.smile.render.GrinPlayer import GrinPlayer
-from apps.smile.comfy.messages import GenMessage, GenState, MessageCallback
-from apps.smile.comfy.settings import PipelineSettings, StyleSettings
+from apps.smile.comfy.messages import GeneratorMessage, GeneratorState, MessageCallback
+from apps.smile.comfy.settings import GeneratorSettings, StyleSettings
 from apps.smile.comfy.styles import Styles
 from apps.smile.comfy.workflow import NO_LORA, Workflow
 
@@ -56,10 +56,10 @@ class NoEvents(RuntimeError):
 
 
 class Generator(Thread):
-    def __init__(self, settings: PipelineSettings, player: GrinPlayer) -> None:
+    def __init__(self, settings: GeneratorSettings, grin_player: GrinPlayer) -> None:
         super().__init__(name='generator')
-        self.settings: PipelineSettings = settings
-        self.player: GrinPlayer = player
+        self.settings: GeneratorSettings = settings
+        self.grin_player: GrinPlayer = grin_player
         self.workflow: Workflow = Workflow(settings.connection.workflow)
         self.styles: Styles = Styles(settings)
         self.client: ComfyClient = ComfyClient(settings.connection.host, settings.connection.port)
@@ -75,7 +75,7 @@ class Generator(Thread):
         self._silent: bool = False
         self._warmed_up: bool = False
         self._warmup_steps: set[str] = set()    # the steps the running warm-up has reached
-        self.is_diffusing: bool = False
+        self.is_generating: bool = False
 
     # PUBLIC
     @property
@@ -107,9 +107,9 @@ class Generator(Thread):
         count as done without having proven anything."""
         with self._mutex:
             self._image = None      # a capture that was handed over and not taken yet
-        if self.is_diffusing and not self._silent:
+        if self.is_generating and not self._silent:
             self._interrupt_event.set()
-            self.player.clear()
+            self.grin_player.clear()
 
     def next_style(self) -> str:
         """Call once per visitor (when its sequence starts); returns the style id, which also picks the music."""
@@ -215,7 +215,7 @@ class Generator(Thread):
         self.settings.connection.status = 'ready'
 
     # GENERATION
-    def _emit(self, message: GenMessage) -> None:
+    def _emit(self, message: GeneratorMessage) -> None:
         if self._silent or self._interrupt_event.is_set():
             return
         with self._mutex:
@@ -228,7 +228,7 @@ class Generator(Thread):
         start: float = time.time()
         failure: str | None = None
         self._interrupt_event.clear()
-        self.is_diffusing = True
+        self.is_generating = True
         try:
             self._run_job(image, start + timeout)
         except Interrupted:
@@ -237,22 +237,22 @@ class Generator(Thread):
         except TimeoutError as e:       # our own job_timeout (an OSError, but not a lost connection)
             logger.warning('Generation timed out: %s', e)
             failure = 'timed out'
-            self._emit(GenMessage(GenState.IDLE))
+            self._emit(GeneratorMessage(GeneratorState.IDLE))
         except (websocket.WebSocketException, RequestException, ConnectionError, OSError):
-            self._emit(GenMessage(GenState.IDLE))
+            self._emit(GeneratorMessage(GeneratorState.IDLE))
             raise
         except NoEvents as e:
             logger.warning('Generation failed: %s', e)
             failure = str(e)
             self._warmed_up = False     # not ready until a warm-up gets its events again
             self._warmup_steps = set()
-            self._emit(GenMessage(GenState.IDLE))
+            self._emit(GeneratorMessage(GeneratorState.IDLE))
         except Exception:
             logger.exception('Generation failed')
             failure = 'failed (see the log)'
-            self._emit(GenMessage(GenState.IDLE))
+            self._emit(GeneratorMessage(GeneratorState.IDLE))
         finally:
-            self.is_diffusing = False
+            self.is_generating = False
             self._interrupt_event.clear()
             self.settings.connection.last_duration = round(time.time() - start, 1)
             if self.settings.connection.connected:
@@ -287,7 +287,7 @@ class Generator(Thread):
             self.client.receive(0.05)
 
     def _run_job(self, image: np.ndarray, deadline: float) -> None:
-        s: PipelineSettings = self.settings
+        s: GeneratorSettings = self.settings
         wf: Workflow = self.workflow
 
         if self.client.busy():
@@ -335,8 +335,8 @@ class Generator(Thread):
                 self._idle(0.5)
 
         # the depth of the last grin frame is the mask for the bloom back to the camera
-        self._emit(GenMessage(GenState.IDLE, 1.0, last_depth))
-        self._emit(GenMessage(GenState.IDLE))
+        self._emit(GeneratorMessage(GeneratorState.IDLE, 1.0, last_depth))
+        self._emit(GeneratorMessage(GeneratorState.IDLE))
 
     def _run_pass(self, workflow: dict, deadline: float, replay: bool = False, play: bool = True) -> tuple[np.ndarray | None, int]:
         """Queue the workflow and hand its grin to the player; returns, once the last frame has been shown,
@@ -346,16 +346,16 @@ class Generator(Thread):
         try:
             return self._receive_pass(workflow, deadline, replay, play)
         except BaseException:
-            self.player.clear()     # after a failure or a reset nothing of the grin is left to play
+            self.grin_player.clear()     # after a failure or a reset nothing of the grin is left to play
             raise
 
     def _receive_pass(self, workflow: dict, deadline: float, replay: bool, play: bool) -> tuple[np.ndarray | None, int]:
-        s: PipelineSettings = self.settings
+        s: GeneratorSettings = self.settings
         wf: Workflow = self.workflow
         total: int = wf.frame_count(workflow)
         if play and not self._silent:
             # the first grin after a portrait holds on its first frame (the blend); the warm-up opens no clip
-            self.player.begin(total, hold=not replay)
+            self.grin_player.begin(total, hold=not replay)
         main_id: str = self.client.queue(workflow)
 
         made: int = 0
@@ -393,10 +393,10 @@ class Generator(Thread):
                 if node == wf.grin:
                     made += 1
                     show(f'grin {made}/{total}')
-                    self.player.add(event.image)
-                    self._emit(GenMessage(GenState.DIFF_LOOP, min(made / total, 1.0), event.image))
+                    self.grin_player.add(event.image)
+                    self._emit(GeneratorMessage(GeneratorState.DIFF_LOOP, min(made / total, 1.0), event.image))
                 elif node == wf.sampler and not replay:
-                    self._emit(GenMessage(GenState.DIFFUSION, sampler_progress, event.image))
+                    self._emit(GeneratorMessage(GeneratorState.DIFFUSION, sampler_progress, event.image))
 
             elif event.type == 'executing':
                 name: str | None = wf.step(event.data.get('node'))
@@ -421,12 +421,12 @@ class Generator(Thread):
                     depth: np.ndarray | None = self.client.view(output['images'][0])
                     if depth is not None:
                         self._capture_depth = depth
-                        self._emit(GenMessage(GenState.CAM_DEPTH, 0.0, depth))
+                        self._emit(GeneratorMessage(GeneratorState.CAM_DEPTH, 0.0, depth))
                 elif node == wf.portrait and output.get('images'):
                     portrait: np.ndarray | None = self.client.view(output['images'][0])
                     if portrait is not None:
-                        self._emit(GenMessage(GenState.DIFFUSION, 1.0, portrait, final=True))
-                        self.player.hold_from_now()
+                        self._emit(GeneratorMessage(GeneratorState.DIFFUSION, 1.0, portrait, final=True))
+                        self.grin_player.hold_from_now()
                 elif node == wf.description and output.get('text'):
                     self._style.description = str(output['text'][0])
 
@@ -439,10 +439,10 @@ class Generator(Thread):
                 raise RuntimeError(f"ComfyUI {event.type}: {event.data.get('exception_message', '')}")
 
         # the render shows the frames on its own clock: IDLE and the next pass wait for the last one
-        self.player.end()
-        if self.player.busy:
+        self.grin_player.end()
+        if self.grin_player.busy:
             show('playing grin')
-        while self.player.busy:
+        while self.grin_player.busy:
             self._check(deadline)
             self.client.receive(0.02)
         self._check(deadline)       # a reset empties the player too

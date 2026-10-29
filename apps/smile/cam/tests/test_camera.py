@@ -89,7 +89,7 @@ class TestCamera(unittest.TestCase):
         frame[4:8] = 255                    # a band across the middle
         device.push(frame)
         self.assertEqual(len(self.frames), 1)
-        shown = self.camera.getColorImg()
+        shown = self.camera.frame()[0]
         self.assertEqual(shown.shape, (6, 8, 3))
         self.assertEqual(int(shown[0, 0, 0]), 0)
         self.assertEqual(int(shown[3, 0, 0]), 255)
@@ -97,7 +97,7 @@ class TestCamera(unittest.TestCase):
         self.settings.use_image = True
         device.push(frame)
         self.assertTrue(wait_for(lambda: len(self.frames) > 1 and self.frames[-1] is not shown))
-        image = self.camera.getColorImg()
+        image = self.camera.frame()[0]
         self.assertEqual(image.shape, (6, 8, 3))
         self.assertEqual(int(image[0, 0, 0]), 100)     # a.jpg, at the output size
 

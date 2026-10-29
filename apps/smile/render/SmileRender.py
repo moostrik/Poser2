@@ -7,14 +7,14 @@ from OpenGL.GL import GL_RGBA32F, glViewport  # type: ignore
 
 from apps.smile.render.GrinPlayer import GrinPlayer
 from apps.smile.render.grab import ScreenGrab
-from apps.smile.comfy.messages import GenMessage, GenState
+from apps.smile.comfy.messages import GeneratorMessage, GeneratorState
 from modules.face import FaceFrame
 from apps.smile import sphere
 from modules.gl import Blit, Fbo, MonitorId, RenderBase, Shader, Style, Texture, clear_color
 from modules.gl import fit
-from apps.smile.player.Render import PlayerRender
+from apps.smile.player.Render import WallRender
 from apps.smile.render.inputs import Inputs
-from apps.smile.render.layers import CameraLayer, CreditLayer, DestructLayer, DiffusionLayer, FlashLayer, LayerBase, RevealLayer, StatusLayer
+from apps.smile.render.layers import BloomLayer, CameraLayer, CreditLayer, DiffusionLayer, FlashLayer, LayerBase, RevealLayer, StatusLayer
 from apps.smile.render.layers.CreditLayer import caption_shown, fade_step, new_line_due
 from apps.smile.render.layers.passes import copy
 from apps.smile.render.Sequencer import SequenceType, Sequencer
@@ -28,18 +28,18 @@ COMPOSITION_FORMAT = GL_RGBA32F
 class SmileRender(RenderBase):
     """The installation display. Runs the sequencer every frame (it is the app clock), then lets the
     stage of the current sequence state render the layers, and fits its output in the window.
-    The grin frames come from the player, which is asked every frame for the one that is due.
-    The two walls of the sphere (`walls`, `PlayerRender`) are composited after it, each shown in the
+    The grin frames come from the grin player, which is asked every frame for the one that is due.
+    The two walls of the sphere (`walls`, `WallRender`) are composited after it, each shown in the
     secondary window of its monitor (`window.secondary_list`: the first entry is wall 0, screens 1-24);
     the online cell of one of them shows the output as the phone sees it during an online turn.
     Keys: Enter starts a sequence; f fullscreen, w borderless, Esc quit (the window manager)."""
 
-    def __init__(self, settings: RenderSettings, players: Any, sequencer: Sequencer, player: GrinPlayer, width: int, height: int) -> None:
+    def __init__(self, settings: RenderSettings, walls_settings: Any, sequencer: Sequencer, grin_player: GrinPlayer, width: int, height: int) -> None:
         super().__init__(settings.window)
         self.settings: RenderSettings = settings
         self.sequencer: Sequencer = sequencer
-        self.player: GrinPlayer = player
-        self._plays: int = player.plays
+        self.grin_player: GrinPlayer = grin_player
+        self._plays: int = grin_player.plays
         self.width: int = width
         self.height: int = height
 
@@ -50,7 +50,7 @@ class SmileRender(RenderBase):
             flash=FlashLayer(camera, self.inputs.white),
             reveal=RevealLayer(self.inputs.capture_depth, self.inputs.white),
             diffusion=DiffusionLayer(self.inputs.diffusion),
-            destruct=DestructLayer(self.inputs.diffusion_depth),
+            bloom=BloomLayer(self.inputs.diffusion_depth),
         )
         # the artist's credit: the QR code always, the caption over the grin and the result
         self._credit: CreditLayer = CreditLayer(settings)
@@ -74,7 +74,7 @@ class SmileRender(RenderBase):
         self.grab: ScreenGrab = ScreenGrab()
         self._phone_view: Texture = self._output     # the output as the phone sees it: no QR code, no status line
         # the walls of the sphere, and which cell of which one is SMILE Online's (wall, cell, mode, page)
-        self.walls: list[PlayerRender] = [PlayerRender(settings, players, [str(i) for i in range(sphere.CELLS)]) for _ in range(sphere.PLAYERS)]
+        self.walls: list[WallRender] = [WallRender(settings, walls_settings, [str(i) for i in range(sphere.CELLS)]) for _ in range(sphere.WALLS)]
         self._online: tuple[int, int, str, str] | None = None
 
         self.window_manager.add_keyboard_callback(self._on_key)
@@ -169,16 +169,16 @@ class SmileRender(RenderBase):
 
     def _play_grin(self) -> None:
         """Show the grin frame that is due. Its first frame arrives during DIFFUSION and blends in as
-        a generation step; DIFF_LOOP starts when the player starts playing."""
-        frame: np.ndarray | None = self.player.update(time.perf_counter())
+        a generation step; DIFF_LOOP starts when the grin player starts playing."""
+        frame: np.ndarray | None = self.grin_player.update(time.perf_counter())
         if frame is not None:
             self.inputs.diffusion.set_image(frame)
-        started: bool = self.player.plays != self._plays
+        started: bool = self.grin_player.plays != self._plays
         if started:
-            self._plays = self.player.plays
+            self._plays = self.grin_player.plays
             self.sequencer.set_sequence(SequenceType.DIFF_LOOP)
-        if started or (frame is not None and self.player.playing):
-            self.sequencer.set_diffusion_progress(self.player.progress)
+        if started or (frame is not None and self.grin_player.playing):
+            self.sequencer.set_diffusion_progress(self.grin_player.progress)
 
     def draw_main(self, width: int, height: int) -> None:
         clear_color(0, 0, 0, 1)
@@ -239,18 +239,18 @@ class SmileRender(RenderBase):
         `page`) or `screen` (the main screen as the phone sees it); applied to the walls at the next frame."""
         self._online = (wall, cell, mode, page) if mode != 'clip' else None
 
-    def set_diffusion_message(self, message: GenMessage) -> None:
+    def set_generator_message(self, message: GeneratorMessage) -> None:
         # the image first, so it is uploaded no later than the frame the new state starts
-        if message.state == GenState.CAM_DEPTH:
+        if message.state == GeneratorState.CAM_DEPTH:
             if message.image is not None:
                 self.inputs.capture_depth.set_image(message.image)
             self.sequencer.start_reveal()
-        elif message.state == GenState.DIFFUSION:
+        elif message.state == GeneratorState.DIFFUSION:
             if message.image is not None:
                 self.inputs.diffusion.set_image(message.image)
             self.sequencer.set_sequence(SequenceType.DIFFUSION)
             self.sequencer.set_diffusion_progress(message.progress)
-        elif message.state == GenState.IDLE:
+        elif message.state == GeneratorState.IDLE:
             if message.image is not None:
                 self.inputs.diffusion_depth.set_image(message.image)
             self.sequencer.finish()

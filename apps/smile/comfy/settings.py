@@ -1,4 +1,4 @@
-"""Settings of the pipeline from face crop to grin: one card per stage of the ComfyUI workflow
+"""Settings of the generator from face crop to grin: one card per stage of the ComfyUI workflow
 (the face detection and crop, SMILE's own, are under the camera settings).
 
 The panel is the source of truth: every run fills these values into the workflow, whose own values
@@ -69,7 +69,7 @@ class PortraitSettings(BaseSettings):
     fixed_seed:         Field[bool]  = Field(False, description="Same seeds every run, to compare settings (off: random)")
 
 
-class Ease(Enum):
+class GrinCurve(Enum):
     SMOOTHSTEP  = 'smoothstep'
     LINEAR      = 'linear'
     EASE_IN     = 'ease_in'
@@ -94,7 +94,7 @@ class GrinSettings(BaseSettings):
     frames:             Field[int]   = Field(150, min=10, max=300, step=10, newline=True, description="Frames of the grin; it lasts frames / Grin fps (Sequence tab)")
     face_region:        Field[float] = Field(2.0, min=1.5, max=3.0, step=0.1, description="Area around the face that LivePortrait animates, relative to the face")
     stitching:          Field[bool]  = Field(True, description="LivePortrait stitching (shifts the head; off keeps it in place)")
-    ease:              Field[Ease]  = Field(Ease.SINE_IN_OUT, newline=True, description="Curve from neutral to the peak and back")
+    ease:              Field[GrinCurve] = Field(GrinCurve.SINE_IN_OUT, newline=True, description="Curve from neutral to the peak and back")
     midpoint:           Field[float] = Field(0.7, min=0.0, max=1.0, step=0.01, description="Moment of the peak, as part of the animation")
     midpoint_deviation: Field[float] = Field(0.2, min=0.0, max=0.5, step=0.01, description="Each parameter peaks at a random moment within midpoint +- this")
 
@@ -145,7 +145,7 @@ class StyleMode(Enum):
     BOTH = 'Both'
 
 
-class PipelineSettings(BaseSettings):
+class GeneratorSettings(BaseSettings):
     style_mode:     Field[StyleMode] = Field(StyleMode.BOTH, description="Style of the visitors: only A, only B, or both in turn")
     style_visitors_a: Field[int] = Field(26, min=1, max=100, step=1, label="Visitors A", description="Visitors in style A before B takes over, with Both")
     style_visitors_b: Field[int] = Field(26, min=1, max=100, step=1, label="Visitors B", description="Visitors in style B before A takes over, with Both")
@@ -154,7 +154,7 @@ class PipelineSettings(BaseSettings):
     skip_animation:  Field[bool] = Field(False, description="Debug: no grin animation, the portrait is the result")
 
     connection: Group[ConnectionSettings] = Group(ConnectionSettings)
-    style_a:    Group[StyleSettings]      = Group(StyleSettings)    # movement 0000
-    style_b:    Group[StyleSettings]      = Group(StyleSettings)    # movement 0001
+    style_a:    Group[StyleSettings]      = Group(StyleSettings)    # style 0000
+    style_b:    Group[StyleSettings]      = Group(StyleSettings)    # style 0001
     portrait:   Group[PortraitSettings]   = Group(PortraitSettings)
     grin:       Group[GrinSettings]       = Group(GrinSettings)

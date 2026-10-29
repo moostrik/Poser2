@@ -1,7 +1,7 @@
-"""One detected face turned into one mark: its box (the portrait crop's, upright), colour and label. No GL: arithmetic and text
+"""One detected face turned into one mark: its box (the portrait crop's, upright), color and label. No GL: arithmetic and text
 (after poser2's marks). `build_marks` marks every face of a detector frame (a rejected one with its
 reason); `SubjectMark` is the chosen face's box, kept while its charge drains: the box the camera
-turns to colour, and its mark when the face has left."""
+turns to color, and its mark when the face has left."""
 
 from dataclasses import dataclass
 
@@ -36,7 +36,7 @@ class Mark:
     color: Color
     line: float                                 # outline width in pixels
     label: str
-    dots: Color | None = None                   # colour of the keypoints; None: as the outline
+    dots: Color | None = None                   # color of the keypoints; None: as the outline
     subject: bool = False                       # the chosen face
     far: float = 0.0                            # its distance from good, 0..1
 
@@ -68,7 +68,7 @@ def face_fields(frame: FaceFrame, pad: Pad = NO_PAD) -> list[tuple[float, float,
 def build_marks(frame: FaceFrame, subject_color: Color = SUBJECT_COLOR, charge: float = 0.0, pad: Pad = NO_PAD) -> list[Mark]:
     """A mark per face (its box `pad` inside the image): rejected first, under everyone; the subject
     last, drawn over all. A rejected face is labelled with the failed check, its value and the limit;
-    the panel has the readout. The subject's outline goes from grey to its colour with the charge, its
+    the panel has the readout. The subject's outline goes from grey to its color with the charge, its
     dots are grey."""
     marks: list[Mark] = []
     for face in frame.faces:
@@ -92,7 +92,7 @@ def build_marks(frame: FaceFrame, subject_color: Color = SUBJECT_COLOR, charge: 
 
 class SubjectMark:
     """The chosen face's mark, without a label: the subject's box, its outline going from grey to the active
-    colour with the charge and its dots grey. While the charge drains it stays on the face that is
+    color with the charge and its dots grey. While the charge drains it stays on the face that is
     there, or else where it last was (then as far from good as can be); None once the charge is empty."""
 
     def __init__(self) -> None:

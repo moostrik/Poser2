@@ -53,11 +53,11 @@ def easing_function(value: Easing) -> Callable[[float], float]:
 
 
 class FaceFill(Enum):
-    FADE  = 'Fade'      # colour over the whole box
-    RISE  = 'Rise'      # colour climbs from the bottom
-    IRIS  = 'Iris'      # colour grows as a circle from the centre
-    TRACE = 'Trace'     # no colour: the outline draws itself around the box
-    SCAN  = 'Scan'      # as Rise, with a bright line at the colour's edge
+    FADE  = 'Fade'      # color over the whole box
+    RISE  = 'Rise'      # color climbs from the bottom
+    IRIS  = 'Iris'      # color grows as a circle from the center
+    TRACE = 'Trace'     # no color: the outline draws itself around the box
+    SCAN  = 'Scan'      # as Rise, with a bright line at the color's edge
 
 
 class FaceEffect(Enum):
@@ -71,31 +71,31 @@ class RenderSettings(BaseSettings):
     window:        Group[WindowSettings] = Group(WindowSettings)
     show_camera:   Field[bool]  = Field(False, description="Draw the raw camera image on top; no sequence starts", pinned=True)
     face_marks:    Field[bool]  = Field(False, description="Draw the faces' outlines, dots and reject reasons on the camera")
-    face_color:    Field[Color] = Field(Color(0.2, 1.0, 0.2), description="Colour of the chosen face's box and dots")
-    face_fill:     Field[FaceFill] = Field(FaceFill.FADE, description="How the chosen face's box turns to colour as its charge fills")
+    face_color:    Field[Color] = Field(Color(0.2, 1.0, 0.2), description="Color of the chosen face's box and dots")
+    face_fill:     Field[FaceFill] = Field(FaceFill.FADE, description="How the chosen face's box turns to color as its charge fills")
     face_effect:   Field[FaceEffect] = Field(FaceEffect.DARK, description="How a face's box shows its distance from good")
     face_amount:   Field[float] = Field(0.5, min=0.0, max=1.0, step=0.05, description="Strength of the effect on a face that is far from good")
     freeze:        Field[bool]  = Field(False, description="Hold the current frame")
     trail_active:  Field[bool]  = Field(True, description="Blend new diffusion images over the previous ones")
     trail:         Field[float] = Field(0.995, min=0.98, max=1.0, step=0.001, description="Trail amount")
     loop_trail:    Field[float] = Field(0.5, min=0.0, max=0.99, step=0.01, description="Trail while the grin animation plays (0 = none)")
-    destroy_blur:  Field[float] = Field(0.1, min=0.0, max=1.0, step=0.01, description="Blur while fading the last image out")
-    destroy_bloom: Field[float] = Field(0.6, min=0.0, max=1.0, step=0.1, description="Bloom while fading the last image out")
+    fade_blur:     Field[float] = Field(0.1, min=0.0, max=1.0, step=0.01, description="Blur while fading the last image out")
+    bloom_amount:  Field[float] = Field(0.6, min=0.0, max=1.0, step=0.1, description="Bloom while fading the last image out")
     credit:        Field[bool]  = Field(True, newline=True, row_label="Credit", label="Show", description="Show the QR code in the corner, and the artist's line with the grin and the result")
     credit_name:   Field[str]   = Field(CREDIT_NAME, label="Name", description="The artist's name, the caption's first line")
     credit_lines:  Field[str]   = Field(CREDIT_LINES, access=Field.INIT, label="Lines file", description="Text file with the lines under the name, one per line")
     credit_line:   Field[str]   = Field(CREDIT_LINE, access=Field.READ, label="Line", description="The line under the name for the current visitor")
     credit_url:    Field[str]   = Field(CREDIT_URL, label="URL", description="Page the QR code opens")
     credit_camera: Field[bool]  = Field(False, newline=True, row_label="Caption", label="On camera", description="Also show the caption over the camera view, while waiting for a visitor")
-    credit_players: Field[bool] = Field(False, label="On players", description="Show each clip's caption on the player walls (name top, line bottom)")
-    credit_qr_players: Field[bool] = Field(True, label="QR on players", description="One cell of each player wall shows the QR code and the name instead of its clip, one play at a time")
+    credit_walls:  Field[bool]  = Field(False, label="On walls", description="Show each clip's caption on the walls (name top, line bottom)")
+    credit_qr_walls: Field[bool] = Field(True, label="QR on walls", description="One cell of each wall shows the QR code and the name instead of its clip, one play at a time")
     credit_size:   Field[int]   = Field(200, min=120, max=480, step=10, label="QR size (px)", description="Size of the QR code (px)")
-    credit_scroll: Field[bool]  = Field(False, newline=True, row_label="Scroll", label="On players", description="Each word of the name goes round its own ring of the player walls without end, like a ticker")
+    credit_scroll: Field[bool]  = Field(False, newline=True, row_label="Scroll", label="On walls", description="Each word of the name goes round its own ring of the walls without end, like a ticker")
     credit_scroll_rows: Field[str] = Field(CREDIT_SCROLL_ROWS, label="Rows", description="Rings the words go round, 0 (top) to 4, the first word on the first; 1 to 3 have 12 screens")
     credit_scroll_speed_1: Field[float] = Field(1.0, min=0.1, max=5.0, step=0.1, label="Speed 1 (screens/s)", description="How fast the first word moves, in screen widths per second")
     credit_scroll_speed_2: Field[float] = Field(0.8, min=0.1, max=5.0, step=0.1, label="Speed 2 (screens/s)", description="How fast the second word moves, in screen widths per second")
-    credit_scroll_size: Field[int] = Field(512, min=64, max=640, step=16, label="Size (px)", description="Height of the letters with their edge, of the screen's 640 px, centred")
-    credit_scroll_gap: Field[int] = Field(CREDIT_SCROLL_GAP, min=0, max=2048, step=16, label="Gap (px)", description="The wall between two neighbouring screens, as pixels the letters cross unseen")
+    credit_scroll_size: Field[int] = Field(512, min=64, max=640, step=16, label="Size (px)", description="Height of the letters with their edge, of the screen's 640 px, centered")
+    credit_scroll_gap: Field[int] = Field(CREDIT_SCROLL_GAP, min=0, max=2048, step=16, label="Gap (px)", description="The wall between two neighboring screens, as pixels the letters cross unseen")
     credit_scroll_reverse: Field[bool] = Field(False, label="Reverse", description="The words go the other way round the sphere")
     credit_scroll_last: Field[str] = Field('', access=Field.READ, label="Going round", description="Which word goes round which row now")
 
@@ -104,7 +104,7 @@ class SequencerSettings(BaseSettings):
     start:              Field[bool]   = Field(False, widget=Widget.button, description="Start a sequence (key Enter)")
     reset:              Field[bool]   = Field(False, widget=Widget.button, description="Reset the sequence")
     pause:              Field[bool]   = Field(False, pinned=True, description="No new visitors: a found face does not start a cycle (Start still works)")
-    save:               Field[bool]   = Field(True, pinned=True, newline=True, label="Save visitors", description="Save each finished visitor (grin clip, capture, portrait) to output/ for the players")
+    save:               Field[bool]   = Field(True, pinned=True, newline=True, label="Save visitors", description="Save each finished visitor (grin clip, capture, portrait) to output/ for the walls")
     encoder:            Field[Encoder] = Field(Encoder.AUTO, access=Field.INIT, label="Encoder", description="Video encoder for the grin clip (Auto tries Intel, Nvidia, CPU)")
 
     state:              Field[str]    = Field("", access=Field.READ, newline=True, description="Current sequence state")
@@ -115,7 +115,7 @@ class SequencerSettings(BaseSettings):
     # the steps of a visitor's cycle in the order they happen, one row each; the row's title names the step
     charge:             Field[float]  = Field(2.0, min=0.1, max=10.0, step=0.1, newline=True, row_label="Face found", label="Charge (s)", description="Time a face must stay qualified until the flash (s)")
     drain:              Field[float]  = Field(4.0, min=0.1, max=10.0, step=0.1, label="Drain (s)", description="Time the charge takes to fall back when the face is lost (s)")
-    charge_ease:        Field[Easing] = Field(Easing.LINEAR, label="Ease", description="Easing of the face's turn to colour")
+    charge_ease:        Field[Easing] = Field(Easing.LINEAR, label="Ease", description="Easing of the face's turn to color")
     flash_in:           Field[float]  = Field(0.5, min=0.1, max=6.0, step=0.1, newline=True, row_label="Flash in", label="Duration (s)", description="The camera flashes; the capture is taken halfway (s)")
     flash_in_ease:      Field[Easing] = Field(Easing.QUAD_IN, label="Ease", description="Easing of the flash in")
     flash_hold:         Field[float]  = Field(0.5, min=0.0, max=3.0, step=0.1, label="Hold (s)", description="Hold the full flash at least this long before the capture appears (s)")
@@ -128,7 +128,7 @@ class SequencerSettings(BaseSettings):
     grin_buffer_wait:   Field[float]  = Field(0.0, access=Field.READ, label="Buffer wait (s)", description="Wait the last grin needed to play without stalling (s)")
     grin_start_wait:    Field[float]  = Field(0.0, access=Field.READ, label="Start wait (s)", description="Wait before the last grin played: the longer of delay and buffer wait (s)")
     timeout:            Field[float]  = Field(5.0, min=0.1, max=6.0, step=0.1, newline=True, label="Timeout (s)", description="The result stays after the grin, before the bloom (s)")
-    destroy_in:         Field[float]  = Field(0.4, min=0.1, max=6.0, step=0.1, newline=True, row_label="Bloom", label="Duration (s)", description="The result blooms (s)")
-    destroy_in_ease:    Field[Easing] = Field(Easing.QUAD_IN, label="Ease", description="Easing of the bloom")
-    destroy_out:        Field[float]  = Field(1.1, min=0.1, max=6.0, step=0.1, newline=True, row_label="Fade", label="Duration (s)", description="The result dissolves into the camera (s)")
-    destroy_out_ease:   Field[Easing] = Field(Easing.CUBIC_OUT, label="Ease", description="Easing of the fade")
+    bloom:              Field[float]  = Field(0.4, min=0.1, max=6.0, step=0.1, newline=True, row_label="Bloom", label="Duration (s)", description="The result blooms (s)")
+    bloom_ease:         Field[Easing] = Field(Easing.QUAD_IN, label="Ease", description="Easing of the bloom")
+    fade:               Field[float]  = Field(1.1, min=0.1, max=6.0, step=0.1, newline=True, row_label="Fade", label="Duration (s)", description="The result dissolves into the camera (s)")
+    fade_ease:          Field[Easing] = Field(Easing.CUBIC_OUT, label="Ease", description="Easing of the fade")

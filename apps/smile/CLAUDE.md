@@ -95,15 +95,15 @@ provides; the models live in `ComfyUI/models` as ComfyUI has it, listed with siz
 127.0.0.1:8188), started by `scripts/start_comfy.bat`, with a log per start in `output/logs/comfy_*.log`. Every model is
 local and a run makes no internet calls; a model that is missing is an error (`HF_HUB_OFFLINE=1` in `start_comfy.bat`) and a WARNING in the SMILE log when the panel names it. Keep ComfyUI core and the node packs unmodified; depth comes from
 ComfyUI's own Depth Anything 3 nodes. `comfy/`: `Generator` sends each capture to ComfyUI and turns its
-websocket events into `GenMessage`s for the render (CAM_DEPTH → DIFFUSION → DIFF_LOOP → IDLE);
+websocket events into `GeneratorMessage`s for the render (CAM_DEPTH → DIFFUSION → DIFF_LOOP → IDLE);
 `workflow.py` adapts the API export in `data/comfy/` (SMILE crops and rotates the face itself, so the export
-starts from the uploaded image; an old export's crop subgraph and video recorder are stripped; depth outputs added) and fills in every value from `PipelineSettings` per run: the
+starts from the uploaded image; an old export's crop subgraph and video recorder are stripped; depth outputs added) and fills in every value from `GeneratorSettings` per run: the
 panel is the source of truth, the workflow only provides the structure. Each visitor gets one of two
 styles (`style_a`, `style_b`, cycled by `styles.py`: `style_visitors_a` visitors in A, then `style_visitors_b` in B, or one of them for
 everyone with `style_mode` A or B; the style id is the movement id of the music): a style holds the describe settings (instruction, max tokens, repetition
 penalty, prefix and suffix around the description), the style prompt, the negative and three LoRA
 slots (file and strength, filled into the workflow's three LoRA nodes; `none` or 0 is off). The model is
-shared by both styles (`pipeline.portrait`): the `checkpoint`, and a `distill_lora` (e.g. DMD2, on the
+shared by both styles (`generator.portrait`): the `checkpoint`, and a `distill_lora` (e.g. DMD2, on the
 model only, a node `build` adds in front of the style LoRAs) whose strength sets how far the checkpoint
 is distilled; steps, CFG, sampler and scheduler have to be set to match by hand. Keep one workflow per
 visitor: a second workflow in between drops the first from ComfyUI's cache and reloads the models.
@@ -120,9 +120,9 @@ sent at every RESET) ends a visitor's job only, never a warm-up, which would oth
 a capture taken while the generator is not ready is not handed over and stands as the result at once;
 and `Main._limit_visitor` ends a visitor the generator did not end 30 s after its `job_timeout`
 (not while the grin loops), which only happens when the generator's thread is stuck.
-For debugging the rest of the cycle, `pipeline.skip_generation` sends the capture for the
+For debugging the rest of the cycle, `generator.skip_generation` sends the capture for the
 description and its depth only (`build_describe`: no portrait, no grin); the flash out then goes
-to the timeout (`Sequencer.finish`). `pipeline.skip_animation` only leaves out the grin
+to the timeout (`Sequencer.finish`). `generator.skip_animation` only leaves out the grin
 (`build_portrait`): the portrait holds for the timeout.
 ComfyUI sends the events of all its clients from one queue, so a client that stops reading stalls
 them for SMILE too: a ComfyUI browser tab that Edge put to sleep did this (ComfyUI's log says
@@ -159,7 +159,7 @@ no new sequence while it is on (`Sequencer.blocked`). Shaders are
 The two **walls** of the sphere are secondary windows of the same `WindowManager` (`render.window.secondary_list`, read at
 the start: the first entry is wall 0, screens 1-24, the second wall 1; `secondary_fullscreen` borderless on that monitor,
 forced on by `-fs` like the main window; a monitor that is missing gets a small window on the primary one, and back when
-it is plugged in). `SmileRender.walls` are two `PlayerRender`s (`player/Render.py`, no window of their own)
+it is plugged in). `SmileRender.walls` are two `WallRender`s (`player/Render.py`, no window of their own)
 composited in `update()` after the main screen, and `draw_secondary` blits the wall of the monitor's index in the list
 (poser2's pattern, hd_trio). The secondary windows share the main context (textures yes, FBOs and VAOs no), so the
 render loop makes the main context current at the start of every frame and before `deallocate` (`WindowManager._render_loop`;
@@ -175,9 +175,9 @@ the top (white with a black edge, in the comic font `data/Bangers-Regular.ttf`: 
 own line, drawn when that view begins: `new_line_due`), from the Render tab's `credit` fields; it is not in the saved clips. The
 same pass without the QR code goes into `CreditLayer.clean`, the phone's and the online cell's copy. The walls show the code and the name under it (scaled to the code's width) on one cell instead of its clip,
 for one play: it takes a cell when a clip starts there and leaves at that cell's next start (`next_credit_cell`, never the online cell), so no
-clip start flashes over it; `credit_qr_players` switches it (the walls read the Render tab's fields every frame), off takes the card away at once. With `credit_players`
+clip start flashes over it; `credit_qr_walls` switches it (the walls read the Render tab's fields every frame), off takes the card away at once. With `credit_walls`
 on, every cell shows a caption over its clip, the name over the top and a random line from the same file along the bottom, new at every play (`Player._on_play`, not tied
-to the clip), drawn into a transparent portrait texture per cell (`PlayerRender._draw_caption`).
+to the clip), drawn into a transparent portrait texture per cell (`WallRender._draw_caption`).
 `sphere.py` is the one place that knows the sphere and its wiring: 12 ribs holding 5 and 3 screens by turn, heights 0 (top) to 4
 (heights 1 to 3 have 12 screens, 0 and 4 have 6), screens numbered down each rib (1-5, 6-8, 9-13 …, the ribs counting to the left, so rib r is at -30r degrees), and screen s on Datapath unit
 ⌈s/4⌉ output ((s-1) mod 4)+1, unit n = grid column n-1, output k = grid row k-1 (`screen_of_cell`, `cell_of_screen`, `row_screens`,
@@ -190,7 +190,7 @@ the visitor's right, and a ticker moves to the visitor's left; `reverse` the oth
 second (`send_loops` to `Player.scroll_loop`: wall, word, px/s, gap, size, the ring's screens, `started` the time the loop began, the cells with their places),
 each word at its own speed (`credit_scroll_speed_1`, `_2`; a speed changed in the panel moves the start
 so the word goes on from where it is, `word_start`); `credit_scroll_last` is the readout. The walls
-(`PlayerRender.scroll_loop`, `_draw_scrolls`) take the position from that and the clock (a renewal moves nothing), carried once onto `time.perf_counter()` for the frames: on Windows
+(`WallRender.scroll_loop`, `_draw_scrolls`) take the position from that and the clock (a renewal moves nothing), carried once onto `time.perf_counter()` for the frames: on Windows
 `time.time()` moves in 15.6 ms steps on Python 3.12, coarser than a frame, which made the word stand still one frame and jump the next and drop a
 loop no message renewed for `TIMEOUT`. They draw a word as a ticker reading left to right and moving left: `name_strip` renders it once with freetype into one long BGRA image,
 640 high, the ink `credit_scroll_size` tall in the vertical middle, white with a black edge (not the font atlas: too big at that size); each cell on the ring blits the strip
@@ -222,7 +222,7 @@ must be on the PATH: the gyan.dev full build); the encoder is picked at startup 
 those processes any other way: the apps run under pythonw, so they need `CREATE_NO_WINDOW` and no
 inherited handles. The clip player (`player/`: `Player`, one for the sphere, started and stopped by `Main`) decodes each of the newest clips once into RAM
 (`ClipPool`, 512x640, about 200 MB per clip) and plays from memory on the 48 cells of the two walls (`sphere.CELLS` each, cell ids
-0-47, wall = id // 24; the loaders feed `PlayerRender.set_image` and bang Max on 4115 for wall 0, 4116 for wall 1); the Players tab
+0-47, wall = id // 24; the loaders feed `WallRender.set_image` and bang Max on 4115 for wall 0, 4116 for wall 1); the Walls tab
 (`player/settings.py`) has `pool` the clips kept, `recent`, `recycle_every` and `hwaccel` (read at the start), `fps` the playback
 speed (default 20, 0 = the clip's own rate), `spread` a random speed difference per play so the cells drift apart (default 0.1), `trail` a blend
 with the previous output (default 0: none), read at every play or frame.
@@ -268,11 +268,11 @@ the file against it), adds the panel's `laughter_offset` (`/laughter_offset`, de
 speaker (three `expr`s: speakers at -60, 60 and 180 degrees from the camera, each laugh over its two nearest at
 constant power). The gains travel with the note into the `poly~` voice (`SmileSamplepoly.maxpat`), which
 applies them only on a note-on, so the note-off from `makenote` does not move a fading laugh. The panel's
-`laughter_test` (`audio/ScreenTest.py`, stepped from `Main.sequence_callback`) lights the cell on its wall
+`laughter_test` (`audio/laughter_test.py`, stepped from `Main.sequence_callback`) lights the cell on its wall
 (`Player.light`, a call: no OSC between SMILE and its walls): the wall shows the cell white with the screen's number (`Text` into a portrait FBO, blitted with `BlitRotated`
 like a clip, so it stands upright on the turned screen). SMILE bangs Max itself with `/test_bang <index> <sample>`
 (`Sender` sends a tuple as separate arguments), which `p laughterSampler` takes past the gates (`r testBang`) with
-the panel's `laughter_test_sample` (a file of the laughter folder; `ScreenTest.list_samples` numbers the folder as
+the panel's `laughter_test_sample` (a file of the laughter folder; `laughter_test.list_samples` numbers the folder as
 `polybuffer~ readfolder` does, alphabetical with case ignored) at velocity 100; `/laughter_test` closes the clips' gate meanwhile (an `expr` on
 `laughterOn` and `laughterTest`) and the sequencer is blocked, so only the test laugh sounds. The patch is JSON, edited by hand in Max's own formatting (tabs, LF) so the diff stays
 readable; Max rewrites the whole file when the patch is saved from Max.
@@ -302,7 +302,7 @@ and low-pass filter, `tapeStage` in `app.js`, floored to what a phone speaker ca
 taken without the caption (`ScreenGrab.last`, sent as `LAST`: the page fades the caption out itself and keeps the frame; the
 bloom would brighten it), the turn runs on through the bloom and the fade (sound only) and ends back at the camera. The phone also plays the room's laughter samples (`laugh_files`, uploaded to the relay's `laughs/` at
 the first connect, `/api/library`) at random, following `audio.laughter` through the `eye` message. The turn ends
-with the sequence; `ClipSaver`'s saved callback gives the files (the recording closes at the last grin frame, `Main.diffusion_callback`, while the
+with the sequence; `ClipSaver`'s saved callback gives the files (the recording closes at the last grin frame, `Main.generator_callback`, while the
 grin still plays), which are uploaded at once (`Delivery`)
 and the `result` goes to the phone by its id, so it has the video when its turn ends and the next turn can start meanwhile. The phone sends its camera mirrored, as it
 shows it. The token is a file (`data/online_token.txt`, git-ignored), never a setting in a preset.
@@ -311,7 +311,7 @@ QR code to the phone page (`online.page`, empty = the relay's host, `Link.http_b
 and the relay connected, and the main screen as the phone sees it (`CreditLayer.clean`: the caption, no QR code, no status line)
 from the judging to the phone's last frame (`Online.showing`), then the card again; off or disconnected it is a clip cell like any
 (`online_cell_mode` in `Player.py`). `Main._online_cell` sets it every frame: `Player.online_cell` (no bang, no caption: its clip plays
-unseen) and `SmileRender.set_online_cell`, which the walls take in `update()` (`PlayerRender.set_online`).
+unseen) and `SmileRender.set_online_cell`, which the walls take in `update()` (`WallRender.set_online`).
 Tests: `relay/tests` (the line, the server on aiohttp's test server, the page's files: `test_web.py`) and `online/tests`
 (a fake link and camera).
 

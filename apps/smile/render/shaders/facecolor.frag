@@ -8,7 +8,7 @@ const int PIXELS = 1;
 const int BLUR = 2;
 const int FOG = 3;
 
-// fill: how the chosen face's box turns to colour with its charge
+// fill: how the chosen face's box turns to color with its charge
 const int FADE = 0;
 const int RISE = 1;
 const int IRIS = 2;
@@ -35,7 +35,7 @@ uniform float mosaic;               // pixels: block size of the whole image (th
 in vec2 texCoord;
 out vec4 fragColor;
 
-const float EDGE = 0.04;            // softness of the colour's moving edge, as a part of the rect's height
+const float EDGE = 0.04;            // softness of the color's moving edge, as a part of the rect's height
 const float MAX_BLOCK = 64.0;       // pixels: block size of the pixels effect at amount 1
 const float TRACE_PX = 10.0;        // width of the traced outline
 const float SCAN_GLOW = 0.6;        // brightness of the scan line
@@ -80,30 +80,30 @@ void main() {
         gray = mix(gray, 0.5, far * amount);
     }
 
-    // the colour of the chosen face: how much of it at this pixel
+    // the color of the chosen face: how much of it at this pixel
     float level = charge * (1.0 + EDGE);
     float from_bottom = (rect.y + rect.w - p.y) / max(rect.w, 1e-6);
-    float colour = charge;
+    float color_amount = charge;
     float glow = 0.0;
     if (fill == RISE || fill == SCAN) {
-        // full colour below a line that climbs from the bottom (charge 0) to the top (1)
-        colour = 1.0 - smoothstep(level - EDGE, level, from_bottom);
+        // full color below a line that climbs from the bottom (charge 0) to the top (1)
+        color_amount = 1.0 - smoothstep(level - EDGE, level, from_bottom);
         if (fill == SCAN) {
             float line = 1.0 - smoothstep(0.0, EDGE, abs(from_bottom - (level - EDGE * 0.5)));
             glow = SCAN_GLOW * line * step(0.001, charge) * step(charge, 0.999);
         }
     } else if (fill == IRIS) {
-        // a circle from the centre that reaches the corners at charge 1
-        vec2 from_centre = (p - (rect.xy + rect.zw * 0.5)) * resolution;
-        float radius = length(from_centre) / max(length(rect.zw * resolution * 0.5), 1e-6);
-        colour = 1.0 - smoothstep(level - EDGE, level, radius);
+        // a circle from the center that reaches the corners at charge 1
+        vec2 from_center = (p - (rect.xy + rect.zw * 0.5)) * resolution;
+        float radius = length(from_center) / max(length(rect.zw * resolution * 0.5), 1e-6);
+        color_amount = 1.0 - smoothstep(level - EDGE, level, radius);
     } else if (fill == TRACE) {
-        colour = 0.0;       // the outline alone shows the charge
+        color_amount = 0.0;       // the outline alone shows the charge
     }
-    vec3 result = mix(vec3(gray), color.rgb, colour * in_rect) + glow * in_rect;
+    vec3 result = mix(vec3(gray), color.rgb, color_amount * in_rect) + glow * in_rect;
 
     if (fill == TRACE && in_rect > 0.0) {
-        // the outline draws itself from the top centre, clockwise, up to charge of the perimeter
+        // the outline draws itself from the top center, clockwise, up to charge of the perimeter
         vec2 size = rect.zw * resolution;
         vec2 q = (p - rect.xy) * resolution;
         float top = q.y, right = size.x - q.x, bottom = size.y - q.y, left = q.x;

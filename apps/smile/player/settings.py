@@ -1,8 +1,8 @@
 from modules.settings import BaseSettings, Field, Widget
 
 
-class PlayersSettings(BaseSettings):
-    """The clip players on the sphere's walls (the two secondary windows): what the one pool keeps and how
+class WallsSettings(BaseSettings):
+    """The clip player on the sphere's walls (the two secondary windows): what the one pool keeps and how
     the cells play. The pool's values are read at the start; the play values at every play or frame."""
     pool:           Field[int]   = Field(30, min=1, max=200, access=Field.INIT, description="Clips kept decoded in RAM (about 200 MB each)")
     recent:         Field[int]   = Field(4, min=0, max=24, access=Field.INIT, description="The last recordings, always playing on every third of the sphere; 0 = none")

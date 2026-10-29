@@ -1,4 +1,4 @@
-"""Tests for the face overlay's marks: colours, labels and draw order (no GL needed)."""
+"""Tests for the face overlay's marks: colors, labels and draw order (no GL needed)."""
 
 import unittest
 
@@ -21,7 +21,7 @@ class TestSubjectMark(unittest.TestCase):
         self.assertEqual(mark.label, '')
         self.assertAlmostEqual(mark.w, 0.4)
 
-    def test_the_outline_goes_from_grey_to_the_active_colour_with_the_charge(self):
+    def test_the_outline_goes_from_grey_to_the_active_color_with_the_charge(self):
         subject = SubjectMark()
         blue = (0.0, 0.0, 1.0, 1.0)
         good = FaceFrame((observation(subject=True),), 10.0)
@@ -89,7 +89,7 @@ class TestLabels(unittest.TestCase):
 
 
 class TestBuildMarks(unittest.TestCase):
-    def test_colours_and_lines(self):
+    def test_colors_and_lines(self):
         frame = FaceFrame((observation(subject=True), observation(), observation(Rejection.EYES)), 0.0)
         marks = {m.color: m for m in build_marks(frame, charge=1.0)}
         self.assertEqual(marks[SUBJECT_COLOR].line, SUBJECT_LINE_PX)

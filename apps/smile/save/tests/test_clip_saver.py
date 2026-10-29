@@ -11,7 +11,7 @@ import subprocess
 import cv2
 import numpy as np
 
-from apps.smile.comfy.settings import PipelineSettings
+from apps.smile.comfy.settings import GeneratorSettings
 from apps.smile.render.settings import SequencerSettings
 from apps.smile.save import record
 from apps.smile.save.ClipSaver import ClipSaver
@@ -55,7 +55,7 @@ class TestClipSaverStyle(unittest.TestCase):
         settings.encoder = video.Encoder.CPU
         settings.save = True
         made = {'description': 'a face, "quoted"', 'seed': 7, 'grin': {'smile': 2.0},
-                'settings': {'pipeline': PipelineSettings().to_dict()}}
+                'settings': {'generator': GeneratorSettings().to_dict()}}
         with tempfile.TemporaryDirectory() as root:
             saver = ClipSaver(settings, root=root)
             try:

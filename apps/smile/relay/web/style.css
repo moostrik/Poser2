@@ -90,7 +90,7 @@ html, body {
   text-shadow: 0 0 2px #000, 0 2px 4px #000;
 }
 
-/* THE COLUMN: title, frame, bar, credit; centred, the frame fits with the rest in view */
+/* THE COLUMN: title, frame, bar, credit; centered, the frame fits with the rest in view */
 #page {
   position: relative;
   height: var(--vh);
@@ -125,11 +125,11 @@ html, body {
    letters, wherever a text names the machine (the title, the terms, the bar); the share video's watermark
    draws it with these proportions (share.py, MARK_*). It takes its size from the text */
 .ai {
-  display: inline-flex;       /* the letters centred in the ring (the border counts inside the box) */
+  display: inline-flex;       /* the letters centered in the ring (the border counts inside the box) */
   align-items: center;
   justify-content: center;
   /* measured in the font (freetype): Bangers' lowercase is as tall as its capitals, the ink of "ai" runs from
-     the baseline to 0.74 em and its centre comes 0.02 em above the line's, 0.03 em right of the advance's;
+     the baseline to 0.74 em and its center comes 0.02 em above the line's, 0.03 em right of the advance's;
      the padding takes both out */
   padding: 0.04em 0.06em 0 0;
   font-size: 0.5em;           /* the letters; the ring is 1.5 of them, 0.75 of the text */
@@ -166,9 +166,9 @@ html, body {
 #cam { display: none; }
 
 /* the camera (drawn and sent as a mirror) in black and white, the whole image in pixels while waiting and as
-   long as a face is not right; from the flash the window is the main screen, in colour */
+   long as a face is not right; from the flash the window is the main screen, in color */
 #view { image-rendering: pixelated; filter: grayscale(1); }
-body.colour #view { filter: none; }
+body.color #view { filter: none; }
 
 /* the saved video is the result and loops on over the last frame of the screen, which stands until the video
    actually plays (the element is black before that) */
@@ -232,7 +232,7 @@ body.done.playing #grin { display: block; }
 /* the label: #label stands in the flow, invisible, for its room and the bar's height (VOLUME grows it); the
    text seen is two copies laid over the bar with the same content (JS: bar.say), the white one clipped to the
    black part of the bar and the black one to the fill. Two opaque texts, no blending: the poops can fly out
-   from behind the letters (z-index between the fill and the copies) without colouring them */
+   from behind the letters (z-index between the fill and the copies) without coloring them */
 #share > span { text-transform: uppercase; white-space: pre; }
 #label { position: relative; visibility: hidden; }
 #share > span.copy {
@@ -266,7 +266,7 @@ body.done.playing #grin { display: block; }
 }
 /* the poops flying out of BULLSHITTING: JS throws three or four from a letter every 150 ms (bar, flyPoops) and
    takes each away when it has flown; --vx, --vy, --drop, --spin and the duration are each poop's own, set by
-   JS. They stand outside the label, over the fill and under the letters, so they keep their colour */
+   JS. They stand outside the label, over the fill and under the letters, so they keep their color */
 #share i.fly {
   position: absolute;
   z-index: 1;                 /* over the fill, under the letters: a poop comes out from behind the word */

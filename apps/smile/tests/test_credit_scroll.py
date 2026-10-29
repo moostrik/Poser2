@@ -19,7 +19,7 @@ class TestRows(unittest.TestCase):
         # every screen is in exactly one row
         self.assertEqual(sorted(s for row in range(5) for s in row_screens(row)), list(range(48)))
 
-    def test_a_screen_is_a_cell_of_a_player_by_the_wiring(self):
+    def test_a_screen_is_a_cell_of_a_wall_by_the_wiring(self):
         self.assertEqual(screen_cell(0), (0, 0))
         self.assertEqual(screen_cell(1), (0, 6))     # screen 2: unit 1 output 2, grid row 1
         self.assertEqual(screen_cell(4), (0, 1))     # screen 5: unit 2 output 1
@@ -43,11 +43,11 @@ class TestPath(unittest.TestCase):
         self.assertEqual(RingPath(1).count, 12)
         self.assertEqual(RingPath(4).count, 6)
 
-    def test_each_player_gets_its_own_cells_with_their_place_round_the_ring(self):
+    def test_each_wall_gets_its_own_cells_with_their_place_round_the_ring(self):
         path = RingPath(1)       # screens (from 0) 1 | 45, 41, 37, 33, 29, 25 | 21, 17, 13, 9, 5: height 1, grid row 1
         self.assertEqual(path.cells(0), [(6, 0), (11, 7), (10, 8), (9, 9), (8, 10), (7, 11)])
         self.assertEqual(path.cells(1), [(11, 1), (10, 2), (9, 3), (8, 4), (7, 5), (6, 6)])
-        self.assertEqual(sorted(place for player in (0, 1) for _, place in path.cells(player)), list(range(12)))
+        self.assertEqual(sorted(place for wall in (0, 1) for _, place in path.cells(wall)), list(range(12)))
 
 
 class TestLoops(unittest.TestCase):
@@ -83,7 +83,7 @@ class TestStrip(unittest.TestCase):
         self.assertGreater(rows[-1] - rows[0], 0.9 * 512)
         # in the vertical middle
         self.assertLessEqual(abs(rows[0] - (639 - rows[-1])), 3)
-        # white letters on a black edge: both colours are there where the alpha is
+        # white letters on a black edge: both colors are there where the alpha is
         self.assertTrue((strip[:, :, :3][alpha > 0] == 255).any())
         self.assertTrue((strip[:, :, :3][alpha > 0] == 0).any())
         # several screens long

@@ -11,7 +11,7 @@ import numpy as np
 from modules.face import FaceFrame, FaceObservation, HeadPose, Rejection
 from apps.smile.online.Online import ASK_TIMEOUT, INSIDE, LOOKING, SAVE_TIMEOUT, Online, Phase, face_message
 from apps.smile.online.settings import OnlineSettings
-from apps.smile.render.Sequencer import SeqenceMessage, SequenceType
+from apps.smile.render.Sequencer import SequenceMessage, SequenceType
 
 
 class FakeLink:
@@ -130,7 +130,7 @@ class TestOnline(unittest.TestCase):
     def step(self, seq: SequenceType = SequenceType.CAMERA_SHOW, dt: float = 0.1, progress: float = 0.0, initial: bool = False,
              ready: bool = True, busy: bool = False, value: float = 0.0) -> None:
         self.now += dt
-        self.online.update(self.now, SeqenceMessage(seq, progress, initial, value), ready, busy)
+        self.online.update(self.now, SequenceMessage(seq, progress, initial, value), ready, busy)
 
     def go_idle(self) -> None:
         self.settings.active = True

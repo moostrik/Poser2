@@ -101,10 +101,6 @@ class Camera:
         self.clear_frame_callbacks()
 
     # FRAMES
-    def getColorImg(self) -> np.ndarray:
-        with self._mutex:
-            return self._frame
-
     def frame(self) -> tuple[np.ndarray, float]:
         """The newest frame and when it arrived: a source that stopped keeps its last frame, with its old time."""
         with self._mutex:

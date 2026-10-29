@@ -8,7 +8,7 @@ from unittest import mock
 
 from apps.smile.comfy.client import Event
 from apps.smile.comfy.Generator import NO_EVENTS, SILENT_AFTER, Generator, NoEvents
-from apps.smile.comfy.settings import PipelineSettings
+from apps.smile.comfy.settings import GeneratorSettings
 from apps.smile.render.GrinPlayer import GrinPlayer
 from apps.smile.render.settings import SequencerSettings
 
@@ -52,7 +52,7 @@ class FakeClient:
 
 class TestGenerator(unittest.TestCase):
     def setUp(self):
-        self.settings = PipelineSettings()
+        self.settings = GeneratorSettings()
         self.settings.connection.workflow = WORKFLOW
         self.generator = Generator(self.settings, GrinPlayer(SequencerSettings()))
         self.clock = FakeClock()
@@ -124,7 +124,7 @@ class TestGenerator(unittest.TestCase):
             self.assertEqual(self.settings.connection.status, 'ready')
 
     def test_a_reset_does_not_end_a_warm_up(self):
-        self.generator.is_diffusing = True
+        self.generator.is_generating = True
         self.generator._silent = True
         self.generator.interrupt()
         self.assertFalse(self.generator._interrupt_event.is_set())

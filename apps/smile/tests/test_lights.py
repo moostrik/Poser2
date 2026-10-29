@@ -31,7 +31,7 @@ class TestLights(unittest.TestCase):
         lights.set_progress(1.0, AnimationType.DIFFUSE_OUT)     # the full red ring
         before = lights.cam_lights
         self.assertTrue(np.all(before[:, 0] == 1.0))
-        lights.set_progress(0.5, AnimationType.DESTRUCT_OUT)
+        lights.set_progress(0.5, AnimationType.FADE)
         # a new array: the sender thread never sees the one it reads half filled in
         self.assertIsNot(lights.cam_lights, before)
         self.assertTrue(np.all(before[:, 0] == 1.0))

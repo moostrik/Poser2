@@ -4,7 +4,7 @@ import os
 import random
 import unittest
 
-from apps.smile.comfy.settings import PipelineSettings, Ease, Prefer, StyleMode
+from apps.smile.comfy.settings import GeneratorSettings, GrinCurve, Prefer, StyleMode
 from apps.smile.comfy.styles import Styles
 from apps.smile.comfy.workflow import FIXED_SEED, GRIN_ROTATIONS, GRIN_TARGETS, MAX_SEED, Workflow
 
@@ -21,7 +21,7 @@ def links(workflow: dict) -> list[tuple[str, str, str]]:
 class TestWorkflow(unittest.TestCase):
     def setUp(self):
         self.wf = Workflow(WORKFLOW)
-        self.settings = PipelineSettings()
+        self.settings = GeneratorSettings()
         self.settings.grin.frames = 120
         self.settings.style_a.prompt = 'a style'
         self.settings.style_a.negative = 'a negative'
@@ -54,7 +54,7 @@ class TestWorkflow(unittest.TestCase):
         self.assertEqual(self.built[self.wf.last_frame]['inputs']['batch_index'], 119)
 
     def test_settings_fill_the_nodes(self):
-        s = PipelineSettings()
+        s = GeneratorSettings()
         s.style_b.max_tokens = 200
         s.style_b.repetition_penalty = 1.1
         s.style_b.instruction = 'describe'
@@ -74,7 +74,7 @@ class TestWorkflow(unittest.TestCase):
         s.style_b.lora_1, s.style_b.lora_1_strength = 'other.safetensors', 0.9
         s.style_b.lora_2, s.style_b.lora_2_strength = 'none', 2.0
         s.style_b.lora_3, s.style_b.lora_3_strength = 'missing.safetensors', -0.3
-        s.grin.ease = Ease.LINEAR
+        s.grin.ease = GrinCurve.LINEAR
         s.grin.smile_min = s.grin.smile_max = 3.0
         s.grin.yaw_min = s.grin.yaw_max = 10.0
         s.grin.stitching = False
@@ -437,7 +437,7 @@ class TestWorkflow(unittest.TestCase):
 
 class TestStyles(unittest.TestCase):
     def test_cycle(self):
-        settings = PipelineSettings()
+        settings = GeneratorSettings()
         settings.style_visitors_a = settings.style_visitors_b = 2
         styles = Styles(settings)
         ids = [styles.advance() for _ in range(3)]
@@ -450,7 +450,7 @@ class TestStyles(unittest.TestCase):
         self.assertIs(styles.current(), settings.style_a)
 
     def test_each_style_has_its_own_number_of_visitors(self):
-        settings = PipelineSettings()
+        settings = GeneratorSettings()
         settings.style_visitors_a = 3
         settings.style_visitors_b = 1
         styles = Styles(settings)
@@ -458,7 +458,7 @@ class TestStyles(unittest.TestCase):
         self.assertEqual(ids, ['0000', '0000', '0000', '0001', '0000', '0000', '0000', '0001', '0000'])
 
     def test_one_style_for_everyone(self):
-        settings = PipelineSettings()
+        settings = GeneratorSettings()
         settings.style_visitors_a = settings.style_visitors_b = 2
         styles = Styles(settings)
         settings.style_mode = StyleMode.B

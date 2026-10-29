@@ -10,7 +10,7 @@ from unittest import mock
 from apps.smile.main import SmileMain
 from apps.smile.settings import Settings
 from modules.inout import OscSenderSettings
-from apps.smile.render.Sequencer import SeqenceMessage, SequenceType
+from apps.smile.render.Sequencer import SequenceMessage, SequenceType
 from modules.settings import presets
 
 
@@ -34,11 +34,11 @@ class TestMaxControls(unittest.TestCase):
     def setUp(self):
         self.settings = Settings()
         self.app = SimpleNamespace(
-            settings=self.settings, diffuse=mock.Mock(ready=True),
+            settings=self.settings, generator=mock.Mock(ready=True),
             # a Mock attribute is truthy: the camera must really not be stalled
             camera=SimpleNamespace(frame=lambda: (None, 0.0), stalled=False, next_image=mock.Mock()),
             render=mock.Mock(), lights=mock.Mock(), face=mock.Mock(), save=mock.Mock(), sequencer=mock.Mock(),
-            audio=mock.Mock(get_audio_id=lambda: '0001'), osc=mock.Mock(), screen_test=mock.Mock(),
+            audio=mock.Mock(get_music_id=lambda: '0001'), osc=mock.Mock(), laughter_test=mock.Mock(),
             _limit_visitor=lambda seq: None,
             _style_picked=False, _face_frame_time=0.0, _visitor_start=None, _saving=False, _grin_saved=False,
             credit_scroller=mock.Mock(), online=mock.Mock(showing=False, pass_value=''), clip_player=mock.Mock())
@@ -47,7 +47,7 @@ class TestMaxControls(unittest.TestCase):
     def frame(self) -> dict:
         """One sequencer frame: what went to the OSC sender, by address."""
         self.app.osc.submit.reset_mock()
-        SmileMain.sequence_callback(self.app, SeqenceMessage(SequenceType.CAMERA_SHOW, 0.0))
+        SmileMain.sequence_callback(self.app, SequenceMessage(SequenceType.CAMERA_SHOW, 0.0))
         return {c.args[0]: c.args[1] for c in self.app.osc.submit.call_args_list}
 
     def test_the_panel_controls_go_out_every_frame_in_max_units(self):
@@ -79,7 +79,7 @@ class TestMaxControls(unittest.TestCase):
 
     def test_the_laughter_test_runs_every_frame_holds_new_visitors_and_tells_max(self):
         sent = self.frame()
-        self.app.screen_test.update.assert_called_once()
+        self.app.laughter_test.update.assert_called_once()
         self.assertFalse(self.app.sequencer.blocked)
         self.assertEqual((sent['/laughter_test'], sent['/laughter']), (0, 1))
         self.settings.audio.laughter_test = True
@@ -108,7 +108,7 @@ class TestMaxControls(unittest.TestCase):
         self.app.render.set_online_cell.assert_called_with(1, 12, 'clip', 'http://127.0.0.1:8800/')
         self.app.online.pass_value = 'abc'
         self.frame()
-        self.assertEqual(self.app.clip_player.online_cell, 24 + 12)     # the player's cells count over both walls
+        self.assertEqual(self.app.clip_player.online_cell, 24 + 12)     # the clip player's cells count over both walls
         self.app.render.set_online_cell.assert_called_with(1, 12, 'qr', 'http://127.0.0.1:8800/?pass=abc')
         self.app.online.showing = True
         online.page = ' https://smile.example/ '

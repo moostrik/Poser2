@@ -18,10 +18,10 @@ def sources(node: dict) -> set[str]:
 class TestTestflow(unittest.TestCase):
     def setUp(self):
         self.settings = Settings()
-        self.settings.pipeline.portrait.fixed_seed = True       # the app's build is then repeatable
+        self.settings.generator.portrait.fixed_seed = True       # the app's build is then repeatable
         self.settings.sequence.grin_fps = 13.0
         self.wf = Workflow(WORKFLOW)
-        p = self.settings.pipeline
+        p = self.settings.generator
         self.app = self.wf.build(CAPTURE, p.style_b, p)
         self.test = make_test_workflow(WORKFLOW, self.settings, 'b')
 
@@ -51,7 +51,7 @@ class TestTestflow(unittest.TestCase):
         overlay = next(node for node in self.test.values() if node['class_type'] == 'ImageBlend')
         self.assertEqual(overlay['inputs']['image2'], self.test[self.wf.portrait]['inputs']['images'])
         self.assertEqual(self.test[PROMPT]['inputs']['source'], [self.wf.suffix, 0])
-        self.assertEqual(self.test[self.wf.style]['inputs']['text'], self.settings.pipeline.style_b.prompt)
+        self.assertEqual(self.test[self.wf.style]['inputs']['text'], self.settings.generator.style_b.prompt)
 
 
 if __name__ == '__main__':

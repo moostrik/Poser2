@@ -68,16 +68,16 @@ def read(path: str) -> dict | None:
 
 
 def to_preset(record: dict) -> dict:
-    """The record as a preset of the pipeline settings: its style under style_a or style_b, the
+    """The record as a preset of the generator settings: its style under style_a or style_b, the
     portrait, and the grin with every range closed on the value that was drawn, so loading it
     repeats this visitor's pose (the moments stay random around the midpoint: no setting holds them)."""
-    if 'settings' in record:        # a record of the first shape held the preset itself
-        return record['settings']
+    if 'settings' in record:        # a record of the first shape held the preset itself, the generator's group as 'pipeline'
+        return {('generator' if key == 'pipeline' else key): value for key, value in record['settings'].items()}
     grin: dict = {name: value for name, value in record.get('grin', {}).items() if name not in ('peak', 'peak_at')}
     for name, value in record.get('grin', {}).get('peak', {}).items():
         grin[f'{name}_min'] = grin[f'{name}_max'] = value
     style: str = 'style_b' if record.get('style') == 'B' else 'style_a'
-    return {'pipeline': {style: record.get('style_settings', {}), 'portrait': record.get('portrait', {}), 'grin': grin}}
+    return {'generator': {style: record.get('style_settings', {}), 'portrait': record.get('portrait', {}), 'grin': grin}}
 
 
 def main() -> None:

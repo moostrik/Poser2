@@ -1,4 +1,4 @@
-"""The sphere of screens and how the players' cells are wired to it: the one place that knows which
+"""The sphere of screens and how the walls' cells are wired to it: the one place that knows which
 screen a cell is. Used by the laughter test (the number a lit cell shows), the scrolling name (the
 screens of a row), `data/audio/screen_angles.txt` (the angle of every cell, for the laughter) and the
 clip pool (the third of the sphere a cell is in: every recent recording plays on each).
@@ -9,9 +9,9 @@ count to the right; checked on site 2026-10-25),
 holding 5 and 3 screens by turn at heights 0 (top) to 4; a 3-rib holds the heights 1, 2 and 3. The
 screens are numbered from 1 down each rib, then the next rib: 1-5 the first 5-rib, 6-8 the 3-rib
 after it, 9-13, 14-16 and so on round. The wiring: screen s is Datapath unit ceil(s / 4), output
-((s - 1) mod 4) + 1; player 1's units PL1-PL6 carry screens 1-24, player 2's 25-48; unit n is column
-n - 1 of the player's 6 x 4 grid and output k its row k - 1, so cell = row * 6 + column. That puts the
-heights 1, 2 and 3 of a player's six ribs on its grid rows 1, 2 and 3 in order, and the tops and
+((s - 1) mod 4) + 1; wall 1's units PL1-PL6 carry screens 1-24, wall 2's 25-48; unit n is column
+n - 1 of the wall's 6 x 4 grid and output k its row k - 1, so cell = row * 6 + column. That puts the
+heights 1, 2 and 3 of a wall's six ribs on its grid rows 1, 2 and 3 in order, and the tops and
 bottoms of its three 5-ribs by turns on grid row 0."""
 
 RIBS: int = 12
@@ -20,9 +20,9 @@ HEIGHTS: int = 5                        # rows of the sphere, 0 the top
 RIB_HEIGHTS: tuple[range, range] = (range(0, 5), range(1, 4))   # the heights a 5-rib and a 3-rib hold
 PAIR_SCREENS: int = 8                   # a 5-rib and the 3-rib after it
 SCREENS: int = RIBS // 2 * PAIR_SCREENS  # 48
-PLAYERS: int = 2
-CELLS: int = SCREENS // PLAYERS         # 24 per player
-COLUMNS: int = 6                        # the player's grid: Datapath units
+WALLS: int = 2
+CELLS: int = SCREENS // WALLS           # 24 per wall
+COLUMNS: int = 6                        # the wall's grid: Datapath units
 OUTPUTS: int = 4                        # grid rows: a unit's outputs
 SECTORS: int = 3                        # the sphere in thirds, 4 ribs each: a visitor standing anywhere sees one whole
 
@@ -49,22 +49,22 @@ def row_screens(height: int) -> list[int]:
     return [s for rib in range(RIBS) for s in [screen_at(rib, height)] if s is not None]
 
 
-def screen_of_cell(player: int, cell: int) -> int:
-    """The screen (from 1) a cell (0 to 23) of player 0 or 1 shows, by the wiring."""
+def screen_of_cell(wall: int, cell: int) -> int:
+    """The screen (from 1) a cell (0 to 23) of wall 0 or 1 shows, by the wiring."""
     row, column = divmod(cell, COLUMNS)
-    return player * CELLS + column * OUTPUTS + row + 1
+    return wall * CELLS + column * OUTPUTS + row + 1
 
 
 def cell_of_screen(screen: int) -> tuple[int, int]:
-    """The player (0 or 1) and its cell (0 to 23) that show screen `screen` (1 to 48)."""
-    player, rest = divmod(screen - 1, CELLS)
+    """The wall (0 or 1) and its cell (0 to 23) that show screen `screen` (1 to 48)."""
+    wall, rest = divmod(screen - 1, CELLS)
     column, row = divmod(rest, OUTPUTS)
-    return player, row * COLUMNS + column
+    return wall, row * COLUMNS + column
 
 
-def sector_of_cell(player: int, cell: int) -> int:
-    """The third of the sphere (0 to SECTORS - 1, by rib: 0-3, 4-7, 8-11) that a cell of a player is in."""
-    return rib_height(screen_of_cell(player, cell))[0] * SECTORS // RIBS
+def sector_of_cell(wall: int, cell: int) -> int:
+    """The third of the sphere (0 to SECTORS - 1, by rib: 0-3, 4-7, 8-11) that a cell of a wall is in."""
+    return rib_height(screen_of_cell(wall, cell))[0] * SECTORS // RIBS
 
 
 def rib_angle(rib: int) -> float:
@@ -74,9 +74,9 @@ def rib_angle(rib: int) -> float:
 
 
 def cell_angles() -> list[float]:
-    """The angle of every cell, indexed as the Max patch does: cell + 24 for player 2 (the lines of
+    """The angle of every cell, indexed as the Max patch does: cell + 24 for wall 2 (the lines of
     data/audio/screen_angles.txt)."""
-    return [rib_angle(rib_height(screen_of_cell(player, cell))[0]) for player in range(PLAYERS) for cell in range(CELLS)]
+    return [rib_angle(rib_height(screen_of_cell(wall, cell))[0]) for wall in range(WALLS) for cell in range(CELLS)]
 
 
 def screen_angles_text() -> str:

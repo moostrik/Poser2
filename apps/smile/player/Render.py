@@ -93,14 +93,14 @@ def next_credit_cell(current: str | None, left: str | None, started: list[str],
     return current, left
 
 
-class PlayerRender:
+class WallRender:
     """One wall of the sphere: grin sequences in a grid of cells, each image turned a quarter, with a trail
     over the whole grid, composited into `texture` on the render thread (`update`) and shown in one of SMILE's
     secondary windows. A cell flashes white for one frame when its next sequence starts, and is white with
     its screen's number while the laughter test lights it (`light`). One cell shows the artist's name and
-    a QR code to the project page instead of its clip (`credit_qr_players`): it takes a cell when a clip
+    a QR code to the project page instead of its clip (`credit_qr_walls`): it takes a cell when a clip
     starts there, after its white frame, and stays for that play, so it moves on as often as the clips
-    change. With `credit_players` on, every cell shows a caption over its clip, set at every play
+    change. With `credit_walls` on, every cell shows a caption over its clip, set at every play
     (`set_caption`): the artist's name over the top and a random line along the bottom. The words of the
     name go round the sphere (`scroll_loop`, renewed every second): letters most of a screen tall move
     over the cells of a ring, each cell showing its part of one long texture (`name_strip`). The online
@@ -111,9 +111,9 @@ class PlayerRender:
     CELL_WIDTH: int = 640
     CELL_HEIGHT: int = 512
 
-    def __init__(self, settings: Any, players: Any, ids: list[str]) -> None:
+    def __init__(self, settings: Any, walls_settings: Any, ids: list[str]) -> None:
         self.settings: Any = settings       # RenderSettings: the credit fields
-        self.players: Any = players         # PlayersSettings: the trail
+        self.walls_settings: Any = walls_settings   # WallsSettings: the trail
 
         self.width: int = self.COLUMNS * self.CELL_WIDTH
         self.height: int = ceil(len(ids) / self.COLUMNS) * self.CELL_HEIGHT
@@ -231,9 +231,9 @@ class PlayerRender:
         self._blend.reload()
         self._rotated.reload()
         settings = self.settings
-        credit: bool = bool(settings.credit_qr_players)
-        caption: bool = bool(settings.credit_players)
-        trail: float = float(self.players.trail)
+        credit: bool = bool(settings.credit_qr_walls)
+        caption: bool = bool(settings.credit_walls)
+        trail: float = float(self.walls_settings.trail)
         online: str | None = self._online_cell
 
         flashes: list[str] = []
@@ -331,7 +331,7 @@ class PlayerRender:
         self._trail_fbo.end()
 
     def _draw_number(self, number: int) -> None:
-        """The number texture: white, with the number centred in black (none for 0, or without a font)."""
+        """The number texture: white, with the number centered in black (none for 0, or without a font)."""
         self._number_fbo.begin()
         glClearColor(1.0, 1.0, 1.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT)
@@ -471,7 +471,7 @@ class PlayerRender:
             self._initials[id] = int(initial)
 
     def set_caption(self, id: str, name: str, line: str) -> None:
-        """The caption on a cell from now on, shown while `credit_players` is on (any thread); an unknown id is ignored."""
+        """The caption on a cell from now on, shown while `credit_walls` is on (any thread); an unknown id is ignored."""
         if id not in self._rects:
             return
         with self._mutex:

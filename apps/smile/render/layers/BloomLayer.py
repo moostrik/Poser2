@@ -4,7 +4,7 @@ from .LayerBase import LayerBase
 from .passes import blur, copy
 
 
-class DestructLayer(LayerBase):
+class BloomLayer(LayerBase):
     """The last image blooms and dissolves into the camera, masked by the depth of that image."""
 
     def __init__(self, depth: Image) -> None:

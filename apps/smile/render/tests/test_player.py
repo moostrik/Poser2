@@ -24,7 +24,7 @@ class TestGrinPlayer(unittest.TestCase):
         self.settings = SequencerSettings()
         self.settings.grin_fps = 15.0
         self.settings.grin_delay = 1.0
-        self.player = GrinPlayer(self.settings)
+        self.grin_player = GrinPlayer(self.settings)
         self.now = 0.0
         patcher = mock.patch('apps.smile.render.GrinPlayer.time.perf_counter', lambda: self.now)
         patcher.start()
@@ -37,21 +37,21 @@ class TestGrinPlayer(unittest.TestCase):
         shown: list[tuple[float, int]] = []
         added: int = 0
         tick: int = 0
-        self.player.begin(total, hold)
-        while self.player.busy:
+        self.grin_player.begin(total, hold)
+        while self.grin_player.busy:
             now: float = tick * TICK
             if portrait is not None and portrait <= now:
                 self.now = portrait
-                self.player.hold_from_now()
+                self.grin_player.hold_from_now()
                 portrait = None
             while added < total and arrivals[added] <= now:
                 self.now = arrivals[added]
-                self.player.add(frame(added))
+                self.grin_player.add(frame(added))
                 added += 1
                 if added == total:
-                    self.player.end()
+                    self.grin_player.end()
             self.now = now
-            image = self.player.update(now)
+            image = self.grin_player.update(now)
             if image is not None:
                 shown.append((now, index_of(image)))
             tick += 1
@@ -79,8 +79,8 @@ class TestGrinPlayer(unittest.TestCase):
         shown = self.play(total=60, made_fps=100.0, hold=False)
         self.assertEqual(len(shown), 60)
         self.assert_steady(shown)
-        self.assertEqual(self.player.plays, 1)
-        self.assertEqual(self.player.progress, 1.0)
+        self.assertEqual(self.grin_player.plays, 1)
+        self.assertEqual(self.grin_player.progress, 1.0)
 
     def test_frames_made_slower_than_played_start_later_and_never_run_dry(self):
         total, made_fps, first = 100, 10.0, 0.5
@@ -102,68 +102,68 @@ class TestGrinPlayer(unittest.TestCase):
         # 100 frames at 10 per second need about 3.5 s of buffer: a delay of 1 s changes nothing
         held = self.play(total=100, made_fps=10.0, hold=True)
         start_held: float = held[1][0]
-        self.player.clear()
+        self.grin_player.clear()
         replay = self.play(total=100, made_fps=10.0, hold=False)
         self.assertAlmostEqual(start_held, replay[1][0], delta=2 * TICK)
 
     def test_one_frame_clip_shows_and_counts_as_played(self):
         shown = self.play(total=1, made_fps=10.0, hold=False)
         self.assertEqual([index for _, index in shown], [0])
-        self.assertEqual(self.player.plays, 1)
-        self.assertTrue(self.player.playing)
+        self.assertEqual(self.grin_player.plays, 1)
+        self.assertTrue(self.grin_player.playing)
 
     def test_busy_until_the_last_frame_is_shown(self):
-        self.player.begin(3, hold=False)
+        self.grin_player.begin(3, hold=False)
         for i in range(3):
-            self.player.add(frame(i))
-        self.player.end()
-        self.assertTrue(self.player.busy)
-        self.assertEqual(index_of(self.player.update(0.0)), 0)
-        self.assertIsNone(self.player.update(0.01))
-        self.assertEqual(index_of(self.player.update(1 / 15)), 1)
-        self.assertTrue(self.player.busy)
-        self.assertEqual(index_of(self.player.update(2 / 15)), 2)
-        self.assertFalse(self.player.busy)
+            self.grin_player.add(frame(i))
+        self.grin_player.end()
+        self.assertTrue(self.grin_player.busy)
+        self.assertEqual(index_of(self.grin_player.update(0.0)), 0)
+        self.assertIsNone(self.grin_player.update(0.01))
+        self.assertEqual(index_of(self.grin_player.update(1 / 15)), 1)
+        self.assertTrue(self.grin_player.busy)
+        self.assertEqual(index_of(self.grin_player.update(2 / 15)), 2)
+        self.assertFalse(self.grin_player.busy)
 
     def test_a_clip_without_frames_is_not_busy(self):
-        self.player.begin(30, hold=True)
-        self.player.end()
-        self.assertFalse(self.player.busy)
-        self.assertIsNone(self.player.update(1.0))
+        self.grin_player.begin(30, hold=True)
+        self.grin_player.end()
+        self.assertFalse(self.grin_player.busy)
+        self.assertIsNone(self.grin_player.update(1.0))
 
     def test_clear_drops_the_clip_and_late_frames(self):
-        self.player.begin(30, hold=False)
-        self.player.add(frame(0))
-        self.player.clear()
-        self.assertFalse(self.player.busy)
-        self.player.add(frame(1))       # arrives after the reset
-        self.assertIsNone(self.player.update(1.0))
-        self.assertEqual(self.player.plays, 0)
+        self.grin_player.begin(30, hold=False)
+        self.grin_player.add(frame(0))
+        self.grin_player.clear()
+        self.assertFalse(self.grin_player.busy)
+        self.grin_player.add(frame(1))       # arrives after the reset
+        self.assertIsNone(self.grin_player.update(1.0))
+        self.assertEqual(self.grin_player.plays, 0)
 
     def test_frames_without_a_clip_are_dropped(self):
-        self.player.add(frame(0))       # the warm-up opens no clip
-        self.player.end()
-        self.assertFalse(self.player.busy)
-        self.assertIsNone(self.player.update(1.0))
+        self.grin_player.add(frame(0))       # the warm-up opens no clip
+        self.grin_player.end()
+        self.assertFalse(self.grin_player.busy)
+        self.assertIsNone(self.grin_player.update(1.0))
 
     def test_running_dry_continues_without_a_burst(self):
-        self.player.begin(12, hold=False)
+        self.grin_player.begin(12, hold=False)
         for i in range(10):
             self.now = i / 20
-            self.player.add(frame(i))
+            self.grin_player.add(frame(i))
         shown: list[int] = []
         for tick in range(120):         # two seconds: the ten frames play, then it waits for the last two
-            image = self.player.update(tick * TICK)
+            image = self.grin_player.update(tick * TICK)
             if image is not None:
                 shown.append(index_of(image))
         self.assertEqual(shown, list(range(10)))
         self.now = 2.0
-        self.player.add(frame(10))
-        self.player.add(frame(11))
-        self.player.end()
-        self.assertEqual(index_of(self.player.update(2.0)), 10)
-        self.assertIsNone(self.player.update(2.0 + TICK))
-        self.assertEqual(index_of(self.player.update(2.0 + 1 / 15)), 11)
+        self.grin_player.add(frame(10))
+        self.grin_player.add(frame(11))
+        self.grin_player.end()
+        self.assertEqual(index_of(self.grin_player.update(2.0)), 10)
+        self.assertIsNone(self.grin_player.update(2.0 + TICK))
+        self.assertEqual(index_of(self.grin_player.update(2.0 + 1 / 15)), 11)
 
     def test_reports_the_speed_and_the_waits(self):
         self.play(total=100, made_fps=10.0, hold=True, first=0.5, portrait=0.2)

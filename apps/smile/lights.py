@@ -28,8 +28,8 @@ def lfo(time: float, Htz: float, phase: float) -> float:
     return 0.5 * math.sin(time * math.pi * Htz + (0.75 + phase) * math.pi * 2) + 0.5
 
 
-def lfor(time: float, Htz: float, phase: float, rangeMin: float, rangeMax: float) -> float:
-    return lfo(time, Htz, phase) * (rangeMax - rangeMin) + rangeMin
+def lfor(time: float, Htz: float, phase: float, range_min: float, range_max: float) -> float:
+    return lfo(time, Htz, phase) * (range_max - range_min) + range_min
 
 
 def get_counter_active_light(value: float) -> list[int]:
@@ -150,9 +150,9 @@ class Lights:
     def set_progress(self, progress: float, type: AnimationType) -> None:
         if type == AnimationType.NONE:
             self.set_camera_red(1.0)
-        if type == AnimationType.DESTRUCT_IN:
+        if type == AnimationType.BLOOM:
             self.set_camera_red(1.0)
-        if type == AnimationType.DESTRUCT_OUT:
+        if type == AnimationType.FADE:
             self.set_camera_counter(1.0 - progress, True)
         if type == AnimationType.CAMERA_IN:
             self.set_camera_white(progress * 0.2)

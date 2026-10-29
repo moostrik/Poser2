@@ -25,7 +25,7 @@ SOURCE_MARGIN: float = 1.4      # the track read is this much longer than the cl
 MARK_RING: float = 0.75         # the ring's outer diameter
 MARK_STROKE: float = 0.07       # the ring's thickness
 MARK_LETTERS: float = 0.5       # the font size of "ai"
-MARK_LIFT: float = 0.635        # the ring's centre above the baseline (the letters' baseline 0.45 up, their ink 0.37 tall)
+MARK_LIFT: float = 0.635        # the ring's center above the baseline (the letters' baseline 0.45 up, their ink 0.37 tall)
 MARK_GAP: float = 0.2           # from the E to the ring
 
 
@@ -58,11 +58,11 @@ def watermark_image(text: str, height_px: int = WATERMARK_PX, alpha: float = WAT
         np.maximum(ink[y:y + h, x:x + w], piece, out=ink[y:y + h, x:x + w])
 
     put(title, title_base, 0)
-    centre: tuple[int, int] = (title.shape[1] + gap + ring // 2, baseline - lift)
-    cv2.circle(ink, centre, (ring - stroke) // 2, 255, stroke, cv2.LINE_AA)
+    center: tuple[int, int] = (title.shape[1] + gap + ring // 2, baseline - lift)
+    cv2.circle(ink, center, (ring - stroke) // 2, 255, stroke, cv2.LINE_AA)
     h, w = letters.shape[:2]
-    y0: int = centre[1] - h // 2       # the letters' ink centred in the ring
-    x0: int = centre[0] - w // 2
+    y0: int = center[1] - h // 2       # the letters' ink centered in the ring
+    x0: int = center[0] - w // 2
     np.maximum(ink[y0:y0 + h, x0:x0 + w], letters, out=ink[y0:y0 + h, x0:x0 + w])
     if name.size:
         put(name, name_base, title.shape[1] + gap + ring + after)

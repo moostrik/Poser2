@@ -6,7 +6,7 @@ rewired to the image. The overlay check is removed too, and the saved portrait b
 piles up in ComfyUI's output folder). The crop and scale in front of the grin are removed as well: the grin
 animates the whole portrait. Nodes are found by class type or title, not by id.
 
-The workflow only provides the structure: every run fills in the values from PipelineSettings.
+The workflow only provides the structure: every run fills in the values from GeneratorSettings.
 """
 
 import copy
@@ -17,7 +17,7 @@ from typing import Callable
 
 import pytweening as easing
 
-from apps.smile.comfy.settings import PipelineSettings, Prefer, StyleSettings
+from apps.smile.comfy.settings import GeneratorSettings, Prefer, StyleSettings
 
 logger = logging.getLogger(__name__)
 
@@ -186,7 +186,7 @@ class Workflow():
         """The steps a full run goes through."""
         return len(self._steps)
 
-    def build(self, image_name: str, style: StyleSettings, s: PipelineSettings) -> dict:
+    def build(self, image_name: str, style: StyleSettings, s: GeneratorSettings) -> dict:
         """The workflow of one visitor, in one of the styles of s (style_a, style_b)."""
         workflow: dict = copy.deepcopy(self._template)
         workflow[self.load_image]['inputs']['image'] = image_name
@@ -247,7 +247,7 @@ class Workflow():
             self._warned.add(name)
             logger.warning('ComfyUI does not offer the %s %s: %s is used instead', what, name, instead)
 
-    def build_warmup(self, image_name: str, style: StyleSettings, s: PipelineSettings) -> dict:
+    def build_warmup(self, image_name: str, style: StyleSettings, s: GeneratorSettings) -> dict:
         """The same run at its shortest: one sampler step and one grin frame. The models load at the
         first step and the first frame; the rest of a full run would only cost time."""
         workflow: dict = self.build(image_name, style, s)
@@ -256,7 +256,7 @@ class Workflow():
         workflow[self.last_frame]['inputs']['batch_index'] = 0
         return workflow
 
-    def build_portrait(self, image_name: str, style: StyleSettings, s: PipelineSettings) -> dict:
+    def build_portrait(self, image_name: str, style: StyleSettings, s: GeneratorSettings) -> dict:
         """The same run without the grin (skip_animation): the grin's outputs are removed, so
         ComfyUI stops after the portrait. The other nodes stay, so ComfyUI keeps their cache."""
         workflow: dict = self.build(image_name, style, s)
@@ -264,7 +264,7 @@ class Workflow():
             del workflow[node_id]
         return workflow
 
-    def build_describe(self, image_name: str, style: StyleSettings, s: PipelineSettings) -> dict:
+    def build_describe(self, image_name: str, style: StyleSettings, s: GeneratorSettings) -> dict:
         """The same run without the portrait and the grin (skip_generation): only the description
         and the capture's depth are left as outputs."""
         workflow: dict = self.build_portrait(image_name, style, s)
@@ -272,7 +272,7 @@ class Workflow():
             del workflow[node_id]
         return workflow
 
-    def build_replay(self, previous: dict, s: PipelineSettings) -> dict:
+    def build_replay(self, previous: dict, s: GeneratorSettings) -> dict:
         """The previous workflow with only the grin filled in again (the grin loop). Everything up to
         the portrait is unchanged, so ComfyUI takes it from its cache and only makes the grin."""
         workflow: dict = copy.deepcopy(previous)
@@ -291,7 +291,7 @@ class Workflow():
                 'peak': {name: round(value, 2) for name, value in peak.items()},
                 'peak_at': {name: round(value, 3) for name, value in peak_at.items()}}
 
-    def _fill_grin(self, workflow: dict, s: PipelineSettings, seed: int | None = None) -> None:
+    def _fill_grin(self, workflow: dict, s: GeneratorSettings, seed: int | None = None) -> None:
         """seed is the visitor's; without one (a replay) the grin draws its own."""
         g = s.grin
         grin: dict = workflow[self.grin]['inputs']
@@ -337,5 +337,5 @@ class Workflow():
         return 1 if grin['still'] else grin['frames']
 
     @staticmethod
-    def _seed(s: PipelineSettings) -> int:
+    def _seed(s: GeneratorSettings) -> int:
         return FIXED_SEED if s.portrait.fixed_seed else random.randint(1, MAX_SEED)

@@ -1,5 +1,5 @@
 """The artist's credit: a QR code to the project page and the text around it, shown with the result on
-the main screen (`CreditLayer`) and on one changing cell of each player wall (`PlayerRender`). No GL here."""
+the main screen (`CreditLayer`) and on one changing cell of each wall (`WallRender`). No GL here."""
 
 import logging
 import os

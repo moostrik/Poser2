@@ -1,5 +1,5 @@
 """The clip player of the sphere: one pool of clips for the 48 cells of the two walls, each cell playing
-on its own thread, the walls composited by `PlayerRender` into SMILE's secondary windows. No window and no
+on its own thread, the walls composited by `WallRender` into SMILE's secondary windows. No window and no
 OSC in here but the `/bang` to the Max patch; SMILE's laughter test and scrolling name call `light` and
 `scroll_loop` directly."""
 
@@ -15,7 +15,7 @@ import numpy as np
 from apps.smile import sphere
 from apps.smile.credit import CreditLines
 from apps.smile.player.ImgLoader import LoadImages
-from apps.smile.player.Render import PlayerRender
+from apps.smile.player.Render import WallRender
 from apps.smile.player.ClipPool import Clip, ClipPool, next_start
 from apps.smile.player.FolderScanner import FolderScanner
 
@@ -40,9 +40,9 @@ def online_cell_mode(active: bool, connected: bool, showing: bool) -> str:
 
 
 class Player:
-    def __init__(self, settings: Any, walls: list[PlayerRender], render_settings: Any, root: str = 'apps/smile/output/') -> None:
-        self.settings: Any = settings           # PlayersSettings
-        self.walls: list[PlayerRender] = walls
+    def __init__(self, settings: Any, walls: list[WallRender], render_settings: Any, root: str = 'apps/smile/output/') -> None:
+        self.settings: Any = settings           # WallsSettings
+        self.walls: list[WallRender] = walls
         self._name: Any = render_settings       # its credit_name goes over the captions
         # the Max patch places a clip's laugh by the cell its play starts in: `/bang <cell>` to the wall's port
         self.osc: list[OscSender] = []
@@ -60,7 +60,7 @@ class Player:
         ids: list[str] = [str(i) for i in range(len(walls) * CELLS)]
 
         # the clips are decoded once into RAM at the size the cells show them (the portrait is turned a quarter)
-        cell_size: tuple[int, int] = (PlayerRender.CELL_HEIGHT, PlayerRender.CELL_WIDTH)
+        cell_size: tuple[int, int] = (WallRender.CELL_HEIGHT, WallRender.CELL_WIDTH)
         hwaccel: int | None = int(settings.hwaccel) if int(settings.hwaccel) >= 0 else None
         pool_size: int = int(settings.pool)
         recent: int = int(settings.recent)
@@ -140,7 +140,7 @@ class Player:
             logger.info('%.1f frames/s per cell, %d clips on %d cells: %d shown, most %dx',
                         frames / STATS_INTERVAL / len(self.loaders), len(self.pool), len(self.loaders), shown, most)
 
-    def isRunning(self) -> bool:
+    def is_running(self) -> bool:
         return self._running
 
     # THE WALLS: a cell's wall and its cell there

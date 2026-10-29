@@ -1,20 +1,20 @@
 """Style cycling, as aiia3's 'smile' keyword: one style for N visitors, then the next; or one style
 for everyone (style_mode).
 
-The style id is also the movement id for the music (data/audio/music_map.json).
+The style id also picks the music (data/audio/music_map.json).
 """
 
-from apps.smile.comfy.settings import PipelineSettings, StyleMode, StyleSettings
+from apps.smile.comfy.settings import GeneratorSettings, StyleMode, StyleSettings
 
-# movement id -> the letter of its StyleSettings group (style_a, style_b)
+# style id -> the letter of its StyleSettings group (style_a, style_b)
 STYLE_LETTERS: dict[str, str] = {'0000': 'a', '0001': 'b'}
 # style_mode A or B: the index of the one style every visitor gets
 FORCED: dict[StyleMode, int] = {StyleMode.A: 0, StyleMode.B: 1}
 
 
 class Styles():
-    def __init__(self, settings: PipelineSettings) -> None:
-        self.settings: PipelineSettings = settings
+    def __init__(self, settings: GeneratorSettings) -> None:
+        self.settings: GeneratorSettings = settings
         self._ids: list[str] = list(STYLE_LETTERS)
         self._index: int = 0
         self._count: int = 0

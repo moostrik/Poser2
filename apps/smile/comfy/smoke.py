@@ -91,7 +91,7 @@ def warm_up(client: ComfyClient, preset: str, save: Path | None = None) -> float
     settings = Settings()
     if not presets.load(settings, preset):
         raise Failed(f'could not load the preset {preset}')
-    p = settings.pipeline
+    p = settings.generator
     sampler: dict = client.object_info('KSampler')['input']['required']
     loras: list[str] = list(client.object_info('LoraLoader')['input']['required']['lora_name'][0])
     p.portrait.sampler_options = list(sampler['sampler_name'][0])

@@ -76,7 +76,7 @@ const timing = {};      // moments of the turn's end (ms since the page loaded):
 function setState(next) {
   state = next;
   document.body.className = next;
-  if (next === 'done') document.body.classList.add('colour');
+  if (next === 'done') document.body.classList.add('color');
   if (next !== 'you') faces = null;
   if (next !== 'you' && next !== 'transform') setLight(0, 0.25);
   if (next !== 'done') { grinVideo.pause(); document.body.classList.remove('playing'); }
@@ -143,7 +143,7 @@ const bar = (() => {
   // the poops: while the bar says BULLSHITTING they fly out of the word, three or four at a time from a random
   // letter every while, each thrown its own way (any direction, its own speed, spinning, falling under
   // gravity, fading, CSS: fly) and gone when it has flown; they stand outside the label, so they keep their
-  // colour over the fill
+  // color over the fill
   const POOP_EVERY = 150, POOPS_IN_AIR = 60;
   const POOP_SPEED = [60, 150], POOP_GRAVITY = 100, POOP_FLIGHT = [1300, 2200];     // px/s, px/s^2, ms
 
@@ -794,7 +794,7 @@ function onStage(message) {
 
 function startStreaming() {
   streaming = true;
-  document.body.classList.add('colour');     // the main screen is in colour, the phone's own image was black and white
+  document.body.classList.add('color');     // the main screen is in color, the phone's own image was black and white
 }
 
 function onImage(data) {
