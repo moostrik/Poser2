@@ -5,6 +5,7 @@ recordings/*
 logs/*
 *.trt
 data/models/archive/
+data/models/*.tar.xz
 apps/**/data/diagnosis/*
 apps/**/data/settings/.*
 apps/**/data/recordings/*

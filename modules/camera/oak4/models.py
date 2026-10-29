@@ -4,8 +4,9 @@
 
 The chip takes a model compiled by Luxonis, which the zoo hands out as an NN archive (a `.tar.xz`
 with the compiled model and the config that says what its outputs mean). Public models need no
-key. The archive is copied under the name the backend expects (`definitions.POSE_ARCHIVE`) and
-committed with LFS, so a show PC needs no internet; run this again only for a new model.
+key. The archive is copied under the name the backend expects (`definitions.POSE_ARCHIVE`); it is
+not in git (`data/models/*.tar.xz` is ignored until the models are settled), so every OAK4 PC runs
+this once, with internet, and again for a new model.
 """
 
 import argparse
