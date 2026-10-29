@@ -1,44 +1,31 @@
+"""One ffmpeg decoder process read frame by frame on its own schedule: the reader of one camera
+recording stream, paced on `perf_counter` and handing each frame to a callback with its index."""
+
 import ffmpeg
 import numpy as np
 from threading import Thread, Event, Lock
 from typing import Callable
-from enum import Enum
 import time
-
-
-from ..camera.definitions import FrameType
 
 import logging
 logger = logging.getLogger(__name__)
 
-class HwAccelerationType(Enum):
-    CPU =   0
-    GPU =   1
-    iGPU =  2
+# (cam_id, frame_type, frame, chunk_id, frame_id): a stream knows which camera and kind it is
+# reading for and says so with every frame, the kind being whatever the caller passed in.
+StreamFrameCallback = Callable[[int, object, np.ndarray, int, int], None]
 
-HwaccelString: dict[HwAccelerationType, str] = {
-    HwAccelerationType.GPU:  'd3d12va',
-    HwAccelerationType.iGPU: 'd3d12va'
-}
-
-HwaccelDeviceString: dict[HwAccelerationType, str] = {
-    HwAccelerationType.GPU:  '0',
-    HwAccelerationType.iGPU: '1'
-}
-
-# PlayerCallback = Callable[[int, FrameType, np.ndarray, ], None]
-EndCallback = Callable[[int], None]
 
 class StreamReader:
-    def __init__(self, cam_id: int, frameType: FrameType, frameCallback,
-                 hw_acceleration_type: str = '', hw_acceleration_device: str = '', fps: float = 0.0,
-                 gray: bool = False) -> None:
-        self.frame_callback = frameCallback
+    def __init__(self, cam_id: int, frame_type: object, frame_callback: StreamFrameCallback, color: bool,
+                 hw_acceleration_type: str = '', hw_acceleration_device: str = '', fps: float = 0.0) -> None:
+        """``color``: decode to BGR; otherwise to gray, so a mono pipeline gets the luma straight from
+        ffmpeg, saving the colour conversion and two thirds of the pipe."""
+        self.frame_callback: StreamFrameCallback = frame_callback
 
         self.cam_id: int = cam_id
-        self.frame_type: FrameType = frameType
-        self.gray: bool = gray                   # a mono pipeline wants gray video: ffmpeg extracts
-        self.channels: int = 1                   # the luma, saving the colour conversion and ⅔ of the pipe
+        self.frame_type: object = frame_type
+        self.color: bool = color
+        self.channels: int = 1
         self.hw_acceleration_type: str = hw_acceleration_type
         self.hw_acceleration_device: str = hw_acceleration_device
 
@@ -109,9 +96,8 @@ class StreamReader:
             self.ffmpeg_process = None
             return
 
-        color: bool = self.frame_type == FrameType.VIDEO and not self.gray
-        pix_fmt: str = 'bgr24' if color else 'gray'          # BGR matches getCvFrame, no conversion needed
-        self.channels = 3 if color else 1
+        pix_fmt: str = 'bgr24' if self.color else 'gray'     # BGR matches getCvFrame, no conversion needed
+        self.channels = 3 if self.color else 1
         self.bytes_per_frame: int = self.frame_width * self.frame_height * self.channels
 
         ffmpeg_process = None

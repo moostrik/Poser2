@@ -1,6 +1,6 @@
 import math
 
-from modules.oak import FrameWindow, frame_window
+from modules.camera import FrameWindow, frame_window
 from modules.utils import Rect
 
 from .annotation import Annotation
@@ -36,7 +36,7 @@ class Rig:
 
     `RigSync` keeps it in step with `RigSettings`. The delivered frame is **level** and
     **cylindrical** — a column is one azimuth at every height, a row one elevation (as its tangent)
-    at every column — because the camera's warp makes it so (`modules/oak/camera/definitions.py`,
+    at every column — because the camera's warp makes it so (`modules/camera/geometry.py`,
     `warp_mesh_points`), so there is no distortion correction here.
     """
 

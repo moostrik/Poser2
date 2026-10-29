@@ -8,16 +8,17 @@ import cv2
 import depthai as dai
 import numpy as np
 
+from modules.camera import FrameType, CameraResolution, mono_frame_size, color_frame_size, WARP_MESH, \
+    warp_mesh_points, source_lens
+
 from .definitions import (
-    FrameType,
     YOLOV8_WIDE_5S, YOLOV8_WIDE_6S, YOLOV8_WIDE_7S,
     YOLOV8_SQUARE_5S, YOLOV8_SQUARE_6S, YOLOV8_SQUARE_7S,
     YOLO_CONFIDENCE_THRESHOLD, YOLO_OVERLAP_THRESHOLD, detector_input_size,
     TRACKER_PERSON_LABEL, TRACKER_TYPE,
     DEPTH_TRACKER_BOX_SCALE, DEPTH_TRACKER_LOCATION,
     DEPTH_TRACKER_MIN_DEPTH, DEPTH_TRACKER_MAX_DEPTH,
-    CameraResolution, mono_mode, color_mode, mono_frame_size, color_frame_size,
-    WARP_MESH, warp_mesh_points, source_lens, IMU_RATE_HZ,
+    mono_mode, color_mode, IMU_RATE_HZ,
 )
 
 logger = logging.getLogger(__name__)
@@ -32,7 +33,7 @@ class WarpConfig:
     from a tilted camera while keeping the whole frame. They are exclusive per camera — see
     `build_warp_mesh`. `fov_h` is the azimuth span of the delivered frame, quoted for the
     un-cropped sensor width. `lens_fov`, `lens_centre_x`, `lens_centre_y` are the lens itself
-    (`definitions.source_lens`); at their defaults the lens is taken to be `fov_h`.
+    (`geometry.source_lens`); at their defaults the lens is taken to be `fov_h`.
     """
     flip_h: bool
     flip_v: bool
@@ -827,7 +828,7 @@ def find_warp(
     """The Warp node's mesh for the frame contract — column = azimuth, row = tangent of
     elevation, tilt undone — as depthai points.
 
-    All of the geometry lives in `definitions.warp_mesh_points`, which has no depthai or
+    All of the geometry lives in `modules.camera.geometry` (`warp_mesh_points`), which has no depthai or
     OpenCV dependency and carries the explanation of the lens model, the window and the mesh
     density. This is only the adapter. For the *other* correction, `keystone`, see
     `find_keystone_warp`.
@@ -881,7 +882,7 @@ def clip_warp_mesh(
 # These two builders are the original `find_perspective_warp` / `_square`, unchanged apart
 # from the name, at their original 2 x 64 mesh. They build a homography that pins all four
 # corners of the output to the frame corners: a rotation composed with a stretch-to-fit. That
-# is the wrong model for re-aiming a wide lens (see `definitions.warp_mesh_points`), but it is
+# is the wrong model for re-aiming a wide lens (see `geometry.warp_mesh_points`), but it is
 # exactly what hd_trio and deep_flow rely on — a person seen from a down-tilted camera gets
 # normal proportions while the whole frame is kept. Two columns suffice because the map is
 # affine in x per row; the vertical curvature is what the 64 rows are for. Nothing here may
@@ -1010,7 +1011,7 @@ def build_warp_mesh(
     keystone exists to avoid. Both non-zero is not a valid state for any camera, so it warns and
     takes `tilt`. Both zero goes through the tilt path, which is NOT the identity: it is the
     equidistant -> cylindrical reprojection that makes a column one azimuth (see
-    `definitions.warp_mesh_points`). Only a non-zero `keystone` reaches the old builder.
+    `geometry.warp_mesh_points`). Only a non-zero `keystone` reaches the old builder.
     """
     if mount.tilt != 0.0 and mount.keystone != 0.0:
         logger.warning("tilt (%.1f) and keystone (%.2f) are both set; they are exclusive — using tilt",

@@ -1,56 +1,14 @@
 import depthai as dai
 
+from modules.camera import CameraSettings, CameraResolution
+from modules.settings import BaseSettings, Field, Group, Widget
+
 from .definitions import (
     EXPOSURE_RANGE, ISO_RANGE, BALANCE_RANGE, CONTRAST_RANGE, BRIGHTNESS_RANGE,
     LUMA_DENOISE_RANGE, SATURATION_RANGE, SHARPNESS_RANGE,
-    STEREO_DEPTH_RANGE, STEREO_BRIGHTNESS_RANGE, StereoMedianFilterType,
-    CameraResolution, Input,
+    STEREO_DEPTH_RANGE, STEREO_BRIGHTNESS_RANGE, StereoMedianFilterType, Input,
 )
 from .pipeline import get_stereo_config
-from modules.settings import BaseSettings, Field, Group, Widget
-
-
-class CameraCheckSettings(BaseSettings):
-    """Pinned verdicts saying whether the cameras are mounted and running the way the preset assumes.
-
-    The per-camera readings live on each `CameraSettings`, groups deep in the panel, which is
-    where a readout goes to be ignored. The pinned indicators say good or bad; which camera and
-    which value is drawn on that camera's own view in the renderer.
-    """
-    mount_tolerance: Field[float] = Field(2.0, min=0.5, max=10.0, step=0.5,
-                                          description="Tilt or roll deviation (°) a camera may have before the mount warns")
-    mount:           Field[bool]  = Field(True, access=Field.READ, pinned=True, widget=Widget.status,
-                                          description="Camera tilt and roll within tolerance; each camera view shows its error")
-    camera_fps:      Field[bool]  = Field(False, access=Field.READ, pinned=True, widget=Widget.status,
-                                          description="Camera frame rates within 5 % of fps; each camera view shows its rate")
-    video_rate:      Field[bool]  = Field(False, access=Field.READ, pinned=True, widget=Widget.status, label="Video",
-                                          description="Every camera's momentary video rate above half its fps")
-    video_fps_avg:   Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Video", unit="fps",
-                                          description="Slowest camera's average video rate")
-    video_min_fps:   Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Video min", unit="fps",
-                                          description="Worst momentary video rate across the cameras")
-
-
-class CameraReadings(BaseSettings):
-    """What the camera reports back about itself, and the one number that corrects it.
-
-    Nothing in the show reads any of this — it exists for whoever is setting the rig up. All of it
-    is read-only except `roll_offset`, which lives here rather than with the mount constants
-    because it is the thing you reach for while looking at the roll it corrects.
-    """
-    video_fps:        Field[float] = Field(0.0, access=Field.READ, description="Video FPS")
-    video_min_fps:    Field[float] = Field(0.0, access=Field.READ, description="Lowest momentary video rate: 1 / the worst gap between frames (fps)")
-    tracker_fps:      Field[float] = Field(0.0, access=Field.READ, description="Tracker updates/s")
-    tracklets:      Field[int]   = Field(0, access=Field.READ, description="Active tracklets")
-    # How the camera is actually mounted, as the board reports it — NaN until measured, which is
-    # the honest default for a board with no IMU.
-    tilt_measured:  Field[float] = Field(float('nan'), access=Field.READ, description="Up-tilt (°) from the camera's own IMU — compare with `tilt`")
-    roll_measured:  Field[float] = Field(float('nan'), access=Field.READ, description="Roll (°) about the optical axis, `roll_offset` subtracted. Should be 0")
-    # No min/max: `Widget.resolve` sends a bounded float to a slider and an unbounded one to a
-    # number box, and this is typed in or filled by the zero button, never dragged.
-    roll_offset:    Field[float] = Field(0.0, description="What this camera reads when level (°). Corrects the reading, not the image")
-    fov_factory:    Field[float] = Field(float('nan'), access=Field.READ, description="Horizontal field (°) this unit's own calibration spans across the frame")
-    lens_error:     Field[float] = Field(float('nan'), access=Field.READ, description="Largest bearing error (°) this unit has under the shared lens")
 
 
 class ColorSensorSettings(BaseSettings):
@@ -89,41 +47,24 @@ class DepthSettings(BaseSettings):
     bright_max:     Field[int]  = Field(STEREO_BRIGHTNESS_RANGE[1], min=STEREO_BRIGHTNESS_RANGE[0], max=STEREO_BRIGHTNESS_RANGE[1], widget=Widget.slider, description="Stereo brightness max")
 
 
-class CameraSettings(BaseSettings):
-    """Per-camera runtime settings. Instantiated N times via Child(count=num_cameras).
+class OakCameraSettings(CameraSettings):
+    """One OAK camera: the contract's rate, mount and readings, plus what shapes its pipeline.
 
-    The tunables live in four subgroups — `readings`, `color_sensor`, `mono_sensor`, `depth` —
+    The tunables live in subgroups — `readings`, `color_sensor`, `mono_sensor`, `depth` —
     because forty flat fields in one panel is not something anyone reads. What stays at this level
-    is what shapes the pipeline (`color`, `square`, `stereo`, `yolo`, `resolution`) or describes
-    the mount (`flip_*`, `tilt`, `keystone`, `fov`), which are the fields a person actually sets.
+    is what shapes the pipeline (`color`, `square`, `stereo`, `yolo`, `resolution`) and the mount
+    (`CameraSettings`), which are the fields a person actually sets. The preset keys are flat:
+    the same `cam_0.tilt` as every other backend.
     """
 
     # Initial settings
     device_id:      Field[str]   = Field("", access=Field.INIT, description="Camera device ID (MxID)")
-    fps:            Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera FPS")
     color:          Field[bool]  = Field(True, access=Field.INIT, newline=True, description="Color camera (False = mono)")
     square:         Field[bool]  = Field(True, access=Field.INIT)
     stereo:         Field[bool]  = Field(False, access=Field.INIT)
     yolo:           Field[bool]  = Field(True, access=Field.INIT)
     resolution:     Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode. P1080 is colour only; mono falls back to P800")
     model_path:     Field[str]   = Field("data/models", access=Field.INIT)
-    flip_h:         Field[bool]  = Field(False, access=Field.INIT, description="Flip horizontal")
-    flip_v:         Field[bool]  = Field(False, access=Field.INIT, description="Flip vertical")
-    tilt:           Field[float] = Field(0.0, access=Field.INIT,
-                                         description="Camera up-tilt (°), positive = aimed up. Exclusive with keystone")
-    keystone:       Field[float] = Field(0.0, access=Field.INIT,
-                                         description="Keystone (fraction of frame). Exclusive with tilt")
-    # Relayed down from the camera group so the warp can turn `tilt` into pixels.
-    fov:            Field[float] = Field(127.0, access=Field.INIT,
-                                         description="Azimuth span (°) of the delivered frame, quoted for the full sensor width")
-    # The lens itself — see the lens geometry notes in `definitions.py`. Shared by an
-    # installation's cameras; 0 / 0 / 0 is the old model, the lens taken to be `fov`.
-    lens_fov:       Field[float] = Field(0.0, access=Field.INIT, step=0.1,
-                                         description="Field (°) the lens spans across the full sensor width; 0 = same as fov")
-    lens_centre_x:  Field[float] = Field(0.0, access=Field.INIT, step=0.5,
-                                         description="Optical centre offset from the frame centre (px), full sensor mode")
-    lens_centre_y:  Field[float] = Field(0.0, access=Field.INIT, step=0.5,
-                                         description="Optical centre offset from the frame centre (px), positive = down")
 
     # Two values arrive shared from the camera group and are relayed one level further into
     # `mono_sensor`, so the panel shows them where the rest of the mono controls are rather than
@@ -131,7 +72,6 @@ class CameraSettings(BaseSettings):
     mono_auto_exposure: Field[bool]  = Field(True, visible=False, description="Relayed to mono_sensor.auto_exposure")
     ir_flood_light:     Field[float] = Field(0.0, min=0.0, max=1.0, visible=False, description="Relayed to mono_sensor.ir_flood_light")
 
-    readings:     Group[CameraReadings]     = Group(CameraReadings)
     color_sensor: Group[ColorSensorSettings] = Group(ColorSensorSettings)
     mono_sensor:  Group[MonoSensorSettings]  = Group(MonoSensorSettings, share=[mono_auto_exposure.as_('auto_exposure'), ir_flood_light])
     depth:        Group[DepthSettings]       = Group(DepthSettings)
@@ -370,11 +310,3 @@ class CameraSettings(BaseSettings):
         if self.mono_sensor.auto_exposure:
             self.mono_sensor.exposure = int(frame.getExposureTime().total_seconds() * 1000000)
             self.mono_sensor.iso = frame.getSensitivity()
-
-
-
-
-
-
-
-

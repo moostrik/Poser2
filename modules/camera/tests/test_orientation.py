@@ -2,15 +2,15 @@
 
 Neither needs a device. The gravity conversion is a pure function, and `CameraCheck` reads plain
 settings objects, so the interesting cases — a rig with no IMU, one camera out of four off — are
-all reachable without hardware.
+all reachable without hardware. How the gravity vector gets out of an OAK board's IMU frame is
+the backend's (`modules/oak/tests/test_imu.py`).
 """
 
 import math
 import unittest
 
-from modules.oak import CameraCheck, CameraCheckSettings, imu_to_camera, unroll_imu_frame, \
+from modules.camera import CameraCheck, CameraCheckSettings, CameraReadings, CameraSettings, \
     orientation_from_gravity, mount_deviation, fps_deviation
-from modules.oak.camera.settings import CameraReadings, CameraSettings
 
 
 def gravity(tilt: float, roll: float) -> tuple[float, float, float]:
@@ -67,65 +67,6 @@ class TestOrientationFromGravity(unittest.TestCase):
     def test_a_dead_sensor_reads_nan_not_zero(self) -> None:
         tilt, roll = orientation_from_gravity(0.0, 0.0, 0.0)
         self.assertTrue(math.isnan(tilt) and math.isnan(roll))
-
-
-class TestImuToCamera(unittest.TestCase):
-    def test_identity_and_missing_pass_through(self) -> None:
-        v = (0.1, 0.9, -0.2)
-        identity = [[1.0, 0.0, 0.0, 0.0], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]]
-        self.assertEqual(imu_to_camera(v, identity), v)
-        self.assertEqual(imu_to_camera(v, None), v)
-        self.assertEqual(imu_to_camera(v, []), v)
-
-    def test_a_known_rotation(self) -> None:
-        """90 degrees about z: x <- -y, y <- x."""
-        quarter = [[0.0, -1.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0]]
-        x, y, z = imu_to_camera((0.0, 1.0, 0.0), quarter)
-        self.assertAlmostEqual(x, -1.0, places=9)
-        self.assertAlmostEqual(y, 0.0, places=9)
-        self.assertAlmostEqual(z, 0.0, places=9)
-
-
-def as_imu(vector: tuple[float, float, float]) -> tuple[float, float, float]:
-    """What the board actually reports for a camera-frame gravity vector.
-
-    The IMU sits a quarter turn about the optical axis, so its reading is `Rz(+90)` of the camera
-    frame — this is the misalignment `unroll_imu_frame` undoes. Verified on the rig: all four
-    cameras read roll -90 while their tilt read true.
-    """
-    x, y, z = vector
-    return (-y, x, z)
-
-
-class TestUnrollImuFrame(unittest.TestCase):
-    def test_a_level_camera_reads_minus_ninety_before_correction(self) -> None:
-        """The observation this constant was derived from."""
-        _, roll = orientation_from_gravity(*as_imu(gravity(0.0, 0.0)))
-        self.assertAlmostEqual(roll, -90.0, places=6)
-
-    def test_tilt_survives_the_misalignment_uncorrected(self) -> None:
-        """Why the tilt readout was trustworthy before the correction existed: a rotation about z
-        leaves gz alone and hypot(gx, gy) invariant."""
-        for angle in (0.0, 12.0, 16.0, 25.0):
-            tilt, _ = orientation_from_gravity(*as_imu(gravity(angle, 0.0)))
-            self.assertAlmostEqual(tilt, angle, places=6, msg=f'tilt {angle}')
-
-    def test_correction_recovers_the_camera_frame(self) -> None:
-        for tilt_in in (0.0, 12.0, 16.0):
-            for roll_in in (-3.0, 0.0, 3.0, 7.5):
-                tilt, roll = orientation_from_gravity(*unroll_imu_frame(as_imu(gravity(tilt_in, roll_in))))
-                self.assertAlmostEqual(tilt, tilt_in, places=6, msg=f'{tilt_in}/{roll_in}')
-                self.assertAlmostEqual(roll, roll_in, places=6, msg=f'{tilt_in}/{roll_in}')
-
-    def test_a_real_tripod_roll_is_not_swallowed(self) -> None:
-        """The point of the correction: what is left after the quarter turn is the actual roll."""
-        _, roll = orientation_from_gravity(*unroll_imu_frame(as_imu(gravity(12.0, 4.0))))
-        self.assertAlmostEqual(roll, 4.0, places=6)
-
-    def test_no_offset_is_the_identity(self) -> None:
-        v = (0.1, 0.9, -0.2)
-        for component, expected in zip(unroll_imu_frame(v, board_roll=0.0), v):
-            self.assertAlmostEqual(component, expected, places=9)
 
 
 def _cameras(readings: list[tuple[float, float]], configured_tilt: float = 12.0) -> list[CameraSettings]:

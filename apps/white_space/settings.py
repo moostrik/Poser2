@@ -13,7 +13,8 @@ from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.panel import PanelSettings
-from modules.oak import CameraSettings, CameraResolution, CameraCheckSettings, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.camera import CameraCheckSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.oak import OakCameraSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import PanoramicTrackerSettings, PosesFromTrackletsSettings
@@ -111,17 +112,17 @@ class OakGroup(BaseSettings):
     _cam_share: list = [fps, color, square, stereo, yolo, resolution, model_path, ir_flood_light, fov, tilt,
                         lens_fov, lens_centre_x, lens_centre_y, mono_auto_exposure]
 
-    cam_0     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
-    cam_1     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
-    cam_2     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
-    cam_3     : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
+    cam_0     : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)
+    cam_1     : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)
+    cam_2     : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)
+    cam_3     : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)
     camera_check: Group[CameraCheckSettings]     = Group(CameraCheckSettings)
     simulator : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cameras, fps])
     frame_sync: Group[SyncSettings]              = Group(SyncSettings, share=[num_cameras, fps])
     tracklet_sync: Group[SyncSettings]           = Group(SyncSettings, share=[num_cameras, fps])
 
     @property
-    def cameras(self) -> list[CameraSettings]:
+    def cameras(self) -> list[OakCameraSettings]:
         return [self.cam_0, self.cam_1, self.cam_2, self.cam_3]
 
 

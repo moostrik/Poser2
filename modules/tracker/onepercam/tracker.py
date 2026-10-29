@@ -5,12 +5,12 @@ from queue import Empty, Queue
 from threading import Lock, Thread, Event
 
 # Local application imports
-from modules.oak import DepthTracklet
+from modules.camera import CameraTracklet, TrackingStatus
 from modules.settings import BaseSettings, Field
 from modules.utils import PerformanceTimer
 from .. import (
     BaseTracker,
-    Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback,
+    Tracklet, TrackletDict, TrackletDictCallback,
 )
 from .store import TrackletStore
 
@@ -160,12 +160,7 @@ class Tracker(Thread, BaseTracker):
             if callback not in self._tracklet_callbacks:
                 self._tracklet_callbacks.append(callback)
 
-    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[DepthTracklet]) -> None:
-        tracklet_list: list[Tracklet] = []
-        for t in cam_tracklets:
-            tracklet: Tracklet | None = Tracklet.from_depthcam(cam_id, t)
-            if tracklet is not None:
-                tracklet_list.append(tracklet)
-
+    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[CameraTracklet]) -> None:
+        tracklet_list: list[Tracklet] = [Tracklet.from_camera(t) for t in cam_tracklets]
         if tracklet_list:
             self._input_queue.put(tracklet_list)

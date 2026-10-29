@@ -7,7 +7,7 @@ from typing import Callable
 import numpy as np
 
 # Local application imports
-from modules.oak import FrameWindow, degrees_per_pixel, delivered_height, frame_coverage, \
+from modules.camera import FrameWindow, degrees_per_pixel, delivered_height, frame_coverage, \
     frame_window, mode_size
 from .projection import camera_bearing, focus_distance
 from .rig import Rig

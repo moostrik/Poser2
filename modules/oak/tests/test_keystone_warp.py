@@ -16,7 +16,7 @@ from modules.oak.camera.pipeline import (
     WarpConfig, build_warp_mesh, find_keystone_warp, find_keystone_warp_square,
     KEYSTONE_MESH_W, KEYSTONE_MESH_H,
 )
-from modules.oak import WARP_MESH
+from modules.camera import WARP_MESH
 
 
 # ── Reference: the pre-step-3 builders, verbatim apart from returning tuples ──────────────

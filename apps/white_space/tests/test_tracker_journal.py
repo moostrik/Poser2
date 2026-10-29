@@ -6,7 +6,8 @@ import time
 import unittest
 from pathlib import Path
 
-from modules.tracker import PanoramicAnnotation, Tracklet, TrackingStatus
+from modules.camera import TrackingStatus
+from modules.tracker import PanoramicAnnotation, Tracklet
 from modules.utils import Rect
 
 from apps.white_space.tracker_journal import (

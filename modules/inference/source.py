@@ -5,7 +5,7 @@ from typing import TypeAlias
 import numpy as np
 import torch
 
-from modules.oak import FrameType
+from modules.camera import CameraFrame, FrameType
 from modules.utils import PerformanceTimer
 
 logger = logging.getLogger(__name__)
@@ -35,18 +35,16 @@ class Uploader:
             color="green", omit_init=25,
         )
 
-    def set_image(self, cam_id: int, frame_type: FrameType, image: np.ndarray) -> None:
+    def set_image(self, frame: CameraFrame) -> None:
         """Upload a camera frame to GPU. Only VIDEO frames are stored.
 
-        Shifts current to previous before uploading the new frame.
-
-        Args:
-            cam_id:     Camera identifier
-            frame_type: Type of frame (only VIDEO is processed)
-            image:      BGR uint8 (H, W, 3) or grayscale uint8 (H, W)
+        Shifts current to previous before uploading the new frame. The image is BGR uint8
+        (H, W, 3) or grayscale uint8 (H, W).
         """
-        if frame_type != FrameType.VIDEO:
+        if frame.kind != FrameType.VIDEO:
             return
+        cam_id: int = frame.cam_id
+        image: np.ndarray = frame.image
 
         start = time.perf_counter()
 

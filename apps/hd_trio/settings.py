@@ -14,7 +14,8 @@ from typing import Any
 
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.panel import PanelSettings
-from modules.oak import CameraSettings, CameraCheckSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.camera import CameraCheckSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
+from modules.oak import OakCameraSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, ArtNetBarsSettings, OscReceiverSettings
 from modules.utils import Color
@@ -147,9 +148,9 @@ class OakGroup(BaseSettings):
 
     _cam_share: list = [fps, color, square, stereo, yolo, resolution, model_path, fov]
 
-    cam_0        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
-    cam_1        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
-    cam_2        : Group[CameraSettings]            = Group(CameraSettings, share=_cam_share)
+    cam_0        : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)
+    cam_1        : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)
+    cam_2        : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)
     camera_check : Group[CameraCheckSettings]       = Group(CameraCheckSettings)
     simulator    : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cameras, fps])
     tracker      : Group[OnePerCamTrackerSettings]  = Group(OnePerCamTrackerSettings)
@@ -157,7 +158,7 @@ class OakGroup(BaseSettings):
     tracklet_sync: Group[SyncSettings]              = Group(SyncSettings, share=[num_cameras, fps])
 
     @property
-    def cameras(self) -> list[CameraSettings]:
+    def cameras(self) -> list[OakCameraSettings]:
         return [self.cam_0, self.cam_1, self.cam_2]
 
 

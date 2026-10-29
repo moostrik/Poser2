@@ -3,7 +3,7 @@
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, clear_color, Style
-from modules.oak import CameraSettings, CameraCheckSettings, mono_frame_size, delivered_height
+from modules.camera import CameraSettings, CameraCheckSettings, mono_frame_size, delivered_height
 from modules.tracker import PanoramicTrackerSettings
 from apps.white_space.render.layers.light_simulation_layer import LightSimulationLayer
 from apps.white_space.render.layers.beam_light_simulation_layer import BeamLightSimulationLayer

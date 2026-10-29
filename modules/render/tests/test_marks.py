@@ -13,8 +13,9 @@ from dataclasses import replace
 
 from modules.render.layers.panorama.marks import Mark, MarkContext, build_marks
 from modules.render.layers.panorama.strip import strip_spans, strip_y
+from modules.camera import TrackingStatus
 from modules.tracker import PanoramicAnnotation, PanoramicTracker, PanoramicTrackerSettings, Rejection, \
-    Tracklet, TrackingStatus, row_from_elevation
+    Tracklet, row_from_elevation
 from modules.utils import Rect
 
 

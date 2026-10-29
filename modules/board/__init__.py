@@ -15,7 +15,7 @@ from .frames import                 HasFrames, FrameStoreMixin
 from .windows import                HasWindows, WindowSource, WindowStoreMixin
 from .inference import                 HasCameraImages, CameraImageStoreMixin, HasCropImages, CropImageStoreMixin, \
                                     HasSegmentationImages, SegmentationImageStoreMixin
-from .depth_tracklets import        HasDepthTracklets, DepthTrackletStoreMixin
+from .camera_tracklets import       HasCameraTracklets, CameraTrackletStoreMixin
 from .sequence import               HasSequence, SequenceStoreMixin
 from .playhead import               HasPlayhead, PlayheadStoreMixin, PlayheadSignals
 from .sound import                  HasSoundLevels, SoundLevelStoreMixin, SoundLevels

@@ -3,7 +3,9 @@
 import unittest
 from functools import partial
 
-from modules.oak import Sync, SyncSettings
+import numpy as np
+
+from modules.camera import CameraFrame, FrameType, Sync, SyncSettings
 
 
 class _Recorder:
@@ -25,7 +27,7 @@ class SyncCallbackTest(unittest.TestCase):
         for i, recorder in enumerate(recorders):
             sync.add_sync_callback(recorder.bang if i % 2 else partial(_Recorder.bang, recorder))
         sync.add_sync_callback(recorders[1].bang)                 # registered twice: called once, first position
-        sync.submit_frame(0)                                      # one camera: its first frame bangs
+        sync.submit_frame(CameraFrame(0, FrameType.VIDEO, np.zeros((2, 2), np.uint8), 0.0))   # one camera: its first frame bangs
         self.assertEqual(calls, list(range(16)))
 
 

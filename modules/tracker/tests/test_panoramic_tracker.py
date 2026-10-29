@@ -7,10 +7,10 @@ import time
 import unittest
 from dataclasses import replace
 
-from modules.oak import CameraResolution, delivered_height, frame_coverage, frame_window
+from modules.camera import CameraResolution, TrackingStatus, delivered_height, frame_coverage, frame_window
 from modules.tracker import (
     PanoramicTracker, PanoramicTrackerSettings, PanoramicAnnotation, Rejection,
-    Tracklet, TrackingStatus, TrackletDict, camera_bearing, camera_local_to_azimuth, focus_distance,
+    Tracklet, TrackletDict, camera_bearing, camera_local_to_azimuth, focus_distance,
     row_from_elevation, row_model, wrap180,
 )
 from modules.tracker.panoramic.players import PlayerSlots
@@ -1368,15 +1368,6 @@ class TestPlayerSlotLifecycle(RigTrackerCase):
         out = self.seen(3.0)                                     # and is still emitted on it
         self.assertEqual(set(out.keys()), {0})
         self.assertEqual(self.tracker.observations.world_of(0, 1), 0)
-
-
-class TestUnknownStatus(PanoramicTrackerCase):
-
-    def test_an_unmapped_device_status_changes_nothing(self) -> None:
-        self.submit(make_tracklet(0, 1, 50.0))
-        before = self.tracker.observations.live(0, 1)
-        self.submit(make_tracklet(0, 1, 60.0, status=TrackingStatus.NONE))
-        self.assertEqual(self.tracker.observations.live(0, 1), before)
 
 
 class TestWorldAzimuth(PanoramicTrackerCase):

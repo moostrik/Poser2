@@ -1,20 +1,56 @@
+"""Records every camera's frames to chunked clips: one ffmpeg stream per camera and frame kind,
+files named `<cam>_<kind>_<chunk>` in a folder named after the start time, written to a temp folder
+and moved into place chunk by chunk."""
+
 from threading import Thread, Lock, Event
 from pathlib import Path
 import shutil
 import time
 from enum import Enum, auto
-from numpy import ndarray
 from queue import Queue, Empty
 
-from ..camera.definitions import CoderType, CoderFormat, FrameType, FRAME_TYPE_LABEL_DICT
-from .settings import RecorderSettings
-from .stream_writer import StreamWriter
+from modules.settings import BaseSettings, Field, Widget
+from modules.video import CoderType, CoderFormat, encoder_name, StreamWriter
+
+from .frame import FrameType, CameraFrame
 
 import logging
 logger = logging.getLogger(__name__)
 
+
+class RecorderSettings(BaseSettings):
+
+    # ── Initial settings ───────────────────────────────────────────────
+    num_cameras:        Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
+    fps:                Field[float]            = Field(30.0, access=Field.INIT, description="Camera frame rate")
+    keyframe_interval:  Field[int]              = Field(0, access=Field.INIT, description="Keyframe interval in frames (0 = encoder default, 1 = every frame)")
+    temp_path:          Field[str]              = Field("temp", access=Field.INIT, description="Temporary files directory")
+    video_encoder:      Field[CoderType]        = Field(CoderType.iGPU, access=Field.INIT, description="Video encoder type")
+    video_format:       Field[CoderFormat]      = Field(CoderFormat.H264, access=Field.INIT, description="Video format")
+    video_frame_types:  Field[list[FrameType]]  = Field([FrameType.VIDEO], access=Field.INIT, description="Frame types to record", visible=False)
+
+    # ── Recording controls ────────────────────────────────────────────
+    enabled:            Field[bool]             = Field(True, widget=Widget.switch, description="Enable video recording")
+    start:              Field[bool]             = Field(False, widget=Widget.button, description="Start recording")
+    stop:               Field[bool]             = Field(False, widget=Widget.button, description="Stop recording")
+    recording:          Field[bool]             = Field(False, access=Field.READ, description="Recording")
+    split:              Field[bool]             = Field(False, widget=Widget.button, description="Split chunk")
+    output_path:        Field[str]              = Field("recordings", access=Field.INIT, description="Video recordings directory")
+    name:               Field[str]              = Field("", widget=Widget.input, description="Recording name")
+
+
+FRAME_TYPE_LABELS: dict[FrameType, str] = {
+    FrameType.NONE_: 'N',
+    FrameType.VIDEO: 'C',
+    FrameType.LEFT_: 'L',
+    FrameType.RIGHT: 'R',
+    FrameType.DEPTH: 'S'
+}
+
+
 def make_file_name(cam_id: int, frame_type: FrameType, chunk: int, suffix: str) -> str:
-    return f"{cam_id}_{FRAME_TYPE_LABEL_DICT[frame_type]}_{chunk:03d}{suffix}"
+    return f"{cam_id}_{FRAME_TYPE_LABELS[frame_type]}_{chunk:03d}{suffix}"
+
 
 def make_folder_name(name: str = "") -> str:
     folder = time.strftime("%Y%m%d-%H%M%S")
@@ -22,18 +58,6 @@ def make_folder_name(name: str = "") -> str:
         folder += f"_{name}"
     return folder
 
-EncoderString: dict[CoderFormat, dict[CoderType, str]] = {
-    CoderFormat.H264: {
-        CoderType.CPU:  'libx264',
-        CoderType.GPU:  'h264_nvenc',
-        CoderType.iGPU: 'h264_qsv'
-    },
-    CoderFormat.H265: {
-        CoderType.CPU:  'libx265',
-        CoderType.GPU:  'hevc_nvenc',
-        CoderType.iGPU: 'hevc_qsv'
-    }
-}
 
 class RecState(Enum):
     IDLE =  auto()
@@ -50,23 +74,20 @@ class Recorder(Thread):
         self.settings: RecorderSettings = settings
 
         self.recorders: dict[int, dict[FrameType, StreamWriter]] = {}
-        self.fps: dict[int, float] = {}
-        self.frames: dict[int, Queue[dict[FrameType, ndarray]]] = {}
+        self.frames: dict[int, Queue[CameraFrame]] = {}
         self.folder_path: Path | None = None
 
         for c in range(settings.num_cameras):
             self.recorders[c] = {}
-            self.fps[c] = settings.fps
             self.frames[c] = Queue()
             for t in self.settings.video_frame_types:
-                self.recorders[c][t] = StreamWriter(EncoderString[settings.video_format][settings.video_encoder], settings.keyframe_interval)
+                self.recorders[c][t] = StreamWriter(encoder_name(settings.video_format, settings.video_encoder), settings.keyframe_interval)
 
         self.chunk_index = 0
         self.suffix: str = settings.video_format.value
 
         self.state: RecState = RecState.IDLE
         self.state_lock = Lock()
-        self.settings_lock = Lock()
         self.stop_event = Event()
 
         self.settings.bind(RecorderSettings.start, self._on_start)
@@ -110,10 +131,9 @@ class Recorder(Thread):
         self.chunk_index = 0
 
         for c in range(self.settings.num_cameras):
-            fps: float = self.get_fps(c)
             for t in self.settings.video_frame_types:
                 path: Path = self.folder_path / make_file_name(c, t, self.chunk_index, self.suffix)
-                self.recorders[c][t].start(str(path), fps)
+                self.recorders[c][t].start(str(path), self.settings.fps)
 
         logger.info("VideoRecorder started → %s", self.output_folder_path)
 
@@ -130,10 +150,9 @@ class Recorder(Thread):
         old_chunk = self.chunk_index
         self.chunk_index += 1
         for c in range(self.settings.num_cameras):
-            fps: float = self.get_fps(c)
             for t in self.settings.video_frame_types:
                 path: Path = self.folder_path / make_file_name(c, t, self.chunk_index, self.suffix)
-                self.recorders[c][t].split(str(path), fps)
+                self.recorders[c][t].split(str(path), self.settings.fps)
         self._move_chunk_files(old_chunk)
 
     def _move_chunk_files(self, chunk_index: int) -> None:
@@ -160,12 +179,10 @@ class Recorder(Thread):
     def _update_recording(self) -> None:
         for c in range(self.settings.num_cameras):
             try:
-                frames: dict[FrameType, ndarray] = self.frames[c].get(timeout=0.01)
+                frame: CameraFrame = self.frames[c].get(timeout=0.01)
             except Empty:
                 continue
-            for t in self.settings.video_frame_types:
-                if t in frames:
-                    self.recorders[c][t].submit_frame(frames[t])
+            self.recorders[c][frame.kind].submit_frame(frame.image)
 
     def _get_state(self) -> RecState:
         with self.state_lock:
@@ -181,18 +198,10 @@ class Recorder(Thread):
             self.state = state
 
     # EXTERNAL METHODS
-    def submit_synced_frames(self, cam_id: int, frames: dict[FrameType, ndarray], fps: float) -> None:
-        self.set_fps(cam_id, fps)
-        if self._get_state() == RecState.REC:
-            self.frames[cam_id].put(frames)
-
-    def set_fps(self, cam_id: int, fps: float) -> None:
-        with self.settings_lock:
-            self.fps[cam_id] = fps
-
-    def get_fps(self, cam_id) -> float:
-        with self.settings_lock:
-            return self.fps[cam_id]
+    def submit_frame(self, frame: CameraFrame) -> None:
+        """A camera's frame callback: queued while recording, of the kinds the recorder writes."""
+        if frame.kind in self.settings.video_frame_types and self._get_state() == RecState.REC:
+            self.frames[frame.cam_id].put(frame)
 
     # SETTINGS CALLBACKS
     def _on_enabled(self, value: bool) -> None:
@@ -212,5 +221,3 @@ class Recorder(Thread):
     def _on_split(self, _=None) -> None:
         if self._get_state() == RecState.REC:
             self._do_split()
-
-

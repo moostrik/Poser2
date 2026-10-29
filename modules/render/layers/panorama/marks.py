@@ -31,7 +31,8 @@ import math
 from dataclasses import dataclass
 
 # Local application imports
-from modules.tracker import PanoramicAnnotation, Rejection, Tracklet, TrackingStatus, camera_azimuth, \
+from modules.camera import TrackingStatus
+from modules.tracker import PanoramicAnnotation, Rejection, Tracklet, camera_azimuth, \
     camera_local_to_azimuth, centre_distance, elevation_from_row, focus_distance, wrap180
 
 from .strip import centre_elevation, strip_y

@@ -8,7 +8,7 @@ the round trip breaks here rather than on the wall.
 import math
 import unittest
 
-from modules.oak import frame_window
+from modules.camera import frame_window
 from modules.tracker import azimuth_to_camera_x, camera_azimuth, camera_local_to_azimuth, \
     centre_distance, elevation_from_row, focus_distance, row_from_elevation, row_model, wrap180
 from modules.tracker.panoramic.rig import Rig

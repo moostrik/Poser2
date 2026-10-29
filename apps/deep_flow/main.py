@@ -4,7 +4,8 @@ from typing import Optional
 from functools import partial
 
 from modules.utils import Broadcast
-from modules.oak import Camera, CameraCheck, Simulator, Player, Recorder, Sync
+from modules.camera import CameraSource, CameraCheck, Player, Recorder, Sync
+from modules.oak import Camera, Simulator
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound
@@ -48,7 +49,7 @@ class DeepFlowMain:
         # CAMERA
         configure_features(num_players)
 
-        self.cameras: list[Camera | Simulator] = []
+        self.cameras: list[CameraSource] = []
         self.recorder: Optional[Recorder] = None
         self.player: Optional[Player] = None
         if self.settings.camera.sim_enabled:
@@ -67,12 +68,12 @@ class DeepFlowMain:
 
         for camera in self.cameras:
             if self.recorder:
-                camera.add_sync_callback(self.recorder.submit_synced_frames)
+                camera.add_frame_callback(self.recorder.submit_frame)
             camera.add_frame_callback(self.image_uploader.set_image)
             camera.add_frame_callback(self.frame_sync_bang.submit_frame)
-            camera.add_tracker_callback(self.tracker.submit_cam_tracklets)
-            camera.add_tracker_callback(self.board.set_depth_tracklets)
-            camera.add_tracker_callback(self.tracklet_sync_bang.submit_frame)
+            camera.add_tracklet_callback(self.tracker.submit_cam_tracklets)
+            camera.add_tracklet_callback(self.board.set_camera_tracklets)
+            camera.add_tracklet_callback(self.tracklet_sync_bang.submit_tracklets)
 
         # DETECTION
         self.poses_from_tracklets = PosesFromTracklets(p.tracklets, num_players)

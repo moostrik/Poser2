@@ -6,10 +6,10 @@ from queue import Empty, Queue
 from threading import Lock, Thread, Event
 
 # Local application imports
-from modules.oak import DepthTracklet
+from modules.camera import CameraTracklet, TrackingStatus
 from modules.utils import PerformanceTimer
 from ..tracker_base import BaseTracker
-from ..tracklet import Tracklet, TrackingStatus, TrackletDict, TrackletDictCallback, TrackletListCallback
+from ..tracklet import Tracklet, TrackletDict, TrackletDictCallback, TrackletListCallback
 from .annotation import Annotation, Rejection
 from .observations import ObservationStore
 from .rig import Rig
@@ -172,7 +172,6 @@ class Tracker(Thread, BaseTracker):
                 self.observations.lose(cam_id, ext_id)
             return
 
-        # A status the device mapping does not know (`TrackingStatus.NONE`) says nothing usable.
         if not new_tracklet.is_active:
             return
 
@@ -386,10 +385,6 @@ class Tracker(Thread, BaseTracker):
             if callback not in self._observation_callbacks:
                 self._observation_callbacks.append(callback)
 
-    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[DepthTracklet]) -> None:
+    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[CameraTracklet]) -> None:
         for t in cam_tracklets:
-            tracklet: Tracklet | None = Tracklet.from_depthcam(cam_id, t)
-            if tracklet is None:
-                logger.warning(f"Invalid tracklet from camera {cam_id}, skipping.")
-                continue
-            self._input_queue.put(tracklet)
+            self._input_queue.put(Tracklet.from_camera(t))
