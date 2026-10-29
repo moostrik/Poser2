@@ -224,6 +224,7 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
         await smile.send_json({'type': 'turn_end', 'reason': 'done'})
         self.assertEqual((await self.receive(phone, 'turn_end'))['reason'], 'done')
         self.assertIsNone(self.relay.line.turn)
+        self.assertEqual(len(self.relay.line.durations), 1)        # the turn was timed, for the others' wait
         portrait = await self.upload('portrait', data=b'portrait')
         self.assertRegex(portrait, RANDOM_NAME.format('portrait', 'jpg'))
         await smile.send_json({'type': 'result', 'id': 'v1', 'phone': turn['id'], 'name': 'Name', 'caption': 'hi', 'ok': True})

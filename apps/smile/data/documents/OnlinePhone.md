@@ -28,9 +28,13 @@ over the field of smileys and nothing of the column until it is turned back (a d
 fitted to its height).
 
 **The bar** is the page's one button and one line of text, there from the start. Its texts in order: the agree
-button (white); black with white text the wait (WAITING FOR SMILE, the number BEFORE YOU, SMILE IS ASLEEP when
-SMILE is not there: made on the page from the state's `place` and `eye`, the relay's own `status` sentence is
-not shown); in the turn what the face still needs; once the flash's white is full, TURN YOUR VOLUME UP (the
+button (white); black with white text the wait: why, from the state's `reason` (SOMEONE INSIDE IS SMILING,
+SOMEONE ONLINE IS SMILING, SMILE IS WARMING UP, SMILE IS BUSY INSIDE, WAITING FOR SMILE when the eye is free,
+SMILE IS ASLEEP when SMILE is not there) or the number BEFORE YOU further back in line, by turns with how long
+(UNDER A MINUTE, ABOUT N MIN, 3 s each) from the state's `eta`: the relay times its turns (the median of the last
+ten, 40 s before any; a visitor inside takes the same sequence) and adds what is left of the one running now to
+a turn for every phone ahead, nothing while the generator warms up or the room is busy (the relay's own
+`status` sentence is not shown); in the turn what the face still needs; once the flash's white is full, TURN YOUR VOLUME UP (the
 track has just started, and a phone on silent would otherwise never know there is something to hear; VOLUME
 grows now and then, the words beside it moving aside and the bar growing with it); from the generation on
 BULLSHITTING over the loading bar (poops fly out of the word in every direction, three or four at a time, under
@@ -163,7 +167,7 @@ the context, gets a black background and the same page otherwise.
 The bar under the frame is one block of `app.js` (THE BAR, `const bar`): its texts, its fill, the poops and the
 loud word live there, and the rest of the page only tells it the turn's moments. `bar.agree` under the terms
 (full white, I AGREE TO SMILE, still until the camera is allowed, then rippling), `bar.wait` the wait from the
-relay's state, `bar.hint` what the face still needs (the first word of the subject's `reject` label mapped to a
+relay's state (the reason or the place, and the time, by turns), `bar.hint` what the face still needs (the first word of the subject's `reject` label mapped to a
 line; the pitch's sign picks CHIN UP or CHIN DOWN), `bar.turn` the reset of a new turn, `bar.flash` the empty
 bar at the flash, `bar.volume` TURN YOUR VOLUME UP once the white is full (asked from the flash-in at 1 and
 from the first flash-out message, whichever comes), `bar.stage` the fill and the texts along the sequence,

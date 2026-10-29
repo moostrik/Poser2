@@ -300,12 +300,25 @@ const bar = (() => {
   }
 
   // THE TEXTS OF THE TURN
+  // why the phone waits, by the relay's `reason`; a place further back shows the place instead
+  const REASONS = {
+    free: 'WAITING FOR SMILE(ai)', inside: 'SOMEONE INSIDE IS SMILING', outside: 'SOMEONE ONLINE IS SMILING',
+    warming: 'SMILE(ai) IS WARMING UP', busy: 'SMILE(ai) IS BUSY INSIDE',
+  };
+  function etaText(eta) {
+    // the relay's estimate in seconds (what is left of the turn running, a turn per phone ahead), or nothing
+    if (eta === null || eta === undefined) return '';
+    return eta <= 50 ? 'UNDER A MINUTE' : `ABOUT ${Math.max(1, Math.round(eta / 60))} MIN`;
+  }
   function lineText(message) {
     // the wait, from the relay's state (its own sentence, `status`, is for the API): asleep when SMILE is not
-    // there, else the place in line
+    // there, else the reason or the place in line, by turns with the time it will take (3 s each; the state
+    // comes about once a second)
     if (message.eye === 'asleep') return 'SMILE(ai) IS ASLEEP';
     const ahead = Math.max(0, (message.place || 1) - 1);
-    return ahead ? `${ahead} BEFORE YOU` : 'WAITING FOR SMILE(ai)';
+    const reason = ahead ? `${ahead} BEFORE YOU` : REASONS[message.reason] || REASONS.free;
+    const time = etaText(message.eta);
+    return time && Math.floor(performance.now() / 3000) % 2 ? time : reason;
   }
   function faceHint(subject) {
     if (!subject) return 'SHOW ME YOUR FACE';

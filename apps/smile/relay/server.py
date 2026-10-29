@@ -29,8 +29,8 @@ keeps. The phone with the turn is the only one whose frames are passed on, and o
 
 Phone -> relay: join (on the tap, after a missed or lost turn, at a reconnect), leave, seen (a screen frame
     drawn), timing (its turn's end, for the log); frames (FRAME).
-Relay -> phone: state (see Line.state: eye, status, place, waiting, block, laughter; at every change of the line
-    and at every `eye` from SMILE, about once a second), turn {window}, music, face, stage, result {id, ok, name,
+Relay -> phone: state (see Line.state: eye, status, place, waiting, block, laughter, reason, eta; at every change of
+    the line and at every `eye` from SMILE, about once a second), turn {window}, music, face, stage, result {id, ok, name,
     caption, portrait, grin: the urls, None for a file that is not there}, turn_end {reason: done, missed, lost or
     reset; `lost` also from the relay itself when SMILE goes}, expired (the pass ran out: the socket closes);
     SHOW and LAST images.
@@ -208,8 +208,9 @@ class Relay:
 
     async def send_states(self) -> None:
         """Every phone its state: after anything that moves the line or the eye."""
+        now: float = time.time()
         for phone, ws in list(self.phones.items()):
-            await self.send(ws, self.line.state(phone))
+            await self.send(ws, self.line.state(phone, now))
 
     async def send_line(self) -> None:
         await self.send(self.smile, {'type': 'line', 'waiting': len(self.line.waiting)})
@@ -232,7 +233,7 @@ class Relay:
         self.phones[phone] = ws
         self.phone_passes[phone] = value
         logger.info('phone %s connected (%d online)', phone[:8], len(self.phones))
-        await self.send(ws, self.line.state(phone))
+        await self.send(ws, self.line.state(phone, time.time()))
         try:
             async for message in ws:
                 if message.type == WSMsgType.TEXT:
@@ -301,7 +302,7 @@ class Relay:
         ws = web.WebSocketResponse(heartbeat=HEARTBEAT, max_msg_size=MAX_UPLOAD)
         await ws.prepare(request)
         self.smile = ws
-        self.line.set_eye(True)
+        self.line.set_eye(True, now=time.time())
         logger.info('SMILE connected')
         await self.send(ws, self.pass_message())
         await self.send(ws, self.invite_message())
@@ -322,7 +323,7 @@ class Relay:
             if self.smile is ws:
                 self.smile = None
                 turn = self.line.turn
-                self.line.set_eye(False)
+                self.line.set_eye(False, now=time.time())
                 if turn is not None:
                     await self.send(self.phones.get(turn), {'type': 'turn_end', 'reason': 'lost'})
                 await self.send_states()
@@ -355,7 +356,7 @@ class Relay:
     async def smile_message(self, message: dict) -> None:
         kind: str = str(message.get('type', ''))
         if kind == 'eye':
-            self.line.set_eye(True, bool(message.get('free', False)), str(message.get('status', '')), bool(message.get('laughter', True)))
+            self.line.set_eye(True, bool(message.get('free', False)), str(message.get('status', '')), bool(message.get('laughter', True)), now=time.time())
             await self.send_states()
         elif kind == 'new_invite':
             self.new_invite()
@@ -363,7 +364,7 @@ class Relay:
             await self.send(self.smile, self.invite_message())
         elif kind == 'turn_start':
             self._reset_frames()
-            phone: str | None = self.line.start_turn()
+            phone: str | None = self.line.start_turn(time.time())
             await self.send(self.smile, {'type': 'turn', 'id': phone})
             if phone is not None:
                 await self.send(self.phones.get(phone), {'type': 'turn', 'window': message.get('window', 10)})
@@ -376,7 +377,7 @@ class Relay:
         elif kind == 'turn_end':
             self._log_flights()
             self._reset_frames()
-            phone = self.line.end_turn()
+            phone = self.line.end_turn(time.time())
             if phone is not None:
                 await self.send(self.phones.get(phone), {'type': 'turn_end', 'reason': str(message.get('reason', 'done'))})
             await self.send_states()

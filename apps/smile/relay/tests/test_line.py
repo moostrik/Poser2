@@ -2,7 +2,7 @@
 
 import unittest
 
-from apps.smile.relay.line import ASLEEP, BLOCKS, LOOKING, OUTSIDE, Line
+from apps.smile.relay.line import ASLEEP, BLOCKS, BUSY, INSIDE, LEAST_LEFT, LOOKING, OUTSIDE, TYPICAL_TURN, WARMING, Line
 
 
 class TestLine(unittest.TestCase):
@@ -86,6 +86,55 @@ class TestState(unittest.TestCase):
         self.line.set_eye(False)
         self.assertIsNone(self.line.turn)
         self.assertEqual(self.line.state('a')['eye'], 'asleep')
+        self.assertEqual((self.line.state('a')['reason'], self.line.state('a')['eta']), ('asleep', None))
+
+
+class TestWait(unittest.TestCase):
+    """The reason a phone waits and how long: what runs now has its rest, every phone ahead a typical turn."""
+    def setUp(self):
+        self.line = Line()
+        self.line.set_eye(True, free=True, status=LOOKING, now=100.0)
+        for phone in 'abc':
+            self.line.join(phone)
+
+    def wait(self, phone: str, now: float) -> tuple[str, float | None]:
+        state = self.line.state(phone, now)
+        return state['reason'], state['eta']
+
+    def test_free_is_the_least_wait_and_a_turn_per_phone_ahead(self):
+        self.assertEqual(self.wait('a', 100.0), ('free', LEAST_LEFT))
+        self.assertEqual(self.wait('c', 100.0), ('free', LEAST_LEFT + 2 * TYPICAL_TURN))
+        self.assertEqual(self.wait('x', 100.0), ('free', LEAST_LEFT + 3 * TYPICAL_TURN))      # not in line: behind everyone
+
+    def test_someone_inside_has_the_rest_of_a_typical_turn(self):
+        self.line.set_eye(True, free=False, status=INSIDE, now=100.0)
+        self.assertEqual(self.wait('a', 110.0), ('inside', TYPICAL_TURN - 10.0))
+        self.assertEqual(self.wait('b', 110.0), ('inside', 2 * TYPICAL_TURN - 10.0))
+        self.assertEqual(self.wait('a', 300.0), ('inside', LEAST_LEFT))                      # never already over
+        self.line.set_eye(True, free=False, status=INSIDE, now=300.0)                        # the same status: the start stays
+        self.assertEqual(self.wait('a', 300.0), ('inside', LEAST_LEFT))
+
+    def test_an_online_turn_counts_down_and_is_timed(self):
+        self.line.start_turn(100.0)
+        self.assertEqual(self.wait('b', 120.0), ('outside', TYPICAL_TURN - 20.0))
+        self.line.end_turn(145.0)
+        self.assertEqual(list(self.line.durations), [45.0])
+        self.assertEqual(self.line.typical(), 45.0)
+        self.line.start_turn(200.0)
+        self.assertEqual(self.wait('c', 200.0), ('outside', 45.0))
+
+    def test_the_typical_turn_is_the_median_of_the_last_ones(self):
+        self.line.join('d')
+        for duration in (30.0, 50.0, 40.0, 400.0):      # four phones, four turns; the median shrugs at the long one
+            self.assertIsNotNone(self.line.start_turn(0.0))
+            self.line.end_turn(duration)
+        self.assertEqual(self.line.typical(), 45.0)
+
+    def test_warming_up_and_busy_give_no_estimate(self):
+        self.line.set_eye(True, free=False, status=WARMING, now=100.0)
+        self.assertEqual(self.wait('a', 100.0), ('warming', None))
+        self.line.set_eye(True, free=False, status=BUSY, now=100.0)
+        self.assertEqual(self.wait('a', 100.0), ('busy', None))
 
 
 if __name__ == '__main__':
