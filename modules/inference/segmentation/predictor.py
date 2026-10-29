@@ -56,8 +56,8 @@ class Predictor:
         # Pending frames awaiting segmentation results, keyed by batch_id
         self._pending_frames: dict[int, tuple[FrameDict, crop.ImageDict]] = {}
 
-        # Track active tracklet IDs for detecting removed tracklets
-        self._previous_tracklet_ids: set[int] = set()
+        # Active track ids, for detecting removed tracks
+        self._previous_track_ids: set[int] = set()
 
         # Track inference times
         self._process_timer =   PerformanceTimer(name="RVM Segmentation  ", sample_count=1000, report_interval=100, color='cyan', omit_init=25)
@@ -78,21 +78,21 @@ class Predictor:
         """Submit poses with GPU images for async processing. Results broadcast via callbacks.
 
         Args:
-            poses: Dictionary of poses keyed by tracklet ID
-            crop_frames: Crop frames with crops already on GPU, keyed by tracklet ID
+            poses: Dictionary of poses keyed by track id
+            crop_frames: Crop frames with crops already on GPU, keyed by track id
         """
         if not self._segmentation.is_ready:
             return
         if not self._settings.enabled:
             return
 
-        tracklet_ids: list[int] = []
+        track_ids: list[int] = []
         gpu_image_list: list = []  # list[cp.ndarray]
 
-        for tracklet_id in poses.keys():
-            if tracklet_id in crop_frames:
-                tracklet_ids.append(tracklet_id)
-                gpu_image_list.append(crop_frames[tracklet_id].crop)
+        for track_id in poses.keys():
+            if track_id in crop_frames:
+                track_ids.append(track_id)
+                gpu_image_list.append(crop_frames[track_id].crop)
 
         # If no crops available, forward frames without segmentation to maintain data flow
         if not gpu_image_list:
@@ -107,7 +107,7 @@ class Predictor:
         self._segmentation.submit(SegmentationInput(
             batch_id=batch_id,
             gpu_images=gpu_image_list,
-            tracklet_ids=tracklet_ids
+            track_ids=track_ids
         ))
 
     def _on_segmentation_result(self, output: SegmentationOutput) -> None:
@@ -135,11 +135,11 @@ class Predictor:
 
         # Build ImageDict from segmentation results
         result_frames: ImageDict = {}
-        for idx, tracklet_id in enumerate(output.tracklet_ids):
+        for idx, track_id in enumerate(output.track_ids):
             if idx < output.mask_tensor.shape[0]:
                 mask = output.mask_tensor[idx]  # (H, W) tensor on GPU
                 foreground = output.fgr_tensor[idx]
-                result_frames[tracklet_id] = Image(
+                result_frames[track_id] = Image(
                     mask=mask,
                     foreground=foreground,
                 )

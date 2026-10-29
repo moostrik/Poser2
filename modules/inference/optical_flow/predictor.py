@@ -31,7 +31,7 @@ class Predictor:
     Batches are processed asynchronously on GPU. Under load, pending batches may
     be dropped by the optical flow queue to maintain real-time performance.
 
-    Broadcasts GPU tensors (dict[tracklet_id, torch.Tensor]) via callbacks for efficient
+    Broadcasts GPU tensors (dict[track_id, torch.Tensor]) via callbacks for efficient
     OpenGL texture conversion. Flow tensors stay on GPU to avoid unnecessary CPU transfers.
 
     This design prioritizes low latency over data completeness, making it suitable
@@ -90,23 +90,23 @@ class Predictor:
         """Submit batch for async processing. Results broadcast via callbacks.
 
         Args:
-            poses: Dictionary of poses keyed by tracklet ID
-            crop_frames: Crop frames with crop and prev_crop tensors, keyed by tracklet ID
+            poses: Dictionary of poses keyed by track id
+            crop_frames: Crop frames with crop and prev_crop tensors, keyed by track id
         """
         if not self._optical_flow.is_ready:
             return
         if not self._settings.enabled:
             return
 
-        tracklet_id_list: list[int] = []
+        track_id_list: list[int] = []
         pair_list: list[tuple[torch.Tensor, torch.Tensor]] = []
 
-        for tracklet_id in poses.keys():
-            if tracklet_id in crop_frames:
-                crop_frame = crop_frames[tracklet_id]
+        for track_id in poses.keys():
+            if track_id in crop_frames:
+                crop_frame = crop_frames[track_id]
                 # Only add if prev_crop and crop exist (need both frames for optical flow)
                 if crop_frame.prev_crop is not None:
-                    tracklet_id_list.append(tracklet_id)
+                    track_id_list.append(track_id)
                     pair_list.append((crop_frame.prev_crop, crop_frame.crop))
 
         # If no pairs available, emit empty flow dict to maintain data flow
@@ -121,7 +121,7 @@ class Predictor:
         self._optical_flow.submit(OpticalFlowInput(
             batch_id=batch_id,
             gpu_image_pairs=pair_list,
-            tracklet_ids=tracklet_id_list
+            track_ids=track_id_list
         ))
 
     def _on_optical_flow_result(self, output: OpticalFlowOutput) -> None:
@@ -136,11 +136,11 @@ class Predictor:
         self._process_timer.add_time(output.inference_time_ms, report=self._verbose)
         self._wait_timer.add_time(output.lock_time_ms, report=self._verbose)
 
-        # Create FlowDict mapping tracklet_id -> flow tensor (2, H, W)
+        # Create FlowDict mapping track_id -> flow tensor (2, H, W)
         flow_dict: FlowDict = {}
-        for idx, tracklet_id in enumerate(output.tracklet_ids):
+        for idx, track_id in enumerate(output.track_ids):
             if idx < output.flow_tensor.shape[0]:
-                flow_dict[tracklet_id] = output.flow_tensor[idx]
+                flow_dict[track_id] = output.flow_tensor[idx]
 
         # Broadcast to callbacks
         self._notify_callbacks(flow_dict)

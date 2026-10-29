@@ -22,30 +22,30 @@ class TrackletStore:
 
     def add_tracklet(self, tracklet: Tracklet) -> int | None:
         with self._lock:
-            tracklet_id: int = tracklet.cam_id
+            track_id: int = tracklet.cam_id
 
-            if tracklet_id in self._tracklets:
+            if track_id in self._tracklets:
                 logger.warning(
                     f"Tracklet with cam_id "
-                    f"{tracklet_id} already exists. Skipping addition."
+                    f"{track_id} already exists. Skipping addition."
                 )
                 return None
 
-            if tracklet_id >= self._max_size:
+            if track_id >= self._max_size:
                 logger.warning(
                     f"Tracklet with cam_id "
-                    f"{tracklet_id} exceeds max size {self._max_size}. "
+                    f"{track_id} exceeds max size {self._max_size}. "
                     f"Skipping addition."
                 )
                 return None
 
             new_tracklet: Tracklet = replace(
                 tracklet,
-                id=tracklet_id,
+                id=track_id,
                 status=TrackingStatus.NEW,
             )
-            self._tracklets[tracklet_id] = new_tracklet
-            return tracklet_id
+            self._tracklets[track_id] = new_tracklet
+            return track_id
 
     def remove_tracklet(self, id: int) -> None:
         with self._lock:

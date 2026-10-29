@@ -61,26 +61,26 @@ class Predictor(FrameDictCallbackMixin):
         """Submit poses with GPU images for async processing. Results broadcast via callbacks.
 
         Args:
-            poses: Dictionary of poses keyed by tracklet ID
-            crop_frames: Crop frames with crops already on GPU, keyed by tracklet ID
+            poses: Dictionary of poses keyed by track id
+            crop_frames: Crop frames with crops already on GPU, keyed by track id
         """
         if not self._detection.is_ready:
             return
         if not self._settings.enabled:
             return
 
-        tracklet_ids: list[int] = []
+        track_ids: list[int] = []
         gpu_image_list: list = []  # list[cp.ndarray]
 
-        for tracklet_id in poses.keys():
-            if tracklet_id in crop_frames:
-                tracklet_ids.append(tracklet_id)
-                gpu_image_list.append(crop_frames[tracklet_id].crop)
+        for track_id in poses.keys():
+            if track_id in crop_frames:
+                track_ids.append(track_id)
+                gpu_image_list.append(crop_frames[track_id].crop)
 
         with self._lock:
             self._batch_counter += 1
             batch_id: int = self._batch_counter
-            self._waiting_batches[batch_id] = (poses, tracklet_ids)
+            self._waiting_batches[batch_id] = (poses, track_ids)
 
         self._detection.submit(DetectionInput(batch_id=batch_id, gpu_images=gpu_image_list))
 
@@ -97,7 +97,7 @@ class Predictor(FrameDictCallbackMixin):
             logger.warning(f"Point2DExtractor Warning: No waiting batch for batch_id {output.batch_id} (possible reset during processing)")
             return
 
-        original_poses, tracklet_ids = batch_data
+        original_poses, track_ids = batch_data
         result_poses: FrameDict = {}
 
         # print(output.inference_time_ms)
@@ -105,13 +105,13 @@ class Predictor(FrameDictCallbackMixin):
         # self._wait_timer.add_time(output.lock_time_ms, report=self._verbose)
 
         if output.processed:
-            for idx, tracklet_id in enumerate(tracklet_ids):
-                if idx < len(output.point_batch) and tracklet_id in original_poses:
+            for idx, track_id in enumerate(track_ids):
+                if idx < len(output.point_batch) and track_id in original_poses:
                     point_feature = Points2D(
                         values=output.point_batch[idx],
                         scores=output.score_batch[idx]
                     )
-                    result_poses[tracklet_id] = replace(original_poses[tracklet_id], {Points2D: point_feature})
+                    result_poses[track_id] = replace(original_poses[track_id], {Points2D: point_feature})
 
             self._notify_frames_callbacks(result_poses)
 

@@ -180,7 +180,7 @@ class RunnerONNX(Thread):
         if dropped_batch is not None:
             dropped_output = SegmentationOutput(
                 batch_id=dropped_batch.batch_id,
-                tracklet_ids=dropped_batch.tracklet_ids,
+                track_ids=dropped_batch.track_ids,
                 processed=False  # Mark as not processed
             )
             try:
@@ -324,20 +324,20 @@ class RunnerONNX(Thread):
                 logger.debug(f"Segmentation: Periodic state reset at frame {self._frame_counter}")
             self._recurrent_states.clear()
 
-        output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=False)
+        output = SegmentationOutput(batch_id=batch.batch_id, track_ids=batch.track_ids, processed=False)
 
         # Run inference
         gpu_images = batch.gpu_images[:self._max_batch]
-        tracklets_to_process = batch.tracklet_ids[:self._max_batch]
+        track_ids_to_process = batch.track_ids[:self._max_batch]
 
         if gpu_images:
             try:
-                mask_tensor, fgr_tensor, inference_time_ms = self._infer(gpu_images, tracklets_to_process)
+                mask_tensor, fgr_tensor, inference_time_ms = self._infer(gpu_images, track_ids_to_process)
                 output = SegmentationOutput(
                     batch_id=batch.batch_id,
                     mask_tensor=mask_tensor,
                     fgr_tensor=fgr_tensor,
-                    tracklet_ids=batch.tracklet_ids,
+                    track_ids=batch.track_ids,
                     processed=True,
                     inference_time_ms=inference_time_ms
                 )
@@ -349,7 +349,7 @@ class RunnerONNX(Thread):
         except Exception:
             logger.warning("Segmentation Callback queue full, dropping inference results")
 
-    def _infer(self, gpu_imgs: list[torch.Tensor], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float]:
+    def _infer(self, gpu_imgs: list[torch.Tensor], track_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float]:
         """Run batched ONNX inference with per-tracklet recurrent states using GPU images.
 
         All preprocessing and inference runs on the dedicated stream for zero sync overhead.
@@ -358,7 +358,7 @@ class RunnerONNX(Thread):
 
         Args:
             gpu_imgs: List of RGB float32 tensors on GPU (H, W, 3) in [0,1] range
-            tracklet_ids: Tracklet IDs for each image
+            track_ids: Track ids for each image
 
         Returns:
             (alpha_matte (actual_batch,H,W), foreground (actual_batch,3,H,W), inference_ms)
@@ -379,20 +379,20 @@ class RunnerONNX(Thread):
 
         # Gather recurrent states for real tracklets first
         states: list[RecurrentState | None] = []
-        for tid in tracklet_ids:
+        for tid in track_ids:
             states.append(self._recurrent_states.get(tid))
 
         if num_padding > 0:
             # Find which IDs from 0 to max_batch-1 are missing
             all_ids = set(range(self._max_batch))
-            used_ids = set(tracklet_ids)
+            used_ids = set(track_ids)
             available_ids = list(all_ids - used_ids)
 
             # Add padding with zero images at SAME SIZE as input images (not model size)
             for i in range(num_padding):
                 padding_id = available_ids[i]
                 gpu_imgs.append(torch.zeros((input_h, input_w, 3), dtype=torch.float32, device='cuda'))
-                tracklet_ids.append(padding_id)
+                track_ids.append(padding_id)
                 padding_ids.append(padding_id)
                 states.append(None)  # Padding gets zero states
 
@@ -497,7 +497,7 @@ class RunnerONNX(Thread):
         # Build new recurrent states from outputs ONLY for real tracklets (skip padding IDs)
         # States are views into output buffers - keep them on GPU
         new_states_dict: dict[int, RecurrentState] = {}
-        for i, tid in enumerate(tracklet_ids):
+        for i, tid in enumerate(track_ids):
             if tid not in padding_ids:
                 new_states_dict[tid] = RecurrentState(
                     r1=r1o_out[i:i+1],  # View into output buffer (GPU tensor)

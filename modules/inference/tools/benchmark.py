@@ -65,10 +65,10 @@ MODELS: list[Model] = [
           lambda batch_id, crops, _prev: DetectionInput(batch_id=batch_id, gpu_images=crops), _pose_output),
     Model('segmentation',
           lambda batch_id, crops, _prev: SegmentationInput(batch_id=batch_id, gpu_images=crops,
-                                                           tracklet_ids=list(range(len(crops)))), _segmentation_output),
+                                                           track_ids=list(range(len(crops)))), _segmentation_output),
     Model('optical_flow',
           lambda batch_id, crops, prev: OpticalFlowInput(batch_id=batch_id, gpu_image_pairs=list(zip(prev, crops)),
-                                                         tracklet_ids=list(range(len(crops)))), _flow_output),
+                                                         track_ids=list(range(len(crops)))), _flow_output),
 ]
 
 

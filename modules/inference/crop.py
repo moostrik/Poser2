@@ -82,14 +82,14 @@ class Extractor:
         zoom: float = 1.0 + self.settings.padding
 
         with torch.cuda.stream(self._stream):
-            for pose_id, pose in poses.items():
+            for track_id, pose in poses.items():
                 cam_id = pose.cam_id
                 if cam_id not in images:
                     continue
 
                 if pose_count >= self.settings.max_poses:
                     logger.warning(
-                        f"Exceeded max poses ({self.settings.max_poses}), skipping {pose_id}"
+                        f"Exceeded max poses ({self.settings.max_poses}), skipping {track_id}"
                     )
                     continue
 
@@ -107,15 +107,15 @@ class Extractor:
                         prev_crop = self._gpu_crop_resize(prev_img, crop_roi, prev_w, prev_h)
 
                     normalized_roi = crop_roi.scale(Point2f(1.0 / img_width, 1.0 / img_height))
-                    cropped_poses[pose_id] = replace(pose, {BBox: BBox.from_rect(normalized_roi)})
-                    crop_images[pose_id] = Image(
+                    cropped_poses[track_id] = replace(pose, {BBox: BBox.from_rect(normalized_roi)})
+                    crop_images[track_id] = Image(
                         crop=crop_tensor,
                         prev_crop=prev_crop,
                     )
                     pose_count += 1
 
                 except Exception:
-                    logger.exception(f"Error processing pose {pose_id}")
+                    logger.exception(f"Error processing pose {track_id}")
 
         self._stream.synchronize()
 

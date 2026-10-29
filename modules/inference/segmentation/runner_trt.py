@@ -175,7 +175,7 @@ class RunnerTRT(Thread):
         if dropped_batch is not None:
             dropped_output = SegmentationOutput(
                 batch_id=dropped_batch.batch_id,
-                tracklet_ids=dropped_batch.tracklet_ids,
+                track_ids=dropped_batch.track_ids,
                 processed=False
             )
             try:
@@ -323,20 +323,20 @@ class RunnerTRT(Thread):
                 logger.debug(f"Segmentation: Periodic state reset at frame {self._frame_counter}")
             self._recurrent_states.clear()
 
-        output = SegmentationOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=False)
+        output = SegmentationOutput(batch_id=batch.batch_id, track_ids=batch.track_ids, processed=False)
 
         # Run inference using selected mode
         gpu_images = batch.gpu_images[:self._max_batch]
-        tracklets_to_process = batch.tracklet_ids[:self._max_batch]
+        track_ids_to_process = batch.track_ids[:self._max_batch]
 
         if gpu_images:
             try:
-                mask_tensor, fgr_tensor, inference_time_ms, lock_wait_ms = self._infer(gpu_images, tracklets_to_process)
+                mask_tensor, fgr_tensor, inference_time_ms, lock_wait_ms = self._infer(gpu_images, track_ids_to_process)
                 output = SegmentationOutput(
                     batch_id=batch.batch_id,
                     mask_tensor=mask_tensor,
                     fgr_tensor=fgr_tensor,
-                    tracklet_ids=batch.tracklet_ids,
+                    track_ids=batch.track_ids,
                     processed=True,
                     inference_time_ms=inference_time_ms,
                     lock_time_ms=lock_wait_ms
@@ -349,7 +349,7 @@ class RunnerTRT(Thread):
         except Exception:
             logger.warning("Segmentation Callback queue full, dropping results")
 
-    def _infer(self, gpu_imgs: list[torch.Tensor], tracklet_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float, float]:
+    def _infer(self, gpu_imgs: list[torch.Tensor], track_ids: list[int]) -> tuple[torch.Tensor, torch.Tensor, float, float]:
         """Run batched TensorRT inference with per-tracklet recurrent states.
 
         All preprocessing and inference runs on the dedicated stream for zero sync overhead.
@@ -358,7 +358,7 @@ class RunnerTRT(Thread):
 
         Args:
             gpu_imgs: List of RGB float32 tensors on GPU (3, H, W) CHW [0,1]
-            tracklet_ids: Tracklet IDs for each image
+            track_ids: Track ids for each image
 
         Returns:
             (alpha_matte (B,H,W), foreground (B,3,H,W) CHW, inference_ms, lock_wait_ms)
@@ -406,7 +406,7 @@ class RunnerTRT(Thread):
             src_buffer.copy_(batch_chw)
 
             # Gather recurrent states for all tracklets into preallocated buffers
-            for i, tid in enumerate(tracklet_ids):
+            for i, tid in enumerate(track_ids):
                 state = self._recurrent_states.get(tid)
                 if state is not None:
                     r1i_buffer[i:i+1].copy_(state.r1)
@@ -445,7 +445,7 @@ class RunnerTRT(Thread):
 
         # Build new recurrent states from outputs (views into fresh buffers, no clone needed)
         new_states_dict: dict[int, RecurrentState] = {}
-        for i, tid in enumerate(tracklet_ids):
+        for i, tid in enumerate(track_ids):
             new_states_dict[tid] = RecurrentState(
                 r1=r1o_out[i:i+1],
                 r2=r2o_out[i:i+1],

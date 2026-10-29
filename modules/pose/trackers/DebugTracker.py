@@ -38,18 +38,18 @@ class DebugTracker(TrackerBase):
 
         # Detect new poses
         new_ids = current_ids - self._tracked_ids
-        for pose_id in new_ids:
-            logger.debug(f"New pose detected [id={pose_id}]")
+        for track_id in new_ids:
+            logger.debug(f"New pose detected [id={track_id}]")
 
         # Detect lost poses (reset)
         lost_ids = self._tracked_ids - current_ids
-        for pose_id in lost_ids:
-            logger.debug(f"Pose lost/reset [id={pose_id}]")
+        for track_id in lost_ids:
+            logger.debug(f"Pose lost/reset [id={track_id}]")
 
         # Log updates if enabled
         if self._log_updates:
-            for pose_id in current_ids & self._tracked_ids:
-                logger.debug(f"Pose updated [id={pose_id}]")
+            for track_id in current_ids & self._tracked_ids:
+                logger.debug(f"Pose updated [id={track_id}]")
 
         # Update tracked set
         self._tracked_ids = current_ids

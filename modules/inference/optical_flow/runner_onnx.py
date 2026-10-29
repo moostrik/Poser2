@@ -154,7 +154,7 @@ class RunnerONNX(Thread):
         if dropped_batch is not None:
             dropped_output = OpticalFlowOutput(
                 batch_id=dropped_batch.batch_id,
-                tracklet_ids=dropped_batch.tracklet_ids,
+                track_ids=dropped_batch.track_ids,
                 processed=False
             )
             try:
@@ -264,13 +264,13 @@ class RunnerONNX(Thread):
         if batch is None:
             return
 
-        output = OpticalFlowOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=False)
+        output = OpticalFlowOutput(batch_id=batch.batch_id, track_ids=batch.track_ids, processed=False)
 
         # Run inference
         if batch.gpu_image_pairs:
             # Limit processing to max batch size
             pairs_to_process = batch.gpu_image_pairs[:self._max_batch]
-            tracklets_to_process = batch.tracklet_ids[:self._max_batch]
+            track_ids_to_process = batch.track_ids[:self._max_batch]
 
             try:
                 flow_tensor, inference_time_ms = self._infer(pairs_to_process)
@@ -278,14 +278,14 @@ class RunnerONNX(Thread):
                 output = OpticalFlowOutput(
                     batch_id=batch.batch_id,
                     flow_tensor=flow_tensor,
-                    tracklet_ids=tracklets_to_process,
+                    track_ids=track_ids_to_process,
                     processed=True,
                     inference_time_ms=inference_time_ms
                 )
             except Exception as e:
                 logger.error(f"Optical Flow: Batched inference failed: {str(e)}")
         else:
-            output = OpticalFlowOutput(batch_id=batch.batch_id, tracklet_ids=batch.tracklet_ids, processed=True)
+            output = OpticalFlowOutput(batch_id=batch.batch_id, track_ids=batch.track_ids, processed=True)
 
         # Queue for callbacks
         try:
