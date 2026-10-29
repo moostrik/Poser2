@@ -115,7 +115,7 @@ class CompositorTest(unittest.TestCase):
         self.assertEqual(seen, [(36.0, 1.5)])
 
     def test_sync_rides_out_only_while_its_layer_draws(self) -> None:
-        """The frame's sync (full sync's envelope, the pose instrument's) is carried out of the
+        """The frame's sync (group sync's envelope, the pose instrument's) is carried out of the
         scratch only for a layer that rendered: out of the mix or at weight 0 it stays 0."""
         class Syncing(FakeLayer):
             def render(self, frame: LightFrame) -> None:

@@ -139,11 +139,13 @@ class WhiteSpaceMain:
 
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. The camera's frame bang drives the frame
         # domain through the tracklet poses; the light tick drives the output domain (LERP, where the dummy joins).
-        # Every stage's frames go to the board, which also reads each stage's window; the sound reads LERP.
+        # Every stage's frames and group record go to the board, which also reads each stage's window; the sound
+        # reads LERP, and so do the instrument and the state machine (the group sync on the LERP record).
         self.pipeline = PosePipeline(pipeline_spec(ps, self.poses_from_tracklets, self.pose_inference, self.dummy,
                                                    self._column_to_azimuth, self.board.get_playhead_phase))
         for stage in Stage:
             self.pipeline.add_frames_callback(stage, partial(self.board.set_frames, stage))
+            self.pipeline.add_group_callback(stage, partial(self.board.set_group, stage))
             self.board.set_window_source(stage, self.pipeline.window(stage))
         self.pipeline.add_frames_callback(Stage.LERP, partial(self.osc_sound_sender.submit_frames, int(Stage.LERP)))
 
@@ -169,7 +171,7 @@ class WhiteSpaceMain:
         # STATE MACHINE — the show's single decision maker; commands the Conductor through
         # its three channels (look, layer resets, motor) and emits state to board + OSC.
         self.state_machine = StateMachine(
-            self.settings.states, self.settings.light, self.settings.pose_instrument, board=self.board,
+            self.settings.states, self.settings.light, board=self.board,
             set_mix=self.conductor.set_mix,
             reset_layers=self.conductor.reset_layers,
             set_motor=self.conductor.set_motor_mode,

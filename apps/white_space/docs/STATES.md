@@ -18,10 +18,11 @@ Vocabulary:
   old (its `Age`; `studio.json`: 2 s) has its hits recorded: a double or a false positive lives a moment, so
   its hits neither build nor break the streak, while the hit itself still starts the intro. `HitSync`
   (`pose/hit_sync.py`) records each hit's pose off the LERP frame and publishes the streak on the board
-- **full sync** — the room's gate in the pose instrument: every present pair alike over the band `pose_instrument.on_at` /
-  `pose_instrument.off_at`, with hysteresis (`POSE_INSTRUMENT.md`, *The sync strobe*). The instrument computes it once per
-  tick while it draws and publishes it as `pose_instrument.full_sync`; the machine reads it in PLAY, where its **hold** —
-  built over `play_full_sync_seconds` while it holds, drained over `play_full_sync_release_seconds` by a
+- **group sync** — the pipeline's gate on the group's similarity (`SIMILARITY.md`, *Group sync*): the group's level
+  (`pose.similarity.group_sync.mode`: the least alike pair of all, or with one left out) over the band `on_at` / `off_at`,
+  with hysteresis. The gate is a LERP step, written to the LERP group record every tick (`GroupSync`, also the
+  panel's readout); the machine reads it off the board in PLAY, where its **hold** —
+  built over `play_group_sync_seconds` while it holds, drained over `play_group_sync_release_seconds` by a
   break — is the sync end (S11) once full
 - **neutral** — arms hanging: the arm joint furthest from neutral within
   `pose.arm_deviation_extractor.min_degrees` of it (`ArmDeviation` 0; 1 from `max_degrees`, linear between).
@@ -66,9 +67,9 @@ What **in sync** means in degrees, the settings behind it and how they depend on
 | S11 | PLAY_INTRO | ≥ min_players     | `spin_down_seconds`, then lock  | BEAM       | wall → DIM line                    | none                 | open       | open                          |
 
 Durations name settings in the `states` group; `studio.json` sets `off_idle_bars` 1, `intro_idle_bars` 2,
-`spin_up_seconds` 14, `end_bars` 8 and `spin_down_seconds` 6. S7 ends on its own once its full-sync hold
-has built over `play_full_sync_seconds` (20; 0 never), breaks draining it over
-`play_full_sync_release_seconds` (5), and S4 reached from S11 arms only after the hits have been out of
+`spin_up_seconds` 14, `end_bars` 8 and `spin_down_seconds` 6. S7 ends on its own once its group-sync hold
+has built over `play_group_sync_seconds` (20; 0 never), breaks draining it over
+`play_group_sync_release_seconds` (5), and S4 reached from S11 arms only after the hits have been out of
 sync for `intro_grace_seconds` (20). `open` cells are listed under *Open*. The
 P column is the stand-alone show; in session mode S6 is entered with any P > 0 and S7 and S8 run on time
 whatever the count (see below).
@@ -114,7 +115,7 @@ stateDiagram-v2
     INTRO_PLAY --> PLAY       : spin-up done
 
     PLAY       --> END        : too few players (P < min_players)
-    PLAY       --> PLAY_INTRO : full sync held (play_full_sync_seconds)
+    PLAY       --> PLAY_INTRO : group sync held (play_group_sync_seconds)
 
     END        --> PLAY       : players back (P ≥ min_players), wound back
     END        --> END_INTRO  : wound down, players remain (P > 0)
@@ -335,26 +336,26 @@ line during the spin-up, and the sound enhances the accelerating chaos.
 ## S7 — PLAY
 
 The players play the instrument, creating music and light patterns. The space between players
-holding the same pose fills with light. Holding **full sync** (*Vocabulary*) is how the players end it:
-once its hold has built over `play_full_sync_seconds` the machine spins down to the intro (S11).
+holding the same pose fills with light. Holding **group sync** (*Vocabulary*) is how the players end it:
+once its hold has built over `play_group_sync_seconds` the machine spins down to the intro (S11).
 
-- **Players**: ≥ min_players (session: any) · **Duration**: ∞, or until the full-sync hold has built
+- **Players**: ≥ min_players (session: any) · **Duration**: ∞, or until the group-sync hold has built
   (session: `session.play_seconds`) · **Motor**: PROJECTION
 - **Transitions**
   1. stand-alone: P < min_players → S8 END
-  2. stand-alone: the full-sync hold is full → S11 PLAY_INTRO. The hold builds over `play_full_sync_seconds`
-     while full sync holds and drains over `play_full_sync_release_seconds` while it does not, so a short
+  2. stand-alone: the group-sync hold is full → S11 PLAY_INTRO. The hold builds over `play_group_sync_seconds`
+     while group sync holds and drains over `play_group_sync_release_seconds` while it does not, so a short
      break costs seconds, not the hold (release 0: a break restarts it at once); 0 disables the exit.
      Checked after the count, so a room losing a player ends through S8 even in sync
   3. session: elapsed ≥ `session.play_seconds` → S8 END *(the count is not checked: a session plays out
      its time)*
 - **Mix**: `pose_instrument` 1.0
-- **White**: the pose instrument — patterns per pose plus the sync strobe at full sync — and
+- **White**: the pose instrument — patterns per pose plus the sync strobe at group sync — and
   the playhead line at full white
 - **Blue**: pose instrument (`pose_instrument`'s blue)
 - **Pose sound**: yes
 - **Secondary sound**: ENHANCE spin
-- **Progress** (OSC `/global/state/progress`): the full-sync hold, 0 → 1
+- **Progress** (OSC `/global/state/progress`): the group-sync hold, 0 → 1
 
 ## S8 — END
 
@@ -423,7 +424,7 @@ holds — landing on the BRIGHT line instead of the dim one.
 
 ## S11 — PLAY_INTRO
 
-The sync end: the players' full sync has built the hold (S7), and the machine spins down to the intro
+The sync end: the players' group sync has built the hold (S7), and the machine spins down to the intro
 under the sync strobe. The same engine as S9 — the wall owns the timed fade over
 `spin_down_seconds`, the dim line sits underneath and is revealed, and the state hands over once the fade
 is complete and the playhead lock holds — but the wall is `beam_sync_wind_down`, the **strobing wall**
@@ -431,8 +432,8 @@ is complete and the playhead lock holds — but the wall is `beam_sync_wind_down
 packet, so the instrument's picture gives way to the wall in one frame, and the sync strobe carries
 across: on the beam lights, on the strobes' shared tick grid at the top rung, in the instrument's mode
 (`pose_instrument.sync_strobe.mode`: INVERT swaps the wall to the blue beam lights, BLACK blanks it), until the fade has
-taken the wall. The instrument is reset on entry: it is done, and `pose_instrument.full_sync` reads off from here
-until S6 starts the next one. The intro it lands in is disarmed (S4): the room is still posing, and the
+taken the wall. The instrument is reset on entry: it is done until S6 starts the next one (the gate is the
+pipeline's and keeps reading the room; PLAY's hold starts fresh at its next entry). The intro it lands in is disarmed (S4): the room is still posing, and the
 show spins up again only once the hits have been out of sync for `intro_grace_seconds`.
 
 - **Players**: ≥ min_players · **Duration**: the spin-down (fade complete, then the lock) · **Motor**: BEAM

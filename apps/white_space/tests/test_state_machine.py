@@ -1,14 +1,16 @@
 """Tests for the show StateMachine — the CSV transition graph in both modes,
 bar-denominated durations, goto/hold, motor commands, and looks. The hits and the
 streak of alike ones come from the board (HitSync's, tested in test_hit_sync.py); the room's
-full sync from the pose instrument's readout (pose_instrument.full_sync, tested in test_pose_instrument.py)."""
+group sync from the board (the pipeline's gate on the LERP group record, tested in modules/pose/tests/test_group_sync_gate.py)."""
 
 import unittest
 from types import SimpleNamespace
 
 from modules.board import HitStreak
 
-from apps.white_space.light import LayerId, LightSettings, MotorMode, PoseInstrumentSettings, Tick
+from modules.pose import GroupRecord, GroupSync
+
+from apps.white_space.light import LayerId, LightSettings, MotorMode, Tick
 from apps.white_space.statemachine import StateId, StateMachine, StateMachineSettings, machine as machine_module
 
 POSE_STAGE = 4
@@ -25,6 +27,7 @@ class FakeBoard:
         self.is_projecting: bool = False   # fast enough for the projection to show
         self.frames: dict[int, FakeFrame] = {}
         self.hit_streak: HitStreak = HitStreak()
+        self.group_sync: bool = False      # the pipeline's gate on the LERP group record
 
     def get_playhead_signals(self):
         return SimpleNamespace(phase=float("nan"), bars=self.bars, is_locked=self.is_locked,
@@ -33,6 +36,10 @@ class FakeBoard:
     def get_frames(self, stage: int):
         assert stage == POSE_STAGE
         return self.frames
+
+    def get_group(self, stage: int) -> GroupRecord:
+        assert stage == POSE_STAGE
+        return GroupRecord(features={GroupSync: GroupSync.from_value(1.0 if self.group_sync else 0.0)})
 
     def get_hit_streak(self) -> HitStreak:
         return self.hit_streak
@@ -46,7 +53,6 @@ class StateMachineTest(unittest.TestCase):
 
         self.settings = StateMachineSettings()
         self.light = LightSettings()
-        self.instrument = PoseInstrumentSettings()
         self.board = FakeBoard()
         self.mixes: list = []
         self.resets: list = []
@@ -54,7 +60,7 @@ class StateMachineTest(unittest.TestCase):
         self.emitted: list = []
 
         self.machine = StateMachine(
-            self.settings, self.light, self.instrument, board=self.board,
+            self.settings, self.light, board=self.board,
             set_mix=self.mixes.append,
             reset_layers=self.resets.append,
             set_motor=self.motors.append,
@@ -88,9 +94,9 @@ class StateMachineTest(unittest.TestCase):
         """HitSync's streak on the board: this many hits in a row struck alike poses."""
         self.board.hit_streak = HitStreak(hit=False, hits=hits)
 
-    def set_full_sync(self, on: bool) -> None:
-        """The instrument's readout: the room in full sync (every present pair alike over the band)."""
-        self.instrument.full_sync = on
+    def set_group_sync(self, on: bool) -> None:
+        """The pipeline's gate on the board: the group in sync."""
+        self.board.group_sync = on
 
     @property
     def current(self) -> StateId:
@@ -333,83 +339,83 @@ class StateMachineTest(unittest.TestCase):
     # -- the sync end: PLAY → PLAY_INTRO → INTRO --------------------------------
 
     def _to_play_intro(self) -> None:
-        """Full sync held for play_full_sync_seconds in PLAY: the sync end."""
+        """Group sync held for play_group_sync_seconds in PLAY: the sync end."""
         self._to_play()
-        self.set_full_sync(True)
-        self.tick()                                                   # the anchor: full sync came on
-        self.tick(dt=self.settings.play_full_sync_seconds + 0.1)
+        self.set_group_sync(True)
+        self.tick()                                                   # the anchor: group sync came on
+        self.tick(dt=self.settings.play_group_sync_seconds + 0.1)
         self.assertEqual(self.current, StateId.PLAY_INTRO)
 
-    def test_full_sync_held_winds_play_down_to_the_intro(self) -> None:
-        # The room holds full sync (the instrument's readout) for play_full_sync_seconds: PLAY hands
+    def test_group_sync_held_winds_play_down_to_the_intro(self) -> None:
+        # The group holds sync (the gate on the board) for play_group_sync_seconds: PLAY hands
         # over to PLAY_INTRO, commanding BEAM — the spin-down starts at once.
         self._to_play()
-        self.set_full_sync(True)
+        self.set_group_sync(True)
         self.tick()
-        self.tick(dt=self.settings.play_full_sync_seconds / 2)
+        self.tick(dt=self.settings.play_group_sync_seconds / 2)
         self.assertEqual(self.current, StateId.PLAY)
-        self.tick(dt=self.settings.play_full_sync_seconds / 2 + 0.1)
+        self.tick(dt=self.settings.play_group_sync_seconds / 2 + 0.1)
         self.assertEqual(self.current, StateId.PLAY_INTRO)
         self.assertEqual(self.motors[-1], MotorMode.BEAM)
 
-    def test_a_break_in_full_sync_drains_the_hold_over_the_release(self) -> None:
+    def test_a_break_in_group_sync_drains_the_hold_over_the_release(self) -> None:
         # Hold 20 s, release 5 s: 16 s in sync builds 0.8; a 1 s break drains 0.2; back in sync, 8 s
         # more fill it — the break cost its length times hold/release, not the whole hold.
-        self.settings.play_full_sync_seconds = 20.0
-        self.settings.play_full_sync_release_seconds = 5.0
+        self.settings.play_group_sync_seconds = 20.0
+        self.settings.play_group_sync_release_seconds = 5.0
         self._to_play()
-        self.set_full_sync(True)
+        self.set_group_sync(True)
         self.tick(dt=16.0)
         self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.8, places=6)
-        self.set_full_sync(False)
+        self.set_group_sync(False)
         self.tick(dt=1.0)
         self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.6, places=6)
-        self.set_full_sync(True)
+        self.set_group_sync(True)
         self.tick(dt=7.9)
         self.assertEqual(self.current, StateId.PLAY)
         self.tick(dt=0.2)
         self.assertEqual(self.current, StateId.PLAY_INTRO)
 
     def test_a_break_of_the_whole_release_starts_the_hold_over(self) -> None:
-        self.settings.play_full_sync_seconds = 20.0
-        self.settings.play_full_sync_release_seconds = 5.0
+        self.settings.play_group_sync_seconds = 20.0
+        self.settings.play_group_sync_release_seconds = 5.0
         self._to_play()
-        self.set_full_sync(True)
+        self.set_group_sync(True)
         self.tick(dt=16.0)
-        self.set_full_sync(False)
+        self.set_group_sync(False)
         self.tick(dt=5.0)                                             # drained
         self.assertEqual(self.emitted[-1].stage_progress, 0.0)
-        self.set_full_sync(True)
+        self.set_group_sync(True)
         self.tick(dt=19.9)
         self.assertEqual(self.current, StateId.PLAY)
         self.tick(dt=0.2)
         self.assertEqual(self.current, StateId.PLAY_INTRO)
 
     def test_a_zero_release_restarts_the_hold_on_any_break(self) -> None:
-        self.settings.play_full_sync_release_seconds = 0.0
+        self.settings.play_group_sync_release_seconds = 0.0
         self._to_play()
-        self.set_full_sync(True)
-        self.tick(dt=self.settings.play_full_sync_seconds * 0.8)
-        self.set_full_sync(False)
+        self.set_group_sync(True)
+        self.tick(dt=self.settings.play_group_sync_seconds * 0.8)
+        self.set_group_sync(False)
         self.tick()                                                   # one tick out: gone
         self.assertEqual(self.emitted[-1].stage_progress, 0.0)
-        self.set_full_sync(True)
-        self.tick(dt=self.settings.play_full_sync_seconds * 0.8)
+        self.set_group_sync(True)
+        self.tick(dt=self.settings.play_group_sync_seconds * 0.8)
         self.assertEqual(self.current, StateId.PLAY)
-        self.tick(dt=self.settings.play_full_sync_seconds * 0.2 + 0.1)
+        self.tick(dt=self.settings.play_group_sync_seconds * 0.2 + 0.1)
         self.assertEqual(self.current, StateId.PLAY_INTRO)
 
     def test_plays_progress_is_the_hold(self) -> None:
         self._to_play()
         self.assertEqual(self.emitted[-1].stage_progress, 0.0)
-        self.set_full_sync(True)
-        self.tick(dt=self.settings.play_full_sync_seconds / 2)
+        self.set_group_sync(True)
+        self.tick(dt=self.settings.play_group_sync_seconds / 2)
         self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.5, places=6)
 
     def test_a_zero_hold_never_ends_play_on_sync(self) -> None:
-        self.settings.play_full_sync_seconds = 0.0
+        self.settings.play_group_sync_seconds = 0.0
         self._to_play()
-        self.set_full_sync(True)
+        self.set_group_sync(True)
         for _ in range(5):
             self.tick(dt=100.0)
         self.assertEqual(self.current, StateId.PLAY)
@@ -417,10 +423,10 @@ class StateMachineTest(unittest.TestCase):
     def test_too_few_players_beats_the_sync_end(self) -> None:
         # Both true the same tick: the count exit comes first — END, the path that winds back.
         self._to_play()
-        self.set_full_sync(True)
+        self.set_group_sync(True)
         self.tick()
         self.board.frames = {0: FakeFrame()}
-        self.tick(dt=self.settings.play_full_sync_seconds + 0.1)
+        self.tick(dt=self.settings.play_group_sync_seconds + 0.1)
         self.assertEqual(self.current, StateId.END)
 
     def test_play_intro_is_the_wind_down_engine_under_the_strobing_wall(self) -> None:

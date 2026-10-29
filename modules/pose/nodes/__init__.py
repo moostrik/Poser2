@@ -19,6 +19,7 @@ from .group.posture_similarity_extractor import PostureSimilarityExtractor
 from .group.similarity_sticky_filler import     SimilarityStickyFiller, SimilarityStickyFillerSettings
 from .group.motion_gate_extractor import        MotionGateExtractor
 from .group.similarity_result_hold import       SimilarityResultHold
+from .group.group_sync_gate import              GroupSyncGate, GroupSyncSettings
 
 from .filters.angle_calibrator import           AngleCalibrator, AngleCalibratorSettings
 from .filters.confidence_filters import         ConfidenceFilterSettings,     BBoxConfidenceFilter,   PointConfidenceFilter,  AngleConfidenceFilter,  AngleVelocityConfidenceFilter,   AngleSymmetryConfidenceFilter

@@ -59,10 +59,11 @@ where the feet meet the floor (`TRACKING.md`); it is NaN without a reading.
 
 The similarity is a row: index `n` is this player against live player `n`, `max_players` wide; a
 pair that does not exist is sent as 0.
-What it measures and how it is smoothed is in `SIMILARITY.md`. The light takes the mean of both
-directions of a pair and strobes the room while every pair holds over `pose_instrument.sync_strobe.on_at`
-(`PoseInstrument._set_sync_strobe`; `POSE_INSTRUMENT.md`, *The sync strobe*); Max gets the row
-to shape itself, and the light's own gate ready-made on `/global/sync` (*The global messages*):
+What it measures and how it is smoothed is in `SIMILARITY.md`. The pipeline takes the mean of both
+directions of a pair and gates the group's level over the band `pose.similarity.group_sync.on_at` / `off_at`
+(group sync, `SIMILARITY.md` *Group sync*); the light strobes the room while the gate is open
+(`PoseInstrument._set_sync_strobe`; `POSE_INSTRUMENT.md`, *The sync strobe*). Max gets the row
+to shape itself, and the gate ready-made on `/global/sync` (*The global messages*):
 the strobe envelope's value, with the band's hysteresis and pair rules already applied.
 
 ## The wire
@@ -133,7 +134,7 @@ Sent once per bundle.
 | `/global/progress`        | float   | 0..1     | the show's progress                                          |
 | `/global/playhead`        | float   | −π..π    | the playhead as an azimuth (`CALIBRATION.md`, *Playhead*)    |
 | `/global/motor`           | int     | mode     | the motor command's mode                                     |
-| `/global/sync`            | float   | 0..1     | full sync's envelope: the sync strobe's attack and release while every present pair holds the band (`POSE_INSTRUMENT.md`, *The sync strobe*); 0 under S11's strobing wall, which carries the strobe in light only |
+| `/global/sync`            | float   | 0..1     | group sync's envelope: the sync strobe's attack and release while every present pair holds the band (`POSE_INSTRUMENT.md`, *The sync strobe*); 0 under S11's strobing wall, which carries the strobe in light only |
 | `/global/players`         | int     | 0..6     | the number of live players: occupied slots 0–5, the dummy not counted |
 | `/global/volume`          | float   | 0..1     | the operator's fader (`CALIBRATION.md`, *Sound (Max)*)       |
 | `/global/speaker/offset`  | float   | radians  | where speaker 0 stands (`CALIBRATION.md`, *Sound (Max)*)     |

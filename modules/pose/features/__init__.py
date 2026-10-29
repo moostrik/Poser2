@@ -20,6 +20,8 @@ from .bbox_azimuth import   BBoxAzimuth
 from .distance import       Distance
 from .leg_deviation import  LegDeviation
 from .torso_tilt import     TorsoTilt
+from .group_similarity import GroupSimilarity
+from .group_sync import     GroupSync
 
 
 FEATURES: list[type[BaseFeature]] = [

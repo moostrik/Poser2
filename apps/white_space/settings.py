@@ -226,8 +226,10 @@ class SimilarityFeature(BaseSettings):
     sticky               : Group[nodes.SimilarityStickyFillerSettings] = Group(nodes.SimilarityStickyFillerSettings)
     neutral_weight       : Group[NeutralWeightSettings]               = Group(NeutralWeightSettings)
     smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, share=[frequency])
-    # LERP: interpolated to the output rate; the motion gate has no settings.
+    # LERP: interpolated to the output rate (the motion gate has no settings), then the group sync: the group's
+    # level by its mode and the gate on it, with hysteresis, written to the LERP group record for the show.
     interpolator         : Group[nodes.ChaseInterpolatorSettings]     = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
+    group_sync           : Group[nodes.GroupSyncSettings]             = Group(nodes.GroupSyncSettings)
 
 
 # ---------------------------------------------------------------------------

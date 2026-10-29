@@ -4,7 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from modules.pose import Age, Angles, FrameDict, LegDeviation, MotionGate, TorsoTilt, configure_features
+from modules.pose import Age, Angles, FrameDict, GroupRecord, GroupSync, LegDeviation, MotionGate, TorsoTilt, \
+                         configure_features
 from modules.pose.pipeline import Domain, PosePipeline
 
 from apps.white_space.pose import Dummy, PlayheadOffset, dummy_id
@@ -58,7 +59,9 @@ class PipelineSpecTest(unittest.TestCase):
 
     def test_the_dummy_comes_out_of_lerp_with_everything_a_person_has(self) -> None:
         out: list[FrameDict] = []
+        groups: list[GroupRecord] = []
         self.pipeline.add_frames_callback(Stage.LERP, out.append)
+        self.pipeline.add_group_callback(Stage.LERP, groups.append)
         self.settings.pose_instrument.dummy.enabled = True
         self.settings.pose_instrument.dummy.morph = 0.0
         self.pipeline.update(Domain.OUTPUT, 1.0)
@@ -67,6 +70,7 @@ class PipelineSpecTest(unittest.TestCase):
         f = out[-1][dummy_id(self.players)]
         for ft in (Angles, LegDeviation, TorsoTilt, Age, MotionGate, PlayheadOffset):
             self.assertIn(ft, f)
+        self.assertIn(GroupSync, groups[-1])                 # the gate is on the LERP record (closed: the dummy alone)
 
 
 if __name__ == "__main__":

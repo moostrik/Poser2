@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 class OscSoundSender(BaseOscSound):
     """The sound sender — modules' OscSound extended with the rotation playhead
-    (/global/playhead), the motor mode (/global/motor), full sync's envelope (/global/sync,
-    the light instrument's gate: 0..1, 0 while the instrument is not drawn), the live player
+    (/global/playhead), the motor mode (/global/motor), group sync's envelope (/global/sync,
+    the pipeline's gate through the instrument's strobe envelope: 0..1, 0 while the instrument is not drawn), the live player
     count (/global/players: occupied live slots, the dummy excluded; presence
     data, never zeroed on idle), the two operator settings (/global/volume,
     /global/speaker/offset), and the panoramic-only per-pose azimuth, distance and
@@ -104,7 +104,7 @@ class OscSoundSender(BaseOscSound):
         motor_msg.add_arg(motor_mode, OscMessageBuilder.ARG_TYPE_INT)
         bundle_builder.add_content(motor_msg.build())  # type: ignore
 
-        # Full sync's envelope (0..1): the light's own gate, 0 while the pose instrument is
+        # Group sync's envelope (0..1): the gate through the strobe's envelope, 0 while the pose instrument is
         # not drawn — the compositor only carries it out of a rendered frame.
         sync: float = 0.0 if (idle or light_frame is None) else float(light_frame.sync)
         sync_msg = OscMessageBuilder(address="/global/sync")

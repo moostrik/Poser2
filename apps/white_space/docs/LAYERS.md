@@ -25,9 +25,9 @@ projection block's generic patterns keep a `test_` prefix.
 ## Inputs
 
 Show layers and the state machine read pose frames from the board, never the tracker's tracklets. The
-state machine also reads the board's hit streak (`HitSync`, `STATES.md` *Vocabulary*: in sync) and the pose
-instrument's full-sync readout (`pose_instrument.full_sync`, `STATES.md` *Vocabulary*: full sync); the live `Similarity`
-feature stays the instrument's (the window opening, the gate) and the sound's.
+state machine also reads the board's hit streak (`HitSync`, `STATES.md` *Vocabulary*: in sync) and, as the pose
+instrument does, the group sync on the board's LERP group record (`GroupSync`, the pipeline's gate; `STATES.md`
+*Vocabulary*: group sync); the live `Similarity` feature stays the pipeline's and the sound's.
 A player is present while their pose exists: the pose pipeline stops posing a player
 `pose.tracklets.detection_timeout` (1.0 s) after their last detection, and every filter downstream
 resets a track the moment its pose is missing. A layer adds no presence test of its own. A player's

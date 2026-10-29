@@ -62,7 +62,7 @@ class SoundGlobalsTest(unittest.TestCase):
         self.assertAlmostEqual(messages["/global/speaker/offset"], math.radians(45.0), places=6)
 
     def test_sync_is_the_light_frames_and_zeroed_on_idle(self) -> None:
-        """/global/sync carries the frame's full-sync envelope while a show runs; it is show
+        """/global/sync carries the frame's group-sync envelope while a show runs; it is show
         state, so idle (no sequencer state) zeroes it like the playhead and the motor."""
         light_frame = LightFrame(360, Tick(0.0, 1 / 32, index=0))
         light_frame.sync = 0.7

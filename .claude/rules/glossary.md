@@ -40,6 +40,7 @@ Each bullet names the term to use and, after "not", the synonyms it replaces. A 
 - Settings groups shared by the apps: `session` / `control`, `tracker`, `input_fps`; not `record` / `core`, `track`, `fps`
 - An app's renderer: `<App>Render`
 - The camera count at an app's root: `num_cams`, separate from `max_players`
+- The gate on the group's similarity: "group sync" (`group_sync`, `GroupSync`, `GroupSyncGate`); not "full sync". The OSC address stays `/global/sync`
 
 ## smile
 
