@@ -38,8 +38,14 @@ if %errorlevel% neq 0 (
     goto endofscript
 )
 
-@REM Builds or updates .venv to match uv.lock exactly (Python 3.12 included)
-uv sync --locked
+@REM Builds or updates .venv to match uv.lock exactly (Python 3.12 included).
+@REM "install.bat oak4" installs depthai 3 for the OAK4 backend in place of depthai 2 (pyproject.toml, dependency-groups)
+set SYNC_GROUPS=
+if /i "%~1"=="oak4" (
+    set SYNC_GROUPS=--no-group oak --group oak4
+    echo [33mOAK4: depthai 3 instead of depthai 2[0m
+)
+uv sync --locked %SYNC_GROUPS%
 if %errorlevel% neq 0 (
     echo [91mPackage install failed![0m
     goto endofscript

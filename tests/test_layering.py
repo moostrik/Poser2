@@ -11,7 +11,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULES = ROOT / 'modules'
-CAMERA_BACKENDS = {'oak', 'replay', 'vimba', 'webcam'}
+CAMERA_BACKENDS = {'oak', 'oak4', 'replay', 'vimba', 'webcam'}
 SKIPPED_DIRS = {'tests', 'vimbapython', '__pycache__'}
 
 

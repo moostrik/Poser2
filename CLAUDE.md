@@ -16,6 +16,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Keep modules independent and cross-module coupling minimal
 - `modules/settings/` is shared infrastructure; any module may depend on it
 - `modules/camera/` is the camera contract; the tracker, inference, board and render import it, never a backend package such as `modules/camera/oak/`
+- `modules/camera/oak/` runs on depthai 2 and `modules/camera/oak4/` on depthai 3; a PC has one of them installed (`install.bat`, `install.bat oak4`) and `oak_backend()` says which, so an app never imports both
 - `apps/smile/` has its own rules in its `CLAUDE.md`; its `cam` is the app's image source (a `modules/camera` backend, an image folder, a phone), not a camera backend
 - Never change the White Space fixture firmware (`apps/white_space/data/firmware/`); solve everything on the app side of the wire
 
