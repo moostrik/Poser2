@@ -6,7 +6,7 @@ import time
 import unittest
 from pathlib import Path
 
-from modules.camera import TrackingStatus
+from modules.camera import CameraTracklet, TrackingStatus
 from modules.tracker import PanoramicAnnotation, Tracklet
 from modules.utils import Rect
 
@@ -86,6 +86,21 @@ class TestJournalWriter(unittest.TestCase):
             self.assertEqual(lines[4]['dropped'], 0)
             self.assertEqual(lines[4]['marks'], 1)
             self.assertEqual(settings.marks, 1)
+
+    def test_camera_tracklets_write_an_in_line(self) -> None:
+        settings = TrackerJournalSettings()
+        settings.enabled = True
+        raw = CameraTracklet(cam_id=2, id=7, status=TrackingStatus.TRACKED, roi=Rect(0.1, 0.2, 0.3, 0.4), age=12, time=1.5)
+        with tempfile.TemporaryDirectory() as tmp:
+            journal = TrackerJournal(settings, data_path=tmp)
+            journal.start()
+            journal.submit_cam_tracklets(2, [raw], 1.5)
+            journal.stop()
+
+            lines = self.read_lines(self.capture_folders(tmp, settings)[0])
+            self.assertEqual([line['k'] for line in lines], ['meta', 'in', 'end'])
+            self.assertEqual(lines[1]['cam'], 2)
+            self.assertEqual(lines[1]['items'][0][0], 7)          # the device id
 
     def test_idle_journal_accepts_nothing_and_writes_nothing(self) -> None:
         settings = TrackerJournalSettings()                       # enabled stays False
