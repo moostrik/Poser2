@@ -126,7 +126,7 @@ class SmileMain():
                                      lambda: (self.settings.render.credit_name, self.settings.render.credit_line),
                                      lambda: (self.music_map.get_music_id(), self.music_map.track_path()),
                                      laughs=laugh_files, laughter=lambda: self.settings.audio.laughter, pick=self.pick_style)
-        self.save.set_saved_callback(self.online.on_saved)
+        self.save.add_saved_callback(self.online.on_saved)
 
         self._stopping: bool = False
 
@@ -218,7 +218,7 @@ class SmileMain():
             self._flash_time = time.perf_counter()
         if seq == SequenceType.DIFF_LOOP and message.initial:
             # the grin starts playing: the share clip gets the track from the point the room hears now
-            self.save.set_share(self.music_map.track_path(), time.perf_counter() - self._flash_time)
+            self.save.submit_share(self.music_map.track_path(), time.perf_counter() - self._flash_time)
 
         audio = self.settings.audio
         if audio.osc.enabled:
@@ -272,7 +272,7 @@ class SmileMain():
                 logger.warning('Generator not ready at the capture, ending the visitor')
                 self.sequencer.finish()
             self.render.set_cap_image(cap_image)
-            self.save.new_sequence(cap_image, self.settings.generator.style_current)
+            self.save.submit_open(cap_image, self.settings.generator.style_current)
             self._saving = True
             self._grin_saved = False
             # a test run on images: the next visitor is the next file
@@ -284,14 +284,14 @@ class SmileMain():
             if message.initial == True and self._saving:
                 # still open here: a failed or stopped visitor has no complete grin, its folder is not kept
                 self._saving = False
-                self.save.end_sequence(keep=self._grin_saved)
+                self.save.submit_close(keep=self._grin_saved)
 
         if seq == SequenceType.RESET:
             self.generator.interrupt()
             if self._saving:
                 # a reset before the result: the visitor's files are not kept
                 self._saving = False
-                self.save.end_sequence(keep=False)
+                self.save.submit_close(keep=False)
 
     def _online_cell(self) -> None:
         """The online cell of the walls, every frame: the screen `online.screen` shows the QR code to the phone
@@ -335,7 +335,7 @@ class SmileMain():
         if not self._style_picked:
             self._style_picked = True
             style_id: str = self.generator.next_style()
-            self.music_map.update(style_id)
+            self.music_map.set_style(style_id)
 
     def face_callback(self, frame: FaceFrame) -> None:
         # the sequencer charges toward the flash while the face qualifies
@@ -352,15 +352,15 @@ class SmileMain():
             return
         if message.state == GeneratorState.DIFFUSION and message.final:
             # the record first: it goes into the portrait and the clip
-            self.save.set_record(self.generator.record())
-            self.save.save_portrait(message.image)
+            self.save.submit_record(self.generator.record())
+            self.save.submit_portrait(message.image)
         if message.state == GeneratorState.DIFF_LOOP:
-            self.save.save_frame(message.image)
+            self.save.submit_frame(message.image)
             if message.progress >= 1.0 and not self._grin_saved:
                 # the grin is complete: the recording closes now, while the grin still plays on the screens,
                 # so the share clip is built and on its way to a visitor outside before the turn is over
                 self._grin_saved = True
                 if self._saving:
                     self._saving = False
-                    self.save.end_sequence(keep=True)
+                    self.save.submit_close(keep=True)
 

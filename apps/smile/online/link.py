@@ -1,6 +1,6 @@
 """The connection to the relay (relay/server.py): a websocket client on its own thread that reconnects
 by itself, hands every message to a callback and sends what the other threads queue. The screen frames
-for the phone (`send_frame`) have one slot, the newest wins, and are JPEG-encoded on the link's thread,
+for the phone (`set_frame`) have one slot, the newest wins, and are JPEG-encoded on the link's thread,
 never on the render thread. Uploads (the visitor's files, over HTTP) run on a third thread, so a slow
 upload never holds the frames.
 
@@ -36,7 +36,7 @@ WARN_INTERVAL: float = 60.0         # s between the log lines of a connection th
 UPLOAD_TIMEOUT: float = 60.0
 STREAM_QUALITY: int = 70            # JPEG, the screen frames for the phone
 
-MessageCallback = Callable[[dict], None]
+RelayMessageCallback = Callable[[dict], None]
 FrameCallback = Callable[[bytes], None]
 DoneCallback = Callable[[bool], None]
 
@@ -63,11 +63,11 @@ def http_base(ws_url: str) -> str:
 
 
 class Link(Thread):
-    def __init__(self, url: str, token: str, on_message: MessageCallback, on_frame: FrameCallback, name: str = 'online-link') -> None:
+    def __init__(self, url: str, token: str, on_message: RelayMessageCallback, on_frame: FrameCallback, name: str = 'online-link') -> None:
         super().__init__(name=name, daemon=True)
         self.url: str = url
         self.token: str = token
-        self._on_message: MessageCallback = on_message
+        self._on_message: RelayMessageCallback = on_message
         self._on_frame: FrameCallback = on_frame
         self._out: queue.Queue[str | bytes] = queue.Queue(maxsize=256)
         self._uploads: queue.Queue[tuple[list[tuple[str, str, str]], DoneCallback]] = queue.Queue()
@@ -95,14 +95,14 @@ class Link(Thread):
                 pass
 
     # SENDING, from any thread
-    def send(self, message: dict) -> None:
+    def submit(self, message: dict) -> None:
         self._queue(json.dumps(message, separators=(',', ':')))
 
-    def send_image(self, jpeg: bytes) -> None:
+    def submit_image(self, jpeg: bytes) -> None:
         """An image for the phone's window (SHOW), encoded already."""
         self._queue(bytes([SHOW]) + jpeg)
 
-    def send_frame(self, frame: np.ndarray, last: bool = False) -> None:
+    def set_frame(self, frame: np.ndarray, last: bool = False) -> None:
         """A screen frame (RGBA, the render's grab) for the phone's window: replaces one not sent yet;
         `last` is the turn's last, the one the phone keeps."""
         with self._frame_mutex:
@@ -114,7 +114,7 @@ class Link(Thread):
         except queue.Full:
             logger.debug('online link: outgoing queue full, dropping')
 
-    def upload(self, files: list[tuple[str, str, str]], done: DoneCallback) -> None:
+    def submit_upload(self, files: list[tuple[str, str, str]], done: DoneCallback) -> None:
         """Upload files [(kind, id, path)] over HTTP, then call done(all_ok) on the upload thread."""
         self._uploads.put((files, done))
 

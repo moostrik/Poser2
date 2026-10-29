@@ -198,12 +198,12 @@ class Online:
             return
         image: np.ndarray | None = cv2.imdecode(np.frombuffer(jpeg, np.uint8), cv2.IMREAD_COLOR)
         if image is not None:
-            self.camera.push_online(image)
+            self.camera.process_online_frame(image)
 
     def on_face(self, frame: FaceFrame) -> None:
         """Every detector frame (Main.face_callback): the judging goes to the phone during its turn."""
         if self._phase == Phase.JUDGING and self._link is not None:
-            self._link.send(face_message(frame, self._charge))
+            self._link.submit(face_message(frame, self._charge))
 
     def on_saved(self, id: str, style: str, kept: bool, grin: str, portrait: str, share: str = '') -> None:
         """The saver closed the visitor's files (ClipSaver's callback, on its thread)."""
@@ -253,7 +253,7 @@ class Online:
         if s.new_invite:
             s.new_invite = False
             if connected:
-                link.send({'type': 'new_invite'})
+                link.submit({'type': 'new_invite'})
         if self._phase == Phase.OFF:
             self._phase = Phase.IDLE
         if 'library' in notes:
@@ -283,7 +283,7 @@ class Online:
         elif self._phase == Phase.IDLE:
             s.status = f'idle ({self._waiting} waiting)'
             if free and self._waiting > 0:
-                link.send({'type': 'turn_start', 'window': s.turn_window})
+                link.submit({'type': 'turn_start', 'window': s.turn_window})
                 self._asked = now
                 self._phase = Phase.ASKING
         elif self._phase == Phase.ASKING:
@@ -304,7 +304,7 @@ class Online:
             elif seq not in CAMERA_STATES:
                 # the flash: the capture is taken from the phone's frames, the transformation is the machine's,
                 # and the phone sees the screen from here to the end of the timeout
-                link.send({'type': 'stage', 'stage': 'flash', 'in': round(float(self.sequencer.settings.flash_in), 2),
+                link.submit({'type': 'stage', 'stage': 'flash', 'in': round(float(self.sequencer.settings.flash_in), 2),
                            'out': round(float(self.sequencer.settings.flash_out), 2)})
                 self._phase = Phase.TRANSFORMING
                 self._timed_out = False
@@ -325,7 +325,7 @@ class Online:
                 self.camera.set_online(False)
             frame, last = self.grab.take()
             if frame is not None:
-                link.send_frame(frame, last)
+                link.set_frame(frame, last)
                 if last:
                     self.grab.set(False)     # the picture stands on the phone from here; the bloom and the fade are the room's
             self._send_stage(now, link, message)
@@ -382,7 +382,7 @@ class Online:
         stage: dict = {'type': 'stage', 'stage': name, 'progress': progress}
         if name in FLASH_STAGES:
             stage['value'] = round(float(message.value_1), 3)
-        link.send(stage)
+        link.submit(stage)
 
     # THE MUSIC
     def _start_music(self, now: float, link: Link) -> None:
@@ -409,7 +409,7 @@ class Online:
             return False
         self._uploading.add(id)
         turn: int = self.settings.turns
-        link.upload([('track', id, path)], lambda ok: self._note(track=(id, turn)) if ok else None)
+        link.submit_upload([('track', id, path)], lambda ok: self._note(track=(id, turn)) if ok else None)
         return False
 
     def _music_offset(self, now: float) -> float:
@@ -418,7 +418,7 @@ class Online:
 
     @staticmethod
     def _send_music(link: Link, id: str, offset: float) -> None:
-        link.send({'type': 'music', 'id': id, 'url': f'/files/tracks/{id}.m4a', 'offset': round(max(0.0, offset), 2)})
+        link.submit({'type': 'music', 'id': id, 'url': f'/files/tracks/{id}.m4a', 'offset': round(max(0.0, offset), 2)})
 
     def _upload_laughs(self, present: set[str], link: Link) -> None:
         """The laughter samples the relay lacks, in one upload (once per relay; 8 MB in all)."""
@@ -426,7 +426,7 @@ class Online:
         if not missing:
             return
         logger.info('online: uploading %d laughter samples to the relay', len(missing))
-        link.upload(missing, lambda ok: None if ok else logger.warning('online: not every laughter sample reached the relay'))
+        link.submit_upload(missing, lambda ok: None if ok else logger.warning('online: not every laughter sample reached the relay'))
 
     def _deliver(self, now: float, link: Link) -> None:
         """The result: upload the saved files as soon as the saver has closed them (during the timeout, so
@@ -442,14 +442,14 @@ class Online:
             if kept:
                 # the phone's video is the share clip (the track on the tape, the watermark); the walls' clip without one
                 files: list[tuple[str, str, str]] = [('portrait', id, portrait), ('grin', id, shared or grin)]
-                link.upload(files, lambda ok: link.send({**result, 'ok': ok}))
+                link.submit_upload(files, lambda ok: link.submit({**result, 'ok': ok}))
             else:
                 logger.warning('online: the visitor %s was not saved, no result', id)
-                link.send({**result, 'ok': False})
+                link.submit({**result, 'ok': False})
         elif delivery.over is not None and now - delivery.over > SAVE_TIMEOUT:
             delivery.started = True
             logger.warning('online: no saved files within %.0f s of the turn, no result', SAVE_TIMEOUT)
-            link.send({**result, 'id': '', 'ok': False})
+            link.submit({**result, 'id': '', 'ok': False})
 
     # THE EYE
     def _eye_free(self, now: float, seq: SequenceType, ready: bool, room_busy: bool, connected: bool) -> bool:
@@ -481,7 +481,7 @@ class Online:
         if eye != self._eye_last or now - self._eye_sent > EYE_INTERVAL:
             self._eye_last = eye
             self._eye_sent = now
-            link.send({'type': 'eye', 'free': free, 'status': status, 'laughter': laughter})
+            link.submit({'type': 'eye', 'free': free, 'status': status, 'laughter': laughter})
 
     # THE TURN
     def _begin_turn(self, now: float, phone: str) -> None:
@@ -507,7 +507,7 @@ class Online:
         self.camera.set_online(False)
         self.grab.set(False)
         if reason is not None and self._link is not None:
-            self._link.send({'type': 'turn_end', 'reason': reason})
+            self._link.submit({'type': 'turn_end', 'reason': reason})
         if self.turn:
             logger.info('online: turn ends (%s)', reason)
         self._phase = Phase.IDLE

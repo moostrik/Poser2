@@ -44,7 +44,7 @@ class MusicMap():
         self._style_id: str = 'none'
         self._music_id: str = 'none'
 
-    def update(self, style_id: str) -> None:
+    def set_style(self, style_id: str) -> None:
         self._style_id: str = style_id
         self._music_id = self._pick(style_id)
         self.settings.music_id = self._music_id

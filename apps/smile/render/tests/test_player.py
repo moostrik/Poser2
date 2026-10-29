@@ -46,7 +46,7 @@ class TestGrinPlayer(unittest.TestCase):
                 portrait = None
             while added < total and arrivals[added] <= now:
                 self.now = arrivals[added]
-                self.grin_player.add(frame(added))
+                self.grin_player.submit_frame(frame(added))
                 added += 1
                 if added == total:
                     self.grin_player.end()
@@ -115,7 +115,7 @@ class TestGrinPlayer(unittest.TestCase):
     def test_busy_until_the_last_frame_is_shown(self):
         self.grin_player.begin(3, hold=False)
         for i in range(3):
-            self.grin_player.add(frame(i))
+            self.grin_player.submit_frame(frame(i))
         self.grin_player.end()
         self.assertTrue(self.grin_player.busy)
         self.assertEqual(index_of(self.grin_player.update(0.0)), 0)
@@ -133,15 +133,15 @@ class TestGrinPlayer(unittest.TestCase):
 
     def test_clear_drops_the_clip_and_late_frames(self):
         self.grin_player.begin(30, hold=False)
-        self.grin_player.add(frame(0))
+        self.grin_player.submit_frame(frame(0))
         self.grin_player.clear()
         self.assertFalse(self.grin_player.busy)
-        self.grin_player.add(frame(1))       # arrives after the reset
+        self.grin_player.submit_frame(frame(1))       # arrives after the reset
         self.assertIsNone(self.grin_player.update(1.0))
         self.assertEqual(self.grin_player.plays, 0)
 
     def test_frames_without_a_clip_are_dropped(self):
-        self.grin_player.add(frame(0))       # the warm-up opens no clip
+        self.grin_player.submit_frame(frame(0))       # the warm-up opens no clip
         self.grin_player.end()
         self.assertFalse(self.grin_player.busy)
         self.assertIsNone(self.grin_player.update(1.0))
@@ -150,7 +150,7 @@ class TestGrinPlayer(unittest.TestCase):
         self.grin_player.begin(12, hold=False)
         for i in range(10):
             self.now = i / 20
-            self.grin_player.add(frame(i))
+            self.grin_player.submit_frame(frame(i))
         shown: list[int] = []
         for tick in range(120):         # two seconds: the ten frames play, then it waits for the last two
             image = self.grin_player.update(tick * TICK)
@@ -158,8 +158,8 @@ class TestGrinPlayer(unittest.TestCase):
                 shown.append(index_of(image))
         self.assertEqual(shown, list(range(10)))
         self.now = 2.0
-        self.grin_player.add(frame(10))
-        self.grin_player.add(frame(11))
+        self.grin_player.submit_frame(frame(10))
+        self.grin_player.submit_frame(frame(11))
         self.grin_player.end()
         self.assertEqual(index_of(self.grin_player.update(2.0)), 10)
         self.assertIsNone(self.grin_player.update(2.0 + TICK))

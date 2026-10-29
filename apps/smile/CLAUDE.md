@@ -203,7 +203,7 @@ texture, over the clips and the credit card, under the lit test cells. Nothing o
 the grin as `grins/<style>/<id>.mp4` (silent h264 at the full portrait size, at `grin_fps`), the capture and the
 portrait as `portraits/<style>/<id>_capture.jpg` and `<id>_portrait.jpg`, and after the grin landed the phone's copy
 `shares/<style>/<id>.mp4` (`save/share.py`: the same grin re-encoded with the watermark, "SMILE", a circled "ai" and "by" the credit name, in the bottom
-right, no caption, built before the players' clip lands, and the visitor's track as its sound: `ClipSaver.set_share` from `Main` at DIFF_LOOP's start with the seconds
+right, no caption, built before the players' clip lands, and the visitor's track as its sound: `ClipSaver.submit_share` from `Main` at DIFF_LOOP's start with the seconds
 since the flash, read with `video.read_audio`, played on the tape of `audio/tape.py`, the Max patch's spin-up over
 the first half second and a wind-down over the last, muxed by `video.make_share`; a share clip that fails is a warning and
 the players' clip goes to the phone instead). `<style>` is the visitor's
@@ -288,7 +288,7 @@ is SMILE's side: `Link` (a websocket client thread that reconnects, plus an uplo
 from `Main.sequence_callback`, the only place its phase changes: OFF, IDLE, ASKING, JUDGING, TRANSFORMING; the files
 after a turn are a `Delivery` record beside the phase) and
 `fake.py`, a stand-in for SMILE at the relay. A turn puts the phone's frames into `Camera` as a third source
-(`set_online`, `push_online`; the device and the image are muted meanwhile and back once the capture is taken) and the face finder,
+(`set_online`, `process_online_frame`; the device and the image are muted meanwhile and back once the capture is taken) and the face finder,
 the charge, the flash and the generation run unchanged; `Online.on_face` sends the judging, and from the flash to the
 end of the timeout the phone gets the main screen as rendered (`ScreenGrab` in `render/screen_grab.py`, taken in
 `SmileRender._render_credit` from a credit pass without the QR code and before the status line, `stream_fps` x `stream_width`,

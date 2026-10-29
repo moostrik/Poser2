@@ -249,7 +249,7 @@ def reset_message(state: SequenceState) -> SequenceMessage:
 
     return SequenceMessage(state.previous_type, 1.0, initial)
 
-MessageCallback = Callable[[SequenceMessage], None]
+SequenceMessageCallback = Callable[[SequenceMessage], None]
 
 class Sequencer():
     """Time-based state machine of a visitor cycle. update() runs once per render frame, on the render
@@ -262,7 +262,7 @@ class Sequencer():
         self.settings: SequencerSettings = settings
         self._input_mutex: Lock = Lock()
         self._state_mutex: RLock = RLock()
-        self._message_callbacks: list[MessageCallback] = []
+        self._message_callbacks: list[SequenceMessageCallback] = []
         self.message: SequenceMessage = SequenceMessage(SequenceType.NONE, 0.0)
 
         self._state: SequenceState = SequenceState()
@@ -296,7 +296,7 @@ class Sequencer():
         # the callbacks run outside the state lock: they may set the sequence themselves
         with self._state_mutex:
             self.message = self._next_message()
-        self.message_callback(self.message)
+        self._message_callback(self.message)
         return self.message
 
     def _next_message(self) -> SequenceMessage:
@@ -446,15 +446,15 @@ class Sequencer():
 
         return max(min(duration, 6.0), 1.0)
 
-    def message_callback(self, message: SequenceMessage) -> None:
+    def _message_callback(self, message: SequenceMessage) -> None:
         with self._input_mutex:
             for c in self._message_callbacks: c(message)
 
-    def add_message_callback(self, callback: MessageCallback) -> None:
+    def add_message_callback(self, callback: SequenceMessageCallback) -> None:
         with self._input_mutex:
             self._message_callbacks.append(callback)
 
-    def remove_message_callback(self, callback: MessageCallback) -> None:
+    def remove_message_callback(self, callback: SequenceMessageCallback) -> None:
         with self._input_mutex:
             if callback in self._message_callbacks:
                 self._message_callbacks.remove(callback)

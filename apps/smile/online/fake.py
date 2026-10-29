@@ -67,7 +67,7 @@ class FakeSmile:
             elif kind == 'gone':
                 if self.turn and not self.busy:
                     self.turn = False
-                    self.link.send({'type': 'turn_end', 'reason': 'lost'})
+                    self.link.submit({'type': 'turn_end', 'reason': 'lost'})
 
     def on_frame(self, jpeg: bytes) -> None:
         with self.mutex:
@@ -113,7 +113,7 @@ class FakeSmile:
                 self.charged_at = 0.0
                 self.charge = max(0.0, self.charge - 0.05)
             charge: float = self.charge
-        self.link.send({'type': 'face', 'charge': round(charge, 3), 'faces': faces})
+        self.link.submit({'type': 'face', 'charge': round(charge, 3), 'faces': faces})
         if charge >= 1.0:
             # on its own thread: this one is the link's, which has to keep sending
             Thread(target=self.transform, args=(image,), daemon=True).start()
@@ -128,8 +128,8 @@ class FakeSmile:
             self.busy = True        # the turn goes on until the sequence is over: no judging, no new turn
         link: Link = self.link
         phone: str = self.phone
-        link.send({'type': 'stage', 'stage': 'flash', 'in': 0.9, 'out': 1.5})
-        link.send({'type': 'stage', 'stage': 'flash_in', 'progress': 1.0, 'value': 1.0})
+        link.submit({'type': 'stage', 'stage': 'flash', 'in': 0.9, 'out': 1.5})
+        link.submit({'type': 'stage', 'stage': 'flash_in', 'progress': 1.0, 'value': 1.0})
         portrait: np.ndarray = cv2.applyColorMap(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY), cv2.COLORMAP_PINK)
         frames: int = int(6 * STREAM_FPS)
         for i in range(frames):
@@ -144,11 +144,11 @@ class FakeSmile:
             else:
                 shown = cv2.addWeighted(image, max(0.0, 1 - (t - 0.7) / 0.1), portrait, min(1.0, (t - 0.7) / 0.1), 0)
                 stage = {'type': 'stage', 'stage': 'grin', 'progress': round((t - 0.7) / 0.3, 3)}
-            link.send(stage)
-            link.send_image(encode(shown) or b'')
+            link.submit(stage)
+            link.submit_image(encode(shown) or b'')
             time.sleep(1.0 / STREAM_FPS)
-        link.send({'type': 'stage', 'stage': 'timeout', 'progress': 1.0})
-        link.send({'type': 'turn_end', 'reason': 'done'})
+        link.submit({'type': 'stage', 'stage': 'timeout', 'progress': 1.0})
+        link.submit({'type': 'turn_end', 'reason': 'done'})
         with self.mutex:
             self.turn = False
             self.busy = False
@@ -159,11 +159,11 @@ class FakeSmile:
         cv2.imwrite(path, portrait)
 
         def done(ok: bool) -> None:
-            link.send({'type': 'result', 'id': id, 'phone': phone, 'name': 'Matthias Oostrik', 'caption': 'loves your smile!', 'ok': ok})
+            link.submit({'type': 'result', 'id': id, 'phone': phone, 'name': 'Matthias Oostrik', 'caption': 'loves your smile!', 'ok': ok})
             os.remove(path)
             logger.info('result delivered (%s)', 'ok' if ok else 'upload failed')
         time.sleep(2.0)
-        link.upload([('portrait', id, path)], done)
+        link.submit_upload([('portrait', id, path)], done)
 
     def run(self) -> None:
         self.link.start()
@@ -178,14 +178,14 @@ class FakeSmile:
                 asked: float = self.asked
                 if turn and not self.busy and now - self.turn_start > WINDOW and self.charge == 0.0:
                     self.turn = False
-                    self.link.send({'type': 'turn_end', 'reason': 'missed'})
+                    self.link.submit({'type': 'turn_end', 'reason': 'missed'})
                     logger.info('turn missed')
                     turn = False
-            self.link.send({'type': 'eye', 'free': not turn, 'status': 'looking for faces'})
+            self.link.submit({'type': 'eye', 'free': not turn, 'status': 'looking for faces'})
             if not turn and waiting > 0 and now - asked > 3.0:
                 with self.mutex:
                     self.asked = now
-                self.link.send({'type': 'turn_start', 'window': WINDOW})
+                self.link.submit({'type': 'turn_start', 'window': WINDOW})
 
 
 def main() -> None:

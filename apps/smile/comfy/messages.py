@@ -27,4 +27,4 @@ class GeneratorMessage():
         self.final: bool = final
 
 
-MessageCallback = Callable[[GeneratorMessage], None]
+GeneratorMessageCallback = Callable[[GeneratorMessage], None]

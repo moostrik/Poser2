@@ -27,7 +27,7 @@ from requests import RequestException
 
 from apps.smile.comfy.client import ComfyClient, Event as ComfyEvent
 from apps.smile.render.grin_player import GrinPlayer
-from apps.smile.comfy.messages import GeneratorMessage, GeneratorState, MessageCallback
+from apps.smile.comfy.messages import GeneratorMessage, GeneratorState, GeneratorMessageCallback
 from apps.smile.comfy.settings import GeneratorSettings, StyleSettings
 from apps.smile.comfy.styles import Styles
 from apps.smile.comfy.workflow import NO_LORA, Workflow
@@ -65,7 +65,7 @@ class Generator(Thread):
         self.client: ComfyClient = ComfyClient(settings.connection.host, settings.connection.port)
 
         self._mutex: Lock = Lock()
-        self._callbacks: list[MessageCallback] = []
+        self._callbacks: list[GeneratorMessageCallback] = []
         self._image: np.ndarray | None = None
         self._capture_depth: np.ndarray | None = None   # of the job that is running
         self._style: StyleSettings = self.styles.current()     # of the job that is running: the next visitor's may be picked already
@@ -121,7 +121,7 @@ class Generator(Thread):
         not the ranges). Call from a message callback, once the portrait is there."""
         return {'description': self._style.description, **self._record}
 
-    def add_message_callback(self, callback: MessageCallback) -> None:
+    def add_message_callback(self, callback: GeneratorMessageCallback) -> None:
         with self._mutex:
             self._callbacks.append(callback)
 
@@ -393,7 +393,7 @@ class Generator(Thread):
                 if node == wf.grin:
                     made += 1
                     show(f'grin {made}/{total}')
-                    self.grin_player.add(event.image)
+                    self.grin_player.submit_frame(event.image)
                     self._emit(GeneratorMessage(GeneratorState.DIFF_LOOP, min(made / total, 1.0), event.image))
                 elif node == wf.sampler and not replay:
                     self._emit(GeneratorMessage(GeneratorState.DIFFUSION, sampler_progress, event.image))

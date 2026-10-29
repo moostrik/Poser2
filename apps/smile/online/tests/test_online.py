@@ -32,15 +32,15 @@ class FakeLink:
     def stop(self) -> None:
         self.stopped = True
 
-    def send(self, message: dict) -> None:
+    def submit(self, message: dict) -> None:
         self.sent.append(message)
 
-    def send_frame(self, frame, last: bool = False) -> None:
+    def set_frame(self, frame, last: bool = False) -> None:
         self.frames.append(frame)
         if last:
             self.last_frame = frame
 
-    def upload(self, files, done) -> None:
+    def submit_upload(self, files, done) -> None:
         self.uploads.append((files, done))
 
     def types(self) -> list[str]:
@@ -80,7 +80,7 @@ class FakeCamera:
     def set_online(self, active: bool) -> None:
         self.online = active
 
-    def push_online(self, frame) -> None:
+    def process_online_frame(self, frame) -> None:
         self.pushed += 1
 
 

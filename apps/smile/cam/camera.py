@@ -1,6 +1,6 @@
 """The app's image source: the frames of a camera device (a `CameraSource`: the Vimba camera or the
 webcam, `modules/camera/`), or, with `use_image` on, an image from `input/`, whether a device was
-found or not; or, during an online turn, the frames of a phone (`set_online`, `push_online`: SMILE
+found or not; or, during an online turn, the frames of a phone (`set_online`, `process_online_frame`: SMILE
 Online, modules/online/). Every frame is fitted to the output size here (`cover`: scaled to fill it,
 the middle kept, no distortion); the device only rotates and flips. A missing device is a warning
 and the `device` readout says `none`; there is no automatic fallback to the image, so a failed
@@ -137,7 +137,7 @@ class Camera:
         with self._mutex:
             self._online = active
 
-    def push_online(self, frame: np.ndarray) -> None:
+    def process_online_frame(self, frame: np.ndarray) -> None:
         """A frame of the online source: fitted like any other; dropped while the source is off."""
         if not self._online:
             return

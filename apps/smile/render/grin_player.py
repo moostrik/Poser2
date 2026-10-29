@@ -57,7 +57,7 @@ class GrinPlayer():
             if self._open and self._added == 0:
                 self._origin = time.perf_counter()
 
-    def add(self, frame: np.ndarray) -> None:
+    def submit_frame(self, frame: np.ndarray) -> None:
         now: float = time.perf_counter()
         with self._mutex:
             if not self._open or self._ended:

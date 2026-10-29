@@ -96,10 +96,10 @@ class Lights:
         self.sender.stop()
 
     def fill(self, packet: bytearray) -> None:
-        self.update_module(packet)
-        self.update_cameras(packet)
+        self.process_module(packet)
+        self.process_cameras(packet)
 
-    def update_module(self, packet: bytearray) -> None:
+    def process_module(self, packet: bytearray) -> None:
         current_time: float = max(time.time() - self.start_time, 0)
         breath: float = lfor(current_time, 0.1666, 0, 0.05, 1)
         b: int = min(max(int(breath * 255), 0), 255)
@@ -108,7 +108,7 @@ class Lights:
             for i in range(CORE_LEDS):
                 packet[a + i * 3 + 1] = b
 
-    def update_cameras(self, packet: bytearray) -> None:
+    def process_cameras(self, packet: bytearray) -> None:
         lights: np.ndarray = self.cam_lights    # one reference: the setters replace the array
         power = 2.0
         byte_array: bytes = (lights ** power * 255).astype(np.uint8).tobytes()

@@ -29,11 +29,11 @@ class TestClipSaverStyle(unittest.TestCase):
             saver = ClipSaver(settings, root=root)
             try:
                 image = np.full((64, 64, 3), 128, np.uint8)
-                saver.new_sequence(image, 'B')
-                saver.save_portrait(image)
+                saver.submit_open(image, 'B')
+                saver.submit_portrait(image)
                 for _ in range(5):
-                    saver.save_frame(image)
-                saver.end_sequence(keep=True)
+                    saver.submit_frame(image)
+                saver.submit_close(keep=True)
             finally:
                 saver.stop()
 
@@ -60,12 +60,12 @@ class TestClipSaverStyle(unittest.TestCase):
             saver = ClipSaver(settings, root=root)
             try:
                 image = np.full((64, 64, 3), 128, np.uint8)
-                saver.new_sequence(image, 'A')
-                saver.set_record(made)
-                saver.save_portrait(image)
+                saver.submit_open(image, 'A')
+                saver.submit_record(made)
+                saver.submit_portrait(image)
                 for _ in range(5):
-                    saver.save_frame(image)
-                saver.end_sequence(keep=True)
+                    saver.submit_frame(image)
+                saver.submit_close(keep=True)
             finally:
                 saver.stop()
 
@@ -91,15 +91,15 @@ class TestClipSaverStyle(unittest.TestCase):
             self.assertEqual(process.returncode, 0)
             saved = []
             saver = ClipSaver(settings, root=root, watermark='Test Name')
-            saver.set_saved_callback(lambda *args: saved.append(args))
+            saver.add_saved_callback(lambda *args: saved.append(args))
             try:
                 image = np.full((64, 64, 3), 128, np.uint8)
-                saver.new_sequence(image, 'A')
-                saver.set_record(made)
+                saver.submit_open(image, 'A')
+                saver.submit_record(made)
                 for _ in range(15):
-                    saver.save_frame(image)
-                saver.set_share(tone, 0.5)
-                saver.end_sequence(keep=True)
+                    saver.submit_frame(image)
+                saver.submit_share(tone, 0.5)
+                saver.submit_close(keep=True)
             finally:
                 saver.stop()
 
@@ -151,14 +151,14 @@ class TestClipSaverStyle(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             saved = []
             saver = ClipSaver(settings, root=root)
-            saver.set_saved_callback(lambda *args: saved.append(args))
+            saver.add_saved_callback(lambda *args: saved.append(args))
             try:
                 image = np.full((64, 64, 3), 128, np.uint8)
-                saver.new_sequence(image, 'A')
+                saver.submit_open(image, 'A')
                 for _ in range(5):
-                    saver.save_frame(image)
-                saver.set_share(os.path.join(root, 'missing.mp3'), 0.0)
-                saver.end_sequence(keep=True)
+                    saver.submit_frame(image)
+                saver.submit_share(os.path.join(root, 'missing.mp3'), 0.0)
+                saver.submit_close(keep=True)
             finally:
                 saver.stop()
             clips = os.listdir(os.path.join(root, 'grins', 'A'))

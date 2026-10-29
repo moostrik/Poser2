@@ -29,7 +29,7 @@ class ClipSaver:
     style (A or B) from that folder. The clip and the portrait carry the visitor's record: how they
     were made (modules/save/record.py). After the clip, the share clip for the visitor's phone
     (modules/save/share.py, `shares/<style>/<id>.mp4`): the same grin with the visitor's track as its
-    sound (`set_music`: the file and the point of it the room hears when the grin starts) on the tape, and
+    sound (`submit_share`: the file and the point of it the room hears when the grin starts) on the tape, and
     the watermark; the players' clip stays silent. The share clip is built first, the players' clip
     lands after it: the visitor outside is waiting for theirs. The save thread is the only
     owner of the encoder process; the other threads only enqueue commands, in order."""
@@ -59,7 +59,7 @@ class ClipSaver:
         self.queue: queue.Queue[Command] = queue.Queue(max_queue_size)
         self._share: tuple[str | None, float] | None = None   # the open visitor's track and offset (save thread)
         self._dropped: bool = False
-        self._saved_callback: SavedCallback | None = None
+        self._saved_callbacks: list[SavedCallback] = []
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self._save_loop, name='ClipSaver')
         self.thread.start()
@@ -67,7 +67,7 @@ class ClipSaver:
 
     # ANY THREAD
 
-    def new_sequence(self, capture: np.ndarray, style: str) -> None:
+    def submit_open(self, capture: np.ndarray, style: str) -> None:
         """Open the visitor's files and save the capture. style is the visitor's style (A or B): the
         folder its files end up in. The fps is read here, not on the save thread."""
         if not self._active():
@@ -76,23 +76,23 @@ class ClipSaver:
         self.queue.put(('open', id, float(self.settings.grin_fps), style or STYLES[0]))
         self.queue.put(('capture', capture))
 
-    def set_record(self, record: dict) -> None:
+    def submit_record(self, record: dict) -> None:
         """How the visitor is made (modules/save/record.py): goes into the portrait and the clip, so
         hand it over before the portrait."""
         if self._active():
             self.queue.put(('record', record))
 
-    def save_portrait(self, image: np.ndarray) -> None:
+    def submit_portrait(self, image: np.ndarray) -> None:
         if self._active():
             self.queue.put(('portrait', image))
 
-    def set_share(self, track: str | None, offset: float) -> None:
+    def submit_share(self, track: str | None, offset: float) -> None:
         """The share clip's sound: the track's file and the second of it that plays when the grin starts in
         the room (None: silence)."""
         if self._active():
             self.queue.put(('share', track, offset))
 
-    def save_frame(self, image: np.ndarray) -> None:
+    def submit_frame(self, image: np.ndarray) -> None:
         """A grin frame; dropped with a warning when the encoder is that far behind, so the caller never blocks."""
         if not self._active():
             return
@@ -104,7 +104,7 @@ class ClipSaver:
                 logger.warning('Save queue full, dropping grin frames')
                 self._dropped = True
 
-    def end_sequence(self, keep: bool) -> None:
+    def submit_close(self, keep: bool) -> None:
         """Close the visitor's files: kept for the players when the sequence is complete, else deleted."""
         if self._active():
             self.queue.put(('close', keep))
@@ -203,8 +203,7 @@ class ClipSaver:
                     os.remove(path)
                 except FileNotFoundError:
                     pass
-        callback: SavedCallback | None = self._saved_callback
-        if callback is not None:
+        for callback in list(self._saved_callbacks):
             try:
                 callback(id, style, kept, grin, portrait, shared)
             except Exception:
@@ -227,11 +226,11 @@ class ClipSaver:
                 pass
             return ''
 
-    def set_saved_callback(self, callback: SavedCallback | None) -> None:
+    def add_saved_callback(self, callback: SavedCallback) -> None:
         """Called on the save thread when a visitor's files are closed: (id, style, kept, grin path,
         portrait path, share path); the paths are empty when the files were not kept (the share path
-        also when it could not be made)."""
-        self._saved_callback = callback
+        also when it could not be made). Add before the first visitor: the save thread reads the list."""
+        self._saved_callbacks.append(callback)
 
     def _temp_path(self, id: str, suffix: str) -> str:
         return os.path.join(self.temp_dir, id + suffix)
