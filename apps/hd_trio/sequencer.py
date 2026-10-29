@@ -1,4 +1,4 @@
-"""Sequencer — HD Trio's stage-based show sequencer with config-driven control, ticked by the render loop."""
+"""Sequencer — HD Trio's stage-based show sequencer with settings-driven control, ticked by the render loop."""
 
 import time
 from typing import Callable
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class SequencerSettings(BaseSettings):
-    """Base configuration for Sequencer.
+    """Base settings for Sequencer.
 
     Subclass this per project and override:
     - ``stages`` with your stage enum list (the playlist of stages to play)
@@ -46,23 +46,23 @@ class Sequencer:
 
     Example::
 
-        config = ShowSequencerSettings()
-        sequencer = Sequencer(config)
+        settings = ShowSequencerSettings()
+        sequencer = Sequencer(settings)
         sequencer.add_state_callback(on_state)
         renderer.add_update_callback(sequencer.update)
 
-        config.stages = [0, 1, 2, 3, 4]   # Full show
-        SequencerSettings.start.fire(config)
+        settings.stages = [0, 1, 2, 3, 4]   # Full show
+        SequencerSettings.start.fire(settings)
 
-        config.stages = [2]                # Test single stage
-        SequencerSettings.start.fire(config)
+        settings.stages = [2]                # Test single stage
+        SequencerSettings.start.fire(settings)
     """
 
-    def __init__(self, config: SequencerSettings) -> None:
-        self.config = config
+    def __init__(self, settings: SequencerSettings) -> None:
+        self.settings = settings
 
-        if not config.durations:
-            raise ValueError("config.durations must contain at least one entry")
+        if not settings.durations:
+            raise ValueError("settings.durations must contain at least one entry")
 
         self._state_callbacks: list[Callable[[SequencerState], None]] = []      # run in registration order
 
@@ -76,11 +76,11 @@ class Sequencer:
         self._cumulative: list[float] = []
         self._total_duration: float = 0.0
 
-        config.bind(SequencerSettings.start, self._on_start)
-        config.bind(SequencerSettings.stop, self._on_stop)
-        config.bind(SequencerSettings.skip, self._on_skip)
-        config.bind(SequencerSettings.durations, self._on_playlist_changed)
-        config.bind(SequencerSettings.stages, self._on_playlist_changed)
+        settings.bind(SequencerSettings.start, self._on_start)
+        settings.bind(SequencerSettings.stop, self._on_stop)
+        settings.bind(SequencerSettings.skip, self._on_skip)
+        settings.bind(SequencerSettings.durations, self._on_playlist_changed)
+        settings.bind(SequencerSettings.stages, self._on_playlist_changed)
         self._set_idle_state()
 
     # -- Settings callbacks --------------------------------------------------
@@ -109,8 +109,8 @@ class Sequencer:
 
     def _build_playlist(self) -> None:
         """Snapshot the playlist and precompute duration data."""
-        durations = self.config.durations
-        self._playlist = [int(s) for s in self.config.stages]
+        durations = self.settings.durations
+        self._playlist = [int(s) for s in self.settings.stages]
         self._stage_durations = [
             float(durations[s]) if 0 <= s < len(durations) else 0.0
             for s in self._playlist
@@ -129,9 +129,9 @@ class Sequencer:
         """Set outputs to end-of-show: last playlist stage, full progress."""
         self._build_playlist()
         if self._playlist:
-            self.config.stage = self._playlist[-1]
-        self.config.stage_progress = 1.0
-        self.config.progress = 1.0
+            self.settings.stage = self._playlist[-1]
+        self.settings.stage_progress = 1.0
+        self.settings.progress = 1.0
 
     def _start_show(self) -> None:
         self._build_playlist()
@@ -139,21 +139,21 @@ class Sequencer:
             logger.warning("empty stages playlist, not starting")
             return
         self._active = True
-        self.config.running = True
+        self.settings.running = True
         self._pos = 0
         self._enter_stage()
 
     def _stop_show(self) -> None:
         self._active = False
-        self.config.running = False
+        self.settings.running = False
         self._set_idle_state()
         self._notify_state(0.0)
 
     def _enter_stage(self) -> None:
         self._stage_start = time.perf_counter()
-        self.config.stage_progress = 0.0
+        self.settings.stage_progress = 0.0
         stage = self._playlist[self._pos]
-        self.config.stage = stage
+        self.settings.stage = stage
         self._notify_state(0.0)
 
     def _advance_stage(self) -> None:
@@ -161,11 +161,11 @@ class Sequencer:
         if next_pos < len(self._playlist):
             self._pos = next_pos
             self._enter_stage()
-        elif self.config.loop:
+        elif self.settings.loop:
             self._pos = 0
             self._enter_stage()
         else:
-            SequencerSettings.stop.fire(self.config)
+            SequencerSettings.stop.fire(self.settings)
 
     # -- Callbacks -----------------------------------------------------------
 
@@ -173,9 +173,9 @@ class Sequencer:
         if callback not in self._state_callbacks:
             self._state_callbacks.append(callback)
         callback(SequencerState(
-            stage=self.config.stage,
-            stage_progress=self.config.stage_progress,
-            progress=self.config.progress,
+            stage=self.settings.stage,
+            stage_progress=self.settings.stage_progress,
+            progress=self.settings.progress,
             elapsed=0.0,
             active=self._active,
         ))
@@ -186,9 +186,9 @@ class Sequencer:
 
     def _notify_state(self, elapsed: float) -> None:
         state = SequencerState(
-            stage=self.config.stage,
-            stage_progress=self.config.stage_progress,
-            progress=self.config.progress,
+            stage=self.settings.stage,
+            stage_progress=self.settings.stage_progress,
+            progress=self.settings.progress,
             elapsed=elapsed,
             active=self._active,
         )
@@ -209,15 +209,15 @@ class Sequencer:
         duration = self._stage_durations[self._pos]
 
         # Stage progress
-        self.config.stage_progress = min(elapsed / duration, 1.0) if duration > 0 else 1.0
+        self.settings.stage_progress = min(elapsed / duration, 1.0) if duration > 0 else 1.0
 
         # Overall progress
         if self._total_duration > 0:
-            self.config.progress = min(
+            self.settings.progress = min(
                 (self._cumulative[self._pos] + elapsed) / self._total_duration, 1.0
             )
         else:
-            self.config.progress = 1.0
+            self.settings.progress = 1.0
 
         # State callbacks
         self._notify_state(elapsed)
