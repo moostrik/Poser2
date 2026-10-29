@@ -41,8 +41,8 @@ _NO_FORGIVENESS = 1.1      # below this the distance is the plain maximum (see t
 class PostureSimilaritySettings(BaseSettings):
     """The definition of alike: the slack, the forgiveness for one odd joint, and the joints compared."""
     max_players:       Field[int]   = Field(3, min=1, max=16, access=Field.INIT, description="Players tracked at most")
-    angle_tolerance: Field[float] = Field(20.0, min=1.0, max=89.0, step=1.0, description="Slack (°): postures this close to identical are fully alike (1), this close to opposite fully different (0)")
-    forgiveness:     Field[float] = Field(1.4, min=1.0, max=3.0, step=0.1, description="One joint may exceed the tolerance by this factor when the rest match: 1 none, 1.4 the default, 2 twice the tolerance")
+    angle_tolerance: Field[float] = Field(20.0, min=1.0, max=89.0, step=1.0, description="Slack (°): this close to identical is 1, this close to opposite is 0")
+    forgiveness:     Field[float] = Field(1.4, min=1.0, max=3.0, step=0.1, description="Factor one joint may exceed the tolerance by when the rest match (1 = none)")
     joints:          Group[JointSelectSettings] = Group(JointSelectSettings)
 
 

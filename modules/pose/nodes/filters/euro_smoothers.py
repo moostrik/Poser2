@@ -40,8 +40,8 @@ class EuroSmootherSettings(BaseSettings):
     """
     frequency:   Field[float] = Field(30.0,  access=Field.INIT)
     min_cutoff:  Field[float] = Field(1.0,   min=0.001, max=10.0,  widget=Widget.log_slider, description="Minimum low-pass cutoff (Hz). Lower = more smooth, more lag")
-    cutoff_rise: Field[float] = Field(0.025, min=0.001, max=100.0, widget=Widget.log_slider, description="Cutoff rise (Hz) = this × difference between raw and smoothed per second. Lower = more smooth, more lag")
-    d_cutoff:    Field[float] = Field(1.0,   min=0.1,   max=10.0,  visible=False,            description="Low-pass on the difference between raw and smoothed (Hz). Lower = more smooth when still, slower to notice a move")
+    cutoff_rise: Field[float] = Field(0.025, min=0.001, max=100.0, widget=Widget.log_slider, description="Cutoff rise per raw-smoothed difference per second (Hz); lower = smoother")
+    d_cutoff:    Field[float] = Field(1.0,   min=0.1,   max=10.0,  visible=False,            description="Low-pass on the raw-smoothed difference (Hz); lower = smoother when still")
 
 
 class FeatureEuroSmoother(FilterNode):

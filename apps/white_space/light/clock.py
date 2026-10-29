@@ -38,7 +38,7 @@ class ClockSettings(BaseSettings):
     min_fps:     Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Clock min", unit="fps", description="Worst momentary tick rate over the last second (1 / longest interval)")
     late_max_ms: Field[float] = Field(0.0, access=Field.READ, label="Clock late", unit="ms", description="Worst tick lateness vs. its deadline over the last second (ms)")
     dt_max_ms:   Field[float] = Field(0.0, access=Field.READ, description="Longest tick interval over the last second (ms)")
-    busy_max_ms: Field[float] = Field(0.0, access=Field.READ, label="Clock busy", unit="ms", description="Longest per-tick work (tick return → next call) over the last second (ms) — the conductor's GIL share is busy/interval")
+    busy_max_ms: Field[float] = Field(0.0, access=Field.READ, label="Clock busy", unit="ms", description="Longest tick work (return → next call) over the last second (ms)")
     overruns:    Field[int]   = Field(0,   access=Field.READ, pinned=True, label="Clock overruns", description="Ticks that ran more than one interval late and resynced (cumulative)")
 
 

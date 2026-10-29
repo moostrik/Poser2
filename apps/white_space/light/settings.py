@@ -81,7 +81,7 @@ class BeamLayersSettings(BaseSettings):
     """Per-layer composition settings — the beam-mode block of the pool.
     `spin_down_seconds` is a hidden relay (from the root) into wind_down — the spin-down
     slider's visible home is the states panel, next to spin_up."""
-    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9–S11 wall-fade seconds — hidden relay from states (via the root) into wind_down")
+    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9–S11 wall fade (s), hidden relay from states into wind_down")
     beam_blue_sound:    Group[BeamBlueSoundSettings]    = Group(BeamBlueSoundSettings)
     beam_playhead:      Group[BeamPlayheadSettings]     = Group(BeamPlayheadSettings)
     beam_flash:         Group[BeamFlashSettings]        = Group(BeamFlashSettings)
@@ -117,17 +117,17 @@ class LightSettings(BaseSettings):
     num_cams:      Field[int]   = Field(1,    min=1,   max=16,   access=Field.INIT, description="Number of cameras")
     light_rate:       Field[float] = Field(32.0, min=1,   max=120,  description="Light tick rate (fps, shared from the root)")
     light_resolution: Field[int]   = Field(3600, min=256, max=4000, access=Field.INIT, description="Projection resolution (pixels per turn)")
-    fov: Field[float] = Field(110.0, access=Field.INIT, description="Camera horizontal FOV — relay from root to test_calibration; its visible home is the camera panel")
-    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9–S11 wall-fade seconds — hidden relay from states (via the root) into wind_down")
+    fov: Field[float] = Field(110.0, access=Field.INIT, description="Camera horizontal FOV (°), relay from root; set on the camera panel")
+    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9–S11 wall fade (s), hidden relay from states into wind_down")
 
-    brightness:     Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Main brightness — applied to the composite; the beam light gamma and floor live in the light sender", newline=True, pinned=True)
+    brightness:     Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="Main brightness of the composite (gamma and floor: light sender)", newline=True, pinned=True)
 
     # Debug override — a first-class select ABOVE the state machine: choosing a layer IS
     # turning debug on. The Compositor draws that one layer solo (full weight) and the
     # motor auto-follows its mode (ProjectionLayer → PROJECTION, BeamLayer → BEAM); OFF returns the
     # show where it would have been. Comes back as saved: a projection layer saved with a real
     # motor spins the fixture up at power-on, and the Conductor warns about it in the log.
-    debug: Field[DebugLayer] = Field(DebugLayer.OFF, description="Debug override: select a layer to show it solo and auto-follow the motor to its mode (OFF = show runs)", pinned=True)
+    debug: Field[DebugLayer] = Field(DebugLayer.OFF, description="Layer shown solo, the motor following its mode (OFF = show runs)", pinned=True)
     motor_simulate: Field[bool] = Field(False, description="Simulate the motor + fall sensor; while on, nothing is sent to the fixture", pinned=True)
 
     clock:        Group[ClockSettings]        = Group(ClockSettings, share=[light_rate])

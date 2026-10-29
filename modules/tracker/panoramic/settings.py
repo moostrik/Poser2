@@ -21,7 +21,7 @@ class SeamSettings(BaseSettings):
     # A primary that loses the person hands over at once, skipping `hysteresis`; without this a
     # one-frame miss would switch cameras twice.
     hold: Field[float] = Field(0.5, min=0.0, max=2.0, step=0.05,
-                               description="Seconds after a lost primary is replaced before the better-placed camera may take the person back")
+                               description="Wait after a primary's replacement before the better camera takes it back (s)")
 
 
 class RigSettings(BaseSettings):
@@ -40,13 +40,13 @@ class RigSettings(BaseSettings):
     tracks with.
     """
     camera_radius: Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01,
-                                        description="Distance (m) of each lens from the fixture axis. 0 disables the parallax correction")
+                                        description="Distance (m) of each lens from the fixture axis; 0 = no parallax correction")
     camera_height: Field[float] = Field(0.5, min=0.1, max=3.0, step=0.01,
                                         description="Lens height above the floor (m), measured")
     zone_min_radius: Field[float] = Field(1.5, min=0.25, max=10.0, step=0.05, newline=True,
                                           description="Radius (m) of the tracked floor's near edge — the nearest distance claimed")
     zone_max_radius: Field[float] = Field(3.5, min=0.5, max=15.0, step=0.05,
-                                          description="Radius (m) of its far edge — sets the overlap band, and where zone_filter ignores people")
+                                          description="Radius (m) of its far edge: the overlap band and the zone_filter limit")
     parallax_radius: Field[float] = Field(2.1, access=Field.READ,
                                           description="Radius (m) the world azimuth is corrected at — derived, the zone's harmonic mean")
     # In world azimuth, as the panorama's grid measures it; the `Rig` keeps the local-angle
@@ -103,7 +103,7 @@ class TrackerSettings(BaseSettings):
     # Simultaneous tracks in one camera: the device does not always de-duplicate — NMS can pass two
     # boxes on one body, and a re-acquired person's old device id can come back.
     same_cam_angle: Field[float] = Field(5.0, min=0.0, max=20.0, step=0.5,
-                                         description="How far (°) apart two simultaneous tracks in one camera may be and still be one person")
+                                         description="Gap (°) at which two tracks in one camera are still one person")
     # How long they keep a pose from their last box is the pose side's `detection_timeout`.
     lost_timeout: Field[float] = Field(2.0, min=1.0, max=5.0, step=0.1,
                                        description="Seconds a lost person is remembered, for seam links and re-acquisition")

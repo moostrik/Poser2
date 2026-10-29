@@ -67,20 +67,20 @@ class StateMachineSettings(BaseSettings):
     # Transition-state durations — one per state. spin_down_seconds is shared (via the
     # root) into the beam_wind_down layer, which runs the S9–S11 wall fade on it; those
     # states exit once the fade is complete and the playhead lock holds.
-    spin_up_seconds:       Field[float] = Field(14.0, min=1.0, max=60.0,  step=0.5, description="INTRO_PLAY: spin-up transition (seconds) — hand-tuned to the physical spin-up (spin_down_seconds' mirror)", newline=True)
-    spin_down_seconds:     Field[float] = Field(10.0, min=1.0, max=60.0,  step=0.5, description="END_INTRO/END_IDLE/PLAY_INTRO: wall fade towards the line (seconds) — hand-tuned to the physical spin-down (drives the beam_wind_down layer)")
+    spin_up_seconds:       Field[float] = Field(14.0, min=1.0, max=60.0,  step=0.5, description="INTRO_PLAY spin-up, tuned to the physical spin-up (s)", newline=True)
+    spin_down_seconds:     Field[float] = Field(10.0, min=1.0, max=60.0,  step=0.5, description="END_INTRO/END_IDLE/PLAY_INTRO wall fade, tuned to the spin-down (s)")
     off_idle_bars:         Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="OFF_IDLE: wake fade from dark, in playhead bars", newline=True)
     intro_idle_bars:       Field[float] = Field(1.0,  min=0.1, max=20.0,  step=0.1, description="INTRO_IDLE: playhead bars back to IDLE")
     end_bars:              Field[float] = Field(3.0,  min=0.5, max=20.0,  step=0.5, description="END: wind-down playhead bars (bidirectional ramp)")
 
     # Looks
-    dim_level: Field[float] = Field(0.4, min=0.0, max=1.0, step=0.01, description="DIM line level: the front white beam light in INTRO, and where INTRO_PLAY, END_INTRO and PLAY_INTRO hold it", newline=True)
+    dim_level: Field[float] = Field(0.4, min=0.0, max=1.0, step=0.01, description="DIM line level of the front white beam light in INTRO and its transitions", newline=True)
 
     # Condition tunables
     min_players:        Field[int]   = Field(3, min=2, max=16, description="Players the show needs at least: present to play, alike hits in a row to start", newline=True)
     play_full_sync_seconds: Field[float] = Field(20.0, min=0.0, max=600.0, step=1.0, description="PLAY → PLAY_INTRO once the full-sync hold has built over this long (s); 0 never")
     play_full_sync_release_seconds: Field[float] = Field(5.0, min=0.0, max=60.0, step=0.5, description="PLAY: a break in full sync drains the hold over this (s); 0 restarts it at once")
-    intro_grace_seconds:    Field[float] = Field(20.0, min=0.0, max=300.0, step=1.0, description="INTRO after PLAY_INTRO: spins up only once the hits have been out of sync this long (s)")
+    intro_grace_seconds:    Field[float] = Field(20.0, min=0.0, max=300.0, step=1.0, description="Hits out of sync this long before INTRO spins up after PLAY_INTRO (s)")
 
     # The sync condition's group is HitSync's settings (pose/hit_sync.py): it fills the telemetry.
     sync:    Group[HitSyncSettings]     = Group(HitSyncSettings)

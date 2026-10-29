@@ -50,7 +50,7 @@ class HitSyncSettings(BaseSettings):
     ``angle_tolerance``."""
     hits:     Field[int]   = Field(0, access=Field.READ, pinned=True, description="Hits in a row that struck alike poses, this round")
     distance: Field[float] = Field(0.0, min=0.0, max=180.0, widget=Widget.number, access=Field.READ, description="Largest distance (°) between the hits in the streak; 0 with fewer than two")
-    min_age_seconds: Field[float] = Field(2.0, min=0.0, max=10.0, step=0.5, description="Seconds a pose must have existed before its hits count in the streak; 0 counts every hit")
+    min_age_seconds: Field[float] = Field(2.0, min=0.0, max=10.0, step=0.5, description="Pose age before its hits count in the streak (s); 0 counts every hit")
 
 
 @dataclass(frozen=True, slots=True)

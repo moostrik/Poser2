@@ -66,11 +66,11 @@ def _to_degrees(radians: float) -> float:
 
 class PlayheadSettings(BaseSettings):
     pulse_offset:   Field[float] = Field(0.0,  min=0.0, max=360.0, step=0.1,
-                                         description="Playhead offset from the sensor pulse (degrees): the front beam light's azimuth at the pulse")
+                                         description="Front beam light's azimuth at the sensor pulse (°)")
     tracking:       Field[float] = Field(0.1,  min=0.0, max=1.0, step=0.01,
-                                         description="Phase-lock gain — how tightly the playhead's position locks to the measured motor phase (0=free-run, 1=snap)")
+                                         description="Playhead lock to the measured motor phase (0=free-run, 1=snap)")
     speed_smoothing:Field[float] = Field(0.5,  min=0.0, max=1.0, step=0.01,
-                                         description="How much to average the measured motor speed feeding the sweep rate (0=raw, 1=heavy)")
+                                         description="Averaging of the motor speed for the sweep rate (0=raw, 1=heavy)")
     playhead:       Field[float] = Field(0.0,  min=0.0, max=360.0, step=0.1,
                                          access=Field.READ, widget=Widget.slider, description="Continuous playhead azimuth (degrees)")
 

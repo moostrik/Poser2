@@ -31,7 +31,7 @@ class OscillatorSettings(BaseSettings):
     them)."""
     enabled:            Field[bool]  = Field(True,                                                label="On",         description="Off: this oscillator draws nothing", newline=True)
     bypass_all:         Field[bool]  = Field(False, widget=Widget.button,                         label="Bypass All", description="Bypass every slot, so the panel draws this oscillator; again to lift them all")
-    mirror:             Field[bool]  = Field(True,                                                label="Mirror",     description="On: lines come from the player both ways; off: one pattern passing behind the player")
+    mirror:             Field[bool]  = Field(True,                                                label="Mirror",     description="On: lines from the player both ways; off: one pattern passing behind")
     pitch:              Field[float] = Field(25.7, min=2.0,    max=180.0, step=0.1,  widget=KNOB, label="Base",   description="Lines per revolution of the pattern: 25.7 is a 14° interval at scale 1", row_label="Pitch", newline=True)
     pitch_amount:       Field[float] = Field(0.0,  min=-90.0,  max=90.0,  step=0.5,  widget=KNOB, label="Amount", description="How far the source moves the pitch (lines per revolution)")
     pitch_curve:        Field[Curve] = Field(Curve.LINEAR,                           width=CURVE, label="Curve",  description="How the source's magnitude is eased")

@@ -93,7 +93,7 @@ class OakGroup(BaseSettings):
     resolution:         Field[CameraResolution]  = Field(CameraResolution.P1080, access=Field.INIT, description="Sensor mode. P720 and P800 on both sensors, P1080 color only.")
     sim_enabled:        Field[bool]              = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path:         Field[str]               = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
-    fov:                Field[float]             = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°) — OAK-D Pro W, OV9782 color, 1280x800 native. 720p is a vertical crop, so the full width and this figure both hold.")
+    fov:                Field[float]             = Field(127.0, access=Field.INIT, description="Camera horizontal FOV over the full sensor width (°)")  # OAK-D Pro W, OV9782 color, 1280x800; 720p is a vertical crop
 
     _cam_share: list = [fps, color, square, yolo, resolution, model_path, fov]
     cam_0          : Group[OakCameraSettings]              = Group(OakCameraSettings, share=_cam_share)

@@ -81,7 +81,7 @@ class InstrumentWindowSettings(EnvelopeSettings):
     width_bypass:   Field[bool]  = Field(False,                                            label="Bypass",         description="Both reaches at the width: no sync growth")
     scale:          Field[float] = Field(1.0,  min=0.1, max=2.0,   step=0.01, widget=KNOB, label="Scale",          description="Overall window scale: the whole pattern compresses, nothing needs recalibrating", row_label="Scale", newline=True)
     crowd:          Field[float] = Field(1.0,  min=0.5, max=1.0,   step=0.01, widget=KNOB, label="Crowd",          description="Each further player multiplies the scale by this; 1 = off")
-    overlap:        Field[float] = Field(1.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Overlap",        description="How far a window may reach into a neighbour's: 1 full, 0 territories meeting at the midpoint, negative a gap between them")
+    overlap:        Field[float] = Field(1.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Overlap",        description="Reach into a neighbour's window: 1 full, 0 to the midpoint, negative a gap")
 
 
 class Opposite(IntEnum):
@@ -162,8 +162,8 @@ class PoseInstrumentSettings(BaseSettings):
     two oscillators, their strobes and the LFO (the synth's patch, a slot per parameter), the
     dummy. The wiring is ``connect``; the measures' dead zones are the pipeline's."""
     max_lines:    Field[int]  = Field(90, min=30, max=180, step=1, description="Visual limit: lines per revolution; no pitch goes above it")
-    opposite:     Field[Opposite] = Field(Opposite.OFF, widget=Widget.select, description="Draw each player's lines at them, half a turn away, or both (the copies win the overlap); the masks stay on the players")
-    lean_share:   Field[float] = Field(2.0, min=0.0, max=4.0, step=0.05, widget=KNOB, label="Lean Share", description="How far a lean hands the arms' pull to one color: 0 off, 1 all of it at full lean, above overshooting")
+    opposite:     Field[Opposite] = Field(Opposite.OFF, widget=Widget.select, description="Each player's lines at them, half a turn away, or both (copies win the overlap)")
+    lean_share:   Field[float] = Field(2.0, min=0.0, max=4.0, step=0.05, widget=KNOB, label="Lean Share", description="Arms' pull a lean hands to one color: 0 off, 1 all at full lean, >1 overshoots")
     on_at:        Field[float] = Field(0.95, min=0.0, max=1.0, step=0.01, widget=KNOB, label="On At",  description="Full sync comes on when every pair reads at least this", row_label="Sync", newline=True)
     off_at:       Field[float] = Field(0.90, min=0.0, max=1.0, step=0.01, widget=KNOB, label="Off At", description="Full sync goes off when any pair falls below this")
     full_sync:    Field[bool]  = Field(False, access=Field.READ, label="Full Sync", description="Every present pair alike over the band")

@@ -102,7 +102,7 @@ class OakGroup(BaseSettings):
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, description="Model files directory")
     ir_flood_light    : Field[float]           = Field(0.8, min=0.0, max=1.0, widget=Widget.slider, description="IR flood light")
-    tilt              : Field[float]           = Field(0.0, access=Field.INIT, description="Camera up-tilt (degrees), positive = aimed upward, the same for all four cameras. Baked into the warp when the devices open.")
+    tilt              : Field[float]           = Field(0.0, access=Field.INIT, description="Up-tilt of all four cameras (°), positive = upward; baked into the warp at open")
     lens_fov          : Field[float]           = Field(0.0, access=Field.INIT, step=0.1, description="Field (°) the lens spans across the full sensor width; 0 = same as fov")
     lens_center_x     : Field[float]           = Field(0.0, access=Field.INIT, step=0.5, description="Optical center offset from the frame center (px), full sensor mode")
     lens_center_y     : Field[float]           = Field(0.0, access=Field.INIT, step=0.5, description="Optical center offset from the frame center (px), positive = down")
@@ -133,7 +133,7 @@ class OakGroup(BaseSettings):
 class _OscSoundSettings(OscSoundSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage to read poses from")
     volume: Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, newline=True, pinned=True, description="Main sound volume — sent to Max on /global/volume")
-    speaker_offset: Field[float] = Field(0.0, min=0.0, max=360.0, step=1.0, description="Where speaker 0 stands, as an azimuth (degrees) — Max adds it in its panner. 0 when the speakers are placed by the layout")
+    speaker_offset: Field[float] = Field(0.0, min=0.0, max=360.0, step=1.0, description="Azimuth of speaker 0, added in Max's panner (°); 0 = placed by the layout")
 
 
 class InOutGroup(BaseSettings):
@@ -217,7 +217,7 @@ class MotionFeature(BaseSettings):
 class SimilarityFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
     output_frequency: Field[float] = Field(32.0)
-    max_players     : Field[int]   = Field(3, min=1, max=16, access=Field.INIT, description="Players tracked at most (shared from root max_players): the similarity row's width")
+    max_players     : Field[int]   = Field(3, min=1, max=16, access=Field.INIT, description="Players tracked at most, the similarity row's width (shared from root)")
 
     # In pipeline order. On the SMOOTH poses, synchronously: the posture similarity (distance in degrees →
     # 0..1), a present pair's gap held, the pair weighted by the arm deviation out of neutral; then, per
@@ -355,7 +355,7 @@ class BeamLightSimSettings(BaseSettings):
 
 class RenderSettings(BaseSettings):
     layout:      Field[Layout]     = Field(Layout.CAMERA, widget=Widget.select,
-                                           description="CAMERA: the cameras' rows; POSE: the three longest-present poses, large, over the projection")
+                                           description="CAMERA: the cameras' rows; POSE: the three longest-present poses, large")
     camera_view: Field[CameraView] = Field(CameraView.BOTH, widget=Widget.select,
                                            description="Which camera row to show: the delivered frames, the 360° strip, or both")
     azimuth_overlay: Field[bool] = Field(True, description="Eye (solid) and bbox (faint) azimuth lines over the projection row")
@@ -383,16 +383,16 @@ class Settings(BaseSettings):
     max_players     : Field[int]   = Field(4, access=Field.INIT, description="Players tracked at most: the id slots 0..N−1")
     num_cams     : Field[int]   = Field(4, access=Field.INIT)
     input_fps       : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
-    light_rate      : Field[float] = Field(32.0, min=1.0, max=120.0, description="Light tick rate (fps): the fixture's frame rate, the conductor's clock and the LERP stage's step")
+    light_rate      : Field[float] = Field(32.0, min=1.0, max=120.0, description="Light tick rate: fixture frame rate, conductor clock, LERP step (fps)")
     light_resolution: Field[int]   = Field(300, min=10, max=1000, access=Field.INIT, description="Projection resolution (pixels per turn)")
-    fov             : Field[float] = Field(127.0, access=Field.INIT, description="Azimuth span (°) of each delivered camera frame — the tracker's contract, baked in at open")
+    fov             : Field[float] = Field(127.0, access=Field.INIT, description="Azimuth span of each delivered camera frame (°), baked in at open")
     resolution      : Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode for all cameras")
     tilt            : Field[float] = Field(0.0, access=Field.INIT, description="Camera up-tilt (°), positive = aimed up, the same for all four")
     # The lens, shared by all four — read off their calibrations; see CALIBRATION.md, Camera.
     lens_fov        : Field[float] = Field(0.0, access=Field.INIT, step=0.1, description="Field (°) the lens spans across the full sensor width; 0 = same as fov")
     lens_center_x   : Field[float] = Field(0.0, access=Field.INIT, step=0.5, description="Optical center offset from the frame center (px), full sensor mode")
     lens_center_y   : Field[float] = Field(0.0, access=Field.INIT, step=0.5, description="Optical center offset from the frame center (px), positive = down")
-    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9–S11 wall-fade seconds — canonical value tying states (the visible slider) to the wind_down layer")
+    spin_down_seconds: Field[float] = Field(10.0, min=1.0, max=60.0, step=0.5, visible=False, description="S9–S11 wall fade (s), tying the states slider to the wind_down layer")
 
     # In panel order: what you look at, what you capture, the wires out, the sensors, what is made of
     # them, and what the show does with it.

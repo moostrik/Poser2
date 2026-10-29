@@ -24,7 +24,7 @@ class TorsoTiltExtractorSettings(BaseSettings):
     tilt_degrees: Field[float] = Field(45.0, min=1.0, max=90.0, step=0.5,
                                        description="Spine angle from vertical (°) that counts as full lean (±1.0)")
     aspect_ratio: Field[float] = Field(0.75, access=Field.INIT,
-                                       description="Crop width/height — corrects the y axis to isotropic space (as the angle extractor)")
+                                       description="Crop width/height, corrects the y axis to isotropic space")
 
 
 class TorsoTiltExtractor(FilterNode):

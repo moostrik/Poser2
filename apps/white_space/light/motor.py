@@ -77,11 +77,11 @@ class MotorCommand:
 
 
 class MotorSettings(BaseSettings):
-    simulate:             Field[bool] = Field(False,                              description="Simulate the motor + fall sensor (no hardware): obeys the commanded mode with modeled inertia")
-    active_mode:          Field[MotorMode] = Field(MotorMode.STOPPED, access=Field.READ, description="Active mode — the arbitrated mode actually driven (debug > state machine; no command = STOPPED)")
+    simulate:             Field[bool] = Field(False,                              description="Simulate the motor + fall sensor, with modeled inertia (no hardware)")
+    active_mode:          Field[MotorMode] = Field(MotorMode.STOPPED, access=Field.READ, description="Mode driven now: debug over state machine; no command = STOPPED")
     beam_rpm:             Field[float] = Field(72.0,   min=0.0, max=300.0,  step=1.0,  description="Target rpm in BEAM mode", newline=True)
     projection_rpm:       Field[float] = Field(1920.0, min=0.0, max=2400.0, step=1.0,  description="Target rpm in PROJECTION mode")
-    light_rate:           Field[float] = Field(32.0,   min=1.0, max=120.0, description="Light tick rate (fps, shared from the light settings): the simulation loop's cadence")
+    light_rate:           Field[float] = Field(32.0,   min=1.0, max=120.0, description="Light tick rate, the simulation loop's cadence (fps, shared)")
     measured_rpm:         Field[float] = Field(0.0,   min=0.0, max=FIXTURE_PROJECTION_RPM, step=0.01,  access=Field.READ, description="Current measured RPM", newline=True)
     phase:                Field[float] = Field(0.0,   min=0.0, max=360.0, step=0.1, access=Field.READ, widget=Widget.slider, description="Measured motor phase since the sensor pulse (degrees)")
 

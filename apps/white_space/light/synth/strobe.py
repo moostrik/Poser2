@@ -48,7 +48,7 @@ class StrobeSettings(BaseSettings):
     phase_amount:  Field[float] = Field(0.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Amount", description="How far the source moves the phase (cycles)")
     phase_curve:   Field[Curve] = Field(Curve.LINEAR,                        width=CURVE, label="Curve",  description="How the source's magnitude is eased")
     phase_bypass:  Field[bool]  = Field(False,                                            label="Bypass", description="Switch the modulation off: the phase is its base")
-    shift:         Field[float] = Field(0.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Base",   description="Shift from one line to the next: 0 in step, 0.5 a quarter cycle, 1 opposite; negative runs inward", row_label="Shift", newline=True)
+    shift:         Field[float] = Field(0.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Base",   description="Line-to-line shift: 0 in step, 0.5 quarter cycle, 1 opposite; < 0 inward", row_label="Shift", newline=True)
     shift_amount:  Field[float] = Field(0.0,  min=-1.0, max=1.0,  step=0.01, widget=KNOB, label="Amount", description="How far the source moves the shift (half cycles per line)")
     shift_curve:   Field[Curve] = Field(Curve.LINEAR,                        width=CURVE, label="Curve",  description="How the source's magnitude is eased")
     shift_bypass:  Field[bool]  = Field(False,                                            label="Bypass", description="Switch the modulation off: the shift is its base")

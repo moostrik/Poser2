@@ -31,7 +31,7 @@ class AngleCalibratorSettings(BaseSettings):
     elbow_neutral:    Field[float] = Field(-162.0, min=-180.0, max=180.0, step=0.5, widget=Widget.number, description="Elbow angle read with the arm straight (°)")
     hip_neutral:      Field[float] = Field(171.0,  min=-180.0, max=180.0, step=0.5, widget=Widget.number, description="Hip angle read standing (°)")
     knee_neutral:     Field[float] = Field(-180.0, min=-180.0, max=180.0, step=0.5, widget=Widget.number, description="Knee angle read standing (°)")
-    raised:           Field[bool]  = Field(True, description="Use the arms-raised readings: the shoulder's is 180°, the elbow's is straight with the arm up", newline=True)
+    raised:           Field[bool]  = Field(True, description="Use the arms-raised readings: shoulder 180°, elbow straight with the arm up", newline=True)
     shoulder_raised:  Field[float] = Field(153.0,  min=-180.0, max=180.0, step=0.5, widget=Widget.number, description="Shoulder angle read with the arm raised (°)")
     elbow_raised:     Field[float] = Field(-162.0, min=-180.0, max=180.0, step=0.5, widget=Widget.number, description="Elbow angle read with the arm raised (°)")
 
