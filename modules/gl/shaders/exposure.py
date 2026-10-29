@@ -1,6 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from .. import Shader, draw_quad
-from .. import Texture
+from .. import Shader, draw_quad, Texture
 
 import logging
 logger = logging.getLogger(__name__)

@@ -7,8 +7,8 @@ from enum import IntEnum, auto
 from OpenGL.GL import *  # type: ignore
 
 # Local application imports
-from modules.gl import Texture, Style
-from ..layer_base import LayerBase, Blit
+from modules.gl import Texture, Style, Blit
+from ..layer_base import LayerBase
 from modules.board import HasFrames
 from modules.pose import Frame, AngleMotion
 

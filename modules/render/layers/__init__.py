@@ -1,4 +1,4 @@
-from .layer_base import LayerBase, Rect, DataCache, Blit
+from .layer_base import LayerBase, DataCache
 
 from .cam import      BBoxRenderer, BBoxRendererSettings, CameraReadingsLayer, CropLayer, CropLayerSettings, \
                       PoseRenderer, PoseRendererSettings, PoseCompositor, PoseCompositorSettings, \

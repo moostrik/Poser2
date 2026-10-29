@@ -8,8 +8,8 @@ from time import time
 import math
 
 # Local application imports
-from modules.gl import Fbo, SwapFbo, Texture, Style
-from ..layer_base import LayerBase, Blit
+from modules.gl import Fbo, SwapFbo, Texture, Style, Blit
+from ..layer_base import LayerBase
 from modules.board import HasFrames
 from modules.pose import Similarity, MotionGate, AngleMotion, Frame
 from modules.settings import Field, BaseSettings

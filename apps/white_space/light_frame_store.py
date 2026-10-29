@@ -6,8 +6,7 @@ from threading import Lock
 from typing import Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from .light.frame import LightFrame
-    from .light.frame import LightFrame as CompositionDebug
+    from .light.frame import LightFrame, LightFrame as CompositionDebug
 
 
 class HasLightFrame(Protocol):

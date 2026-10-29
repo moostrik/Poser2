@@ -1,6 +1,5 @@
 from OpenGL.GL import * # type: ignore
-from .. import Shader, draw_quad
-from .. import Texture
+from .. import Shader, draw_quad, Texture
 import numpy as np
 from pathlib import Path
 

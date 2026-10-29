@@ -8,8 +8,8 @@ from OpenGL.GL import *  # type: ignore
 import numpy as np
 
 # Local application imports
-from modules.gl import Texture, Style, Fbo
-from ..layer_base import LayerBase, Blit
+from modules.gl import Texture, Style, Fbo, Blit
+from ..layer_base import LayerBase
 from modules.board import HasFrames
 from modules.pose import Frame, Similarity, MotionGate, AngleMotion
 

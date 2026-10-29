@@ -5,7 +5,8 @@ from typing import Any
 
 from modules.settings import Field, BaseSettings
 from modules.gl import Fbo, Texture, Blit
-from ..layer_base import LayerBase, Rect
+from modules.utils import Rect
+from ..layer_base import LayerBase
 
 from .bbox_renderer import BBoxRenderer, BBoxRendererSettings
 from .tracklet_renderer import TrackletRenderer

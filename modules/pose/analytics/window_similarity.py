@@ -13,9 +13,7 @@ import numpy as np
 # Pose imports
 from modules.settings import BaseSettings, Field, Group
 from ..frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
-from ..features import Angles, AngleMotion, AngleVelocity
-from ..features import AggregationMethod, NormalizedScalarFeature
-from ..features import Similarity, LeaderScore
+from ..features import Angles, AngleMotion, AngleVelocity, AggregationMethod, NormalizedScalarFeature, Similarity, LeaderScore
 from .joint_select import JointSelectSettings, joint_mask
 from modules.utils import PerformanceTimer, HotReloadMethods
 

@@ -3,9 +3,8 @@
 from functools import partial
 
 from modules.utils import Broadcast
-from modules.camera import CameraSource, CameraCheck, Player, Recorder, Sync
+from modules.camera import CameraSource, CameraCheck, Player, Recorder, Sync, replay
 from modules.camera.oak import Camera, Simulator
-from modules.camera import replay
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound

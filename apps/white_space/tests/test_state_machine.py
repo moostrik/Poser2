@@ -9,8 +9,7 @@ from types import SimpleNamespace
 from modules.board import HitStreak
 
 from apps.white_space.light import LayerId, LightSettings, MotorMode, PoseInstrumentSettings
-from apps.white_space.statemachine import StateId, StateMachine, StateMachineSettings
-from apps.white_space.statemachine import machine as machine_module
+from apps.white_space.statemachine import StateId, StateMachine, StateMachineSettings, machine as machine_module
 
 POSE_STAGE = 4
 

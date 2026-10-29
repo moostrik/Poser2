@@ -5,10 +5,10 @@ from OpenGL.GL import * # type: ignore
 from modules.settings import Field, BaseSettings
 from modules.board import HasFrames
 from modules.pose import Frame, BBox
-from ..layer_base import LayerBase, Rect
+from ..layer_base import LayerBase
 from ...shaders import DrawRectangleOutline
 from ...color_settings import ColorSettings
-from modules.utils import Color
+from modules.utils import Color, Rect
 
 
 class BBoxRendererSettings(BaseSettings):

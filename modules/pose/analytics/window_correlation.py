@@ -12,9 +12,7 @@ from numpy.fft import rfft, irfft
 # Pose imports
 from modules.settings import BaseSettings, Field
 from ..frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
-from ..features import Angles, AngleMotion
-from ..features import AggregationMethod, NormalizedScalarFeature
-from ..features import Similarity, LeaderScore
+from ..features import Angles, AngleMotion, AggregationMethod, NormalizedScalarFeature, Similarity, LeaderScore
 from .window_similarity import SimilarityResult
 from modules.utils import PerformanceTimer, HotReloadMethods
 

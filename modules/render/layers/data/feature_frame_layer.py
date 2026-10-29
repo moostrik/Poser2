@@ -8,8 +8,9 @@ from OpenGL.GL import *  # type: ignore
 # Local application imports
 from modules.board import HasFrames
 from modules.gl import Fbo, Texture, Blit, clear_color, Text
+from modules.utils import Rect
 from modules.pose import AngleVelocity, Angles, BaseScalarFeature, Frame
-from ..layer_base import LayerBase, DataCache, Rect
+from ..layer_base import LayerBase, DataCache
 from ...shaders import FeatureShader
 from .data_layer_settings import DataLayerSettingsProtocol, LayerMode, FEATURE_MAP, TRACK_COLOR_FEATURES, AngleOffset, has_pi_range, offset_angles
 from ...color_settings import ColorSettings

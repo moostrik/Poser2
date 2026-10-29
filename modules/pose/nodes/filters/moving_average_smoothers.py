@@ -18,11 +18,6 @@ from ...frame import Frame, replace
 from modules.settings import BaseSettings, Field
 
 
-# Re-export WindowType for convenience
-__all__ = ['WindowType', 'MovingAverageSmootherSettings', 'FeatureMovingAverageSmoother',
-           'AngleMotionMovingAverageSmoother', 'SimilarityMovingAverageSmoother']
-
-
 class MovingAverageSmootherSettings(BaseSettings):
     """Configuration for moving average smoothing."""
     window_size: Field[int]        = Field(30)
