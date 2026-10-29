@@ -76,6 +76,24 @@ class Predict:
         """The newest sample's stamp."""
         return self._t
 
+    @property
+    def samples(self) -> int:
+        """How many samples the window holds."""
+        return int(self._samples.shape[0])
+
+    @property
+    def stamps(self) -> np.ndarray:
+        """The window's stamps, oldest first."""
+        return self._stamps
+
+    def coefficients(self) -> tuple[np.ndarray, np.ndarray, np.ndarray, float]:
+        """The fit through the newest sample: value, velocity, half the acceleration, and its stamp."""
+        return self._p, self._v, self._a, self._t
+
+    def constrain(self, values: np.ndarray) -> np.ndarray:
+        """Clamp (or wrap) values the way this fit's outputs are."""
+        return self._constrain(values)
+
     def add_sample(self, values: np.ndarray, timestamp: float) -> None:
         """Add a sample with its stamp and refit."""
         if values.shape[0] != self._vector_size:

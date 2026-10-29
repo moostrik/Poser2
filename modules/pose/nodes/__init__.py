@@ -36,5 +36,6 @@ from .filters.temporal_stabilizers import       TemporalStabilizerSettings,   BB
 from .interpolators.base_interpolator import    TickStep
 from .interpolators.chase_interpolators import  ChaseInterpolatorSettings,    BBoxChaseInterpolator,  PointChaseInterpolator, AngleChaseInterpolator, AngleVelocityChaseInterpolator,  AngleSymmetryChaseInterpolator,  SimilarityChaseInterpolator,    AzimuthChaseInterpolator,   DistanceChaseInterpolator
 from .interpolators.lerp_interpolators import   LerpInterpolatorSettings,     BBoxLerpInterpolator,   PointLerpInterpolator,  AngleLerpInterpolator,  AngleVelocityLerpInterpolator,   AngleSymmetryLerpInterpolator
+from .interpolators.predict_interpolators import PredictInterpolatorSettings, BlendMode, BBoxPredictInterpolator, PointPredictInterpolator, AnglePredictInterpolator, AngleVelocityPredictInterpolator, AngleSymmetryPredictInterpolator, SimilarityPredictInterpolator, AzimuthPredictInterpolator, DistancePredictInterpolator
 
 from ..frame import                             FeatureWindow
