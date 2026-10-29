@@ -19,10 +19,10 @@ def keypoints(nose_dx: float = 0.0, nose_ratio: float = NOSE_NEUTRAL, roll: floa
     return points @ matrix.T + np.array([300.0, 200.0])
 
 
-def eye_contour(centre: tuple[float, float], width: float, height: float) -> list[list[float]]:
+def eye_contour(center: tuple[float, float], width: float, height: float) -> list[list[float]]:
     """8 points on an ellipse (including its extremes) and two pupil points."""
-    ellipse = [[centre[0] + width * 0.5 * math.cos(a), centre[1] + height * 0.5 * math.sin(a)] for a in np.linspace(0, 2 * math.pi, 8, endpoint=False)]
-    return ellipse + [list(centre), list(centre)]
+    ellipse = [[center[0] + width * 0.5 * math.cos(a), center[1] + height * 0.5 * math.sin(a)] for a in np.linspace(0, 2 * math.pi, 8, endpoint=False)]
+    return ellipse + [list(center), list(center)]
 
 
 def landmarks(left_height: float, right_height: float, roll: float = 0.0) -> np.ndarray:
@@ -146,7 +146,7 @@ class TestPortraitBox(unittest.TestCase):
     def face(self, roll: float = 0.0) -> Face:
         return Face(np.array([200.0, 100.0, 400.0, 300.0]), 0.9, keypoints(roll=roll))
 
-    def test_the_box_has_the_crop_s_centre_and_size(self):
+    def test_the_box_has_the_crop_s_center_and_size(self):
         # face 200 high, zoom 1.5: 300 wide, at the portrait's aspect 4:5 375 high, around the face's centre
         self.assertEqual(portrait_box(self.face(), 1.5, 0.0, 896, 1120), (150.0, 12.5, 450.0, 387.5))
 

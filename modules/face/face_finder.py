@@ -61,17 +61,17 @@ def crop_geometry(face: Face, portrait_zoom: float, portrait_offset: float, port
 
     crop_width: float = real_size * portrait_zoom
     crop_height: float = crop_width * portrait_height / portrait_width
-    centre: np.ndarray = np.array([(x0 + x1) * 0.5, (y0 + y1) * 0.5]) - axis_y * portrait_offset * real_size
-    return centre, crop_width, crop_height, angle
+    center: np.ndarray = np.array([(x0 + x1) * 0.5, (y0 + y1) * 0.5]) - axis_y * portrait_offset * real_size
+    return center, crop_width, crop_height, angle
 
 
 def portrait_box(face: Face, portrait_zoom: float, portrait_offset: float, portrait_width: int, portrait_height: int) -> tuple[float, float, float, float]:
     """The portrait crop as an upright box in the image (x0, y0, x1, y1, pixels): its centre and size,
     without its rotation. It reaches past the image edge as far as `crop_margin` allows (`crop_edge`), or
     for a rejected face."""
-    centre, crop_width, crop_height, _ = crop_geometry(face, portrait_zoom, portrait_offset, portrait_width, portrait_height)
-    return (float(centre[0] - crop_width * 0.5), float(centre[1] - crop_height * 0.5),
-            float(centre[0] + crop_width * 0.5), float(centre[1] + crop_height * 0.5))
+    center, crop_width, crop_height, _ = crop_geometry(face, portrait_zoom, portrait_offset, portrait_width, portrait_height)
+    return (float(center[0] - crop_width * 0.5), float(center[1] - crop_height * 0.5),
+            float(center[0] + crop_width * 0.5), float(center[1] + crop_height * 0.5))
 
 
 def crop_edge(face: Face, portrait_zoom: float, portrait_offset: float, portrait_width: int, portrait_height: int,
@@ -86,7 +86,7 @@ def crop_edge(face: Face, portrait_zoom: float, portrait_offset: float, portrait
 
 def portrait_crop(img: np.ndarray, face: Face, portrait_zoom: float, portrait_offset: float, portrait_width: int, portrait_height: int) -> np.ndarray:
     """Crop a portrait around the face, rotated so the eyes are level (as ComfyUI's face crop did)."""
-    centre, crop_width, crop_height, angle = crop_geometry(face, portrait_zoom, portrait_offset, portrait_width, portrait_height)
+    center, crop_width, crop_height, angle = crop_geometry(face, portrait_zoom, portrait_offset, portrait_width, portrait_height)
     axis_x: np.ndarray = np.array([np.cos(angle), np.sin(angle)])     # portrait x axis in the image
     axis_y: np.ndarray = np.array([-np.sin(angle), np.cos(angle)])    # portrait y axis (down) in the image
 
@@ -95,7 +95,7 @@ def portrait_crop(img: np.ndarray, face: Face, portrait_zoom: float, portrait_of
 
     # map each portrait pixel to the image: origin at the top left corner, axes scaled to pixels
     scale: float = crop_width / portrait_width
-    origin: np.ndarray = centre - half_x - half_y
+    origin: np.ndarray = center - half_x - half_y
     matrix: np.ndarray = np.array([[axis_x[0] * scale, axis_y[0] * scale, origin[0]],
                                    [axis_x[1] * scale, axis_y[1] * scale, origin[1]]])
     # the crop may extend past the image edge: fill that part with the edge pixels instead of black

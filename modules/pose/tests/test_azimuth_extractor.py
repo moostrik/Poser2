@@ -41,7 +41,7 @@ class AzimuthExtractorTest(unittest.TestCase):
     def _azimuth(self, frame: Frame) -> float:
         return self.extractor.process(frame)[Azimuth].value
 
-    def test_eyes_on_box_centre_equal_bbox_azimuth(self) -> None:
+    def test_eyes_on_box_center_equal_bbox_azimuth(self) -> None:
         self.assertAlmostEqual(self._azimuth(_frame()), 0.5, places=5)
 
     def test_shift_is_eye_midpoint_offset_through_projection(self) -> None:

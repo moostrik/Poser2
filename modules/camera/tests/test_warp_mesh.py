@@ -132,7 +132,7 @@ class SourceLensTest(unittest.TestCase):
         self.assertAlmostEqual(focal, 568.9, delta=0.1)          # the four units' mean, 568.6, rounded to the step
         self.assertEqual((cx, cy), (CX - 10.5, CY + 10.5))
 
-    def test_centre_offset_survives_the_720_crop(self) -> None:
+    def test_center_offset_survives_the_720_crop(self) -> None:
         # The 720-row mode is a centre crop, so the offset from the frame centre is the same.
         _, cx8, cy8 = source_lens((1280, 800), 1280, MONO_FOV_H, LENS_FOV, LENS_CENTER)
         _, cx7, cy7 = source_lens((1280, 720), 1280, MONO_FOV_H, LENS_FOV, LENS_CENTER)
@@ -218,7 +218,7 @@ class WarpMeshProjectionTest(unittest.TestCase):
         self.assertAlmostEqual(sx, CX, delta=1e-3)
         self.assertAlmostEqual(sy, CY, delta=1e-3)
 
-    def test_the_centre_column_is_straight(self) -> None:
+    def test_the_center_column_is_straight(self) -> None:
         n = 9
         pts = mesh(0.0, mesh_w=n, mesh_h=n).reshape(n, n, 2)
         np.testing.assert_allclose(pts[:, 4, 0], CX, atol=1e-6)      # centre column: x stays centre
@@ -283,7 +283,7 @@ class WarpMeshGeometryTest(unittest.TestCase):
                 self.assertAlmostEqual(sx, cx, delta=0.01)
                 self.assertAlmostEqual(sy, cy, delta=0.01)
 
-    def test_the_bottom_row_reads_the_sensor_bottom_on_the_centre_column(self) -> None:
+    def test_the_bottom_row_reads_the_sensor_bottom_on_the_center_column(self) -> None:
         # The window is pinned there: nothing is black at the bottom of the centre column, and
         # no sensor row below the axis is thrown away, at any tilt.
         n = 9
@@ -368,7 +368,7 @@ class WarpMeshGeometryTest(unittest.TestCase):
 class WarpMeshCropTest(unittest.TestCase):
     """The square crop is a window on the same lens, not a different one."""
 
-    def test_square_crop_keeps_the_centre_and_the_vertical_mapping(self) -> None:
+    def test_square_crop_keeps_the_center_and_the_vertical_mapping(self) -> None:
         # The crop removes columns only: its centre column is the full frame's, and its rows
         # map exactly as the full frame's do, at any tilt.
         n = 9
@@ -415,7 +415,7 @@ class FrameCoverageTest(unittest.TestCase):
                 hi = mid
         return win.row(lo)
 
-    def test_the_centre_column_is_covered_top_to_bottom(self) -> None:
+    def test_the_center_column_is_covered_top_to_bottom(self) -> None:
         for tilt in (0.0, 16.0):
             with self.subTest(tilt=tilt):
                 cov = self._coverage(tilt)

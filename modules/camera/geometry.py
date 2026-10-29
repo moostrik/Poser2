@@ -354,9 +354,9 @@ def lens_deviation(focal: float, cx: float, cy: float, src_size: tuple[int, int]
     shared_focal, shared_cx, shared_cy = source_lens(src_size, mode_width, fov_h, lens_fov, lens_center)
     if shared_focal <= 0.0 or focal <= 0.0:
         return float('nan')
-    centre: float = math.hypot(cx - shared_cx, cy - shared_cy) / shared_focal
+    center: float = math.hypot(cx - shared_cx, cy - shared_cy) / shared_focal
     edge: float = (mode_width / 2.0) * abs(1.0 / shared_focal - 1.0 / focal)
-    return math.degrees(max(centre, edge))
+    return math.degrees(max(center, edge))
 
 
 def _project_grid(
@@ -521,10 +521,10 @@ def coverage_summary(coverage: np.ndarray, out_size: tuple[int, int], mode_width
     off axis, the worse side) and at the edge columns (idem)."""
     out_w, out_h = out_size
     dpp: float = degrees_per_pixel(fov_h, mode_width)
-    centre: float = (out_w - 1) / 2.0
+    center: float = (out_w - 1) / 2.0
 
     def column(bearing: float) -> int:
-        x: float = centre + (bearing / dpp if dpp > 0.0 else 0.0)
+        x: float = center +(bearing / dpp if dpp > 0.0 else 0.0)
         x = (out_w - 1) - x if flip_h else x
         return int(round(min(max(x, 0.0), out_w - 1.0)))
 

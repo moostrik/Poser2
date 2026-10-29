@@ -218,10 +218,10 @@ class LensImageTest(unittest.TestCase):
                 found = brightest_row(self.warped['ceiling'], column, expected)
                 self.assertIsNotNone(found)
                 self.assertAlmostEqual(found, expected, delta=1.0)
-        # And it is genuinely curved: the centre sits well above the sides.
-        centre = WINDOW.row(math.degrees(math.atan(Scene.CEILING / Scene.WALL)))
+        # And it is genuinely curved: the center sits well above the sides.
+        center = WINDOW.row(math.degrees(math.atan(Scene.CEILING / Scene.WALL)))
         side = WINDOW.row(math.degrees(math.atan(Scene.CEILING * math.cos(math.radians(55.0)) / Scene.WALL)))
-        self.assertGreater(side - centre, 100.0)
+        self.assertGreater(side - center, 100.0)
 
     def test_a_metre_is_the_same_height_anywhere_in_the_frame(self) -> None:
         # The cylindrical property: at a fixed horizontal distance a vertical metre spans

@@ -28,12 +28,12 @@ class FaceLandmarks():
     def detect(self, image: np.ndarray, face: Face, roll: float = 0.0) -> np.ndarray:
         """The 106 landmarks of the face, in image pixels; `roll` in degrees levels the crop."""
         x0, y0, x1, y1 = face.bbox
-        centre: tuple[float, float] = (float(x0 + x1) * 0.5, float(y0 + y1) * 0.5)
+        center: tuple[float, float] = (float(x0 + x1) * 0.5, float(y0 + y1) * 0.5)
         scale: float = INPUT_SIZE / (max(face.width, face.height) * CROP_SCALE)
-        # rotate and scale about the face centre, then move the centre to the middle of the input
-        matrix: np.ndarray = cv2.getRotationMatrix2D(centre, roll, scale)
-        matrix[0, 2] += INPUT_SIZE * 0.5 - centre[0]
-        matrix[1, 2] += INPUT_SIZE * 0.5 - centre[1]
+        # rotate and scale about the face center, then move the center to the middle of the input
+        matrix: np.ndarray = cv2.getRotationMatrix2D(center, roll, scale)
+        matrix[0, 2] += INPUT_SIZE * 0.5 - center[0]
+        matrix[1, 2] += INPUT_SIZE * 0.5 - center[1]
         crop: np.ndarray = cv2.warpAffine(image, matrix, (INPUT_SIZE, INPUT_SIZE), borderValue=(0, 0, 0))
 
         blob: np.ndarray = cv2.dnn.blobFromImage(crop, 1.0, (INPUT_SIZE, INPUT_SIZE), (0.0, 0.0, 0.0), swapRB=True)

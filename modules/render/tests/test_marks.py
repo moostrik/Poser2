@@ -250,7 +250,7 @@ class TestFieldWidth(unittest.TestCase):
     """The width says which rule owns this part of the turn, and it is the rule's angle wide rather
     than either side of the line, so that two fields overlapping *is* the rule."""
 
-    def test_in_an_overlap_it_is_the_link_angle_centred_on_the_mark(self) -> None:
+    def test_in_an_overlap_it_is_the_link_angle_centered_on_the_mark(self) -> None:
         m: Mark = mark(observation(0, 120.0, 96.0, overlap=True))
         low, high = span(m)
         self.assertAlmostEqual(high - low, LINK_ANGLE, places=9)

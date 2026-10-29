@@ -51,6 +51,6 @@ class AzimuthExtractor(FilterNode):
         eye_x: float = sum(eye_xs) / len(eye_xs)
 
         eye_column: float = rect.x + eye_x * rect.width
-        centre_column: float = rect.x + 0.5 * rect.width
+        center_column: float = rect.x + 0.5 * rect.width
         return (self._column_to_azimuth(pose.cam_id, eye_column)
-                - self._column_to_azimuth(pose.cam_id, centre_column))
+                - self._column_to_azimuth(pose.cam_id, center_column))
