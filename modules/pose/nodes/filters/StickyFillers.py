@@ -93,11 +93,11 @@ class AngleStickyFiller(FeatureStickyFiller):
         super().__init__(settings,Angles)
 
 
-class AngleVelStickyFiller(FeatureStickyFiller):
+class AngleVelocityStickyFiller(FeatureStickyFiller):
     def __init__(self, settings:StickyFillerSettings) -> None:
         super().__init__(settings,AngleVelocity)
 
 
-class AngleSymStickyFiller(FeatureStickyFiller):
+class AngleSymmetryStickyFiller(FeatureStickyFiller):
     def __init__(self, settings:StickyFillerSettings) -> None:
         super().__init__(settings,AngleSymmetry)

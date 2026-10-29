@@ -8,7 +8,7 @@ import unittest
 import numpy as np
 
 from modules.pose.features import AngleLandmark, Angles, AngleSymmetry
-from modules.pose.nodes import AngleRateLimiter, AngleSymRateLimiter, RateLimiterSettings
+from modules.pose.nodes import AngleRateLimiter, AngleSymmetryRateLimiter, RateLimiterSettings
 
 from ._builders import frame, scalar
 
@@ -30,7 +30,7 @@ class RateLimitTest(unittest.TestCase):
     """The limiter itself, through a plain-vector node's instance, with explicit times."""
 
     def _limiter(self, max_increase: float = 2.0, max_decrease: float = 1.0):
-        return AngleSymRateLimiter(_settings(max_increase, max_decrease))._limiter
+        return AngleSymmetryRateLimiter(_settings(max_increase, max_decrease))._limiter
 
     def test_the_first_value_initializes_at_once(self) -> None:
         limiter = self._limiter()

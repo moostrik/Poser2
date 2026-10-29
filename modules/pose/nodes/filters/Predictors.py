@@ -112,12 +112,12 @@ class AnglePredictor(FeaturePredictor):
         super().__init__(settings,Angles)
 
 
-class AngleVelPredictor(FeaturePredictor):
+class AngleVelocityPredictor(FeaturePredictor):
     def __init__(self, settings:PredictorSettings) -> None:
         super().__init__(settings,AngleVelocity)
 
 
-class AngleSymPredictor(FeaturePredictor):
+class AngleSymmetryPredictor(FeaturePredictor):
     def __init__(self, settings:PredictorSettings) -> None:
         super().__init__(settings,AngleSymmetry)
 

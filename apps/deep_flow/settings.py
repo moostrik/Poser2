@@ -139,7 +139,7 @@ class PointFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0)
 
-    confidence_filter = Group(nodes.DualConfFilterSettings)
+    confidence_filter = Group(nodes.DualConfidenceFilterSettings)
     smoother     = Group(nodes.EuroSmootherSettings, share=[frequency])
     prediction   = Group(nodes.PredictorSettings, share=[frequency])
     interpolator = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
@@ -157,7 +157,7 @@ class VelocityFeature(BaseSettings):
     frequency:          Field[float] = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float] = Field(60.0)
 
-    extractor     = Group(nodes.AngleVelExtractorSettings, share=[frequency])
+    extractor     = Group(nodes.AngleVelocityExtractorSettings, share=[frequency])
     smoother         = Group(nodes.EuroSmootherSettings, share=[frequency])
     prediction          = Group(nodes.PredictorSettings, share=[frequency])
     interpolator  = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
@@ -165,7 +165,7 @@ class VelocityFeature(BaseSettings):
 
 class MotionFeature(BaseSettings):
     extractor       = Group(nodes.AngleMotionExtractorSettings)
-    moving_average  = Group(nodes.MovingAverageSettings)
+    moving_average  = Group(nodes.MovingAverageSmootherSettings)
 
 
 # ---------------------------------------------------------------------------

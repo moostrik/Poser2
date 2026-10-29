@@ -129,10 +129,10 @@ class DeepFlowMain:
         # STAGE CLEAN
         self.filters_clean = trackers.FilterTracker({
             i: trackers.FilterPipeline([
-                nodes.PointDualConfFilter(p.point.confidence_filter),
+                nodes.PointDualConfidenceFilter(p.point.confidence_filter),
                 nodes.AngleExtractor(p.angle_extractor),
                 nodes.AngleCalibrator(),
-                nodes.AngleVelExtractor(p.velocity.extractor),
+                nodes.AngleVelocityExtractor(p.velocity.extractor),
             ])
             for i in range(num_players)
         }, name="Pose clean")
@@ -145,12 +145,12 @@ class DeepFlowMain:
                 nodes.PointEuroSmoother(p.point.smoother),
                 nodes.AngleExtractor(p.angle_extractor),
                 nodes.AngleCalibrator(),
-                nodes.AngleVelExtractor(p.velocity.extractor),
-                nodes.AngleVelEuroSmoother(p.velocity.smoother),
+                nodes.AngleVelocityExtractor(p.velocity.extractor),
+                nodes.AngleVelocityEuroSmoother(p.velocity.smoother),
                 nodes.AngleEuroSmoother(p.angle.smoother),
                 nodes.AngleMotionExtractor(p.motion.extractor),
                 nodes.AngleMotionMovingAverageSmoother(p.motion.moving_average),
-                nodes.AngleSymExtractor(),
+                nodes.AngleSymmetryExtractor(),
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),
             ])
@@ -164,7 +164,7 @@ class DeepFlowMain:
             i: trackers.FilterPipeline([
                 nodes.PointPredictor(p.point.prediction),
                 nodes.AnglePredictor(p.angle.prediction),
-                nodes.AngleVelPredictor(p.velocity.prediction),
+                nodes.AngleVelocityPredictor(p.velocity.prediction),
                 nodes.AngleStickyFiller(p.angle.sticky),
             ])
             for i in range(num_players)
@@ -180,17 +180,17 @@ class DeepFlowMain:
                 nodes.BBoxChaseInterpolator(p.bbox.interpolator),
                 nodes.PointChaseInterpolator(p.point.interpolator),
                 nodes.AngleChaseInterpolator(p.angle.interpolator),
-                nodes.AngleVelChaseInterpolator(p.velocity.interpolator),
+                nodes.AngleVelocityChaseInterpolator(p.velocity.interpolator),
             ])
             for i in range(num_players)
         }, name="Pose interpolate")
         self.filters_lerp = trackers.FilterTracker({
             i: trackers.FilterPipeline([
-                nodes.AngleSymExtractor(),
+                nodes.AngleSymmetryExtractor(),
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),
-                nodes.AngleVelStickyFiller(p.velocity.sticky),
-                nodes.AngleVelEuroSmoother(p.velocity.smoother),
+                nodes.AngleVelocityStickyFiller(p.velocity.sticky),
+                nodes.AngleVelocityEuroSmoother(p.velocity.smoother),
                 nodes.AngleMotionExtractor(p.motion.extractor),
                 nodes.AngleMotionMovingAverageSmoother(p.motion.moving_average),
             ])

@@ -11,7 +11,7 @@ from collections import defaultdict
 import numpy as np
 
 # Pose imports
-from .._utils.ArrayEmaSmooth import EMASmooth, AngleEMASmooth, PointEMASmooth
+from .._utils.ArrayEmaSmooth import EmaSmooth, AngleEmaSmooth, PointEmaSmooth
 from ...features import Angles, Points2D, AngleVelocity, AngleMotion, AngleSymmetry, BBox, Similarity, BaseFeature
 from ..Nodes import FilterNode
 from ...frame import Frame, replace
@@ -29,10 +29,10 @@ class FeatureEmaSmoother(FilterNode):
 
     # Registry mapping feature types to smoother classes
     _SMOOTH_MAP: dict[type[BaseFeature], type] = defaultdict(
-        lambda: EMASmooth,
+        lambda: EmaSmooth,
         {
-            Angles: AngleEMASmooth,
-            Points2D: PointEMASmooth,
+            Angles: AngleEmaSmooth,
+            Points2D: PointEmaSmooth,
         }
     )
 
@@ -86,12 +86,12 @@ class AngleEmaSmoother(FeatureEmaSmoother):
         super().__init__(settings,Angles)
 
 
-class AngleVelEmaSmoother(FeatureEmaSmoother):
+class AngleVelocityEmaSmoother(FeatureEmaSmoother):
     def __init__(self, settings:EmaSmootherSettings) -> None:
         super().__init__(settings,AngleVelocity)
 
 
-class AngleSymEmaSmoother(FeatureEmaSmoother):
+class AngleSymmetryEmaSmoother(FeatureEmaSmoother):
     def __init__(self, settings:EmaSmootherSettings) -> None:
         super().__init__(settings,AngleSymmetry)
 

@@ -37,7 +37,7 @@ EASING_FUNCTIONS: dict[str, Callable[[float], float]] = {
 }
 
 
-class EasingSettings(BaseSettings):
+class EasingNodeSettings(BaseSettings):
     """Configuration for easing with selectable function."""
     easing_name: Field[str] = Field('easeInOutSine')
 
@@ -54,8 +54,8 @@ class EasingNode(FilterNode):
     (e.g., AngleMotion, LeaderScore).
     """
 
-    def __init__(self, settings: EasingSettings, feature_type: type[NormalizedSingleValue]) -> None:
-        self.settings: EasingSettings = settings
+    def __init__(self, settings: EasingNodeSettings, feature_type: type[NormalizedSingleValue]) -> None:
+        self.settings: EasingNodeSettings = settings
         self._feature_type: type[NormalizedSingleValue] = feature_type
 
     def process(self, pose: Frame) -> Frame:
@@ -88,5 +88,5 @@ class EasingNode(FilterNode):
 class AngleMotionEasingNode(EasingNode):
     """Convenience class for easing angle_motion."""
 
-    def __init__(self, settings: EasingSettings) -> None:
+    def __init__(self, settings: EasingNodeSettings) -> None:
         super().__init__(settings, AngleMotion)

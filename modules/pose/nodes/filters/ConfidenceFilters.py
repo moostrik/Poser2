@@ -100,11 +100,11 @@ class AngleConfidenceFilter(ConfidenceFilter):
         super().__init__(settings,Angles)
 
 
-class AngleVelConfidenceFilter(ConfidenceFilter):
+class AngleVelocityConfidenceFilter(ConfidenceFilter):
     def __init__(self, settings:ConfidenceFilterSettings) -> None:
         super().__init__(settings,AngleVelocity)
 
 
-class AngleSymConfFilter(ConfidenceFilter):
+class AngleSymmetryConfidenceFilter(ConfidenceFilter):
     def __init__(self, settings:ConfidenceFilterSettings) -> None:
         super().__init__(settings,AngleSymmetry)

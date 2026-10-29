@@ -1,4 +1,4 @@
-"""Tests for AngleSymExtractor — signed left-minus-right per pair, the limbs as wholes."""
+"""Tests for AngleSymmetryExtractor — signed left-minus-right per pair, the limbs as wholes."""
 
 import math
 import unittest
@@ -7,7 +7,7 @@ import numpy as np
 
 from modules.pose.frame import Frame
 from modules.pose.features import Angles, AngleLandmark, AngleSymmetry, SymmetryElement
-from modules.pose.nodes import AngleSymExtractor, LegDeviationExtractorSettings
+from modules.pose.nodes import AngleSymmetryExtractor,LegDeviationExtractorSettings
 
 
 def _frame(**joints: float) -> Frame:
@@ -28,9 +28,9 @@ def _settings() -> LegDeviationExtractorSettings:
     return cfg
 
 
-class AngleSymExtractorTest(unittest.TestCase):
+class AngleSymmetryExtractorTest(unittest.TestCase):
     def _sym(self, frame: Frame) -> AngleSymmetry:
-        return AngleSymExtractor(_settings()).process(frame)[AngleSymmetry]
+        return AngleSymmetryExtractor(_settings()).process(frame)[AngleSymmetry]
 
     def test_a_mirror_symmetric_pose_is_zero_everywhere(self) -> None:
         sym = self._sym(_frame(left_shoulder=0.7, right_shoulder=0.7, left_elbow=-0.2, right_elbow=-0.2,
@@ -71,7 +71,7 @@ class AngleSymExtractorTest(unittest.TestCase):
         self.assertEqual(sym.get_score(SymmetryElement.elbow), 1.0)
 
     def test_all_nan_leaves_feature_absent(self) -> None:
-        out = AngleSymExtractor(_settings()).process(_frame())
+        out = AngleSymmetryExtractor(_settings()).process(_frame())
         self.assertNotIn(AngleSymmetry, out)
         self.assertTrue(np.isnan(out[AngleSymmetry].values).all())
         np.testing.assert_array_equal(out[AngleSymmetry].scores, 0.0)

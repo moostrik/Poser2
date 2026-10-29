@@ -77,11 +77,11 @@ class AngleLerpInterpolator(FeatureLerpInterpolator):
         super().__init__(settings,Angles)
 
 
-class AngleVelLerpInterpolator(FeatureLerpInterpolator):
+class AngleVelocityLerpInterpolator(FeatureLerpInterpolator):
     def __init__(self, settings:LerpInterpolatorSettings) -> None:
         super().__init__(settings,AngleVelocity)
 
 
-class AngleSymLerpInterpolator(FeatureLerpInterpolator):
+class AngleSymmetryLerpInterpolator(FeatureLerpInterpolator):
     def __init__(self, settings:LerpInterpolatorSettings) -> None:
         super().__init__(settings,AngleSymmetry)

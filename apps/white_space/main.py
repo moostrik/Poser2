@@ -200,14 +200,14 @@ class WhiteSpaceMain:
         # POSE STAGE CLEAN
         self.filters_clean = trackers.FilterTracker({
             i: trackers.FilterPipeline([
-                nodes.PointDualConfFilter(ps.point.confidence),
+                nodes.PointDualConfidenceFilter(ps.point.confidence),
                 nodes.PointStickyFiller(ps.point.sticky),
                 # Here, not later: the keypoints are still normalised in the crop they came from, so
                 # the box's jitter cancels out of the eye azimuth. A held eye moves with the box.
                 nodes.AzimuthExtractor(self._column_to_azimuth),
                 nodes.AngleExtractor(ps.angle_extractor),
                 nodes.AngleCalibrator(ps.angle_calibrator),
-                nodes.AngleVelExtractor(ps.velocity.extractor),
+                nodes.AngleVelocityExtractor(ps.velocity.extractor),
             ])
             for i in range(max_players)
         }, name="Pose clean")
@@ -222,14 +222,14 @@ class WhiteSpaceMain:
                 nodes.PointEuroSmoother(ps.point.smoother),
                 nodes.AngleExtractor(ps.angle_extractor),
                 nodes.AngleCalibrator(ps.angle_calibrator),
-                nodes.AngleVelExtractor(ps.velocity.extractor),
-                nodes.AngleVelEuroSmoother(ps.velocity.smoother),
+                nodes.AngleVelocityExtractor(ps.velocity.extractor),
+                nodes.AngleVelocityEuroSmoother(ps.velocity.smoother),
                 nodes.AngleEuroSmoother(ps.angle.smoother),
                 nodes.AzimuthEuroSmoother(ps.azimuth.smoother),
                 nodes.DistanceEuroSmoother(ps.distance.smoother),
                 nodes.AngleMotionExtractor(ps.motion.extractor),
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
-                nodes.AngleSymExtractor(ps.leg_deviation_extractor),
+                nodes.AngleSymmetryExtractor(ps.leg_deviation_extractor),
                 nodes.LegDeviationExtractor(ps.leg_deviation_extractor),
                 nodes.ArmDeviationExtractor(ps.arm_deviation_extractor),
                 nodes.ArmTravelExtractor(ps.arm_travel_extractor),
@@ -266,7 +266,7 @@ class WhiteSpaceMain:
             i: trackers.FilterPipeline([
                 nodes.PointPredictor(ps.point.prediction),
                 nodes.AnglePredictor(ps.angle.prediction),
-                nodes.AngleVelPredictor(ps.velocity.prediction),
+                nodes.AngleVelocityPredictor(ps.velocity.prediction),
                 nodes.AzimuthPredictor(ps.azimuth.prediction),
                 nodes.AngleStickyFiller(ps.angle.sticky),
             ])
@@ -282,7 +282,7 @@ class WhiteSpaceMain:
             i: trackers.InterpolatorPipeline([
                 nodes.PointChaseInterpolator(ps.point.interpolator),
                 nodes.AngleChaseInterpolator(ps.angle.interpolator),
-                nodes.AngleVelChaseInterpolator(ps.velocity.interpolator),
+                nodes.AngleVelocityChaseInterpolator(ps.velocity.interpolator),
                 nodes.SimilarityChaseInterpolator(ps.similarity.interpolator),
                 nodes.AzimuthChaseInterpolator(ps.azimuth.interpolator),
                 nodes.DistanceChaseInterpolator(ps.distance.interpolator),
@@ -294,7 +294,7 @@ class WhiteSpaceMain:
                 # First, before the extractors: every angle-derived measure (arm travel, leg
                 # deviation) inherits the cap, and the sound's angle messages read the same values.
                 nodes.AngleRateLimiter(ps.angle.rate_limiter),
-                nodes.AngleSymExtractor(ps.leg_deviation_extractor),
+                nodes.AngleSymmetryExtractor(ps.leg_deviation_extractor),
                 nodes.LegDeviationExtractor(ps.leg_deviation_extractor),
                 nodes.ArmDeviationExtractor(ps.arm_deviation_extractor),
                 nodes.ArmTravelExtractor(ps.arm_travel_extractor),
@@ -302,8 +302,8 @@ class WhiteSpaceMain:
                 nodes.TorsoTiltExtractor(ps.torso_tilt_extractor),
                 nodes.MotionTimeExtractor(),
                 nodes.AgeExtractor(),
-                nodes.AngleVelStickyFiller(ps.velocity.sticky),
-                nodes.AngleVelEuroSmoother(ps.velocity.smoother),
+                nodes.AngleVelocityStickyFiller(ps.velocity.sticky),
+                nodes.AngleVelocityEuroSmoother(ps.velocity.smoother),
                 nodes.AngleMotionExtractor(ps.motion.extractor),
                 nodes.AngleMotionMovingAverageSmoother(ps.motion.moving_average),
                 PlayheadOffsetExtractor(self.board.get_playhead),

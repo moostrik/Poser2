@@ -136,11 +136,11 @@ class AngleTemporalStabilizer(TemporalStabilizer):
         super().__init__(settings,Angles)
 
 
-class AngleVelTemporalStabilizer(TemporalStabilizer):
+class AngleVelocityTemporalStabilizer(TemporalStabilizer):
     def __init__(self, settings:TemporalStabilizerSettings) -> None:
         super().__init__(settings,AngleVelocity)
 
 
-class AngleSymTemporalStabilizer(TemporalStabilizer):
+class AngleSymmetryTemporalStabilizer(TemporalStabilizer):
     def __init__(self, settings:TemporalStabilizerSettings) -> None:
         super().__init__(settings,AngleSymmetry)

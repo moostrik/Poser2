@@ -17,7 +17,7 @@ _RIGHT: list[AngleLandmark] = [
 ]
 
 
-class AngleSymExtractor(FilterNode):
+class AngleSymmetryExtractor(FilterNode):
     """Extracts the signed left-minus-right symmetry of every pair from the (mirrored) angles.
 
     The four joints: the difference wrapped to [-π, π), over π. ``arms``: the mean of the

@@ -77,12 +77,12 @@ class AngleRateLimiter(FeatureRateLimiter):
         super().__init__(settings,Angles)
 
 
-class AngleVelRateLimiter(FeatureRateLimiter):
+class AngleVelocityRateLimiter(FeatureRateLimiter):
     def __init__(self, settings:RateLimiterSettings) -> None:
         super().__init__(settings,AngleVelocity)
 
 
-class AngleSymRateLimiter(FeatureRateLimiter):
+class AngleSymmetryRateLimiter(FeatureRateLimiter):
     def __init__(self, settings:RateLimiterSettings) -> None:
         super().__init__(settings,AngleSymmetry)
 

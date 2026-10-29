@@ -6,7 +6,7 @@ from typing import Union
 import numpy as np
 
 
-class EMASmooth:
+class EmaSmooth:
     """Exponential Moving Average (EMA) smoothing for vector data with attack/release.
 
     Provides asymmetric smoothing with different response rates for increasing vs decreasing values.
@@ -149,7 +149,7 @@ class EMASmooth:
         self.release = release
 
 
-class AngleEMASmooth(EMASmooth):
+class AngleEmaSmooth(EmaSmooth):
     """EMA smoothing for angular/circular data with proper wrapping.
 
     Smoothing is applied to the shortest angular path between current and target values.
@@ -192,7 +192,7 @@ class AngleEMASmooth(EMASmooth):
         self._smoothed = np.arctan2(np.sin(self._smoothed), np.cos(self._smoothed))
 
 
-class PointEMASmooth(EMASmooth):
+class PointEmaSmooth(EmaSmooth):
     """EMA smoothing for 2D points with (x, y) coordinates."""
 
     def __init__(self, vector_size: int, attack: float = 0.5, release: float = 0.2,
@@ -220,4 +220,4 @@ class PointEMASmooth(EMASmooth):
         return self._smoothed.reshape(self._num_points, 2).copy()
 
 
-ArrayEMASmooth = Union[EMASmooth, AngleEMASmooth, PointEMASmooth]
+ArrayEmaSmooth = Union[EmaSmooth, AngleEmaSmooth, PointEmaSmooth]

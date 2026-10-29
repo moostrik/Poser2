@@ -13,10 +13,10 @@ from modules.pose.features import (
 from modules.pose.frame import Frame
 from modules.pose.nodes import (
     AgeExtractor, AngleCalibrator, AngleEuroSmoother, AngleExtractor, AngleMotionExtractor, AngleMotionMovingAverageSmoother,
-    AnglePredictor, AngleRateLimiter, AngleStickyFiller, AngleSymExtractor, AngleVelEuroSmoother, AngleVelExtractor,
-    AngleVelPredictor, AngleVelStickyFiller, AzimuthEuroSmoother, AzimuthExtractor, AzimuthPredictor,
-    DualConfFilterSettings, EuroSmootherSettings, FilterNode, LeaderScoreApplicator, LegDeviationExtractor, MotionGateApplicator, MotionTimeExtractor,
-    MovingAverageSettings, PointDualConfFilter, PointEuroSmoother, PointPredictor, PointStickyFiller,
+    AnglePredictor, AngleRateLimiter, AngleStickyFiller, AngleSymmetryExtractor, AngleVelocityEuroSmoother, AngleVelocityExtractor,
+    AngleVelocityPredictor, AngleVelocityStickyFiller, AzimuthEuroSmoother, AzimuthExtractor, AzimuthPredictor,
+    DualConfidenceFilterSettings, EuroSmootherSettings, FilterNode, LeaderScoreApplicator, LegDeviationExtractor, MotionGateApplicator, MotionTimeExtractor,
+    MovingAverageSmootherSettings, PointDualConfidenceFilter, PointEuroSmoother, PointPredictor, PointStickyFiller,
     PredictionMethod, PredictorSettings, RateLimiterSettings, SimilarityApplicator, SimilarityEuroSmoother,
     StickyFillerSettings, TorsoTiltExtractor, WindowType,
 )
@@ -31,19 +31,19 @@ P = PointLandmark
 def _stage_nodes() -> list[FilterNode]:
     """Every FilterNode the app's stage pipelines use, with default settings."""
     return [
-        PointDualConfFilter(DualConfFilterSettings()),
+        PointDualConfidenceFilter(DualConfidenceFilterSettings()),
         PointStickyFiller(StickyFillerSettings()),
         AzimuthExtractor(lambda _cam, x: x),
         AngleExtractor(),
         AngleCalibrator(),
-        AngleVelExtractor(),
+        AngleVelocityExtractor(),
         PointEuroSmoother(EuroSmootherSettings()),
-        AngleVelEuroSmoother(EuroSmootherSettings()),
+        AngleVelocityEuroSmoother(EuroSmootherSettings()),
         AngleEuroSmoother(EuroSmootherSettings()),
         AzimuthEuroSmoother(EuroSmootherSettings()),
         AngleMotionExtractor(),
-        AngleMotionMovingAverageSmoother(MovingAverageSettings()),
-        AngleSymExtractor(),
+        AngleMotionMovingAverageSmoother(MovingAverageSmootherSettings()),
+        AngleSymmetryExtractor(),
         LegDeviationExtractor(),
         TorsoTiltExtractor(),
         MotionTimeExtractor(),
@@ -53,11 +53,11 @@ def _stage_nodes() -> list[FilterNode]:
         SimilarityEuroSmoother(EuroSmootherSettings()),
         PointPredictor(PredictorSettings()),
         AnglePredictor(PredictorSettings()),
-        AngleVelPredictor(PredictorSettings()),
+        AngleVelocityPredictor(PredictorSettings()),
         AzimuthPredictor(PredictorSettings()),
         AngleRateLimiter(RateLimiterSettings()),
         AngleStickyFiller(StickyFillerSettings()),
-        AngleVelStickyFiller(StickyFillerSettings()),
+        AngleVelocityStickyFiller(StickyFillerSettings()),
         MotionGateApplicator(),
     ]
 
@@ -118,15 +118,15 @@ def _conf_frame(wrist_score: float) -> Frame:
                                             scores={P.left_wrist: wrist_score})})
 
 
-class DualConfFilterTest(unittest.TestCase):
-    def _filter(self, rescale: bool = False) -> PointDualConfFilter:
-        settings = DualConfFilterSettings()
+class DualConfidenceFilterTest(unittest.TestCase):
+    def _filter(self, rescale: bool = False) -> PointDualConfidenceFilter:
+        settings = DualConfidenceFilterSettings()
         settings.threshold_low = 0.3
         settings.threshold_high = 0.5
         settings.rescale_scores = rescale
-        return PointDualConfFilter(settings)
+        return PointDualConfidenceFilter(settings)
 
-    def _wrist_visible(self, f: PointDualConfFilter, score: float) -> bool:
+    def _wrist_visible(self, f: PointDualConfidenceFilter, score: float) -> bool:
         return bool(f.process(_conf_frame(score))[Points2D].valid_mask[P.left_wrist])
 
     def test_hysteresis(self) -> None:
@@ -306,9 +306,9 @@ class PredictorTest(unittest.TestCase):
         self.assertAlmostEqual(p.process(_angle_frame(head=0.5))[Angles][A.head], 0.5, places=6)
 
 
-class MovingAverageTest(unittest.TestCase):
+class MovingAverageSmootherTest(unittest.TestCase):
     def _smoother(self, size: int, kind: WindowType) -> AngleMotionMovingAverageSmoother:
-        settings = MovingAverageSettings()
+        settings = MovingAverageSmootherSettings()
         settings.window_size = size
         settings.window_type = kind
         return AngleMotionMovingAverageSmoother(settings)
@@ -405,7 +405,7 @@ class ApplicatorTest(unittest.TestCase):
 
 class AngleVelocityChainTest(unittest.TestCase):
     def test_velocity_sticky_holds_and_zeroes_score(self) -> None:
-        f = AngleVelStickyFiller(StickyFillerSettings())
+        f = AngleVelocityStickyFiller(StickyFillerSettings())
         f.process(frame(features={AngleVelocity: scalar(AngleVelocity, {A.head: 2.0})}))
         out = f.process(frame())[AngleVelocity]
         self.assertAlmostEqual(out[A.head], 2.0, places=6)

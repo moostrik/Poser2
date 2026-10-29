@@ -22,13 +22,13 @@ from modules.pose.frame import FrameDict
 from modules.pose.nodes import (
     AgeExtractor, AngleCalibrator, AngleCalibratorSettings, AngleChaseInterpolator, AngleEuroSmoother, AngleExtractor, AngleExtractorSettings,
     AngleMotionExtractor, AngleMotionExtractorSettings, AngleMotionMovingAverageSmoother, AnglePredictor,
-    AngleStickyFiller, AngleSymExtractor, AngleVelChaseInterpolator, AngleVelEuroSmoother, AngleVelExtractor,
-    AngleVelExtractorSettings, AngleVelPredictor, AngleVelStickyFiller, ArmDeviationExtractor,
+    AngleStickyFiller, AngleSymmetryExtractor, AngleVelocityChaseInterpolator, AngleVelocityEuroSmoother, AngleVelocityExtractor,
+    AngleVelocityExtractorSettings, AngleVelocityPredictor, AngleVelocityStickyFiller, ArmDeviationExtractor,
     ArmDeviationExtractorSettings, ArmTravelExtractor, ArmTravelExtractorSettings, AzimuthChaseInterpolator,
     AzimuthEuroSmoother, AzimuthExtractor, AzimuthPredictor, ChaseInterpolatorSettings,
-    DualConfFilterSettings, EuroSmootherSettings, LeaderScoreApplicator,
+    DualConfidenceFilterSettings, EuroSmootherSettings, LeaderScoreApplicator,
     LegDeviationExtractor, LegDeviationExtractorSettings, MotionGateApplicator, MotionTimeExtractor,
-    MovingAverageSettings, PointChaseInterpolator, PointDualConfFilter, PointEuroSmoother, PointPredictor,
+    MovingAverageSmootherSettings, PointChaseInterpolator, PointDualConfidenceFilter, PointEuroSmoother, PointPredictor,
     PointStickyFiller, PredictorSettings, ShoulderDifferenceExtractor, SimilarityApplicator,
     SimilarityChaseInterpolator, SimilarityEuroSmoother, StickyFillerSettings, TorsoTiltExtractor,
     TorsoTiltExtractorSettings,
@@ -48,17 +48,17 @@ class _Settings:
     """One settings object per role, shared across tracks as the app's settings tree does."""
 
     def __init__(self) -> None:
-        self.confidence = DualConfFilterSettings()
+        self.confidence = DualConfidenceFilterSettings()
         self.point_sticky = StickyFillerSettings()
         self.angle_extractor = AngleExtractorSettings()
         self.angle_calibrator = AngleCalibratorSettings()
-        self.velocity_extractor = AngleVelExtractorSettings()
+        self.velocity_extractor = AngleVelocityExtractorSettings()
         self.point_smoother = EuroSmootherSettings()
         self.velocity_smoother = EuroSmootherSettings()
         self.angle_smoother = EuroSmootherSettings()
         self.azimuth_smoother = EuroSmootherSettings()
         self.motion_extractor = AngleMotionExtractorSettings()
-        self.motion_average = MovingAverageSettings()
+        self.motion_average = MovingAverageSmootherSettings()
         self.leg_deviation = LegDeviationExtractorSettings()
         self.arm_deviation = ArmDeviationExtractorSettings()
         self.arm_travel = ArmTravelExtractorSettings()
@@ -84,12 +84,12 @@ class _Stages:
         tracks = range(NUM_POSES)
 
         self.clean = FilterTracker({i: FilterPipeline([
-            PointDualConfFilter(ps.confidence),
+            PointDualConfidenceFilter(ps.confidence),
             PointStickyFiller(ps.point_sticky),
             AzimuthExtractor(lambda _cam, x: x),
             AngleExtractor(ps.angle_extractor),
             AngleCalibrator(ps.angle_calibrator),
-            AngleVelExtractor(ps.velocity_extractor),
+            AngleVelocityExtractor(ps.velocity_extractor),
         ]) for i in tracks})
 
         self.similarity_applicator = SimilarityApplicator()
@@ -101,13 +101,13 @@ class _Stages:
             PointEuroSmoother(ps.point_smoother),
             AngleExtractor(ps.angle_extractor),
             AngleCalibrator(ps.angle_calibrator),
-            AngleVelExtractor(ps.velocity_extractor),
-            AngleVelEuroSmoother(ps.velocity_smoother),
+            AngleVelocityExtractor(ps.velocity_extractor),
+            AngleVelocityEuroSmoother(ps.velocity_smoother),
             AngleEuroSmoother(ps.angle_smoother),
             AzimuthEuroSmoother(ps.azimuth_smoother),
             AngleMotionExtractor(ps.motion_extractor),
             AngleMotionMovingAverageSmoother(ps.motion_average),
-            AngleSymExtractor(ps.leg_deviation),
+            AngleSymmetryExtractor(ps.leg_deviation),
             LegDeviationExtractor(ps.leg_deviation),
             ArmDeviationExtractor(ps.arm_deviation),
             ArmTravelExtractor(ps.arm_travel),
@@ -123,7 +123,7 @@ class _Stages:
         self.predict = FilterTracker({i: FilterPipeline([
             PointPredictor(ps.point_prediction),
             AnglePredictor(ps.angle_prediction),
-            AngleVelPredictor(ps.velocity_prediction),
+            AngleVelocityPredictor(ps.velocity_prediction),
             AzimuthPredictor(ps.azimuth_prediction),
             AngleStickyFiller(ps.angle_sticky),
         ]) for i in tracks})
@@ -131,13 +131,13 @@ class _Stages:
         self.interpolate = InterpolatorTracker({i: InterpolatorPipeline([
             PointChaseInterpolator(ps.point_interpolator),
             AngleChaseInterpolator(ps.angle_interpolator),
-            AngleVelChaseInterpolator(ps.velocity_interpolator),
+            AngleVelocityChaseInterpolator(ps.velocity_interpolator),
             SimilarityChaseInterpolator(ps.similarity_interpolator),
             AzimuthChaseInterpolator(ps.azimuth_interpolator),
         ]) for i in tracks})
 
         self.lerp = FilterTracker({i: FilterPipeline([
-            AngleSymExtractor(ps.leg_deviation),
+            AngleSymmetryExtractor(ps.leg_deviation),
             LegDeviationExtractor(ps.leg_deviation),
             ArmDeviationExtractor(ps.arm_deviation),
             ArmTravelExtractor(ps.arm_travel),
@@ -145,8 +145,8 @@ class _Stages:
             TorsoTiltExtractor(ps.torso_tilt),
             MotionTimeExtractor(),
             AgeExtractor(),
-            AngleVelStickyFiller(ps.velocity_sticky),
-            AngleVelEuroSmoother(ps.velocity_smoother),
+            AngleVelocityStickyFiller(ps.velocity_sticky),
+            AngleVelocityEuroSmoother(ps.velocity_smoother),
             AngleMotionExtractor(ps.motion_extractor),
             AngleMotionMovingAverageSmoother(ps.motion_average),
         ]) for i in tracks})

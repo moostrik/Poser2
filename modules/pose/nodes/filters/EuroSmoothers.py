@@ -111,12 +111,12 @@ class AngleEuroSmoother(FeatureEuroSmoother):
         super().__init__(settings,Angles)
 
 
-class AngleVelEuroSmoother(FeatureEuroSmoother):
+class AngleVelocityEuroSmoother(FeatureEuroSmoother):
     def __init__(self, settings:EuroSmootherSettings) -> None:
         super().__init__(settings,AngleVelocity)
 
 
-class AngleSymEuroSmoother(FeatureEuroSmoother):
+class AngleSymmetryEuroSmoother(FeatureEuroSmoother):
     def __init__(self, settings:EuroSmootherSettings) -> None:
         super().__init__(settings,AngleSymmetry)
 

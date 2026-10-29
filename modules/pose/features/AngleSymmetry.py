@@ -5,7 +5,7 @@ says which side leads (positive: the left angle is the larger), the magnitude ho
 are. The four joints are the wrapped angle difference over π; ``arms`` is the mean of the
 shoulder and elbow elements, ``legs`` the mean of the hip and knee differences each normalised
 by its own full-deviation angle (as ``LegDeviation`` weights them), clipped to the range.
-Populated by ``AngleSymExtractor`` from ``Angles`` (already mirrored, so a symmetric pose gives
+Populated by ``AngleSymmetryExtractor`` from ``Angles`` (already mirrored, so a symmetric pose gives
 left == right). An element is NaN with score 0.0 when either side is missing.
 """
 

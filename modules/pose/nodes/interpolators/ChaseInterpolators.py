@@ -88,12 +88,12 @@ class AngleChaseInterpolator(FeatureChaseInterpolator):
         super().__init__(settings,Angles)
 
 
-class AngleVelChaseInterpolator(FeatureChaseInterpolator):
+class AngleVelocityChaseInterpolator(FeatureChaseInterpolator):
     def __init__(self, settings:ChaseInterpolatorSettings) -> None:
         super().__init__(settings,AngleVelocity)
 
 
-class AngleSymChaseInterpolator(FeatureChaseInterpolator):
+class AngleSymmetryChaseInterpolator(FeatureChaseInterpolator):
     def __init__(self, settings:ChaseInterpolatorSettings) -> None:
         super().__init__(settings,AngleSymmetry)
 

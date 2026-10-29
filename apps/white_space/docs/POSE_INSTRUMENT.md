@@ -266,7 +266,7 @@ which arm is which shows only as a different sound. The **symmetry** feature (`A
 holds the meaningful pairs, the four joints (shoulder, elbow, hip, knee) and the arm and the leg as
 a whole per side (`arms`: shoulder and elbow; `legs`: hip and knee, weighted as the leg deviation
 is), each signed, left minus right, −1..1, so that downstream the signed value or its absolute can
-be used. A person and their mirror image draw differently. `AngleSymExtractor` makes it; it is
+be used. A person and their mirror image draw differently. `AngleSymmetryExtractor` makes it; it is
 windowed, graphed and sent to Max like the leg deviation. The shoulders' **difference**
 (`ShoulderDifference`, *The body*) is its travel-space sibling: left less right of the travels
 instead of the raw angles, so it rests exactly at 0 at both fixed points through the travels'

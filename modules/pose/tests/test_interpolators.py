@@ -8,7 +8,7 @@ import numpy as np
 from modules.pose.features import AngleLandmark, Angles, AngleVelocity, Points2D, PointLandmark, Similarity
 from modules.pose.frame import Frame
 from modules.pose.nodes import (
-    AngleChaseInterpolator, AngleLerpInterpolator, AngleVelLerpInterpolator, ChaseInterpolatorSettings,
+    AngleChaseInterpolator, AngleLerpInterpolator, AngleVelocityLerpInterpolator, ChaseInterpolatorSettings,
     LerpInterpolatorSettings, PointChaseInterpolator, SimilarityChaseInterpolator,
 )
 from modules.pose.trackers import InterpolatorPipeline
@@ -130,7 +130,7 @@ class InterpolatorPipelineTest(unittest.TestCase):
     def test_merges_each_feature_from_its_own_node(self) -> None:
         pipeline = InterpolatorPipeline([
             AngleLerpInterpolator(LerpInterpolatorSettings()),
-            AngleVelLerpInterpolator(LerpInterpolatorSettings()),
+            AngleVelocityLerpInterpolator(LerpInterpolatorSettings()),
         ])
         pts = points({PointLandmark.nose: (0.5, 0.5)})
 

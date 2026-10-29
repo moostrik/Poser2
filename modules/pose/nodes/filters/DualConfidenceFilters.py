@@ -8,7 +8,7 @@ from ...frame import Frame, replace
 from modules.settings import BaseSettings, Field
 
 
-class DualConfFilterSettings(BaseSettings):
+class DualConfidenceFilterSettings(BaseSettings):
     """Configuration for hysteresis confidence filtering."""
     threshold_low:  Field[float] = Field(0.3)
     threshold_high: Field[float] = Field(0.5)
@@ -31,11 +31,11 @@ class DualConfidenceFilter(FilterNode):
         feature_type: Feature type specifying which feature to filter
 
     Example:
-        settings = HysteresisFilterConfig(threshold_low=0.3, threshold_high=0.5)
-        filter = FeatureHysteresisFilter(settings, Points2D)
+        settings = DualConfidenceFilterSettings(threshold_low=0.3, threshold_high=0.5)
+        filter = DualConfidenceFilter(settings, Points2D)
     """
 
-    def __init__(self, settings: DualConfFilterSettings, feature_type: type[BaseFeature]):
+    def __init__(self, settings: DualConfidenceFilterSettings, feature_type: type[BaseFeature]):
         self.settings = settings
         self._feature_type = feature_type
         # State: tracks which elements are currently "on" (visible)
@@ -99,26 +99,26 @@ class DualConfidenceFilter(FilterNode):
 
 
 # Convenience classes for hysteresis filtering
-class BBoxDualConfFilter(DualConfidenceFilter):
-    def __init__(self, settings:DualConfFilterSettings) -> None:
+class BBoxDualConfidenceFilter(DualConfidenceFilter):
+    def __init__(self, settings:DualConfidenceFilterSettings) -> None:
         super().__init__(settings,BBox)
 
 
-class PointDualConfFilter(DualConfidenceFilter):
-    def __init__(self, settings:DualConfFilterSettings) -> None:
+class PointDualConfidenceFilter(DualConfidenceFilter):
+    def __init__(self, settings:DualConfidenceFilterSettings) -> None:
         super().__init__(settings,Points2D)
 
 
-class AngleDualConfFilter(DualConfidenceFilter):
-    def __init__(self, settings:DualConfFilterSettings) -> None:
+class AngleDualConfidenceFilter(DualConfidenceFilter):
+    def __init__(self, settings:DualConfidenceFilterSettings) -> None:
         super().__init__(settings,Angles)
 
 
-class AngleVelDualConfFilter(DualConfidenceFilter):
-    def __init__(self, settings:DualConfFilterSettings) -> None:
+class AngleVelocityDualConfidenceFilter(DualConfidenceFilter):
+    def __init__(self, settings:DualConfidenceFilterSettings) -> None:
         super().__init__(settings,AngleVelocity)
 
 
-class AngleSymDualConfidenceFilter(DualConfidenceFilter):
-    def __init__(self, settings:DualConfFilterSettings) -> None:
+class AngleSymmetryDualConfidenceFilter(DualConfidenceFilter):
+    def __init__(self, settings:DualConfidenceFilterSettings) -> None:
         super().__init__(settings,AngleSymmetry)

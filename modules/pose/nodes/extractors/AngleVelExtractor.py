@@ -7,12 +7,12 @@ from ...frame import Frame, replace
 from modules.settings import BaseSettings, Field
 
 
-class AngleVelExtractorSettings(BaseSettings):
-    """Configuration for AngleVelExtractor."""
+class AngleVelocityExtractorSettings(BaseSettings):
+    """Configuration for AngleVelocityExtractor."""
     frequency: Field[float] = Field(30.0, access=Field.INIT)
 
 
-class AngleVelExtractor(FilterNode):
+class AngleVelocityExtractor(FilterNode):
     """Computes frame-to-frame changes (deltas) for a single pose.
 
     Calculates:
@@ -21,9 +21,9 @@ class AngleVelExtractor(FilterNode):
     Handles occlusion: Sets deltas to NaN when joints reappear after being invalid.
     """
 
-    def __init__(self, settings: AngleVelExtractorSettings | None = None) -> None:
+    def __init__(self, settings: AngleVelocityExtractorSettings | None = None) -> None:
         super().__init__()
-        self._settings = settings if settings is not None else AngleVelExtractorSettings()
+        self._settings = settings if settings is not None else AngleVelocityExtractorSettings()
         self._prev_pose: Frame | None = None
         self._dt = 1.0 / self._settings.frequency
 
