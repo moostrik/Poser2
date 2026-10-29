@@ -55,8 +55,16 @@
       "apply_warp": false,
       "folder": "20260612-131225_keyframes",
       "sim_passthrough": false,
+      "replay": false,
       "start_norm": 0.0,
       "end_norm": 1.0
+    },
+    "detector": {
+      "model": "yolov8n_coco_512x448.onnx",
+      "model_path": "data/models",
+      "confidence": 0.5,
+      "overlap": 0.5,
+      "verbose": false
     },
     "recorder": {
       "temp_path": "temp",

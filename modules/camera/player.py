@@ -39,6 +39,7 @@ class SimulatorSettings(BaseSettings):
     folder:             Field[str]              = Field("", widget=Widget.text_select, options=available_folders, description="Recording folder")
     refresh:            Field[bool]             = Field(False, widget=Widget.button, description="Refresh recording folders")
     sim_passthrough:    Field[bool]             = Field(False, description="Passthrough", visible=False)
+    replay:             Field[bool]             = Field(False, access=Field.INIT, description="Play the recordings on the host without an OAK device: the person detector and tracker run in software (modules/camera/replay)")
     start_norm:         Field[float]            = Field(0.0, min=0.0, max=1.0, widget=Widget.slider, description="Range start", newline=True)
     end_norm:           Field[float]            = Field(1.0, min=0.0, max=1.0, widget=Widget.slider, description="Range end")
     playback_norm:      Field[float]            = Field(0.0, min=0.0, max=1.0, access=Field.READ, widget=Widget.slider, description="Playback head (normalized)")

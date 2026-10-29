@@ -14,7 +14,8 @@
       "device_id": "19443010D153874800",
       "flip_h": false,
       "flip_v": true,
-      "keystone": -0.22,      "lens_fov": 0.0,
+      "keystone": -0.22,
+      "lens_fov": 0.0,
       "lens_centre_x": 0.0,
       "lens_centre_y": 0.0,
       "readings": {
@@ -45,7 +46,8 @@
       "device_id": "19443010D1E4974800",
       "flip_h": false,
       "flip_v": true,
-      "keystone": -0.22,      "lens_fov": 0.0,
+      "keystone": -0.22,
+      "lens_fov": 0.0,
       "lens_centre_x": 0.0,
       "lens_centre_y": 0.0,
       "readings": {
@@ -76,7 +78,8 @@
       "device_id": "19443010D14C874800",
       "flip_h": false,
       "flip_v": true,
-      "keystone": -0.22,      "lens_fov": 0.0,
+      "keystone": -0.22,
+      "lens_fov": 0.0,
       "lens_centre_x": 0.0,
       "lens_centre_y": 0.0,
       "readings": {
@@ -115,8 +118,16 @@
       ],
       "folder": "20260607-152033_3_square_color_UMU260607-1500",
       "sim_passthrough": false,
+      "replay": false,
       "range_start": 0,
       "range_end": 22
+    },
+    "detector": {
+      "model": "yolov8n_coco_512x448.onnx",
+      "model_path": "data/models",
+      "confidence": 0.5,
+      "overlap": 0.5,
+      "verbose": false
     },
     "tracker": {
       "tracklet_min_age": 3,
