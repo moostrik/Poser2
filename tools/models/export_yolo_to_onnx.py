@@ -2,7 +2,9 @@
 """Export the YOLOv8 person detector to ONNX for the replay backend's host detector.
 
 The same weights the device blobs were built from (`data/models/base/yolov8n.pt`), at the wide
-blob's input size, with a dynamic batch so one run takes every camera's frame of a round.
+blob's input size, with a dynamic batch so one run takes every camera's frame of a round
+(ultralytics makes the height and width symbols too; the size stays in the file's `imgsz`
+metadata, which the detector reads).
 ultralytics is not a dependency of the apps: run this once with it added for the call.
 
 Usage (from the repo root, on a PC with the venv):
@@ -21,11 +23,11 @@ from ultralytics import YOLO
 
 def export(weights: str, output: str, width: int, height: int, opset: int) -> None:
     model = YOLO(weights)
-    # ultralytics writes <weights stem>.onnx next to the weights; dynamic = the batch axis
+    # ultralytics writes <weights stem>.onnx next to the weights; dynamic = batch, height and width
     exported = model.export(format='onnx', imgsz=(height, width), dynamic=True, simplify=True, opset=opset, half=False)
     Path(output).parent.mkdir(parents=True, exist_ok=True)
     shutil.move(str(exported), output)
-    print(f"Exported {weights} to {output} at {width}x{height}, opset {opset}, dynamic batch")
+    print(f"Exported {weights} to {output} at {width}x{height} (in the imgsz metadata), opset {opset}, dynamic batch")
 
 
 if __name__ == '__main__':
