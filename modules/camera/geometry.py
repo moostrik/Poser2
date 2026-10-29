@@ -574,3 +574,77 @@ def orientation_from_gravity(gx: float, gy: float, gz: float) -> tuple[float, fl
     tilt: float = math.degrees(math.atan2(-gz, math.hypot(gx, gy)))
     roll: float = math.degrees(math.atan2(gx, gy))
     return (tilt, roll)
+
+
+# ---------------------------------------------------------------------------
+#  The board's IMU: a vector from the IMU's frame into the camera's
+# ---------------------------------------------------------------------------
+# `orientation_from_gravity` turns the gravity vector into tilt and roll; these get the vector
+# there. A backend reads the IMU-to-camera matrix off its device's calibration and knows the
+# turn its board mounts the IMU at (`oak.definitions.IMU_BOARD_ROLL`, measured on the OAK-D).
+
+def imu_to_camera(vector: tuple[float, float, float],
+                  extrinsics: list[list[float]] | None) -> tuple[float, float, float]:
+    """Rotate a vector from the IMU's frame into a camera's.
+
+    ``extrinsics`` is the 4x4 from ``CalibrationHandler.getImuToCameraExtrinsics``; only its
+    rotation block is used, since a direction has no position. A missing or malformed matrix
+    falls through as the identity: on a board where the two frames happen to agree that is
+    right, and where they do not it is at least not silently wrong in an invented direction.
+    """
+    if not extrinsics or len(extrinsics) < 3:
+        return vector
+    try:
+        return tuple(                                       # type: ignore[return-value]
+            sum(extrinsics[row][col] * vector[col] for col in range(3))
+            for row in range(3)
+        )
+    except (IndexError, TypeError):
+        return vector
+
+
+def unroll_imu_frame(vector: tuple[float, float, float], board_roll: float) -> tuple[float, float, float]:
+    """Undo the IMU's mounting rotation about the optical axis, `board_roll` degrees.
+
+    A rotation about z, so it corrects the roll and cannot disturb the tilt. Under this matrix a
+    rotation by `angle` maps a roll of phi to phi - angle, so the angle to apply IS the offset
+    being removed, not its negation.
+    """
+    angle: float = math.radians(board_roll)
+    cos_a, sin_a = math.cos(angle), math.sin(angle)
+    x, y, z = vector
+    return (x * cos_a - y * sin_a, x * sin_a + y * cos_a, z)
+
+
+# ---------------------------------------------------------------------------
+#  Keystone: the four corners a homography pins
+# ---------------------------------------------------------------------------
+# The keystone correction of hd_trio and deep_flow is a homography that maps the frame's four
+# corners to four points spread by `keystone` (a fraction of the frame): the top edge narrowed
+# and the bottom widened, so a person seen from a down-tilted camera gets normal proportions
+# while the whole frame is kept. `oak.pipeline.find_keystone_warp` samples that homography into
+# a warp mesh; a chip with a four-point transform takes the corners themselves. Both pin the
+# same points, so the two backends agree to the pixel.
+
+Corners = tuple[tuple[float, float], tuple[float, float], tuple[float, float], tuple[float, float]]
+
+
+def keystone_corners(width: int, height: int, keystone: float, flip_h: bool, flip_v: bool,
+                     offset_base: int | None = None) -> tuple[Corners, Corners]:
+    """The source corners of a `width` x `height` frame and where the keystone puts them, in
+    pixels, top-left first and clockwise. `offset_base` is the length the spread is quoted
+    against: the width for a wide frame, the source height for a square cut from it."""
+    base: int = width if offset_base is None else offset_base
+    spread: float = base * 0.5 * keystone
+    src: Corners = ((0.0, 0.0), (float(width), 0.0), (float(width), float(height)), (0.0, float(height)))
+    dst: list[tuple[float, float]] = [(spread, 0.0), (width - spread, 0.0), (width + spread, float(height)), (-spread, float(height))]
+    if flip_h:
+        dst = [(width - x, y) for x, y in dst]
+    if flip_v:
+        dst = [(x, height - y) for x, y in dst]
+    return src, tuple(dst)                                  # type: ignore[return-value]
+
+
+def square_crop(src_size: tuple[int, int], size: int) -> tuple[int, int, int, int]:
+    """The centred `size` x `size` window of a frame, as (x, y, width, height)."""
+    return ((src_size[0] - size) // 2, (src_size[1] - size) // 2, size, size)

@@ -17,12 +17,12 @@ from numpy import ndarray
 
 from .. import CameraResolution, CameraFrame, RigCameraReadings, CameraTracklet, FrameType, CameraFrameCallback, \
     TrackletCallback, orientation_from_gravity, mode_size, frame_size, frame_window, frame_coverage, coverage_summary, \
-    delivered_height, lens_field, lens_deviation
+    delivered_height, lens_field, lens_deviation, imu_to_camera, unroll_imu_frame
 from modules.utils import FPS, Rect
 
 from .control import SensorControl
 from .definitions import TRACKING_STATUS, get_device_list, log_connected_sensors, read_lens_calibration, \
-    imu_rotation_to_camera, imu_to_camera, unroll_imu_frame, IMU_SMOOTHING
+    imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL
 from .pipeline import build_pipeline, WarpConfig, VIDEO_STREAM, TRACKLETS_STREAM, IMU_STREAM, CONTROL_STREAM
 from .settings import OakCameraSettings
 
@@ -263,7 +263,7 @@ class Camera(Thread):
         for packet in msg.packets:
             raw = packet.acceleroMeter
             vector: tuple[float, float, float] = unroll_imu_frame(
-                imu_to_camera((raw.x, raw.y, raw.z), self._imu_rotation))
+                imu_to_camera((raw.x, raw.y, raw.z), self._imu_rotation), IMU_BOARD_ROLL)
             if self._gravity is None:
                 self._gravity = vector
             else:

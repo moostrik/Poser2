@@ -6,7 +6,6 @@ control ranges, and the board's IMU. The frame geometry every camera shares is
 
 from pathlib import Path
 
-import math
 from depthai import Tracklet, TrackerType, Device, OpenVINO, MonoCameraProperties, ColorCameraProperties
 
 from .. import CameraResolution, resolve_resolution, TrackingStatus
@@ -162,41 +161,6 @@ IMU_SMOOTHING: float = 0.1
 # fourth unit on this rig needs -2.25 while sitting level — a sensor fault, probably from a fall —
 # which no shared constant could ever have absorbed.
 IMU_BOARD_ROLL: float = -90.0
-
-
-def imu_to_camera(vector: tuple[float, float, float],
-                  extrinsics: list[list[float]] | None) -> tuple[float, float, float]:
-    """Rotate a vector from the IMU's frame into a camera's.
-
-    ``extrinsics`` is the 4x4 from ``CalibrationHandler.getImuToCameraExtrinsics``; only its
-    rotation block is used, since a direction has no position. A missing or malformed matrix
-    falls through as the identity — on a board where the two frames happen to agree that is
-    right, and where they do not it is at least not silently wrong in an invented direction.
-    """
-    if not extrinsics or len(extrinsics) < 3:
-        return vector
-    try:
-        return tuple(                                       # type: ignore[return-value]
-            sum(extrinsics[row][col] * vector[col] for col in range(3))
-            for row in range(3)
-        )
-    except (IndexError, TypeError):
-        return vector
-
-
-def unroll_imu_frame(vector: tuple[float, float, float],
-                     board_roll: float = IMU_BOARD_ROLL) -> tuple[float, float, float]:
-    """Undo the IMU's mounting rotation about the optical axis.
-
-    A rotation about z, so it corrects the roll and cannot disturb the tilt — which is the reason
-    the tilt readout was already trustworthy before this existed. See ``IMU_BOARD_ROLL``.
-    """
-    # Under this matrix a rotation by `angle` maps a roll of phi to phi - angle, so the angle to
-    # apply IS the offset being removed, not its negation.
-    angle: float = math.radians(board_roll)
-    cos_a, sin_a = math.cos(angle), math.sin(angle)
-    x, y, z = vector
-    return (x * cos_a - y * sin_a, x * sin_a + y * cos_a, z)
 
 
 def read_lens_calibration(device: Device, socket, mode_size: tuple[int, int],
