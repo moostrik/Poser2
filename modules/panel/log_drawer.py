@@ -1,4 +1,6 @@
-"""The log drawer: the app's log ring buffer as a slide-up drawer at the bottom of the page."""
+"""The log drawer: the app's log ring buffer as a slide-up drawer at the bottom of the page.
+
+Its styles are in the page's stylesheet (static/panel.css), its scroll and drag helpers in its script."""
 
 from __future__ import annotations
 
@@ -47,21 +49,6 @@ def build_log_drawer(buf: LogRingBuffer | None, *, poll_interval: float) -> tupl
         'show_time': False,
         'show_source': False,
     }
-
-    ui.add_css('''
-    .log-drawer { font-family: 'Roboto Mono', monospace; font-size: 13px; }
-    .log-drawer .log-line {
-        padding: 1px 8px;
-        white-space: pre-wrap; word-break: break-all; line-height: 1.4;
-    }
-    .log-chip-active { opacity: 1.0 !important; }
-    .log-chip-inactive { opacity: 0.35 !important; }
-    .log-drag-handle {
-        height: 6px; cursor: ns-resize; background: #333;
-        flex-shrink: 0; transition: background 0.15s;
-    }
-    .log-drag-handle:hover, .log-drag-handle:active { background: #4af; }
-    ''')
 
     drawer = ui.element('div').classes('log-drawer').style(
         f'position: fixed; bottom: 0; left: 0; right: 0; height: {LOG_DRAWER_DEFAULT_HEIGHT};'
@@ -151,7 +138,7 @@ def build_log_drawer(buf: LogRingBuffer | None, *, poll_interval: float) -> tupl
     def _clear_log():
         log_area.clear()
         if buf:
-            state['cursor'] = buf._counter
+            state['cursor'] = buf.cursor
         state['auto_scroll'] = True
 
     def _make_line_text(entry) -> tuple[str, str]:
@@ -173,10 +160,7 @@ def build_log_drawer(buf: LogRingBuffer | None, *, poll_interval: float) -> tupl
             _scroll_to_bottom()
 
     def _scroll_to_bottom():
-        ui.run_javascript(f'''
-            var el = document.getElementById("c{log_area.id}");
-            if (el) {{ el.scrollTop = el.scrollHeight; }}
-        ''')
+        ui.run_javascript(f'panel.scrollToBottom({log_area.id})')
 
     def _full_refresh():
         log_area.clear()
@@ -207,35 +191,11 @@ def build_log_drawer(buf: LogRingBuffer | None, *, poll_interval: float) -> tupl
 
     ui.timer(poll_interval, _poll_log)   # stopped by NiceGUI when the client is gone
 
-    log_area.on('scroll', lambda: ui.run_javascript(f'''
-        var el = document.getElementById("c{log_area.id}");
-        if (el) {{
-            var atBottom = (el.scrollHeight - el.scrollTop - el.clientHeight) < 30;
-            emitEvent("log_scroll", {{atBottom: atBottom}});
-        }}
-    '''))
+    # The page's script (panel.js) tells the server when the user scrolls away from the bottom
+    # and makes the handle drag the drawer's height.
+    log_area.on('scroll', lambda: ui.run_javascript(f'panel.reportScroll({log_area.id})'))
     ui.on('log_scroll', lambda e: state.update({'auto_scroll': e.args.get('atBottom', True)}))
-
-    ui.run_javascript(f'''
-        (function() {{
-            var handle = document.getElementById("c{drag_handle.id}");
-            var drawer = document.getElementById("c{drawer.id}");
-            if (!handle || !drawer) return;
-            var startY = 0, startH = 0, dragging = false;
-            handle.addEventListener("mousedown", function(e) {{
-                dragging = true; startY = e.clientY;
-                startH = drawer.offsetHeight;
-                e.preventDefault();
-            }});
-            document.addEventListener("mousemove", function(e) {{
-                if (!dragging) return;
-                var newH = startH + (startY - e.clientY);
-                newH = Math.max(100, Math.min(window.innerHeight - 60, newH));
-                drawer.style.height = newH + "px";
-            }});
-            document.addEventListener("mouseup", function() {{ dragging = false; }});
-        }})();
-    ''')
+    ui.run_javascript(f'panel.dragHandle({drag_handle.id}, {drawer.id})')
 
     visible = {'v': False}
 

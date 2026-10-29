@@ -275,8 +275,7 @@ class Status(Control):
         shown, hidden = (self.ok_text, self.warning_text) if value else (self.warning_text, self.ok_text)
         shown.classes(remove="invisible")
         hidden.classes(add="invisible")
-        self.badge._props["color"] = "positive" if value else "negative"
-        self.badge.update()
+        self.badge.props("color=positive" if value else "color=negative")
 
 
 class Toggle(Control):
@@ -290,12 +289,9 @@ class Toggle(Control):
 
     def show(self, value: Any) -> None:
         if value:
-            self.button.props(remove="outline")
-            self.button._props["color"] = "primary"
+            self.button.props("color=primary", remove="outline")
         else:
-            self.button.props(add="outline")
-            self.button._props["color"] = "grey"
-        self.button.update()
+            self.button.props("color=grey outline")
 
 
 class ActionButton(Control):

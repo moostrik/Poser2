@@ -2028,7 +2028,7 @@ class TestPresetsUtilities(unittest.TestCase):
 
     def setUp(self):
         # presets resolves "apps/<app>/data/settings" relative to the cwd, so each test runs
-        # inside a temp tree under a throwaway app name — exercising the real _app_dir lookup.
+        # inside a temp tree under a throwaway app name — exercising the real app_dir lookup.
         tmp = self.enterContext(tempfile.TemporaryDirectory())
         self._orig_cwd = os.getcwd()
         os.chdir(tmp)
