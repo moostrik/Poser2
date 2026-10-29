@@ -92,7 +92,7 @@ class StreamReader:
             if self.frame_rate == 0.0:
                 self.frame_rate = frame_rate
         except Exception as e:
-            logger.error('Error getting video dimensions:', e)
+            logger.error('Error getting video dimensions of %s: %s', video_file, e)
             self.ffmpeg_process = None
             return
 
@@ -120,7 +120,7 @@ class StreamReader:
                 )
 
         except ffmpeg.Error as e:
-            logger.error('Error loading:', e)
+            logger.error('Error loading %s: %s', video_file, e)
             self.ffmpeg_process = None
 
         with self._load_lock:
@@ -159,7 +159,7 @@ class StreamReader:
                     # print ('End of stream', self.frame_type)
                     break
             except ffmpeg.Error as e:
-                logger.error('Error reading frame:', e)
+                logger.error('Error reading frame: %s', e)
                 break
 
             if self.channels == 3:
