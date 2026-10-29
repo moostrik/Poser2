@@ -11,8 +11,7 @@ from typing import Callable
 from apps.smile.render.settings import SequencerSettings
 from apps.smile.save import share
 from apps.smile.save.record import embed_jpeg
-from apps.smile.video import ffmpeg
-from apps.smile.video.ffmpeg import ClipWriter, Encoder
+from modules import video
 
 logger = logging.getLogger(__name__)
 
@@ -51,10 +50,10 @@ class ClipSaver:
         if self._watermark and not share.write_watermark(watermark, self._watermark):
             self._watermark = None
 
-        self.enabled: bool = ffmpeg.available()
+        self.enabled: bool = video.available()
         if not self.enabled:
             logger.error('ffmpeg not found on the PATH: visitors are not saved')
-        self.encoder: Encoder = ffmpeg.pick_encoder(settings.encoder) if self.enabled else Encoder.CPU
+        self.encoder: video.Encoder = video.pick_encoder(settings.encoder) if self.enabled else video.Encoder.CPU
         logger.info('Clip encoder: %s', self.encoder.value)
 
         self.queue: queue.Queue[Command] = queue.Queue(max_queue_size)
@@ -129,7 +128,7 @@ class ClipSaver:
     def _save_loop(self) -> None:
         id: str = ''
         style: str = STYLES[0]
-        writer: ClipWriter | None = None
+        writer: video.ClipWriter | None = None
         while not (self.stop_event.is_set() and self.queue.empty()):
             try:
                 command = self.queue.get(timeout=.1)
@@ -142,7 +141,7 @@ class ClipSaver:
                         self._finish(id, style, writer, keep=False)
                     id = command[1]
                     style = command[3]
-                    writer = ClipWriter(self._temp_path(id, '.mp4'), command[2], self.encoder)
+                    writer = video.ClipWriter(self._temp_path(id, '.mp4'), command[2], self.encoder)
                     self._share = None
                 elif writer is None:
                     continue
@@ -174,7 +173,7 @@ class ClipSaver:
         if writer is not None:
             self._finish(id, style, writer, keep=False)
 
-    def _finish(self, id: str, style: str, writer: ClipWriter, keep: bool) -> None:
+    def _finish(self, id: str, style: str, writer: video.ClipWriter, keep: bool) -> None:
         complete: bool = writer.close()
         temp = {name: self._temp_path(id, name) for name in ('.mp4', '_capture.jpg', '_portrait.jpg')}
         kept: bool = keep and complete

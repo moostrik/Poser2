@@ -8,8 +8,7 @@ from unittest import mock
 
 import numpy as np
 
-from apps.smile.face.FaceFinder import FaceFrame
-from apps.smile.face.quality import FaceObservation, Pose, Rejection
+from modules.face import FaceFrame, FaceObservation, Pose, Rejection
 from apps.smile.online.Online import ASK_TIMEOUT, INSIDE, LOOKING, SAVE_TIMEOUT, Online, Phase, face_message
 from apps.smile.online.settings import OnlineSettings
 from apps.smile.render.Sequencer import SeqenceMessage, SequenceType

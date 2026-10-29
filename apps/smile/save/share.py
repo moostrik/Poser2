@@ -12,8 +12,7 @@ import numpy as np
 
 from apps.smile.audio import tape
 from apps.smile.credit_scroll import FONT, _render, _render_baseline
-from apps.smile.video import ffmpeg
-from apps.smile.video.ffmpeg import Encoder
+from modules import video
 
 logger = logging.getLogger(__name__)
 
@@ -90,20 +89,20 @@ def write_watermark(text: str, path: str) -> bool:
         return False
 
 
-def build_share(clip: str, track: str | None, offset: float, watermark: str | None, encoder: Encoder, out: str,
+def build_share(clip: str, track: str | None, offset: float, watermark: str | None, encoder: video.Encoder, out: str,
                 sample_rate: int = SAMPLE_RATE) -> None:
     """Write the share clip `out` from the players' clip: `track` from `offset` s (the point the room heard
     when the grin started) on the tape, or silence without one; the `watermark` PNG (or None) in the bottom
     right. Raises when it fails."""
-    frames, fps, width, height = ffmpeg.probe(clip)
+    frames, fps, width, height = video.probe(clip)
     if frames <= 0 or fps <= 0:
         raise RuntimeError(f'{clip} does not say its length')
     duration: float = frames / fps
     seconds: float = duration * SOURCE_MARGIN + 1.0
     if track:
-        audio: np.ndarray = ffmpeg.read_audio(track, offset, seconds, sample_rate)
+        audio: np.ndarray = video.read_audio(track, offset, seconds, sample_rate)
     else:
         audio = np.zeros((round(seconds * sample_rate), 2), np.float32)
     pcm: np.ndarray = tape.resample(audio, tape.speed_curve(duration, sample_rate), sample_rate)
     overlays: list[tuple[str, str]] = [(watermark, 'W-w-24:H-h-24')] if watermark else []
-    ffmpeg.make_share(clip, overlays, pcm, sample_rate, encoder, out)
+    video.make_share(clip, overlays, pcm, sample_rate, encoder, out)

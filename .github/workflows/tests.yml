@@ -30,7 +30,7 @@ jobs:
         shell: bash
         run: |
           status=0
-          for dir in modules modules/settings modules/utils modules/pose modules/tracker modules/oak modules/render apps/white_space apps/smile apps/smile/artnet apps/smile/audio apps/smile/cam apps/smile/comfy apps/smile/face apps/smile/online apps/smile/osc apps/smile/player apps/smile/relay apps/smile/render apps/smile/save apps/smile/video; do
+          for dir in modules modules/settings modules/utils modules/pose modules/tracker modules/oak modules/render modules/face modules/video modules/inout apps/white_space apps/smile apps/smile/audio apps/smile/cam apps/smile/comfy apps/smile/online apps/smile/player apps/smile/relay apps/smile/render apps/smile/save; do
             echo "::group::$dir"
             .venv/Scripts/python -m unittest discover -s "$dir/tests" -t . || status=1
             echo "::endgroup::"

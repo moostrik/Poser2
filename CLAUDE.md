@@ -15,7 +15,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - `apps/` may import `modules/`; `modules/` must never import app code
 - Keep modules independent and cross-module coupling minimal
 - `modules/settings/` is shared infrastructure; any module may depend on it
-- `apps/smile/` has its own rules in its `CLAUDE.md`; its `cam`, `face`, `video`, `osc` and `artnet` stay app-local until they are promoted
+- `apps/smile/` has its own rules in its `CLAUDE.md`; its `cam` stays app-local until the camera contract (step 3) takes it in
 - Never change the White Space fixture firmware (`apps/white_space/data/firmware/`); solve everything on the app side of the wire
 
 ## Naming
@@ -99,8 +99,8 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 
 ```
 python -m unittest discover -s apps/white_space/tests -t .
-python -m unittest discover -s apps/smile/<pkg>/tests -t .  # tests, face, comfy, render, player, relay, ...
-python -m unittest discover -s modules/<pkg>/tests -t .    # oak, pose, render, settings, tracker
+python -m unittest discover -s apps/smile/<pkg>/tests -t .  # tests, comfy, render, player, relay, ...
+python -m unittest discover -s modules/<pkg>/tests -t .    # face, inout, oak, pose, render, settings, tracker, video
 ```
 
 ## API evolution

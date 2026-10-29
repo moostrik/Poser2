@@ -27,7 +27,7 @@ not in git, safe to delete); the app's own logs are in Poser2's `logs\`.
 * configure the global user name and email
 ```git config --global user.name "M.Oostrik"```
 ```git config --global user.email "m.oostrik@gmail.com"```
-* initialize Git LFS: ```git lfs install``` (the face models in `data\models\` and the fonts are LFS files)
+* initialize Git LFS: ```git lfs install``` (the face models in Poser2's `data\models\` and the fonts are LFS files)
 
 ### VSCode (optional, for development)
 * install the latest version from [site](https://code.visualstudio.com/Download)
@@ -76,7 +76,7 @@ not in git, safe to delete); the app's own logs are in Poser2's `logs\`.
 * **laughter test** (Audio tab): `laughter_test` steps one laugh round the screens in their own order, 1 to 48 (1 to 5 down the first rib, 6 to 8 the next, and so on round), `laughter_test_step` seconds each; the screen under test is white with its number meanwhile (`laughter_test_screen` shows it too), on whatever cell the wiring puts it. The laugh must come from the numbered screen, else that screen's line in `screen_angles.txt` is wrong. It is always the same laugh, the file `laughter_test_sample` of `data\audio\laughter` (SMILE sends the patch its number in the folder's alphabetical order, case ignored, which is the order `polybuffer~ readfolder` numbers the files in on NTFS; a laugh that is not the chosen file means that order differs), at one level, and the only one: SMILE sends Max `/laughter_test 1`, which closes the gate of the clips' laughs (the laughter switch may stay as it is, the test sounds either way), and bangs Max itself with `/test_bang <index> <sample>`, past the gates. New visitors wait while the test runs
 
 ### Lights (Art-Net)
-* the Art-Net node is at the panel's `artnet.ip` (10.0.0.11, universe 1); `data\artnet.json` lists the modules: three cores (pc, audio, video) and the 24-LED ring around the camera (mako)
+* the Art-Net node is at the panel's `artnet.ip` (10.0.0.11, universe 1); `data\artnet.json` lists the modules (`lights.py` over `modules.inout.ArtNetSender`): three cores (pc, audio, video) and the 24-LED ring around the camera (mako)
 
 ## RUN
 
@@ -99,7 +99,7 @@ not in git, safe to delete); the app's own logs are in Poser2's `logs\`.
 * ```apps\smile\scripts\start_comfy.bat```: only ComfyUI, in this window (`--enable-manager` for the ComfyUI-Manager); the launcher does not start it, so start it first when running SMILE from VSCode
 * ComfyUI log lines that are safe to ignore: `0 models unloaded.` at every sampler step (ComfyUI fills the card on purpose and reports that nothing could be freed), at startup `[ComfyUI-Manager] PyTorch is not installed` (it wants torchaudio), the `PatchTritonVAE requires triton` traceback (KJNodes, an unused node), `No module named 'llama_cpp'` (QwenVL's GGUF variant, unused), `triton not found`, `Skip loading CUDA and cuDNN DLLs since torch is imported` (a good sign: onnxruntime reuses torch's CUDA), and `ConnectionResetError ... _call_connection_lost` after "Prompt executed" (a browser tab closed). **Not ignorable**: `CUDAExecutionProvider is not in available provider names` means face analysis fell back to the CPU (crops take 25 s instead of 1 s); `install_comfy.ps1` checks the provider and reinstalls `onnxruntime-gpu` when it is missing, so run `apps\smile\scripts\install.bat` again
 * ```.venv\Scripts\python launcher.py -app smile```: `-fs` borderless fullscreen with the walls borderless too (else the preset's window modes), `-wc` a webcam instead of the Vimba camera, `-lm` landscape instead of portrait, `-v` DEBUG on the console (the launcher's, before the app's)
-* ```apps\smile\scripts\make_test_workflow.bat```: writes `data\comfy\smile_test.json`, the app's workflow with a preset's values plus previews and a video recorder, to drag into the ComfyUI page; it starts from the app's last capture, and any other photo goes in after ```.venv\Scripts\python -m apps.smile.face.crop photo.jpg``` (the crop as SMILE makes it, `photo_crop.png`)
+* ```apps\smile\scripts\make_test_workflow.bat```: writes `data\comfy\smile_test.json`, the app's workflow with a preset's values plus previews and a video recorder, to drag into the ComfyUI page; it starts from the app's last capture, and any other photo goes in after ```.venv\Scripts\python -m modules.face.crop photo.jpg``` (the crop as SMILE makes it, `photo_crop.png`)
 * drop a saved clip or portrait on ```apps\smile\scripts\clip_info.bat``` to see what it was made with (the record: id, style, description, seed, settings); ```.venv\Scripts\python -m apps.smile.save.record <file> --preset <name>``` writes those settings to `data\settings\<name>.json`
 * tests: ```.venv\Scripts\python -m unittest discover -s apps/smile/<package>/tests -t .``` from the Poser2 root (`tests`, `face`, `comfy`, ..., `relay`)
 

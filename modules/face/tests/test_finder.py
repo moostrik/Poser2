@@ -4,8 +4,7 @@ import unittest
 
 import numpy as np
 
-from apps.smile.face.FaceFinder import FaceFinder, FaceFrame
-from apps.smile.face.settings import FaceSettings
+from modules.face import FaceFinder, FaceFrame, FaceSettings
 
 
 class NoFaces:

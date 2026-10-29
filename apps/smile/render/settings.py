@@ -8,7 +8,7 @@ from apps.smile.credit_scroll import DEFAULT_GAP_PX as CREDIT_SCROLL_GAP, DEFAUL
 from modules.gl import WindowSettings
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.utils import Color
-from apps.smile.video.ffmpeg import Encoder
+from modules.video import Encoder
 
 
 class Easing(Enum):

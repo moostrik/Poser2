@@ -1,7 +1,7 @@
 import math
 import time
 
-from apps.smile.face.FaceFinder import FaceFrame
+from modules.face import FaceFrame
 from modules.gl import Fbo, Image, Style, SwapFbo, Text, Texture
 from modules.gl.shaders.convenience.BlurH import BlurH
 from modules.gl.shaders.convenience.BlurV import BlurV

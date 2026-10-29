@@ -2,8 +2,7 @@
 
 import unittest
 
-from apps.smile.face.FaceFinder import FaceFrame
-from apps.smile.face.quality import FaceObservation, Pose, Rejection
+from modules.face import FaceFrame, FaceObservation, Pose, Rejection
 from apps.smile.render.layers.face_marks import ACCEPTED_COLOR, FACES_STALE, REJECTED_COLOR, SUBJECT_COLOR, SUBJECT_LINE_PX, LINE_PX, SubjectMark, build_marks, face_fields, fit_box, mix
 
 

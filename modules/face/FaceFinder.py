@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from threading import Thread, Lock
 from typing import Callable
 
-from apps.smile.face.FaceDetector import FaceDetector, Face
-from apps.smile.face.FaceLandmarks import FaceLandmarks
-from apps.smile.face.quality import FaceObservation, Pose, Rejection, distance, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
-from apps.smile.face.settings import FaceSettings
+from .FaceDetector import FaceDetector, Face
+from .FaceLandmarks import FaceLandmarks
+from .quality import FaceObservation, Pose, Rejection, distance, eye_distance, eye_openness, gate, head_pose, readout, rejection_label
+from .settings import FaceSettings
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +128,7 @@ class FaceFinder(Thread):
     frame callbacks, for the overlay."""
 
     def __init__(self, settings: FaceSettings, composition_width: int, composition_height: int,
-                 model_path: str = 'apps/smile/data/models/scrfd_10g_bnkps.onnx', landmark_path: str = 'apps/smile/data/models/2d106det.onnx') -> None:
+                 model_path: str = 'data/models/scrfd_10g_bnkps.onnx', landmark_path: str = 'data/models/2d106det.onnx') -> None:
         super().__init__()
         self.settings: FaceSettings = settings
         self._input_mutex: Lock = Lock()

@@ -1,6 +1,6 @@
-"""ffmpeg and ffprobe as subprocesses: the grin clips are written and read through them.
+"""ffmpeg and ffprobe as subprocesses: clips are written and read through them.
 
-The apps run under pythonw (scripts/start.bat), so every process is started with CREATE_NO_WINDOW
+The apps run under pythonw, so every process is started with CREATE_NO_WINDOW
 and without inheriting stdin or stderr, which are invalid handles there. stderr is a pipe that is
 read when the process ends, so a failure has a message."""
 

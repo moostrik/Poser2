@@ -19,8 +19,7 @@ from apps.smile.player.Render import PlayerRender
 from apps.smile.player.ClipPool import Clip, ClipPool, next_start
 from apps.smile.player.FolderScanner import FolderScanner
 
-from apps.smile.osc.Sender import Sender as Osc
-from apps.smile.osc.settings import OscSettings
+from modules.inout import OscSender, OscSenderSettings
 
 logger = logging.getLogger(__name__)
 
@@ -45,11 +44,11 @@ class Player:
         self.walls: list[PlayerRender] = walls
         self._name: Any = render_settings       # its credit_name goes over the captions
         # the Max patch places a clip's laugh by the cell its play starts in: `/bang <cell>` to the wall's port
-        self.osc: list[Osc] = []
+        self.osc: list[OscSender] = []
         for wall in range(len(walls)):
-            osc_settings = OscSettings()
+            osc_settings = OscSenderSettings()
             osc_settings.port = BANG_PORT + wall
-            self.osc.append(Osc(osc_settings))
+            self.osc.append(OscSender(osc_settings, events=('/bang',)))
         self._lines: CreditLines = CreditLines(str(render_settings.credit_lines))     # the captions' lines, one at random per play
         self._lines_lock = threading.Lock()
         # the cell (0 to 47) that is SMILE Online's: no bang and no caption for the clip playing on unseen

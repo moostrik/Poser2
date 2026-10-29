@@ -23,7 +23,7 @@ import numpy as np
 import requests
 import websocket
 
-from apps.smile.video import ffmpeg
+from modules import video
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +180,7 @@ class Link(Thread):
         fd, temp = tempfile.mkstemp(suffix='.m4a')
         os.close(fd)
         try:
-            ffmpeg.transcode_aac(path, temp)
+            video.transcode_aac(path, temp)
             with open(temp, 'rb') as f:
                 return f.read()
         finally:

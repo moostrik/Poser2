@@ -3,8 +3,7 @@
 import time
 import unittest
 
-from apps.smile.osc.Sender import Sender
-from apps.smile.osc.settings import OscSettings
+from modules.inout import OscSender, OscSenderSettings
 
 
 class FailingClient:
@@ -21,9 +20,9 @@ class FailingClient:
 
 class TestSender(unittest.TestCase):
     def setUp(self):
-        self.settings = OscSettings()
+        self.settings = OscSenderSettings()
         self.settings.fps = 120.0
-        self.sender = Sender(self.settings)
+        self.sender = OscSender(self.settings, events=('/bang', '/test_bang'))
 
     def tearDown(self):
         self.sender.stop()
@@ -46,7 +45,7 @@ class TestSender(unittest.TestCase):
         self.sender.start()
         client = FailingClient(failures=1)
         self.sender.client = client
-        with self.assertLogs('apps.smile.osc.Sender', 'ERROR'):
+        with self.assertLogs('modules.inout.osc_sender', 'ERROR'):
             self.sender.send('/progress', 0.1)
             end = time.time() + 2.0
             while client.failures and time.time() < end:

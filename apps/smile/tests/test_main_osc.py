@@ -9,7 +9,7 @@ from unittest import mock
 
 from apps.smile.main import SmileMain
 from apps.smile.settings import Settings
-from apps.smile.osc.settings import OscSettings
+from modules.inout import OscSenderSettings
 from apps.smile.render.Sequencer import SeqenceMessage, SequenceType
 from modules.settings import presets
 
@@ -17,7 +17,7 @@ from modules.settings import presets
 class TestAudioTree(unittest.TestCase):
     def test_osc_lives_under_audio(self):
         settings = Settings()
-        self.assertIsInstance(settings.audio.osc, OscSettings)
+        self.assertIsInstance(settings.audio.osc, OscSenderSettings)
         self.assertNotIn('osc', settings.children)
         self.assertIn('osc', settings.to_dict()['audio'])
 
@@ -37,7 +37,7 @@ class TestMaxControls(unittest.TestCase):
             settings=self.settings, diffuse=mock.Mock(ready=True),
             # a Mock attribute is truthy: the camera must really not be stalled
             camera=SimpleNamespace(frame=lambda: (None, 0.0), stalled=False, next_image=mock.Mock()),
-            render=mock.Mock(), artnet=mock.Mock(), face=mock.Mock(), save=mock.Mock(), sequencer=mock.Mock(),
+            render=mock.Mock(), lights=mock.Mock(), face=mock.Mock(), save=mock.Mock(), sequencer=mock.Mock(),
             audio=mock.Mock(get_audio_id=lambda: '0001'), osc=mock.Mock(), screen_test=mock.Mock(),
             _limit_visitor=lambda seq: None,
             _style_picked=False, _face_frame_time=0.0, _visitor_start=None, _saving=False, _grin_saved=False,
