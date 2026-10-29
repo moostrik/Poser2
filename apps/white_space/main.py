@@ -187,7 +187,7 @@ class WhiteSpaceMain:
             set_motor=self.conductor.set_motor_mode,
             pose_stage=int(Stage.LERP),
         )
-        self.state_machine.add_state_callback(self.board.set_sequence)
+        self.state_machine.add_state_callback(self.board.set_sequencer_state)
         self.state_machine.add_state_callback(self.osc_sound_sender.set_sequencer_state)
         # HIT SYNC — the hits' poses and the streak of alike ones, published on the board for the machine. It
         # compares the hit poses with the posture module's own distance, on the posture settings.

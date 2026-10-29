@@ -176,7 +176,7 @@ class HDTrioRender(RenderBase):
         self._preview_layers = self.settings.layer.select.preview
 
         # Stage transitions — enter/exit before layer updates so settings writes take effect
-        seq = self.board.get_sequence()
+        seq = self.board.get_sequencer_state()
         stage = ShowStage(seq.stage)
         progress = seq.stage_progress
         prev_stage = self._prev_stage

@@ -63,7 +63,7 @@ class HDTrioMain:
         self.session_osc.bind('/group/id',        self._on_osc_group_id)
         self.osc_sound = OscSound(self.settings.inout.osc_sound)
         self.sequencer = Sequencer(self.settings.session.sequencer)
-        self.sequencer.add_state_callback(self.board.set_sequence)
+        self.sequencer.add_state_callback(self.board.set_sequencer_state)
         self.sequencer.add_state_callback(self.osc_sound.set_sequencer_state)
         self.video_recorder = VideoRecorder(self.settings.session.video, data_path=DATA_PATH)
         self.pose_recorder = PoseRecorder(self.settings.session.pose, data_path=DATA_PATH)
