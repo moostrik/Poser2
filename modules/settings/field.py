@@ -69,7 +69,7 @@ class Field(Generic[T]):
 
     Only *default* affects the runtime behaviour of the class that uses the
     setting.  All other keyword parameters are metadata consumed by the UI
-    layer (``nice_panel.py``) and are never enforced by the descriptor itself:
+    layer (``modules/panel``) and are never enforced by the descriptor itself:
 
     - ``min``, ``max``, ``step`` — range hints for sliders; the descriptor
       does **not** clamp or validate values against them.

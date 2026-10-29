@@ -1,4 +1,4 @@
-"""Knob — the settings panel's rotary control, turned by circling the pointer (see ``nice_knob.js``).
+"""Knob — the settings panel's rotary control, turned by circling the pointer (see ``knob.js``).
 
 Quasar's QKnob sets the value from the angle of the pointer, so grabbing it jumps the value.
 This knob keeps the value where it is on grab and turns by how far the pointer circles from there.
@@ -14,7 +14,7 @@ from nicegui.element import Element
 CHANGE_THROTTLE = 0.05  # seconds between changes sent while turning; the last one always arrives
 
 
-class Knob(Element, component="nice_knob.js"):
+class Knob(Element, component="knob.js"):
     """SVG knob that reports its value through ``on_change`` while the user turns it.
 
     The client shows its own value while the user changes it; ``set_value`` both updates the

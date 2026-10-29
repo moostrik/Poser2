@@ -19,7 +19,8 @@ from apps.smile.online.Online import Online
 from apps.smile.online.Link import http_base
 from apps.smile.player.Player import Player, online_cell_mode
 from apps.smile import sphere
-from modules.settings import presets, NiceServer
+from modules.settings import presets
+from modules.panel import PanelServer
 from modules.gl import FullscreenMode
 from apps.smile.settings import Settings
 from argparse import ArgumentParser, Namespace
@@ -70,19 +71,19 @@ class SmileMain():
         # SETTINGS
         presets.set_app(APP_NAME, default_startup='Smile')
         self.settings = Settings()
-        self.settings.server.title = 'SMILE'
-        self.settings.server.port = 667
+        self.settings.panel.title = 'SMILE'
+        self.settings.panel.port = 667
         preset_file = presets.startup_path()
         if not presets.load(self.settings, preset_file):
             logger.warning('No preset at %s, using defaults', preset_file)
         if not interface:
-            self.settings.server.browser = False  # launcher override; the preset cannot turn it back on
+            self.settings.panel.browser = False  # launcher override; the preset cannot turn it back on
         if fullscreen:
             # the installation's start: borderless (exclusive fullscreen minimizes when a wall gets focus), the walls too
             self.settings.render.window.fullscreen_mode = FullscreenMode.WINDOWED_FULLSCREEN
             self.settings.render.window.secondary_fullscreen = True
         self.settings.initialize()
-        self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
+        self.panel_server = PanelServer(self.settings, self.settings.panel, on_exit=self.stop)
 
         self.sequencer: Sequencer = Sequencer(self.settings.sequence)
         # the generator fills the player with the grin frames, the render plays them on its own clock
@@ -148,7 +149,7 @@ class SmileMain():
         self.osc.start()
         self.lights.start()
 
-        self.settings_server.start()
+        self.panel_server.start()
 
         # last: its frames drive the sequencer, which drives everything else
         self.render.add_exit_callback(self.stop)
@@ -174,7 +175,7 @@ class SmileMain():
                  self.diffuse.clear_message_callbacks, self.diffuse.stop,
                  self.face.clear_frame_callbacks, self.face.stop,
                  self.save.stop,
-                 self.settings_server.stop)
+                 self.panel_server.stop)
         try:
             for step in steps:
                 # a step that fails must not keep the others, or the process, from ending

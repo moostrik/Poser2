@@ -10,7 +10,8 @@ import numpy as np
 
 from modules.utils import Broadcast
 from modules.oak import Camera, Simulator, Player, Sync, Recorder as VideoRecorder, FrameType, CameraCheck
-from modules.settings import presets, NiceServer
+from modules.settings import presets
+from modules.panel import PanelServer
 from modules.inout import OscReceiver
 from modules.tracker import PanoramicTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict
@@ -47,7 +48,7 @@ class WhiteSpaceMain:
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
         self.settings.camera.sim_enabled = simulation
         if not interface:
-            self.settings.server.browser = False  # launcher override; the preset cannot turn it back on
+            self.settings.panel.browser = False  # launcher override; the preset cannot turn it back on
         # The crop is the pose model's input, so it is cut at that size: one antialiased resample
         # from the camera frame, rather than a larger crop the runner scales down again. Derived
         # from the model so a change of pose resolution cannot silently reintroduce the second one.
@@ -55,7 +56,7 @@ class WhiteSpaceMain:
         crop_settings.output_width = self.settings.pose.pose.width
         crop_settings.output_height = self.settings.pose.pose.height
         self.settings.initialize()
-        self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
+        self.panel_server = PanelServer(self.settings, self.settings.panel, on_exit=self.stop)
 
         max_players: int = self.settings.max_players
         num_cameras: int = self.settings.camera.num_cameras
@@ -336,7 +337,7 @@ class WhiteSpaceMain:
         self.render.window_manager.add_keyboard_callback(self._on_key)
 
     def start(self) -> None:
-        self.settings_server.start()
+        self.panel_server.start()
 
         for camera in self.cameras:
             camera.start()
@@ -403,7 +404,7 @@ class WhiteSpaceMain:
             return
         self.is_running = False
 
-        self.settings_server.stop()
+        self.panel_server.stop()
 
         self.render.stop()
 

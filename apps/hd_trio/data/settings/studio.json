@@ -729,7 +729,7 @@
       "fullscreen_mode": "WINDOWED"
     }
   },
-  "server": {
+  "panel": {
     "title": "POSER",
     "port": 666
   },

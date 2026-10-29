@@ -54,7 +54,7 @@ if __name__ == '__main__':
     parser: ArgumentParser = ArgumentParser()
     parser.add_argument('-app',     '--app',            type=str,   default=None, choices=APP_NAMES, help='app to launch (default: from .app_select.json or first app)')
     parser.add_argument('-sim',     '--simulation',     action='store_true',        help='use prerecorded video with camera')
-    parser.add_argument('-ni',      '--no-interface',   action='store_true',        help='do not open the settings interface in an Edge window')
+    parser.add_argument('-ni',      '--no-interface',   action='store_true',        help='do not open the settings panel in an Edge window')
     parser.add_argument('-v',       '--verbose',        action='store_true',        help='enable verbose (DEBUG) console output')
     parser.add_argument('-timing',  '--timing',         type=float, default=0.0,    help='seconds of timing session: write a timing report to logs/, then quit (0 = off)')
     parser.add_argument('-warmup',  '--timing-warmup',  type=float, default=30.0,   help='seconds before the timing session starts')

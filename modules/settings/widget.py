@@ -1,143 +1,82 @@
-"""Widget — GUI presentation hints for Field descriptors.
+"""Widget — the panel hint of a Field: which control shows it.
 
-Each Widget member declares which Field value types it is compatible with.
-The panel uses ``Widget.resolve()`` to map ``Widget.default`` to a concrete
-widget based on the field's type and parameters.
+The hint is pure data; the panel (``modules/panel/controls.py``) holds one builder per member.
+``Widget.resolve()`` maps ``Widget.default`` to the member a field's type and parameters call for.
 
-Adding a new widget:
-    1. Add member to the ``Widget`` enum below.
-    2. Register a builder in ``nice_panel.py`` with ``@widget_builder(Widget.xxx)``.
-    3. Optionally add it to ``resolve()`` if it should be the auto-pick for a type.
+Adding a widget: add the member here with its types in ``_TYPES``, register its builder in the
+panel, and add it to ``resolve()`` when it should be the pick for a type.
 """
 
 from __future__ import annotations
 
 import math
-from enum import Enum
+from enum import Enum, auto
 from typing import TYPE_CHECKING, get_origin, get_args
+
+from modules.utils import Color, Point2f, Rect
 
 if TYPE_CHECKING:
     from .field import Field
 
-# Lazy import to avoid circular dependency at module level.
-# Special types are only needed at runtime inside accepts() / resolve().
-_Color = None
-_Point2f = None
-_Rect = None
-
-def _get_color():
-    global _Color
-    if _Color is None:
-        from modules.utils import Color
-        _Color = Color
-    return _Color
-
-
-def _get_point2f():
-    global _Point2f
-    if _Point2f is None:
-        from modules.utils import Point2f
-        _Point2f = Point2f
-    return _Point2f
-
-
-def _get_rect():
-    global _Rect
-    if _Rect is None:
-        from modules.utils import Rect
-        _Rect = Rect
-    return _Rect
-
 
 class Widget(Enum):
-    """GUI hint for how a Setting should be rendered in the panel.
-
-    Each member carries a ``types`` tuple declaring compatible Setting
-    value types, or ``None`` meaning *any type* (used by ``default``,
-    ``color``, ``color_alpha``, ``point2f``, ``rect``).
+    """The control a field is shown with; ``default`` lets ``resolve()`` pick one.
 
     List widgets:
         - ``checklist`` — checkboxes only (pick items, no reorder)
         - ``playlist``  — checkboxes + reorder arrows (pick and arrange)
         - ``order``     — reorder arrows only (arrange, no selection)
-
-    The ``resolve(field)`` class method maps ``Widget.default`` to a concrete
-    widget based on the field's ``type_``, ``min``, and ``max``.
     """
 
-    # Use __new__ to give each member a unique auto-incrementing int value
-    # so that members with the same compatible types (e.g. switch/toggle/button)
-    # remain distinct instead of collapsing into aliases.
-    # Enum unpacks tuple values as positional args, so we accept *args.
-    def __new__(cls, *args):
-        obj = object.__new__(cls)
-        obj._value_ = len(cls.__members__) + 1
-        return obj
-
-    def __init__(self, *args) -> None:
-        # args == (None,) for 'default = None'; (bool,) for 'switch = (bool,)';
-        # (int, float) for 'slider = (int, float)'; etc.
-        if len(args) == 1 and args[0] is None:
-            self._types = None
-        else:
-            self._types = args
-
-    # -- Members (argument = compatible types, or None) ----------------------
+    default = auto()
     # bool widgets
-    default     = None
-    switch      = (bool,)
-    toggle      = (bool,)
-    button      = (bool,)
-    status      = (bool,)   # read-only badge: "<label> OK" in green when True, "<label> WARNING" in red when False
+    switch = auto()
+    toggle = auto()
+    button = auto()
+    status = auto()         # read-only badge: "<label> OK" in green when True, "<label> WARNING" in red when False
     # numeric widgets
-    slider      = (int, float)
-    log_slider  = (int, float)   # logarithmic slider for values spanning decades; needs min > 0
-    number      = (int, float)
-    knob        = (int, float)
-    number_field = (int, float)
+    slider = auto()
+    log_slider = auto()     # logarithmic slider for values spanning decades; needs min > 0
+    number = auto()
+    knob = auto()
+    number_field = auto()
     # enum widgets
-    select      = (Enum,)
-    radio       = (Enum,)
+    select = auto()
+    radio = auto()
     # string widgets
-    input       = (str,)
-    ip_field          = (str,)
-    textarea    = (str,)
-    text_select = (str,)
-    # color widgets (accepts() uses lazy Color import)
-    color       = None
-    color_alpha = None
-    point2f     = None
-    rect        = None
+    input = auto()
+    ip_field = auto()
+    textarea = auto()
+    text_select = auto()
+    # value-object widgets
+    color = auto()
+    color_alpha = auto()
+    point2f = auto()
+    rect = auto()
     # list widgets
-    checklist   = (list,)
-    playlist    = (list,)
-    order       = (list,)
-    number_list = (list,)
-
-    # -- Public API ----------------------------------------------------------
+    checklist = auto()
+    playlist = auto()
+    order = auto()
+    number_list = auto()
 
     @property
     def types(self) -> tuple[type, ...] | None:
         """Compatible field types, or ``None`` for *any type*."""
-        return self._types
+        return _TYPES[self]
 
     def accepts(self, field_type: type) -> bool:
         """Return True if this widget is compatible with *field_type*."""
-        types = self._types
-        if types is None:
-            # Widget.default accepts anything; special widgets need exact type matches.
-            if self.name in ("color", "color_alpha"):
-                return field_type is _get_color()
-            if self.name == "point2f":
-                return field_type is _get_point2f()
-            if self.name == "rect":
-                return field_type is _get_rect()
-            return True  # Widget.default accepts anything
+        if self is Widget.default:
+            return True
+        exact = _EXACT_TYPES.get(self)
+        if exact is not None:
+            return field_type is exact
+        types = _TYPES[self]
         origin = get_origin(field_type)
         if origin is not None:
             field_type = origin  # list[Enum] → list
         # bool is a subclass of int — reject it for numeric widgets
-        if field_type is bool and types and bool not in types:
+        if field_type is bool and bool not in types:
             return False
         for t in types:
             if t is Enum:
@@ -160,9 +99,6 @@ class Widget(Enum):
             return field.widget
 
         ft = field.type_
-        Color = _get_color()
-        Point2f = _get_point2f()
-        Rect = _get_rect()
 
         # Generic list → checklist (enum elements) or number_list (numeric elements)
         if get_origin(ft) is list:
@@ -224,3 +160,39 @@ class Widget(Enum):
     def __repr__(self) -> str:
         return f"Widget.{self.name}"
 
+
+# The field types each widget shows; None for the ones that take any type or one exact type.
+_TYPES: dict[Widget, tuple[type, ...] | None] = {
+    Widget.default: None,
+    Widget.switch: (bool,),
+    Widget.toggle: (bool,),
+    Widget.button: (bool,),
+    Widget.status: (bool,),
+    Widget.slider: (int, float),
+    Widget.log_slider: (int, float),
+    Widget.number: (int, float),
+    Widget.knob: (int, float),
+    Widget.number_field: (int, float),
+    Widget.select: (Enum,),
+    Widget.radio: (Enum,),
+    Widget.input: (str,),
+    Widget.ip_field: (str,),
+    Widget.textarea: (str,),
+    Widget.text_select: (str,),
+    Widget.color: None,
+    Widget.color_alpha: None,
+    Widget.point2f: None,
+    Widget.rect: None,
+    Widget.checklist: (list,),
+    Widget.playlist: (list,),
+    Widget.order: (list,),
+    Widget.number_list: (list,),
+}
+
+# The widgets that take exactly one value-object type.
+_EXACT_TYPES: dict[Widget, type] = {
+    Widget.color: Color,
+    Widget.color_alpha: Color,
+    Widget.point2f: Point2f,
+    Widget.rect: Rect,
+}

@@ -5,7 +5,8 @@ from functools import partial
 
 from modules.utils import Broadcast
 from modules.oak import Camera, CameraCheck, Simulator, Player, Recorder, Sync
-from modules.settings import presets, NiceServer
+from modules.settings import presets
+from modules.panel import PanelServer
 from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, window, FrameDict
@@ -34,9 +35,9 @@ class DeepFlowMain:
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
         self.settings.camera.sim_enabled = simulation
         if not interface:
-            self.settings.server.browser = False  # launcher override; the preset cannot turn it back on
+            self.settings.panel.browser = False  # launcher override; the preset cannot turn it back on
         self.settings.initialize()
-        self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
+        self.panel_server = PanelServer(self.settings, self.settings.panel, on_exit=self.stop)
 
         num_players: int = self.settings.num_players
         p = self.settings.pose
@@ -209,7 +210,7 @@ class DeepFlowMain:
         self.render.add_update_callback(self.interpolators_lerp.update)
 
     def start(self) -> None:
-        self.settings_server.start()
+        self.panel_server.start()
 
         for camera in self.cameras:
             camera.start()
@@ -239,7 +240,7 @@ class DeepFlowMain:
             return
         self.is_running = False
 
-        self.settings_server.stop()
+        self.panel_server.stop()
 
         self.render.stop()
 

@@ -6,7 +6,8 @@ from functools import partial
 
 from modules.utils import Broadcast
 from modules.oak import Camera, CameraCheck, Simulator, Player, Sync, Recorder as VideoRecorder
-from modules.settings import presets, NiceServer
+from modules.settings import presets
+from modules.panel import PanelServer
 from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
 from modules.pose import nodes, trackers, features, window, analytics, FrameDict
@@ -40,12 +41,12 @@ class HDTrioMain:
             raise FileNotFoundError(f"No preset found for '{APP_NAME}' at {preset_file}")
         self.settings.camera.sim_enabled = simulation
         if not interface:
-            self.settings.server.browser = False  # launcher override; the preset cannot turn it back on
+            self.settings.panel.browser = False  # launcher override; the preset cannot turn it back on
         # Never resume armed: a preset saved mid-take would otherwise record the
         # first show after startup.
         self.settings.render.intro_sequence.arm_record = False
         self.settings.initialize()
-        self.settings_server = NiceServer(self.settings, self.settings.server, on_exit=self.stop)
+        self.panel_server = PanelServer(self.settings, self.settings.panel, on_exit=self.stop)
 
         num_players: int = self.settings.num_players
         ps = self.settings.pose
@@ -259,7 +260,7 @@ class HDTrioMain:
         self.render.add_exit_callback(self.stop)
 
     def start(self) -> None:
-        self.settings_server.start()
+        self.panel_server.start()
 
         for camera in self.cameras:
             camera.start()
@@ -292,7 +293,7 @@ class HDTrioMain:
             return
         self.is_running = False
 
-        self.settings_server.stop()
+        self.panel_server.stop()
 
         self.render.stop()
 

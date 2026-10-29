@@ -1072,7 +1072,7 @@
       "play_seconds": 150.0
     }
   },
-  "server": {
+  "panel": {
     "title": "White Space",
     "port": 666,
     "browser": true,

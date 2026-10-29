@@ -543,7 +543,7 @@
       "verbose": false
     }
   },
-  "server": {
+  "panel": {
     "title": "POSER",
     "port": 666,
     "browser": false,

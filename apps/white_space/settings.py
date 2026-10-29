@@ -11,7 +11,8 @@ The root class is ``Settings``.
 
 from enum import IntEnum, auto
 
-from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
+from modules.settings import BaseSettings, Field, Group, Widget
+from modules.panel import PanelSettings
 from modules.oak import CameraSettings, CameraResolution, CameraCheckSettings, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
 from modules.render.layers import LayerMode, AngleOffset
@@ -418,4 +419,4 @@ class Settings(BaseSettings):
     # The pose instrument's values: its own root group, not a layer group (POSE_INSTRUMENT.md, Settings).
     PI     : Group[PoseInstrumentSettings] = Group(PoseInstrumentSettings)
     states : Group[StateMachineSettings] = Group(StateMachineSettings, share=[spin_down_seconds])
-    server : Group[NiceSettings]    = Group(NiceSettings)
+    panel : Group[PanelSettings]    = Group(PanelSettings)
