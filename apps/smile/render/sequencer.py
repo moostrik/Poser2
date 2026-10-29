@@ -4,7 +4,7 @@ from threading import Lock, RLock
 from typing import Callable
 import pytweening as easing
 
-from apps.smile.render.settings import SequencerSettings, easing_function
+from .settings import SequencerSettings, easing_function
 
 class SequenceType(IntEnum):
     NONE            = 0         # Nothing happens, last diffusion shown

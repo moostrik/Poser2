@@ -3,9 +3,9 @@ import time
 
 from modules.face import FaceFrame
 from modules.gl import Fbo, Image, Style, SwapFbo, Text, Texture, shaders
-from apps.smile.render.inputs import Faces
-from apps.smile.render.settings import FaceEffect, FaceFill, RenderSettings
-from apps.smile.render.shaders import FaceColor
+from ..inputs import Faces
+from ..settings import FaceEffect, FaceFill, RenderSettings
+from ..shaders import FaceColor
 
 from .layer_base import LayerBase
 from .mark_drawer import MarkDrawer

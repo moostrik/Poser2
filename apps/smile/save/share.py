@@ -10,8 +10,8 @@ import cv2
 import freetype
 import numpy as np
 
-from apps.smile.audio import tape
-from apps.smile.credit_scroll import FONT, _render, _render_baseline
+from ..audio import resample, speed_curve
+from ..credit_scroll import FONT, _render, _render_baseline
 from modules import video
 
 logger = logging.getLogger(__name__)
@@ -103,6 +103,6 @@ def build_share(clip: str, track: str | None, offset: float, watermark: str | No
         audio: np.ndarray = video.read_audio(track, offset, seconds, sample_rate)
     else:
         audio = np.zeros((round(seconds * sample_rate), 2), np.float32)
-    pcm: np.ndarray = tape.resample(audio, tape.speed_curve(duration, sample_rate), sample_rate)
+    pcm: np.ndarray = resample(audio, speed_curve(duration, sample_rate), sample_rate)
     overlays: list[tuple[str, str]] = [(watermark, 'W-w-24:H-h-24')] if watermark else []
     video.make_share(clip, overlays, pcm, sample_rate, encoder, out)

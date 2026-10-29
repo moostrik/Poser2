@@ -16,7 +16,7 @@ from threading import Lock
 
 import numpy as np
 
-from apps.smile.render.settings import SequencerSettings
+from .settings import SequencerSettings
 
 MIN_FRAMES: int = 8     # frames needed to measure how fast they come in
 RATE_FRAMES: int = 30   # that speed is measured over the newest frames

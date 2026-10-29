@@ -12,7 +12,7 @@ import numpy as np
 from OpenGL.GL import GL_RGBA8  # type: ignore
 
 from modules.gl import Fbo, Texture
-from apps.smile.render.layers.passes import copy
+from .layers import copy
 
 
 class ScreenGrab:

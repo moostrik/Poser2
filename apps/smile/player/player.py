@@ -12,12 +12,12 @@ from typing import Any
 
 import numpy as np
 
-from apps.smile import sphere
-from apps.smile.credit import CreditLines
-from apps.smile.player.clip_loader import ClipLoader
-from apps.smile.player.wall_render import WallRender
-from apps.smile.player.clip_pool import Clip, ClipPool, next_start
-from apps.smile.player.folder_scanner import FolderScanner
+from .. import sphere
+from ..credit import CreditLines
+from .clip_loader import ClipLoader
+from .wall_render import WallRender
+from .clip_pool import Clip, ClipPool, next_start
+from .folder_scanner import FolderScanner
 
 from modules.inout import OscSender, OscSenderSettings
 

@@ -5,9 +5,9 @@ import logging
 import os
 from typing import Callable
 
-from apps.smile import sphere
+from .. import sphere
 
-from apps.smile.audio.settings import AudioSettings
+from .settings import AudioSettings
 
 logger = logging.getLogger(__name__)
 

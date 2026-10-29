@@ -11,7 +11,7 @@ import time
 import numpy as np
 
 from modules.inout import ArtNetSender, ArtNetSenderSettings
-from apps.smile.render.sequencer import AnimationType
+from .render import AnimationType
 
 logger = logging.getLogger(__name__)
 

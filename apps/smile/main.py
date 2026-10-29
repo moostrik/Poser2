@@ -1,29 +1,26 @@
 """SMILE: a camera captures a face, an image generator turns it into a portrait, shown with music and lights,
 and the grins of the visitors before play on the two walls of the sphere (README.md, CLAUDE.md)."""
 
-from apps.smile.cam.camera import Camera
+from .cam import Camera
 from modules.camera import vimba, webcam
 from modules.face import FaceFinder, FaceFrame
-from apps.smile.render.smile_render import SmileRender
-from apps.smile.render.sequencer import Sequencer, SequenceMessage, SequenceType, AnimationType, AnimationTypeNames
-from apps.smile.comfy.generator import Generator
-from apps.smile.render.grin_player import GrinPlayer
-from apps.smile.comfy.messages import GeneratorMessage, GeneratorState
+from .render.smile_render import SmileRender
+from .render import AnimationType, AnimationTypeNames, GrinPlayer, RenderSettings, Sequencer, SequenceMessage, SequenceType
+from .comfy.generator import Generator
+from .comfy.messages import GeneratorMessage, GeneratorState
 from modules.inout import OscSender
-from apps.smile.audio.music_map import MusicMap, laugh_files
-from apps.smile.audio.laughter_test import LaughterTest
-from apps.smile.credit_scroll import CreditScroller
-from apps.smile.render.settings import RenderSettings
-from apps.smile.save.clip_saver import ClipSaver
-from apps.smile.lights import Lights
-from apps.smile.online.online import Online
-from apps.smile.online.link import http_base
-from apps.smile.player.player import Player, online_cell_mode
-from apps.smile import sphere
+from .audio import LaughterTest, MusicMap, laugh_files
+from .credit_scroll import CreditScroller
+from .save import ClipSaver
+from .lights import Lights
+from .online.online import Online
+from .online.link import http_base
+from .player import Player, online_cell_mode
+from . import sphere
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.gl import FullscreenMode
-from apps.smile.settings import Settings
+from .settings import Settings
 from argparse import ArgumentParser, Namespace
 from enum import Enum
 import logging

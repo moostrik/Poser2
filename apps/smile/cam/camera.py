@@ -18,7 +18,7 @@ from typing import Any, Callable
 import cv2
 import numpy as np
 
-from apps.smile.cam.settings import CameraSettings
+from .settings import CameraSettings
 from modules.camera import CameraFrame, CameraSource
 
 logger = logging.getLogger(__name__)

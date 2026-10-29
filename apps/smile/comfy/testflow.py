@@ -13,9 +13,9 @@ import copy
 import json
 import os
 
-from apps.smile.comfy.workflow import Workflow, _find
+from .workflow import Workflow, _find
 from modules.settings import presets
-from apps.smile.settings import Settings
+from ..settings import Settings
 
 CAPTURE: str = 'smile_capture.png'      # the name Generator uploads every capture under
 PROMPT: str = 'test_prompt'

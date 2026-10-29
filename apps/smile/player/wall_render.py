@@ -9,11 +9,11 @@ import numpy as np
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TEST, glClear, glClearColor,  # type: ignore
                        glDisable, glEnable, glScissor, glViewport)
 
-from apps.smile.credit import FONT, qr_image, quiet_px, wrap_balanced
-from apps.smile.credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_offset
+from ..credit import FONT, qr_image, quiet_px, wrap_balanced
+from ..credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_offset
 from modules.gl import Blit, Fbo, Image, Shader, Style, SwapFbo, Text, Texture
-from apps.smile.render.shaders import Blend
-from apps.smile.player.shaders import BlitRotated
+from ..render.shaders import Blend
+from .shaders import BlitRotated
 
 logger = logging.getLogger(__name__)
 

@@ -4,7 +4,7 @@ for everyone (style_mode).
 The style id also picks the music (data/audio/music_map.json).
 """
 
-from apps.smile.comfy.settings import GeneratorSettings, StyleMode, StyleSettings
+from .settings import GeneratorSettings, StyleMode, StyleSettings
 
 # style id -> the letter of its StyleSettings group (style_a, style_b)
 STYLE_LETTERS: dict[str, str] = {'0000': 'a', '0001': 'b'}

@@ -30,12 +30,11 @@ from typing import Callable
 import cv2
 import numpy as np
 
-from apps.smile.cam.camera import Camera
+from ..cam import Camera
 from modules.face import FaceFinder, FaceFrame, rejection_label
-from apps.smile.online.link import Link, http_base, read_token
-from apps.smile.online.settings import OnlineSettings
-from apps.smile.render.screen_grab import ScreenGrab
-from apps.smile.render.sequencer import CAMERA_STATES, SequenceMessage, Sequencer, SequenceType
+from .link import Link, http_base, read_token
+from .settings import OnlineSettings
+from ..render import CAMERA_STATES, ScreenGrab, SequenceMessage, Sequencer, SequenceType
 
 logger = logging.getLogger(__name__)
 

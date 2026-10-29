@@ -5,21 +5,19 @@ import glfw
 import numpy as np
 from OpenGL.GL import GL_RGBA32F, glViewport  # type: ignore
 
-from apps.smile.render.grin_player import GrinPlayer
-from apps.smile.render.screen_grab import ScreenGrab
-from apps.smile.comfy.messages import GeneratorMessage, GeneratorState
+from .grin_player import GrinPlayer
+from .screen_grab import ScreenGrab
+from ..comfy.messages import GeneratorMessage, GeneratorState
 from modules.face import FaceFrame
-from apps.smile import sphere
-from modules.gl import Blit, Fbo, MonitorId, RenderBase, Shader, Style, Texture, clear_color
-from modules.gl import fit
-from apps.smile.player.wall_render import WallRender
-from apps.smile.render.inputs import Inputs
-from apps.smile.render.layers import BloomLayer, CameraLayer, CreditLayer, DiffusionLayer, FlashLayer, LayerBase, RevealLayer, StatusLayer
-from apps.smile.render.layers.credit_layer import caption_shown, fade_step, new_line_due
-from apps.smile.render.layers.passes import copy
-from apps.smile.render.sequencer import SequenceType, Sequencer
-from apps.smile.render.settings import RenderSettings
-from apps.smile.render.stages import STAGES, Layers, Stage
+from .. import sphere
+from modules.gl import Blit, Fbo, MonitorId, RenderBase, Shader, Style, Texture, clear_color, fit
+from ..player import WallRender
+from .inputs import Inputs
+from .layers import (BloomLayer, CameraLayer, CreditLayer, DiffusionLayer, FlashLayer, LayerBase, RevealLayer, StatusLayer,
+                     caption_shown, copy, fade_step, new_line_due)
+from .sequencer import SequenceType, Sequencer
+from .settings import RenderSettings
+from .stages import STAGES, Layers, Stage
 
 # 32 bit: the trail (0.995) adds steps too small for half floats
 COMPOSITION_FORMAT = GL_RGBA32F

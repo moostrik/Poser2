@@ -3,8 +3,8 @@ from typing import Callable
 
 import pytweening as easing
 
-from apps.smile.credit import LINE as CREDIT_LINE, LINES as CREDIT_LINES, NAME as CREDIT_NAME, URL as CREDIT_URL
-from apps.smile.credit_scroll import DEFAULT_GAP_PX as CREDIT_SCROLL_GAP, DEFAULT_ROWS as CREDIT_SCROLL_ROWS
+from ..credit import LINE as CREDIT_LINE, LINES as CREDIT_LINES, NAME as CREDIT_NAME, URL as CREDIT_URL
+from ..credit_scroll import DEFAULT_GAP_PX as CREDIT_SCROLL_GAP, DEFAULT_ROWS as CREDIT_SCROLL_ROWS
 from modules.gl import WindowSettings
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.utils import Color

@@ -2,13 +2,13 @@
 
 from modules.settings import BaseSettings, Group
 from modules.panel import PanelSettings
-from apps.smile.render.settings import RenderSettings, SequencerSettings
-from apps.smile.comfy.settings import GeneratorSettings
-from apps.smile.cam.settings import CameraSettings
-from apps.smile.audio.settings import AudioSettings
+from .render import RenderSettings, SequencerSettings
+from .comfy.settings import GeneratorSettings
+from .cam import CameraSettings
+from .audio import AudioSettings
 from modules.inout import ArtNetSenderSettings
-from apps.smile.online.settings import OnlineSettings
-from apps.smile.player.settings import WallsSettings
+from .online.settings import OnlineSettings
+from .player import WallsSettings
 
 
 class Settings(BaseSettings):

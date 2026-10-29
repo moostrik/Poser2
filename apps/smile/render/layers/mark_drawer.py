@@ -1,4 +1,4 @@
-from apps.smile.render.shaders import DrawColoredRectangle, DrawRectangleOutline
+from ..shaders import DrawColoredRectangle, DrawRectangleOutline
 
 from .face_marks import Mark
 

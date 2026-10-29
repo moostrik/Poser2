@@ -1,10 +1,10 @@
 from OpenGL.GL import glViewport  # type: ignore
 
-from apps.smile.credit import FONT, CreditLines, qr_image, wrap_balanced
+from ...credit import FONT, CreditLines, qr_image, wrap_balanced
 from modules.gl import Blit, Fbo, Image, Style, Text, Texture
-from apps.smile.render.sequencer import SequenceType
-from apps.smile.render.settings import RenderSettings
-from apps.smile.render.shaders import Blend
+from ..sequencer import SequenceType
+from ..settings import RenderSettings
+from ..shaders import Blend
 
 from .layer_base import LayerBase
 from .passes import copy

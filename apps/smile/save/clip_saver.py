@@ -8,9 +8,9 @@ import json
 import logging
 from typing import Callable
 
-from apps.smile.render.settings import SequencerSettings
-from apps.smile.save import share
-from apps.smile.save.record import embed_jpeg
+from ..render import SequencerSettings
+from . import share
+from .record import embed_jpeg
 from modules import video
 
 logger = logging.getLogger(__name__)

@@ -25,12 +25,12 @@ import numpy as np
 import websocket
 from requests import RequestException
 
-from apps.smile.comfy.client import ComfyClient, Event as ComfyEvent
-from apps.smile.render.grin_player import GrinPlayer
-from apps.smile.comfy.messages import GeneratorMessage, GeneratorState, GeneratorMessageCallback
-from apps.smile.comfy.settings import GeneratorSettings, StyleSettings
-from apps.smile.comfy.styles import Styles
-from apps.smile.comfy.workflow import NO_LORA, Workflow
+from .client import ComfyClient, Event as ComfyEvent
+from ..render import GrinPlayer
+from .messages import GeneratorMessage, GeneratorState, GeneratorMessageCallback
+from .settings import GeneratorSettings, StyleSettings
+from .styles import Styles
+from .workflow import NO_LORA, Workflow
 
 logger = logging.getLogger(__name__)
 

@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from apps.smile import sphere
+from .. import sphere
 from modules import video
 
 logger = logging.getLogger(__name__)

@@ -4,10 +4,10 @@ layer is shown. One stage covers one or more SequenceTypes; enter() runs when th
 from dataclasses import dataclass
 
 from modules.gl import Texture
-from apps.smile.render.inputs import Inputs
-from apps.smile.render.layers import BloomLayer, CameraLayer, DiffusionLayer, FlashLayer, RevealLayer
-from apps.smile.render.sequencer import CAPTURE_AT, SequenceMessage, SequenceType
-from apps.smile.render.settings import RenderSettings
+from .inputs import Inputs
+from .layers import BloomLayer, CameraLayer, DiffusionLayer, FlashLayer, RevealLayer
+from .sequencer import CAPTURE_AT, SequenceMessage, SequenceType
+from .settings import RenderSettings
 
 
 @dataclass

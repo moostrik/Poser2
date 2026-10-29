@@ -17,7 +17,7 @@ from typing import Callable
 
 import pytweening as easing
 
-from apps.smile.comfy.settings import GeneratorSettings, Prefer, StyleSettings
+from .settings import GeneratorSettings, Prefer, StyleSettings
 
 logger = logging.getLogger(__name__)
 

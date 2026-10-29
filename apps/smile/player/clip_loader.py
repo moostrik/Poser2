@@ -3,7 +3,7 @@ from threading import Thread, Lock, Event
 import time
 import numpy as np
 from typing import Any, Callable
-from apps.smile.player.clip_pool import ClipPool, Clip
+from .clip_pool import ClipPool, Clip
 
 ImageCallback= Callable[[str, np.ndarray, bool], None]
 
