@@ -242,7 +242,7 @@
     "music": true,
     "screen": 3
   },
-  "server": {
+  "panel": {
     "title": "SMILE",
     "port": 667
   }

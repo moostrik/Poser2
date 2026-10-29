@@ -26,11 +26,16 @@ jobs:
           uv pip install -r requirements-ci.txt
           uv pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
 
+      # The settings tree is importable without the panel: the panel is the only place NiceGUI is loaded.
+      - name: Settings free of NiceGUI
+        shell: bash
+        run: .venv/Scripts/python -c "import modules.settings, sys; assert 'nicegui' not in sys.modules"
+
       - name: Unit tests
         shell: bash
         run: |
           status=0
-          for dir in modules modules/settings modules/utils modules/pose modules/tracker modules/oak modules/render modules/face modules/video modules/inout apps/white_space apps/smile apps/smile/audio apps/smile/cam apps/smile/comfy apps/smile/online apps/smile/player apps/smile/relay apps/smile/render apps/smile/save; do
+          for dir in modules modules/settings modules/panel modules/utils modules/pose modules/tracker modules/oak modules/render modules/face modules/video modules/inout apps/white_space apps/smile apps/smile/audio apps/smile/cam apps/smile/comfy apps/smile/online apps/smile/player apps/smile/relay apps/smile/render apps/smile/save; do
             echo "::group::$dir"
             .venv/Scripts/python -m unittest discover -s "$dir/tests" -t . || status=1
             echo "::endgroup::"

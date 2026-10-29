@@ -1,3 +1,5 @@
+"""The log drawer: the app's log ring buffer as a slide-up drawer at the bottom of the page."""
+
 from __future__ import annotations
 
 import logging
@@ -5,7 +7,9 @@ from typing import Callable
 
 from nicegui import ui
 
-from .nice_util import SafeTimer
+from modules.log_config import LogRingBuffer
+
+logger = logging.getLogger(__name__)
 
 LOG_DRAWER_DEFAULT_HEIGHT = '33vh'
 
@@ -29,14 +33,13 @@ _LOG_LEVELS = ['DEBUG', 'INFO', 'WARNING', 'ERROR']
 _LOG_SOURCE_ICON = 'code'
 
 
-def build_log_drawer(timers: list, *, poll_interval: float) -> tuple:
-    """Build a slide-up log drawer anchored to the bottom of the page.
+def build_log_drawer(buf: LogRingBuffer | None, *, poll_interval: float) -> tuple:
+    """Build a slide-up log drawer anchored to the bottom of the page, polling *buf* every
+    *poll_interval* seconds.
 
     Returns (drawer_element, toggle_function) so the caller can place
     a toggle button in the header.
     """
-    from modules.log_config import get_log_buffer
-
     state = {
         'cursor': 0,
         'filter_level': logging.INFO,
@@ -147,7 +150,6 @@ def build_log_drawer(timers: list, *, poll_interval: float) -> tuple:
 
     def _clear_log():
         log_area.clear()
-        buf = get_log_buffer()
         if buf:
             state['cursor'] = buf._counter
         state['auto_scroll'] = True
@@ -178,7 +180,6 @@ def build_log_drawer(timers: list, *, poll_interval: float) -> tuple:
 
     def _full_refresh():
         log_area.clear()
-        buf = get_log_buffer()
         if not buf:
             return
         _, all_entries = buf.get_entries_since(0)
@@ -186,8 +187,9 @@ def build_log_drawer(timers: list, *, poll_interval: float) -> tuple:
         state['auto_scroll'] = True
         _scroll_to_bottom()
 
+    failed = {'v': False}
+
     def _poll_log():
-        buf = get_log_buffer()
         if not buf:
             return
         try:
@@ -195,11 +197,15 @@ def build_log_drawer(timers: list, *, poll_interval: float) -> tuple:
             if entries:
                 state['cursor'] = new_cursor
                 _append_entries(entries)
-        except RuntimeError:
-            pass
+        except Exception:
+            # Logged once, not every tick: the log line itself comes round through the buffer.
+            if not failed['v']:
+                failed['v'] = True
+                logger.exception("Log drawer failed to show new entries")
+            return
+        failed['v'] = False
 
-    t = SafeTimer(poll_interval, _poll_log)
-    timers.append(t)
+    ui.timer(poll_interval, _poll_log)   # stopped by NiceGUI when the client is gone
 
     log_area.on('scroll', lambda: ui.run_javascript(f'''
         var el = document.getElementById("c{log_area.id}");

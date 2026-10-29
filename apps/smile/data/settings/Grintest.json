@@ -172,7 +172,7 @@
     "universe": 1,
     "fps": 40.0
   },
-  "server": {
+  "panel": {
     "title": "SMILE",
     "port": 667
   }

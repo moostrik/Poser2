@@ -12,7 +12,8 @@ The root class is ``Settings``.
 from enum import IntEnum, auto
 from typing import Any
 
-from modules.settings import BaseSettings, NiceSettings, Field, Group, Widget
+from modules.settings import BaseSettings, Field, Group, Widget
+from modules.panel import PanelSettings
 from modules.oak import CameraSettings, CameraCheckSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, ArtNetBarsSettings, OscReceiverSettings
@@ -404,5 +405,5 @@ class Settings(BaseSettings):
     inout  : Group[InOutGroup]   = Group(InOutGroup)
     pose   : Group[PoseGroup]    = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
     render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_players.as_('num_cams')])
-    server : Group[NiceSettings] = Group(NiceSettings)
+    panel : Group[PanelSettings] = Group(PanelSettings)
     session: Group[SessionGroup] = Group(SessionGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
