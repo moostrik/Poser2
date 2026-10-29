@@ -63,12 +63,10 @@ def pipeline_spec(ps: PoseGroup, tracklet_poses: FrameSource, pose_inference: As
             # The group steps: the posture similarity (the pairwise distance of the poses as a 0..1 similarity)
             # stamped on them; where presence is known, the sticky filler bridges a present pair's gap (a departed
             # player's slot stays NaN); the neutral weight scales a pair by how far both are out of neutral (their
-            # arm deviation, this frame's); the hold stamps the rows one frame late, the lag the show was tuned
-            # with. Then the rows are smoothed.
+            # arm deviation, this frame's). Then the rows are smoothed.
             GroupStep(nodes.PostureSimilarityExtractor(ps.similarity.posture)),
             GroupStep(nodes.SimilarityStickyFiller(ps.similarity.sticky)),
             GroupStep(NeutralWeight(ps.similarity.neutral_weight)),
-            GroupStep(nodes.OneFrameHold(features.Similarity)),
             PoseStep(nodes.SimilarityEuroSmoother, ps.similarity.smoother),
         ], window=ps.window_smooth),
 

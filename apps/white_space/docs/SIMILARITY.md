@@ -71,10 +71,9 @@ The arms are alike, then, when every arm joint is within the tolerance, allowing
 | Output                | `HitStreak` on the board; `states.sync.hits`, `states.sync.distance` (°) | the rows on the LERP frames; `/pose/N/similarity/pose` to Max; `pose_instrument.full_sync` |
 
 Both read one settings group, `pose.similarity.posture`, and one switch for neutral,
-`pose.similarity.neutral_weight.enabled`. The feature's chain is four group steps on the SMOOTH poses:
+`pose.similarity.neutral_weight.enabled`. The feature's chain is three group steps on the SMOOTH poses:
 `PostureSimilarityExtractor` stamps the rows, the sticky filler holds a present pair's gap (a departed
-player's slot is NaN), the neutral weight scales each pair, and `OneFrameHold` stamps them one frame late;
-then they are smoothed and chased at LERP. The hit sync reads none of that, so a change to the similarity smoothers changes the light
+player's slot is NaN), and the neutral weight scales each pair; then they are smoothed and chased at LERP. The hit sync reads none of that, so a change to the similarity smoothers changes the light
 and the sound, never the sync. White Space produces no leader scores; `/pose/N/similarity/leader` carries
 zeros.
 
