@@ -19,7 +19,7 @@ The one-per-camera tracker (`modules/tracker/onepercam/`) is not described here.
 
 ## Two tiers
 
-1. **On each camera**, YOLO feeds depthai's `ObjectTracker` (`modules/oak/camera/pipeline.py`,
+1. **On each camera**, YOLO feeds depthai's `ObjectTracker` (`modules/camera/oak/pipeline.py`,
    `TRACKER_TYPE` in `definitions.py`). It detects people, associates them frame to frame, bridges
    short misses as LOST under the same id, de-duplicates, and hands out device ids.
 2. **On the host**, the panoramic tracker (`modules/tracker/panoramic/`, `Tracker`) joins those

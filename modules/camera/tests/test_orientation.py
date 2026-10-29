@@ -3,7 +3,7 @@
 Neither needs a device. The gravity conversion is a pure function, and `CameraCheck` reads plain
 settings objects, so the interesting cases — a rig with no IMU, one camera out of four off — are
 all reachable without hardware. How the gravity vector gets out of an OAK board's IMU frame is
-the backend's (`modules/oak/tests/test_imu.py`).
+the backend's (`modules/camera/oak/tests/test_imu.py`).
 """
 
 import math

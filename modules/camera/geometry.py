@@ -68,7 +68,7 @@ RESOLUTION_SIZES: dict[CameraResolution, tuple[int, int]] = {
 # ColorCamera expose THE_720_P and THE_800_P, which is what lets one label span them. Mono also
 # has THE_400_P, THE_480_P and THE_1200_P — the last is for AR0234-class sensors, not the
 # OV9282 W in use — and colour has 4 K upward; none are offered until something needs them.
-# A backend maps the label to its own sensor mode enum (`modules/oak`, `mono_mode`, `color_mode`).
+# A backend maps the label to its own sensor mode enum (`modules/camera/oak`, `mono_mode`, `color_mode`).
 MONO_RESOLUTIONS: frozenset[CameraResolution] = frozenset({CameraResolution.P720, CameraResolution.P800})
 COLOR_RESOLUTIONS: frozenset[CameraResolution] = frozenset({CameraResolution.P720, CameraResolution.P800,
                                                              CameraResolution.P1080})

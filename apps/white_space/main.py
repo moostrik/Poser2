@@ -10,7 +10,7 @@ import numpy as np
 
 from modules.utils import Broadcast
 from modules.camera import CameraSource, CameraFrame, FrameType, Player, Sync, Recorder as VideoRecorder, CameraCheck
-from modules.oak import Camera, Simulator
+from modules.camera.oak import Camera, Simulator
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscReceiver

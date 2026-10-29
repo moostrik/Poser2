@@ -1,17 +1,15 @@
 # https://blobconverter.luxonis.com/
 
 """What the oak backend knows about depthai: sensor modes, the detector and tracker constants, the
-control ranges, the device queues, and the board's IMU. The frame geometry every camera shares is
+control ranges, and the board's IMU. The frame geometry every camera shares is
 `modules.camera.geometry`; this maps it onto the device."""
 
 from pathlib import Path
 
 import math
-from enum import Enum, IntEnum, auto
-from depthai import (Tracklet, TrackerType, Device, OpenVINO,
-                     SpatialLocationCalculatorAlgorithm, MonoCameraProperties, ColorCameraProperties)
+from depthai import Tracklet, TrackerType, Device, OpenVINO, MonoCameraProperties, ColorCameraProperties
 
-from modules.camera import CameraResolution, resolve_resolution, TrackingStatus
+from .. import CameraResolution, resolve_resolution, TrackingStatus
 
 import logging
 logger = logging.getLogger(__name__)
@@ -59,11 +57,11 @@ TRACKING_STATUS: dict[Tracklet.TrackingStatus, TrackingStatus] = {
 # 512 x 448 is 1.143; the P720 frame at 1280 x 960 is 1.333, a 17 % mismatch that a 512 x 384
 # blob would close). Same pixel count as the 640 x 352 they replace (229 k vs 225 k), so the
 # same inference cost — confirmed on the rig, `tracker_fps` at the input rate on all four
-# cameras. The 640 x 352 files stay in data/models for reference; nothing selects them.
-YOLOV8_WIDE_5S: str = "yolov8n_coco_512x448_5S.blob"
+# cameras. The 640 x 352 files and the 5-shave builds (the stereo pipeline's, gone) stay in
+# data/models for reference; nothing selects them. 6 shaves on a device, 7 for clips
+# (`pipeline.model_path`).
 YOLOV8_WIDE_6S: str = "yolov8n_coco_512x448_6S.blob"
 YOLOV8_WIDE_7S: str = "yolov8n_coco_512x448_7S.blob"
-YOLOV8_SQUARE_5S: str = "yolov8n_coco_416x416_5S.blob"
 YOLOV8_SQUARE_6S: str = "yolov8n_coco_416x416_6S.blob"
 YOLOV8_SQUARE_7S: str = "yolov8n_coco_416x416_7S.blob"
 YOLO_CONFIDENCE_THRESHOLD: float = 0.5
@@ -73,8 +71,8 @@ YOLO_OVERLAP_THRESHOLD: float = 0.5
 def detector_input_size(blob_path: str | Path) -> tuple[int, int]:
     """(width, height) the detector blob was compiled for, read from the blob itself.
 
-    Not a camera dimension: the frame is resized into this whatever the sensor mode is, with
-    `setKeepAspectRatio(False)` (see the Yolo setups in pipeline.py), so the frame is STRETCHED
+    Not a camera dimension: a wide frame is resized into this whatever the sensor mode is, with
+    `setKeepAspectRatio(False)` (`pipeline.add_detector`), so the frame is STRETCHED
     into the blob, never cropped and never letterboxed. Two consequences: nothing is lost at the
     frame edges, so nobody goes undetected there; and detections come back in normalized
     coordinates of the detector input, which a pure stretch preserves, so they map 1:1 onto the
@@ -94,11 +92,6 @@ TRACKER_TYPE: TrackerType = TrackerType.ZERO_TERM_IMAGELESS
 # ZERO_TERM_COLOR_HISTOGRAM higher accuracy (but can drift when losing object)
 # ZERO_TERM_IMAGELESS slightly faster
 
-DEPTH_TRACKER_LOCATION: SpatialLocationCalculatorAlgorithm = SpatialLocationCalculatorAlgorithm.MIN
-DEPTH_TRACKER_BOX_SCALE: float = 1.0
-DEPTH_TRACKER_MIN_DEPTH: int = 500
-DEPTH_TRACKER_MAX_DEPTH: int = 10000
-
 EXPOSURE_RANGE:     tuple[int, int] = (1000, 33000)
 ISO_RANGE:          tuple[int, int] = ( 100, 1600 )
 BALANCE_RANGE:      tuple[int, int] = (1000, 12000)
@@ -107,34 +100,6 @@ BRIGHTNESS_RANGE:   tuple[int, int] = ( -10, 10   )
 LUMA_DENOISE_RANGE: tuple[int, int] = (   0, 4    )
 SATURATION_RANGE:   tuple[int, int] = ( -10, 10   )
 SHARPNESS_RANGE:    tuple[int, int] = (   0, 4    )
-
-STEREO_DEPTH_RANGE: tuple[int, int] = ( 500, 15000)
-STEREO_BRIGHTNESS_RANGE: tuple[int, int] = (   0, 255  )
-
-class StereoMedianFilterType(Enum):
-    OFF = 0
-    KERNEL_3x3 = 1
-    KERNEL_5x5 = 2
-    KERNEL_7x7 = 3
-
-STEREO_FILTER_NAMES: list[str] = [e.name for e in StereoMedianFilterType]
-
-class Input(IntEnum):
-    COLOR_CONTROL = auto()
-    MONO_CONTROL = auto()
-    STEREO_CONTROL = auto()
-    VIDEO_FRAME_IN = auto()
-    LEFT_FRAME_IN = auto()
-    RIGHT_FRAME_IN = auto()
-
-class Output(IntEnum):
-    VIDEO_FRAME_OUT = auto()
-    LEFT_FRAME_OUT = auto()
-    RIGHT_FRAME_OUT = auto()
-    STEREO_FRAME_OUT = auto()
-    SYNC_FRAMES_OUT = auto()
-    TRACKLETS_OUT = auto()
-    IMU_OUT = auto()
 
 def get_device_list(verbose: bool = False) -> list[str]:
     device_list: list[str] = []

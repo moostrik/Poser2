@@ -6,7 +6,7 @@ from functools import partial
 
 from modules.utils import Broadcast
 from modules.camera import CameraSource, CameraCheck, Player, Sync, Recorder as VideoRecorder
-from modules.oak import Camera, Simulator
+from modules.camera.oak import Camera, Simulator
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound, ArtNetBars, OscReceiver
