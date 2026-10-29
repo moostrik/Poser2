@@ -1,7 +1,7 @@
-from .BBoxRenderer import        BBoxRenderer, BBoxRendererSettings
-from .CameraReadingsLayer import CameraReadingsLayer
-from .CropLayer import           CropLayer, CropLayerSettings
-from .PoseRenderer import        PoseRenderer, PoseRendererSettings
-from .PoseCompositor import      PoseCompositor, PoseCompositorSettings
-from .TrackerCompositor import   TrackerCompositor, TrackerCompositorSettings
-from .TrackletRenderer import    TrackletRenderer
+from .bbox_renderer import         BBoxRenderer, BBoxRendererSettings
+from .camera_readings_layer import CameraReadingsLayer
+from .crop_layer import            CropLayer, CropLayerSettings
+from .pose_renderer import         PoseRenderer, PoseRendererSettings
+from .pose_compositor import       PoseCompositor, PoseCompositorSettings
+from .tracker_compositor import    TrackerCompositor, TrackerCompositorSettings
+from .tracklet_renderer import     TrackletRenderer

@@ -1,0 +1,149 @@
+"""Renders centered and rotated mask with temporal blending and blur."""
+
+# Third-party imports
+from OpenGL.GL import GL_R16F
+
+# Local application imports
+from modules.settings import Field, BaseSettings
+from ..layer_base import LayerBase
+from .center_geometry import CenterGeometry
+from ...shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur, MaskDilate, MaskErode
+from modules.gl import Fbo, SwapFbo, Texture, Style
+
+
+class CenterMaskLayerSettings(BaseSettings):
+    """Configuration for CenterMaskLayer temporal blending and blur."""
+    blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Temporal blending strength (0=static, 1=instant)")
+    dilation_steps: Field[int]   = Field(0, min=-10, max=10, description="Mask dilation iterations (positive=expand, negative=shrink)")
+    blur_steps:     Field[int]   = Field(0, min=0, max=10, description="Number of blur iterations")
+    blur_radius:    Field[float] = Field(1.0, min=0.0, max=20.0, description="Blur kernel radius in pixels")
+
+
+class CenterMaskLayer(LayerBase):
+    """Renders mask image cropped and rotated with temporal blending and blur."""
+
+    def __init__(self, cam_id: int, geometry: CenterGeometry, mask_texture: Texture, settings: CenterMaskLayerSettings | None = None) -> None:
+        self._cam_id: int = cam_id
+        self._geometry: CenterGeometry = geometry
+        self._mask_src: Texture = mask_texture
+
+        # Configuration
+        self.settings: CenterMaskLayerSettings = settings or CenterMaskLayerSettings()
+
+        # FBOs
+        self._roi_fbo: Fbo = Fbo()  # Single temp buffer for ROI
+        self._blend_fbo: SwapFbo = SwapFbo()
+        self._mask_blur_fbo: SwapFbo = SwapFbo()  # Used for AA output, dilation, and blur
+
+        # Shaders
+        self._roi_shader = DrawRoi()
+        self._mask_blend_shader = MaskBlend()
+        self._mask_AA_shader = MaskAA()
+        self._mask_dilate_shader = MaskDilate()
+        self._mask_erode_shader = MaskErode()
+        self._mask_blur_shader = MaskBlur()
+
+    @property
+    def texture(self) -> Texture:
+        """Output texture for external use."""
+        return self._mask_blur_fbo.texture
+
+    def allocate(self, width: int, height: int, internal_format: int) -> None:
+        self._roi_fbo.allocate(width, height, GL_R16F)
+        self._blend_fbo.allocate(width, height, GL_R16F)
+        self._mask_blur_fbo.allocate(width, height, GL_R16F)
+
+        self._roi_shader.allocate()
+        self._mask_blend_shader.allocate()
+        self._mask_AA_shader.allocate()
+        self._mask_dilate_shader.allocate()
+        self._mask_erode_shader.allocate()
+        self._mask_blur_shader.allocate()
+
+    def deallocate(self) -> None:
+        self._roi_fbo.deallocate()
+        self._blend_fbo.deallocate()
+        self._mask_blur_fbo.deallocate()
+
+        self._roi_shader.deallocate()
+        self._mask_blend_shader.deallocate()
+        self._mask_AA_shader.deallocate()
+        self._mask_dilate_shader.deallocate()
+        self._mask_erode_shader.deallocate()
+        self._mask_blur_shader.deallocate()
+
+    def update(self) -> None:
+        """Render mask crop using bbox geometry from CenterGeometry."""
+        if self._geometry.lost:
+            self._blend_fbo.clear_all()
+            self._mask_blur_fbo.clear_all()
+            return
+
+        if self._geometry.crop_pose_points is None:
+            return
+
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
+
+        # Render ROI to temp buffer
+        self._roi_fbo.begin()
+        self._roi_shader.use(
+            self._mask_src,
+            self._geometry.bbox_geometry.crop_roi,
+            self._geometry.bbox_geometry.rotation,
+            self._geometry.bbox_geometry.rotation_center,
+            self._geometry.bbox_geometry.aspect
+        )
+        self._roi_fbo.end()
+
+        # Temporal blending
+        self._blend_fbo.swap()
+        self._blend_fbo.begin()
+        self._mask_blend_shader.use(
+            self._blend_fbo.back_texture,
+            self._roi_fbo.texture,
+            self.settings.blend_factor
+        )
+        self._blend_fbo.end()
+
+        # AA directly to blur buffer
+        self._mask_blur_fbo.begin()
+        self._mask_AA_shader.use(self._blend_fbo.texture)
+        self._mask_blur_fbo.end()
+
+        # Multi-pass dilation or erosion
+        steps = self.settings.dilation_steps
+        if steps > 0:
+            for _ in range(steps):
+                self._mask_blur_fbo.swap()
+                self._mask_blur_fbo.begin()
+                self._mask_dilate_shader.use(self._mask_blur_fbo.back_texture, 1.0)
+                self._mask_blur_fbo.end()
+        elif steps < 0:
+            for _ in range(-steps):
+                self._mask_blur_fbo.swap()
+                self._mask_blur_fbo.begin()
+                self._mask_erode_shader.use(self._mask_blur_fbo.back_texture, 1.0)
+                self._mask_blur_fbo.end()
+
+        # Multi-pass blur
+        for i in range(self.settings.blur_steps):
+            self._mask_blur_fbo.swap()
+            self._mask_blur_fbo.begin()
+            self._mask_blur_shader.use(
+                self._mask_blur_fbo.back_texture,
+                True,
+                self.settings.blur_radius
+            )
+            self._mask_blur_fbo.end()
+
+            self._mask_blur_fbo.swap()
+            self._mask_blur_fbo.begin()
+            self._mask_blur_shader.use(
+                self._mask_blur_fbo.back_texture,
+                False,
+                self.settings.blur_radius
+            )
+            self._mask_blur_fbo.end()
+
+        Style.pop_style()

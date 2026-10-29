@@ -1,15 +1,15 @@
 """Fluid simulation shaders."""
 
-from .Advect import Advect
-from .Divergence import Divergence
-from .Gradient import Gradient
-from .JacobiPressure import JacobiPressure
-from .JacobiPressureCompute import JacobiPressureCompute
-from .JacobiDiffusion import JacobiDiffusion
-from .JacobiDiffusionCompute import JacobiDiffusionCompute
-from .VorticityCurl import VorticityCurl
-from .VorticityForce import VorticityForce
-from .Buoyancy import Buoyancy
-from .AddBoolean import AddBoolean
+from .advect import Advect
+from .divergence import Divergence
+from .gradient import Gradient
+from .jacobi_pressure import JacobiPressure
+from .jacobi_pressure_compute import JacobiPressureCompute
+from .jacobi_diffusion import JacobiDiffusion
+from .jacobi_diffusion_compute import JacobiDiffusionCompute
+from .vorticity_curl import VorticityCurl
+from .vorticity_force import VorticityForce
+from .buoyancy import Buoyancy
+from .add_boolean import AddBoolean
 
 

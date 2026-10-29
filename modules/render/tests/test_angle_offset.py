@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 
 from modules.pose import Angles, AngleMotion, AngleVelocity, Azimuth
-from modules.render.layers.data.DataLayerSettings import AngleOffset, has_pi_range, offset_angles
+from modules.render.layers.data.data_layer_settings import AngleOffset, has_pi_range, offset_angles
 
 # hanging (0), horizontal out (π/2), raised (π) and across the body (-π/2)
 POSES = np.array([0.0, math.pi / 2, math.pi, -math.pi / 2], dtype=np.float32)

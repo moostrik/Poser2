@@ -1,15 +1,15 @@
 """OpenGL shaders for various rendering operations."""
 
-from .Blit import Blit
-from .BlitRect import BlitRect
-from .BlitRegion import BlitRegion
-from .Contrast import Contrast
-from .Exposure import Exposure
-from .Hsl import Hsl
-from .Hsv import Hsv
-from .Lut import Lut
-from .Noise import Noise
-from .NoiseSimplex import NoiseSimplex
-from .Sharpen import Sharpen
+from .blit import Blit
+from .blit_rect import BlitRect
+from .blit_region import BlitRegion
+from .contrast import Contrast
+from .exposure import Exposure
+from .hsl import Hsl
+from .hsv import Hsv
+from .lut import Lut
+from .noise import Noise
+from .noise_simplex import NoiseSimplex
+from .sharpen import Sharpen
 from .convenience import BlurH, BlurV, Curtain, FlashIn, FlashOut, NoiseBlend, NoiseSimplexBlend, Omission
 

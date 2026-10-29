@@ -1,2 +1,2 @@
-from .DrawColoredRectangle import DrawColoredRectangle
-from .DrawRectangleOutline import DrawRectangleOutline
+from .draw_colored_rectangle import DrawColoredRectangle
+from .draw_rectangle_outline import DrawRectangleOutline

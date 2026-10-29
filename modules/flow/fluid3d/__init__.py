@@ -1,3 +1,3 @@
 """3D volumetric fluid simulation."""
 
-from .FluidFlow3D import FluidFlow3D
+from .fluid_flow_3d import FluidFlow3D

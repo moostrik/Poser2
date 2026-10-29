@@ -1,0 +1,162 @@
+# Standard library imports
+from dataclasses import dataclass
+from enum import IntEnum
+from typing import Tuple
+
+# Third-party imports
+from OpenGL.GL import *  # type: ignore
+
+# Local application imports
+from modules.board import HasFrames
+from modules.gl import Fbo, Texture, Blit, clear_color, Text
+from modules.pose import AngleVelocity, Angles, BaseScalarFeature, Frame
+from ..layer_base import LayerBase, DataCache, Rect
+from ...shaders import FeatureShader
+from .data_layer_settings import DataLayerSettingsProtocol, LayerMode, FEATURE_MAP, TRACK_COLOR_FEATURES, AngleOffset, has_pi_range, offset_angles
+from ...color_settings import ColorSettings
+
+
+class FeatureFrameLayer(LayerBase):
+    """Visualizes a single pose feature as horizontal lines per joint.
+
+    Displays feature values as horizontal lines with color cycling through
+    a configurable color list. Transparent background.
+    """
+    LAYER_MODE: LayerMode = LayerMode.FRAME
+
+    def __init__(self, track_id: int, board: HasFrames, settings: DataLayerSettingsProtocol, color_settings: ColorSettings,
+                 feature_map: dict[IntEnum, type[BaseScalarFeature]] = FEATURE_MAP) -> None:
+        self._track_id: int = track_id
+        self._board: HasFrames = board
+        self.settings: DataLayerSettingsProtocol = settings
+        self._color_settings: ColorSettings = color_settings
+        self._feature_map: dict[IntEnum, type[BaseScalarFeature]] = feature_map
+        self._was_active: bool = False
+
+        self._fbo: Fbo = Fbo()
+        self._label_fbo: Fbo = Fbo()
+        self._data_cache: DataCache[Frame] = DataCache[Frame]()
+        self._labels: list[str] = []
+
+        self.draw_labels: bool = False
+
+        self._shader: FeatureShader = FeatureShader()
+        self._text_renderer: Text = Text()
+
+    @property
+    def _is_active(self) -> bool:
+        return self.settings.mode == self.LAYER_MODE
+
+    @property
+    def texture(self) -> Texture:
+        return self._fbo.texture
+
+    def allocate(self, width: int, height: int, internal_format: int) -> None:
+        self._fbo.allocate(width, height, internal_format)
+        self._label_fbo.allocate(width, height, internal_format)
+        self._shader.allocate()
+        self._text_renderer.allocate("data/RobotoMono-Regular.ttf", font_size=14)
+
+    def deallocate(self) -> None:
+        self._fbo.deallocate()
+        self._label_fbo.deallocate()
+        self._shader.deallocate()
+        self._text_renderer.deallocate()
+
+    def clear(self) -> None:
+        """Clear cached data."""
+        self._data_cache = DataCache()
+        self._labels = []
+
+    def draw(self) -> None:
+        if not self._is_active:
+            return
+        if self._fbo.allocated:
+            Blit.use(self._fbo.texture)
+            if self.draw_labels and self.settings.render_labels:
+                Blit.use(self._label_fbo.texture)
+
+    def update(self) -> None:
+        """Update visualization from DataHub Frame."""
+        active = self._is_active
+        if self._was_active and not active:
+            self.clear()
+        self._was_active = active
+        if not active:
+            return
+        pose: Frame | None = self._board.get_frame(self.settings.stage, self._track_id)
+        self._data_cache.update(pose)
+
+        if self._data_cache.lost:
+            self._fbo.clear()
+
+        if self._data_cache.idle or pose is None:
+            return
+
+        # Extract feature from frame
+        feature_type = self._feature_map[self.settings.feature_field]
+        feature = pose[feature_type]
+        offset = self.settings.angle_offset
+        if offset != AngleOffset.NONE and has_pi_range(feature_type):
+            feature = feature_type(offset_angles(feature.values, offset), feature.scores)
+
+        # If showing angles, also fetch velocity for thickness modulation. Compare the
+        # resolved feature type (not the enum member) so any feature_map/enum works.
+        deltas = pose[AngleVelocity].values if feature_type is Angles else None
+
+        colors = self._resolve_colors()
+
+        line_width = 1.0 / self._fbo.height * self.settings.line_width
+        line_smooth = 1.0 / self._fbo.height * self.settings.line_smooth
+        display_range = feature.display_range()
+
+        self._fbo.begin()
+        clear_color()
+        self._shader.use(feature, colors, line_width, line_smooth, self.settings.use_scores, display_range, deltas=deltas)
+        self._fbo.end()
+
+        # Render labels if changed
+        if self.settings.render_labels:
+            joint_enum_type = feature.__class__.enum()
+            num_joints: int = len(feature)
+            labels: list[str] = [joint_enum_type(i).name for i in range(num_joints)]
+            if labels != self._labels:
+                self._render_labels_static(self._label_fbo, labels)
+                self._labels = labels
+
+    def _render_labels_static(self, fbo: Fbo, labels: list[str]) -> None:
+        """Render feature labels overlay."""
+        rect = Rect(0, 0, fbo.width, fbo.height)
+
+        fbo.begin()
+        clear_color()
+
+        num_labels: int = len(labels)
+        if num_labels == 0:
+            fbo.end()
+            return
+
+        step: float = rect.width / num_labels
+
+        colors = self._resolve_colors()
+
+        for i in range(num_labels):
+            string: str = labels[i]
+            x: int = int(rect.x + (i + 0.1) * step)
+            y: int = int(rect.y + rect.height * 0.5 - 7)
+            clr: int = i % len(colors)
+
+            self._text_renderer.draw_box_text(
+                x, y, string, colors[clr], (0.0, 0.0, 0.0, 0.66),
+                screen_width=fbo.width, screen_height=fbo.height
+            )
+
+        fbo.end()
+
+    def _resolve_colors(self) -> list[tuple[float, float, float, float]]:
+        if self.settings.use_history_color:
+            return [self._color_settings.history.to_tuple()]
+        feature_type = self._feature_map[self.settings.feature_field]
+        if feature_type in TRACK_COLOR_FEATURES:
+            return self._color_settings.track_color_tuples
+        return self._color_settings.default_color_tuples

@@ -1,4 +1,4 @@
 """Bridge-specific shaders."""
 
-from .DensityBridgeShader import DensityBridgeShader
-from .TemperatureBridge import TemperatureBridge
+from .density_bridge_shader import DensityBridgeShader
+from .temperature_bridge import TemperatureBridge

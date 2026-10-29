@@ -1,4 +1,4 @@
 """Flow visualization shaders."""
 
-from .VelocityDirectionMap import VelocityDirectionMap
-from .VelocityArrowField import VelocityArrowField
+from .velocity_direction_map import VelocityDirectionMap
+from .velocity_arrow_field import VelocityArrowField

@@ -6,8 +6,8 @@ subpackages (e.g. ``from modules.flow import FluidFlow``, never
 """
 
 # Base classes
-from .FlowBase import FlowBase
-from .FlowUtil import FlowUtil
+from .flow_base import FlowBase
+from .flow_util import FlowUtil
 
 # Optical flow
 from .optical import OpticalFlow, OpticalFlowSettings

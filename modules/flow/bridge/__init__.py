@@ -1,6 +1,6 @@
 """Bridge layers — convert raw signals into fluid-compatible fields."""
 
-from .DensityBridge import DensityBridge, DensityBridgeSettings
-from .SmoothTrail import SmoothTrail, VelocitySmoothTrail, SmoothTrailSettings
-from .Magnitude import Magnitude, VelocityMagnitude
-from .TemperatureBridge import TemperatureBridge, TemperatureBridgeSettings
+from .density_bridge import DensityBridge, DensityBridgeSettings
+from .smooth_trail import SmoothTrail, VelocitySmoothTrail, SmoothTrailSettings
+from .magnitude import Magnitude, VelocityMagnitude
+from .temperature_bridge import TemperatureBridge, TemperatureBridgeSettings

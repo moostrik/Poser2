@@ -1,7 +1,7 @@
 """Optical flow shaders."""
 
-from .Luminance import Luminance
-from .MergeRGB import MergeRGB
-from .OpticalFlow import OpticalFlow
-from .OpticalFlowMM import OpticalFlowMM
+from .luminance import Luminance
+from .merge_rgb import MergeRGB
+from .optical_flow import OpticalFlow
+from .optical_flow_mm import OpticalFlowMM
 

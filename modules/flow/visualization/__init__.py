@@ -1,5 +1,5 @@
 """Flow field visualization."""
 
-from .BaseField import FieldBase, VisualizationFieldSettings
-from .VelocityField import VelocityField
-from .Visualiser import Visualizer
+from .field_base import FieldBase, VisualizationFieldSettings
+from .velocity_field import VelocityField
+from .visualizer import Visualizer

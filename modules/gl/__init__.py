@@ -1,22 +1,24 @@
 
-from .RenderBase import RenderBase
-from .Shader import Shader, draw_quad
-from .ComputeShader import ComputeShader
-from .WindowManager import WindowManager, WindowSettings, MonitorId, FullscreenMode, MouseButton
-from . import Style
-from . import shaders
-from .Utils import Blit, clear_color, FpsCounter, fit
+from .render_base import RenderBase
+from .shader import Shader, draw_quad
+from .compute_shader import ComputeShader
+from .window_manager import WindowManager, WindowSettings, MonitorId, FullscreenMode, MouseButton
+from . import style as Style
+from .utils import Blit, clear_color, FpsCounter, fit
 
 # TEXTURE CLASSES
-from .Texture import Texture
-from .Texture3D import Texture3D, SwapTexture3D
-from .Texture2DArray import Texture2DArray, SwapTexture2DArray
-from .Fbo import Fbo, SwapFbo
-from .Image import Image
-from .Tensor import Tensor
+from .texture import Texture
+from .texture_3d import Texture3D, SwapTexture3D
+from .texture_2d_array import Texture2DArray, SwapTexture2DArray
+from .fbo import Fbo, SwapFbo
+from .image import Image
+from .tensor import Tensor
+
+# SHADERS (after the texture classes: they import `Texture` from this package)
+from . import shaders
 
 # TEXT RENDERING
-from .Text import Text
+from .text import Text
 
 # PROFILING
-from .Profiler import Profiler
+from .profiler import Profiler

@@ -9,8 +9,8 @@ from unittest import mock
 
 from modules.gl import FullscreenMode, WindowManager, WindowSettings
 
-MODULE = sys.modules['modules.gl.WindowManager']      # the module: the package exports the class under its name
-LOGGER: str = 'modules.gl.WindowManager'
+MODULE = sys.modules['modules.gl.window_manager']     # the module: the package exports the class under its name
+LOGGER: str = 'modules.gl.window_manager'
 DISCONNECTED: int = 0x00040002
 
 

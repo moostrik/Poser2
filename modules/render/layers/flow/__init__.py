@@ -1,3 +1,3 @@
-from .FlowLayer import         FlowLayer, FlowLayerSettings, FlowSettings, FlowDrawMode
-from .FluidLayer import        FluidLayer, FluidLayerSettings, FluidDrawMode
-from .Fluid3DLayer import      Fluid3DLayer, Fluid3DLayerSettings
+from .flow_layer import         FlowLayer, FlowLayerSettings, FlowSettings, FlowDrawMode
+from .fluid_layer import        FluidLayer, FluidLayerSettings, FluidDrawMode
+from .fluid_3d_layer import     Fluid3DLayer, Fluid3DLayerSettings
