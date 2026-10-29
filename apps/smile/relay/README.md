@@ -19,7 +19,9 @@ Where it runs and how it is reached, on the tailnet for a test and on the VPS, i
   as an `Authorization` header, never in a URL, and the relay keeps no access log, so no log holds it
 * `pip install aiohttp` (Poser2's venv has it), then from the Poser2 root:
   `python -m apps.smile.relay.server --port 8800` (`-v` for debug logging); `apps\smile\scripts\start_relay.bat` does this on the PC.
-  On the VPS the `relay` folder stands alone and runs as `python -m relay.server` beside it.
+  On the VPS the `relay` folder stands alone and runs as `python -m relay.server` beside it: `deploy/setup_vps.sh`
+  makes the machine once, `apps\smile\scripts\deploy_relay.bat` sends the folder and restarts the service
+  (`data/documents/OnlineHosting.md`).
   The log goes to the console and to `data/relay.log`; every phone reports the end of its turn there
   (`phone … timing: result, play, playing, file; first byte, KB, KB at every second`: seconds after the turn's end that
   the result came, the video was started, played its first frame, and the file was on the phone; then the

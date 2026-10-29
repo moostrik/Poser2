@@ -20,34 +20,46 @@ relay itself, `OnlinePhone.md` what happens on a phone.
 6. The library: the relay fills it from SMILE (see [The library](#the-library)), or it is copied from a
    relay that has it.
 
-## Later: the VPS
+## The public: the VPS, smile.oostrik.net
 
-1. A VPS (a TransIP VPS V1 is enough) with Python 3.12 or newer; clone the repo (only `relay/` is used),
-   `pip install aiohttp`, the token in `relay/token.txt` as above.
-2. The relay as a systemd service under a normal user: `python -m relay.server --port 8800` from the repo
-   root, data in `relay/data` as on the PC. The backup is a copy of that folder.
-3. TLS in front: a DNS name for the VPS and Caddy as reverse proxy from 443 to `127.0.0.1:8800`; Caddy
-   fetches and renews the certificate. Without a proxy the relay takes `--cert` and `--key` and the renewal
-   is yours.
-4. SMILE, Online tab: `relay` = `wss://<name>/ws/smile`, `active` on. SMILE makes outgoing connections only;
-   nothing on the installation is opened to the internet.
-5. The library: copy `relay/data/tracks` and `relay/data/laughs` from the test relay before the first
-   visitor.
-6. After the first turns: `relay/data/relay.log`, the `timing` and `frames to the phone` lines, for what the
-   venue's uplink does to the times measured on one PC in `OnlinePhone.md`.
+oostrik.net itself is on TransIP web hosting (PHP and static files), which cannot keep a websocket open, so
+the relay has a VPS of its own (TransIP's smallest, Ubuntu) under a subdomain; the page and `server.py`
+use root paths, so no code knows the name. Only the relay folder goes there, never a clone of Poser2.
+
+1. The VPS, in TransIP's panel: installed with the PC's SSH key (`%USERPROFILE%\.ssh\id_ed25519.pub`;
+   TransIP puts it on the login user it makes, `moostrik`, who has sudo), its firewall on with 22, 80 and 443
+   only. DNS of oostrik.net: `smile` as an `A` record to the VPS's IPv4 and an `AAAA` to its IPv6.
+2. The machine, once, from the PC: `ssh moostrik@<ip> bash -s < apps\smile\relay\deploy\setup_vps.sh`
+   (`C:\Windows\System32\OpenSSH\ssh.exe` when `ssh` is not on the PATH). It sets the hostname and the clock,
+   updates (now and unattended), SSH by keys only, `ufw` with the same three ports, Caddy with
+   `smile.oostrik.net { reverse_proxy 127.0.0.1:8800 }` (the Let's Encrypt certificate fetched and renewed by
+   Caddy, websockets passed through, no upload limit), aiohttp from Ubuntu's packages, the user `smile` (no login),
+   and the relay as the systemd service `smile-relay` (`python3 -m relay.server --host 127.0.0.1 --port 8800`
+   from `/home/smile`, so only Caddy reaches it, restarted when it stops). Safe to run again.
+3. The relay, from the PC, every time it changed: `apps\smile\scripts\deploy_relay.bat` sends
+   `apps\smile\relay` (the code, the page, the token) to `/home/smile/relay` and restarts the service; the VPS's
+   own data (passes, visitors' files, log) is never touched. The first time `deploy_relay.bat --library` sends
+   the PC relay's `data\tracks` and `data\laughs` too (64 MB), so the first visitors wait for no uploads.
+4. SMILE, Online tab: `relay` = `wss://smile.oostrik.net/ws/smile`, `page` empty, `active` on; saved in the
+   preset. SMILE makes outgoing connections only; nothing on the installation is opened to the internet.
+5. On the VPS: `systemctl status smile-relay`, `journalctl -u smile-relay -f` and `/home/smile/relay/data/relay.log`
+   say what the relay does; `systemctl status caddy` the proxy and its certificate.
+6. After the first turns: `relay.log`'s `timing` and `frames to the phone` lines, for what the venue's uplink
+   does to the times measured on one PC in `OnlinePhone.md`.
 
 ## The same and the different
 
 | Part                   | Tailnet test                             | VPS                                   |
 |------------------------|------------------------------------------|---------------------------------------|
-| the relay              | this PC, `scripts\start_relay.bat`       | the VPS, a systemd service            |
-| its start              | `python -m relay.server --port 8800`     | the same                              |
-| its data               | `relay/data`                             | the same                              |
+| the relay              | this PC, `scripts\start_relay.bat`       | the VPS, the service `smile-relay`    |
+| its start              | `python -m relay.server --port 8800`     | the same, `--host 127.0.0.1`          |
+| its data               | `relay/data`                             | `/home/smile/relay/data`              |
+| its code               | the repo                                 | `scripts\deploy_relay.bat`            |
 | TLS                    | `tailscale serve`, the ts.net certificate | Caddy, a Let's Encrypt certificate   |
-| the name               | `iaai.tail63e3df.ts.net`                 | a DNS name of the VPS                 |
-| who reaches the page   | the tailnet (`funnel`: anyone)           | anyone                                |
-| SMILE's `online.relay` | `wss://iaai.tail63e3df.ts.net/ws/smile`  | `wss://<name>/ws/smile`               |
-| the QR code on the walls | `https://iaai.tail63e3df.ts.net/` (`online.page` empty: the relay's host) | `https://<name>/`, or `online.page` |
+| the name               | `iaai.tail63e3df.ts.net`                 | `smile.oostrik.net`                   |
+| who reaches the page   | the tailnet (`funnel`: anyone)           | anyone with a pass (the QR code)      |
+| SMILE's `online.relay` | `wss://iaai.tail63e3df.ts.net/ws/smile`  | `wss://smile.oostrik.net/ws/smile`    |
+| the QR code on the walls | `https://iaai.tail63e3df.ts.net/?pass=…` (`online.page` empty: the relay's host) | `https://smile.oostrik.net/?pass=…` |
 | SMILE to the relay     | one PC                                   | the venue's uplink                    |
 
 The relay never terminates TLS itself in either case and reads no difference between the two.
@@ -82,8 +94,5 @@ folders hold at most the last half hour of turns.
 
 ## Open
 
-- SMILE through the TLS proxy (step 4 of the test) has not run yet; the proxy's limit on an upload's size
-  is not checked against the 2 MB tracks and grins.
-- The relay on another machine of the tailnet, to put a network between SMILE and the relay in the test.
-- The VPS's DNS name, and whether the page gets a name under oostrik.net.
+- SMILE through a TLS proxy (step 4 of the test, the VPS) has not run yet.
 - The times over the venue's uplink.

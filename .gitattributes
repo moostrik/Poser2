@@ -1,6 +1,8 @@
 # Every text file is stored with LF; the checkout gets the platform's ending (Windows CRLF), so an editor's
 # or a session's line endings never show as a change
 * text=auto
+# shell scripts run on the VPS (fed to bash over ssh): LF on every checkout, a CR would end every command
+*.sh text eol=lf
 
 data/models/*.onnx filter=lfs diff=lfs merge=lfs -text
 data/models/*.blob filter=lfs diff=lfs merge=lfs -text
