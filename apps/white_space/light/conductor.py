@@ -75,7 +75,7 @@ class Conductor(Thread):
             LayerId.projection_playhead: ProjectionPlayhead (resolution, HI.projection_playhead, instrument.playhead, instrument.mask, board, pose_stage),
             LayerId.flood:               Flood              (resolution, HI.flood,               board),
             LayerId.test_player_lines:   TestPlayerLines    (resolution, HI.test_player_lines,   board, pose_stage),
-            LayerId.test_calibration:    TestCalibration    (resolution, HI.test_calibration,    config.num_cameras, board),
+            LayerId.test_calibration:    TestCalibration    (resolution, HI.test_calibration,    config.num_cams, board),
             LayerId.test_fill:           TestFill           (resolution, HI.test_fill,           board),
             LayerId.test_pulse:          TestPulse          (resolution, HI.test_pulse,          board),
             LayerId.test_chase:          TestChase          (resolution, HI.test_chase,          board),

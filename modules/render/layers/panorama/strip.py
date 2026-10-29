@@ -140,7 +140,7 @@ def elevation_window(band: tuple[float, float], camera_radius: float,
             math.degrees(math.atan(math.tan(math.radians(low)) * ratio)))
 
 
-def panorama_coverage(azimuth: float, num_cameras: int, cam_fov: float, target_fov: float,
+def panorama_coverage(azimuth: float, num_cams: int, cam_fov: float, target_fov: float,
                       camera_radius: float, depth_radius: float) -> int:
     """How many cameras see this azimuth — the divisor an averaging blend needs.
 
@@ -150,7 +150,7 @@ def panorama_coverage(azimuth: float, num_cameras: int, cam_fov: float, target_f
     never 0 as long as the cameras' fields sum past 360.
     """
     return sum(
-        1 for cam_id in range(num_cameras)
+        1 for cam_id in range(num_cams)
         if azimuth_to_camera_x(azimuth, cam_id, cam_fov, target_fov,
                                camera_radius, depth_radius) is not None
     )

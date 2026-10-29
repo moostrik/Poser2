@@ -251,7 +251,7 @@ changed by editing the preset and relaunching:
 
 - **`fov`** — 127°, the azimuth span of the delivered frame, quoted for the full sensor width. A
   contract, not a lens fact: the tracker's `cam_fov`, the overlaps and the azimuth of a column all
-  follow from it. Each camera owns `target_fov = 360 / num_cameras`; the excess is overlap shared
+  follow from it. Each camera owns `target_fov = 360 / num_cams`; the excess is overlap shared
   with its neighbours. It must not exceed the lens's field (`lens_fov`) or the edge columns read past
   the sensor and go black; the warp warns.
 - **`lens_fov`, `lens_centre_x`, `lens_centre_y`** — the lens itself; see *The lens*.

@@ -93,7 +93,7 @@ class Layers(IntEnum):
 
 class OakGroup(BaseSettings):
     fov               : Field[float]           = Field(127.0, access=Field.INIT, description="Camera horizontal FOV (°), quoted for the full sensor width")
-    num_cameras       : Field[int]             = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
+    num_cams       : Field[int]             = Field(4, access=Field.INIT, visible=False, description="Number of cameras")
     fps               : Field[float]           = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
     yolo              : Field[bool]            = Field(True, access=Field.INIT, description="Enable YOLO person detection")
     color             : Field[bool]            = Field(False, access=Field.INIT, description="Color camera (False = mono)")
@@ -116,10 +116,10 @@ class OakGroup(BaseSettings):
     cam_2     : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)
     cam_3     : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)
     camera_check: Group[CameraCheckSettings]     = Group(CameraCheckSettings)
-    simulator : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cameras, fps])
+    simulator : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cams, fps])
     person_detector  : Group[inference.detection.Settings] = Group(inference.detection.Settings)     # the replay backend's person detector
-    frame_sync: Group[SyncSettings]              = Group(SyncSettings, share=[num_cameras, fps])
-    tracklet_sync: Group[SyncSettings]           = Group(SyncSettings, share=[num_cameras, fps])
+    frame_sync: Group[SyncSettings]              = Group(SyncSettings, share=[num_cams, fps])
+    tracklet_sync: Group[SyncSettings]           = Group(SyncSettings, share=[num_cams, fps])
 
     @property
     def cameras(self) -> list[OakCameraSettings]:
@@ -278,7 +278,7 @@ class RecordingGroup(BaseSettings):
     """App recording group — composes SessionSettings with app-specific recorders.
     Recording is decoupled from the show: it works stand-alone and during session mode,
     and nothing here touches the state machine."""
-    num_cameras:   Field[int]   = Field(4, access=Field.INIT, description="Number of cameras")
+    num_cams:   Field[int]   = Field(4, access=Field.INIT, description="Number of cameras")
     fps:           Field[float] = Field(30.0, access=Field.INIT, description="Camera frame rate")
 
     start:         Field[bool]  = Field(False, widget=Widget.button, description="Start recording")
@@ -293,7 +293,7 @@ class RecordingGroup(BaseSettings):
 
     osc:      Group[OscReceiverSettings]    = Group(OscReceiverSettings)
     core:     Group[SessionSettings]        = Group(SessionSettings, share=_session_share)
-    video:    Group[RecorderSettings]       = Group(RecorderSettings, share=_recorder_share + [num_cameras, fps])
+    video:    Group[RecorderSettings]       = Group(RecorderSettings, share=_recorder_share + [num_cams, fps])
     # The tracker diagnosis journal runs for the whole app run while enabled, so it deliberately
     # does not share the record start/stop buttons.
     journal:  Group[TrackerJournalSettings] = Group(TrackerJournalSettings)
@@ -381,7 +381,7 @@ class RenderSettings(BaseSettings):
 
 class Settings(BaseSettings):
     max_players     : Field[int]   = Field(4, access=Field.INIT, description="Players tracked at most: the id slots 0..N−1")
-    num_cameras     : Field[int]   = Field(4, access=Field.INIT)
+    num_cams     : Field[int]   = Field(4, access=Field.INIT)
     input_fps       : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
     light_rate      : Field[float] = Field(32.0, min=1.0, max=120.0, description="Light tick rate (fps): the fixture's frame rate, the conductor's clock and the LERP stage's step")
     light_resolution: Field[int]   = Field(300, min=10, max=1000, access=Field.INIT, description="Projection resolution (pixels per turn)")
@@ -396,10 +396,10 @@ class Settings(BaseSettings):
 
     # In panel order: what you look at, what you capture, the wires out, the sensors, what is made of
     # them, and what the show does with it.
-    render : Group[RenderSettings]  = Group(RenderSettings, share=[max_players, num_cameras.as_('num_cams'), tilt])
-    record : Group[RecordingGroup]  = Group(RecordingGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])
+    render : Group[RenderSettings]  = Group(RenderSettings, share=[max_players, num_cams, tilt])
+    record : Group[RecordingGroup]  = Group(RecordingGroup, share=[num_cams, input_fps.as_('fps')])
     inout  : Group[InOutGroup]      = Group(InOutGroup, share=[max_players, light_resolution.as_('resolution')])
-    camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov, tilt, resolution,
+    camera : Group[OakGroup]        = Group(OakGroup, share=[num_cams, input_fps.as_('fps'), fov, tilt, resolution,
                                                              lens_fov, lens_centre_x, lens_centre_y])
     # Its own group, not under `camera`: the tracker fuses the cameras' output, as `pose` does, and
     # nothing in it is a camera setting. The frame's shape is shared in straight from the root.
@@ -407,7 +407,7 @@ class Settings(BaseSettings):
                                                                                       lens_fov, lens_centre_x, lens_centre_y])
     # The LERP stage is ticked by the light conductor, so its interpolators step at the light rate.
     pose   : Group[PoseGroup]       = Group(PoseGroup, share=[max_players, input_fps.as_('frequency'), light_rate.as_('output_frequency')])
-    light  : Group[LightSettings]   = Group(LightSettings, share=[max_players, num_cameras.as_('num_cameras'), light_rate, light_resolution.as_('light_resolution'), fov, spin_down_seconds])
+    light  : Group[LightSettings]   = Group(LightSettings, share=[max_players, num_cams, light_rate, light_resolution.as_('light_resolution'), fov, spin_down_seconds])
     # The pose instrument's values: its own root group, not a layer group (POSE_INSTRUMENT.md, Settings).
     PI     : Group[PoseInstrumentSettings] = Group(PoseInstrumentSettings)
     states : Group[StateMachineSettings] = Group(StateMachineSettings, share=[spin_down_seconds])

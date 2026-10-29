@@ -101,7 +101,7 @@ class Compositor(LayerBase):
 
     @property
     def target_fov(self) -> float:
-        """The sector one camera owns — the tracker's own `360 / num_cameras`."""
+        """The sector one camera owns — the tracker's own `360 / num_cams`."""
         return 360.0 / self.num_cams
 
     @property

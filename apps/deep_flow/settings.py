@@ -84,7 +84,7 @@ class LayerSettings(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class OakGroup(BaseSettings):
-    num_cameras:        Field[int]               = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
+    num_cams:        Field[int]               = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
     fps:                Field[float]             = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
     keyframe_interval:  Field[int]               = Field(1, access=Field.INIT, visible=False, description="Keyframe interval in frames (1 = every frame)")
     yolo:               Field[bool]              = Field(True, access=Field.INIT, description="Enable YOLO person detection")
@@ -98,12 +98,12 @@ class OakGroup(BaseSettings):
     _cam_share = [fps, color, square, yolo, resolution, model_path, fov]
     cam_0         = Group(OakCameraSettings, share=_cam_share)
     camera_check  = Group(CameraCheckSettings)
-    simulator     = Group(SimulatorSettings, share=[num_cameras, fps])
+    simulator     = Group(SimulatorSettings, share=[num_cams, fps])
     person_detector = Group(inference.detection.Settings)   # the replay backend's person detector
-    recorder      = Group(RecorderSettings, share=[num_cameras, fps, keyframe_interval])
+    recorder      = Group(RecorderSettings, share=[num_cams, fps, keyframe_interval])
     tracker       = Group(OnePerCamTrackerSettings)
-    frame_sync    = Group(SyncSettings, share=[num_cameras, fps])
-    tracklet_sync = Group(SyncSettings, share=[num_cameras, fps])
+    frame_sync    = Group(SyncSettings, share=[num_cams, fps])
+    tracklet_sync = Group(SyncSettings, share=[num_cams, fps])
 
     @property
     def cameras(self) -> list[OakCameraSettings]:
@@ -267,7 +267,7 @@ class Settings(BaseSettings):
     num_players:        Field[int]   = Field(1, access=Field.INIT, visible=False)
     fps:                Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
 
-    camera  = Group(OakGroup, share=[num_players.as_('num_cameras'), fps])
+    camera  = Group(OakGroup, share=[num_players.as_('num_cams'), fps])
     pose    = Group(PoseGroup, share=[num_players.as_('max_poses'), fps.as_('frequency')])
     render  = Group(RenderSettings)
     inout   = Group(InOutGroup)

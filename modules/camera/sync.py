@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class SyncSettings(BaseSettings):
-    num_cameras:    Field[int]   = Field(1, access=Field.INIT, visible=False)
+    num_cams:    Field[int]   = Field(1, access=Field.INIT, visible=False)
     fps:            Field[float] = Field(30.0, access=Field.INIT, visible=False)
 
 
@@ -24,7 +24,7 @@ class Sync:
     separate instances with the same rule (`frame_sync`, `tracklet_sync`)."""
 
     def __init__(self, settings: SyncSettings, verbose: bool = False, stream_name: str = '') -> None:
-        num_cams: int = settings.num_cameras
+        num_cams: int = settings.num_cams
         self.verbose: bool = verbose
         self.stream_name: str = stream_name
         self.max_gap_s: float = 1.0 / settings.fps

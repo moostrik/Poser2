@@ -55,7 +55,7 @@ class PanoramicTrackerCase(unittest.TestCase):
         # them; the far-edge filter has its own tests (`TestFarEdge`). At camera radius 0, the zone moves
         # nothing else here: the overlap band is the bare field at any zone.
         self.settings.rig.zone_max_radius = 15.0
-        self.tracker = PanoramicTracker(self.settings, num_players=8, num_cameras=4)
+        self.tracker = PanoramicTracker(self.settings, num_players=8, num_cams=4)
         self.emitted: list[TrackletDict] = []
         self.tracker.add_tracklet_callback(self.emitted.append)
 
@@ -652,7 +652,7 @@ class TestSplitWorlds(PanoramicTrackerCase):
         # The repair needs a fresh world for the detached view; world ids are unbounded, so a full
         # roster cannot block it: B keeps a slot through the split (their rejoined world inherits
         # it), and A's azimuth stops blending B's cam-1 view.
-        self.tracker = PanoramicTracker(self.settings, num_players=2, num_cameras=4)
+        self.tracker = PanoramicTracker(self.settings, num_players=2, num_cams=4)
         self.tracker.add_tracklet_callback(self.emitted.append)
         self.submit(make_tracklet(0, 1, 96.0))              # A: world 0, slot 0
         self.submit(make_tracklet(1, 1, 9.0))               # B seen by cam 1 first: wrongly joins A
@@ -1082,7 +1082,7 @@ class TestSeamBirths(unittest.TestCase):
         self.settings.rig.camera_radius = CAMERA_RADIUS
         self.settings.rig.camera_height = CAMERA_HEIGHT
         self.settings.seam.dead_zone = 6.5
-        self.tracker = PanoramicTracker(self.settings, num_players=8, num_cameras=4)
+        self.tracker = PanoramicTracker(self.settings, num_players=8, num_cams=4)
         # The fixture's own frame, as in `TestRigParallax`: P800 up 16 on the full reach.
         self.tracker.rig.set_window(WINDOW, ROWS)
         self.emitted: list[TrackletDict] = []
@@ -1122,7 +1122,7 @@ class RigTrackerCase(unittest.TestCase):
         self.settings.rig.camera_radius = CAMERA_RADIUS
         self.settings.rig.camera_height = CAMERA_HEIGHT
         self.settings.lost_timeout = 2.0
-        self.tracker = PanoramicTracker(self.settings, num_players=8, num_cameras=4)
+        self.tracker = PanoramicTracker(self.settings, num_players=8, num_cams=4)
         self.tracker.rig.set_window(WINDOW, ROWS)
         self.emitted: list[TrackletDict] = []
         self.observed: list[list[Tracklet]] = []
@@ -1312,7 +1312,7 @@ class TestRejectedDetections(RigTrackerCase):
         self.assertEqual(self.rejected(), {})
 
     def test_full_player_slots_are_not_a_rejection(self) -> None:
-        self.tracker = PanoramicTracker(self.settings, num_players=1, num_cameras=4)
+        self.tracker = PanoramicTracker(self.settings, num_players=1, num_cams=4)
         self.tracker.rig.set_window(WINDOW, ROWS)
         self.tracker.add_tracklet_callback(self.emitted.append)
         self.tracker.add_observation_callback(self.observed.append)
@@ -1330,7 +1330,7 @@ class TestPlayerSlotLifecycle(RigTrackerCase):
     slot goes to the oldest waiter, who first emits the tick after the leaver's world is removed."""
 
     def capped(self, num_players: int) -> None:
-        self.tracker = PanoramicTracker(self.settings, num_players=num_players, num_cameras=4)
+        self.tracker = PanoramicTracker(self.settings, num_players=num_players, num_cams=4)
         self.tracker.rig.set_window(WINDOW, ROWS)
         self.tracker.add_tracklet_callback(self.emitted.append)
         self.tracker.add_observation_callback(self.observed.append)
@@ -1460,7 +1460,7 @@ class TestNoStepAtHandover(RigTrackerCase):
 class TestLifecycle(unittest.TestCase):
 
     def test_stop_before_start_does_not_raise(self) -> None:
-        PanoramicTracker(PanoramicTrackerSettings(fov=FOV), num_players=1, num_cameras=4).stop()
+        PanoramicTracker(PanoramicTrackerSettings(fov=FOV), num_players=1, num_cams=4).stop()
 
 
 class TestRigHeight(unittest.TestCase):
@@ -1830,7 +1830,7 @@ class TestReachReadouts(unittest.TestCase):
 
     def test_published_reach_matches_a_brute_force_scan(self) -> None:
         settings = self.make_settings()
-        PanoramicTracker(settings, num_players=4, num_cameras=4)
+        PanoramicTracker(settings, num_players=4, num_cams=4)
         r = settings.rig
         self.assertAlmostEqual(r.feet_from,
                                self.brute_force(0.0, 0.0, CAMERA_RADIUS, CAMERA_HEIGHT, 1), delta=0.0015)
@@ -1846,7 +1846,7 @@ class TestReachReadouts(unittest.TestCase):
         against a top that falls toward the seam: here R 1.73 on the axis but beyond R 1.9 on the
         seam. And the lower tilt-for-resolution leaves feet out of frame at R 1.5."""
         settings = self.make_settings(CameraResolution.P720)
-        PanoramicTracker(settings, num_players=4, num_cameras=4)
+        PanoramicTracker(settings, num_players=4, num_cams=4)
         r = settings.rig
         self.assertAlmostEqual(r.feet_from, 1.65, delta=0.01)
         self.assertAlmostEqual(r.hands_from, 1.73, delta=0.01)
@@ -1856,7 +1856,7 @@ class TestReachReadouts(unittest.TestCase):
         # Both are live settings and both move the reach; neither needs the coverage redone.
         # A live change is applied on the tracker's own thread; `_apply_settings` stands in for its tick.
         settings = self.make_settings()
-        tracker = PanoramicTracker(settings, num_players=4, num_cameras=4)
+        tracker = PanoramicTracker(settings, num_players=4, num_cams=4)
         feet, hands = settings.rig.feet_from, settings.rig.hands_from
         settings.rig.camera_radius = CAMERA_RADIUS + 0.1
         tracker._apply_settings()
@@ -1884,7 +1884,7 @@ class TestInitialRigSync(unittest.TestCase):
         for zone in ((1.5, 3.5), (1.0, 4.0), (2.0, 2.0)):
             with self.subTest(zone=zone):
                 settings.rig.zone_min_radius, settings.rig.zone_max_radius = zone
-                tracker = PanoramicTracker(settings, num_players=4, num_cameras=4)
+                tracker = PanoramicTracker(settings, num_players=4, num_cams=4)
                 self.assertEqual(settings.rig.parallax_radius, tracker.rig.parallax_radius)
                 # ...and it really is the zone's harmonic mean, in the zone's own unit.
                 lo, hi = zone
@@ -1899,14 +1899,14 @@ class TestInitialRigSync(unittest.TestCase):
         settings = PanoramicTrackerSettings(fov=PARALLAX_FOV)
         settings.rig.camera_radius = CAMERA_RADIUS
         settings.rig.camera_height = CAMERA_HEIGHT
-        tracker = PanoramicTracker(settings, num_players=4, num_cameras=4)
+        tracker = PanoramicTracker(settings, num_players=4, num_cams=4)
         self.assertEqual(tracker.rig.cam_fov, PARALLAX_FOV)
         self.assertEqual(tracker.rig._camera_radius, CAMERA_RADIUS)
         self.assertEqual(tracker.rig._camera_height, CAMERA_HEIGHT)
-        # Each camera owns 360/num_cameras of the turn, not a hardcoded 90
+        # Each camera owns 360/num_cams of the turn, not a hardcoded 90
         self.assertAlmostEqual(tracker.rig.target_fov, 90.0, places=9)
         self.assertAlmostEqual(
-            PanoramicTracker(settings, num_players=4, num_cameras=3).rig.target_fov,
+            PanoramicTracker(settings, num_players=4, num_cams=3).rig.target_fov,
             120.0, places=9)
         # The row model is derived from the shared camera fields with the warp's own functions —
         # the sensor's full reach at this tilt — and published as the frame's shape and two edge

@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 class SimulatorSettings(BaseSettings):
 
     # ── Initial settings ───────────────────────────────────────────────
-    num_cameras:        Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
+    num_cams:        Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
     fps:                Field[float]            = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Simulation FPS")
     video_path:         Field[str]              = Field("recordings", access=Field.INIT, description="Video recordings directory")
     video_decoder:      Field[CoderType]        = Field(CoderType.iGPU, access=Field.INIT, description="Video decoder type")
@@ -90,7 +90,7 @@ class Player(Thread):
         self.settings: SimulatorSettings = settings
         self.data_path: str = data_path
         self.gray: bool = gray
-        self.num_cams: int = settings.num_cameras
+        self.num_cams: int = settings.num_cams
         self.types: list[FrameType] = settings.video_frame_types
         self.fps: float = settings.fps
 

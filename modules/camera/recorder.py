@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class RecorderSettings(BaseSettings):
 
     # ── Initial settings ───────────────────────────────────────────────
-    num_cameras:        Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
+    num_cams:        Field[int]              = Field(1, access=Field.INIT, description="Number of cameras")
     fps:                Field[float]            = Field(30.0, access=Field.INIT, description="Camera frame rate")
     keyframe_interval:  Field[int]              = Field(0, access=Field.INIT, description="Keyframe interval in frames (0 = encoder default, 1 = every frame)")
     temp_path:          Field[str]              = Field("temp", access=Field.INIT, description="Temporary files directory")
@@ -74,7 +74,7 @@ class Recorder(Thread):
         self.frames: dict[int, Queue[CameraFrame]] = {}
         self.folder_path: Path | None = None
 
-        for c in range(settings.num_cameras):
+        for c in range(settings.num_cams):
             self.recorders[c] = {}
             self.frames[c] = Queue()
             for t in self.settings.video_frame_types:
@@ -127,7 +127,7 @@ class Recorder(Thread):
 
         self.chunk_index = 0
 
-        for c in range(self.settings.num_cameras):
+        for c in range(self.settings.num_cams):
             for t in self.settings.video_frame_types:
                 path: Path = self.folder_path / make_file_name(c, t, self.chunk_index, self.suffix)
                 self.recorders[c][t].start(str(path), self.settings.fps)
@@ -135,7 +135,7 @@ class Recorder(Thread):
         logger.info("VideoRecorder started → %s", self.output_folder_path)
 
     def _stop_recording(self) -> None:
-        for c in range(self.settings.num_cameras):
+        for c in range(self.settings.num_cams):
             for t in self.settings.video_frame_types:
                 self.recorders[c][t].stop()
 
@@ -146,7 +146,7 @@ class Recorder(Thread):
     def _do_split(self) -> None:
         old_chunk = self.chunk_index
         self.chunk_index += 1
-        for c in range(self.settings.num_cameras):
+        for c in range(self.settings.num_cams):
             for t in self.settings.video_frame_types:
                 path: Path = self.folder_path / make_file_name(c, t, self.chunk_index, self.suffix)
                 self.recorders[c][t].split(str(path), self.settings.fps)
@@ -155,7 +155,7 @@ class Recorder(Thread):
     def _move_chunk_files(self, chunk_index: int) -> None:
         if not hasattr(self, 'output_folder_path'):
             return
-        for c in range(self.settings.num_cameras):
+        for c in range(self.settings.num_cams):
             for t in self.settings.video_frame_types:
                 name = make_file_name(c, t, chunk_index, self.suffix)
                 src = self.folder_path / name
@@ -174,7 +174,7 @@ class Recorder(Thread):
                 logger.warning("Temp folder not empty, leaving: %s", self.folder_path)
 
     def _update_recording(self) -> None:
-        for c in range(self.settings.num_cameras):
+        for c in range(self.settings.num_cams):
             try:
                 frame: CameraFrame = self.frames[c].get(timeout=0.01)
             except Empty:

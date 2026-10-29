@@ -114,7 +114,7 @@ class LightSettings(BaseSettings):
 
     # Construction / wiring (INIT — requires restart to take effect)
     max_players:      Field[int]   = Field(3,    min=1,   max=16,   access=Field.INIT, description="Players tracked at most (shared from the root)")
-    num_cameras:      Field[int]   = Field(1,    min=1,   max=16,   access=Field.INIT, description="Number of cameras")
+    num_cams:      Field[int]   = Field(1,    min=1,   max=16,   access=Field.INIT, description="Number of cameras")
     light_rate:       Field[float] = Field(32.0, min=1,   max=120,  description="Light tick rate (fps, shared from the root)")
     light_resolution: Field[int]   = Field(3600, min=256, max=4000, access=Field.INIT, description="Projection resolution (pixels per turn)")
     fov: Field[float] = Field(110.0, access=Field.INIT, description="Camera horizontal FOV — relay from root to test_calibration; its visible home is the camera panel")

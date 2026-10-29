@@ -60,8 +60,8 @@ class WhiteSpaceMain:
         self.panel_server = PanelServer(self.settings, self.settings.panel, on_exit=self.stop)
 
         max_players: int = self.settings.max_players
-        num_cameras: int = self.settings.camera.num_cameras
-        logging.info("Settings loaded: %s players, %s cameras, simulation=%s", max_players, num_cameras, simulation)
+        num_cams: int = self.settings.camera.num_cams
+        logging.info("Settings loaded: %s players, %s cameras, simulation=%s", max_players, num_cams, simulation)
         ps = self.settings.pose
 
         # BLACKBOARD
@@ -88,16 +88,16 @@ class WhiteSpaceMain:
                 # the recordings on the host, without a device: the people found and followed here
                 if self.settings.camera.yolo:
                     self.person_detector = detection.PersonDetector(self.settings.camera.person_detector)
-                for i in range(num_cameras):
+                for i in range(num_cams):
                     self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.person_detector, replay.Tracker(), i))
             else:
-                for i in range(num_cameras):
+                for i in range(num_cams):
                     self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
         else:
-            for i in range(num_cameras):
+            for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
-        self.tracker = PanoramicTracker(self.settings.track, max_players, num_cameras)
+        self.tracker = PanoramicTracker(self.settings.track, max_players, num_cams)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
         self.source_uploader = source.Uploader()
         self.crop_extractor = crop.Extractor(ps.image_crop)
@@ -393,7 +393,7 @@ class WhiteSpaceMain:
         sim = self.settings.camera.simulator
         return {
             'app': APP_NAME,
-            'num_cameras': self.settings.camera.num_cameras,
+            'num_cams': self.settings.camera.num_cams,
             'max_players': self.settings.max_players,
             'fps': self.settings.camera.fps,
             'track': self.settings.track.to_dict(),

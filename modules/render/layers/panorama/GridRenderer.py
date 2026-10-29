@@ -52,7 +52,7 @@ class GridRenderer(LayerBase):
 
     @property
     def _target_fov(self) -> float:
-        """The sector one camera owns — the tracker's own `360 / num_cameras`."""
+        """The sector one camera owns — the tracker's own `360 / num_cams`."""
         return 360.0 / self._num_cams
 
     def set_geometry(self, elevation_window: tuple[float, float]) -> None:

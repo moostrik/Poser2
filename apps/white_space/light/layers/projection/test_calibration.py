@@ -57,12 +57,12 @@ class TestCalibration(ProjectionLayer):
         self,
         resolution:  int,
         config:      TestCalibrationSettings,
-        num_cameras: int,
+        num_cams: int,
         board:       Board,
     ) -> None:
         super().__init__(resolution, config, board)
         self._config      = config
-        self._num_cameras = num_cameras
+        self._num_cams = num_cams
 
     # ------------------------------------------------------------------
     # Layer interface
@@ -71,7 +71,7 @@ class TestCalibration(ProjectionLayer):
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         cfg = self._config
         fov  = cfg.fov
-        nc   = self._num_cameras
+        nc   = self._num_cams
         res  = self.resolution
 
         images = {cam_id: self._board.get_video_image(cam_id) for cam_id in range(nc)}

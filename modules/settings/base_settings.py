@@ -259,7 +259,7 @@ class BaseSettings:
         Bad values are logged and skipped — one broken field does not
         prevent the remaining fields from loading.
         """
-        # Pass 1: update own fields (so count fields like num_cameras are current)
+        # Pass 1: update own fields (so count fields like num_cams are current)
         child_data = {}
         for name, raw in data.items():
             if name in self._children:

@@ -135,7 +135,7 @@ class LayerSettings(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class OakGroup(BaseSettings):
-    num_cameras       : Field[int]             = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
+    num_cams       : Field[int]             = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
     fps               : Field[float]           = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
     yolo              : Field[bool]            = Field(True, access=Field.INIT, description="Enable YOLO person detection")
     color             : Field[bool]            = Field(True, access=Field.INIT, description="Color camera (False = mono)")
@@ -151,11 +151,11 @@ class OakGroup(BaseSettings):
     cam_1        : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)
     cam_2        : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)
     camera_check : Group[CameraCheckSettings]       = Group(CameraCheckSettings)
-    simulator    : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cameras, fps])
+    simulator    : Group[SimulatorSettings]         = Group(SimulatorSettings, share=[num_cams, fps])
     person_detector     : Group[inference.detection.Settings] = Group(inference.detection.Settings)     # the replay backend's person detector
     tracker      : Group[OnePerCamTrackerSettings]  = Group(OnePerCamTrackerSettings)
-    frame_sync   : Group[SyncSettings]              = Group(SyncSettings, share=[num_cameras, fps])
-    tracklet_sync: Group[SyncSettings]              = Group(SyncSettings, share=[num_cameras, fps])
+    frame_sync   : Group[SyncSettings]              = Group(SyncSettings, share=[num_cams, fps])
+    tracklet_sync: Group[SyncSettings]              = Group(SyncSettings, share=[num_cams, fps])
 
     @property
     def cameras(self) -> list[OakCameraSettings]:
@@ -295,7 +295,7 @@ class _IntroRecorderSettings(_PoseRecorderSettings):
 
 class SessionGroup(BaseSettings):
     """App session group — composes SessionSettings with app-specific recorders."""
-    num_cameras:   Field[int]   = Field(1, access=Field.INIT, description="Number of cameras")
+    num_cams:   Field[int]   = Field(1, access=Field.INIT, description="Number of cameras")
     fps:           Field[float] = Field(30.0, access=Field.INIT, description="Camera frame rate")
 
     start:         Field[bool]  = Field(False, widget=Widget.button, description="Start session", pinned=True)
@@ -311,7 +311,7 @@ class SessionGroup(BaseSettings):
     osc:        Group[OscReceiverSettings]     = Group(OscReceiverSettings)
     control:    Group[SessionSettings]         = Group(SessionSettings, share=_session_share)
     sequencer:  Group[ShowSequencerSettings]   = Group(ShowSequencerSettings, share=[start, stop])
-    video:      Group[RecorderSettings]        = Group(RecorderSettings, share=_recorder_share + [num_cameras, fps])
+    video:      Group[RecorderSettings]        = Group(RecorderSettings, share=_recorder_share + [num_cams, fps])
     pose:       Group[_PoseRecorderSettings]   = Group(_PoseRecorderSettings, share=_recorder_share)
 
 
@@ -402,9 +402,9 @@ class Settings(BaseSettings):
     input_fps  : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
     render_fps : Field[float] = Field(60.0)
 
-    camera : Group[OakGroup]     = Group(OakGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
+    camera : Group[OakGroup]     = Group(OakGroup, share=[num_players.as_('num_cams'), input_fps.as_('fps')])
     inout  : Group[InOutGroup]   = Group(InOutGroup)
     pose   : Group[PoseGroup]    = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
     render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_players.as_('num_cams')])
     panel : Group[PanelSettings] = Group(PanelSettings)
-    session: Group[SessionGroup] = Group(SessionGroup, share=[num_players.as_('num_cameras'), input_fps.as_('fps')])
+    session: Group[SessionGroup] = Group(SessionGroup, share=[num_players.as_('num_cams'), input_fps.as_('fps')])

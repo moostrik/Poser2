@@ -48,7 +48,7 @@ class Tracker(Thread, BaseTracker):
     detection, for the panorama.
     """
 
-    def __init__(self, settings: TrackerSettings, num_players: int, num_cameras: int) -> None:
+    def __init__(self, settings: TrackerSettings, num_players: int, num_cams: int) -> None:
         super().__init__()
 
         self._running: bool = False
@@ -62,9 +62,9 @@ class Tracker(Thread, BaseTracker):
         self.observations: ObservationStore = ObservationStore(num_players)
 
         self.settings: TrackerSettings = settings
-        # Each camera owns 360/num_cameras degrees of the turn; whatever its field has beyond
+        # Each camera owns 360/num_cams degrees of the turn; whatever its field has beyond
         # that is the overlap it shares with its neighbours.
-        self.rig: Rig = Rig(settings.fov, 360.0 / num_cameras)
+        self.rig: Rig = Rig(settings.fov, 360.0 / num_cams)
         self.rig_sync: RigSync = RigSync(settings, self.rig)
         self.seams: Seams = Seams(self.observations, self.rig, settings)
 
