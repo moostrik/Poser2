@@ -1,4 +1,4 @@
-"""Tests for the chase and lerp interpolator nodes and the InterpolatorPipeline that merges their outputs."""
+"""Tests for the chase, lerp and predict interpolator nodes and the InterpolatorPipeline that merges their outputs."""
 
 import math
 import unittest
@@ -8,8 +8,9 @@ import numpy as np
 from modules.pose.features import AngleLandmark, Angles, AngleVelocity, Points2D, PointLandmark, Similarity
 from modules.pose.frame import Frame
 from modules.pose.nodes import (
-    AngleChaseInterpolator, AngleLerpInterpolator, AngleVelocityLerpInterpolator, ChaseInterpolatorSettings,
-    LerpInterpolatorSettings, PointChaseInterpolator, SimilarityChaseInterpolator, TickStep,
+    AngleChaseInterpolator, AngleLerpInterpolator, AnglePredictInterpolator, AngleVelocityLerpInterpolator, BlendMode,
+    ChaseInterpolatorSettings, LerpInterpolatorSettings, PointChaseInterpolator, PredictInterpolatorSettings,
+    PredictionMethod, SimilarityChaseInterpolator, TickStep,
 )
 from modules.pose.trackers import InterpolatorPipeline
 
@@ -163,6 +164,65 @@ class LerpInterpolatorTest(unittest.TestCase):
         node.set(_angles(head=-math.pi + 0.1))
         self.assertAlmostEqual(abs(node.head()), math.pi, places=4)
         self.assertAlmostEqual(node.head(), -math.pi + 0.1, places=4)
+
+
+FRAME = 1.0 / 30.0         # the camera's interval
+
+
+def _predict(blend_mode: BlendMode = BlendMode.NONE, fit_frames: int = 2, **fields: float) -> AnglePredictInterpolator:
+    """A predict interpolator on a 60 Hz FIXED grid, a linear fit over ``fit_frames``."""
+    settings = PredictInterpolatorSettings()
+    settings.method = PredictionMethod.LINEAR
+    settings.blend_mode = blend_mode
+    settings.fit_frames = fit_frames
+    for name, value in fields.items():
+        setattr(settings, name, value)
+    return AnglePredictInterpolator(settings)
+
+
+def _ramp(node: AnglePredictInterpolator) -> None:
+    """Two frames at 30 Hz, the head rising 3 rad/s, the newest stamped 0."""
+    node.set(_angles(t=-FRAME, head=-0.1))
+    node.set(_angles(t=0.0, head=0.0))
+
+
+class PredictInterpolatorTest(unittest.TestCase):
+    def test_the_output_rides_the_fit_to_the_tick_plus_the_output_delay(self) -> None:
+        node = _predict()
+        _ramp(node)
+        node.update(0.0)                                                     # anchors the grid
+        self.assertAlmostEqual(node.update(TICK)[Angles][A.head], 0.05, places=6)       # 3 rad/s over one tick
+        node = _predict(output_delay=0.1, max_horizon=0.5)
+        _ramp(node)
+        node.update(0.0)
+        self.assertAlmostEqual(node.update(TICK)[Angles][A.head], 0.35, places=6)       # and 0.1 s further
+
+    def test_a_late_tick_does_not_move_the_fixed_grid(self) -> None:
+        node = _predict()
+        _ramp(node)
+        node.update(0.0)
+        self.assertAlmostEqual(node.update(TICK + 0.004)[Angles][A.head], 0.05, places=6)   # aimed at the grid, not 0.062
+        node = _predict(step=TickStep.MEASURED)
+        _ramp(node)
+        node.update(0.0)
+        self.assertAlmostEqual(node.update(TICK + 0.004)[Angles][A.head], 0.062, places=6)
+
+    def test_a_correction_is_continuous_at_the_frame_and_on_the_new_fit_after_the_blend(self) -> None:
+        node = _predict(BlendMode.RAMP)
+        _ramp(node)
+        node.update(0.0)
+        node.update(TICK)
+        node.set(_angles(t=FRAME, head=0.5))                                  # the ramp would have given 0.1
+        self.assertAlmostEqual(node.update(2 * TICK)[Angles][A.head], 0.1, places=6)    # still the old fit
+        self.assertAlmostEqual(node.update(3 * TICK)[Angles][A.head], 0.45, places=6)   # halfway: old 0.15, new 0.75
+        self.assertAlmostEqual(node.update(4 * TICK)[Angles][A.head], 1.0, places=6)    # the new fit, 15 rad/s
+
+    def test_frames_that_stop_hold_at_the_max_horizon(self) -> None:
+        node = _predict(max_horizon=0.1)
+        _ramp(node)
+        node.update(0.0)
+        self.assertAlmostEqual(node.update(1.0)[Angles][A.head], 0.3, places=6)
+        self.assertAlmostEqual(node.update(2.0)[Angles][A.head], 0.3, places=6)
 
 
 class InterpolatorPipelineTest(unittest.TestCase):
