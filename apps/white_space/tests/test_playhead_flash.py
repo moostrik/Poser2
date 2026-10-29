@@ -29,7 +29,7 @@ class FlashBoard(SimpleNamespace):
     def get_frames(self, stage: int):
         return self.frames
 
-    def add_flash(self, azimuth: float, white: float, blue: float) -> None:
+    def add_flash(self, azimuth: float, white: float, blue: float, timestamp: float) -> None:
         self.flashes.append((azimuth, white, blue))
 
 

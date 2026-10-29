@@ -2,25 +2,24 @@
 
 from modules.board import (
     FrameStoreMixin, GroupStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
-    CameraTrackletStoreMixin, TrackletStoreMixin, ObservationStoreMixin,
-    VideoImageStoreMixin, SequencerStateStoreMixin,
-    PlayheadStoreMixin, SoundLevelStoreMixin, FlashStoreMixin,
+    CameraTrackletStoreMixin, TrackletStoreMixin, ObservationStoreMixin, SequencerStateStoreMixin,
 )
 
-from .light_frame_store import LightFrameStoreMixin
+from .flashes import FlashStoreMixin
+from .light_frame import LightFrameStoreMixin
+from .playhead import PlayheadStoreMixin
+from .sound_levels import SoundLevelStoreMixin
+from .video_images import VideoImageStoreMixin
 
 
 class RenderBoard(
     FrameStoreMixin, GroupStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
-    CameraTrackletStoreMixin, TrackletStoreMixin, ObservationStoreMixin,
-    VideoImageStoreMixin, LightFrameStoreMixin, SequencerStateStoreMixin,
-    PlayheadStoreMixin, SoundLevelStoreMixin, FlashStoreMixin,
+    CameraTrackletStoreMixin, TrackletStoreMixin, ObservationStoreMixin, SequencerStateStoreMixin,
+    VideoImageStoreMixin, LightFrameStoreMixin, PlayheadStoreMixin, SoundLevelStoreMixin, FlashStoreMixin,
 ):
-    """Thread-safe blackboard for the White Space app.
-
-    All pipeline stages (compositor, cameras, pose, tracking) write their own
-    slices here. Render layers and output modules poll whatever slices they need.
-    """
+    """Thread-safe blackboard for the White Space app: the module slices (poses, windows, images, tracklets,
+    the sequencer state) and the app's own (the playhead, the light frame, the flashes, the sound levels,
+    the video images). Producers write their own slices; render layers and output modules poll what they need."""
 
     def __init__(self) -> None:
         FrameStoreMixin.__init__(self)
@@ -31,9 +30,9 @@ class RenderBoard(
         CameraTrackletStoreMixin.__init__(self)
         TrackletStoreMixin.__init__(self)
         ObservationStoreMixin.__init__(self)
+        SequencerStateStoreMixin.__init__(self)
         VideoImageStoreMixin.__init__(self)
         LightFrameStoreMixin.__init__(self)
-        SequencerStateStoreMixin.__init__(self)
         PlayheadStoreMixin.__init__(self)
         SoundLevelStoreMixin.__init__(self)
         FlashStoreMixin.__init__(self)

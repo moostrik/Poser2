@@ -24,7 +24,7 @@ from ...frame import LightFrame
 from .._utilities import BlendType, apply_circular, normalize_azimuth
 
 if TYPE_CHECKING:
-    from ....render_board import RenderBoard
+    from ....board import RenderBoard
 
 
 class TestPlayerLinesSettings(LayerSettings):

@@ -21,14 +21,13 @@ at the wire, the internals speak ``state`` throughout.
 
 from __future__ import annotations
 
-import time
 from dataclasses import dataclass
 from typing import Callable
 
 from modules.pose import GroupSync
 from modules.session import SequencerState
 
-from ..render_board import RenderBoard
+from ..board import RenderBoard
 from ..light import LightSettings, LayerId, Mix, MotorMode, Tick
 from ..pose import Hit, HitStreak
 from .settings import StateId, StateMachineSettings, ManualSettings
@@ -39,10 +38,10 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class StateContext:
-    """Per-tick inputs handed to the active state — wall clock, content clock, and conditions."""
-    elapsed: float          # seconds since state entry (one-way wall-clock ramps)
+    """Per-tick inputs handed to the active state — the tick's clock, the content clock, and conditions."""
+    elapsed: float          # seconds since state entry, on the tick's clock (one-way ramps)
     bars:    float          # playhead bars since state entry (one-way bar ramps)
-    dt:      float          # this tick's wall-clock delta (bidirectional ramps integrate these)
+    dt:      float          # this tick's dt (bidirectional ramps integrate these)
     dbar:    float          # this tick's bar delta
     players: int            # live player count (the dummy excluded)
     sync_hits: int          # hits in a row, within one round, that struck alike poses (HitSync's streak, on the record)
@@ -91,7 +90,6 @@ class StateMachine:
         self._state_callbacks: list[Callable[[SequencerState], None]] = []      # run in registration order
 
         # Tick timing
-        self._prev_time: float | None = None
         self._entered_time: float = 0.0
         self._entered_bars: float = 0.0
         self._prev_bars: float = 0.0
@@ -137,12 +135,10 @@ class StateMachine:
 
     # -- Tick (light thread, via conductor.add_update_callback) ---------------
 
-    def update(self, _tick: Tick) -> None:
-        """One light tick. The machine keeps its own wall clock for its dt until step 6 of the roadmap moves
-        the light domain onto the tick."""
-        now = time.time()
-        dt = now - self._prev_time if self._prev_time is not None else 0.0
-        self._prev_time = now
+    def update(self, tick: Tick) -> None:
+        """One light tick: its ``now`` is the machine's clock (the state's elapsed time, the ramps' dt)."""
+        now = tick.now
+        dt = tick.dt
         signals = self._board.get_playhead_signals()
 
         # The people present are the people with a pose: `pose.tracklets.detection_timeout` decides.

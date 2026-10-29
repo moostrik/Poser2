@@ -22,7 +22,7 @@ from .._base_layer import ProjectionLayer, LayerSettings
 from ...frame import LightFrame
 
 if TYPE_CHECKING:
-    from ....render_board import RenderBoard
+    from ....board import RenderBoard
 
 
 class DetectMode(IntEnum):

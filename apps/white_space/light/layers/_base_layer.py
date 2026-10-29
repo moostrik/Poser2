@@ -22,7 +22,7 @@ from ..frame import LightFrame, BeamLightId, BUFFER_DTYPE
 from ..motor import MotorMode
 
 if TYPE_CHECKING:
-    from ...render_board import RenderBoard
+    from ...board import RenderBoard
 
 
 class LayerSettings(BaseSettings):

@@ -12,21 +12,21 @@ lasts a tick or two on the fixture stays readable on screen; the steady lines ar
 """
 
 import math
-from time import monotonic
+from time import perf_counter
 from typing import Protocol
 
 import numpy as np
 from OpenGL.GL import * # type: ignore
 
 from modules.gl import Fbo, Texture, Image
-from modules.board import HasFlashes
+from apps.white_space.board import HasFlashes
 from modules.render import layers
 
 from apps.white_space.light import BUFFER_DTYPE
 from apps.white_space.render.shaders.light_simulation import LightSimulation
 
 from .beam_light_projection import project_beam_lights, paint_flashes
-from ...light_frame_store import HasLightFrame
+from ...board import HasLightFrame
 from ...settings import BeamLightSimSettings
 
 
@@ -71,7 +71,7 @@ class BeamLightSimulationLayer(layers.LayerBase):
             self._projection = np.zeros(frame.light_img.shape, dtype=BUFFER_DTYPE)
         width, blur = math.radians(self._settings.width), math.radians(self._settings.blur)
         project_beam_lights(frame.beam_lights, self._heading, width, blur, self._projection)
-        paint_flashes(self.board.get_flashes(), monotonic(), self._settings.flash_seconds, width, blur,
+        paint_flashes(self.board.get_flashes(), perf_counter(), self._settings.flash_seconds, width, blur,
                       self._projection)
 
         self.image.set_image(self._projection)

@@ -18,7 +18,7 @@ from modules.pose.pipeline import Domain, PosePipeline
 from modules.inference import detection, PoseInference
 from modules.session import Session
 
-from .render_board import RenderBoard
+from .board import RenderBoard
 from .pose import Dummy, dummy_id
 from .pose.pipeline import pipeline_spec      # not through the package: it reads the settings, which read the package
 from .light import Conductor, Tick
