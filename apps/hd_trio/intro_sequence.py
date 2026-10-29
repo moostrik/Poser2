@@ -154,7 +154,7 @@ class IntroSequencePlayer:
         if self._duration <= 0.0:
             return
         self._active = True
-        self._start_time = time.time()
+        self._start_time = time.perf_counter()
         if self._settings.verbose:
             logger.info("IntroSequencePlayer started")
 
@@ -171,12 +171,12 @@ class IntroSequencePlayer:
         """
         if not self._active:
             if self._settings.loop and self._duration > 0.0:
-                self._start_time = time.time()
+                self._start_time = time.perf_counter()
                 self._active = True
             else:
                 return {}
 
-        elapsed = time.time() - self._start_time
+        elapsed = time.perf_counter() - self._start_time
         if elapsed >= self._duration:
             if self._settings.loop:
                 self._start_time += self._duration

@@ -31,8 +31,8 @@ class FrameAccessTest(unittest.TestCase):
         f = Frame(track_id=4, cam_id=2, time_stamp=12.5)
         self.assertEqual((f.track_id, f.cam_id, f.time_stamp), (4, 2, 12.5))
 
-    def test_timestamp_defaults_to_now(self) -> None:
-        self.assertGreater(Frame(0, 0).time_stamp, 0.0)
+    def test_timestamp_is_the_one_given(self) -> None:
+        self.assertEqual(Frame(0, 0, 7.5).time_stamp, 7.5)
 
 
 class FrameImmutabilityTest(unittest.TestCase):

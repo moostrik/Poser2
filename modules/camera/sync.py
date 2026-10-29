@@ -3,7 +3,6 @@
 from collections import deque
 from threading import Lock
 from typing import Any, Callable
-import time
 
 from modules.settings import BaseSettings, Field
 
@@ -33,29 +32,27 @@ class Sync:
         self.last_bang_time_s: float = 0.0
 
         self._timestamp_history: deque[tuple[int, float]] = deque(maxlen=10 * num_cams)
-        self._callbacks: list[Callable[[], None]] = []      # run in registration order
+        self._callbacks: list[Callable[[float], Any]] = []  # run in registration order, with the bang's time
         self._lock = Lock()
 
     def submit_frame(self, frame: CameraFrame) -> None:
-        self._submit(frame.cam_id)
+        self._submit(frame.cam_id, frame.time)
 
-    def submit_tracklets(self, cam_id: int, tracklets: list[CameraTracklet]) -> None:
-        self._submit(cam_id)
+    def submit_tracklets(self, cam_id: int, tracklets: list[CameraTracklet], time: float) -> None:
+        self._submit(cam_id, time)
 
-    def _submit(self, cam_id: int) -> None:
-        timestamp: float = time.time()
-
+    def _submit(self, cam_id: int, timestamp: float) -> None:
+        """A message with its host time; the bang carries the time of the message that triggered it."""
         with self._lock:
             self._timestamp_history.append((cam_id, timestamp))
             trigger_cam_id: int = Sync._find_sync_trigger_camera(self._timestamp_history, self.max_gap_s)
 
             if cam_id == trigger_cam_id:
-                current_time_s: float = time.time()
-                time_since_last_bang: float = current_time_s - self.last_bang_time_s
-                self.last_bang_time_s = current_time_s
+                time_since_last_bang: float = timestamp - self.last_bang_time_s
+                self.last_bang_time_s = timestamp
 
                 if time_since_last_bang >= self.min_bang_interval_s:
-                    self._notify_callbacks()
+                    self._notify_callbacks(timestamp)
                 else:
                     if self.verbose:
                         logger.info(f"{self.stream_name}Skipped bang (only {time_since_last_bang:.3f}s since last, from cam {cam_id})")
@@ -151,11 +148,11 @@ class Sync:
             cameras.add(cam_id)
         return cameras
 
-    def add_sync_callback(self, callback: Callable[[], Any]) -> None:
+    def add_sync_callback(self, callback: Callable[[float], Any]) -> None:
         with self._lock:
             if callback not in self._callbacks:
                 self._callbacks.append(callback)
 
-    def _notify_callbacks(self) -> None:
+    def _notify_callbacks(self, timestamp: float) -> None:
         for callback in self._callbacks:
-            callback()
+            callback(timestamp)

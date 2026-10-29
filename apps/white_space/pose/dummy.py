@@ -177,7 +177,7 @@ class Dummy(FrameDictCallbackMixin):
     def process(self, frames: FrameDict) -> None:
         """The merge step before the LERP filters: the frames as they are, plus the dummy's; with
         ``solo``, the dummy's alone."""
-        now = time.monotonic()
+        now = time.perf_counter()
         dt = 0.0 if self._last is None else now - self._last
         self._last = now
         if not self._settings.enabled:
@@ -188,7 +188,7 @@ class Dummy(FrameDictCallbackMixin):
         low, high = points.values.min(axis=0), points.values.max(axis=0)
         tight = Rect(float(low[0]), float(low[1]), float(high[0] - low[0]), float(high[1] - low[1]))
         box = Rect(0.0, 0.0, self._aspect_ratio, 1.0).aspect_fill(tight)     # around the pose, at the crop's aspect
-        frame = Frame(self._track_id, 0, time_stamp=time.time(), features={
+        frame = Frame(self._track_id, 0, time_stamp=now, features={
             Points2D: points,
             Azimuth: Azimuth.from_value(math.radians(m.azimuth)),
             Distance: Distance.from_value(m.distance),

@@ -176,8 +176,8 @@ class FaceFinder(Thread):
                 self._process(image, image_time, detector, landmarks)
             except Exception:
                 # nothing may end this thread: without it nobody is ever chosen. The frame is skipped
-                if time.time() - self._error_time > ERROR_LOG_INTERVAL:
-                    self._error_time = time.time()
+                if time.perf_counter() - self._error_time > ERROR_LOG_INTERVAL:
+                    self._error_time = time.perf_counter()
                     logger.exception('Face detection failed')
 
     def _process(self, image: np.ndarray, now: float, detector: FaceDetector, landmarks: FaceLandmarks) -> None:

@@ -58,7 +58,7 @@ class RunnerTRT(Thread):
         # Input queue
         self._input_lock: Lock = Lock()
         self._pending_batch: SegmentationInput | None = None
-        self._input_timestamp: float = time.time()
+        self._input_timestamp: float = time.perf_counter()
         self._last_dropped_batch_id: int = 0
 
         # Callbacks
@@ -164,12 +164,12 @@ class RunnerTRT(Thread):
             if self._pending_batch is not None:
                 dropped_batch = self._pending_batch
                 if self.verbose:
-                    lag = int((time.time() - self._input_timestamp) * 1000)
+                    lag = int((time.perf_counter() - self._input_timestamp) * 1000)
                     logger.info(f"Segmentation: Dropped batch {dropped_batch.batch_id} with lag {lag} ms after {dropped_batch.batch_id - self._last_dropped_batch_id} batches")
                 self._last_dropped_batch_id = dropped_batch.batch_id
 
             self._pending_batch = input_batch
-            self._input_timestamp = time.time()
+            self._input_timestamp = time.perf_counter()
 
         # Notify about dropped batch
         if dropped_batch is not None:

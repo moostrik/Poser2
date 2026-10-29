@@ -53,7 +53,7 @@ class TestSequencer(unittest.TestCase):
         self.sequencer.settings.charge = charge
         self.sequencer.settings.drain = drain
         clock = [100.0]
-        return clock, mock.patch('apps.smile.render.Sequencer.time.time', lambda: clock[0])
+        return clock, mock.patch('apps.smile.render.Sequencer.time.perf_counter', lambda: clock[0])
 
     def test_a_qualifying_face_charges_to_the_flash(self):
         clock, patched = self.charging()
@@ -144,7 +144,7 @@ class TestSequencer(unittest.TestCase):
     def test_progress_stays_full_from_the_timeout_into_the_reset(self):
         clock = [100.0]
         self.sequencer.settings.timeout = 1.0
-        with mock.patch('apps.smile.render.Sequencer.time.time', lambda: clock[0]):
+        with mock.patch('apps.smile.render.Sequencer.time.perf_counter', lambda: clock[0]):
             self.sequencer.set_sequence(SequenceType.TIMEOUT)
             self.sequencer.update()
             clock[0] += 1.1
@@ -159,7 +159,7 @@ class TestSequencer(unittest.TestCase):
         settings = self.sequencer.settings
         settings.destroy_in = 0.4
         settings.destroy_out = 1.1
-        with mock.patch('apps.smile.render.Sequencer.time.time', lambda: clock[0]):
+        with mock.patch('apps.smile.render.Sequencer.time.perf_counter', lambda: clock[0]):
             self.sequencer.set_sequence(SequenceType.BLOOM)
             self.sequencer.update()
             clock[0] += 0.39
@@ -196,7 +196,7 @@ class TestSequencer(unittest.TestCase):
 
     def test_flash_waits_for_the_depth(self):
         clock = [100.0]
-        with mock.patch('apps.smile.render.Sequencer.time.time', lambda: clock[0]):
+        with mock.patch('apps.smile.render.Sequencer.time.perf_counter', lambda: clock[0]):
             self.flash_until_ask(clock)
             clock[0] += 10.0
             self.sequencer.update()
@@ -205,7 +205,7 @@ class TestSequencer(unittest.TestCase):
     def test_flash_out_starts_after_the_hold(self):
         clock = [100.0]
         self.sequencer.settings.flash_hold = 1.0
-        with mock.patch('apps.smile.render.Sequencer.time.time', lambda: clock[0]):
+        with mock.patch('apps.smile.render.Sequencer.time.perf_counter', lambda: clock[0]):
             self.flash_until_ask(clock)
             self.sequencer.start_reveal()       # the depth is in before the flash is full
             clock[0] = 101.4                    # flash full at 100.5, held until 101.5
@@ -224,7 +224,7 @@ class TestSequencer(unittest.TestCase):
         settings.flash_hold = 0.0
         settings.flash_out_auto = False
         settings.flash_out = 2.0
-        with mock.patch('apps.smile.render.Sequencer.time.time', lambda: clock[0]):
+        with mock.patch('apps.smile.render.Sequencer.time.perf_counter', lambda: clock[0]):
             self.flash_until_ask(clock)
             self.sequencer.start_reveal()
             self.sequencer.finish()             # nothing generated: done before the flash is full
@@ -244,7 +244,7 @@ class TestSequencer(unittest.TestCase):
 
     def test_finish_without_the_depth_frees_the_flash(self):
         clock = [100.0]
-        with mock.patch('apps.smile.render.Sequencer.time.time', lambda: clock[0]):
+        with mock.patch('apps.smile.render.Sequencer.time.perf_counter', lambda: clock[0]):
             self.flash_until_ask(clock)
             self.sequencer.finish()             # the generator failed before the depth
             self.assertEqual(self.sequencer.get_sequence(), SequenceType.TIMEOUT)
@@ -262,7 +262,7 @@ class TestSequencer(unittest.TestCase):
         settings.flash_hold = 0.0
         settings.flash_out_auto = False
         settings.flash_out = 2.0
-        with mock.patch('apps.smile.render.Sequencer.time.time', lambda: clock[0]):
+        with mock.patch('apps.smile.render.Sequencer.time.perf_counter', lambda: clock[0]):
             self.flash_until_ask(clock)
             self.sequencer.start_reveal()
             self.sequencer.finish()
@@ -278,7 +278,7 @@ class TestSequencer(unittest.TestCase):
     def test_flash_out_waits_for_the_generator(self):
         clock = [100.0]
         self.sequencer.settings.flash_out_auto = False
-        with mock.patch('apps.smile.render.Sequencer.time.time', lambda: clock[0]):
+        with mock.patch('apps.smile.render.Sequencer.time.perf_counter', lambda: clock[0]):
             self.sequencer.set_sequence(SequenceType.CONTROL_0)
             self.sequencer.update()
             clock[0] += 10.0
@@ -289,7 +289,7 @@ class TestSequencer(unittest.TestCase):
         clock = [100.0]
         self.sequencer.settings.flash_hold = 0.0
         self.sequencer.start_reveal()
-        with mock.patch('apps.smile.render.Sequencer.time.time', lambda: clock[0]):
+        with mock.patch('apps.smile.render.Sequencer.time.perf_counter', lambda: clock[0]):
             self.flash_until_ask(clock)
             clock[0] += 5.0
             self.sequencer.update()

@@ -51,7 +51,7 @@ class FigureTest(unittest.TestCase):
 
     def _read(self, m: Measures) -> np.ndarray:
         points = Dummy.points(m, self.angle_settings.aspect_ratio)
-        return self.extractor.process(Frame(0, 0, features={Points2D: points}))[Angles].values
+        return self.extractor.process(Frame(0, 0, 0.0, features={Points2D: points}))[Angles].values
 
     def _assert_reads_as_set(self, m: Measures) -> None:
         read = self._read(m)
@@ -147,7 +147,7 @@ class ReadingsTest(unittest.TestCase):
                                         nodes.TorsoTiltExtractor(nodes.TorsoTiltExtractorSettings())])
 
     def _frame(self, m: Measures) -> Frame:
-        return Frame(0, 0, features={Points2D: Dummy.points(m, self.angle_settings.aspect_ratio)})
+        return Frame(0, 0, 0.0, features={Points2D: Dummy.points(m, self.angle_settings.aspect_ratio)})
 
     def _raw(self, m: Measures) -> np.ndarray:
         return self.extractor.process(self._frame(m))[Angles].values
@@ -336,7 +336,7 @@ class DummyTest(unittest.TestCase):
     # -- the step --
 
     def test_disabled_passes_the_frames_through(self) -> None:
-        frames = {0: Frame(0, 0)}
+        frames = {0: Frame(0, 0, 0.0)}
         self.dummy.process(frames)
         self.assertIs(self.out[-1], frames)
 
@@ -346,7 +346,7 @@ class DummyTest(unittest.TestCase):
         self.cfg.azimuth = 90.0
         self.cfg.distance = 0.8
         self.cfg.left_shoulder = 180.0
-        self.dummy.process({0: Frame(0, 0)})
+        self.dummy.process({0: Frame(0, 0, 0.0)})
         frames = self.out[-1]
         self.assertEqual(set(frames), {0, ID})
         f = frames[ID]
@@ -360,12 +360,12 @@ class DummyTest(unittest.TestCase):
     def test_solo_leaves_the_live_players_out(self) -> None:
         self.cfg.enabled = True
         self.cfg.solo = True
-        self.dummy.process({0: Frame(0, 0)})
+        self.dummy.process({0: Frame(0, 0, 0.0)})
         self.assertEqual(set(self.out[-1]), {ID})
 
     def test_solo_without_enabled_passes_the_frames_through(self) -> None:
         self.cfg.solo = True
-        frames = {0: Frame(0, 0)}
+        frames = {0: Frame(0, 0, 0.0)}
         self.dummy.process(frames)
         self.assertIs(self.out[-1], frames)
 

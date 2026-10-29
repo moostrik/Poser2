@@ -18,7 +18,7 @@ def _frame(**legs: float) -> Frame:
     for name, angle in legs.items():
         values[AngleLandmark[name]] = angle
         scores[AngleLandmark[name]] = 1.0
-    return Frame(track_id=0, cam_id=0, features={Angles: Angles(values, scores)})
+    return Frame(track_id=0, cam_id=0, time_stamp=0.0, features={Angles: Angles(values, scores)})
 
 
 def _settings(n_top: int = 2, dead_zone: float = 0.0) -> LegDeviationExtractorSettings:

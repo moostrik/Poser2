@@ -1,6 +1,6 @@
 # Standard library imports
 from typing import Union
-from time import monotonic
+from time import perf_counter
 
 # Third-party imports
 import numpy as np
@@ -55,7 +55,7 @@ class DerivativeRateLimit:
     def update(self, current_time: float | None = None) -> None:
         """Update the limited derivative based on elapsed time."""
         if current_time is None:
-            current_time = monotonic()
+            current_time = perf_counter()
 
         if self._last_update_time is None:
             self._last_update_time = current_time

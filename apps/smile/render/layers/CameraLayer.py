@@ -97,7 +97,7 @@ class CameraLayer(LayerBase):
         if not self._camera.allocated:
             return
         r, g, b, a = self.settings.face_color
-        now: float = time.time()
+        now: float = time.perf_counter()
         frame: FaceFrame | None = self._faces.get()
         if frame is not None and now - frame.time > FACES_STALE:
             frame = None

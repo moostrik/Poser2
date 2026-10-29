@@ -14,7 +14,7 @@ keyed by feature class.
 Identity (fixed slots):
   • track_id: int          — Tracked object ID
   • cam_id: int            — Camera source ID
-  • time_stamp: float      — Capture timestamp (default: time.time())
+  • time_stamp: float      — The host time of the camera frame it came from (`CameraFrame.time`, perf_counter)
 
 Feature Access:
   • frame[FeatureType]           → feature instance (NaN dummy if not yet set)
@@ -58,7 +58,6 @@ To add a new feature to the system:
 """
 from __future__ import annotations
 from typing import Callable, Any, TypeAlias, TypeVar, TYPE_CHECKING
-import time
 
 if TYPE_CHECKING:
     from ..features import BaseFeature
@@ -75,12 +74,12 @@ class Frame:
         self,
         track_id: int,
         cam_id: int,
-        time_stamp: float | None = None,
+        time_stamp: float,
         features: dict[type[BaseFeature], BaseFeature] | None = None,
     ) -> None:
         object.__setattr__(self, '_track_id', track_id)
         object.__setattr__(self, '_cam_id', cam_id)
-        object.__setattr__(self, '_time_stamp', time_stamp if time_stamp is not None else time.time())
+        object.__setattr__(self, '_time_stamp', time_stamp)
         object.__setattr__(self, '_features', dict(features) if features else {})
 
     # ========== IDENTITY ==========

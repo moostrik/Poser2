@@ -6,8 +6,11 @@ File layout (``pose_NNN.h5``):
         recording_start  float64   absolute time.time() when recording began
         chunk_start      float64   absolute time.time() when this chunk began
         chunk_index      uint32    0-based index of this chunk
+        clock            str       the clock of /timestamps: 'perf_counter' (files before it: time.time())
 
-    /timestamps                   float64(n_frames,)
+    /timestamps                   float64(n_frames,)   when each entry reached the recorder; only
+                                                       differences mean anything (the Player seeks
+                                                       relative to a recording's first stamp)
 
     /tracks/{track_id}
         /attrs
@@ -75,6 +78,7 @@ def write_chunk(
         f.attrs['recording_start'] = recording_start
         f.attrs['chunk_start'] = chunk_start
         f.attrs['chunk_index'] = chunk_index
+        f.attrs['clock'] = 'perf_counter'
 
         f.create_dataset('timestamps', data=timestamps)
 

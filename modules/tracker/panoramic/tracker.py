@@ -53,6 +53,7 @@ class Tracker(Thread, BaseTracker):
 
         self._running: bool = False
         self._update_event: Event = Event()
+        self._update_time: float = 0.0     # the time of the bang that asked for the tick
 
         self._input_queue: Queue[Tracklet] = Queue()
         # One tick: the intake, the expiry and the emission (its callbacks only store)
@@ -114,8 +115,10 @@ class Tracker(Thread, BaseTracker):
         if self.is_alive():
             self.join(timeout=1.0)  # Wait for the thread to finish
 
-    def notify_update(self) -> None:
+    def notify_update(self, time: float) -> None:
+        """The tracklet bang: a tick at the time of the message that triggered it."""
         if self._running:
+            self._update_time = time
             self._update_event.set()
 
     def run(self) -> None:
@@ -136,7 +139,7 @@ class Tracker(Thread, BaseTracker):
                     except Empty:
                         break
 
-                self._update_and_notify()
+                self._update_and_notify(self._update_time)
             except Exception:
                 logger.exception("PanoramicTracker error")
             self._timer.add_time((time.perf_counter() - start) * 1000.0, report=False)
@@ -303,12 +306,10 @@ class Tracker(Thread, BaseTracker):
         self._rejected[(tracklet.cam_id, tracklet.external_id)] = self._with_rejection(tracklet, reason)
 
     # TICK
-    def _update_and_notify(self) -> None:
-        now: float = time.time()
-
+    def _update_and_notify(self, now: float) -> None:
         # Expire timed-out observations
         for t in self.observations.all():
-            if t.is_expired(self.config.lost_timeout):
+            if t.is_expired(now, self.config.lost_timeout):
                 self.observations.retire(t.obs_id)
 
         self.seams.split_worlds()
@@ -385,6 +386,6 @@ class Tracker(Thread, BaseTracker):
             if callback not in self._observation_callbacks:
                 self._observation_callbacks.append(callback)
 
-    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[CameraTracklet]) -> None:
+    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[CameraTracklet], time: float) -> None:
         for t in cam_tracklets:
             self._input_queue.put(Tracklet.from_camera(t))

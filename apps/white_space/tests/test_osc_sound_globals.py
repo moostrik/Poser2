@@ -74,13 +74,13 @@ class SoundGlobalsTest(unittest.TestCase):
     def test_players_counts_only_live_slots(self) -> None:
         """/global/players counts the occupied live slots; the dummy doesn't count."""
         dummy = self.settings.max_players
-        frames = {id: PoseFrame(id, 0) for id in (0, 2, dummy, dummy + 1)}
+        frames = {id: PoseFrame(id, 0, 0.0) for id in (0, 2, dummy, dummy + 1)}
         seq = SequencerState(stage=4, stage_progress=0.5, progress=0.5, elapsed=10.0, active=True)
         self.assertEqual(_globals(self.sender, seq, frames)["/global/players"], 2)
 
     def test_players_is_presence_and_survives_idle(self) -> None:
         """The count is presence data, not show state: no sequencer state leaves it true."""
-        frames = {0: PoseFrame(0, 0)}
+        frames = {0: PoseFrame(0, 0, 0.0)}
         self.assertEqual(_globals(self.sender, None, frames)["/global/players"], 1)
 
     def test_players_is_zero_without_frames(self) -> None:

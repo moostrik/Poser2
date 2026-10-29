@@ -21,8 +21,9 @@ class CameraTracklet:
     """Device-neutral: what a camera's object tracker says about one track, in its own frame.
 
     `id` is the device tracker's id for the track and `age` its age in frames; `roi` is normalised
-    to the delivered frame; `time` is the host arrival time of the message, stamped by the backend
-    at hand-over. `keypoints` is empty until a backend fills it (OAK4).
+    to the delivered frame; `time` is the host arrival time of the message (`time.perf_counter()`,
+    stamped by the backend at hand-over, the same for every tracklet of one message). `keypoints`
+    is empty until a backend fills it (OAK4).
     """
     cam_id: int
     id: int

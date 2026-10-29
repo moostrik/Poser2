@@ -19,7 +19,7 @@ def _frame(**joints: float) -> Frame:
     for name, angle in joints.items():
         values[A[name]] = angle
         scores[A[name]] = 0.7
-    return Frame(track_id=0, cam_id=0, features={Angles: Angles(values, scores)})
+    return Frame(track_id=0, cam_id=0, time_stamp=0.0, features={Angles: Angles(values, scores)})
 
 
 def _settings(**values: float) -> AngleCalibratorSettings:
@@ -111,7 +111,7 @@ class AngleCalibratorTest(unittest.TestCase):
         self.assertAlmostEqual(out.get_score(A.left_shoulder), 0.7, places=5)
 
     def test_no_angles_leaves_the_frame(self) -> None:
-        frame = Frame(track_id=0, cam_id=0)
+        frame = Frame(track_id=0, cam_id=0, time_stamp=0.0)
         self.assertIs(AngleCalibrator(_settings()).process(frame), frame)
 
     def test_the_defaults_change_nothing_but_the_neutral(self) -> None:

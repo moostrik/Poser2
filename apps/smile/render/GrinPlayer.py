@@ -55,10 +55,10 @@ class GrinPlayer():
         """The portrait is shown: the hold counts from here instead of from the first frame."""
         with self._mutex:
             if self._open and self._added == 0:
-                self._origin = time.time()
+                self._origin = time.perf_counter()
 
     def add(self, frame: np.ndarray) -> None:
-        now: float = time.time()
+        now: float = time.perf_counter()
         with self._mutex:
             if not self._open or self._ended:
                 return      # no clip: the warm-up, or a frame that arrives after a reset
