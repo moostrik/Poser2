@@ -13,7 +13,7 @@ import unittest
 
 from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
-from modules.pose.frame import Frame as PoseFrame, FrameDict
+from modules.pose import Frame as PoseFrame, FrameDict
 from modules.session import SequencerState
 
 from apps.white_space.inout.osc_sound_sender import OscSoundSender
@@ -72,7 +72,7 @@ class SoundGlobalsTest(unittest.TestCase):
         self.assertEqual(_globals(self.sender, None)["/global/sync"], 0.0)
 
     def test_players_counts_only_live_slots(self) -> None:
-        """/global/players counts the occupied live slots; the dummy and the ghosts don't count."""
+        """/global/players counts the occupied live slots; the dummy doesn't count."""
         dummy = self.settings.max_players
         frames = {id: PoseFrame(id, 0) for id in (0, 2, dummy, dummy + 1)}
         seq = SequencerState(stage=4, stage_progress=0.5, progress=0.5, elapsed=10.0, active=True)

@@ -11,7 +11,7 @@ from apps.smile.comfy.messages import GenMessage, GenState
 from modules.face import FaceFrame
 from apps.smile import sphere
 from modules.gl import Blit, Fbo, MonitorId, RenderBase, Shader, Style, Texture, clear_color
-from modules.gl.Utils import fit
+from modules.gl import fit
 from apps.smile.player.Render import PlayerRender
 from apps.smile.render.inputs import Inputs
 from apps.smile.render.layers import CameraLayer, CreditLayer, DestructLayer, DiffusionLayer, FlashLayer, LayerBase, RevealLayer, StatusLayer

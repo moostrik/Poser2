@@ -5,10 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.pose import features
-from modules.pose.analytics import SimilarityResult
-from modules.pose.features import ArmDeviation, Similarity
-from modules.pose.frame import Frame
+from modules.pose import features, analytics, ArmDeviation, Similarity, Frame
 
 from apps.white_space.pose import NeutralWeight, NeutralWeightSettings
 
@@ -36,9 +33,9 @@ class NeutralWeightTest(unittest.TestCase):
     def setUp(self) -> None:
         self.config = NeutralWeightSettings()
         self.weight = NeutralWeight(self.config)
-        self.out: list[SimilarityResult] = []
+        self.out: list[analytics.SimilarityResult] = []
         self.weight.add_similarity_callback(self.out.append)
-        self.result = SimilarityResult(
+        self.result = analytics.SimilarityResult(
             {0: _row(_1=0.9, _2=0.8), 1: _row(_0=0.9, _2=0.7), 2: _row(_0=0.8, _1=0.7)},
             {0: "lead"})
 

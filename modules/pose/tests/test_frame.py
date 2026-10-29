@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 
 from modules.pose.features import Age, Angles, AngleLandmark, Points2D
-from modules.pose.frame import Frame, reidentify, replace
+from modules.pose.frame import Frame, replace
 
 from ._builders import scalar
 
@@ -71,16 +71,6 @@ class ReplaceTest(unittest.TestCase):
         replace(src, {Age: Age.from_value(2.0), Angles: Angles.create_dummy()})
         self.assertIs(src[Age], age)
         self.assertEqual(len(src), 1)
-
-
-class ReidentifyTest(unittest.TestCase):
-    def test_changes_only_track_id(self) -> None:
-        pts = Points2D.create_dummy()
-        src = Frame(track_id=1, cam_id=2, time_stamp=3.0, features={Points2D: pts})
-        out = reidentify(src, 9)
-        self.assertEqual((out.track_id, out.cam_id, out.time_stamp), (9, 2, 3.0))
-        self.assertIs(out[Points2D], pts)
-        self.assertEqual(src.track_id, 1)
 
 
 if __name__ == "__main__":

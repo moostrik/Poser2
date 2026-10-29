@@ -10,18 +10,13 @@ from pathlib import Path
 
 import numpy as np
 
-from modules.pose.features import Angles, AngleLandmark, Azimuth, BBox, Distance, LegDeviation, Points2D, PointLandmark as P, TorsoTilt
-from modules.pose.frame import Frame
-from modules.pose.nodes import (AngleCalibrator, AngleCalibratorSettings, AngleExtractor, AngleExtractorSettings,
-                                LegDeviationExtractor, LegDeviationExtractorSettings, TorsoTiltExtractor,
-                                TorsoTiltExtractorSettings)
-from modules.pose.trackers import FilterPipeline
+from modules.pose import nodes, trackers, Angles, AngleLandmark, Azimuth, BBox, Distance, LegDeviation, Points2D, PointLandmark as P, TorsoTilt, Frame
 
 from apps.white_space.pose import Dummy, DummySettings, Measures, REST, dummy_id
 
 POSES = Path('apps/white_space/data/poses.json')
 JOINTS = ('left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow', 'left_hip', 'right_hip', 'left_knee', 'right_knee')
-ID = dummy_id(4)            # four live players: the dummy is 4, the ghosts start at 5
+ID = dummy_id(4)            # four live players: the dummy is 4
 
 
 def wrap(angle: float) -> float:
@@ -51,8 +46,8 @@ class FigureTest(unittest.TestCase):
     """The dummy's degrees are the angle extractor's angles: what is set is what it reads."""
 
     def setUp(self) -> None:
-        self.angle_settings = AngleExtractorSettings()
-        self.extractor = AngleExtractor(self.angle_settings)
+        self.angle_settings = nodes.AngleExtractorSettings()
+        self.extractor = nodes.AngleExtractor(self.angle_settings)
 
     def _read(self, m: Measures) -> np.ndarray:
         points = Dummy.points(m, self.angle_settings.aspect_ratio)
@@ -136,20 +131,20 @@ class ReadingsTest(unittest.TestCase):
     on a person, and the dummy reading a little off after that is information."""
 
     def setUp(self) -> None:
-        self.angle_settings = AngleExtractorSettings()
-        self.extractor = AngleExtractor(self.angle_settings)
+        self.angle_settings = nodes.AngleExtractorSettings()
+        self.extractor = nodes.AngleExtractor(self.angle_settings)
         raw = self._raw(NEUTRAL)
         up = self._raw(UP)
-        self.calibration = AngleCalibratorSettings()
+        self.calibration = nodes.AngleCalibratorSettings()
         self.calibration.shoulder_neutral = math.degrees(float(raw[AngleLandmark.left_shoulder]))   # the settings are degrees
         self.calibration.shoulder_raised = math.degrees(float(up[AngleLandmark.left_shoulder]))
         self.calibration.elbow_neutral = math.degrees(float(raw[AngleLandmark.left_elbow]))
         self.calibration.elbow_raised = math.degrees(float(up[AngleLandmark.left_elbow]))
         self.calibration.hip_neutral = math.degrees(float(raw[AngleLandmark.left_hip]))
         self.calibration.knee_neutral = math.degrees(float(raw[AngleLandmark.left_knee]))
-        self.pipeline = FilterPipeline([self.extractor, AngleCalibrator(self.calibration),
-                                        LegDeviationExtractor(LegDeviationExtractorSettings()),
-                                        TorsoTiltExtractor(TorsoTiltExtractorSettings())])
+        self.pipeline = trackers.FilterPipeline([self.extractor, nodes.AngleCalibrator(self.calibration),
+                                        nodes.LegDeviationExtractor(nodes.LegDeviationExtractorSettings()),
+                                        nodes.TorsoTiltExtractor(nodes.TorsoTiltExtractorSettings())])
 
     def _frame(self, m: Measures) -> Frame:
         return Frame(0, 0, features={Points2D: Dummy.points(m, self.angle_settings.aspect_ratio)})
@@ -229,7 +224,7 @@ class DummyTest(unittest.TestCase):
         self.path.write_text(json.dumps({'up': {'left_shoulder': 180.0, 'right_shoulder': 180.0}}), encoding='utf-8')
         self.cfg = DummySettings()
         self.cfg.morph = 1.0
-        self.dummy = Dummy(self.cfg, AngleExtractorSettings(), AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
+        self.dummy = Dummy(self.cfg, nodes.AngleExtractorSettings(), nodes.AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
         self.out: list[dict] = []
         self.dummy.add_frames_callback(self.out.append)
 
@@ -248,7 +243,7 @@ class DummyTest(unittest.TestCase):
         self.path.write_text(json.dumps({'up': {'left_shoulder': 180.0}, 'neutral': {'left_shoulder': -20.0, 'left_hip': -10.0}}), encoding='utf-8')
         cfg = DummySettings()
         cfg.left_shoulder = 90.0                                  # where a preset left it
-        dummy = Dummy(cfg, AngleExtractorSettings(), AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
+        dummy = Dummy(cfg, nodes.AngleExtractorSettings(), nodes.AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
         out: list[dict] = []
         dummy.add_frames_callback(out.append)
         self.assertEqual(cfg.pose, 'neutral')
@@ -256,7 +251,7 @@ class DummyTest(unittest.TestCase):
         self.assertEqual(cfg.left_hip, -10.0)
         cfg.enabled = True
         dummy.process({})
-        points = Dummy.points(Measures(left_shoulder=-20.0, left_hip=-10.0), AngleExtractorSettings().aspect_ratio)
+        points = Dummy.points(Measures(left_shoulder=-20.0, left_hip=-10.0), nodes.AngleExtractorSettings().aspect_ratio)
         np.testing.assert_allclose(out[0][ID][Points2D].values, points.values, atol=1e-6)     # in neutral at once, no morph
 
     def test_picking_a_pose_sets_the_measures(self) -> None:
@@ -267,7 +262,7 @@ class DummyTest(unittest.TestCase):
     def test_picking_a_pose_leaves_the_placement_alone(self) -> None:
         self.path.write_text(json.dumps({'old': {'azimuth': 180.0, 'distance': 0.5, 'left_shoulder': 180.0}}), encoding='utf-8')
         cfg = DummySettings()
-        Dummy(cfg, AngleExtractorSettings(), AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
+        Dummy(cfg, nodes.AngleExtractorSettings(), nodes.AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
         cfg.azimuth, cfg.distance = 90.0, 0.2
         cfg.pose = 'old'
         self.assertEqual(cfg.left_shoulder, 180.0)
@@ -381,8 +376,8 @@ class DummyTest(unittest.TestCase):
         self.cfg.left_hip = self.cfg.right_hip = -60.0
         self.cfg.left_knee = self.cfg.right_knee = -90.0
         self.dummy.process({})
-        filters = FilterPipeline([LegDeviationExtractor(LegDeviationExtractorSettings()),
-                                  TorsoTiltExtractor(TorsoTiltExtractorSettings())])
+        filters = trackers.FilterPipeline([nodes.LegDeviationExtractor(nodes.LegDeviationExtractorSettings()),
+                                  nodes.TorsoTiltExtractor(nodes.TorsoTiltExtractorSettings())])
         f = filters.process(self.out[-1][ID])
         self.assertAlmostEqual(f[LegDeviation].value, 1.0, delta=1e-3)
         self.assertAlmostEqual(f[TorsoTilt].value, 1.0, delta=1e-3)

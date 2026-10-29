@@ -4,7 +4,7 @@
 Checks which weights would be clipped when converting to FP16 and shows statistics.
 
 Usage:
-    python modules/pose/batch/detection/diagnose_fp16_weights.py --onnx models/rtmpose-l_256x192.onnx
+    python tools/models/diagnose_fp16_weights.py --onnx models/rtmpose-l_256x192.onnx
 """
 
 import argparse

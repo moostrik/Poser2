@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Callable, TypeAlias, Union
 import torch
 
 from .. import crop, ModelType
-from modules.pose.frame import FrameDict
+from modules.pose import FrameDict
 
 import logging
 logger = logging.getLogger(__name__)

@@ -21,8 +21,7 @@ from typing import Callable
 
 import numpy as np
 
-from modules.pose import FrameDict, features
-from modules.pose.analytics import SimilarityResult
+from modules.pose import FrameDict, features, analytics
 from modules.settings import BaseSettings, Field
 
 
@@ -38,9 +37,9 @@ class NeutralWeight:
         self._config = config
         self._lock = Lock()
         self._deviation: dict[int, float] = {}
-        self._callbacks: list[Callable[[SimilarityResult], None]] = []
+        self._callbacks: list[Callable[[analytics.SimilarityResult], None]] = []
 
-    def add_similarity_callback(self, callback: Callable[[SimilarityResult], None]) -> None:
+    def add_similarity_callback(self, callback: Callable[[analytics.SimilarityResult], None]) -> None:
         self._callbacks.append(callback)
 
     def set_frames(self, frames: FrameDict) -> None:
@@ -49,14 +48,14 @@ class NeutralWeight:
         with self._lock:
             self._deviation = deviation
 
-    def process(self, result: SimilarityResult) -> None:
+    def process(self, result: analytics.SimilarityResult) -> None:
         """Weight the pairwise rows and emit them (analytics thread)."""
         if self._config.enabled:
             result = self._weight(result)
         for callback in self._callbacks:
             callback(result)
 
-    def _weight(self, result: SimilarityResult) -> SimilarityResult:
+    def _weight(self, result: analytics.SimilarityResult) -> analytics.SimilarityResult:
         with self._lock:
             deviation = self._deviation
         length = features.Similarity.length()
@@ -71,4 +70,4 @@ class NeutralWeight:
             own = weights[id] if id < length else 0.0
             pair = np.minimum(own, weights)                       # a pair reads as its less-moved member
             rows[id] = features.Similarity(row.values * pair, row.scores)   # a weighted pair is a real value; NaN stays NaN
-        return SimilarityResult(rows, result.leader_score)
+        return analytics.SimilarityResult(rows, result.leader_score)

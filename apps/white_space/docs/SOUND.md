@@ -68,8 +68,8 @@ the strobe envelope's value, with the band's hysteresis and pair rules already a
 ## The wire
 
 One OSC bundle per LERP frame, over UDP, to `ip_addresses`:`port`. The frames are the LERP-stage
-poses as the ghoster emits them (`main.py`, `Ghoster.add_sound_callback`), so every value is
-smoothed and interpolated as the light's is.
+poses as the motion gate emits them (`main.py`, `gate_lerp`), so every value is smoothed and
+interpolated as the light's is.
 
 | Setting        | Preset `studio` | What it is                      |
 |----------------|-----------------|---------------------------------|
@@ -79,14 +79,12 @@ smoothed and interpolated as the light's is.
 
 ## Slots
 
-Every person is a slot `{id}` in `/pose/{id}/...`. With the preset `studio` (`max_players` 6,
-`num_virtual` 8):
+Every person is a slot `{id}` in `/pose/{id}/...`. With the preset `studio` (`max_players` 6):
 
 | Slots | Who                                             |
 |-------|-------------------------------------------------|
 | 0–5   | live players, the tracker's ids (`TRACKING.md`) |
 | 6     | the dummy (`POSE_INSTRUMENT.md`, *The dummy*)   |
-| 7–14  | active ghosts; passive ghosts are never sent    |
 
 A slot that empties sends its reset, every value 0 and `active` 0, for two bundles and then
 nothing. On shutdown one bundle resets every slot and sends `/global/state` −1.
@@ -115,7 +113,6 @@ Sent with every person; the light instrument plays with none of them.
 
 | Address                         | Values        | Range      | What it is                                      |
 |---------------------------------|---------------|------------|-------------------------------------------------|
-| `/pose/{id}/playhead/fade`      | 1 float       | 0..1       | deprecated; 1, or a surplus ghost fading out    |
 | `/pose/{id}/angle/vel`          | 9 floats      | radians/s  | the angles' velocities                          |
 | `/pose/{id}/time/motion`        | 1 float       | count      | motion time: rises about 1 per second of motion |
 | `/pose/{id}/time/age`           | 1 float       | seconds    | how long the person has been tracked            |
@@ -137,7 +134,7 @@ Sent once per bundle.
 | `/global/playhead`        | float   | −π..π    | the playhead as an azimuth (`CALIBRATION.md`, *Playhead*)    |
 | `/global/motor`           | int     | mode     | the motor command's mode                                     |
 | `/global/sync`            | float   | 0..1     | full sync's envelope: the sync strobe's attack and release while every present pair holds the band (`POSE_INSTRUMENT.md`, *The sync strobe*); 0 under S11's strobing wall, which carries the strobe in light only |
-| `/global/players`         | int     | 0..6     | the number of live players: occupied slots 0–5, ghosts and the dummy not counted |
+| `/global/players`         | int     | 0..6     | the number of live players: occupied slots 0–5, the dummy not counted |
 | `/global/volume`          | float   | 0..1     | the operator's fader (`CALIBRATION.md`, *Sound (Max)*)       |
 | `/global/speaker/offset`  | float   | radians  | where speaker 0 stands (`CALIBRATION.md`, *Sound (Max)*)     |
 

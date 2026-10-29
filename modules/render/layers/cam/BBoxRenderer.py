@@ -4,8 +4,7 @@ from OpenGL.GL import * # type: ignore
 # Local application imports
 from modules.settings import Field, BaseSettings
 from modules.board import HasFrames
-from modules.pose.frame import Frame
-from modules.pose.features import BBox
+from modules.pose import Frame, BBox
 from ..LayerBase import LayerBase, Rect
 from ...shaders import DrawRectangleOutline
 from ...color_settings import ColorSettings

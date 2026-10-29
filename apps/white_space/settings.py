@@ -15,7 +15,6 @@ from modules.settings import BaseSettings, Field, Group, Widget
 from modules.panel import PanelSettings
 from modules.oak import CameraSettings, CameraResolution, CameraCheckSettings, SimulatorSettings, RecorderSettings, SyncSettings
 from modules.render import layers, ColorSettings
-from modules.render.layers import LayerMode, AngleOffset
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import PanoramicTrackerSettings, PosesFromTrackletsSettings
 from modules.pose import nodes, trackers, window, analytics
@@ -24,7 +23,7 @@ from modules.session import SessionSettings
 from modules.gl import WindowSettings
 from .light import LightSettings, PoseInstrumentSettings
 from .inout import OscLightSenderSettings, UdpLightReceiverSettings
-from .pose import GhosterSettings, NeutralWeightSettings
+from .pose import NeutralWeightSettings
 from .statemachine import StateMachineSettings
 from .tracker_journal import TrackerJournalSettings
 
@@ -132,7 +131,6 @@ class OakGroup(BaseSettings):
 
 class _OscSoundSettings(OscSoundSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage to read poses from")
-    virtual_players: Field[int] = Field(0, min=0, max=16, access=Field.INIT, visible=False, description="Extra virtual (ghost) id slots beyond max_players (shared from root num_virtual)")
     volume: Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, newline=True, pinned=True, description="Main sound volume — sent to Max on /global/volume")
     speaker_offset: Field[float] = Field(0.0, min=0.0, max=360.0, step=1.0, description="Where speaker 0 stands, as an azimuth (degrees) — Max adds it in its panner. 0 when the speakers are placed by the layout")
 
@@ -142,12 +140,10 @@ class InOutGroup(BaseSettings):
     hears the fall sensor (plain UDP); the sound sender feeds Max and its receiver hears
     /WS/idle/blue/left and /right (real OSC)."""
     max_players:     Field[int] = Field(8,   access=Field.INIT, visible=False)
-    num_virtual:     Field[int] = Field(8,   access=Field.INIT, visible=False)
     resolution:      Field[int] = Field(3600, access=Field.INIT, visible=False)
     osc_light_sender  : Group[OscLightSenderSettings]   = Group(OscLightSenderSettings, share=[resolution])
     udp_light_receiver: Group[UdpLightReceiverSettings] = Group(UdpLightReceiverSettings)
-    # OSC sends max_players (live) + virtual_players (ghost) id slots; both shared from root.
-    osc_sound_sender  : Group[_OscSoundSettings]        = Group(_OscSoundSettings, share=[max_players, num_virtual.as_('virtual_players')])
+    osc_sound_sender  : Group[_OscSoundSettings]        = Group(_OscSoundSettings, share=[max_players])
     osc_sound_receiver: Group[OscReceiverSettings]      = Group(OscReceiverSettings)
 
 
@@ -241,7 +237,6 @@ class SimilarityFeature(BaseSettings):
 
 class PoseGroup(BaseSettings):
     max_players      : Field[int]       = Field(3, min=1, max=16, access=Field.INIT, description="Players tracked at most (shared from root max_players)")
-    ghost_slots      : Field[int]       = Field(8, min=0, max=16, access=Field.INIT, visible=False, description="Ghost id pool size (shared from root num_virtual)")
     model_type       : Field[inference.ModelType] = Field(inference.ModelType.TRT, access=Field.INIT)
     model_path       : Field[str]       = Field("", access=Field.INIT, visible=False)
     verbose          : Field[bool]      = Field(False, access=Field.INIT)
@@ -272,9 +267,6 @@ class PoseGroup(BaseSettings):
     window_smooth   : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_predict  : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_lerp     : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
-    # The ghost subsystem — virtual poses injected into the pipeline (feeds the OSC sound
-    # id slots and the beam_haunted debug visual; the show's beam_flash is independent of it).
-    ghoster         : Group[GhosterSettings]                 = Group(GhosterSettings, share=[max_players, ghost_slots.as_('ghost_slots')])
 
 
 # ---------------------------------------------------------------------------
@@ -329,27 +321,27 @@ class PreviewGroup(BaseSettings):
 
 
 class PlayheadFeatureSelect(IntEnum):
-    """App-local feature dropdown for the playhead data layers (keys PLAYHEAD_FEATURE_MAP)."""
+    """The playhead data layers' feature (keys PLAYHEAD_FEATURE_MAP); one member, so the
+    field is hidden from the panel."""
     PlayheadOffset    = 0
-    GhostFeature      = auto()
 
 
 class PlayheadDataLayerSettings(BaseSettings):
-    """App-owned data-layer config (mirrors DataLayerSettings, but its own feature dropdown).
+    """App-owned data-layer config (mirrors DataLayerSettings, but its own feature enum).
 
-    Drives the generic FeatureWindowLayer/FeatureFrameLayer over the app's playhead features.
+    Drives the generic FeatureWindowLayer/FeatureFrameLayer over the app's playhead offset.
     Defaults off (mode NONE) and to the LERP stage — the only stage where the features exist.
     Set the generic ``data.mode`` to NONE when enabling this to avoid two graphs overlapping.
     """
     stage:             Field[Stage]               = Field(Stage.LERP)
-    mode:              Field[LayerMode]            = Field(LayerMode.NONE)
-    feature_field:     Field[PlayheadFeatureSelect] = Field(PlayheadFeatureSelect.GhostFeature)
+    mode:              Field[layers.LayerMode]            = Field(layers.LayerMode.NONE)
+    feature_field:     Field[PlayheadFeatureSelect] = Field(PlayheadFeatureSelect.PlayheadOffset, visible=False)
     line_width:        Field[float]               = Field(3.0)
     line_smooth:       Field[float]               = Field(1.0)
     use_scores:        Field[bool]                = Field(False)
     render_labels:     Field[bool]                = Field(True)
     use_history_color: Field[bool]                = Field(False)
-    angle_offset:      Field[AngleOffset]         = Field(AngleOffset.NONE, description="Shift ±π angles before drawing: HALF_PI puts the seam at -π/2, PI at 0")
+    angle_offset:      Field[layers.AngleOffset]         = Field(layers.AngleOffset.NONE, description="Shift ±π angles before drawing: HALF_PI puts the seam at -π/2, PI at 0")
 
 
 class BeamLightSimSettings(BaseSettings):
@@ -388,7 +380,6 @@ class RenderSettings(BaseSettings):
 
 class Settings(BaseSettings):
     max_players     : Field[int]   = Field(4, access=Field.INIT, description="Players tracked at most: the id slots 0..N−1")
-    num_virtual     : Field[int]   = Field(8, access=Field.INIT)
     num_cameras     : Field[int]   = Field(4, access=Field.INIT)
     input_fps       : Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
     light_rate      : Field[float] = Field(32.0, min=1.0, max=120.0, description="Light tick rate (fps): the fixture's frame rate, the conductor's clock and the LERP stage's step")
@@ -406,7 +397,7 @@ class Settings(BaseSettings):
     # them, and what the show does with it.
     render : Group[RenderSettings]  = Group(RenderSettings, share=[max_players, num_cameras.as_('num_cams'), tilt])
     record : Group[RecordingGroup]  = Group(RecordingGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps')])
-    inout  : Group[InOutGroup]      = Group(InOutGroup, share=[max_players, num_virtual.as_('num_virtual'), light_resolution.as_('resolution')])
+    inout  : Group[InOutGroup]      = Group(InOutGroup, share=[max_players, light_resolution.as_('resolution')])
     camera : Group[OakGroup]        = Group(OakGroup, share=[num_cameras.as_('num_cameras'), input_fps.as_('fps'), fov, tilt, resolution,
                                                              lens_fov, lens_centre_x, lens_centre_y])
     # Its own group, not under `camera`: the tracker fuses the cameras' output, as `pose` does, and
@@ -414,7 +405,7 @@ class Settings(BaseSettings):
     track  : Group[PanoramicTrackerSettings] = Group(PanoramicTrackerSettings, share=[fov, resolution, tilt,
                                                                                       lens_fov, lens_centre_x, lens_centre_y])
     # The LERP stage is ticked by the light conductor, so its interpolators step at the light rate.
-    pose   : Group[PoseGroup]       = Group(PoseGroup, share=[max_players, num_virtual.as_('ghost_slots'), input_fps.as_('frequency'), light_rate.as_('output_frequency')])
+    pose   : Group[PoseGroup]       = Group(PoseGroup, share=[max_players, input_fps.as_('frequency'), light_rate.as_('output_frequency')])
     light  : Group[LightSettings]   = Group(LightSettings, share=[max_players, num_cameras.as_('num_cameras'), light_rate, light_resolution.as_('light_resolution'), fov, spin_down_seconds])
     # The pose instrument's values: its own root group, not a layer group (POSE_INSTRUMENT.md, Settings).
     PI     : Group[PoseInstrumentSettings] = Group(PoseInstrumentSettings)

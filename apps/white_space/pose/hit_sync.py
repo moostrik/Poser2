@@ -31,9 +31,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from modules.board import HitStreak
-from modules.pose import features
-from modules.pose.frame import Frame
-from modules.pose.analytics import PostureSimilaritySettings, posture_distance, posture_similarity
+from modules.pose import features, Frame, analytics
 from modules.settings import BaseSettings, Field, Widget
 
 from .neutral_weight import NeutralWeightSettings
@@ -66,7 +64,7 @@ class _Hit:
 class HitSync:
     """Records the hits' poses and publishes the streak; see the module docstring."""
 
-    def __init__(self, config: HitSyncSettings, posture: PostureSimilaritySettings, neutral: NeutralWeightSettings,
+    def __init__(self, config: HitSyncSettings, posture: analytics.PostureSimilaritySettings, neutral: NeutralWeightSettings,
                  light: LightSettings, board: Board, pose_stage: int) -> None:
         self._config = config
         self._posture = posture
@@ -128,7 +126,7 @@ class HitSync:
             run = distances[first:, first:][np.triu_indices(size, k=1)]
             if np.isnan(run).any():
                 continue
-            if all(posture_similarity(float(d), self._posture) >= _FULL for d in run):
+            if all(analytics.posture_similarity(float(d), self._posture) >= _FULL for d in run):
                 return size, float(run.max())
         return 1, 0.0
 
@@ -150,6 +148,6 @@ class HitSync:
         pair = np.full((n, n), np.nan)
         for i in range(n):
             for j in range(i + 1, n):
-                distance, _ = posture_distance(hits[i].pose[features.Angles], hits[j].pose[features.Angles], self._posture)
+                distance, _ = analytics.posture_distance(hits[i].pose[features.Angles], hits[j].pose[features.Angles], self._posture)
                 pair[i, j] = pair[j, i] = distance
         return pair

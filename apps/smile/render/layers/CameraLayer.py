@@ -2,9 +2,7 @@ import math
 import time
 
 from modules.face import FaceFrame
-from modules.gl import Fbo, Image, Style, SwapFbo, Text, Texture
-from modules.gl.shaders.convenience.BlurH import BlurH
-from modules.gl.shaders.convenience.BlurV import BlurV
+from modules.gl import Fbo, Image, Style, SwapFbo, Text, Texture, shaders
 from apps.smile.render.inputs import Faces
 from apps.smile.render.settings import FaceEffect, FaceFill, RenderSettings
 from apps.smile.render.shaders import FaceColor
@@ -57,8 +55,8 @@ class CameraLayer(LayerBase):
         self._text: Text = Text()
         # a blurred camera frame, only made for the blur effect
         self._blurred: SwapFbo = SwapFbo()
-        self._blur_h: BlurH = BlurH()
-        self._blur_v: BlurV = BlurV()
+        self._blur_h: shaders.BlurH = shaders.BlurH()
+        self._blur_v: shaders.BlurV = shaders.BlurV()
         self._width: int = 1
         self._height: int = 1
 

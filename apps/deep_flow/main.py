@@ -9,9 +9,8 @@ from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
-from modules.pose import nodes, trackers, window, FrameDict
+from modules.pose import nodes, trackers, window, FrameDict, configure_features
 from modules.inference import source, crop, pose, segmentation, optical_flow
-from modules.pose.features import configure_features
 
 from .render_board import RenderBoard
 from .settings import Settings, Stage

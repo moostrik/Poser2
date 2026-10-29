@@ -811,7 +811,7 @@ it "left" (site fact), reading from the wall looking at the fixture. Which physi
 calibration of their own: the lamp shines where the bar points, and where that is as an azimuth is the
 playhead. The sender copies them into the pixels the firmware reads in beam mode (pixel 0 and 1800 of
 each channel, `FIRMWARE_LIGHT_SLOT_AZIMUTHS`), which the projection offset and interlace cannot reach. A
-beam layer that reacts to people (`beam_flash`, `beam_haunted`) depends on `PlayheadOffset`.
+beam layer that reacts to people (`beam_flash`) depends on `PlayheadOffset`.
 
 **Projection layers** draw the projection at normalized azimuths — `pose_instrument` at each person's
 `Azimuth` and its playhead marker at the playhead (`ProjectionLayer`). No calibration of their own: they

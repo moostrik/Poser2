@@ -577,7 +577,6 @@ class SimulationColorYolo(SetupColorYolo):
         else:
             pipeline.remove(self.color_warp)
             self.ex_video.out.link(self.detection_manip.inputImage)
-            self.ex_video.out.link(self.output_video.input)
         self.ex_video.out.link(self.output_video.input)
 
 class SimulationColorStereo(SetupColorStereo):

@@ -7,7 +7,7 @@ straddling it, 3 = the closest and both neighbours). Which ticks light is ``Play
 rule (``pose/playhead_offset.py``): no history is needed for the closest tick, so the tick that starts
 INTRO flashes even though INTRO resets this layer on entry, and a jittered pass lights neither an
 extra tick nor none. Every hit flashes the same — the brightness is plain ``white`` / ``blue``, one
-level for everyone. The ghost-driven variant is the separate ``beam_haunted`` debug layer.
+level for everyone.
 
 The state machine's hit is the same closest tick (``statemachine/machine.py``), so INTRO starts on
 the flash.

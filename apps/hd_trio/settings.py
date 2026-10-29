@@ -19,11 +19,11 @@ from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, ArtNetBarsSettings, OscReceiverSettings
 from modules.utils import Color
 from modules.tracker import OnePerCamTrackerSettings, PosesFromTrackletsSettings
-from modules.pose import nodes, trackers, window, analytics
+from modules.pose import nodes, trackers, window, analytics, RecorderSettings as PoseRecorderSettings
 from modules import inference
-from modules.pose.recorder import RecorderSettings as PoseRecorderSettings
-from modules.session import SessionSettings, SequencerSettings
+from modules.session import SessionSettings
 from modules.gl import WindowSettings
+from .sequencer import SequencerSettings
 
 
 # ---------------------------------------------------------------------------

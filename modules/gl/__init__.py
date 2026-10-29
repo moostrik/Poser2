@@ -5,7 +5,7 @@ from .ComputeShader import ComputeShader
 from .WindowManager import WindowManager, WindowSettings, MonitorId, FullscreenMode, MouseButton
 from . import Style
 from . import shaders
-from .Utils import Blit, clear_color, FpsCounter
+from .Utils import Blit, clear_color, FpsCounter, fit
 
 # TEXTURE CLASSES
 from .Texture import Texture

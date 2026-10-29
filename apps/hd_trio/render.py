@@ -4,7 +4,6 @@ from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId, WindowSettings
 from modules.oak import CameraSettings, CameraCheckSettings
-from modules.render.layers import LayerBase
 from modules.render import layers as ls, make_subdivision, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
 
@@ -60,7 +59,7 @@ class HDTrioRender(RenderBase):
         self._preview_layers: list[Layers] = settings.layer.select.preview
         self._draw_layers: list[Layers] = settings.layer.select.final
 
-        self.L: dict[Layers, dict[int, LayerBase]] = {layer: {} for layer in Layers}
+        self.L: dict[Layers, dict[int, ls.LayerBase]] = {layer: {} for layer in Layers}
         self._stages: dict[ShowStage, list[StageLayer]] = {stage: [] for stage in STAGES}
 
         # Set data.b overrides

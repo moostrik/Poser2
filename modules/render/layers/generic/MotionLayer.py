@@ -11,8 +11,7 @@ from modules.gl import Fbo, Texture, Style
 from ..LayerBase import LayerBase, DataCache
 from ...shaders import Tint as shader
 
-from modules.pose.frame import Frame
-from modules.pose.features import AngleMotion
+from modules.pose import Frame, AngleMotion
 from ...color_settings import ColorSettings
 
 from modules.utils import HotReloadMethods

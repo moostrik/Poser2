@@ -3,8 +3,7 @@
 import math
 import unittest
 
-from modules.pose.features import Age
-from modules.pose.frame import Frame
+from modules.pose import Age, Frame
 
 from apps.white_space.pose import dummy_id
 from apps.white_space.render.pose_slots import POSE_SLOTS, longest_present, pose_slots

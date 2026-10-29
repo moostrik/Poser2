@@ -7,8 +7,7 @@ from typing import cast
 from pytweening import *  # type: ignore
 
 from modules.board import HasFrames
-from modules.pose.features import MotionTime
-from modules.render.layers import LayerBase
+from modules.pose import MotionTime
 from modules.render import layers as ls
 
 from .settings import Layers, RenderSettings, ShowStage, Stage
@@ -48,7 +47,7 @@ class StageLayer:
     """Base for per-stage orchestration — settings control + composition."""
 
     def __init__(self, cam_id: int, board: HasFrames, settings: RenderSettings,
-                 layers: dict[Layers, LayerBase]) -> None:
+                 layers: dict[Layers, ls.LayerBase]) -> None:
         self.cam_id = cam_id
         self.board: HasFrames = board
         self.settings = settings

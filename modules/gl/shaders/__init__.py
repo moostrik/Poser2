@@ -11,4 +11,5 @@ from .Lut import Lut
 from .Noise import Noise
 from .NoiseSimplex import NoiseSimplex
 from .Sharpen import Sharpen
+from .convenience import BlurH, BlurV, Curtain, FlashIn, FlashOut, NoiseBlend, NoiseSimplexBlend, Omission
 

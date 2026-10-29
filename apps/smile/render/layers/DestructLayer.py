@@ -1,7 +1,4 @@
-from modules.gl import Fbo, Image, SwapFbo, Texture
-from modules.gl.shaders.convenience.BlurH import BlurH
-from modules.gl.shaders.convenience.BlurV import BlurV
-from modules.gl.shaders.convenience.Omission import Omission
+from modules.gl import Fbo, Image, SwapFbo, Texture, shaders
 
 from .LayerBase import LayerBase
 from .passes import blur, copy
@@ -14,9 +11,9 @@ class DestructLayer(LayerBase):
         self._depth: Image = depth
         self._fbo: Fbo = Fbo()
         self._mask: SwapFbo = SwapFbo()
-        self._omission: Omission = Omission()
-        self._blur_h: BlurH = BlurH()
-        self._blur_v: BlurV = BlurV()
+        self._omission: shaders.Omission = shaders.Omission()
+        self._blur_h: shaders.BlurH = shaders.BlurH()
+        self._blur_v: shaders.BlurV = shaders.BlurV()
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         assert width and height and internal_format

@@ -1,6 +1,5 @@
 {
   "max_players": 6,
-  "num_virtual": 8,
   "num_cameras": 4,
   "input_fps": 23.0,
   "light_rate": 32.0,
@@ -623,21 +622,6 @@
     "window_lerp": {
       "window_size": 360,
       "emit_partial": true
-    },
-    "ghoster": {
-      "enabled": false,
-      "recycle_oldest": true,
-      "reclaim_near": false,
-      "ghost_limit": 0,
-      "limit_fade_beats": 32,
-      "dwell_radius": 8.0,
-      "dwell_beats": 3,
-      "motion_beats": 2,
-      "motion_scale": 0.1,
-      "stability_hold_beats": 2,
-      "stability_expiry_beats": 3,
-      "stability_tolerance": 45.8,
-      "stability_threshold": 0.9
     }
   },
   "light": {
@@ -681,14 +665,6 @@
       },
       "beam_sync_wind_down": {
         "level": 1.0,
-        "blend": "ADD"
-      },
-      "beam_haunted": {
-        "white": 1.0,
-        "base_white": 0.33,
-        "blue": 0.0,
-        "width": 0.0,
-        "ghosts": true,
         "blend": "ADD"
       },
       "beam_test": {

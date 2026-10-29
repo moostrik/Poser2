@@ -32,9 +32,7 @@ from pathlib import Path
 import numpy as np
 import pytweening
 
-from modules.pose.features import Azimuth, BBox, Distance, Points2D, PointLandmark
-from modules.pose.frame import Frame, FrameDict, FrameDictCallbackMixin
-from modules.pose.nodes import AngleCalibrator, AngleCalibratorSettings, AngleExtractor, AngleExtractorSettings
+from modules.pose import Azimuth, BBox, Distance, Points2D, PointLandmark, Frame, FrameDict, FrameDictCallbackMixin, nodes
 from modules.settings import BaseSettings, Field, Widget
 from modules.utils import Rect
 
@@ -95,8 +93,7 @@ REST: dict[str, float] = {
 
 
 def dummy_id(max_players: int) -> int:
-    """The dummy's track id: its own, between the live players (0 … max_players − 1) and the
-    ghosts, which start one above it."""
+    """The dummy's track id: its own, one above the live players (0 … max_players − 1)."""
     return max_players
 
 _P = PointLandmark
@@ -154,12 +151,12 @@ _ARMS: tuple[tuple[str, PointLandmark], ...] = (
 class Dummy(FrameDictCallbackMixin):
     """The dummy in the pose pipeline; see the module docstring."""
 
-    def __init__(self, settings: DummySettings, angle_extractor: AngleExtractorSettings,
-                 angle_calibrator: AngleCalibratorSettings, track_id: int, poses_path: Path) -> None:
+    def __init__(self, settings: DummySettings, angle_extractor: nodes.AngleExtractorSettings,
+                 angle_calibrator: nodes.AngleCalibratorSettings, track_id: int, poses_path: Path) -> None:
         super().__init__()
         self._settings = settings
-        self._extractor = AngleExtractor(angle_extractor)
-        self._calibrator = AngleCalibrator(angle_calibrator)      # the dummy enters after the stages that run these
+        self._extractor = nodes.AngleExtractor(angle_extractor)
+        self._calibrator = nodes.AngleCalibrator(angle_calibrator)      # the dummy enters after the stages that run these
         self._aspect_ratio = float(angle_extractor.aspect_ratio)
         self._track_id = track_id
         self._poses_path = Path(poses_path)

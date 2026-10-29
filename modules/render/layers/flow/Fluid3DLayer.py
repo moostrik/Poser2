@@ -18,8 +18,7 @@ import numpy as np
 from modules.gl import Texture, Style, Text
 from ..LayerBase import LayerBase, Blit
 from modules.board import HasFrames
-from modules.pose.frame import Frame
-from modules.pose.features import Similarity, MotionGate, AngleMotion, Points2D, PointLandmark
+from modules.pose import Frame, Similarity, MotionGate, AngleMotion, Points2D, PointLandmark
 
 from modules.settings import Field, BaseSettings, Group
 from modules.flow import FluidFlow, FluidFlow3D, FluidFlowSettings

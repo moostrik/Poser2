@@ -7,8 +7,7 @@ from OpenGL.GL import * # type: ignore
 from modules.settings import Field, BaseSettings
 from modules.board import HasFrames
 from modules.gl import Fbo, Texture, clear_color
-from modules.pose.frame import Frame
-from modules.pose.features import BBox
+from modules.pose import Frame, BBox
 from ..LayerBase import LayerBase, DataCache, Rect
 from ...shaders import DrawRoi
 

@@ -9,7 +9,7 @@ from pythonosc.osc_message_builder import OscMessageBuilder
 
 from ..light import Frame, Tick, BeamLightId, BEAM_LIGHT_CHANNEL, FIXTURE_PROJECTION_RPM, MotorSettings
 from modules.settings import BaseSettings, Field, Group, Widget
-from modules.inout.net_probe import validate_connection
+from modules.inout import validate_connection
 
 import logging
 logger = logging.getLogger(__name__)

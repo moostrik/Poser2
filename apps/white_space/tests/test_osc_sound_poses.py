@@ -13,8 +13,7 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 
 from apps.white_space.inout.osc_sound_sender import OscSoundSender
 from apps.white_space.settings import _OscSoundSettings
-from modules.pose.features import Azimuth, Distance, Angles, AngleLandmark, ArmTravel, TravelElement, ShoulderDifference
-from modules.pose.frame import Frame
+from modules.pose import Azimuth, Distance, Angles, AngleLandmark, ArmTravel, TravelElement, ShoulderDifference, Frame
 
 ID = 2
 

@@ -2,7 +2,7 @@
 
 CLEAN → SMOOTH → PREDICT → chase-interpolate → LERP extractors → motion gate, driven tick by tick with a moving
 skeleton for two tracks: a confidence dropout on one wrist, and one track that leaves and comes back. App-local
-nodes (playhead offset, ghoster) are left out; similarity is fed straight into the applicators instead of through
+nodes (the playhead offset) are left out; similarity is fed straight into the applicators instead of through
 the threaded WindowSimilarity. Keep the node lists in step with main.py when its stages change.
 """
 

@@ -2,8 +2,7 @@ import logging
 import math
 from threading import Lock
 
-from modules.pose.frame import Frame, FrameDict, FrameDictCallbackMixin
-from modules.pose.features import BBox, BBoxAzimuth, Distance
+from modules.pose import Frame, FrameDict, FrameDictCallbackMixin, BBox, BBoxAzimuth, Distance
 from modules.settings import BaseSettings, Field
 from .tracklet import Tracklet
 from .panoramic.annotation import Annotation as PanoramicAnnotation

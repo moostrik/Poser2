@@ -10,14 +10,13 @@ from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound, ArtNetBars, OscReceiver
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
-from modules.pose import nodes, trackers, features, window, analytics, FrameDict
-from modules.pose import Recorder as PoseRecorder
-from modules.pose.recorder import RecorderSettings as PoseRecorderSettings
+from modules.pose import nodes, trackers, features, window, analytics, FrameDict, Recorder as PoseRecorder, RecorderSettings as PoseRecorderSettings
 from modules.inference import source, crop, pose, segmentation
-from modules.session import Session, SessionSettings, Sequencer, SequencerState
+from modules.session import Session, SessionSettings, SequencerState
 from modules.gl import WindowSettings
 
 from .render_board import RenderBoard
+from .sequencer import Sequencer
 from .settings import Settings, Stage, ShowStage, IntroSequenceSettings
 from .render import HDTrioRender
 

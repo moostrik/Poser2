@@ -3,11 +3,9 @@
 import math
 import unittest
 
-from modules.pose.frame import Frame
-from modules.pose.features import Azimuth
+from modules.pose import Frame, Azimuth
 from apps.white_space.pose import PlayheadOffset, PlayheadOffsetExtractor, playhead_step, ticks_to_crossing
 from apps.white_space.light.layers._utilities import normalize_azimuth
-from apps.white_space.light.layers.beam.haunted import offset_to_level
 
 PI = math.pi
 TAU = math.tau
@@ -84,29 +82,6 @@ class TicksToCrossingTest(unittest.TestCase):
         self.assertTrue(math.isnan(ticks_to_crossing(PI / 2, self.STEP)))       # far half
         self.assertTrue(math.isnan(ticks_to_crossing(-3.0, self.STEP)))         # far half, past the wrap
         self.assertTrue(math.isnan(ticks_to_crossing(0.1, 0.0)))                # playhead not moving
-
-
-class FlashWindowTest(unittest.TestCase):
-    def test_on_within_window(self) -> None:
-        self.assertEqual(offset_to_level(0.0, 0.5), 1.0)     # on the playhead
-        self.assertEqual(offset_to_level(0.25, 0.5), 1.0)    # ahead, within width
-        self.assertEqual(offset_to_level(-0.25, 0.5), 1.0)   # behind, within width
-        self.assertEqual(offset_to_level(0.5, 0.5), 1.0)     # ahead edge (inclusive)
-        self.assertEqual(offset_to_level(-0.5, 0.5), 1.0)    # behind edge (inclusive)
-
-    def test_off_outside_and_nan(self) -> None:
-        self.assertEqual(offset_to_level(1.0, 0.5), 0.0)         # ahead, beyond width
-        self.assertEqual(offset_to_level(-1.0, 0.5), 0.0)        # behind, beyond width
-        self.assertEqual(offset_to_level(float("nan"), 0.5), 0.0)
-        self.assertEqual(offset_to_level(0.3, 0.0), 0.0)         # zero width → off
-
-    def test_centre_gap(self) -> None:
-        # gap = 0.25 of width = 0.1 rad dark notch on each side of the crossing
-        self.assertEqual(offset_to_level(0.0, 0.4, 0.25), 0.0)   # dead centre → notched off
-        self.assertEqual(offset_to_level(0.05, 0.4, 0.25), 0.0)  # inside the notch → off
-        self.assertEqual(offset_to_level(0.1, 0.4, 0.25), 1.0)   # notch edge (inclusive) → on
-        self.assertEqual(offset_to_level(0.3, 0.4, 0.25), 1.0)   # past notch, within width → on
-        self.assertEqual(offset_to_level(0.5, 0.4, 0.25), 0.0)   # beyond width → off
 
 
 if __name__ == "__main__":

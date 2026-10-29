@@ -7,8 +7,7 @@ from OpenGL.GL import * # type: ignore
 from modules.settings import Field, BaseSettings
 from modules.board import HasFrames
 from modules.gl import Fbo, Texture, clear_color
-from modules.pose.frame import Frame
-from modules.pose.features import Points2D
+from modules.pose import Frame, Points2D
 from ..LayerBase import LayerBase, DataCache
 from ...shaders import PosePointDots as shader
 

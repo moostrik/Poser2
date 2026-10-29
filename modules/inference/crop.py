@@ -5,8 +5,7 @@ from typing import Callable, TypeAlias
 import torch
 import torch.nn.functional as F
 
-from modules.pose.features import BBox
-from modules.pose.frame import FrameDict, replace
+from modules.pose import BBox, FrameDict, replace
 from .source import ImageDict as SourceImageDict
 from modules.utils import Rect, Point2f
 from modules.settings import BaseSettings, Field

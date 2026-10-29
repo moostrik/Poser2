@@ -19,7 +19,7 @@ from modules.inference import source, crop, pose
 from modules.session import Session
 
 from .board import Board
-from .pose import GhostFeature, PlayheadOffset, PlayheadOffsetExtractor, Ghoster, Dummy, dummy_id, NeutralWeight, HitSync
+from .pose import PlayheadOffset, PlayheadOffsetExtractor, Dummy, dummy_id, NeutralWeight, HitSync
 from .light import Conductor
 from .inout import OscLightSender, OscSoundSender, UdpLightReceiver
 from .render import Render as WindowRender
@@ -69,9 +69,8 @@ class WhiteSpaceMain:
         # RECORDING (independent of the show — works stand-alone and during session mode)
         self.session = Session(self.settings.record.core)
         self.osc_sound_sender = OscSoundSender(self.settings.inout.osc_sound_sender)
-        self.ghoster = Ghoster(self.settings.pose.ghoster, playhead=self.board.get_playhead)   # live/pool counts shared from root
-        # The dummy has its own id between the live players and the ghosts; the LERP stage is
-        # built one id wider for it, so it is a pose like any other from there.
+        # The dummy has its own id above the live players; the LERP stage is built one id wider
+        # for it, so it is a pose like any other from there.
         self.dummy = Dummy(self.settings.PI.dummy, ps.angle_extractor, ps.angle_calibrator, dummy_id(max_players),
                            Path(DATA_PATH) / "poses.json")
         self.video_recorder = VideoRecorder(self.settings.record.video, data_path=DATA_PATH)
@@ -135,9 +134,9 @@ class WhiteSpaceMain:
         self.poses_from_tracklets.add_frames_callback(self._process_poses)
 
         # STAGE WINDOW TRACKERS & BROADCASTS
-        # The LERP tracker also windows the app-local playhead features (the only stage where
-        # they're stamped) so the data layers can graph them; other stages use the built-ins.
-        lerp_features = features.SCALAR_FEATURES + [PlayheadOffset, GhostFeature]
+        # The LERP tracker also windows the app-local playhead offset (the only stage where it is
+        # stamped) so the data layers can graph it; other stages use the built-ins.
+        lerp_features = features.SCALAR_FEATURES + [PlayheadOffset]
         self.window_trackers: dict[Stage, window.WindowTracker] = {}
         self.stages: dict[Stage, Broadcast] = {}
         for stage in Stage:
@@ -313,12 +312,9 @@ class WhiteSpaceMain:
         self.dummy.add_frames_callback(self.filters_lerp.process)
         self.filters_lerp.add_frames_callback(self.motion_gate_applicator.set)
         self.filters_lerp.add_frames_callback(self.gate_lerp.process)
-        # Ghoster sits between LERP and the fan-out: records held poses, commits/refreshes ghosts,
-        # publishes the ghost snapshot to the board, and feeds (muted live + ghosts) to OSC sound.
-        self.gate_lerp.add_frames_callback(self.ghoster.process)
-        self.ghoster.add_frames_callback(self.stages[Stage.LERP])
-        self.ghoster.add_ghosts_callback(self.board.set_ghosts)
-        self.ghoster.add_sound_callback(partial(self.osc_sound_sender.set_frames, int(Stage.LERP)))
+        # The gated LERP poses fan out to the board (through the stage broadcast) and to the OSC sound.
+        self.gate_lerp.add_frames_callback(self.stages[Stage.LERP])
+        self.gate_lerp.add_frames_callback(partial(self.osc_sound_sender.set_frames, int(Stage.LERP)))
 
         # CAMERA CHECK — compares each camera's own IMU reading and frame rate against the preset,
         # and summarises them as pinned indicators. A setup aid; nothing downstream reads it.
@@ -418,7 +414,6 @@ class WhiteSpaceMain:
         self.tracker_journal.stop()
         self.osc_sound_sender.stop()
         self.state_machine.stop()
-        self.ghoster.stop()
         self.osc_light_sender.stop()
         self.osc_sound_receiver.stop()
         self.udp_light_receiver.stop()

@@ -5,7 +5,7 @@ import torch
 
 from .. import crop, ModelType
 from .image import Image, ImageDict, ImageCallback
-from modules.pose.frame import FrameDict
+from modules.pose import FrameDict
 from .settings import Settings
 from modules.utils import PerformanceTimer
 

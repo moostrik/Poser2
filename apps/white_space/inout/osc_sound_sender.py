@@ -5,11 +5,10 @@ from pythonosc.osc_bundle_builder import OscBundleBuilder, IMMEDIATELY
 from pythonosc.osc_message_builder import OscMessageBuilder
 
 from modules.inout import OscSound as BaseOscSound, OscSoundSettings
-from modules.pose.frame import Frame as PoseFrame, FrameDict
-from modules.pose.features import Azimuth, Distance, Angles, ArmTravel, TravelElement, ShoulderDifference
+from modules.pose import Frame as PoseFrame, FrameDict, Azimuth, Distance, Angles, ArmTravel, TravelElement, ShoulderDifference
 from modules.session import SequencerState
 from ..light import Frame
-from ..pose import GhostElement, GhostFeature, PlayheadOffset
+from ..pose import PlayheadOffset
 
 import logging
 logger = logging.getLogger(__name__)
@@ -19,7 +18,7 @@ class OscSoundSender(BaseOscSound):
     """The sound sender — modules' OscSound extended with the rotation playhead
     (/global/playhead), the motor mode (/global/motor), full sync's envelope (/global/sync,
     the light instrument's gate: 0..1, 0 while the instrument is not drawn), the live player
-    count (/global/players: occupied live slots, ghosts and the dummy excluded; presence
+    count (/global/players: occupied live slots, the dummy excluded; presence
     data, never zeroed on idle), the two operator settings (/global/volume,
     /global/speaker/offset), and the panoramic-only per-pose azimuth, distance and
     playhead-offset messages.
@@ -39,22 +38,21 @@ class OscSoundSender(BaseOscSound):
     and its elbow's travel, and their mean — and ``/pose/{id}/shoulder/difference`` the
     shoulders' signed travel difference: the pipeline's values, the same ones the light plays.
 
-    Also owns the id-slot count: it sends ``max_players`` live slots plus ``virtual_players``
-    ghost slots (ids Ghoster injects beyond the tracked players). It overrides the base's
-    ``_build_bundle`` / ``_send_blackout`` to iterate that extended range while keeping the
-    per-track (similarity/gate/leader) array width at ``max_players``."""
+    Also owns the id-slot count: it sends ``max_players`` live slots plus the dummy's. It
+    overrides the base's ``_build_bundle`` / ``_send_blackout`` to iterate that extended range
+    while keeping the per-track (similarity/gate/leader) array width at ``max_players``."""
 
     def __init__(self, settings: OscSoundSettings) -> None:
         super().__init__(settings)
         self._composition: Frame | None = None
-        # Extend the base's inactive-reset throttle to cover the virtual (ghost) slots.
+        # Extend the base's inactive-reset throttle to cover the dummy's slot.
         self._inactive_counts = {id: 0 for id in range(self._slot_count)}
 
     @property
     def _slot_count(self) -> int:
-        """Live players (``max_players``) + the dummy's slot + the virtual (ghost) id slots
-        Ghoster injects. The per-track array width stays ``max_players``; only the slot count grows."""
-        return self._config.max_players + 1 + self._config.virtual_players  # type: ignore[attr-defined]
+        """Live players (``max_players``) + the dummy's slot. The per-track array width stays
+        ``max_players``; only the slot count grows."""
+        return self._config.max_players + 1
 
     def set_composition(self, output: Frame) -> None:
         """Store the latest Frame; thread-safe."""
@@ -62,7 +60,7 @@ class OscSoundSender(BaseOscSound):
             self._composition = output
 
     def _build_bundle(self, frames: FrameDict, seq_state: SequencerState | None) -> OscBundleBuilder:
-        """Live + ghost slots; per-track arrays stay ``max_players`` wide (see class doc)."""
+        """Live slots and the dummy's; per-track arrays stay ``max_players`` wide (see class doc)."""
         bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
         self._add_global_messages(bundle, frames, seq_state)
 
@@ -80,7 +78,7 @@ class OscSoundSender(BaseOscSound):
         return bundle
 
     def _send_blackout(self) -> None:
-        """All-zero bundle across every live + ghost slot."""
+        """All-zero bundle across every slot."""
         bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
         self._add_global_messages(bundle, {}, None)  # no frames, None → zeroed globals
         for id in range(self._slot_count):
@@ -114,7 +112,7 @@ class OscSoundSender(BaseOscSound):
         bundle_builder.add_content(sync_msg.build())  # type: ignore
 
         # Presence, not show state, so never zeroed on idle: the count of live players,
-        # ghosts and the dummy excluded — the same frames the active flags are built from.
+        # the dummy excluded — the same frames the active flags are built from.
         players: int = sum(1 for id in range(self._config.max_players) if id in frames)
         players_msg = OscMessageBuilder(address="/global/players")
         players_msg.add_arg(players, OscMessageBuilder.ARG_TYPE_INT)
@@ -172,12 +170,6 @@ class OscSoundSender(BaseOscSound):
         offset_msg.add_arg(playhead_offset, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(offset_msg.build())  # type: ignore
 
-        # 1.0 for a live pose; a ghost's presence fades 1→0 over its lifetime (absent → fully present).
-        fade: float = frame[GhostFeature].get(GhostElement.Fade) if GhostFeature in frame else 1.0
-        fade_msg = OscMessageBuilder(address=f"/pose/{id}/playhead/fade")
-        fade_msg.add_arg(fade, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(fade_msg.build())  # type: ignore
-
     def _add_inactive_frame_messages(self, bundle_builder: OscBundleBuilder, id: int, num_players: int) -> None:
         super()._add_inactive_frame_messages(bundle_builder, id, num_players)
         arm_msg = OscMessageBuilder(address=f"/pose/{id}/arm")
@@ -185,7 +177,7 @@ class OscSoundSender(BaseOscSound):
             arm_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
         bundle_builder.add_content(arm_msg.build())  # type: ignore
         for address in (f"/pose/{id}/shoulder/difference", f"/pose/{id}/azimuth", f"/pose/{id}/distance",
-                        f"/pose/{id}/playhead/offset", f"/pose/{id}/playhead/fade"):
+                        f"/pose/{id}/playhead/offset"):
             msg = OscMessageBuilder(address=address)
             msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
             bundle_builder.add_content(msg.build())  # type: ignore

@@ -2,7 +2,7 @@
 
 Every LERP pose with an azimuth and keypoints is drawn as its skeleton in its track colour, its
 eyes at its azimuth on the row's 360° x axis (the azimuth is the eyes', `LAYERS.md` *Inputs*), so
-a person, a ghost's origin or the dummy can be seen where the light places them. The figure keeps
+a person or the dummy can be seen where the light places them. The figure keeps
 the crop's aspect: its height is a fraction of the row, its width follows from the row's pixel
 aspect and the crop's.
 """
@@ -13,11 +13,8 @@ from typing import Protocol
 import numpy as np
 
 from modules.board import HasFrames
-from modules.pose.features import Azimuth, Points2D, PointLandmark
-from modules.pose.nodes import AngleExtractorSettings
-from modules.render import ColorSettings
-from modules.render.layers import LayerBase
-from modules.render.shaders import PosePointLines
+from modules.pose import Azimuth, Points2D, PointLandmark, nodes
+from modules.render import ColorSettings, layers, shaders
 
 from ...light.layers import normalize_azimuth
 from ...settings import Stage
@@ -52,18 +49,18 @@ class PoseFigureBoard(HasFrames, Protocol):
     ...
 
 
-class PoseFigureLayer(LayerBase):
+class PoseFigureLayer(layers.LayerBase):
     """The poses' figures over the projection row; see the module docstring.
 
     Owns no FBO: it draws into whatever viewport is current when `draw()` is called, which must be
     the projection row's, sized by the last `allocate`.
     """
 
-    def __init__(self, board: PoseFigureBoard, colors: ColorSettings, angle_extractor: AngleExtractorSettings) -> None:
+    def __init__(self, board: PoseFigureBoard, colors: ColorSettings, angle_extractor: nodes.AngleExtractorSettings) -> None:
         self._board: PoseFigureBoard = board
         self._colors: ColorSettings = colors
-        self._angle_extractor: AngleExtractorSettings = angle_extractor   # its aspect_ratio is the crop's
-        self._shader: PosePointLines = PosePointLines()
+        self._angle_extractor: nodes.AngleExtractorSettings = angle_extractor   # its aspect_ratio is the crop's
+        self._shader: shaders.PosePointLines = shaders.PosePointLines()
         self._width: int = 1
         self._height: int = 1
 
