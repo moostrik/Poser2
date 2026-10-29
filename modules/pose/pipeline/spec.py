@@ -5,7 +5,8 @@ steps that are made once, and the sources the app owns. ``PosePipeline`` turns i
 startup. Every stage belongs to a clock domain: the frame domain runs on the camera's frame bang (the
 source pushes, the async step emits on its thread), an output domain runs on the consumer's tick
 (``PosePipeline.update``). The interpolators of a stage are the one crossing from the frame domain to an
-output domain; a tick source joins at a stage the tick drives.
+output domain; a tick source joins at a stage the tick drives. A stage emits its poses and a group record
+(``GroupRecord``): the per-pose steps and the group steps stamp the poses, the group steps write the record.
 """
 
 from __future__ import annotations
@@ -83,7 +84,8 @@ class PoseStep:
 
 
 class GroupStep:
-    """A ``GroupNode`` instance, built once: every pose of the frame in, the same poses out, stamped."""
+    """A ``GroupNode`` instance, built once: every pose of the frame in, the same poses out, stamped, and the
+    group record written."""
 
     __slots__ = ('node',)
 

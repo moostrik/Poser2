@@ -2,3 +2,4 @@ from .joint_select import JointSelectSettings, joint_mask
 from .window_similarity import WindowSimilarity, WindowSimilaritySettings, SimilarityResult
 from .window_correlation import WindowCorrelation, WindowCorrelationSettings
 from .posture_similarity import PostureSimilaritySettings, joint_distances, posture_distance, posture_similarity, posture_similarity_rows
+from .group_similarity import GroupSimilarityMode, similarity_matrix, group_similarity_level

@@ -16,12 +16,15 @@ paths:
 - A stage's interpolators are the one crossing from the frame domain to an output domain; a tick source joins at a stage the tick drives
 - A step entry is plain data: a node class with its settings object, or a node built once; no closures
 - A node takes time from the frame it processes; the crossing stamps a frame with the tick it was made on, so no node reads a clock
+- A stage emits a group record (`GroupRecord`) beside its poses: what belongs to everyone in the frame and to no single pose (a level, a gate, this tick's hits); read it with `add_group_callback` or the board's `get_group`, on the same tick as the poses
+- The group record follows the poses through the stages of a domain; across the crossing and an async step the latest record is held
+- A value derived from pose data, a threshold on it included (a gate, a dead zone), is a pipeline step with its settings; the show reads it from the record or the poses
 
 ## Nodes
 
 - Extractors derive new features from existing pose features and return enriched frames
 - Filters preserve frame identity while refining feature values over time
-- Group nodes see every pose of a frame and stamp what they derive from the group; they never add or remove a pose
+- Group nodes see every pose of a frame: `process` stamps the poses with what they derive from the group, `record` writes the group record; they never add or remove a pose
 - Interpolators and window nodes own internal temporal state and must reset cleanly
 
 ## Trackers

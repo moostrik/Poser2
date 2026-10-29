@@ -41,7 +41,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 
 ## Pose Frame contract
 
-- `frame[FeatureType]` never raises; missing data is NaN with score `0.0`
+- `frame[FeatureType]` and `group[FeatureType]` never raise; missing data is NaN with score `0.0`
 
 ## Composition and wiring
 
@@ -51,6 +51,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Name public data-flow methods by execution timing: `set` stores for polling, `submit` enqueues deferred work, `process` transforms and emits synchronously, `update` advances on a tick
 - Name output channels verb + domain noun (`submit_frames`, `add_similarity_callback`)
 - Share runtime data through `modules/board/` protocol + mixin pairs; each app composes its own `RenderBoard` from the mixins it needs
+- A value derived from pose data, a threshold on it included (a gate, a dead zone), is the pipeline's and so are its settings; the show owns only what it does with it: timings, looks, sound
 
 ## Concurrency
 
