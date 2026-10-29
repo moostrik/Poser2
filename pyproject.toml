@@ -7,7 +7,6 @@ requires-python = "==3.12.*"
 # Exact pins are the exceptions, each with its reason.
 dependencies = [
     "aiohttp>=3.14",                # SMILE Online's relay, when it runs on the PC (apps/smile/relay)
-    "depthai==2.30.0",              # depthai 3 does not work for White Space; 2.30 is more stable than 2.32
     "ffmpeg-python>=0.2",
     "freetype-py>=2.5",
     "glfw>=2.10",
@@ -33,8 +32,17 @@ dependencies = [
     "tensorrt-cu13==11.4.0.106",
 ]
 
+# depthai 2 and depthai 3 are the same package name, so an install holds one of them: `oak` is the
+# OAK-D backend (White Space needs depthai 2; 2.30 is more stable than 2.32), `oak4` the OAK4 backend
+# (modules/camera/oak4). `uv sync` installs `oak`; `scripts\install.bat oak4` installs `oak4` instead.
+[dependency-groups]
+oak = ["depthai==2.30.0"]
+oak4 = ["depthai>=3.11"]
+
 [tool.uv]
 package = false
+default-groups = ["oak"]
+conflicts = [[{ group = "oak" }, { group = "oak4" }]]
 
 [tool.uv.sources]
 torch = { index = "pytorch-cu130" }

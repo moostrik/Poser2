@@ -11,3 +11,4 @@ from .geometry import       CameraResolution, RESOLUTION_SIZES, MONO_RESOLUTIONS
 from .sync import           Sync, SyncSettings
 from .recorder import       Recorder, RecorderSettings, make_file_name, make_folder_name
 from .player import         Player, PlayerSettings, ClipFrameCallback
+from .depthai_backend import oak_backend, require_backend
