@@ -50,7 +50,7 @@ class SessionModeSettings(BaseSettings):
 
 class StateMachineSettings(BaseSettings):
     """Configuration for the show StateMachine. Every timing is named for the state it
-    times, unit in the name (seconds = wall clock, bars = playhead bars)."""
+    times, unit in the name (seconds = the light tick's clock, bars = playhead bars)."""
 
     # Blackout — the installation's big switch. Pinning it is OFF's entry door (from any
     # state, beating hold and goto); leaving OFF is a normal condition: once unpinned and

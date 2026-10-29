@@ -9,7 +9,7 @@ while its mix wrote only beam lights would be a black one.
 
 import unittest
 
-from apps.white_space.render_board import RenderBoard
+from apps.white_space.board import RenderBoard
 from apps.white_space.light import Conductor, LightFrame, LayerId, MotorMode, FIXTURE_PROJECTION_RPM
 from apps.white_space.light.clock import Tick
 from apps.white_space.settings import Settings, Stage

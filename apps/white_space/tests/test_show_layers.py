@@ -3,10 +3,9 @@ fallback) and wind_down (the dying wall, plain and under the sync strobe). The p
 are in test_pose_instrument.py."""
 
 import unittest
-from time import monotonic
 from types import SimpleNamespace
 
-from modules.board import SoundLevels
+from apps.white_space.board import SoundLevels
 
 from apps.white_space.light import Tick, BeamLightId
 from apps.white_space.light.frame import LightFrame
@@ -28,18 +27,19 @@ class SoundBoard(SimpleNamespace):
 
 
 class BeamBlueSoundTest(unittest.TestCase):
+    NOW = 100.0                                              # the tick's stamp the levels are judged against
     def setUp(self) -> None:
         self.settings = BeamBlueSoundSettings()
         self.board = SoundBoard(levels=SoundLevels())
         self.layer = BeamBlueSound(RES, self.settings, self.board)
 
     def _fresh(self, left: float, right: float) -> None:
-        self.board.levels = SoundLevels(left=left, right=right, timestamp=monotonic())
+        self.board.levels = SoundLevels(left=left, right=right, timestamp=self.NOW)
 
     def test_levels_land_on_the_blue_lamps(self) -> None:
         self.settings.smoothing_frames = 0
         self._fresh(0.8, 0.3)
-        f = frame()
+        f = frame(self.NOW)
         self.layer.render(f)
         self.assertAlmostEqual(f.beam_lights[BeamLightId.LEFT_BLUE],  0.8, places=5)
         self.assertAlmostEqual(f.beam_lights[BeamLightId.RIGHT_BLUE], 0.3, places=5)
@@ -51,22 +51,22 @@ class BeamBlueSoundTest(unittest.TestCase):
         self.settings.smoothing_frames = 0
         self.settings.gain = 0.5
         self._fresh(0.8, 0.4)
-        f = frame()
+        f = frame(self.NOW)
         self.layer.render(f)
         self.assertAlmostEqual(f.beam_lights[BeamLightId.LEFT_BLUE], 0.4, places=5)
 
     def test_smoothing_window_bridges_jitter(self) -> None:
         self.settings.smoothing_frames = 2
         self._fresh(1.0, 1.0)
-        self.layer.render(frame())
+        self.layer.render(frame(self.NOW))
         self._fresh(0.0, 0.0)
-        f = frame()
+        f = frame(self.NOW)
         self.layer.render(f)                                  # average of the last 2 frames
         self.assertAlmostEqual(f.beam_lights[BeamLightId.LEFT_BLUE], 0.5, places=5)
 
     def test_stale_input_off_fallback(self) -> None:
-        self.board.levels = SoundLevels(left=1.0, right=1.0, timestamp=monotonic() - 60.0)
-        f = frame()
+        self.board.levels = SoundLevels(left=1.0, right=1.0, timestamp=self.NOW - 60.0)
+        f = frame(self.NOW)
         self.layer.render(f)
         self.assertEqual(float(f.beam_lights.sum()), 0.0)      # never freezes at a stuck level
 

@@ -14,7 +14,6 @@ from __future__ import annotations
 import math
 from collections import deque
 from enum import IntEnum, auto
-from time import monotonic
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -25,7 +24,7 @@ from .._base_layer import BeamLayer, LayerSettings
 from ...frame import LightFrame
 
 if TYPE_CHECKING:
-    from ....render_board import RenderBoard
+    from ....board import RenderBoard
 
 # The gentle idle pulse's rate while input is stale (slow breath, ~12 cycles/minute).
 _PULSE_HZ: float = 0.2
@@ -61,7 +60,7 @@ class BeamBlueSound(BeamLayer):
         P = self._settings
         levels = self._board.get_sound_levels()
 
-        if levels.timestamp == 0.0 or monotonic() - levels.timestamp > P.stale_seconds:
+        if levels.timestamp == 0.0 or frame.tick.now - levels.timestamp > P.stale_seconds:
             self._window.clear()
             if P.fallback == SoundFallback.PULSE:
                 pulse = P.fallback_level * (0.5 - 0.5 * math.cos(math.tau * _PULSE_HZ * frame.tick.time))

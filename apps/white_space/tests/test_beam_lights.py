@@ -8,7 +8,7 @@ import numpy as np
 
 from apps.white_space.light import LightFrame, Tick, BeamLightId, BEAM_LIGHT_HEADINGS, BUFFER_DTYPE
 from apps.white_space.light.layers import BeamTest, BeamTestSettings
-from modules.board import Flash, FlashStoreMixin
+from apps.white_space.board import Flash, FlashStoreMixin
 from apps.white_space.render.layers.beam_light_projection import beam_profile, project_beam_lights, paint_flashes
 
 R = 360   # one pixel per degree keeps the expected indices readable
@@ -195,7 +195,7 @@ class FlashStoreTest(unittest.TestCase):
     def test_flashes_come_back_oldest_first_and_bounded(self) -> None:
         store = FlashStoreMixin()
         for i in range(100):
-            store.add_flash(float(i), 1.0, 0.0)
+            store.add_flash(float(i), 1.0, 0.0, float(i))
         flashes = store.get_flashes()
         self.assertLess(len(flashes), 100)
         self.assertEqual(flashes[-1].azimuth, 99.0)

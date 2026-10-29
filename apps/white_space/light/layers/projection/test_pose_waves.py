@@ -15,7 +15,7 @@ from ...frame import LightFrame, BUFFER_DTYPE
 from .._utilities import BlendType, draw_waves, draw_field, normalize_azimuth
 
 if TYPE_CHECKING:
-    from ....render_board import RenderBoard
+    from ....board import RenderBoard
 
 import logging
 logger = logging.getLogger(__name__)

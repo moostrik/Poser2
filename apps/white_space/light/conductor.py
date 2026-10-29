@@ -22,9 +22,8 @@ from .layers import (BaseLayer, Compositor, Mix,
                      PoseInstrument, PoseInstrumentSettings, ProjectionPlayhead, Flood,
                      TestPlayerLines, TestCalibration, TestFill, TestPulse, TestChase, TestLines,
                      TestRandom, TestPoseWaves, TestHarmonic)
-from modules.board import PlayheadSignals
 
-from ..render_board import RenderBoard
+from ..board import PlayheadSignals, RenderBoard
 
 import logging
 logger = logging.getLogger(__name__)

@@ -14,7 +14,7 @@ from modules.pose import nodes
 from modules.utils import Color, Rect, Point2f
 from modules.render import layers, make_subdivision, SubdivisionRow, Subdivision
 
-from ..render_board import RenderBoard
+from ..board import RenderBoard
 from ..pose import PlayheadOffset, dummy_id
 from ..settings import Layers, RenderSettings, PlayheadFeatureSelect, CameraView, Layout, Stage
 from .pose_slots import POSE_SLOTS, pose_slots

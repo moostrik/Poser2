@@ -5,7 +5,7 @@ from modules.render import layers
 
 from apps.white_space.render.shaders.light_simulation import LightSimulation
 
-from ...light_frame_store import HasLightFrame
+from ...board import HasLightFrame
 
 
 class LightSimulationLayer(layers.LayerBase):

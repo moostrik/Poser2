@@ -12,7 +12,7 @@ from modules.pose import GroupRecord, GroupSync
 
 from apps.white_space.light import LayerId, LightSettings, MotorMode, Tick
 from apps.white_space.pose import Hit, HitStreak
-from apps.white_space.statemachine import StateId, StateMachine, StateMachineSettings, machine as machine_module
+from apps.white_space.statemachine import StateId, StateMachine, StateMachineSettings
 
 POSE_STAGE = 4
 
@@ -54,8 +54,6 @@ class FakeBoard:
 class StateMachineTest(unittest.TestCase):
     def setUp(self) -> None:
         self.t = 1000.0
-        self._orig_time = machine_module.time
-        machine_module.time = SimpleNamespace(time=lambda: self.t)
 
         self.settings = StateMachineSettings()
         self.light = LightSettings()
@@ -76,7 +74,6 @@ class StateMachineTest(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.machine.stop()
-        machine_module.time = self._orig_time
 
     # -- helpers ------------------------------------------------------------
 

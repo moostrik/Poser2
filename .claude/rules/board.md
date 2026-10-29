@@ -2,6 +2,7 @@
 description: Board protocols, mixins, and app render board composition
 paths:
   - "modules/board/**"
+  - "apps/*/board/**"
   - "apps/*/render_board.py"
   - "apps/*/render/render_board.py"
   - "modules/render/layers/**"
@@ -19,6 +20,8 @@ paths:
 2. The mixin owns its own `Lock` — never share locks between mixins
 3. Add re-exports to `__init__.py`
 4. Add the mixin to whichever app `RenderBoard` classes need it
+5. A slice only one app reads lives in that app's board package (`apps/<app>/board/`), as the same protocol +
+   mixin pair; `modules/board/` holds only what a module or more than one app reads
 
 ## Protocol rules
 
@@ -35,7 +38,7 @@ paths:
 
 ## App render board
 
-- `apps/*/render_board.py` defines `class RenderBoard(Mixin1, Mixin2, ...):`
+- `apps/*/render_board.py`, or `apps/*/board/render_board.py` when the app has slices of its own, defines `class RenderBoard(Mixin1, Mixin2, ...):`
 - `__init__` calls each mixin's `__init__` explicitly
 - App render boards have no additional methods — they are pure mixin composition
 - App renders and main type-hint the concrete `RenderBoard`; module layers type-hint the protocol they need
