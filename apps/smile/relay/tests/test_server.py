@@ -12,6 +12,7 @@ from aiohttp.test_utils import TestClient, TestServer
 from apps.smile.relay.server import FRAME, LAST, SHOW, Relay, make_app
 
 TOKEN: str = 'test-token'
+AUTH: dict[str, str] = {'Authorization': f'Bearer {TOKEN}'}
 
 
 class RelayTest(unittest.IsolatedAsyncioTestCase):
@@ -25,12 +26,11 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
 
     async def phone(self) -> ClientWebSocketResponse:
         ws = await self.client.ws_connect('/ws/phone')
-        self.assertEqual((await ws.receive_json())['type'], 'grid')
         self.assertEqual((await ws.receive_json())['type'], 'state')
         return ws
 
     async def smile(self) -> ClientWebSocketResponse:
-        ws = await self.client.ws_connect(f'/ws/smile?token={TOKEN}')
+        ws = await self.client.ws_connect('/ws/smile', headers=AUTH)
         self.assertEqual((await ws.receive_json())['type'], 'line')
         return ws
 
@@ -63,13 +63,16 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
             response = await client.get(path)
             self.assertEqual(response.status, 200)
             self.assertEqual(response.headers.get('Cache-Control'), 'no-cache')
-        response = await client.get('/api/grid')
+        response = await client.get('/api/library')
         self.assertIsNone(response.headers.get('Cache-Control'))
 
-    async def test_smile_needs_the_token(self):
-        response = await self.client.get('/ws/smile?token=wrong', headers={'Upgrade': 'websocket'})
+    async def test_smile_needs_the_token_in_the_header(self):
+        response = await self.client.get('/ws/smile', headers={'Upgrade': 'websocket', 'Authorization': 'Bearer wrong'})
         self.assertEqual(response.status, 401)
-        response = await self.client.post('/api/upload?token=&kind=still&id=x', data=b'x')
+        response = await self.client.post('/api/upload?kind=portrait&id=x', data=b'x')
+        self.assertEqual(response.status, 401)
+        # the token in the URL (the old way: a request line in a log would keep it) is no token at all
+        response = await self.client.post(f'/api/upload?token={TOKEN}&kind=portrait&id=x', data=b'x')
         self.assertEqual(response.status, 401)
 
     async def test_a_phone_joins_and_smile_hears_the_line(self):
@@ -114,22 +117,20 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
         await smile.send_json({'type': 'turn_end', 'reason': 'done'})
         self.assertEqual((await self.receive(phone, 'turn_end'))['reason'], 'done')
         self.assertIsNone(self.relay.line.turn)
-        other = await self.phone()
-        response = await self.client.post(f'/api/upload?token={TOKEN}&kind=still&id=v1', data=b'still')
+        response = await self.client.post('/api/upload?kind=portrait&id=v1', headers=AUTH, data=b'portrait')
         self.assertEqual(response.status, 200)
         await smile.send_json({'type': 'result', 'id': 'v1', 'phone': turn['id'], 'name': 'Name', 'caption': 'hi', 'ok': True})
         result = await self.receive(phone, 'result')
         self.assertEqual((result['name'], result['caption'], result['ok']), ('Name', 'hi', True))
-        self.assertEqual(result['still'], '/files/stills/v1.jpg')
+        self.assertEqual(result['portrait'], '/files/portraits/v1.jpg')
         self.assertIsNone(result['grin'])
-        self.assertEqual((await self.receive(other, 'grid'))['stills'], ['/files/stills/v1.jpg'])
-        response = await self.client.get('/files/stills/v1.jpg')
-        self.assertEqual(await response.read(), b'still')
+        response = await self.client.get('/files/portraits/v1.jpg')
+        self.assertEqual(await response.read(), b'portrait')
         # a result without files (the visitor was not kept) still reaches the phone, so it stops waiting
         await smile.send_json({'type': 'result', 'id': '', 'phone': turn['id'], 'name': 'Name', 'caption': 'hi', 'ok': False})
         result = await self.receive(phone, 'result')
         self.assertFalse(result['ok'])
-        self.assertIsNone(result['still'])
+        self.assertIsNone(result['portrait'])
 
     async def test_frames_from_a_phone_without_the_turn_are_dropped(self):
         phone = await self.phone()
@@ -163,27 +164,25 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
     async def test_the_library_is_uploaded_once_and_listed(self):
         response = await self.client.get('/api/library')
         self.assertEqual(await response.json(), {'tracks': [], 'laughs': []})
-        response = await self.client.post(f'/api/upload?token={TOKEN}&kind=track&id=0001', data=b'aac')
+        response = await self.client.post('/api/upload?kind=track&id=0001', headers=AUTH, data=b'aac')
         self.assertEqual(response.status, 200)
         self.assertEqual((await response.json())['url'], '/files/tracks/0001.m4a')
         # a laugh keeps its own extension, mp3 or wav
-        response = await self.client.post(f'/api/upload?token={TOKEN}&kind=laugh&id=Hehe-2&ext=wav', data=b'wav')
+        response = await self.client.post('/api/upload?kind=laugh&id=Hehe-2&ext=wav', headers=AUTH, data=b'wav')
         self.assertEqual((await response.json())['url'], '/files/laughs/Hehe-2.wav')
-        response = await self.client.post(f'/api/upload?token={TOKEN}&kind=laugh&id=Haha', data=b'x')
+        response = await self.client.post('/api/upload?kind=laugh&id=Haha', headers=AUTH, data=b'x')
         self.assertEqual(response.status, 400)
-        response = await self.client.post(f'/api/upload?token={TOKEN}&kind=laugh&id=Haha&ext=exe', data=b'x')
+        response = await self.client.post('/api/upload?kind=laugh&id=Haha&ext=exe', headers=AUTH, data=b'x')
         self.assertEqual(response.status, 400)
         response = await self.client.get('/api/library')
         self.assertEqual(await response.json(), {'tracks': ['0001'], 'laughs': ['Hehe-2.wav']})
         response = await self.client.get('/files/tracks/0001.m4a')
         self.assertEqual(await response.read(), b'aac')
-        # a track is not one of a visitor's files
-        self.assertNotIn('track', (await self.client.get('/api/grid')).headers)
 
     async def test_an_upload_needs_a_safe_id_and_kind(self):
-        response = await self.client.post(f'/api/upload?token={TOKEN}&kind=still&id=../x', data=b'x')
+        response = await self.client.post('/api/upload?kind=portrait&id=../x', headers=AUTH, data=b'x')
         self.assertEqual(response.status, 400)
-        response = await self.client.post(f'/api/upload?token={TOKEN}&kind=exe&id=x', data=b'x')
+        response = await self.client.post('/api/upload?kind=exe&id=x', headers=AUTH, data=b'x')
         self.assertEqual(response.status, 400)
 
 

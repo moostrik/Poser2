@@ -707,8 +707,6 @@ function onMessage(message) {
     case 'turn_end':
       onTurnEnd(message.reason);
       break;
-    case 'grid':
-      break;      // the newest stills, sent at every connect: the page shows no grid
   }
 }
 

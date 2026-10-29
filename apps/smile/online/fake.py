@@ -6,8 +6,8 @@ It connects like SMILE, says its eye is free, takes the first in line, judges th
 SMILE's own face detector (SCRFD; without its model, the middle of the frame counts as a face: a box,
 its distance from good by its size and place, the charge rising while it is good), flashes, streams a
 fake transformation of the frame as the screen (a few seconds at 10 fps), ends the turn and then
-uploads the frame as the portrait and the still, the result addressed to the phone. No grin: the page
-then shows the portrait."""
+uploads the frame as the portrait, the result addressed to the phone. No grin: the page then shows
+the portrait."""
 
 import argparse
 import logging
@@ -163,7 +163,7 @@ class FakeSmile:
             os.remove(path)
             logger.info('result delivered (%s)', 'ok' if ok else 'upload failed')
         time.sleep(2.0)
-        link.upload([('portrait', id, path), ('still', id, path)], done)
+        link.upload([('portrait', id, path)], done)
 
     def run(self) -> None:
         self.link.start()

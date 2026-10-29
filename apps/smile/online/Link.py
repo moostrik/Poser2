@@ -132,7 +132,7 @@ class Link(Thread):
 
     def _connect_and_serve(self) -> None:
         ws = websocket.WebSocket()
-        ws.connect(f'{self.url}?token={self.token}', timeout=5)
+        ws.connect(self.url, header=[f'Authorization: Bearer {self.token}'], timeout=5)
         self._ws = ws
         self._connected = True
         self._warned = 0.0
@@ -238,8 +238,8 @@ class Link(Thread):
                 try:
                     data: bytes = self._track_aac(path) if kind == 'track' else open(path, 'rb').read()
                     ext: str = 'm4a' if kind == 'track' else os.path.splitext(path)[1].lstrip('.').lower()
-                    response = requests.post(f'{base}/api/upload', params={'token': self.token, 'kind': kind, 'id': id, 'ext': ext},
-                                             data=data, timeout=UPLOAD_TIMEOUT)
+                    response = requests.post(f'{base}/api/upload', params={'kind': kind, 'id': id, 'ext': ext},
+                                             headers={'Authorization': f'Bearer {self.token}'}, data=data, timeout=UPLOAD_TIMEOUT)
                     response.raise_for_status()
                 except Exception as e:
                     ok = False

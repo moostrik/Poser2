@@ -69,10 +69,10 @@ first use of every track.
 | the same as AAC 128 kbit/s            | about 150 MB, 2 MB a track              |
 | in the test relay after 46 turns      | 28 tracks, 55 MB                        |
 | the 304 laughter samples              | 8.7 MB                                  |
-| one turn's still, portrait and grin   | about 2.2 MB (46 turns: 100 MB)         |
+| one turn's portrait and grin          | about 1.6 MB (152 turns: 246 MB)        |
 | the relay's upload limit              | 64 MB (`MAX_UPLOAD`)                    |
 
-The relay keeps every turn's still, portrait and grin (`KINDS`) in `relay/data` without end; see Open.
+The relay keeps every turn's portrait and grin (`KINDS`) in `relay/data` without end; see Open.
 
 ## Open
 

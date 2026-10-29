@@ -107,14 +107,13 @@ The messages of a turn, in order, as the page sees them (`relay/server.py` has t
 | SMILE | `… flash_in/out {value}`                  | the flash stages                               | the white, as the room eases it               |
 | SMILE | binary `SHOW` frame                       | flash to the result's end, one in flight       | the window, from full white on                |
 | SMILE | binary `LAST` frame                       | the result has stood its time                  | fade to it, keep it                           |
-| SMILE | `result {id, ok, name, caption, still, portrait, grin}` | the files are built (or were not)  | download the video; no files: NO SMILE THIS TIME |
+| SMILE | `result {id, ok, name, caption, portrait, grin}` | the files are built (or were not)         | download the video; no files: NO SMILE THIS TIME |
 | SMILE | `turn_end {reason}`                       | the sequence is back at the camera             | done: wind down into the video; missed, lost, reset: back in line |
 | page  | `seen`                                    | every `SHOW` frame received                    | the relay sends the next frame                |
 | page  | `timing`                                  | the file is here, the video plays              | the relay logs it (with the download)         |
 
-A phone that is not the turn's gets `state`, `grid` (the newest stills, at every connect and after every result
-with a still; the page ignores it: the relay keeps and serves the stills, `/api/grid`, the page shows none) and,
-after its own turn, its `result`, addressed by id. The relay itself sends `turn_end {lost}` when SMILE goes.
+A phone that is not the turn's gets `state` and, after its own turn, its `result`, addressed by id. The relay
+itself sends `turn_end {lost}` when SMILE goes.
 
 ### The judging
 
@@ -249,7 +248,7 @@ encoder, this PC as room and relay, the phone over Tailscale on a direct connect
 
 ## Open
 
-- The still at the grin's peak (the relay keeps a still per turn; the portrait stands in).
+- A still at the grin's peak for the phone (the portrait stands in).
 - The caption for the outside and the QwenVL line on the machine.
 - The capture at the phone's full resolution.
 - The page on its own domain; the relay on the VPS.

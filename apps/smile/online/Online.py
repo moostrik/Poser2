@@ -417,7 +417,7 @@ class Online:
             result['id'] = id
             if kept:
                 # the phone's video is the share clip (the track on the tape, the watermark); the players' clip without one
-                files: list[tuple[str, str, str]] = [('portrait', id, portrait), ('still', id, portrait), ('grin', id, shared or grin)]
+                files: list[tuple[str, str, str]] = [('portrait', id, portrait), ('grin', id, shared or grin)]
                 link.upload(files, lambda ok: link.send({**result, 'ok': ok}))
             else:
                 logger.warning('online: the visitor %s was not saved, no result', id)

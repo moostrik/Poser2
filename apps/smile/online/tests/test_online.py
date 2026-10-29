@@ -410,8 +410,8 @@ class TestOnline(unittest.TestCase):
         self.online.on_saved('v1', 'A', True, 'grins/A/v1.mp4', 'portraits/A/v1_portrait.jpg')
         self.step(seq=SequenceType.TIMEOUT)
         files, done = self.link.uploads[0]
-        self.assertEqual([f[0] for f in files], ['portrait', 'still', 'grin'])
-        self.assertEqual(files[2], ('grin', 'v1', 'grins/A/v1.mp4'))     # no share clip: the players' clip
+        self.assertEqual([f[0] for f in files], ['portrait', 'grin'])
+        self.assertEqual(files[1], ('grin', 'v1', 'grins/A/v1.mp4'))     # no share clip: the players' clip
         done(True)
         result = self.link.last('result')
         self.assertEqual((result['id'], result['phone'], result['name'], result['caption'], result['ok']),
@@ -434,7 +434,7 @@ class TestOnline(unittest.TestCase):
         self.online.on_saved('v1', 'A', True, 'g.mp4', 'p.jpg', 'shares/A/v1.mp4')
         self.step()
         self.assertEqual(len(self.link.uploads), 1)
-        self.assertEqual(self.link.uploads[0][0][2], ('grin', 'v1', 'shares/A/v1.mp4'))   # the phone's video is the share clip
+        self.assertEqual(self.link.uploads[0][0][1], ('grin', 'v1', 'shares/A/v1.mp4'))   # the phone's video is the share clip
         self.link.uploads[0][1](False)
         self.assertFalse(self.link.last('result')['ok'])
 

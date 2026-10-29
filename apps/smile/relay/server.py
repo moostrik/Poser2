@@ -4,9 +4,10 @@
                            [--cert cert.pem --key key.pem]
 
 It serves the phone page (`--web`, the files of relay/web), a websocket for every phone (`/ws/phone`),
-one for SMILE (`/ws/smile?token=...`), uploads from SMILE (`POST /api/upload?token=&kind=&id=`) and the
-visitors' files (`/files/<kind>s/<name>`, kept under `--data`). It keeps the line (relay/line.py) and
-passes messages; it decides nothing about a turn: SMILE starts and ends every turn.
+one for SMILE (`/ws/smile`), uploads from SMILE (`POST /api/upload?kind=&id=`) and the visitors' files
+(`/files/<kind>s/<name>`, kept under `--data`). SMILE's websocket and uploads carry the token as
+`Authorization: Bearer <token>` (never in the URL, which logs would keep). It keeps the line (relay/line.py)
+and passes messages; it decides nothing about a turn: SMILE starts and ends every turn.
 
 Messages are JSON text, images are binary with one leading byte: FRAME (0) a phone's camera frame to
 SMILE, SHOW (1) an image from SMILE for the phone's window, LAST (2) the turn's last one, which the phone
@@ -15,9 +16,8 @@ keeps. The phone with the turn is the only one whose frames are passed on, and o
 Phone -> relay: join (on the tap, after a missed or lost turn, at a reconnect), leave, seen (a screen frame
     drawn), timing (its turn's end, for the log); frames (FRAME).
 Relay -> phone: state (see Line.state: eye, status, place, waiting, block, laughter; at every change of the line
-    and at every `eye` from SMILE, about once a second), grid (the newest stills: at every connect and after every
-    result with a still; the page ignores it), turn {window}, music, face, stage, result {id, ok, name, caption,
-    still, portrait, grin: the urls, None for a file that is not there}, turn_end {reason: done, missed, lost or
+    and at every `eye` from SMILE, about once a second), turn {window}, music, face, stage, result {id, ok, name,
+    caption, portrait, grin: the urls, None for a file that is not there}, turn_end {reason: done, missed, lost or
     reset; `lost` also from the relay itself when SMILE goes}; SHOW and LAST images.
 Relay -> SMILE: line {waiting}, turn {id}, gone (the phone with the turn left); frames.
 SMILE -> relay: eye {free, status, laughter}, turn_start, face, stage {flash, in, out} then stage {stage, progress}
@@ -44,25 +44,23 @@ import ssl
 import time
 import sys
 import uuid
-from collections import deque
 from typing import Any
 
 from aiohttp import WSMsgType, web
 
 from .line import Line
 
-logger = logging.getLogger('relay')
+logger = logging.getLogger(__name__)
 
 FRAME: int = 0      # a phone's camera frame, to SMILE
 SHOW: int = 1       # an image from SMILE, to the phone with the turn
 LAST: int = 2       # the turn's last image from SMILE: paced like the others, the phone keeps it
 
-KINDS: dict[str, str] = {'still': '.jpg', 'portrait': '.jpg', 'grin': '.mp4'}     # a visitor's files, and their folders (kind + 's')
+KINDS: dict[str, str] = {'portrait': '.jpg', 'grin': '.mp4'}                      # a visitor's files, and their folders (kind + 's')
 UPLOAD_KINDS: dict[str, str] = {**KINDS, 'track': '.m4a', 'laugh': ''}            # and the library: tracks/ (AAC, for every phone), laughs/ (their own extension)
 LAUGH_EXTENSIONS: tuple[str, ...] = ('mp3', 'wav')
 MAX_FRAME: int = 512 * 1024             # bytes; a phone frame larger than this is dropped
 MAX_UPLOAD: int = 64 * 1024 * 1024
-GRID_SIZE: int = 32                     # stills the phones are told about
 HEARTBEAT: float = 20.0                 # s; a websocket ping, so a dead phone leaves the line
 FRAME_PATIENCE: float = 2.0             # s a screen frame may stay unanswered before the next goes anyway
 
@@ -74,16 +72,11 @@ class Relay:
         self.line: Line = Line()
         self.phones: dict[str, web.WebSocketResponse] = {}
         self.smile: web.WebSocketResponse | None = None
-        self.stills: deque[str] = deque(maxlen=GRID_SIZE)      # urls, the newest last
         self._frame_pending: bytes | None = None                # the newest screen frame not sent yet
         self._frame_in_flight: float | None = None              # when the frame the phone has not seen yet was sent
         self._flights: list[float] = []                         # the flight times of the turn's frames, for the log
-        for kind, ext in UPLOAD_KINDS.items():
+        for kind in UPLOAD_KINDS:
             os.makedirs(os.path.join(data, kind + 's'), exist_ok=True)
-        folder: str = os.path.join(data, 'stills')
-        for name in sorted(os.listdir(folder))[-GRID_SIZE:]:
-            if name.endswith(KINDS['still']):
-                self.stills.append(f'/files/stills/{name}')
 
     # SENDING
     async def send(self, ws: web.WebSocketResponse | None, message: dict) -> None:
@@ -110,9 +103,6 @@ class Relay:
     async def send_line(self) -> None:
         await self.send(self.smile, {'type': 'line', 'waiting': len(self.line.waiting)})
 
-    def grid(self) -> dict:
-        return {'type': 'grid', 'stills': list(reversed(self.stills))}
-
     @property
     def turn_ws(self) -> web.WebSocketResponse | None:
         return self.phones.get(self.line.turn) if self.line.turn else None
@@ -124,7 +114,6 @@ class Relay:
         phone: str = uuid.uuid4().hex
         self.phones[phone] = ws
         logger.info('phone %s connected (%d online)', phone[:8], len(self.phones))
-        await self.send(ws, self.grid())
         await self.send(ws, self.line.state(phone))
         try:
             async for message in ws:
@@ -174,7 +163,7 @@ class Relay:
 
     # SMILE
     async def smile_socket(self, request: web.Request) -> web.StreamResponse:
-        if not self.authorized(request.query.get('token', '')):
+        if not self.authorized(request):
             raise web.HTTPUnauthorized()
         if self.smile is not None and not self.smile.closed:
             logger.warning('a second SMILE connected: the first is closed')
@@ -257,8 +246,8 @@ class Relay:
             await self.send_states()
 
     async def result(self, message: dict) -> None:
-        """The visitor's files are uploaded (or were not): the phone of that turn gets their urls, every
-        phone the new still. The turn may be over, so the phone is named; the turn's phone is the fallback."""
+        """The visitor's files are uploaded (or were not): the phone of that turn gets their urls. The turn
+        may be over, so the phone is named; the turn's phone is the fallback."""
         id: str = self.safe_id(str(message.get('id', '')))
         result: dict = {'type': 'result', 'id': id, 'ok': bool(message.get('ok', True)),
                         'name': str(message.get('name', '')), 'caption': str(message.get('caption', ''))}
@@ -267,15 +256,10 @@ class Relay:
             result[kind] = f'/files/{kind}s/{id}{ext}' if path and os.path.exists(path) else None
         phone: str = str(message.get('phone', ''))
         await self.send(self.phones.get(phone) if phone else self.turn_ws, result)
-        if result['still']:
-            self.stills.append(result['still'])
-            grid: dict = self.grid()
-            for ws in list(self.phones.values()):
-                await self.send(ws, grid)
 
     # HTTP
     async def upload(self, request: web.Request) -> web.Response:
-        if not self.authorized(request.query.get('token', '')):
+        if not self.authorized(request):
             raise web.HTTPUnauthorized()
         kind: str = request.query.get('kind', '')
         id: str = self.safe_id(request.query.get('id', ''))
@@ -297,9 +281,6 @@ class Relay:
         os.replace(temp, path)
         return web.json_response({'ok': True, 'url': f'/files/{kind}s/{id}{ext}'})
 
-    async def grid_json(self, request: web.Request) -> web.Response:
-        return web.json_response(self.grid())
-
     async def library_json(self, request: web.Request) -> web.Response:
         """The music tracks (ids) and laughter samples (file names) here: SMILE uploads what is missing,
         the phones play from it."""
@@ -309,8 +290,10 @@ class Relay:
                                    if name.rsplit('.', 1)[-1].lower() in LAUGH_EXTENSIONS)
         return web.json_response({'tracks': tracks, 'laughs': laughs})
 
-    def authorized(self, token: str) -> bool:
-        return bool(self.token) and secrets.compare_digest(token, self.token)
+    def authorized(self, request: web.Request) -> bool:
+        """SMILE's token, in the Authorization header (`Bearer <token>`)."""
+        scheme, _, token = request.headers.get('Authorization', '').partition(' ')
+        return bool(self.token) and scheme == 'Bearer' and secrets.compare_digest(token.strip(), self.token)
 
     @staticmethod
     def safe_id(id: str) -> str:
@@ -333,7 +316,6 @@ def make_app(relay: Relay, web_dir: str) -> web.Application:
     app.router.add_get('/ws/phone', relay.phone)
     app.router.add_get('/ws/smile', relay.smile_socket)
     app.router.add_post('/api/upload', relay.upload)
-    app.router.add_get('/api/grid', relay.grid_json)
     app.router.add_get('/api/library', relay.library_json)
     app.router.add_static('/files/', relay.data, show_index=False)
     if os.path.isdir(web_dir):
@@ -380,7 +362,8 @@ def main(argv: list[str] | None = None) -> int:
         context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         context.load_cert_chain(args.cert, args.key or None)
     logger.info('relay on %s:%d (%s), files in %s', args.host, args.port, 'https' if context else 'http', args.data)
-    web.run_app(app, host=args.host, port=args.port, ssl_context=context, print=None)
+    # no access log: the relay logs what matters itself, and a request line would keep whatever a URL carries
+    web.run_app(app, host=args.host, port=args.port, ssl_context=context, print=None, access_log=None)
     return 0
 
 
