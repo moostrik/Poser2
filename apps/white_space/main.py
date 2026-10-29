@@ -10,7 +10,7 @@ import numpy as np
 
 from modules.utils import Broadcast
 from modules.camera import CameraSource, CameraFrame, FrameType, Player, Sync, Recorder as VideoRecorder, CameraCheck
-from modules.oak import Camera, Simulator
+from modules.camera.oak import Camera, Simulator
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscReceiver
@@ -367,7 +367,7 @@ class WhiteSpaceMain:
     def _store_video_frame(self, frame: CameraFrame) -> None:
         """Camera frame callback — store raw VIDEO frames on the board for the light renderer."""
         if frame.kind == FrameType.VIDEO:
-            self.board.set_video_image(cam_id, frame)
+            self.board.set_video_image(frame.cam_id, frame.image)
 
     def _column_to_azimuth(self, cam_id: int, x: float) -> float:
         """A camera column's world azimuth in radians, through the tracker's own geometry."""

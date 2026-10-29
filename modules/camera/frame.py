@@ -7,11 +7,9 @@ import numpy as np
 
 
 class FrameType(Enum):
-    NONE_ = 0
+    """The kinds of frame a source delivers. One so far: a backend with more (OAK4's depth,
+    say) adds its own here, and the recorder's labels with them."""
     VIDEO = 1
-    LEFT_ = 2
-    RIGHT = 3
-    DEPTH = 4
 
 
 @dataclass(frozen=True)

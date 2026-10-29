@@ -24,7 +24,7 @@ class Tracker(Thread, BaseTracker):
     """Tracks people across a rig of cameras sharing a 360° field of view.
 
     **The second of two tiers.** Each camera runs YOLO into depthai's `ObjectTracker`
-    (`modules/oak/camera/pipeline.py`): detection, per-frame association, short misses bridged as
+    (`modules/camera/oak/pipeline.py`): detection, per-frame association, short misses bridged as
     LOST under the same id, and device ids all happen there — but not always de-duplication: NMS
     can pass two boxes on one body, and a dropped person returns under a new id. This class joins
     those per-camera tracks into world identities — same-camera continuations at intake

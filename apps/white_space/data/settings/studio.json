@@ -229,7 +229,6 @@
     "yolo": true,
     "color": false,
     "square": false,
-    "stereo": false,
     "sim_enabled": true,
     "model_path": "data/models",
     "ir_flood_light": 0.75,
@@ -258,14 +257,6 @@
         "exposure": 0,
         "iso": 0,
         "ir_grid_light": 0.0
-      },
-      "depth": {
-        "show": false,
-        "depth_min": 500,
-        "depth_max": 15000,
-        "median_filter": "OFF",
-        "bright_min": 0,
-        "bright_max": 255
       }
     },
     "cam_1": {
@@ -292,14 +283,6 @@
         "exposure": 0,
         "iso": 0,
         "ir_grid_light": 0.0
-      },
-      "depth": {
-        "show": false,
-        "depth_min": 500,
-        "depth_max": 15000,
-        "median_filter": "OFF",
-        "bright_min": 0,
-        "bright_max": 255
       }
     },
     "cam_2": {
@@ -326,14 +309,6 @@
         "exposure": 0,
         "iso": 0,
         "ir_grid_light": 0.0
-      },
-      "depth": {
-        "show": false,
-        "depth_min": 500,
-        "depth_max": 15000,
-        "median_filter": "OFF",
-        "bright_min": 0,
-        "bright_max": 255
       }
     },
     "cam_3": {
@@ -360,14 +335,6 @@
         "exposure": 0,
         "iso": 0,
         "ir_grid_light": 0.0
-      },
-      "depth": {
-        "show": false,
-        "depth_min": 500,
-        "depth_max": 15000,
-        "median_filter": "OFF",
-        "bright_min": 0,
-        "bright_max": 255
       }
     },
     "camera_check": {

@@ -39,12 +39,9 @@ class RecorderSettings(BaseSettings):
     name:               Field[str]              = Field("", widget=Widget.input, description="Recording name")
 
 
+# The letter in a clip's file name: `0_C_001.mp4` is camera 0's video, chunk 1.
 FRAME_TYPE_LABELS: dict[FrameType, str] = {
-    FrameType.NONE_: 'N',
     FrameType.VIDEO: 'C',
-    FrameType.LEFT_: 'L',
-    FrameType.RIGHT: 'R',
-    FrameType.DEPTH: 'S'
 }
 
 

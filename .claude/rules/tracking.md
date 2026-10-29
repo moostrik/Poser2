@@ -7,7 +7,7 @@ paths:
 
 ## Two tiers
 
-- Each camera runs depthai `YoloDetectionNetwork` → `ObjectTracker` (`modules/oak/camera/pipeline.py`, `TRACKER_TYPE` in `definitions.py`); read them before reasoning about identity
+- Each camera runs depthai `YoloDetectionNetwork` → `ObjectTracker` (`modules/camera/oak/pipeline.py`, `TRACKER_TYPE` in `definitions.py`); read them before reasoning about identity
 - The camera's `ObjectTracker` owns detection, per-frame association, short-term LOST bridging under the same id, and device ids; it may hand one person two tracks (NMS double boxes, id churn)
 - A host tracker (`modules/tracker/`) works on those device tracks; it adds what one camera cannot know, plus the same-camera identity the device fails to settle
 

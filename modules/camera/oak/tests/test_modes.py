@@ -3,7 +3,7 @@
 import unittest
 
 from modules.camera import CameraResolution
-from modules.oak.camera.definitions import mono_mode, color_mode
+from modules.camera.oak.definitions import mono_mode, color_mode
 
 
 class SensorModeTest(unittest.TestCase):

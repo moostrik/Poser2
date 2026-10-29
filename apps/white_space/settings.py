@@ -14,7 +14,7 @@ from enum import IntEnum, auto
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.panel import PanelSettings
 from modules.camera import CameraCheckSettings, CameraResolution, SimulatorSettings, RecorderSettings, SyncSettings
-from modules.oak import OakCameraSettings
+from modules.camera.oak import OakCameraSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import PanoramicTrackerSettings, PosesFromTrackletsSettings
@@ -98,7 +98,6 @@ class OakGroup(BaseSettings):
     yolo              : Field[bool]            = Field(True, access=Field.INIT, description="Enable YOLO person detection")
     color             : Field[bool]            = Field(False, access=Field.INIT, description="Color camera (False = mono)")
     square            : Field[bool]            = Field(True, access=Field.INIT, description="Use square aspect ratio")
-    stereo            : Field[bool]            = Field(False, access=Field.INIT, description="Enable stereo mode")
     resolution        : Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode, all four cameras. P800 is the full readout, P720 a vertical crop")
     sim_enabled       : Field[bool]            = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path        : Field[str]             = Field("data/models", access=Field.INIT, description="Model files directory")
@@ -109,7 +108,7 @@ class OakGroup(BaseSettings):
     lens_centre_y     : Field[float]           = Field(0.0, access=Field.INIT, step=0.5, description="Optical centre offset from the frame centre (px), positive = down")
     mono_auto_exposure: Field[bool]            = Field(True, widget=Widget.switch, description="Mono auto exposure, all four cameras")
 
-    _cam_share: list = [fps, color, square, stereo, yolo, resolution, model_path, ir_flood_light, fov, tilt,
+    _cam_share: list = [fps, color, square, yolo, resolution, model_path, ir_flood_light, fov, tilt,
                         lens_fov, lens_centre_x, lens_centre_y, mono_auto_exposure]
 
     cam_0     : Group[OakCameraSettings]            = Group(OakCameraSettings, share=_cam_share)

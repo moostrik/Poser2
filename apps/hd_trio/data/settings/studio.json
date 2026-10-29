@@ -6,7 +6,6 @@
     "yolo": true,
     "color": true,
     "square": true,
-    "stereo": false,
     "resolution": "P720",
     "sim_enabled": false,
     "model_path": "data/models",
@@ -37,14 +36,6 @@
         "exposure": 1000,
         "iso": 100,
         "ir_grid_light": 0.0
-      },
-      "depth": {
-        "show": false,
-        "depth_min": 500,
-        "depth_max": 15000,
-        "median_filter": "OFF",
-        "bright_min": 0,
-        "bright_max": 255
       },
       "tilt": 0.0,
       "mono_auto_exposure": true,
@@ -77,14 +68,6 @@
         "iso": 100,
         "ir_grid_light": 0.0
       },
-      "depth": {
-        "show": false,
-        "depth_min": 500,
-        "depth_max": 15000,
-        "median_filter": "OFF",
-        "bright_min": 0,
-        "bright_max": 255
-      },
       "tilt": 0.0,
       "mono_auto_exposure": true,
       "ir_flood_light": 0.0
@@ -115,14 +98,6 @@
         "exposure": 1000,
         "iso": 100,
         "ir_grid_light": 0.0
-      },
-      "depth": {
-        "show": false,
-        "depth_min": 500,
-        "depth_max": 15000,
-        "median_filter": "OFF",
-        "bright_min": 0,
-        "bright_max": 255
       },
       "tilt": 0.0,
       "mono_auto_exposure": true,

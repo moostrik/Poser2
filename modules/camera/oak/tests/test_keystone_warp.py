@@ -3,7 +3,7 @@
 hd_trio and deep_flow ran on those builders at `perspective = -0.22` for years. Step 3 renamed
 the control to `keystone` and added `tilt` beside it; nothing about those two installations may
 change. The reference implementations below are copied from the last commit before step 3
-(`git show 6ac6fb27:modules/oak/camera/pipeline.py`) and return plain tuples so the comparison
+(`git show 6ac6fb27:modules/oak/camera/pipeline.py`, kept verbatim through the move to `modules/camera/oak`) and return plain tuples so the comparison
 is on numbers, not on depthai objects.
 """
 
@@ -12,7 +12,7 @@ import unittest
 import cv2
 import numpy as np
 
-from modules.oak.camera.pipeline import (
+from modules.camera.oak.pipeline import (
     WarpConfig, build_warp_mesh, find_keystone_warp, find_keystone_warp_square,
     KEYSTONE_MESH_W, KEYSTONE_MESH_H,
 )
@@ -144,7 +144,7 @@ class BuildWarpMeshSelectsTest(unittest.TestCase):
         self.assertGreater(float(np.hypot(top_left[0] - 0.0, top_left[1] - 0.0)), 1.0)
 
     def test_both_set_warns_and_takes_tilt(self) -> None:
-        with self.assertLogs("modules.oak.camera.pipeline", level="WARNING") as log:
+        with self.assertLogs("modules.camera.oak.pipeline", level="WARNING") as log:
             mesh, mw, mh = build_warp_mesh((1280, 800), (1280, 800), 1280, self._mount(10.0, -0.22))
         self.assertEqual((mw, mh), (WARP_MESH, WARP_MESH))
         self.assertTrue(any("exclusive" in line for line in log.output))

@@ -219,8 +219,8 @@ not the offsets.
 
 ### Hardware
 
-Luxonis OAK-D Pro W; the app runs `color = false` and uses the left mono camera only (`SetupMono`,
-`modules/oak/camera/pipeline.py`): OV9282 W, global shutter, 1280 × 800, lens 127° × 79.5° by the
+Luxonis OAK-D Pro W; the app runs `color = false` and uses the left mono camera only (`add_sensor`,
+`modules/camera/oak/pipeline.py`): OV9282 W, global shutter, 1280 × 800, lens 127° × 79.5° by the
 spec, a little more by the units' own calibrations (see *The lens*). The lens maps angle linearly to
 radius (equidistant): the factory calibrations confirm it to 0.5 % out to 75° off axis, and the warp
 relies on it. The sensor table for every OAK variant in use, with Luxonis links, lives beside the
