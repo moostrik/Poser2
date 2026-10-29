@@ -12,8 +12,8 @@ bridge is everything the synth does not know:
   extractors); ``connect`` is the wiring of the document's *The connections* written out, a
   person's measures into the sources of the synth's slots. The bases and amounts are settings of
   the ``pose_instrument`` group; the wiring is code.
-- the **events**: presence (a pose is seen), the hit (``PlayheadCrossing``, the tick closest to
-  the crossing: each oscillator's push and the mask's flash), and **group sync**: the pipeline's gate on
+- the **events**: presence (a pose is seen), the hit (the pose's ``Hit``, the pipeline's one crossing
+  detector: each oscillator's push and the mask's flash), and **group sync**: the pipeline's gate on
   the group's similarity (``GroupSyncGate`` at LERP, its band and mode in ``pose.similarity.group_sync``),
   read off the LERP group record on the board (``GroupSync``) as the state machine reads it (``docs/STATES.md``, S7) and
   taken by three mechanisms, each through its own bypass into its own envelope: the **sync
@@ -64,7 +64,7 @@ from .playhead_marker import PlayheadMarker, PlayheadMarkerSettings
 from ...frame import LightFrame
 from ...synth import (Voice, Parameter, Sources, Envelope, Strobe,
                       OscillatorSettings, EnvelopeSettings, LfoSettings, StrobeSettings)
-from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step, DummySettings
+from ....pose import Hit, DummySettings
 
 KNOB = Widget.knob
 
@@ -198,8 +198,6 @@ class _Player:
 class PoseInstrument(ProjectionLayer):
     """The pose instrument; see the module docstring."""
 
-    HIT_TICKS = 1                   # a hit is the one tick closest to the crossing
-
     def __init__(self, resolution: int, settings: LayerSettings, instrument: PoseInstrumentSettings, board,
                  pose_stage: int) -> None:
         super().__init__(resolution, settings, board)
@@ -213,7 +211,6 @@ class PoseInstrument(ProjectionLayer):
         self._grow = Envelope()                                             # the growth's envelope: the windows toward the full circle
         self._blend = Envelope()                                            # the blend's envelope: the measures toward the room's mean
         self._means: dict[str, float] = {}                                  # this tick's presence-weighted mean per measure
-        self._crossing = PlayheadCrossing()
         self._pixels = np.arange(resolution, dtype=np.float64)              # the strip's pixel indices
         self._mask = np.zeros(resolution, dtype=bool)
         self._mask_white = np.zeros(resolution, dtype=np.float32)
@@ -227,7 +224,6 @@ class PoseInstrument(ProjectionLayer):
         """A fresh instrument (S6 entry): forget every player, pass and sync envelope; the gate is the
         pipeline's and keeps reading the room."""
         self._players.clear()
-        self._crossing.reset()
         self._group_sync = False
         self._sync_strobe.reset()
         self._grow.reset()
@@ -322,7 +318,7 @@ class PoseInstrument(ProjectionLayer):
         P = self._instrument
         for p in self._players.values():
             p.present = False
-        offsets: dict[int, float] = {}
+            p.hit = False
         for id, pose in self._board.get_frames(self._pose_stage).items():
             azimuth = pose[features.Azimuth].value
             if math.isnan(azimuth):
@@ -342,10 +338,7 @@ class PoseInstrument(ProjectionLayer):
             p.body_bend = self._value(pose[features.TorsoTilt].value, p.body_bend)
             p.distance = self._value(pose[features.Distance].value, p.distance)
             p.symmetry = np.where(np.isnan(pose[features.AngleSymmetry].values), p.symmetry, pose[features.AngleSymmetry].values)
-            offsets[id] = pose[PlayheadOffset].value
-
-        step = playhead_step(frame.motor_command.beam_rpm, frame.tick.interval)
-        hits = self._crossing.update(offsets, step, self.HIT_TICKS)
+            p.hit = pose[Hit].on                                            # the pipeline's one detector
 
         min_interval = self._min_interval()
         ticks_per_second = self._ticks_per_second = max(1, round(1.0 / max(frame.tick.interval, 1e-3)))   # the strobes' grid
@@ -361,7 +354,6 @@ class PoseInstrument(ProjectionLayer):
         self._set_blend(frame.tick.dt)                                      # before the loop: connect reads through it
         gone: list[int] = []
         for id, p in self._players.items():
-            p.hit = id in hits
             p.voice.update_lfo(frame.tick.dt, self.connect_lfo(self._blended(p)))   # first: connect reads its output
             p.voice.update(frame.tick.dt, p.present, p.hit, self._sources(p), min_interval / self._scale,
                            frame.tick.index, ticks_per_second)

@@ -24,7 +24,7 @@ from modules.session import SessionSettings
 from modules.gl import WindowSettings
 from .light import LightSettings, PoseInstrumentSettings
 from .inout import OscLightSenderSettings, UdpLightReceiverSettings
-from .pose import NeutralWeightSettings
+from .pose import HitSyncSettings, NeutralWeightSettings
 from .statemachine import StateMachineSettings
 from .tracker_journal import TrackerJournalSettings
 
@@ -263,6 +263,8 @@ class PoseGroup(BaseSettings):
     velocity       : Group[VelocityFeature]                 = Group(VelocityFeature, share=_feature_share)
     motion          : Group[MotionFeature]                   = Group(MotionFeature)
     similarity      : Group[SimilarityFeature]               = Group(SimilarityFeature, share=[frequency, output_frequency, max_players])
+    # LERP: the hit sync records the hit poses and writes the streak of alike ones to the group record (pose/hit_sync.py).
+    hit_sync        : Group[HitSyncSettings]                 = Group(HitSyncSettings)
     window_raw      : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_clean    : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)
     window_smooth   : Group[window.WindowNodeSettings]       = Group(window.WindowNodeSettings)

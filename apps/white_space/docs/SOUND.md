@@ -34,7 +34,7 @@ The events and the place (`POSE_INSTRUMENT.md`, *Events*):
 | In the light instrument | Pose feature       | OSC address                  | Index | On the wire                    | The light reads it as                           |
 |-------------------------|--------------------|------------------------------|-------|--------------------------------|-------------------------------------------------|
 | sync                    | `Similarity`       | `/pose/{id}/similarity/pose` | other | 0..1 per live player           | the pair's mean, the sync strobe's band over it |
-| hit                     | `PlayheadOffset`   | `/pose/{id}/playhead/offset` | –     | −π..π; azimuth minus playhead  | the ticks closest to 0 (`PlayheadCrossing`)     |
+| hit                     | `PlayheadOffset`   | `/pose/{id}/playhead/offset` | –     | −π..π; azimuth minus playhead  | the hit tick (`Hit`, `pose/hit.py`)             |
 | presence                | the pose itself    | `/pose/{id}/active`          | –     | 1 present, 0 gone              | the presence envelope's gate                    |
 | where the player stands | `Azimuth`          | `/pose/{id}/azimuth`         | –     | radians                        | the center of the window and the mask           |
 

@@ -41,11 +41,11 @@ player. The render draws every LERP pose as a figure over the
 projection row at its azimuth (`render.pose_figures`). How the tracker produces the poses is in
 `TRACKING.md`, *Downstream*.
 
-The hit is detected by `PlayheadCrossing` (`pose/playhead_offset.py`) in three instances
-(`beam_flash`, `pose_instrument`, `HitSync`) on the same LERP `PlayheadOffset` and the same step
-(`beam_rpm` at the tick rate), so they agree by construction; one shared detector would gain the
-layers nothing. `HitSync` records in its streak only the hits on poses at least `sync.min_age_seconds` old
-(`STATES.md` *Vocabulary*: in sync); its hit flag, the flash and the instrument's mark fire on every crossing.
+The hit is detected once, by the LERP step `HitExtractor` (`pose/hit.py`, the one `PlayheadCrossing` on the
+LERP `PlayheadOffset` and the step `beam_rpm` at the light rate), and stamped on the pose as `Hit`; `beam_flash`,
+`pose_instrument` and the state machine read it there, so they agree by construction. `HitSync`, the LERP step
+after it, records in its streak only the hits on poses at least `pose.hit_sync.min_age_seconds` old
+(`STATES.md` *Vocabulary*: in sync); the hit itself, the flash and the instrument's mark fire on every crossing.
 
 ## Index — show layers
 
@@ -174,8 +174,8 @@ and the light synth that draws the lines is `LIGHT_SYNTH.md`.
 - **beam_blue_sound**: fallback choice (off vs idle pulse); exact `/WS/idle/blue/left` and `/right` scaling agreed
   with Max (linear 0..1 vs dB)
 - **pose_instrument**: see `POSE_INSTRUMENT.md`, *Open*
-- **The playhead boundary**: `PlayheadOffset` is a pose feature stamped at LERP, the pose package's one
-  playhead dependency. The playhead offset (azimuth − playhead, stateless) can be computed by its consumers
-  — the flash, the instrument, `HitSync`, the sound sender when its frames arrive — and leave the frame, so
-  the pose pipeline takes the light's clock (the LERP stage runs inside the light tick) and none of its data
-  (roadmap step 6, light to pose)
+- **The playhead boundary**: `PlayheadOffset` and `Hit` are pose features stamped at LERP, and the hit streak
+  a group feature there: the playhead is the one light datum the app's pose steps read (`playhead_phase`,
+  `playhead_bars` off the board, `beam_rpm` and the light rate from the settings). They are White Space's own
+  (`apps/white_space/pose`), so `modules/pose` knows no playhead; the light layers and the state machine read the
+  results off the frames and the record, never detect them (roadmap step 6, light to pose)

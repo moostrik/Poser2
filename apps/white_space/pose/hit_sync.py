@@ -1,24 +1,24 @@
 """HitSync — the show's sync condition on the hits: how many of the last hits struck alike poses.
 
 The playhead crosses each player once per round and plays that pose's sound; that crossing is the hit
-(``PlayheadCrossing``, the one rule the flash, the instrument and the show share). This component records the
-hit player's LERP pose at that tick and compares the most recent hits with the pipeline's own posture module
-on its own settings (``posture_distance`` / ``posture_similarity``, ``pose.similarity.posture``). A hit is
-recorded only on a pose at least ``min_age_seconds`` old (its ``Age``, the time since the track's first
-frame): a double or a false positive lives a moment, so its hits neither build nor break the streak. The hit
-flag itself counts every crossing, so the intro still starts on a newcomer's first pass. A run of
-hits is **in sync** when two sentences hold: every pair of its poses is fully alike — the similarity reads 1,
-its plateau, the postures within ``angle_tolerance`` — and, while the neutral weight is enabled, every one of
-them is fully out of neutral (``ArmDeviation`` 1, at or beyond the arm extractor's ``max_degrees``), so a
-neutral hit — the glass ping — is alike to nothing. The streak is the longest such run of the most recent
-hits spanning less than one round (bar). A hit that does not match becomes the newest hit and the count
-restarts from it at once. The tolerance, in degrees, is the sync's knob, and the sync is the test of it:
-too strict and the show never spins up; the age is the gate in front of it.
+(``Hit`` on the pose, stamped by ``HitExtractor``, the one rule the flash, the instrument and the show share).
+This LERP group step records the hit player's pose at that tick and compares the most recent hits with the
+pipeline's own posture module on its own settings (``posture_distance`` / ``posture_similarity``,
+``pose.similarity.posture``). A hit is recorded only on a pose at least ``min_age_seconds`` old (its ``Age``,
+the time since the track's first frame): a double or a false positive lives a moment, so its hits neither
+build nor break the streak. The hit itself is on the pose whatever its age, so the intro still starts on a
+newcomer's first pass. A run of hits is **in sync** when two sentences hold: every pair of its poses is fully
+alike — the similarity reads 1, its plateau, the postures within ``angle_tolerance`` — and, while the neutral
+weight is enabled, every one of them is fully out of neutral (``ArmDeviation`` 1, at or beyond the arm
+extractor's ``max_degrees``), so a neutral hit — the glass ping — is alike to nothing. The streak is the
+longest such run of the most recent hits spanning less than one round (bar). A hit that does not match
+becomes the newest hit and the count restarts from it at once. The tolerance, in degrees, is the sync's knob,
+and the sync is the test of it: too strict and the show never spins up; the age is the gate in front of it.
 
-Published on the board per light tick (``HitStreak``): the state machine spins the show up at ``min_players``
-alike hits in a row, and anything else may read the tension building. The readout is in degrees: the largest
-distance between the hits in the streak. The dummy's hits count like a player's when it is enabled. Ticked by
-the conductor on the light thread, before the state machine.
+Written to the LERP group record every tick as ``HitStreak`` (``hits``, ``distance``): the state machine spins
+the show up at ``min_players`` alike hits in a row, and anything else may read the tension building. The
+readout is in degrees: the largest distance between the hits in the streak. The dummy's hits count like a
+player's when it is enabled. The playhead's bar count, not the tick's time, is the clock here.
 """
 
 from __future__ import annotations
@@ -26,23 +26,47 @@ from __future__ import annotations
 import math
 from collections import deque
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from enum import IntEnum
+from typing import Callable
 
 import numpy as np
 
-from modules.board import HitStreak
-from modules.pose import features, Frame, analytics
+from modules.pose import features, analytics, nodes, BaseScalarFeature, Frame, FrameDict, GroupRecord, replace_group
 from modules.settings import BaseSettings, Field, Widget
 
+from .hit import Hit
 from .neutral_weight import NeutralWeightSettings
-from .playhead_offset import PlayheadCrossing, PlayheadOffset, playhead_step
-
-if TYPE_CHECKING:
-    from ..render_board import RenderBoard
-    from ..light import LightSettings, Tick
 
 _KEPT_HITS = 16          # more than a round of the largest room
 _FULL = 1.0 - 1e-6       # "reads 1" for a float: the similarity's plateau, the deviation's top
+
+
+class HitStreakElement(IntEnum):
+    hits     = 0     # hits in a row, within one round, that struck alike poses
+    distance = 1     # the largest posture distance between them, degrees; 0 with fewer than two
+
+
+class HitStreak(BaseScalarFeature[HitStreakElement]):
+    """The hits' sync on the group record: ``hits`` in a row and their largest ``distance`` (degrees); see
+    the module docstring. Absent (NaN, score 0.0) reads as no streak."""
+
+    @classmethod
+    def enum(cls) -> type[IntEnum]:
+        return HitStreakElement
+
+    @classmethod
+    def range(cls) -> tuple[float, float]:
+        return (0.0, 180.0)
+
+    @property
+    def hits(self) -> int:
+        value = float(self._values[HitStreakElement.hits])
+        return 0 if math.isnan(value) else int(value)
+
+    @property
+    def distance(self) -> float:
+        value = float(self._values[HitStreakElement.distance])
+        return 0.0 if math.isnan(value) else value
 
 
 class HitSyncSettings(BaseSettings):
@@ -61,42 +85,33 @@ class _Hit:
     pose: Frame
 
 
-class HitSync:
-    """Records the hits' poses and publishes the streak; see the module docstring."""
+class HitSync(nodes.GroupNode):
+    """Records the hits' poses and writes the streak to the group record; see the module docstring.
+    ``playhead_bars`` reads the playhead's bar count (the board's)."""
 
     def __init__(self, settings: HitSyncSettings, posture: analytics.PostureSimilaritySettings, neutral: NeutralWeightSettings,
-                 light: LightSettings, board: RenderBoard, pose_stage: int) -> None:
+                 playhead_bars: Callable[[], float]) -> None:
         self._settings = settings
         self._posture = posture
         self._neutral = neutral
-        self._light = light
-        self._board = board
-        self._pose_stage = pose_stage
-        self._crossing = PlayheadCrossing()
+        self._playhead_bars = playhead_bars
         self._hits: deque[_Hit] = deque(maxlen=_KEPT_HITS)
         self._streak: tuple[int, float] = (0, 0.0)
 
     def reset(self) -> None:
-        """Forget the hits and the passes under way."""
+        """Forget the hits."""
         self._hits.clear()
-        self._crossing.reset()
         self._streak = (0, 0.0)
 
-    def update(self, _tick: Tick) -> None:
-        """One light tick: record this tick's hits on poses old enough, drop those older than a round, publish
-        the streak. The crossing runs on every pose, so a pose that comes of age mid-pass fires no second hit.
-        The playhead, not the tick's time, is the clock here."""
-        signals = self._board.get_playhead_signals()
-        frames = self._board.get_frames(self._pose_stage)
-        step = playhead_step(self._light.motor.beam_rpm, 1.0 / self._light.light_rate)
-        offsets = {id: frame[PlayheadOffset].value for id, frame in frames.items()}
-        ids = self._crossing.update(offsets, step, 1)
-
-        recorded = [id for id in sorted(ids) if self._is_old_enough(frames[id])]
+    def record(self, frames: FrameDict, group: GroupRecord) -> GroupRecord:
+        """One light tick: record this tick's hits on poses old enough, drop those older than a round, write
+        the streak."""
+        bars = self._playhead_bars()
+        recorded = [id for id in sorted(frames) if frames[id][Hit].on and self._is_old_enough(frames[id])]
         for id in recorded:
-            self._hits.append(_Hit(signals.bars, id, frames[id]))
+            self._hits.append(_Hit(bars, id, frames[id]))
         expired = False
-        while self._hits and signals.bars - self._hits[0].bar >= 1.0:
+        while self._hits and bars - self._hits[0].bar >= 1.0:
             self._hits.popleft()
             expired = True
         if recorded or expired:
@@ -105,7 +120,7 @@ class HitSync:
         hits, distance = self._streak
         self._settings.hits = hits
         self._settings.distance = distance
-        self._board.set_hit_streak(HitStreak(hit=bool(ids), hits=hits, distance=distance))
+        return replace_group(group, {HitStreak: HitStreak.from_values(np.array([hits, distance], dtype=np.float32))})
 
     def _compute_streak(self) -> tuple[int, float]:
         """The longest run of the most recent hits, spanning less than one bar, that is in sync (the module

@@ -2,16 +2,14 @@
 
 Pure data (fields, groups, enums), mirroring ``light/settings.py``'s role for its
 package: ``StateId`` is the state vocabulary of ``docs/STATES.md`` and ``StateMachineSettings`` the
-panel — telemetry first, then the show timings, with the sync (``HitSyncSettings``, the INTRO →
-INTRO_PLAY condition on the hits, owned by ``pose/hit_sync.py``) / manual / session corners as
-nested groups.
+panel — telemetry first, then the show timings, with the manual / session corners as nested groups. The
+sync condition on the hits (the streak, ``pose.hit_sync``) is the pipeline's; the states only compare it
+with ``min_players``.
 """
 
 from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, Field, Group, Widget
-
-from ..pose import HitSyncSettings
 
 
 class StateId(IntEnum):
@@ -82,7 +80,5 @@ class StateMachineSettings(BaseSettings):
     play_group_sync_release_seconds: Field[float] = Field(5.0, min=0.0, max=60.0, step=0.5, description="PLAY: a break in group sync drains the hold over this (s); 0 restarts it at once")
     intro_grace_seconds:    Field[float] = Field(20.0, min=0.0, max=300.0, step=1.0, description="Hits out of sync this long before INTRO spins up after PLAY_INTRO (s)")
 
-    # The sync condition's group is HitSync's settings (pose/hit_sync.py): it fills the telemetry.
-    sync:    Group[HitSyncSettings]     = Group(HitSyncSettings)
     manual:  Group[ManualSettings]      = Group(ManualSettings)
     session: Group[SessionModeSettings] = Group(SessionModeSettings)

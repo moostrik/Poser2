@@ -4,7 +4,7 @@ from modules.board import (
     FrameStoreMixin, GroupStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
     CameraTrackletStoreMixin, TrackletStoreMixin, ObservationStoreMixin,
     VideoImageStoreMixin, SequencerStateStoreMixin,
-    PlayheadStoreMixin, SoundLevelStoreMixin, FlashStoreMixin, HitStreakStoreMixin,
+    PlayheadStoreMixin, SoundLevelStoreMixin, FlashStoreMixin,
 )
 
 from .light_frame_store import LightFrameStoreMixin
@@ -14,7 +14,7 @@ class RenderBoard(
     FrameStoreMixin, GroupStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CropImageStoreMixin,
     CameraTrackletStoreMixin, TrackletStoreMixin, ObservationStoreMixin,
     VideoImageStoreMixin, LightFrameStoreMixin, SequencerStateStoreMixin,
-    PlayheadStoreMixin, SoundLevelStoreMixin, FlashStoreMixin, HitStreakStoreMixin,
+    PlayheadStoreMixin, SoundLevelStoreMixin, FlashStoreMixin,
 ):
     """Thread-safe blackboard for the White Space app.
 
@@ -37,4 +37,3 @@ class RenderBoard(
         PlayheadStoreMixin.__init__(self)
         SoundLevelStoreMixin.__init__(self)
         FlashStoreMixin.__init__(self)
-        HitStreakStoreMixin.__init__(self)

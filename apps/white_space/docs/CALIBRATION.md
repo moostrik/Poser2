@@ -758,8 +758,8 @@ the measured motor phase while locked and adds it (`light/playhead.py`). (The pe
 - `PlayheadOffset = azimuth − playhead` per pose (`pose/playhead_offset.py`): the flash layers fire on
   it, and the sound receives it (`/pose/N/playhead/offset`).
 - The hit that starts INTRO, and whose pose `HitSync` records, is the tick the playhead is closest to the
-  person, the same tick the flash lights (`pose/playhead_offset.py`, `PlayheadCrossing`). A wrong offset
-  fires the intro early or late.
+  person, the same tick the flash lights (`pose/hit.py`, the one `PlayheadCrossing`, stamped on the pose as
+  `Hit`). A wrong offset fires the intro early or late.
 - The bar simulation on screen draws the four beam lights at this heading.
 - Max receives it as `/global/playhead`.
 

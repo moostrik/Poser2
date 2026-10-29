@@ -13,11 +13,11 @@ Vocabulary:
   in a row spin it up, fewer present end it, and END winds back to PLAY once they are back
 - **in sync** — the most recent hits, within one round, whose poses are alike: every pair of them fully
   alike (`SIMILARITY.md`: the arm postures within `angle_tolerance` of each other) and every one fully out of
-  neutral. `sync.hits` is how many in a row, `sync.distance` the largest distance between them in degrees; a
-  hit that does not match restarts the count from itself at once. Only a pose at least `sync.min_age_seconds`
+  neutral. `pose.hit_sync.hits` is how many in a row, `pose.hit_sync.distance` the largest distance between them in degrees; a
+  hit that does not match restarts the count from itself at once. Only a pose at least `pose.hit_sync.min_age_seconds`
   old (its `Age`; `studio.json`: 2 s) has its hits recorded: a double or a false positive lives a moment, so
   its hits neither build nor break the streak, while the hit itself still starts the intro. `HitSync`
-  (`pose/hit_sync.py`) records each hit's pose off the LERP frame and publishes the streak on the board
+  (`pose/hit_sync.py`, a LERP step) records each hit's pose and writes the streak to the LERP group record
 - **group sync** — the pipeline's gate on the group's similarity (`SIMILARITY.md`, *Group sync*): the group's level
   (`pose.similarity.group_sync.mode`: the least alike pair of all, or with one left out) over the band `on_at` / `off_at`,
   with hysteresis. The gate is a LERP step, written to the LERP group record every tick (`GroupSync`, also the
@@ -30,9 +30,9 @@ Vocabulary:
   spin the show up. On the `Similarity` feature it is a ramp: a pair is weighted by the deviation of its
   member closer to neutral (`pose/neutral_weight.py`), so a pose leaving neutral never jumps a level
 - **bar** — one full playhead cycle, the content clock
-- **hit** — the tick the playhead is closest to a player, once per pass (`PlayheadCrossing` in
-  `pose/playhead_offset.py`): the tick a one-frame `beam_flash` lights, the instrument marks the player, and
-  `HitSync` reads their pose. The playhead crosses each player once per round, so a round has one hit per
+- **hit** — the tick the playhead is closest to a player, once per pass (`Hit` on the LERP pose, stamped by
+  `HitExtractor` in `pose/hit.py`, the one `PlayheadCrossing`): the tick a one-frame `beam_flash` lights, the
+  instrument marks the player, and `HitSync` reads their pose. The playhead crosses each player once per round, so a round has one hit per
   player and the players hear each hit as that pose's sound
 - **readout mode** — the fixture reads beam mode below 200 rpm and projection mode at or above, switching
   on receipt of the *commanded* rpm (see `CALIBRATION.md` *Two modes, two offsets*). A spin-up is in
@@ -280,9 +280,9 @@ sound `min_players` times in a row.
 - **Players**: > 0 · **Duration**: ∞ · **Motor**: BEAM
 - **Transitions**
   1. P == 0 → S5 INTRO_IDLE
-  2. armed, `sync.hits` ≥ min_players (the last min_players hits **in sync**, *Vocabulary*) and P ≥ min_players →
+  2. armed, `pose.hit_sync.hits` ≥ min_players (the last min_players hits **in sync**, *Vocabulary*) and P ≥ min_players →
      S6 INTRO_PLAY. A neutral hit is alike to nothing, so pings never spin the show up; a hit that does not
-     match restarts the count at once, a hit on a pose younger than `sync.min_age_seconds` is not recorded
+     match restarts the count at once, a hit on a pose younger than `pose.hit_sync.min_age_seconds` is not recorded
      (*Vocabulary*: in sync), and the count is visible on the panel as it builds. Entered from
      S11 PLAY_INTRO the intro is **disarmed**: the room is still posing, so it arms only once the streak has
      stayed under min_players for `intro_grace_seconds` without a break (a streak reaching min_players

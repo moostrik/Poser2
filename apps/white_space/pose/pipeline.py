@@ -2,9 +2,9 @@
 
 The frame domain (the camera's frame bang) runs the tracklet poses through the pose model and the RAW,
 CLEAN, SMOOTH and PREDICT stages on the model's thread. The light tick drives LERP: the interpolated
-players and the dummy meet there, and everything a person has is stamped on both; the group sync, the gate on
-the group's similarity, goes to the LERP group record. ``docs/POSE_INSTRUMENT.md`` says what the stages mean to
-the show and ``docs/SIMILARITY.md`` what the similarity steps compute.
+players and the dummy meet there, and everything a person has is stamped on both, the hit included; the hit
+streak and the group sync, the gate on the group's similarity, go to the LERP group record. ``docs/POSE_INSTRUMENT.md``
+says what the stages mean to the show and ``docs/SIMILARITY.md`` what the similarity steps compute.
 """
 
 from __future__ import annotations
@@ -15,17 +15,22 @@ from modules.pose import features, nodes
 from modules.pose.pipeline import AsyncNode, AsyncStep, Domain, FrameSource, GroupStep, Merge, PipelineSpec, PoseStep, \
                                   StageSpec
 
+from ..light import LightSettings
 from ..settings import PoseGroup, Stage
 from .dummy import Dummy
+from .hit import HitExtractor
+from .hit_sync import HitSync
 from .neutral_weight import NeutralWeight
 from .playhead_offset import PlayheadOffset, PlayheadOffsetExtractor
 
 
-def pipeline_spec(ps: PoseGroup, tracklet_poses: FrameSource, pose_inference: AsyncNode, dummy: Dummy,
-                  column_to_azimuth: Callable[[int, float], float], playhead_phase: Callable[[], float]) -> PipelineSpec:
-    """The pipeline on the app's pose settings ``ps``; ``tracklet_poses`` is the camera source, ``pose_inference``
-    the crop and pose model, ``column_to_azimuth`` the tracker's geometry for the eye azimuth and ``playhead_phase``
-    the board's playhead for the LERP stage's playhead offset."""
+def pipeline_spec(ps: PoseGroup, light: LightSettings, tracklet_poses: FrameSource, pose_inference: AsyncNode, dummy: Dummy,
+                  column_to_azimuth: Callable[[int, float], float], playhead_phase: Callable[[], float],
+                  playhead_bars: Callable[[], float]) -> PipelineSpec:
+    """The pipeline on the app's pose settings ``ps`` and the light settings (the playhead's rate, for the hit);
+    ``tracklet_poses`` is the camera source, ``pose_inference`` the crop and pose model, ``column_to_azimuth`` the
+    tracker's geometry for the eye azimuth, ``playhead_phase`` and ``playhead_bars`` the board's playhead for the
+    LERP stage's playhead offset and the hit sync's round."""
     return PipelineSpec([
         StageSpec(Stage.RAW, tracklet_poses, [
             AsyncStep(pose_inference),
@@ -98,6 +103,10 @@ def pipeline_spec(ps: PoseGroup, tracklet_poses: FrameSource, pose_inference: As
             PoseStep(nodes.AngleMotionExtractor, ps.motion.extractor),
             PoseStep(nodes.AngleMotionMovingAverageSmoother, ps.motion.moving_average),
             PoseStep(PlayheadOffsetExtractor, playhead_phase),
+            # The hit: the one crossing detector stamps Hit on the pose the playhead is closest to this tick, and
+            # the hit sync records that pose and writes the streak to the LERP group record.
+            GroupStep(HitExtractor(light)),
+            GroupStep(HitSync(ps.hit_sync, ps.similarity.posture, ps.similarity.neutral_weight, playhead_bars)),
             GroupStep(nodes.MotionGateExtractor()),
             # Last, on the interpolated similarity rows: the group's level and the gate on it (group sync), written
             # to the LERP group record; the instrument and the state machine read it off the board.

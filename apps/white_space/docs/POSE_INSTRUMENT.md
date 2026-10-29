@@ -482,8 +482,8 @@ instrument: the wind-down's wall carries it on the beam lights, same grid, same 
 
 ### The hit
 
-On the tick the playhead is closest to a player (`PlayheadCrossing` in `pose/playhead_offset.py`,
-`PoseInstrument.HIT_TICKS`, the same rule as `beam_flash`), each of the player's oscillators is
+On the tick the playhead is closest to a player (the pose's `Hit`, stamped at LERP by the one crossing
+detector in `pose/hit.py`, the same tick `beam_flash` lights), each of the player's oscillators is
 pushed (its `push`, falling back over its `push_release_seconds`) and the mask goes to its flash
 levels (`mask.flash_white`, `mask.flash_blue`), falling back to its own over
 `mask.flash_release_seconds`. Every mark has a white and a blue level, and 0 is off. The crossing

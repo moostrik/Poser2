@@ -15,7 +15,7 @@ from apps.white_space.light import Tick, MotorCommand, MotorMode, LayerSettings
 from apps.white_space.light.frame import LightFrame
 from apps.white_space.light.layers import PoseInstrument, PoseInstrumentSettings, SyncStrobeMode, Opposite
 from apps.white_space.light.synth import Parameter, Curve
-from apps.white_space.pose import PlayheadOffset
+from apps.white_space.pose import Hit
 
 IRES = 3600                 # one pixel per 0.1°
 C = IRES // 2               # the pixel of a person at normalized azimuth 0.5
@@ -46,10 +46,10 @@ class FakePose:
 def _pose(azimuth_pos: float, sims: dict[int, float] | None = None, left_shoulder: float = 0.0,
           right_shoulder: float | None = None, left_elbow: float = 0.0, right_elbow: float = 0.0,
           legs: float = 0.0, tilt: float = 0.0, distance: float = 0.0,
-          offset_deg: float = float("nan")) -> FakePose:
+          hit: bool = False) -> FakePose:
     """A fake pose at normalized azimuth ``azimuth_pos`` (0..1) with the arm angles (radians; the
     right shoulder follows the left unless given), leg deviation, body bend, distance, pairwise
-    sims and playhead offset. The travels, the arms and the shoulder difference are as the
+    sims and hit. The travels, the arms and the shoulder difference are as the
     pipeline's extractors give them with zero zones and lift ½ (their own tests are the
     modules'); the joint travel is the angle over π."""
     angles = np.full(len(features.AngleLandmark), np.nan)
@@ -74,7 +74,7 @@ def _pose(azimuth_pos: float, sims: dict[int, float] | None = None, left_shoulde
         features.LegDeviation: SimpleNamespace(value=legs),
         features.TorsoTilt: SimpleNamespace(value=tilt),
         features.Distance: SimpleNamespace(value=distance),
-        PlayheadOffset: SimpleNamespace(value=math.radians(offset_deg)),
+        Hit: Hit.from_value(1.0 if hit else 0.0),
     })
 
 
@@ -591,12 +591,12 @@ class PoseInstrumentTest(unittest.TestCase):
 
     # -- the hit --
 
-    STEADY = (23.4, 16.2, 9.0, 1.8, -5.4, -12.6)     # 36 rpm at 30 Hz: 7.2° a tick, closest at +1.8°
+    PASS = (False, False, False, True, False, False)   # a pass: the hit (the pipeline's) on the fourth tick
 
     def _sweep(self, **pose) -> list[LightFrame]:
         frames = []
-        for offset in self.STEADY:
-            self._people({0: _pose(0.5, offset_deg=offset, **pose)})
+        for hit in self.PASS:
+            self._people({0: _pose(0.5, hit=hit, **pose)})
             frames.append(self._render())
         return frames
 
@@ -680,14 +680,6 @@ class PoseInstrumentTest(unittest.TestCase):
         self.assertAlmostEqual(after_left - before_left, 31 * 7.0 * TICK * 10, delta=1.0)   # left: toward the person
         self._on_grid(self._inner(f.blue), INTERVAL, INTERVAL / 2)             # blue, mirrored: as before
 
-    def test_reset_starts_a_new_pass(self) -> None:
-        M = self.settings.mask
-        M.flash_release_seconds = 0.0
-        self._people({0: _pose(0.5, offset_deg=1.8)})
-        self.assertAlmostEqual(float(self._render().blue[C]), M.flash_blue, places=6)
-        self.assertAlmostEqual(float(self._render().blue[C]), M.blue, places=6)   # one hit per pass
-        self.layer.reset()
-        self.assertAlmostEqual(float(self._render().blue[C]), M.flash_blue, places=6)
 
     # -- the playhead's marker --
 

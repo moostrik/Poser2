@@ -1,16 +1,11 @@
-"""BeamFlash — the INTRO flash: the beam lights strike on for the ticks the rotating playhead is
-closest to each player, driven by the continuous ``PlayheadOffset``.
+"""BeamFlash — the INTRO flash: the beam lights strike on at each player's hit, the tick the rotating
+playhead is closest to them.
 
-Each pass flashes exactly ``frames`` ticks (1–3) per player: the ticks closest to the crossing,
-measured in playhead steps at ``beam_rpm`` (``ticks_to_crossing``: 1 = the closest, 2 = the pair
-straddling it, 3 = the closest and both neighbours). Which ticks light is ``PlayheadCrossing``'s
-rule (``pose/playhead_offset.py``): no history is needed for the closest tick, so the tick that starts
-INTRO flashes even though INTRO resets this layer on entry, and a jittered pass lights neither an
-extra tick nor none. Every hit flashes the same — the brightness is plain ``white`` / ``blue``, one
-level for everyone.
-
-The state machine's hit is the same closest tick (``statemachine/machine.py``), so INTRO starts on
-the flash.
+The hit is the pose's ``Hit`` (``pose/hit.py``: the one crossing detector, a LERP step, so the flash, the
+instrument and the state machine agree by construction), and the flash lasts ``frames`` ticks (1–3) from
+it: the hit tick alone, or the hit tick and the ticks after. The hit needs no history, so the tick that
+starts INTRO flashes even though INTRO resets this layer on entry. Every hit flashes the same — the
+brightness is plain ``white`` / ``blue``, one level for everyone.
 
 Every tick it lights, the flash is also posted to the board (``add_flash``: the playhead heading
 and the white and blue flash levels), so the render can mark it longer than the ticks it lasts on
@@ -25,7 +20,7 @@ from modules.settings import Field
 
 from .._base_layer import BeamLayer, LayerSettings
 from ...frame import LightFrame
-from ....pose import PlayheadCrossing, PlayheadOffset, playhead_step
+from ....pose import Hit
 
 
 class BeamFlashSettings(LayerSettings):
@@ -33,28 +28,28 @@ class BeamFlashSettings(LayerSettings):
     base_blue:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Base brightness of both blue beam lights")
     white:      Field[float] = Field(1.0, min=0.0, max=1.0, step=0.01, description="White flash brightness", newline=True)
     blue:       Field[float] = Field(0.0, min=0.0, max=1.0, step=0.01, description="Blue flash brightness")
-    frames:     Field[int]   = Field(1,   min=1,   max=3,   step=1,    description="Flash length: the ticks closest to the crossing, 1–3", newline=True)
+    frames:     Field[int]   = Field(1,   min=1,   max=3,   step=1,    description="Flash length: the hit tick and the ticks after it, 1–3", newline=True)
 
 
 class BeamFlash(BeamLayer):
-    """Constant base level plus a flash of the ``frames`` ticks closest to each player's crossing,
-    read from ``PlayheadOffset``; see the module docstring."""
+    """Constant base level plus a flash of ``frames`` ticks from each player's hit, read from the poses'
+    ``Hit``; see the module docstring."""
 
     def __init__(self, resolution: int, settings: BeamFlashSettings, board, pose_stage: int) -> None:
         super().__init__(resolution, settings, board)
         self._settings: BeamFlashSettings = settings
         self._pose_stage = pose_stage
-        self._crossing = PlayheadCrossing()
+        self._remaining = 0                 # ticks of the current flash still to light, after this one
 
     def reset(self) -> None:
-        self._crossing.reset()
+        self._remaining = 0
 
     def _draw(self, frame: LightFrame, beam_lights: np.ndarray) -> None:
         P = self._settings
-        step: float = playhead_step(frame.motor_command.beam_rpm, frame.tick.interval)
-        offsets = {pose.track_id: pose[PlayheadOffset].value
-                   for pose in self._board.get_frames(self._pose_stage).values()}
-        lit = bool(self._crossing.update(offsets, step, int(P.frames)))
+        if any(pose[Hit].on for pose in self._board.get_frames(self._pose_stage).values()):
+            self._remaining = int(P.frames)
+        lit = self._remaining > 0
+        self._remaining = max(self._remaining - 1, 0)
 
         flash_white = P.white if lit else 0.0
         flash_blue = P.blue if lit else 0.0

@@ -1,30 +1,26 @@
-"""Tests for the INTRO flash layer (the ticks closest to each crossing)."""
+"""Tests for the INTRO flash layer: the beam lights strike on at a pose's hit, for ``frames`` ticks."""
 
-import math
 import unittest
 from types import SimpleNamespace
-
-import numpy as np
 
 from apps.white_space.light import Tick, MotorCommand
 from apps.white_space.light.frame import LightFrame, BeamLightId
 from apps.white_space.light.layers.beam.flash import BeamFlash, BeamFlashSettings
-from apps.white_space.pose import PlayheadOffset
+from apps.white_space.pose import Hit
 
-R = math.radians
 RES = 200
 
 
 class FlashPose:
-    """A pose frame carrying only a PlayheadOffset: all the flash reads."""
+    """A pose frame carrying only its Hit: all the flash reads."""
 
-    def __init__(self, track_id: int, offset_deg: float) -> None:
+    def __init__(self, track_id: int, hit: bool) -> None:
         self.track_id = track_id
-        self._offset = R(offset_deg)
+        self._hit = hit
 
     def __getitem__(self, feature_type):
-        assert feature_type is PlayheadOffset
-        return SimpleNamespace(value=self._offset)
+        assert feature_type is Hit
+        return Hit.from_value(1.0 if self._hit else 0.0)
 
 
 class FlashBoard(SimpleNamespace):
@@ -38,9 +34,6 @@ class FlashBoard(SimpleNamespace):
 
 
 class FlashTest(unittest.TestCase):
-    """At 36 rpm and 30 Hz the playhead steps 7.2° per tick."""
-
-    INTERVAL = 1.0 / 30.0
 
     def setUp(self) -> None:
         self.settings = BeamFlashSettings()
@@ -49,78 +42,43 @@ class FlashTest(unittest.TestCase):
 
     def _render(self, pose, playhead: float = 1.0) -> LightFrame:
         self.board.frames = {} if pose is None else {pose.track_id: pose}
-        f = LightFrame(RES, Tick(0.0, self.INTERVAL), motor_command=MotorCommand(beam_rpm=36.0), playhead=playhead)
+        f = LightFrame(RES, Tick(0.0, 1.0 / 30.0), motor_command=MotorCommand(beam_rpm=36.0), playhead=playhead)
         self.layer.render(f)
         return f
 
-    def _sweep(self, *offsets_deg: float, id: int = 0) -> list[float]:
-        """Run one pose through a sequence of offsets; return the front white lamp per tick."""
-        return [float(self._render(FlashPose(id, deg)).beam_lights[BeamLightId.FRONT_WHITE])
-                for deg in offsets_deg]
+    def _sweep(self, *hits: bool) -> list[float]:
+        """Run one pose through a sequence of ticks, hit or not; the front white lamp per tick."""
+        return [float(self._render(FlashPose(0, hit)).beam_lights[BeamLightId.FRONT_WHITE]) for hit in hits]
 
-    STEADY = (23.4, 16.2, 9.0, 1.8, -5.4, -12.6)     # a steady sweep, closest tick at +1.8°
+    def test_one_frame_is_the_hit_tick(self) -> None:
+        self.assertEqual(self._sweep(False, True, False, False), [0.0, 1.0, 0.0, 0.0])
 
-    def test_one_frame_is_the_closest_tick(self) -> None:
-        self.assertEqual(self._sweep(*self.STEADY), [0.0, 0.0, 0.0, 1.0, 0.0, 0.0])
-
-    def test_two_frames_straddle_the_crossing(self) -> None:
-        self.settings.frames = 2
-        self.assertEqual(self._sweep(*self.STEADY), [0.0, 0.0, 0.0, 1.0, 1.0, 0.0])
-
-    def test_three_frames_are_the_closest_and_both_neighbours(self) -> None:
+    def test_more_frames_hold_the_flash_over_the_ticks_after_the_hit(self) -> None:
         self.settings.frames = 3
-        self.assertEqual(self._sweep(*self.STEADY), [0.0, 0.0, 1.0, 1.0, 1.0, 0.0])
+        self.assertEqual(self._sweep(False, True, False, False, False), [0.0, 1.0, 1.0, 1.0, 0.0])
 
-    def test_a_phase_the_old_window_lit_twice_is_one_frame(self) -> None:
-        # +5.0° and −2.2° both sat inside an 11.5° window; only −2.2° is the closest tick.
-        self.assertEqual(self._sweep(12.2, 5.0, -2.2, -9.4), [0.0, 0.0, 1.0, 0.0])
-
-    def test_a_shrinking_step_never_lights_an_extra_tick(self) -> None:
-        # +3.0° then −2.9° (a tracking correction): both are within half a step, one frame lights.
-        self.assertEqual(self._sweep(10.2, 3.0, -2.9, -10.1), [0.0, 1.0, 0.0, 0.0])
-
-    def test_a_jittered_pass_that_misses_every_close_tick_still_flashes_once(self) -> None:
-        # +4.0° and −4.0° are each more than half a 7.2° step out: the sign flip fires.
-        self.assertEqual(self._sweep(12.0, 4.0, -4.0, -12.0), [0.0, 0.0, 1.0, 0.0])
-
-    def test_the_next_pass_flashes_again(self) -> None:
-        self._sweep(*self.STEADY)
-        self.assertEqual(self._sweep(-100.0, 100.0, 9.0, 1.8), [0.0, 0.0, 0.0, 1.0])
-
-    def test_no_history_needed_on_the_first_drawn_tick(self) -> None:
-        # INTRO resets this layer on the very tick of the hit; that tick must still flash.
-        self.assertEqual(self._sweep(1.8), [1.0])
-
-    def test_flash_is_full_brightness(self) -> None:
+    def test_flash_is_full_brightness_over_the_base(self) -> None:
         self.settings.white = 0.7
-        self.assertAlmostEqual(self._sweep(0.0)[0], 0.7, places=6)
-
-    def test_away_from_the_crossing_stays_at_base(self) -> None:
         self.settings.base_white = 0.2
-        self.assertAlmostEqual(self._sweep(90.0)[0], 0.2, places=6)
-
-    def test_nan_offset_never_flashes(self) -> None:
-        pose = FlashPose(0, 0.0)
-        pose._offset = float("nan")
-        self.assertEqual(float(self._render(pose).beam_lights[BeamLightId.FRONT_WHITE]), 0.0)
+        self.assertAlmostEqual(self._sweep(True)[0], 0.9, places=6)
+        self.assertAlmostEqual(self._sweep(False)[0], 0.2, places=6)
 
     def test_nobody_with_a_pose_no_flash(self) -> None:
         self.assertEqual(float(self._render(None).beam_lights[BeamLightId.FRONT_WHITE]), 0.0)
 
-    def test_each_lit_tick_posts_a_flash_at_the_playhead(self) -> None:
+    def test_each_lit_tick_posts_a_flash_at_the_playhead_and_no_playhead_posts_nothing(self) -> None:
         self.settings.frames = 2
-        for deg in self.STEADY:
-            self._render(FlashPose(0, deg), playhead=1.25)
+        for hit in (False, True, False, False):
+            self._render(FlashPose(0, hit), playhead=1.25)
         self.assertEqual(self.board.flashes, [(1.25, 1.0, 0.0), (1.25, 1.0, 0.0)])
+        self._render(FlashPose(0, True), playhead=float("nan"))
+        self.assertEqual(len(self.board.flashes), 2)
 
-    def test_no_playhead_posts_nothing(self) -> None:
-        self._render(FlashPose(0, 0.0), playhead=float("nan"))
-        self.assertEqual(self.board.flashes, [])
-
-    def test_reset_starts_a_fresh_pass(self) -> None:
-        self._sweep(1.8)
+    def test_reset_ends_a_held_flash(self) -> None:
+        self.settings.frames = 3
+        self._sweep(True)
         self.layer.reset()
-        self.assertEqual(self._sweep(0.5), [1.0])
+        self.assertEqual(self._sweep(False), [0.0])
 
 
 if __name__ == "__main__":
