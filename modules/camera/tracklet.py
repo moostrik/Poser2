@@ -23,7 +23,9 @@ class CameraTracklet:
     `id` is the device tracker's id for the track and `age` its age in frames; `roi` is normalised
     to the delivered frame; `timestamp` is the host arrival time of the message (`time.perf_counter()`,
     stamped by the backend at hand-over, the same for every tracklet of one message). `keypoints`
-    is empty until a backend fills it (OAK4).
+    is None unless the camera runs a pose model (OAK4): then float32 (17, 3), the body landmarks in
+    the pose's order (`modules.pose.PointLandmark`, COCO), each x and y normalised to the delivered
+    frame like `roi`, and its score.
     """
     cam_id: int
     id: int

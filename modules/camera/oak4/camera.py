@@ -1,28 +1,32 @@
 """The oak4 backend: one OAK4 camera on depthai 3, implementing `modules.camera.CameraSource`.
 
 Each camera opens its own device and builds its own pipeline on it (`build_pipeline`; a depthai 3
-pipeline is bound to one device), reads the delivered frames and the IMU through queues on the
-node outputs, on depthai's callback thread, which is where the frames become the contract's and
-get their host time. The sensor controls are `SensorControl`'s for as long as the device is open.
+pipeline is bound to one device), reads the delivered frames, the tracklets and the IMU through
+queues on the node outputs, on depthai's callback thread, which is where the frames and tracklets
+become the contract's and get their host time. With `yolo` the device runs the pose model, so a
+tracklet carries its keypoints. The sensor controls are `SensorControl`'s for as long as the
+device is open.
 
 Docs: https://docs.luxonis.com/software-v3/depthai
 """
 
 import logging
 import time
+from pathlib import Path
 from threading import Thread, Event
 
 import depthai as dai
 from numpy import ndarray
 
-from .. import CameraResolution, CameraFrame, RigCameraReadings, FrameType, CameraFrameCallback, TrackletCallback, \
-    orientation_from_gravity, frame_size, frame_window, frame_coverage, coverage_summary, delivered_height, \
-    lens_field, lens_deviation, imu_to_camera, unroll_imu_frame
-from modules.utils import FPS
+from .. import CameraResolution, CameraFrame, RigCameraReadings, CameraTracklet, FrameType, CameraFrameCallback, \
+    TrackletCallback, orientation_from_gravity, frame_size, frame_window, frame_coverage, coverage_summary, \
+    delivered_height, lens_field, lens_deviation, imu_to_camera, unroll_imu_frame
+from modules.utils import FPS, Rect
 
 from .control import SensorControl
 from .definitions import SENSOR_SOCKET, requested_size, get_device_list, log_connected_sensors, \
-    read_lens_calibration, imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL
+    read_lens_calibration, imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL, POSE_ARCHIVE, TRACKING_STATUS, \
+    tracklet_keypoints
 from .pipeline import build_pipeline, MountConfig, PipelineOutputs
 from .settings import Oak4CameraSettings
 
@@ -67,15 +71,18 @@ class Camera(Thread):
         )
         self.frame_height: int = delivered_height(self.color, self.resolution, self.mount.fov_h, self.mount.tilt,
                                                   self.mount.lens_fov, self.mount.lens_center)
+        self.pose_archive: Path | None = Path(self.model_path) / POSE_ARCHIVE if self.yolo else None
 
         # DEVICE — its pipeline and queues are made in `_open` and closed with it.
         self.device: dai.Device | None = None
         self.pipeline: dai.Pipeline | None = None
         self.queues: list[dai.MessageQueue] = []
         self.control: SensorControl | None = None
+        self.num_tracklets: int = 0
 
         # FPS
         self.video_fps: FPS = FPS(120)
+        self.tracklet_fps: FPS = FPS(120)
 
         # CALLBACKS (run in registration order)
         self.frame_callbacks: list[CameraFrameCallback] = []
@@ -120,7 +127,8 @@ class Camera(Thread):
             self.device = dai.Device(dai.DeviceInfo(self.device_id))
             self.pipeline = dai.Pipeline(self.device)
             outputs: PipelineOutputs = build_pipeline(self.pipeline, self.fps, self.color, self.square, self.resolution,
-                                                      self.mount, frame_height=self.frame_height)
+                                                      self.mount, frame_height=self.frame_height,
+                                                      pose_archive=self.pose_archive)
             self._setup_queues(outputs)
             self.pipeline.start()
         except Exception as e:
@@ -158,10 +166,15 @@ class Camera(Thread):
         logger.info(f'{self.device_id} CLOSED')
 
     def _setup_queues(self, outputs: PipelineOutputs) -> None:
-        """The host's ends of the pipeline: the frames every camera has, the IMU, the sensor controls."""
+        """The host's ends of the pipeline: the frames every camera has, the tracklets with a pose
+        model, the IMU, the sensor controls."""
         video: dai.MessageQueue = outputs.video.createOutputQueue(maxSize=QUEUE_SIZE, blocking=False)
         video.addCallback(self._video_callback)
         self.queues.append(video)
+        if outputs.tracklets is not None:
+            tracklets: dai.MessageQueue = outputs.tracklets.createOutputQueue(maxSize=QUEUE_SIZE, blocking=False)
+            tracklets.addCallback(self._tracker_callback)
+            self.queues.append(tracklets)
         imu: dai.MessageQueue = outputs.imu.createOutputQueue(maxSize=QUEUE_SIZE, blocking=False)
         imu.addCallback(self._imu_callback)
         self.queues.append(imu)
@@ -212,6 +225,21 @@ class Camera(Thread):
             self.control.readback(msg)
         self._emit_frame(FrameType.VIDEO, msg.getCvFrame())
 
+    def _tracker_callback(self, name: str, msg: dai.Tracklets) -> None:
+        """The hand-over of the device's tracklets: the contract's, with the keypoints the pose model
+        found for each, and the message's host time."""
+        self.tracklet_fps.processed()
+        self.settings.readings.tracker_fps = self.tracklet_fps.get_rate_average()
+        now: float = time.perf_counter()
+        tracklets: list[CameraTracklet] = [
+            CameraTracklet(cam_id=self.id, id=t.id, status=TRACKING_STATUS[t.status],
+                           roi=Rect(t.roi.x, t.roi.y, t.roi.width, t.roi.height), age=t.age, timestamp=now,
+                           keypoints=tracklet_keypoints(t.srcImgDetection))
+            for t in msg.tracklets]
+        self.num_tracklets = len(tracklets)
+        self.settings.readings.tracklets = self.num_tracklets
+        self._emit_tracklets(tracklets, now)
+
     def _imu_callback(self, name: str, msg: dai.IMUData) -> None:
         for packet in msg.packets:
             raw = packet.acceleroMeter
@@ -237,6 +265,12 @@ class Camera(Thread):
         for c in self.frame_callbacks:
             c(frame)
 
+    def _emit_tracklets(self, tracklets: list[CameraTracklet], timestamp: float) -> None:
+        if not self.running:
+            return
+        for c in self.tracklet_callbacks:
+            c(self.id, tracklets, timestamp)
+
     # ── CameraSource ───────────────────────────────────────────────────
 
     def add_frame_callback(self, callback: CameraFrameCallback) -> None:
@@ -247,7 +281,6 @@ class Camera(Thread):
             self.frame_callbacks.append(callback)
 
     def add_tracklet_callback(self, callback: TrackletCallback) -> None:
-        """Taken, for the detector branch of step 9.3; until then no tracklet message is sent."""
         if self.running:
             logger.warning('cannot add callback while camera is running')
             return
