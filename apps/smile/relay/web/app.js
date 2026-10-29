@@ -308,7 +308,7 @@ const bar = (() => {
   function etaText(eta) {
     // the relay's estimate in seconds (what is left of the turn running, a turn per phone ahead), or nothing
     if (eta === null || eta === undefined) return '';
-    return eta <= 50 ? 'UNDER A MINUTE' : `ABOUT ${Math.max(1, Math.round(eta / 60))} MIN`;
+    return eta <= 50 ? 'ALMOST YOUR TURN' : `ABOUT ${Math.max(1, Math.round(eta / 60))} MIN TO YOUR TURN`;
   }
   function lineText(message) {
     // the wait, from the relay's state (its own sentence, `status`, is for the API): asleep when SMILE is not

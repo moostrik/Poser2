@@ -31,7 +31,7 @@ fitted to its height).
 button (white); black with white text the wait: why, from the state's `reason` (SOMEONE INSIDE IS SMILING,
 SOMEONE ONLINE IS SMILING, SMILE IS WARMING UP, SMILE IS BUSY INSIDE, WAITING FOR SMILE when the eye is free,
 SMILE IS ASLEEP when SMILE is not there) or the number BEFORE YOU further back in line, by turns with how long
-(UNDER A MINUTE, ABOUT N MIN, 3 s each) from the state's `eta`: the relay times its turns (the median of the last
+(ALMOST YOUR TURN, ABOUT N MIN TO YOUR TURN, 3 s each) from the state's `eta`: the relay times its turns (the median of the last
 ten, 40 s before any; a visitor inside takes the same sequence) and adds what is left of the one running now to
 a turn for every phone ahead, nothing while the generator warms up or the room is busy (the relay's own
 `status` sentence is not shown); in the turn what the face still needs; once the flash's white is full, TURN YOUR VOLUME UP (the
