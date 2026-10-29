@@ -6,11 +6,12 @@ Reads the source with `tokenize` and checks NAME tokens only, so comments and st
 quote an old name. Tests are checked too; vendored code is skipped. Preset keys are checked at
 every depth, and so are string values that are identifiers (the enum names a preset stores, such
 as a layer playlist's entries); files starting with '.' are not presets. Each entry is one
-finished concept; add an entry when a rename lands, and add an app to `ROOTS` and `PRESET_DIRS`
-when it follows.
+finished concept; add an entry when a rename lands, and add an app to `APPS` when it follows.
+An app's own terms (a glossary section of its own) are banned in that app only (`APP_BANNED`).
 """
 
 import json
+import os
 import re
 import tokenize
 import unittest
@@ -18,10 +19,12 @@ from collections.abc import Iterator
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-APPS = ['white_space', 'hd_trio', 'deep_flow']
+APPS = ['white_space', 'hd_trio', 'deep_flow', 'smile']
 ROOTS = [ROOT / 'modules'] + [ROOT / 'apps' / app for app in APPS]
 PRESET_DIRS = [ROOT / 'apps' / app / 'data' / 'settings' for app in APPS]
 SKIPPED_DIRS = {'vimbapython', '__pycache__'}
+# vendored code inside an app: SMILE's ComfyUI install and the ComfyUI nodes it ships
+SKIPPED_PATHS = {ROOT / 'apps' / 'smile' / 'ComfyUI', ROOT / 'apps' / 'smile' / 'data' / 'comfy'}
 # Stale preset keys the settings tree no longer has: the loader ignores them, and they stay as saved.
 STALE_PRESET_KEYS = {
     ('apps/deep_flow/data/settings/3D_rev2.json', 'render.fluid3d.visualisation'),
@@ -51,10 +54,38 @@ BANNED: list[tuple[str, str]] = [
     ('add/remove_<kind>_callback, not register/unregister_callback', r'^register_callback$|^unregister_callback$'),
 ]
 
+# the glossary's app sections: banned in that app's code and presets
+APP_BANNED: dict[str, list[tuple[str, str]]] = {
+    'smile': [
+        ('wall, not player (WallRender, WALLS)', r'PlayerRender|PLAYERS|PlayersSettings|credit_(qr_)?players'),
+        ('generator, not diffuse / GenMessage / pipeline', r'diffuse|GenMessage|GenState|PipelineSettings|^pipeline$'),
+        ('bloom / fade, not destroy / destruct', r'[Dd]estruct|destroy_'),
+        ('music_id, not audio_id', r'audio_id'),
+        ('style_id, not movement_id', r'movement_id'),
+        ('LaughterTest, not ScreenTest', r'ScreenTest|screen_test'),
+        ('Sequence, not Seqence', r'Seqence'),
+    ],
+}
+
+
+def app_of(path: Path) -> str | None:
+    """The app a file belongs to, None for modules/."""
+    parts: tuple[str, ...] = path.relative_to(ROOT).parts
+    return parts[1] if len(parts) > 1 and parts[0] == 'apps' else None
+
+
+def patterns_for(path: Path) -> list[tuple[str, re.Pattern[str]]]:
+    return [(concept, re.compile(regex)) for concept, regex in BANNED + APP_BANNED.get(app_of(path) or '', [])]
+
 
 def source_files() -> list[Path]:
-    return [path for root in ROOTS for path in sorted(root.rglob('*.py'))
-            if not SKIPPED_DIRS.intersection(path.relative_to(ROOT).parts)]
+    """Every .py under the roots, without the skipped folders (pruned, not walked: ComfyUI is large)."""
+    files: list[Path] = []
+    for root in ROOTS:
+        for folder, dirs, names in os.walk(root):
+            dirs[:] = sorted(d for d in dirs if d not in SKIPPED_DIRS and Path(folder, d) not in SKIPPED_PATHS)
+            files.extend(Path(folder, name) for name in sorted(names) if name.endswith('.py'))
+    return files
 
 
 def names(path: Path) -> list[tuple[int, str]]:
@@ -85,9 +116,9 @@ def stored_names(node: object, path: str = '') -> Iterator[tuple[str, str]]:
 class TestGlossary(unittest.TestCase):
 
     def test_no_identifier_uses_a_replaced_synonym(self) -> None:
-        patterns = [(concept, re.compile(regex)) for concept, regex in BANNED]
         found: list[str] = []
         for path in source_files():
+            patterns = patterns_for(path)
             for lineno, name in names(path):
                 for concept, pattern in patterns:
                     if pattern.search(name):
@@ -95,9 +126,9 @@ class TestGlossary(unittest.TestCase):
         self.assertEqual(found, [], "identifiers that use a replaced synonym:\n" + '\n'.join(found))
 
     def test_no_preset_name_uses_a_replaced_synonym(self) -> None:
-        patterns = [(concept, re.compile(regex)) for concept, regex in BANNED]
         found: list[str] = []
         for path in preset_files():
+            patterns = patterns_for(path)
             preset = path.relative_to(ROOT).as_posix()
             for key_path, name in stored_names(json.loads(path.read_text(encoding='utf-8'))):
                 if (preset, key_path) in STALE_PRESET_KEYS:
