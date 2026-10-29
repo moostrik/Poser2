@@ -222,14 +222,14 @@ class SimilarityFeature(BaseSettings):
     # In pipeline order. On the SMOOTH poses, synchronously: the posture similarity (distance in degrees →
     # 0..1), a present pair's gap held, the pair weighted by the arm deviation out of neutral; then, per
     # frame: stamped on the poses and smoothed.
-    posture              : Group[analytics.PostureSimilaritySettings] = Group(analytics.PostureSimilaritySettings, share=[max_players.as_('max_poses')])
+    posture              : Group[analytics.PostureSimilaritySettings] = Group(analytics.PostureSimilaritySettings, share=[max_players])
     sticky               : Group[analytics.SimilarityStickyFillerSettings] = Group(analytics.SimilarityStickyFillerSettings)
     neutral_weight       : Group[NeutralWeightSettings]               = Group(NeutralWeightSettings)
-    similarity_applicator: Group[nodes.SimilarityApplicatorSettings]  = Group(nodes.SimilarityApplicatorSettings, share=[max_players.as_('max_poses')])
+    similarity_applicator: Group[nodes.SimilarityApplicatorSettings]  = Group(nodes.SimilarityApplicatorSettings, share=[max_players])
     smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, share=[frequency])
     # LERP: interpolated to the output rate, then the motion gate.
     interpolator         : Group[nodes.ChaseInterpolatorSettings]     = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
-    motion_gate          : Group[nodes.MotionGateApplicatorSettings]  = Group(nodes.MotionGateApplicatorSettings, share=[max_players.as_('max_poses')])
+    motion_gate          : Group[nodes.MotionGateApplicatorSettings]  = Group(nodes.MotionGateApplicatorSettings, share=[max_players])
 
 
 # ---------------------------------------------------------------------------
@@ -246,9 +246,9 @@ class PoseGroup(BaseSettings):
 
     _feature_share: list = [frequency, output_frequency]
 
-    pose            : Group[inference.pose.Settings]         = Group(inference.pose.Settings, share=[max_players.as_('max_poses'), model_type, model_path, verbose])
+    pose            : Group[inference.pose.Settings]         = Group(inference.pose.Settings, share=[max_players, model_type, model_path, verbose])
     tracklets       : Group[PosesFromTrackletsSettings]      = Group(PosesFromTrackletsSettings)
-    image_crop      : Group[inference.crop.Settings]         = Group(inference.crop.Settings, share=[max_players.as_('max_poses')])
+    image_crop      : Group[inference.crop.Settings]         = Group(inference.crop.Settings, share=[max_players])
     angle_extractor : Group[nodes.AngleExtractorSettings]    = Group(nodes.AngleExtractorSettings)
     angle_calibrator: Group[nodes.AngleCalibratorSettings]   = Group(nodes.AngleCalibratorSettings)
     leg_deviation_extractor: Group[nodes.LegDeviationExtractorSettings] = Group(nodes.LegDeviationExtractorSettings)

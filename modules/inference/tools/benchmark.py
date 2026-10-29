@@ -92,7 +92,7 @@ def model_settings(app_group: Any, model_type: ModelType) -> Any:
     model folder.
     """
     copy = type(app_group)()
-    copy.max_poses = app_group.max_poses
+    copy.max_players = app_group.max_players
     copy.resolution = app_group.resolution
     copy.model_type = model_type
     copy.model_path = '.' if model_type is ModelType.ONNX else app_group.model_path
@@ -133,7 +133,7 @@ def run_model(model: Model, settings: Any, crop_w: int, crop_h: int, warmup: int
                                             f"{'onnx' if settings.model_type is ModelType.ONNX else 'trt'}", __package__)
     runner_class = getattr(runner_module, 'RunnerONNX' if settings.model_type is ModelType.ONNX else 'RunnerTRT')
 
-    label = f"{model.name} {settings.model_type.name} {settings.resolution.name} b{settings.max_poses}"
+    label = f"{model.name} {settings.model_type.name} {settings.resolution.name} b{settings.max_players}"
     inference_timer = PerformanceTimer(name=f"{label} inference")
     latency_timer = PerformanceTimer(name=f"{label} latency")
 
@@ -156,7 +156,7 @@ def run_model(model: Model, settings: Any, crop_w: int, crop_h: int, warmup: int
         time.sleep(0.05)
     memory_mb = gpu_used_mb() - memory_before
 
-    crops, prev = make_crops(settings.max_poses, crop_w, crop_h, image, seed)
+    crops, prev = make_crops(settings.max_players, crop_w, crop_h, image, seed)
     outputs: dict[str, np.ndarray] = {}
     try:
         for i in range(warmup + iterations):
@@ -215,7 +215,7 @@ def main() -> None:
         if group is None or not group.enabled:
             continue
         settings = model_settings(group, model_type)
-        logger.info("%s: %s, batch %d, crop %dx%d", model.name, settings.model, settings.max_poses,
+        logger.info("%s: %s, batch %d, crop %dx%d", model.name, settings.model, settings.max_players,
                     crop.output_width, crop.output_height)
         model_outputs, memory_mb, model_stats = run_model(model, settings, crop.output_width, crop.output_height,
                                              args.warmup, args.iterations, args.image, args.seed)

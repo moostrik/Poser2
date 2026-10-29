@@ -16,7 +16,7 @@ class WindowTracker(FrameWindowDictCallbackMixin):
     Automatically resets buffers when a track disappears.
     """
 
-    def __init__(self, num_tracks: int, settings: WindowNodeSettings | None = None,
+    def __init__(self, max_players: int, settings: WindowNodeSettings | None = None,
                  features: list[type[BaseScalarFeature]] | None = None) -> None:
         super().__init__()
 
@@ -29,10 +29,10 @@ class WindowTracker(FrameWindowDictCallbackMixin):
             features = SCALAR_FEATURES
 
         self._nodes: dict[type[BaseFeature], dict[int, WindowNode]] = {
-            ft: {i: WindowNode(ft, settings) for i in range(num_tracks)}
+            ft: {i: WindowNode(ft, settings) for i in range(max_players)}
             for ft in features
         }
-        self._track_ids = set(range(num_tracks))
+        self._track_ids = set(range(max_players))
 
     def process(self, poses: FrameDict) -> None:
         """Append poses to all window nodes; emit a FrameWindowDict only to registered callbacks.

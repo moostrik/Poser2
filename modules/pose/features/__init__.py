@@ -42,7 +42,7 @@ TRACK_FEATURES: set[type[BaseScalarFeature]] = {Similarity, LeaderScore, MotionG
 """Scalar features whose elements are indexed by track (pose), not by joint/body part."""
 
 
-def configure_features(max_poses: int) -> None:
+def configure_features(max_players: int) -> None:
     """Configure all track-indexed features at startup.
 
     Must be called once before building the pipeline so that every feature
@@ -50,4 +50,4 @@ def configure_features(max_poses: int) -> None:
     has effect.
     """
     for ft in TRACK_FEATURES:
-        ft.configure(max_poses)  # type: ignore[attr-defined]
+        ft.configure(max_players)  # type: ignore[attr-defined]

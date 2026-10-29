@@ -23,19 +23,19 @@ class PosesFromTrackletsSettings(BaseSettings):
 class PosesFromTracklets(FrameDictCallbackMixin):
     """Generates poses from tracklets, maintaining state per track."""
 
-    def __init__(self, settings: PosesFromTrackletsSettings, num_tracks: int) -> None:
+    def __init__(self, settings: PosesFromTrackletsSettings, max_players: int) -> None:
         super().__init__()
         self.settings: PosesFromTrackletsSettings = settings
         # The incoming dict keys are used directly as slot indices below, so the feeding tracker
-        # must key by a slot under `num_tracks` (the panoramic tracker's player slots; cam ids for
+        # must key by a slot under `max_players` (the panoramic tracker's player slots; cam ids for
         # one-per-cam rigs): a key at or above it would vanish here without a trace. Both come from
         # `num_players` in main.py — an invariant spanning two modules, so it is worth stating.
-        if num_tracks <= 0:
-            raise ValueError(f"PosesFromTracklets needs at least one track slot, got {num_tracks}")
-        self._num_tracks = num_tracks
+        if max_players <= 0:
+            raise ValueError(f"PosesFromTracklets needs at least one track slot, got {max_players}")
+        self._max_players = max_players
         # Store submitted tracklets per track ID
         self._tracklets: dict[int, Tracklet | None] = {
-            track_id: None for track_id in range(num_tracks)
+            track_id: None for track_id in range(max_players)
         }
         self._lock = Lock()
         self._batch_id_counter = 0
@@ -46,15 +46,15 @@ class PosesFromTracklets(FrameDictCallbackMixin):
         Args:
             tracklet_dict: Dictionary of track_id -> Tracklet
         """
-        dropped: list[int] = [k for k in tracklet_dict if k >= self._num_tracks]
+        dropped: list[int] = [k for k in tracklet_dict if k >= self._max_players]
         if dropped:
             logger.warning(
-                f"PosesFromTracklets: track ids {dropped} are beyond {self._num_tracks} slots "
-                f"and produce no pose — the feeding tracker has more slots than num_tracks."
+                f"PosesFromTracklets: track ids {dropped} are beyond {self._max_players} slots "
+                f"and produce no pose — the feeding tracker has more slots than max_players."
             )
         with self._lock:
             # Update all track slots
-            for track_id in range(self._num_tracks):
+            for track_id in range(self._max_players):
                 if track_id in tracklet_dict:
                     self._tracklets[track_id] = tracklet_dict[track_id]
                 else:
@@ -117,7 +117,7 @@ class PosesFromTracklets(FrameDictCallbackMixin):
     def reset(self) -> None:
         """Reset all tracklets."""
         with self._lock:
-            for track_id in range(self._num_tracks):
+            for track_id in range(self._max_players):
                 self._tracklets[track_id] = None
 
     def reset_at(self, id_: int) -> None:

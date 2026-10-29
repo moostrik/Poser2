@@ -80,7 +80,7 @@ class RunnerTRT(Thread):
         self.output_names: list[str]
 
         # Model configuration (initialized in _setup())
-        self._max_inputs: int = min(settings.max_poses, 4)
+        self._max_inputs: int = min(settings.max_players, 4)
         self._torch_dtype: torch.dtype
 
         # Preallocated zero recurrent states for new tracklets (read-only, shared)

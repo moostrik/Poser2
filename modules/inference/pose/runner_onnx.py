@@ -35,7 +35,7 @@ class RunnerONNX(Thread):
         self.model_file: str = settings.model_path + '/' + settings.model
         self.model_width: int = settings.width
         self.model_height: int = settings.height
-        self.model_num_warmups: int = settings.max_poses
+        self.model_num_warmups: int = settings.max_players
         self.num_keypoints: int = 17  # RTMPose COCO format
         self.simcc_split_ratio: float = 2.0  # From RTMPose config
 
@@ -65,7 +65,7 @@ class RunnerONNX(Thread):
         self.model_precision: str = "UNKNOWN"
 
         # Batch inference settings
-        self._max_batch: int = min(settings.max_poses, 8)
+        self._max_batch: int = min(settings.max_players, 8)
 
     @property
     def is_ready(self) -> bool:

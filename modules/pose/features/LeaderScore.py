@@ -30,16 +30,16 @@ class LeaderScore(BaseScalarFeature[FeatureEnum]):
     """
 
     @classmethod
-    def configure(cls, max_poses: int) -> None:
+    def configure(cls, max_players: int) -> None:
         """Configure with number of poses to track. Idempotent."""
         global _PoseEnum
         if _PoseEnum is None:
-            _PoseEnum = cast(type[IntEnum], IntEnum("PoseIndex", {f"POSE_{i}": i for i in range(max_poses)}))
+            _PoseEnum = cast(type[IntEnum], IntEnum("PoseIndex", {f"POSE_{i}": i for i in range(max_players)}))
 
     def __init__(self, values: np.ndarray, scores: np.ndarray) -> None:
         if _PoseEnum is None:
             raise RuntimeError(
-                "LeaderScore not configured. Call configure_features(max_poses) at app startup."
+                "LeaderScore not configured. Call configure_features(max_players) at app startup."
             )
         super().__init__(values, scores)
 
@@ -47,7 +47,7 @@ class LeaderScore(BaseScalarFeature[FeatureEnum]):
     def enum(cls) -> type[IntEnum]:
         if _PoseEnum is None:
             raise RuntimeError(
-                "LeaderScore not configured. Call configure_features(max_poses) at app startup."
+                "LeaderScore not configured. Call configure_features(max_players) at app startup."
             )
         return _PoseEnum
 
@@ -62,7 +62,7 @@ class LeaderScore(BaseScalarFeature[FeatureEnum]):
         if cls._empty_instance is None:
             if _PoseEnum is None:
                 raise RuntimeError(
-                "LeaderScore not configured. Call configure_features(max_poses) at app startup."
+                "LeaderScore not configured. Call configure_features(max_players) at app startup."
                 )
             values = np.full(len(_PoseEnum), np.nan, dtype=np.float32)
             scores = np.zeros(len(_PoseEnum), dtype=np.float32)

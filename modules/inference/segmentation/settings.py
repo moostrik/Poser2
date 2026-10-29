@@ -20,7 +20,7 @@ _MODELS = {
 class Settings(BaseSettings):
     """Settings for person segmentation (RVM)."""
 
-    max_poses:      Field[int]        = Field(1, min=1, max=16, access=Field.INIT)
+    max_players:      Field[int]        = Field(1, min=1, max=16, access=Field.INIT)
     model_type:     Field[ModelType]  = Field(ModelType.TRT, access=Field.INIT)
     resolution:     Field[Resolution] = Field(Resolution.STANDARD, access=Field.INIT)
     model_path:     Field[str]        = Field("data/models", access=Field.INIT, visible=False)

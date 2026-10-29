@@ -31,7 +31,7 @@ def _angles(degrees: dict[AngleLandmark, float] | float = 0.0, missing: tuple[An
 
 def _settings(arms_only: bool = True, **fields) -> PostureSimilaritySettings:
     cfg = PostureSimilaritySettings()
-    cfg.max_poses = NUM_POSES
+    cfg.max_players = NUM_POSES
     cfg.angle_tolerance = 20.0
     if arms_only:
         for landmark in AngleLandmark:

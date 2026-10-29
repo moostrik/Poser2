@@ -11,7 +11,7 @@ from modules.settings import BaseSettings, Field
 
 class MotionGateApplicatorSettings(BaseSettings):
     """Configuration for MotionGateApplicator."""
-    max_poses: Field[int] = Field(4, min=1, max=16, access=Field.INIT)
+    max_players: Field[int] = Field(4, min=1, max=16, access=Field.INIT)
 
 
 class MotionGateApplicator(FilterNode):
@@ -38,7 +38,7 @@ class MotionGateApplicator(FilterNode):
         Args:
             frames: Dictionary mapping track_id -> Frame
         """
-        max_poses = self.settings.max_poses
+        max_players = self.settings.max_players
 
         # Step 1: Extract motion values for each pose
         motion_values: dict[int, float] = {}
@@ -50,11 +50,11 @@ class MotionGateApplicator(FilterNode):
         motion_gate_dict: dict[int, MotionGate] = {}
 
         for track_id_i, motion_i in motion_values.items():
-            values = np.zeros(max_poses, dtype=np.float32)
-            scores = np.zeros(max_poses, dtype=np.float32)
+            values = np.zeros(max_players, dtype=np.float32)
+            scores = np.zeros(max_players, dtype=np.float32)
 
             # Store self-motion at own index
-            if track_id_i < max_poses:
+            if track_id_i < max_players:
                 values[track_id_i] = motion_i
                 scores[track_id_i] = 1.0
 
@@ -63,7 +63,7 @@ class MotionGateApplicator(FilterNode):
                 if track_id_i == track_id_j:
                     continue  # Skip self-comparison for gate
 
-                if track_id_j < max_poses:
+                if track_id_j < max_players:
                     # Gate = product of motions
                     gate = motion_i * motion_j
                     values[track_id_j] = gate

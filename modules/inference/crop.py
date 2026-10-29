@@ -43,7 +43,7 @@ class Settings(BaseSettings):
                                            description="Margin added around the box before cropping (fraction; RTMPose uses 0.25)")
     output_width:     Field[int]   = Field(384, access=Field.INIT)
     output_height:    Field[int]   = Field(512, access=Field.INIT)
-    max_poses:        Field[int]   = Field(4, min=1, max=16, access=Field.INIT)
+    max_players:        Field[int]   = Field(4, min=1, max=16, access=Field.INIT)
     enable_prev_crop: Field[bool]  = Field(True, access=Field.INIT)
 
 
@@ -87,9 +87,9 @@ class Extractor:
                 if cam_id not in images:
                     continue
 
-                if pose_count >= self.settings.max_poses:
+                if pose_count >= self.settings.max_players:
                     logger.warning(
-                        f"Exceeded max poses ({self.settings.max_poses}), skipping {track_id}"
+                        f"Exceeded max poses ({self.settings.max_players}), skipping {track_id}"
                     )
                     continue
 

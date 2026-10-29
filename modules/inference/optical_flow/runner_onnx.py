@@ -77,7 +77,7 @@ class RunnerONNX(Thread):
         self._img2_buffer: torch.Tensor  # (max_batch, 3, H, W) input 2
 
         # Batch inference settings
-        self._max_batch: int = min(settings.max_poses, 8)
+        self._max_batch: int = min(settings.max_players, 8)
 
     @property
     def is_ready(self) -> bool:

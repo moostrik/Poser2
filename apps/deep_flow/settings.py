@@ -173,28 +173,28 @@ class MotionFeature(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class PoseGroup(BaseSettings):
-    max_poses:          Field[int]                  = Field(1, min=1, max=16, access=Field.INIT)
+    max_players:          Field[int]                  = Field(1, min=1, max=16, access=Field.INIT)
     model_type:         Field[inference.ModelType]  = Field(inference.ModelType.TRT, access=Field.INIT)
     model_path:         Field[str]                  = Field("", access=Field.INIT, visible=False)
     verbose:            Field[bool]                 = Field(False, access=Field.INIT)
     frequency:          Field[float]                = Field(30.0, access=Field.INIT)
     output_frequency:   Field[float]                = Field(60.0)
 
-    _batch_share = [max_poses, model_type, model_path, verbose]
+    _batch_share = [max_players, model_type, model_path, verbose]
     _feature_share = [frequency, output_frequency]
 
     pose         = Group(inference.pose.Settings, share=_batch_share)
     segmentation = Group(inference.segmentation.Settings, share=_batch_share)
     optical_flow = Group(inference.optical_flow.Settings, share=_batch_share)
     tracklets    = Group(PosesFromTrackletsSettings)
-    image_crop   = Group(inference.crop.Settings, share=[max_poses])
+    image_crop   = Group(inference.crop.Settings, share=[max_players])
     angle_extractor = Group(nodes.AngleExtractorSettings)
     bbox         = Group(BboxFeature, share=_feature_share)
     point        = Group(PointFeature, share=_feature_share)
     angle        = Group(AngleFeature, share=_feature_share)
     velocity     = Group(VelocityFeature, share=_feature_share)
     motion       = Group(MotionFeature)
-    motion_gate  = Group(nodes.MotionGateApplicatorSettings, share=[max_poses])
+    motion_gate  = Group(nodes.MotionGateApplicatorSettings, share=[max_players])
     window_raw   = Group(window.WindowNodeSettings)
     window_clean = Group(window.WindowNodeSettings)
     window_smooth = Group(window.WindowNodeSettings)
@@ -268,7 +268,7 @@ class Settings(BaseSettings):
     fps:                Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
 
     camera  = Group(OakGroup, share=[num_players.as_('num_cams'), fps])
-    pose    = Group(PoseGroup, share=[num_players.as_('max_poses'), fps.as_('frequency')])
+    pose    = Group(PoseGroup, share=[num_players.as_('max_players'), fps.as_('frequency')])
     render  = Group(RenderSettings)
     inout   = Group(InOutGroup)
     panel   = Group(PanelSettings)

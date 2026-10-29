@@ -41,7 +41,7 @@ class _JointAggregator(NormalizedScalarFeature):
 
 class WindowCorrelationSettings(BaseSettings):
     """Configuration for WindowCorrelation."""
-    max_poses:              Field[int]                = Field(3, min=1, max=10, access=Field.INIT, description="Maximum number of tracked poses")
+    max_players:              Field[int]                = Field(3, min=1, max=10, access=Field.INIT, description="Players tracked at most")
     window_length:          Field[int]                = Field(30, min=4, max=300, description="Number of frames for correlation")
     method:                 Field[AggregationMethod]  = Field(AggregationMethod.HARMONIC_MEAN, description="Aggregation method")
     max_lag:                Field[int]                = Field(15, min=1, max=150, description="Maximum lag to search (±frames)")
@@ -175,7 +175,7 @@ class WindowCorrelation:
             for track_id in track_ids:
                 sim_feature = similarity_dict[track_id]
                 leader_feature = leader_dict[track_id]
-                for other_id in range(self.settings.max_poses):
+                for other_id in range(self.settings.max_players):
                     if not np.isnan(sim_feature.values[other_id]):
                         sim_val = sim_feature.values[other_id]
                         lead_val = leader_feature.values[other_id]
@@ -293,12 +293,12 @@ class WindowCorrelation:
         """Build per-pose Similarity dict from correlation matrix."""
 
         N = len(track_ids)
-        max_poses = self.settings.max_poses
+        max_players = self.settings.max_players
         result: dict[int, Similarity] = {}
 
         for i in range(N):
-            values = np.full(max_poses, 0.0, dtype=np.float32)
-            scores = np.zeros(max_poses, dtype=np.float32)
+            values = np.full(max_players, 0.0, dtype=np.float32)
+            scores = np.zeros(max_players, dtype=np.float32)
 
             for j in range(N):
                 if i == j:
@@ -339,12 +339,12 @@ class WindowCorrelation:
         """Build per-pose LeaderScore dict from lag matrix."""
 
         N = len(track_ids)
-        max_poses = self.settings.max_poses
+        max_players = self.settings.max_players
         result: dict[int, LeaderScore] = {}
 
         for i in range(N):
-            values = np.zeros(max_poses, dtype=np.float32)
-            scores = np.zeros(max_poses, dtype=np.float32)
+            values = np.zeros(max_players, dtype=np.float32)
+            scores = np.zeros(max_players, dtype=np.float32)
 
             for j in range(N):
                 if i == j:

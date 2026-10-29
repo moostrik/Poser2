@@ -82,7 +82,7 @@ def aggregate_joints(joint_sims: np.ndarray, method: AggregationMethod,
 
 class WindowSimilaritySettings(BaseSettings):
     """Configuration for WindowSimilarity."""
-    max_poses:              Field[int]                = Field(3, min=1, max=10, access=Field.INIT, description="Maximum number of tracked poses")
+    max_players:              Field[int]                = Field(3, min=1, max=10, access=Field.INIT, description="Players tracked at most")
     window_length:          Field[int]                = Field(30, min=1, max=300, description="Number of frames to compare")
     method:                 Field[AggregationMethod]  = Field(AggregationMethod.HARMONIC_MEAN, description="Aggregation method")
     use_angle_similarity:   Field[bool]               = Field(True, description="Use angle similarity")
@@ -258,7 +258,7 @@ class WindowSimilarity:
                 leader_feature = leader_dict[track_id]
 
                 # Show similarities to other poses
-                for other_id in range(self.settings.max_poses):
+                for other_id in range(self.settings.max_players):
                     if not np.isnan(sim_feature.values[other_id]):
                         sim_val = sim_feature.values[other_id]
                         conf_val = sim_feature.scores[other_id]
@@ -409,13 +409,13 @@ class WindowSimilarity:
         """
 
         N = len(track_ids)
-        max_poses = self.settings.max_poses
+        max_players = self.settings.max_players
         result: dict[int, Similarity] = {}
 
         # For each pose i, build its Similarity array
         for i in range(N):
-            values = np.full(max_poses, np.nan, dtype=np.float32)
-            scores = np.zeros(max_poses, dtype=np.float32)
+            values = np.full(max_players, np.nan, dtype=np.float32)
+            scores = np.zeros(max_players, dtype=np.float32)
 
             # For each other pose j
             for j in range(N):
@@ -458,13 +458,13 @@ class WindowSimilarity:
         """
 
         N = len(track_ids)
-        max_poses = self.settings.max_poses
+        max_players = self.settings.max_players
         result: dict[int, LeaderScore] = {}
 
         # For each pose i, build its LeaderScore array
         for i in range(N):
-            values = np.zeros(max_poses, dtype=np.float32)
-            scores = np.zeros(max_poses, dtype=np.float32)
+            values = np.zeros(max_players, dtype=np.float32)
+            scores = np.zeros(max_players, dtype=np.float32)
 
             # For each other pose j
             for j in range(N):

@@ -10,7 +10,7 @@ from modules.settings import BaseSettings, Field
 
 class LeaderScoreApplicatorSettings(BaseSettings):
     """Configuration for LeaderScoreApplicator."""
-    max_poses: Field[int] = Field(4, access=Field.INIT, min=1, max=16)
+    max_players: Field[int] = Field(4, access=Field.INIT, min=1, max=16)
 
 
 class LeaderScoreApplicator(FilterNode):

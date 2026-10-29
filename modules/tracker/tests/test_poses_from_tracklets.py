@@ -28,7 +28,7 @@ class PosesFromTrackletsCase(unittest.TestCase):
     def setUp(self) -> None:
         self.settings = PosesFromTrackletsSettings()
         self.settings.detection_timeout = 1.0
-        self.poses = PosesFromTracklets(self.settings, num_tracks=4)
+        self.poses = PosesFromTracklets(self.settings, max_players=4)
 
 
 class TestDetectionTimeout(PosesFromTrackletsCase):

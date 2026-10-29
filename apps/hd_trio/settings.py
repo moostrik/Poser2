@@ -228,16 +228,16 @@ class MotionFeature(BaseSettings):
 class SimilarityFeature(BaseSettings):
     frequency       : Field[float] = Field(30.0, access=Field.INIT)
     output_frequency: Field[float] = Field(60.0)
-    max_poses       : Field[int]   = Field(3, min=1, max=16, access=Field.INIT)
+    max_players       : Field[int]   = Field(3, min=1, max=16, access=Field.INIT)
 
-    window_similarity    : Group[analytics.WindowSimilaritySettings]      = Group(analytics.WindowSimilaritySettings, share=[max_poses])
-    window_correlation   : Group[analytics.WindowCorrelationSettings]     = Group(analytics.WindowCorrelationSettings, share=[max_poses])
-    similarity_applicator: Group[nodes.SimilarityApplicatorSettings]  = Group(nodes.SimilarityApplicatorSettings, share=[max_poses])
-    leader_applicator    : Group[nodes.LeaderScoreApplicatorSettings] = Group(nodes.LeaderScoreApplicatorSettings, share=[max_poses])
+    window_similarity    : Group[analytics.WindowSimilaritySettings]      = Group(analytics.WindowSimilaritySettings, share=[max_players])
+    window_correlation   : Group[analytics.WindowCorrelationSettings]     = Group(analytics.WindowCorrelationSettings, share=[max_players])
+    similarity_applicator: Group[nodes.SimilarityApplicatorSettings]  = Group(nodes.SimilarityApplicatorSettings, share=[max_players])
+    leader_applicator    : Group[nodes.LeaderScoreApplicatorSettings] = Group(nodes.LeaderScoreApplicatorSettings, share=[max_players])
     smoother             : Group[nodes.EuroSmootherSettings]          = Group(nodes.EuroSmootherSettings, share=[frequency])
     interpolator         : Group[nodes.ChaseInterpolatorSettings]     = Group(nodes.ChaseInterpolatorSettings, share=[frequency.as_('input_frequency'), output_frequency])
     sticky               : Group[analytics.SimilarityStickyFillerSettings] = Group(analytics.SimilarityStickyFillerSettings)
-    motion_gate          : Group[nodes.MotionGateApplicatorSettings]  = Group(nodes.MotionGateApplicatorSettings, share=[max_poses])
+    motion_gate          : Group[nodes.MotionGateApplicatorSettings]  = Group(nodes.MotionGateApplicatorSettings, share=[max_players])
 
 
 # ---------------------------------------------------------------------------
@@ -245,28 +245,28 @@ class SimilarityFeature(BaseSettings):
 # ---------------------------------------------------------------------------
 
 class PoseGroup(BaseSettings):
-    max_poses       : Field[int]       = Field(3, min=1, max=16, access=Field.INIT)
+    max_players       : Field[int]       = Field(3, min=1, max=16, access=Field.INIT)
     model_type      : Field[inference.ModelType] = Field(inference.ModelType.TRT, access=Field.INIT)
     model_path      : Field[str]       = Field("", access=Field.INIT, visible=False)
     verbose         : Field[bool]      = Field(False, access=Field.INIT)
     frequency       : Field[float]     = Field(30.0, access=Field.INIT)
     output_frequency: Field[float]     = Field(60.0)
 
-    _batch_share  : list = [max_poses, model_type, model_path, verbose]
+    _batch_share  : list = [max_players, model_type, model_path, verbose]
     _feature_share: list = [frequency, output_frequency]
 
     pose            : Group[inference.pose.Settings]          = Group(inference.pose.Settings, share=_batch_share)
     segmentation    : Group[inference.segmentation.Settings]  = Group(inference.segmentation.Settings, share=_batch_share)
     optical_flow    : Group[inference.optical_flow.Settings]  = Group(inference.optical_flow.Settings, share=_batch_share)
     tracklets       : Group[PosesFromTrackletsSettings]       = Group(PosesFromTrackletsSettings)
-    image_crop      : Group[inference.crop.Settings]          = Group(inference.crop.Settings, share=[max_poses])
+    image_crop      : Group[inference.crop.Settings]          = Group(inference.crop.Settings, share=[max_players])
     angle_extractor : Group[nodes.AngleExtractorSettings]     = Group(nodes.AngleExtractorSettings)
     bbox            : Group[BboxFeature]                      = Group(BboxFeature, share=_feature_share)
     point           : Group[PointFeature]                     = Group(PointFeature, share=_feature_share)
     angle           : Group[AngleFeature]                     = Group(AngleFeature, share=_feature_share)
     velocity        : Group[VelocityFeature]                  = Group(VelocityFeature, share=_feature_share)
     motion          : Group[MotionFeature]                    = Group(MotionFeature)
-    similarity      : Group[SimilarityFeature]                = Group(SimilarityFeature, share=[frequency, output_frequency, max_poses])
+    similarity      : Group[SimilarityFeature]                = Group(SimilarityFeature, share=[frequency, output_frequency, max_players])
     window_raw      : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
     window_clean    : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
     window_smooth   : Group[window.WindowNodeSettings]        = Group(window.WindowNodeSettings)
@@ -404,7 +404,7 @@ class Settings(BaseSettings):
 
     camera : Group[OakGroup]     = Group(OakGroup, share=[num_players.as_('num_cams'), input_fps.as_('fps')])
     inout  : Group[InOutGroup]   = Group(InOutGroup)
-    pose   : Group[PoseGroup]    = Group(PoseGroup, share=[num_players.as_('max_poses'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
+    pose   : Group[PoseGroup]    = Group(PoseGroup, share=[num_players.as_('max_players'), input_fps.as_('frequency'), render_fps.as_('output_frequency')])
     render : Group[RenderSettings]  = Group(RenderSettings, share=[num_players, num_players.as_('num_cams')])
     panel : Group[PanelSettings] = Group(PanelSettings)
     session: Group[SessionGroup] = Group(SessionGroup, share=[num_players.as_('num_cams'), input_fps.as_('fps')])

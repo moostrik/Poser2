@@ -70,7 +70,7 @@ class RunnerTRT(Thread):
         self.output_name: str
 
         # Model configuration (initialized in _setup())
-        self._max_batch: int = min(settings.max_poses, 4)
+        self._max_batch: int = min(settings.max_players, 4)
         self._torch_dtype: torch.dtype
         self.model_precision: str
 

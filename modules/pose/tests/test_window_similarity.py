@@ -37,7 +37,7 @@ def _ramp(lag: int = 0, offset: float = 0.0) -> list[np.ndarray]:
 
 def _similarity(**fields) -> WindowSimilarity:
     settings = WindowSimilaritySettings()
-    settings.max_poses = NUM_POSES
+    settings.max_players = NUM_POSES
     settings.window_length = T
     for name, value in fields.items():
         setattr(settings, name, value)

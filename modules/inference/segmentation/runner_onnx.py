@@ -100,7 +100,7 @@ class RunnerONNX(Thread):
         self._r4i_buffer: torch.Tensor    # (max_batch, 64, H/16, W/16)
 
         # Batch inference settings
-        self._max_batch: int = min(settings.max_poses, 4)
+        self._max_batch: int = min(settings.max_players, 4)
 
     @property
     def is_ready(self) -> bool:

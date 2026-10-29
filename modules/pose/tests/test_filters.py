@@ -388,7 +388,7 @@ class ApplicatorTest(unittest.TestCase):
         np.testing.assert_allclose(gate.values, [0.5, 0.0, 0.2, 0.0], atol=1e-6)
         np.testing.assert_allclose(gate.scores, [1.0, 0.0, 1.0, 1.0])
 
-    def test_motion_gate_ignores_track_ids_beyond_max_poses(self) -> None:
+    def test_motion_gate_ignores_track_ids_beyond_max_players(self) -> None:
         app = MotionGateApplicator()
         app.set({0: frame(track_id=0, features={AngleMotion: AngleMotion.from_value(0.5)}),
                  NUM_POSES: frame(track_id=NUM_POSES, features={AngleMotion: AngleMotion.from_value(0.5)})})
