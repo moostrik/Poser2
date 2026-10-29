@@ -32,7 +32,7 @@ class PersonDetector(Protocol):
     thread: `modules.inference.detection.PersonDetector`. Named here so the contract does not import
     the inference package."""
     def submit(self, cam_id: int, image: np.ndarray) -> None: ...
-    def register_callback(self, callback) -> None: ...
+    def add_detection_callback(self, callback) -> None: ...
 
 
 class BoxTracker(Protocol):
@@ -69,7 +69,7 @@ class Camera:
         the frames come on the player's threads, the tracklets on the detector's."""
         self.player.add_frame_callback(self._clip_callback)
         if self.detector is not None:
-            self.detector.register_callback(self._on_detection)
+            self.detector.add_detection_callback(self._on_detection)
         self.running = True
 
     def stop(self) -> None:

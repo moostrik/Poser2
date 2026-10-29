@@ -67,7 +67,7 @@ class PersonDetectorTest(unittest.TestCase):
         self.settings.initialize()
         self.detector = PersonDetector(self.settings)
         self.detections = []
-        self.detector.register_callback(self.detections.append)
+        self.detector.add_detection_callback(self.detections.append)
         logging.disable(logging.WARNING)        # the CPU-provider warning
         self.detector.start()
         self.assertTrue(wait_for(lambda: self.detector.is_ready))

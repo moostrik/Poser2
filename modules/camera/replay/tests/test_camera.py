@@ -31,7 +31,7 @@ class FakePersonDetector:
     def submit(self, cam_id: int, image: np.ndarray) -> None:
         self.submitted.append((cam_id, image))
 
-    def register_callback(self, callback) -> None:
+    def add_detection_callback(self, callback) -> None:
         self.callbacks.append(callback)
 
     def report(self, cam_id: int, boxes: list[Rect]) -> None:
