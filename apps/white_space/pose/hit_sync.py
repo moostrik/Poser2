@@ -64,9 +64,9 @@ class _Hit:
 class HitSync:
     """Records the hits' poses and publishes the streak; see the module docstring."""
 
-    def __init__(self, config: HitSyncSettings, posture: analytics.PostureSimilaritySettings, neutral: NeutralWeightSettings,
+    def __init__(self, settings: HitSyncSettings, posture: analytics.PostureSimilaritySettings, neutral: NeutralWeightSettings,
                  light: LightSettings, board: Board, pose_stage: int) -> None:
-        self._config = config
+        self._settings = settings
         self._posture = posture
         self._neutral = neutral
         self._light = light
@@ -102,8 +102,8 @@ class HitSync:
             self._streak = self._compute_streak()
 
         hits, distance = self._streak
-        self._config.hits = hits
-        self._config.distance = distance
+        self._settings.hits = hits
+        self._settings.distance = distance
         self._board.set_hit_streak(HitStreak(hit=bool(ids), hits=hits, distance=distance))
 
     def _compute_streak(self) -> tuple[int, float]:
@@ -133,7 +133,7 @@ class HitSync:
     def _is_old_enough(self, pose: Frame) -> bool:
         """``Age`` at least ``min_age_seconds``; a NaN age (the track's first frame) is 0."""
         age = pose[features.Age].value
-        return (0.0 if math.isnan(age) else age) >= self._config.min_age_seconds
+        return (0.0 if math.isnan(age) else age) >= self._settings.min_age_seconds
 
     def _is_posing(self, pose: Frame) -> bool:
         """Fully out of neutral, or the neutral weight is off; arms not seen are neutral."""

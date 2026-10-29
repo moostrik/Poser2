@@ -328,7 +328,7 @@ class PlayheadFeatureSelect(IntEnum):
 
 
 class PlayheadDataLayerSettings(BaseSettings):
-    """App-owned data-layer config (mirrors DataLayerSettings, but its own feature enum).
+    """App-owned data-layer settings (mirrors DataLayerSettings, but its own feature enum).
 
     Drives the generic FeatureWindowLayer/FeatureFrameLayer over the app's playhead offset.
     Defaults off (mode NONE) and to the LERP stage — the only stage where the features exist.

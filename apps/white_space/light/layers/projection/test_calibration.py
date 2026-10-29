@@ -56,12 +56,12 @@ class TestCalibration(ProjectionLayer):
     def __init__(
         self,
         resolution:  int,
-        config:      TestCalibrationSettings,
-        num_cams: int,
+        settings:    TestCalibrationSettings,
+        num_cams:    int,
         board:       Board,
     ) -> None:
-        super().__init__(resolution, config, board)
-        self._config      = config
+        super().__init__(resolution, settings, board)
+        self._settings: TestCalibrationSettings = settings
         self._num_cams = num_cams
 
     # ------------------------------------------------------------------
@@ -69,8 +69,8 @@ class TestCalibration(ProjectionLayer):
     # ------------------------------------------------------------------
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
-        cfg = self._config
-        fov  = cfg.fov
+        settings = self._settings
+        fov  = settings.fov
         nc   = self._num_cams
         res  = self.resolution
 
@@ -80,7 +80,7 @@ class TestCalibration(ProjectionLayer):
         target_fov  = 360.0 / nc
         fov_overlap = (fov - target_fov) / 2.0
 
-        thresh = cfg.threshold
+        thresh = settings.threshold
 
         for cam_id, img in images.items():
             if img is None or img.size == 0:
@@ -90,8 +90,8 @@ class TestCalibration(ProjectionLayer):
             # Extract horizontal luminance slice
             # ----------------------------------------------------------
             h, w = img.shape[:2]
-            row_top    = max(0, int((cfg.slice_centre - cfg.slice_height * 0.5) * h))
-            row_bottom = min(h, int((cfg.slice_centre + cfg.slice_height * 0.5) * h))
+            row_top    = max(0, int((settings.slice_centre - settings.slice_height * 0.5) * h))
+            row_bottom = min(h, int((settings.slice_centre + settings.slice_height * 0.5) * h))
             if row_bottom <= row_top:
                 continue
 
@@ -105,14 +105,14 @@ class TestCalibration(ProjectionLayer):
                 lum /= 255.0
 
             # Reduce each column to a single value using the chosen method
-            if cfg.method == SampleMethod.MAX:
+            if settings.method == SampleMethod.MAX:
                 col_val = lum.max(axis=0)
-            elif cfg.method == SampleMethod.MIN:
+            elif settings.method == SampleMethod.MIN:
                 col_val = lum.min(axis=0)
             else:
                 col_val = lum.mean(axis=0)
 
-            if cfg.detect == DetectMode.BRIGHT:
+            if settings.detect == DetectMode.BRIGHT:
                 on_mask = col_val > thresh
             else:
                 on_mask = col_val < thresh
@@ -138,8 +138,8 @@ class TestCalibration(ProjectionLayer):
         # ----------------------------------------------------------
         # Overlap zone indicator
         # ----------------------------------------------------------
-        marker = white if cfg.white_markers else blue
-        if cfg.show_overlap and fov_overlap > 0.0:
+        marker = white if settings.white_markers else blue
+        if settings.show_overlap and fov_overlap > 0.0:
             half_w = fov_overlap / 360.0
             for cam_id in range(nc):
                 for edge in (target_fov * cam_id, target_fov * (cam_id + 1)):
@@ -152,7 +152,7 @@ class TestCalibration(ProjectionLayer):
                         marker[lo:] = np.maximum(marker[lo:], 1.0)
                         marker[:hi] = np.maximum(marker[:hi], 1.0)
 
-        if cfg.show_centre:
+        if settings.show_centre:
             half_c = 5
             for cam_id in range(nc):
                 centre_angle = (target_fov * cam_id + target_fov * 0.5) % 360.0

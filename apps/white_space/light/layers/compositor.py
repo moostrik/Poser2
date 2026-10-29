@@ -58,11 +58,11 @@ class Compositor:
     its mix" — the Compositor is the mixer those layers pass through.
     """
 
-    def __init__(self, config: LightSettings, layers: dict[LayerId, BaseLayer]) -> None:
-        self._config = config
+    def __init__(self, settings: LightSettings, layers: dict[LayerId, BaseLayer]) -> None:
+        self._settings = settings
         self._layers = layers
         self._entries: Mix = []
-        self._scratch = Frame(config.light_resolution, Tick(0.0, 0.0))
+        self._scratch = Frame(settings.light_resolution, Tick(0.0, 0.0))
 
     # -- Mix input (light thread, same thread as render) ----------------------
 
@@ -83,11 +83,11 @@ class Compositor:
     # -- Per-tick mix ----------------------------------------------------------
 
     def render(self, frame: Frame) -> None:
-        cfg = self._config
+        settings = self._settings
         entries: Mix = self._entries
-        if int(cfg.debug) != 0:                       # a debug layer is selected → solo it
+        if int(settings.debug) != 0:                  # a debug layer is selected → solo it
             from ..settings import LayerId            # local: settings imports this package
-            entries = [(LayerId(int(cfg.debug)), 1.0)]
+            entries = [(LayerId(int(settings.debug)), 1.0)]
 
         s = self._scratch
         s.tick, s.motor, s.motor_command, s.playhead = frame.tick, frame.motor, frame.motor_command, frame.playhead

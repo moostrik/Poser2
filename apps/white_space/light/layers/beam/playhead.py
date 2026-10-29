@@ -20,9 +20,9 @@ class BeamPlayheadSettings(LayerSettings):
 class BeamPlayhead(BeamLayer):
     """The beam-mode playhead: the front white beam light at ``level``."""
 
-    def __init__(self, resolution: int, config: BeamPlayheadSettings, board) -> None:
-        super().__init__(resolution, config, board)
-        self._config = config
+    def __init__(self, resolution: int, settings: BeamPlayheadSettings, board) -> None:
+        super().__init__(resolution, settings, board)
+        self._settings: BeamPlayheadSettings = settings
 
     def _draw(self, frame: Frame, beam_lights: np.ndarray) -> None:
-        self._add_beam_lights(beam_lights, front_white=self._config.level)
+        self._add_beam_lights(beam_lights, front_white=self._settings.level)

@@ -48,9 +48,9 @@ class BeamBlueSoundSettings(LayerSettings):
 class BeamBlueSound(BeamLayer):
     """Left level → left blue lamp, right level → right blue lamp; see the module docstring."""
 
-    def __init__(self, resolution: int, config: BeamBlueSoundSettings, board: Board) -> None:
-        super().__init__(resolution, config, board)
-        self._config = config
+    def __init__(self, resolution: int, settings: BeamBlueSoundSettings, board: Board) -> None:
+        super().__init__(resolution, settings, board)
+        self._settings: BeamBlueSoundSettings = settings
         self._window: deque[tuple[float, float]] = deque(maxlen=3)
 
     def reset(self) -> None:
@@ -58,7 +58,7 @@ class BeamBlueSound(BeamLayer):
         self._window.clear()
 
     def _draw(self, frame: Frame, beam_lights: np.ndarray) -> None:
-        P = self._config
+        P = self._settings
         levels = self._board.get_sound_levels()
 
         if levels.timestamp == 0.0 or monotonic() - levels.timestamp > P.stale_seconds:

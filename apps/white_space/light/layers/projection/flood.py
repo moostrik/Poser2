@@ -20,9 +20,9 @@ class FloodSettings(LayerSettings):
 class Flood(ProjectionLayer):
     """``white[:] += level``; see the module docstring."""
 
-    def __init__(self, resolution: int, config: FloodSettings, board) -> None:
-        super().__init__(resolution, config, board)
-        self._config = config
+    def __init__(self, resolution: int, settings: FloodSettings, board) -> None:
+        super().__init__(resolution, settings, board)
+        self._settings: FloodSettings = settings
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
-        white += self._config.level
+        white += self._settings.level

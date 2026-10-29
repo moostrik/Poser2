@@ -56,9 +56,9 @@ class StateBase:
 
     MOTOR: MotorMode = MotorMode.BEAM    # commanded via the machine's set_motor on entry
 
-    def __init__(self, config: StateMachineSettings, light: LightSettings,
+    def __init__(self, settings: StateMachineSettings, light: LightSettings,
                  reset_layers: Callable[[list[LayerId]], None]) -> None:
-        self._config = config
+        self._settings = settings
         self._light = light
         self._reset_layers = reset_layers
 
@@ -146,26 +146,26 @@ class IntroState(StateBase):
         self._reset_layers([LayerId.beam_flash])   # no stale flash decay from a previous cycle
         # After the sync end the room is still posing: the intro arms only once the hits have been
         # out of sync for the grace period. From everywhere else the first alike hits count at once.
-        self._armed = ctx.prev != StateId.PLAY_INTRO or self._config.intro_grace_seconds <= 0.0
+        self._armed = ctx.prev != StateId.PLAY_INTRO or self._settings.intro_grace_seconds <= 0.0
         self._unsynced_since = None
 
     def update(self, ctx: StateContext) -> Mix:
         if not self._armed:
-            if ctx.sync_hits >= self._config.min_players:
+            if ctx.sync_hits >= self._settings.min_players:
                 self._unsynced_since = None                   # alike again: the grace restarts
             elif self._unsynced_since is None:
                 self._unsynced_since = ctx.elapsed
-            elif ctx.elapsed - self._unsynced_since >= self._config.intro_grace_seconds:
+            elif ctx.elapsed - self._unsynced_since >= self._settings.intro_grace_seconds:
                 self._armed = True
-        return [(LayerId.beam_playhead, self._config.dim_level), (LayerId.beam_flash, 1.0)]
+        return [(LayerId.beam_playhead, self._settings.dim_level), (LayerId.beam_flash, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.players == 0:       # before the session timeout: an empty room never spins up
             return StateId.INTRO_IDLE
         # The players heard the same sound min_players times in a row: that many alike hits launch the spin-up.
-        if self._armed and ctx.sync_hits >= self._config.min_players and ctx.players >= self._config.min_players:
+        if self._armed and ctx.sync_hits >= self._settings.min_players and ctx.players >= self._settings.min_players:
             return StateId.INTRO_PLAY
-        if ctx.session and ctx.elapsed >= self._config.session.intro_seconds:
+        if ctx.session and ctx.elapsed >= self._settings.session.intro_seconds:
             return StateId.INTRO_PLAY
         return None
 
@@ -175,7 +175,7 @@ class IntroState(StateBase):
             return 1.0
         if self._unsynced_since is None:
             return 0.0
-        return _clamp((ctx.elapsed - self._unsynced_since) / self._config.intro_grace_seconds)
+        return _clamp((ctx.elapsed - self._unsynced_since) / self._settings.intro_grace_seconds)
 
 
 class PlayState(StateBase):
@@ -192,19 +192,19 @@ class PlayState(StateBase):
     def update(self, ctx: StateContext) -> Mix:
         # A break in full sync drains the hold over the release instead of clearing it, so one pair
         # flickering under the band costs seconds, not the whole hold.
-        self._hold.update(ctx.full_sync, ctx.dt, self._config.play_full_sync_seconds,
-                          self._config.play_full_sync_release_seconds)
+        self._hold.update(ctx.full_sync, ctx.dt, self._settings.play_full_sync_seconds,
+                          self._settings.play_full_sync_release_seconds)
         return [(LayerId.pose_instrument, 1.0)]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.session:                 # a session plays out its time, whatever the count
-            if ctx.elapsed >= self._config.session.play_seconds:
+            if ctx.elapsed >= self._settings.session.play_seconds:
                 return StateId.END
             return None
-        if ctx.players < self._config.min_players:
+        if ctx.players < self._settings.min_players:
             return StateId.END
         # The hold has built: the sync end, the wind-down to the intro.
-        if self._config.play_full_sync_seconds > 0.0 and self._hold.level >= _FULL:
+        if self._settings.play_full_sync_seconds > 0.0 and self._hold.level >= _FULL:
             return StateId.PLAY_INTRO
         return None
 
@@ -226,12 +226,12 @@ class OffIdleState(StateBase):
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.hit:                     # swept mid-wake → the intro begins
             return StateId.INTRO
-        if ctx.bars >= self._config.off_idle_bars:
+        if ctx.bars >= self._settings.off_idle_bars:
             return StateId.IDLE
         return None
 
     def progress(self, ctx: StateContext) -> float:
-        return _clamp(ctx.bars / self._config.off_idle_bars)
+        return _clamp(ctx.bars / self._settings.off_idle_bars)
 
 
 class IntroIdleState(StateBase):
@@ -240,14 +240,14 @@ class IntroIdleState(StateBase):
 
     def __init__(self, *args) -> None:
         super().__init__(*args)
-        self._start_lamp: float = self._config.dim_level
+        self._start_lamp: float = self._settings.dim_level
         self._start_sound: float = 0.0
 
     def enter(self, ctx: StateContext) -> None:
         # Ramp from where the show was: DIM line and no sound visuals from INTRO, both
         # already full on the IDLE_INTRO pass-through.
         from_intro = ctx.prev == StateId.INTRO
-        self._start_lamp = self._config.dim_level if from_intro else 1.0
+        self._start_lamp = self._settings.dim_level if from_intro else 1.0
         self._start_sound = 0.0 if from_intro else 1.0
 
     def update(self, ctx: StateContext) -> Mix:
@@ -258,12 +258,12 @@ class IntroIdleState(StateBase):
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if ctx.hit:                     # someone returned and was swept mid-fade → back to the intro
             return StateId.INTRO
-        if ctx.bars >= self._config.intro_idle_bars:
+        if ctx.bars >= self._settings.intro_idle_bars:
             return StateId.IDLE
         return None
 
     def progress(self, ctx: StateContext) -> float:
-        return _clamp(ctx.bars / self._config.intro_idle_bars)
+        return _clamp(ctx.bars / self._settings.intro_idle_bars)
 
 
 class IntroPlayState(StateBase):
@@ -285,35 +285,35 @@ class IntroPlayState(StateBase):
         if self._projecting_elapsed is None and ctx.is_projecting:
             self._projecting_elapsed = ctx.elapsed      # the projection shows — hard mix now
         if self._projecting_elapsed is None:
-            return [(LayerId.beam_playhead, self._config.dim_level)]   # not projecting yet: hold INTRO's dim line
-        remaining = max(self._config.spin_up_seconds - self._projecting_elapsed, 1e-6)
+            return [(LayerId.beam_playhead, self._settings.dim_level)]   # not projecting yet: hold INTRO's dim line
+        remaining = max(self._settings.spin_up_seconds - self._projecting_elapsed, 1e-6)
         blue = _ease((ctx.elapsed - self._projecting_elapsed) / remaining)
         return [(LayerId.pose_instrument, (1.0, blue))]
 
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
-        if ctx.elapsed >= self._config.spin_up_seconds:
+        if ctx.elapsed >= self._settings.spin_up_seconds:
             return StateId.PLAY
         return None
 
     def progress(self, ctx: StateContext) -> float:
-        return _clamp(ctx.elapsed / self._config.spin_up_seconds)
+        return _clamp(ctx.elapsed / self._settings.spin_up_seconds)
 
 
 class EndState(StateBase):
     """S8 — END. See docs/STATES.md."""
     MOTOR = MotorMode.PROJECTION
 
-    def __init__(self, config: StateMachineSettings, light: LightSettings,
+    def __init__(self, settings: StateMachineSettings, light: LightSettings,
                  reset_layers: Callable[[list[LayerId]], None]) -> None:
-        super().__init__(config, light, reset_layers)
+        super().__init__(settings, light, reset_layers)
         self._p: float = 0.0
 
     def enter(self, ctx: StateContext) -> None:
         self._p = 0.0
 
     def update(self, ctx: StateContext) -> Mix:
-        forward = ctx.players < self._config.min_players or ctx.session
-        self._p = self._ramp(self._p, ctx.dbar / self._config.end_bars, forward)
+        forward = ctx.players < self._settings.min_players or ctx.session
+        self._p = self._ramp(self._p, ctx.dbar / self._settings.end_bars, forward)
         # One ramp gives both CSV behaviors: the flood crosses the white to full while the
         # blue fades out with the instrument (the instrument is the only blue source).
         return [(LayerId.pose_instrument, 1.0 - self._p),
@@ -322,7 +322,7 @@ class EndState(StateBase):
     def needs_state_change(self, ctx: StateContext) -> StateId | None:
         if self._p >= 1.0:
             return StateId.END_INTRO if ctx.players > 0 else StateId.END_IDLE
-        if self._p <= 0.0 and not ctx.session and ctx.players >= self._config.min_players:
+        if self._p <= 0.0 and not ctx.session and ctx.players >= self._settings.min_players:
             return StateId.PLAY
         return None
 
@@ -358,7 +358,7 @@ class EndIntroState(WindDownStateBase):
     TARGET = StateId.INTRO
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.beam_wind_down, 1.0), (LayerId.beam_playhead, self._config.dim_level)]
+        return [(LayerId.beam_wind_down, 1.0), (LayerId.beam_playhead, self._settings.dim_level)]
 
 
 class EndIdleState(WindDownStateBase):
@@ -382,7 +382,7 @@ class PlayIntroState(WindDownStateBase):
         self._reset_layers([LayerId.beam_sync_wind_down, LayerId.pose_instrument])
 
     def update(self, ctx: StateContext) -> Mix:
-        return [(LayerId.beam_sync_wind_down, 1.0), (LayerId.beam_playhead, self._config.dim_level)]
+        return [(LayerId.beam_sync_wind_down, 1.0), (LayerId.beam_playhead, self._settings.dim_level)]
 
 
 # -- Registry (total over StateId) ----------------------------------------------

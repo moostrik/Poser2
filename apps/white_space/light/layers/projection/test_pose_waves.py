@@ -79,12 +79,12 @@ class TestPoseWaves(ProjectionLayer):
         self,
         resolution: int,
         max_players: int,
-        config: TestPoseWavesSettings,
+        settings: TestPoseWavesSettings,
         board: Board,
         pose_stage: int,
     ) -> None:
-        super().__init__(resolution, config, board)
-        self._config = config
+        super().__init__(resolution, settings, board)
+        self._settings: TestPoseWavesSettings = settings
         self._pose_stage = pose_stage
 
         self._player_states: dict[int, PlayerState] = {
@@ -108,7 +108,7 @@ class TestPoseWaves(ProjectionLayer):
             state.reset()
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
-        P = self._config
+        P = self._settings
         dt: float = frame.tick.dt
 
         frames = list(self._board.get_frames(self._pose_stage).values())

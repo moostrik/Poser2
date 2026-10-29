@@ -46,18 +46,18 @@ class TestHarmonic(ProjectionLayer):
     according to their individual amplitudes.
     """
 
-    def __init__(self, resolution: int, config: TestHarmonicSettings, board) -> None:
-        super().__init__(resolution, config, board)
-        self._config = config
+    def __init__(self, resolution: int, settings: TestHarmonicSettings, board) -> None:
+        super().__init__(resolution, settings, board)
+        self._settings: TestHarmonicSettings = settings
         # Normalized azimuth per pixel: 0.0 → 1.0 (exclusive)
         self._x: np.ndarray = np.linspace(0.0, 1.0, resolution, endpoint=False, dtype=np.float32)
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         sources = (
-            self._config.source_0,
-            self._config.source_1,
-            self._config.source_2,
-            self._config.source_3,
+            self._settings.source_0,
+            self._settings.source_1,
+            self._settings.source_2,
+            self._settings.source_3,
         )
         for src in sources:
             if not src.enabled:

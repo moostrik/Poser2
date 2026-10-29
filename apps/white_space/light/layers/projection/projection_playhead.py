@@ -23,9 +23,9 @@ from ...frame import Frame
 class ProjectionPlayhead(ProjectionLayer):
     """The marker by itself; see the module docstring."""
 
-    def __init__(self, resolution: int, config: LayerSettings, marker: PlayheadMarkerSettings,
+    def __init__(self, resolution: int, settings: LayerSettings, marker: PlayheadMarkerSettings,
                  mask: MaskSettings, board, pose_stage: int) -> None:
-        super().__init__(resolution, config, board)
+        super().__init__(resolution, settings, board)
         self._marker = marker
         self._mask = mask
         self._pose_stage = pose_stage

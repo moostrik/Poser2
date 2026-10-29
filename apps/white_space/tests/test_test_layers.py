@@ -28,12 +28,12 @@ def runs(levels: np.ndarray) -> list[tuple[int, int]]:
 
 class LinesTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.cfg = TestLinesSettings()
-        self.layer = TestLines(RES, self.cfg, SimpleNamespace())
-        for ch in (self.cfg.white, self.cfg.blue):
+        self.settings = TestLinesSettings()
+        self.layer = TestLines(RES, self.settings, SimpleNamespace())
+        for ch in (self.settings.white, self.settings.blue):
             ch.speed, ch.phase, ch.amount, ch.width, ch.hardness = 0.0, 0.0, 4, 0.25, 1.0
-        self.cfg.white.level = 1.0
-        self.cfg.blue.level = 0.0
+        self.settings.white.level = 1.0
+        self.settings.blue.level = 0.0
 
     def test_hard_lines_are_off_or_full_and_the_width_of_the_interval(self) -> None:
         f = frame()
@@ -46,7 +46,7 @@ class LinesTest(unittest.TestCase):
         self.assertEqual(float(f.blue.sum()), 0.0)                       # blue independent of white
 
     def test_hardness_softens_the_flanks_only(self) -> None:
-        self.cfg.white.hardness = 0.3
+        self.settings.white.hardness = 0.3
         f = frame()
         self.layer.render(f)
         interval = RES // 4
@@ -55,7 +55,7 @@ class LinesTest(unittest.TestCase):
         self.assertTrue(((f.white > 0.0) & (f.white < 1.0)).any())
 
     def test_lines_travel(self) -> None:
-        self.cfg.white.speed = 1.0                                       # adj = speed*amount/10 = 0.4 cycles/s
+        self.settings.white.speed = 1.0                                       # adj = speed*amount/10 = 0.4 cycles/s
         first, later = frame(0.0), frame(0.25)
         self.layer.render(first)
         self.layer.render(later)
@@ -65,36 +65,36 @@ class LinesTest(unittest.TestCase):
 
 class ChaseTest(unittest.TestCase):
     def test_width_half_and_hardness_zero_is_a_sine(self) -> None:
-        cfg = TestChaseSettings()
-        cfg.white.speed, cfg.white.phase, cfg.white.amount = 0.0, 0.0, 3
-        cfg.white.width, cfg.white.hardness, cfg.white.level = 0.5, 0.0, 1.0
-        cfg.blue.level = 0.0
+        settings = TestChaseSettings()
+        settings.white.speed, settings.white.phase, settings.white.amount = 0.0, 0.0, 3
+        settings.white.width, settings.white.hardness, settings.white.level = 0.5, 0.0, 1.0
+        settings.blue.level = 0.0
         f = frame()
-        TestChase(RES, cfg, SimpleNamespace()).render(f)
+        TestChase(RES, settings, SimpleNamespace()).render(f)
         cycle = np.arange(RES) * 3 / RES
         np.testing.assert_allclose(f.white, 0.5 + 0.5 * np.cos(math.tau * cycle), atol=1e-5)
 
     def test_hardness_one_is_a_square(self) -> None:
-        cfg = TestChaseSettings()
-        cfg.white.speed, cfg.white.phase, cfg.white.amount = 0.0, 0.0, 3
-        cfg.white.width, cfg.white.hardness, cfg.white.level = 0.5, 1.0, 1.0
-        cfg.blue.level = 0.0
+        settings = TestChaseSettings()
+        settings.white.speed, settings.white.phase, settings.white.amount = 0.0, 0.0, 3
+        settings.white.width, settings.white.hardness, settings.white.level = 0.5, 1.0, 1.0
+        settings.blue.level = 0.0
         f = frame()
-        TestChase(RES, cfg, SimpleNamespace()).render(f)
+        TestChase(RES, settings, SimpleNamespace()).render(f)
         self.assertEqual(set(np.unique(f.white)), {0.0, 1.0})
         self.assertAlmostEqual(float(f.white.mean()), 0.5, delta=0.02)
 
 
 class PulseTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.cfg = TestPulseSettings()
-        self.cfg.white.speed, self.cfg.white.phase, self.cfg.white.width = 1.0, 0.0, 0.5
-        self.cfg.white.level = 0.8
-        self.cfg.blue.level = 0.0
-        self.layer = TestPulse(RES, self.cfg, SimpleNamespace())
+        self.settings = TestPulseSettings()
+        self.settings.white.speed, self.settings.white.phase, self.settings.white.width = 1.0, 0.0, 0.5
+        self.settings.white.level = 0.8
+        self.settings.blue.level = 0.0
+        self.layer = TestPulse(RES, self.settings, SimpleNamespace())
 
     def test_hard_pulse_strobes_the_whole_ring(self) -> None:
-        self.cfg.white.hardness = 1.0
+        self.settings.white.hardness = 1.0
         on, off = frame(0.0), frame(0.5)
         self.layer.render(on)
         self.layer.render(off)
@@ -103,7 +103,7 @@ class PulseTest(unittest.TestCase):
         self.assertEqual(float(on.blue.sum()), 0.0)
 
     def test_soft_pulse_is_a_sine(self) -> None:
-        self.cfg.white.hardness = 0.0
+        self.settings.white.hardness = 0.0
         f = frame(0.25)                                                  # a quarter cycle: halfway down
         self.layer.render(f)
         np.testing.assert_allclose(f.white, 0.4, atol=1e-5)

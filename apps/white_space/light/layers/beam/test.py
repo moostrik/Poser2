@@ -22,11 +22,11 @@ class BeamTestSettings(LayerSettings):
 class BeamTest(BeamLayer):
     """Direct levels for the four beam lights; see the module docstring."""
 
-    def __init__(self, resolution: int, config: BeamTestSettings, board) -> None:
-        super().__init__(resolution, config, board)
-        self._config = config
+    def __init__(self, resolution: int, settings: BeamTestSettings, board) -> None:
+        super().__init__(resolution, settings, board)
+        self._settings: BeamTestSettings = settings
 
     def _draw(self, frame: Frame, beam_lights: np.ndarray) -> None:
-        P = self._config
+        P = self._settings
         self._add_beam_lights(beam_lights, front_white=P.front_white, back_white=P.back_white,
                              left_blue=P.left_blue, right_blue=P.right_blue)

@@ -212,9 +212,9 @@ class PoseInstrument(ProjectionLayer):
 
     HIT_TICKS = 1                   # a hit is the one tick closest to the crossing
 
-    def __init__(self, resolution: int, config: LayerSettings, instrument: PoseInstrumentSettings, board,
+    def __init__(self, resolution: int, settings: LayerSettings, instrument: PoseInstrumentSettings, board,
                  pose_stage: int) -> None:
-        super().__init__(resolution, config, board)
+        super().__init__(resolution, settings, board)
         self._instrument = instrument
         self._pose_stage = pose_stage
         self._players: dict[int, _Player] = {}

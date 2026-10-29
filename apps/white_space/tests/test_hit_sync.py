@@ -63,12 +63,12 @@ class FakeBoard:
 
 class HitSyncTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.config = HitSyncSettings()
+        self.settings = HitSyncSettings()
         posture = analytics.PostureSimilaritySettings()
         posture.angle_tolerance = 45.0
         self.neutral = NeutralWeightSettings()
         self.board = FakeBoard()
-        self.sync = HitSync(self.config, posture, self.neutral, LightSettings(),
+        self.sync = HitSync(self.settings, posture, self.neutral, LightSettings(),
                             board=self.board, pose_stage=POSE_STAGE)
         self.players = 3
         self.board.frames = {i: FakeFrame() for i in range(self.players)}
@@ -92,8 +92,8 @@ class HitSyncTest(unittest.TestCase):
         streak = self.hit(2, 80.0)
         self.assertEqual(streak.hits, 3)
         self.assertAlmostEqual(streak.distance, 20.0, places=3)       # the largest pair: 60° against 80°
-        self.assertEqual(self.config.hits, 3)
-        self.assertAlmostEqual(self.config.distance, 20.0, places=3)
+        self.assertEqual(self.settings.hits, 3)
+        self.assertAlmostEqual(self.settings.distance, 20.0, places=3)
 
     def test_a_tick_without_a_crossing_keeps_the_streak_and_clears_the_hit_flag(self) -> None:
         self.hit(0)
@@ -174,7 +174,7 @@ class HitSyncTest(unittest.TestCase):
         self.assertEqual(self.hit(2, age=2.0).hits, 2)
 
     def test_at_zero_every_hit_counts(self) -> None:
-        self.config.min_age_seconds = 0.0
+        self.settings.min_age_seconds = 0.0
         self.hit(0, age=math.nan)
         self.assertEqual(self.hit(1, age=0.0).hits, 2)
 

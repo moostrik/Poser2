@@ -46,24 +46,24 @@ def _debug_motor_mode(selection: DebugLayer, layers: dict[LayerId, BaseLayer]) -
 class Conductor(Thread):
     """Runs the light loop at a fixed rate (light_rate Hz); see the module docstring."""
 
-    def __init__(self, config: LightSettings, instrument: PoseInstrumentSettings, board: Board, pose_stage: int) -> None:
+    def __init__(self, settings: LightSettings, instrument: PoseInstrumentSettings, board: Board, pose_stage: int) -> None:
         super().__init__(daemon=True, name="LightConductor")
 
         self._stop_event = Event()
 
-        self._config: LightSettings = config
-        self._board: Board          = board
-        self._motor_controller      = MotorController(config.motor)
-        self._playhead              = Playhead(config.playhead)
-        self._clock                 = Clock(config.clock)
+        self._settings: LightSettings = settings
+        self._board: Board            = board
+        self._motor_controller      = MotorController(settings.motor)
+        self._playhead              = Playhead(settings.playhead)
+        self._clock                 = Clock(settings.clock)
 
-        resolution: int             = config.light_resolution
-        max_players: int            = config.max_players
+        resolution: int             = settings.light_resolution
+        max_players: int            = settings.max_players
 
         # The unified layer pool — one instance per LayerId, each reading its own settings
         # group (beam_layers / projection_layers, mirroring the folder taxonomy); each layer's
         # mode lives in its class (BeamLayer/ProjectionLayer).
-        LO, HI = config.beam_layers, config.projection_layers
+        LO, HI = settings.beam_layers, settings.projection_layers
         self.layers: dict[LayerId, BaseLayer] = {
             LayerId.beam_blue_sound:     BeamBlueSound      (resolution, LO.beam_blue_sound,     board),
             LayerId.beam_playhead:       BeamPlayhead       (resolution, LO.beam_playhead,       board),
@@ -75,7 +75,7 @@ class Conductor(Thread):
             LayerId.projection_playhead: ProjectionPlayhead (resolution, HI.projection_playhead, instrument.playhead, instrument.mask, board, pose_stage),
             LayerId.flood:               Flood              (resolution, HI.flood,               board),
             LayerId.test_player_lines:   TestPlayerLines    (resolution, HI.test_player_lines,   board, pose_stage),
-            LayerId.test_calibration:    TestCalibration    (resolution, HI.test_calibration,    config.num_cams, board),
+            LayerId.test_calibration:    TestCalibration    (resolution, HI.test_calibration,    settings.num_cams, board),
             LayerId.test_fill:           TestFill           (resolution, HI.test_fill,           board),
             LayerId.test_pulse:          TestPulse          (resolution, HI.test_pulse,          board),
             LayerId.test_chase:          TestChase          (resolution, HI.test_chase,          board),
@@ -85,12 +85,12 @@ class Conductor(Thread):
             LayerId.test_harmonic:       TestHarmonic       (resolution, HI.test_harmonic,       board),
         }
 
-        self._compositor = Compositor(config, self.layers)
+        self._compositor = Compositor(settings, self.layers)
         # Nothing in the preset is forced at start; the one saved state that spins the fixture up
         # at power-on is worth a line in the log.
-        if not config.motor.simulate and _debug_motor_mode(config.debug, self.layers) is MotorMode.PROJECTION:
+        if not settings.motor.simulate and _debug_motor_mode(settings.debug, self.layers) is MotorMode.PROJECTION:
             logger.warning("Starting with debug layer %s selected: the fixture spins up to PROJECTION at once",
-                           DebugLayer(int(config.debug)).name)
+                           DebugLayer(int(settings.debug)).name)
 
         self.fps_counter = FpsCounter()
         self._update_callbacks: list[Callable[[], Any]] = []
@@ -153,7 +153,7 @@ class Conductor(Thread):
         # Debug auto-follow: while a debug layer is selected, the motor follows its mode
         # (outranking the machine); OFF relinquishes back to the machine.
         self._motor_controller.set_debug_mode(
-            _debug_motor_mode(self._config.debug, self.layers))
+            _debug_motor_mode(self._settings.debug, self.layers))
 
         # Measure the motor, advance the playhead under the command in force over this dt, and
         # publish the playhead BEFORE the update callbacks: the state machine reads it this tick
@@ -174,11 +174,11 @@ class Conductor(Thread):
         # command as it stands now: the rpm it is sent with is the rpm its content is drawn for.
         command = self._motor_controller.command
 
-        frame = Frame(self._config.light_resolution, tick, motor, command, playhead=playhead)
+        frame = Frame(self._settings.light_resolution, tick, motor, command, playhead=playhead)
         self._compositor.render(frame)
 
         # Main brightness — the projection and the beam lights alike
-        m = self._config.brightness
+        m = self._settings.brightness
         if m != 1.0:
             frame.white      *= m
             frame.blue       *= m

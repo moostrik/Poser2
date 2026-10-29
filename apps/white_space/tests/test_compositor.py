@@ -14,7 +14,7 @@ from apps.white_space.light.layers.compositor import Compositor
 RES = 8
 
 
-def config(**overrides) -> SimpleNamespace:
+def settings(**overrides) -> SimpleNamespace:
     base = dict(light_resolution=RES, debug=DebugLayer.OFF)
     base.update(overrides)
     return SimpleNamespace(**base)
@@ -43,8 +43,8 @@ class CompositorTest(unittest.TestCase):
         self.a = FakeLayer(1.0)
         self.b = FakeLayer(2.0)
         self.layers = {LayerId.beam_playhead: self.a, LayerId.test_pose_waves: self.b}
-        self.cfg = config()
-        self.comp = Compositor(self.cfg, self.layers)
+        self.settings = settings()
+        self.comp = Compositor(self.settings, self.layers)
 
     def test_weighted_blend(self) -> None:
         self.comp.set_mix([(LayerId.beam_playhead, 0.5), (LayerId.test_pose_waves, 0.25)])
@@ -72,7 +72,7 @@ class CompositorTest(unittest.TestCase):
                 frame.white += 1.0
                 frame.blue += 1.0
 
-        comp = Compositor(config(), {LayerId.test_pose_waves: Both(1.0)})
+        comp = Compositor(settings(),{LayerId.test_pose_waves: Both(1.0)})
         comp.set_mix([(LayerId.test_pose_waves, (1.0, 0.25))])   # white hard, blue partial
         f = frame()
         comp.render(f)
@@ -91,7 +91,7 @@ class CompositorTest(unittest.TestCase):
             def render(self, frame: Frame) -> None:
                 frame.white[0] += 1.0
 
-        comp = Compositor(config(), {LayerId.test_pose_waves: Marker(1.0)})
+        comp = Compositor(settings(),{LayerId.test_pose_waves: Marker(1.0)})
         f = frame()
         comp.set_mix([(LayerId.test_pose_waves, 1.0)])
         comp.render(f)
@@ -108,7 +108,7 @@ class CompositorTest(unittest.TestCase):
             def render(self, frame: Frame) -> None:
                 seen.append((frame.motor_command.beam_rpm, frame.playhead))
 
-        comp = Compositor(config(), {LayerId.test_pose_waves: Reader(0.0)})
+        comp = Compositor(settings(),{LayerId.test_pose_waves: Reader(0.0)})
         comp.set_mix([(LayerId.test_pose_waves, 1.0)])
         f = Frame(RES, Tick(0.0, 0.0), motor_command=MotorCommand(mode=MotorMode.PROJECTION, beam_rpm=36.0), playhead=1.5)
         comp.render(f)
@@ -121,7 +121,7 @@ class CompositorTest(unittest.TestCase):
             def render(self, frame: Frame) -> None:
                 frame.sync = 0.8
 
-        comp = Compositor(config(), {LayerId.test_pose_waves: Syncing(0.0), LayerId.beam_playhead: FakeLayer(1.0)})
+        comp = Compositor(settings(),{LayerId.test_pose_waves: Syncing(0.0), LayerId.beam_playhead: FakeLayer(1.0)})
         f = frame()
         comp.set_mix([(LayerId.test_pose_waves, 1.0), (LayerId.beam_playhead, 1.0)])
         comp.render(f)
@@ -137,7 +137,7 @@ class CompositorTest(unittest.TestCase):
 
     def test_debug_override_replaces_state_mix(self) -> None:
         # Selecting a layer IS turning debug on: the select replaces the state's mix solo.
-        self.cfg.debug = DebugLayer.test_pose_waves
+        self.settings.debug = DebugLayer.test_pose_waves
         self.comp.set_mix([(LayerId.beam_playhead, 1.0)])
         f = frame()
         self.comp.render(f)
@@ -150,10 +150,10 @@ class LampMappingTest(unittest.TestCase):
 
     def test_named_lamps_land_on_the_bar_lights(self) -> None:
         from apps.white_space.light.layers.beam.test import BeamTest, BeamTestSettings
-        cfg = BeamTestSettings()
-        cfg.front_white, cfg.back_white = 0.9, 0.6
-        cfg.left_blue, cfg.right_blue = 0.4, 0.2
-        layer = BeamTest(RES, cfg, board=None)
+        settings = BeamTestSettings()
+        settings.front_white, settings.back_white = 0.9, 0.6
+        settings.left_blue, settings.right_blue = 0.4, 0.2
+        layer = BeamTest(RES, settings, board=None)
         f = frame()
         layer.render(f)
         self.assertAlmostEqual(f.beam_lights[BeamLightId.FRONT_WHITE], 0.9, places=6)
@@ -176,7 +176,7 @@ class BeamLightMixTest(unittest.TestCase):
             pass
 
     def test_per_channel_weights(self) -> None:
-        comp = Compositor(config(), {LayerId.beam_test: self.BeamFakeLayer()})
+        comp = Compositor(settings(),{LayerId.beam_test: self.BeamFakeLayer()})
         f = frame()
         comp.set_mix([(LayerId.beam_test, (0.5, 0.2))])
         comp.render(f)
@@ -184,7 +184,7 @@ class BeamLightMixTest(unittest.TestCase):
         self.assertEqual(float(f.light_img.sum()), 0.0)
 
     def test_zero_weight_keeps_beam_lights_dark(self) -> None:
-        comp = Compositor(config(), {LayerId.beam_test: self.BeamFakeLayer()})
+        comp = Compositor(settings(),{LayerId.beam_test: self.BeamFakeLayer()})
         f = frame()
         comp.set_mix([(LayerId.beam_test, 0.0)])
         comp.render(f)

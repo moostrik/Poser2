@@ -40,9 +40,9 @@ class BeamFlash(BeamLayer):
     """Constant base level plus a flash of the ``frames`` ticks closest to each player's crossing,
     read from ``PlayheadOffset``; see the module docstring."""
 
-    def __init__(self, resolution: int, config: BeamFlashSettings, board, pose_stage: int) -> None:
-        super().__init__(resolution, config, board)
-        self._config = config
+    def __init__(self, resolution: int, settings: BeamFlashSettings, board, pose_stage: int) -> None:
+        super().__init__(resolution, settings, board)
+        self._settings: BeamFlashSettings = settings
         self._pose_stage = pose_stage
         self._crossing = PlayheadCrossing()
 
@@ -50,7 +50,7 @@ class BeamFlash(BeamLayer):
         self._crossing.reset()
 
     def _draw(self, frame: Frame, beam_lights: np.ndarray) -> None:
-        P = self._config
+        P = self._settings
         step: float = playhead_step(frame.motor_command.beam_rpm, frame.tick.interval)
         offsets = {pose.track_id: pose[PlayheadOffset].value
                    for pose in self._board.get_frames(self._pose_stage).values()}

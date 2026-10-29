@@ -33,8 +33,8 @@ class NeutralWeightSettings(BaseSettings):
 class NeutralWeight:
     """Weights the pairwise similarity rows by the players' arm deviation; see the module docstring."""
 
-    def __init__(self, config: NeutralWeightSettings) -> None:
-        self._config = config
+    def __init__(self, settings: NeutralWeightSettings) -> None:
+        self._settings = settings
         self._lock = Lock()
         self._deviation: dict[int, float] = {}
         self._callbacks: list[Callable[[analytics.SimilarityResult], None]] = []
@@ -50,7 +50,7 @@ class NeutralWeight:
 
     def process(self, result: analytics.SimilarityResult) -> None:
         """Weight the pairwise rows and emit them (analytics thread)."""
-        if self._config.enabled:
+        if self._settings.enabled:
             result = self._weight(result)
         for callback in self._callbacks:
             callback(result)

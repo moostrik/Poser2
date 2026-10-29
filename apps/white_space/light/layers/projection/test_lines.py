@@ -18,16 +18,16 @@ class TestLines(ProjectionLayer):
     """Bright lines scrolling around the projection: ``amount`` lines per revolution, each ``width``
     of its interval wide, flanks by ``hardness`` (``Oscillator.pulse``)."""
 
-    def __init__(self, resolution: int, config: TestLinesSettings, board) -> None:
-        super().__init__(resolution, config, board)
-        self._config = config
+    def __init__(self, resolution: int, settings: TestLinesSettings, board) -> None:
+        super().__init__(resolution, settings, board)
+        self._settings: TestLinesSettings = settings
         self._indices: np.ndarray = np.arange(resolution, dtype=np.float32)
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         t         = frame.tick.time         # plain seconds; `speed` scales the rate
         res       = self.resolution
-        W         = self._config.white
-        B         = self._config.blue
+        W         = self._settings.white
+        B         = self._settings.blue
 
         adj_w    = W.speed * W.amount / 10.0
         cycle_w  = self._indices * (W.amount / res) - t * adj_w + W.phase    # in cycles: whole numbers at line centres

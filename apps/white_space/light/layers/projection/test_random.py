@@ -47,9 +47,9 @@ class TestRandom(ProjectionLayer):
     Each pixel evolves independently over time - no directional motion.
     """
 
-    def __init__(self, resolution: int, config: TestRandomSettings, board) -> None:
-        super().__init__(resolution, config, board)
-        self._config    = config
+    def __init__(self, resolution: int, settings: TestRandomSettings, board) -> None:
+        super().__init__(resolution, settings, board)
+        self._settings: TestRandomSettings = settings
         self._positions = np.linspace(0.0, 1.0, resolution, endpoint=False, dtype=np.float64)
 
         rng = np.random.default_rng(seed=42)
@@ -60,8 +60,8 @@ class TestRandom(ProjectionLayer):
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         t = frame.tick.time                 # plain seconds; `speed` scales the rate
-        W = self._config.white
-        B = self._config.blue
+        W = self._settings.white
+        B = self._settings.blue
 
         white += self._fbm(self._perm_w, self._vals_w, self._positions,
                            t, W.scale, W.speed, W.octaves,

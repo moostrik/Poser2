@@ -20,13 +20,13 @@ class TestPulse(ProjectionLayer):
     """Pulses the whole projection at a uniform rate per channel: ``speed`` cycles per second, lit
     for ``width`` of every cycle, flanks by ``hardness`` (``Oscillator.pulse``)."""
 
-    def __init__(self, resolution: int, config: TestPulseSettings, board) -> None:
-        super().__init__(resolution, config, board)
-        self._config = config
+    def __init__(self, resolution: int, settings: TestPulseSettings, board) -> None:
+        super().__init__(resolution, settings, board)
+        self._settings: TestPulseSettings = settings
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         t = frame.tick.time                 # plain seconds; `speed` is the rate in Hz
-        W = self._config.white
-        B = self._config.blue
+        W = self._settings.white
+        B = self._settings.blue
         white += Oscillator.pulse(np.asarray(t * W.speed + W.phase), W.width, W.hardness) * W.level
         blue  += Oscillator.pulse(np.asarray(t * B.speed + B.phase), B.width, B.hardness) * B.level

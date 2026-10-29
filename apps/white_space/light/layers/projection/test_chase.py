@@ -20,16 +20,16 @@ class TestChase(ProjectionLayer):
     each ``width`` of its interval wide, flanks by ``hardness`` (``Oscillator.pulse``); width 0.5 and
     hardness 0 is a sine."""
 
-    def __init__(self, resolution: int, config: TestChaseSettings, board) -> None:
-        super().__init__(resolution, config, board)
-        self._config = config
+    def __init__(self, resolution: int, settings: TestChaseSettings, board) -> None:
+        super().__init__(resolution, settings, board)
+        self._settings: TestChaseSettings = settings
         self._indices: np.ndarray = np.arange(resolution, dtype=np.float32)
 
     def _draw(self, frame: Frame, white: np.ndarray, blue: np.ndarray) -> None:
         t         = frame.tick.time         # plain seconds; `speed` scales the rate
         res       = self.resolution
-        W         = self._config.white
-        B         = self._config.blue
+        W         = self._settings.white
+        B         = self._settings.blue
 
         adj_w    = W.speed * W.amount / 10.0
         cycle_w  = self._indices * (W.amount / res) - t * adj_w + W.phase    # in cycles: whole numbers at wave crests

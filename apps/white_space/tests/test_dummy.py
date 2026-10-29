@@ -222,9 +222,9 @@ class DummyTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.path = Path(self.tmp.name) / 'poses.json'
         self.path.write_text(json.dumps({'up': {'left_shoulder': 180.0, 'right_shoulder': 180.0}}), encoding='utf-8')
-        self.cfg = DummySettings()
-        self.cfg.morph = 1.0
-        self.dummy = Dummy(self.cfg, nodes.AngleExtractorSettings(), nodes.AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
+        self.settings = DummySettings()
+        self.settings.morph = 1.0
+        self.dummy = Dummy(self.settings, nodes.AngleExtractorSettings(), nodes.AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
         self.out: list[dict] = []
         self.dummy.add_frames_callback(self.out.append)
 
@@ -234,48 +234,48 @@ class DummyTest(unittest.TestCase):
     # -- the poses --
 
     def test_the_poses_file_fills_the_select(self) -> None:
-        self.assertEqual(self.cfg.poses, ['up'])
+        self.assertEqual(self.settings.poses, ['up'])
 
     def test_the_shipped_poses_are_the_rows_of_the_results_table(self) -> None:
         self.assertEqual(tuple(POSES_FILE), ROWS)
 
     def test_the_dummy_starts_in_the_saved_neutral(self) -> None:
         self.path.write_text(json.dumps({'up': {'left_shoulder': 180.0}, 'neutral': {'left_shoulder': -20.0, 'left_hip': -10.0}}), encoding='utf-8')
-        cfg = DummySettings()
-        cfg.left_shoulder = 90.0                                  # where a preset left it
-        dummy = Dummy(cfg, nodes.AngleExtractorSettings(), nodes.AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
+        settings = DummySettings()
+        settings.left_shoulder = 90.0                                  # where a preset left it
+        dummy = Dummy(settings, nodes.AngleExtractorSettings(), nodes.AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
         out: list[dict] = []
         dummy.add_frames_callback(out.append)
-        self.assertEqual(cfg.pose, 'neutral')
-        self.assertEqual(cfg.left_shoulder, -20.0)
-        self.assertEqual(cfg.left_hip, -10.0)
-        cfg.enabled = True
+        self.assertEqual(settings.pose, 'neutral')
+        self.assertEqual(settings.left_shoulder, -20.0)
+        self.assertEqual(settings.left_hip, -10.0)
+        settings.enabled = True
         dummy.process({})
         points = Dummy.points(Measures(left_shoulder=-20.0, left_hip=-10.0), nodes.AngleExtractorSettings().aspect_ratio)
         np.testing.assert_allclose(out[0][ID][Points2D].values, points.values, atol=1e-6)     # in neutral at once, no morph
 
     def test_picking_a_pose_sets_the_measures(self) -> None:
-        self.cfg.pose = 'up'
-        self.assertEqual(self.cfg.left_shoulder, 180.0)
-        self.assertEqual(self.cfg.right_shoulder, 180.0)
+        self.settings.pose = 'up'
+        self.assertEqual(self.settings.left_shoulder, 180.0)
+        self.assertEqual(self.settings.right_shoulder, 180.0)
 
     def test_picking_a_pose_leaves_the_placement_alone(self) -> None:
         self.path.write_text(json.dumps({'old': {'azimuth': 180.0, 'distance': 0.5, 'left_shoulder': 180.0}}), encoding='utf-8')
-        cfg = DummySettings()
-        Dummy(cfg, nodes.AngleExtractorSettings(), nodes.AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
-        cfg.azimuth, cfg.distance = 90.0, 0.2
-        cfg.pose = 'old'
-        self.assertEqual(cfg.left_shoulder, 180.0)
-        self.assertEqual(cfg.azimuth, 90.0)                       # a pose file's placement keys are ignored
-        self.assertEqual(cfg.distance, 0.2)
+        settings = DummySettings()
+        Dummy(settings, nodes.AngleExtractorSettings(), nodes.AngleCalibratorSettings(), track_id=ID, poses_path=self.path)
+        settings.azimuth, settings.distance = 90.0, 0.2
+        settings.pose = 'old'
+        self.assertEqual(settings.left_shoulder, 180.0)
+        self.assertEqual(settings.azimuth, 90.0)                       # a pose file's placement keys are ignored
+        self.assertEqual(settings.distance, 0.2)
 
     def test_saving_adds_a_pose_to_the_file_and_the_select(self) -> None:
-        self.cfg.left_elbow = 120.0
-        self.cfg.azimuth, self.cfg.distance = 90.0, 0.2
-        self.cfg.name = 'bent'
-        DummySettings.save.fire(self.cfg)
-        self.assertEqual(self.cfg.poses, ['up', 'bent'])
-        self.assertEqual(self.cfg.pose, 'bent')
+        self.settings.left_elbow = 120.0
+        self.settings.azimuth, self.settings.distance = 90.0, 0.2
+        self.settings.name = 'bent'
+        DummySettings.save.fire(self.settings)
+        self.assertEqual(self.settings.poses, ['up', 'bent'])
+        self.assertEqual(self.settings.pose, 'bent')
         saved = json.loads(self.path.read_text(encoding='utf-8'))['bent']
         self.assertEqual(saved['left_elbow'], 120.0)
         self.assertNotIn('azimuth', saved)                        # where the dummy stands is not part of a pose
@@ -285,40 +285,40 @@ class DummyTest(unittest.TestCase):
 
     def test_a_change_morphs_over_the_morph_time(self) -> None:
         self.dummy.update(0.0)
-        self.cfg.left_shoulder = 90.0
+        self.settings.left_shoulder = 90.0
         self.assertAlmostEqual(self.dummy.update(0.0).left_shoulder, 0.0, places=6)      # the change starts a morph
         self.assertAlmostEqual(self.dummy.update(0.5).left_shoulder, 45.0, places=6)     # half way at half time
         self.assertAlmostEqual(self.dummy.update(0.5).left_shoulder, 90.0, places=6)
         self.assertAlmostEqual(self.dummy.update(0.5).left_shoulder, 90.0, places=6)     # and stays
 
     def test_morph_zero_snaps(self) -> None:
-        self.cfg.morph = 0.0
-        self.cfg.left_shoulder = 90.0
+        self.settings.morph = 0.0
+        self.settings.left_shoulder = 90.0
         self.assertEqual(self.dummy.update(0.0).left_shoulder, 90.0)
 
     def test_circular_measures_take_the_shortest_route(self) -> None:
-        self.cfg.morph = 0.0
-        self.cfg.azimuth, self.cfg.left_shoulder = 350.0, 30.0
+        self.settings.morph = 0.0
+        self.settings.azimuth, self.settings.left_shoulder = 350.0, 30.0
         self.dummy.update(0.0)                                           # settled at the start
-        self.cfg.morph = 1.0
-        self.cfg.azimuth, self.cfg.left_shoulder = 10.0, -30.0
+        self.settings.morph = 1.0
+        self.settings.azimuth, self.settings.left_shoulder = 10.0, -30.0
         self.dummy.update(0.0)
         m = self.dummy.update(0.5)
         self.assertAlmostEqual(m.azimuth % 360.0, 0.0, places=6)          # through 0, not 180
         self.assertAlmostEqual(m.left_shoulder % 360.0, 0.0, places=6)    # through 0
 
     def test_the_distance_morphs_in_a_straight_line(self) -> None:
-        self.cfg.morph = 0.0
-        self.cfg.distance = 0.0
+        self.settings.morph = 0.0
+        self.settings.distance = 0.0
         self.dummy.update(0.0)                                           # settled at the start
-        self.cfg.morph = 1.0
-        self.cfg.distance = 1.0
+        self.settings.morph = 1.0
+        self.settings.distance = 1.0
         self.dummy.update(0.0)
         self.assertAlmostEqual(self.dummy.update(0.5).distance, 0.5, places=6)   # not a way round a circle
 
     def test_a_tie_goes_up_through_the_front_on_both_sides(self) -> None:
         self.dummy.update(0.0)
-        self.cfg.left_shoulder = self.cfg.right_shoulder = 180.0
+        self.settings.left_shoulder = self.settings.right_shoulder = 180.0
         self.dummy.update(0.0)
         m = self.dummy.update(0.5)
         self.assertAlmostEqual(m.left_shoulder, 90.0, places=6)
@@ -326,10 +326,10 @@ class DummyTest(unittest.TestCase):
 
     def test_a_change_mid_morph_starts_from_where_it_is(self) -> None:
         self.dummy.update(0.0)
-        self.cfg.left_shoulder = 90.0
+        self.settings.left_shoulder = 90.0
         self.dummy.update(0.0)
         self.dummy.update(0.5)                                           # at 45
-        self.cfg.left_shoulder = 0.0
+        self.settings.left_shoulder = 0.0
         self.assertAlmostEqual(self.dummy.update(0.0).left_shoulder, 45.0, places=6)
         self.assertAlmostEqual(self.dummy.update(1.0).left_shoulder, 0.0, places=6)
 
@@ -341,11 +341,11 @@ class DummyTest(unittest.TestCase):
         self.assertIs(self.out[-1], frames)
 
     def test_enabled_adds_the_dummy_at_its_id(self) -> None:
-        self.cfg.enabled = True
-        self.cfg.morph = 0.0
-        self.cfg.azimuth = 90.0
-        self.cfg.distance = 0.8
-        self.cfg.left_shoulder = 180.0
+        self.settings.enabled = True
+        self.settings.morph = 0.0
+        self.settings.azimuth = 90.0
+        self.settings.distance = 0.8
+        self.settings.left_shoulder = 180.0
         self.dummy.process({0: Frame(0, 0, 0.0)})
         frames = self.out[-1]
         self.assertEqual(set(frames), {0, ID})
@@ -358,23 +358,23 @@ class DummyTest(unittest.TestCase):
         self.assertGreater(abs(float(f[Angles].values[AngleLandmark.left_shoulder])), 0.8 * math.pi)   # raised, at the default calibration
 
     def test_solo_leaves_the_live_players_out(self) -> None:
-        self.cfg.enabled = True
-        self.cfg.solo = True
+        self.settings.enabled = True
+        self.settings.solo = True
         self.dummy.process({0: Frame(0, 0, 0.0)})
         self.assertEqual(set(self.out[-1]), {ID})
 
     def test_solo_without_enabled_passes_the_frames_through(self) -> None:
-        self.cfg.solo = True
+        self.settings.solo = True
         frames = {0: Frame(0, 0, 0.0)}
         self.dummy.process(frames)
         self.assertIs(self.out[-1], frames)
 
     def test_the_lerp_filters_derive_the_rest(self) -> None:
-        self.cfg.enabled = True
-        self.cfg.morph = 0.0
-        self.cfg.torso = 45.0
-        self.cfg.left_hip = self.cfg.right_hip = -60.0
-        self.cfg.left_knee = self.cfg.right_knee = -90.0
+        self.settings.enabled = True
+        self.settings.morph = 0.0
+        self.settings.torso = 45.0
+        self.settings.left_hip = self.settings.right_hip = -60.0
+        self.settings.left_knee = self.settings.right_knee = -90.0
         self.dummy.process({})
         filters = trackers.FilterPipeline([nodes.LegDeviationExtractor(nodes.LegDeviationExtractorSettings()),
                                   nodes.TorsoTiltExtractor(nodes.TorsoTiltExtractorSettings())])

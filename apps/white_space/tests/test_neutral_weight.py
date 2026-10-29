@@ -31,8 +31,8 @@ def _row(**pairs: float) -> Similarity:
 
 class NeutralWeightTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.config = NeutralWeightSettings()
-        self.weight = NeutralWeight(self.config)
+        self.settings = NeutralWeightSettings()
+        self.weight = NeutralWeight(self.settings)
         self.out: list[analytics.SimilarityResult] = []
         self.weight.add_similarity_callback(self.out.append)
         self.result = analytics.SimilarityResult(
@@ -74,7 +74,7 @@ class NeutralWeightTest(unittest.TestCase):
         self.assertAlmostEqual(rows[0][2], 0.8, places=6)
 
     def test_disabled_passes_the_result_through(self) -> None:
-        self.config.enabled = False
+        self.settings.enabled = False
         self._run({0: _frame(0, 0.0), 1: _frame(1, 0.0), 2: _frame(2, 0.0)})
         self.assertIs(self.out[-1], self.result)
 

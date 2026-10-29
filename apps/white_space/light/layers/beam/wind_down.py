@@ -51,23 +51,23 @@ class BeamWindDown(BeamLayer):
     """The two white beam lights at the current fade level — under the sync strobe when built
     with ``strobe``; see the module docstring."""
 
-    def __init__(self, resolution: int, config: BeamWindDownSettings, board,
+    def __init__(self, resolution: int, settings: BeamWindDownSettings, board,
                  strobe: SyncStrobeSettings | None = None) -> None:
-        super().__init__(resolution, config, board)
-        self._config = config
+        super().__init__(resolution, settings, board)
+        self._settings: BeamWindDownSettings = settings
         self._strobe = strobe
         self._elapsed: float = 0.0
 
     def reset(self) -> None:
         self._elapsed = 0.0
-        self._config.progress = 0.0
+        self._settings.progress = 0.0
 
     def _draw(self, frame: Frame, beam_lights: np.ndarray) -> None:
         self._elapsed += frame.tick.dt
-        t = min(self._elapsed / max(self._config.spin_down_seconds, 1e-6), 1.0)
+        t = min(self._elapsed / max(self._settings.spin_down_seconds, 1e-6), 1.0)
         f = 1.0 - pytweening.easeInOutSine(t)
-        self._config.progress = 1.0 - f
-        wall = f * self._config.level
+        self._settings.progress = 1.0 - f
+        wall = f * self._settings.level
         if self._strobe is None:
             self._add_beam_lights(beam_lights, front_white=wall, back_white=wall)
             return

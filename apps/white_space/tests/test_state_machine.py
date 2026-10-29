@@ -45,7 +45,7 @@ class StateMachineTest(unittest.TestCase):
         self._orig_time = machine_module.time
         machine_module.time = SimpleNamespace(time=lambda: self.t)
 
-        self.config = StateMachineSettings()
+        self.settings = StateMachineSettings()
         self.light = LightSettings()
         self.instrument = PoseInstrumentSettings()
         self.board = FakeBoard()
@@ -55,7 +55,7 @@ class StateMachineTest(unittest.TestCase):
         self.emitted: list = []
 
         self.machine = StateMachine(
-            self.config, self.light, self.instrument, board=self.board,
+            self.settings, self.light, self.instrument, board=self.board,
             set_mix=self.mixes.append,
             reset_layers=self.resets.append,
             set_motor=self.motors.append,
@@ -95,10 +95,10 @@ class StateMachineTest(unittest.TestCase):
 
     @property
     def current(self) -> StateId:
-        return StateId(int(self.config.current))
+        return StateId(int(self.settings.current))
 
     def goto(self, state: StateId) -> None:
-        self.config.manual.select = state
+        self.settings.manual.select = state
         self.machine._on_goto(True)
         self.tick()
 
@@ -108,7 +108,7 @@ class StateMachineTest(unittest.TestCase):
         asserted afterwards — IDLE is locked at BEAM."""
         self.board.is_locked = True
         self.tick()                                             # OFF, locked → OFF_IDLE
-        self.tick(dbar=self.config.off_idle_bars + 0.1)         # wake complete → IDLE
+        self.tick(dbar=self.settings.off_idle_bars + 0.1)         # wake complete → IDLE
         self.assertEqual(self.current, StateId.IDLE)
 
     # -- startup ------------------------------------------------------------
@@ -131,14 +131,14 @@ class StateMachineTest(unittest.TestCase):
         self.tick()
         self.assertEqual(self.current, StateId.OFF_IDLE)
         self.assertEqual(self.emitted[-1].stage, int(StateId.OFF_IDLE))
-        self.tick(dbar=self.config.off_idle_bars + 0.1)
+        self.tick(dbar=self.settings.off_idle_bars + 0.1)
         self.assertEqual(self.current, StateId.IDLE)
 
     def test_startup_ignores_persisted_select(self) -> None:
         # Failsafe: a preset saved mid-show (select = PLAY) must never boot into a
         # PROJECTION-motor state — the show always starts in OFF; select is only the goto target.
-        self.config.manual.select = StateId.PLAY
-        self.config.manual.hold = True          # isolate the boot state from conditions
+        self.settings.manual.select = StateId.PLAY
+        self.settings.manual.hold = True          # isolate the boot state from conditions
         self.board.is_locked = True
         self.tick()
         self.assertEqual(self.current, StateId.OFF)
@@ -177,7 +177,7 @@ class StateMachineTest(unittest.TestCase):
         self.set_players(0)
         self.assertEqual(self.current, StateId.INTRO_IDLE)
         self.board.frames = {0: FakeFrame()}
-        self.hit(dbar=self.config.intro_idle_bars / 2.0)    # well inside the fade
+        self.hit(dbar=self.settings.intro_idle_bars / 2.0)    # well inside the fade
         self.assertEqual(self.current, StateId.INTRO)
         for _ in range(5):
             self.tick(dt=0.5)
@@ -191,7 +191,7 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.INTRO_IDLE)
         # Arrived from IDLE_INTRO (already bright): both channels ramp from 1.0 — no dip/blink
         self.assertEqual(self.mixes[-1], [(LayerId.beam_playhead, 1.0), (LayerId.beam_blue_sound, 1.0)])
-        self.tick(dbar=self.config.intro_idle_bars + 0.1)
+        self.tick(dbar=self.settings.intro_idle_bars + 0.1)
         self.assertEqual(self.current, StateId.IDLE)
 
     def _to_intro(self, players: int = 3) -> None:
@@ -209,7 +209,7 @@ class StateMachineTest(unittest.TestCase):
         self.tick()
         self.assertIn([LayerId.pose_instrument], self.resets)
         self.resets.clear()
-        self.tick(dt=self.config.spin_up_seconds + 0.1)   # INTRO_PLAY → PLAY
+        self.tick(dt=self.settings.spin_up_seconds + 0.1)   # INTRO_PLAY → PLAY
         self.assertEqual(self.current, StateId.PLAY)
         self.assertEqual(self.resets, [])                    # PLAY inherits, never resets
 
@@ -230,7 +230,7 @@ class StateMachineTest(unittest.TestCase):
         self.assertLess(blue, 1.0)                            # easing in from projecting
         self.assertNotIn(LayerId.projection_playhead, mix)    # the marker is the instrument's
         self.assertNotIn(LayerId.beam_playhead, mix)
-        self.tick(dt=self.config.spin_up_seconds)
+        self.tick(dt=self.settings.spin_up_seconds)
         self.assertEqual(self.current, StateId.PLAY)
         self.assertEqual(self.mixes[-1], [(LayerId.pose_instrument, 1.0)])
 
@@ -244,7 +244,7 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.END)
         # END advances on bars; with P == 0 it lands in END_IDLE
         for _ in range(4):
-            self.tick(dbar=self.config.end_bars / 3)
+            self.tick(dbar=self.settings.end_bars / 3)
         self.assertEqual(self.current, StateId.END_IDLE)
         self.assertEqual(self.motors[-1], MotorMode.BEAM)
         self.tick(dt=999.0)                            # time alone never exits a spin-down
@@ -263,7 +263,7 @@ class StateMachineTest(unittest.TestCase):
         self._to_play()
         self.set_players(0)
         for _ in range(4):
-            self.tick(dbar=self.config.end_bars / 3)
+            self.tick(dbar=self.settings.end_bars / 3)
         self.assertEqual(self.current, StateId.END_IDLE)
         self.board.frames = {0: FakeFrame()}
         self.hit()
@@ -277,7 +277,7 @@ class StateMachineTest(unittest.TestCase):
         self.set_players(2)
         self.assertEqual(self.current, StateId.END)
         for _ in range(4):
-            self.tick(dbar=self.config.end_bars / 3)
+            self.tick(dbar=self.settings.end_bars / 3)
         self.assertEqual(self.current, StateId.END_INTRO)
         self.board.is_locked = True
         self.light.beam_layers.beam_wind_down.progress = 1.0
@@ -291,7 +291,7 @@ class StateMachineTest(unittest.TestCase):
         self._to_play()
         self.set_players(2)
         for _ in range(4):
-            self.tick(dbar=self.config.end_bars / 3)
+            self.tick(dbar=self.settings.end_bars / 3)
         self.assertEqual(self.current, StateId.END_INTRO)
         self.assertIn([LayerId.beam_wind_down], self.resets)          # fade restarted at the full wall
         self.assertEqual(self.mixes[-1], [(LayerId.beam_wind_down, 1.0), (LayerId.beam_playhead, 0.4)])
@@ -312,7 +312,7 @@ class StateMachineTest(unittest.TestCase):
         self.set_players(0)
         self.assertEqual(self.current, StateId.END)
         for _ in range(4):
-            self.tick(dbar=self.config.end_bars / 3)
+            self.tick(dbar=self.settings.end_bars / 3)
         self.assertEqual(self.current, StateId.END_IDLE)
         self.light.beam_layers.beam_wind_down.progress = 0.25
         self.tick()
@@ -323,12 +323,12 @@ class StateMachineTest(unittest.TestCase):
         self._to_play()
         self.set_players(2)
         self.assertEqual(self.current, StateId.END)
-        self.tick(dbar=self.config.end_bars / 2)   # half-way down
+        self.tick(dbar=self.settings.end_bars / 2)   # half-way down
         self.set_players(3)                    # people return
         self.assertEqual(self.current, StateId.END)   # no jump: winds back first
-        self.tick(dbar=self.config.end_bars / 4)
+        self.tick(dbar=self.settings.end_bars / 4)
         self.assertEqual(self.current, StateId.END)
-        self.tick(dbar=self.config.end_bars)        # ramp reaches 0
+        self.tick(dbar=self.settings.end_bars)        # ramp reaches 0
         self.assertEqual(self.current, StateId.PLAY)
 
     # -- the sync end: PLAY → PLAY_INTRO → INTRO --------------------------------
@@ -338,7 +338,7 @@ class StateMachineTest(unittest.TestCase):
         self._to_play()
         self.set_full_sync(True)
         self.tick()                                                   # the anchor: full sync came on
-        self.tick(dt=self.config.play_full_sync_seconds + 0.1)
+        self.tick(dt=self.settings.play_full_sync_seconds + 0.1)
         self.assertEqual(self.current, StateId.PLAY_INTRO)
 
     def test_full_sync_held_winds_play_down_to_the_intro(self) -> None:
@@ -347,17 +347,17 @@ class StateMachineTest(unittest.TestCase):
         self._to_play()
         self.set_full_sync(True)
         self.tick()
-        self.tick(dt=self.config.play_full_sync_seconds / 2)
+        self.tick(dt=self.settings.play_full_sync_seconds / 2)
         self.assertEqual(self.current, StateId.PLAY)
-        self.tick(dt=self.config.play_full_sync_seconds / 2 + 0.1)
+        self.tick(dt=self.settings.play_full_sync_seconds / 2 + 0.1)
         self.assertEqual(self.current, StateId.PLAY_INTRO)
         self.assertEqual(self.motors[-1], MotorMode.BEAM)
 
     def test_a_break_in_full_sync_drains_the_hold_over_the_release(self) -> None:
         # Hold 20 s, release 5 s: 16 s in sync builds 0.8; a 1 s break drains 0.2; back in sync, 8 s
         # more fill it — the break cost its length times hold/release, not the whole hold.
-        self.config.play_full_sync_seconds = 20.0
-        self.config.play_full_sync_release_seconds = 5.0
+        self.settings.play_full_sync_seconds = 20.0
+        self.settings.play_full_sync_release_seconds = 5.0
         self._to_play()
         self.set_full_sync(True)
         self.tick(dt=16.0)
@@ -372,8 +372,8 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.PLAY_INTRO)
 
     def test_a_break_of_the_whole_release_starts_the_hold_over(self) -> None:
-        self.config.play_full_sync_seconds = 20.0
-        self.config.play_full_sync_release_seconds = 5.0
+        self.settings.play_full_sync_seconds = 20.0
+        self.settings.play_full_sync_release_seconds = 5.0
         self._to_play()
         self.set_full_sync(True)
         self.tick(dt=16.0)
@@ -387,28 +387,28 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.PLAY_INTRO)
 
     def test_a_zero_release_restarts_the_hold_on_any_break(self) -> None:
-        self.config.play_full_sync_release_seconds = 0.0
+        self.settings.play_full_sync_release_seconds = 0.0
         self._to_play()
         self.set_full_sync(True)
-        self.tick(dt=self.config.play_full_sync_seconds * 0.8)
+        self.tick(dt=self.settings.play_full_sync_seconds * 0.8)
         self.set_full_sync(False)
         self.tick()                                                   # one tick out: gone
         self.assertEqual(self.emitted[-1].stage_progress, 0.0)
         self.set_full_sync(True)
-        self.tick(dt=self.config.play_full_sync_seconds * 0.8)
+        self.tick(dt=self.settings.play_full_sync_seconds * 0.8)
         self.assertEqual(self.current, StateId.PLAY)
-        self.tick(dt=self.config.play_full_sync_seconds * 0.2 + 0.1)
+        self.tick(dt=self.settings.play_full_sync_seconds * 0.2 + 0.1)
         self.assertEqual(self.current, StateId.PLAY_INTRO)
 
     def test_plays_progress_is_the_hold(self) -> None:
         self._to_play()
         self.assertEqual(self.emitted[-1].stage_progress, 0.0)
         self.set_full_sync(True)
-        self.tick(dt=self.config.play_full_sync_seconds / 2)
+        self.tick(dt=self.settings.play_full_sync_seconds / 2)
         self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.5, places=6)
 
     def test_a_zero_hold_never_ends_play_on_sync(self) -> None:
-        self.config.play_full_sync_seconds = 0.0
+        self.settings.play_full_sync_seconds = 0.0
         self._to_play()
         self.set_full_sync(True)
         for _ in range(5):
@@ -421,7 +421,7 @@ class StateMachineTest(unittest.TestCase):
         self.set_full_sync(True)
         self.tick()
         self.board.frames = {0: FakeFrame()}
-        self.tick(dt=self.config.play_full_sync_seconds + 0.1)
+        self.tick(dt=self.settings.play_full_sync_seconds + 0.1)
         self.assertEqual(self.current, StateId.END)
 
     def test_play_intro_is_the_wind_down_engine_under_the_strobing_wall(self) -> None:
@@ -467,9 +467,9 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.emitted[-1].stage_progress, 0.0)        # and no grace under way
         self.set_streak(1)
         self.tick()                                                   # the anchor: out of sync from here
-        self.tick(dt=self.config.intro_grace_seconds / 2)
+        self.tick(dt=self.settings.intro_grace_seconds / 2)
         self.assertAlmostEqual(self.emitted[-1].stage_progress, 0.5, places=2)   # the grace shows as progress
-        self.tick(dt=self.config.intro_grace_seconds / 2 + 0.1)
+        self.tick(dt=self.settings.intro_grace_seconds / 2 + 0.1)
         self.assertEqual(self.emitted[-1].stage_progress, 1.0)        # armed
         self.assertEqual(self.current, StateId.INTRO)
         self.set_streak(3)
@@ -480,20 +480,20 @@ class StateMachineTest(unittest.TestCase):
         self._to_intro_after_the_sync_end()
         self.set_streak(1)
         self.tick()
-        self.tick(dt=self.config.intro_grace_seconds * 0.8)
+        self.tick(dt=self.settings.intro_grace_seconds * 0.8)
         self.set_streak(3)                                            # alike again: the grace restarts
         self.tick()
         self.assertEqual(self.current, StateId.INTRO)
         self.assertEqual(self.emitted[-1].stage_progress, 0.0)
         self.set_streak(1)
         self.tick()
-        self.tick(dt=self.config.intro_grace_seconds * 0.8)           # 1.6 × the grace since the first anchor
+        self.tick(dt=self.settings.intro_grace_seconds * 0.8)           # 1.6 × the grace since the first anchor
         self.set_streak(3)
         self.tick()
         self.assertEqual(self.current, StateId.INTRO)                 # still disarmed: the count restarted
 
     def test_a_zero_grace_arms_the_intro_at_once(self) -> None:
-        self.config.intro_grace_seconds = 0.0
+        self.settings.intro_grace_seconds = 0.0
         self._to_intro_after_the_sync_end()
         self.assertEqual(self.emitted[-1].stage_progress, 1.0)
         self.set_streak(3)
@@ -506,7 +506,7 @@ class StateMachineTest(unittest.TestCase):
         self._to_play()
         self.set_players(2)
         for _ in range(4):
-            self.tick(dbar=self.config.end_bars / 3)
+            self.tick(dbar=self.settings.end_bars / 3)
         self.assertEqual(self.current, StateId.END_INTRO)
         self.board.is_locked = True
         self.light.beam_layers.beam_wind_down.progress = 1.0
@@ -519,39 +519,39 @@ class StateMachineTest(unittest.TestCase):
     # -- session mode ---------------------------------------------------------
 
     def test_session_intro_timeout(self) -> None:
-        self.config.session.enabled = True
+        self.settings.session.enabled = True
         self._to_intro(players=1)
-        self.tick(dt=self.config.session.intro_seconds + 1.0)
+        self.tick(dt=self.settings.session.intro_seconds + 1.0)
         self.assertEqual(self.current, StateId.INTRO_PLAY)
 
     def test_session_empty_room_never_spins_up(self) -> None:
-        self.config.session.enabled = True
+        self.settings.session.enabled = True
         self._to_intro(players=1)
         self.set_players(0)
-        self.tick(dt=self.config.session.intro_seconds + 1.0)
+        self.tick(dt=self.settings.session.intro_seconds + 1.0)
         self.assertNotEqual(self.current, StateId.INTRO_PLAY)
 
     def test_session_play_timeout_and_end_only_winds_down(self) -> None:
-        self.config.session.enabled = True
+        self.settings.session.enabled = True
         self._to_play()
         self.assertEqual(self.current, StateId.PLAY)   # P == 3: no natural end
-        self.tick(dt=self.config.session.play_seconds + 1.0)
+        self.tick(dt=self.settings.session.play_seconds + 1.0)
         self.assertEqual(self.current, StateId.END)
         for _ in range(4):                                # P ≥ 3, but session: no wind-back
-            self.tick(dbar=self.config.end_bars / 3)
+            self.tick(dbar=self.settings.end_bars / 3)
         self.assertEqual(self.current, StateId.END_INTRO)
 
     def test_session_play_ignores_the_count(self) -> None:
         # A small session that timed out into the spin-up gets its full PLAY: only play_seconds ends it.
-        self.config.session.enabled = True
+        self.settings.session.enabled = True
         self._to_intro(players=1)
-        self.tick(dt=self.config.session.intro_seconds + 1.0)
+        self.tick(dt=self.settings.session.intro_seconds + 1.0)
         self.assertEqual(self.current, StateId.INTRO_PLAY)
-        self.tick(dt=self.config.spin_up_seconds + 0.1)
+        self.tick(dt=self.settings.spin_up_seconds + 0.1)
         self.assertEqual(self.current, StateId.PLAY)
-        self.tick(dt=self.config.session.play_seconds / 2)
+        self.tick(dt=self.settings.session.play_seconds / 2)
         self.assertEqual(self.current, StateId.PLAY)       # P == 1 does not end a session
-        self.tick(dt=self.config.session.play_seconds)
+        self.tick(dt=self.settings.session.play_seconds)
         self.assertEqual(self.current, StateId.END)
 
     # -- dev controls ----------------------------------------------------------
@@ -561,7 +561,7 @@ class StateMachineTest(unittest.TestCase):
         # /global/state 0), and OFF stays put while pinned. Dark and silent, but the
         # rotor keeps sweeping at BEAM so the playhead never unlocks.
         self._to_play()
-        self.config.blackout = True
+        self.settings.blackout = True
         self.tick()
         self.assertEqual(self.current, StateId.OFF)
         self.assertEqual(self.motors[-1], MotorMode.BEAM)      # still sweeping — no re-acquire
@@ -572,7 +572,7 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.OFF)
 
     def _to_off(self) -> None:
-        self.config.blackout = True
+        self.settings.blackout = True
         self.tick()
         self.assertEqual(self.current, StateId.OFF)
 
@@ -582,11 +582,11 @@ class StateMachineTest(unittest.TestCase):
         self._to_play()                                       # 3 players present
         self._to_off()
         self.board.is_locked = True                              # spun down to BEAM and re-locked
-        self.config.blackout = False
+        self.settings.blackout = False
         self.tick()
         self.assertEqual(self.current, StateId.OFF_IDLE)
         self.assertEqual(self.motors[-1], MotorMode.BEAM)
-        self.tick(dbar=self.config.off_idle_bars + 0.1)
+        self.tick(dbar=self.settings.off_idle_bars + 0.1)
         self.assertEqual(self.current, StateId.IDLE)
 
     def test_released_blackout_waits_for_the_lock(self) -> None:
@@ -595,7 +595,7 @@ class StateMachineTest(unittest.TestCase):
         self.boot()
         self._to_off()
         self.board.is_locked = False                             # e.g. a silent sensor
-        self.config.blackout = False
+        self.settings.blackout = False
         self.tick(dt=999.0, dbar=50.0)
         self.assertEqual(self.current, StateId.OFF)           # held dark
         self.board.is_locked = True
@@ -605,11 +605,11 @@ class StateMachineTest(unittest.TestCase):
     def test_wake_ramps_up_from_dark(self) -> None:
         self.boot()
         self._to_off()
-        self.config.blackout = False
+        self.settings.blackout = False
         self.tick()                                           # entered the wake at p ≈ 0
         for layer, weight in self.mixes[-1]:
             self.assertAlmostEqual(weight, 0.0, places=6)     # still dark on entry
-        self.tick(dbar=self.config.off_idle_bars / 2)
+        self.tick(dbar=self.settings.off_idle_bars / 2)
         mix = dict(self.mixes[-1])
         self.assertGreater(mix[LayerId.beam_playhead], 0.0)    # searchlight fading up
         self.assertLess(mix[LayerId.beam_playhead], 1.0)
@@ -619,35 +619,35 @@ class StateMachineTest(unittest.TestCase):
         self.boot()
         self.set_players(1)
         self._to_off()
-        self.config.blackout = False
+        self.settings.blackout = False
         self.tick()
         self.assertEqual(self.current, StateId.OFF_IDLE)
-        self.tick(dbar=self.config.off_idle_bars / 4)
+        self.tick(dbar=self.settings.off_idle_bars / 4)
         self.assertEqual(self.current, StateId.OFF_IDLE)
-        self.hit(dbar=self.config.off_idle_bars / 4)          # swept mid-fade → the intro begins
+        self.hit(dbar=self.settings.off_idle_bars / 4)          # swept mid-fade → the intro begins
         self.assertEqual(self.current, StateId.INTRO)
 
     def test_repinning_mid_wake_snaps_back_to_off(self) -> None:
         self.boot()
         self._to_off()
-        self.config.blackout = False
+        self.settings.blackout = False
         self.tick()
         self.assertEqual(self.current, StateId.OFF_IDLE)
-        self.config.blackout = True
+        self.settings.blackout = True
         self.tick()
         self.assertEqual(self.current, StateId.OFF)
         self.assertEqual(self.mixes[-1], [])
 
     def test_blackout_entry_beats_hold_exit_is_a_normal_condition(self) -> None:
         self.boot()
-        self.config.manual.hold = True
-        self.config.blackout = True
+        self.settings.manual.hold = True
+        self.settings.blackout = True
         self.tick()
         self.assertEqual(self.current, StateId.OFF)           # entry wins over hold
-        self.config.blackout = False
+        self.settings.blackout = False
         self.tick()
         self.assertEqual(self.current, StateId.OFF)           # exit is condition-driven → held
-        self.config.manual.hold = False
+        self.settings.manual.hold = False
         self.tick()
         self.assertEqual(self.current, StateId.OFF_IDLE)      # released → normal exit
 
@@ -655,30 +655,30 @@ class StateMachineTest(unittest.TestCase):
         # OFF is a state like any other: goto + hold parks it dark; without hold its own
         # exit condition (blackout unpinned) fires immediately, like any bouncing goto.
         self.boot()
-        self.config.manual.hold = True
+        self.settings.manual.hold = True
         self.goto(StateId.OFF)
         self.assertEqual(self.current, StateId.OFF)
         self.assertEqual(self.motors[-1], MotorMode.BEAM)
-        self.config.manual.hold = False
+        self.settings.manual.hold = False
         self.tick()
         self.assertEqual(self.current, StateId.OFF_IDLE)      # unpinned → wakes right out
 
     def test_a_saved_blackout_comes_back_pinned(self) -> None:
         # Nothing in the preset is forced at start: saved with blackout pinned, the machine boots
         # into OFF and stays there past the lock, dark at BEAM, until the pin is released.
-        self.config.blackout = True
+        self.settings.blackout = True
         self.board.is_locked = True
         self.tick()
         self.tick(dt=999.0, dbar=50.0)
         self.assertEqual(self.current, StateId.OFF)
         self.assertEqual(self.motors, [MotorMode.BEAM])
-        self.config.blackout = False
+        self.settings.blackout = False
         self.tick()
         self.assertEqual(self.current, StateId.OFF_IDLE)
 
     def test_goto_jumps_and_commands_motor(self) -> None:
         self.boot()
-        self.config.manual.hold = True          # park on the state (goto + hold workflow)
+        self.settings.manual.hold = True          # park on the state (goto + hold workflow)
         self.goto(StateId.PLAY)
         self.assertEqual(self.current, StateId.PLAY)
         self.assertEqual(self.motors[-1], MotorMode.PROJECTION)
@@ -690,22 +690,22 @@ class StateMachineTest(unittest.TestCase):
 
     def test_hold_freezes_transitions(self) -> None:
         self.boot()
-        self.config.manual.hold = True
+        self.settings.manual.hold = True
         self.set_players(2)
         self.assertEqual(self.current, StateId.IDLE)
-        self.config.manual.hold = False
+        self.settings.manual.hold = False
         self.tick()
         self.assertEqual(self.current, StateId.IDLE_INTRO)
 
     def test_a_saved_hold_comes_back_held(self) -> None:
         # Nothing in the preset is forced at start: saved mid-hold, the machine boots into OFF and
         # the hold keeps it there past the lock, until it is released.
-        self.config.manual.hold = True
+        self.settings.manual.hold = True
         self.board.is_locked = True
         self.tick()
         self.tick(dt=999.0, dbar=50.0)
         self.assertEqual(self.current, StateId.OFF)
-        self.config.manual.hold = False
+        self.settings.manual.hold = False
         self.tick()
         self.assertEqual(self.current, StateId.OFF_IDLE)
 
@@ -722,7 +722,7 @@ class StateMachineTest(unittest.TestCase):
 
     def test_alike_hits_without_enough_players_present_hold_intro(self) -> None:
         # A streak can only be as long as the players in the room, but the presence gate is its own condition.
-        self.config.min_players = 3
+        self.settings.min_players = 3
         self._to_intro(players=2)
         self.set_streak(3)
         self.tick()
@@ -731,19 +731,19 @@ class StateMachineTest(unittest.TestCase):
     def test_min_players_of_two_runs_a_two_person_show(self) -> None:
         # The min_players is the show's size: two alike hits spin up, PLAY holds with two, and END
         # winds back to PLAY once two are back.
-        self.config.min_players = 2
+        self.settings.min_players = 2
         self._to_intro(players=2)
         self.set_streak(2)
         self.tick()
         self.assertEqual(self.current, StateId.INTRO_PLAY)
-        self.tick(dt=self.config.spin_up_seconds + 0.1)
+        self.tick(dt=self.settings.spin_up_seconds + 0.1)
         self.assertEqual(self.current, StateId.PLAY)
         self.board.is_locked = False
         self.set_players(1)
         self.assertEqual(self.current, StateId.END)
-        self.tick(dbar=self.config.end_bars / 2)
+        self.tick(dbar=self.settings.end_bars / 2)
         self.set_players(2)
-        self.tick(dbar=self.config.end_bars)
+        self.tick(dbar=self.settings.end_bars)
         self.assertEqual(self.current, StateId.PLAY)
 
     def test_default_min_players_needs_three_people(self) -> None:
@@ -767,7 +767,7 @@ class StateMachineTest(unittest.TestCase):
         self.assertEqual(self.current, StateId.INTRO_PLAY)
 
     def test_dim_level_is_the_intro_line(self) -> None:
-        self.config.dim_level = 0.25
+        self.settings.dim_level = 0.25
         self._to_intro(players=1)
         self.assertEqual(dict(self.mixes[-1])[LayerId.beam_playhead], 0.25)
 

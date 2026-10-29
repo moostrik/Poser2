@@ -36,9 +36,9 @@ class BeamLightSimulationBoard(HasCompositionOutput, HasFlashes, Protocol):
 
 class BeamLightSimulationLayer(layers.LayerBase):
 
-    def __init__(self, board: BeamLightSimulationBoard, config: BeamLightSimSettings) -> None:
+    def __init__(self, board: BeamLightSimulationBoard, settings: BeamLightSimSettings) -> None:
         self.board: BeamLightSimulationBoard = board
-        self._config: BeamLightSimSettings = config
+        self._settings: BeamLightSimSettings = settings
         self.fbo_angles: Fbo = Fbo()
         self.image: Image = Image()
         self._shader: LightSimulation = LightSimulation()
@@ -69,9 +69,9 @@ class BeamLightSimulationLayer(layers.LayerBase):
 
         if self._projection is None or self._projection.shape != output.light_img.shape:
             self._projection = np.zeros(output.light_img.shape, dtype=BUFFER_DTYPE)
-        width, blur = math.radians(self._config.width), math.radians(self._config.blur)
+        width, blur = math.radians(self._settings.width), math.radians(self._settings.blur)
         project_beam_lights(output.beam_lights, self._heading, width, blur, self._projection)
-        paint_flashes(self.board.get_flashes(), monotonic(), self._config.flash_seconds, width, blur,
+        paint_flashes(self.board.get_flashes(), monotonic(), self._settings.flash_seconds, width, blur,
                       self._projection)
 
         self.image.set_image(self._projection)

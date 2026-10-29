@@ -483,11 +483,11 @@ class DebugOverrideTest(unittest.TestCase):
         # after construction (a projection layer with a real motor is warned about in the log).
         from apps.white_space.light import Conductor, DebugLayer, LightSettings, PoseInstrumentSettings
         from apps.white_space.board import Board
-        cfg = LightSettings()
-        cfg.debug = DebugLayer.test_pose_waves
+        settings = LightSettings()
+        settings.debug = DebugLayer.test_pose_waves
         with self.assertLogs("apps.white_space.light.conductor", level="WARNING"):
-            Conductor(cfg, PoseInstrumentSettings(), Board(), pose_stage=4)
-        self.assertEqual(DebugLayer(int(cfg.debug)), DebugLayer.test_pose_waves)
+            Conductor(settings, PoseInstrumentSettings(), Board(), pose_stage=4)
+        self.assertEqual(DebugLayer(int(settings.debug)), DebugLayer.test_pose_waves)
 
 
 class BarsTest(unittest.TestCase):

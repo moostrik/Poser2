@@ -32,10 +32,10 @@ class PlayheadBoard(SimpleNamespace):
 class ProjectionPlayheadTest(unittest.TestCase):
     def setUp(self) -> None:
         self.instrument = PoseInstrumentSettings()
-        self.cfg = self.instrument.playhead
-        self.cfg.width = 1.0                                   # 10 px
+        self.settings = self.instrument.playhead
+        self.settings.width = 1.0                                   # 10 px
         self.board = PlayheadBoard(frames={})
-        self.layer = ProjectionPlayhead(RES, LayerSettings(), self.cfg, self.instrument.mask, self.board, pose_stage=4)
+        self.layer = ProjectionPlayhead(RES, LayerSettings(), self.settings, self.instrument.mask, self.board, pose_stage=4)
 
     def _render(self, playhead_pos: float) -> Frame:
         f = Frame(RES, Tick(0.0, 1 / 30), playhead=playhead_pos * math.tau)
@@ -46,12 +46,12 @@ class ProjectionPlayheadTest(unittest.TestCase):
         self.board.frames = {0: FakePose(0.5)}
         f = self._render(0.25)
         centre = RES // 4
-        np.testing.assert_array_equal(f.white[centre - 5:centre + 5], self.cfg.white)
-        self.assertEqual(float(f.white.sum()), 10 * self.cfg.white)
+        np.testing.assert_array_equal(f.white[centre - 5:centre + 5], self.settings.white)
+        self.assertEqual(float(f.white.sum()), 10 * self.settings.white)
         self.assertEqual(float(f.blue.sum()), 0.0)
 
     def test_the_marker_has_a_blue_level_too(self) -> None:
-        self.cfg.blue = 0.4
+        self.settings.blue = 0.4
         f = self._render(0.25)
         centre = RES // 4
         np.testing.assert_allclose(f.blue[centre - 5:centre + 5], 0.4)
@@ -61,27 +61,27 @@ class ProjectionPlayheadTest(unittest.TestCase):
         self.board.frames = {0: FakePose(0.5)}
         f = self._render(0.5)
         centre = RES // 2
-        np.testing.assert_allclose(f.white[centre - 5:centre + 5], self.cfg.white * self.cfg.at_mask)
+        np.testing.assert_allclose(f.white[centre - 5:centre + 5], self.settings.white * self.settings.at_mask)
 
     def test_the_marker_dims_pixel_by_pixel_at_the_mask_edge(self) -> None:
         # The default mask is 3°: 15 px each side of the person.
         self.board.frames = {0: FakePose(0.5)}
         f = self._render(0.5 + 15 / RES)                       # the marker straddles the mask's edge
         centre = RES // 2 + 15
-        dim = self.cfg.white * self.cfg.at_mask
+        dim = self.settings.white * self.settings.at_mask
         np.testing.assert_allclose(f.white[centre - 5:centre + 1], dim)
-        np.testing.assert_allclose(f.white[centre + 1:centre + 5], self.cfg.white)
+        np.testing.assert_allclose(f.white[centre + 1:centre + 5], self.settings.white)
 
     def test_the_mask_follows_its_width(self) -> None:
         self.instrument.mask.width = 6.0                       # 30 px each side
         self.board.frames = {0: FakePose(0.5)}
         f = self._render(0.5 + 25 / RES)
-        np.testing.assert_allclose(f.white[RES // 2 + 20:RES // 2 + 30], self.cfg.white * self.cfg.at_mask)
+        np.testing.assert_allclose(f.white[RES // 2 + 20:RES // 2 + 30], self.settings.white * self.settings.at_mask)
 
     def test_a_pose_without_an_azimuth_has_no_mask(self) -> None:
         self.board.frames = {0: FakePose(float("nan"))}
         f = self._render(0.5)
-        np.testing.assert_array_equal(f.white[RES // 2 - 5:RES // 2 + 5], self.cfg.white)
+        np.testing.assert_array_equal(f.white[RES // 2 - 5:RES // 2 + 5], self.settings.white)
 
     def test_no_playhead_draws_nothing(self) -> None:
         f = self._render(float("nan"))

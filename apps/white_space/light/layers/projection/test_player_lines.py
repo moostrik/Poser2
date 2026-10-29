@@ -46,9 +46,9 @@ class _PlayerState:
 class TestPlayerLines(ProjectionLayer):
     """Draws a centre line + two flanking lines for each tracked player."""
 
-    def __init__(self, resolution: int, config: TestPlayerLinesSettings, board: Board, pose_stage: int) -> None:
-        super().__init__(resolution, config, board)
-        self._config = config
+    def __init__(self, resolution: int, settings: TestPlayerLinesSettings, board: Board, pose_stage: int) -> None:
+        super().__init__(resolution, settings, board)
+        self._settings: TestPlayerLinesSettings = settings
         self._pose_stage = pose_stage
         self._states: dict[int, _PlayerState] = {}
         self._flank_buf: np.ndarray = np.zeros(resolution, dtype=np.float32)
@@ -83,7 +83,7 @@ class TestPlayerLines(ProjectionLayer):
         frames = list(self._board.get_frames(self._pose_stage).values())
         self._update_states(frames)
 
-        P = self._config
+        P = self._settings
         depth_scale:   float = P.depth_scale
         level_center:  float = P.level_center
         level_flank:   float = P.level_flank

@@ -21,11 +21,11 @@ def _frame() -> Frame:
 class LowLayerWritesTest(unittest.TestCase):
 
     def test_named_writes_land_on_the_bar_lights_and_nowhere_else(self) -> None:
-        cfg = BeamTestSettings()
-        cfg.front_white, cfg.back_white = 0.1, 0.2
-        cfg.left_blue,   cfg.right_blue = 0.3, 0.4
+        settings = BeamTestSettings()
+        settings.front_white, settings.back_white = 0.1, 0.2
+        settings.left_blue,   settings.right_blue = 0.3, 0.4
         f = _frame()
-        BeamTest(R, cfg, board=None).render(f)
+        BeamTest(R, settings, board=None).render(f)
         np.testing.assert_allclose(f.beam_lights, [0.1, 0.2, 0.3, 0.4], rtol=1e-6)
         self.assertEqual(float(f.light_img.sum()), 0.0)
 

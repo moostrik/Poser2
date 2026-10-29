@@ -65,13 +65,13 @@ class StateMachine:
     ``conductor.add_update_callback`` — everything runs on the light thread and every input is
     read from the board there, so composing needs no locking."""
 
-    def __init__(self, config: StateMachineSettings, light: LightSettings, instrument: PoseInstrumentSettings,
+    def __init__(self, settings: StateMachineSettings, light: LightSettings, instrument: PoseInstrumentSettings,
                  board: Board,
                  set_mix: Callable[[Mix], None],
                  reset_layers: Callable[[list[LayerId]], None],
                  set_motor: Callable[[MotorMode | None], None],
                  pose_stage: int) -> None:
-        self._config = config
+        self._settings = settings
         self._light = light
         self._instrument = instrument
         self._board = board
@@ -81,7 +81,7 @@ class StateMachine:
         self._pose_stage = pose_stage
 
         from .states import StateBase, STATES   # local import: states.py imports from this module
-        self._states = {s: cls(config, light, reset_layers) for s, cls in STATES.items()}
+        self._states = {s: cls(settings, light, reset_layers) for s, cls in STATES.items()}
         # The show always starts in OFF (dark, motor BEAM) and wakes through OFF_IDLE once the
         # playhead has locked. `manual.select` is only the goto target, entered on `goto`, never
         # at start. Nothing in the preset is forced: a saved hold or blackout comes back as saved.
@@ -103,13 +103,13 @@ class StateMachine:
         self._streak: HitStreak = HitStreak()       # this tick's hit and hit streak, from the board
 
         self._goto_requested: bool = False
-        config.manual.bind(ManualSettings.goto, self._on_goto)
+        settings.manual.bind(ManualSettings.goto, self._on_goto)
 
     # -- Lifecycle -----------------------------------------------------------
 
     def stop(self) -> None:
         """Teardown — unbind the settings callbacks (no thread of its own)."""
-        self._config.manual.unbind(ManualSettings.goto, self._on_goto)
+        self._settings.manual.unbind(ManualSettings.goto, self._on_goto)
 
     # -- Settings callbacks --------------------------------------------------
 
@@ -130,8 +130,8 @@ class StateMachine:
             sync_hits=self._streak.hits,
             hit=hit,
             full_sync=self._instrument.full_sync,
-            session=self._config.session.enabled,
-            blackout=self._config.blackout,
+            session=self._settings.session.enabled,
+            blackout=self._settings.blackout,
             prev=self._prev_state,
             is_playhead_locked=signals.is_locked,
             is_projecting=signals.is_projecting,
@@ -157,7 +157,7 @@ class StateMachine:
             # wakes through OFF_IDLE by itself once the playhead locks.
             self._goto_requested = False
             self._switch(StateId.OFF, now, dt, signals.bars, players, hit, signals)
-        elif self._config.blackout and self._current != StateId.OFF:
+        elif self._settings.blackout and self._current != StateId.OFF:
             # Pinning blackout is OFF's entry door: highest-priority input, from anywhere,
             # beating hold and goto. Leaving OFF is a normal condition — OffState wakes
             # through OFF_IDLE once the toggle is released and the playhead lock holds.
@@ -165,13 +165,13 @@ class StateMachine:
             self._switch(StateId.OFF, now, dt, signals.bars, players, hit, signals)
         elif self._goto_requested:
             self._goto_requested = False
-            self._switch(StateId(int(self._config.manual.select)), now, dt, signals.bars, players, hit, signals)
+            self._switch(StateId(int(self._settings.manual.select)), now, dt, signals.bars, players, hit, signals)
 
         ctx = self._build_context(now, dt, signals, players, hit)
         entries = self._active.update(ctx)
         self._set_mix(entries)
 
-        if not self._config.manual.hold:
+        if not self._settings.manual.hold:
             nxt = self._active.needs_state_change(ctx)
             if nxt is not None:
                 self._switch(nxt, now, dt, signals.bars, players, hit, signals)
@@ -182,8 +182,8 @@ class StateMachine:
         self._prev_bars = signals.bars
 
         p = self._active.progress(ctx)
-        self._config.progress = p
-        self._config.players = players
+        self._settings.progress = p
+        self._settings.players = players
         self._notify_state(SequencerState(
             stage=int(self._current),                       # wire-format naming (see module doc)
             stage_progress=p,
@@ -208,7 +208,7 @@ class StateMachine:
         self._prev_bars = bars_now
         self._active = self._states[target]
         self._set_motor(self._active.MOTOR)
-        self._config.current = target
+        self._settings.current = target
         self._active.enter(self._build_context(now, dt, signals, players, hit))
 
     # -- State callbacks (Sequencer-compatible) --------------------------------
@@ -218,8 +218,8 @@ class StateMachine:
             self._state_callbacks.append(callback)
         callback(SequencerState(
             stage=int(self._current),
-            stage_progress=self._config.progress,
-            progress=(int(self._current) + self._config.progress) / len(StateId),
+            stage_progress=self._settings.progress,
+            progress=(int(self._current) + self._settings.progress) / len(StateId),
             elapsed=0.0,
             active=True,           # wire-format legacy field; nothing consumes it
         ))

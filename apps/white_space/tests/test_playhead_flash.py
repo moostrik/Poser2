@@ -43,9 +43,9 @@ class FlashTest(unittest.TestCase):
     INTERVAL = 1.0 / 30.0
 
     def setUp(self) -> None:
-        self.cfg = BeamFlashSettings()
+        self.settings = BeamFlashSettings()
         self.board = FlashBoard(frames={}, flashes=[])
-        self.layer = BeamFlash(RES, self.cfg, self.board, pose_stage=4)
+        self.layer = BeamFlash(RES, self.settings, self.board, pose_stage=4)
 
     def _render(self, pose, playhead: float = 1.0) -> Frame:
         self.board.frames = {} if pose is None else {pose.track_id: pose}
@@ -64,11 +64,11 @@ class FlashTest(unittest.TestCase):
         self.assertEqual(self._sweep(*self.STEADY), [0.0, 0.0, 0.0, 1.0, 0.0, 0.0])
 
     def test_two_frames_straddle_the_crossing(self) -> None:
-        self.cfg.frames = 2
+        self.settings.frames = 2
         self.assertEqual(self._sweep(*self.STEADY), [0.0, 0.0, 0.0, 1.0, 1.0, 0.0])
 
     def test_three_frames_are_the_closest_and_both_neighbours(self) -> None:
-        self.cfg.frames = 3
+        self.settings.frames = 3
         self.assertEqual(self._sweep(*self.STEADY), [0.0, 0.0, 1.0, 1.0, 1.0, 0.0])
 
     def test_a_phase_the_old_window_lit_twice_is_one_frame(self) -> None:
@@ -92,11 +92,11 @@ class FlashTest(unittest.TestCase):
         self.assertEqual(self._sweep(1.8), [1.0])
 
     def test_flash_is_full_brightness(self) -> None:
-        self.cfg.white = 0.7
+        self.settings.white = 0.7
         self.assertAlmostEqual(self._sweep(0.0)[0], 0.7, places=6)
 
     def test_away_from_the_crossing_stays_at_base(self) -> None:
-        self.cfg.base_white = 0.2
+        self.settings.base_white = 0.2
         self.assertAlmostEqual(self._sweep(90.0)[0], 0.2, places=6)
 
     def test_nan_offset_never_flashes(self) -> None:
@@ -108,7 +108,7 @@ class FlashTest(unittest.TestCase):
         self.assertEqual(float(self._render(None).beam_lights[BeamLightId.FRONT_WHITE]), 0.0)
 
     def test_each_lit_tick_posts_a_flash_at_the_playhead(self) -> None:
-        self.cfg.frames = 2
+        self.settings.frames = 2
         for deg in self.STEADY:
             self._render(FlashPose(0, deg), playhead=1.25)
         self.assertEqual(self.board.flashes, [(1.25, 1.0, 0.0), (1.25, 1.0, 0.0)])
