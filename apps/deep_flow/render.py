@@ -5,7 +5,7 @@ from typing import cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId, WindowSettings
+from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId, WindowSettings
 from modules.camera import RigCameraSettings, CameraCheckSettings
 from modules.render import layers as ls, make_subdivision, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
@@ -42,6 +42,19 @@ LARGE_LAYERS: list[Layers] = [
     Layers.fluid3d,
     Layers.composite,
 ]
+
+OUTPUT_WIDTH: int = 1080
+OUTPUT_HEIGHT: int = 1920
+
+# The layers that are not output-shaped, each with the layer whose texture holds its shape
+SHAPE_LAYERS: dict[Layers, Layers] = {
+    Layers.cam_image:      Layers.cam_image,
+    Layers.cam_mask:       Layers.cam_mask,
+    Layers.cam_foreground: Layers.cam_foreground,
+    Layers.cam_crop:       Layers.cam_crop,
+    Layers.tracker:        Layers.cam_image,  # camera stretched into a panel-sized FBO
+    Layers.pose:           Layers.cam_crop,   # crop stretched into a panel-sized FBO
+}
 
 
 class DeepFlowRender(RenderBase):
@@ -101,9 +114,9 @@ class DeepFlowRender(RenderBase):
 
         # Split-view composition: left panel + right panel side by side
         self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name='panels', columns=2, rows=1, src_aspect_ratio=9.0/16.0, padding=Point2f(1.0, 1.0)),
+            SubdivisionRow(name='panels', columns=2, rows=1, src_aspect_ratio=OUTPUT_WIDTH / OUTPUT_HEIGHT, padding=Point2f(1.0, 1.0)),
         ]
-        self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, False)
+        self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, True)
 
         # Propagate window fps to fluid simulation settings
         def _propagate_fps(fps: int) -> None:
@@ -121,9 +134,9 @@ class DeepFlowRender(RenderBase):
         for layer_type, cam_dict in self.L.items():
             for layer in cam_dict.values():
                 if layer_type in LARGE_LAYERS:
-                    layer.allocate(1080 * 2, 1920 * 2, GL_RGBA16F)
+                    layer.allocate(OUTPUT_WIDTH * 2, OUTPUT_HEIGHT * 2, GL_RGBA16F)
                 else:
-                    layer.allocate(1080, 1920, GL_RGBA16F)
+                    layer.allocate(OUTPUT_WIDTH, OUTPUT_HEIGHT, GL_RGBA16F)
         self.allocate_window_renders()
         Shader.enable_hot_reload()
 
@@ -180,17 +193,11 @@ class DeepFlowRender(RenderBase):
 
         # Left panel
         left_rect: Rect = self.subdivision.get_rect('panels', 0)
-        glViewport(int(left_rect.x), int(height - left_rect.y - left_rect.height), int(left_rect.width), int(left_rect.height))
-        for layer_type in self._left_layers:
-            if 0 in self.L[layer_type]:
-                self.L[layer_type][0].draw()
+        self._draw_fit(self._left_layers, left_rect.x, height - left_rect.y - left_rect.height, left_rect.width, left_rect.height)
 
         # Right panel
         right_rect: Rect = self.subdivision.get_rect('panels', 1)
-        glViewport(int(right_rect.x), int(height - right_rect.y - right_rect.height), int(right_rect.width), int(right_rect.height))
-        for layer_type in self._right_layers:
-            if 0 in self.L[layer_type]:
-                self.L[layer_type][0].draw()
+        self._draw_fit(self._right_layers, right_rect.x, height - right_rect.y - right_rect.height, right_rect.width, right_rect.height)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         clear_color()
@@ -199,8 +206,23 @@ class DeepFlowRender(RenderBase):
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.ADD)
 
-        for layer_type in self._draw_layers:
-            if 0 in self.L[layer_type]:
-                self.L[layer_type][0].draw()
+        self._draw_fit(self._draw_layers, 0, 0, width, height)
 
         Style.pop_style()
+
+    def _draw_fit(self, layer_types: list[Layers], x: float, y: float, width: float, height: float) -> None:
+        """Draw each layer into a GL rect (origin bottom left) at its own shape, centered."""
+        if width <= 0 or height <= 0:
+            return
+        for layer_type in layer_types:
+            if 0 in self.L[layer_type]:
+                fit_x, fit_y, fit_width, fit_height = fit(*self._layer_size(layer_type), width, height)
+                glViewport(int(x + fit_x), int(y + fit_y), int(fit_width), int(fit_height))
+                self.L[layer_type][0].draw()
+
+    def _layer_size(self, layer_type: Layers) -> tuple[int, int]:
+        if layer_type in SHAPE_LAYERS:
+            texture: Texture = self.L[SHAPE_LAYERS[layer_type]][0].texture
+            if texture.allocated:
+                return texture.width, texture.height
+        return OUTPUT_WIDTH, OUTPUT_HEIGHT
