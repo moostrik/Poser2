@@ -1,31 +1,28 @@
 """The depthai 3 pipeline of one OAK4 camera, built in one pass on the camera's own device.
 
-The sensor at the requested size and type, the correction that turns the sensor's frame into the
-contract's, and the IMU. A color frame without `keystone` takes no correction here at all: the
-Camera node crops it to 5:4, undistorts it and delivers NV12, the lowest latency by far, and the
-host converts, straightens and mirrors it. Undistorted because aligned depth always is: the depth
-misses a distorted frame by 4 % at its edges, and the extra 3 ms is the price of the two
-overlapping. Past that, two corrections, at the sensor mode's full width: a grey frame goes through
-the `Warp` node for the cylindrical reprojection that makes a column one azimuth, with the mesh from
-`geometry.warp_mesh_points`, as this chip warps grey frames only; `keystone` is a four-point
-transform in `ImageManip`, in colour or grey. The detector branch is the model on the
-delivered frame, the device's object tracker on its detections, and the tracklets, with their
+The sensor at the requested size and type, and the IMU. A color frame takes no correction here at
+all: the Camera node crops it to 5:4, undistorts it and delivers NV12, the lowest latency by far,
+and the host converts, straightens and mirrors it. Undistorted because aligned depth always is: the
+depth misses a distorted frame by 4 % at its edges, and the extra 3 ms is the price of the two
+overlapping. A grey frame goes through the `Warp` node at the sensor mode's full width, for the
+cylindrical reprojection that makes a column one azimuth, with the mesh from
+`geometry.warp_mesh_points`, as this chip warps grey frames only. The detector branch is the model
+on the delivered frame, the device's object tracker on its detections, and the tracklets, with their
 keypoints when the model is a pose model. The depth branch is Neural Depth off the stereo pair,
 aligned on the camera to the delivered frame. Nothing here is an XLink stream: the host reads a
 node's output through the queue `Camera` creates on it.
 """
 
 from dataclasses import dataclass
-from enum import IntEnum
 from pathlib import Path
 import logging
 import os
 
 import depthai as dai
 
-from .. import CameraResolution, frame_size, WARP_MESH, warp_mesh_points, keystone_corners
+from .. import CameraResolution, frame_size, WARP_MESH, warp_mesh_points
 
-from .definitions import SENSOR_SOCKET, STEREO_SOCKETS, STEREO_SIZE, DEPTH_MODELS, DepthModel, frame_type, requested_size, \
+from .definitions import SENSOR_SOCKET, STEREO_SOCKETS, STEREO_SIZE, DEPTH_MODELS, DepthModel, requested_size, \
     direct_size, depth_size, IMU_RATE_HZ, nn_frame_type, POSE_CONFIDENCE_THRESHOLD, POSE_OVERLAP_THRESHOLD, \
     POSE_CROP_PADDING, TRACKER_PERSON_LABEL, TRACKER_TYPE
 
@@ -39,7 +36,6 @@ class MountConfig:
     frame, quoted for the un-cropped sensor width; the lens fields are `geometry.source_lens`'s."""
     flip_h: bool
     flip_v: bool
-    keystone: float
     fov_h: float
     lens_fov: float = 0.0
     lens_center_x: float = 0.0
@@ -65,11 +61,9 @@ class PipelineOutputs:
     flip_on_host: bool = False
 
 
-def delivered_size(color: bool, resolution: CameraResolution, mount: MountConfig, frame_height: int = 0) -> tuple[int, int]:
-    """The delivered frame: 5:4 where the Camera node crops it, else the sensor mode's full width."""
-    if is_direct(color, mount.keystone, mount.flip_v):
-        return direct_size(resolution)
-    return frame_size(color, resolution, False, frame_height)
+def delivered_size(color: bool, resolution: CameraResolution, frame_height: int = 0) -> tuple[int, int]:
+    """The delivered frame: color 5:4, as the Camera node crops it, grey the sensor mode's full width."""
+    return direct_size(resolution) if color else frame_size(color, resolution, False, frame_height)
 
 
 def build_pipeline(
@@ -91,19 +85,19 @@ def build_pipeline(
     pose model on each person's crop.
     """
     src_size: tuple[int, int] = requested_size(color, resolution)
-    out_size: tuple[int, int] = delivered_size(color, resolution, mount, frame_height)
+    out_size: tuple[int, int] = delivered_size(color, resolution, frame_height)
     model: Path | None = pose_archive or detector_archive
-    correction: Correction = pick_correction(color, mount.keystone, mount.flip_v)
-    logger.info("OAK4 pipeline: %dx%d, %s, %s%s%s", out_size[0], out_size[1], 'color' if color else 'grey', correction.name.lower(),
+    logger.info("OAK4 pipeline: %dx%d, %s%s%s", out_size[0], out_size[1], 'color' if color else 'grey',
                 f', model {model.name}' if model else '', f', depth {depth_model.name}' if depth_model != DepthModel.OFF else '')
 
     camera: dai.node.Camera = pipeline.create(dai.node.Camera).build(SENSOR_SOCKET)
     frames: dai.Node.Output
-    if correction == Correction.DIRECT:
+    if color:
+        if mount.flip_v:
+            logger.warning('flip_v is ignored: a color frame is only mirrored left to right')
         frames = camera.requestOutput(out_size, dai.ImgFrame.Type.NV12, dai.ImgResizeMode.CROP, fps=fps, enableUndistortion=True)
     else:
-        source: dai.Node.Output = camera.requestOutput(src_size, frame_type(color), fps=fps)
-        frames = add_correction(pipeline, source, src_size, out_size, color, mount, correction)
+        frames = add_warp(pipeline, camera.requestOutput(src_size, dai.ImgFrame.Type.GRAY8, fps=fps), src_size, out_size, mount)
     imu: dai.Node.Output = add_imu(pipeline)
     tracklets: dai.Node.Output | None = None
     poses: dai.Node.Output | None = None
@@ -115,40 +109,7 @@ def build_pipeline(
     if depth_model != DepthModel.OFF:
         depth = add_depth(pipeline, frames, fps, depth_model, out_size)
     return PipelineOutputs(video=frames, control=camera.inputControl, imu=imu, tracklets=tracklets, poses=poses, depth=depth,
-                           flip_on_host=correction == Correction.DIRECT and mount.flip_h)
-
-
-class Correction(IntEnum):
-    WARP = 0            # the mesh: the cylindrical reprojection
-    FOUR_POINT = 1      # the keystone; at keystone 0 the plain crop and flips
-    DIRECT = 2          # none: the Camera node's own crop, NV12, straightened and mirrored on the host
-
-
-def is_direct(color: bool, keystone: float, flip_v: bool) -> bool:
-    """Whether the frame needs no correction on the chip: color, and no flip the host does not do."""
-    return color and keystone == 0.0 and not flip_v
-
-
-def pick_correction(color: bool, keystone: float, flip_v: bool) -> Correction:
-    """The one correction a camera uses. A grey frame without keystone takes the reprojection. The
-    chip warps grey frames only, so a colour frame without keystone needs no reprojection at all
-    and goes `DIRECT`, unless `flip_v` asks for a flip the host does not do, which stays on the
-    four-point transform."""
-    if keystone == 0.0 and not color:
-        return Correction.WARP
-    if is_direct(color, keystone, flip_v):
-        return Correction.DIRECT
-    return Correction.FOUR_POINT
-
-
-def add_correction(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tuple[int, int],
-                   out_size: tuple[int, int], color: bool, mount: MountConfig, correction: Correction) -> dai.Node.Output:
-    """The correction `pick_correction` named, on the chip."""
-    if correction == Correction.WARP:
-        return add_warp(pipeline, source, src_size, out_size, mount)
-    if mount.keystone == 0.0:
-        logger.info("OAK4 colour frame: cropped and flipped, not reprojected (the chip warps grey frames only)")
-    return add_keystone(pipeline, source, src_size, out_size, color, mount)
+                           flip_on_host=color and mount.flip_h)
 
 
 def add_warp(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tuple[int, int],
@@ -163,21 +124,6 @@ def add_warp(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tuple[in
     warp.setWarpMesh(mesh, WARP_MESH, WARP_MESH)
     source.link(warp.inputImage)
     return warp.out
-
-
-def add_keystone(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tuple[int, int],
-                 out_size: tuple[int, int], color: bool, mount: MountConfig) -> dai.Node.Output:
-    """The keystone as a four-point transform: the frame's corners pinned to the points the
-    OAK-D's homography pins (`geometry.keystone_corners`)."""
-    manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
-    initial: dai.ImageManipConfig = manip.initialConfig
-    src, dst = keystone_corners(src_size[0], src_size[1], mount.keystone, mount.flip_h, mount.flip_v)
-    initial.addTransformFourPoints([dai.Point2f(x, y) for x, y in src], [dai.Point2f(x, y) for x, y in dst], False)
-    initial.setOutputSize(out_size[0], out_size[1], dai.ImageManipConfig.ResizeMode.STRETCH)
-    initial.setFrameType(frame_type(color))
-    manip.setMaxOutputFrameSize(out_size[0] * out_size[1] * (3 if color else 1))
-    source.link(manip.inputImage)
-    return manip.out
 
 
 def add_one_model_chain(pipeline: dai.Pipeline, frames: dai.Node.Output, archive_path: Path) -> dai.Node.Output:

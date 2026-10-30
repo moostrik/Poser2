@@ -89,8 +89,6 @@ class RigCameraSettings(CameraSettings):
 
     The panel shows the backend's fields first and these after them.
     """
-    keystone:       Field[float] = Field(0.0, access=Field.INIT,
-                                         description="Keystone (fraction of frame)")
     # Relayed down from the camera group so the warp can turn a tilt into pixels.
     fov:           Field[float] = Field(127.0, access=Field.INIT,
                                          description="Azimuth span (°) of the delivered frame, quoted for the full sensor width")

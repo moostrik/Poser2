@@ -39,8 +39,8 @@ class OakCameraSettings(RigCameraSettings):
 
     The tunables live in subgroups — `readings`, `color_sensor`, `mono_sensor` — because forty
     flat fields in one panel is not something anyone reads. What stays at this level is what
-    shapes the pipeline (`color`, `square`, `yolo`, `resolution`) and the mount (`tilt` here, the
-    rest in `RigCameraSettings`), which are the fields a person actually sets. The preset keys are
+    shapes the pipeline (`color`, `square`, `yolo`, `resolution`) and the mount (`tilt` and `keystone`
+    here, the rest in `RigCameraSettings`), which are the fields a person actually sets. The preset keys are
     flat: `cam_0.tilt`.
     """
 
@@ -53,6 +53,8 @@ class OakCameraSettings(RigCameraSettings):
     model_path:     Field[str]   = Field("data/models", access=Field.INIT)
     tilt:           Field[float] = Field(0.0, access=Field.INIT,
                                          description="Camera up-tilt (°), positive = aimed up. Exclusive with keystone")
+    keystone:       Field[float] = Field(0.0, access=Field.INIT,
+                                         description="Keystone (fraction of frame)")
 
     # Two values arrive shared from the camera group and are relayed one level further into
     # `mono_sensor`, so the panel shows them where the rest of the mono controls are rather than

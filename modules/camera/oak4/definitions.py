@@ -21,8 +21,7 @@ logger = logging.getLogger(__name__)
 SENSOR_SOCKET: dai.CameraBoardSocket = dai.CameraBoardSocket.CAM_A
 STEREO_SOCKETS: tuple[dai.CameraBoardSocket, dai.CameraBoardSocket] = (dai.CameraBoardSocket.CAM_B, dai.CameraBoardSocket.CAM_C)
 
-# The width over the height of the frame the Camera node crops itself (`Correction.DIRECT`): 5:4 at
-# the sensor mode's rows, so the depth model's 8:5 frame is used further across than by a square.
+# The width over the height of the frame the Camera node crops itself: 5:4 at the sensor mode's rows, so the depth model's 8:5 frame is used further across than by a square.
 FRAME_ASPECT: float = 5.0 / 4.0
 
 # The direct frame's width is a multiple of this: the iGPU's H.264 decoder hangs on a clip of any
@@ -54,12 +53,6 @@ def depth_size(model: DepthModel, frame: tuple[int, int]) -> tuple[int, int]:
     it has, and an even width at the frame's aspect."""
     rows: int = DEPTH_MODELS[model][1]
     return (round(rows * frame[0] / frame[1] / 2.0) * 2, rows)
-
-
-def frame_type(color: bool) -> dai.ImgFrame.Type:
-    """The frame type requested from the sensor: interleaved BGR, which `getCvFrame` hands over as
-    it is, or 8-bit grey, the one type the chip's warp block takes whole."""
-    return dai.ImgFrame.Type.BGR888i if color else dai.ImgFrame.Type.GRAY8
 
 
 def requested_size(color: bool, resolution: CameraResolution) -> tuple[int, int]:

@@ -16,7 +16,6 @@
       "link": "USB",
       "pose_chain": "DETECTOR",
       "depth_model": "NEURAL_480",
-      "keystone": 0.0,
       "lens_fov": 0.0,
       "lens_center_x": 0.0,
       "lens_center_y": 0.0,

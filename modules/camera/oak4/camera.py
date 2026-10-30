@@ -81,7 +81,6 @@ class Camera(Thread):
         self.mount: MountConfig = MountConfig(
             flip_h=settings.flip_h,
             flip_v=settings.flip_v,
-            keystone=settings.keystone,
             fov_h=settings.fov,
             lens_fov=settings.lens_fov,
             lens_center_x=settings.lens_center_x,
@@ -89,7 +88,7 @@ class Camera(Thread):
         )
         self.frame_height: int = delivered_height(self.color, self.resolution, self.mount.fov_h, 0.0,
                                                   self.mount.lens_fov, self.mount.lens_center)
-        self.frame_size: tuple[int, int] = delivered_size(self.color, self.resolution, self.mount, self.frame_height)
+        self.frame_size: tuple[int, int] = delivered_size(self.color, self.resolution, self.frame_height)
         self.pose_chain: PoseChain = settings.pose_chain
         models = Path(self.model_path)
         pose, detector = model_archives(self.pose_chain) if self.yolo else (None, None)
@@ -231,6 +230,11 @@ class Camera(Thread):
                 logger.debug(f'{self.device_id} device close: {exc}')
             self.device = None
 
+        readings: RigCameraReadings = self.settings.readings        # they update on a frame, and none come now
+        readings.video_fps = readings.video_min_fps = readings.video_latency = 0.0
+        readings.tracker_fps = readings.tracker_latency = readings.depth_fps = readings.depth_latency = 0.0
+        readings.tracklets = 0
+
     def _setup_queues(self, outputs: PipelineOutputs) -> None:
         """The host's ends of the pipeline: the frames every camera has, the tracklets with a model,
         the depth with a depth model, the IMU, the sensor controls."""
@@ -259,9 +263,7 @@ class Camera(Thread):
 
     def _log_frame_geometry(self) -> None:
         """The window the warp delivers and where the sensor covers it, pure geometry from the
-        preset, logged so a rig check reads the horizon row off the log. Not on the keystone path."""
-        if self.mount.keystone != 0.0:
-            return
+        preset, logged so a rig check reads the horizon row off the log."""
         src: tuple[int, int] = requested_size(self.color, self.resolution)
         out: tuple[int, int] = self.frame_size
         window = frame_window(src, out, src[0], self.mount.fov_h, 0.0,

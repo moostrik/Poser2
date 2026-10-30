@@ -33,12 +33,12 @@ The pinned readouts measure capture to arrival on the PC.
 | Readout       | Expected    | When it is off                                |
 |---------------|-------------|-----------------------------------------------|
 | Video         | 60 fps      | The camera or the link is not keeping up      |
-| Video latency | 28 to 29 ms | Check the link: Ethernet adds 4 ms or more    |
+| Video latency | 28 to 29 ms | Check the link: Ethernet adds about 6 ms      |
 | Depth latency | 42 to 52 ms | Moves between phases of a run; this is normal |
 
 ### When the camera is not found
 
-The camera keeps trying by itself, so a reopen right after closing the app needs no action. A problem is logged once, and `delivers frames again` marks its end.
+The camera keeps trying by itself, so a reopen right after closing the app needs no action. A problem is logged once, and `delivers frames again` marks its end. While the camera is closed its rates and latencies read 0.
 
 | Situation                              | What the camera does               |
 |----------------------------------------|------------------------------------|
@@ -47,11 +47,13 @@ The camera keeps trying by itself, so a reopen right after closing the app needs
 | No first frame within 15 s of opening  | Closes, then tries again every 1 s |
 | The pipeline fails on an opened camera | Logs an error once and stops       |
 
+A quick reopen fails at the search, with `no OAK4 found`. In one reopen, 4.6 s after the camera closed, it stayed out of the search for about 8 s and delivered frames 12.4 s after the close.
+
 The last case is a broken setup, such as a missing model archive. A retry changes nothing there, so the log line `pipeline failed, not trying again` means the setup must be fixed.
 
 ### In a dark room
 
-Turn on `sensor.flood_light`. Without IR light there is almost no depth (see [IR light](#ir-light)). The color sensor does not see IR, so the image does not change. Nothing turns the lights on for a recording; set them by hand.
+Turn on `sensor.flood_light`. Without IR light there is almost no depth (see [IR light](#ir-light)). The color sensor does not see IR, so the image does not change.
 
 ### Tilt
 
@@ -92,7 +94,7 @@ Capture to PC, mean ms (std), 720x720 at about 59 fps with detector and tracker,
 | BGR, then `ImageManip`           | 42.7 (1.0) | 33.9 (0.7) |
 | NV12, cropped by the Camera node | 28.8 (0.3) | 24.9 (0.5) |
 
-A color frame without `keystone` takes the NV12 path, with no `ImageManip`. Undistortion adds about 3 ms to it, and [the frame](#the-frame) says why it stays on.
+A color frame takes the NV12 path, with no `ImageManip`. Undistortion adds about 3 ms to it, and [the frame](#the-frame) says why it stays on.
 
 Compare latencies only on one OS version. On OS 1.25.3 NV12 over Ethernet measured 21.9 ms, and the 7 ms difference is unexplained.
 
@@ -136,7 +138,20 @@ The camera thread does no color work: `Uploader` converts and flips on the GPU. 
 
 The conversion is limited-range BT.601 with nearest chroma, which matches `getCvFrame` to 0.32 of 255. Full range is 8.5 off.
 
-### Link load
+### Link
+
+USB is the link to use. Ethernet carries the whole pipeline at 60 fps, 6 ms later on color, but it stalled in one run of five. Capture to PC in ms, on the probe, with no player in view, in a dark room, with `-sim` running on the PC. Color and boxes are means over the second half of a run; the worst gap covers color and depth.
+
+| Link     | Run  | Color | Boxes | Depth mean | Depth max | Worst gap |
+|----------|------|-------|-------|------------|-----------|-----------|
+| USB      | 20 s | 28.6  | 34.5  | 42.6       | 48.9      | 32.1      |
+| Ethernet | 20 s | 35.1  | 35.9  | 42.6       | 48.2      | 33.0      |
+| Ethernet | 20 s | 108.3 | 109.2 | 128.2      | 1676.7    | 4763.0    |
+| Ethernet | 30 s | 34.8  | 35.8  | 43.7       | 49.3      | 39.7      |
+| Ethernet | 30 s | 34.7  | 35.2  | 47.9       | 52.1      | 35.7      |
+| Ethernet | 30 s | 34.8  | 35.4  | 48.4       | 51.3      | 41.9      |
+
+The load on the link:
 
 | Stream                | Rate                      |
 |-----------------------|---------------------------|
@@ -145,7 +160,7 @@ The conversion is limited-range BT.601 with nearest chroma, which matches `getCv
 | Together              | 572 Mbit/s                |
 | Ethernet, expected    | About 800 Mbit/s          |
 
-The stream rates are calculated from the frame sizes **(deduction)**, before the chip's row padding. The Ethernet figure is from the Luxonis docs. Depth beside color over Ethernet is not measured.
+The stream rates are calculated from the frame sizes **(deduction)**, before the chip's row padding. The Ethernet figure is from the Luxonis docs.
 
 ## The frame
 
@@ -161,7 +176,7 @@ Lens of the delivered frame, as tagged on a recording, in pixels:
 
 That gives a view of about 79.6° by 67.6° **(deduction)**. The color sensor spans 95° and the stereo pair 127° (Luxonis docs), so the whole frame has depth. Depth has about 291 rows of real detail inside the 720 rows, since the frame spans about 775 of the 800 mono rows **(deduction)**.
 
-`HORIZONTAL_MIRROR` has no effect on this camera: the mirrored frame matches the plain one. So the PC mirrors, and the backend mirrors boxes and keypoints to match.
+`HORIZONTAL_MIRROR` has no effect on this camera: the mirrored frame matches the plain one. So the PC mirrors, and the backend mirrors boxes and keypoints to match. There is no vertical flip for color: `flip_v` logs a warning and does nothing.
 
 ## Depth
 
@@ -247,21 +262,10 @@ A 10 s recording held 60 fps with the recorder's queues at 1 or less, and gave 6
 
 ## Open
 
-- A quick reopen is assumed to fail at the device, not at the pipeline **(deduction)**. If `pipeline failed, not trying again` appears after a quick reopen, that failure must be retried too.
-- The retry has not run on the camera.
-- A pipeline that starts and never delivers a frame reopens about every 16 s; it cannot be told apart from a cable pulled right after opening.
-- While the camera is away the panel keeps showing the last fps, since those readouts update on a frame.
 - Video min sometimes reads about 30 fps **(site fact)**. The cause is not known.
 - `center_depth` has not been seen with a player in view.
 - A standing player reading as one distance from head to feet has not been checked.
-- `-sim` with a real recording through `replay.Camera` has not been run in the app.
-- Recording beside the whole app, and file size at `video_quality` 24 live, are not measured.
-- The GPU warp's time is not measured.
 - Depth has one outlier of about 153 mm near the top left on synthetic frames, at all widths. The cause is not known.
 - `StreamReader.frame_count` can read one short on an `.mkv`, as it estimates from the duration.
-- Depth beside color over Ethernet is not measured.
+- Ethernet stalled once in 130 s of streaming, with a gap of 4.8 s and latency up to 1.7 s. The cause is not known, and a USB run of that length has not been compared.
 - A player at show distance has not been compared across depth sizes or IR lights.
-- IR lights could follow the recording automatically.
-- `oak4_test`'s two-model chain delivers no keypoints.
-- `keystone` remains on the OAK4 path and no preset uses it.
-- A camera on its side gives about 363 depth rows along the player against 291 **(deduction)**, but the detector then needs rotated frames.

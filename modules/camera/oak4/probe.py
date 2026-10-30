@@ -1,7 +1,7 @@
 """The OAK4 bring-up: the real backend on one device for a few seconds, reporting what arrives.
 
     python -m modules.camera.oak4.probe [device_id] [-s SECONDS] [--fps FPS] [--resolution P720|P800|P1080]
-        [--link USB|ETHERNET] [--color] [--flip-h] [--keystone K] [--tilt-offset T]
+        [--link USB|ETHERNET] [--color] [--flip-h] [--tilt-offset T]
         [--no-pose | --two-models | --detector] [--depth NEURAL_288|NEURAL_384|NEURAL_480] [--projector I]
         [--flood-light I]
 
@@ -38,7 +38,6 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--projector', type=float, default=0.0, help='dot projector brightness, 0 to 1')
     parser.add_argument('--flood-light', type=float, default=0.0, help='IR flood light brightness, 0 to 1')
     parser.add_argument('--flip-h', action='store_true')
-    parser.add_argument('--keystone', type=float, default=0.0)
     parser.add_argument('--tilt-offset', type=float, default=None, help='turn the tilt correction on, with this offset (°)')
     chain = parser.add_mutually_exclusive_group()
     chain.add_argument('--no-pose', action='store_true', help='frames only, no model on the device')
@@ -61,7 +60,6 @@ def main(argv: list[str] | None = None) -> int:
     settings.sensor.dot_projector = args.projector
     settings.sensor.flood_light = args.flood_light
     settings.flip_h = args.flip_h
-    settings.keystone = args.keystone
     settings.tilt.enabled = args.tilt_offset is not None
     settings.tilt.offset = args.tilt_offset or 0.0
     settings.yolo = not args.no_pose

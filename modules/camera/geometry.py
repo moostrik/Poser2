@@ -620,35 +620,6 @@ def unroll_imu_frame(vector: tuple[float, float, float], board_roll: float) -> t
 
 
 # ---------------------------------------------------------------------------
-#  Keystone: the four corners a homography pins
-# ---------------------------------------------------------------------------
-# The keystone correction of hd_trio and deep_flow is a homography that maps the frame's four
-# corners to four points spread by `keystone` (a fraction of the frame): the top edge narrowed
-# and the bottom widened, so a person seen from a down-tilted camera gets normal proportions
-# while the whole frame is kept. `oak.pipeline.find_keystone_warp` samples that homography into
-# a warp mesh; a chip with a four-point transform takes the corners themselves. Both pin the
-# same points, so the two backends agree to the pixel.
-
-Corners = tuple[tuple[float, float], tuple[float, float], tuple[float, float], tuple[float, float]]
-
-
-def keystone_corners(width: int, height: int, keystone: float, flip_h: bool, flip_v: bool,
-                     offset_base: int | None = None) -> tuple[Corners, Corners]:
-    """The source corners of a `width` x `height` frame and where the keystone puts them, in
-    pixels, top-left first and clockwise. `offset_base` is the length the spread is quoted
-    against: the width for a wide frame, the source height for a square cut from it."""
-    base: int = width if offset_base is None else offset_base
-    spread: float = base * 0.5 * keystone
-    src: Corners = ((0.0, 0.0), (float(width), 0.0), (float(width), float(height)), (0.0, float(height)))
-    dst: list[tuple[float, float]] = [(spread, 0.0), (width - spread, 0.0), (width + spread, float(height)), (-spread, float(height))]
-    if flip_h:
-        dst = [(width - x, y) for x, y in dst]
-    if flip_v:
-        dst = [(x, height - y) for x, y in dst]
-    return src, cast(Corners, tuple(dst))
-
-
-# ---------------------------------------------------------------------------
 #  Tilt: the picture of a level camera
 # ---------------------------------------------------------------------------
 # A tilt is a rotation about the camera, so where a pixel lands does not depend on how far away it
@@ -711,8 +682,3 @@ def mirrored_intrinsics(intrinsics: list[list[float]], width: int) -> list[list[
     mirrored: list[list[float]] = [list(row) for row in intrinsics]
     mirrored[0][2] = width - mirrored[0][2]
     return mirrored
-
-
-def square_crop(src_size: tuple[int, int], size: int) -> tuple[int, int, int, int]:
-    """The centred `size` x `size` window of a frame, as (x, y, width, height)."""
-    return ((src_size[0] - size) // 2, (src_size[1] - size) // 2, size, size)

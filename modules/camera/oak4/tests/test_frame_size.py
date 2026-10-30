@@ -4,22 +4,18 @@ import unittest
 
 from modules.camera import CameraResolution
 from modules.camera.oak4.definitions import FRAME_WIDTH_ALIGNMENT, DepthModel, depth_size, direct_size
-from modules.camera.oak4.pipeline import MountConfig, delivered_size
-
-
-def mount(keystone: float = 0.0) -> MountConfig:
-    return MountConfig(flip_h=True, flip_v=False, keystone=keystone, fov_h=102.0)
+from modules.camera.oak4.pipeline import delivered_size
 
 
 class DeliveredSizeTest(unittest.TestCase):
     def test_the_direct_frame_is_about_five_by_four_on_a_width_the_decoder_plays(self) -> None:
         self.assertEqual(direct_size(CameraResolution.P720), (896, 720))
-        self.assertEqual(delivered_size(True, CameraResolution.P720, mount()), (896, 720))
+        self.assertEqual(delivered_size(True, CameraResolution.P720), (896, 720))
         for resolution in (CameraResolution.P720, CameraResolution.P800, CameraResolution.P1080):
             self.assertEqual(direct_size(resolution)[0] % FRAME_WIDTH_ALIGNMENT, 0)
 
-    def test_a_keystoned_frame_keeps_the_full_width(self) -> None:
-        self.assertEqual(delivered_size(True, CameraResolution.P720, mount(keystone=0.2)), (1280, 720))
+    def test_a_grey_frame_keeps_the_full_width(self) -> None:
+        self.assertEqual(delivered_size(False, CameraResolution.P720), (1280, 720))
 
 
 class DepthSizeTest(unittest.TestCase):

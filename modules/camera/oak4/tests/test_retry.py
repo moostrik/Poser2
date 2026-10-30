@@ -133,6 +133,16 @@ class ConnectedTest(unittest.TestCase):
     def test_a_camera_that_never_opened_is_not_connected(self) -> None:
         self.assertFalse(Camera(Oak4CameraSettings()).connected)
 
+    def test_a_closed_camera_reads_no_rate(self) -> None:
+        camera = Camera(Oak4CameraSettings())
+        camera.settings.readings.video_fps = 60.0
+        camera.settings.readings.video_min_fps = 58.0
+        camera.settings.readings.depth_latency = 46.0
+        camera._close()
+        self.assertEqual(camera.settings.readings.video_fps, 0.0)
+        self.assertEqual(camera.settings.readings.video_min_fps, 0.0)
+        self.assertEqual(camera.settings.readings.depth_latency, 0.0)
+
     def test_a_closed_camera_is_not_running_and_keeps_its_callbacks(self) -> None:
         camera = Camera(Oak4CameraSettings())
         camera.running = True
