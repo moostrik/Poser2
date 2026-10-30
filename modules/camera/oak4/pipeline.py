@@ -77,7 +77,7 @@ def build_pipeline(
     src_size: tuple[int, int] = requested_size(color, resolution)
     out_size: tuple[int, int] = frame_size(color, resolution, square, frame_height)
     logger.info("OAK4 pipeline: %s, %s, %s%s", 'square' if square else 'wide', 'color' if color else 'grey',
-                'keystone' if mount.keystone != 0.0 and mount.tilt == 0.0 else 'tilt',
+                pick_correction(color, mount.tilt, mount.keystone).name.lower(),
                 f', pose model {pose_archive.name}' if pose_archive else '')
 
     camera: dai.node.Camera = pipeline.create(dai.node.Camera).build(SENSOR_SOCKET)

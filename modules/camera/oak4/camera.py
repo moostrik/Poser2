@@ -78,7 +78,7 @@ class Camera(Thread):
         two_models: bool = self.yolo and self.pose_chain == PoseChain.TWO_MODELS
         self.pose_archive: Path | None = models / (TOP_DOWN_ARCHIVE if two_models else POSE_ARCHIVE) if self.yolo else None
         self.detector_archive: Path | None = models / DETECTOR_ARCHIVE if two_models else None
-        self.join: PoseJoin | None = PoseJoin() if two_models else None
+        self.pose_join: PoseJoin | None = PoseJoin() if two_models else None
 
         # DEVICE — its pipeline and queues are made in `_open` and closed with it.
         self.device: dai.Device | None = None
@@ -242,7 +242,7 @@ class Camera(Thread):
         self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
         if self.control is not None:
             self.control.readback(msg)
-        if self.join is not None:
+        if self.pose_join is not None:
             self._frame_transformation = msg.getTransformation()
         self._emit_frame(FrameType.VIDEO, msg.getCvFrame())
 
@@ -253,7 +253,7 @@ class Camera(Thread):
         self.tracklet_fps.processed()
         self.settings.readings.tracker_fps = self.tracklet_fps.get_rate_average()
         now: float = time.perf_counter()
-        one_model: bool = self.join is None
+        one_model: bool = self.pose_join is None
         tracklets: list[CameraTracklet] = [
             CameraTracklet(cam_id=self.id, id=t.id, status=TRACKING_STATUS[t.status],
                            roi=Rect(t.roi.x, t.roi.y, t.roi.width, t.roi.height), age=t.age, timestamp=now,
@@ -261,12 +261,12 @@ class Camera(Thread):
             for t in msg.tracklets]
         self.num_tracklets = len(tracklets)
         self.settings.readings.tracklets = self.num_tracklets
-        if self.join is None:
+        if self.pose_join is None:
             self._emit_tracklets(tracklets, now)
             return
         boxes: list[Box] = [(t.srcImgDetection.xmin, t.srcImgDetection.ymin, t.srcImgDetection.xmax,
                              t.srcImgDetection.ymax) for t in msg.tracklets]
-        joined = self.join.put_tracklets(msg.getSequenceNum(), tracklets, boxes)
+        joined = self.pose_join.put_tracklets(msg.getSequenceNum(), tracklets, boxes)
         if joined is not None:
             self._emit_tracklets(joined, now)
 
@@ -274,7 +274,7 @@ class Camera(Thread):
         """The two-model chain's poses: depthai-nodes' `GatheredData`, the people's detections of one
         frame (`reference_data`) with one keypoint message per person (`items`, in the same order),
         each remapped from its crop into the delivered frame."""
-        if self.join is None:
+        if self.pose_join is None:
             return
         detections = msg.reference_data
         boxes: list[Box] = [(d.xmin, d.ymin, d.xmax, d.ymax) for d in detections.detections]
@@ -282,7 +282,7 @@ class Camera(Thread):
         if len(keypoints) != len(boxes):
             logger.debug(f'{self.device_id} frame {detections.getSequenceNum()}: {len(keypoints)} poses for {len(boxes)} people')
             keypoints = (keypoints + [None] * len(boxes))[:len(boxes)]
-        joined = self.join.put_poses(detections.getSequenceNum(), boxes, keypoints)
+        joined = self.pose_join.put_poses(detections.getSequenceNum(), boxes, keypoints)
         if joined is not None:
             self._emit_tracklets(joined, time.perf_counter())
 
