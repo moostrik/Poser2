@@ -11,6 +11,7 @@ through the queue `Camera` creates on it.
 """
 
 from dataclasses import dataclass
+from enum import IntEnum
 from pathlib import Path
 import logging
 
@@ -71,8 +72,7 @@ def build_pipeline(
     `frame_height` is the delivered height the tilt correction produces (`delivered_height`),
     0 for the sensor's rows; `pose_archive` is the pose model's NN archive, None for frames only,
     and with `detector_archive` the chain is the detector plus the pose model on each person's crop.
-    Raises `ValueError` for a colour frame with `tilt`, which the chip cannot warp: the camera then
-    does not open, rather than deliver a frame the tracker would read wrong.
+    Raises `ValueError` for a colour frame with `tilt` (`pick_correction`).
     """
     src_size: tuple[int, int] = requested_size(color, resolution)
     out_size: tuple[int, int] = frame_size(color, resolution, square, frame_height)
@@ -93,18 +93,36 @@ def build_pipeline(
     return PipelineOutputs(video=frames, control=camera.inputControl, imu=imu, tracklets=tracklets, poses=poses)
 
 
-def add_correction(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tuple[int, int],
-                   out_size: tuple[int, int], color: bool, mount: MountConfig) -> dai.Node.Output:
-    """The one correction a camera uses, picked as `oak.pipeline.build_warp_mesh` picks it: both
-    set warns and takes `tilt`; both zero is the tilt path, which is not the identity but the
-    reprojection; only a non-zero `keystone` is the four-point transform."""
-    if mount.tilt != 0.0 and mount.keystone != 0.0:
-        logger.warning("tilt (%.1f) and keystone (%.2f) are both set; they are exclusive, using tilt",
-                       mount.tilt, mount.keystone)
-    if mount.tilt != 0.0 or mount.keystone == 0.0:
+class Correction(IntEnum):
+    WARP = 0            # the mesh: the tilt, or at tilt 0 the cylindrical reprojection
+    FOUR_POINT = 1      # the keystone; at keystone 0 the plain crop and flips
+
+
+def pick_correction(color: bool, tilt: float, keystone: float) -> Correction:
+    """The one correction a camera uses, picked as `oak.pipeline.build_warp_mesh` picks it where the
+    chip allows: both set takes `tilt`; both zero is the reprojection in grey. The chip warps grey
+    frames only, so a colour frame takes the four-point transform: at keystone 0 the sensor's frame
+    cropped and flipped, not reprojected. Raises `ValueError` for a colour frame with `tilt`, which
+    the chip cannot correct: the camera then does not open, rather than deliver a frame the tracker
+    would read wrong."""
+    if tilt != 0.0 and keystone != 0.0:
+        logger.warning("tilt (%.1f) and keystone (%.2f) are both set; they are exclusive, using tilt", tilt, keystone)
+    if tilt != 0.0:
         if color:
             raise ValueError('the OAK4 warps grey frames only: tilt needs color off, or keystone instead')
+        return Correction.WARP
+    if keystone == 0.0 and not color:
+        return Correction.WARP
+    return Correction.FOUR_POINT
+
+
+def add_correction(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tuple[int, int],
+                   out_size: tuple[int, int], color: bool, mount: MountConfig) -> dai.Node.Output:
+    """The correction `pick_correction` names, on the chip."""
+    if pick_correction(color, mount.tilt, mount.keystone) == Correction.WARP:
         return add_warp(pipeline, source, src_size, out_size, mount)
+    if mount.keystone == 0.0:
+        logger.info("OAK4 colour frame: cropped and flipped, not reprojected (the chip warps grey frames only)")
     return add_keystone(pipeline, source, src_size, out_size, color, mount)
 
 

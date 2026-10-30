@@ -1,0 +1,12 @@
+"""The OAK4 test app's render board — thread-safe shared data store."""
+
+from modules.board import FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CameraTrackletStoreMixin
+
+
+class RenderBoard(FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CameraTrackletStoreMixin):
+
+    def __init__(self) -> None:
+        FrameStoreMixin.__init__(self)
+        WindowStoreMixin.__init__(self)
+        CameraImageStoreMixin.__init__(self)
+        CameraTrackletStoreMixin.__init__(self)

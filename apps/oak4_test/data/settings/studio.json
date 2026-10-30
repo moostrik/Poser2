@@ -1,0 +1,242 @@
+{
+  "max_players": 4,
+  "num_cams": 1,
+  "input_fps": 30.0,
+  "camera": {
+    "yolo": true,
+    "color": true,
+    "square": true,
+    "resolution": "P800",
+    "model_path": "data/models",
+    "fov": 127.0,
+    "cam_0": {
+      "device_id": "",
+      "pose_chain": "ONE_MODEL",
+      "tilt": 0.0,
+      "keystone": 0.0,
+      "lens_fov": 0.0,
+      "lens_center_x": 0.0,
+      "lens_center_y": 0.0,
+      "flip_h": false,
+      "flip_v": false,
+      "sensor": {
+        "exposure": 1000,
+        "iso": 100,
+        "auto_exposure": true,
+        "balance": 1000,
+        "auto_balance": true,
+        "brightness": 0,
+        "contrast": 0,
+        "saturation": 0,
+        "denoise": 0,
+        "sharpness": 0
+      },
+      "readings": {
+        "roll_offset": 0.0
+      }
+    },
+    "camera_check": {
+      "mount_tolerance": 2.0
+    },
+    "tracker": {
+      "tracklet_min_age": 3,
+      "add_center_threshold": 0.15,
+      "update_center_threshold": 0.3,
+      "timeout": 2.0,
+      "add_height_threshold": 0.5,
+      "update_height_threshold": 0.25,
+      "add_bottom_threshold": 0.2
+    },
+    "frame_sync": {},
+    "tracklet_sync": {}
+  },
+  "pose": {
+    "output_frequency": 60.0,
+    "tracklets": {
+      "detection_timeout": 2.0,
+      "crop_aspect": 0.75,
+      "crop_padding": 0.0
+    },
+    "angle_extractor": {
+      "aspect_ratio": 0.75
+    },
+    "bbox": {
+      "smoother": {
+        "min_cutoff": 1.0,
+        "cutoff_rise": 0.025,
+        "d_cutoff": 1.0
+      },
+      "interpolator": {
+        "method": "LINEAR",
+        "fit_frames": 3,
+        "output_delay": 0.0,
+        "blend_mode": "RAMP",
+        "blend": 0.0,
+        "max_horizon": 0.1,
+        "step": "FIXED"
+      }
+    },
+    "point": {
+      "confidence_filter": {
+        "threshold_low": 0.3,
+        "threshold_high": 0.5,
+        "rescale_scores": true
+      },
+      "smoother": {
+        "min_cutoff": 1.0,
+        "cutoff_rise": 0.025,
+        "d_cutoff": 1.0
+      },
+      "interpolator": {
+        "method": "LINEAR",
+        "fit_frames": 3,
+        "output_delay": 0.0,
+        "blend_mode": "RAMP",
+        "blend": 0.0,
+        "max_horizon": 0.1,
+        "step": "FIXED"
+      }
+    },
+    "angle": {
+      "smoother": {
+        "min_cutoff": 1.0,
+        "cutoff_rise": 0.025,
+        "d_cutoff": 1.0
+      },
+      "interpolator": {
+        "method": "LINEAR",
+        "fit_frames": 3,
+        "output_delay": 0.0,
+        "blend_mode": "RAMP",
+        "blend": 0.0,
+        "max_horizon": 0.1,
+        "step": "FIXED"
+      }
+    },
+    "window_raw": {
+      "window_size": 30,
+      "emit_partial": true
+    },
+    "window_clean": {
+      "window_size": 30,
+      "emit_partial": true
+    },
+    "window_smooth": {
+      "window_size": 30,
+      "emit_partial": true
+    },
+    "window_lerp": {
+      "window_size": 30,
+      "emit_partial": true
+    }
+  },
+  "render": {
+    "layer": {
+      "final": [
+        "tracker",
+        "cam_readings"
+      ]
+    },
+    "tracker": {
+      "stage": "LERP",
+      "pose_line_width": 2.0,
+      "bbox_line_width": 2
+    },
+    "colors": {
+      "player_0": {
+        "r": 1.0,
+        "g": 0.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_1": {
+        "r": 0.0,
+        "g": 0.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_2": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_3": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_4": {
+        "r": 1.0,
+        "g": 0.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_5": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "player_6": {
+        "r": 1.0,
+        "g": 0.5,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "player_7": {
+        "r": 0.5,
+        "g": 0.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "pose_left": {
+        "r": 1.0,
+        "g": 0.5,
+        "b": 0.0,
+        "a": 1.0
+      },
+      "pose_right": {
+        "r": 0.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "pose_center": {
+        "r": 1.0,
+        "g": 1.0,
+        "b": 1.0,
+        "a": 1.0
+      },
+      "history": {
+        "r": 0.5,
+        "g": 0.5,
+        "b": 0.5,
+        "a": 1.0
+      }
+    },
+    "window": {
+      "title": "OAK4 test",
+      "v_sync": true,
+      "monitor": "M0",
+      "x": 900,
+      "y": 80,
+      "width": 1000,
+      "height": 1000,
+      "secondary_list": [],
+      "secondary_fullscreen": true,
+      "fullscreen_mode": "WINDOWED",
+      "fullscreen_mouse": false
+    }
+  },
+  "panel": {
+    "title": "OAK4 test",
+    "port": 666,
+    "browser": true,
+    "browser_x": 0,
+    "browser_y": 0,
+    "browser_width": 900,
+    "browser_height": 1100
+  }
+}
