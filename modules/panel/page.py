@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import socket
+from functools import partial
 from pathlib import Path
 from typing import Callable, NamedTuple
 
@@ -306,12 +307,12 @@ class TabBar:
         with ui.tabs().classes("w-full bg-[#121212] rounded").props("dense active-color=primary no-indicator") as self.tabs:
             for name in names:
                 tab = ui.tab(generate_label(name))
-                tab.on("click", lambda name=name: self.select(name))
+                tab.on("click", partial(self.select, name))
                 self.tab_of[name] = tab
 
         with ui.row().classes("w-full items-center"):
             for toggle in TOGGLES:
-                self.buttons[toggle] = ui.button(icon=toggle.icon, on_click=lambda toggle=toggle: self.toggle(toggle)).props(
+                self.buttons[toggle] = ui.button(icon=toggle.icon, on_click=partial(self.toggle, toggle)).props(
                     "dense flat size=sm"
                 ).tooltip(toggle.tooltip)
             ui.element("div").classes("flex-1")

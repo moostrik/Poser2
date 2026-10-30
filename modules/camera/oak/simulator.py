@@ -58,6 +58,7 @@ class Simulator(Camera):
         sensor controls (there is no sensor)."""
         assert self.device is not None
         self.clips = self.device.getInputQueue(name=CLIPS_STREAM, maxSize=1, blocking=False)  # type: ignore
+        assert self.clips is not None
         self.queues.append(self.clips)
         self._setup_frame_queues()
 

@@ -7,6 +7,7 @@ from typing import Any
 import logging
 
 from pythonosc.udp_client import SimpleUDPClient
+from pythonosc.osc_bundle import OscBundle
 from pythonosc import osc_bundle_builder, osc_message_builder
 
 from modules.settings import BaseSettings, Field, Widget
@@ -107,7 +108,7 @@ class OscSender(Thread):
                 processed_data.append((address, args_list[-1]))
         return processed_data
 
-    def build_bundle(self, data_list: list[tuple[str, ArgValue]]) -> bytes:
+    def build_bundle(self, data_list: list[tuple[str, ArgValue]]) -> OscBundle:
         bundle = osc_bundle_builder.OscBundleBuilder(osc_bundle_builder.IMMEDIATELY)
         for address, args in data_list:
             msg = osc_message_builder.OscMessageBuilder(address=address)

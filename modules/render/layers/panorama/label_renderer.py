@@ -92,6 +92,7 @@ class LabelRenderer(LayerBase):
                 x: float = mark_px - _MARK_GAP_PX - width if to_the_left else mark_px + _MARK_GAP_PX
                 x = min(max(x, 0.0), max(0.0, self._width - width))
 
+                assert mark.player is not None    # _by_world leaves out the marks without a player
                 y: float = _LANE_TOP_PX + mark.player * (height + _LANE_GAP_PX)
                 if y + height > self._height:
                     continue

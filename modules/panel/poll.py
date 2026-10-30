@@ -5,6 +5,7 @@ bind per write would flood the websocket and call NiceGUI from the GL thread.
 """
 
 import logging
+from collections.abc import Sequence
 from typing import Protocol
 
 logger = logging.getLogger(__name__)
@@ -14,13 +15,15 @@ POLL_INTERVAL = 0.25    # seconds between ticks, per client
 
 class Polled(Protocol):
     """What the tick needs of a control: its field, and a poll that shows the field's value when it changed."""
-    settings: object
     name: str
+
+    @property
+    def settings(self) -> object: ...
 
     def poll(self) -> None: ...
 
 
-def tick(controls: list[Polled], failed: set[int]) -> None:
+def tick(controls: Sequence[Polled], failed: set[int]) -> None:
     """Poll every control.
 
     A control that raises is logged at its first failure and skipped until it polls without one;

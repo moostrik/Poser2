@@ -1,6 +1,7 @@
 # Standard library imports
 from dataclasses import dataclass
 from enum import IntEnum
+from typing import cast
 
 # Third-party imports
 import numpy as np
@@ -11,6 +12,7 @@ from modules.board import HasWindows
 from modules.gl import Fbo, Texture, Blit, Image, clear_color, Text
 from modules.utils import Rect
 from modules.pose import FeatureWindow, BaseScalarFeature
+from modules.settings import BaseSettings
 from ..layer_base import LayerBase, DataCache
 from ...shaders import WindowShader
 from .data_layer_settings import DataLayerSettingsProtocol, LayerMode, FEATURE_MAP, TRACK_COLOR_FEATURES, AngleOffset, has_pi_range, offset_angles
@@ -26,11 +28,11 @@ class FeatureWindowLayer(LayerBase):
     """
     LAYER_MODE: LayerMode = LayerMode.WINDOW
 
-    def __init__(self, track_id: int, board: HasWindows, settings: DataLayerSettingsProtocol, color_settings: ColorSettings,
+    def __init__(self, track_id: int, board: HasWindows, settings: BaseSettings, color_settings: ColorSettings,
                  feature_map: dict[IntEnum, type[BaseScalarFeature]] = FEATURE_MAP) -> None:
         self._track_id: int = track_id
         self._board: HasWindows = board
-        self.settings: DataLayerSettingsProtocol = settings
+        self.settings: DataLayerSettingsProtocol = cast(DataLayerSettingsProtocol, settings)
         self._color_settings: ColorSettings = color_settings
         self._feature_map: dict[IntEnum, type[BaseScalarFeature]] = feature_map
         self._was_active: bool = False

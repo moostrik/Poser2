@@ -100,7 +100,7 @@ class WindowManager():
         self._mouse_px: float = 0.0
         self._mouse_py: float = 0.0
 
-        self._monitor: glfw._GLFWmonitor | None = None
+        self._monitor: glfw._GLFWmonitorPointerT | None = None
         self._ordered_monitor_ids: list[int] = []
 
         self._render_thread: Thread | None = None
@@ -114,8 +114,8 @@ class WindowManager():
 
         # Secondary windows sharing the main context: logical_id → window
 
-        self._main_window: glfw._GLFWwindow | None = None
-        self._secondary_windows: dict[int, glfw._GLFWwindow] = {}
+        self._main_window: glfw._GLFWwindowPointerT | None = None
+        self._secondary_windows: dict[int, glfw._GLFWwindowPointerT] = {}
         self._secondary_fallback: set[int] = set()
         self._monitor_cb = None  # strong ref to monitor callback (prevents GC)
         self._quad_buffers: dict[int, tuple[int, int]] = {}  # id(window) -> (vao, vbo)
@@ -242,7 +242,7 @@ class WindowManager():
         logger.info("Setting up secondary monitors: %s", self.settings.secondary_list)
 
         for slot_index, logical_id in enumerate(self.settings.secondary_list):
-            win: glfw._GLFWwindow | None = self._create_secondary_window(f'{logical_id}')
+            win: glfw._GLFWwindowPointerT | None = self._create_secondary_window(f'{logical_id}')
             if not win:
                 continue
             self._secondary_windows[logical_id] = win
@@ -294,7 +294,7 @@ class WindowManager():
         glBindVertexArray(0)
         return vao, vbo
 
-    def _bind_quad_vao(self, window: glfw._GLFWwindow) -> None:
+    def _bind_quad_vao(self, window: glfw._GLFWwindowPointerT) -> None:
         """Bind quad VAO for the given window, creating it if needed."""
         key = id(window)
         if key not in self._quad_buffers:
@@ -375,7 +375,7 @@ class WindowManager():
         s.unbind_all(self._cb_mouse)
 
         try:
-            glfw.set_monitor_callback(None)
+            glfw.set_monitor_callback(None)  # type: ignore
             self._monitor_cb = None
             self._destroy_secondary_windows()
             if self._main_window and self._quad_buffers:
@@ -393,7 +393,7 @@ class WindowManager():
 
         self._notify_exit_callbacks()
 
-    def _framebuffer_size_callback(self, window: glfw._GLFWwindow | None, width: int, height: int) -> None:
+    def _framebuffer_size_callback(self, window: glfw._GLFWwindowPointerT | None, width: int, height: int) -> None:
         """Framebuffer resize (pixels) — used for viewport and renderer."""
         if not window or width <= 0 or height <= 0:
             return
@@ -401,7 +401,7 @@ class WindowManager():
         self._actual_height = height
         self.renderer.on_main_window_resize(width, height)
 
-    def _window_size_callback(self, window: glfw._GLFWwindow | None, width: int, height: int) -> None:
+    def _window_size_callback(self, window: glfw._GLFWwindowPointerT | None, width: int, height: int) -> None:
         """Window resize (screen coordinates) — write back to settings."""
         if not window or width <= 0 or height <= 0:
             return
@@ -411,7 +411,7 @@ class WindowManager():
             self.settings.width = width
             self.settings.height = height
 
-    def _window_pos_callback(self, window: glfw._GLFWwindow | None, x: int, y: int) -> None:
+    def _window_pos_callback(self, window: glfw._GLFWwindowPointerT | None, x: int, y: int) -> None:
         """Window move — write back to settings (relative to current monitor)."""
         if not window:
             return
@@ -454,12 +454,12 @@ class WindowManager():
         glfw.swap_buffers(self._main_window)
 
     # SECONDARY WINDOWS
-    def _create_secondary_window(self, name: str) -> glfw._GLFWwindow | None:
+    def _create_secondary_window(self, name: str) -> glfw._GLFWwindowPointerT | None:
         if self._main_window is None:
             logger.error("Main window must be created before secondary windows")
             return None
 
-        win: glfw._GLFWwindow | None = glfw.create_window(100, 100, name, None, self._main_window)
+        win: glfw._GLFWwindowPointerT | None = glfw.create_window(100, 100, name, None, self._main_window)
         if not win:
             logger.error("Failed to create secondary window")
             return None
@@ -482,15 +482,15 @@ class WindowManager():
             glfw.destroy_window(win)
         self._secondary_windows.clear()
 
-    def _setup_secondary_window(self, window: glfw._GLFWwindow, monitor_id: int, fullscreen: bool) -> None:
+    def _setup_secondary_window(self, window: glfw._GLFWwindowPointerT, monitor_id: int, fullscreen: bool) -> None:
         """Setup a secondary window with the given monitor ID and fullscreen mode"""
-        monitors: list[glfw._GLFWmonitor] = glfw.get_monitors()
-        monitor: glfw._GLFWmonitor | None = monitors[monitor_id] if monitor_id < len(monitors) else None
+        monitors: list[glfw._GLFWmonitorPointerT] = glfw.get_monitors()
+        monitor: glfw._GLFWmonitorPointerT | None = monitors[monitor_id] if monitor_id < len(monitors) else None
         if not monitor:
             logger.warning("Monitor %s not found", monitor_id)
             return
 
-        mode: glfw._GLFWvidmode = glfw.get_video_mode(monitor)
+        mode: glfw._GLFWvidmodeT = glfw.get_video_mode(monitor)
         width: int = mode.size.width
         height: int = mode.size.height
         posX, posY = glfw.get_monitor_pos(monitor)
@@ -506,9 +506,9 @@ class WindowManager():
             glfw.set_window_pos(window, posX + 100, posY + 100)
             glfw.set_input_mode(window, glfw.CURSOR, glfw.CURSOR_NORMAL)
 
-    def _setup_secondary_window_fallback(self, window: glfw._GLFWwindow, slot_index: int) -> None:
+    def _setup_secondary_window_fallback(self, window: glfw._GLFWwindowPointerT, slot_index: int) -> None:
         """Place a secondary window as a small windowed window on the primary monitor."""
-        primary: glfw._GLFWmonitor = glfw.get_primary_monitor()
+        primary: glfw._GLFWmonitorPointerT = glfw.get_primary_monitor()
         posX, posY = glfw.get_monitor_pos(primary)
         fw, fh = 200, 200
         step: int = fh + 40  # content height + ~30px title bar + 10px gap
@@ -517,7 +517,7 @@ class WindowManager():
         glfw.set_window_pos(window, posX + 40, posY + 40 + slot_index * step)
         glfw.set_input_mode(window, glfw.CURSOR, glfw.CURSOR_NORMAL)
 
-    def _on_monitor_change(self, monitor: glfw._GLFWmonitor, event: int) -> None:
+    def _on_monitor_change(self, monitor: glfw._GLFWmonitorPointerT, event: int) -> None:
         """GLFW monitor connect/disconnect callback. Fires on render thread during poll_events()."""
         if event == glfw.DISCONNECTED and self._monitor is not None and self._same_monitor(monitor, self._monitor):
             self._monitor = None  # its handle is no longer valid; the primary monitor stands in until the window moves
@@ -542,16 +542,17 @@ class WindowManager():
                 self._secondary_fallback.add(logical_id)
 
     @staticmethod
-    def _same_monitor(a: glfw._GLFWmonitor, b: glfw._GLFWmonitor) -> bool:
+    def _same_monitor(a: glfw._GLFWmonitorPointerT, b: glfw._GLFWmonitorPointerT) -> bool:
         """Two handles of the same monitor (GLFW hands out a new handle object per call)."""
         return ctypes.addressof(a.contents) == ctypes.addressof(b.contents)
 
-    def _secondary_close_callback(self, window: glfw._GLFWwindow) -> None:
+    def _secondary_close_callback(self, window: glfw._GLFWwindowPointerT) -> None:
         """Close the whole app when any secondary window is closed."""
+        assert self._main_window is not None
         glfw.set_window_should_close(self._main_window, True)
         glfw.post_empty_event()
 
-    def _draw_secondary_window(self, logical_id: int, window: glfw._GLFWwindow) -> None:
+    def _draw_secondary_window(self, logical_id: int, window: glfw._GLFWwindowPointerT) -> None:
         glfw.make_context_current(window)
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         self._bind_quad_vao(window)
@@ -566,7 +567,7 @@ class WindowManager():
 
     @staticmethod
     def _get_monitors_sorted_by_position() -> list[int]:
-        monitors: list[glfw._GLFWmonitor] = glfw.get_monitors()
+        monitors: list[glfw._GLFWmonitorPointerT] = glfw.get_monitors()
         if not monitors:
             return []
 
@@ -589,6 +590,7 @@ class WindowManager():
     def _notify_key_callback(self, window, key, scancode, action, mods) -> None:
         if action == glfw.PRESS or action == glfw.REPEAT:
             if key == glfw.KEY_ESCAPE:
+                assert self._main_window is not None
                 glfw.set_window_should_close(self._main_window, True)
                 glfw.post_empty_event()
                 return
@@ -683,7 +685,7 @@ class WindowManager():
             posX, posY = glfw.get_monitor_pos(monitor)
             glfw.set_window_attrib(self._main_window, glfw.DECORATED, glfw.FALSE)
             glfw.set_window_monitor(
-                self._main_window, None, posX, posY,
+                self._main_window, None, posX, posY,  # type: ignore
                 video_mode.size.width, video_mode.size.height, 0
             )
             glfw.set_input_mode(self._main_window, glfw.CURSOR, self._cursor_mode(True))
@@ -692,7 +694,7 @@ class WindowManager():
             mon_x, mon_y = glfw.get_monitor_pos(self._monitor) if self._monitor else (0, 0)
             glfw.set_window_attrib(self._main_window, glfw.DECORATED, glfw.TRUE)
             glfw.set_window_monitor(
-                self._main_window, None, mon_x + self.settings.x, mon_y + self.settings.y,
+                self._main_window, None, mon_x + self.settings.x, mon_y + self.settings.y,  # type: ignore
                 self.settings.width, self.settings.height, 0
             )
             glfw.set_input_mode(self._main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
@@ -713,7 +715,7 @@ class WindowManager():
             video_mode = glfw.get_video_mode(self._monitor)
             posX, posY = glfw.get_monitor_pos(self._monitor)
             glfw.set_window_monitor(
-                self._main_window, None, posX, posY,
+                self._main_window, None, posX, posY,  # type: ignore
                 video_mode.size.width, video_mode.size.height, 0
             )
             return

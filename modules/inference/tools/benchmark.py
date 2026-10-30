@@ -229,7 +229,7 @@ def main() -> None:
 
     LOG_DIR.mkdir(exist_ok=True)
     stem = f"inference_{args.app}_{args.model_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    np.savez_compressed(LOG_DIR / f"{stem}.npz", **outputs)
+    np.savez_compressed(LOG_DIR / f"{stem}.npz", **outputs)  # type: ignore
     report = {
         'app': args.app,
         'model_type': args.model_type,

@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import math
 from enum import Enum
-from typing import Any, Callable, ClassVar, TypeVar, get_args
+from typing import Any, Callable, ClassVar, TypeVar, cast, get_args
 
 from nicegui import ui
 
@@ -326,6 +326,7 @@ class Slider(Control):
 
     def build(self) -> None:
         field = self.field
+        assert field.min is not None and field.max is not None
         step = self.step()
         color = getattr(field, "color", "primary")
         with ui.column().classes(f"{_slider_width(field)} max-w-full gap-1"):
@@ -375,6 +376,7 @@ class LogSlider(Control):
 
     def build(self) -> None:
         field = self.field
+        assert field.min is not None and field.max is not None
         color = getattr(field, "color", "primary")
         with ui.column().classes(f"{_slider_width(field)} max-w-full gap-1"):
             with ui.row().classes("w-full items-center justify-between flex-nowrap"):
@@ -424,6 +426,7 @@ class LogSlider(Control):
         _commit_typed(self.input, commit_input)
 
     def _clamp(self, v: float) -> float:
+        assert self.field.min is not None and self.field.max is not None
         return max(self.field.min, min(self.field.max, v))
 
     def commit(self, value: Any) -> None:
@@ -482,7 +485,7 @@ class KnobControl(Control):
                     self.show(self.value())
             self.knob.on_change(on_change)
 
-    def _rounded(self, v):
+    def _rounded(self, v: Any) -> Any:
         return self.field.type_(round(v, self.decimals)) if v is not None else v
 
     def show(self, value: Any) -> None:
@@ -495,7 +498,7 @@ class Select(Control):
     widget = Widget.select
 
     def build(self) -> None:
-        options = {m: generate_label(m.name) for m in self.field.type_}
+        options = {m: generate_label(m.name) for m in cast(type[Enum], self.field.type_)}
         width = f"w-{self.field.width}" if self.field.width is not None else "w-48"
         self.select = self.tooltip(ui.select(options=options, value=self.shown, label=self.label).props(
             "dense outlined" + self.lock()
@@ -545,7 +548,7 @@ class Radio(Control):
     widget = Widget.radio
 
     def build(self) -> None:
-        options = {m: generate_label(m.name) for m in self.field.type_}
+        options = {m: generate_label(m.name) for m in cast(type[Enum], self.field.type_)}
         with ui.column().classes("gap-1"):
             self.title()
             self.toggle = ui.toggle(options=options, value=self.shown).props("dense" + self.lock())
@@ -718,7 +721,9 @@ class SortableList(Control):
     with_order: ClassVar[bool] = True
 
     def build(self) -> None:
-        self.members = list(_enum_type(self.field))
+        enum_type = _enum_type(self.field)
+        assert enum_type is not None    # control_class sends any other field to Fallback
+        self.members = list(enum_type)
         with ui.column().classes("w-72 max-w-full gap-1"):
             with ui.row().classes("w-full items-center gap-1"):
                 self.title(classes="flex-1")
@@ -753,7 +758,7 @@ class SortableList(Control):
                 ):
                     if self.with_checkboxes and not self.locked:
                         ui.checkbox(
-                            value=is_active, on_change=lambda e, m=member: self._check(m, e.value),
+                            value=is_active, on_change=lambda e, m=member: self._check(m, bool(e.value)),
                         ).props("dense").classes("my-0")
                     ui.label(generate_label(member.name)).classes("flex-1")
                     if self.with_order and not self.locked:

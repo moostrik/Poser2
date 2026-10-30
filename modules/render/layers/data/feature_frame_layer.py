@@ -1,6 +1,7 @@
 # Standard library imports
 from dataclasses import dataclass
 from enum import IntEnum
+from typing import cast
 
 # Third-party imports
 from OpenGL.GL import *  # type: ignore
@@ -10,6 +11,7 @@ from modules.board import HasFrames
 from modules.gl import Fbo, Texture, Blit, clear_color, Text
 from modules.utils import Rect
 from modules.pose import AngleVelocity, Angles, BaseScalarFeature, Frame
+from modules.settings import BaseSettings
 from ..layer_base import LayerBase, DataCache
 from ...shaders import FeatureShader
 from .data_layer_settings import DataLayerSettingsProtocol, LayerMode, FEATURE_MAP, TRACK_COLOR_FEATURES, AngleOffset, has_pi_range, offset_angles
@@ -24,11 +26,11 @@ class FeatureFrameLayer(LayerBase):
     """
     LAYER_MODE: LayerMode = LayerMode.FRAME
 
-    def __init__(self, track_id: int, board: HasFrames, settings: DataLayerSettingsProtocol, color_settings: ColorSettings,
+    def __init__(self, track_id: int, board: HasFrames, settings: BaseSettings, color_settings: ColorSettings,
                  feature_map: dict[IntEnum, type[BaseScalarFeature]] = FEATURE_MAP) -> None:
         self._track_id: int = track_id
         self._board: HasFrames = board
-        self.settings: DataLayerSettingsProtocol = settings
+        self.settings: DataLayerSettingsProtocol = cast(DataLayerSettingsProtocol, settings)
         self._color_settings: ColorSettings = color_settings
         self._feature_map: dict[IntEnum, type[BaseScalarFeature]] = feature_map
         self._was_active: bool = False

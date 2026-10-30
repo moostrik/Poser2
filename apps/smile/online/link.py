@@ -167,9 +167,9 @@ class Link(Thread):
             else:
                 ws.send(item)
         with self._frame_mutex:
-            item, self._frame = self._frame, None
-        if item is not None:
-            frame, last = item
+            pending, self._frame = self._frame, None
+        if pending is not None:
+            frame, last = pending
             jpeg: bytes | None = encode(cv2.cvtColor(frame, cv2.COLOR_RGBA2BGR))
             if jpeg is not None:
                 ws.send_binary(bytes([LAST if last else SHOW]) + jpeg)

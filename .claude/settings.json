@@ -22,7 +22,8 @@
       "WebSearch",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:arduino-pico.readthedocs.io)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "mcp__plugin_luxonis_luxonis"
     ]
   }
 }

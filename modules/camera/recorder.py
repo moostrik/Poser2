@@ -144,6 +144,7 @@ class Recorder(Thread):
         logger.info("VideoRecorder stopped")
 
     def _do_split(self) -> None:
+        assert self.folder_path is not None
         old_chunk = self.chunk_index
         self.chunk_index += 1
         for c in range(self.settings.num_cams):
@@ -155,6 +156,7 @@ class Recorder(Thread):
     def _move_chunk_files(self, chunk_index: int) -> None:
         if not hasattr(self, 'output_folder_path'):
             return
+        assert self.folder_path is not None     # set before output_folder_path
         for c in range(self.settings.num_cams):
             for t in self.settings.video_frame_types:
                 name = make_file_name(c, t, chunk_index, self.suffix)

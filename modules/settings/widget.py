@@ -72,6 +72,7 @@ class Widget(Enum):
         if exact is not None:
             return field_type is exact
         types = _TYPES[self]
+        assert types is not None    # None only for default and the exact types, both handled above
         origin = get_origin(field_type)
         if origin is not None:
             field_type = origin  # list[Enum] → list

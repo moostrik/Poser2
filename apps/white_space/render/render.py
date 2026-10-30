@@ -1,6 +1,7 @@
 """White Space render — layer graph for 3-camera panoramic light installation."""
 
 from collections.abc import Sequence
+from enum import IntEnum
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
@@ -12,7 +13,7 @@ from apps.white_space.render.layers.beam_light_simulation_layer import BeamLight
 from apps.white_space.render.layers.azimuth_overlay_layer import AzimuthOverlayLayer
 from apps.white_space.render.layers.pose_figure_layer import PoseFigureLayer
 from apps.white_space.light import FIXTURE_PROJECTION_RPM
-from modules.pose import nodes
+from modules.pose import BaseScalarFeature, nodes
 from modules.utils import Color, Rect, Point2f
 from modules.render import layers, make_subdivision, SubdivisionRow, Subdivision
 
@@ -23,7 +24,7 @@ from .pose_slots import POSE_SLOTS, pose_slots
 
 # Maps the app-local feature enum to the concrete app feature. Kept here (not in settings,
 # which stays data-only) and handed to the generic data layers via feature_map.
-PLAYHEAD_FEATURE_MAP = {
+PLAYHEAD_FEATURE_MAP: dict[IntEnum, type[BaseScalarFeature]] = {
     PlayheadFeatureSelect.PlayheadOffset: PlayheadOffset,
 }
 
@@ -82,11 +83,11 @@ class WhiteSpaceRender(RenderBase):
                 settings.preview.pose,
                 settings.colors,
             )
-            self.L[Layers.data_W][i]    = layers.FeatureWindowLayer(i, board, settings.data, settings.colors) # type: ignore
-            self.L[Layers.data_F][i]    = layers.FeatureFrameLayer( i, board, settings.data, settings.colors)   # type: ignore
+            self.L[Layers.data_W][i]    = layers.FeatureWindowLayer(i, board, settings.data, settings.colors)
+            self.L[Layers.data_F][i]    = layers.FeatureFrameLayer( i, board, settings.data, settings.colors)
             self.L[Layers.data_time][i] = layers.MotionTimeRenderer(i, board, settings.data_time)
-            self.L[Layers.data_playhead_W][i] = layers.FeatureWindowLayer(i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
-            self.L[Layers.data_playhead_F][i] = layers.FeatureFrameLayer( i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
+            self.L[Layers.data_playhead_W][i] = layers.FeatureWindowLayer(i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP)
+            self.L[Layers.data_playhead_F][i] = layers.FeatureFrameLayer( i, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP)
 
         # The dummy's column, last in the same row: its skeleton at LERP, the only stage it is in
         # (the pose compositor overlays CLEAN, SMOOTH and PREDICT over a crop it has neither of),
@@ -98,11 +99,11 @@ class WhiteSpaceRender(RenderBase):
             line_smooth=settings.preview.pose.line_smooth,
             use_scores=True, use_bbox=False, color=Color(1.0, 1.0, 1.0),
         ))
-        self.L[Layers.data_W][d]    = layers.FeatureWindowLayer(d, board, settings.data, settings.colors) # type: ignore
-        self.L[Layers.data_F][d]    = layers.FeatureFrameLayer( d, board, settings.data, settings.colors)   # type: ignore
+        self.L[Layers.data_W][d]    = layers.FeatureWindowLayer(d, board, settings.data, settings.colors)
+        self.L[Layers.data_F][d]    = layers.FeatureFrameLayer( d, board, settings.data, settings.colors)
         self.L[Layers.data_time][d] = layers.MotionTimeRenderer(d, board, settings.data_time)
-        self.L[Layers.data_playhead_W][d] = layers.FeatureWindowLayer(d, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
-        self.L[Layers.data_playhead_F][d] = layers.FeatureFrameLayer( d, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP) # type: ignore
+        self.L[Layers.data_playhead_W][d] = layers.FeatureWindowLayer(d, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP)
+        self.L[Layers.data_playhead_F][d] = layers.FeatureFrameLayer( d, board, settings.playhead_data, settings.colors, feature_map=PLAYHEAD_FEATURE_MAP)
 
         # Rows 2–4 — shared panoramic layers; constructed after cam layers so textures are ready.
         # The calibration strip owns row 2 by itself: it consumes all four camera images at once and

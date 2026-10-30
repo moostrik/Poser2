@@ -66,6 +66,7 @@ exclude = [
     "modules/camera/vimba/vimbapython", # vendored SDK
     "modules/camera/oak4",              # depthai 3 code: scan it against .venv-oak4
     "apps/oak4_test",                   # depthai 3 code: scan it against .venv-oak4
+    "scripts/test/multicam_barrier.py", # depthai 3 code: scan it against .venv-oak4
 ]
 venvPath = "."
 venv = ".venv"
