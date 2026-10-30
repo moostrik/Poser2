@@ -126,6 +126,9 @@ class Camera(Thread):
 
     def _open(self) -> bool:
         device_list: list[str] = get_device_list(verbose=False)
+        if not self.device_id and device_list:
+            self.device_id = device_list[0]          # no id in the preset: the first OAK4 on the network
+            logger.info(f'no device id set: opening the first OAK4 found, {self.device_id} (of {device_list})')
         if self.device_id not in device_list:
             logger.warning(f'{self.device_id} NOT AVAILABLE in {device_list}')
             return False

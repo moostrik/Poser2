@@ -32,7 +32,7 @@ class Oak4CameraSettings(RigCameraSettings):
     same way (`fps`, `color`, `square`, `yolo`, `resolution`, `model_path`, `fov`) and the
     preset keys stay flat. `color` picks the delivered frame, colour or grey, off the one sensor.
     """
-    device_id:      Field[str]   = Field("", access=Field.INIT, description="Camera device ID (serial, or its IP)")
+    device_id:      Field[str]   = Field("", access=Field.INIT, description="Camera device ID (serial, or its IP; empty = the first OAK4 found)")
     color:          Field[bool]  = Field(True, access=Field.INIT, newline=True, description="Color frames (False = grey off the same sensor)")
     square:         Field[bool]  = Field(True, access=Field.INIT)
     yolo:           Field[bool]  = Field(True, access=Field.INIT)
