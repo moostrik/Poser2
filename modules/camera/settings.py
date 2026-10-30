@@ -31,6 +31,7 @@ class CameraReadings(BaseSettings):
     """What every camera reports back: the rate its frames arrive at. Read-only; a backend fills it."""
     video_fps:        Field[float] = Field(0.0, access=Field.READ, description="Video FPS")
     video_min_fps:    Field[float] = Field(0.0, access=Field.READ, description="Lowest momentary video rate: 1 / the worst gap between frames (fps)")
+    video_latency:    Field[float] = Field(0.0, access=Field.READ, unit="ms", description="Frame capture to arrival on the PC")
 
 
 class RigCameraReadings(CameraReadings):
@@ -42,6 +43,7 @@ class RigCameraReadings(CameraReadings):
     what its device can measure; the rest stays at its default (NaN for the angles).
     """
     tracker_fps:      Field[float] = Field(0.0, access=Field.READ, description="Tracker updates/s")
+    tracker_latency:  Field[float] = Field(0.0, access=Field.READ, unit="ms", description="Frame capture to the tracklets' arrival on the PC")
     tracklets:      Field[int]   = Field(0, access=Field.READ, description="Active tracklets")
     # How the camera is actually mounted, as the board reports it — NaN until measured, which is
     # the honest default for a board with no IMU.

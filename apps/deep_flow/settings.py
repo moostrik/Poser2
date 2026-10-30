@@ -14,7 +14,7 @@ from enum import IntEnum, auto
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.panel import PanelSettings
 from modules.camera import CameraCheckSettings, CameraResolution, PlayerSettings, RecorderSettings, SyncSettings
-from modules.camera.oak import OakCameraSettings
+from modules.camera.oak4 import Oak4CameraSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings, PosesFromTrackletsSettings
@@ -79,23 +79,23 @@ class LayerSettings(BaseSettings):
 
 
 # ---------------------------------------------------------------------------
-#  Oak camera group (1 camera)
+#  OAK4 camera group (1 camera)
 # ---------------------------------------------------------------------------
 
-class OakGroup(BaseSettings):
+class Oak4Group(BaseSettings):
     num_cams:        Field[int]               = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
-    fps:                Field[float]             = Field(30.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
+    fps:                Field[float]             = Field(60.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
     keyframe_interval:  Field[int]               = Field(1, access=Field.INIT, visible=False, description="Keyframe interval in frames (1 = every frame)")
     yolo:               Field[bool]              = Field(True, access=Field.INIT, description="Enable YOLO person detection")
     color:              Field[bool]              = Field(True, access=Field.INIT, description="Enable color capture")
     square:             Field[bool]              = Field(True, access=Field.INIT, description="Use square aspect ratio")
-    resolution:         Field[CameraResolution]  = Field(CameraResolution.P1080, access=Field.INIT, description="Sensor mode. P720 and P800 on both sensors, P1080 color only.")
+    resolution:         Field[CameraResolution]  = Field(CameraResolution.P720, access=Field.INIT, description="Delivered size before the crop; the sensor mode follows it")
     sim_enabled:        Field[bool]              = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path:         Field[str]               = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
-    fov:                Field[float]             = Field(127.0, access=Field.INIT, description="Camera horizontal FOV over the full sensor width (°)")  # OAK-D Pro W, OV9782 color, 1280x800; 720p is a vertical crop
+    fov:                Field[float]             = Field(102.0, access=Field.INIT, description="Camera horizontal FOV over the full sensor width (°)")  # OAK4 Pro W, IMX586 across 1280 px, from the unit's calibration (`readings.fov_factory`)
 
     _cam_share: list = [fps, color, square, yolo, resolution, model_path, fov]
-    cam_0          : Group[OakCameraSettings]              = Group(OakCameraSettings, share=_cam_share)
+    cam_0          : Group[Oak4CameraSettings]             = Group(Oak4CameraSettings, share=_cam_share)
     camera_check   : Group[CameraCheckSettings]            = Group(CameraCheckSettings)
     simulator      : Group[PlayerSettings]                 = Group(PlayerSettings, share=[num_cams, fps])
     person_detector: Group[inference.detection.Settings]   = Group(inference.detection.Settings)   # the replay backend's person detector
@@ -105,7 +105,7 @@ class OakGroup(BaseSettings):
     tracklet_sync  : Group[SyncSettings]                   = Group(SyncSettings, share=[num_cams, fps])
 
     @property
-    def cameras(self) -> list[OakCameraSettings]:
+    def cameras(self) -> list[Oak4CameraSettings]:
         return [self.cam_0]
 
 
@@ -260,9 +260,9 @@ class RenderSettings(BaseSettings):
 class Settings(BaseSettings):
     max_players:        Field[int]   = Field(1, access=Field.INIT, visible=False)
     num_cams:           Field[int]   = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
-    input_fps:          Field[float] = Field(30.0, min=1.0, max=120.0, access=Field.INIT)
+    input_fps:          Field[float] = Field(60.0, min=1.0, max=120.0, access=Field.INIT)
 
-    camera: Group[OakGroup]       = Group(OakGroup, share=[num_cams, input_fps.as_('fps')])
+    camera: Group[Oak4Group]      = Group(Oak4Group, share=[num_cams, input_fps.as_('fps')])
     pose  : Group[PoseGroup]      = Group(PoseGroup, share=[max_players, input_fps.as_('frequency')])
     render: Group[RenderSettings] = Group(RenderSettings)
     inout : Group[InOutGroup]     = Group(InOutGroup)

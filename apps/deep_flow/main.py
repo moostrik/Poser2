@@ -1,9 +1,13 @@
-"""Deep Flow — single-camera 3D volumetric fluid installation."""
+"""Deep Flow — single-camera 3D volumetric fluid installation.
+
+Runs in `.venv-oak4`, the depthai 3 venv (`scripts\\install.bat oak4`), on one OAK4. `-sim` plays the
+recordings on the host with the replay backend, with no camera attached.
+"""
 
 from functools import partial
 
 from modules.camera import CameraSource, CameraCheck, Player, Recorder, Sync, replay
-from modules.camera.oak import Camera, Simulator
+from modules.camera.oak4 import Camera
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound
@@ -56,15 +60,11 @@ class DeepFlowMain:
         self.person_detector: detection.PersonDetector | None = None      # the replay backend's, shared by its cameras
         if self.settings.camera.sim_enabled:
             self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH)
-            if self.settings.camera.simulator.replay:
-                # the recordings on the host, without a device: the people found and followed here
-                if self.settings.camera.yolo:
-                    self.person_detector = detection.PersonDetector(self.settings.camera.person_detector)
-                for i in range(num_cams):
-                    self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.person_detector, replay.Tracker(), i))
-            else:
-                for i in range(num_cams):
-                    self.cameras.append(Simulator(self.player, self.settings.camera.cameras[i], self.settings.camera.simulator))
+            # the recordings on the host, without a device: the people found and followed here
+            if self.settings.camera.yolo:
+                self.person_detector = detection.PersonDetector(self.settings.camera.person_detector)
+            for i in range(num_cams):
+                self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.person_detector, replay.Tracker(), i))
         else:
             self.recorder = Recorder(self.settings.camera.recorder, data_path=DATA_PATH)
             for i in range(num_cams):

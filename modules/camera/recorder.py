@@ -12,7 +12,7 @@ from queue import Queue, Empty
 from modules.settings import BaseSettings, Field, Widget
 from modules.video import CoderType, CoderFormat, encoder_name, StreamWriter
 
-from .frame import FrameType, CameraFrame
+from .frame import FrameType, CameraFrame, mirrored_image
 
 import logging
 logger = logging.getLogger(__name__)
@@ -181,7 +181,7 @@ class Recorder(Thread):
                 frame: CameraFrame = self.frames[c].get(timeout=0.01)
             except Empty:
                 continue
-            self.recorders[c][frame.kind].submit_frame(frame.image)
+            self.recorders[c][frame.kind].submit_frame(mirrored_image(frame) if frame.flip_h else frame.image, frame.nv12)
 
     def _get_state(self) -> RecState:
         with self.state_lock:

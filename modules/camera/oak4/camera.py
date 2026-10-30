@@ -3,10 +3,15 @@
 Each camera opens its own device and builds its own pipeline on it (`build_pipeline`; a depthai 3
 pipeline is bound to one device), reads the delivered frames, the tracklets and the IMU through
 queues on the node outputs, on depthai's callback thread, which is where the frames and tracklets
-become the contract's and get their host time. With `yolo` the device runs the pose model, so a
-tracklet carries its keypoints: from its own detection in the one-model chain, or, in the two-model
-chain, from the pose of its crop, joined to it by frame (`PoseJoin`). The sensor controls are
-`SensorControl`'s for as long as the device is open.
+become the contract's and get their host time. With `yolo` the device runs the chain `pose_chain`
+names. DETECTOR gives boxes only; with a pose chain a tracklet carries its keypoints: from its own
+detection in the one-model chain, or, in the two-model chain, from the pose of its crop, joined to
+it by frame (`PoseJoin`). The sensor controls are `SensorControl`'s for as long as the device is open.
+
+The frame leaves here untouched where it can: an NV12 frame goes on packed, and the GPU upload
+converts and mirrors it, so this thread does no color work. The camera cannot mirror that frame
+itself, so its boxes and keypoints are mirrored here to match. `readings.video_latency` and
+`tracker_latency` say what each message took from capture to here.
 
 Docs: https://docs.luxonis.com/software-v3/depthai
 """
@@ -26,9 +31,9 @@ from .. import CameraResolution, CameraFrame, RigCameraReadings, CameraTracklet,
 from modules.utils import FPS, Rect
 
 from .control import SensorControl
-from .definitions import SENSOR_SOCKET, requested_size, get_device_list, log_connected_sensors, \
-    read_lens_calibration, imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL, POSE_ARCHIVE, DETECTOR_ARCHIVE, \
-    TOP_DOWN_ARCHIVE, PoseChain, TRACKING_STATUS, tracklet_keypoints, keypoints_in_frame
+from .definitions import SENSOR_SOCKET, requested_size, get_device_list, find_device, log_connected_sensors, \
+    read_lens_calibration, imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL, PoseChain, CameraLink, model_archives, \
+    TRACKING_STATUS, tracklet_keypoints, keypoints_in_frame, packed_nv12, smoothed_latency, mirrored_roi, mirrored_keypoints
 from .pipeline import build_pipeline, MountConfig, PipelineOutputs
 from .pose_join import PoseJoin, Box
 from .settings import Oak4CameraSettings
@@ -55,6 +60,7 @@ class Camera(Thread):
 
         # FIXED SETTINGS (read from INIT fields once)
         self.device_id: str =           settings.device_id
+        self.link: CameraLink =         settings.link
         self.model_path: str =          settings.model_path
         self.fps: float =               settings.fps
         self.square: bool =             settings.square
@@ -76,10 +82,10 @@ class Camera(Thread):
                                                   self.mount.lens_fov, self.mount.lens_center)
         self.pose_chain: PoseChain = settings.pose_chain
         models = Path(self.model_path)
-        two_models: bool = self.yolo and self.pose_chain == PoseChain.TWO_MODELS
-        self.pose_archive: Path | None = models / (TOP_DOWN_ARCHIVE if two_models else POSE_ARCHIVE) if self.yolo else None
-        self.detector_archive: Path | None = models / DETECTOR_ARCHIVE if two_models else None
-        self.pose_join: PoseJoin | None = PoseJoin() if two_models else None
+        pose, detector = model_archives(self.pose_chain) if self.yolo else (None, None)
+        self.pose_archive: Path | None = models / pose if pose else None
+        self.detector_archive: Path | None = models / detector if detector else None
+        self.pose_join: PoseJoin | None = PoseJoin() if pose and detector else None
 
         # DEVICE — its pipeline and queues are made in `_open` and closed with it.
         self.device: dai.Device | None = None
@@ -87,6 +93,7 @@ class Camera(Thread):
         self.queues: list[dai.MessageQueue] = []
         self.control: SensorControl | None = None
         self.num_tracklets: int = 0
+        self.flip_on_host: bool = False
         self._frame_transformation: dai.ImgTransformation | None = None     # the delivered frame's, for the crops' keypoints
 
         # FPS
@@ -136,10 +143,14 @@ class Camera(Thread):
         if self.device_id not in device_list:
             logger.warning(f'{self.device_id} NOT AVAILABLE in the OAK4s found: {device_list}')
             return False
+        info: dai.DeviceInfo | None = find_device(self.device_id, self.link)
+        if info is None:
+            logger.warning(f'{self.device_id} is gone')
+            return False
 
         self._log_frame_geometry()
         try:
-            self.device = dai.Device(dai.DeviceInfo(self.device_id))
+            self.device = dai.Device(info)
             self.pipeline = dai.Pipeline(self.device)
             outputs: PipelineOutputs = build_pipeline(self.pipeline, self.fps, self.color, self.square, self.resolution,
                                                       self.mount, frame_height=self.frame_height,
@@ -152,7 +163,7 @@ class Camera(Thread):
             self._close()
             return False
 
-        logger.info(f'{self.device_id} OPEN')
+        logger.info(f'{self.device_id} OPEN over {info.protocol}')
         log_connected_sensors(self.device, self.device_id)
         self._read_mount_calibration()
         self.running = True
@@ -182,8 +193,9 @@ class Camera(Thread):
         logger.info(f'{self.device_id} CLOSED')
 
     def _setup_queues(self, outputs: PipelineOutputs) -> None:
-        """The host's ends of the pipeline: the frames every camera has, the tracklets with a pose
-        model, the IMU, the sensor controls."""
+        """The host's ends of the pipeline: the frames every camera has, the tracklets with a model,
+        the IMU, the sensor controls."""
+        self.flip_on_host = outputs.flip_on_host
         video: dai.MessageQueue = outputs.video.createOutputQueue(maxSize=QUEUE_SIZE, blocking=False)
         video.addCallback(self._video_callback)
         self.queues.append(video)
@@ -238,27 +250,39 @@ class Camera(Thread):
     # ── The queues' callbacks: the hand-over to the contract ───────────
 
     def _video_callback(self, name: str, msg: dai.ImgFrame) -> None:
+        readings: RigCameraReadings = self.settings.readings
+        readings.video_latency = smoothed_latency(readings.video_latency, msg)
         self.video_fps.processed()
-        self.settings.readings.video_fps = self.video_fps.get_rate_average()
-        self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
+        readings.video_fps = self.video_fps.get_rate_average()
+        readings.video_min_fps = self.video_fps.get_rate_minimum()
         if self.control is not None:
             self.control.readback(msg)
         if self.pose_join is not None:
             self._frame_transformation = msg.getTransformation()
-        self._emit_frame(FrameType.VIDEO, msg.getCvFrame())
+        if msg.getType() == dai.ImgFrame.Type.NV12:
+            self._emit_frame(FrameType.VIDEO, packed_nv12(msg), nv12=True)
+        else:
+            self._emit_frame(FrameType.VIDEO, msg.getCvFrame())
+
+    def _tracklet(self, tracklet: dai.Tracklet, keypoints: ndarray | None, timestamp: float) -> CameraTracklet:
+        """One device tracklet as the contract's, mirrored when the frames are."""
+        roi = Rect(tracklet.roi.x, tracklet.roi.y, tracklet.roi.width, tracklet.roi.height)
+        if self.flip_on_host:
+            roi, keypoints = mirrored_roi(roi), mirrored_keypoints(keypoints)
+        return CameraTracklet(cam_id=self.id, id=tracklet.id, status=TRACKING_STATUS[tracklet.status], roi=roi,
+                              age=tracklet.age, timestamp=timestamp, keypoints=keypoints)
 
     def _tracker_callback(self, name: str, msg: dai.Tracklets) -> None:
         """The hand-over of the device's tracklets: the contract's, with the keypoints the pose model
         found for each, and the message's host time. In the two-model chain the keypoints come with
         the poses (`_poses_callback`), and the tracklets wait in the join for them."""
+        self.settings.readings.tracker_latency = smoothed_latency(self.settings.readings.tracker_latency, msg)
         self.tracklet_fps.processed()
         self.settings.readings.tracker_fps = self.tracklet_fps.get_rate_average()
         now: float = time.perf_counter()
         one_model: bool = self.pose_join is None
         tracklets: list[CameraTracklet] = [
-            CameraTracklet(cam_id=self.id, id=t.id, status=TRACKING_STATUS[t.status],
-                           roi=Rect(t.roi.x, t.roi.y, t.roi.width, t.roi.height), age=t.age, timestamp=now,
-                           keypoints=tracklet_keypoints(t.srcImgDetection) if one_model else None)
+            self._tracklet(t, tracklet_keypoints(t.srcImgDetection) if one_model else None, now)
             for t in msg.tracklets]
         self.num_tracklets = len(tracklets)
         self.settings.readings.tracklets = self.num_tracklets
@@ -283,6 +307,8 @@ class Camera(Thread):
         if len(keypoints) != len(boxes):
             logger.debug(f'{self.device_id} frame {detections.getSequenceNum()}: {len(keypoints)} poses for {len(boxes)} people')
             keypoints = (keypoints + [None] * len(boxes))[:len(boxes)]
+        if self.flip_on_host:
+            keypoints = [mirrored_keypoints(points) for points in keypoints]
         joined = self.pose_join.put_poses(detections.getSequenceNum(), boxes, keypoints)
         if joined is not None:
             self._emit_tracklets(joined, time.perf_counter())
@@ -306,9 +332,10 @@ class Camera(Thread):
         self.settings.readings.tilt_measured = tilt
         self.settings.readings.roll_measured = roll - self.settings.readings.roll_offset
 
-    def _emit_frame(self, kind: FrameType, image: ndarray) -> None:
+    def _emit_frame(self, kind: FrameType, image: ndarray, nv12: bool = False) -> None:
         """The hand-over: the frame gets its host time here and goes to every callback."""
-        frame = CameraFrame(cam_id=self.id, kind=kind, image=image, timestamp=time.perf_counter())
+        frame = CameraFrame(cam_id=self.id, kind=kind, image=image, timestamp=time.perf_counter(),
+                            nv12=nv12, flip_h=self.flip_on_host)
         for c in self.frame_callbacks:
             c(frame)
 

@@ -1,13 +1,15 @@
 """The depthai 3 pipeline of one OAK4 camera, built in one pass on the camera's own device.
 
 The sensor at the requested size and type, the correction that turns the sensor's frame into the
-contract's, and the IMU. Two corrections, as on the OAK-D: `tilt` (and tilt 0, the cylindrical
-reprojection that makes a column one azimuth) goes through the `Warp` node with the mesh from
-`geometry.warp_mesh_points`, which on this chip warps grey frames only; `keystone` (hd_trio,
-deep_flow) is a four-point transform in `ImageManip`, in colour or grey. The detector branch
-is the pose model on the delivered frame, the device's object tracker on its detections, and the
-tracklets with their keypoints. Nothing here is an XLink stream: the host reads a node's output
-through the queue `Camera` creates on it.
+contract's, and the IMU. A color frame with neither `tilt` nor `keystone` takes no correction at all:
+the Camera node crops it itself and delivers NV12, the lowest latency by far (capture to PC 25 ms
+against 34 through `ImageManip` in BGR, over USB), and the host converts and mirrors it. Past that,
+two corrections as on the OAK-D: `tilt` (and tilt 0, the cylindrical reprojection that makes a column
+one azimuth) goes through the `Warp` node with the mesh from `geometry.warp_mesh_points`, which on
+this chip warps grey frames only; `keystone` is a four-point transform in `ImageManip`, in colour or
+grey. The detector branch is the model on the delivered frame, the device's object tracker on its detections, and the
+tracklets, with their keypoints when the model is a pose model. Nothing here is an XLink stream:
+the host reads a node's output through the queue `Camera` creates on it.
 """
 
 from dataclasses import dataclass
@@ -49,12 +51,14 @@ class MountConfig:
 @dataclass
 class PipelineOutputs:
     """What the host reads and writes: the delivered frames, the sensor's control input, the IMU,
-    with a pose model the tracklets, and with the two-model chain the poses of the crops."""
+    with a model the tracklets, and with the two-model chain the poses of the crops. `flip_on_host`
+    says the camera did not mirror what it delivers, frames and boxes alike, so the host must."""
     video: dai.Node.Output
     control: dai.Node.Input
     imu: dai.Node.Output
     tracklets: dai.Node.Output | None = None
     poses: dai.Node.Output | None = None
+    flip_on_host: bool = False
 
 
 def build_pipeline(
@@ -71,41 +75,49 @@ def build_pipeline(
     """Build the camera's pipeline into `pipeline`, the one bound to its device.
 
     `frame_height` is the delivered height the tilt correction produces (`delivered_height`),
-    0 for the sensor's rows; `pose_archive` is the pose model's NN archive, None for frames only,
-    and with `detector_archive` the chain is the detector plus the pose model on each person's crop.
+    0 for the sensor's rows. The archives are the models' NN archives: neither is frames only,
+    `pose_archive` alone the one-model chain, `detector_archive` alone boxes only, and both the
+    detector plus the pose model on each person's crop.
     Raises `ValueError` for a colour frame with `tilt` (`pick_correction`).
     """
     src_size: tuple[int, int] = requested_size(color, resolution)
     out_size: tuple[int, int] = frame_size(color, resolution, square, frame_height)
+    model: Path | None = pose_archive or detector_archive
+    correction: Correction = pick_correction(color, mount.tilt, mount.keystone, mount.flip_v)
     logger.info("OAK4 pipeline: %s, %s, %s%s", 'square' if square else 'wide', 'color' if color else 'grey',
-                pick_correction(color, mount.tilt, mount.keystone).name.lower(),
-                f', pose model {pose_archive.name}' if pose_archive else '')
+                correction.name.lower(), f', model {model.name}' if model else '')
 
     camera: dai.node.Camera = pipeline.create(dai.node.Camera).build(SENSOR_SOCKET)
-    source: dai.Node.Output = camera.requestOutput(src_size, frame_type(color), fps=fps)
-    frames: dai.Node.Output = add_correction(pipeline, source, src_size, out_size, color, mount)
+    frames: dai.Node.Output
+    if correction == Correction.DIRECT:
+        frames = camera.requestOutput(out_size, dai.ImgFrame.Type.NV12, dai.ImgResizeMode.CROP, fps=fps)
+    else:
+        source: dai.Node.Output = camera.requestOutput(src_size, frame_type(color), fps=fps)
+        frames = add_correction(pipeline, source, src_size, out_size, color, mount, correction)
     imu: dai.Node.Output = add_imu(pipeline)
     tracklets: dai.Node.Output | None = None
     poses: dai.Node.Output | None = None
     if pose_archive and detector_archive:
         tracklets, poses = add_pose_chain(pipeline, frames, fps, detector_archive, pose_archive)
-    elif pose_archive:
-        tracklets = add_pose_detector(pipeline, frames, pose_archive)
-    return PipelineOutputs(video=frames, control=camera.inputControl, imu=imu, tracklets=tracklets, poses=poses)
+    elif model:
+        tracklets = add_one_model_chain(pipeline, frames, model)
+    return PipelineOutputs(video=frames, control=camera.inputControl, imu=imu, tracklets=tracklets, poses=poses,
+                           flip_on_host=correction == Correction.DIRECT and mount.flip_h)
 
 
 class Correction(IntEnum):
     WARP = 0            # the mesh: the tilt, or at tilt 0 the cylindrical reprojection
     FOUR_POINT = 1      # the keystone; at keystone 0 the plain crop and flips
+    DIRECT = 2          # none: the Camera node's own crop, NV12, mirrored on the host
 
 
-def pick_correction(color: bool, tilt: float, keystone: float) -> Correction:
+def pick_correction(color: bool, tilt: float, keystone: float, flip_v: bool) -> Correction:
     """The one correction a camera uses, picked as `oak.pipeline.build_warp_mesh` picks it where the
     chip allows: both set takes `tilt`; both zero is the reprojection in grey. The chip warps grey
-    frames only, so a colour frame takes the four-point transform: at keystone 0 the sensor's frame
-    cropped and flipped, not reprojected. Raises `ValueError` for a colour frame with `tilt`, which
-    the chip cannot correct: the camera then does not open, rather than deliver a frame the tracker
-    would read wrong."""
+    frames only, so a colour frame with both zero needs no reprojection at all and goes `DIRECT`,
+    unless `flip_v` asks for a flip the host does not do, which stays on the four-point transform.
+    Raises `ValueError` for a colour frame with `tilt`, which the chip cannot correct: the camera
+    then does not open, rather than deliver a frame the tracker would read wrong."""
     if tilt != 0.0 and keystone != 0.0:
         logger.warning("tilt (%.1f) and keystone (%.2f) are both set; they are exclusive, using tilt", tilt, keystone)
     if tilt != 0.0:
@@ -114,13 +126,15 @@ def pick_correction(color: bool, tilt: float, keystone: float) -> Correction:
         return Correction.WARP
     if keystone == 0.0 and not color:
         return Correction.WARP
+    if keystone == 0.0 and not flip_v:
+        return Correction.DIRECT
     return Correction.FOUR_POINT
 
 
 def add_correction(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tuple[int, int],
-                   out_size: tuple[int, int], color: bool, mount: MountConfig) -> dai.Node.Output:
-    """The correction `pick_correction` names, on the chip."""
-    if pick_correction(color, mount.tilt, mount.keystone) == Correction.WARP:
+                   out_size: tuple[int, int], color: bool, mount: MountConfig, correction: Correction) -> dai.Node.Output:
+    """The correction `pick_correction` named, on the chip."""
+    if correction == Correction.WARP:
         return add_warp(pipeline, source, src_size, out_size, mount)
     if mount.keystone == 0.0:
         logger.info("OAK4 colour frame: cropped and flipped, not reprojected (the chip warps grey frames only)")
@@ -161,17 +175,18 @@ def add_keystone(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tupl
     return manip.out
 
 
-def add_pose_detector(pipeline: dai.Pipeline, frames: dai.Node.Output, archive_path: Path) -> dai.Node.Output:
-    """The one-model chain: the pose model on the delivered frame, the device's object tracker on
-    its detections, and the tracklets out. The archive's config tells the network how to decode the
-    boxes and the 17 keypoints, so no decode of ours; each tracklet's source detection carries them."""
+def add_one_model_chain(pipeline: dai.Pipeline, frames: dai.Node.Output, archive_path: Path) -> dai.Node.Output:
+    """The model on the delivered frame, the device's object tracker on its detections, and the
+    tracklets out. The archive's config tells the network how to decode them, so no decode of ours:
+    a pose model's boxes bring their 17 keypoints in each tracklet's source detection, a person
+    detector's only the box."""
     network = add_detector(pipeline, frames, dai.NNArchive(archive_path))
     return add_tracker(pipeline, network.passthrough, network.out)
 
 
 def add_detector(pipeline: dai.Pipeline, frames: dai.Node.Output, archive: dai.NNArchive) -> dai.node.DetectionNetwork:
-    """The delivered frame stretched into the model and the network on it: the first stage of both
-    chains. STRETCHED, never cropped or letterboxed, as the OAK-D's detector takes it: nothing is
+    """The delivered frame stretched into the model and the network on it: the first stage of every
+    chain. STRETCHED, never cropped or letterboxed, as the OAK-D's detector takes it: nothing is
     lost at the edges and the normalised boxes map 1:1 onto the delivered frame; an aspect mismatch
     costs detection quality, never geometry."""
     size: tuple[int, int] | None = archive.getInputSize()
@@ -193,8 +208,8 @@ def add_detector(pipeline: dai.Pipeline, frames: dai.Node.Output, archive: dai.N
 
 
 def add_tracker(pipeline: dai.Pipeline, frames: dai.Node.Output, detections: dai.Node.Output) -> dai.Node.Output:
-    """The device's object tracker on the people, as the OAK-D runs it; `frames` are the frames the
-    detections were made on (the network's passthrough), so it only ever sees frames that were inferred."""
+    """The device's object tracker on the people; `frames` are the frames the detections were made
+    on (the network's passthrough), so it only ever sees frames that were inferred."""
     tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
     tracker.setDetectionLabelsToTrack([TRACKER_PERSON_LABEL])
     tracker.setTrackerType(TRACKER_TYPE)

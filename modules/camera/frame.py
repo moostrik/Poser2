@@ -19,9 +19,26 @@ class CameraFrame:
     `timestamp` is the host's arrival time on the one clock, `time.perf_counter()`, stamped by the
     backend at hand-over; camera timestamps are not used, and everything downstream takes its
     time from the frame instead of reading a clock (the wall clock is for file names only).
-    `image` is BGR uint8 (H, W, 3) or gray uint8 (H, W), as the backend delivers it.
+    `image` is BGR uint8 (H, W, 3) or gray uint8 (H, W), as the backend delivers it; with `nv12` it is
+    packed NV12 uint8 (H * 3 / 2, W): the Y rows, then the interleaved UV rows, which a consumer
+    converts where it is cheapest. `flip_h` says the image still has to be mirrored, because the
+    device could not: the GPU upload does it, anything off the GPU takes `mirrored_image`.
     """
     cam_id: int
     kind: FrameType
     image: np.ndarray
     timestamp: float
+    nv12: bool = False
+    flip_h: bool = False
+
+
+def mirrored_image(frame: CameraFrame) -> np.ndarray:
+    """The frame's image flipped left to right, in the frame's own layout. A new array: `Uploader`
+    flips on the GPU instead, so this is for a consumer that keeps the image on the host."""
+    image: np.ndarray = frame.image
+    if not frame.nv12:
+        return image[:, ::-1].copy()
+    rows: int = image.shape[0] * 2 // 3
+    width: int = image.shape[1]
+    uv: np.ndarray = image[rows:].reshape(rows // 2, width // 2, 2)[:, ::-1]     # the pairs stay together
+    return np.concatenate((image[:rows, ::-1], uv.reshape(rows // 2, width)))

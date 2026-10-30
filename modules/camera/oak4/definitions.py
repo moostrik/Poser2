@@ -9,13 +9,15 @@ import depthai as dai
 import numpy as np
 
 from .. import CameraResolution, resolve_resolution, mode_size, TrackingStatus
+from modules.utils import Rect
 
 logger = logging.getLogger(__name__)
 
 
-# The OAK4 has one sensor, colour (IMX586 on the OAK4 S); grey comes off the same sensor as the
-# ISP's luma. The contract's resolution labels are delivered sizes here, not sensor modes: the
-# Camera node picks the sensor mode from the size requested (`geometry.mode_size`).
+# This backend delivers the color sensor (IMX586); the OAK4 Pro W also has an OV9282 stereo pair on
+# CAM_B and CAM_C. Grey comes off the color sensor as the ISP's luma. The contract's resolution
+# labels are delivered sizes here, not sensor modes: the Camera node picks the sensor mode from the
+# size requested (`geometry.mode_size`).
 SENSOR_SOCKET: dai.CameraBoardSocket = dai.CameraBoardSocket.CAM_A
 
 
@@ -43,21 +45,83 @@ SHARPNESS_RANGE:    tuple[int, int] = (   0, 4    )
 
 
 def get_device_list(verbose: bool = False) -> list[str]:
-    """The ids of the OAK4s depthai sees now, USB and Ethernet alike. depthai 3 also sees the OAK-D cameras
-    (RVC2) on the same PC; they are left out, so this backend never opens one."""
+    """The ids of the OAK4s depthai sees now, each once: an OAK4 on both USB and Ethernet is listed
+    by depthai on both. depthai 3 also sees the OAK-D cameras (RVC2) on the same PC; they are left
+    out, so this backend never opens one."""
     device_list: list[str] = []
     if verbose:
         logger.info('-- CAMERAS --------------------------------------------------')
     for device in dai.Device.getAllAvailableDevices():
         is_oak4: bool = device.platform == dai.XLinkPlatform.X_LINK_RVC4
-        if is_oak4:
+        if is_oak4 and device.getDeviceId() not in device_list:
             device_list.append(device.getDeviceId())
         if verbose:
             skipped: str = '' if is_oak4 else ' (not an OAK4: skipped)'
-            logger.info(f"Camera: {device.getDeviceId()} {device.name} {device.platform} {device.state}{skipped}")
+            logger.info(f"Camera: {device.getDeviceId()} {device.name} {device.platform} {device.protocol} {device.state}{skipped}")
     if verbose:
         logger.info('-------------------------------------------------------------')
     return device_list
+
+
+class CameraLink(IntEnum):
+    """How the camera reaches the PC. USB is the faster: measured 4 to 9 ms less capture to arrival."""
+    USB = 0
+    ETHERNET = 1
+
+
+LINK_PROTOCOLS: dict[CameraLink, dai.XLinkProtocol] = {
+    CameraLink.USB: dai.XLinkProtocol.X_LINK_USB_EP,
+    CameraLink.ETHERNET: dai.XLinkProtocol.X_LINK_TCP_IP,
+}
+
+
+def find_device(device_id: str, link: CameraLink) -> dai.DeviceInfo | None:
+    """This OAK4 on `link`, or on the link it does have with a warning; None when it is on neither.
+    Chosen here because depthai's own pick by id is whichever it finds first."""
+    routes: list[dai.DeviceInfo] = [device for device in dai.Device.getAllAvailableDevices() if device.getDeviceId() == device_id]
+    for route in routes:
+        if route.protocol == LINK_PROTOCOLS[link]:
+            return route
+    if routes:
+        logger.warning(f'{device_id} is not on {link.name}: using {routes[0].protocol}')
+        return routes[0]
+    return None
+
+
+def packed_nv12(frame: dai.ImgFrame) -> np.ndarray:
+    """The frame's Y rows then its interleaved UV rows, without the chip's padding: `getData` holds
+    each row at the stride and the UV below a padded plane. A new array, safe to keep."""
+    width, height, stride = frame.getWidth(), frame.getHeight(), frame.getStride()
+    data: np.ndarray = frame.getData()
+    uv_start: int = stride * frame.getPlaneHeight()
+    y: np.ndarray = data[:stride * height].reshape(height, stride)[:, :width]
+    uv: np.ndarray = data[uv_start:uv_start + stride * (height // 2)].reshape(height // 2, stride)[:, :width]
+    return np.concatenate((y, uv))
+
+
+LATENCY_SMOOTHING: float = 0.1      # how hard each frame pulls the latency reading
+
+
+def smoothed_latency(previous: float, message: dai.ImgFrame | dai.Tracklets) -> float:
+    """The latency reading in ms after this message, capture to arrival, on depthai's clock because
+    the message's timestamp is. A reading for the panel; nothing downstream takes time from it."""
+    latency: float = (dai.Clock.now() - message.getTimestamp()).total_seconds() * 1000.0
+    return latency if previous == 0.0 else previous + LATENCY_SMOOTHING * (latency - previous)
+
+
+def mirrored_roi(roi: Rect) -> Rect:
+    """A normalised box in the frame flipped left to right."""
+    return Rect(1.0 - roi.x - roi.width, roi.y, roi.width, roi.height)
+
+
+def mirrored_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
+    """Keypoints (N, 3) with x flipped left to right. The labels stay: a left shoulder stays the
+    model's left shoulder, as the model saw the frame unflipped."""
+    if keypoints is None:
+        return None
+    mirrored: np.ndarray = keypoints.copy()
+    mirrored[:, 0] = 1.0 - mirrored[:, 0]
+    return mirrored
 
 
 def log_connected_sensors(device: dai.Device, device_id: str = '') -> None:
@@ -84,11 +148,11 @@ IMU_RATE_HZ: int = 5
 IMU_SMOOTHING: float = 0.1
 
 # The turn the board mounts the IMU at about the optical axis. On the OAK-D it is a measured
-# quarter turn (`oak.definitions.IMU_BOARD_ROLL`); on the OAK4 it is unmeasured, so this claims
-# nothing until a camera standing level reads a roll, which goes here as a board constant and
-# not in `roll_offset`, which is per unit. Since depthai 3.6.1 `ACCELEROMETER_RAW` is the IMU's
-# own frame, unrotated, which is the frame `getImuToCameraExtrinsics` describes.
-IMU_BOARD_ROLL: float = 0.0
+# quarter turn (`oak.definitions.IMU_BOARD_ROLL`); on the OAK4 a half turn, measured: an upright
+# OAK4 Pro W read a roll of -178.6 with this at 0. It is a board constant and not in `roll_offset`,
+# which is per unit. Since depthai 3.6.1 `ACCELEROMETER_RAW` is the IMU's own frame, unrotated,
+# which is the frame `getImuToCameraExtrinsics` describes.
+IMU_BOARD_ROLL: float = 180.0
 
 
 def read_lens_calibration(device: dai.Device, socket: dai.CameraBoardSocket, size: tuple[int, int],
@@ -134,14 +198,18 @@ def imu_rotation_to_camera(device: dai.Device, socket: dai.CameraBoardSocket, de
 # the 17 body landmarks (COCO, the order of `modules.pose.PointLandmark`), `PoseChain` picks:
 # ONE_MODEL finds the people and their landmarks in one pass, decoded by `DetectionNetwork` from the
 # archive's config; TWO_MODELS runs a detector, cuts one crop per person on the device and runs a
-# top-down pose model on each crop, through Luxonis's depthai-nodes.
+# top-down pose model on each crop, through Luxonis's depthai-nodes. DETECTOR gives boxes only, for
+# an app that poses the crops on the host: yolov8n at the square frame's 416x416, compiled through
+# Luxonis's HubAI, as the zoo has no square size for this chip.
 
 
 class PoseChain(IntEnum):
     ONE_MODEL = 0       # YOLOv8-pose: boxes and keypoints in one pass
     TWO_MODELS = 1      # YOLOv6 detector, then Lite-HRNet on each person's crop
+    DETECTOR = 2        # YOLOv8n: boxes only
 
 
+PERSON_DETECTOR_ARCHIVE: str = 'yolov8n_coco_416x416_rvc4.tar.xz'
 POSE_MODEL: str = 'luxonis/yolov8-nano-pose-estimation:coco-512x288'
 POSE_ARCHIVE: str = 'yolov8n_pose_coco_512x288_rvc4.tar.xz'
 DETECTOR_MODEL: str = 'luxonis/yolov6-nano:r2-coco-512x288'
@@ -161,7 +229,17 @@ TRACKING_STATUS: dict[dai.Tracklet.TrackingStatus, TrackingStatus] = {
     dai.Tracklet.TrackingStatus.REMOVED: TrackingStatus.REMOVED,
 }
 TRACKER_PERSON_LABEL: int = 0
-TRACKER_TYPE: dai.TrackerType = dai.TrackerType.ZERO_TERM_IMAGELESS
+TRACKER_TYPE: dai.TrackerType = dai.TrackerType.SHORT_TERM_IMAGELESS    # this chip has no ZERO_TERM_IMAGELESS, the `oak` backend's type
+
+
+def model_archives(chain: PoseChain) -> tuple[str | None, str | None]:
+    """The (pose, detector) archive names of a chain: `build_pipeline` reads one model off the one
+    that is set, and the two-model chain off both."""
+    if chain == PoseChain.DETECTOR:
+        return None, PERSON_DETECTOR_ARCHIVE
+    if chain == PoseChain.TWO_MODELS:
+        return TOP_DOWN_ARCHIVE, DETECTOR_ARCHIVE
+    return POSE_ARCHIVE, None
 
 
 def nn_frame_type(archive: dai.NNArchive) -> dai.ImgFrame.Type:

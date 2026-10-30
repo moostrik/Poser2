@@ -1,7 +1,7 @@
 {
   "max_players": 1,
   "num_cams": 1,
-  "input_fps": 30.0,
+  "input_fps": 60.0,
   "camera": {
     "keyframe_interval": 1,
     "yolo": true,
@@ -10,9 +10,11 @@
     "resolution": "P720",
     "sim_enabled": false,
     "model_path": "data/models",
-    "fov": 127.0,
+    "fov": 102.0,
     "cam_0": {
-      "device_id": "14442C10F124D9D600",
+      "device_id": "",
+      "link": "USB",
+      "pose_chain": "DETECTOR",
       "flip_h": true,
       "flip_v": false,
       "tilt": 0.0,
@@ -20,12 +22,10 @@
       "lens_fov": 0.0,
       "lens_center_x": 0.0,
       "lens_center_y": 0.0,
-      "mono_auto_exposure": true,
-      "ir_flood_light": 0.0,
       "readings": {
         "roll_offset": 0.0
       },
-      "color_sensor": {
+      "sensor": {
         "exposure": 29992,
         "iso": 147,
         "auto_exposure": true,
@@ -36,11 +36,6 @@
         "saturation": 0,
         "denoise": 0,
         "sharpness": 0
-      },
-      "mono_sensor": {
-        "exposure": 1000,
-        "iso": 100,
-        "ir_grid_light": 0.0
       }
     },
     "camera_check": {
@@ -56,7 +51,7 @@
       "apply_warp": false,
       "folder": "20260612-131225_keyframes",
       "sim_passthrough": false,
-      "replay": false,
+      "replay": true,
       "start_norm": 0.0,
       "end_norm": 1.0
     },
@@ -102,7 +97,7 @@
     "segmentation": {
       "resolution": "EXTREME",
       "enabled": true,
-      "reset_interval": 240
+      "reset_interval": 480
     },
     "optical_flow": {
       "resolution": "STANDARD",
@@ -206,20 +201,20 @@
         "n_top_motions": 1
       },
       "moving_average": {
-        "window_size": 23,
+        "window_size": 46,
         "window_type": "UNIFORM"
       }
     },
     "window_raw": {
-      "window_size": 180,
+      "window_size": 360,
       "emit_partial": true
     },
     "window_clean": {
-      "window_size": 180,
+      "window_size": 360,
       "emit_partial": true
     },
     "window_smooth": {
-      "window_size": 180,
+      "window_size": 360,
       "emit_partial": true
     },
     "window_lerp": {

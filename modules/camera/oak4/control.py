@@ -1,5 +1,5 @@
 """The sensor controls: the panel's sensor fields written to the device, and the device's auto
-values read back into them. The OAK-D backend's `SensorControl` for the OAK4's one sensor."""
+values read back into them. The OAK-D backend's `SensorControl` for the OAK4's color sensor."""
 
 import logging
 

@@ -25,5 +25,18 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "mcp__plugin_luxonis_luxonis"
     ]
+  },
+  "hooks": {
+    "PermissionRequest": [
+      {
+        "matcher": "mcp__plugin_luxonis_luxonis__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PermissionRequest\",\"decision\":{\"behavior\":\"allow\"}}}'"
+          }
+        ]
+      }
+    ]
   }
 }

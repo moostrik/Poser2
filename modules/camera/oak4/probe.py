@@ -1,11 +1,13 @@
 """The OAK4 bring-up: the real backend on one device for a few seconds, reporting what arrives.
 
-    python -m modules.camera.oak4.probe [device_id] [-s SECONDS] [--color] [--keystone K | --tilt T] [--no-pose | --two-models]
+    python -m modules.camera.oak4.probe [device_id] [-s SECONDS] [--fps FPS] [--resolution P720|P800|P1080]
+        [--link USB|ETHERNET] [--color] [--square] [--flip-h] [--keystone K | --tilt T]
+        [--no-pose | --two-models | --detector]
 
 Lists the devices depthai sees, opens the first (or the one named) through `Camera` exactly as an
 app would, and prints the frame rate, the frame type and size, the tracklets with their keypoints
 when the pose model's archive is in `data/models` (`--no-pose` leaves it out, `--two-models` runs
-the detector plus the pose model on the crops), the readings
+the detector plus the pose model on the crops, `--detector` the detector alone), the readings
 (exposure readback, tilt and roll from the IMU, the lens) at the end. A failure names the depthai
 call, not an app.
 """
@@ -15,9 +17,9 @@ import logging
 import sys
 import time
 
-from .. import CameraFrame, CameraTracklet
+from .. import CameraFrame, CameraResolution, CameraTracklet
 from .camera import Camera
-from .definitions import get_device_list, PoseChain
+from .definitions import get_device_list, CameraLink, PoseChain
 from .settings import Oak4CameraSettings
 
 logger = logging.getLogger(__name__)
@@ -27,12 +29,18 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description='stream one OAK4 through the oak4 backend and report')
     parser.add_argument('device_id', nargs='?', default='', help='device id or IP; the first found when left out')
     parser.add_argument('-s', '--seconds', type=float, default=10.0)
+    parser.add_argument('--fps', type=float, default=30.0)
+    parser.add_argument('--resolution', choices=[r.name for r in CameraResolution], default=CameraResolution.P800.name)
+    parser.add_argument('--link', choices=[l.name for l in CameraLink], default=CameraLink.USB.name)
     parser.add_argument('--color', action='store_true', help='colour frames (the warp then needs keystone, not tilt)')
     parser.add_argument('--square', action='store_true')
+    parser.add_argument('--flip-h', action='store_true')
     parser.add_argument('--keystone', type=float, default=0.0)
     parser.add_argument('--tilt', type=float, default=0.0)
-    parser.add_argument('--no-pose', action='store_true', help='frames only, no pose model on the device')
-    parser.add_argument('--two-models', action='store_true', help='the detector and the pose model on each crop')
+    chain = parser.add_mutually_exclusive_group()
+    chain.add_argument('--no-pose', action='store_true', help='frames only, no model on the device')
+    chain.add_argument('--two-models', action='store_true', help='the detector and the pose model on each crop')
+    chain.add_argument('--detector', action='store_true', help='the detector alone: boxes, no keypoints')
     args = parser.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
 
@@ -42,12 +50,16 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     settings = Oak4CameraSettings()
     settings.device_id = args.device_id or devices[0]
+    settings.fps = args.fps
+    settings.resolution = CameraResolution[args.resolution]
+    settings.link = CameraLink[args.link]
     settings.color = args.color
     settings.square = args.square
+    settings.flip_h = args.flip_h
     settings.keystone = args.keystone
     settings.tilt = args.tilt
     settings.yolo = not args.no_pose
-    settings.pose_chain = PoseChain.TWO_MODELS if args.two_models else PoseChain.ONE_MODEL
+    settings.pose_chain = PoseChain.TWO_MODELS if args.two_models else PoseChain.DETECTOR if args.detector else PoseChain.ONE_MODEL
     settings.initialize()
 
     frames: list[CameraFrame] = []
@@ -57,10 +69,14 @@ def main(argv: list[str] | None = None) -> int:
     camera.add_tracklet_callback(lambda cam_id, message, timestamp: tracklets.append(message))
     camera.start()
     started: float = time.perf_counter()
+    video_latency: list[float] = []
+    tracker_latency: list[float] = []
     while time.perf_counter() - started < args.seconds and camera.is_alive():
         time.sleep(0.5)
-        logger.info(f'{len(frames)} frames, {settings.readings.video_fps:.1f} fps, '
-                    f'{len(tracklets)} tracklet messages, {settings.readings.tracker_fps:.1f}/s, '
+        video_latency.append(settings.readings.video_latency)
+        tracker_latency.append(settings.readings.tracker_latency)
+        logger.info(f'{len(frames)} frames, {settings.readings.video_fps:.1f} fps, {settings.readings.video_latency:.1f} ms, '
+                    f'{len(tracklets)} tracklet messages, {settings.readings.tracker_fps:.1f}/s, {settings.readings.tracker_latency:.1f} ms, '
                     f'exposure {settings.sensor.exposure} us iso {settings.sensor.iso}, '
                     f'tilt {settings.readings.tilt_measured:+.1f} roll {settings.readings.roll_measured:+.1f}')
     camera.stop()
@@ -70,6 +86,9 @@ def main(argv: list[str] | None = None) -> int:
         logger.error('no frame arrived')
         return 1
     first: CameraFrame = frames[0]
+    settled_video, settled_tracker = video_latency[len(video_latency) // 2:], tracker_latency[len(tracker_latency) // 2:]
+    logger.info(f'capture to arrival, second half of the run: frames mean {sum(settled_video) / len(settled_video):.1f} ms, '
+                f'max {max(settled_video):.1f}; boxes mean {sum(settled_tracker) / len(settled_tracker):.1f} ms, max {max(settled_tracker):.1f}')
     gaps = [b.timestamp - a.timestamp for a, b in zip(frames, frames[1:])]
     logger.info(f'{len(frames)} frames of {first.image.shape} {first.image.dtype}; '
                 f'{settings.readings.video_fps:.1f} fps average, worst gap {max(gaps) * 1000:.1f} ms' if gaps else 'one frame')
@@ -83,7 +102,7 @@ def main(argv: list[str] | None = None) -> int:
                     + (f', keypoints {sample.keypoints.shape} scores {sample.keypoints[:, 2].min():.2f}..'
                        f'{sample.keypoints[:, 2].max():.2f}' if sample.keypoints is not None else ''))
     elif not args.no_pose:
-        logger.info('no tracklet arrived: nobody in view, or the pose model did not run')
+        logger.info('no tracklet arrived: nobody in view, or the model did not run')
     if camera.pose_join is not None:
         logger.info(f'two-model chain: {camera.pose_join.joined} frames joined, {camera.pose_join.dropped} dropped incomplete')
     logger.info(f'lens: field {settings.readings.fov_factory:.1f} deg, {settings.readings.lens_error:.2f} deg off the preset lens; '

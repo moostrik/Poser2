@@ -11,6 +11,19 @@ from .source import ImageDict
 logger = logging.getLogger(__name__)
 
 
+def nv12_to_rgb(y: torch.Tensor, uv: torch.Tensor) -> torch.Tensor:
+    """RGB CHW float32 in [0, 1] from NV12's planes, uint8: Y (H, W) and interleaved UV (H / 2, W).
+
+    BT.601 limited range with the chroma repeated, which is how `getCvFrame` reads an OAK4's frame,
+    so the colors match the BGR it replaces.
+    """
+    chroma: torch.Tensor = uv.reshape(uv.shape[0], -1, 2).repeat_interleave(2, 0).repeat_interleave(2, 1).float() - 128.0
+    u, v = chroma[..., 0], chroma[..., 1]
+    luma: torch.Tensor = (y.float() - 16.0) * 1.164383
+    rgb: torch.Tensor = torch.stack((luma + 1.596027 * v, luma - 0.391762 * u - 0.812968 * v, luma + 2.017232 * u))
+    return rgb.clamp_(0.0, 255.0).div_(255.0)
+
+
 class Uploader:
     """Uploads CPU numpy frames to GPU float16 CHW tensors.
 
@@ -18,7 +31,7 @@ class Uploader:
     processors (e.g. optical flow). Call snapshot() once per tick to
     synchronize the CUDA stream and retrieve both buffers.
 
-    Input:  BGR uint8 (H, W, 3) or grayscale uint8 (H, W)
+    Input:  BGR uint8 (H, W, 3), grayscale uint8 (H, W) or packed NV12 uint8 (H * 3 / 2, W)
     Output: float16 RGB CHW [0, 1] tensors keyed by cam_id
     """
 
@@ -36,7 +49,8 @@ class Uploader:
         """Upload a camera frame to GPU. Only VIDEO frames are stored.
 
         Shifts current to previous before uploading the new frame. The image is BGR uint8
-        (H, W, 3) or grayscale uint8 (H, W).
+        (H, W, 3), grayscale uint8 (H, W) or packed NV12, converted and flipped here on the GPU so
+        the camera's thread does neither.
         """
         if frame.kind != FrameType.VIDEO:
             return
@@ -50,18 +64,22 @@ class Uploader:
                 self._prev_gpu_images[cam_id] = self._gpu_images[cam_id]
 
             gpu_img = torch.from_numpy(image).cuda(non_blocking=True)
-            if image.ndim == 2:
+            if frame.nv12:
+                rows: int = image.shape[0] * 2 // 3
+                rgb: torch.Tensor = nv12_to_rgb(gpu_img[:rows], gpu_img[rows:]).to(dtype=torch.float16)
+            elif image.ndim == 2:
                 # Grayscale (H, W) -> normalize -> expand to (3, H, W)
-                self._gpu_images[cam_id] = (
+                rgb = (
                     gpu_img.unsqueeze(0).to(dtype=torch.float16).mul_(1.0 / 255.0)
                     .expand(3, -1, -1).contiguous()
                 )
             else:
                 # Color HWC BGR -> CHW RGB, normalize to [0, 1]
-                self._gpu_images[cam_id] = (
+                rgb = (
                     gpu_img.permute(2, 0, 1).flip(0)
                     .to(dtype=torch.float16).mul_(1.0 / 255.0)
                 )
+            self._gpu_images[cam_id] = rgb.flip(-1) if frame.flip_h else rgb
 
         self._accumulated_upload_ms += (time.perf_counter() - start) * 1000.0
 
