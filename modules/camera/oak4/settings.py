@@ -43,5 +43,7 @@ class Oak4CameraSettings(RigCameraSettings):
     depth_model:    Field[DepthModel] = Field(DepthModel.OFF, access=Field.INIT, description="Neural Depth size on the camera; larger is sharper and slower")
     resolution:     Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Delivered size before the crop; the sensor mode follows it")
     model_path:     Field[str]   = Field("data/models", access=Field.INIT)
+    tilt_correction: Field[bool]  = Field(False, widget=Widget.switch, newline=True, description="Straighten color and depth for the camera's tilt")
+    tilt_offset:    Field[float] = Field(0.0, min=-60.0, max=60.0, step=0.5, widget=Widget.slider, description="Added to the IMU's tilt (°)")
 
     sensor: Group[SensorSettings] = Group(SensorSettings)

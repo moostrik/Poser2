@@ -3,6 +3,7 @@ import logging
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 from modules.camera import CameraFrame, FrameType
 from modules.utils import PerformanceTimer
@@ -24,6 +25,21 @@ def nv12_to_rgb(y: torch.Tensor, uv: torch.Tensor) -> torch.Tensor:
     return rgb.clamp_(0.0, 255.0).div_(255.0)
 
 
+def warp_grid(homography: torch.Tensor, height: int, width: int) -> torch.Tensor:
+    """The `grid_sample` grid (1, height, width, 2) that draws a frame through `homography`, uv to
+    uv, on the homography's device: each output pixel looks up where it came from. A pixel from
+    behind the camera gets a place outside the frame, which samples to nothing."""
+    inverse: torch.Tensor = torch.linalg.inv(homography)
+    device: torch.device = homography.device
+    u: torch.Tensor = (torch.arange(width, device=device, dtype=torch.float32) + 0.5) / width
+    v: torch.Tensor = (torch.arange(height, device=device, dtype=torch.float32) + 0.5) / height
+    grid_v, grid_u = torch.meshgrid(v, u, indexing='ij')
+    source: torch.Tensor = inverse @ torch.stack((grid_u.ravel(), grid_v.ravel(), torch.ones_like(grid_u).ravel()))
+    uv: torch.Tensor = (source[:2] / source[2]).T.reshape(height, width, 2) * 2.0 - 1.0
+    uv[(source[2] <= 0.0).reshape(height, width)] = 2.0
+    return uv.unsqueeze(0)
+
+
 class Uploader:
     """Uploads CPU numpy frames to GPU float16 CHW tensors.
 
@@ -38,6 +54,7 @@ class Uploader:
     def __init__(self) -> None:
         self._gpu_images: dict[int, torch.Tensor] = {}
         self._prev_gpu_images: dict[int, torch.Tensor] = {}
+        self._warp_grids: dict[int, tuple[np.ndarray, torch.Tensor]] = {}   # each camera's homography and its grid
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
         self._accumulated_upload_ms: float = 0.0
         self._timer: PerformanceTimer = PerformanceTimer(
@@ -49,8 +66,8 @@ class Uploader:
         """Upload a camera frame to GPU. Only VIDEO frames are stored.
 
         Shifts current to previous before uploading the new frame. The image is BGR uint8
-        (H, W, 3), grayscale uint8 (H, W) or packed NV12, converted and flipped here on the GPU so
-        the camera's thread does neither.
+        (H, W, 3), grayscale uint8 (H, W) or packed NV12, converted, straightened and flipped here
+        on the GPU so the camera's thread does none of it.
         """
         if frame.kind != FrameType.VIDEO:
             return
@@ -79,9 +96,20 @@ class Uploader:
                     gpu_img.permute(2, 0, 1).flip(0)
                     .to(dtype=torch.float16).mul_(1.0 / 255.0)
                 )
+            if frame.homography is not None:
+                rgb = self._straightened(cam_id, rgb, frame.homography)
             self._gpu_images[cam_id] = rgb.flip(-1) if frame.flip_h else rgb
 
         self._accumulated_upload_ms += (time.perf_counter() - start) * 1000.0
+
+    def _straightened(self, cam_id: int, rgb: torch.Tensor, homography: np.ndarray) -> torch.Tensor:
+        """`rgb` drawn through the homography. The grid is made once per homography."""
+        cached: tuple[np.ndarray, torch.Tensor] | None = self._warp_grids.get(cam_id)
+        if cached is None or cached[0] is not homography:
+            matrix: torch.Tensor = torch.from_numpy(homography).to(rgb.device, torch.float32)
+            cached = (homography, warp_grid(matrix, rgb.shape[1], rgb.shape[2]))
+            self._warp_grids[cam_id] = cached
+        return F.grid_sample(rgb.unsqueeze(0).float(), cached[1], align_corners=False)[0].to(dtype=torch.float16)
 
     def snapshot(self) -> tuple[ImageDict, ImageDict]:
         """Synchronize the upload stream and return current and previous GPU images.
@@ -107,3 +135,4 @@ class Uploader:
         """Clear all stored GPU images."""
         self._gpu_images.clear()
         self._prev_gpu_images.clear()
+        self._warp_grids.clear()

@@ -16,13 +16,13 @@ MIN_RATE_FACTOR: float = 0.5
 def mount_deviation(camera: RigCameraSettings) -> tuple[float, float]:
     """The camera's signed ``(tilt, roll)`` deviation in degrees; NaN where it has no reading.
 
-    - **tilt** — ``tilt_measured - tilt``. `tilt` is the value the warp mesh was baked with, so
-      a camera that does not sit at it is being un-tilted by the wrong amount.
+    - **tilt** — ``tilt_measured - expected_tilt``. On an OAK-D that is the `tilt` the warp mesh
+      was baked with, so a camera that does not sit at it is being un-tilted by the wrong amount.
     - **roll** — ``roll_measured``. There is no configured roll: `warp_mesh_points` has no
       roll term at all, so the only correct value is zero, and any roll tips the horizon in a way
       the panorama cannot distinguish from a wrong tilt.
     """
-    return (camera.readings.tilt_measured - camera.tilt, camera.readings.roll_measured)
+    return (camera.readings.tilt_measured - camera.expected_tilt, camera.readings.roll_measured)
 
 
 def fps_deviation(camera: RigCameraSettings) -> float:

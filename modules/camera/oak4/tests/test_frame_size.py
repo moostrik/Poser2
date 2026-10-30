@@ -7,8 +7,8 @@ from modules.camera.oak4.definitions import DepthModel, depth_size, direct_size
 from modules.camera.oak4.pipeline import MountConfig, delivered_size
 
 
-def mount(tilt: float = 0.0, keystone: float = 0.0) -> MountConfig:
-    return MountConfig(flip_h=True, flip_v=False, tilt=tilt, keystone=keystone, fov_h=102.0)
+def mount(keystone: float = 0.0) -> MountConfig:
+    return MountConfig(flip_h=True, flip_v=False, keystone=keystone, fov_h=102.0)
 
 
 class DeliveredSizeTest(unittest.TestCase):

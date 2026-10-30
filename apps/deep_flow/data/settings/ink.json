@@ -15,7 +15,8 @@
       "link": "USB",
       "pose_chain": "DETECTOR",
       "depth_model": "NEURAL_480",
-      "tilt": 0.0,
+      "tilt_correction": true,
+      "tilt_offset": -0.5,
       "keystone": 0.0,
       "lens_fov": 0.0,
       "lens_center_x": 0.0,
@@ -26,14 +27,15 @@
         "exposure": 16277,
         "iso": 5832,
         "auto_exposure": true,
-        "balance": 5568,
+        "balance": 7622,
         "auto_balance": true,
         "brightness": 0,
         "contrast": 0,
         "saturation": 0,
         "denoise": 0,
         "sharpness": 0,
-        "dot_projector": 0.0
+        "dot_projector": 0.0,
+        "flood_light": 1.0
       },
       "readings": {
         "roll_offset": 0.0

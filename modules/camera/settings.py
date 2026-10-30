@@ -1,6 +1,6 @@
 """What every camera has in the panel: its rate, its flips and what it reads back; and what a
 rig camera has on top: its mount and lens. A backend's settings class extends one of the two with
-the fields of its device, so the preset keys stay flat: `cam_0.tilt` and `cam_0.readings.roll_offset`
+the fields of its device, so the preset keys stay flat: `cam_0.fov` and `cam_0.readings.roll_offset`
 are the same keys for every rig backend."""
 
 from modules.settings import BaseSettings, Field, Group, Widget
@@ -82,12 +82,10 @@ class RigCameraSettings(CameraSettings):
 
     The panel shows the backend's fields first and these after them.
     """
-    tilt:           Field[float] = Field(0.0, access=Field.INIT,
-                                         description="Camera up-tilt (°), positive = aimed up. Exclusive with keystone")
     keystone:       Field[float] = Field(0.0, access=Field.INIT,
-                                         description="Keystone (fraction of frame). Exclusive with tilt")
-    # Relayed down from the camera group so the warp can turn `tilt` into pixels.
-    fov:            Field[float] = Field(127.0, access=Field.INIT,
+                                         description="Keystone (fraction of frame)")
+    # Relayed down from the camera group so the warp can turn a tilt into pixels.
+    fov:           Field[float] = Field(127.0, access=Field.INIT,
                                          description="Azimuth span (°) of the delivered frame, quoted for the full sensor width")
     # The lens itself — see the lens geometry notes in `geometry.py`. Shared by an
     # installation's cameras; 0 / 0 / 0 is the old model, the lens taken to be `fov`.
@@ -99,3 +97,9 @@ class RigCameraSettings(CameraSettings):
                                          description="Optical center offset from the frame center (px), positive = down")
 
     readings:     Group[RigCameraReadings]  = Group(RigCameraReadings)
+
+    @property
+    def expected_tilt(self) -> float:
+        """The up-tilt (°) the mount check compares the IMU with: level, unless a backend's mount
+        says otherwise."""
+        return 0.0

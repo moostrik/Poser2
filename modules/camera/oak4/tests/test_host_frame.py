@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from modules.camera.oak4.definitions import mirrored_keypoints, mirrored_roi, packed_nv12
+from modules.camera.oak4.definitions import corrected_keypoints, corrected_roi, mirrored_keypoints, mirrored_roi, packed_nv12
 from modules.utils import Rect
 
 
@@ -34,6 +34,27 @@ class MirrorTest(unittest.TestCase):
         np.testing.assert_array_almost_equal(mirrored_keypoints(points), [[0.75, 0.5, 0.9]])
         self.assertEqual(points[0, 0], 0.25)
         self.assertIsNone(mirrored_keypoints(None))
+
+
+class CorrectionTest(unittest.TestCase):
+    SHIFT = np.array([[1.0, 0.0, 0.1], [0.0, 1.0, 0.2], [0.0, 0.0, 1.0]])
+
+    def test_a_box_moves_with_the_frame(self) -> None:
+        roi = corrected_roi(Rect(0.1, 0.1, 0.2, 0.3), self.SHIFT)
+        self.assertAlmostEqual(roi.x, 0.2)
+        self.assertAlmostEqual(roi.y, 0.3)
+        self.assertAlmostEqual(roi.width, 0.2)
+        self.assertAlmostEqual(roi.height, 0.3)
+
+    def test_a_box_stays_in_the_frame(self) -> None:
+        roi = corrected_roi(Rect(0.8, 0.1, 0.2, 0.3), self.SHIFT)
+        self.assertAlmostEqual(roi.x + roi.width, 1.0)
+
+    def test_keypoints_move_and_keep_their_scores(self) -> None:
+        points = np.array([[0.25, 0.5, 0.9]], dtype=np.float32)
+        np.testing.assert_array_almost_equal(corrected_keypoints(points, self.SHIFT), [[0.35, 0.7, 0.9]])
+        self.assertEqual(points[0, 0], 0.25)
+        self.assertIsNone(corrected_keypoints(None, self.SHIFT))
 
 
 if __name__ == '__main__':

@@ -11,6 +11,7 @@ import unittest
 
 from modules.camera import CameraCheck, CameraCheckSettings, RigCameraReadings, RigCameraSettings, \
     orientation_from_gravity, mount_deviation, fps_deviation
+from modules.settings import Field
 
 
 def gravity(tilt: float, roll: float) -> tuple[float, float, float]:
@@ -69,10 +70,19 @@ class TestOrientationFromGravity(unittest.TestCase):
         self.assertTrue(math.isnan(tilt) and math.isnan(roll))
 
 
+class _TiltedCamera(RigCameraSettings):
+    """A backend with a configured mount tilt, as the OAK-D's settings have."""
+    tilt: Field[float] = Field(0.0)
+
+    @property
+    def expected_tilt(self) -> float:
+        return self.tilt
+
+
 def _cameras(readings: list[tuple[float, float]], configured_tilt: float = 12.0) -> list[RigCameraSettings]:
     cameras: list[RigCameraSettings] = []
     for tilt_measured, roll_measured in readings:
-        camera = RigCameraSettings()
+        camera = _TiltedCamera()
         camera.tilt = configured_tilt
         camera.readings.tilt_measured = tilt_measured
         camera.readings.roll_measured = roll_measured

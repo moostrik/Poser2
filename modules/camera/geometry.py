@@ -646,6 +646,46 @@ def keystone_corners(width: int, height: int, keystone: float, flip_h: bool, fli
     return src, cast(Corners, tuple(dst))
 
 
+# ---------------------------------------------------------------------------
+#  Tilt: the picture of a level camera
+# ---------------------------------------------------------------------------
+# A tilt is a rotation about the camera, so where a pixel lands does not depend on how far away it
+# is: one homography straightens a frame and the depth aligned to it. It holds for a rectilinear
+# frame only, so an undistorted one. The third coordinate it gives a pixel is that pixel's depth
+# scale: a distance along the tilted axis times it is the distance along the level one.
+
+MIN_CORNER_SCALE: float = 0.1       # a frame corner past the horizon has no place in the level picture
+
+
+def tilt_homography(intrinsics: list[list[float]], size: tuple[int, int], tilt: float) -> np.ndarray:
+    """From the uv of a frame `size` to the uv of the same frame from a level camera, for a camera
+    `tilt` degrees up; `intrinsics` is the frame's 3x3 lens in pixels. The picture is scaled and
+    moved so all of it stays in the frame, and tilt 0 is the identity. The result is not rescaled:
+    its third row is the depth scale of a pixel (`H[2] @ (u, v, 1)`)."""
+    width, height = size
+    lens: np.ndarray = np.array(intrinsics, dtype=np.float64)
+    lens /= lens[2, 2]
+    cos_t, sin_t = math.cos(math.radians(tilt)), math.sin(math.radians(tilt))
+    rotation: np.ndarray = np.array([[1.0, 0.0, 0.0], [0.0, cos_t, -sin_t], [0.0, sin_t, cos_t]])
+    level: np.ndarray = lens @ rotation @ np.linalg.inv(lens)
+
+    corners: np.ndarray = level @ np.array([[0.0, 0.0, 1.0], [width, 0.0, 1.0], [width, height, 1.0], [0.0, height, 1.0]]).T
+    x, y = corners[:2] / np.maximum(corners[2], MIN_CORNER_SCALE)
+    span_x, span_y = float(x.max() - x.min()), float(y.max() - y.min())
+    scale: float = min(width / span_x, height / span_y)
+    fit: np.ndarray = np.array([[scale, 0.0, (width - scale * span_x) / 2.0 - scale * float(x.min())],
+                                [0.0, scale, (height - scale * span_y) / 2.0 - scale * float(y.min())],
+                                [0.0, 0.0, 1.0]])
+    to_uv: np.ndarray = np.diag([1.0 / width, 1.0 / height, 1.0])
+    return to_uv @ fit @ level @ np.diag([float(width), float(height), 1.0])
+
+
+def homography_points(homography: np.ndarray, points: np.ndarray) -> np.ndarray:
+    """uv points (N, 2) through a homography."""
+    mapped: np.ndarray = homography @ np.column_stack((points, np.ones(len(points)))).T
+    return (mapped[:2] / mapped[2]).T
+
+
 def square_crop(src_size: tuple[int, int], size: int) -> tuple[int, int, int, int]:
     """The centred `size` x `size` window of a frame, as (x, y, width, height)."""
     return ((src_size[0] - size) // 2, (src_size[1] - size) // 2, size, size)

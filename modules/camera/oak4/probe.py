@@ -1,7 +1,7 @@
 """The OAK4 bring-up: the real backend on one device for a few seconds, reporting what arrives.
 
     python -m modules.camera.oak4.probe [device_id] [-s SECONDS] [--fps FPS] [--resolution P720|P800|P1080]
-        [--link USB|ETHERNET] [--color] [--flip-h] [--keystone K | --tilt T]
+        [--link USB|ETHERNET] [--color] [--flip-h] [--keystone K] [--tilt-offset T]
         [--no-pose | --two-models | --detector] [--depth NEURAL_288|NEURAL_384|NEURAL_480] [--projector I]
         [--flood-light I]
 
@@ -33,13 +33,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--fps', type=float, default=30.0)
     parser.add_argument('--resolution', choices=[r.name for r in CameraResolution], default=CameraResolution.P800.name)
     parser.add_argument('--link', choices=[l.name for l in CameraLink], default=CameraLink.USB.name)
-    parser.add_argument('--color', action='store_true', help='colour frames (the warp then needs keystone, not tilt)')
+    parser.add_argument('--color', action='store_true', help='colour frames')
     parser.add_argument('--depth', choices=[m.name for m in DepthModel], default=DepthModel.OFF.name)
     parser.add_argument('--projector', type=float, default=0.0, help='dot projector brightness, 0 to 1')
     parser.add_argument('--flood-light', type=float, default=0.0, help='IR flood light brightness, 0 to 1')
     parser.add_argument('--flip-h', action='store_true')
     parser.add_argument('--keystone', type=float, default=0.0)
-    parser.add_argument('--tilt', type=float, default=0.0)
+    parser.add_argument('--tilt-offset', type=float, default=None, help='turn the tilt correction on, with this offset (°)')
     chain = parser.add_mutually_exclusive_group()
     chain.add_argument('--no-pose', action='store_true', help='frames only, no model on the device')
     chain.add_argument('--two-models', action='store_true', help='the detector and the pose model on each crop')
@@ -62,7 +62,8 @@ def main(argv: list[str] | None = None) -> int:
     settings.sensor.flood_light = args.flood_light
     settings.flip_h = args.flip_h
     settings.keystone = args.keystone
-    settings.tilt = args.tilt
+    settings.tilt_correction = args.tilt_offset is not None
+    settings.tilt_offset = args.tilt_offset or 0.0
     settings.yolo = not args.no_pose
     settings.pose_chain = PoseChain.TWO_MODELS if args.two_models else PoseChain.DETECTOR if args.detector else PoseChain.ONE_MODEL
     settings.initialize()

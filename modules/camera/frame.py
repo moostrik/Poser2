@@ -26,7 +26,9 @@ class CameraFrame:
     converts where it is cheapest. A DEPTH frame's `image` is uint16 millimetres (H, W), 0 where
     there is no depth, on the same view as the VIDEO frames. `flip_h` says the image still has to
     be mirrored, because the device could not: the GPU upload does it, anything off the GPU takes
-    `mirrored_image`.
+    `mirrored_image`. `homography` (`geometry.tilt_homography`, uv to uv) says the image still has
+    to be straightened, before that mirror; one array stands for one correction, so a consumer
+    keeps what it derives from it until the array changes.
     """
     cam_id: int
     kind: FrameType
@@ -34,6 +36,7 @@ class CameraFrame:
     timestamp: float
     nv12: bool = False
     flip_h: bool = False
+    homography: np.ndarray | None = None
 
 
 def mirrored_image(frame: CameraFrame) -> np.ndarray:

@@ -10,14 +10,17 @@ it by frame (`PoseJoin`). With `depth_model` it also delivers depth aligned to t
 frames. The sensor controls are `SensorControl`'s for as long as the device is open.
 
 The frame leaves here untouched where it can: an NV12 frame goes on packed, and the GPU upload
-converts and mirrors it, so this thread does no color work. The camera cannot mirror that frame
-itself, so its boxes and keypoints are mirrored here to match. `readings.video_latency`,
+converts, straightens and mirrors it, so this thread does no color work. The camera cannot do
+either to that frame itself, so its boxes and keypoints get the same here to match. With
+`tilt_correction` the IMU's tilt plus `tilt_offset` makes the homography every frame carries, on
+this one view for color and depth alike. `readings.video_latency`,
 `tracker_latency` and `depth_latency` say what each message took from capture to here.
 
 Docs: https://docs.luxonis.com/software-v3/depthai
 """
 
 import logging
+import math
 import time
 from pathlib import Path
 from threading import Thread, Event
@@ -28,13 +31,14 @@ from numpy import ndarray
 
 from .. import CameraResolution, CameraFrame, RigCameraReadings, CameraTracklet, FrameType, CameraFrameCallback, \
     TrackletCallback, orientation_from_gravity, frame_window, frame_coverage, coverage_summary, \
-    delivered_height, lens_field, lens_deviation, imu_to_camera, unroll_imu_frame
+    delivered_height, lens_field, lens_deviation, imu_to_camera, unroll_imu_frame, tilt_homography
 from modules.utils import FPS, Rect
 
 from .control import SensorControl
 from .definitions import SENSOR_SOCKET, requested_size, get_device_list, find_device, log_connected_sensors, \
-    read_lens_calibration, imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL, PoseChain, CameraLink, DepthModel, model_archives, \
-    TRACKING_STATUS, tracklet_keypoints, keypoints_in_frame, packed_nv12, smoothed_latency, mirrored_roi, mirrored_keypoints
+    read_lens_calibration, imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL, TILT_STEP, PoseChain, CameraLink, DepthModel, \
+    model_archives, TRACKING_STATUS, tracklet_keypoints, keypoints_in_frame, packed_nv12, smoothed_latency, corrected_roi, \
+    corrected_keypoints, mirrored_roi, mirrored_keypoints
 from .pipeline import build_pipeline, delivered_size, MountConfig, PipelineOutputs
 from .pose_join import PoseJoin, Box
 from .settings import Oak4CameraSettings
@@ -72,14 +76,13 @@ class Camera(Thread):
         self.mount: MountConfig = MountConfig(
             flip_h=settings.flip_h,
             flip_v=settings.flip_v,
-            tilt=settings.tilt,
             keystone=settings.keystone,
             fov_h=settings.fov,
             lens_fov=settings.lens_fov,
             lens_center_x=settings.lens_center_x,
             lens_center_y=settings.lens_center_y,
         )
-        self.frame_height: int = delivered_height(self.color, self.resolution, self.mount.fov_h, self.mount.tilt,
+        self.frame_height: int = delivered_height(self.color, self.resolution, self.mount.fov_h, 0.0,
                                                   self.mount.lens_fov, self.mount.lens_center)
         self.frame_size: tuple[int, int] = delivered_size(self.color, self.resolution, self.mount, self.frame_height)
         self.pose_chain: PoseChain = settings.pose_chain
@@ -110,6 +113,11 @@ class Camera(Thread):
         # MOUNT READOUT — the gravity vector, smoothed, and how to get it into the camera's frame.
         self._imu_rotation: list[list[float]] | None = None
         self._gravity: tuple[float, float, float] | None = None
+
+        # TILT CORRECTION — the direct frame's lens, read off its first frame, and what it makes.
+        self._intrinsics: list[list[float]] | None = None
+        self._homography: ndarray | None = None
+        self._homography_tilt: float = math.nan     # the angle `_homography` was made for
 
     @property
     def readings(self) -> RigCameraReadings:
@@ -225,13 +233,13 @@ class Camera(Thread):
     def _log_frame_geometry(self) -> None:
         """The window the warp delivers and where the sensor covers it, pure geometry from the
         preset, logged so a rig check reads the horizon row off the log. Not on the keystone path."""
-        if self.mount.keystone != 0.0 and self.mount.tilt == 0.0:
+        if self.mount.keystone != 0.0:
             return
         src: tuple[int, int] = requested_size(self.color, self.resolution)
         out: tuple[int, int] = self.frame_size
-        window = frame_window(src, out, src[0], self.mount.fov_h, self.mount.tilt,
+        window = frame_window(src, out, src[0], self.mount.fov_h, 0.0,
                               self.mount.lens_fov, self.mount.lens_center)
-        coverage = frame_coverage(src, out, src[0], self.mount.fov_h, self.mount.tilt,
+        coverage = frame_coverage(src, out, src[0], self.mount.fov_h, 0.0,
                                   self.mount.flip_h, self.mount.flip_v,
                                   self.mount.lens_fov, self.mount.lens_center)
         logger.info(f'frame {out[0]}x{out[1]}: elevation {window.elevation_bottom:+.1f} to '
@@ -269,6 +277,9 @@ class Camera(Thread):
         if self.pose_join is not None:
             self._frame_transformation = msg.getTransformation()
         if msg.getType() == dai.ImgFrame.Type.NV12:
+            if self._intrinsics is None:
+                self._intrinsics = msg.getTransformation().getIntrinsicMatrix()
+                logger.info(f'{self.device_id} delivered lens: {self._intrinsics}')
             self._emit_frame(FrameType.VIDEO, packed_nv12(msg), nv12=True)
         else:
             self._emit_frame(FrameType.VIDEO, msg.getCvFrame())
@@ -282,8 +293,11 @@ class Camera(Thread):
         self._emit_frame(FrameType.DEPTH, msg.getFrame().copy())
 
     def _tracklet(self, tracklet: dai.Tracklet, keypoints: ndarray | None, timestamp: float) -> CameraTracklet:
-        """One device tracklet as the contract's, mirrored when the frames are."""
+        """One device tracklet as the contract's, straightened and mirrored when the frames are."""
         roi = Rect(tracklet.roi.x, tracklet.roi.y, tracklet.roi.width, tracklet.roi.height)
+        homography: ndarray | None = self._homography
+        if homography is not None:
+            roi, keypoints = corrected_roi(roi, homography), corrected_keypoints(keypoints, homography)
         if self.flip_on_host:
             roi, keypoints = mirrored_roi(roi), mirrored_keypoints(keypoints)
         return CameraTracklet(cam_id=self.id, id=tracklet.id, status=TRACKING_STATUS[tracklet.status], roi=roi,
@@ -324,6 +338,9 @@ class Camera(Thread):
         if len(keypoints) != len(boxes):
             logger.debug(f'{self.device_id} frame {detections.getSequenceNum()}: {len(keypoints)} poses for {len(boxes)} people')
             keypoints = (keypoints + [None] * len(boxes))[:len(boxes)]
+        homography: ndarray | None = self._homography
+        if homography is not None:
+            keypoints = [corrected_keypoints(points, homography) for points in keypoints]
         if self.flip_on_host:
             keypoints = [mirrored_keypoints(points) for points in keypoints]
         joined = self.pose_join.put_poses(detections.getSequenceNum(), boxes, keypoints)
@@ -348,11 +365,24 @@ class Camera(Thread):
         tilt, roll = orientation_from_gravity(*self._gravity)
         self.settings.readings.tilt_measured = tilt
         self.settings.readings.roll_measured = roll - self.settings.readings.roll_offset
+        self._update_homography(tilt)
+
+    def _update_homography(self, tilt: float) -> None:
+        """Make the homography for the IMU's `tilt` plus the offset, when the correction is on and
+        the angle has moved by `TILT_STEP`. A new array only then: the upload rebuilds on one."""
+        if not self.settings.tilt_correction or self._intrinsics is None or math.isnan(tilt):
+            self._homography = None
+            self._homography_tilt = math.nan
+            return
+        angle: float = tilt + self.settings.tilt_offset
+        if abs(angle - self._homography_tilt) >= TILT_STEP or math.isnan(self._homography_tilt):
+            self._homography_tilt = angle
+            self._homography = tilt_homography(self._intrinsics, self.frame_size, angle)
 
     def _emit_frame(self, kind: FrameType, image: ndarray, nv12: bool = False) -> None:
         """The hand-over: the frame gets its host time here and goes to every callback."""
         frame = CameraFrame(cam_id=self.id, kind=kind, image=image, timestamp=time.perf_counter(),
-                            nv12=nv12, flip_h=self.flip_on_host)
+                            nv12=nv12, flip_h=self.flip_on_host, homography=self._homography)
         for c in self.frame_callbacks:
             c(frame)
 

@@ -4,7 +4,9 @@ import unittest
 
 import torch
 
-from modules.inference.uploader import nv12_to_rgb
+import torch.nn.functional as F
+
+from modules.inference.uploader import nv12_to_rgb, warp_grid
 
 
 def _plain(y: int, u: int, v: int) -> torch.Tensor:
@@ -29,6 +31,26 @@ class Nv12ToRgbTest(unittest.TestCase):
         rgb = nv12_to_rgb(luma, chroma)
         self.assertEqual(rgb.shape, (3, 2, 4))
         self.assertGreater(float(rgb[0, 1, 1]), float(rgb[0, 1, 2]))
+
+
+class WarpGridTest(unittest.TestCase):
+    def test_the_identity_keeps_the_frame(self) -> None:
+        image = torch.arange(12.0).reshape(1, 1, 3, 4)
+        warped = F.grid_sample(image, warp_grid(torch.eye(3), 3, 4), align_corners=False)
+        self.assertTrue(torch.allclose(warped, image, atol=1e-3))
+
+    def test_a_shift_right_moves_the_picture_right(self) -> None:
+        image = torch.zeros(1, 1, 1, 4)
+        image[0, 0, 0, 1] = 1.0
+        shift = torch.tensor([[1.0, 0.0, 0.25], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+        warped = F.grid_sample(image, warp_grid(shift, 1, 4), align_corners=False)
+        self.assertAlmostEqual(float(warped[0, 0, 0, 2]), 1.0, places=3)
+
+    def test_a_pixel_from_behind_the_camera_is_empty(self) -> None:
+        image = torch.ones(1, 1, 2, 2)
+        behind = torch.tensor([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]])
+        warped = F.grid_sample(image, warp_grid(behind, 2, 2), align_corners=False)
+        self.assertEqual(float(warped.max()), 0.0)
 
 
 if __name__ == '__main__':

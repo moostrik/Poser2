@@ -3,15 +3,15 @@ from enum import IntEnum
 
 # Third-party imports
 import numpy as np
-from OpenGL.GL import GL_NEAREST, GL_RGBA16F
+from OpenGL.GL import GL_NEAREST, GL_R32F, GL_RGBA16F
 
 # Local application imports
 from modules.board import HasCameraDepth
-from modules.camera import CameraFrame, mirrored_image
+from modules.camera import CameraFrame
 from modules.gl import Fbo, Image, Texture
 from modules.settings import BaseSettings, Field
 from ..layer_base import LayerBase, DataCache
-from ...shaders import DepthView
+from ...shaders import DepthView, DepthWarp
 
 
 class DepthDrawMode(IntEnum):
@@ -33,16 +33,19 @@ def depth_metres(depth: np.ndarray) -> np.ndarray:
 
 
 class DepthSourceLayer(LayerBase):
-    """The camera's depth on the view of the camera image: `depth` in metres, `texture` as a
-    picture (`DepthDrawMode`). Stays empty on a source without depth."""
+    """The camera's depth on the view of the camera image, straightened and mirrored as that image
+    is: `depth` in metres, `texture` as a picture (`DepthDrawMode`). Stays empty on a source without
+    depth."""
 
     def __init__(self, cam_id: int, board: HasCameraDepth, cam_texture: Texture, settings: DepthSourceLayerSettings) -> None:
         self._cam_id: int = cam_id
         self._board: HasCameraDepth = board
         self._cam_texture: Texture = cam_texture
         self.settings: DepthSourceLayerSettings = settings
-        self._depth: Image = Image(interpolation=GL_NEAREST)    # an edge never reads as a distance in between
+        self._source: Image = Image(interpolation=GL_NEAREST)   # an edge never reads as a distance in between
+        self._depth: Fbo = Fbo(interpolation=GL_NEAREST)
         self._view: Fbo = Fbo()
+        self._warp_shader: DepthWarp = DepthWarp()
         self._shader: DepthView = DepthView()
         self._data_cache: DataCache[CameraFrame] = DataCache[CameraFrame]()
         self._dirty: bool = False
@@ -61,11 +64,14 @@ class DepthSourceLayer(LayerBase):
         return self._dirty
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
+        self._warp_shader.allocate()
         self._shader.allocate()     # the textures on the first frame, at its size
 
     def deallocate(self) -> None:
+        self._source.deallocate()
         self._depth.deallocate()
         self._view.deallocate()
+        self._warp_shader.deallocate()
         self._shader.deallocate()
 
     def update(self) -> None:
@@ -79,10 +85,15 @@ class DepthSourceLayer(LayerBase):
         if self._data_cache.idle or frame is None:
             return
 
-        self._depth.set_image(depth_metres(mirrored_image(frame) if frame.flip_h else frame.image))
-        self._depth.update()
+        self._source.set_image(depth_metres(frame.image))
+        self._source.update()
         if not self._view.allocated:
+            self._depth.allocate(frame.image.shape[1], frame.image.shape[0], GL_R32F)
             self._view.allocate(frame.image.shape[1], frame.image.shape[0], GL_RGBA16F)
+
+        self._depth.begin()
+        self._warp_shader.use(self._source, frame.homography, frame.flip_h)
+        self._depth.end()
 
         self._view.clear()          # no depth is transparent, so it must not leave the last frame showing
         self._view.begin()

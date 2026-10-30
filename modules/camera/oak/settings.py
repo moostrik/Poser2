@@ -39,9 +39,9 @@ class OakCameraSettings(RigCameraSettings):
 
     The tunables live in subgroups — `readings`, `color_sensor`, `mono_sensor` — because forty
     flat fields in one panel is not something anyone reads. What stays at this level is what
-    shapes the pipeline (`color`, `square`, `yolo`, `resolution`) and the mount (`RigCameraSettings`),
-    which are the fields a person actually sets. The preset keys are flat: the same `cam_0.tilt`
-    as every other backend.
+    shapes the pipeline (`color`, `square`, `yolo`, `resolution`) and the mount (`tilt` here, the
+    rest in `RigCameraSettings`), which are the fields a person actually sets. The preset keys are
+    flat: `cam_0.tilt`.
     """
 
     # Initial settings
@@ -51,6 +51,8 @@ class OakCameraSettings(RigCameraSettings):
     yolo:           Field[bool]  = Field(True, access=Field.INIT)
     resolution:     Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Sensor mode. P1080 is colour only; mono falls back to P800")
     model_path:     Field[str]   = Field("data/models", access=Field.INIT)
+    tilt:           Field[float] = Field(0.0, access=Field.INIT,
+                                         description="Camera up-tilt (°), positive = aimed up. Exclusive with keystone")
 
     # Two values arrive shared from the camera group and are relayed one level further into
     # `mono_sensor`, so the panel shows them where the rest of the mono controls are rather than
@@ -60,3 +62,7 @@ class OakCameraSettings(RigCameraSettings):
 
     color_sensor: Group[ColorSensorSettings] = Group(ColorSensorSettings)
     mono_sensor:  Group[MonoSensorSettings]  = Group(MonoSensorSettings, share=[mono_auto_exposure.as_('auto_exposure'), ir_flood_light])
+
+    @property
+    def expected_tilt(self) -> float:
+        return self.tilt

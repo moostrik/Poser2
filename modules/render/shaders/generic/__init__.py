@@ -5,6 +5,7 @@ from .draw_roi import          DrawRoi
 from .draw_circles import      DrawCircles
 from .density_colorize import  DensityColorize
 from .depth_view import        DepthView
+from .depth_warp import        DepthWarp
 from .edge_sketch import       EdgeSketch
 from .detail_threshold import  DetailThreshold
 from .cel_shade import         CelShade
