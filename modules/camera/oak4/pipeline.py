@@ -50,14 +50,15 @@ class MountConfig:
 class PipelineOutputs:
     """What the host reads and writes: the delivered frames, the sensor's control input, the IMU,
     with a model the tracklets, with the two-model chain the poses of the crops, and with a depth
-    model the aligned depth. `flip_on_host` says the camera did not mirror what it delivers, frames
-    and boxes alike, so the host must."""
+    model the aligned depth and its config input. `flip_on_host` says the camera did not mirror what
+    it delivers, frames and boxes alike, so the host must."""
     video: dai.Node.Output
     control: dai.Node.Input
     imu: dai.Node.Output
     tracklets: dai.Node.Output | None = None
     poses: dai.Node.Output | None = None
     depth: dai.Node.Output | None = None
+    depth_config: dai.Node.Input | None = None
     flip_on_host: bool = False
 
 
@@ -106,10 +107,11 @@ def build_pipeline(
     elif model:
         tracklets = add_one_model_chain(pipeline, frames, model)
     depth: dai.Node.Output | None = None
+    depth_config: dai.Node.Input | None = None
     if depth_model != DepthModel.OFF:
-        depth = add_depth(pipeline, frames, fps, depth_model, out_size)
+        depth, depth_config = add_depth(pipeline, frames, fps, depth_model, out_size)
     return PipelineOutputs(video=frames, control=camera.inputControl, imu=imu, tracklets=tracklets, poses=poses, depth=depth,
-                           flip_on_host=color and mount.flip_h)
+                           depth_config=depth_config, flip_on_host=color and mount.flip_h)
 
 
 def add_warp(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tuple[int, int],
@@ -209,11 +211,11 @@ def add_pose_chain(pipeline: dai.Pipeline, frames: dai.Node.Output, fps: float, 
 
 
 def add_depth(pipeline: dai.Pipeline, frames: dai.Node.Output, fps: float, model: DepthModel,
-              frame: tuple[int, int]) -> dai.Node.Output:
+              frame: tuple[int, int]) -> tuple[dai.Node.Output, dai.Node.Input]:
     """Neural Depth off the stereo pair, aligned on the camera to the delivered frame, so the host
     takes it on the frame's own view. Aligned at the model's rows (`depth_size`), which keeps the
     link's load down: uint16 at 60 fps. `ImageAlign` reads `frames` once, for its metadata, so the
-    depth waits for nothing from the color branch."""
+    depth waits for nothing from the color branch. Returns the depth and Neural Depth's config input."""
     left, right = [pipeline.create(dai.node.Camera).build(socket, sensorFps=fps).requestOutput(STEREO_SIZE, fps=fps)
                    for socket in STEREO_SOCKETS]
     neural: dai.node.NeuralDepth = pipeline.create(dai.node.NeuralDepth).build(left, right, DEPTH_MODELS[model][0])
@@ -222,7 +224,7 @@ def add_depth(pipeline: dai.Pipeline, frames: dai.Node.Output, fps: float, model
     align.setOutKeepAspectRatio(False)
     neural.depth.link(align.input)
     frames.link(align.inputAlignTo)
-    return align.outputAligned
+    return align.outputAligned, neural.inputConfig
 
 
 def add_imu(pipeline: dai.Pipeline) -> dai.Node.Output:

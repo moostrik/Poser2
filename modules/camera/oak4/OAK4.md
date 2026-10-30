@@ -68,6 +68,19 @@ Measured on the color sensor at P720 and 60 fps, by asking for manual values and
 
 Whether manual exposure really goes past the frame time is in [Open](#open).
 
+### Auto exposure
+
+Auto exposure is on by default, and these settings in `sensor` shape it, live. Measured in a dark room, where it sits at 16277 µs and ISO 5832:
+
+| Setting                     | ISO   | Mean luma |
+|-----------------------------|-------|-----------|
+| Defaults                    | 5832  | 24.0      |
+| `auto_iso_limit` 1000       | 998   | 10.8      |
+| `exposure_compensation` -9  | 2183  | 15.4      |
+| `exposure_compensation` +9  | 16585 | 42.4      |
+
+`exposure_region` is in fractions of the picture as shown, mirrored or not. The other new settings in `sensor` are `auto_exposure_lock`, `auto_balance_lock`, `anti_banding` and `chroma_denoise`; what is known about them is in [Open](#open).
+
 ### Tilt
 
 `tilt.enabled` straightens color and depth for the camera's own tilt, read from its IMU. `tilt.offset` adds to that tilt, from -60° to 60°. It trims the correction, and on a level camera it tests the correction: dragging it warps color and depth as if the camera were tilted. A change takes effect within 0.2 s.
@@ -210,6 +223,23 @@ The camera has two IR lights, `dot_projector` and `flood_light`. Dark room, full
 
 A step is the change of a pixel's depth from one frame to the next, where both frames have depth. Flicker is the share of pixels that gain or lose depth between two frames. Flood does nearly all the work on valid pixels and flicker; adding the dots lowers the median step.
 
+### Depth filters
+
+`depth` in the camera's settings holds Neural Depth's filters, live. A pixel that fails one reads 0. Dark room, flood light at full, a still scene, about 2 s per row, read at the backend's hand-over:
+
+| Setting              | Rate   | Latency | Valid  | Median step | p95 step | Flicker |
+|----------------------|--------|---------|--------|-------------|----------|---------|
+| Defaults             | 60 fps | 44 ms   | 93.8 % | 38 mm       | 255 mm   | 3.0 %   |
+| `confidence` 200     | 60 fps | 44 ms   | 61.5 % | 25 mm       | 134 mm   | 10.7 %  |
+| `confidence` 50      | 60 fps | 44 ms   | 99.1 % | 43 mm       | 389 mm   | 0.3 %   |
+| `edge` 100           | 60 fps | 44 ms   | 94.3 % | 38 mm       | 265 mm   | 3.4 %   |
+| `temporal_alpha` 0.4 | 60 fps | 44 ms   | 95.6 % | 12 mm       | 86 mm    | 1.3 %   |
+| `temporal_alpha` 0.1 | 60 fps | 45 ms   | 95.7 % | 3 mm        | 20 mm    | 1.3 %   |
+
+The two temporal rows have `temporal_filter` on. `near` and `far` cut exactly: at 2 m the depth read 2000 mm and over, or 2000 mm and under. `far` at its top sets no limit.
+
+The filter's latency is the latency of a message: a moving body's depth lags by more, since each pixel is an average of past frames **(deduction)**.
+
 ## Tilt correction
 
 For a camera above a big screen, looking down. A tilt is a pure rotation about the camera, so where a pixel lands does not depend on its distance. One homography therefore serves color, depth and boxes, with no point cloud and no holes.
@@ -290,5 +320,8 @@ Dragging a marker on the player's bar pauses playback and shows the frame under 
 - Ethernet stalled once in 130 s of streaming, with a gap of 4.8 s and latency up to 1.7 s. The cause is not known, and a USB run of that length has not been compared.
 - A player at show distance has not been compared across depth sizes or IR lights.
 - The detector squeezes the 5:4 frame into its 416x416 square, 20 % narrower. Boxes stay in place, and the effect on detection has not been measured.
+- `auto_exposure_lock` did not hold: with it on, `exposure_compensation` +9 still moved ISO to 16585. Whether it holds against a change of light has not been tested.
+- `exposure_region`, `auto_balance_lock` and `anti_banding` changed nothing in a dark room, where exposure was already at its ceiling and nothing flickered. They need a test with light. `chroma_denoise` 4 lowered mean luma from 24.0 to 22.1, so it does reach the sensor.
+- The temporal filter has only been measured on a still scene. How far depth trails a moving player has not been measured.
 - A manual exposure past the frame time is reported as asked and the rate stays at 60 fps, up to 100000 µs, which cannot be real. In a dark room the picture's brightness did not follow exposure at all, so the real top needs a test with light.
 - `test_a_split_keeps_the_streams_in_step_across_chunks` fails about 2 runs in 5, because a split lands 1 to 3 frames early. No frames are lost: 50 of 50 in all three streams.

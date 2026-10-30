@@ -33,7 +33,7 @@ from .. import CameraResolution, CameraFrame, FrameReadings, RigCameraReadings, 
     delivered_height, lens_field, lens_deviation, imu_to_camera, unroll_imu_frame, TiltCorrection, corrected_roi, corrected_keypoints
 from modules.utils import FPS, Rect
 
-from .control import SensorControl
+from .control import DepthControl, SensorControl
 from .definitions import SENSOR_SOCKET, requested_size, get_device_list, find_device, log_connected_sensors, \
     read_lens_calibration, imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL, ModelChain, CameraLink, DepthModel, \
     model_archives, TRACKING_STATUS, tracklet_keypoints, keypoints_in_frame, packed_nv12, smoothed_latency, \
@@ -100,6 +100,7 @@ class Camera(Thread):
         self.pipeline: dai.Pipeline | None = None
         self.queues: list[dai.MessageQueue] = []
         self.control: SensorControl | None = None
+        self.depth_control: DepthControl | None = None
         self.num_tracklets: int = 0
         self.flip_on_host: bool = False
         self._frame_transformation: dai.ImgTransformation | None = None     # the delivered frame's, for the crops' keypoints
@@ -212,6 +213,9 @@ class Camera(Thread):
         if self.control is not None:
             self.control.close()
             self.control = None
+        if self.depth_control is not None:
+            self.depth_control.close()
+            self.depth_control = None
         if self.pipeline is not None:
             try:
                 self.pipeline.stop()
@@ -258,7 +262,9 @@ class Camera(Thread):
         self.queues.append(imu)
         control: dai.InputQueue = outputs.control.createInputQueue()
         assert self.device is not None
-        self.control = SensorControl(self.settings, self.device, control)
+        self.control = SensorControl(self.settings, self.device, control, self.flip_on_host)
+        if outputs.depth_config is not None:
+            self.depth_control = DepthControl(self.settings.depth, outputs.depth_config.createInputQueue())
 
     def _log_frame_geometry(self) -> None:
         """The window the warp delivers and where the sensor covers it, pure geometry from the

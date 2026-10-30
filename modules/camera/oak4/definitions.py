@@ -4,6 +4,7 @@ the board's IMU, and the reads off an open device. The frame geometry every came
 
 import logging
 from enum import IntEnum
+from typing import Callable
 
 import depthai as dai
 import numpy as np
@@ -76,8 +77,39 @@ BALANCE_RANGE:      tuple[int, int] = (1000, 12000)
 CONTRAST_RANGE:     tuple[int, int] = ( -10, 10   )
 BRIGHTNESS_RANGE:   tuple[int, int] = ( -10, 10   )
 LUMA_DENOISE_RANGE: tuple[int, int] = (   0, 4    )
+CHROMA_DENOISE_RANGE: tuple[int, int] = ( 0, 4    )
 SATURATION_RANGE:   tuple[int, int] = ( -10, 10   )
 SHARPNESS_RANGE:    tuple[int, int] = (   0, 4    )
+COMPENSATION_RANGE: tuple[int, int] = (  -9, 9    )
+DEPTH_SCORE_RANGE:  tuple[int, int] = (   0, 255  )     # confidence, edge and the temporal delta
+FAR_LIMIT_M:        float           = 12.0              # the far slider's top, the recording's full scale: no limit
+NO_FAR_LIMIT_MM:    int             = 65535
+
+
+class AntiBanding(IntEnum):
+    """The mains flicker auto exposure avoids, by exposing in multiples of its half period."""
+    OFF = 0
+    MAINS_50_HZ = 1
+    MAINS_60_HZ = 2
+    AUTO = 3
+
+
+ANTI_BANDING_MODES: dict[AntiBanding, dai.CameraControl.AntiBandingMode] = {
+    AntiBanding.OFF: dai.CameraControl.AntiBandingMode.OFF,
+    AntiBanding.MAINS_50_HZ: dai.CameraControl.AntiBandingMode.MAINS_50_HZ,
+    AntiBanding.MAINS_60_HZ: dai.CameraControl.AntiBandingMode.MAINS_60_HZ,
+    AntiBanding.AUTO: dai.CameraControl.AntiBandingMode.AUTO,
+}
+
+
+def sensor_region(region: Rect, flip_h: bool, to_source: Callable[[float, float], tuple[float, float]]) -> tuple[int, int, int, int]:
+    """A region of the picture as shown, in fractions of it, as the sensor pixels `setAutoExposureRegion`
+    takes: (x, y, width, height). `to_source` maps a frame fraction to the sensor's pixels; the picture
+    is mirrored after the camera when `flip_h`, so the region is mirrored back first."""
+    frame: Rect = mirrored_roi(region) if flip_h else region
+    x0, y0 = to_source(frame.x, frame.y)
+    x1, y1 = to_source(frame.x + frame.width, frame.y + frame.height)
+    return (round(x0), round(y0), round(x1 - x0), round(y1 - y0))
 
 
 def get_device_list(verbose: bool = False) -> list[str]:
