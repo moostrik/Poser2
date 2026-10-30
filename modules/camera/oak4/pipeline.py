@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from enum import IntEnum
 from pathlib import Path
 import logging
+import os
 
 import depthai as dai
 
@@ -216,11 +217,16 @@ def add_pose_chain(pipeline: dai.Pipeline, frames: dai.Node.Output, fps: float, 
     The parser's own score threshold is turned off: it would drop a keypoint below it from the
     message and leave the rest unnumbered, while the contract carries all 17 with their scores.
     """
-    from depthai_nodes.node import ImgDetectionsFilter, FrameCropper, ParsingNeuralNetwork, GatherData
+    level: str | None = os.environ.pop('DEPTHAI_LEVEL', None)   # depthai_nodes rejects depthai's `error` at import
+    try:
+        from depthai_nodes.node import ImgDetectionsFilter, FrameCropper, ParsingNeuralNetwork, GatherData
+    finally:
+        if level is not None:
+            os.environ['DEPTHAI_LEVEL'] = level
 
     detector = add_detector(pipeline, frames, dai.NNArchive(str(detector_archive)))
     persons: ImgDetectionsFilter = pipeline.create(ImgDetectionsFilter).build(detector.out)
-    persons.setLabels([TRACKER_PERSON_LABEL], keep=True)
+    persons.keepLabels([TRACKER_PERSON_LABEL])
 
     pose = dai.NNArchive(str(pose_archive))
     crop_size: tuple[int, int] | None = pose.getInputSize()
@@ -230,7 +236,7 @@ def add_pose_chain(pipeline: dai.Pipeline, frames: dai.Node.Output, fps: float, 
         persons.out, outputSize=crop_size, resizeMode=dai.ImageManipConfig.ResizeMode.LETTERBOX,
         padding=POSE_CROP_PADDING).build(frames)
     network: ParsingNeuralNetwork = pipeline.create(ParsingNeuralNetwork).build(cropper.out, pose)
-    network.getParser(0).score_threshold = 0.0
+    network.getParser(0).setScoreThreshold(0.0)
     gather: GatherData = pipeline.create(GatherData).build(int(round(fps)), network.out, persons.out)
 
     tracklets: dai.Node.Output = add_tracker(pipeline, detector.passthrough, persons.out)

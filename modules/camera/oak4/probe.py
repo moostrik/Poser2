@@ -84,8 +84,8 @@ def main(argv: list[str] | None = None) -> int:
                        f'{sample.keypoints[:, 2].max():.2f}' if sample.keypoints is not None else ''))
     elif not args.no_pose:
         logger.info('no tracklet arrived: nobody in view, or the pose model did not run')
-    if camera.join is not None:
-        logger.info(f'two-model chain: {camera.join.joined} frames joined, {camera.join.dropped} dropped incomplete')
+    if camera.pose_join is not None:
+        logger.info(f'two-model chain: {camera.pose_join.joined} frames joined, {camera.pose_join.dropped} dropped incomplete')
     logger.info(f'lens: field {settings.readings.fov_factory:.1f} deg, {settings.readings.lens_error:.2f} deg off the preset lens; '
                 f'tilt {settings.readings.tilt_measured:+.1f} roll {settings.readings.roll_measured:+.1f} deg')
     return 0

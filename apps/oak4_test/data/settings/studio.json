@@ -11,7 +11,7 @@
     "fov": 127.0,
     "cam_0": {
       "device_id": "",
-      "pose_chain": "ONE_MODEL",
+      "pose_chain": "TWO_MODELS",
       "tilt": 0.0,
       "keystone": 0.0,
       "lens_fov": 0.0,
