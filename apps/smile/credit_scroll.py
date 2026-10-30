@@ -1,20 +1,21 @@
-"""The artist's name going round the sphere on the walls: each word of it (the first name, the surname)
-circles its own ring of screens without end, over the playing clips, like a ticker, letters most of a screen
-tall, one word per lap so a screen is clear between two laps. SMILE plans the loops (`CreditScroller`, in the
-render loop) and hands each wall, every second, the cells of its own on each ring with their place round it
-and the time the loop began; the walls know nothing of the sphere and draw the word from one long texture
-(`name_strip`) by the clock. No GL here: the geometry is tested without one."""
+"""The artist's name going round the sphere on the walls while the installation is idle: each word of it (the
+first name, the surname) circles its own ring of screens, over the playing clips, like a ticker, letters most of
+a screen tall, one word per lap so a screen is clear between two laps. A word enters through the side of the
+first screen and, when it has to go, runs out through the side of the screen its head is on. SMILE plans the loops
+(`CreditScroller`, in the render loop) and hands each wall, every second, the cells of its own on each ring with
+their place round it and the time the loop began; the walls know nothing of the sphere and draw the word from
+one long texture (`name_strip`) by the clock. No GL here: the geometry is tested without one."""
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Callable
 
 import cv2
 import freetype
 import numpy as np
 
 from . import sphere
-from .credit import FONT
+from .credit import FONT, render_text
 
 if TYPE_CHECKING:
     from .render import RenderSettings
@@ -99,6 +100,34 @@ def scroll_offset(place: int, travelled: float, gap_px: float, screen_px: int = 
     return travelled - screen_px - place * (screen_px + gap_px)
 
 
+def scroll_copies(place: int, ring: int, travelled: float, gap_px: float, strip_px: int, last: int | None = None,
+                  screen_px: int = SCREEN_PX) -> list[float]:
+    """The offsets (`scroll_offset`) of the word on the screen at `place` of a ring of `ring` screens: this lap's
+    and the tail of the lap before. `travelled` is not wrapped, so a screen is counted on from lap to lap: one
+    before the first lap has nothing on it, so the word enters at the first screen's side, and neither has one
+    past `last`, so the word runs out at the left side of that screen."""
+    laps: int = int(travelled // (ring * (screen_px + gap_px)))
+    offsets: list[float] = []
+    for lap in (laps, laps - 1):
+        round_place: int = place + lap * ring
+        if round_place < 0 or (last is not None and round_place > last):
+            continue
+        offset: float = scroll_offset(round_place, travelled, gap_px, screen_px)
+        if offset < strip_px and offset + screen_px > 0:
+            offsets.append(offset)
+    return offsets
+
+
+def last_place(travelled: float, gap_px: float, screen_px: int = SCREEN_PX) -> int:
+    """The screen, counted on from lap to lap, that the head of a word has reached: where it leaves."""
+    return int(travelled // (screen_px + gap_px))
+
+
+def scroll_gone(last: int, travelled: float, gap_px: float, strip_px: int, screen_px: int = SCREEN_PX) -> bool:
+    """Whether the tail of a leaving word has passed the left side of its `last` screen."""
+    return scroll_offset(last, travelled, gap_px, screen_px) >= strip_px
+
+
 def name_strip(text: str, height: int, size: int, font: str = FONT, outline_ratio: float = 0.025,
                probe_px: int = 200) -> np.ndarray:
     """The word as one long transparent BGRA image `height` px tall, white letters with a black edge, their
@@ -111,11 +140,11 @@ def name_strip(text: str, height: int, size: int, font: str = FONT, outline_rati
     except Exception:
         logger.exception('No font %s for the scrolling name', font)
         return np.zeros((height, 1, 4), np.uint8)
-    probe: np.ndarray = _render(face, text, probe_px)
+    probe: np.ndarray = render_text(face, text, probe_px)
     ink: int = probe.shape[0]
     if not text or ink == 0:
         return np.zeros((height, 1, 4), np.uint8)
-    glyphs: np.ndarray = _render(face, text, max(1, round(probe_px * (inner - 2 * outline) / ink)))
+    glyphs: np.ndarray = render_text(face, text, max(1, round(probe_px * (inner - 2 * outline) / ink)))
     # the black edge: the letters' alpha grown by `outline`, under the white letters
     kernel: np.ndarray = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * outline + 1, 2 * outline + 1))
     padded: np.ndarray = np.pad(glyphs, outline)
@@ -129,54 +158,20 @@ def name_strip(text: str, height: int, size: int, font: str = FONT, outline_rati
     return strip
 
 
-def _render(face: Any, text: str, px: int) -> np.ndarray:
-    """The text's ink at `px` pixels, as an alpha image cropped to the ink (0 x 0 without any)."""
-    return _render_baseline(face, text, px)[0]
-
-
-def _render_baseline(face: Any, text: str, px: int) -> tuple[np.ndarray, int]:
-    """`_render`'s image and the row of the baseline in it (the rows above it hold the ascent)."""
-    face.set_pixel_sizes(0, px)
-    pen: int = 0
-    pieces: list[tuple[int, int, np.ndarray]] = []     # x, top (from the baseline up), bitmap
-    previous: str | None = None
-    for char in text:
-        if previous is not None:
-            pen += face.get_kerning(previous, char).x >> 6
-        face.load_char(char, freetype.FT_LOAD_RENDER)  # pyright: ignore[reportAttributeAccessIssue]
-        glyph = face.glyph
-        bitmap = glyph.bitmap
-        if bitmap.width and bitmap.rows:
-            pieces.append((pen + glyph.bitmap_left, glyph.bitmap_top,
-                           np.array(bitmap.buffer, np.uint8).reshape(bitmap.rows, bitmap.width)))
-        pen += glyph.advance.x >> 6
-        previous = char
-    if not pieces:
-        return np.zeros((0, 0), np.uint8), 0
-    left: int = min(x for x, _, _ in pieces)
-    right: int = max(x + b.shape[1] for x, _, b in pieces)
-    top: int = max(t for _, t, _ in pieces)
-    bottom: int = min(t - b.shape[0] for _, t, b in pieces)
-    image: np.ndarray = np.zeros((top - bottom, right - left), np.uint8)
-    for x, t, b in pieces:
-        y: int = top - t
-        region = image[y:y + b.shape[0], x - left:x - left + b.shape[1]]
-        np.maximum(region, b, out=region)
-    return image, top
-
-
-# wall (0 or 1), word, speed (px/s), gap (px), size (px), the ring's screens, when the loop began, the wall's cells with their places
-Send = Callable[[int, str, float, float, int, int, float, list[tuple[int, int]]], None]
+# wall (0 or 1), word, speed (px/s), gap (px), size (px), the ring's screens, when the loop began, the wall's cells with
+# their places, and the screen it leaves at (None: it goes on)
+Send = Callable[[int, str, float, float, int, int, float, list[tuple[int, int]], int | None], None]
 
 
 class CreditScroller:
     """Hands the loops from the panel's Scroll settings (`RenderSettings`) to the walls (the clip player's
     `scroll_loop`). `update` runs in SMILE's render loop (with `time.time()`) and never raises there: while
-    `credit_scroll` is on and nothing blocks it (the laughter test), every `SEND_EVERY` second each row of
-    `credit_scroll_rows` gets its word of `credit_name` (`plan_loops`) with the time it began and its own speed
-    (`credit_scroll_speed_1` for the first word, `_2` for the others). A speed changed in the panel moves the
-    start time so the word goes on from where it is. Off, or blocked, nothing is sent and the walls' loops
-    time out. `credit_scroll_last` shows what goes round."""
+    `credit_scroll` is on and nothing blocks it (a recent face, the laughter test), every `SEND_EVERY` second each
+    row of `credit_scroll_rows` gets its word of `credit_name` (`plan_loops`) with the time it began and its own
+    speed (`credit_scroll_speed_1` for the first word, `_2` for the others). A speed changed in the panel moves
+    the start time so the word goes on from where it is. Off, or blocked, the loops get one last message with
+    the screen they leave at and nothing more; a loop that was never told times out on the walls.
+    `credit_scroll_last` shows what goes round."""
 
     def __init__(self, settings: 'RenderSettings', send: Send) -> None:
         self.settings: RenderSettings = settings
@@ -190,7 +185,9 @@ class CreditScroller:
     def update(self, now: float, blocked: bool) -> None:
         settings = self.settings
         if not settings.credit_scroll or blocked:
-            self._words.clear()
+            if self._words:
+                self.send_loops(now, leaving=True)
+                self._words.clear()
             if self._text:
                 self._text = ''
                 settings.credit_scroll_last = ''
@@ -201,7 +198,7 @@ class CreditScroller:
             self._sent = now
             self.send_loops(now)
 
-    def send_loops(self, now: float) -> list[tuple[str, RingPath]]:
+    def send_loops(self, now: float, leaving: bool = False) -> list[tuple[str, RingPath]]:
         settings = self.settings
         rows: list[int] = parse_rows(str(settings.credit_scroll_rows))
         loops: list[tuple[str, RingPath]] = plan_loops(rows, str(settings.credit_name).split(), bool(settings.credit_scroll_reverse))
@@ -217,13 +214,17 @@ class CreditScroller:
         for index, (word, path) in enumerate(loops):
             speed: float = max(1.0, speeds[min(index, 1)] * SCREEN_PX)
             start: float = self.word_start(index, speed, now)
+            last: int | None = last_place((now - start) * speed, gap) if leaving else None
             for wall in range(WALLS):
                 cells: list[tuple[int, int]] = path.cells(wall)
                 if cells:
                     try:
-                        self._send(wall, word, speed, float(gap), int(settings.credit_scroll_size), path.count, start, cells)
+                        self._send(wall, word, speed, float(gap), int(settings.credit_scroll_size), path.count, start, cells, last)
                     except Exception:
                         logger.exception('Scrolling name: wall %d failed', wall + 1)
+        if leaving:
+            logger.info('Scrolling name: leaving')
+            return loops
         for index in [index for index in self._words if index >= len(loops)]:
             del self._words[index]
         text: str = ', '.join(f'{word} round row {path.row}' for word, path in loops)

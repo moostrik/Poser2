@@ -227,15 +227,15 @@ class RelayTest(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(self.relay.line.durations), 1)        # the turn was timed, for the others' wait
         portrait = await self.upload('portrait', data=b'portrait')
         self.assertRegex(portrait, RANDOM_NAME.format('portrait', 'jpg'))
-        await smile.send_json({'type': 'result', 'id': 'v1', 'phone': turn['id'], 'name': 'Name', 'caption': 'hi', 'ok': True})
+        await smile.send_json({'type': 'result', 'id': 'v1', 'phone': turn['id'], 'name': 'Name', 'ok': True})
         result = await self.receive(phone, 'result')
-        self.assertEqual((result['name'], result['caption'], result['ok']), ('Name', 'hi', True))
+        self.assertEqual((result['name'], result['ok']), ('Name', True))
         self.assertEqual(result['portrait'], portrait)
         self.assertIsNone(result['grin'])
         response = await self.client.get(portrait)
         self.assertEqual(await response.read(), b'portrait')
         # a result without files (the visitor was not kept) still reaches the phone, so it stops waiting
-        await smile.send_json({'type': 'result', 'id': '', 'phone': turn['id'], 'name': 'Name', 'caption': 'hi', 'ok': False})
+        await smile.send_json({'type': 'result', 'id': '', 'phone': turn['id'], 'name': 'Name', 'ok': False})
         result = await self.receive(phone, 'result')
         self.assertFalse(result['ok'])
         self.assertIsNone(result['portrait'])

@@ -7,9 +7,32 @@ from unittest import mock
 
 import cv2
 
-from apps.smile.credit import LINE, LINES, QUIET_MODULES, URL, CreditLines, qr_image, quiet_px, wrap_balanced
+from apps.smile.credit import (LINE, LINES, QUIET_MODULES, TITLE_FONT, URL, CreditLines, qr_image, quiet_px, title_image,
+                               wrap_balanced)
 from apps.smile.render.layers.credit_layer import FADE_S, SHOWN, caption_shown, fade_step, new_line_due
 from apps.smile.render.sequencer import SequenceType
+
+
+class TestTitle(unittest.TestCase):
+    def test_the_title_alone_is_white_letters_with_a_black_edge_on_transparent(self):
+        image = title_image('', 107)
+        self.assertEqual(image.shape[2], 4)
+        self.assertGreater(image.shape[1], image.shape[0])          # SMILE and the ring side by side
+        self.assertTrue((image[:, :, 3] == 0).any())
+        self.assertEqual(image[:, :, :3].max(), 255)
+
+    def test_the_height_follows_the_font_size(self):
+        self.assertAlmostEqual(title_image('', 200).shape[0] / title_image('', 100).shape[0], 2.0, delta=0.05)
+        self.assertEqual(round(96 / TITLE_FONT), 107)
+
+    def test_a_name_comes_after_it(self):
+        self.assertGreater(title_image('Matthias Oostrik', 28).shape[1], title_image('', 28).shape[1])
+
+    def test_the_outline_is_part_of_the_image(self):
+        self.assertGreater(title_image('', 107, outline_ratio=0.05).shape[1], title_image('', 107).shape[1])
+
+    def test_alpha_scales_the_whole_image(self):
+        self.assertLessEqual(title_image('', 28, alpha=0.5)[:, :, 3].max(), 127)
 
 
 class TestQr(unittest.TestCase):

@@ -4,7 +4,6 @@
   "input_fps": 60.0,
   "camera": {
     "keyframe_interval": 60,
-    "yolo": true,
     "color": true,
     "resolution": "P720",
     "sim_enabled": true,
@@ -13,7 +12,7 @@
     "cam_0": {
       "device_id": "",
       "link": "USB",
-      "pose_chain": "DETECTOR",
+      "model_chain": "DETECTOR",
       "depth_model": "NEURAL_480",
       "flip_h": true,
       "flip_v": false,

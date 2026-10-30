@@ -23,13 +23,12 @@ class TestPlaysOnTheOnlineCell(unittest.TestCase):
         self.clip_player.osc = [mock.Mock(), mock.Mock()]
         self.clip_player._lines = mock.Mock(pick=lambda: 'a line')
         self.clip_player._lines_lock = mock.MagicMock()
-        self.clip_player._name = mock.Mock(credit_name='Name')
         self.clip_player.online_cell = None
 
     def test_a_play_bangs_max_and_captions_the_cell_on_its_wall(self):
         self.clip_player._on_play(30)                    # wall 1, cell 6
         self.clip_player.osc[1].submit.assert_called_once_with('/bang', 6)
-        self.walls[1].set_caption.assert_called_once_with('6', 'Name', 'a line')
+        self.walls[1].set_caption.assert_called_once_with('6', 'a line')
         self.clip_player.osc[0].submit.assert_not_called()
 
     def test_the_online_cells_play_is_nobodys(self):

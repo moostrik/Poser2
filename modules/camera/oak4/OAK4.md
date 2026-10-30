@@ -11,7 +11,7 @@ Every number assumes this configuration unless its table says otherwise:
 | Software | Luxonis OS 1.45.0, depthai 3.11                         |
 | Link     | USB, reading 5 Gbps                                     |
 | Frame    | `P720`, 60 fps, 896x720 NV12, undistorted               |
-| Boxes    | `pose_chain` `DETECTOR`: yolov8n, 416x416               |
+| Boxes    | `model_chain` `DETECTOR`: yolov8n, 416x416              |
 | Depth    | `depth_model` `NEURAL_480`, aligned to 374x300          |
 | PC       | i7-13700K with UHD 770, RTX 4090                        |
 
@@ -55,6 +55,19 @@ The last case is a broken setup, such as a missing model archive. A retry change
 
 Turn on `sensor.flood_light`. Without IR light there is almost no depth (see [IR light](#ir-light)). The color sensor does not see IR, so the image does not change.
 
+### Sensor limits
+
+Measured on the color sensor at P720 and 60 fps, by asking for manual values and reading back what the frames report:
+
+| Control         | Low   | High     | Note                         |
+|-----------------|-------|----------|------------------------------|
+| Manual exposure | 86 µs | 33000 µs | High end from the docs       |
+| Manual ISO      | 65    | 16585    | Higher values clamp to 16585 |
+| Auto exposure   |       | 16277 µs | At 60 fps                    |
+| Auto ISO, seen  | 65    | 5832     | Holds 5832 in a dark room    |
+
+Whether manual exposure really goes past the frame time is in [Open](#open).
+
 ### Tilt
 
 `tilt.enabled` straightens color and depth for the camera's own tilt, read from its IMU. `tilt.offset` adds to that tilt, from -60° to 60°. It trims the correction, and on a level camera it tests the correction: dragging it warps color and depth as if the camera were tilted. A change takes effect within 0.2 s.
@@ -65,10 +78,10 @@ Deep Flow records chunks of 60 s (`split_seconds`), each one `.mkv` holding colo
 
 ### Measuring
 
-Measure before changing the path. A held frame rate says nothing about latency.
+Measure before changing the path. A held frame rate says nothing about latency. With no flags the probe runs the setup at the top of this document.
 
 ```
-.venv-oak4\Scripts\python -m modules.camera.oak4.probe --color --resolution P720 --fps 60 --detector --depth NEURAL_480
+.venv-oak4\Scripts\python -m modules.camera.oak4.probe
 ```
 
 ## Latency
@@ -222,21 +235,26 @@ The format is in [chunk.py](../chunk.py) and [depth_frame.py](../../video/depth_
 
 Encoding runs on the iGPU because it does nothing else in the installation **(site fact)**, so recording stays out of the way of the show.
 
-| Stream | Codec       | Encoder    | Format                                    |
-|--------|-------------|------------|-------------------------------------------|
-| Color  | H.264       | `h264_qsv` | `video_quality` 24, `keyframe_interval` 0 |
-| Depth  | 12-bit HEVC | `hevc_qsv` | `p012le`, 3 mm steps, 12 m full scale     |
+| Stream | Codec       | Encoder    | Format                                |
+|--------|-------------|------------|---------------------------------------|
+| Color  | H.264       | `h264_qsv` | `video_quality` 24                    |
+| Depth  | 12-bit HEVC | `hevc_qsv` | `p012le`, 3 mm steps, 12 m full scale |
+
+`keyframe_interval` is 60 on both.
+
+Both streams share `keyframe_interval`, and depth has no B-frames, so a seek finds both streams whole. A seek in a chunk goes to a color keyframe, and depth without a keyframe there comes back about 100 mm off. With B-frames depth was also off after a shared keyframe; why is not settled. At 60, 15 of 15 seeks on a real recording matched reading from the start, in both streams, at about 185 ms a frame. A recording made with `keyframe_interval` 0 keeps the fault in its depth.
 
 Depth is lossy. That is acceptable because the fluid spreads and smooths its input and has only 20 to 32 depth layers, so a few millimeters should not show **(deduction)**. On synthetic frames 99 % of pixels are within 11 mm, with a steady offset of about 6 mm. Set depth quality with `-q:v`; `global_quality` breaks at low values, with errors in meters.
 
 ### File size
 
-| Source                | `video_quality` | Color    | Depth    | Together |
-|-----------------------|-----------------|----------|----------|----------|
-| Recorded, 18.1 s      | 18              | 7.4 MB/s | 1.8 MB/s | 9.2 MB/s |
-| Same clip, re-encoded | 24              | 1.4 MB/s | 1.8 MB/s | 3.2 MB/s |
+| Source                | `video_quality` | `keyframe_interval` | Color    | Depth    | Together |
+|-----------------------|-----------------|---------------------|----------|----------|----------|
+| Recorded, 18.1 s      | 18              | 0                   | 7.4 MB/s | 1.8 MB/s | 9.2 MB/s |
+| Same clip, re-encoded | 24              | 0                   | 1.4 MB/s | 1.8 MB/s | 3.2 MB/s |
+| Same clip, re-encoded | 24              | 60                  | 1.8 MB/s | 2.1 MB/s | 3.9 MB/s |
 
-The clip is a dark room, and the color rate at 18 is mostly sensor noise **(deduction)**.
+The last row is the current setup. The clip is a dark room, and the color rate at 18 is mostly sensor noise **(deduction)**.
 
 ### Encoder load
 
@@ -260,6 +278,8 @@ A 10 s recording held 60 fps with the recorder's queues at 1 or less, and gave 6
 
 `replay.Camera` emits both streams and rebuilds `H` from the tagged lens and each frame's recorded tilt, plus the live `tilt.offset`. The recorded frames are already mirrored, so the lens's `cx` is mirrored for this and `flip_h` stays off.
 
+Dragging a marker on the player's bar pauses playback and shows the frame under it, the newest position as fast as a frame can be fetched. Letting go plays from the in marker. Each recording keeps its markers in `in_out.json` in its folder.
+
 ## Open
 
 - Video min sometimes reads about 30 fps **(site fact)**. The cause is not known.
@@ -269,3 +289,6 @@ A 10 s recording held 60 fps with the recorder's queues at 1 or less, and gave 6
 - `StreamReader.frame_count` can read one short on an `.mkv`, as it estimates from the duration.
 - Ethernet stalled once in 130 s of streaming, with a gap of 4.8 s and latency up to 1.7 s. The cause is not known, and a USB run of that length has not been compared.
 - A player at show distance has not been compared across depth sizes or IR lights.
+- The detector squeezes the 5:4 frame into its 416x416 square, 20 % narrower. Boxes stay in place, and the effect on detection has not been measured.
+- A manual exposure past the frame time is reported as asked and the rate stays at 60 fps, up to 100000 µs, which cannot be real. In a dark room the picture's brightness did not follow exposure at all, so the real top needs a test with light.
+- `test_a_split_keeps_the_streams_in_step_across_chunks` fails about 2 runs in 5, because a split lands 1 to 3 frames early. No frames are lost: 50 of 50 in all three streams.

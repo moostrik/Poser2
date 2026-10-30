@@ -38,7 +38,6 @@ const W = 640, H = 800; // the frame we send and draw, 4:5 like the installation
 const FPS = 15;         // frames a second to SMILE during the turn
 const QUALITY = 0.6;    // JPEG
 const MAX_BLOCK = 32;   // a face's pixel size at distance 1 (the installation's face_effect)
-const TAGS = '#smile #oostrik';   // the share text, until the real tags are decided
 const CELL = 20;        // css pixels per smiley of the background
 const NBSP = '\u00a0';             // the empty label's one character: the bar keeps its height
 const POOP = '\uD83D\uDCA9';       // the poop emoji, as the phone draws it
@@ -63,7 +62,7 @@ let state = 'idle';     // idle, waiting, you, transform, done, asleep, lost, no
 let eye = {};           // the last state message from the relay
 let faces = null;       // the last face message during the turn
 let stream = null;      // the camera
-let result = null;      // the result message: urls and caption, after the turn
+let result = null;      // the result message: urls and the artist's name, after the turn
 let shareFile = null;   // the video as a File, fetched when the result comes, so the share sheet opens at once
 let fetched = null;     // the fetch of that file, awaited by the video and the share sheet
 let flashAt = 0;        // performance.now() of the flash: the track starts there
@@ -1009,7 +1008,7 @@ function sendFrame() {
   }, 'image/jpeg', QUALITY);
 }
 
-// THE SHARING: the grin through the share sheet, with the caption as the share text (and on the clipboard,
+// THE SHARING: the grin through the share sheet, with SMILE by the artist as the share text (and on the clipboard,
 // because Instagram drops it); the file is fetched when the result comes (prefetchShare), because a share
 // sheet has to open right on the tap, a phone refuses one that comes seconds later; a download where there
 // is no sheet.
@@ -1061,7 +1060,7 @@ function fileName(message, url) {
 
 async function shareSmile() {
   if (!result) return;
-  const text = `${result.name || ''} ${result.caption || ''} ${TAGS}`.trim();
+  const text = result.name ? `SMILE by ${result.name}` : 'SMILE';
   try { navigator.clipboard.writeText(text).catch(() => {}); } catch (error) { /* no clipboard: the share text is all */ }
   try {
     if (!shareFile && fetched) await fetched;

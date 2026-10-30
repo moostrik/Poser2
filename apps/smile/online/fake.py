@@ -159,7 +159,7 @@ class FakeSmile:
         cv2.imwrite(path, portrait)
 
         def done(ok: bool) -> None:
-            link.submit({'type': 'result', 'id': id, 'phone': phone, 'name': 'Matthias Oostrik', 'caption': 'loves your smile!', 'ok': ok})
+            link.submit({'type': 'result', 'id': id, 'phone': phone, 'name': 'Matthias Oostrik', 'ok': ok})
             os.remove(path)
             logger.info('result delivered (%s)', 'ok' if ok else 'upload failed')
         time.sleep(2.0)

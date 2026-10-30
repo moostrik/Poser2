@@ -87,7 +87,7 @@
       "embedding_strength": 0.9,
       "keypoint_strength": 1.0,
       "depth_strength": 0.65,
-      "depth_end": 0.55,
+      "depth_end": 0.4,
       "full_preview": true,
       "fixed_seed": false
     },
@@ -187,6 +187,7 @@
     "credit_qr_walls": false,
     "credit_size": 200,
     "credit_scroll": true,
+    "credit_scroll_idle": 120.0,
     "credit_scroll_rows": "1,3",
     "credit_scroll_speed_1": 1.0,
     "credit_scroll_speed_2": 0.91,

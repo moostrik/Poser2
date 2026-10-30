@@ -5,7 +5,7 @@ from .. import RigCameraSettings, CameraResolution, TiltCorrectionSettings
 from modules.settings import BaseSettings, Field, Group, Widget
 
 from .definitions import (
-    PoseChain, CameraLink, DepthModel, EXPOSURE_RANGE, ISO_RANGE, BALANCE_RANGE, CONTRAST_RANGE, BRIGHTNESS_RANGE,
+    ModelChain, CameraLink, DepthModel, EXPOSURE_RANGE, ISO_RANGE, BALANCE_RANGE, CONTRAST_RANGE, BRIGHTNESS_RANGE,
     LUMA_DENOISE_RANGE, SATURATION_RANGE, SHARPNESS_RANGE,
 )
 
@@ -31,15 +31,13 @@ class SensorSettings(BaseSettings):
 class Oak4CameraSettings(RigCameraSettings):
     """One OAK4 camera: the contract's rate, mount and readings, plus what shapes its pipeline.
 
-    The same fields at this level as the OAK-D's `OakCameraSettings`, so an app shares them the
-    same way (`fps`, `color`, `yolo`, `resolution`, `model_path`, `fov`) and the preset keys stay
-    flat. `color` picks the delivered frame, color or grey, off the color sensor.
+    An app shares `fps`, `color`, `resolution`, `model_path` and `fov` from its camera group, and the
+    preset keys stay flat. `color` picks the delivered frame, color or grey, off the color sensor.
     """
     device_id:      Field[str]   = Field("", access=Field.INIT, description="Camera device ID (serial, or its IP; empty = the first OAK4 found)")
     link:           Field[CameraLink] = Field(CameraLink.USB, access=Field.INIT, description="Link to the PC; the other one is used when this one is missing")
     color:          Field[bool]  = Field(True, access=Field.INIT, newline=True, description="Color frames (False = grey off the same sensor)")
-    yolo:           Field[bool]  = Field(True, access=Field.INIT)
-    pose_chain:     Field[PoseChain] = Field(PoseChain.ONE_MODEL, access=Field.INIT, description="Models on the camera: one pose model, a detector and a pose model on each crop, or a detector alone")
+    model_chain:    Field[ModelChain] = Field(ModelChain.DETECTOR, access=Field.INIT, description="Models on the camera: none, a detector alone, one pose model, or a detector and a pose model on each crop")
     depth_model:    Field[DepthModel] = Field(DepthModel.OFF, access=Field.INIT, description="Neural Depth size on the camera; larger is sharper and slower")
     resolution:     Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Delivered size before the crop; the sensor mode follows it")
     model_path:     Field[str]   = Field("data/models", access=Field.INIT)

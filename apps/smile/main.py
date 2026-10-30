@@ -5,7 +5,7 @@ from .cam import Camera
 from modules.camera import vimba, webcam
 from modules.face import FaceFinder, FaceFrame
 from .render.smile_render import SmileRender
-from .render import AnimationType, AnimationTypeNames, GrinPlayer, RenderSettings, Sequencer, SequenceMessage, SequenceType
+from .render import CAMERA_STATES, AnimationType, AnimationTypeNames, GrinPlayer, RenderSettings, Sequencer, SequenceMessage, SequenceType
 from .comfy.generator import Generator
 from .comfy.messages import GeneratorMessage, GeneratorState
 from modules.inout import OscSender
@@ -108,8 +108,9 @@ class SmileMain():
         self.osc: OscSender = OscSender(self.settings.audio.osc, events=('/test_bang',))
         # the laughter test, stepped from sequence_callback: it lights the walls' cells and bangs Max
         self.laughter_test: LaughterTest = LaughterTest(self.settings.audio, send=self.clip_player.light, bang=self._test_bang)
-        # the name going round the walls, planned here and handed to them every second
+        # the name going round the walls while nobody is seen, planned here and handed to them every second
         self.credit_scroller: CreditScroller = CreditScroller(self.settings.render, self.clip_player.scroll_loop)
+        self._face_seen: float = time.perf_counter()    # the last qualifying face or visitor: the name waits from here
         self.save: ClipSaver = ClipSaver(self.settings.sequence, watermark=self.settings.render.credit_name)
         self._grin_saved: bool = False      # the visitor's grin was saved to its last frame
         self._saving: bool = False          # the visitor's files are open in the saver
@@ -120,7 +121,7 @@ class SmileMain():
         self.lights: Lights = Lights(self.settings.artnet, f'{DATA_PATH}/artnet.json')
         # SMILE Online: a turn for someone outside when the room's eye is free, stepped from sequence_callback
         self.online: Online = Online(self.settings.online, self.camera, self.sequencer, self.face, self.render.grab,
-                                     lambda: (self.settings.render.credit_name, self.settings.render.credit_line),
+                                     lambda: self.settings.render.credit_name,
                                      lambda: (self.music_map.get_music_id(), self.music_map.track_path()),
                                      laughs=laugh_files, laughter=lambda: self.settings.audio.laughter, pick=self.pick_style)
         self.save.add_saved_callback(self.online.on_saved)
@@ -238,8 +239,12 @@ class SmileMain():
         # is the wall clock: the scroller sends its times to the walls, which carry them onto perf_counter themselves
         now: float = time.time()
         self.laughter_test.update(now)
-        # and the scrolling name's passes, timed on the app clock too; not while the test lights the screens
-        self.credit_scroller.update(now, self.settings.audio.laughter_test)
+        # and the scrolling name's passes, timed on the app clock too; only after `credit_scroll_idle` s without a
+        # qualifying face (the finder sees no frames during a visitor, who counts as one) and not while the test lights the screens
+        if seq not in CAMERA_STATES:
+            self._face_seen = time.perf_counter()
+        waiting: bool = time.perf_counter() - self._face_seen < self.settings.render.credit_scroll_idle
+        self.credit_scroller.update(now, self.settings.audio.laughter_test or waiting)
         # the online turn: it takes the camera when the room's eye is free, and the sequence runs as for a visitor inside
         self.online.update(now, message, ready, self.settings.render.show_camera or self.settings.audio.laughter_test)
         self._online_cell()
@@ -337,6 +342,8 @@ class SmileMain():
     def face_callback(self, frame: FaceFrame) -> None:
         # the sequencer charges toward the flash while the face qualifies
         self.sequencer.set_face(frame.qualified, frame.timestamp)
+        if frame.qualified:
+            self._face_seen = frame.timestamp
         self.online.on_face(frame)
 
     def generator_callback(self, message: GeneratorMessage) -> None:

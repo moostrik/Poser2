@@ -67,10 +67,11 @@ def direct_size(resolution: CameraResolution) -> tuple[int, int]:
     return (round(rows * FRAME_ASPECT / FRAME_WIDTH_ALIGNMENT) * FRAME_WIDTH_ALIGNMENT, rows)
 
 
-# The control ranges of the OAK-D, kept until the IMX586's own are read off the hardware: the
-# `CameraControl` setters are the same calls on depthai 3.
-EXPOSURE_RANGE:     tuple[int, int] = (1000, 33000)
-ISO_RANGE:          tuple[int, int] = ( 100, 1600 )
+# The control ranges. Exposure's floor and ISO are where this sensor clamps a manual value, measured
+# on the IMX586 of an OAK-4-PRO-W at P720 and 60 fps; exposure's top and the rest are the ranges in
+# the `CameraControl` docs. Auto exposure goes up to 16277 µs at that rate.
+EXPOSURE_RANGE:     tuple[int, int] = (  86, 33000)
+ISO_RANGE:          tuple[int, int] = (  65, 16585)
 BALANCE_RANGE:      tuple[int, int] = (1000, 12000)
 CONTRAST_RANGE:     tuple[int, int] = ( -10, 10   )
 BRIGHTNESS_RANGE:   tuple[int, int] = ( -10, 10   )
@@ -230,18 +231,19 @@ def imu_rotation_to_camera(device: dai.Device, socket: dai.CameraBoardSocket, de
 # ---------------------------------------------------------------------------
 # The OAK4's chip takes a model compiled by Luxonis, fetched once from their zoo as an NN archive
 # (`python -m modules.camera.oak4.models`, local files in `data/models`, not in git). Two chains give
-# the 17 body landmarks (COCO, the order of `modules.pose.PointLandmark`), `PoseChain` picks:
+# the 17 body landmarks (COCO, the order of `modules.pose.PointLandmark`), `ModelChain` picks:
 # ONE_MODEL finds the people and their landmarks in one pass, decoded by `DetectionNetwork` from the
 # archive's config; TWO_MODELS runs a detector, cuts one crop per person on the device and runs a
 # top-down pose model on each crop, through Luxonis's depthai-nodes. DETECTOR gives boxes only, for
-# an app that poses the crops on the host: yolov8n at the square frame's 416x416, compiled through
-# Luxonis's HubAI, as the zoo has no square size for this chip.
+# an app that poses the crops on the host: yolov8n at 416x416, compiled through Luxonis's HubAI, as
+# the zoo has no square size for this chip.
 
 
-class PoseChain(IntEnum):
-    ONE_MODEL = 0       # YOLOv8-pose: boxes and keypoints in one pass
-    TWO_MODELS = 1      # YOLOv6 detector, then Lite-HRNet on each person's crop
-    DETECTOR = 2        # YOLOv8n: boxes only
+class ModelChain(IntEnum):
+    OFF = 0             # no model on the camera: frames only
+    DETECTOR = 1        # YOLOv8n: boxes only
+    ONE_MODEL = 2       # YOLOv8-pose: boxes and keypoints in one pass
+    TWO_MODELS = 3      # YOLOv6 detector, then Lite-HRNet on each person's crop
 
 
 PERSON_DETECTOR_ARCHIVE: str = 'yolov8n_coco_416x416_rvc4.tar.xz'
@@ -267,14 +269,16 @@ TRACKER_PERSON_LABEL: int = 0
 TRACKER_TYPE: dai.TrackerType = dai.TrackerType.SHORT_TERM_IMAGELESS    # this chip has no ZERO_TERM_IMAGELESS, the `oak` backend's type
 
 
-def model_archives(chain: PoseChain) -> tuple[str | None, str | None]:
+def model_archives(chain: ModelChain) -> tuple[str | None, str | None]:
     """The (pose, detector) archive names of a chain: `build_pipeline` reads one model off the one
     that is set, and the two-model chain off both."""
-    if chain == PoseChain.DETECTOR:
+    if chain == ModelChain.DETECTOR:
         return None, PERSON_DETECTOR_ARCHIVE
-    if chain == PoseChain.TWO_MODELS:
+    if chain == ModelChain.TWO_MODELS:
         return TOP_DOWN_ARCHIVE, DETECTOR_ARCHIVE
-    return POSE_ARCHIVE, None
+    if chain == ModelChain.ONE_MODEL:
+        return POSE_ARCHIVE, None
+    return None, None
 
 
 def nn_frame_type(archive: dai.NNArchive) -> dai.ImgFrame.Type:

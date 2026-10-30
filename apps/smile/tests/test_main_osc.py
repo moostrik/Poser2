@@ -2,6 +2,7 @@
 tab is built from (no camera, no GL, no ComfyUI: the callback runs on a stand-in for the app)."""
 
 import logging
+import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
@@ -41,7 +42,7 @@ class TestMaxControls(unittest.TestCase):
             music_map=mock.Mock(get_music_id=lambda: '0001'), osc=mock.Mock(), laughter_test=mock.Mock(),
             _limit_visitor=lambda seq: None,
             _style_picked=False, _face_frame_time=0.0, _visitor_start=None, _saving=False, _grin_saved=False,
-            credit_scroller=mock.Mock(), online=mock.Mock(showing=False, pass_value=''), clip_player=mock.Mock())
+            _face_seen=0.0, credit_scroller=mock.Mock(), online=mock.Mock(showing=False, pass_value=''), clip_player=mock.Mock())
         self.app._online_cell = lambda: SmileMain._online_cell(self.app)
 
     def frame(self) -> dict:
@@ -49,6 +50,34 @@ class TestMaxControls(unittest.TestCase):
         self.app.osc.submit.reset_mock()
         SmileMain.sequence_callback(self.app, SequenceMessage(SequenceType.CAMERA_SHOW, 0.0))
         return {c.args[0]: c.args[1] for c in self.app.osc.submit.call_args_list}
+
+    def name_held(self, sequence_type: SequenceType = SequenceType.CAMERA_SHOW) -> bool:
+        """One sequencer frame: whether the scrolling name was held back in it."""
+        SmileMain.sequence_callback(self.app, SequenceMessage(sequence_type, 0.0))
+        return self.app.credit_scroller.update.call_args.args[1]
+
+    def test_the_name_waits_the_idle_time_after_the_last_qualifying_face(self):
+        self.settings.render.credit_scroll_idle = 120.0
+        self.app._face_seen = time.perf_counter() - 121.0
+        self.assertFalse(self.name_held())
+        SmileMain.face_callback(self.app, SimpleNamespace(qualified=False, timestamp=time.perf_counter()))
+        self.assertFalse(self.name_held())                  # a rejected face is nobody
+        SmileMain.face_callback(self.app, SimpleNamespace(qualified=True, timestamp=time.perf_counter()))
+        self.assertTrue(self.name_held())
+        self.app._face_seen = time.perf_counter() - 119.0
+        self.assertTrue(self.name_held())
+        self.app._face_seen = time.perf_counter() - 121.0
+        self.assertFalse(self.name_held())
+
+    def test_a_visitor_holds_the_name_back_and_the_camera_view_starts_the_count(self):
+        self.app._face_seen = time.perf_counter() - 121.0
+        self.assertTrue(self.name_held(SequenceType.DIFFUSION))
+        self.assertTrue(self.name_held(SequenceType.CAMERA_SHOW))
+
+    def test_the_laughter_test_holds_the_name_back(self):
+        self.app._face_seen = time.perf_counter() - 121.0
+        self.settings.audio.laughter_test = True
+        self.assertTrue(self.name_held())
 
     def test_the_panel_controls_go_out_every_frame_in_max_units(self):
         sent = self.frame()

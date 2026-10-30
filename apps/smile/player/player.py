@@ -47,7 +47,6 @@ class Player:
     def __init__(self, settings: WallsSettings, walls: list[WallRender], render_settings: 'RenderSettings', root: str = 'apps/smile/output/') -> None:
         self.settings: WallsSettings = settings
         self.walls: list[WallRender] = walls
-        self._name: RenderSettings = render_settings       # its credit_name goes over the captions
         # the Max patch places a clip's laugh by the cell its play starts in: `/bang <cell>` to the wall's port
         self.osc: list[OscSender] = []
         for wall in range(len(walls)):
@@ -157,9 +156,10 @@ class Player:
         self.walls[wall].light(str(cell), seconds, number)
 
     def scroll_loop(self, wall: int, word: str, speed: float, gap: float, size: int, ring: int, started: float,
-                    cells: list[tuple[int, int]]) -> None:
-        """The scrolling name: a word going round a ring, with the wall's cells on it and their places."""
-        if self.walls[wall].scroll_loop(word, speed, gap, size, ring, started, [(str(cell), place) for cell, place in cells]):
+                    cells: list[tuple[int, int]], last: int | None) -> None:
+        """The scrolling name: a word going round a ring, with the wall's cells on it and their places, until
+        it leaves at the screen `last`."""
+        if self.walls[wall].scroll_loop(word, speed, gap, size, ring, started, [(str(cell), place) for cell, place in cells], last):
             logger.info('Scrolling name %s going round over wall %d cells %s', word, wall + 1, ', '.join(f'{cell}@{place}' for cell, place in cells))
 
     # THE LOADERS' THREADS
@@ -172,7 +172,7 @@ class Player:
     def _on_play(self, cell: int) -> None:
         """A clip starts in a cell: the Max patch places its laugh by that screen's angle
         (data/audio/screen_angles.txt, by cell for port 4115 and cell + 24 for 4116), and the cell gets a
-        caption for this play, the artist's name and a random line, as on the main screen. The lines are
+        caption for this play, a random line under SMILE(ai), as on the main screen. The lines are
         not tied to the clips. Nothing for the online cell: its clip plays unseen."""
         if cell == self.online_cell:
             return
@@ -180,4 +180,4 @@ class Player:
         self.osc[wall].submit('/bang', index)
         with self._lines_lock:
             line: str = self._lines.pick()
-        self.walls[wall].set_caption(str(index), str(self._name.credit_name), line)
+        self.walls[wall].set_caption(str(index), line)

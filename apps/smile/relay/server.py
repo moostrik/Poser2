@@ -31,7 +31,7 @@ Phone -> relay: join (on the tap, after a missed or lost turn, at a reconnect), 
     drawn), timing (its turn's end, for the log); frames (FRAME).
 Relay -> phone: state (see Line.state: eye, status, place, waiting, block, laughter, reason, eta; at every change of
     the line and at every `eye` from SMILE, about once a second), turn {window}, music, face, stage, result {id, ok, name,
-    caption, portrait, grin: the urls, None for a file that is not there}, turn_end {reason: done, missed, lost or
+    portrait, grin: the urls, None for a file that is not there}, turn_end {reason: done, missed, lost or
     reset; `lost` also from the relay itself when SMILE goes}, expired (the pass ran out: the socket closes);
     SHOW and LAST images.
 Relay -> SMILE: pass {value} (at connect and at every change), invite {value} (at connect and after `new_invite`),
@@ -40,7 +40,7 @@ SMILE -> relay: new_invite, eye {free, status, laughter}, turn_start, face, stag
     through the sequence (the flash stages with `value`, the room's eased progress), music {id, url, offset} (the visitor's track, which SMILE uploaded as kind `track` the
     first time; the laughter samples as kind `laugh` with `ext`; `GET /api/library` lists what the relay has),
     turn_end {reason}, and after the turn
-    result {id, phone, name, caption, ok} (to that phone, whatever it does now; without `phone` to the turn's);
+    result {id, phone, name, ok} (to that phone, whatever it does now; without `phone` to the turn's);
     show images; uploads over HTTP.
 The screen frames (SHOW) are paced by the phone: one is in flight at a time, the phone answers each with
 `seen`, and a newer frame from SMILE replaces one still waiting. So a slow phone gets fewer frames, not
@@ -388,8 +388,7 @@ class Relay:
         starts the files' last minutes now."""
         id: str = self.safe_id(str(message.get('id', '')))
         delivery: Delivery | None = self.deliveries.get(id)
-        result: dict = {'type': 'result', 'id': id, 'ok': bool(message.get('ok', True)),
-                        'name': str(message.get('name', '')), 'caption': str(message.get('caption', ''))}
+        result: dict = {'type': 'result', 'id': id, 'ok': bool(message.get('ok', True)), 'name': str(message.get('name', ''))}
         for kind in KINDS:
             name: str | None = delivery.files.get(kind) if delivery else None
             result[kind] = f'/files/{kind}s/{name}' if name else None

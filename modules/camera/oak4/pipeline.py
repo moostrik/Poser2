@@ -31,9 +31,9 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class MountConfig:
-    """How a camera is mounted and what its lens is, as the correction needs it: the OAK-D's
-    `WarpConfig`, under the name of what it holds. `fov_h` is the azimuth span of the delivered
-    frame, quoted for the un-cropped sensor width; the lens fields are `geometry.source_lens`'s."""
+    """How a camera is mounted and what its lens is, as the correction needs it. `fov_h` is the
+    azimuth span of the delivered frame, quoted for the un-cropped sensor width; the lens fields are
+    `geometry.source_lens`'s."""
     flip_h: bool
     flip_v: bool
     fov_h: float
@@ -137,9 +137,8 @@ def add_one_model_chain(pipeline: dai.Pipeline, frames: dai.Node.Output, archive
 
 def add_detector(pipeline: dai.Pipeline, frames: dai.Node.Output, archive: dai.NNArchive) -> dai.node.DetectionNetwork:
     """The delivered frame stretched into the model and the network on it: the first stage of every
-    chain. STRETCHED, never cropped or letterboxed, as the OAK-D's detector takes it: nothing is
-    lost at the edges and the normalised boxes map 1:1 onto the delivered frame; an aspect mismatch
-    costs detection quality, never geometry."""
+    chain. STRETCHED, never cropped or letterboxed: nothing is lost at the edges and the normalised
+    boxes map 1:1 onto the delivered frame; an aspect mismatch costs detection quality, never geometry."""
     size: tuple[int, int] | None = archive.getInputSize()
     if size is None:
         raise ValueError('the model archive names no input size')

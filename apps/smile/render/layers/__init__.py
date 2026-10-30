@@ -6,4 +6,4 @@ from .reveal_layer import RevealLayer
 from .diffusion_layer import DiffusionLayer
 from .bloom_layer import BloomLayer
 from .status_layer import StatusLayer
-from .credit_layer import CreditLayer, caption_shown, fade_step, new_line_due
+from .credit_layer import CreditLayer, CreditView, caption_shown, fade_step, new_line_due

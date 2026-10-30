@@ -3,8 +3,8 @@
 Each camera opens its own device and builds its own pipeline on it (`build_pipeline`; a depthai 3
 pipeline is bound to one device), reads the delivered frames, the tracklets and the IMU through
 queues on the node outputs, on depthai's callback thread, which is where the frames and tracklets
-become the contract's and get their host time. With `yolo` the device runs the chain `pose_chain`
-names. DETECTOR gives boxes only; with a pose chain a tracklet carries its keypoints: from its own
+become the contract's and get their host time. The device runs the chain `model_chain` names.
+DETECTOR gives boxes only; with a pose chain a tracklet carries its keypoints: from its own
 detection in the one-model chain, or, in the two-model chain, from the pose of its crop, joined to
 it by frame (`PoseJoin`). With `depth_model` it also delivers depth aligned to the frames, as DEPTH
 frames. The sensor controls are `SensorControl`'s for as long as the device is open.
@@ -35,7 +35,7 @@ from modules.utils import FPS, Rect
 
 from .control import SensorControl
 from .definitions import SENSOR_SOCKET, requested_size, get_device_list, find_device, log_connected_sensors, \
-    read_lens_calibration, imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL, PoseChain, CameraLink, DepthModel, \
+    read_lens_calibration, imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL, ModelChain, CameraLink, DepthModel, \
     model_archives, TRACKING_STATUS, tracklet_keypoints, keypoints_in_frame, packed_nv12, smoothed_latency, \
     mirrored_roi, mirrored_keypoints
 from .pipeline import build_pipeline, delivered_size, MountConfig, PipelineOutputs
@@ -74,7 +74,6 @@ class Camera(Thread):
         self.model_path: str =          settings.model_path
         self.fps: float =               settings.fps
         self.color: bool =              settings.color
-        self.yolo: bool =               settings.yolo
         self.depth_model: DepthModel =  settings.depth_model
         self.resolution: CameraResolution = settings.resolution
 
@@ -89,9 +88,9 @@ class Camera(Thread):
         self.frame_height: int = delivered_height(self.color, self.resolution, self.mount.fov_h, 0.0,
                                                   self.mount.lens_fov, self.mount.lens_center)
         self.frame_size: tuple[int, int] = delivered_size(self.color, self.resolution, self.frame_height)
-        self.pose_chain: PoseChain = settings.pose_chain
+        self.model_chain: ModelChain = settings.model_chain
         models = Path(self.model_path)
-        pose, detector = model_archives(self.pose_chain) if self.yolo else (None, None)
+        pose, detector = model_archives(self.model_chain)
         self.pose_archive: Path | None = models / pose if pose else None
         self.detector_archive: Path | None = models / detector if detector else None
         self.pose_join: PoseJoin | None = PoseJoin() if pose and detector else None
@@ -167,7 +166,7 @@ class Camera(Thread):
     def _open(self) -> bool:
         device_list: list[str] = get_device_list(verbose=False)
         if not self.device_id and device_list:
-            self.device_id = device_list[0]          # no id in the preset: the first OAK4 on the network
+            self.device_id = device_list[0]          # no id in the preset: the first OAK4 found
             logger.info(f'no device id set: opening the first OAK4 found, {self.device_id} (of {device_list})')
         if not self.device_id:
             self._warn('no OAK4 found (an OAK-D is never opened by this backend)')

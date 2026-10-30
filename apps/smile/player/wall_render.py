@@ -9,8 +9,8 @@ import numpy as np
 from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TEST, glClear, glClearColor,
                        glDisable, glEnable, glScissor, glViewport)
 
-from ..credit import FONT, qr_image, quiet_px, wrap_balanced
-from ..credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_offset
+from ..credit import FONT, TITLE_FONT, qr_image, quiet_px, title_image, wrap_balanced
+from ..credit_scroll import TIMEOUT as SCROLL_TIMEOUT, name_strip, scroll_copies, scroll_gone
 from modules.gl import Blit, Fbo, Image, Shader, Style, SwapFbo, Text, Texture
 from ..render.shaders import Blend
 from .settings import WallsSettings
@@ -33,8 +33,9 @@ CREDIT_NAME_COLOR: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)
 # the online cell: the same card with the QR code to the phone page and this line under it
 ONLINE_LINE: str = 'SMILE from your phone'
 
-# a clip's caption, in the clip's upright 512 x 640: the name over the top, the line along the bottom, as on the main screen
+# a clip's caption, in the clip's upright 512 x 640: SMILE(ai) over the top, the line along the bottom, as on the main screen
 CAPTION_PX: int = 44
+CAPTION_TITLE_PX: int = round(CAPTION_PX / TITLE_FONT)
 CAPTION_MARGIN_PX: int = 20
 CAPTION_OUTLINE_PX: int = 3
 CAPTION_COLOR: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
@@ -47,9 +48,10 @@ class Scroll:
     """A word of the name going round a ring of `ring` screens on this wall (the scroller's loop): the
     cells on the ring with their place round it, moving at `speed` px/s from `started` (`time.time()`),
     with `gap` px of wall between two screens, until `expires`, the time the scroller's next message
-    is due by. The frames are timed with `time.perf_counter()`: on Windows `time.time()` moves in steps of the
-    system tick (15.6 ms on Python 3.12), coarser than a frame, which made the word stand still one frame and
-    jump the next. `started` is carried onto that clock once, when it is new (`started_perf`)."""
+    is due by, or, told to leave, until it has run out at the left side of the screen `last`. The frames
+    are timed with `time.perf_counter()`: on Windows `time.time()` moves in steps of the system tick (15.6 ms
+    on Python 3.12), coarser than a frame, which made the word stand still one frame and jump the next.
+    `started` is carried onto that clock once, when it is new (`started_perf`)."""
 
     def __init__(self, name: str, speed: float, gap: float, size: int, ring: int, cells: list[tuple[str, int]],
                  started: float, expires: float) -> None:
@@ -62,12 +64,13 @@ class Scroll:
         self.started: float = started
         self.started_perf: float = time.perf_counter() - (time.time() - started)
         self.expires: float = expires
+        self.last: int | None = None
 
-    def renew(self, speed: float, gap: float, size: int, started: float, expires: float) -> None:
+    def renew(self, speed: float, gap: float, size: int, started: float, expires: float, last: int | None) -> None:
         if started != self.started:         # a new phase (a speed changed in the panel): carry it over again
             self.started_perf = time.perf_counter() - (time.time() - started)
             self.started = started
-        self.speed, self.gap, self.size, self.expires = speed, gap, size, expires
+        self.speed, self.gap, self.size, self.expires, self.last = speed, gap, size, expires, last
 
     def travelled(self, now_perf: float) -> float:
         """The px the word moved by `now_perf` (`time.perf_counter()`)."""
@@ -105,7 +108,7 @@ class WallRender:
     a QR code to the project page instead of its clip (`credit_qr_walls`): it takes a cell when a clip
     starts there, after its white frame, and stays for that play, so it moves on as often as the clips
     change. With `credit_walls` on, every cell shows a caption over its clip, set at every play
-    (`set_caption`): the artist's name over the top and a random line along the bottom. The words of the
+    (`set_caption`): SMILE(ai) over the top and a random line along the bottom. The words of the artist's
     name go round the sphere (`scroll_loop`, renewed every second): letters most of a screen tall move
     over the cells of a ring, each cell showing its part of one long texture (`name_strip`). The online
     cell (`set_online`) shows the QR code to the phone page with a line under it while SMILE Online waits
@@ -161,12 +164,13 @@ class WallRender:
         self._online_qr: Image = Image('BGR')
         self._online_key: str | None = None                 # the url the card was drawn with
         self._online_text: Text = Text()
-        # the clips' captions: per cell a name and a line, drawn into a transparent portrait texture when
-        # they change, and blitted over the cell turned like the clip
-        self._captions: dict[str, tuple[str, str]] = {id: ('', '') for id in ids}
-        self._caption_drawn: dict[str, tuple[str, str] | None] = {id: None for id in ids}
+        # the clips' captions: per cell a line, drawn with the title into a transparent portrait texture when
+        # it changes, and blitted over the cell turned like the clip
+        self._captions: dict[str, str] = {id: '' for id in ids}
+        self._caption_drawn: dict[str, str | None] = {id: None for id in ids}
         self._caption_fbos: dict[str, Fbo] = {id: Fbo() for id in ids}
         self._caption_text: Text = Text()
+        self._caption_title: Image = Image('BGR')
         # the scrolling name: the words going round, a strip texture per word and size in use, and per cell a
         # transparent portrait texture with the parts of the strips on that screen
         self._scrolls: list[Scroll] = []
@@ -193,7 +197,9 @@ class WallRender:
         self._credit_key = self._online_key = None
         for fbo in self._caption_fbos.values():
             fbo.allocate(self.CELL_HEIGHT, self.CELL_WIDTH, GL_RGBA8)
-        if not self._caption_text.allocate(FONT, CAPTION_PX):
+        if self._caption_text.allocate(FONT, CAPTION_PX):
+            self._caption_title.set_image(title_image('', CAPTION_TITLE_PX, outline_ratio=CAPTION_OUTLINE_PX / CAPTION_TITLE_PX))
+        else:
             logger.warning('No font for the captions: the clips play without')
         for fbo in self._scroll_fbos.values():
             fbo.allocate(self.CELL_HEIGHT, self.CELL_WIDTH, GL_RGBA8)
@@ -213,6 +219,7 @@ class WallRender:
         self._online_qr.deallocate()
         self._online_text.deallocate()
         self._caption_text.deallocate()
+        self._caption_title.deallocate()
         for fbo in self._caption_fbos.values():
             fbo.deallocate()
         for fbo in self._scroll_fbos.values():
@@ -253,13 +260,14 @@ class WallRender:
             lit: list[str] = lit_cells(self._lit, time.time())
             numbers: dict[str, int] = {id: self._numbers.get(id, 0) for id in lit}
             self._numbers = numbers
-            captions: dict[str, tuple[str, str]] = {id: c for id, c in self._captions.items() if id != online} if caption else {}
+            captions: dict[str, str] = {id: c for id, c in self._captions.items() if id != online} if caption else {}
             scrolls: list[Scroll] = list(self._scrolls)
         # the online cell shows no clip: no white frame there, and its clip's start is nobody's
         flashes = [id for id in flashes if id != online]
         starts = [id for id in starts if id != online]
         for image in self._images.values():
             image.update()
+        self._caption_title.update()
         if credit:
             self._credit_cell, self._credit_left = next_credit_cell(self._credit_cell, self._credit_left, flashes, online)
         else:
@@ -282,10 +290,10 @@ class WallRender:
             self._update_credit()
         if online is not None and self._online_mode == 'qr':
             self._update_online_card()
-        for id, text in captions.items():
-            if text != self._caption_drawn[id]:
-                self._draw_caption(id, *text)
-                self._caption_drawn[id] = text
+        for id, line in captions.items():
+            if line != self._caption_drawn[id]:
+                self._draw_caption(id, line)
+                self._caption_drawn[id] = line
         scrolling: list[str] = self._draw_scrolls(scrolls, time.perf_counter()) if scrolls else []
 
         self._trail_fbo.swap()
@@ -298,8 +306,8 @@ class WallRender:
         # the clips' captions, over each cell's clip
         if captions:
             Style.set_blend_mode(Style.BlendMode.ALPHA)
-            for id, (name, line) in captions.items():
-                if name or line:
+            for id, line in captions.items():
+                if line:
                     glViewport(*self._rects[id])
                     self._rotated.use(self._caption_fbos[id])
             Style.set_blend_mode(Style.BlendMode.DISABLED)
@@ -348,8 +356,8 @@ class WallRender:
             Style.set_blend_mode(Style.BlendMode.DISABLED)
         self._number_fbo.end()
 
-    def _draw_caption(self, id: str, name: str, line: str) -> None:
-        """The cell's caption texture: transparent, the name in even lines over the top and the line along
+    def _draw_caption(self, id: str, line: str) -> None:
+        """The cell's caption texture: transparent, SMILE(ai) over the top and the line in even lines along
         the bottom, white with a black edge."""
         fbo: Fbo = self._caption_fbos[id]
         width, height = self.CELL_HEIGHT, self.CELL_WIDTH
@@ -357,25 +365,30 @@ class WallRender:
         glClearColor(0.0, 0.0, 0.0, 0.0)
         glClear(GL_COLOR_BUFFER_BIT)
         text: Text = self._caption_text
-        if text.allocated:
+        title: Image = self._caption_title
+        if text.allocated and line:
             measure = lambda part: text.measure_text(part)[0]
             _, line_height = text.measure_text("Mg")
-            top: list[str] = wrap_balanced(name, measure, width - 2 * CAPTION_MARGIN_PX)
             bottom: list[str] = wrap_balanced(line, measure, width - 2 * CAPTION_MARGIN_PX)
+            y: float = height - CAPTION_MARGIN_PX - len(bottom) * line_height
             Style.set_blend_mode(Style.BlendMode.ALPHA)
-            for lines, y in ((top, CAPTION_MARGIN_PX), (bottom, height - CAPTION_MARGIN_PX - len(bottom) * line_height)):
-                for i, part in enumerate(lines):
-                    x: float = (width - measure(part)) / 2
-                    for dx, dy in CAPTION_OUTLINE:
-                        text.draw_text(x + dx, y + i * line_height + dy, part, CAPTION_OUTLINE_COLOR, width, height)
-                    text.draw_text(x, y + i * line_height, part, CAPTION_COLOR, width, height)
+            if title.allocated:
+                # the viewport's origin is the bottom left
+                glViewport((width - title.width) // 2, height - CAPTION_MARGIN_PX - title.height, title.width, title.height)
+                Blit.use(title)
+                glViewport(0, 0, width, height)
+            for i, part in enumerate(bottom):
+                x: float = (width - measure(part)) / 2
+                for dx, dy in CAPTION_OUTLINE:
+                    text.draw_text(x + dx, y + i * line_height + dy, part, CAPTION_OUTLINE_COLOR, width, height)
+                text.draw_text(x, y + i * line_height, part, CAPTION_COLOR, width, height)
             Style.set_blend_mode(Style.BlendMode.DISABLED)
         fbo.end()
 
     def _draw_scrolls(self, scrolls: list[Scroll], now_perf: float) -> list[str]:
         """The cells the scrolling name is on at `now_perf` (`time.perf_counter()`), each cell's texture filled
-        with its part of every word that crosses it; a loop the scroller stopped renewing is dropped, and so is a
-        strip no loop uses."""
+        with its part of every word that crosses it; a loop that ran out or that the scroller stopped renewing
+        is dropped, and so is a strip no loop uses."""
         width, height = self.CELL_HEIGHT, self.CELL_WIDTH     # the screen upright: its width is the cell's height
         parts: dict[str, list[tuple[Image, float]]] = {}     # per cell: the strips on it with their offsets
         keys: set[tuple[str, int]] = set()
@@ -389,20 +402,16 @@ class WallRender:
             strip.update()
             if not strip.allocated:
                 continue
-            if now_perf > scroll.expires:
+            travelled: float = scroll.travelled(now_perf)
+            last: int | None = scroll.last
+            if now_perf > scroll.expires if last is None else scroll_gone(last, travelled, scroll.gap, strip.width, width):
                 with self._mutex:
                     if scroll in self._scrolls:
                         self._scrolls.remove(scroll)
                 continue
-            # the distance round the ring: the strip drawn where it is on this lap and where the next lap's copy
-            # enters at the end of the ring
-            lap: float = scroll.ring * (width + scroll.gap)
-            travelled: float = scroll.travelled(now_perf) % lap
             for id, place in scroll.cells:
-                for t in (travelled, travelled + lap):
-                    offset: float = scroll_offset(place, t, scroll.gap, width)
-                    if offset < strip.width and offset + width > 0:
-                        parts.setdefault(id, []).append((strip, offset))
+                for offset in scroll_copies(place, scroll.ring, travelled, scroll.gap, strip.width, last, width):
+                    parts.setdefault(id, []).append((strip, offset))
         for key in [key for key in self._scroll_strips if key not in keys]:
             self._scroll_strips.pop(key).deallocate()
         for id, strips in parts.items():
@@ -474,27 +483,31 @@ class WallRender:
         with self._mutex:
             self._initials[id] = int(initial)
 
-    def set_caption(self, id: str, name: str, line: str) -> None:
-        """The caption on a cell from now on, shown while `credit_walls` is on (any thread); an unknown id is ignored."""
+    def set_caption(self, id: str, line: str) -> None:
+        """The caption's line on a cell from now on, shown while `credit_walls` is on (any thread); an unknown id is ignored."""
         if id not in self._rects:
             return
         with self._mutex:
-            self._captions[id] = (name, line)
+            self._captions[id] = line
 
     def scroll_loop(self, name: str, speed: float, gap: float, size: int, ring: int, started: float,
-                    cells: list[tuple[str, int]]) -> bool:
-        """A word going round a ring of `ring` screens without end (any thread, the scroller renews it every
-        second): `started` is when it began by `time.time()`, so the position comes from the clock and a resend
-        moves nothing. The loop ends when no message renews it for `SCROLL_TIMEOUT`. True for a loop that is new."""
+                    cells: list[tuple[str, int]], last: int | None = None) -> bool:
+        """A word going round a ring of `ring` screens (any thread, the scroller renews it every second):
+        `started` is when it began by `time.time()`, so the position comes from the clock and a resend moves
+        nothing. The loop ends when no message renews it for `SCROLL_TIMEOUT`, or with `last` when the word
+        has run out at the left side of that screen; a loop leaving takes no more messages, so a word
+        that comes back meanwhile is a new loop. True for a loop that is new."""
         cells = [(id, place) for id, place in cells if id in self._rects]
         if not cells or ring <= 0:
             return False
         expires: float = time.perf_counter() + SCROLL_TIMEOUT
         with self._mutex:
             for scroll in self._scrolls:
-                if scroll.ring == ring and scroll.name == name and scroll.cells == cells:
-                    scroll.renew(speed, gap, size, started, expires)
+                if scroll.last is None and scroll.ring == ring and scroll.name == name and scroll.cells == cells:
+                    scroll.renew(speed, gap, size, started, expires, last)
                     return False
+            if last is not None:
+                return False
             self._scrolls.append(Scroll(name, speed, gap, size, ring, cells, started, expires))
         return True
 

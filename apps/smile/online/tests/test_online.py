@@ -116,7 +116,7 @@ class TestOnline(unittest.TestCase):
         self.laughter: bool = True              # the panel's laughter switch
         self.picks: int = 0                     # Main.pick_style calls
         self.online = Online(self.settings, self.camera, self.sequencer, self.face, self.grab,
-                             caption=lambda: ('Name', 'line'), music=lambda: self.music,
+                             name=lambda: 'Name', music=lambda: self.music,
                              laughs=lambda: self.laughs, laughter=lambda: self.laughter, pick=self.pick, link_factory=factory)
         self.now: float = 1000.0
 
@@ -449,8 +449,8 @@ class TestOnline(unittest.TestCase):
         self.assertEqual(files[1], ('grin', 'v1', 'grins/A/v1.mp4'))     # no share clip: the players' clip
         done(True)
         result = self.link.last('result')
-        self.assertEqual((result['id'], result['phone'], result['name'], result['caption'], result['ok']),
-                         ('v1', 'phone1', 'Name', 'line', True))
+        self.assertEqual((result['id'], result['phone'], result['name'], result['ok']), ('v1', 'phone1', 'Name', True))
+        self.assertNotIn('caption', result)
         self.assertIsNone(self.link.last('turn_end'))                   # the turn goes on
         self.step(seq=SequenceType.CAMERA_SHOW)
         self.assertEqual(self.link.last('turn_end')['reason'], 'done')

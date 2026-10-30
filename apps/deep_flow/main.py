@@ -7,7 +7,7 @@ recordings on the host with the replay backend, with no camera attached.
 from functools import partial
 
 from modules.camera import CameraFrame, CameraSource, CameraCheck, FrameType, Player, Recorder, Sync, replay
-from modules.camera.oak4 import Camera
+from modules.camera.oak4 import Camera, ModelChain
 from modules.session import Session
 from modules.settings import presets
 from modules.panel import PanelServer
@@ -62,7 +62,7 @@ class DeepFlowMain:
         if self.settings.camera.sim_enabled:
             self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH)
             # the recordings on the host, without a device: the people found and followed here
-            if self.settings.camera.yolo:
+            if self.settings.camera.cam_0.model_chain != ModelChain.OFF:
                 self.person_detector = detection.PersonDetector(self.settings.camera.person_detector)
             for i in range(num_cams):
                 cam = self.settings.camera.cameras[i]

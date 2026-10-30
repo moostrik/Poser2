@@ -167,35 +167,39 @@ drawing a secondary leaves its context current; the same fix is in poser2).
 
 ## Credit
 
-`credit.py` holds the artist's credit (name, URL, the lines file `data/credit_lines.txt`: `CreditLines` reads it again when
+`credit.py` holds the credit (the artist's name, URL, the lines file `data/credit_lines.txt`: `CreditLines` reads it again when
 it changes and `pick`s a random line, never the last one again, `LINE` when it has none) and makes the QR code (OpenCV's encoder, whole pixels per
-module, with its quiet zone). `CreditLayer` draws the code in the bottom right corner of everything the main screen shows, and the caption, the name with the
+module, with its quiet zone) and the machine's title (`title_image`: SMILE with the ringed "ai" as the page's title has it, with freetype because the font atlas cannot
+draw the ring; with "by" the artist's name it is the watermark). `CreditLayer` draws the code in the bottom right corner of everything the main screen shows, and the caption, the title with the
 visitor's line under it (drawn at the capture, `CreditLayer.new_visitor`, into the `credit_line` readout), as a meme caption over
 the top (white with a black edge, in the comic font `data/Bangers-Regular.ttf`: the credit is a joke) over the generation, the grin and the result (DIFFUSION, DIFF_LOOP and TIMEOUT, fading in and out), and with `credit_camera` over the camera view too (its
-own line, drawn when that view begins: `new_line_due`), from the Render tab's `credit` fields; it is not in the saved clips. The
-same pass without the QR code goes into `CreditLayer.clean`, the phone's and the online cell's copy. The walls show the code and the name under it (scaled to the code's width) on one cell instead of its clip,
+own line, drawn when that view begins: `new_line_due`), from the Render tab's `credit` fields; it is not in the saved clips. Each `CreditView` is a pass of its own: without the QR code into `CreditLayer.cell`, the online cell's copy,
+and also without the title into `CreditLayer.clean`, the phone's copy, whose page has the title above the picture. The lines are the machine's jokes, each reading on after SMILE(ai), and hold no "SMILE(ai)" themselves: the atlas cannot draw the ring. The walls show the code and the name under it (scaled to the code's width) on one cell instead of its clip,
 for one play: it takes a cell when a clip starts there and leaves at that cell's next start (`next_credit_cell`, never the online cell), so no
 clip start flashes over it; `credit_qr_walls` switches it (the walls read the Render tab's fields every frame), off takes the card away at once. With `credit_walls`
-on, every cell shows a caption over its clip, the name over the top and a random line from the same file along the bottom, new at every play (`Player._on_play`, not tied
+on, every cell shows a caption over its clip, the title over the top and a random line from the same file along the bottom, new at every play (`Player._on_play`, not tied
 to the clip), drawn into a transparent portrait texture per cell (`WallRender._draw_caption`).
 `sphere.py` is the one place that knows the sphere and its wiring: 12 ribs holding 5 and 3 screens by turn, heights 0 (top) to 4
 (heights 1 to 3 have 12 screens, 0 and 4 have 6), screens numbered down each rib (1-5, 6-8, 9-13 …, the ribs counting to the left, so rib r is at -30r degrees), and screen s on Datapath unit
 ⌈s/4⌉ output ((s-1) mod 4)+1, unit n = grid column n-1, output k = grid row k-1 (`screen_of_cell`, `cell_of_screen`, `row_screens`,
 `cell_angles`): the laughter test (it steps the screens in the sphere's order, 1 to 48 down the ribs, lighting the cell `cell_of_screen` gives), the scrolling name's rows and `data/audio/screen_angles.txt` (generated: `screen_angles_text`,
 a test keeps the file equal to it) all come from it; a cabling that differs is changed there.
-The **scrolling name** (`credit_scroll.py`, no GL): each word of `credit_name` goes round its own ring of the sphere without end, the first word on the
+The **scrolling name** (`credit_scroll.py`, no GL): while the installation is idle each word of `credit_name` goes round its own ring of the sphere, the first word on the
 first of `credit_scroll_rows` (`plan_loops`, `RingPath`: all the ring's screens from the rib at the camera down the rib numbers, since the ribs count to the camera's left,
 the visitor's right, and a ticker moves to the visitor's left; `reverse` the other way round; `row_screens`, `screen_cell`, screens counted from 0 there). `CreditScroller`
-(stepped from `Main.sequence_callback` with `time.time()`, not during the laughter test) hands each wall its own cells with their place round the ring every `SEND_EVERY`
-second (`send_loops` to `Player.scroll_loop`: wall, word, px/s, gap, size, the ring's screens, `started` the time the loop began, the cells with their places),
+(stepped from `Main.sequence_callback` with `time.time()`; blocked during the laughter test and until `credit_scroll_idle` seconds after `Main._face_seen`, the last qualifying face or sequence frame outside
+the camera states, since the face finder gets no frames there) hands each wall its own cells with their place round the ring every `SEND_EVERY`
+second (`send_loops` to `Player.scroll_loop`: wall, word, px/s, gap, size, the ring's screens, `started` the time the loop began, the cells with their places, `last`),
 each word at its own speed (`credit_scroll_speed_1`, `_2`; a speed changed in the panel moves the start
-so the word goes on from where it is, `word_start`); `credit_scroll_last` is the readout. The walls
+so the word goes on from where it is, `word_start`). Blocked or switched off, each loop gets one message with `last`, the screen its head has reached (`last_place`, counted on from lap to lap), and nothing more;
+`credit_scroll_last` is the readout. The walls
 (`WallRender.scroll_loop`, `_draw_scrolls`) take the position from that and the clock (a renewal moves nothing), carried once onto `time.perf_counter()` for the frames: on Windows
 `time.time()` moves in 15.6 ms steps on Python 3.12, coarser than a frame, which made the word stand still one frame and jump the next and drop a
 loop no message renewed for `TIMEOUT`. They draw a word as a ticker reading left to right and moving left: `name_strip` renders it once with freetype into one long BGRA image,
 640 high, the ink `credit_scroll_size` tall in the vertical middle, white with a black edge (not the font atlas: too big at that size); each cell on the ring blits the strip
-shifted by `scroll_offset` (its place times screen width plus `credit_scroll_gap`, minus the distance travelled round the lap, and the next lap's copy) into its own portrait
-texture, over the clips and the credit card, under the lit test cells. Nothing of it is in the recordings.
+shifted by `scroll_copies` (its place times screen width plus `credit_scroll_gap`, minus the distance travelled, this lap's copy and the tail of the lap before) into its own portrait
+texture, over the clips and the credit card, under the lit test cells. Places are counted on from lap to lap, so nothing shows before the first lap, and a word enters through the right side of the
+first screen; with `last` it lights no place past that one and runs out at its left side (`scroll_gone`), and a word that comes back meanwhile is a new loop. Nothing of it is in the recordings.
 
 ## Recordings
 
@@ -291,7 +295,7 @@ after a turn are a `Delivery` record beside the phase) and
 (`set_online`, `process_online_frame`; the device and the image are muted meanwhile and back once the capture is taken) and the face finder,
 the charge, the flash and the generation run unchanged; `Online.on_face` sends the judging, and from the flash to the
 end of the timeout the phone gets the main screen as rendered (`ScreenGrab` in `render/screen_grab.py`, taken in
-`SmileRender._render_credit` from a credit pass without the QR code and before the status line, `stream_fps` x `stream_width`,
+`SmileRender._render_credit` from a credit pass without the QR code and the title and before the status line, `stream_fps` x `stream_width`,
 encoded on the link's thread as `SHOW` frames, paced by the relay to one in flight per phone (`seen` from the page); the phone's own judging is the whole image in pixels while the face is not right and the
 page's white as the charge). The phone plays the visitor's track from the flash (`music` message; the relay keeps the
 tracks in its own `data/tracks` as AAC, `Link._track_aac` transcodes one the first time it is used, `DB.track_path`) on the tape: SMILE picks the style
@@ -308,7 +312,7 @@ and the `result` goes to the phone by its id, so it has the video when its turn 
 shows it. The token is a file (`data/online_token.txt`, git-ignored), never a setting in a preset.
 The **online cell**: the screen `online.screen` (1-48, 0 = none; pick one off the scroll rows) of the walls shows a white card with the
 QR code to the phone page (`online.page`, empty = the relay's host, `Link.http_base`) and a line under it while SMILE Online is on
-and the relay connected, and the main screen as the phone sees it (`CreditLayer.clean`: the caption, no QR code, no status line)
+and the relay connected, and the main screen (`CreditLayer.cell`: the caption, no QR code, no status line)
 from the judging to the phone's last frame (`Online.showing`), then the card again; off or disconnected it is a clip cell like any
 (`online_cell_mode` in `player.py`). `Main._online_cell` sets it every frame: `Player.online_cell` (no bang, no caption: its clip plays
 unseen) and `SmileRender.set_online_cell`, which the walls take in `update()` (`WallRender.set_online`).

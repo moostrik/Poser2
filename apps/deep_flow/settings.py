@@ -94,7 +94,6 @@ class Oak4Group(BaseSettings):
     num_cams:       Field[int]               = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
     fps:                Field[float]             = Field(60.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
     keyframe_interval:  Field[int]               = Field(60, access=Field.INIT, visible=False, description="Keyframe interval in frames, the same for colour and depth")
-    yolo:               Field[bool]              = Field(True, access=Field.INIT, description="Enable YOLO person detection")
     color:              Field[bool]              = Field(True, access=Field.INIT, description="Enable color capture")
     resolution:         Field[CameraResolution]  = Field(CameraResolution.P720, access=Field.INIT, description="Delivered size before the crop; the sensor mode follows it")
     sim_enabled:        Field[bool]              = Field(False, access=Field.INIT, description="Enable simulation mode")
@@ -106,7 +105,7 @@ class Oak4Group(BaseSettings):
     split:              Field[bool]              = Field(False, widget=Widget.button, description="Split chunk", visible=False)
     split_seconds:      Field[float]             = Field(60, min=1, max=60, widget=Widget.number, description="Split recording into chunks of this length (seconds)")
 
-    _cam_share: list = [fps, color, yolo, resolution, model_path, fov]
+    _cam_share: list = [fps, color, resolution, model_path, fov]
     cam_0          : Group[Oak4CameraSettings]             = Group(Oak4CameraSettings, share=_cam_share)
     camera_check   : Group[_CameraCheckSettings]           = Group(_CameraCheckSettings)
     simulator      : Group[PlayerSettings]                 = Group(PlayerSettings, share=[num_cams, fps])

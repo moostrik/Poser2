@@ -63,8 +63,8 @@ standstill: it spins up with the wobble of the room's tape, muffled, the pitch r
 window becomes the main screen of the installation, and shows the room's flash out as the room draws it: the
 capture appearing from the white by its depth, while the page behind the frame goes dark with the same curve.
 From here the visitor watches the room: the generation steps, the grin, the
-portrait standing after it. The caption, the artist's name and the visitor's line, fades in with
-the first generated image, as on the main screen. The track opens up through the transformation and runs at
+portrait standing after it. The caption, the visitor's line, fades in with the first generated image, as on the
+main screen, where SMILE stands over it; the page has that title above the frame already. The track opens up through the transformation and runs at
 full speed through the grin. The laughter is silent from the flash until the track has stopped.
 
 **The end.** When the portrait has stood its time the caption fades out and the portrait stands, without
@@ -74,7 +74,7 @@ the video takes over: the grin, looping, with its own sound (the track on the ta
 wound down at the end) and a small watermark bottom right, SMILE with its mark as the title has it and by the artist's name. The video
 has no caption. The bar under the frame says PREPARING YOUR SMILE through the timeout; once the turn is over
 and the file is here it reads SHARE YOUR SMILE and is the button: it opens the share sheet at once, with the file,
-named `smile_by_matthias_oostrik.mp4` (the credit's name), and the text (the name, the line, the tags), which goes
+named `smile_by_matthias_oostrik.mp4` (the credit's name), and the text (SMILE by the credit's name), which goes
 to the clipboard too; a sheet closed without sharing changes nothing, the button is there for another try; a
 browser without a share sheet downloads the file instead (from the phone's own copy). A browser that will not
 start the video's sound by itself plays it silent; a tap on the video turns the sound on. A turn that left no
@@ -112,7 +112,7 @@ The messages of a turn, in order, as the page sees them (`relay/server.py` has t
 | SMILE | `… flash_in/out {value}`                  | the flash stages                               | the white, as the room eases it               |
 | SMILE | binary `SHOW` frame                       | flash to the result's end, one in flight       | the window, from full white on                |
 | SMILE | binary `LAST` frame                       | the result has stood its time                  | fade to it, keep it                           |
-| SMILE | `result {id, ok, name, caption, portrait, grin}` | the files are built (or were not)         | download the video; no files: NO SMILE THIS TIME |
+| SMILE | `result {id, ok, name, portrait, grin}`   | the files are built (or were not)              | download the video; no files: NO SMILE THIS TIME |
 | SMILE | `turn_end {reason}`                       | the sequence is back at the camera             | done: wind down into the video; missed, lost, reset: back in line |
 | page  | `seen`                                    | every `SHOW` frame received                    | the relay sends the next frame                |
 | page  | `timing`                                  | the file is here, the video plays              | the relay logs it (with the download)         |
@@ -142,7 +142,7 @@ the room's face marks are never shown. The flash out is in the stream (the captu
 its depth, `RevealStage`): the page draws no white of its own over it, and the white behind the frame goes
 down with `1 - value`. The stream is
 the main screen as rendered, taken in `SmileRender._render_credit` before the status line and from a credit
-pass without the QR code (`ScreenGrab`; `online.stream_width`, 4:5, `online.stream_fps`; JPEG at
+pass without the QR code and the title (`ScreenGrab`; `online.stream_width`, 4:5, `online.stream_fps`; JPEG at
 `Link.STREAM_QUALITY`, encoded on the link's thread). The relay keeps one frame in flight per phone: the next
 goes when the phone has answered `seen`, or after `FRAME_PATIENCE`, and the newest replaces one still
 waiting. A slow phone so gets fewer frames, never late ones, and the messages behind the frames never queue.

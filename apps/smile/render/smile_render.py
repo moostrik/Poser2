@@ -12,8 +12,8 @@ from .. import sphere
 from modules.gl import Blit, Fbo, MonitorId, RenderBase, Shader, Style, Texture, clear_color, fit
 from ..player import WallRender, WallsSettings
 from .inputs import Inputs
-from .layers import (BloomLayer, CameraLayer, CreditLayer, DiffusionLayer, FlashLayer, LayerBase, RevealLayer, StatusLayer,
-                     caption_shown, copy, fade_step, new_line_due)
+from .layers import (BloomLayer, CameraLayer, CreditLayer, CreditView, DiffusionLayer, FlashLayer, LayerBase, RevealLayer,
+                     StatusLayer, caption_shown, copy, fade_step, new_line_due)
 from .sequencer import SequenceType, Sequencer
 from .settings import RenderSettings
 from .stages import STAGES, Layers, Stage
@@ -28,7 +28,7 @@ class SmileRender(RenderBase):
     The grin frames come from the grin player, which is asked every frame for the one that is due.
     The two walls of the sphere (`walls`, `WallRender`) are composited after it, each shown in the
     secondary window of its monitor (`window.secondary_list`: the first entry is wall 0, screens 1-24);
-    the online cell of one of them shows the output as the phone sees it during an online turn.
+    the online cell of one of them shows the output without the QR code during an online turn.
     Keys: Enter starts a sequence; f fullscreen, w borderless, Esc quit (the window manager)."""
 
     def __init__(self, settings: RenderSettings, walls_settings: WallsSettings, sequencer: Sequencer, grin_player: GrinPlayer, width: int, height: int) -> None:
@@ -49,7 +49,7 @@ class SmileRender(RenderBase):
             diffusion=DiffusionLayer(self.inputs.diffusion),
             bloom=BloomLayer(self.inputs.diffusion_depth),
         )
-        # the artist's credit: the QR code always, the caption over the grin and the result
+        # the credit: the QR code always, the caption over the grin and the result
         self._credit: CreditLayer = CreditLayer(settings)
         self._credit_alpha: float = 0.0
         self._credit_time: float = time.perf_counter()
@@ -69,7 +69,7 @@ class SmileRender(RenderBase):
         self._frozen: bool = False
         # the screen for the phones of SMILE Online: switched on and read by modules/online
         self.grab: ScreenGrab = ScreenGrab()
-        self._phone_view: Texture = self._output     # the output as the phone sees it: no QR code, no status line
+        self._cell_view: Texture = self._output      # the output as the online cell shows it: no QR code, no status line
         # the walls of the sphere, and which cell of which one is SMILE Online's (wall, cell, mode, page)
         self.walls: list[WallRender] = [WallRender(settings, walls_settings, [str(i) for i in range(sphere.CELLS)]) for _ in range(sphere.WALLS)]
         self._online: tuple[int, int, str, str] | None = None
@@ -127,9 +127,9 @@ class SmileRender(RenderBase):
         self._update_walls()
 
     def _render_credit(self, sequence_type: SequenceType, grab: bool) -> None:
-        """The credit over the output; the copy without the QR code (`CreditLayer.clean`) is the phone's and the
-        online cell's: rendered when `grab` takes it for the phone (the turn's last frame, `grab.clean`, without
-        the caption too: the phone fades it out itself and keeps that frame) and while the online cell shows it."""
+        """The credit over the output, with two copies for SMILE Online: the phone's (`CreditLayer.clean`), rendered
+        when `grab` takes it (the turn's last frame, `grab.clean`, without the caption: the phone fades it out itself
+        and keeps that frame), and the online cell's (`CreditLayer.cell`), rendered while that cell shows it."""
         now: float = time.perf_counter()
         if new_line_due(sequence_type, self._credit_sequence):
             self._credit.new_visitor()
@@ -139,15 +139,16 @@ class SmileRender(RenderBase):
         self._credit_time = now
         online: tuple[int, int, str, str] | None = self._online
         if self.settings.credit:
-            if grab or (online is not None and online[2] == 'screen'):
-                self._credit.render(self._output, 0.0 if self.grab.clean else self._credit_alpha, qr_code=False)
             if grab:
+                self._credit.render(self._output, 0.0 if self.grab.clean else self._credit_alpha, CreditView.PHONE)
                 self.grab.grab(self._credit.clean)
-            self._phone_view = self._credit.clean
+            if online is not None and online[2] == 'screen':
+                self._credit.render(self._output, self._credit_alpha, CreditView.CELL)
+            self._cell_view = self._credit.cell
             self._credit.render(self._output, self._credit_alpha)
             self._output = self._credit.texture
         else:
-            self._phone_view = self._output
+            self._cell_view = self._output
             if grab:
                 self.grab.grab(self._output)
 
@@ -158,7 +159,7 @@ class SmileRender(RenderBase):
         shown: int = len(self.settings.window.secondary_list)
         for index, wall in enumerate(self.walls):
             if online is not None and online[0] == index:
-                wall.set_online(str(online[1]), online[2], self._phone_view if online[2] == 'screen' else None, online[3])
+                wall.set_online(str(online[1]), online[2], self._cell_view if online[2] == 'screen' else None, online[3])
             else:
                 wall.set_online(None)
             if index < shown:

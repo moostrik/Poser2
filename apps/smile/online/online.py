@@ -61,7 +61,7 @@ WARMING: str = 'warming up'
 BUSY: str = 'busy inside'
 
 LinkFactory = Callable[[str, str, Callable[[dict], None], Callable[[bytes], None]], Link]
-Caption = Callable[[], tuple[str, str]]     # the credit: name and the visitor's line
+Name = Callable[[], str]                        # the artist's name, for the file the visitor keeps
 Music = Callable[[], tuple[str, str | None]]    # the visitor's track: its id and its file (None without)
 Laughs = Callable[[], list[tuple[str, str]]]    # the laughter samples: file name and path
 Switch = Callable[[], bool]                     # the panel's laughter switch
@@ -78,13 +78,9 @@ class Phase(Enum):
 
 @dataclass
 class Delivery:
-    """A turn's result on its way to the phone: made at the flash, the caption read at the capture, the
-    saver's files uploaded as soon as they come (the phone fetches the video while the room still shows
-    the result), the phone told once."""
+    """A turn's result on its way to the phone: made at the flash, the saver's files uploaded as soon as
+    they come (the phone fetches the video while the room still shows the result), the phone told once."""
     phone: str
-    name: str = ''
-    line: str = ''
-    captioned: bool = False
     saved: tuple[str, bool, str, str, str] | None = None    # id, kept, grin path, portrait path, share path
     over: float | None = None                           # when the turn ended, None while it runs
     started: bool = False
@@ -98,14 +94,14 @@ def face_message(frame: FaceFrame, charge: float) -> dict:
 
 class Online:
     def __init__(self, settings: OnlineSettings, camera: Camera, sequencer: Sequencer, face: FaceFinder,
-                 grab: ScreenGrab, caption: Caption, music: Music, laughs: Laughs = lambda: [], laughter: Switch = lambda: True,
+                 grab: ScreenGrab, name: Name, music: Music, laughs: Laughs = lambda: [], laughter: Switch = lambda: True,
                  pick: Pick = lambda: None, link_factory: LinkFactory = Link) -> None:
         self.settings: OnlineSettings = settings
         self.camera: Camera = camera
         self.sequencer: Sequencer = sequencer
         self.face: FaceFinder = face
         self.grab: ScreenGrab = grab
-        self._caption: Caption = caption
+        self._name: Name = name
         self._music: Music = music
         self._laughs: Laughs = laughs
         self._laughter: Switch = laughter
@@ -329,10 +325,6 @@ class Online:
                 if last:
                     self.grab.set(False)     # the picture stands on the phone from here; the bloom and the fade are the room's
             self._send_stage(now, link, message)
-            if self._delivery is not None and not self._delivery.captioned and seq >= SequenceType.ASK:
-                # the capture is taken: the visitor's line is drawn, the caption is theirs
-                self._delivery.name, self._delivery.line = self._caption()
-                self._delivery.captioned = True
             if seq == SequenceType.TIMEOUT and not self._timed_out:
                 # the result stands: a few frames a second are enough, the phone is downloading its clip
                 self._timed_out = True
@@ -434,7 +426,7 @@ class Online:
         delivery: Delivery | None = self._delivery
         if delivery is None or delivery.started:
             return
-        result: dict = {'type': 'result', 'phone': delivery.phone, 'name': delivery.name, 'caption': delivery.line}
+        result: dict = {'type': 'result', 'phone': delivery.phone, 'name': self._name()}
         if delivery.saved is not None:
             id, kept, grin, portrait, shared = delivery.saved
             delivery.started = True
