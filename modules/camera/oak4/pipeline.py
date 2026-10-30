@@ -19,7 +19,7 @@ import depthai as dai
 from .. import CameraResolution, frame_size, WARP_MESH, warp_mesh_points, keystone_corners, square_crop
 
 from .definitions import SENSOR_SOCKET, frame_type, requested_size, IMU_RATE_HZ, nn_frame_type, \
-    POSE_CONFIDENCE_THRESHOLD, POSE_OVERLAP_THRESHOLD, TRACKER_PERSON_LABEL, TRACKER_TYPE
+    POSE_CONFIDENCE_THRESHOLD, POSE_OVERLAP_THRESHOLD, POSE_CROP_PADDING, TRACKER_PERSON_LABEL, TRACKER_TYPE
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +47,12 @@ class MountConfig:
 @dataclass
 class PipelineOutputs:
     """What the host reads and writes: the delivered frames, the sensor's control input, the IMU,
-    and with a pose model the tracklets."""
+    with a pose model the tracklets, and with the two-model chain the poses of the crops."""
     video: dai.Node.Output
     control: dai.Node.Input
     imu: dai.Node.Output
     tracklets: dai.Node.Output | None = None
+    poses: dai.Node.Output | None = None
 
 
 def build_pipeline(
@@ -63,11 +64,13 @@ def build_pipeline(
     mount: MountConfig,
     frame_height: int = 0,
     pose_archive: Path | None = None,
+    detector_archive: Path | None = None,
 ) -> PipelineOutputs:
     """Build the camera's pipeline into `pipeline`, the one bound to its device.
 
     `frame_height` is the delivered height the tilt correction produces (`delivered_height`),
-    0 for the sensor's rows; `pose_archive` is the pose model's NN archive, None for frames only.
+    0 for the sensor's rows; `pose_archive` is the pose model's NN archive, None for frames only,
+    and with `detector_archive` the chain is the detector plus the pose model on each person's crop.
     Raises `ValueError` for a colour frame with `tilt`, which the chip cannot warp: the camera then
     does not open, rather than deliver a frame the tracker would read wrong.
     """
@@ -81,8 +84,13 @@ def build_pipeline(
     source: dai.Node.Output = camera.requestOutput(src_size, frame_type(color), fps=fps)
     frames: dai.Node.Output = add_correction(pipeline, source, src_size, out_size, color, mount)
     imu: dai.Node.Output = add_imu(pipeline)
-    tracklets: dai.Node.Output | None = add_pose_detector(pipeline, frames, pose_archive) if pose_archive else None
-    return PipelineOutputs(video=frames, control=camera.inputControl, imu=imu, tracklets=tracklets)
+    tracklets: dai.Node.Output | None = None
+    poses: dai.Node.Output | None = None
+    if pose_archive and detector_archive:
+        tracklets, poses = add_pose_chain(pipeline, frames, fps, detector_archive, pose_archive)
+    elif pose_archive:
+        tracklets = add_pose_detector(pipeline, frames, pose_archive)
+    return PipelineOutputs(video=frames, control=camera.inputControl, imu=imu, tracklets=tracklets, poses=poses)
 
 
 def add_correction(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tuple[int, int],
@@ -135,21 +143,21 @@ def add_keystone(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tupl
 
 
 def add_pose_detector(pipeline: dai.Pipeline, frames: dai.Node.Output, archive_path: Path) -> dai.Node.Output:
-    """The pose branch: the delivered frame sized for the model, the model, the device's object
-    tracker on its detections, and the tracklets out.
+    """The one-model chain: the pose model on the delivered frame, the device's object tracker on
+    its detections, and the tracklets out. The archive's config tells the network how to decode the
+    boxes and the 17 keypoints, so no decode of ours; each tracklet's source detection carries them."""
+    network = add_detector(pipeline, frames, dai.NNArchive(str(archive_path)))
+    return add_tracker(pipeline, network.passthrough, network.out)
 
-    The frame is STRETCHED into the model's input, never cropped or letterboxed, as the OAK-D's
-    detector takes it (`oak.definitions.detector_input_size`): nothing is lost at the edges and the
-    normalised boxes and keypoints map 1:1 onto the delivered frame; an aspect mismatch costs
-    detection quality, never geometry. The archive's config tells the network how to decode the
-    boxes and the 17 keypoints, so no decode of ours; the tracker takes the network's passthrough
-    as its frame, so it only ever sees frames that were inferred.
-    """
-    archive = dai.NNArchive(str(archive_path))
+
+def add_detector(pipeline: dai.Pipeline, frames: dai.Node.Output, archive: dai.NNArchive) -> dai.node.DetectionNetwork:
+    """The delivered frame stretched into the model and the network on it: the first stage of both
+    chains. STRETCHED, never cropped or letterboxed, as the OAK-D's detector takes it: nothing is
+    lost at the edges and the normalised boxes map 1:1 onto the delivered frame; an aspect mismatch
+    costs detection quality, never geometry."""
     size: tuple[int, int] | None = archive.getInputSize()
     if size is None:
-        raise ValueError(f'{archive_path.name} names no input size')
-
+        raise ValueError('the model archive names no input size')
     manip: dai.node.ImageManip = pipeline.create(dai.node.ImageManip)
     manip.initialConfig.setOutputSize(size[0], size[1], dai.ImageManipConfig.ResizeMode.STRETCH)
     manip.initialConfig.setFrameType(nn_frame_type(archive))
@@ -162,15 +170,53 @@ def add_pose_detector(pipeline: dai.Pipeline, frames: dai.Node.Output, archive_p
     network.detectionParser.setIouThreshold(POSE_OVERLAP_THRESHOLD)
     network.input.setBlocking(False)
     manip.out.link(network.input)
+    return network
 
+
+def add_tracker(pipeline: dai.Pipeline, frames: dai.Node.Output, detections: dai.Node.Output) -> dai.Node.Output:
+    """The device's object tracker on the people, as the OAK-D runs it; `frames` are the frames the
+    detections were made on (the network's passthrough), so it only ever sees frames that were inferred."""
     tracker: dai.node.ObjectTracker = pipeline.create(dai.node.ObjectTracker)
     tracker.setDetectionLabelsToTrack([TRACKER_PERSON_LABEL])
     tracker.setTrackerType(TRACKER_TYPE)
     tracker.setTrackerIdAssignmentPolicy(dai.TrackerIdAssignmentPolicy.SMALLEST_ID)
-    network.passthrough.link(tracker.inputTrackerFrame)
-    network.passthrough.link(tracker.inputDetectionFrame)
-    network.out.link(tracker.inputDetections)
+    frames.link(tracker.inputTrackerFrame)
+    frames.link(tracker.inputDetectionFrame)
+    detections.link(tracker.inputDetections)
     return tracker.out
+
+
+def add_pose_chain(pipeline: dai.Pipeline, frames: dai.Node.Output, fps: float, detector_archive: Path,
+                   pose_archive: Path) -> tuple[dai.Node.Output, dai.Node.Output]:
+    """The two-model chain, Luxonis's way (depthai-nodes): the detector on the stretched frame, its
+    detections filtered to the people, one letterboxed crop per person cut out of the delivered
+    frame on the device (`FrameCropper`), the top-down pose model on each crop with its parser
+    (`ParsingNeuralNetwork`), and the crops' keypoints gathered per frame beside the detections
+    they came from (`GatherData`). The tracker runs on the same people. Returns the tracklets and
+    the gathered poses; `Camera` joins the two by frame.
+
+    The parser's own score threshold is turned off: it would drop a keypoint below it from the
+    message and leave the rest unnumbered, while the contract carries all 17 with their scores.
+    """
+    from depthai_nodes.node import ImgDetectionsFilter, FrameCropper, ParsingNeuralNetwork, GatherData
+
+    detector = add_detector(pipeline, frames, dai.NNArchive(str(detector_archive)))
+    persons: ImgDetectionsFilter = pipeline.create(ImgDetectionsFilter).build(detector.out)
+    persons.setLabels([TRACKER_PERSON_LABEL], keep=True)
+
+    pose = dai.NNArchive(str(pose_archive))
+    crop_size: tuple[int, int] | None = pose.getInputSize()
+    if crop_size is None:
+        raise ValueError(f'{pose_archive.name} names no input size')
+    cropper: FrameCropper = pipeline.create(FrameCropper).fromImgDetections(
+        persons.out, outputSize=crop_size, resizeMode=dai.ImageManipConfig.ResizeMode.LETTERBOX,
+        padding=POSE_CROP_PADDING).build(frames)
+    network: ParsingNeuralNetwork = pipeline.create(ParsingNeuralNetwork).build(cropper.out, pose)
+    network.getParser(0).score_threshold = 0.0
+    gather: GatherData = pipeline.create(GatherData).build(int(round(fps)), network.out, persons.out)
+
+    tracklets: dai.Node.Output = add_tracker(pipeline, detector.passthrough, persons.out)
+    return tracklets, gather.out
 
 
 def add_imu(pipeline: dai.Pipeline) -> dai.Node.Output:

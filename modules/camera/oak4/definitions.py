@@ -3,6 +3,7 @@ the board's IMU, and the reads off an open device. The frame geometry every came
 `modules.camera.geometry`; this maps it onto the device."""
 
 import logging
+from enum import IntEnum
 
 import depthai as dai
 import numpy as np
@@ -125,12 +126,26 @@ def imu_rotation_to_camera(device: dai.Device, socket: dai.CameraBoardSocket, de
 #  The pose model and the tracker
 # ---------------------------------------------------------------------------
 # The OAK4's chip takes a model compiled by Luxonis, fetched once from their zoo as an NN archive
-# (`python -m modules.camera.oak4.models`, a local file in `data/models`, not in git). One model finds the
-# people and their 17 body landmarks (COCO, the order of `modules.pose.PointLandmark`); the
-# archive's config tells `DetectionNetwork` how to decode both.
+# (`python -m modules.camera.oak4.models`, local files in `data/models`, not in git). Two chains give
+# the 17 body landmarks (COCO, the order of `modules.pose.PointLandmark`), `PoseChain` picks:
+# ONE_MODEL finds the people and their landmarks in one pass, decoded by `DetectionNetwork` from the
+# archive's config; TWO_MODELS runs a detector, cuts one crop per person on the device and runs a
+# top-down pose model on each crop, through Luxonis's depthai-nodes.
+
+
+class PoseChain(IntEnum):
+    ONE_MODEL = 0       # YOLOv8-pose: boxes and keypoints in one pass
+    TWO_MODELS = 1      # YOLOv6 detector, then Lite-HRNet on each person's crop
+
+
 POSE_MODEL: str = 'luxonis/yolov8-nano-pose-estimation:coco-512x288'
 POSE_ARCHIVE: str = 'yolov8n_pose_coco_512x288_rvc4.tar.xz'
+DETECTOR_MODEL: str = 'luxonis/yolov6-nano:r2-coco-512x288'
+DETECTOR_ARCHIVE: str = 'yolov6n_coco_512x288_rvc4.tar.xz'
+TOP_DOWN_MODEL: str = 'luxonis/lite-hrnet:18-coco-192x256'
+TOP_DOWN_ARCHIVE: str = 'lite_hrnet18_coco_192x256_rvc4.tar.xz'
 NUM_KEYPOINTS: int = 17
+POSE_CROP_PADDING: float = 0.0          # margin round the person's box before the crop, normalised to the frame
 POSE_CONFIDENCE_THRESHOLD: float = 0.5
 POSE_OVERLAP_THRESHOLD: float = 0.5
 
@@ -163,3 +178,27 @@ def tracklet_keypoints(detection: dai.ImgDetection) -> np.ndarray | None:
     if len(points) != NUM_KEYPOINTS:
         return None
     return np.array([(p.imageCoordinates.x, p.imageCoordinates.y, p.confidence) for p in points], dtype=np.float32)
+
+
+def keypoints_in_frame(message: dai.beta.Keypoints, frame: dai.ImgTransformation | None) -> np.ndarray | None:
+    """A crop's keypoints from the top-down pose model, in the delivered frame, as the contract
+    carries them: (17, 3) float32, x and y normalised to the frame, and the score. The message's
+    transformation is the crop's, the frame's is the delivered frame's (both descend from the same
+    sensor, so depthai remaps one into the other); None without a transformation to remap through,
+    or when the count is not 17."""
+    points = message.getKeypoints()
+    if len(points) != NUM_KEYPOINTS:
+        return None
+    source = message.getTransformation()
+    if source is None or frame is None:
+        return None
+    width, height = frame.getSize()
+    rows: list[tuple[float, float, float]] = []
+    for p in points:
+        c = p.imageCoordinates
+        q = source.remapPointTo(frame, dai.Point2f(c.x, c.y, True))
+        if q.isNormalized():
+            rows.append((q.x, q.y, p.confidence))
+        else:
+            rows.append((q.x / width, q.y / height, p.confidence))
+    return np.array(rows, dtype=np.float32)
