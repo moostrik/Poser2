@@ -1,6 +1,7 @@
 """Compare what the cameras report about themselves against what the preset says they should be."""
 
 import math
+from collections.abc import Sequence
 
 from .settings import RigCameraSettings, CameraCheckSettings
 
@@ -51,8 +52,8 @@ class CameraCheck:
     to teach someone to ignore warnings.
     """
 
-    def __init__(self, cameras: list[RigCameraSettings], settings: CameraCheckSettings) -> None:
-        self._cameras: list[RigCameraSettings] = cameras
+    def __init__(self, cameras: Sequence[RigCameraSettings], settings: CameraCheckSettings) -> None:
+        self._cameras: Sequence[RigCameraSettings] = cameras
         self._settings: CameraCheckSettings = settings
 
     def update(self, _now: float) -> None:

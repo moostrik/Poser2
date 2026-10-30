@@ -54,3 +54,21 @@ torch = { index = "pytorch-cu130" }
 name = "pytorch-cu130"
 url = "https://download.pytorch.org/whl/cu130"
 explicit = true
+
+# Read by Pylance and the pyright CLI alike, so the Problems panel and a full scan report the same rules.
+[tool.pyright]
+include = ["apps", "modules", "tests", "tools", "scripts", "launcher.py"]
+exclude = [
+    "**/__pycache__",
+    "**/.*",
+    "apps/smile/ComfyUI",               # third party, own .venv, gitignored
+    "apps/smile/data/comfy",            # ComfyUI node, needs ComfyUI's imports
+    "modules/camera/vimba/vimbapython", # vendored SDK
+    "modules/camera/oak4",              # depthai 3 code: scan it against .venv-oak4
+    "apps/oak4_test",                   # depthai 3 code: scan it against .venv-oak4
+]
+venvPath = "."
+venv = ".venv"
+pythonVersion = "3.12"
+pythonPlatform = "Windows"
+typeCheckingMode = "basic"

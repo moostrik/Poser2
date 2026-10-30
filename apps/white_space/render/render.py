@@ -1,5 +1,7 @@
 """White Space render — layer graph for 3-camera panoramic light installation."""
 
+from collections.abc import Sequence
+
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, clear_color, Style
@@ -43,7 +45,7 @@ _SWITCHED_ROWS: dict[str, tuple[Layers, ...]] = {
 class WhiteSpaceRender(RenderBase):
     def __init__(self, board: RenderBoard, settings: RenderSettings,
                  tracker: PanoramicTrackerSettings,
-                 cameras: list[RigCameraSettings], camera_check: CameraCheckSettings,
+                 cameras: Sequence[RigCameraSettings], camera_check: CameraCheckSettings,
                  angle_extractor: nodes.AngleExtractorSettings) -> None:
         super().__init__(settings.window)
         self.max_players: int = settings.max_players

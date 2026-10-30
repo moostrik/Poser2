@@ -1,5 +1,6 @@
 """Deep Flow render — split-view layer graph with 3D volumetric fluid."""
 
+from collections.abc import Sequence
 from typing import cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
@@ -45,7 +46,7 @@ LARGE_LAYERS: list[Layers] = [
 
 class DeepFlowRender(RenderBase):
     def __init__(self, board: RenderBoard, settings: RenderSettings,
-                 cameras: list[RigCameraSettings], camera_check: CameraCheckSettings,
+                 cameras: Sequence[RigCameraSettings], camera_check: CameraCheckSettings,
                  num_cams: int = 1, max_players: int = 1) -> None:
         super().__init__(settings.window)
         self.max_players: int = max_players

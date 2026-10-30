@@ -1,5 +1,7 @@
 """HD Trio render — layer graph for 3-camera fluid installation."""
 
+from collections.abc import Sequence
+
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId, WindowSettings
@@ -46,7 +48,7 @@ LARGE_LAYERS: list[Layers] = [
 
 class HDTrioRender(RenderBase):
     def __init__(self, board: RenderBoard, settings: RenderSettings,
-                 cameras: list[RigCameraSettings], camera_check: CameraCheckSettings, data_path: str = "") -> None:
+                 cameras: Sequence[RigCameraSettings], camera_check: CameraCheckSettings, data_path: str = "") -> None:
         super().__init__(settings.window)
         self.max_players: int = settings.max_players
         self.num_cams: int = settings.num_cams

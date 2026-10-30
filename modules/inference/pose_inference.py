@@ -44,11 +44,11 @@ class PoseInference(FrameDictCallbackMixin):
         """A camera frame as it arrives (the camera's thread): uploaded to the GPU for the next ``submit``."""
         self._uploader.set_image(frame)
 
-    def submit(self, poses: FrameDict) -> None:
+    def submit(self, frames: FrameDict) -> None:
         """Crop the poses' boxes from the newest images and queue them for the pose model."""
         images, prev_images = self._uploader.snapshot()
         self._camera_images_callbacks(images)
-        self._crop_extractor.process(poses, images, prev_images)
+        self._crop_extractor.process(frames, images, prev_images)
 
     def add_camera_images_callback(self, callback: Callable[[ImageDict], None]) -> None:
         """The GPU images of each batch, before the crops are cut."""
