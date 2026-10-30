@@ -23,7 +23,7 @@ import depthai as dai
 from .. import CameraResolution, frame_size, WARP_MESH, warp_mesh_points
 
 from .definitions import SENSOR_SOCKET, STEREO_SOCKETS, STEREO_SIZE, DEPTH_MODELS, DepthModel, requested_size, \
-    direct_size, depth_size, IMU_RATE_HZ, nn_frame_type, POSE_CONFIDENCE_THRESHOLD, POSE_OVERLAP_THRESHOLD, \
+    direct_size, depth_size, IMU_RATE_HZ, SYSTEM_RATE_HZ, nn_frame_type, POSE_CONFIDENCE_THRESHOLD, POSE_OVERLAP_THRESHOLD, \
     POSE_CROP_PADDING, TRACKER_PERSON_LABEL, TRACKER_TYPE
 
 logger = logging.getLogger(__name__)
@@ -49,12 +49,13 @@ class MountConfig:
 @dataclass
 class PipelineOutputs:
     """What the host reads and writes: the delivered frames, the sensor's control input, the IMU,
-    with a model the tracklets, with the two-model chain the poses of the crops, and with a depth
+    the camera's load, with a model the tracklets, with the two-model chain the poses of the crops, and with a depth
     model the aligned depth and its config input. `flip_on_host` says the camera did not mirror what
     it delivers, frames and boxes alike, so the host must."""
     video: dai.Node.Output
     control: dai.Node.Input
     imu: dai.Node.Output
+    system: dai.Node.Output
     tracklets: dai.Node.Output | None = None
     poses: dai.Node.Output | None = None
     depth: dai.Node.Output | None = None
@@ -110,8 +111,8 @@ def build_pipeline(
     depth_config: dai.Node.Input | None = None
     if depth_model != DepthModel.OFF:
         depth, depth_config = add_depth(pipeline, frames, fps, depth_model, out_size)
-    return PipelineOutputs(video=frames, control=camera.inputControl, imu=imu, tracklets=tracklets, poses=poses, depth=depth,
-                           depth_config=depth_config, flip_on_host=color and mount.flip_h)
+    return PipelineOutputs(video=frames, control=camera.inputControl, imu=imu, system=add_system_logger(pipeline),
+                           tracklets=tracklets, poses=poses, depth=depth, depth_config=depth_config, flip_on_host=color and mount.flip_h)
 
 
 def add_warp(pipeline: dai.Pipeline, source: dai.Node.Output, src_size: tuple[int, int],
@@ -239,3 +240,10 @@ def add_imu(pipeline: dai.Pipeline) -> dai.Node.Output:
     imu.setBatchReportThreshold(1)
     imu.setMaxBatchReports(10)
     return imu.out
+
+
+def add_system_logger(pipeline: dai.Pipeline) -> dai.Node.Output:
+    """The camera's own report of its CPU, memory and temperature. It has no power and no NPU load."""
+    system: dai.node.SystemLogger = pipeline.create(dai.node.SystemLogger)
+    system.setRate(SYSTEM_RATE_HZ)
+    return system.out

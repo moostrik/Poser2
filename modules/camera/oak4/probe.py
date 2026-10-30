@@ -89,7 +89,8 @@ def main(argv: list[str] | None = None) -> int:
                     f'{len(tracklets)} tracklet messages, {settings.readings.tracker_fps:.1f}/s, {settings.readings.tracker_latency:.1f} ms, '
                     f'{len(depths)} depth frames, {settings.readings.depth_fps:.1f} fps, {settings.readings.depth_latency:.1f} ms, '
                     f'exposure {settings.sensor.exposure} us iso {settings.sensor.iso}, '
-                    f'tilt {settings.readings.tilt_measured:+.1f} roll {settings.readings.roll_measured:+.1f}')
+                    f'tilt {settings.readings.tilt_measured:+.1f} roll {settings.readings.roll_measured:+.1f}, '
+                    f'cpu {settings.readings.cpu:.0f} % memory {settings.readings.memory:.0f} % {settings.readings.temperature:.0f} C')
     camera.stop()
     camera.join(5.0)
 

@@ -11,7 +11,7 @@ Every number assumes this configuration unless its table says otherwise:
 | Software | Luxonis OS 1.45.0, depthai 3.11                         |
 | Link     | USB, reading 5 Gbps                                     |
 | Frame    | `P720`, 60 fps, 896x720 NV12, undistorted               |
-| Boxes    | `model_chain` `DETECTOR`: yolov8n, 416x416              |
+| Boxes    | `model_chain` `DETECTOR`: yolov8n, 640x512              |
 | Depth    | `depth_model` `NEURAL_480`, aligned to 374x300          |
 | PC       | i7-13700K with UHD 770, RTX 4090                        |
 
@@ -35,6 +35,8 @@ The pinned readouts measure capture to arrival on the PC.
 | Video         | 60 fps      | The camera or the link is not keeping up      |
 | Video latency | 28 to 29 ms | Check the link: Ethernet adds about 6 ms      |
 | Depth latency | 42 to 52 ms | Moves between phases of a run; this is normal |
+
+The camera's `readings` show its own `cpu`, `memory` and `temperature` on the line under `video_latency`, once a second (see [camera load](#camera-load)).
 
 ### When the camera is not found
 
@@ -106,10 +108,33 @@ Latency is `dai.Clock.now()` minus the message's timestamp, on depthai's clock, 
 | Stream | Size          | Rate   | Capture to PC        |
 |--------|---------------|--------|----------------------|
 | Color  | 896x720       | 60 fps | 28 to 29 ms          |
-| Boxes  | 416x416 input | 60 fps | 35 ms                |
+| Boxes  | 640x512 input | 60 fps | 35 ms                |
 | Depth  | 374x300       | 60 fps | 42 to 52 ms, mean 46 |
 
 The worst gap between depth frames is 27.5 ms, measured at 900x720 without undistortion. Depth arrives about 18 ms after color, so a moving body's depth trails its image by about a frame **(deduction)**.
+
+### Detector size
+
+The detector is 640x512 so a frame goes in at its own 5:4 shape and a player keeps the most rows. The sizes cost the same. Beside color and depth, about 4 s each, nobody in view, dark room with the flood light on:
+
+| Detector | Color   | Boxes   | Depth   | Rate   |
+|----------|---------|---------|---------|--------|
+| 416x416  | 28.8 ms | 34.7 ms | 44.5 ms | 60 fps |
+| 480x384  | 28.2 ms | 35.4 ms | 41.7 ms | 60 fps |
+| 512x416  | 28.4 ms | 34.8 ms | 41.6 ms | 60 fps |
+| 640x512  | 28.7 ms | 35.0 ms | 40.2 ms | 60 fps |
+
+### Frame size
+
+`resolution` sets the delivered frame. With the 640x512 detector and depth, on the probe, about 3 s each:
+
+| `resolution` | Frame     | Color   | Boxes   | Depth   | Rate   | NV12 on the link |
+|--------------|-----------|---------|---------|---------|--------|------------------|
+| `P720`       | 896x720   | 28.9 ms | 35.5 ms | 43.4 ms | 60 fps | 464 Mbit/s       |
+| `P800`       | 992x800   | 31.1 ms | 36.1 ms | 39.4 ms | 60 fps | 571 Mbit/s       |
+| `P1080`      | 1344x1072 | 37.7 ms | 39.2 ms | 43.5 ms | 60 fps | 1037 Mbit/s      |
+
+The link rates are calculated from the frame sizes **(deduction)**, before the chip's row padding. `P1080` does not fit Ethernet.
 
 ### Color path
 
@@ -187,6 +212,21 @@ The load on the link:
 | Ethernet, expected    | About 800 Mbit/s          |
 
 The stream rates are calculated from the frame sizes **(deduction)**, before the chip's row padding. The Ethernet figure is from the Luxonis docs.
+
+## Camera load
+
+One sample each of `oakctl device stats`: idle, and with Deep Flow running on the camera over USB.
+
+| Reading            | Idle        | Deep Flow   |
+|--------------------|-------------|-------------|
+| CPU, all 6 cores   | 15.7 %      | 48.3 %      |
+| Memory, of 7.55 GB | 0.81 GB     | 1.36 GB     |
+| Power, camera      | 3.4 W       | 14.8 W      |
+| Power, chip        | 3.0 W       | 7.8 W       |
+| NPU temperature    | 28 to 31 °C | 51 to 57 °C |
+| Hottest zone       | 37.5 °C     | 62.2 °C     |
+
+The panel's `cpu`, `memory` and `temperature` come from depthai's `SystemLogger` node, which runs in the pipeline. It reports no power, no NPU load, and no NPU temperature; those need `oakctl`.
 
 ## The frame
 
@@ -312,6 +352,8 @@ Dragging a marker on the player's bar pauses playback and shows the frame under 
 
 ## Open
 
+- NPU load is not read. depthai does not report it, and `oakctl device stats` gives `dsp` null with a pipeline running. `sysMonApp` on the camera reads the NPU through `/dev/fastrpc-cdsp`, which only the `system` user can open, and the ADB shell runs as `adb`, so it fails with a FastRPC error. It needs a root shell through `oakctl device unlock`, which has not been tried.
+- depthai once stopped listing the camera on USB after an app closed, and kept listing it on Ethernet, while ADB and Windows still saw it on USB. Every open fell back to Ethernet until `oakctl device reboot` brought USB back. The cause is not known.
 - Video min sometimes reads about 30 fps **(site fact)**. The cause is not known.
 - `center_depth` has not been seen with a player in view.
 - A standing player reading as one distance from head to feet has not been checked.
@@ -319,7 +361,8 @@ Dragging a marker on the player's bar pauses playback and shows the frame under 
 - `StreamReader.frame_count` can read one short on an `.mkv`, as it estimates from the duration.
 - Ethernet stalled once in 130 s of streaming, with a gap of 4.8 s and latency up to 1.7 s. The cause is not known, and a USB run of that length has not been compared.
 - A player at show distance has not been compared across depth sizes or IR lights.
-- The detector squeezes the 5:4 frame into its 416x416 square, 20 % narrower. Boxes stay in place, and the effect on detection has not been measured.
+- Detection at 640x512 has not been compared with 416x416 on a player, and its latency has not been measured with a player in view.
+- `P800` and `P1080` have not been run in the app, nor recorded and replayed.
 - `auto_exposure_lock` did not hold: with it on, `exposure_compensation` +9 still moved ISO to 16585. Whether it holds against a change of light has not been tested.
 - `exposure_region`, `auto_balance_lock` and `anti_banding` changed nothing in a dark room, where exposure was already at its ceiling and nothing flickered. They need a test with light. `chroma_denoise` 4 lowered mean luma from 24.0 to 22.1, so it does reach the sensor.
 - The temporal filter has only been measured on a still scene. How far depth trails a moving player has not been measured.

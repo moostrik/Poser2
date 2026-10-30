@@ -8,8 +8,8 @@ key. The archive is copied under the name the backend expects (`definitions.POSE
 not in git (`data/models/*.tar.xz` is ignored until the models are settled), so every OAK4 PC runs
 this once, with internet, and again for a new model.
 
-`definitions.PERSON_DETECTOR_ARCHIVE` is not fetched here: the zoo has no square size for this chip,
-so it is compiled from `data/models/base/yolov8n.pt` through Luxonis's HubAI, at 416x416, with
+`definitions.PERSON_DETECTOR_ARCHIVE` is not fetched here: the zoo has no 5:4 size for this chip,
+so it is compiled from `data/models/base/yolov8n.pt` through Luxonis's HubAI, at 640x512, with
 `hubai-sdk` and a Hub API key, and copied to `data/models` by hand.
 """
 

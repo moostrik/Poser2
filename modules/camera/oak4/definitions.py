@@ -210,6 +210,7 @@ def log_connected_sensors(device: dai.Device, device_id: str = '') -> None:
 # roll, `imu_to_camera` and `unroll_imu_frame` get the vector there.
 
 IMU_RATE_HZ: int = 5
+SYSTEM_RATE_HZ: float = 1.0     # how often the camera reports its CPU, memory and temperature
 
 # How hard each new sample pulls the running average: the camera is on a tripod, a single
 # reading is almost entirely noise and there is no motion to track.
@@ -267,8 +268,8 @@ def imu_rotation_to_camera(device: dai.Device, socket: dai.CameraBoardSocket, de
 # ONE_MODEL finds the people and their landmarks in one pass, decoded by `DetectionNetwork` from the
 # archive's config; TWO_MODELS runs a detector, cuts one crop per person on the device and runs a
 # top-down pose model on each crop, through Luxonis's depthai-nodes. DETECTOR gives boxes only, for
-# an app that poses the crops on the host: yolov8n at 416x416, compiled through Luxonis's HubAI, as
-# the zoo has no square size for this chip.
+# an app that poses the crops on the host: yolov8n at 640x512, the delivered frame's 5:4, compiled
+# through Luxonis's HubAI, as the zoo has no such size for this chip.
 
 
 class ModelChain(IntEnum):
@@ -278,7 +279,7 @@ class ModelChain(IntEnum):
     TWO_MODELS = 3      # YOLOv6 detector, then Lite-HRNet on each person's crop
 
 
-PERSON_DETECTOR_ARCHIVE: str = 'yolov8n_coco_416x416_rvc4.tar.xz'
+PERSON_DETECTOR_ARCHIVE: str = 'yolov8n_coco_640x512_rvc4.tar.xz'
 POSE_MODEL: str = 'luxonis/yolov8-nano-pose-estimation:coco-512x288'
 POSE_ARCHIVE: str = 'yolov8n_pose_coco_512x288_rvc4.tar.xz'
 DETECTOR_MODEL: str = 'luxonis/yolov6-nano:r2-coco-512x288'

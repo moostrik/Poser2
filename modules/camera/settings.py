@@ -46,7 +46,10 @@ class RigCameraReadings(CameraReadings):
     because it is the thing you reach for while looking at the roll it corrects. A backend fills
     what its device can measure; the rest stays at its default (NaN for the angles).
     """
-    tracker_fps:      Field[float] = Field(0.0, access=Field.READ, description="Tracker updates/s")
+    cpu:              Field[float] = Field(0.0, access=Field.READ, newline=True, unit="%", description="Camera CPU use, all cores")
+    memory:           Field[float] = Field(0.0, access=Field.READ, unit="%", description="Camera memory in use")
+    temperature:      Field[float] = Field(0.0, access=Field.READ, unit="°C", description="Camera chip temperature, average")
+    tracker_fps:      Field[float] = Field(0.0, access=Field.READ, newline=True, description="Tracker updates/s")
     tracker_latency:  Field[float] = Field(0.0, access=Field.READ, unit="ms", description="Frame capture to the tracklets' arrival on the PC")
     tracklets:      Field[int]   = Field(0, access=Field.READ, description="Active tracklets")
     depth_fps:        Field[float] = Field(0.0, access=Field.READ, description="Depth FPS")

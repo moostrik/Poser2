@@ -236,11 +236,12 @@ class Camera(Thread):
         readings: RigCameraReadings = self.settings.readings        # they update on a frame, and none come now
         readings.video_fps = readings.video_min_fps = readings.video_latency = 0.0
         readings.tracker_fps = readings.tracker_latency = readings.depth_fps = readings.depth_latency = 0.0
+        readings.cpu = readings.memory = readings.temperature = 0.0
         readings.tracklets = 0
 
     def _setup_queues(self, outputs: PipelineOutputs) -> None:
         """The host's ends of the pipeline: the frames every camera has, the tracklets with a model,
-        the depth with a depth model, the IMU, the sensor controls."""
+        the depth with a depth model, the IMU, the camera's load, the sensor controls."""
         self.flip_on_host = outputs.flip_on_host
         video: dai.MessageQueue = outputs.video.createOutputQueue(maxSize=QUEUE_SIZE, blocking=False)
         video.addCallback(self._video_callback)
@@ -260,6 +261,9 @@ class Camera(Thread):
         imu: dai.MessageQueue = outputs.imu.createOutputQueue(maxSize=QUEUE_SIZE, blocking=False)
         imu.addCallback(self._imu_callback)
         self.queues.append(imu)
+        system: dai.MessageQueue = outputs.system.createOutputQueue(maxSize=QUEUE_SIZE, blocking=False)
+        system.addCallback(self._system_callback)
+        self.queues.append(system)
         control: dai.InputQueue = outputs.control.createInputQueue()
         assert self.device is not None
         self.control = SensorControl(self.settings, self.device, control, self.flip_on_host)
@@ -388,6 +392,12 @@ class Camera(Thread):
         joined = self.pose_join.put_poses(detections.getSequenceNum(), boxes, keypoints)
         if joined is not None:
             self._emit_tracklets(joined, time.perf_counter())
+
+    def _system_callback(self, name: str, msg: dai.SystemInformationRVC4) -> None:
+        readings: RigCameraReadings = self.settings.readings
+        readings.cpu = msg.cpuAvgUsage.average * 100.0
+        readings.memory = msg.ddrMemoryUsage.used / msg.ddrMemoryUsage.total * 100.0
+        readings.temperature = msg.chipTemperature.average
 
     def _imu_callback(self, name: str, msg: dai.IMUData) -> None:
         for packet in msg.packets:
