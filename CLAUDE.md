@@ -16,7 +16,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Keep modules independent and cross-module coupling minimal
 - `modules/settings/` is shared infrastructure; any module may depend on it
 - `modules/camera/` is the camera contract; the tracker, inference, board and render import it, never a backend package such as `modules/camera/oak/`
-- `modules/camera/oak/` runs on depthai 2 and `modules/camera/oak4/` on depthai 3; a PC has one of them installed (`install.bat`, `install.bat oak4`) and `oak_backend()` says which, so an app never imports both
+- `modules/camera/oak/` runs on depthai 2 in `.venv` (`install.bat`) and `modules/camera/oak4/` on depthai 3 in a second venv, `.venv-oak4` (`install.bat oak4`); `oak_backend()` says which the running venv has, so an app never imports both
 - `apps/smile/` has its own rules in its `CLAUDE.md`; its `cam` is the app's image source (a `modules/camera` backend, an image folder, a phone), not a camera backend
 - Never change the White Space fixture firmware (`apps/white_space/data/firmware/`); solve everything on the app side of the wire
 
@@ -109,9 +109,9 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 
 ```
 python -m unittest discover -s tests -t .                  # guard tests: import layering, glossary
-python -m unittest discover -s apps/<app>/tests -t .        # white_space, hd_trio, deep_flow; oak4_test on a depthai 3 install
+python -m unittest discover -s apps/<app>/tests -t .        # white_space, hd_trio, deep_flow; oak4_test in .venv-oak4
 python -m unittest discover -s apps/smile/<pkg>/tests -t .  # tests, comfy, render, player, relay, ...
-python -m unittest discover -s modules/<pkg>/tests -t .    # camera, camera/oak, camera/oak4 (depthai 3), camera/replay, camera/vimba, camera/webcam, face, inference/detection, inout, pose, render, settings, tracker, video
+python -m unittest discover -s modules/<pkg>/tests -t .    # camera, camera/oak, camera/oak4 (.venv-oak4), camera/replay, camera/vimba, camera/webcam, face, inference/detection, inout, pose, render, settings, tracker, video
 ```
 
 ## API evolution
