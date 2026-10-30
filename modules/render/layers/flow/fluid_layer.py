@@ -4,7 +4,7 @@
 from enum import IntEnum, auto
 
 # Third-party imports
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_RGBA16F
 import numpy as np
 
 # Local application imports

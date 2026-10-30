@@ -1,6 +1,3 @@
-# Third-party imports
-from OpenGL.GL import * # type: ignore
-
 # Local application imports
 from modules.utils import HotReloadMethods
 

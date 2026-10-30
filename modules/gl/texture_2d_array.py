@@ -11,7 +11,7 @@ Usage:
     density_tex = Texture2DArray(wrap=GL_CLAMP_TO_BORDER, border_color=(0,0,0,0))
     density_tex.allocate(3840, 2160, 28, GL_RGBA16F)
 """
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_HALF_FLOAT, GL_LINEAR, GL_NONE, GL_ONE, GL_RED, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE, glBindTexture, glClearTexImage, glDeleteTextures, glGenTextures, glGetTexImage, glTexImage3D, glTexParameterfv, glTexParameteri
 import numpy as np
 
 from .texture import get_format, get_data_type, get_channel_count, get_numpy_dtype

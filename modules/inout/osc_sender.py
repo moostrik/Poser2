@@ -115,7 +115,7 @@ class OscSender(Thread):
             # a tuple or list goes as separate arguments (as one add_arg it would be an OSC array, which Max does not take)
             for arg in (args if isinstance(args, (tuple, list)) else (args,)):
                 msg.add_arg(arg)
-            bundle.add_content(msg.build()) # type: ignore
+            bundle.add_content(msg.build())
         return bundle.build()
 
     def submit(self, address: str, args: ArgValue) -> None:

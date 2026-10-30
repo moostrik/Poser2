@@ -3,7 +3,7 @@
 Ported from ofxFlowTools ftUtil.h/cpp
 """
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_R16, GL_R16F, GL_R32F, GL_R8, GL_RG16, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB16, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA16, GL_RGBA16F, GL_RGBA32F, GL_RGBA8
 from modules.gl import Fbo, SwapFbo, Texture
 
 
@@ -356,7 +356,7 @@ class FlowUtil:
         dst_fbo.end()
 
     @staticmethod
-    def get_num_channels(internal_format) -> int:  # type: ignore
+    def get_num_channels(internal_format) -> int:
         """Get number of channels from OpenGL internal format.
 
         Args:

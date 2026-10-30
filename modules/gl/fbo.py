@@ -1,4 +1,4 @@
-from OpenGL.GL import * # type: ignore
+from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_COLOR_ATTACHMENT0, GL_COLOR_BUFFER_BIT, GL_FRAMEBUFFER, GL_LINEAR, GL_TEXTURE_2D, glBindFramebuffer, glClear, glClearColor, glFramebufferTexture2D, glGenFramebuffers, glViewport
 from .texture import Texture
 
 _current_viewport: tuple[int, int, int, int] = (0, 0, 0, 0)

@@ -1,7 +1,7 @@
 from time import time
 import math
 
-from OpenGL.GL import glDrawArrays, GL_TRIANGLE_FAN, glClearColor, glClear, GL_COLOR_BUFFER_BIT, glClearDepth, GL_DEPTH_BUFFER_BIT  # type: ignore
+from OpenGL.GL import glDrawArrays, GL_TRIANGLE_FAN, glClearColor, glClear, GL_COLOR_BUFFER_BIT, glClearDepth, GL_DEPTH_BUFFER_BIT
 
 
 def clear_color(r: float = 0, g: float = 0, b: float = 0, a: float = 0.0) -> None:

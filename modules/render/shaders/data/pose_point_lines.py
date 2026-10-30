@@ -1,6 +1,6 @@
 import numpy as np
 
-from OpenGL.GL import * # type: ignore
+from OpenGL.GL import glUniform1f, glUniform4f, glUniform4fv, glUseProgram
 from modules.gl import Shader, draw_quad
 from modules.pose import Points2D
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_COLOR_BUFFER_BIT, GL_RGBA16F, glClear, glClearColor
 
 from modules.gl import Fbo, Texture, Style, shaders
 from ..layer_base import LayerBase

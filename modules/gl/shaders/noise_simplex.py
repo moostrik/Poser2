@@ -1,4 +1,4 @@
-from OpenGL.GL import * # type: ignore
+from OpenGL.GL import glUniform1f, glUseProgram
 from .. import Shader, draw_quad
  # ...existing code...
 from time import time

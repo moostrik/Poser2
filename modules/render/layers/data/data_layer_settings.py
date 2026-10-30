@@ -22,7 +22,7 @@ _VISUALIZABLE = sorted(
     key=lambda c: c.__name__,
 )
 
-ScalarFeatureSelect = IntEnum(                          # type: ignore[misc]
+ScalarFeatureSelect = IntEnum(
     'ScalarFeatureSelect',
     {cls.__name__: i for i, cls in enumerate(_VISUALIZABLE)},
 )

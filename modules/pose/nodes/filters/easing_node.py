@@ -4,7 +4,7 @@
 from typing import Callable
 
 # Third-party imports
-import pytweening  # type: ignore
+import pytweening
 
 # Pose imports
 from ..nodes import FilterNode

@@ -1,6 +1,6 @@
 """ObstacleOffset shader - Precompute neighbor obstacle flags."""
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 

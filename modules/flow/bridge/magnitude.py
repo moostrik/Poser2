@@ -5,7 +5,7 @@ Outputs scalar magnitude to R channel.
 
 Ported from ofxFlowTools ftVelocityMaskFlow.h
 """
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_R32F, GL_RG32F, GL_RGBA16F
 
 from modules.gl import Texture
 from .. import FlowBase, FlowUtil

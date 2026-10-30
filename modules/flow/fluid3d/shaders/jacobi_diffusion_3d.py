@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import math
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_READ_ONLY, GL_RGBA16F, GL_WRITE_ONLY, glUniform1f, glUniform1i, glUniform3f, glUniform3i, glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
 

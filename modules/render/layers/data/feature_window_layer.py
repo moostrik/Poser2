@@ -5,7 +5,6 @@ from typing import cast
 
 # Third-party imports
 import numpy as np
-from OpenGL.GL import *  # type: ignore
 
 # Local application imports
 from modules.board import HasWindows

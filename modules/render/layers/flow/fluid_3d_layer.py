@@ -11,7 +11,7 @@ from __future__ import annotations
 from enum import IntEnum, auto
 
 # Third-party imports
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_VIEWPORT, glGetIntegerv
 import numpy as np
 
 # Local application imports

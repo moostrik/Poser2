@@ -4,7 +4,7 @@ Sets a specific region of destination to source texture.
 Source is stretched to fill the target region. Outside region is preserved.
 """
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform4f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging

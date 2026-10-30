@@ -1,4 +1,3 @@
-# type: ignore
 """Diagnose FP16 compatibility of ONNX model weights.
 
 Checks which weights would be clipped when converting to FP16 and shows statistics.

@@ -3,7 +3,6 @@
 Automatically chooses visualization method based on texture format.
 Ported from ofxFlowTools ftVisualizationField.h
 """
-from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture
 
@@ -75,7 +74,7 @@ class Visualizer:
         self._current_texture = texture
 
         # Get texture format
-        num_channels = FlowUtil.get_num_channels(texture.internal_format)  # type: ignore
+        num_channels = FlowUtil.get_num_channels(texture.internal_format)
 
         # Visualize 2-channel velocity data (RG32F)
         # Always visualized since raw output can contain negatives

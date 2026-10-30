@@ -4,7 +4,7 @@ Renders a texture to a specified rectangular region (x, y, w, h) in the viewport
 with coordinates in normalized device space [-1, 1].
 """
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUniform4f, glUseProgram
 from ..shader import Shader, draw_quad
 from .. import Texture
 

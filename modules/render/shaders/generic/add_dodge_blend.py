@@ -1,6 +1,6 @@
 """AddDodgeBlend shader - Two-phase blend from additive to color dodge with foreground reveal."""
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 

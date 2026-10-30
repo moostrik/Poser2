@@ -1,7 +1,7 @@
 """Buoyancy3D - 3D temperature-driven buoyancy force."""
 from __future__ import annotations
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_RGBA16F, glUniform1f, glUniform1i, glUniform3i, glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
 

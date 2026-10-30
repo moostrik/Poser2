@@ -1,7 +1,7 @@
 """InjectChannel3D - Inject single-channel 2D input into one RGBA channel of a 3D volume."""
 from __future__ import annotations
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_RGBA16F, GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform3i, glUseProgram
 
 from modules.gl import Texture, Texture3D, ComputeShader
 

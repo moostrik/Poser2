@@ -23,7 +23,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_ALL_BARRIER_BITS, GL_COMPILE_STATUS, GL_COMPUTE_SHADER, GL_FALSE, GL_LINK_STATUS, GL_MAX_COMPUTE_WORK_GROUP_COUNT, GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, GL_MAX_COMPUTE_WORK_GROUP_SIZE, GL_READ_ONLY, GL_READ_WRITE, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_SHADER_STORAGE_BARRIER_BIT, GL_TEXTURE0, GL_TEXTURE_2D, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_3D, GL_TEXTURE_FETCH_BARRIER_BIT, GL_TRUE, GL_WRITE_ONLY, glActiveTexture, glAttachShader, glBindImageTexture, glBindTexture, glCompileShader, glCreateProgram, glCreateShader, glDeleteProgram, glDeleteShader, glDispatchCompute, glGetIntegeri_v, glGetIntegerv, glGetProgramInfoLog, glGetProgramiv, glGetShaderInfoLog, glGetShaderiv, glLinkProgram, glMemoryBarrier, glShaderSource, glUniform1i
 
 from .shader import Shader
 from .texture import Texture

@@ -1,6 +1,3 @@
-# Third-party imports
-from OpenGL.GL import * # type: ignore
-
 # Local application imports
 from modules.gl import Texture
 from modules.tracker import PanoramicTrackerSettings

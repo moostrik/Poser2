@@ -25,6 +25,7 @@ paths:
 - Treat hot-reload as a development aid, not runtime control flow
 - Validate render-state assumptions locally (blend, depth, viewport)
 - Name a shader's `.frag`/`.vert`/`.comp` source after the `.py` file that holds its class, beside it; the loader resolves it by that module name
+- Import OpenGL names by name, never with `from OpenGL.GL import *`
 
 ## Layered rendering
 

@@ -6,9 +6,6 @@ import numpy as np
 from enum import IntEnum
 from dataclasses import dataclass
 
-# Third-party imports
-from OpenGL.GL import * # type: ignore
-
 # Local application imports
 from modules.board import HasFrames
 from modules.settings import Field, BaseSettings

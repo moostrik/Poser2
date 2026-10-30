@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 import freetype
 import numpy as np
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_CLAMP_TO_EDGE, GL_LINEAR, GL_R8, GL_RED, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE, glBindTexture, glDeleteTextures, glGenTextures, glTexImage2D, glTexParameteri
 
 
 @dataclass

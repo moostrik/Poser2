@@ -1,7 +1,7 @@
 """Add3D - In-place volumetric addition: dst += src * strength."""
 from __future__ import annotations
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_RGBA16F, glUniform1f, glUniform3i, glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
 

@@ -11,7 +11,7 @@ from typing import Callable, TYPE_CHECKING
 logger = logging.getLogger(__name__)
 
 # Third-party imports
-from OpenGL.GL import (  # type: ignore
+from OpenGL.GL import (
     glGetString, GL_VERSION, glBindFramebuffer, GL_FRAMEBUFFER, glViewport,
     glGenBuffers, glBindBuffer, GL_ARRAY_BUFFER, glBufferData, GL_STATIC_DRAW,
     glGenVertexArrays, glBindVertexArray, glEnableVertexAttribArray,

@@ -3,7 +3,7 @@ import time
 from typing import Protocol
 
 # Third-party imports
-from OpenGL.GL import * # type: ignore
+from OpenGL.GL import GL_BLEND, GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, glBlendFunc, glEnable
 
 # Local application imports
 from modules.board import HasObservations, HasTracklets

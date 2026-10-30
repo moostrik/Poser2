@@ -8,7 +8,7 @@ import ctypes
 from pathlib import Path
 
 import numpy as np
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_ARRAY_BUFFER, GL_BLEND, GL_DYNAMIC_DRAW, GL_FALSE, GL_FLOAT, GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, GL_VERTEX_ARRAY_BINDING, glBindBuffer, glBindVertexArray, glBlendFunc, glBufferData, glDeleteBuffers, glDeleteVertexArrays, glEnable, glEnableVertexAttribArray, glGenBuffers, glGenVertexArrays, glGetIntegerv, glVertexAttribPointer
 
 from .font_atlas import FontAtlas
 from .shaders.text_shader import TextShader

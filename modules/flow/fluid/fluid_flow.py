@@ -20,7 +20,7 @@ Boundary conditions via per-field wrap modes:
     Pressure/temp:     GL_CLAMP_TO_EDGE              -> zero-gradient / Neumann
     Obstacle:          GL_CLAMP_TO_BORDER(1,1,1,1)   -> OOB = obstacle
 """
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_R16F, GL_R8, GL_RG16F, GL_RGBA16F
 
 from modules.gl import Texture, SwapFbo, Fbo, Profiler
 from .. import FlowUtil

@@ -3,7 +3,7 @@
 
 from typing import Sequence
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1fv, glUniform1i, glUniform2f, glUniform4f, glUniform4fv, glUseProgram
 from modules.gl import Shader, Texture, draw_quad
 
 import logging

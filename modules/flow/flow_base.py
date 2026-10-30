@@ -4,7 +4,6 @@ Ported from ofxFlowTools ftFlow.h/cpp
 """
 
 from abc import ABC, abstractmethod
-from OpenGL.GL import *  # type: ignore
 
 from modules.gl import SwapFbo, Texture, Blit
 from .flow_util import FlowUtil

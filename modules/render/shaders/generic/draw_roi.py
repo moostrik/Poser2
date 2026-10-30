@@ -1,4 +1,4 @@
-from OpenGL.GL import * # type: ignore
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUniform4f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 from modules.utils import Rect, Point2f
 

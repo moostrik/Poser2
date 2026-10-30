@@ -4,7 +4,7 @@ Single-pass separable Gaussian blur for spatial smoothing.
 Optimized implementation using linear sampling.
 """
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging

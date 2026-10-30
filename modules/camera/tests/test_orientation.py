@@ -154,7 +154,7 @@ class TestRollOffsetIsABox(unittest.TestCase):
 
     def test_it_resolves_to_a_number_box(self) -> None:
         from modules.settings import Widget
-        field = RigCameraReadings.roll_offset                       # type: ignore[attr-defined]
+        field = RigCameraReadings.roll_offset
         self.assertEqual(Widget.resolve(field), Widget.number)
         self.assertIsNone(field.min)
         self.assertIsNone(field.max)

@@ -221,8 +221,8 @@ class OscLightSender:
         self._running = False
         self._thread: Thread | None = None
 
-        self.settings.bind(OscLightSenderSettings.ip, self._on_connection_change)  # type: ignore[arg-type]
-        self.settings.bind(OscLightSenderSettings.port,         self._on_connection_change)  # type: ignore[arg-type]
+        self.settings.bind(OscLightSenderSettings.ip, self._on_connection_change)
+        self.settings.bind(OscLightSenderSettings.port,         self._on_connection_change)
         self.settings.interlace.bind_all(self._on_interlace_change)
 
     @property
@@ -244,8 +244,8 @@ class OscLightSender:
             self._thread.join(timeout=1.0)
             self._thread = None
 
-        self.settings.unbind(OscLightSenderSettings.ip, self._on_connection_change)  # type: ignore[arg-type]
-        self.settings.unbind(OscLightSenderSettings.port,         self._on_connection_change)  # type: ignore[arg-type]
+        self.settings.unbind(OscLightSenderSettings.ip, self._on_connection_change)
+        self.settings.unbind(OscLightSenderSettings.port,         self._on_connection_change)
         self.settings.interlace.unbind_all(self._on_interlace_change)
 
         # Send AFTER the join: guaranteed to be the last thing on the wire (late

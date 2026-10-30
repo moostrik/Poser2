@@ -4,7 +4,7 @@ Visualizes velocity field using procedural arrows without geometry shaders.
 Ported from ofxFlowTools visualization concepts.
 """
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, GL_VIEWPORT, glActiveTexture, glBindTexture, glGetIntegerv, glUniform1f, glUniform1i, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging

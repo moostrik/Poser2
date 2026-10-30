@@ -33,7 +33,7 @@ FEATURES: list[type[BaseFeature]] = [
 Feature: type[IntEnum] = IntEnum('Feature', {cls.__name__: i for i, cls in enumerate(FEATURES, 1)})  # type: ignore[misc]
 """Enum with one member per concrete feature class, auto-generated from FEATURES."""
 
-FEATURE_CLASS: dict = dict(zip(Feature, FEATURES))  # type: ignore[arg-type]
+FEATURE_CLASS: dict = dict(zip(Feature, FEATURES))
 """Map Feature enum member → concrete feature class."""
 
 SCALAR_FEATURES: list[type[BaseScalarFeature]] = [

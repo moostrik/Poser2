@@ -1,6 +1,6 @@
 """Draw colored rectangle shader - positioned rectangle with solid color."""
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import glUniform4f, glUseProgram
 from modules.gl import Shader, draw_quad
 
 import logging

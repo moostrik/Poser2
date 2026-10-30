@@ -4,7 +4,7 @@ Combines RGB density with velocity magnitude for fluid simulation.
 
 Ported from ofxFlowTools ftDensityBridgeFlow.h
 """
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_RG32F, GL_RGBA16F
 
 from modules.gl import Texture, SwapFbo
 from modules.settings import Field, BaseSettings

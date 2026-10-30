@@ -6,7 +6,7 @@ import time
 from typing import TYPE_CHECKING
 
 import numpy as np
-from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TEST, glClear, glClearColor,  # type: ignore
+from OpenGL.GL import (GL_COLOR_BUFFER_BIT, GL_RGBA8, GL_RGBA16F, GL_SCISSOR_TEST, glClear, glClearColor,
                        glDisable, glEnable, glScissor, glViewport)
 
 from ..credit import FONT, qr_image, quiet_px, wrap_balanced

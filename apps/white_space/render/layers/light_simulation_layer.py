@@ -1,4 +1,4 @@
-from OpenGL.GL import * # type: ignore
+from OpenGL.GL import GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, glBlendFunc
 
 from modules.gl import Fbo, Texture, Image
 from modules.render import layers

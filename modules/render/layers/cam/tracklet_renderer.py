@@ -1,9 +1,6 @@
 # Standard library imports
 import numpy as np
 
-# Third-party imports
-from OpenGL.GL import * # type: ignore
-
 # Local application imports
 from modules.gl import Text
 from ...shaders import DrawColoredRectangle

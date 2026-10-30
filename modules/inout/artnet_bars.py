@@ -181,7 +181,7 @@ class ArtNetBars:
 
         # Clean up bindings
         self.settings.unbind_all(self._on_settings_change)
-        self.settings.unbind(ArtNetBarsSettings.enabled, self._on_enabled_change)  # type: ignore[arg-type]
+        self.settings.unbind(ArtNetBarsSettings.enabled, self._on_enabled_change)
 
         if self.settings.verbose:
             logger.info(f"Stopped output to {self.settings.ip}")
@@ -199,7 +199,7 @@ class ArtNetBars:
         # Bind all fields: mark dirty and wake thread on any change
         self.settings.bind_all(self._on_settings_change)
         # Specific handler for enabled: blackout when disabled
-        self.settings.bind(ArtNetBarsSettings.enabled, self._on_enabled_change)  # type: ignore[arg-type]
+        self.settings.bind(ArtNetBarsSettings.enabled, self._on_enabled_change)
 
     def _on_enabled_change(self, enabled: bool) -> None:
         """Called when enabled state changes."""
@@ -422,4 +422,4 @@ class ArtNetBars:
             self.stop()
         else:
             self.settings.unbind_all(self._on_settings_change)
-            self.settings.unbind(ArtNetBarsSettings.enabled, self._on_enabled_change)  # type: ignore[arg-type]
+            self.settings.unbind(ArtNetBarsSettings.enabled, self._on_enabled_change)

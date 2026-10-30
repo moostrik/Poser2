@@ -3,7 +3,7 @@
 Application-side state tracking to avoid expensive glGet* calls that cause CPU-GPU sync stalls.
 All state changes go through this module to keep shadow state in sync with actual GL state.
 """
-from OpenGL.GL import * # type: ignore
+from OpenGL.GL import GL_BLEND, GL_DST_COLOR, GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_ONE_MINUS_SRC_COLOR, GL_SRC_ALPHA, GL_ZERO, glBlendFunc, glDisable, glEnable
 import logging
 from dataclasses import dataclass
 from enum import Enum

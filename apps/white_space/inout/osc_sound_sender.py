@@ -61,7 +61,7 @@ class OscSoundSender(BaseOscSound):
 
     def _build_bundle(self, frames: FrameDict, seq_state: SequencerState | None) -> OscBundleBuilder:
         """Live slots and the dummy's; per-track arrays stay ``max_players`` wide (see class doc)."""
-        bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
+        bundle = OscBundleBuilder(IMMEDIATELY)
         self._add_global_messages(bundle, frames, seq_state)
 
         track = self.settings.max_players   # per-track (similarity/gate/leader) array width
@@ -79,7 +79,7 @@ class OscSoundSender(BaseOscSound):
 
     def _send_blackout(self) -> None:
         """All-zero bundle across every slot."""
-        bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
+        bundle = OscBundleBuilder(IMMEDIATELY)
         self._add_global_messages(bundle, {}, None)  # no frames, None → zeroed globals
         for id in range(self._slot_count):
             self._add_inactive_frame_messages(bundle, id, self.settings.max_players)
@@ -97,37 +97,37 @@ class OscSoundSender(BaseOscSound):
         playhead: float = 0.0 if (idle or light_frame is None) else float(light_frame.playhead)
         playhead_msg = OscMessageBuilder(address="/global/playhead")
         playhead_msg.add_arg(playhead, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(playhead_msg.build())  # type: ignore
+        bundle_builder.add_content(playhead_msg.build())
 
         motor_mode: int = 0 if (idle or light_frame is None) else int(light_frame.motor_command.mode)
         motor_msg = OscMessageBuilder(address="/global/motor")
         motor_msg.add_arg(motor_mode, OscMessageBuilder.ARG_TYPE_INT)
-        bundle_builder.add_content(motor_msg.build())  # type: ignore
+        bundle_builder.add_content(motor_msg.build())
 
         # Group sync's envelope (0..1): the gate through the strobe's envelope, 0 while the pose instrument is
         # not drawn — the compositor only carries it out of a rendered frame.
         sync: float = 0.0 if (idle or light_frame is None) else float(light_frame.sync)
         sync_msg = OscMessageBuilder(address="/global/sync")
         sync_msg.add_arg(sync, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(sync_msg.build())  # type: ignore
+        bundle_builder.add_content(sync_msg.build())
 
         # Presence, not show state, so never zeroed on idle: the count of live players,
         # the dummy excluded — the same frames the active flags are built from.
         players: int = sum(1 for id in range(self.settings.max_players) if id in frames)
         players_msg = OscMessageBuilder(address="/global/players")
         players_msg.add_arg(players, OscMessageBuilder.ARG_TYPE_INT)
-        bundle_builder.add_content(players_msg.build())  # type: ignore
+        bundle_builder.add_content(players_msg.build())
 
         # Operator settings, not show state, so they are never zeroed on idle: the fader and
         # the speaker placement must read true whenever they are turned, show or no show.
         volume_msg = OscMessageBuilder(address="/global/volume")
-        volume_msg.add_arg(float(self.settings.volume), OscMessageBuilder.ARG_TYPE_FLOAT)  # type: ignore[attr-defined]
-        bundle_builder.add_content(volume_msg.build())  # type: ignore
+        volume_msg.add_arg(float(self.settings.volume), OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(volume_msg.build())
 
         # Degrees in the panel, radians on the wire — the contract every azimuth here keeps.
         speaker_msg = OscMessageBuilder(address="/global/speaker/offset")
-        speaker_msg.add_arg(math.radians(self.settings.speaker_offset), OscMessageBuilder.ARG_TYPE_FLOAT)  # type: ignore[attr-defined]
-        bundle_builder.add_content(speaker_msg.build())  # type: ignore
+        speaker_msg.add_arg(math.radians(self.settings.speaker_offset), OscMessageBuilder.ARG_TYPE_FLOAT)
+        bundle_builder.add_content(speaker_msg.build())
 
     def _angle_values(self, frame: Frame) -> list[float]:
         """The angles, the four arm entries replaced by the joints' travel × π (see the class doc)."""
@@ -146,38 +146,38 @@ class OscSoundSender(BaseOscSound):
         arm_msg = OscMessageBuilder(address=f"/pose/{id}/arm")
         for value in arm_values:
             arm_msg.add_arg(float(value), OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(arm_msg.build())  # type: ignore
+        bundle_builder.add_content(arm_msg.build())
 
         # range [-1, 1] - the shoulders' signed travel difference, left less right: the higher arm
         difference: float = frame[ShoulderDifference].value if ShoulderDifference in frame else 0.0
         difference_msg = OscMessageBuilder(address=f"/pose/{id}/shoulder/difference")
         difference_msg.add_arg(float(difference), OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(difference_msg.build())  # type: ignore
+        bundle_builder.add_content(difference_msg.build())
 
         azimuth: float = frame[Azimuth].value if Azimuth in frame else np.nan
         azimuth_msg = OscMessageBuilder(address=f"/pose/{id}/azimuth")
         azimuth_msg.add_arg(azimuth, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(azimuth_msg.build())  # type: ignore
+        bundle_builder.add_content(azimuth_msg.build())
 
         # range [0, 1] - 0 at the zone's near edge, 1 at its far edge
         distance: float = frame[Distance].value if Distance in frame else np.nan
         distance_msg = OscMessageBuilder(address=f"/pose/{id}/distance")
         distance_msg.add_arg(distance, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(distance_msg.build())  # type: ignore
+        bundle_builder.add_content(distance_msg.build())
 
         playhead_offset: float = frame[PlayheadOffset].value if PlayheadOffset in frame else np.nan
         offset_msg = OscMessageBuilder(address=f"/pose/{id}/playhead/offset")
         offset_msg.add_arg(playhead_offset, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(offset_msg.build())  # type: ignore
+        bundle_builder.add_content(offset_msg.build())
 
     def _add_inactive_frame_messages(self, bundle_builder: OscBundleBuilder, id: int, max_players: int) -> None:
         super()._add_inactive_frame_messages(bundle_builder, id, max_players)
         arm_msg = OscMessageBuilder(address=f"/pose/{id}/arm")
         for _ in range(3):
             arm_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(arm_msg.build())  # type: ignore
+        bundle_builder.add_content(arm_msg.build())
         for address in (f"/pose/{id}/shoulder/difference", f"/pose/{id}/azimuth", f"/pose/{id}/distance",
                         f"/pose/{id}/playhead/offset"):
             msg = OscMessageBuilder(address=address)
             msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
-            bundle_builder.add_content(msg.build())  # type: ignore
+            bundle_builder.add_content(msg.build())

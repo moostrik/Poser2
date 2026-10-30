@@ -3,7 +3,7 @@
 Computes optical flow velocity field from input frames.
 Ported from ofxFlowTools ftOpticalFlow.h
 """
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R8, GL_RED, GL_RG16F, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
 
 from modules.gl import Fbo, Texture, Blit
 

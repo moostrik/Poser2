@@ -1,9 +1,6 @@
 # Standard library imports
 import torch
 
-# Third-party imports
-from OpenGL.GL import * # type: ignore
-
 # Local application imports
 from modules.board import HasCropImages
 from modules.gl import Tensor, Texture

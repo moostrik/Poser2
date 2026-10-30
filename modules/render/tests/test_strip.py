@@ -84,7 +84,7 @@ class TestCameraElevation(unittest.TestCase):
             azimuth_to_camera_x(camera_azimuth(0, TARGET_FOV) + small, 0, CAM_FOV, TARGET_FOV,
                                 CAMERA_RADIUS, FOCUS_RADIUS)      # type: ignore[operator]
             - azimuth_to_camera_x(camera_azimuth(0, TARGET_FOV), 0, CAM_FOV, TARGET_FOV,
-                                  CAMERA_RADIUS, FOCUS_RADIUS)    # type: ignore[operator]
+                                  CAMERA_RADIUS, FOCUS_RADIUS)
         ) * CAM_FOV / small
         self.assertAlmostEqual(vertical, expected, places=6)
         self.assertAlmostEqual(horizontal, expected, places=4)

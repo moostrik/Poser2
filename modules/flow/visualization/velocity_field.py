@@ -3,7 +3,6 @@
 Renders velocity fields with color encoding or arrow visualization.
 Ported from ofxFlowTools ftVisualizationField.h
 """
-from OpenGL.GL import *  # type: ignore
 
 from modules.gl import Texture
 

@@ -3,9 +3,6 @@
 # Standard library imports
 from enum import IntEnum, auto
 
-# Third-party imports
-from OpenGL.GL import *  # type: ignore
-
 # Local application imports
 from modules.gl import Texture, Style, Blit
 from ..layer_base import LayerBase

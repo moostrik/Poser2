@@ -3,7 +3,7 @@ import torch
 from typing import TYPE_CHECKING
 
 # Third-party imports
-from OpenGL.GL import * # type: ignore
+from OpenGL.GL import GL_CLAMP_TO_BORDER
 
 # Local application imports
 from modules.board import HasSegmentationImages

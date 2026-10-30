@@ -6,7 +6,7 @@ One draw per string instead of one per glyph keeps the render thread's Python/GL
 — and with it its GIL exposure — flat in the text length.
 """
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, GL_TRIANGLES, glActiveTexture, glBindTexture, glDrawArrays, glUniform1i, glUniform2f, glUniform4f, glUseProgram
 from ..shader import Shader
 
 

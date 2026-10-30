@@ -17,7 +17,7 @@ except (ImportError, OSError):
 if TYPE_CHECKING:
     import torch
 
-from OpenGL.GL import * # type: ignore
+from OpenGL.GL import GL_CLAMP_TO_EDGE, GL_FLOAT, GL_HALF_FLOAT, GL_LINEAR, GL_PIXEL_UNPACK_BUFFER, GL_R16F, GL_R32F, GL_R8, GL_RED, GL_RG, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_STREAM_DRAW, GL_TEXTURE_2D, GL_UNSIGNED_BYTE, glBindBuffer, glBindTexture, glBufferData, glDeleteBuffers, glGenBuffers, glGetError, glTexSubImage2D
 
 # Local application imports
 from .texture import Texture

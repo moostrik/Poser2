@@ -1,8 +1,5 @@
 """ Renders pose keypoints as lines into an offscreen buffer """
 
-# Third-party imports
-from OpenGL.GL import * # type: ignore
-
 # Local application imports
 from modules.settings import Field, BaseSettings
 from modules.board import HasFrames

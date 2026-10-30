@@ -146,7 +146,7 @@ def read_chunk(path: Path) -> dict:
             'timestamps':      f['timestamps'][:],                 # type: ignore[index]
             'tracks':          {},
         }
-        tracks_grp = f['tracks']                                   # type: ignore[index]
+        tracks_grp = f['tracks']
         for track_id_str, t_grp in tracks_grp.items():            # type: ignore[union-attr]
             track_id = int(track_id_str)
             track_data: dict = {

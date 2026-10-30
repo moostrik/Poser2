@@ -1,7 +1,7 @@
 """MSColorMaskLayer - Cross-camera mask visualization based on similarity and motion."""
 
 # Third-party imports
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_RGBA16F
 from pytweening import *    # type: ignore
 import numpy as np
 from time import time

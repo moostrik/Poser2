@@ -1,4 +1,4 @@
-from OpenGL.GL import * # type: ignore
+from OpenGL.GL import glUniform1f, glUniform1fv, glUniform1i, glUniform2f, glUniform4fv, glUseProgram
 from modules.gl import Shader, draw_quad
 
 import numpy as np

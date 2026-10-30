@@ -2126,7 +2126,7 @@ class TestLossyFloatToIntRejection(unittest.TestCase):
         """1.5 is lossy → must raise TypeError."""
         s = ListSettings()
         with self.assertRaises(TypeError):
-            s.ids = [1, 2.5, 3]  # type: ignore
+            s.ids = [1, 2.5, 3]
 
     def test_negative_non_integer_rejected(self):
         s = ListSettings()

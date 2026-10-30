@@ -4,7 +4,7 @@ Provides temporal smoothing (trail effect) and spatial smoothing (Gaussian blur)
 for any field type (velocity, density, etc).
 """
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_RG16F, GL_RGBA16F
 
 from modules.gl import Texture
 from modules.settings import Field, BaseSettings

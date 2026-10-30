@@ -1,6 +1,3 @@
-# Third-party imports
-from OpenGL.GL import * # type: ignore
-
 # Local application imports
 from modules.tracker import PanoramicTrackerSettings, camera_local_to_azimuth, wrap180
 

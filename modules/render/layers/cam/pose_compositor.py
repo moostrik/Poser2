@@ -1,8 +1,5 @@
 """ Composite layer showing track camera crop with RAW, SMOOTH, and LERP pose overlays """
 
-# Third-party imports
-from OpenGL.GL import * # type: ignore
-
 from typing import Any
 
 # Local application imports

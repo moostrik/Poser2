@@ -223,7 +223,7 @@ class HotReloadMethods:
                 return None
 
             # Create a new module with only class definitions and constants
-            tree.body = filtered_nodes # type: ignore
+            tree.body = filtered_nodes
 
             # Compile and execute the filtered AST
             code = compile(tree, file_path, 'exec')

@@ -1,7 +1,7 @@
 """Gradient3D - Subtract 3D pressure gradient from velocity."""
 from __future__ import annotations
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_RGBA16F, glUniform1i, glUniform3f, glUniform3i, glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
 

@@ -16,7 +16,7 @@ from time import perf_counter
 from typing import Protocol
 
 import numpy as np
-from OpenGL.GL import * # type: ignore
+from OpenGL.GL import GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, glBlendFunc
 
 from modules.gl import Fbo, Texture, Image
 from apps.white_space.board import HasFlashes

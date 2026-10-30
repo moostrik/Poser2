@@ -96,9 +96,9 @@ def setup_camera(camera: Any, user_set: str | None) -> CameraSetup:
 
                 # after the user set: it holds a packet size of its own and would put that back
                 try:
-                    camera.GVSPAdjustPacketSize.run() # type: ignore
+                    camera.GVSPAdjustPacketSize.run()
 
-                    while not camera.GVSPAdjustPacketSize.is_done(): # type: ignore
+                    while not camera.GVSPAdjustPacketSize.is_done():
                         pass
 
                 except (AttributeError, VimbaFeatureError):

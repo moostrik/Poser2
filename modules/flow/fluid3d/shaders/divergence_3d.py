@@ -1,7 +1,7 @@
 """Divergence3D - Compute divergence of 3D velocity field."""
 from __future__ import annotations
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_R16F, glUniform1i, glUniform3f, glUniform3i, glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
 

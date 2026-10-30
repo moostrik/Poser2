@@ -3,9 +3,6 @@ from dataclasses import dataclass
 from enum import IntEnum
 from typing import cast
 
-# Third-party imports
-from OpenGL.GL import *  # type: ignore
-
 # Local application imports
 from modules.board import HasFrames
 from modules.gl import Fbo, Texture, Blit, clear_color, Text

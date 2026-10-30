@@ -4,8 +4,6 @@ from typing import Any, Callable
 
 import logging
 
-from OpenGL.GL import * # type: ignore
-
 from .window_manager import WindowManager, WindowSettings
 
 logger = logging.getLogger(__name__)

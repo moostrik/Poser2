@@ -4,7 +4,7 @@ Ported from ofxFlowTools ftVisualization.h
 """
 from abc import ABC, abstractmethod
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_RGBA8
 
 from modules.gl import Fbo, Texture, Blit
 from modules.utils import Rect

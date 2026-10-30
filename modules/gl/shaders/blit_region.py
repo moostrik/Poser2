@@ -4,7 +4,7 @@ Renders a specific rectangular region (x, y, w, h) of a texture,
 stretched to fill the entire current viewport.
 """
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUniform4f, glUseProgram
 from .. import Shader, draw_quad, Texture
 
 import logging

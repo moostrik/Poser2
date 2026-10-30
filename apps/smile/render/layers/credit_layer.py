@@ -1,4 +1,4 @@
-from OpenGL.GL import glViewport  # type: ignore
+from OpenGL.GL import glViewport
 
 from ...credit import FONT, CreditLines, qr_image, wrap_balanced
 from modules.gl import Blit, Fbo, Image, Style, Text, Texture

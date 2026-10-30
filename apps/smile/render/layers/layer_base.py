@@ -2,9 +2,6 @@
 from abc import ABC, abstractmethod
 from typing import TypeVar, Generic
 
-# Third-party imports
-from OpenGL.GL import * # type: ignore
-
 # Local application imports
 from modules.utils import Rect
 from modules.gl import Texture, Blit

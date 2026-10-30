@@ -7,7 +7,7 @@ optional depth-graded blur. Debug mode shows the dominant layer as hue.
 """
 from __future__ import annotations
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_RGBA16F, glUniform1f, glUniform1i, glUniform2f, glUniform2i, glUseProgram
 
 from modules.gl import Texture, Texture2DArray, ComputeShader
 

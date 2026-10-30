@@ -1,6 +1,6 @@
 """Draw multiple circles with antialiasing."""
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import glUniform1f, glUniform1i, glUniform4fv, glUseProgram
 from modules.gl import Shader, draw_quad
 
 import logging

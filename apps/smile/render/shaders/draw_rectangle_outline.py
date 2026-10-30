@@ -1,6 +1,6 @@
 """Draw rectangle outline shader - draws rectangle border with specified line width."""
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import glUniform2f, glUniform4f, glUseProgram
 from modules.gl import Shader, draw_quad
 
 import logging

@@ -2,7 +2,7 @@ import time
 
 import glfw
 import numpy as np
-from OpenGL.GL import GL_RGBA32F, glViewport  # type: ignore
+from OpenGL.GL import GL_RGBA32F, glViewport
 
 from .grin_player import GrinPlayer
 from .screen_grab import ScreenGrab

@@ -13,7 +13,7 @@ Ported from ofxFlowTools ftTemperatureBridgeFlow.h
 """
 from dataclasses import dataclass, field
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_R16F, GL_R32F, GL_RGB16F
 
 from modules.gl import Texture, SwapFbo
 from modules.settings import Field, BaseSettings

@@ -1,5 +1,4 @@
-from OpenGL.GL import * # type: ignore
-from OpenGL.GL import shaders
+from OpenGL.GL import GL_COMPILE_STATUS, GL_FRAGMENT_SHADER, GL_LINK_STATUS, GL_TRIANGLE_FAN, GL_VERTEX_SHADER, glAttachShader, glCompileShader, glCreateProgram, glCreateShader, glDeleteProgram, glDeleteShader, glDrawArrays, glGetProgramInfoLog, glGetProgramiv, glGetShaderInfoLog, glGetShaderiv, glGetUniformLocation, glLinkProgram, glShaderSource, shaders
 
 import time
 import inspect

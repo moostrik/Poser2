@@ -5,7 +5,7 @@ for density, while keeping velocity and obstacle as sampler3D.
 """
 from __future__ import annotations
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import GL_RGBA16F, glUniform1f, glUniform1i, glUniform3f, glUniform3i, glUseProgram
 
 from modules.gl import Texture3D, Texture2DArray, ComputeShader
 from .advect_3d import Advect3D

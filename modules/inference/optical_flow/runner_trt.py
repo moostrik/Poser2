@@ -65,7 +65,7 @@ class RunnerTRT(Thread):
         # TensorRT engine and context (initialized in run())
         self.engine: trt.ICudaEngine  # type: ignore
         self.context: trt.IExecutionContext  # type: ignore
-        self.stream: torch.cuda.Stream  # type: ignore
+        self.stream: torch.cuda.Stream
         self.input_names: list[str]
         self.output_name: str
 

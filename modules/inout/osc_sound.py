@@ -48,8 +48,8 @@ class OscSound:
 
         logger.info(f"OscSound client initialized to {self.settings.ip}:{self.settings.port}")
 
-        self.settings.bind(OscSoundSettings.ip, self._on_connection_change)  # type: ignore[arg-type]
-        self.settings.bind(OscSoundSettings.port, self._on_connection_change)          # type: ignore[arg-type]
+        self.settings.bind(OscSoundSettings.ip, self._on_connection_change)
+        self.settings.bind(OscSoundSettings.port, self._on_connection_change)
 
         # Send-interval measurement (rolling window of inter-send gaps).
         self._last_send_time: float | None = None
@@ -145,7 +145,7 @@ class OscSound:
         Zeroed globals + every frame's inactive reset, in one bundle. Composes the
         same leaf builders as the live path, so _build_bundle stays blackout-agnostic.
         """
-        bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
+        bundle = OscBundleBuilder(IMMEDIATELY)
         self._add_global_messages(bundle, {}, None)  # no frames, None → zeroed globals
         max_players = self.settings.max_players
         for id in range(max_players):
@@ -154,7 +154,7 @@ class OscSound:
         self._send_bundle(bundle)
 
     def _build_bundle(self, frames: FrameDict, seq_state: SequencerState | None) -> OscBundleBuilder:
-        bundle = OscBundleBuilder(IMMEDIATELY)  # type: ignore
+        bundle = OscBundleBuilder(IMMEDIATELY)
         self._add_global_messages(bundle, frames, seq_state)
 
         max_players = self.settings.max_players
@@ -186,91 +186,91 @@ class OscSound:
         seq_state yields the all-zero (idle/blackout) globals."""
         stage_msg = OscMessageBuilder(address="/global/state")
         stage_msg.add_arg(seq_state.stage if seq_state is not None else _NO_STATE, arg_type=OscMessageBuilder.ARG_TYPE_INT)
-        bundle_builder.add_content(stage_msg.build()) # type: ignore
+        bundle_builder.add_content(stage_msg.build())
 
         stage_progress_msg = OscMessageBuilder(address="/global/state/progress")
         stage_progress_msg.add_arg(seq_state.stage_progress if seq_state is not None else 0.0, arg_type=OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(stage_progress_msg.build()) # type: ignore
+        bundle_builder.add_content(stage_progress_msg.build())
 
         progress_msg = OscMessageBuilder(address="/global/progress")
         progress_msg.add_arg(seq_state.progress if seq_state is not None else 0.0, arg_type=OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(progress_msg.build()) # type: ignore
+        bundle_builder.add_content(progress_msg.build())
 
     def _add_inactive_frame_messages(self, bundle_builder: OscBundleBuilder, id: int, max_players: int) -> None:
         # Send active=0 message
         msg_builder = OscMessageBuilder(address=f"/pose/{id}/active")
         msg_builder.add_arg(0, OscMessageBuilder.ARG_TYPE_INT)
-        bundle_builder.add_content(msg_builder.build()) # type: ignore
+        bundle_builder.add_content(msg_builder.build())
 
         # Reset bbox to 0 (center_x, center_y, width, height)
         bbox_msg = OscMessageBuilder(address=f"/pose/{id}/bbox")
         for _ in range(4):
             bbox_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(bbox_msg.build()) # type: ignore
+        bundle_builder.add_content(bbox_msg.build())
 
         # Reset time/motion to 0
         motion_msg = OscMessageBuilder(address=f"/pose/{id}/time/motion")
         motion_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(motion_msg.build()) # type: ignore
+        bundle_builder.add_content(motion_msg.build())
 
         # Reset time/age to 0
         age_msg = OscMessageBuilder(address=f"/pose/{id}/time/age")
         age_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(age_msg.build()) # type: ignore
+        bundle_builder.add_content(age_msg.build())
 
         # Reset angle/rad values to 0
         angle_reset_msg = OscMessageBuilder(address=f"/pose/{id}/angle/rad")
         for _ in range(17):  # 17 angle values based on AngleLandmark
             angle_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(angle_reset_msg.build()) # type: ignore
+        bundle_builder.add_content(angle_reset_msg.build())
 
         # Reset angle/vel values to 0
         vel_reset_msg = OscMessageBuilder(address=f"/pose/{id}/angle/vel")
         for _ in range(17):
             vel_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(vel_reset_msg.build()) # type: ignore
+        bundle_builder.add_content(vel_reset_msg.build())
 
         # Reset angle/sym values to 0
         sym_msg = OscMessageBuilder(address=f"/pose/{id}/angle/sym")
         for _ in range(AngleSymmetry.length()):
             sym_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(sym_msg.build()) # type: ignore
+        bundle_builder.add_content(sym_msg.build())
 
         # Reset angle/legs and angle/tilt to 0
         for address in (f"/pose/{id}/angle/legs", f"/pose/{id}/angle/tilt"):
             body_reset_msg = OscMessageBuilder(address=address)
             body_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
-            bundle_builder.add_content(body_reset_msg.build()) # type: ignore
+            bundle_builder.add_content(body_reset_msg.build())
 
         # Reset similarity values to 0
         similarity_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")
         for _ in range(max_players):
             similarity_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(similarity_reset_msg.build()) # type: ignore
+        bundle_builder.add_content(similarity_reset_msg.build())
 
         # Reset similarity/pose to 0
         pose_sim_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/pose")
         for _ in range(max_players):
             pose_sim_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(pose_sim_reset_msg.build()) # type: ignore
+        bundle_builder.add_content(pose_sim_reset_msg.build())
 
         # Reset similarity/gate to 0
         gate_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/gate")
         for _ in range(max_players):
             gate_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(gate_reset_msg.build()) # type: ignore
+        bundle_builder.add_content(gate_reset_msg.build())
 
         # Reset similarity/motion to 0
         motion_sim_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/motion")
         for _ in range(max_players):
             motion_sim_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(motion_sim_reset_msg.build()) # type: ignore
+        bundle_builder.add_content(motion_sim_reset_msg.build())
 
         # Reset similarity/leader to 0
         leader_reset_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/leader")
         for _ in range(max_players):
             leader_reset_msg.add_arg(0.0, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(leader_reset_msg.build()) # type: ignore
+        bundle_builder.add_content(leader_reset_msg.build())
 
     def _angle_values(self, frame: Frame) -> list[float]:
         """The nine values of ``/pose/{id}/angle/rad``, in ``AngleLandmark`` order; a subclass may
@@ -281,87 +281,87 @@ class OscSound:
         id: int = frame.track_id
         active_msg = OscMessageBuilder(address=f"/pose/{id}/active")
         active_msg.add_arg(1, OscMessageBuilder.ARG_TYPE_INT)
-        bundle_builder.add_content(active_msg.build()) # type: ignore
+        bundle_builder.add_content(active_msg.build())
 
         # bbox: center_x, center_y, width, height
         bbox_values: list[float] = frame[BBox].values.tolist() if BBox in frame else [np.nan] * 4
         bbox_msg = OscMessageBuilder(address=f"/pose/{id}/bbox")
         for val in bbox_values:
             bbox_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(bbox_msg.build()) # type: ignore
+        bundle_builder.add_content(bbox_msg.build())
 
         # when there is normal motion, about 1 per second
         motion_time: float = frame[MotionTime].value if MotionTime in frame else 0.0
         change_msg = OscMessageBuilder(address=f"/pose/{id}/time/motion")
         change_msg.add_arg(float(motion_time), OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(change_msg.build()) # type: ignore
+        bundle_builder.add_content(change_msg.build())
 
         # in seconds
         age: float = frame[Age].value if Age in frame else 0.0
         change_msg = OscMessageBuilder(address=f"/pose/{id}/time/age")
         change_msg.add_arg(float(age), OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(change_msg.build()) # type: ignore
+        bundle_builder.add_content(change_msg.build())
 
         # range [-pi, pi]
         angle_rad_values: list[float] = self._angle_values(frame)
         angle_rad_msg = OscMessageBuilder(address=f"/pose/{id}/angle/rad")
         for angle in angle_rad_values:
             angle_rad_msg.add_arg(angle, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(angle_rad_msg.build()) # type: ignore
+        bundle_builder.add_content(angle_rad_msg.build())
 
         # range [-finite, finite] -> [-2pi, 2pi]
         angle_vel_values: list[float] = frame[AngleVelocity].values.tolist()
         angle_vel_msg = OscMessageBuilder(address=f"/pose/{id}/angle/vel")
         for angle_vel in angle_vel_values:
             angle_vel_msg.add_arg(angle_vel, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(angle_vel_msg.build()) # type: ignore
+        bundle_builder.add_content(angle_vel_msg.build())
 
         # range [-1, 1] - signed left-minus-right per pair: shoulder, elbow, hip, knee, arms, legs
         sym_values: list[float] = frame[AngleSymmetry].values.tolist() if AngleSymmetry in frame else [0.0] * AngleSymmetry.length()
         sym_msg = OscMessageBuilder(address=f"/pose/{id}/angle/sym")
         for val in sym_values:
             sym_msg.add_arg(float(val), OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(sym_msg.build()) # type: ignore
+        bundle_builder.add_content(sym_msg.build())
 
         # range [0, 1] - joint-weighted leg deviation from standing straight
         legs: float = frame[LegDeviation].value if LegDeviation in frame else 0.0
         legs_msg = OscMessageBuilder(address=f"/pose/{id}/angle/legs")
         legs_msg.add_arg(float(legs), OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(legs_msg.build()) # type: ignore
+        bundle_builder.add_content(legs_msg.build())
 
         # range [-1, 1] - signed sideways torso lean against the image vertical
         tilt: float = frame[TorsoTilt].value if TorsoTilt in frame else 0.0
         tilt_msg = OscMessageBuilder(address=f"/pose/{id}/angle/tilt")
         tilt_msg.add_arg(float(tilt), OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(tilt_msg.build()) # type: ignore
+        bundle_builder.add_content(tilt_msg.build())
 
         # range [0, 1] - pose similarity per player; NaN (no pair, or no such player) is sent as 0
         pose_sim_values: list[float] = np.nan_to_num(frame[Similarity].values, nan=0.0).tolist() if Similarity in frame else [0.0] * max_players
         pose_sim_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/pose")
         for val in pose_sim_values:
             pose_sim_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(pose_sim_msg.build()) # type: ignore
+        bundle_builder.add_content(pose_sim_msg.build())
 
         # range [0, 1] - motion gate (both poses moving)
         gate_values: list[float] = frame[MotionGate].values.tolist() if MotionGate in frame else [0.0] * max_players
         gate_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/gate")
         for val in gate_values:
             gate_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(gate_msg.build()) # type: ignore
+        bundle_builder.add_content(gate_msg.build())
 
         # range [0, 1] - motion-gated similarity (similarity * motion_gate)
         motion_sim_values: list[float] = np.nan_to_num(frame[Similarity].values, nan=0.0).tolist() if Similarity in frame else [0.0] * max_players
         motion_sim_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/motion")
         for val in motion_sim_values:
             motion_sim_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(motion_sim_msg.build()) # type: ignore
+        bundle_builder.add_content(motion_sim_msg.build())
 
         # range [-1, 1] - leader scores (negative=this leads, positive=other leads)
         leader_values: list[float] = frame[LeaderScore].values.tolist() if LeaderScore in frame else [0.0] * max_players
         leader_msg = OscMessageBuilder(address=f"/pose/{id}/similarity/leader")
         for val in leader_values:
             leader_msg.add_arg(val, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(leader_msg.build()) # type: ignore
+        bundle_builder.add_content(leader_msg.build())
 
         # DEPRECATED: Compute motion-gated similarity using old method (backward compatibility)
 
@@ -371,5 +371,5 @@ class OscSound:
         similarity_msg = OscMessageBuilder(address=f"/pose/{id}/similarity")
         for similarity in similarity_values:
             similarity_msg.add_arg(similarity, OscMessageBuilder.ARG_TYPE_FLOAT)
-        bundle_builder.add_content(similarity_msg.build()) # type: ignore
+        bundle_builder.add_content(similarity_msg.build())
 

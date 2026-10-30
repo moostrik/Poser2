@@ -3,7 +3,7 @@
 Renders solid-color rectangles for text backgrounds.
 """
 
-from OpenGL.GL import *  # type: ignore
+from OpenGL.GL import glUniform2f, glUniform4f, glUseProgram
 from .. import Shader, draw_quad
 
 

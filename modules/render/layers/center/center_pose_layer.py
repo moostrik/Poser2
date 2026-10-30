@@ -3,9 +3,6 @@
 # Standard library imports
 import numpy as np
 
-# Third-party imports
-from OpenGL.GL import * # type: ignore
-
 # Local application imports
 from modules.settings import Field, BaseSettings
 from modules.gl import Fbo, Texture, clear_color

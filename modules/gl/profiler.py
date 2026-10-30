@@ -2,7 +2,7 @@ import time
 import logging
 from collections.abc import Callable
 
-from OpenGL.GL import glFinish  # type: ignore
+from OpenGL.GL import glFinish
 
 logger = logging.getLogger(__name__)
 

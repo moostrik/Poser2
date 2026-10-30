@@ -9,7 +9,7 @@ out itself and keeps that frame. Nothing in modules/gl changes."""
 from threading import Lock
 
 import numpy as np
-from OpenGL.GL import GL_RGBA8  # type: ignore
+from OpenGL.GL import GL_RGBA8
 
 from modules.gl import Fbo, Texture
 from .layers import copy
