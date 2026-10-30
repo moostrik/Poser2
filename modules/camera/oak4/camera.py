@@ -20,6 +20,7 @@ Docs: https://docs.luxonis.com/software-v3/depthai
 """
 
 import logging
+import math
 import time
 from pathlib import Path
 from threading import Thread, Event
@@ -34,7 +35,7 @@ from .. import CameraResolution, CameraFrame, FrameReadings, RigCameraReadings, 
 from modules.utils import FPS, Rect
 
 from .control import DepthControl, SensorControl
-from .definitions import SENSOR_SOCKET, requested_size, get_device_list, find_device, log_connected_sensors, \
+from .definitions import SENSOR_SOCKET, requested_size, get_device_list, find_device, link_resolution, log_connected_sensors, \
     read_lens_calibration, imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL, ModelChain, CameraLink, DepthModel, \
     model_archives, TRACKING_STATUS, tracklet_keypoints, keypoints_in_frame, packed_nv12, smoothed_latency, \
     mirrored_roi, mirrored_keypoints
@@ -75,7 +76,6 @@ class Camera(Thread):
         self.fps: float =               settings.fps
         self.color: bool =              settings.color
         self.depth_model: DepthModel =  settings.depth_model
-        self.resolution: CameraResolution = settings.resolution
 
         self.mount: MountConfig = MountConfig(
             flip_h=settings.flip_h,
@@ -85,9 +85,10 @@ class Camera(Thread):
             lens_center_x=settings.lens_center_x,
             lens_center_y=settings.lens_center_y,
         )
-        self.frame_height: int = delivered_height(self.color, self.resolution, self.mount.fov_h, 0.0,
-                                                  self.mount.lens_fov, self.mount.lens_center)
-        self.frame_size: tuple[int, int] = delivered_size(self.color, self.resolution, self.frame_height)
+        self.resolution: CameraResolution = settings.resolution     # until `_take_link` knows the link
+        self.frame_height: int = 0
+        self.frame_size: tuple[int, int] = (0, 0)
+        self._set_resolution(settings.resolution)
         self.model_chain: ModelChain = settings.model_chain
         models = Path(self.model_path)
         pose, detector = model_archives(self.model_chain)
@@ -180,6 +181,7 @@ class Camera(Thread):
             self._warn(f'{self.device_id} is gone')
             return False
 
+        self._take_link(info)
         self._log_frame_geometry()
         try:
             self.device = dai.Device(info)
@@ -207,6 +209,18 @@ class Camera(Thread):
         self._last_frame = time.perf_counter() + FIRST_FRAME_GRACE
         self.running = True
         return True
+
+    def _set_resolution(self, resolution: CameraResolution) -> None:
+        self.resolution = resolution
+        self.frame_height = delivered_height(self.color, resolution, self.mount.fov_h, 0.0, self.mount.lens_fov, self.mount.lens_center)
+        self.frame_size = delivered_size(self.color, resolution, self.frame_height)
+
+    def _take_link(self, info: dai.DeviceInfo) -> None:
+        """The frame this link carries. A reopen can land on the other link, so the lens read off the
+        last frame and the homography made from it go too: the next frame brings them back."""
+        self._set_resolution(link_resolution(info.protocol, self.settings.resolution, self.settings.ethernet_resolution))
+        self._intrinsics = None
+        self.tilt_correction.update(math.nan, None, self.frame_size)
 
     def _close(self) -> None:
         self.running = False

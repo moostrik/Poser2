@@ -8,7 +8,8 @@ from unittest import mock
 import depthai as dai
 
 from modules.camera.oak4 import CameraLink
-from modules.camera.oak4.definitions import get_device_list, find_device
+from modules.camera import CameraResolution
+from modules.camera.oak4.definitions import get_device_list, find_device, link_resolution
 
 USB = dai.XLinkProtocol.X_LINK_USB_EP
 ETHERNET = dai.XLinkProtocol.X_LINK_TCP_IP
@@ -48,6 +49,12 @@ class FindDeviceTest(unittest.TestCase):
     def test_a_camera_on_no_link_is_none(self) -> None:
         with mock.patch.object(dai.Device, 'getAllAvailableDevices', return_value=[]):
             self.assertIsNone(find_device('oak4', CameraLink.USB))
+
+
+class LinkResolutionTest(unittest.TestCase):
+    def test_each_link_gets_its_own_size(self) -> None:
+        self.assertEqual(link_resolution(USB, CameraResolution.P1080, CameraResolution.P800), CameraResolution.P1080)
+        self.assertEqual(link_resolution(ETHERNET, CameraResolution.P1080, CameraResolution.P800), CameraResolution.P800)
 
 
 if __name__ == '__main__':

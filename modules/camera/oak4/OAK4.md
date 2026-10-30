@@ -126,15 +126,18 @@ The detector is 640x512 so a frame goes in at its own 5:4 shape and a player kee
 
 ### Frame size
 
-`resolution` sets the delivered frame. With the 640x512 detector and depth, on the probe, about 3 s each:
+`resolution` sets the delivered frame on USB and `ethernet_resolution` the one on Ethernet. The backend reads the link the camera actually opened on, so a fallback to the other link gets that link's frame. Deep Flow runs `P1080` on USB and `P800` on Ethernet.
 
-| `resolution` | Frame     | Color   | Boxes   | Depth   | Rate   | NV12 on the link |
-|--------------|-----------|---------|---------|---------|--------|------------------|
-| `P720`       | 896x720   | 28.9 ms | 35.5 ms | 43.4 ms | 60 fps | 464 Mbit/s       |
-| `P800`       | 992x800   | 31.1 ms | 36.1 ms | 39.4 ms | 60 fps | 571 Mbit/s       |
-| `P1080`      | 1344x1072 | 37.7 ms | 39.2 ms | 43.5 ms | 60 fps | 1037 Mbit/s      |
+With the 640x512 detector and depth, on the probe, about 3 s each on USB and 10 s on Ethernet:
 
-The link rates are calculated from the frame sizes **(deduction)**, before the chip's row padding. `P1080` does not fit Ethernet.
+| `resolution` | Link     | Frame     | Color   | Boxes   | Depth   | Rate   | NV12 on the link |
+|--------------|----------|-----------|---------|---------|---------|--------|------------------|
+| `P720`       | USB      | 896x720   | 28.9 ms | 35.5 ms | 43.4 ms | 60 fps | 464 Mbit/s       |
+| `P800`       | USB      | 992x800   | 31.1 ms | 36.1 ms | 39.4 ms | 60 fps | 571 Mbit/s       |
+| `P800`       | Ethernet | 992x800   | 37.0 ms | 37.2 ms | 46.0 ms | 60 fps | 571 Mbit/s       |
+| `P1080`      | USB      | 1344x1072 | 37.7 ms | 39.2 ms | 43.5 ms | 60 fps | 1037 Mbit/s      |
+
+The link rates are calculated from the frame sizes **(deduction)**, before the chip's row padding. With depth, `P800` comes to 679 Mbit/s and `P1080` to 1145 Mbit/s, so `P1080` does not fit Ethernet's [expected 800 Mbit/s](#link).
 
 ### Color path
 
@@ -323,8 +326,9 @@ Depth is lossy. That is acceptable because the fluid spreads and smooths its inp
 | Recorded, 18.1 s      | 18              | 0                   | 7.4 MB/s | 1.8 MB/s | 9.2 MB/s |
 | Same clip, re-encoded | 24              | 0                   | 1.4 MB/s | 1.8 MB/s | 3.2 MB/s |
 | Same clip, re-encoded | 24              | 60                  | 1.8 MB/s | 2.1 MB/s | 3.9 MB/s |
+| `P1080`, recorded     | 24              | 60                  |          |          | 10 MB/s  |
 
-The last row is the current setup. The clip is a dark room, and the color rate at 18 is mostly sensor noise **(deduction)**.
+The first three rows are `P720`, and the third is the current setup at that size. The last row is the current setup at `P1080`, and a 60 s chunk comes to about 600 MB. All rows are a dark room, and the color rate at 18 is mostly sensor noise **(deduction)**.
 
 ### Encoder load
 
@@ -342,7 +346,9 @@ FFV1 is the fallback, exact and on the CPU. The second row is one H.264 picture 
 
 ### On the real camera
 
-A 10 s recording held 60 fps with the recorder's queues at 1 or less, and gave 600 frames in both streams with 600 metadata lines. The iGPU decodes both streams together at more than 670 fps color and 1700 fps depth.
+A 10 s recording at `P720` and one at `P1080` each held 60 fps with the recorder's queues at 1 or less, and gave 600 frames in both streams with 600 metadata lines. At `P1080`, color was 36.8 ms and depth 46.9 ms while recording.
+
+The iGPU decodes both `P720` streams together at more than 670 fps color and 1700 fps depth. It plays both `P1080` streams together at real time, 600 frames each, and a seek to frame 240 matched the full read exactly in both.
 
 ### Replay
 
@@ -359,10 +365,10 @@ Dragging a marker on the player's bar pauses playback and shows the frame under 
 - A standing player reading as one distance from head to feet has not been checked.
 - Depth has one outlier of about 153 mm near the top left on synthetic frames, at all widths. The cause is not known.
 - `StreamReader.frame_count` can read one short on an `.mkv`, as it estimates from the duration.
-- Ethernet stalled once in 130 s of streaming, with a gap of 4.8 s and latency up to 1.7 s. The cause is not known, and a USB run of that length has not been compared.
+- Ethernet stalled once in 130 s of streaming, with a gap of 4.8 s and latency up to 1.7 s. The cause is not known, and a USB run of that length has not been compared. That was at `P720`; `P800` loads Ethernet more and has only run for 10 s.
 - A player at show distance has not been compared across depth sizes or IR lights.
 - Detection at 640x512 has not been compared with 416x416 on a player, and its latency has not been measured with a player in view.
-- `P800` and `P1080` have not been run in the app, nor recorded and replayed.
+- `P800` and `P1080` have not been run in the app, and `P800` has not been recorded and replayed.
 - `auto_exposure_lock` did not hold: with it on, `exposure_compensation` +9 still moved ISO to 16585. Whether it holds against a change of light has not been tested.
 - `exposure_region`, `auto_balance_lock` and `anti_banding` changed nothing in a dark room, where exposure was already at its ceiling and nothing flickered. They need a test with light. `chroma_denoise` 4 lowered mean luma from 24.0 to 22.1, so it does reach the sensor.
 - The temporal filter has only been measured on a still scene. How far depth trails a moving player has not been measured.

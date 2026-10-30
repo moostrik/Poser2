@@ -5,7 +5,7 @@
   "camera": {
     "keyframe_interval": 60,
     "color": true,
-    "resolution": "P720",
+    "resolution": "P1080",
     "sim_enabled": false,
     "model_path": "data/models",
     "fov": 102.0,

@@ -54,6 +54,7 @@ def main(argv: list[str] | None = None) -> int:
     settings.device_id = args.device_id or devices[0]
     settings.fps = args.fps
     settings.resolution = CameraResolution[args.resolution]
+    settings.ethernet_resolution = CameraResolution[args.resolution]
     settings.link = CameraLink[args.link]
     settings.color = not args.grey
     settings.depth_model = DepthModel[args.depth]

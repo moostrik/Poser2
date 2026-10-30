@@ -156,6 +156,11 @@ def find_device(device_id: str, link: CameraLink) -> dai.DeviceInfo | None:
     return None
 
 
+def link_resolution(protocol: dai.XLinkProtocol, resolution: CameraResolution, ethernet_resolution: CameraResolution) -> CameraResolution:
+    """The frame the link the camera opened on can carry: Ethernet has less room than USB."""
+    return ethernet_resolution if protocol == LINK_PROTOCOLS[CameraLink.ETHERNET] else resolution
+
+
 def packed_nv12(frame: dai.ImgFrame) -> np.ndarray:
     """The frame's Y rows then its interleaved UV rows, without the chip's padding: `getData` holds
     each row at the stride and the UV below a padded plane. A new array, safe to keep."""
