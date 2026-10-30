@@ -112,8 +112,7 @@ class DeepFlowMain:
         self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
 
         # RENDER
-        self.render = DeepFlowRender(self.board, self.settings.render, self.settings.camera.cameras,
-                                     self.settings.camera.camera_check, num_cams=len(self.cameras), max_players=max_players)
+        self.render = DeepFlowRender(self.board, self.settings.render, num_cams=len(self.cameras), max_players=max_players)
         self.render.add_exit_callback(self.stop)
         self.render.add_update_callback(self.camera_check.update)
 

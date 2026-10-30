@@ -1,12 +1,10 @@
 """Deep Flow render — split-view layer graph with 3D volumetric fluid."""
 
-from collections.abc import Sequence
 from typing import cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId, WindowSettings
-from modules.camera import RigCameraSettings, CameraCheckSettings
 from modules.render import layers as ls, make_subdivision, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
 
@@ -23,6 +21,7 @@ UPDATE_LAYERS: list[Layers] = [
 
     Layers.center_geometry,
     Layers.center_mask,
+    Layers.center_depth,
     Layers.center_foreground,
     Layers.center_pose,
 
@@ -35,7 +34,6 @@ UPDATE_LAYERS: list[Layers] = [
 INTERFACE_LAYERS: list[Layers] = [
     Layers.tracker,
     Layers.pose,
-    Layers.cam_readings,
 ]
 
 LARGE_LAYERS: list[Layers] = [
@@ -60,9 +58,7 @@ SHAPE_LAYERS: dict[Layers, Layers] = {
 
 
 class DeepFlowRender(RenderBase):
-    def __init__(self, board: RenderBoard, settings: RenderSettings,
-                 cameras: Sequence[RigCameraSettings], camera_check: CameraCheckSettings,
-                 num_cams: int = 1, max_players: int = 1) -> None:
+    def __init__(self, board: RenderBoard, settings: RenderSettings, num_cams: int = 1, max_players: int = 1) -> None:
         super().__init__(settings.window)
         self.max_players: int = max_players
         self.num_cams: int = num_cams
@@ -90,16 +86,16 @@ class DeepFlowRender(RenderBase):
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.board)
             cam_foreground = self.L[Layers.cam_foreground][i] = ls.ForegroundSourceLayer(i, self.board)
             cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.board)
-            self.L[Layers.cam_depth][i] =                   ls.DepthSourceLayer(    i, self.board)
+            cam_depth =     self.L[Layers.cam_depth][i] =   ls.DepthSourceLayer(    i, self.board,   cam_image.texture,          settings.depth)
 
             tracker_compositor = self.L[Layers.tracker][i] = ls.TrackerCompositor(  i, self.board,   cam_image.texture,          settings.preview.tracker,   settings.colors)
             pose_compositor = self.L[Layers.pose][i] =      ls.PoseCompositor(      i, self.board,   cam_image.texture,          settings.preview.pose,      settings.colors)
-            self.L[Layers.cam_readings][i] =                 ls.CameraReadingsLayer( cameras[i], camera_check)
 
             center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, self.board,  cam_image.texture,           settings.center.geometry)
             center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask.texture,           settings.center.mask)
             cmt[i] = center_mask.texture
             center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image.texture,  cmt[i], settings.center.cam)
+            self.L[Layers.center_depth][i] =                ls.CenterCamLayer(      i, center_geometry, cam_depth.texture,  cmt[i], settings.center.depth)
             center_foreground = self.L[Layers.center_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, cam_foreground.texture, cmt[i], settings.center.foreground, settings.colors)
             center_pose =   self.L[Layers.center_pose][i] = ls.CenterPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
 

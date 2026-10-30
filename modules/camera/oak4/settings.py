@@ -12,8 +12,8 @@ from .definitions import (
 
 class SensorSettings(BaseSettings):
     """The color sensor's exposure, balance and image controls, which apply whether the camera
-    delivers color or grey, and the OAK4 Pro's dot projector for the stereo pair. The stereo
-    pair's exposure is its own auto exposure; the IR flood light is not driven."""
+    delivers color or grey, and the OAK4 Pro's two IR lights, which only the stereo pair sees.
+    The stereo pair's exposure is its own auto exposure."""
     exposure:       Field[int]  = Field(EXPOSURE_RANGE[0], min=EXPOSURE_RANGE[0], max=EXPOSURE_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="Exposure (µs)", newline=True)
     iso:            Field[int]  = Field(ISO_RANGE[0], min=ISO_RANGE[0], max=ISO_RANGE[1], access=Field.READWRITE, widget=Widget.slider, description="ISO")
     auto_exposure:  Field[bool] = Field(True, widget=Widget.switch, description="Auto exposure")
@@ -25,6 +25,7 @@ class SensorSettings(BaseSettings):
     denoise:        Field[int]  = Field(0, min=LUMA_DENOISE_RANGE[0], max=LUMA_DENOISE_RANGE[1], widget=Widget.slider, description="Luma denoise")
     sharpness:      Field[int]  = Field(0, min=SHARPNESS_RANGE[0], max=SHARPNESS_RANGE[1], widget=Widget.slider, description="Sharpness")
     dot_projector:  Field[float] = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.slider, description="IR dot projector brightness", newline=True)
+    flood_light:    Field[float] = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.slider, description="IR flood light brightness")
 
 
 class Oak4CameraSettings(RigCameraSettings):

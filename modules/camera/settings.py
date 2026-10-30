@@ -25,6 +25,10 @@ class CameraCheckSettings(BaseSettings):
                                           description="Slowest camera's average video rate")
     video_min_fps:   Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Video min", unit="fps",
                                           description="Worst momentary video rate across the cameras")
+    video_latency:   Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Video latency", unit="ms",
+                                          description="Slowest camera's frame capture to arrival on the PC")
+    depth_latency:   Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Depth latency", unit="ms",
+                                          description="Slowest camera's depth capture to arrival on the PC")
 
 
 class CameraReadings(BaseSettings):

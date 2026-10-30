@@ -148,6 +148,20 @@ class TestCameraFpsCheck(unittest.TestCase):
         self.assertFalse(_camera_fps([0.0]))
 
 
+class TestPinnedLatency(unittest.TestCase):
+    def test_the_slowest_camera_is_published(self) -> None:
+        cameras: list[RigCameraSettings] = []
+        for video, depth in [(26.0, 47.0), (28.0, 44.0)]:
+            camera = RigCameraSettings()
+            camera.readings.video_latency = video
+            camera.readings.depth_latency = depth
+            cameras.append(camera)
+        settings = CameraCheckSettings()
+        CameraCheck(cameras, settings).update(0.0)
+        self.assertEqual(settings.video_latency, 28.0)
+        self.assertEqual(settings.depth_latency, 47.0)
+
+
 class TestRollOffsetIsABox(unittest.TestCase):
     """A box, not a slider. `Widget.resolve` sends a bounded float to `slider`, so this is one
     stray `min=` away from silently becoming one — worth a test rather than a comment."""

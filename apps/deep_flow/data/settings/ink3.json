@@ -313,6 +313,9 @@
         "mask_opacity": 1.0,
         "use_mask": true
       },
+      "depth": {
+        "blend_factor": 1.0
+      },
       "foreground": {
         "blend_factor": 0.2,
         "exposure": 0.99,

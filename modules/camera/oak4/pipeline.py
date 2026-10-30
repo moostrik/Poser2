@@ -2,8 +2,9 @@
 
 The sensor at the requested size and type, the correction that turns the sensor's frame into the
 contract's, and the IMU. A color frame with neither `tilt` nor `keystone` takes no correction at all:
-the Camera node crops it itself to 5:4 and delivers NV12, the lowest latency by far (capture to PC
-25 ms against 34 through `ImageManip` in BGR, over USB), and the host converts and mirrors it. Past
+the Camera node crops it to 5:4, undistorts it and delivers NV12, the lowest latency by far, and
+the host converts and mirrors it. Undistorted because aligned depth always is: the depth misses a
+distorted frame by 4 % at its edges, and the extra 3 ms is the price of the two overlapping. Past
 that, two corrections as on the OAK-D, at the sensor mode's full width: `tilt` (and tilt 0, the
 cylindrical reprojection that makes a column one azimuth) goes through the `Warp` node with the mesh
 from `geometry.warp_mesh_points`, which on this chip warps grey frames only; `keystone` is a
@@ -102,7 +103,7 @@ def build_pipeline(
     camera: dai.node.Camera = pipeline.create(dai.node.Camera).build(SENSOR_SOCKET)
     frames: dai.Node.Output
     if correction == Correction.DIRECT:
-        frames = camera.requestOutput(out_size, dai.ImgFrame.Type.NV12, dai.ImgResizeMode.CROP, fps=fps)
+        frames = camera.requestOutput(out_size, dai.ImgFrame.Type.NV12, dai.ImgResizeMode.CROP, fps=fps, enableUndistortion=True)
     else:
         source: dai.Node.Output = camera.requestOutput(src_size, frame_type(color), fps=fps)
         frames = add_correction(pipeline, source, src_size, out_size, color, mount, correction)
@@ -278,8 +279,7 @@ def add_depth(pipeline: dai.Pipeline, frames: dai.Node.Output, fps: float, model
     """Neural Depth off the stereo pair, aligned on the camera to the delivered frame, so the host
     takes it on the frame's own view. Aligned at the model's rows (`depth_size`), which keeps the
     link's load down: uint16 at 60 fps. `ImageAlign` reads `frames` once, for its metadata, so the
-    depth waits for nothing from the color branch. The frame is not undistorted: that costs color
-    3 ms, for an alignment that already holds to the frame's edge by eye."""
+    depth waits for nothing from the color branch."""
     left, right = [pipeline.create(dai.node.Camera).build(socket, sensorFps=fps).requestOutput(STEREO_SIZE, fps=fps)
                    for socket in STEREO_SOCKETS]
     neural: dai.node.NeuralDepth = pipeline.create(dai.node.NeuralDepth).build(left, right, DEPTH_MODELS[model][0])

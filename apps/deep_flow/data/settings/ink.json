@@ -15,27 +15,28 @@
       "link": "USB",
       "pose_chain": "DETECTOR",
       "depth_model": "NEURAL_480",
-      "flip_h": true,
-      "flip_v": false,
       "tilt": 0.0,
       "keystone": 0.0,
       "lens_fov": 0.0,
       "lens_center_x": 0.0,
       "lens_center_y": 0.0,
-      "readings": {
-        "roll_offset": 0.0
-      },
+      "flip_h": true,
+      "flip_v": false,
       "sensor": {
-        "exposure": 29992,
-        "iso": 147,
+        "exposure": 16277,
+        "iso": 5832,
         "auto_exposure": true,
-        "balance": 3000,
+        "balance": 5568,
         "auto_balance": true,
         "brightness": 0,
         "contrast": 0,
         "saturation": 0,
         "denoise": 0,
-        "sharpness": 0
+        "sharpness": 0,
+        "dot_projector": 0.0
+      },
+      "readings": {
+        "roll_offset": 0.0
       }
     },
     "camera_check": {
@@ -104,7 +105,9 @@
       "enabled": false
     },
     "tracklets": {
-      "detection_timeout": 2.0
+      "detection_timeout": 2.0,
+      "crop_aspect": 0.75,
+      "crop_padding": 0.0
     },
     "image_crop": {
       "padding": 0.1,
@@ -122,7 +125,9 @@
         "d_cutoff": 1.0
       },
       "prediction": {
-        "method": "QUADRATIC"
+        "method": "QUADRATIC",
+        "fit_frames": 3,
+        "lead": 0.03333333333333333
       },
       "interpolator": {
         "method": "NONE",
@@ -130,7 +135,8 @@
         "output_delay": 0.0,
         "blend_mode": "RAMP",
         "blend": 0.0,
-        "max_horizon": 0.1
+        "max_horizon": 0.1,
+        "step": "FIXED"
       }
     },
     "point": {
@@ -150,7 +156,8 @@
         "output_delay": 0.0,
         "blend_mode": "RAMP",
         "blend": 0.0,
-        "max_horizon": 0.1
+        "max_horizon": 0.1,
+        "step": "FIXED"
       }
     },
     "angle": {
@@ -165,7 +172,8 @@
         "output_delay": 0.0,
         "blend_mode": "RAMP",
         "blend": 0.0,
-        "max_horizon": 0.1
+        "max_horizon": 0.1,
+        "step": "FIXED"
       },
       "sticky": {
         "enabled": true,
@@ -186,7 +194,8 @@
         "output_delay": 0.0,
         "blend_mode": "RAMP",
         "blend": 0.0,
-        "max_horizon": 0.1
+        "max_horizon": 0.1,
+        "step": "FIXED"
       },
       "sticky": {
         "enabled": true,
@@ -227,16 +236,19 @@
     "layer": {
       "select": {
         "left": [
-          "center_foreground"
+          "cam_image",
+          "cam_depth"
         ],
         "right": [
-          "fluid3d"
+          "cam_image"
         ],
         "composite": [
-          "fluid3d"
+          "fluid3d",
+          "cam_image"
         ],
         "final": [
-          "composite"
+          "cam_image",
+          "cam_depth"
         ]
       },
       "composite": {
@@ -313,6 +325,11 @@
         "mask_opacity": 1.0,
         "use_mask": true
       },
+      "depth": {
+        "blend_factor": 1.0,
+        "mask_opacity": 1.0,
+        "use_mask": true
+      },
       "foreground": {
         "blend_factor": 0.2,
         "exposure": 0.99,
@@ -341,6 +358,11 @@
         "similarity_scale": 1.0,
         "layered": 0.8
       }
+    },
+    "depth": {
+      "draw_mode": "COLOR",
+      "near": 0.3,
+      "far": 12.0
     },
     "flow": {
       "fps": 60.0,
@@ -437,6 +459,7 @@
           "fade_time": 12.0,
           "buoyancy": 1.5,
           "weight": 4.0,
+          "gravity_x": 0.0,
           "gravity_y": 0.0,
           "gravity_z": 1.0,
           "ambient": 0.0,
@@ -528,15 +551,16 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M0",
-      "x": 2561,
+      "x": 1708,
       "y": 31,
-      "width": 1278,
-      "height": 2080,
+      "width": 851,
+      "height": 1360,
       "secondary_list": [
         "M1"
       ],
       "secondary_fullscreen": true,
-      "fullscreen_mode": "WINDOWED"
+      "fullscreen_mode": "WINDOWED",
+      "fullscreen_mouse": false
     }
   },
   "inout": {

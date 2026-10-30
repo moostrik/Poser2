@@ -48,10 +48,10 @@ class Layers(IntEnum):
     # composite layers
     tracker =       auto()
     pose =          auto()
-    cam_readings =  auto()   # the camera's frame rate, tilt and roll error; draw it over tracker
     # center layers
     center_geometry = auto()
     center_cam =    auto()
+    center_depth =  auto()
     center_mask =   auto()
     center_foreground = auto()
     center_pose =   auto()
@@ -83,8 +83,14 @@ class LayerSettings(BaseSettings):
 #  OAK4 camera group (1 camera)
 # ---------------------------------------------------------------------------
 
+class _CameraCheckSettings(CameraCheckSettings):
+    """No mount verdict here: tilt and roll are read in the camera's own `readings`."""
+    mount:           Field[bool]  = Field(True, access=Field.READ, visible=False)
+    mount_tolerance: Field[float] = Field(2.0, visible=False)
+
+
 class Oak4Group(BaseSettings):
-    num_cams:        Field[int]               = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
+    num_cams:       Field[int]               = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
     fps:                Field[float]             = Field(60.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
     keyframe_interval:  Field[int]               = Field(1, access=Field.INIT, visible=False, description="Keyframe interval in frames (1 = every frame)")
     yolo:               Field[bool]              = Field(True, access=Field.INIT, description="Enable YOLO person detection")
@@ -96,7 +102,7 @@ class Oak4Group(BaseSettings):
 
     _cam_share: list = [fps, color, yolo, resolution, model_path, fov]
     cam_0          : Group[Oak4CameraSettings]             = Group(Oak4CameraSettings, share=_cam_share)
-    camera_check   : Group[CameraCheckSettings]            = Group(CameraCheckSettings)
+    camera_check   : Group[_CameraCheckSettings]           = Group(_CameraCheckSettings)
     simulator      : Group[PlayerSettings]                 = Group(PlayerSettings, share=[num_cams, fps])
     person_detector: Group[inference.detection.Settings]   = Group(inference.detection.Settings)   # the replay backend's person detector
     recorder       : Group[RecorderSettings]               = Group(RecorderSettings, share=[num_cams, fps, keyframe_interval])
@@ -237,6 +243,7 @@ class CenterGroup(BaseSettings):
     geometry  : Group[_CenterGeometrySettings]              = Group(_CenterGeometrySettings)
     mask      : Group[layers.CenterMaskLayerSettings]       = Group(layers.CenterMaskLayerSettings)
     cam       : Group[layers.CenterCamLayerSettings]        = Group(layers.CenterCamLayerSettings)
+    depth     : Group[layers.CenterCamLayerSettings]        = Group(layers.CenterCamLayerSettings)
     foreground: Group[layers.CenterForegroundLayerSettings] = Group(layers.CenterForegroundLayerSettings)
     pose      : Group[layers.CenterPoseLayerSettings]       = Group(layers.CenterPoseLayerSettings)
     color     : Group[layers.MSColorMaskLayerSettings]      = Group(layers.MSColorMaskLayerSettings)
@@ -247,6 +254,7 @@ class RenderSettings(BaseSettings):
     data   : Group[DataGroup]                    = Group(DataGroup)
     preview: Group[PreviewGroup]                 = Group(PreviewGroup)
     center : Group[CenterGroup]                  = Group(CenterGroup)
+    depth  : Group[layers.DepthSourceLayerSettings] = Group(layers.DepthSourceLayerSettings)
     flow   : Group[_FlowLayerSettings]           = Group(_FlowLayerSettings, share=[stage])
     fluid3d: Group[layers.Fluid3DLayerSettings]  = Group(layers.Fluid3DLayerSettings, share=[stage])
     colors : Group[ColorSettings]                = Group(ColorSettings)

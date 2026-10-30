@@ -75,11 +75,13 @@ class CenterCamLayer(LayerBase):
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             return
 
-        if self._geometry.crop_pose_points is None:
+        if self._geometry.crop_pose_points is None or not self._cam_texture.allocated:
             return
 
-        # Render camera image with ROI from anchor calculator
+        # Render camera image with ROI from anchor calculator. Cleared first: a source with
+        # transparent pixels (depth) must not leave the last frame showing through them.
         cam_aspect: float = self._cam_texture.width / self._cam_texture.height
+        self._cam_fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._cam_fbo.begin()
         self._roi_shader.use(
             self._cam_texture,
@@ -92,6 +94,7 @@ class CenterCamLayer(LayerBase):
 
         # Temporal blending
         self._cam_blend_fbo.swap()
+        self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._cam_blend_fbo.begin()
         self._blend_shader.use(
             self._cam_blend_fbo.back_texture,

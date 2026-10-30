@@ -43,6 +43,9 @@ class CameraCheck:
       late, which is what a viewer sees as stutter. The slowest average and the worst momentary
       rate are published as `video_fps_avg` and `video_min_fps`.
 
+    The slowest camera's `video_latency` and `depth_latency` are published as they are, no verdict:
+    0 where a backend does not measure them.
+
     Which camera and axis is off is not repeated here: the renderer draws each camera's numbers
     on its own view (`CameraReadingsLayer`).
 
@@ -68,3 +71,5 @@ class CameraCheck:
         self._settings.video_min_fps = min(minimums, default=0.0)
         self._settings.video_rate = all(minimum >= MIN_RATE_FACTOR * camera.fps
                                         for camera, minimum in zip(self._cameras, minimums))
+        self._settings.video_latency = max((camera.readings.video_latency for camera in self._cameras), default=0.0)
+        self._settings.depth_latency = max((camera.readings.depth_latency for camera in self._cameras), default=0.0)

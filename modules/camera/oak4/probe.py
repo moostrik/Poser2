@@ -3,6 +3,7 @@
     python -m modules.camera.oak4.probe [device_id] [-s SECONDS] [--fps FPS] [--resolution P720|P800|P1080]
         [--link USB|ETHERNET] [--color] [--flip-h] [--keystone K | --tilt T]
         [--no-pose | --two-models | --detector] [--depth NEURAL_288|NEURAL_384|NEURAL_480] [--projector I]
+        [--flood-light I]
 
 Lists the devices depthai sees, opens the first (or the one named) through `Camera` exactly as an
 app would, and prints the frame rate, the frame type and size, the tracklets with their keypoints
@@ -35,6 +36,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--color', action='store_true', help='colour frames (the warp then needs keystone, not tilt)')
     parser.add_argument('--depth', choices=[m.name for m in DepthModel], default=DepthModel.OFF.name)
     parser.add_argument('--projector', type=float, default=0.0, help='dot projector brightness, 0 to 1')
+    parser.add_argument('--flood-light', type=float, default=0.0, help='IR flood light brightness, 0 to 1')
     parser.add_argument('--flip-h', action='store_true')
     parser.add_argument('--keystone', type=float, default=0.0)
     parser.add_argument('--tilt', type=float, default=0.0)
@@ -57,6 +59,7 @@ def main(argv: list[str] | None = None) -> int:
     settings.color = args.color
     settings.depth_model = DepthModel[args.depth]
     settings.sensor.dot_projector = args.projector
+    settings.sensor.flood_light = args.flood_light
     settings.flip_h = args.flip_h
     settings.keystone = args.keystone
     settings.tilt = args.tilt

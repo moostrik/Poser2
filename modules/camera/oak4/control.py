@@ -1,8 +1,9 @@
 """The sensor controls: the panel's sensor fields written to the device, and the device's auto
 values read back into them. The OAK-D backend's `SensorControl` for the OAK4's color sensor, and
-the dot projector."""
+the two IR lights."""
 
 import logging
+from typing import Callable
 
 import depthai as dai
 
@@ -15,7 +16,7 @@ class SensorControl:
     """Binds one camera's sensor fields for as long as the device is open.
 
     Bound on construction, when every current value is sent once; `close()` unbinds and turns the
-    dot projector off, as it would stay lit. The callbacks run on the panel's thread and only send;
+    IR lights off, as they would stay lit. The callbacks run on the panel's thread and only send;
     the readback runs on the camera's.
     """
 
@@ -36,6 +37,7 @@ class SensorControl:
             (SensorSettings.denoise,       self._on_luma_denoise),
             (SensorSettings.sharpness,     self._on_sharpness),
             (SensorSettings.dot_projector, self._on_dot_projector),
+            (SensorSettings.flood_light,   self._on_flood_light),
         ]
         for field, callback in self._bindings:
             self.sensor.bind(field, callback)
@@ -45,7 +47,8 @@ class SensorControl:
         for field, callback in self._bindings:
             self.sensor.unbind(field, callback)
         self._bindings = []
-        self._set_dot_projector(0.0)
+        self._set_light(self.device.setIrLaserDotProjectorIntensity, 0.0)
+        self._set_light(self.device.setIrFloodLightIntensity, 0.0)
 
     def _apply(self) -> None:
         """Every current value, once, after the open."""
@@ -57,15 +60,19 @@ class SensorControl:
         self._on_luma_denoise()
         self._on_sharpness()
         self._on_dot_projector()
+        self._on_flood_light()
 
     def _on_dot_projector(self, value=None) -> None:
-        self._set_dot_projector(self.sensor.dot_projector)
+        self._set_light(self.device.setIrLaserDotProjectorIntensity, self.sensor.dot_projector)
 
-    def _set_dot_projector(self, intensity: float) -> None:
+    def _on_flood_light(self, value=None) -> None:
+        self._set_light(self.device.setIrFloodLightIntensity, self.sensor.flood_light)
+
+    def _set_light(self, setter: Callable[[float], object], intensity: float) -> None:
         try:
-            self.device.setIrLaserDotProjectorIntensity(intensity)
-        except Exception as exc:                    # a closing device, or one without a projector
-            logger.warning(f'dot projector not set: {exc}')
+            setter(intensity)
+        except Exception as exc:                    # a closing device, or one without the light
+            logger.warning(f'IR light not set: {exc}')
 
     def _send(self, ctrl: dai.CameraControl) -> None:
         try:
