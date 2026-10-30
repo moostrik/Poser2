@@ -10,6 +10,8 @@ from typing import cast
 
 import numpy as np
 
+from modules.utils import Rect
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -684,6 +686,31 @@ def homography_points(homography: np.ndarray, points: np.ndarray) -> np.ndarray:
     """uv points (N, 2) through a homography."""
     mapped: np.ndarray = homography @ np.column_stack((points, np.ones(len(points)))).T
     return (mapped[:2] / mapped[2]).T
+
+
+def corrected_roi(roi: Rect, homography: np.ndarray) -> Rect:
+    """A normalised box straightened with the frame: the box round its four moved corners, in the frame."""
+    x0, y0, x1, y1 = roi.x, roi.y, roi.x + roi.width, roi.y + roi.height
+    corners: np.ndarray = homography_points(homography, np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]]))
+    left, top = np.clip(corners.min(axis=0), 0.0, 1.0)
+    right, bottom = np.clip(corners.max(axis=0), 0.0, 1.0)
+    return Rect(float(left), float(top), float(right - left), float(bottom - top))
+
+
+def corrected_keypoints(keypoints: np.ndarray | None, homography: np.ndarray) -> np.ndarray | None:
+    """Keypoints (N, 3) straightened with the frame; the scores stay."""
+    if keypoints is None:
+        return None
+    corrected: np.ndarray = keypoints.copy()
+    corrected[:, :2] = homography_points(homography, keypoints[:, :2])
+    return corrected
+
+
+def mirrored_intrinsics(intrinsics: list[list[float]], width: int) -> list[list[float]]:
+    """A lens as it is for the frame flipped left to right: a recording stores mirrored frames."""
+    mirrored: list[list[float]] = [list(row) for row in intrinsics]
+    mirrored[0][2] = width - mirrored[0][2]
+    return mirrored
 
 
 def square_crop(src_size: tuple[int, int], size: int) -> tuple[int, int, int, int]:

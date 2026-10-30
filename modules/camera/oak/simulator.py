@@ -66,7 +66,7 @@ class Simulator(Camera):
         self.clips = None
         super()._close()
 
-    def _clip_callback(self, cam_id: int, frame_type: FrameType, frame: np.ndarray) -> None:
+    def _clip_callback(self, cam_id: int, frame_type: FrameType, frame: np.ndarray, readings: object) -> None:
         """A decoded clip frame, into the device as the sensor would have sent it."""
         if not self.running or cam_id != self.id or frame_type != FrameType.VIDEO or self.clips is None:
             return
@@ -112,7 +112,7 @@ class Simulator(Camera):
             self.id, width, height, expected[0], expected[1],
         )
 
-    def _passthrough_callback(self, cam_id: int, frame_type: FrameType, frame: np.ndarray) -> None:
+    def _passthrough_callback(self, cam_id: int, frame_type: FrameType, frame: np.ndarray, readings: object) -> None:
         """Without a device: the clip frames go straight to the callbacks, no tracklets."""
         if cam_id != self.id:
             return

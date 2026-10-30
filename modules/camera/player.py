@@ -1,6 +1,8 @@
 """Plays a folder of camera recordings: every camera's chunks in step, frames of one round handed
 over together, with a range on the timeline and the panel's playback readouts. It feeds a source
-(the oak `Simulator` today, the replay backend of step 4.6), which stamps the frames at hand-over."""
+(the oak `Simulator` or the replay backend), which stamps the frames at hand-over. A chunk is one
+`.mkv` with colour, depth and metadata (`chunk`), or a colour-only clip; a folder plays with the
+streams it has, whatever `video_frame_types` asks for."""
 
 from threading import Thread, Event, Lock
 from pathlib import Path
@@ -13,8 +15,9 @@ from time import perf_counter, sleep
 from modules.settings import BaseSettings, Field, Widget
 from modules.video import CoderType, CoderFormat, hwaccel, StreamFrameCallback, StreamReader
 
-from .frame import FrameType
-from .recorder import make_file_name
+from .chunk import ChunkInfo, ChunkMetadata, read_metadata
+from .frame import FrameReadings, FrameType
+from .recorder import make_chunk_name, make_file_name
 
 import logging
 logger = logging.getLogger(__name__)
@@ -52,9 +55,10 @@ class PlayerSettings(BaseSettings):
     max_chunks:         Field[int]              = Field(0, access=Field.READ, description="Total chunks")
 
 
-# A clip frame as the player decodes it: (cam_id, frame_type, image). The source it feeds makes
-# the `CameraFrame`, since the arrival time is its hand-over, not the decode.
-ClipFrameCallback: TypeAlias = Callable[[int, FrameType, ndarray], None]
+# A clip frame as the player decodes it: (cam_id, frame_type, image, readings). The source it feeds
+# makes the `CameraFrame`, since the arrival time is its hand-over, not the decode. `readings` is
+# None for a recording without metadata.
+ClipFrameCallback: TypeAlias = Callable[[int, FrameType, ndarray, FrameReadings | None], None]
 
 
 class State(Enum):
@@ -127,6 +131,9 @@ class Player(Thread):
         self.frame_sync_dict: dict[int, dict[int, dict[FrameType, ndarray]]] = {}
         for i in range(self.num_cams):
             self.frame_sync_dict[i] = {}
+        self.load_types: set[FrameType] = set()     # the streams of the chunk being loaded,
+        self.play_types: set[FrameType] = set()     # and of the one playing: what a frame waits for
+        self.chunk_metadata: dict[tuple[int, int], ChunkMetadata] = {}      # by (cam_id, chunk)
 
         self.drift_lock: Lock = Lock()
         self.drift_ids: dict[int, int] = {}
@@ -222,17 +229,29 @@ class Player(Thread):
         lo: int = start_offset if LC == start_chunk else 0
         hi: int | None = end_offset if LC == end_chunk else None
 
+        self.load_types = set()
         for c in range(self.num_cams):
+            chunk_path: Path = folder.path / make_chunk_name(c, self.load_chunk)
+            if chunk_path.is_file():
+                self.chunk_metadata[(c, self.load_chunk)] = read_metadata(chunk_path)
+                for stream, t in enumerate((FrameType.VIDEO, FrameType.DEPTH)):
+                    if t in self.types:
+                        self._load_stream(c, t, chunk_path, stream, lo, hi)
+                continue
             for t in self.types:
                 path: Path = folder.path / make_file_name(c, t, self.load_chunk, self.suffix)
                 if path.is_file():
-
-                    color: bool = t == FrameType.VIDEO and not self.gray
-                    player: StreamReader = StreamReader(c, t, cast(StreamFrameCallback, self._frame_sync_callback), color, self.hwaccel, self.hwaccel_device, self.fps)
-                    player.load(str(path), self.load_chunk, lo, hi)
-                    self.loaders.append(player)
-                else:
+                    self._load_stream(c, t, path, 0, lo, hi)
+                elif t == FrameType.VIDEO:
                     logger.warning(f"File {path} not found")
+
+    def _load_stream(self, cam_id: int, frame_type: FrameType, path: Path, stream: int, lo: int, hi: int | None) -> None:
+        color: bool = frame_type == FrameType.VIDEO and not self.gray
+        player: StreamReader = StreamReader(cam_id, frame_type, cast(StreamFrameCallback, self._frame_sync_callback), color,
+                                            self.hwaccel, self.hwaccel_device, self.fps, stream, frame_type == FrameType.DEPTH)
+        player.load(str(path), self.load_chunk, lo, hi)
+        self.loaders.append(player)
+        self.load_types.add(frame_type)
 
     def _start(self) -> None:
         for p in self.players:
@@ -243,6 +262,8 @@ class Player(Thread):
         self._set_play_chunk(self._get_load_chunk())
         self._clear_frame_sync()
         self._clear_drift()
+        with self.sync_lock:
+            self.play_types = self.load_types
 
         for p in self.loaders:
             p.play()
@@ -299,7 +320,7 @@ class Player(Thread):
             if frame_id not in cam_frames:
                 cam_frames[frame_id] = {}
             cam_frames[frame_id][frame_type] = frame
-            for t in self.types:
+            for t in self.play_types:
                 if t not in cam_frames[frame_id]:
                     return
 
@@ -319,9 +340,14 @@ class Player(Thread):
         # make thread safe and reset on start of new chunk
         self._calcuate_drift(cam_id, frame_id)
 
-        for ft in sync_frames.keys():
-            for callback in self.frame_callbacks:
-                callback(cam_id, ft, sync_frames[ft])
+        metadata: ChunkMetadata | None = self.chunk_metadata.get((cam_id, chunk_id))
+        readings: FrameReadings | None = None
+        if metadata is not None and frame_id < len(metadata.readings):
+            readings = metadata.readings[frame_id]
+        for ft in self.types:       # VIDEO first: its readings set up what the depth of the frame uses
+            if ft in sync_frames:
+                for callback in self.frame_callbacks:
+                    callback(cam_id, ft, sync_frames[ft], readings)
 
     def _clear_frame_sync(self) -> None:
         with self.sync_lock:
@@ -423,6 +449,11 @@ class Player(Thread):
         with self.drift_lock:
             return self.drift
 
+    def get_chunk_info(self, cam_id: int) -> ChunkInfo | None:
+        """The fixed info of the chunk playing for a camera; None for a recording without it."""
+        metadata: ChunkMetadata | None = self.chunk_metadata.get((cam_id, self._get_play_chunk()))
+        return metadata.info if metadata is not None else None
+
     # CALLBACKS
     def add_frame_callback(self, callback: ClipFrameCallback) -> None:
         if self.running:
@@ -442,8 +473,8 @@ class Player(Thread):
             if folder.is_dir():
                 max_chunk: int = -1
                 for file in folder.iterdir():
-                    if file.is_file() and (file.name.endswith(CoderFormat.H264.value) or file.name.endswith(CoderFormat.H265.value)):
-                        n: str = file.stem.split('_')[2]
+                    if file.is_file() and file.suffix in ('.mkv', CoderFormat.H264.value, CoderFormat.H265.value):
+                        n: str = file.stem.split('_')[-1]       # `0_000.mkv`, or `0_C_000.mp4` of a colour-only clip
                         if n.isdigit():
                             max_chunk = max(max_chunk, int(n))
                 if max_chunk >= 0:
@@ -525,7 +556,9 @@ class Player(Thread):
         frame_type: FrameType = self.types[0]
         frames: list[int] = []
         for chunk in range(folder_obj.chunks + 1):
-            path: Path = folder_obj.path / make_file_name(0, frame_type, chunk, self.suffix)
+            path: Path = folder_obj.path / make_chunk_name(0, chunk)
+            if not path.is_file():
+                path = folder_obj.path / make_file_name(0, frame_type, chunk, self.suffix)
             count: int = StreamReader.frame_count(str(path)) if path.is_file() else 0
             frames.append(count)
         return frames

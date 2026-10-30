@@ -15,6 +15,16 @@ class FrameType(Enum):
 
 
 @dataclass(frozen=True)
+class FrameReadings:
+    """What the camera reported for one frame, in degrees, microseconds and ISO: what a recording
+    keeps beside its images. Tilt and roll are NaN until the IMU has a reading."""
+    tilt: float
+    roll: float
+    exposure: int
+    iso: int
+
+
+@dataclass(frozen=True)
 class CameraFrame:
     """One frame from one camera.
 
@@ -28,7 +38,8 @@ class CameraFrame:
     be mirrored, because the device could not: the GPU upload does it, anything off the GPU takes
     `mirrored_image`. `homography` (`geometry.tilt_homography`, uv to uv) says the image still has
     to be straightened, before that mirror; one array stands for one correction, so a consumer
-    keeps what it derives from it until the array changes.
+    keeps what it derives from it until the array changes. `readings` and `intrinsics` (the
+    frame's 3x3 lens in pixels) are what a recording needs to redo that correction.
     """
     cam_id: int
     kind: FrameType
@@ -37,6 +48,8 @@ class CameraFrame:
     nv12: bool = False
     flip_h: bool = False
     homography: np.ndarray | None = None
+    readings: FrameReadings | None = None
+    intrinsics: list[list[float]] | None = None
 
 
 def mirrored_image(frame: CameraFrame) -> np.ndarray:

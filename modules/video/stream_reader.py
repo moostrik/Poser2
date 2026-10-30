@@ -7,6 +7,8 @@ from threading import Thread, Event, Lock
 from typing import Callable
 import time
 
+from .depth_frame import DEPTH_PIX_FMT, depth_frame_bytes, p012_to_depth
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -17,14 +19,17 @@ StreamFrameCallback = Callable[[int, object, np.ndarray, int, int], None]
 
 class StreamReader:
     def __init__(self, cam_id: int, frame_type: object, frame_callback: StreamFrameCallback, color: bool,
-                 hwaccel: str = '', hwaccel_device: str = '', fps: float = 0.0) -> None:
+                 hwaccel: str = '', hwaccel_device: str = '', fps: float = 0.0, stream: int = 0, depth: bool = False) -> None:
         """``color``: decode to BGR; otherwise to gray, so a mono pipeline gets the luma straight from
-        ffmpeg, saving the colour conversion and two thirds of the pipe."""
+        ffmpeg, saving the colour conversion and two thirds of the pipe. ``stream``: which video
+        stream of the file. ``depth``: it holds depth, delivered as uint16 millimetres."""
         self.frame_callback: StreamFrameCallback = frame_callback
 
         self.cam_id: int = cam_id
         self.frame_type: object = frame_type
         self.color: bool = color
+        self.stream: int = stream
+        self.depth: bool = depth
         self.channels: int = 1
         self.hwaccel: str = hwaccel
         self.hwaccel_device: str = hwaccel_device
@@ -96,28 +101,22 @@ class StreamReader:
             self.ffmpeg_process = None
             return
 
-        pix_fmt: str = 'bgr24' if self.color else 'gray'     # BGR matches getCvFrame, no conversion needed
-        self.channels = 3 if self.color else 1
-        self.bytes_per_frame: int = self.frame_width * self.frame_height * self.channels
+        pix_fmt: str = DEPTH_PIX_FMT if self.depth else 'bgr24' if self.color else 'gray'     # BGR matches getCvFrame, no conversion needed
+        self.channels = 3 if self.color and not self.depth else 1
+        self.bytes_per_frame: int = (depth_frame_bytes(self.frame_width, self.frame_height) if self.depth
+                                     else self.frame_width * self.frame_height * self.channels)
 
         ffmpeg_process = None
         try:
-            if self.hwaccel == '' or self.hwaccel_device == '':
-                ffmpeg_process = (
-                    ffmpeg
-                    .input(video_file)
-                    .output('pipe:', format='rawvideo', pix_fmt=pix_fmt)
-                    .global_args('-loglevel', 'quiet')
-                    .run_async(pipe_stdout=True)
-                )
-            else:
-                ffmpeg_process = (
-                    ffmpeg
-                    .input(video_file, hwaccel=self.hwaccel, hwaccel_device=self.hwaccel_device)
-                    .output('pipe:', format='rawvideo', pix_fmt=pix_fmt)
-                    .global_args('-loglevel', 'quiet')
-                    .run_async(pipe_stdout=True)
-                )
+            hardware: dict[str, str] = {} if self.hwaccel == '' or self.hwaccel_device == '' else \
+                {'hwaccel': self.hwaccel, 'hwaccel_device': self.hwaccel_device}
+            ffmpeg_process = (
+                ffmpeg
+                .input(video_file, **hardware)[f'v:{self.stream}']
+                .output('pipe:', format='rawvideo', pix_fmt=pix_fmt)
+                .global_args('-loglevel', 'quiet')
+                .run_async(pipe_stdout=True)
+            )
 
         except ffmpeg.Error as e:
             logger.error('Error loading %s: %s', video_file, e)
@@ -162,7 +161,9 @@ class StreamReader:
                 logger.error('Error reading frame: %s', e)
                 break
 
-            if self.channels == 3:
+            if self.depth:
+                frame: np.ndarray = p012_to_depth(in_bytes, self.frame_width, self.frame_height)
+            elif self.channels == 3:
                 frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([self.frame_height, self.frame_width, 3])
             else:
                 frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([self.frame_height, self.frame_width])
@@ -222,9 +223,10 @@ class StreamReader:
 
     def _get_video_dimensions(self, video_file: str) -> tuple:
         probe = ffmpeg.probe(video_file)
-        video_stream = next((stream for stream in probe['streams'] if stream['codec_type'] == 'video'), None)
-        if video_stream is None:
+        video_streams: list[dict] = [stream for stream in probe['streams'] if stream['codec_type'] == 'video']
+        if len(video_streams) <= self.stream:
             raise Exception('No video stream found for file', video_file)
+        video_stream: dict = video_streams[self.stream]
         width = int(video_stream['width'])
         height = int(video_stream['height'])
 

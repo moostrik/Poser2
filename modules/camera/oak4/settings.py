@@ -1,7 +1,7 @@
 """One OAK4 camera's settings: the contract's `RigCameraSettings` plus what shapes its pipeline and
 the sensor controls. Pure data; `SensorControl` writes the sensor fields to the device."""
 
-from .. import RigCameraSettings, CameraResolution
+from .. import RigCameraSettings, CameraResolution, TiltCorrectionSettings
 from modules.settings import BaseSettings, Field, Group, Widget
 
 from .definitions import (
@@ -43,7 +43,6 @@ class Oak4CameraSettings(RigCameraSettings):
     depth_model:    Field[DepthModel] = Field(DepthModel.OFF, access=Field.INIT, description="Neural Depth size on the camera; larger is sharper and slower")
     resolution:     Field[CameraResolution] = Field(CameraResolution.P800, access=Field.INIT, description="Delivered size before the crop; the sensor mode follows it")
     model_path:     Field[str]   = Field("data/models", access=Field.INIT)
-    tilt_correction: Field[bool]  = Field(False, widget=Widget.switch, newline=True, description="Straighten color and depth for the camera's tilt")
-    tilt_offset:    Field[float] = Field(0.0, min=-60.0, max=60.0, step=0.5, widget=Widget.slider, description="Added to the IMU's tilt (°)")
 
+    tilt:   Group[TiltCorrectionSettings] = Group(TiltCorrectionSettings)
     sensor: Group[SensorSettings] = Group(SensorSettings)

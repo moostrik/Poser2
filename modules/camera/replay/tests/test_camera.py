@@ -18,9 +18,12 @@ class FakePlayer:
     def add_frame_callback(self, callback) -> None:
         self.callbacks.append(callback)
 
+    def get_chunk_info(self, cam_id: int) -> None:
+        return None
+
     def push(self, cam_id: int, image: np.ndarray, frame_type: FrameType = FrameType.VIDEO) -> None:
         for c in self.callbacks:
-            c(cam_id, frame_type, image)
+            c(cam_id, frame_type, image, None)
 
 
 class FakePersonDetector:

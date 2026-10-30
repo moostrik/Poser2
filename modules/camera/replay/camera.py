@@ -4,7 +4,9 @@ tracker on the host, so `-sim` needs no OAK plugged in.
 
 The detector and the tracker are the app's to give (`modules/inference/detection` and the
 `Tracker` beside this file); without a detector the camera is frames only, as a rig without
-`yolo` is. The device's warp is not applied here: a replay plays what was recorded.
+`yolo` is. The device's warp is not applied here: a replay plays what was recorded. A recording
+with depth and metadata plays as the camera did: depth frames too, and with `tilt` the frames
+straightened from the recorded tilt plus the live offset, boxes with them.
 """
 
 import logging
@@ -15,7 +17,8 @@ import numpy as np
 
 from modules.utils import FPS, Rect
 
-from .. import CameraFrame, CameraTracklet, CameraFrameCallback, FrameType, Player, RigCameraReadings, RigCameraSettings, TrackletCallback
+from .. import CameraFrame, CameraTracklet, CameraFrameCallback, ChunkInfo, FrameReadings, FrameType, Player, RigCameraReadings, RigCameraSettings, \
+    TiltCorrection, TiltCorrectionSettings, TrackletCallback, corrected_roi, mirrored_intrinsics
 from .tracker import Track
 
 logger = logging.getLogger(__name__)
@@ -41,13 +44,15 @@ class BoxTracker(Protocol):
 
 
 class Camera:
-    def __init__(self, player: Player, settings: RigCameraSettings, detector: PersonDetector | None, tracker: BoxTracker | None, id: int = 0) -> None:
+    def __init__(self, player: Player, settings: RigCameraSettings, detector: PersonDetector | None, tracker: BoxTracker | None, id: int = 0,
+                 tilt: TiltCorrectionSettings | None = None) -> None:
         self.id: int = id
         self.settings: RigCameraSettings = settings
         self.player: Player = player
         self.detector: PersonDetector | None = detector
         self.tracker: BoxTracker | None = tracker if detector is not None else None
         self.running: bool = False
+        self.tilt_correction: TiltCorrection | None = TiltCorrection(tilt) if tilt is not None else None
 
         self.video_fps: FPS = FPS(120)
         self.tracklet_fps: FPS = FPS(120)
@@ -94,18 +99,32 @@ class Camera:
 
     # ── Hand-over ──────────────────────────────────────────────────────
 
-    def _clip_callback(self, cam_id: int, frame_type: FrameType, image: np.ndarray) -> None:
+    def _clip_callback(self, cam_id: int, frame_type: FrameType, image: np.ndarray, readings: FrameReadings | None) -> None:
         """A decoded clip frame, on the player's thread: stamped here, to the callbacks and the detector."""
-        if not self.running or cam_id != self.id or frame_type != FrameType.VIDEO:
+        if not self.running or cam_id != self.id:
             return
-        self.video_fps.processed()
-        self.settings.readings.video_fps = self.video_fps.get_rate_average()
-        self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
-        frame = CameraFrame(cam_id=self.id, kind=frame_type, image=image, timestamp=time.perf_counter())
+        if frame_type == FrameType.VIDEO:
+            self.video_fps.processed()
+            self.settings.readings.video_fps = self.video_fps.get_rate_average()
+            self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
+            self._update_tilt(readings)
+        homography: np.ndarray | None = self.tilt_correction.homography if self.tilt_correction is not None else None
+        frame = CameraFrame(cam_id=self.id, kind=frame_type, image=image, timestamp=time.perf_counter(), homography=homography)
         for c in self.frame_callbacks:
             c(frame)
-        if self.detector is not None:
+        if self.detector is not None and frame_type == FrameType.VIDEO:
             self.detector.submit(self.id, image)
+
+    def _update_tilt(self, readings: FrameReadings | None) -> None:
+        """The recorded tilt on the recorded lens. The frames were stored mirrored, so the lens is."""
+        info: ChunkInfo | None = self.player.get_chunk_info(self.id)
+        if readings is None or info is None:
+            return
+        self.settings.readings.tilt_measured = readings.tilt
+        self.settings.readings.roll_measured = readings.roll
+        if self.tilt_correction is not None and info.intrinsics is not None:
+            intrinsics: list[list[float]] = mirrored_intrinsics(info.intrinsics, info.width) if info.flip_h else info.intrinsics
+            self.tilt_correction.update(readings.tilt, intrinsics, (info.width, info.height))
 
     def _on_detection(self, detection: Detection) -> None:
         """The detector's boxes for one frame, on its thread: through the tracker, out as the
@@ -115,8 +134,10 @@ class Camera:
         now: float = time.perf_counter()
         self.tracklet_fps.processed()
         self.settings.readings.tracker_fps = self.tracklet_fps.get_rate_average()
+        homography: np.ndarray | None = self.tilt_correction.homography if self.tilt_correction is not None else None
         tracklets: list[CameraTracklet] = [
-            CameraTracklet(cam_id=self.id, id=t.id, status=t.status, roi=t.roi, age=t.age, timestamp=now)
+            CameraTracklet(cam_id=self.id, id=t.id, status=t.status, roi=corrected_roi(t.roi, homography) if homography is not None else t.roi,
+                           age=t.age, timestamp=now)
             for t in self.tracker.update(detection.boxes)]
         self.settings.readings.tracklets = len(tracklets)
         for c in self.tracklet_callbacks:

@@ -62,6 +62,13 @@ class RigCameraReadings(CameraReadings):
     lens_error:     Field[float] = Field(float('nan'), access=Field.READ, description="Largest bearing error (°) this unit has under the shared lens")
 
 
+class TiltCorrectionSettings(BaseSettings):
+    """Straightening the frames for the camera's tilt: the IMU's tilt plus `offset`. Live, and the
+    same for a camera and for a recording of one."""
+    enabled: Field[bool]  = Field(False, widget=Widget.switch, description="Straighten color and depth for the camera's tilt")
+    offset:  Field[float] = Field(0.0, min=-60.0, max=60.0, step=0.5, widget=Widget.slider, description="Added to the IMU's tilt (°)")
+
+
 class CameraSettings(BaseSettings):
     """The camera as every app knows it: its rate, its flips and its readings.
 

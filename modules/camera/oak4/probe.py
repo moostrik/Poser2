@@ -62,8 +62,8 @@ def main(argv: list[str] | None = None) -> int:
     settings.sensor.flood_light = args.flood_light
     settings.flip_h = args.flip_h
     settings.keystone = args.keystone
-    settings.tilt_correction = args.tilt_offset is not None
-    settings.tilt_offset = args.tilt_offset or 0.0
+    settings.tilt.enabled = args.tilt_offset is not None
+    settings.tilt.offset = args.tilt_offset or 0.0
     settings.yolo = not args.no_pose
     settings.pose_chain = PoseChain.TWO_MODELS if args.two_models else PoseChain.DETECTOR if args.detector else PoseChain.ONE_MODEL
     settings.initialize()

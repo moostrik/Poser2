@@ -3,7 +3,7 @@
 import unittest
 
 from modules.camera import CameraResolution
-from modules.camera.oak4.definitions import DepthModel, depth_size, direct_size
+from modules.camera.oak4.definitions import FRAME_WIDTH_ALIGNMENT, DepthModel, depth_size, direct_size
 from modules.camera.oak4.pipeline import MountConfig, delivered_size
 
 
@@ -12,9 +12,11 @@ def mount(keystone: float = 0.0) -> MountConfig:
 
 
 class DeliveredSizeTest(unittest.TestCase):
-    def test_the_direct_frame_is_five_by_four(self) -> None:
-        self.assertEqual(direct_size(CameraResolution.P720), (900, 720))
-        self.assertEqual(delivered_size(True, CameraResolution.P720, mount()), (900, 720))
+    def test_the_direct_frame_is_about_five_by_four_on_a_width_the_decoder_plays(self) -> None:
+        self.assertEqual(direct_size(CameraResolution.P720), (896, 720))
+        self.assertEqual(delivered_size(True, CameraResolution.P720, mount()), (896, 720))
+        for resolution in (CameraResolution.P720, CameraResolution.P800, CameraResolution.P1080):
+            self.assertEqual(direct_size(resolution)[0] % FRAME_WIDTH_ALIGNMENT, 0)
 
     def test_a_keystoned_frame_keeps_the_full_width(self) -> None:
         self.assertEqual(delivered_size(True, CameraResolution.P720, mount(keystone=0.2)), (1280, 720))
@@ -22,9 +24,9 @@ class DeliveredSizeTest(unittest.TestCase):
 
 class DepthSizeTest(unittest.TestCase):
     def test_the_rows_are_the_models_and_the_width_is_even(self) -> None:
-        self.assertEqual(depth_size(DepthModel.NEURAL_480, (900, 720)), (376, 300))
-        self.assertEqual(depth_size(DepthModel.NEURAL_384, (900, 720)), (300, 240))
-        self.assertEqual(depth_size(DepthModel.NEURAL_288, (900, 720)), (224, 180))
+        self.assertEqual(depth_size(DepthModel.NEURAL_480, (896, 720)), (374, 300))
+        self.assertEqual(depth_size(DepthModel.NEURAL_384, (896, 720)), (298, 240))
+        self.assertEqual(depth_size(DepthModel.NEURAL_288, (896, 720)), (224, 180))
 
 
 if __name__ == '__main__':

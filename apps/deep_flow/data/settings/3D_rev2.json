@@ -3,7 +3,7 @@
   "num_cams": 1,
   "input_fps": 60.0,
   "camera": {
-    "keyframe_interval": 1,
+    "keyframe_interval": 0,
     "yolo": true,
     "color": true,
     "resolution": "P720",
@@ -17,7 +17,9 @@
       "depth_model": "NEURAL_480",
       "flip_h": true,
       "flip_v": false,
-      "tilt_correction": true,
+      "tilt": {
+        "enabled": true
+      },
       "keystone": 0.0,
       "lens_fov": 0.0,
       "lens_center_x": 0.0,
@@ -46,7 +48,8 @@
       "video_decoder": "iGPU",
       "video_format": "H264",
       "video_frame_types": [
-        "VIDEO"
+        "VIDEO",
+        "DEPTH"
       ],
       "apply_warp": false,
       "folder": "20260612-131225_keyframes",
@@ -65,9 +68,11 @@
     "recorder": {
       "temp_path": "temp",
       "video_encoder": "iGPU",
+      "video_quality": 24,
       "video_format": "H264",
       "video_frame_types": [
-        "VIDEO"
+        "VIDEO",
+        "DEPTH"
       ],
       "enabled": true,
       "output_path": "recordings",

@@ -8,7 +8,7 @@ from enum import IntEnum
 import depthai as dai
 import numpy as np
 
-from .. import CameraResolution, resolve_resolution, mode_size, TrackingStatus, homography_points
+from .. import CameraResolution, resolve_resolution, mode_size, TrackingStatus
 from modules.utils import Rect
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,10 @@ STEREO_SOCKETS: tuple[dai.CameraBoardSocket, dai.CameraBoardSocket] = (dai.Camer
 # The width over the height of the frame the Camera node crops itself (`Correction.DIRECT`): 5:4 at
 # the sensor mode's rows, so the depth model's 8:5 frame is used further across than by a square.
 FRAME_ASPECT: float = 5.0 / 4.0
+
+# The direct frame's width is a multiple of this: the iGPU's H.264 decoder hangs on a clip of any
+# other width (900 hangs, 896 and 720 play), so a frame of any other width cannot be replayed.
+FRAME_WIDTH_ALIGNMENT: int = 16
 
 # The stereo frames the depth model is fed; a larger input gained nothing and dropped frames.
 STEREO_SIZE: tuple[int, int] = (640, 400)
@@ -64,9 +68,10 @@ def requested_size(color: bool, resolution: CameraResolution) -> tuple[int, int]
 
 
 def direct_size(resolution: CameraResolution) -> tuple[int, int]:
-    """The frame the Camera node crops itself: `FRAME_ASPECT` at the sensor mode's rows, the width even."""
+    """The frame the Camera node crops itself: `FRAME_ASPECT` at the sensor mode's rows, the width on
+    `FRAME_WIDTH_ALIGNMENT`."""
     rows: int = requested_size(True, resolution)[1]
-    return (round(rows * FRAME_ASPECT / 2.0) * 2, rows)
+    return (round(rows * FRAME_ASPECT / FRAME_WIDTH_ALIGNMENT) * FRAME_WIDTH_ALIGNMENT, rows)
 
 
 # The control ranges of the OAK-D, kept until the IMX586's own are read off the hardware: the
@@ -146,24 +151,6 @@ def smoothed_latency(previous: float, message: dai.ImgFrame | dai.Tracklets) -> 
     return latency if previous == 0.0 else previous + LATENCY_SMOOTHING * (latency - previous)
 
 
-def corrected_roi(roi: Rect, homography: np.ndarray) -> Rect:
-    """A normalised box straightened with the frame: the box round its four moved corners, in the frame."""
-    x0, y0, x1, y1 = roi.x, roi.y, roi.x + roi.width, roi.y + roi.height
-    corners: np.ndarray = homography_points(homography, np.array([[x0, y0], [x1, y0], [x1, y1], [x0, y1]]))
-    left, top = np.clip(corners.min(axis=0), 0.0, 1.0)
-    right, bottom = np.clip(corners.max(axis=0), 0.0, 1.0)
-    return Rect(float(left), float(top), float(right - left), float(bottom - top))
-
-
-def corrected_keypoints(keypoints: np.ndarray | None, homography: np.ndarray) -> np.ndarray | None:
-    """Keypoints (N, 3) straightened with the frame; the scores stay."""
-    if keypoints is None:
-        return None
-    corrected: np.ndarray = keypoints.copy()
-    corrected[:, :2] = homography_points(homography, keypoints[:, :2])
-    return corrected
-
-
 def mirrored_roi(roi: Rect) -> Rect:
     """A normalised box in the frame flipped left to right."""
     return Rect(1.0 - roi.x - roi.width, roi.y, roi.width, roi.height)
@@ -201,10 +188,6 @@ IMU_RATE_HZ: int = 5
 # How hard each new sample pulls the running average: the camera is on a tripod, a single
 # reading is almost entirely noise and there is no motion to track.
 IMU_SMOOTHING: float = 0.1
-
-# How far (°) the tilt must move before the frames are straightened anew: the reading is noisy,
-# and a picture that followed it would shimmer.
-TILT_STEP: float = 0.25
 
 # The turn the board mounts the IMU at about the optical axis. On the OAK-D it is a measured
 # quarter turn (`oak.definitions.IMU_BOARD_ROLL`); on the OAK4 a half turn, measured: an upright

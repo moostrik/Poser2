@@ -64,7 +64,8 @@ class DeepFlowMain:
             if self.settings.camera.yolo:
                 self.person_detector = detection.PersonDetector(self.settings.camera.person_detector)
             for i in range(num_cams):
-                self.cameras.append(replay.Camera(self.player, self.settings.camera.cameras[i], self.person_detector, replay.Tracker(), i))
+                cam = self.settings.camera.cameras[i]
+                self.cameras.append(replay.Camera(self.player, cam, self.person_detector, replay.Tracker(), i, cam.tilt))
         else:
             self.recorder = Recorder(self.settings.camera.recorder, data_path=DATA_PATH)
             for i in range(num_cams):
