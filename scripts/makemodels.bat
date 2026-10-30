@@ -14,7 +14,7 @@ if "%APP%"=="" (
 )
 
 if not exist "%VENV_DIR%\Scripts\activate.bat" (
-    echo Virtual environment not found! Run scripts/install.bat first.
+    echo Virtual environment not found! Run scripts\install.bat first.
     goto endofscript
 )
 call "%VENV_DIR%\Scripts\activate"
