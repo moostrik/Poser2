@@ -55,12 +55,11 @@ class Oak4Group(BaseSettings):
     fps:            Field[float]             = Field(30.0, min=1.0, max=60.0, access=Field.INIT, description="Camera frame rate")
     yolo:           Field[bool]              = Field(True, access=Field.INIT, description="Pose model on the camera")
     color:          Field[bool]              = Field(True, access=Field.INIT, description="Color frames (False = grey off the same sensor)")
-    square:         Field[bool]              = Field(True, access=Field.INIT, description="Square frame cut from the middle")
     resolution:     Field[CameraResolution]  = Field(CameraResolution.P800, access=Field.INIT, description="Delivered size before the crop")
     model_path:     Field[str]               = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
     fov:            Field[float]             = Field(127.0, access=Field.INIT, description="Camera horizontal FOV over the full sensor width (°)")
 
-    _cam_share: list = [fps, color, square, yolo, resolution, model_path, fov]
+    _cam_share: list = [fps, color, yolo, resolution, model_path, fov]
     cam_0        : Group[Oak4CameraSettings]       = Group(Oak4CameraSettings, share=_cam_share)
     camera_check : Group[CameraCheckSettings]      = Group(CameraCheckSettings)
     tracker      : Group[OnePerCamTrackerSettings] = Group(OnePerCamTrackerSettings)

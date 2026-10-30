@@ -25,7 +25,6 @@ class SnapPoint(IntEnum):
 class CenterGeometrySettings(BaseSettings):
     """Configuration for CenterGeometry anchor point positioning."""
     stage:              Field[int] = Field(0, description="Pose data pipeline stage")
-    cam_aspect:         Field[float] = Field(1.7778, access=Field.INIT, description="Camera aspect ratio (16/9 = 1.7778)")
     target_x:           Field[float] = Field(0.5, min=0.0, max=1.0, description="Horizontal position of the pinned point in the output")
     target_y:           Field[float] = Field(0.33, min=0.0, max=1.0, description="Vertical position of the pinned point in the output")
     target_size:        Field[float] = Field(0.27, min=0.01, max=1.0, description="Torso height as a fraction of output height (zoom)")
@@ -56,17 +55,18 @@ class CenterGeometry(LayerBase):
 
     This layer performs no rendering but computes shared geometry used by
     CenterCamLayer, CenterMaskLayer, and CenterPoseLayer. Also transforms
-    pose points to crop space.
+    pose points to crop space. Image coordinates are normalized per axis, so `cam_texture`'s aspect
+    is what turns them into true proportions.
     """
 
-    def __init__(self, cam_id: int, board: HasFrames, settings: CenterGeometrySettings | None = None) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, cam_texture: Texture, settings: CenterGeometrySettings | None = None) -> None:
         self._cam_id: int = cam_id
         self._board: HasFrames = board
+        self._cam_texture: Texture = cam_texture
         self._data_cache: DataCache[Frame] = DataCache[Frame]()
 
         # Configuration
         self.settings: CenterGeometrySettings = settings or CenterGeometrySettings()
-        self._cam_aspect: float = self.settings.cam_aspect
 
         # Geometry results
         self._cam_geometry: CamGeometry = CamGeometry(
@@ -186,8 +186,10 @@ class CenterGeometry(LayerBase):
         if abs(target_distance) < 1e-6:
             self._transformed_points = None
             return
+        cam_height: int = self._cam_texture.height
+        cam_aspect: float = self._cam_texture.width / cam_height if cam_height > 0 else 1.0
         cam_rotation_img, distance, cam_crop_roi_img = CenterGeometry._calculate_roi(
-            anchor_top_img, anchor_bot_img, pin_img, target, target_distance, self.settings.dst_aspectratio
+            anchor_top_img, anchor_bot_img, pin_img, target, target_distance, self.settings.dst_aspectratio, cam_aspect
         )
         if not self.settings.torso_upright:
             cam_rotation_img = 0.0
@@ -205,7 +207,7 @@ class CenterGeometry(LayerBase):
         )
 
         # Calculate bbox-space geometry (aspect-corrected for mask)
-        bbox_aspect = bbox.width / bbox.height if bbox.height > 0 else 1.0
+        bbox_aspect = bbox.width * cam_aspect / bbox.height if bbox.height > 0 else 1.0
         mask_delta = hip_mid - shoulder_mid
         mask_rotation = -math.atan2(mask_delta.x * bbox_aspect, mask_delta.y) if self.settings.torso_upright else 0.0
         mask_distance = math.hypot(mask_delta.x * bbox_aspect, mask_delta.y)
@@ -228,7 +230,7 @@ class CenterGeometry(LayerBase):
 
         # Transform pose points using camera geometry (in image space)
         self._transformed_points = CenterGeometry._transform_points(
-            pose[Points2D], bbox, pin_img, self._cam_aspect, cam_rotation_img, cam_crop_roi_img
+            pose[Points2D], bbox, pin_img, cam_aspect, cam_rotation_img, cam_crop_roi_img
         )
 
     @staticmethod
@@ -246,20 +248,21 @@ class CenterGeometry(LayerBase):
     @staticmethod
     def _calculate_roi(scale_top: Point2f, scale_bot: Point2f, pin_point: Point2f,
                       target: Point2f, target_distance: float,
-                      output_aspect: float) -> tuple[float, float, Rect]:
+                      output_aspect: float, cam_aspect: float = 1.0) -> tuple[float, float, Rect]:
         """Calculate rotation angle and ROI for cropping.
 
         Rotation and scale derive from the torso reference (scale_top -> scale_bot),
-        while the ROI is positioned so that pin_point lands at target.
+        while the ROI is positioned so that pin_point lands at target. The points and the
+        ROI are normalized per axis; `cam_aspect` is the frame's width over its height.
 
         Returns: (rotation_angle, distance, roi_rect)
         """
         delta = scale_bot - scale_top
-        rotation = math.atan2(delta.x, delta.y)
-        distance = math.hypot(delta.x, delta.y)
+        rotation = math.atan2(delta.x * cam_aspect, delta.y)
+        distance = math.hypot(delta.x * cam_aspect, delta.y)
 
         height = distance / target_distance
-        width = height * output_aspect
+        width = height * output_aspect / cam_aspect
 
         roi = Rect(
             x=pin_point.x - width * target.x,
@@ -295,12 +298,12 @@ class CenterGeometry(LayerBase):
         x = x_bbox * bbox.width + bbox.x
         y = y_bbox * bbox.height + bbox.y
 
-        # Rotate around shoulder position (no aspect correction in image space)
-        dx = x - top.x
+        # Rotate around shoulder position, in the frame's true proportions
+        dx = (x - top.x) * aspect
         dy = y - top.y
 
         cos_a, sin_a = np.cos(rotation), np.sin(rotation)
-        x_rot = cos_a * dx - sin_a * dy + top.x
+        x_rot = (cos_a * dx - sin_a * dy) / aspect + top.x
         y_rot = sin_a * dx + cos_a * dy + top.y
 
         # Convert to crop ROI space

@@ -6,7 +6,7 @@ from typing import Any, Callable
 
 from modules.settings import BaseSettings, Field
 
-from .frame import CameraFrame
+from .frame import CameraFrame, FrameType
 from .tracklet import CameraTracklet
 
 import logging
@@ -36,7 +36,9 @@ class Sync:
         self._lock = Lock()
 
     def submit_frame(self, frame: CameraFrame) -> None:
-        self._submit(frame.cam_id, frame.timestamp)
+        """A camera's frame callback. Only VIDEO frames count: a round is one frame per camera."""
+        if frame.kind == FrameType.VIDEO:
+            self._submit(frame.cam_id, frame.timestamp)
 
     def submit_tracklets(self, cam_id: int, tracklets: list[CameraTracklet], timestamp: float) -> None:
         self._submit(cam_id, timestamp)

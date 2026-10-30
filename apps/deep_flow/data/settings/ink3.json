@@ -6,7 +6,6 @@
     "keyframe_interval": 1,
     "yolo": true,
     "color": true,
-    "square": true,
     "resolution": "P720",
     "sim_enabled": false,
     "model_path": "data/models",
@@ -15,6 +14,7 @@
       "device_id": "",
       "link": "USB",
       "pose_chain": "DETECTOR",
+      "depth_model": "NEURAL_480",
       "flip_h": true,
       "flip_v": false,
       "tilt": 0.0,
@@ -126,7 +126,7 @@
       },
       "interpolator": {
         "method": "NONE",
-        "fit_frames": 3,
+        "fit_frames": 5,
         "output_delay": 0.0,
         "blend_mode": "RAMP",
         "blend": 0.0,
@@ -146,7 +146,7 @@
       },
       "interpolator": {
         "method": "LINEAR",
-        "fit_frames": 3,
+        "fit_frames": 5,
         "output_delay": 0.0,
         "blend_mode": "RAMP",
         "blend": 0.0,
@@ -161,7 +161,7 @@
       },
       "interpolator": {
         "method": "LINEAR",
-        "fit_frames": 3,
+        "fit_frames": 5,
         "output_delay": 0.0,
         "blend_mode": "RAMP",
         "blend": 0.0,
@@ -182,7 +182,7 @@
       },
       "interpolator": {
         "method": "LINEAR",
-        "fit_frames": 3,
+        "fit_frames": 5,
         "output_delay": 0.0,
         "blend_mode": "RAMP",
         "blend": 0.0,
@@ -295,7 +295,6 @@
     "center": {
       "geometry": {
         "stage": "SMOOTH",
-        "cam_aspect": 1.7778,
         "target_x": 0.5,
         "target_y": 0.9,
         "target_size": 0.27,

@@ -6,7 +6,7 @@ recordings on the host with the replay backend, with no camera attached.
 
 from functools import partial
 
-from modules.camera import CameraSource, CameraCheck, Player, Recorder, Sync, replay
+from modules.camera import CameraFrame, CameraSource, CameraCheck, FrameType, Player, Recorder, Sync, replay
 from modules.camera.oak4 import Camera
 from modules.settings import presets
 from modules.panel import PanelServer
@@ -79,6 +79,7 @@ class DeepFlowMain:
                 camera.add_frame_callback(self.recorder.submit_frame)
             camera.add_frame_callback(self.pose_inference.set_camera_frame)
             camera.add_frame_callback(self.frame_sync_bang.submit_frame)
+            camera.add_frame_callback(self._on_camera_frame)
             camera.add_tracklet_callback(self.tracker.submit_cam_tracklets)
             camera.add_tracklet_callback(self.board.set_camera_tracklets)
             camera.add_tracklet_callback(self.tracklet_sync_bang.submit_tracklets)
@@ -140,6 +141,10 @@ class DeepFlowMain:
 
         self.is_running = True
         self.render.start()
+
+    def _on_camera_frame(self, frame: CameraFrame) -> None:
+        if frame.kind == FrameType.DEPTH:
+            self.board.set_camera_depth(frame)
 
     def _update_poses(self, now: float) -> None:
         """The render tick drives the pipeline's output domain (LERP) at the frame's time."""

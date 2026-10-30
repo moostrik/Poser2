@@ -443,7 +443,6 @@
     "center": {
       "geometry": {
         "stage": "SMOOTH",
-        "cam_aspect": 1.7778,
         "target_x": 0.5,
         "target_y": 0.33,
         "target_size": 0.27,

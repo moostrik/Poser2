@@ -5,7 +5,6 @@
   "camera": {
     "yolo": true,
     "color": true,
-    "square": true,
     "resolution": "P800",
     "model_path": "data/models",
     "fov": 127.0,

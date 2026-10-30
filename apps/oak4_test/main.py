@@ -8,7 +8,7 @@ them for the window. Runs in `.venv-oak4`, the depthai 3 venv (`scripts\\install
 
 from functools import partial
 
-from modules.camera import CameraCheck, Sync, frame_size
+from modules.camera import CameraCheck, Sync
 from modules.camera.oak4 import Camera
 from modules.settings import presets
 from modules.panel import PanelServer
@@ -65,7 +65,7 @@ class Oak4TestMain:
         self.camera.add_tracklet_callback(self.tracklet_sync_bang.submit_tracklets)
 
         # POSES — the camera's keypoints in the host crop's convention, which needs the delivered frame's aspect.
-        width, height = frame_size(self.camera.color, self.camera.resolution, self.camera.square, self.camera.frame_height)
+        width, height = self.camera.frame_size
         self.poses_from_tracklets = PosesFromTracklets(p.tracklets, max_players, frame_aspect=width / height)
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
         self.tracklet_sync_bang.add_sync_callback(self.tracker.update)

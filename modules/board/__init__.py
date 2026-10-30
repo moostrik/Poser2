@@ -15,6 +15,7 @@ from .frames import                 HasFrames, FrameStoreMixin
 from .groups import                 HasGroups, GroupStoreMixin
 from .windows import                HasWindows, WindowSource, WindowStoreMixin
 from .camera_images import          HasCameraImages, CameraImageStoreMixin
+from .camera_depth import           HasCameraDepth, CameraDepthStoreMixin
 from .crop_images import            HasCropImages, CropImageStoreMixin
 from .segmentation_images import    HasSegmentationImages, SegmentationImageStoreMixin
 from .camera_tracklets import       HasCameraTracklets, CameraTrackletStoreMixin

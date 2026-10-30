@@ -6,12 +6,13 @@ queues on the node outputs, on depthai's callback thread, which is where the fra
 become the contract's and get their host time. With `yolo` the device runs the chain `pose_chain`
 names. DETECTOR gives boxes only; with a pose chain a tracklet carries its keypoints: from its own
 detection in the one-model chain, or, in the two-model chain, from the pose of its crop, joined to
-it by frame (`PoseJoin`). The sensor controls are `SensorControl`'s for as long as the device is open.
+it by frame (`PoseJoin`). With `depth_model` it also delivers depth aligned to the frames, as DEPTH
+frames. The sensor controls are `SensorControl`'s for as long as the device is open.
 
 The frame leaves here untouched where it can: an NV12 frame goes on packed, and the GPU upload
 converts and mirrors it, so this thread does no color work. The camera cannot mirror that frame
-itself, so its boxes and keypoints are mirrored here to match. `readings.video_latency` and
-`tracker_latency` say what each message took from capture to here.
+itself, so its boxes and keypoints are mirrored here to match. `readings.video_latency`,
+`tracker_latency` and `depth_latency` say what each message took from capture to here.
 
 Docs: https://docs.luxonis.com/software-v3/depthai
 """
@@ -26,15 +27,15 @@ import depthai as dai
 from numpy import ndarray
 
 from .. import CameraResolution, CameraFrame, RigCameraReadings, CameraTracklet, FrameType, CameraFrameCallback, \
-    TrackletCallback, orientation_from_gravity, frame_size, frame_window, frame_coverage, coverage_summary, \
+    TrackletCallback, orientation_from_gravity, frame_window, frame_coverage, coverage_summary, \
     delivered_height, lens_field, lens_deviation, imu_to_camera, unroll_imu_frame
 from modules.utils import FPS, Rect
 
 from .control import SensorControl
 from .definitions import SENSOR_SOCKET, requested_size, get_device_list, find_device, log_connected_sensors, \
-    read_lens_calibration, imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL, PoseChain, CameraLink, model_archives, \
+    read_lens_calibration, imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL, PoseChain, CameraLink, DepthModel, model_archives, \
     TRACKING_STATUS, tracklet_keypoints, keypoints_in_frame, packed_nv12, smoothed_latency, mirrored_roi, mirrored_keypoints
-from .pipeline import build_pipeline, MountConfig, PipelineOutputs
+from .pipeline import build_pipeline, delivered_size, MountConfig, PipelineOutputs
 from .pose_join import PoseJoin, Box
 from .settings import Oak4CameraSettings
 
@@ -63,9 +64,9 @@ class Camera(Thread):
         self.link: CameraLink =         settings.link
         self.model_path: str =          settings.model_path
         self.fps: float =               settings.fps
-        self.square: bool =             settings.square
         self.color: bool =              settings.color
         self.yolo: bool =               settings.yolo
+        self.depth_model: DepthModel =  settings.depth_model
         self.resolution: CameraResolution = settings.resolution
 
         self.mount: MountConfig = MountConfig(
@@ -80,6 +81,7 @@ class Camera(Thread):
         )
         self.frame_height: int = delivered_height(self.color, self.resolution, self.mount.fov_h, self.mount.tilt,
                                                   self.mount.lens_fov, self.mount.lens_center)
+        self.frame_size: tuple[int, int] = delivered_size(self.color, self.resolution, self.mount, self.frame_height)
         self.pose_chain: PoseChain = settings.pose_chain
         models = Path(self.model_path)
         pose, detector = model_archives(self.pose_chain) if self.yolo else (None, None)
@@ -99,6 +101,7 @@ class Camera(Thread):
         # FPS
         self.video_fps: FPS = FPS(120)
         self.tracklet_fps: FPS = FPS(120)
+        self.depth_fps: FPS = FPS(120)
 
         # CALLBACKS (run in registration order)
         self.frame_callbacks: list[CameraFrameCallback] = []
@@ -152,10 +155,11 @@ class Camera(Thread):
         try:
             self.device = dai.Device(info)
             self.pipeline = dai.Pipeline(self.device)
-            outputs: PipelineOutputs = build_pipeline(self.pipeline, self.fps, self.color, self.square, self.resolution,
+            outputs: PipelineOutputs = build_pipeline(self.pipeline, self.fps, self.color, self.resolution,
                                                       self.mount, frame_height=self.frame_height,
                                                       pose_archive=self.pose_archive,
-                                                      detector_archive=self.detector_archive)
+                                                      detector_archive=self.detector_archive,
+                                                      depth_model=self.depth_model)
             self._setup_queues(outputs)
             self.pipeline.start()
         except Exception as e:
@@ -194,7 +198,7 @@ class Camera(Thread):
 
     def _setup_queues(self, outputs: PipelineOutputs) -> None:
         """The host's ends of the pipeline: the frames every camera has, the tracklets with a model,
-        the IMU, the sensor controls."""
+        the depth with a depth model, the IMU, the sensor controls."""
         self.flip_on_host = outputs.flip_on_host
         video: dai.MessageQueue = outputs.video.createOutputQueue(maxSize=QUEUE_SIZE, blocking=False)
         video.addCallback(self._video_callback)
@@ -207,11 +211,16 @@ class Camera(Thread):
             poses: dai.MessageQueue = outputs.poses.createOutputQueue(maxSize=QUEUE_SIZE, blocking=False)
             poses.addCallback(self._poses_callback)
             self.queues.append(poses)
+        if outputs.depth is not None:
+            depth: dai.MessageQueue = outputs.depth.createOutputQueue(maxSize=QUEUE_SIZE, blocking=False)
+            depth.addCallback(self._depth_callback)
+            self.queues.append(depth)
         imu: dai.MessageQueue = outputs.imu.createOutputQueue(maxSize=QUEUE_SIZE, blocking=False)
         imu.addCallback(self._imu_callback)
         self.queues.append(imu)
         control: dai.InputQueue = outputs.control.createInputQueue()
-        self.control = SensorControl(self.settings, control)
+        assert self.device is not None
+        self.control = SensorControl(self.settings, self.device, control)
 
     def _log_frame_geometry(self) -> None:
         """The window the warp delivers and where the sensor covers it, pure geometry from the
@@ -219,7 +228,7 @@ class Camera(Thread):
         if self.mount.keystone != 0.0 and self.mount.tilt == 0.0:
             return
         src: tuple[int, int] = requested_size(self.color, self.resolution)
-        out: tuple[int, int] = frame_size(self.color, self.resolution, self.square, self.frame_height)
+        out: tuple[int, int] = self.frame_size
         window = frame_window(src, out, src[0], self.mount.fov_h, self.mount.tilt,
                               self.mount.lens_fov, self.mount.lens_center)
         coverage = frame_coverage(src, out, src[0], self.mount.fov_h, self.mount.tilt,
@@ -263,6 +272,14 @@ class Camera(Thread):
             self._emit_frame(FrameType.VIDEO, packed_nv12(msg), nv12=True)
         else:
             self._emit_frame(FrameType.VIDEO, msg.getCvFrame())
+
+    def _depth_callback(self, name: str, msg: dai.ImgFrame) -> None:
+        """The hand-over of the aligned depth: uint16 millimetres, on the frames' own view."""
+        readings: RigCameraReadings = self.settings.readings
+        readings.depth_latency = smoothed_latency(readings.depth_latency, msg)
+        self.depth_fps.processed()
+        readings.depth_fps = self.depth_fps.get_rate_average()
+        self._emit_frame(FrameType.DEPTH, msg.getFrame().copy())
 
     def _tracklet(self, tracklet: dai.Tracklet, keypoints: ndarray | None, timestamp: float) -> CameraTracklet:
         """One device tracklet as the contract's, mirrored when the frames are."""

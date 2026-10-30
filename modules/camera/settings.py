@@ -45,6 +45,8 @@ class RigCameraReadings(CameraReadings):
     tracker_fps:      Field[float] = Field(0.0, access=Field.READ, description="Tracker updates/s")
     tracker_latency:  Field[float] = Field(0.0, access=Field.READ, unit="ms", description="Frame capture to the tracklets' arrival on the PC")
     tracklets:      Field[int]   = Field(0, access=Field.READ, description="Active tracklets")
+    depth_fps:        Field[float] = Field(0.0, access=Field.READ, description="Depth FPS")
+    depth_latency:    Field[float] = Field(0.0, access=Field.READ, unit="ms", description="Frame capture to the depth's arrival on the PC")
     # How the camera is actually mounted, as the board reports it — NaN until measured, which is
     # the honest default for a board with no IMU.
     tilt_measured:  Field[float] = Field(float('nan'), access=Field.READ, description="Up-tilt (°) from the camera's own IMU — compare with `tilt`")

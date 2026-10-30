@@ -7,9 +7,11 @@ import numpy as np
 
 
 class FrameType(Enum):
-    """The kinds of frame a source delivers. One so far: a backend with more (OAK4's depth,
-    say) adds its own here, and the recorder's labels with them."""
+    """The kinds of frame a source delivers; a backend with more adds its own here, and the
+    recorder's labels with them. Every frame callback gets every kind, so a consumer of one kind
+    checks `kind`."""
     VIDEO = 1
+    DEPTH = 2
 
 
 @dataclass(frozen=True)
@@ -21,8 +23,10 @@ class CameraFrame:
     time from the frame instead of reading a clock (the wall clock is for file names only).
     `image` is BGR uint8 (H, W, 3) or gray uint8 (H, W), as the backend delivers it; with `nv12` it is
     packed NV12 uint8 (H * 3 / 2, W): the Y rows, then the interleaved UV rows, which a consumer
-    converts where it is cheapest. `flip_h` says the image still has to be mirrored, because the
-    device could not: the GPU upload does it, anything off the GPU takes `mirrored_image`.
+    converts where it is cheapest. A DEPTH frame's `image` is uint16 millimetres (H, W), 0 where
+    there is no depth, on the same view as the VIDEO frames. `flip_h` says the image still has to
+    be mirrored, because the device could not: the GPU upload does it, anything off the GPU takes
+    `mirrored_image`.
     """
     cam_id: int
     kind: FrameType

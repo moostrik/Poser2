@@ -32,6 +32,13 @@ class SyncCallbackTest(unittest.TestCase):
         self.assertEqual(calls, list(range(16)))
         self.assertEqual(recorders[0].timestamp, 12.5)       # the bang carries the frame's time
 
+    def test_a_depth_frame_does_not_bang(self) -> None:
+        sync = Sync(SyncSettings())
+        calls: list[int] = []
+        sync.add_sync_callback(_Recorder(0, calls).bang)
+        sync.submit_frame(CameraFrame(0, FrameType.DEPTH, np.zeros((2, 2), np.uint16), 12.5))
+        self.assertEqual(calls, [])
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -14,11 +14,42 @@ from modules.utils import Rect
 logger = logging.getLogger(__name__)
 
 
-# This backend delivers the color sensor (IMX586); the OAK4 Pro W also has an OV9282 stereo pair on
-# CAM_B and CAM_C. Grey comes off the color sensor as the ISP's luma. The contract's resolution
-# labels are delivered sizes here, not sensor modes: the Camera node picks the sensor mode from the
-# size requested (`geometry.mode_size`).
+# This backend delivers the color sensor (IMX586), and with `depth_model` depth off the OV9282 stereo
+# pair on CAM_B and CAM_C. Grey comes off the color sensor as the ISP's luma. The contract's
+# resolution labels are delivered sizes here, not sensor modes: the Camera node picks the sensor mode
+# from the size requested (`geometry.mode_size`).
 SENSOR_SOCKET: dai.CameraBoardSocket = dai.CameraBoardSocket.CAM_A
+STEREO_SOCKETS: tuple[dai.CameraBoardSocket, dai.CameraBoardSocket] = (dai.CameraBoardSocket.CAM_B, dai.CameraBoardSocket.CAM_C)
+
+# The width over the height of the frame the Camera node crops itself (`Correction.DIRECT`): 5:4 at
+# the sensor mode's rows, so the depth model's 8:5 frame is used further across than by a square.
+FRAME_ASPECT: float = 5.0 / 4.0
+
+# The stereo frames the depth model is fed; a larger input gained nothing and dropped frames.
+STEREO_SIZE: tuple[int, int] = (640, 400)
+
+
+class DepthModel(IntEnum):
+    """The Neural Depth model on the camera, by its size. The sizes that hold 60 fps beside the
+    color frames, measured: 576x360 and up do not (46 fps, 139 ms)."""
+    OFF = 0
+    NEURAL_288 = 1      # 288x180: 26 to 28 ms, capture to PC
+    NEURAL_384 = 2      # 384x240: 31 to 41 ms
+    NEURAL_480 = 3      # 480x300: 42 to 44 ms, and the boxes 8 ms later
+
+
+DEPTH_MODELS: dict[DepthModel, tuple[dai.DeviceModelZoo, int]] = {  # the model and its rows
+    DepthModel.NEURAL_288: (dai.DeviceModelZoo.NEURAL_DEPTH_288X180, 180),
+    DepthModel.NEURAL_384: (dai.DeviceModelZoo.NEURAL_DEPTH_384X240, 240),
+    DepthModel.NEURAL_480: (dai.DeviceModelZoo.NEURAL_DEPTH_480X300, 300),
+}
+
+
+def depth_size(model: DepthModel, frame: tuple[int, int]) -> tuple[int, int]:
+    """The aligned depth's size for a delivered `frame`: the model's rows, which is all the detail
+    it has, and an even width at the frame's aspect."""
+    rows: int = DEPTH_MODELS[model][1]
+    return (round(rows * frame[0] / frame[1] / 2.0) * 2, rows)
 
 
 def frame_type(color: bool) -> dai.ImgFrame.Type:
@@ -30,6 +61,12 @@ def frame_type(color: bool) -> dai.ImgFrame.Type:
 def requested_size(color: bool, resolution: CameraResolution) -> tuple[int, int]:
     """The size asked of the sensor for this label, before the warp and the crop."""
     return mode_size(color, resolve_resolution(color, resolution))
+
+
+def direct_size(resolution: CameraResolution) -> tuple[int, int]:
+    """The frame the Camera node crops itself: `FRAME_ASPECT` at the sensor mode's rows, the width even."""
+    rows: int = requested_size(True, resolution)[1]
+    return (round(rows * FRAME_ASPECT / 2.0) * 2, rows)
 
 
 # The control ranges of the OAK-D, kept until the IMX586's own are read off the hardware: the

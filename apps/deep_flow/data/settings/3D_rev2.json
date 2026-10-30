@@ -6,7 +6,6 @@
     "keyframe_interval": 1,
     "yolo": true,
     "color": true,
-    "square": true,
     "resolution": "P720",
     "sim_enabled": true,
     "model_path": "data/models",
@@ -15,6 +14,7 @@
       "device_id": "",
       "link": "USB",
       "pose_chain": "DETECTOR",
+      "depth_model": "NEURAL_480",
       "flip_h": true,
       "flip_v": false,
       "tilt": 0.0,
@@ -126,7 +126,7 @@
       },
       "interpolator": {
         "method": "NONE",
-        "fit_frames": 3,
+        "fit_frames": 5,
         "output_delay": 0.0,
         "blend_mode": "RAMP",
         "blend": 0.0,
@@ -146,7 +146,7 @@
       },
       "interpolator": {
         "method": "LINEAR",
-        "fit_frames": 3,
+        "fit_frames": 5,
         "output_delay": 0.0,
         "blend_mode": "RAMP",
         "blend": 0.0,
@@ -161,7 +161,7 @@
       },
       "interpolator": {
         "method": "LINEAR",
-        "fit_frames": 3,
+        "fit_frames": 5,
         "output_delay": 0.0,
         "blend_mode": "RAMP",
         "blend": 0.0,
@@ -182,7 +182,7 @@
       },
       "interpolator": {
         "method": "LINEAR",
-        "fit_frames": 3,
+        "fit_frames": 5,
         "output_delay": 0.0,
         "blend_mode": "RAMP",
         "blend": 0.0,
@@ -296,7 +296,6 @@
     "center": {
       "geometry": {
         "stage": "SMOOTH",
-        "cam_aspect": 1.7778,
         "target_x": 0.5,
         "target_y": 0.9,
         "target_size": 0.27,
@@ -385,7 +384,6 @@
     "fluid3d": {
       "max_players": 1,
       "sim_engine": "FLUID_3D",
-      "draw_mode": "DENSITY",
       "blend_mode": "ADD",
       "fluid_flow": {
         "profile": false,
@@ -396,8 +394,6 @@
           "depth": 16,
           "sim_depth": 32,
           "spacing": 3.0,
-          "composite_mode": 1,
-          "ray_steps": 16,
           "absorption": 35.68,
           "injection_layer": 0.0,
           "injection_spread": 0.13,
@@ -437,13 +433,6 @@
           "iterations": 40,
           "boundary": "OPEN"
         }
-      },
-      "visualisation": {
-        "toggle_scalar": false,
-        "scale": 1.0,
-        "spacing": 20.0,
-        "element_length": 40.0,
-        "element_width": 1.0
       }
     },
     "colors": {

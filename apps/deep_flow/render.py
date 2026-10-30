@@ -19,6 +19,7 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.cam_mask,
     Layers.cam_foreground,
     Layers.cam_crop,
+    Layers.cam_depth,
 
     Layers.center_geometry,
     Layers.center_mask,
@@ -52,6 +53,7 @@ SHAPE_LAYERS: dict[Layers, Layers] = {
     Layers.cam_mask:       Layers.cam_mask,
     Layers.cam_foreground: Layers.cam_foreground,
     Layers.cam_crop:       Layers.cam_crop,
+    Layers.cam_depth:      Layers.cam_depth,
     Layers.tracker:        Layers.cam_image,  # camera stretched into a panel-sized FBO
     Layers.pose:           Layers.cam_crop,   # crop stretched into a panel-sized FBO
 }
@@ -88,12 +90,13 @@ class DeepFlowRender(RenderBase):
             cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.board)
             cam_foreground = self.L[Layers.cam_foreground][i] = ls.ForegroundSourceLayer(i, self.board)
             cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.board)
+            self.L[Layers.cam_depth][i] =                   ls.DepthSourceLayer(    i, self.board)
 
             tracker_compositor = self.L[Layers.tracker][i] = ls.TrackerCompositor(  i, self.board,   cam_image.texture,          settings.preview.tracker,   settings.colors)
             pose_compositor = self.L[Layers.pose][i] =      ls.PoseCompositor(      i, self.board,   cam_image.texture,          settings.preview.pose,      settings.colors)
             self.L[Layers.cam_readings][i] =                 ls.CameraReadingsLayer( cameras[i], camera_check)
 
-            center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, self.board,                               settings.center.geometry)
+            center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, self.board,  cam_image.texture,           settings.center.geometry)
             center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask.texture,           settings.center.mask)
             cmt[i] = center_mask.texture
             center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image.texture,  cmt[i], settings.center.cam)

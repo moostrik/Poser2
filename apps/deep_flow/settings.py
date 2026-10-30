@@ -44,6 +44,7 @@ class Layers(IntEnum):
     cam_mask =      auto()
     cam_foreground = auto()
     cam_crop =      auto()
+    cam_depth =     auto()
     # composite layers
     tracker =       auto()
     pose =          auto()
@@ -88,13 +89,12 @@ class Oak4Group(BaseSettings):
     keyframe_interval:  Field[int]               = Field(1, access=Field.INIT, visible=False, description="Keyframe interval in frames (1 = every frame)")
     yolo:               Field[bool]              = Field(True, access=Field.INIT, description="Enable YOLO person detection")
     color:              Field[bool]              = Field(True, access=Field.INIT, description="Enable color capture")
-    square:             Field[bool]              = Field(True, access=Field.INIT, description="Use square aspect ratio")
     resolution:         Field[CameraResolution]  = Field(CameraResolution.P720, access=Field.INIT, description="Delivered size before the crop; the sensor mode follows it")
     sim_enabled:        Field[bool]              = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path:         Field[str]               = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
     fov:                Field[float]             = Field(102.0, access=Field.INIT, description="Camera horizontal FOV over the full sensor width (°)")  # OAK4 Pro W, IMX586 across 1280 px, from the unit's calibration (`readings.fov_factory`)
 
-    _cam_share: list = [fps, color, square, yolo, resolution, model_path, fov]
+    _cam_share: list = [fps, color, yolo, resolution, model_path, fov]
     cam_0          : Group[Oak4CameraSettings]             = Group(Oak4CameraSettings, share=_cam_share)
     camera_check   : Group[CameraCheckSettings]            = Group(CameraCheckSettings)
     simulator      : Group[PlayerSettings]                 = Group(PlayerSettings, share=[num_cams, fps])
