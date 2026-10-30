@@ -45,6 +45,10 @@ from .settings import Oak4CameraSettings
 logger = logging.getLogger(__name__)
 
 QUEUE_SIZE: int = 1         # the newest frame only: a frame the host did not take in time is dropped, not queued
+RETRY_INTERVAL: float = 1.0     # s between two tries to find and open the camera
+FRAME_TIMEOUT: float = 5.0      # s without a frame while open: the camera is opened again
+FIRST_FRAME_GRACE: float = 10.0 # s on top of the timeout for the first frame, while the models load
+FRAME_CHECK: float = 0.5        # s between two looks at the time of the last frame
 
 
 class Camera(Thread):
@@ -54,6 +58,8 @@ class Camera(Thread):
         super().__init__()
         self.stop_event = Event()
         self.running: bool = False
+        self._problem: str = ''             # why there are no frames, as logged; '' while they come
+        self._last_frame: float = 0.0
 
         # ID
         self.id: int = Camera._id_counter
@@ -130,14 +136,32 @@ class Camera(Thread):
         self.stop_event.set()
 
     def run(self) -> None:
+        # The thread opens and starts over when the camera was not there or its frames stopped: one
+        # just closed by the last run comes free by itself, a lost one when it is back
         while not self.stop_event.is_set():
             try:
-                if not self._open():
-                    return
-                self.stop_event.wait()
-                self._close()
-            except Exception:
-                logger.exception("Camera error")
+                if self._open():
+                    self._watch_frames()
+                    self._close()
+                    logger.info(f'{self.device_id} CLOSED')
+            except Exception as e:
+                self._warn(f'camera error: {e}')
+            self.stop_event.wait(RETRY_INTERVAL)
+        self.frame_callbacks.clear()
+        self.tracklet_callbacks.clear()
+
+    def _watch_frames(self) -> None:
+        """Until told to stop, or until the frames have stopped: a cable, its power, a crashed device."""
+        while not self.stop_event.wait(FRAME_CHECK):
+            if time.perf_counter() - self._last_frame > FRAME_TIMEOUT:
+                self._warn(f'no frame for {FRAME_TIMEOUT:.0f} s, opening the camera again')
+                return
+
+    def _warn(self, problem: str) -> None:
+        """A reason there are no frames: logged when it is a new one, not at every retry."""
+        if problem != self._problem:
+            self._problem = problem
+            logger.warning(problem)
 
     # ── Open and close ─────────────────────────────────────────────────
 
@@ -147,19 +171,23 @@ class Camera(Thread):
             self.device_id = device_list[0]          # no id in the preset: the first OAK4 on the network
             logger.info(f'no device id set: opening the first OAK4 found, {self.device_id} (of {device_list})')
         if not self.device_id:
-            logger.warning('no OAK4 found (an OAK-D is never opened by this backend)')
+            self._warn('no OAK4 found (an OAK-D is never opened by this backend)')
             return False
         if self.device_id not in device_list:
-            logger.warning(f'{self.device_id} NOT AVAILABLE in the OAK4s found: {device_list}')
+            self._warn(f'{self.device_id} NOT AVAILABLE in the OAK4s found: {device_list}')
             return False
         info: dai.DeviceInfo | None = find_device(self.device_id, self.link)
         if info is None:
-            logger.warning(f'{self.device_id} is gone')
+            self._warn(f'{self.device_id} is gone')
             return False
 
         self._log_frame_geometry()
         try:
             self.device = dai.Device(info)
+        except Exception as e:
+            self._warn(f'{self.device_id} could not open: {e}')
+            return False
+        try:
             self.pipeline = dai.Pipeline(self.device)
             outputs: PipelineOutputs = build_pipeline(self.pipeline, self.fps, self.color, self.resolution,
                                                       self.mount, frame_height=self.frame_height,
@@ -168,18 +196,21 @@ class Camera(Thread):
                                                       depth_model=self.depth_model)
             self._setup_queues(outputs)
             self.pipeline.start()
-        except Exception as e:
-            logger.error(f'{self.device_id} could not open: {e}')
+        except Exception as e:                       # the camera is there and refuses the setup: a retry changes nothing
+            logger.error(f'{self.device_id} pipeline failed, not trying again: {e}')
             self._close()
+            self.stop_event.set()
             return False
 
         logger.info(f'{self.device_id} OPEN over {info.protocol}')
         log_connected_sensors(self.device, self.device_id)
         self._read_mount_calibration()
+        self._last_frame = time.perf_counter() + FIRST_FRAME_GRACE
         self.running = True
         return True
 
     def _close(self) -> None:
+        self.running = False
         if self.control is not None:
             self.control.close()
             self.control = None
@@ -194,13 +225,11 @@ class Camera(Thread):
             queue.close()
         self.queues.clear()
         if self.device is not None:
-            self.device.close()
+            try:
+                self.device.close()
+            except Exception as exc:
+                logger.debug(f'{self.device_id} device close: {exc}')
             self.device = None
-
-        self.frame_callbacks.clear()
-        self.tracklet_callbacks.clear()
-
-        logger.info(f'{self.device_id} CLOSED')
 
     def _setup_queues(self, outputs: PipelineOutputs) -> None:
         """The host's ends of the pipeline: the frames every camera has, the tracklets with a model,
@@ -265,6 +294,10 @@ class Camera(Thread):
     # ── The queues' callbacks: the hand-over to the contract ───────────
 
     def _video_callback(self, name: str, msg: dai.ImgFrame) -> None:
+        self._last_frame = time.perf_counter()
+        if self._problem:
+            logger.info(f'{self.device_id} delivers frames again')
+            self._problem = ''
         readings: RigCameraReadings = self.settings.readings
         readings.video_latency = smoothed_latency(readings.video_latency, msg)
         self.video_fps.processed()

@@ -2,6 +2,7 @@
 the merge and the player where the iGPU is there."""
 
 import math
+import subprocess
 import tempfile
 import time
 import unittest
@@ -36,6 +37,13 @@ def recorder(types: list[FrameType], temp: str = 'temp', output: str = 'out', da
     settings.fps = 60.0
     settings.keyframe_interval = 1
     return Recorder(settings, data_path)
+
+
+def stream_frames(path: Path, stream: int) -> int:
+    """The frames actually stored in one stream of a chunk."""
+    out = subprocess.run(['ffprobe', '-hide_banner', '-loglevel', 'error', '-count_packets', '-select_streams', f'v:{stream}',
+                          '-show_entries', 'stream=nb_read_packets', '-of', 'csv=p=0', str(path)], capture_output=True, text=True).stdout
+    return int(out.strip().strip(','))
 
 
 class PairingTest(unittest.TestCase):
@@ -91,6 +99,43 @@ class MetadataTest(unittest.TestCase):
 
 @unittest.skipUnless(video.available() and video.encoder_works(video.Encoder.QSV), 'no iGPU encoder')
 class RoundTripTest(unittest.TestCase):
+    def test_a_split_keeps_the_streams_in_step_across_chunks(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            root = Path(folder)
+            rec = recorder([FrameType.VIDEO, FrameType.DEPTH], str(root / 'temp'), 'recordings', str(root))
+            rec.start()
+            rec.settings.start = True
+            deadline = time.perf_counter() + 10.0
+            while rec._get_state() != RecState.REC and time.perf_counter() < deadline:
+                time.sleep(0.01)
+            time.sleep(0.1)
+            for i in range(30):
+                rec.submit_frame(depth_frame(1000 + i * 30))
+                rec.submit_frame(video_frame(i))
+                time.sleep(0.002)
+            RecorderSettings.split.fire(rec.settings)
+            while rec.split_requested.is_set() and time.perf_counter() < deadline:
+                time.sleep(0.01)
+            time.sleep(0.2)
+            for i in range(30, 50):
+                rec.submit_frame(depth_frame(1000 + i * 30))
+                rec.submit_frame(video_frame(i))
+                time.sleep(0.002)
+            rec.settings.stop = True
+            while rec._get_state() != RecState.IDLE and time.perf_counter() < deadline + 10.0:
+                time.sleep(0.01)
+            rec.stop()
+
+            recording = next((root / 'recordings').iterdir())
+            self.assertEqual(sorted(p.name for p in recording.iterdir()), [make_chunk_name(0, 0), make_chunk_name(0, 1)])
+            for chunk, count in ((0, 30), (1, 20)):
+                path = recording / make_chunk_name(0, chunk)
+                self.assertEqual(stream_frames(path, 0), count)
+                self.assertEqual(stream_frames(path, 1), count)
+                self.assertEqual(len(read_metadata(path).readings), count)
+            self.assertEqual(read_metadata(recording / make_chunk_name(0, 1)).readings[0].tilt, 0.0)   # frame 30 opens chunk 1
+            self.assertEqual(list((root / 'temp').rglob('*.*')), [])
+
     def test_a_recording_plays_back_in_step(self) -> None:
         count = 40
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:   # a stopped decoder holds its file for a moment

@@ -15,6 +15,7 @@ from modules.settings import BaseSettings, Field, Group, Widget
 from modules.panel import PanelSettings
 from modules.camera import CameraCheckSettings, CameraResolution, PlayerSettings, RecorderSettings, SyncSettings
 from modules.camera.oak4 import Oak4CameraSettings
+from modules.session import SessionSettings
 from modules.render import layers, ColorSettings
 from modules.inout import OscSoundSettings, OscReceiverSettings
 from modules.tracker import OnePerCamTrackerSettings, PosesFromTrackletsSettings
@@ -100,12 +101,18 @@ class Oak4Group(BaseSettings):
     model_path:         Field[str]               = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
     fov:                Field[float]             = Field(102.0, access=Field.INIT, description="Camera horizontal FOV over the full sensor width (°)")  # OAK4 Pro W, IMX586 across 1280 px, from the unit's calibration (`readings.fov_factory`)
 
+    start:              Field[bool]              = Field(False, widget=Widget.button, description="Start recording")
+    stop:               Field[bool]              = Field(False, widget=Widget.button, description="Stop recording")
+    split:              Field[bool]              = Field(False, widget=Widget.button, description="Split chunk", visible=False)
+    split_seconds:      Field[float]             = Field(60, min=1, max=60, widget=Widget.number, description="Split recording into chunks of this length (seconds)")
+
     _cam_share: list = [fps, color, yolo, resolution, model_path, fov]
     cam_0          : Group[Oak4CameraSettings]             = Group(Oak4CameraSettings, share=_cam_share)
     camera_check   : Group[_CameraCheckSettings]           = Group(_CameraCheckSettings)
     simulator      : Group[PlayerSettings]                 = Group(PlayerSettings, share=[num_cams, fps])
     person_detector: Group[inference.detection.Settings]   = Group(inference.detection.Settings)   # the replay backend's person detector
-    recorder       : Group[RecorderSettings]               = Group(RecorderSettings, share=[num_cams, fps, keyframe_interval])
+    control        : Group[SessionSettings]                = Group(SessionSettings, share=[start, stop, split, split_seconds])
+    recorder       : Group[RecorderSettings]               = Group(RecorderSettings, share=[num_cams, fps, keyframe_interval, start, stop, split])
     tracker        : Group[OnePerCamTrackerSettings]       = Group(OnePerCamTrackerSettings)
     frame_sync     : Group[SyncSettings]                   = Group(SyncSettings, share=[num_cams, fps])
     tracklet_sync  : Group[SyncSettings]                   = Group(SyncSettings, share=[num_cams, fps])

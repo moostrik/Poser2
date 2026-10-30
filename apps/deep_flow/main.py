@@ -8,6 +8,7 @@ from functools import partial
 
 from modules.camera import CameraFrame, CameraSource, CameraCheck, FrameType, Player, Recorder, Sync, replay
 from modules.camera.oak4 import Camera
+from modules.session import Session
 from modules.settings import presets
 from modules.panel import PanelServer
 from modules.inout import OscSound
@@ -68,6 +69,7 @@ class DeepFlowMain:
                 self.cameras.append(replay.Camera(self.player, cam, self.person_detector, replay.Tracker(), i, cam.tilt))
         else:
             self.recorder = Recorder(self.settings.camera.recorder, data_path=DATA_PATH)
+            self.session = Session(self.settings.camera.control)       # splits the recording into chunks
             for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
