@@ -129,8 +129,11 @@ class Camera(Thread):
         if not self.device_id and device_list:
             self.device_id = device_list[0]          # no id in the preset: the first OAK4 on the network
             logger.info(f'no device id set: opening the first OAK4 found, {self.device_id} (of {device_list})')
+        if not self.device_id:
+            logger.warning('no OAK4 found (an OAK-D is never opened by this backend)')
+            return False
         if self.device_id not in device_list:
-            logger.warning(f'{self.device_id} NOT AVAILABLE in {device_list}')
+            logger.warning(f'{self.device_id} NOT AVAILABLE in the OAK4s found: {device_list}')
             return False
 
         self._log_frame_geometry()

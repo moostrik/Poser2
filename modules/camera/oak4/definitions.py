@@ -43,14 +43,18 @@ SHARPNESS_RANGE:    tuple[int, int] = (   0, 4    )
 
 
 def get_device_list(verbose: bool = False) -> list[str]:
-    """The ids of the devices depthai sees now, USB and Ethernet alike."""
+    """The ids of the OAK4s depthai sees now, USB and Ethernet alike. depthai 3 also sees the OAK-D cameras
+    (RVC2) on the same PC; they are left out, so this backend never opens one."""
     device_list: list[str] = []
     if verbose:
         logger.info('-- CAMERAS --------------------------------------------------')
     for device in dai.Device.getAllAvailableDevices():
-        device_list.append(device.getDeviceId())
+        is_oak4: bool = device.platform == dai.XLinkPlatform.X_LINK_RVC4
+        if is_oak4:
+            device_list.append(device.getDeviceId())
         if verbose:
-            logger.info(f"Camera: {device.getDeviceId()} {device.name} {device.platform} {device.state}")
+            skipped: str = '' if is_oak4 else ' (not an OAK4: skipped)'
+            logger.info(f"Camera: {device.getDeviceId()} {device.name} {device.platform} {device.state}{skipped}")
     if verbose:
         logger.info('-------------------------------------------------------------')
     return device_list
