@@ -1,4 +1,3 @@
-# type: ignore
 """Convert RVM ONNX models to TensorRT engines.
 
 Usage:

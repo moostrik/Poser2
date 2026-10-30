@@ -1,4 +1,3 @@
-# type: ignore
 """Export the YOLOv8 person detector to ONNX for the replay backend's host detector.
 
 The same weights the device blobs were built from (`data/models/base/yolov8n.pt`), at the wide

@@ -63,7 +63,7 @@ from typing import Callable, Any, TypeAlias, TypeVar, TYPE_CHECKING
 if TYPE_CHECKING:
     from ..features import BaseFeature
 
-T = TypeVar('T')
+T = TypeVar('T', bound='BaseFeature')
 
 
 class Frame:
@@ -104,7 +104,7 @@ class Frame:
         try:
             return self._features[feature_type]
         except KeyError:
-            return feature_type.create_dummy()  # type: ignore[union-attr]
+            return feature_type.create_dummy()
 
     def __contains__(self, feature_type: type) -> bool:
         """Check if a feature type is present."""

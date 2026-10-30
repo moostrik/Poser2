@@ -145,7 +145,7 @@ Infinite bounds (±np.inf) disable range validation for that bound.
 """
 from abc import ABC, abstractmethod
 from enum import IntEnum
-from typing import Generic, TypeVar
+from typing import Generic, Self, TypeVar
 
 import numpy as np
 
@@ -223,7 +223,7 @@ class BaseFeature(ABC, Generic[FeatureEnum]):
 
     @classmethod
     @abstractmethod
-    def create_dummy(cls) -> "BaseFeature":
+    def create_dummy(cls) -> Self:
         """Create a dummy instance with NaN values and zero scores.
 
         Returns:

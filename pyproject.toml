@@ -67,7 +67,9 @@ exclude = [
     "modules/camera/oak4",              # depthai 3 code: scan it against .venv-oak4
     "apps/oak4_test",                   # depthai 3 code: scan it against .venv-oak4
     "scripts/test/multicam_barrier.py", # depthai 3 code: scan it against .venv-oak4
+    "tools/models",                     # one-off export scripts; their packages are not in the venv
 ]
+stubPath = "modules/inference"         # holds tensorrt.pyi, the types TensorRT does not ship
 venvPath = "."
 venv = ".venv"
 pythonVersion = "3.12"

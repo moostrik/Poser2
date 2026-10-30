@@ -1,12 +1,14 @@
 """HD Trio render — layer graph for 3-camera fluid installation."""
 
 from collections.abc import Sequence
+from typing import cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId, WindowSettings
+from modules.board import HasFrames
 from modules.camera import RigCameraSettings, CameraCheckSettings
-from modules.render import layers as ls, make_subdivision, SubdivisionRow, Subdivision
+from modules.render import ColorSettings, layers as ls, make_subdivision, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
 
 from .render_board import RenderBoard
@@ -94,8 +96,8 @@ class HDTrioRender(RenderBase):
             center_foreground = self.L[Layers.center_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, cam_foreground.texture, cmt[i], settings.center.foreground, settings.colors)
             center_pose =   self.L[Layers.center_pose][i] = ls.CenterPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
 
-            intro_geometry = self._intro_geometries[i] =     ls.CenterGeometry(      i, self._intro_proxy,                          settings.center.geometry)  # type: ignore[arg-type]
-            self.L[Layers.intro_pose][i] =                   ls.CenterPoseLayer(     i, intro_geometry,                             settings.intro_sequence.pose, self._intro_color_proxy)  # type: ignore[arg-type]
+            intro_geometry = self._intro_geometries[i] =     ls.CenterGeometry(      i, cast(HasFrames, self._intro_proxy),         settings.center.geometry)
+            self.L[Layers.intro_pose][i] =                   ls.CenterPoseLayer(     i, intro_geometry,                             settings.intro_sequence.pose, cast(ColorSettings, self._intro_color_proxy))
 
             ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,      center_foreground.texture, cmt, settings.center.color,  settings.colors)
             flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,      cam_mask,  center_mask.texture, center_foreground.texture, settings.flow)

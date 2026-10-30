@@ -241,7 +241,8 @@ class Online:
         if self._link is None and not self._start_link():
             self._seq = seq
             return
-        link: Link = self._link       # type: ignore[assignment]
+        assert self._link is not None
+        link: Link = self._link
         connected: bool = link.connected
         if s.connected != connected:
             s.connected = connected

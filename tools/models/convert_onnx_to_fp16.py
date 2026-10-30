@@ -1,4 +1,3 @@
-# type: ignore
 """Convert FP32 ONNX model to FP16 with selective precision control.
 
 Usage:

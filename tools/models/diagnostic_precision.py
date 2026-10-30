@@ -1,4 +1,3 @@
-# type: ignore
 """Diagnostic script to compare model precision behavior.
 
 Compares outputs between any two models (ONNX vs ONNX, TRT vs TRT, or ONNX vs TRT)
@@ -252,7 +251,7 @@ def decode_simcc(simcc_x: np.ndarray, simcc_y: np.ndarray, split_ratio: float = 
     return keypoints, scores
 
 
-def check_numerical_stability(arr: np.ndarray, name: str) -> Dict:
+def check_numerical_stability(arr: np.ndarray, name: str) -> dict:
     """Check array for numerical issues common with FP16."""
     arr_f32 = arr.astype(np.float32)
     

@@ -63,8 +63,8 @@ class RunnerTRT(Thread):
         self._callback_thread: Thread = Thread(target=self._dispatch_callbacks, daemon=True)
 
         # TensorRT engine and context (initialized in run())
-        self.engine: trt.ICudaEngine  # type: ignore
-        self.context: trt.IExecutionContext  # type: ignore
+        self.engine: trt.ICudaEngine
+        self.context: trt.IExecutionContext
         self.stream: torch.cuda.Stream
         self.input_names: list[str]
         self.output_name: str
@@ -194,7 +194,7 @@ class RunnerTRT(Thread):
             name = self.engine.get_tensor_name(i)
             mode = self.engine.get_tensor_mode(name)
 
-            if mode == trt.TensorIOMode.INPUT:  # type: ignore
+            if mode == trt.TensorIOMode.INPUT:
                 self.input_names.append(name)
             else:
                 self.output_name = name
@@ -205,16 +205,16 @@ class RunnerTRT(Thread):
         # Determine model precision from input tensor
         input_dtype = self.engine.get_tensor_dtype(self.input_names[0])
         precision_map = {
-            trt.DataType.FLOAT: "FP32", # type: ignore
-            trt.DataType.HALF: "FP16",  # type: ignore
-            trt.DataType.INT8: "INT8",  # type: ignore
+            trt.DataType.FLOAT: "FP32",
+            trt.DataType.HALF: "FP16",
+            trt.DataType.INT8: "INT8",
         }
         self.model_precision = precision_map.get(input_dtype, "UNKNOWN")
 
         # Map TensorRT dtype to PyTorch dtype
         dtype_to_torch = {
-            trt.DataType.FLOAT: torch.float32, # type: ignore
-            trt.DataType.HALF: torch.float16,  # type: ignore
+            trt.DataType.FLOAT: torch.float32,
+            trt.DataType.HALF: torch.float16,
         }
         self._torch_dtype = dtype_to_torch.get(input_dtype, torch.float32)
 

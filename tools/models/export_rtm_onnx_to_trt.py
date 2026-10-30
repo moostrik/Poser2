@@ -1,4 +1,3 @@
-# type: ignore
 """Convert RTMPose ONNX models to TensorRT engines.
 
 Usage:

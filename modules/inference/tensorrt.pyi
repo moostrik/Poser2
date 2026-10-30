@@ -1,0 +1,33 @@
+"""TensorRT ships no type information: these are the names the runners use, each object's own API as Any."""
+
+from enum import Enum
+from typing import Any
+
+
+class DataType(Enum):
+    FLOAT = ...
+    HALF = ...
+    INT8 = ...
+
+
+class TensorIOMode(Enum):
+    INPUT = ...
+
+
+class Logger:
+    ERROR: Any
+    def __init__(self, severity: Any = ...) -> None: ...
+    def __getattr__(self, name: str) -> Any: ...
+
+
+class Runtime:
+    def __init__(self, logger: Logger) -> None: ...
+    def __getattr__(self, name: str) -> Any: ...
+
+
+class ICudaEngine:
+    def __getattr__(self, name: str) -> Any: ...
+
+
+class IExecutionContext:
+    def __getattr__(self, name: str) -> Any: ...

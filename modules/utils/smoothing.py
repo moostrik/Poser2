@@ -36,8 +36,8 @@ class OneEuroFilterAngular():
         self.__target = x
         sin_value: float = math.sin(x)
         cos_value: float = math.cos(x)
-        filtered_sin: float = self.__sin_interp(sin_value, timestamp) # type: ignore
-        filtered_cos: float = self.__cos_interp(cos_value, timestamp) # type: ignore
+        filtered_sin: float = self.__sin_interp(sin_value, timestamp)  # pyright: ignore[reportArgumentType]
+        filtered_cos: float = self.__cos_interp(cos_value, timestamp)  # pyright: ignore[reportArgumentType]
         self.__value = math.atan2(filtered_sin, filtered_cos)
         return self.__value
 

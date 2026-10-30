@@ -24,7 +24,7 @@ File layout (``pose_NNN.h5``):
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import h5py
 import numpy as np
@@ -138,16 +138,17 @@ def read_chunk(path: Path) -> dict:
         }
     """
     with h5py.File(path, 'r') as f:
-        attrs = f.attrs
+        attrs: Any = f.attrs
+        timestamps: Any = f['timestamps']
         result: dict = {
-            'recording_start': float(attrs['recording_start']),   # type: ignore[arg-type]
-            'chunk_start':     float(attrs['chunk_start']),        # type: ignore[arg-type]
-            'chunk_index':     int(attrs['chunk_index']),          # type: ignore[arg-type]
-            'timestamps':      f['timestamps'][:],                 # type: ignore[index]
+            'recording_start': float(attrs['recording_start']),
+            'chunk_start':     float(attrs['chunk_start']),
+            'chunk_index':     int(attrs['chunk_index']),
+            'timestamps':      timestamps[:],
             'tracks':          {},
         }
-        tracks_grp = f['tracks']
-        for track_id_str, t_grp in tracks_grp.items():            # type: ignore[union-attr]
+        tracks_grp: Any = f['tracks']
+        for track_id_str, t_grp in tracks_grp.items():
             track_id = int(track_id_str)
             track_data: dict = {
                 'present':  t_grp['present'][:],

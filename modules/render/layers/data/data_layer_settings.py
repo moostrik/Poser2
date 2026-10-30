@@ -1,7 +1,7 @@
 # Standard library imports
 import math
 from enum import IntEnum, auto
-from typing import Protocol
+from typing import Any, Protocol
 
 # Third-party imports
 import numpy as np
@@ -22,7 +22,7 @@ _VISUALIZABLE = sorted(
     key=lambda c: c.__name__,
 )
 
-ScalarFeatureSelect = IntEnum(
+ScalarFeatureSelect: Any = IntEnum(
     'ScalarFeatureSelect',
     {cls.__name__: i for i, cls in enumerate(_VISUALIZABLE)},
 )
@@ -33,8 +33,8 @@ display_range() has finite bounds.  Member names match class names
 (e.g. AngleMotion, Angles, BBox).
 """
 
-FEATURE_MAP: dict[ScalarFeatureSelect, type[BaseScalarFeature]] = {  # type: ignore[type-arg]
-    ScalarFeatureSelect(i): cls for i, cls in enumerate(_VISUALIZABLE)  # type: ignore[misc]
+FEATURE_MAP: dict[IntEnum, type[BaseScalarFeature]] = {
+    ScalarFeatureSelect(i): cls for i, cls in enumerate(_VISUALIZABLE)
 }
 
 # Features where each element represents a different track (use per-track colors)
@@ -97,7 +97,7 @@ class DataLayerSettingsProtocol(Protocol):
 class DataLayerSettings(BaseSettings):
     """Unified configuration for data visualization layers."""
     mode:           Field[LayerMode]            = Field(LayerMode.WINDOW)
-    feature_field:  Field[ScalarFeatureSelect]  = Field(ScalarFeatureSelect.AngleMotion)  # type: ignore[attr-defined]
+    feature_field:  Field[IntEnum]              = Field(ScalarFeatureSelect.AngleMotion)
     stage:          Field[int]                  = Field(0)
 
     line_width:     Field[float] = Field(3.0)

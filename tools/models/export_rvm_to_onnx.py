@@ -1,4 +1,3 @@
-# type: ignore
 """Export RVM model to ONNX with TensorRT-compatible settings.
 
 Usage:

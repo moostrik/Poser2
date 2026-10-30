@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from enum import IntEnum
+from typing import cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
@@ -185,7 +186,7 @@ class WhiteSpaceRender(RenderBase):
         actually fill, both measured at the rig center. It is not a preference: `tilt`, `fov` and
         `focus_radius` all move it, and the compositor is the only thing that knows how.
         """
-        panorama: layers.Compositor = self.L[Layers.cam_panorama][0]  # type: ignore[assignment]
+        panorama: layers.Compositor = cast(layers.Compositor, self.L[Layers.cam_panorama][0])
         return SubdivisionRow(name='panoramic', columns=1, rows=1,
                               src_aspect_ratio=panorama.aspect_ratio,
                               padding=Point2f(0.0, 1.0))

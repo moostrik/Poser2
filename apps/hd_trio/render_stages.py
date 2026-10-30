@@ -4,7 +4,7 @@ import math
 from collections.abc import Callable
 from typing import cast
 
-from pytweening import *  # type: ignore
+from pytweening import easeInOutSine, easeInQuint, easeOutQuad, easeOutSine, linear
 
 from modules.board import HasFrames
 from modules.pose import MotionTime

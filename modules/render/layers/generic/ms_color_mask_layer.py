@@ -2,7 +2,7 @@
 
 # Third-party imports
 from OpenGL.GL import GL_RGBA16F
-from pytweening import *    # type: ignore
+from pytweening import easeInOutSine, easeInSine
 import numpy as np
 from time import time
 import math

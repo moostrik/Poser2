@@ -1,6 +1,7 @@
 # Standard library imports
 import math
 from itertools import combinations
+from typing import cast
 
 # Local application imports
 from ..tracklet import Tracklet
@@ -78,6 +79,10 @@ class Seams:
         """
         limit: float = _SPLIT_FACTOR * self.settings.seam.link_angle
         same_cam: float = _SPLIT_FACTOR * self.settings.same_cam_angle
+
+        def annotation(tracklet: Tracklet) -> Annotation:   # of an `active` view, which the filter below checks
+            return cast(Annotation, tracklet.annotation)
+
         for world_id in self._observations.world_ids():
             while True:
                 active: list[Tracklet] = [t for t in self._observations.members(world_id)
@@ -86,9 +91,9 @@ class Seams:
                     break
                 inconsistent: list[Tracklet] = [t for t in active if any(
                     o.cam_id == t.cam_id
-                    and abs(t.annotation.local_angle - o.annotation.local_angle) > same_cam  # type: ignore[union-attr]
+                    and abs(annotation(t).local_angle - annotation(o).local_angle) > same_cam
                     for o in active if o is not t) or all(
-                    self._rig.angle_diff(t.annotation.world_angle, o.annotation.world_angle) > limit  # type: ignore[union-attr]
+                    self._rig.angle_diff(annotation(t).world_angle, annotation(o).world_angle) > limit
                     for o in active if o is not t)]
                 if not inconsistent:
                     break

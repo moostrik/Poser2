@@ -57,7 +57,7 @@ class Simulator(Camera):
         """The clip input and the frame queues; no IMU (it would report a box on a bench) and no
         sensor controls (there is no sensor)."""
         assert self.device is not None
-        self.clips = self.device.getInputQueue(name=CLIPS_STREAM, maxSize=1, blocking=False)  # type: ignore
+        self.clips = self.device.getInputQueue(name=CLIPS_STREAM, maxSize=1, blocking=False)  # pyright: ignore[reportCallIssue]
         assert self.clips is not None
         self.queues.append(self.clips)
         self._setup_frame_queues()
@@ -76,12 +76,12 @@ class Simulator(Camera):
         img = dai.ImgFrame()
         if self.color:
             img.setType(dai.ImgFrame.Type.BGR888p)
-            img.setData(self.to_planar(frame, (width, height)))  # type: ignore
+            img.setData(self.to_planar(frame, (width, height)))  # pyright: ignore[reportCallIssue, reportArgumentType]
         else:
             img.setType(dai.ImgFrame.Type.RAW8)
             if frame.ndim == 3:
                 frame = cvtColor(frame, COLOR_BGR2GRAY)  # clip frames arrive BGR (OpenCV convention); a gray-decoded clip skips this
-            img.setData(frame.flatten())  # type: ignore
+            img.setData(frame.flatten())  # pyright: ignore[reportCallIssue, reportArgumentType]
         img.setTimestamp(timedelta(seconds=process_time()))
         img.setWidth(width)
         img.setHeight(height)

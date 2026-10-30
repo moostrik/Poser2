@@ -15,6 +15,7 @@ import logging
 import time
 from pathlib import Path
 from threading import Thread, Event
+from typing import cast
 
 import depthai as dai
 from numpy import ndarray
@@ -295,10 +296,10 @@ class Camera(Thread):
                 self._gravity = vector
             else:
                 a: float = IMU_SMOOTHING
-                self._gravity = tuple(                          # type: ignore[assignment]
+                self._gravity = cast(tuple[float, float, float], tuple(
                     previous + a * (current - previous)
                     for previous, current in zip(self._gravity, vector)
-                )
+                ))
         if self._gravity is None:
             return
         tilt, roll = orientation_from_gravity(*self._gravity)

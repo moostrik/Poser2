@@ -1,4 +1,3 @@
-# type: ignore
 """Convert RAFT ONNX models to TensorRT engines.
 
 Usage:

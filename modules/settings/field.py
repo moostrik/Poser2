@@ -302,7 +302,7 @@ class Field(Generic[T]):
                 )
         if isinstance(value, dict) and hasattr(self.type_, "from_dict"):
             try:
-                return self.type_.from_dict(value)  # type: ignore[union-attr]
+                return cast(Any, self.type_).from_dict(value)
             except (TypeError, ValueError, KeyError, AttributeError) as exc:
                 raise TypeError(
                     f"Cannot construct {self._type_name} from dict: {value!r}"
@@ -314,7 +314,8 @@ class Field(Generic[T]):
 
     def _coerce_element(self, v):
         """Coerce a single list element to self._element_type."""
-        et: type = self._element_type  # type: ignore[assignment]
+        assert self._element_type is not None
+        et: type = self._element_type
         # Reject bool when int or float is expected (bool is a subclass of int)
         if et in (int, float) and isinstance(v, bool):
             raise TypeError(

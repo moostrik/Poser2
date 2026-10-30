@@ -1,4 +1,3 @@
-# type: ignore
 """Export RAFT optical flow model to ONNX format.
 
 Requires RAFT repository: https://github.com/princeton-vl/RAFT

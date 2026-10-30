@@ -6,6 +6,7 @@ numbers from the same settings."""
 import math
 from dataclasses import dataclass
 from enum import IntEnum, auto
+from typing import cast
 
 import numpy as np
 
@@ -595,10 +596,10 @@ def imu_to_camera(vector: tuple[float, float, float],
     if not extrinsics or len(extrinsics) < 3:
         return vector
     try:
-        return tuple(                                       # type: ignore[return-value]
+        return cast(tuple[float, float, float], tuple(
             sum(extrinsics[row][col] * vector[col] for col in range(3))
             for row in range(3)
-        )
+        ))
     except (IndexError, TypeError):
         return vector
 
@@ -642,7 +643,7 @@ def keystone_corners(width: int, height: int, keystone: float, flip_h: bool, fli
         dst = [(width - x, y) for x, y in dst]
     if flip_v:
         dst = [(x, height - y) for x, y in dst]
-    return src, tuple(dst)                                  # type: ignore[return-value]
+    return src, cast(Corners, tuple(dst))
 
 
 def square_crop(src_size: tuple[int, int], size: int) -> tuple[int, int, int, int]:

@@ -1,6 +1,7 @@
 from enum import IntEnum
+from typing import cast
 
-from .base import           BaseFeature, BaseScalarFeature, BaseVectorFeature, NormalizedScalarFeature, AggregationMethod, NormalizedSingleValue, SingleValue, SingleAngle, SYMMETRIC_PI_RANGE
+from .base import          BaseFeature, BaseScalarFeature, BaseVectorFeature, NormalizedScalarFeature, AggregationMethod, NormalizedSingleValue, SingleValue, SingleAngle, SYMMETRIC_PI_RANGE
 from .bbox import           BBox, BBoxElement
 from .points_2d import      Points2D, PointLandmark
 from .angles import         Angles, AngleLandmark
@@ -30,7 +31,7 @@ FEATURES: list[type[BaseFeature]] = [
     ShoulderDifference, Similarity, TorsoTilt,
 ]
 
-Feature: type[IntEnum] = IntEnum('Feature', {cls.__name__: i for i, cls in enumerate(FEATURES, 1)})  # type: ignore[misc]
+Feature: type[IntEnum] = cast(type[IntEnum], IntEnum('Feature', {cls.__name__: i for i, cls in enumerate(FEATURES, 1)}))
 """Enum with one member per concrete feature class, auto-generated from FEATURES."""
 
 FEATURE_CLASS: dict = dict(zip(Feature, FEATURES))
@@ -40,7 +41,7 @@ SCALAR_FEATURES: list[type[BaseScalarFeature]] = [
     f for f in FEATURES if issubclass(f, BaseScalarFeature)
 ]
 
-TRACK_FEATURES: set[type[BaseScalarFeature]] = {Similarity, LeaderScore, MotionGate}
+TRACK_FEATURES: set[type[Similarity] | type[LeaderScore] | type[MotionGate]] = {Similarity, LeaderScore, MotionGate}
 """Scalar features whose elements are indexed by track (pose), not by joint/body part."""
 
 
@@ -52,4 +53,4 @@ def configure_features(max_players: int) -> None:
     has effect.
     """
     for ft in TRACK_FEATURES:
-        ft.configure(max_players)  # type: ignore[attr-defined]
+        ft.configure(max_players)

@@ -143,7 +143,7 @@ def _render_baseline(face: Any, text: str, px: int) -> tuple[np.ndarray, int]:
     for char in text:
         if previous is not None:
             pen += face.get_kerning(previous, char).x >> 6
-        face.load_char(char, freetype.FT_LOAD_RENDER)      # type: ignore[attr-defined]
+        face.load_char(char, freetype.FT_LOAD_RENDER)  # pyright: ignore[reportAttributeAccessIssue]
         glyph = face.glyph
         bitmap = glyph.bitmap
         if bitmap.width and bitmap.rows:

@@ -81,7 +81,7 @@ class FontAtlas:
         glyph_data: list = []
 
         for char in chars:
-            face.load_char(char, freetype.FT_LOAD_RENDER)  # type: ignore
+            face.load_char(char, freetype.FT_LOAD_RENDER)  # pyright: ignore[reportAttributeAccessIssue]
             bitmap = face.glyph.bitmap
 
             width = bitmap.width

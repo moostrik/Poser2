@@ -11,6 +11,7 @@ Docs: https://oak-web.readthedocs.io/
 import logging
 import time
 from threading import Thread, Event
+from typing import cast
 
 import depthai as dai
 from numpy import ndarray
@@ -169,11 +170,11 @@ class Camera(Thread):
 
     def _setup_frame_queues(self) -> None:
         assert self.device is not None
-        video: dai.DataOutputQueue = self.device.getOutputQueue(name=VIDEO_STREAM, maxSize=1, blocking=False)  # type: ignore
+        video: dai.DataOutputQueue = self.device.getOutputQueue(name=VIDEO_STREAM, maxSize=1, blocking=False)  # pyright: ignore[reportCallIssue]
         video.addCallback(self._video_callback)
         self.queues.append(video)
         if self.yolo:
-            tracklets: dai.DataOutputQueue = self.device.getOutputQueue(name=TRACKLETS_STREAM, maxSize=1, blocking=False)  # type: ignore
+            tracklets: dai.DataOutputQueue = self.device.getOutputQueue(name=TRACKLETS_STREAM, maxSize=1, blocking=False)  # pyright: ignore[reportCallIssue]
             tracklets.addCallback(self._tracker_callback)
             self.queues.append(tracklets)
 
@@ -190,7 +191,7 @@ class Camera(Thread):
             logger.info(f'{self.device_id} has no IMU — mount orientation will not be measured')
             return
         try:
-            imu: dai.DataOutputQueue = self.device.getOutputQueue(name=IMU_STREAM, maxSize=1, blocking=False)  # type: ignore
+            imu: dai.DataOutputQueue = self.device.getOutputQueue(name=IMU_STREAM, maxSize=1, blocking=False)  # pyright: ignore[reportCallIssue]
             imu.addCallback(self._imu_callback)
             self.queues.append(imu)
             logger.debug(f'{self.device_id} IMU {sensor} reporting mount orientation')
@@ -268,10 +269,10 @@ class Camera(Thread):
                 self._gravity = vector
             else:
                 a: float = IMU_SMOOTHING
-                self._gravity = tuple(                          # type: ignore[assignment]
+                self._gravity = cast(tuple[float, float, float], tuple(
                     previous + a * (current - previous)
                     for previous, current in zip(self._gravity, vector)
-                )
+                ))
         if self._gravity is None:
             return
         tilt, roll = orientation_from_gravity(*self._gravity)
