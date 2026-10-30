@@ -6,7 +6,8 @@ With DEPTH in `video_frame_types` a chunk ends as one `<cam>_<chunk>.mkv` (`chun
 colour frame is written with the newest depth, the pairing the app shows live, so the two streams
 count alike, and a metadata line per frame goes beside them. Before the first depth arrives nothing
 is written. Recordings hold what the camera delivered, mirrored and not straightened, so the
-correction can still be tuned on them."""
+correction can still be tuned on them. Both streams share `keyframe_interval`: a seek in a chunk goes
+to a colour keyframe, so a depth stream with its keyframes elsewhere comes back with its references missing."""
 
 from threading import Thread, Lock, Event
 from pathlib import Path
@@ -102,6 +103,9 @@ class Recorder(Thread):
             for t in self.settings.video_frame_types:
                 vcodec: str = DEPTH_ENCODER if t == FrameType.DEPTH else encoder_name(settings.video_format, settings.video_encoder)
                 self.recorders[c][t] = StreamWriter(vcodec, settings.keyframe_interval, settings.video_quality)
+
+        if FrameType.DEPTH in settings.video_frame_types and settings.keyframe_interval <= 0:
+            logger.warning("keyframe_interval 0 with depth: each encoder picks its own keyframes, so seeking will show the wrong depth")
 
         self.chunk_index = 0
         self.suffix: str = settings.video_format.value

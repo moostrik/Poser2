@@ -85,10 +85,6 @@ class StreamReader:
         if self._play_thread is None:
             self._close()
 
-    def set_end_frame(self, end_frame: int | None) -> None:
-        """Move the end of the range while the stream plays."""
-        self.end_frame = end_frame
-
     def join(self) -> None:
         if self._load_thread is not None:
             self._load_thread.join()
@@ -102,6 +98,8 @@ class StreamReader:
             self.frame_width, self.frame_height, fps = self._get_video_dimensions(video_file)
             if self.fps == 0.0:
                 self.fps = fps
+            # Half a frame early: the seek takes the first frame at or after it, and stamps are rounded.
+            seek: dict[str, float] = {'ss': (start_frame - 0.5) / fps} if start_frame > 0 else {}
         except Exception as e:
             logger.error('Error getting video dimensions of %s: %s', video_file, e)
             self.ffmpeg_process = None
@@ -118,7 +116,7 @@ class StreamReader:
                 {'hwaccel': self.hwaccel, 'hwaccel_device': self.hwaccel_device}
             ffmpeg_process = (
                 ffmpeg
-                .input(video_file, **hardware)[f'v:{self.stream}']
+                .input(video_file, **seek, **hardware)[f'v:{self.stream}']
                 .output('pipe:', format='rawvideo', pix_fmt=pix_fmt)
                 .global_args('-loglevel', 'quiet')
                 .run_async(pipe_stdout=True)
@@ -150,22 +148,13 @@ class StreamReader:
             return
         frame_interval: float = 1.0 / self.fps
 
-        start_frame: int = self.start_frame
-        frame_count: int = 0
-
-        # Skip frames before the start of the requested range (decode & discard,
-        # no callback, no pacing). Bounded by one chunk.
-        while frame_count < start_frame and not self.stop_event.is_set():
-            skip_bytes = self.ffmpeg_process.stdout.read(self.bytes_per_frame)
-            if not skip_bytes:
-                break
-            frame_count += 1
+        end_frame: int | None = self.end_frame
+        frame_count: int = self.start_frame     # the decoder starts there: `_load` seeks
 
         # Absolute schedule on perf_counter (the light clock's pattern): per-iteration sleeps on
         # the coarse wall clock quantize every frame by up to ~16 ms and let errors accumulate.
         next_time: float = time.perf_counter()
         while not self.stop_event.is_set():
-            end_frame: int | None = self.end_frame      # read each frame: `set_end_frame` moves it during play
             if end_frame is not None and frame_count >= end_frame:
                 break
             try:

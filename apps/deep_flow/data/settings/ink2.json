@@ -3,7 +3,7 @@
   "num_cams": 1,
   "input_fps": 60.0,
   "camera": {
-    "keyframe_interval": 0,
+    "keyframe_interval": 60,
     "yolo": true,
     "color": true,
     "resolution": "P720",

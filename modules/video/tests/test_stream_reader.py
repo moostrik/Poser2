@@ -1,4 +1,4 @@
-"""`StreamReader`: the end of its range moves while it plays, and no decoder outlives a reader."""
+"""`StreamReader`: a range starts at its frame, and no decoder outlives a reader."""
 
 import os
 import tempfile
@@ -58,15 +58,14 @@ class StreamReaderTest(unittest.TestCase):
         reader.join()
         self.assertFalse(reader.is_loaded())
 
-    def test_the_end_moves_while_it_plays(self) -> None:
-        reader = self.reader(fps=60.0)
-        reader.load(self.path, 0, 0, 25)
+    def test_a_range_counts_from_its_first_frame(self) -> None:
+        reader = self.reader()
+        reader.load(self.path, 0, 12, 15)
         self.assertTrue(wait_for(reader.is_loaded))
         reader.play()
-        self.assertTrue(wait_for(lambda: len(self.frames) >= 3))
-        reader.set_end_frame(10)
+        self.assertTrue(wait_for(lambda: not reader.is_playing()))
         reader.join()
-        self.assertEqual(self.frames, list(range(10)))
+        self.assertEqual(self.frames, [12, 13, 14])
 
 
 if __name__ == '__main__':

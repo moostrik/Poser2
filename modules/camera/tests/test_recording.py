@@ -28,14 +28,14 @@ def depth_frame(value: int) -> CameraFrame:
     return CameraFrame(0, FrameType.DEPTH, np.full((300, 374), value, np.uint16), 0.0)
 
 
-def recorder(types: list[FrameType], temp: str = 'temp', output: str = 'out', data_path: str = '') -> Recorder:
+def recorder(types: list[FrameType], temp: str = 'temp', output: str = 'out', data_path: str = '', keyframe_interval: int = 1) -> Recorder:
     settings = RecorderSettings()
     settings.video_frame_types = types
     settings.video_encoder = video.CoderType.iGPU
     settings.temp_path = temp
     settings.output_path = output
     settings.fps = 60.0
-    settings.keyframe_interval = 1
+    settings.keyframe_interval = keyframe_interval
     return Recorder(settings, data_path)
 
 

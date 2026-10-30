@@ -5,7 +5,8 @@ chunk is one `.mkv` with colour, depth and metadata (`chunk`), or a colour-only 
 with the streams it has, whatever `video_frame_types` asks for.
 
 The markers belong to the recording: each folder keeps its own in a file, so they survive a restart
-and a change of preset. Moving one leaves playback alone unless the playhead ends up outside them."""
+and a change of preset. Dragging one pauses playback and shows the frame under it, the newest one
+asked for as fast as a frame can be fetched; letting go plays from the in marker."""
 
 import json
 from threading import Thread, Event, Lock
@@ -50,7 +51,8 @@ class PlayerSettings(BaseSettings):
     sim_passthrough:    Field[bool]             = Field(False, description="Passthrough", visible=False)
     replay:             Field[bool]             = Field(False, access=Field.INIT, description="Play on the host without an OAK device: detector and tracker in software")
     playhead:           Field[list[float]]      = Field([0.0, 0.0], access=Field.READ, visible=False, description="Playhead and length of the recording (s)")
-    in_out:             Field[list[float]]      = Field([0.0, 1.0], widget=Widget.timeline, options=playhead, saved=False, label="In / Out", newline=True,
+    scrub:              Field[float]            = Field(-1.0, visible=False, saved=False, description="Where the dragged marker is, as a fraction of the length; -1 when none is")
+    in_out:             Field[list[float]]      = Field([0.0, 1.0], widget=Widget.timeline, options=playhead, drag=scrub, saved=False, label="In / Out", newline=True,
                                                         description="Plays between the two handles; each recording keeps its own")
     current_chunk:      Field[int]              = Field(0, access=Field.READ, description="Current chunk", newline=True)
     max_chunks:         Field[int]              = Field(0, access=Field.READ, description="Total chunks")
@@ -84,11 +86,6 @@ def write_in_out(folder: Path, in_out: list[float]) -> None:
         logger.exception("Could not save the markers in %s", folder)
 
 
-def in_range(position: tuple[int, int], start: tuple[int, int], end: tuple[int, int]) -> bool:
-    """Whether a (chunk, frame) lies in the range, `start` inclusive and `end` exclusive."""
-    return start <= position < end
-
-
 class State(Enum):
     IDLE = auto()
     LOAD = auto()
@@ -97,12 +94,14 @@ class State(Enum):
     STOP = auto()
     STOPPING = auto()
     NEXT = auto()
+    SCRUB = auto()
 
 class MessageType(Enum):
     START = auto()
     STOP = auto()
     NEXT = auto()
-    RANGE = auto()
+    SCRUB = auto()
+    RESUME = auto()
 
 class Message():
     def __init__(self, state: MessageType, value: str = '', prepare: bool = False) -> None:
@@ -136,7 +135,8 @@ class Player(Thread):
 
         self.play_chunk: int = -1
         self.load_chunk: int = -1
-        self.head_frame: int = 0            # where cam 0 is in the chunk playing
+        self.scrub_target: float = -1.0     # where the dragged marker is,
+        self.scrub_shown: float = -1.0      # and the last place a frame was fetched for
         self.num_chunks: int = 0
         self.chunk_frames: list[int] = []
         self.start_chunk: int = 0
@@ -145,7 +145,7 @@ class Player(Thread):
         self.end_offset: int = 0
         self.load_folder: str = ''
         self.active_folder: str = ''        # folder we currently intend to play ('' = stopped)
-        self._loading_markers: bool = False   # a load writes `in_out`: not a move to save or to apply
+        self._loading_markers: bool = False   # a load writes `in_out`: not a move to save
         self.suffix: str = settings.video_format.value
 
         self.folders: FolderDict = self._get_video_folders(settings, data_path)
@@ -178,6 +178,7 @@ class Player(Thread):
         self.settings.bind(PlayerSettings.stop, self._on_stop)
         self.settings.bind(PlayerSettings.folder, self._on_folder_changed)
         self.settings.bind(PlayerSettings.in_out, self._on_in_out)
+        self.settings.bind(PlayerSettings.scrub, self._on_scrub)
         self.settings.bind(PlayerSettings.refresh, self._on_refresh_path)
         self.settings.bind(PlayerSettings.video_path, self._on_refresh_path)
 
@@ -214,13 +215,16 @@ class Player(Thread):
                     state = State.LOAD
                 if message and message.state == MessageType.STOP:
                     state = State.STOP
-                if message and message.state == MessageType.RANGE and state in (State.LOAD, State.LOADING, State.PLAYING):
-                    if state == State.PLAYING and self._head_in_range():
-                        self._apply_range()
-                    else:
-                        self._set_load_chunk(-1)
-                        self._set_play_chunk(-1)
-                        state = State.LOAD
+                if message and message.state == MessageType.SCRUB and state in (State.LOAD, State.LOADING, State.PLAYING):
+                    self._stop()
+                    self.scrub_shown = -1.0
+                    state = State.SCRUB
+                if message and message.state == MessageType.RESUME and state == State.SCRUB:
+                    self._set_load_chunk(-1)
+                    self._set_play_chunk(-1)
+                    state = State.LOAD
+                if state == State.SCRUB:
+                    self._update_scrub()
                 if state == State.LOAD:
                     self._stop()
                     self._load()
@@ -248,8 +252,6 @@ class Player(Thread):
             sleep(0.01)
 
     def _load(self) -> None:
-        folder: Folder = self.folders[self.load_folder]
-
         with self.playback_lock:
             start_chunk: int = self.start_chunk
             start_offset: int = self.start_offset
@@ -261,10 +263,11 @@ class Player(Thread):
         if LC > end_chunk or LC < start_chunk:
             LC = start_chunk
         self._set_load_chunk(LC)
+        self._load_chunk(start_offset if LC == start_chunk else 0, end_offset if LC == end_chunk else None)
 
-        lo: int = start_offset if LC == start_chunk else 0
-        hi: int | None = end_offset if LC == end_chunk else None
-
+    def _load_chunk(self, lo: int, hi: int | None) -> None:
+        """The readers of the load chunk's frames `lo` up to `hi`."""
+        folder: Folder = self.folders[self.load_folder]
         self.load_types = set()
         for c in range(self.num_cams):
             chunk_path: Path = folder.path / make_chunk_name(c, self.load_chunk)
@@ -301,38 +304,35 @@ class Player(Thread):
         with self.sync_lock:
             self.play_types = self.load_types
 
-        with self.playback_lock:
-            self.head_frame = self.loaders[0].start_frame if self.loaders else 0
         for p in self.loaders:
             p.play()
             self.players.append(p)
         self.loaders.clear()
 
-    def _head_in_range(self) -> bool:
+    def _update_scrub(self) -> None:
+        """Show one frame of the dragged position through the normal readers, then the newest
+        position by then: a drag outruns the fetching, and the frames between do not matter."""
+        if self.loaders:
+            if self._finished_loading():
+                self._start()
+            return
         with self.playback_lock:
-            return in_range((self.play_chunk, self.head_frame), (self.start_chunk, self.start_offset), (self.end_chunk, self.end_offset))
+            target: float = self.scrub_target
+            chunk_frames: list[int] = self.chunk_frames
+        total: int = sum(chunk_frames)
+        if target == self.scrub_shown or total <= 0 or not self._finished_playing():
+            return
+        self.scrub_shown = target
+        chunk, frame = self._locate(chunk_frames, min(round(target * total), total - 1))
+        self._set_load_chunk(chunk)
+        self._load_chunk(frame, frame + 1)
 
-    def _apply_range(self) -> None:
-        """The new range on what is playing, without a restart: the readers get their end, and the
-        chunk loaded ahead, which was cut to the old range, is loaded again."""
-        play_chunk: int = self._get_play_chunk()
-        with self.playback_lock:
-            end_frame: int | None = self.end_offset if play_chunk == self.end_chunk else None
-        for p in self.players:
-            p.set_end_frame(end_frame)
-        self._drop_loaders()
-        self._set_load_chunk(play_chunk)
-        self._load()
-
-    def _drop_loaders(self) -> None:
+    def _stop(self) -> None:
+        self._set_play_chunk(-1)
         for p in self.loaders:
             p.stop()
             self.closers.append(p)
         self.loaders.clear()
-
-    def _stop(self) -> None:
-        self._set_play_chunk(-1)
-        self._drop_loaders()
         for p in self.players:
             p.stop()
             self.closers.append(p)
@@ -369,8 +369,6 @@ class Player(Thread):
             return
 
         if cam_id == 0 and frame_type == FrameType.VIDEO:
-            with self.playback_lock:
-                self.head_frame = frame_id
             self.update_gui(frame_id)
 
         sync_frames:dict[FrameType, ndarray] = {}
@@ -562,7 +560,17 @@ class Player(Thread):
         folder: Folder | None = self.folders.get(self.settings.folder)
         if folder is not None:
             write_in_out(folder.path, self.settings.in_out)
-        self.state_messages.put(Message(MessageType.RANGE))     # on the player thread, which owns the readers
+
+    def _on_scrub(self, value: float) -> None:
+        """A marker dragged, or let go at -1. Without a recording playing there is nothing to pause."""
+        if not self.active_folder:
+            return
+        if value < 0.0:
+            self.state_messages.put(Message(MessageType.RESUME))
+            return
+        with self.playback_lock:
+            self.scrub_target = value
+        self.state_messages.put(Message(MessageType.SCRUB))
 
     def update_gui(self, frame_id: int = 0) -> None:
         # Settings writes run share propagation and callbacks on this (reader) thread; a GUI

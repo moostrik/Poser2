@@ -93,7 +93,7 @@ class _CameraCheckSettings(CameraCheckSettings):
 class Oak4Group(BaseSettings):
     num_cams:       Field[int]               = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
     fps:                Field[float]             = Field(60.0, min=1.0, max=120.0, access=Field.INIT, description="Camera frame rate")
-    keyframe_interval:  Field[int]               = Field(1, access=Field.INIT, visible=False, description="Keyframe interval in frames (1 = every frame)")
+    keyframe_interval:  Field[int]               = Field(60, access=Field.INIT, visible=False, description="Keyframe interval in frames, the same for colour and depth")
     yolo:               Field[bool]              = Field(True, access=Field.INIT, description="Enable YOLO person detection")
     color:              Field[bool]              = Field(True, access=Field.INIT, description="Enable color capture")
     resolution:         Field[CameraResolution]  = Field(CameraResolution.P720, access=Field.INIT, description="Delivered size before the crop; the sensor mode follows it")

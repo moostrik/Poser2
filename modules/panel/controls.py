@@ -331,14 +331,16 @@ class Timeline(Control):
 
     The field holds the handles as fractions of the length; ``options`` names a field with the
     position and the length in seconds. The times follow a handle while it is dragged, and the
-    field is written only when the handle is let go, so a drag reaches nobody. The fill is a CSS
-    variable on the bar's parent, not on the range, so a position update leaves a drag alone.
+    field is written only when the handle is let go. Until then ``drag`` names the field that
+    hears where the dragged handle is, and it goes to -1 on release. The fill is a CSS variable on
+    the bar's parent, not on the range, so a position update leaves a drag alone.
     """
     widget = Widget.timeline
 
     def build(self) -> None:
-        assert self.field.options is not None
+        assert self.field.options is not None and self.field.drag is not None
         self.position_field = self.field.options
+        self.drag_field = self.field.drag
         self.position: list[float] = self._read_position()
         with ui.column().classes("w-full gap-0"):
             self.title()
@@ -353,7 +355,22 @@ class Timeline(Control):
         self._show_position()
         self.range.on_value_change(lambda _e: (self._show_times(self._dragged()), self._show_position()))
         if not self.locked:
-            self.range.on("change", lambda e: self.commit([e.args["min"], e.args["max"]]), [None])
+            _commit_while_dragging(self.range, self._drag)
+            self.range.on("change", lambda e: self._release(e.args), [None])
+
+    def _drag(self, handles: dict[str, float]) -> None:
+        """Pass on the handle that left where the field has it. Neither did for the throttle's last
+        event, which can arrive after the release."""
+        start, end = self.shown
+        if handles["min"] != start:
+            setattr(self.settings, self.drag_field.name, handles["min"])
+        elif handles["max"] != end:
+            setattr(self.settings, self.drag_field.name, handles["max"])
+
+    def _release(self, handles: dict[str, float]) -> None:
+        self._drag(handles)     # a click on the bar moves a handle with no drag before it
+        self.commit([handles["min"], handles["max"]])
+        setattr(self.settings, self.drag_field.name, -1.0)
 
     def polls(self) -> bool:
         return True

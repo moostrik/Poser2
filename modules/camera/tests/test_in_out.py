@@ -1,6 +1,7 @@
-"""The in and out markers: the range check, the file a recording keeps them in, and on a real chunk
-what moving one does to playback."""
+"""The in and out markers: the file a recording keeps them in, and on a real chunk what dragging one
+does to playback."""
 
+import subprocess
 import tempfile
 import time
 import unittest
@@ -10,23 +11,10 @@ import numpy as np
 
 from modules import video
 from modules.camera import FrameType, Player, PlayerSettings, make_chunk_name
-from modules.camera.player import IN_OUT_FILE, in_range, read_in_out, write_in_out
+from modules.camera.player import IN_OUT_FILE, read_in_out, write_in_out
 from modules.camera.recorder import RecState
 
 from .test_recording import depth_frame, recorder, video_frame
-
-
-class InRangeTest(unittest.TestCase):
-    def test_in_is_inside_and_out_is_not(self) -> None:
-        self.assertTrue(in_range((0, 10), (0, 10), (0, 20)))
-        self.assertTrue(in_range((0, 19), (0, 10), (0, 20)))
-        self.assertFalse(in_range((0, 20), (0, 10), (0, 20)))
-        self.assertFalse(in_range((0, 9), (0, 10), (0, 20)))
-
-    def test_across_chunks_the_chunk_comes_first(self) -> None:
-        self.assertTrue(in_range((1, 500), (0, 900), (2, 5)))
-        self.assertFalse(in_range((2, 5), (0, 900), (2, 5)))
-        self.assertFalse(in_range((0, 899), (0, 900), (2, 5)))
 
 
 class MarkerFileTest(unittest.TestCase):
@@ -47,8 +35,9 @@ class MarkerFileTest(unittest.TestCase):
 
 
 def record(root: Path, count: int) -> Path:
-    """A recording of `count` frames, one chunk, whose depth tells the frame: 1000 + 30 per frame."""
-    rec = recorder([FrameType.VIDEO, FrameType.DEPTH], str(root / 'temp'), 'recordings', str(root))
+    """A recording of `count` frames, one chunk, with keyframes apart as the presets record them. Both
+    streams tell the frame: the colour by its grey, the depth as 1000 + 30 per frame."""
+    rec = recorder([FrameType.VIDEO, FrameType.DEPTH], str(root / 'temp'), 'recordings', str(root), keyframe_interval=30)
     rec.start()
     rec.settings.start = True
     deadline: float = time.perf_counter() + 10.0
@@ -101,44 +90,84 @@ class PlaybackTest(unittest.TestCase):
 
     def setUp(self) -> None:
         (self.recording / IN_OUT_FILE).unlink(missing_ok=True)
-        self.frames: list[int] = []
+        self.depths: list[int] = []
+        self.colours: list[int] = []
         self.player: Player = make_player(self.root, self.recording)
 
         def on_frame(_cam: int, kind: FrameType, image: np.ndarray, _readings: object) -> None:
             if kind == FrameType.DEPTH:
-                self.frames.append(round((int(np.median(image)) - 1000) / 30))
+                self.depths.append(round((int(np.median(image)) - 1000) / 30))
+            else:
+                self.colours.append(int(np.median(image)))
         self.player.add_frame_callback(on_frame)
 
     def tearDown(self) -> None:
-        self.player.stop()
+        if self.player.is_alive():
+            self.player.stop()
 
-    def test_markers_come_back_on_load(self) -> None:
+    def scrub_to(self, frame: int) -> None:
+        """Drag a marker to a frame, and wait for that frame to arrive."""
+        self.player.settings.scrub = frame / self.COUNT
+        self.assertTrue(wait_for(lambda: self.depths and self.depths[-1] == frame), f'frame {frame}, last {self.depths[-1:]}')
+
+    def test_a_seek_finds_both_streams_whole(self) -> None:
+        """A seek goes to a colour keyframe, so depth needs one there too, and its frames stored in
+        display order: the encoder calls its forward-only frames B as well, so the type says nothing."""
+        chunk = str(self.recording / make_chunk_name(0, 0))
+
+        def packets(stream: int) -> list[tuple[int, bool]]:
+            lines = subprocess.run(['ffprobe', '-hide_banner', '-loglevel', 'error', '-select_streams', f'v:{stream}', '-show_entries', 'packet=pts,flags',
+                                    '-of', 'csv=p=0', chunk], capture_output=True, text=True).stdout.split()
+            return [(int(line.split(',')[0]), 'K' in line) for line in lines]
+        colour, depth = packets(0), packets(1)
+        self.assertEqual(len(colour), self.COUNT)
+        stamps: list[int] = [pts for pts, _key in depth]
+        self.assertEqual(stamps, sorted(stamps))
+        self.assertEqual(sorted(pts for pts, key in colour if key), [pts for pts, key in depth if key])
+
+    def test_markers_come_back_on_load_and_the_seek_finds_in(self) -> None:
         write_in_out(self.recording, [0.5, 1.0])
         self.player.start()
-        self.assertTrue(wait_for(lambda: self.frames))
+        self.assertTrue(wait_for(lambda: self.depths))
         self.assertEqual(self.player.settings.in_out, [0.5, 1.0])
-        self.assertLess(abs(self.frames[0] - self.COUNT // 2), 4)
+        self.assertEqual(self.depths[0], self.COUNT // 2)
 
-    def test_a_move_past_the_playhead_keeps_the_readers(self) -> None:
+    def test_a_drag_pauses_on_the_marker_with_both_streams_of_that_frame(self) -> None:
         self.player.start()
-        self.assertTrue(wait_for(lambda: len(self.frames) > 10))
-        readers = list(self.player.players)
-        self.player.settings.in_out = [0.0, 0.5]
-        self.assertTrue(wait_for(lambda: self.player.end_offset == self.COUNT // 2))
-        time.sleep(0.2)
-        self.assertEqual(self.player.players, readers)
-        self.assertTrue(all(p.end_frame == self.COUNT // 2 for p in readers))
-        self.assertTrue(wait_for(lambda: len(self.frames) > self.COUNT // 2 + 5))
-        self.assertEqual(max(self.frames[:self.COUNT // 2 + 5]), self.COUNT // 2 - 1)   # stopped at out, and on from in
-        self.assertEqual(read_in_out(self.recording), [0.0, 0.5])
+        self.assertTrue(wait_for(lambda: len(self.depths) > 5))
+        for frame in (60, 23, 71):
+            self.scrub_to(frame)
+            self.assertLess(abs(self.colours[-1] - frame), 4)
+        arrived: int = len(self.depths)
+        time.sleep(0.4)
+        self.assertEqual(len(self.depths), arrived)     # one frame each: no playback while paused
 
-    def test_a_marker_moved_before_the_playhead_jumps_to_in(self) -> None:
+    def test_a_drag_keeps_only_the_newest_position(self) -> None:
         self.player.start()
-        self.assertTrue(wait_for(lambda: len(self.frames) > 40))
-        readers = list(self.player.players)
-        self.player.settings.in_out = [0.0, 0.25]
-        self.assertTrue(wait_for(lambda: self.player.players and self.player.players != readers))
-        self.assertTrue(wait_for(lambda: self.frames[-1] < 10))
+        self.assertTrue(wait_for(lambda: len(self.depths) > 5))
+        arrived: int = len(self.depths)
+        for frame in range(10, 40):
+            self.player.settings.scrub = frame / self.COUNT
+        self.assertTrue(wait_for(lambda: self.depths[-1] == 39))
+        self.assertLess(len(self.depths) - arrived, 25)
+
+    def test_letting_go_plays_from_in(self) -> None:
+        self.player.start()
+        self.assertTrue(wait_for(lambda: len(self.depths) > 5))
+        self.scrub_to(60)
+        self.player.settings.in_out = [1 / 3, 1.0]
+        self.player.settings.scrub = -1.0
+        self.assertTrue(wait_for(lambda: self.depths[-1] < 60 or self.player.get_current_chunk() < 0, 3.0))
+        self.assertTrue(wait_for(lambda: 30 <= self.depths[-1] < 40))
+        self.assertEqual(read_in_out(self.recording), [1 / 3, 1.0])
+
+    def test_nothing_playing_nothing_paused(self) -> None:
+        self.player.start()
+        self.assertTrue(wait_for(lambda: self.depths))
+        self.player.settings.stop = True
+        self.assertTrue(wait_for(lambda: self.player.active_folder == ''))
+        self.player.settings.scrub = 0.5
+        self.assertEqual(self.player.scrub_target, -1.0)
 
 
 if __name__ == '__main__':

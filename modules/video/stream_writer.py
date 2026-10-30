@@ -82,6 +82,7 @@ class StreamWriter:
                 output_kwargs = dict(pix_fmt=DEPTH_PIX_FMT if depth else 'yuv420p', vcodec=self.vcodec, r=self.fps)
                 if depth:
                     output_kwargs['q:v'] = DEPTH_QUALITY
+                    output_kwargs['bf'] = 0     # measured: with B-frames a seek in a merged chunk gave depth about 100 mm off, why is not settled
                 elif self.quality > 0:
                     output_kwargs['q:v'] = self.quality
                 if self.keyframe_interval > 0:
