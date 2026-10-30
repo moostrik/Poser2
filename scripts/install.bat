@@ -47,6 +47,7 @@ if /i "%~1"=="oak4" (
     set SYNC_GROUPS=--no-group oak --group oak4
     set UV_PROJECT_ENVIRONMENT=.venv-oak4
     echo [33mOAK4: depthai 3 in .venv-oak4[0m
+    if not exist ".venv-oak4" uv venv .venv-oak4 --prompt poser2-oak4
 )
 uv sync --locked %SYNC_GROUPS%
 if %errorlevel% neq 0 (

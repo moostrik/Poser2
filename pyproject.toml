@@ -55,23 +55,7 @@ name = "pytorch-cu130"
 url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
-# Read by Pylance and the pyright CLI alike, so the Problems panel and a full scan report the same rules.
 [tool.pyright]
-include = ["apps", "modules", "tests", "tools", "scripts", "launcher.py"]
-exclude = [
-    "**/__pycache__",
-    "**/.*",
-    "apps/smile/ComfyUI",               # third party, own .venv, gitignored
-    "apps/smile/data/comfy",            # ComfyUI node, needs ComfyUI's imports
-    "modules/camera/vimba/vimbapython", # vendored SDK
-    "modules/camera/oak4",              # depthai 3 code: scan it against .venv-oak4
-    "apps/oak4_test",                   # depthai 3 code: scan it against .venv-oak4
-    "scripts/test/multicam_barrier.py", # depthai 3 code: scan it against .venv-oak4
-    "tools/models",                     # one-off export scripts; their packages are not in the venv
-]
-stubPath = "modules/inference"         # holds tensorrt.pyi, the types TensorRT does not ship
-venvPath = "."
-venv = ".venv"
-pythonVersion = "3.12"
-pythonPlatform = "Windows"
-typeCheckingMode = "basic"
+typeCheckingMode = "basic"      # this block overrides the VS Code setting
+stubPath = "modules/inference"  # holds tensorrt.pyi
+exclude = ["**/__pycache__", "**/.*", "apps/smile/ComfyUI", "apps/smile/data/comfy", "data/models", "modules/camera/vimba/vimbapython", "modules/camera/oak4", "apps/oak4_test", "scripts/test/multicam_barrier.py", "tools/models"]
