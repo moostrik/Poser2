@@ -10,7 +10,7 @@ from modules.settings import BaseSettings, Field
 # The spine's keypoints: shoulder pair (top) and hip pair (bottom).
 _SHOULDERS: list[PointLandmark] = [PointLandmark.left_shoulder, PointLandmark.right_shoulder]
 _HIPS:      list[PointLandmark] = [PointLandmark.left_hip,      PointLandmark.right_hip]
-_SPINE:     list[PointLandmark] = _SHOULDERS + _HIPS
+_SPINE:     list[PointLandmark | int] = [*_SHOULDERS, *_HIPS]
 
 # A spine shorter than this (isotropic crop units) has no usable direction — the same
 # ~2 % / ~4 px convention AngleUtils uses for too-close keypoints.

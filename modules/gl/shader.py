@@ -10,6 +10,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 from watchdog.observers import Observer
+from watchdog.observers.api import BaseObserver
 from watchdog.events import FileSystemEventHandler
 
 
@@ -29,7 +30,7 @@ class FileModifiedHandler(FileSystemEventHandler):
         if not event.is_directory:
             self.callback(event.src_path)
 
-def monitor_path(path, callback) -> Observer:
+def monitor_path(path, callback) -> BaseObserver:
     event_handler = FileModifiedHandler(callback)
     observer = Observer()
     observer.schedule(event_handler, path=path, recursive=False)

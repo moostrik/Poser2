@@ -79,6 +79,10 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Give public methods return type hints
 - Use `Protocol` or `ABC` as appropriate, and be consistent
 - Prefer `IntEnum` over string keys for dict lookups and identifiers
+- Fix a type error in this order: correct the annotation, narrow with `assert` or `isinstance` where the code already guarantees the type, `cast` to the type the value really has, and suppress only as a last resort
+- Suppress only when a third-party stub is provably wrong or the type system cannot express the code, never to hide an error in our own code
+- Suppress with `# pyright: ignore[<rule>]` on the one line; never add a bare `# type: ignore`
+- Never disable a rule in `[tool.pyright]` to clear errors
 
 ## Imports
 

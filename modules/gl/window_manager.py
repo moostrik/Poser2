@@ -375,7 +375,7 @@ class WindowManager():
         s.unbind_all(self._cb_mouse)
 
         try:
-            glfw.set_monitor_callback(None)  # type: ignore
+            glfw.set_monitor_callback(None)  # pyright: ignore[reportArgumentType]
             self._monitor_cb = None
             self._destroy_secondary_windows()
             if self._main_window and self._quad_buffers:
@@ -685,7 +685,7 @@ class WindowManager():
             posX, posY = glfw.get_monitor_pos(monitor)
             glfw.set_window_attrib(self._main_window, glfw.DECORATED, glfw.FALSE)
             glfw.set_window_monitor(
-                self._main_window, None, posX, posY,  # type: ignore
+                self._main_window, None, posX, posY,  # pyright: ignore[reportArgumentType]
                 video_mode.size.width, video_mode.size.height, 0
             )
             glfw.set_input_mode(self._main_window, glfw.CURSOR, self._cursor_mode(True))
@@ -694,7 +694,7 @@ class WindowManager():
             mon_x, mon_y = glfw.get_monitor_pos(self._monitor) if self._monitor else (0, 0)
             glfw.set_window_attrib(self._main_window, glfw.DECORATED, glfw.TRUE)
             glfw.set_window_monitor(
-                self._main_window, None, mon_x + self.settings.x, mon_y + self.settings.y,  # type: ignore
+                self._main_window, None, mon_x + self.settings.x, mon_y + self.settings.y,  # pyright: ignore[reportArgumentType]
                 self.settings.width, self.settings.height, 0
             )
             glfw.set_input_mode(self._main_window, glfw.CURSOR, glfw.CURSOR_NORMAL)
@@ -715,7 +715,7 @@ class WindowManager():
             video_mode = glfw.get_video_mode(self._monitor)
             posX, posY = glfw.get_monitor_pos(self._monitor)
             glfw.set_window_monitor(
-                self._main_window, None, posX, posY,  # type: ignore
+                self._main_window, None, posX, posY,  # pyright: ignore[reportArgumentType]
                 video_mode.size.width, video_mode.size.height, 0
             )
             return

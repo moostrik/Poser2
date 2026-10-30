@@ -33,10 +33,6 @@ class GaussianBlur(Shader):
         if not source_texture.allocated:
             logger.warning("GaussianBlur shader: input texture not allocated.")
             return
-        if radius <= 0:
-            # No blur, just draw source
-            source_texture.draw(0, 0, source_texture.width, source_texture.height)
-            return
 
         glUseProgram(self.shader_program)
 

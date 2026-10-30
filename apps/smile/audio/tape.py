@@ -16,7 +16,7 @@ CLICK_FADE: float = 0.02        # s of gain fade at both ends against clicks
 def spin_up_speed(progress: np.ndarray | float) -> np.ndarray:
     """The speed at a flash-in progress (0..1): 0 at the start, 1.5 at the peak, 1.16 at the end."""
     xs, ys = zip(*SPIN_UP)
-    speed: np.ndarray = SPIN_UP_GAIN * np.interp(progress, xs, ys)
+    speed: np.ndarray | float = SPIN_UP_GAIN * np.interp(progress, xs, ys)
     return np.where(speed < SPIN_UP_FLOOR, 0.0, speed)
 
 

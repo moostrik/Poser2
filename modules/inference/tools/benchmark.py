@@ -197,6 +197,7 @@ def compare_outputs(outputs: dict[str, np.ndarray], reference: dict[str, np.ndar
 
 
 def main() -> None:
+    assert __doc__ is not None
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('--app', required=True, choices=['white_space', 'hd_trio', 'deep_flow'])
     parser.add_argument('--model-type', default='trt', choices=['trt', 'onnx'])
@@ -229,7 +230,7 @@ def main() -> None:
 
     LOG_DIR.mkdir(exist_ok=True)
     stem = f"inference_{args.app}_{args.model_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-    np.savez_compressed(LOG_DIR / f"{stem}.npz", **outputs)  # type: ignore
+    np.savez_compressed(LOG_DIR / f"{stem}.npz", **outputs)  # pyright: ignore[reportArgumentType]
     report = {
         'app': args.app,
         'model_type': args.model_type,

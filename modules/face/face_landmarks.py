@@ -2,6 +2,7 @@ import cv2
 import logging
 import numpy as np
 import onnxruntime as ort
+from typing import cast
 
 from .face_detector import Face
 
@@ -37,7 +38,7 @@ class FaceLandmarks():
         crop: np.ndarray = cv2.warpAffine(image, matrix, (INPUT_SIZE, INPUT_SIZE), borderValue=(0, 0, 0))
 
         blob: np.ndarray = cv2.dnn.blobFromImage(crop, 1.0, (INPUT_SIZE, INPUT_SIZE), (0.0, 0.0, 0.0), swapRB=True)
-        pred: np.ndarray = self.session.run([self.output_name], {self.input_name: blob})[0][0]
+        pred: np.ndarray = cast(list[np.ndarray], self.session.run([self.output_name], {self.input_name: blob}))[0][0]
         points: np.ndarray = (pred.reshape((-1, 2)) + 1.0) * (INPUT_SIZE // 2)
 
         inverse: np.ndarray = cv2.invertAffineTransform(matrix)

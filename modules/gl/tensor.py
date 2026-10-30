@@ -301,6 +301,7 @@ class Tensor(Texture):
         # torch.cuda.synchronize()
 
         # Map the PBO on the current stream, copy the tensor into it on the device, unmap
+        assert self._cuda_gl_resource is not None
         stream = torch.cuda.current_stream().cuda_stream
         cudart.map_resource(self._cuda_gl_resource, stream)
         try:

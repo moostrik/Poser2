@@ -112,7 +112,7 @@ class Voice:
         for i, (oscillator, patch, strobe, source, push) in enumerate(zip(self._oscillators, self._patches, self._strobe_patches, sources, self._pushes)):
             pitch_source = self._played(patch.pitch_bypass, patch.pitch_curve, float(source.get(Parameter.PITCH, 0.0)))
             pitch = Slot.modulate(patch.pitch, patch.pitch_amount, pitch_source)
-            self._intervals[i] = self._interval(pitch, min_interval)
+            self._intervals[i] = self._interval(float(pitch), min_interval)
             speed_source = self._played(patch.speed_bypass, patch.speed_curve, float(source.get(Parameter.SPEED, 0.0)))
             speed = Slot.modulate(patch.speed, patch.speed_amount, speed_source)
             pushed = push.update(hit, dt, 0.0, patch.push_release_seconds)

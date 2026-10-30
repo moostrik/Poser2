@@ -10,6 +10,7 @@ import json
 import logging
 import time
 from threading import Event, Lock, Thread
+from typing import cast
 
 import cv2
 import numpy as np
@@ -166,4 +167,4 @@ class PersonDetector(Thread):
 
     def _infer(self, batch: np.ndarray) -> np.ndarray:
         assert self._session is not None
-        return self._session.run(None, {self._input_name: batch})[0]
+        return cast(list[np.ndarray], self._session.run(None, {self._input_name: batch}))[0]

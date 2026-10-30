@@ -28,7 +28,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, BinaryIO, Callable
+from typing import Any, BinaryIO, Callable, cast
 
 logger = logging.getLogger('models')
 
@@ -75,7 +75,7 @@ class Manifest:
         return cls([Entry.from_dict(d) for d in data.get('files', [])], Path(path))
 
     def save(self, path: Path | None = None) -> None:
-        target: Path = path or self.path
+        target: Path | None = path or self.path
         if target is None:
             raise ValueError('the manifest has no path')
         with open(target, 'w', encoding='utf-8', newline='\n') as f:
@@ -113,7 +113,7 @@ def _http(url: str, method: str = 'GET', headers: dict[str, str] | None = None) 
     try:
         reply = opener.open(request, timeout=TIMEOUT)
     except urllib.error.HTTPError as e:                     # every non-2xx, the 302 included
-        return Response(e.code, {k.lower(): v for k, v in e.headers.items()}, e)
+        return Response(e.code, {k.lower(): v for k, v in e.headers.items()}, cast(BinaryIO, e))
     return Response(reply.status, {k.lower(): v for k, v in reply.headers.items()}, reply)
 
 
@@ -436,7 +436,7 @@ def main(argv: list[str] | None = None) -> int:
     common.add_argument('--manifest', type=Path, default=MANIFEST, help='the manifest (default comfy/models.json)')
     common.add_argument('--models', type=Path, default=MODELS, help='the models folder (default ComfyUI\\models)')
     common.add_argument('-v', '--verbose', action='store_true', help='debug logging')
-    sub = parser.add_subparsers(dest='command', required=True, parser_class=lambda **kw: argparse.ArgumentParser(parents=[common], **kw))
+    sub = parser.add_subparsers(dest='command', required=True, parser_class=lambda **kw: argparse.ArgumentParser(parents=[common], **kw))  # pyright: ignore[reportArgumentType]
     p = sub.add_parser('check', help='every manifest file ok / missing / wrong size / corrupt, extras listed')
     p.add_argument('--quick', action='store_true', help='sizes only, no hashing')
     p = sub.add_parser('install', help='fetch every file that is not ok: a copy from the mirror, else the source')

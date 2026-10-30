@@ -165,7 +165,7 @@ def add_pose_detector(pipeline: dai.Pipeline, frames: dai.Node.Output, archive_p
     """The one-model chain: the pose model on the delivered frame, the device's object tracker on
     its detections, and the tracklets out. The archive's config tells the network how to decode the
     boxes and the 17 keypoints, so no decode of ours; each tracklet's source detection carries them."""
-    network = add_detector(pipeline, frames, dai.NNArchive(str(archive_path)))
+    network = add_detector(pipeline, frames, dai.NNArchive(archive_path))
     return add_tracker(pipeline, network.passthrough, network.out)
 
 
@@ -224,11 +224,11 @@ def add_pose_chain(pipeline: dai.Pipeline, frames: dai.Node.Output, fps: float, 
         if level is not None:
             os.environ['DEPTHAI_LEVEL'] = level
 
-    detector = add_detector(pipeline, frames, dai.NNArchive(str(detector_archive)))
+    detector = add_detector(pipeline, frames, dai.NNArchive(detector_archive))
     persons: ImgDetectionsFilter = pipeline.create(ImgDetectionsFilter).build(detector.out)
     persons.keepLabels([TRACKER_PERSON_LABEL])
 
-    pose = dai.NNArchive(str(pose_archive))
+    pose = dai.NNArchive(pose_archive)
     crop_size: tuple[int, int] | None = pose.getInputSize()
     if crop_size is None:
         raise ValueError(f'{pose_archive.name} names no input size')
@@ -236,7 +236,7 @@ def add_pose_chain(pipeline: dai.Pipeline, frames: dai.Node.Output, fps: float, 
         persons.out, outputSize=crop_size, resizeMode=dai.ImageManipConfig.ResizeMode.LETTERBOX,
         padding=POSE_CROP_PADDING).build(frames)
     network: ParsingNeuralNetwork = pipeline.create(ParsingNeuralNetwork).build(cropper.out, pose)
-    network.getParser(0).setScoreThreshold(0.0)
+    network.getParser(0).setScoreThreshold(0.0)  # pyright: ignore[reportAttributeAccessIssue]
     gather: GatherData = pipeline.create(GatherData).build(int(round(fps)), network.out, persons.out)
 
     tracklets: dai.Node.Output = add_tracker(pipeline, detector.passthrough, persons.out)

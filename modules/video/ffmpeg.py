@@ -4,6 +4,7 @@ The apps run under pythonw, so every process is started with CREATE_NO_WINDOW
 and without inheriting stdin or stderr, which are invalid handles there. stderr is a pipe that is
 read when the process ends, so a failure has a message."""
 
+import io
 import json
 import logging
 import os
@@ -66,7 +67,7 @@ def popen(args: list[str], stdin, stdout, command: str = FFMPEG, background: boo
 PIPE_SIZE: int = 8 << 20     # the default Windows pipe holds 4 KB: reading a clip through it takes 6 times as long
 
 
-def _big_pipe() -> tuple[BinaryIO, int]:
+def _big_pipe() -> tuple[io.FileIO, int]:
     """A pipe with a large buffer: (unbuffered read file, write descriptor to hand to the child)."""
     if os.name == 'nt':
         import _winapi

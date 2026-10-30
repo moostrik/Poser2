@@ -22,6 +22,7 @@ def _change(base: float, new: float) -> float:
 
 
 def main() -> int:
+    assert __doc__ is not None
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('baseline', type=Path)
     parser.add_argument('new', type=Path)

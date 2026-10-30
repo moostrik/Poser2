@@ -5,13 +5,13 @@ over together, with a range on the timeline and the panel's playback readouts. I
 from threading import Thread, Event, Lock
 from pathlib import Path
 from numpy import ndarray
-from typing import Callable, TypeAlias
+from typing import Callable, TypeAlias, cast
 from enum import Enum, auto
 from queue import Queue
 from time import perf_counter, sleep
 
 from modules.settings import BaseSettings, Field, Widget
-from modules.video import CoderType, CoderFormat, hwaccel, StreamReader
+from modules.video import CoderType, CoderFormat, hwaccel, StreamFrameCallback, StreamReader
 
 from .frame import FrameType
 from .recorder import make_file_name
@@ -228,7 +228,7 @@ class Player(Thread):
                 if path.is_file():
 
                     color: bool = t == FrameType.VIDEO and not self.gray
-                    player: StreamReader = StreamReader(c, t, self._frame_sync_callback, color, self.hwaccel, self.hwaccel_device, self.fps)
+                    player: StreamReader = StreamReader(c, t, cast(StreamFrameCallback, self._frame_sync_callback), color, self.hwaccel, self.hwaccel_device, self.fps)
                     player.load(str(path), self.load_chunk, lo, hi)
                     self.loaders.append(player)
                 else:

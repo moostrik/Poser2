@@ -2,6 +2,7 @@ import cv2
 import logging
 import numpy as np
 import onnxruntime as ort
+from typing import cast
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +58,7 @@ class FaceDetector():
     def _get_anchor_centers(self, stride: int) -> np.ndarray:
         if stride not in self._anchor_centers:
             size: int = INPUT_SIZE // stride
-            centers: np.ndarray = np.stack(np.mgrid[:size, :size][::-1], axis=-1).astype(np.float32)
+            centers: np.ndarray = np.stack(list(np.mgrid[:size, :size][::-1]), axis=-1).astype(np.float32)
             centers = (centers * stride).reshape((-1, 2))
             self._anchor_centers[stride] = np.stack([centers] * NUM_ANCHORS, axis=1).reshape((-1, 2))
         return self._anchor_centers[stride]
@@ -71,7 +72,7 @@ class FaceDetector():
         det_image[:resized.shape[0], :resized.shape[1]] = resized
 
         blob: np.ndarray = cv2.dnn.blobFromImage(det_image, 1.0 / INPUT_STD, (INPUT_SIZE, INPUT_SIZE), (INPUT_MEAN, INPUT_MEAN, INPUT_MEAN), swapRB=True)
-        outputs: list = self.session.run(self.output_names, {self.input_name: blob})
+        outputs: list[np.ndarray] = cast(list[np.ndarray], self.session.run(self.output_names, {self.input_name: blob}))
 
         scores_list: list[np.ndarray] = []
         bboxes_list: list[np.ndarray] = []
