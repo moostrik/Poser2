@@ -43,7 +43,7 @@ depth cam pose synchony detection
 
 ### Install Script
 * in the terminal run ```scripts\install.bat```: it pulls the LFS files and builds `.venv` from `uv.lock` (run it again after every pull that changes `uv.lock`)
-* a PC with OAK4 cameras runs ```scripts\install.bat oak4``` instead: depthai 3 in place of depthai 2, and the apps use the `oak4` backend; `install.bat` without the argument puts depthai 2 back
+* for OAK4 cameras also run ```scripts\install.bat oak4```: it builds a second venv, `.venv-oak4`, with depthai 3 in place of depthai 2; `.venv` keeps depthai 2, so both stay installed. An app started with `.venv-oak4\Scripts\python` uses the `oak4` backend (```.venv-oak4\Scripts\python launcher.py -app oak4_test```), one started with `.venv` the OAK-D's `oak` backend. Run it again after every pull that changes `uv.lock`, like `install.bat`
 * and make the models for an app ```scripts/makemodels.bat <app_name>``` or all apps ```scripts/makemodels.bat all``` using the .venv environment; it skips the engines that exist, ```scripts/makemodels.bat all rebuild``` builds them again (needed after a TensorRT upgrade: an engine only runs on the version that built it)
 * The CUDA runtime comes with torch's wheel (CUDA 13) and TensorRT builds the engines from Python, so no CUDA toolkit is installed; the NVIDIA driver has to support CUDA 13
 

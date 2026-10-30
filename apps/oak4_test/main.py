@@ -3,7 +3,7 @@
 The camera finds the people and their keypoints itself (`pose_chain`: one model, or a detector and a pose
 model on each person's crop), so the PC runs no crop and no pose model: the tracker follows the camera's
 tracklets, `PosesFromTracklets` turns them into poses, and the pose pipeline cleans, smooths and interpolates
-them for the window. Runs on a depthai 3 install (`scripts\\install.bat oak4`); there is no simulator.
+them for the window. Runs in `.venv-oak4`, the depthai 3 venv (`scripts\\install.bat oak4`); there is no simulator.
 """
 
 from functools import partial

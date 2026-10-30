@@ -1,5 +1,5 @@
 """The hand-over of depthai's tracklets to the contract: every device status maps. Runs on a
-depthai 3 install (`install.bat oak4`); the oak backend has the same test for depthai 2."""
+depthai 3 install (`.venv-oak4`); the oak backend has the same test for depthai 2."""
 
 import unittest
 
