@@ -25,6 +25,9 @@ html { overflow-y: scroll; }
 .poser-number-list .q-field--dense .q-field__control, .poser-number-list .q-field--dense .q-field__native,
 .poser-number-list .q-field--dense .q-field__marginal { height: 24px; min-height: 24px; padding-top: 0; padding-bottom: 0; }
 
+/* The timeline: the range's blue fills `--played` of the way from the in handle to the out handle. */
+.poser-timeline .q-slider__selection { background: linear-gradient(to right, currentColor var(--played), transparent var(--played)); }
+
 /* The knob (knob.js). */
 .poser-knob { display: flex; align-items: center; gap: 6px; }
 .poser-knob-caption { display: flex; flex-direction: column; align-items: flex-end; min-width: 56px; max-width: 110px; }

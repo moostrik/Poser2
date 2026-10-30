@@ -218,7 +218,7 @@ class BaseSettings:
     def to_dict(self, *, _exclude: set[str] | None = None) -> dict[str, Any]:
         """Serialize mutable fields to a dict.
 
-        Excludes ``Access.READ`` fields and ``Widget.button`` fields.
+        Excludes ``Access.READ`` fields, ``Widget.button`` fields and ``saved=False`` fields.
         ``Access.INIT`` fields **are** included (they are editable in JSON but
         cannot be changed at runtime after construction).
 
@@ -230,7 +230,7 @@ class BaseSettings:
         for name, field in self._fields.items():
             if name in exclude:
                 continue
-            if field.access is Access.READ or field.widget == Widget.button:
+            if field.access is Access.READ or field.widget == Widget.button or not field.saved:
                 continue
             result[name] = field.to_json_value(self)
         for name, child in self._children.items():

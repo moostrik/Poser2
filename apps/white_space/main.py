@@ -252,7 +252,7 @@ class WhiteSpaceMain:
             'max_players': self.settings.max_players,
             'fps': self.settings.camera.fps,
             'track': self.settings.tracker.to_dict(),
-            'source': {'folder': sim.folder, 'start': sim.start_norm, 'end': sim.end_norm}
+            'source': {'folder': sim.folder, 'start': sim.in_out[0], 'end': sim.in_out[1]}
                       if self.player else None,
         }
 

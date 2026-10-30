@@ -350,9 +350,7 @@
       "apply_warp": false,
       "folder": "20261023-163234_ICK",
       "sim_passthrough": false,
-      "replay": false,
-      "start_norm": 0.0,
-      "end_norm": 1.0
+      "replay": false
     },
     "person_detector": {
       "model": "yolov8n_coco_512x448.onnx",

@@ -7,24 +7,25 @@
     "yolo": true,
     "color": true,
     "resolution": "P720",
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "fov": 102.0,
+    "split_seconds": 60,
     "cam_0": {
       "device_id": "",
       "link": "USB",
       "pose_chain": "DETECTOR",
       "depth_model": "NEURAL_480",
-      "tilt": {
-        "enabled": true,
-        "offset": -0.5
-      },
       "keystone": 0.0,
       "lens_fov": 0.0,
       "lens_center_x": 0.0,
       "lens_center_y": 0.0,
       "flip_h": true,
       "flip_v": false,
+      "tilt": {
+        "enabled": true,
+        "offset": -0.5
+      },
       "sensor": {
         "exposure": 16277,
         "iso": 5832,
@@ -57,9 +58,7 @@
       "apply_warp": false,
       "folder": "20260612-131225_keyframes",
       "sim_passthrough": false,
-      "replay": true,
-      "start_norm": 0.0,
-      "end_norm": 1.0
+      "replay": true
     },
     "person_detector": {
       "model": "yolov8n_coco_512x448.onnx",
@@ -68,11 +67,15 @@
       "overlap": 0.5,
       "verbose": false
     },
+    "control": {
+      "output_path": "recordings",
+      "name": ""
+    },
     "recorder": {
       "temp_path": "temp",
       "video_encoder": "iGPU",
-      "video_quality": 24,
       "video_format": "H264",
+      "video_quality": 24,
       "video_frame_types": [
         "VIDEO",
         "DEPTH"

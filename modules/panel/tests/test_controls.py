@@ -7,7 +7,7 @@ from modules.settings import BaseSettings, Field, Widget
 from modules.utils import Color, Point2f, Rect
 
 from ..controls import (CONTROLS, Control, Fallback, access_css_class, control_class, format_readout,
-                        generate_label)
+                        format_time, generate_label)
 
 
 class Mode(Enum):
@@ -98,6 +98,10 @@ class TestHelpers(unittest.TestCase):
         self.assertEqual(access_css_class(probe.fields["gain"]), "poser-input")
         self.assertEqual(access_css_class(probe.fields["readout"]), "poser-feedback")
         self.assertEqual(access_css_class(probe.fields["port"]), "poser-init")
+
+    def test_format_time(self):
+        self.assertEqual(format_time(0.0), "0:00.0")
+        self.assertEqual(format_time(65.3), "1:05.3")
 
     def test_format_readout(self):
         self.assertEqual(format_readout(True), "on")

@@ -54,9 +54,7 @@
       "apply_warp": false,
       "folder": "20260612-131225_keyframes",
       "sim_passthrough": false,
-      "replay": true,
-      "start_norm": 0.0,
-      "end_norm": 1.0
+      "replay": true
     },
     "person_detector": {
       "model": "yolov8n_coco_512x448.onnx",

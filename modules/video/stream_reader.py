@@ -64,7 +64,6 @@ class StreamReader:
         return not self.is_loading() and not self.is_playing()
 
     def load(self, video_file: str, chunk_id: int, start_frame: int = 0, end_frame: int | None = None) -> None:
-        self.stop()
         self._load_thread = Thread(target=self._load, args=(video_file, chunk_id, start_frame, end_frame))
         self._load_thread.start()
 
@@ -80,8 +79,15 @@ class StreamReader:
         self._play_thread.start()
 
     def stop(self) -> None:
-        if self._play_thread is not None:
-            self.stop_event.set()
+        """End the reader for good. One that never played ends its decoder here: nothing else would,
+        and a reader still loading ends it when the load is done."""
+        self.stop_event.set()
+        if self._play_thread is None:
+            self._close()
+
+    def set_end_frame(self, end_frame: int | None) -> None:
+        """Move the end of the range while the stream plays."""
+        self.end_frame = end_frame
 
     def join(self) -> None:
         if self._load_thread is not None:
@@ -127,6 +133,16 @@ class StreamReader:
             self.chunk_id = chunk_id
             self.start_frame = start_frame
             self.end_frame = end_frame
+        if self.stop_event.is_set():
+            self._close()
+
+    def _close(self) -> None:
+        with self._load_lock:
+            process, self.ffmpeg_process = self.ffmpeg_process, None
+        if process is not None:
+            process.stdout.close()
+            process.terminate()
+            process.wait()
 
     def _play(self) -> None:
         if self.ffmpeg_process is None:
@@ -135,7 +151,6 @@ class StreamReader:
         frame_interval: float = 1.0 / self.fps
 
         start_frame: int = self.start_frame
-        end_frame: int | None = self.end_frame
         frame_count: int = 0
 
         # Skip frames before the start of the requested range (decode & discard,
@@ -150,6 +165,7 @@ class StreamReader:
         # the coarse wall clock quantize every frame by up to ~16 ms and let errors accumulate.
         next_time: float = time.perf_counter()
         while not self.stop_event.is_set():
+            end_frame: int | None = self.end_frame      # read each frame: `set_end_frame` moves it during play
             if end_frame is not None and frame_count >= end_frame:
                 break
             try:
@@ -177,9 +193,7 @@ class StreamReader:
                 time.sleep(remaining)
             elif -remaining > frame_interval:
                 next_time = time.perf_counter()   # resync after a stall rather than bursting catch-up frames
-        self.ffmpeg_process.stdout.close()
-        self.ffmpeg_process.terminate()
-        self.ffmpeg_process = None
+        self._close()
 
     @staticmethod
     def frame_count(video_file: str) -> int:

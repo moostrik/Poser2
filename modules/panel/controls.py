@@ -320,6 +320,80 @@ def _slider_width(field: Field) -> str:
     return f"w-{field.width}" if field.width is not None else f"w-{SLIDER_WIDTH}"
 
 
+def format_time(seconds: float) -> str:
+    """Seconds as a timeline shows them: ``1:05.3``."""
+    minutes: int = int(seconds // 60)
+    return f"{minutes}:{seconds - minutes * 60:04.1f}"
+
+
+class Timeline(Control):
+    """One bar with two handles, filling from the in handle up to the position, and the three times below.
+
+    The field holds the handles as fractions of the length; ``options`` names a field with the
+    position and the length in seconds. The times follow a handle while it is dragged, and the
+    field is written only when the handle is let go, so a drag reaches nobody. The fill is a CSS
+    variable on the bar's parent, not on the range, so a position update leaves a drag alone.
+    """
+    widget = Widget.timeline
+
+    def build(self) -> None:
+        assert self.field.options is not None
+        self.position_field = self.field.options
+        self.position: list[float] = self._read_position()
+        with ui.column().classes("w-full gap-0"):
+            self.title()
+            with ui.element("div").classes("poser-timeline w-full") as self.bar:
+                self.range = ui.range(min=0.0, max=1.0, step=0.0001, value=self._handles(self.shown)).props(
+                    "dense" + self.lock()).classes("w-full")
+            with ui.row().classes("w-full justify-between flex-nowrap"):
+                self.in_time = ui.label()
+                self.head_time = ui.label()
+                self.out_time = ui.label()
+        self._show_times(self.shown)
+        self._show_position()
+        self.range.on_value_change(lambda _e: (self._show_times(self._dragged()), self._show_position()))
+        if not self.locked:
+            self.range.on("change", lambda e: self.commit([e.args["min"], e.args["max"]]), [None])
+
+    def polls(self) -> bool:
+        return True
+
+    def poll(self) -> None:
+        position: list[float] = self._read_position()
+        if position != self.position:
+            self.position = position
+            self._show_position()
+            self._show_times(self._dragged())
+        super().poll()
+
+    def show(self, value: Any) -> None:
+        self.range.set_value(self._handles(value))
+
+    @staticmethod
+    def _handles(value: list[float]) -> dict[str, float]:
+        return {"min": value[0], "max": value[1]}
+
+    def _read_position(self) -> list[float]:
+        return getattr(self.settings, self.position_field.name)
+
+    def _dragged(self) -> list[float]:
+        """Where the handles stand now, which during a drag is not what the field holds."""
+        return [self.range.value["min"], self.range.value["max"]]
+
+    def _show_times(self, value: list[float]) -> None:
+        length: float = self.position[1]
+        self.in_time.set_text(format_time(value[0] * length))
+        self.out_time.set_text(format_time(value[1] * length))
+
+    def _show_position(self) -> None:
+        position, length = self.position
+        start, end = self._dragged()
+        head: float = position / length if length > 0.0 else 0.0
+        played: float = (head - start) / (end - start) if end > start else 0.0
+        self.bar.style(f"--played: {100.0 * max(0.0, min(1.0, played)):.2f}%")
+        self.head_time.set_text(format_time(position))
+
+
 class Slider(Control):
     """A slider with a number input beside its title; the input commits typed values, clamped."""
     widget = Widget.slider
@@ -987,8 +1061,8 @@ def build_entry(settings: BaseSettings, name: str, field: Field) -> Control:
     wiring = _wiring_css_class(settings, name)
     if wiring:
         css = f"{css} {wiring}"
-    if Widget.resolve(field) is Widget.textarea:
-        css = f"{css} w-full"   # a text area takes a whole row of its card
+    if Widget.resolve(field) in (Widget.textarea, Widget.timeline):
+        css = f"{css} w-full"   # takes a whole row of its card
     if field.widget == Widget.button:
         with ui.element("div").classes(css):
             return ActionButton(settings, name, field)

@@ -259,6 +259,12 @@ class TestSerialization(unittest.TestCase):
         d = s.to_dict()
         self.assertNotIn("fps", d)
 
+    def test_to_dict_excludes_a_field_not_saved(self):
+        class Marked(BaseSettings):
+            kept = Field(1)
+            elsewhere = Field(2, saved=False)
+        self.assertEqual(Marked().to_dict(), {"kept": 1})
+
     def test_to_dict_includes_writable(self):
         s = CameraSettings()
         d = s.to_dict()

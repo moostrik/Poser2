@@ -40,6 +40,7 @@ class Widget(Enum):
     number = auto()
     knob = auto()
     number_field = auto()
+    timeline = auto()       # in and out handles on a bar: a two-item list, with ``options`` naming the [position, length] field
     # enum widgets
     select = auto()
     radio = auto()
@@ -174,6 +175,7 @@ _TYPES: dict[Widget, tuple[type, ...] | None] = {
     Widget.number: (int, float),
     Widget.knob: (int, float),
     Widget.number_field: (int, float),
+    Widget.timeline: (list,),
     Widget.select: (Enum,),
     Widget.radio: (Enum,),
     Widget.input: (str,),
