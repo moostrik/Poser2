@@ -45,6 +45,7 @@ class FlowDrawMode(IntEnum):
         KINETIC_FAST / KINETIC_SLOW - The two trails (RG16F)
         KINETIC_ACCELERATION - Along the motion in two colors: + onset warm, - release cold
         KINETIC_TURN - Across the motion in two colors
+        KINETIC_HELD_RELEASE - The peak-held release
     """
     OPTICAL_INPUT = 0
     OPTICAL_OUTPUT = auto()
@@ -61,6 +62,7 @@ class FlowDrawMode(IntEnum):
     KINETIC_SLOW = auto()
     KINETIC_ACCELERATION = auto()
     KINETIC_TURN = auto()
+    KINETIC_HELD_RELEASE = auto()
 
 
 class FlowLayerSettings(BaseSettings):
@@ -247,15 +249,18 @@ class FlowLayer(LayerBase):
 
         # Stage 2: Bridges
         velocity: Texture
+        ink: Texture    # what the density bridge reads as alpha, through its length
         if self.settings.bridge == FlowBridge.KINETIC:
             if new_flow:
                 self._kinetic_bridge.set_velocity(self._optical_flow.velocity)
                 self._kinetic_bridge.update(self._flow_interval)
             velocity = self._kinetic_bridge.velocity
+            ink = self._kinetic_bridge.emission
         else:
             self._velocity_trail.set_velocity(self._optical_flow.velocity)
             self._velocity_trail.update()
             velocity = self._velocity_trail.velocity
+            ink = velocity
 
         if new_flow:
             self._flow_interval = 0.0
@@ -266,7 +271,7 @@ class FlowLayer(LayerBase):
         # self._density_bridge.set_color(self._flow_input)
         self._density_bridge.set_color(self._density_input)
         # self._density_bridge.update(motion)
-        self._density_bridge.set_velocity(velocity)
+        self._density_bridge.set_velocity(ink)
         self._density_bridge.update()
 
         self._temperature_bridge.set_color(self._density_input)
@@ -301,6 +306,7 @@ class FlowLayer(LayerBase):
         textures = {
             FlowDrawMode.KINETIC_ACCELERATION: self._kinetic_bridge.acceleration,
             FlowDrawMode.KINETIC_TURN: self._kinetic_bridge.turn,
+            FlowDrawMode.KINETIC_HELD_RELEASE: self._kinetic_bridge.held_release,
         }
         return textures.get(self.settings.draw_mode)
 

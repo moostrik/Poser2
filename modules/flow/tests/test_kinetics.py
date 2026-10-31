@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import decay_weight, project
+from modules.flow import decay_weight, drop, hold_release, project
 
 
 def trails(flow: list[float], fast_time: float = 25.0, slow_time: float = 150.0, dt: float = 1 / 60) -> tuple[np.ndarray, np.ndarray]:
@@ -78,6 +78,38 @@ class ProjectTest(unittest.TestCase):
         fast, slow = trails(list(1.0 + 0.5 * np.sin(2 * np.pi * 0.25 * t)))
         acceleration, _ = project(fast, slow)
         self.assertLess(np.abs(acceleration[300:]).max(), 0.1)
+
+
+class ReleaseTest(unittest.TestCase):
+    def test_onset_holds_nothing(self) -> None:
+        self.assertEqual(hold_release(np.array([2.0]), np.zeros(1), 0.5)[0], 0.0)
+
+    def test_one_stop_is_one_blob(self) -> None:
+        release: list[float] = [0.0, 1.0, 0.1, 0.8, 0.1, 0.0]           # a flickering stop
+        held = np.zeros(1)
+        output: list[float] = []
+        for value in release:
+            held = hold_release(np.array([-value]), held, decay_weight(1 / 60, 100.0))
+            output.append(float(held[0]))
+        self.assertTrue(all(value > 0.6 for value in output[1:5]))      # it never falls away between the peaks
+        self.assertGreater(output[1], output[-1])
+
+    def test_a_full_stop_leaves_the_slow_trail(self) -> None:
+        fast, slow = np.zeros((1, 2)), np.array([[1.0, 0.0]])
+        velocity = drop(fast, slow, np.array([-1.0]), 1.0)
+        np.testing.assert_allclose(velocity, slow)
+
+    def test_no_drop_keeps_the_fast_trail(self) -> None:
+        fast, slow = np.array([[0.5, 0.0]]), np.array([[1.0, 0.0]])
+        np.testing.assert_allclose(drop(fast, slow, np.array([-0.5]), 0.0), fast)
+
+    def test_an_onset_keeps_the_fast_trail(self) -> None:
+        fast, slow = np.array([[2.0, 0.0]]), np.array([[1.0, 0.0]])
+        np.testing.assert_allclose(drop(fast, slow, np.array([1.0]), 1.0), fast)
+
+    def test_no_slow_trail_divides_by_nothing(self) -> None:
+        velocity = drop(np.zeros((1, 2)), np.zeros((1, 2)), np.array([0.0]), 1.0)
+        np.testing.assert_allclose(velocity, np.zeros((1, 2)))
 
 
 if __name__ == '__main__':

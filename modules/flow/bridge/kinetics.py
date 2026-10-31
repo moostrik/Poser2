@@ -30,3 +30,15 @@ def project(fast: np.ndarray, slow: np.ndarray) -> tuple[np.ndarray, np.ndarray]
     acceleration: np.ndarray = np.sum(d * unit, axis=-1)
     turn: np.ndarray = unit[..., 0] * d[..., 1] - unit[..., 1] * d[..., 0]
     return acceleration, turn
+
+
+def hold_release(acceleration: np.ndarray, held: np.ndarray, decay: float) -> np.ndarray:
+    """The peak-held release: the new release, or what remains of the last one when that is more."""
+    return np.maximum(np.maximum(0.0, -acceleration), held * decay)
+
+
+def drop(fast: np.ndarray, slow: np.ndarray, acceleration: np.ndarray, amount: float) -> np.ndarray:
+    """The velocity output: the fast trail, blended to the slow one by `amount` * the release relative to the slow speed."""
+    release: np.ndarray = np.maximum(0.0, -acceleration)
+    weight: np.ndarray = np.clip(release / np.maximum(np.linalg.norm(slow, axis=-1), EPSILON), 0.0, 1.0)
+    return fast + (slow - fast) * (amount * weight)[..., None]
