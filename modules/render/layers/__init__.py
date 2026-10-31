@@ -9,7 +9,7 @@ from .center import   CenterGeometry, CenterGeometrySettings, SnapPoint, CenterC
 from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOffset, FEATURE_MAP, TRACK_COLOR_FEATURES, \
                       FeatureFrameLayer, FeatureWindowLayer, MotionTimeRenderer, MotionTimeRendererSettings, \
                       PoseLineLayer, PoseLineLayerSettings
-from .flow import     FlowLayer, FlowLayerSettings, FlowDrawMode, \
+from .flow import     FlowLayer, FlowLayerSettings, FlowDrawMode, FlowBridge, \
                       FluidLayer, FluidLayerSettings, FluidDrawMode, \
                       Fluid3DLayer, Fluid3DLayerSettings
 from .generic import  CompositeLayer, CompositeLayerSettings, LutSettings, \

@@ -13,6 +13,7 @@ from modules.settings import Field, BaseSettings, Group
 from modules.flow import (
     OpticalFlow, OpticalFlowSettings,
     VelocitySmoothTrail, SmoothTrailSettings,
+    KineticBridge, KineticBridgeSettings,
     Magnitude, VelocityMagnitude,
     TemperatureBridge, TemperatureBridgeSettings,
     DensityBridge, DensityBridgeSettings,
@@ -20,6 +21,12 @@ from modules.flow import (
 )
 
 from modules.utils import HotReloadMethods
+
+
+class FlowBridge(IntEnum):
+    """Which bridge produces the velocity, density and temperature the fluid reads."""
+    TRAIL = 0       # a smoothed velocity, ink where there is speed
+    KINETIC = auto()  # two trails, reading the change of the motion
 
 
 class FlowDrawMode(IntEnum):
@@ -33,6 +40,11 @@ class FlowDrawMode(IntEnum):
         SMOOTH_VELOCITY_OUTPUT - Smoothed velocity (RG32F)
         DENSITY_BRIDGE_OUTPUT - Colored density (RGBA32F)
         TEMPERATURE_BRIDGE_OUTPUT - Temperature field (R32F)
+
+    Kinetic bridge:
+        KINETIC_FAST / KINETIC_SLOW - The two trails (RG16F)
+        KINETIC_ACCELERATION - Along the motion in two colors: + onset warm, - release cold
+        KINETIC_TURN - Across the motion in two colors
     """
     OPTICAL_INPUT = 0
     OPTICAL_OUTPUT = auto()
@@ -45,6 +57,10 @@ class FlowDrawMode(IntEnum):
     TEMPERATURE_BRIDGE_INPUT_COLOR = auto()
     TEMPERATURE_BRIDGE_INPUT_MASK = auto()
     TEMPERATURE_BRIDGE_OUTPUT = auto()
+    KINETIC_FAST = auto()
+    KINETIC_SLOW = auto()
+    KINETIC_ACCELERATION = auto()
+    KINETIC_TURN = auto()
 
 
 class FlowLayerSettings(BaseSettings):
@@ -55,10 +71,12 @@ class FlowLayerSettings(BaseSettings):
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
+    bridge: Field[FlowBridge] =             Field(FlowBridge.TRAIL, description="The bridge the fluid reads")
 
     visualization      = Group(VisualizationFieldSettings)
     optical_flow       = Group(OpticalFlowSettings)
     velocity_trail     = Group(SmoothTrailSettings)
+    kinetic_bridge     = Group(KineticBridgeSettings)
     density_bridge     = Group(DensityBridgeSettings)
     temperature_bridge = Group(TemperatureBridgeSettings)
 
@@ -68,7 +86,7 @@ class FlowLayer(LayerBase):
 
     Computes optical flow and prepares velocity/density/temperature for fluid simulation:
     1. OpticalFlow: Computes motion from source frames
-    2. VelocitySmoothTrail: Smooths velocity temporally
+    2. VelocitySmoothTrail or KineticBridge (settings.bridge): The velocity for the fluid
     3. DensityBridge: Combines RGB density with velocity info
     4. TemperatureBridge: Generates temperature field
 
@@ -106,6 +124,7 @@ class FlowLayer(LayerBase):
 
         self._optical_flow: OpticalFlow = OpticalFlow(self.settings.optical_flow)
         self._velocity_trail: VelocitySmoothTrail = VelocitySmoothTrail(self.settings.velocity_trail)
+        self._kinetic_bridge: KineticBridge = KineticBridge(self.settings.kinetic_bridge)
         self._velocity_magnitude: VelocityMagnitude = VelocityMagnitude()
         self._density_bridge: DensityBridge = DensityBridge(self.settings.density_bridge)
         self._temperature_bridge: TemperatureBridge = TemperatureBridge(self.settings.temperature_bridge)
@@ -113,6 +132,9 @@ class FlowLayer(LayerBase):
         self._visualizer: Visualizer = Visualizer(self.settings.visualization)
 
         self._gpu_timer: GpuTimer = GpuTimer("GPU bridge")
+
+        self._time_step: float = 1.0 / 60.0     # dt of one tick
+        self._flow_interval: float = 0.0        # time since the last optical flow frame (s), counted in ticks
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -125,7 +147,9 @@ class FlowLayer(LayerBase):
 
     @property
     def velocity(self) -> Texture:
-        """Smoothed velocity output (RG16F) for fluid simulation."""
+        """Velocity output (RG16F) for fluid simulation."""
+        if self.settings.bridge == FlowBridge.KINETIC:
+            return self._kinetic_bridge.velocity
         return self._velocity_trail.velocity
 
     @property
@@ -154,6 +178,10 @@ class FlowLayer(LayerBase):
     def set_density_input(self, texture: Texture) -> None:
         self._density_input = texture
 
+    def set_time_step(self, dt: float) -> None:
+        """The dt of one tick, polled by the kinetic bridge; the fluid's step, so a fixed step compares runs."""
+        self._time_step = dt
+
     # ========== Lifecycle Methods ==========
 
     def allocate(self, width: int, height: int, internal_format: int | None = None) -> None:
@@ -169,6 +197,7 @@ class FlowLayer(LayerBase):
 
         self._optical_flow.allocate(sim_width, sim_height)
         self._velocity_trail.allocate(sim_width, sim_height, width, height)
+        self._kinetic_bridge.allocate(sim_width, sim_height)
         self._velocity_magnitude.allocate(sim_width, sim_height)
         self._density_bridge.allocate(width, height)
         self._temperature_bridge.allocate(sim_width, sim_height)
@@ -179,6 +208,7 @@ class FlowLayer(LayerBase):
         """Deallocate all resources."""
         self._optical_flow.deallocate()
         self._velocity_trail.deallocate()
+        self._kinetic_bridge.deallocate()
         self._velocity_magnitude.deallocate()
         self._density_bridge.deallocate()
         self._temperature_bridge.deallocate()
@@ -189,7 +219,9 @@ class FlowLayer(LayerBase):
         """Reset all processing stages."""
         self._optical_flow.reset()
         self._velocity_trail.reset()
+        self._kinetic_bridge.reset()
         self._density_bridge.reset()
+        self._flow_interval = 0.0
 
     # ========== Processing ==========
 
@@ -204,23 +236,37 @@ class FlowLayer(LayerBase):
 
         self._gpu_timer.begin()
 
-        if self._flow_source.dirty:
+        new_flow: bool = self._flow_source.dirty
+        self._flow_interval += self._time_step
+
+        if new_flow:
             # pass
             # Stage 1: Optical flow
             self._optical_flow.set_input(self._flow_input)
             self._optical_flow.update()
 
         # Stage 2: Bridges
-        self._velocity_trail.set_velocity(self._optical_flow.velocity)
-        self._velocity_trail.update()
+        velocity: Texture
+        if self.settings.bridge == FlowBridge.KINETIC:
+            if new_flow:
+                self._kinetic_bridge.set_velocity(self._optical_flow.velocity)
+                self._kinetic_bridge.update(self._flow_interval)
+            velocity = self._kinetic_bridge.velocity
+        else:
+            self._velocity_trail.set_velocity(self._optical_flow.velocity)
+            self._velocity_trail.update()
+            velocity = self._velocity_trail.velocity
 
-        self._velocity_magnitude.set_input(self._velocity_trail.velocity)
+        if new_flow:
+            self._flow_interval = 0.0
+
+        self._velocity_magnitude.set_input(velocity)
         self._velocity_magnitude.update()
 
         # self._density_bridge.set_color(self._flow_input)
         self._density_bridge.set_color(self._density_input)
         # self._density_bridge.update(motion)
-        self._density_bridge.set_velocity(self._velocity_trail.velocity)
+        self._density_bridge.set_velocity(velocity)
         self._density_bridge.update()
 
         self._temperature_bridge.set_color(self._density_input)
@@ -231,7 +277,11 @@ class FlowLayer(LayerBase):
 
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
-        self._visualizer.process(self._get_draw_texture())
+        signed: Texture | None = self._get_signed_texture()
+        if signed is not None:
+            self._visualizer.process_signed(signed)
+        else:
+            self._visualizer.process(self._get_draw_texture())
         Style.pop_style()
 
     # ========== Rendering ==========
@@ -245,6 +295,14 @@ class FlowLayer(LayerBase):
         Style.pop_style()
 
     # ========== Texture Selection ==========
+
+    def _get_signed_texture(self) -> Texture | None:
+        """The scalar field to draw in two colors, None when draw_mode is another kind of texture."""
+        textures = {
+            FlowDrawMode.KINETIC_ACCELERATION: self._kinetic_bridge.acceleration,
+            FlowDrawMode.KINETIC_TURN: self._kinetic_bridge.turn,
+        }
+        return textures.get(self.settings.draw_mode)
 
     def _get_draw_texture(self) -> Texture:
         """Get texture to draw based on draw_mode."""
@@ -260,5 +318,7 @@ class FlowLayer(LayerBase):
             FlowDrawMode.TEMPERATURE_BRIDGE_INPUT_COLOR: self._temperature_bridge.color_input,
             FlowDrawMode.TEMPERATURE_BRIDGE_INPUT_MASK: self._temperature_bridge.mask_input,
             FlowDrawMode.TEMPERATURE_BRIDGE_OUTPUT: self._temperature_bridge.temperature,
+            FlowDrawMode.KINETIC_FAST: self._kinetic_bridge.fast,
+            FlowDrawMode.KINETIC_SLOW: self._kinetic_bridge.slow,
         }
         return textures.get(self.settings.draw_mode, self._density_input)

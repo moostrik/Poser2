@@ -1,6 +1,8 @@
 """Bridge layers — convert raw signals into fluid-compatible fields."""
 
 from .density_bridge import DensityBridge, DensityBridgeSettings
+from .kinetic_bridge import BlurPosition, KineticBridge, KineticBridgeSettings
+from .kinetics import decay_weight, project
 from .smooth_trail import SmoothTrail, VelocitySmoothTrail, SmoothTrailSettings
 from .magnitude import Magnitude, VelocityMagnitude
 from .temperature_bridge import TemperatureBridge, TemperatureBridgeSettings

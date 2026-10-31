@@ -1,0 +1,183 @@
+"""Kinetic Bridge.
+
+Reads the motion's change instead of its speed: two trails on the optical flow, fast and slow, and
+their difference projected on the direction of the motion. Runs on each new optical flow frame.
+"""
+from enum import IntEnum
+
+from OpenGL.GL import GL_R16F, GL_RG16F
+
+from modules.gl import Fbo, SwapFbo, Texture
+from modules.settings import Field, BaseSettings
+from .. import FlowBase, FlowUtil
+from ..shaders import Trail, GaussianBlur
+from .kinetics import decay_weight
+from .shaders import KineticProjection
+
+
+class BlurPosition(IntEnum):
+    BEFORE = 0      # blur the optical flow once, then both trails read it
+    INSIDE = 1      # blur inside each trail's feedback loop, as the trail bridge does
+
+
+class KineticBridgeSettings(BaseSettings):
+    """Configuration for the kinetic bridge."""
+    scale = Field(10.0, min=-50.0, max=50.0, description="Converts optical flow to simulation velocity")
+    fast_time = Field(25.0, min=0.0, max=500.0, description="Fast trail time constant (ms)")
+    slow_time = Field(150.0, min=0.0, max=1000.0, description="Slow trail time constant (ms)")
+    blur_position: Field[BlurPosition] = Field(BlurPosition.BEFORE, description="Blur the flow once before the trails, or inside each trail")
+    blur_radius = Field(2.0, min=0.0, max=10.0, description="Gaussian blur radius in pixels")
+    blur_steps = Field(2, min=0, max=8, description="Number of Gaussian blur passes")
+
+
+class KineticBridge(FlowBase):
+    """Two trails on the optical flow and their difference along and across the motion.
+
+    The trails are unit-gain Emas, so they meet on a steady motion and fast - slow is the change alone.
+    The gain of the trail bridge, 1 / (1 - trail_weight), is in `scale` here.
+
+    Pipeline:
+        1. Receive the optical flow via set_velocity() → input_fbo (RG16F)
+        2. Blur it (BlurPosition.BEFORE)
+        3. Advance the fast and slow trails, blurring each inside its loop (BlurPosition.INSIDE)
+        4. Project fast - slow on the direction of the motion → acceleration, turn (R16F)
+        5. Output the fast trail as velocity (RG16F)
+    """
+
+    def __init__(self, settings: KineticBridgeSettings | None = None) -> None:
+        super().__init__()
+
+        self.settings: KineticBridgeSettings = settings or KineticBridgeSettings()
+
+        self._input_internal_format = GL_RG16F
+        self._output_internal_format = GL_RG16F
+
+        self._fast_fbo: SwapFbo = SwapFbo()
+        self._slow_fbo: SwapFbo = SwapFbo()
+        self._acceleration_fbo: Fbo = Fbo()
+        self._turn_fbo: Fbo = Fbo()
+
+        self._trail_shader: Trail = Trail()
+        self._blur_shader: GaussianBlur = GaussianBlur()
+        self._projection_shader: KineticProjection = KineticProjection()
+
+    @property
+    def velocity(self) -> Texture:
+        """Velocity output for the fluid (RG16F)."""
+        return self._output
+
+    @property
+    def velocity_input(self) -> Texture:
+        """Optical flow input buffer, blurred when BlurPosition.BEFORE."""
+        return self._input
+
+    @property
+    def fast(self) -> Texture:
+        """Fast trail (RG16F)."""
+        return self._fast_fbo.texture
+
+    @property
+    def slow(self) -> Texture:
+        """Slow trail (RG16F)."""
+        return self._slow_fbo.texture
+
+    @property
+    def acceleration(self) -> Texture:
+        """fast - slow along the motion (R16F): + onset, - release."""
+        return self._acceleration_fbo
+
+    @property
+    def turn(self) -> Texture:
+        """fast - slow across the motion (R16F), signed."""
+        return self._turn_fbo
+
+    def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
+        """Allocate all fields at the bridge resolution.
+
+        Args:
+            width: Field width
+            height: Field height
+            output_width: Optional velocity output width (defaults to width)
+            output_height: Optional velocity output height (defaults to height)
+        """
+        super().allocate(width, height, output_width, output_height)
+        self._fast_fbo.allocate(width, height, GL_RG16F)
+        self._slow_fbo.allocate(width, height, GL_RG16F)
+        self._acceleration_fbo.allocate(width, height, GL_R16F)
+        self._turn_fbo.allocate(width, height, GL_R16F)
+        self.reset()
+
+        self._trail_shader.allocate()
+        self._blur_shader.allocate()
+        self._projection_shader.allocate()
+
+    def deallocate(self) -> None:
+        """Release all resources."""
+        super().deallocate()
+        self._fast_fbo.deallocate()
+        self._slow_fbo.deallocate()
+        self._acceleration_fbo.deallocate()
+        self._turn_fbo.deallocate()
+        self._trail_shader.deallocate()
+        self._blur_shader.deallocate()
+        self._projection_shader.deallocate()
+
+    def reset(self) -> None:
+        """Reset all fields to zero."""
+        super().reset()
+        FlowUtil.zero(self._fast_fbo)
+        FlowUtil.zero(self._slow_fbo)
+        FlowUtil.zero(self._acceleration_fbo)
+        FlowUtil.zero(self._turn_fbo)
+
+    def set_velocity(self, velocity: Texture) -> None:
+        """Set the new optical flow frame."""
+        FlowUtil.blit(self._input_fbo, velocity)
+
+    def update(self, delta_time: float = 1.0 / 60.0) -> None:
+        """Advance on a new optical flow frame.
+
+        Args:
+            delta_time: Seconds since the previous optical flow frame
+        """
+        if not self._allocated:
+            return
+
+        s: KineticBridgeSettings = self.settings
+        blur_before: bool = s.blur_position == BlurPosition.BEFORE
+        if blur_before:
+            self._blur(self._input_fbo)
+
+        self._advance_trail(self._fast_fbo, decay_weight(delta_time, s.fast_time), not blur_before)
+        self._advance_trail(self._slow_fbo, decay_weight(delta_time, s.slow_time), not blur_before)
+
+        self._acceleration_fbo.begin()
+        self._projection_shader.use(self.fast, self.slow, False)
+        self._acceleration_fbo.end()
+
+        self._turn_fbo.begin()
+        self._projection_shader.use(self.fast, self.slow, True)
+        self._turn_fbo.end()
+
+        FlowUtil.blit(self._output_fbo, self.fast)
+
+    def _advance_trail(self, trail: SwapFbo, weight: float, blur: bool) -> None:
+        """One unit-gain Ema step: weight * previous + (1 - weight) * scale * input."""
+        trail.swap()
+        trail.begin()
+        self._trail_shader.use(trail.back_texture, self._input, weight, (1.0 - weight) * self.settings.scale)
+        trail.end()
+        if blur:
+            self._blur(trail)
+
+    def _blur(self, field: SwapFbo) -> None:
+        """Gaussian blur in place."""
+        radius: float = self.settings.blur_radius
+        if radius <= 0.0:
+            return
+        for _ in range(self.settings.blur_steps):
+            for horizontal in (True, False):
+                field.swap()
+                field.begin()
+                self._blur_shader.use(field.back_texture, radius, horizontal)
+                field.end()

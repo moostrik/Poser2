@@ -14,11 +14,12 @@ from .optical import OpticalFlow, OpticalFlowSettings
 
 # Bridge layers
 from .bridge import     DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
+                        BlurPosition, KineticBridge, KineticBridgeSettings, decay_weight, project, \
                         SmoothTrail, VelocitySmoothTrail, SmoothTrailSettings, \
                         TemperatureBridge, TemperatureBridgeSettings
 
 # Visualization
-from .visualization import VisualizationFieldSettings, Visualizer, VelocityField
+from .visualization import VisualizationFieldSettings, Visualizer, VelocityField, SignedField
 
 # Time step shared by the 2D and 3D fluid
 from .time_step import TimeStep, TimeStepMode

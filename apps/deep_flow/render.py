@@ -247,8 +247,10 @@ class DeepFlowRender(RenderBase):
         density_key: Layers = self.settings.flow.inputs.density
         flow_source_key: Layers = FLOW_SOURCES.get(flow_key, flow_key)
         for flow_type in flow_types:
+            fluid = self.settings.fluid3d if flow_type == Layers.flow else self.settings.fluid3d_b
             for i, _flow_layer in self.L[flow_type].items():
                 flow_layer = cast(ls.FlowLayer, _flow_layer)
+                flow_layer.set_time_step(1.0 / fluid.fluid_flow.step_fps)
                 if flow_key in self.L and i in self.L[flow_key]:
                     flow_layer.set_flow_input(self.L[flow_key][i].texture)
                     flow_layer.set_flow_source(self.L[flow_source_key][i])
