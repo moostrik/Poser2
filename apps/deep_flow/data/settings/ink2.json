@@ -234,11 +234,8 @@
         "right": [
           "fluid3d"
         ],
-        "composite": [
+        "output": [
           "fluid3d"
-        ],
-        "final": [
-          "composite"
         ]
       },
       "composite": {

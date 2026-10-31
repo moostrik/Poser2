@@ -251,11 +251,7 @@
         "right": [
           "cam_image"
         ],
-        "composite": [
-          "fluid3d",
-          "cam_image"
-        ],
-        "final": [
+        "output": [
           "cam_image",
           "cam_depth"
         ]

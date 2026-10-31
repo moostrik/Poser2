@@ -71,7 +71,7 @@ class DeepFlowRender(RenderBase):
         self._interface_layers: list[Layers] = INTERFACE_LAYERS
         self._left_layers: list[Layers] = settings.layer.select.left
         self._right_layers: list[Layers] = settings.layer.select.right
-        self._draw_layers: list[Layers] = settings.layer.select.final
+        self._output_layers: list[Layers] = settings.layer.select.output
 
         self.L: dict[Layers, dict[int, ls.LayerBase]] = {layer: {} for layer in Layers}
 
@@ -178,7 +178,7 @@ class DeepFlowRender(RenderBase):
 
         self._left_layers = self.settings.layer.select.left
         self._right_layers = self.settings.layer.select.right
-        self._draw_layers = self.settings.layer.select.final
+        self._output_layers = self.settings.layer.select.output
 
         flow_key: Layers = self.settings.flow.inputs.flow
         density_key: Layers = self.settings.flow.inputs.density
@@ -189,18 +189,17 @@ class DeepFlowRender(RenderBase):
             if density_key in self.L and i in self.L[density_key]:
                 flow_layer.set_density_input(self.L[density_key][i].texture)
 
-        composite_keys: list[Layers] = self.settings.layer.select.composite
         for i, _composite_layer in self.L[Layers.composite].items():
             composite_layer = cast(ls.CompositeLayer, _composite_layer)
             composite_layer.set_layers([
-                self.L[key][i] for key in composite_keys
-                if key in self.L and i in self.L[key]
+                self.L[key][i] for key in self._output_layers
+                if key is not Layers.composite and key in self.L and i in self.L[key]   # it cannot draw into itself
             ])
 
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[Layers] = set()
-        for layer_type in self._update_layers + self._interface_layers + self._left_layers + self._right_layers + self._draw_layers:
+        for layer_type in self._update_layers + self._interface_layers + self._left_layers + self._right_layers + self._output_layers:
             if layer_type not in seen:
                 seen.add(layer_type)
                 for layer in self.L[layer_type].values():
@@ -227,7 +226,7 @@ class DeepFlowRender(RenderBase):
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.ADD)
 
-        self._draw_fit(self._draw_layers, 0, 0, width, height)
+        self._draw_fit([Layers.composite], 0, 0, width, height)
 
         Style.pop_style()
 
