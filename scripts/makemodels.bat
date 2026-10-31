@@ -38,12 +38,16 @@ call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rv
 call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_384x288.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_384x288.trt --opt-batch 3 --max-batch 3"
 call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_512x384.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_512x384.trt --opt-batch 3 --max-batch 3"
 call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rvm_mobilenetv3_1024x768.onnx --output apps\hd_trio\data\models\rvm_mobilenetv3_1024x768.trt --opt-batch 3 --max-batch 3"
+
+call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_512x448.onnx --output apps\hd_trio\data\models\yolov8n_coco_512x448.trt --opt-batch 3 --max-batch 3"
 exit /b 0
 
 :section_white_space
 echo.
 echo white_space
 call :build "python tools\models\export_rtm_onnx_to_trt.py --onnx data\models\rtmpose-l_256x192.onnx --output apps\white_space\data\models\rtmpose-l_256x192.trt --opt-batch 6 --max-batch 8"
+
+call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_512x448.onnx --output apps\white_space\data\models\yolov8n_coco_512x448.trt --opt-batch 4 --max-batch 4"
 exit /b 0
 
 :section_deep_flow
@@ -59,6 +63,10 @@ call :build "python tools\models\export_rvm_onnx_to_trt.py --onnx data\models\rv
 call :build "python tools\models\export_raft_onnx_to_trt.py --onnx data\models\raft-sintel_256x192_i12.onnx --output apps\deep_flow\data\models\raft-sintel_256x192_i12.trt --opt-batch 1 --max-batch 1"
 call :build "python tools\models\export_raft_onnx_to_trt.py --onnx data\models\raft-sintel_384x288_i12.onnx --output apps\deep_flow\data\models\raft-sintel_384x288_i12.trt --opt-batch 1 --max-batch 1"
 call :build "python tools\models\export_raft_onnx_to_trt.py --onnx data\models\raft-sintel_512x384_i12.onnx --output apps\deep_flow\data\models\raft-sintel_512x384_i12.trt --opt-batch 1 --max-batch 1"
+
+call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_480x384.onnx --output apps\deep_flow\data\models\yolov8n_coco_480x384.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_512x416.onnx --output apps\deep_flow\data\models\yolov8n_coco_512x416.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_640x512.onnx --output apps\deep_flow\data\models\yolov8n_coco_640x512.trt --opt-batch 1 --max-batch 1"
 exit /b 0
 
 :build

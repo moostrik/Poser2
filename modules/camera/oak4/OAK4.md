@@ -372,6 +372,18 @@ The iGPU decodes both `P720` streams together at more than 670 fps color and 170
 
 Dragging a marker on the player's bar pauses playback and shows the frame under it, the newest position as fast as a frame can be fetched. Letting go plays from the in marker. Each recording keeps its markers in `in_out.json` in its folder.
 
+### Detector in replay
+
+Replay finds players on the PC with [`PersonDetector`](../../inference/detection/person_detector.py). Its `resolution` is set to match `PERSON_DETECTOR_ARCHIVE` on the camera, and its `model_type` picks ONNX Runtime or TensorRT. Time per frame on an empty `P1080` frame, 500 runs each, batch 1, FP32, GPU otherwise idle:
+
+| `resolution` | ONNX, back to back | TensorRT, back to back | ONNX, at 60 Hz | TensorRT, at 60 Hz |
+|--------------|--------------------|------------------------|----------------|--------------------|
+| `R640X512`   | 5.6 ms             | 4.6 ms                 | 10.1 ms        | 9.0 ms             |
+| `R512X416`   | 4.6 ms             | 4.0 ms                 | 8.4 ms         | 8.1 ms             |
+| `R480X384`   | 4.3 ms             | 3.6 ms                 | 8.2 ms         | 7.4 ms             |
+
+The times cover preprocessing on the CPU, inference and decoding. At 60 Hz the GPU drops to idle clocks between runs, which nearly doubles them, and the slowest frame at `R640X512` was 20.1 ms on both runtimes. Back to back, the slowest frame at any size was about 8 ms. Both runtimes find the same players on a photo of people, with scores within 0.001 and boxes within 0.03 px. ONNX Runtime stays the default, as TensorRT saves about 1 ms and takes turns with the other TensorRT models on their shared execution lock.
+
 ## Open
 
 - NPU load is not read. depthai does not report it, and `oakctl device stats` gives `dsp` null with a pipeline running. `sysMonApp` on the camera reads the NPU through `/dev/fastrpc-cdsp`, which only the `system` user can open, and the ADB shell runs as `adb`, so it fails with a FastRPC error. It needs a root shell through `oakctl device unlock`, which has not been tried.

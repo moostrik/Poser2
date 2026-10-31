@@ -1,37 +1,49 @@
 """A YOLO person detector on the host, for the replay backend: the frames of every camera of a round
-in one batch, through ONNX Runtime, out as `Detection`s with boxes normalised to the frame.
+in one batch, through ONNX Runtime or TensorRT, out as `Detection`s with boxes normalised to the frame.
 
 The frame is stretched whole into the model's input, as the device manip does (nothing cropped,
 nobody lost at the edges, boxes map 1:1 onto the frame). A newer frame of a camera replaces one
 still waiting: the latest wins, as in the other runners.
 """
 
-import json
 import logging
 import time
 from threading import Event, Lock, Thread
-from typing import cast
+from typing import TYPE_CHECKING, TypeAlias
 
 import cv2
 import numpy as np
-import onnxruntime as ort
 
 from modules.utils import PerformanceTimer, Rect
 
-from ..ort_runtime import preload_cuda
+from ..model_types import ModelType
 from .decode import normalise, person_boxes
 from .io import Detection, DetectionCallback
+from .runner_onnx import RunnerONNX
 from .settings import Settings
 
+if TYPE_CHECKING:
+    from .runner_trt import RunnerTRT
+
 logger = logging.getLogger(__name__)
+
+DetectionRunner: TypeAlias = "RunnerONNX | RunnerTRT"
 
 
 class PersonDetector(Thread):
     def __init__(self, settings: Settings) -> None:
         super().__init__(daemon=True)
         self.settings: Settings = settings
-        self.width: int = 0             # the model's input, read from the file at setup
-        self.height: int = 0
+        self.width: int = settings.width
+        self.height: int = settings.height
+
+        # One runner per model type; TensorRT is imported only when it is used.
+        self._runner: DetectionRunner
+        if settings.model_type is ModelType.ONNX:
+            self._runner = RunnerONNX(settings.model_file)
+        else:
+            from .runner_trt import RunnerTRT
+            self._runner = RunnerTRT(settings.model_file)
 
         self._shutdown: Event = Event()
         self._wake: Event = Event()
@@ -44,8 +56,6 @@ class PersonDetector(Thread):
         self._callback_lock: Lock = Lock()
         self._callbacks: list[DetectionCallback] = []   # run in registration order, on this thread
 
-        self._session: ort.InferenceSession | None = None
-        self._input_name: str = ''
         self._timer: PerformanceTimer = PerformanceTimer(name="Person Detection  ", sample_count=1000, report_interval=100, color='magenta', omit_init=25)
 
     @property
@@ -97,33 +107,10 @@ class PersonDetector(Thread):
                 logger.exception("Person detector error")
 
     def _setup(self) -> None:
-        preload_cuda()
-        options = ort.SessionOptions()
-        options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
-        options.log_severity_level = 3
-        self._session = ort.InferenceSession(self.settings.model_file, options, providers=['CUDAExecutionProvider', 'CPUExecutionProvider'])
-        provider: str = self._session.get_providers()[0]
-        if provider != 'CUDAExecutionProvider':
-            logger.warning("Person detector runs on %s: CUDA is not available to ONNX Runtime, expect dropped frames", provider)
-        model_input = self._session.get_inputs()[0]
-        self._input_name = model_input.name
-        self.height, self.width = self._input_size(model_input.shape)
-        self._infer(np.zeros((1, 3, self.height, self.width), dtype=np.float32))     # warm-up
+        self._runner.setup()
+        self._runner.infer(np.zeros((1, 3, self.height, self.width), dtype=np.float32))     # warm-up
         self._ready.set()
-        logger.info("Person detector: %s ready, %dx%d on %s", self.settings.model, self.width, self.height, provider)
-
-    def _input_size(self, shape: list) -> tuple[int, int]:
-        """The model's input height and width: from its shape (batch, 3, height, width) when the
-        file fixes them, else from the `imgsz` the export wrote into the metadata, since
-        ultralytics exports every axis but the channels as a symbol."""
-        if isinstance(shape[2], int) and isinstance(shape[3], int):
-            return shape[2], shape[3]
-        assert self._session is not None
-        imgsz: str | None = self._session.get_modelmeta().custom_metadata_map.get('imgsz')
-        if imgsz is None:
-            raise ValueError(f"input shape {shape} has no fixed size and the model carries no imgsz metadata")
-        height, width = json.loads(imgsz)
-        return int(height), int(width)
+        logger.info("Person detector: %s ready", self.settings.model)
 
     def _claim(self) -> dict[int, np.ndarray]:
         with self._lock:
@@ -138,7 +125,7 @@ class PersonDetector(Thread):
         start: float = time.perf_counter()
         cam_ids: list[int] = list(pending.keys())
         batch: np.ndarray = np.stack([self._preprocess(pending[cam_id]) for cam_id in cam_ids])
-        output: np.ndarray = self._infer(batch)
+        output: np.ndarray = self._runner.infer(batch)
         confidence: float = self.settings.confidence
         overlap: float = self.settings.overlap
         detections: list[Detection] = []
@@ -157,14 +144,11 @@ class PersonDetector(Thread):
                     logger.exception("Error in detection callback")
 
     def _preprocess(self, image: np.ndarray) -> np.ndarray:
-        """BGR or gray, any size, to the model's RGB planar float input, stretched to its size."""
+        """BGR or gray, any size, to the model's RGB planar float input, stretched to its size. In C
+        order: a transposed array keeps its pixels interleaved, and TensorRT reads the memory as it lies."""
         resized: np.ndarray = cv2.resize(image, (self.width, self.height), interpolation=cv2.INTER_LINEAR)
         if resized.ndim == 2:
             rgb: np.ndarray = cv2.cvtColor(resized, cv2.COLOR_GRAY2RGB)
         else:
             rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
-        return rgb.transpose(2, 0, 1).astype(np.float32) / 255.0
-
-    def _infer(self, batch: np.ndarray) -> np.ndarray:
-        assert self._session is not None
-        return cast(list[np.ndarray], self._session.run(None, {self._input_name: batch}))[0]
+        return rgb.transpose(2, 0, 1).astype(np.float32, order='C') / 255.0

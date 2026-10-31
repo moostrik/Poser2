@@ -124,7 +124,7 @@
       "range_end": 22
     },
     "person_detector": {
-      "model": "yolov8n_coco_512x448.onnx",
+      "engine_path": "apps/hd_trio/data/models",
       "model_path": "data/models",
       "confidence": 0.5,
       "overlap": 0.5,

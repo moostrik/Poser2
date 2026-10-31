@@ -54,7 +54,7 @@ depth cam pose synchony detection
 
 ### Run Project
 * activate venv and run ```python launcher.py```
-* ```python launcher.py -app <app> -sim``` plays the app's recordings through an OAK device (its detector and tracker); with `replay: true` under `camera.simulator` in the preset they play on the host without a device, the people found by `data/models/yolov8n_coco_512x448.onnx` (exported from the blobs' own weights by ```uv run --with ultralytics python tools/models/export_yolo_to_onnx.py```) and followed by `modules/camera/replay`
+* ```python launcher.py -app <app> -sim``` plays the app's recordings through an OAK device (its detector and tracker); with `replay: true` under `camera.simulator` in the preset they play on the host without a device, the people found by `modules/inference/detection`, on ONNX or TensorRT by its `model_type`, at the input size of `resolution` (the ONNX files exported from the blobs' own weights by ```uv run --with ultralytics python tools/models/export_yolo_to_onnx.py```, the engines built by `scripts\makemodels.bat`) and followed by `modules/camera/replay`
 
 ### Timing
 * ```scripts\timing.bat <app> [seconds]``` runs the app in simulation for a timing session (300 s after a 30 s warm-up, no settings window) and writes `logs/timing_<app>_<date>_<time>.json`: count, mean, p50, p95, p99 and max per timer, with the commit and the package versions

@@ -1,17 +1,17 @@
 """Export the YOLOv8 person detector to ONNX for the replay backend's host detector.
 
 The same weights the device blobs were built from (`data/models/base/yolov8n.pt`), at the wide
-blob's input size, with a dynamic batch so one run takes every camera's frame of a round
-(ultralytics makes the height and width symbols too; the size stays in the file's `imgsz`
-metadata, which the detector reads).
+blob's input size or the OAK4 detector's, with a dynamic batch so one run takes every camera's
+frame of a round (ultralytics makes the height and width symbols too; the size stays in the file's
+`imgsz` metadata, which `export_yolo_onnx_to_trt.py` reads).
 ultralytics is not a dependency of the apps: run this once with it added for the call.
 
 Usage (from the repo root, on a PC with the venv):
     uv run --with ultralytics python tools/models/export_yolo_to_onnx.py
-    uv run --with ultralytics python tools/models/export_yolo_to_onnx.py --weights data/models/base/yolov8n.pt --output data/models/yolov8n_coco_512x448.onnx --width 512 --height 448
+    uv run --with ultralytics python tools/models/export_yolo_to_onnx.py --weights data/models/base/yolov8n.pt --output data/models/yolov8n_coco_640x512.onnx --width 640 --height 512
 
-The output is committed under data/models (LFS) like the pose models; the detector reads the
-input size off the file.
+The output is committed under data/models (LFS) like the pose models; the detector finds it by its
+size, the `resolution` setting.
 """
 import argparse
 import shutil

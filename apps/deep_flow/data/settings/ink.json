@@ -59,7 +59,8 @@
       "replay": true
     },
     "person_detector": {
-      "model": "yolov8n_coco_512x448.onnx",
+      "resolution": "R640X512",
+      "engine_path": "apps/deep_flow/data/models",
       "model_path": "data/models",
       "confidence": 0.5,
       "overlap": 0.5,

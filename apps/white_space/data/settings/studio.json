@@ -353,7 +353,7 @@
       "replay": false
     },
     "person_detector": {
-      "model": "yolov8n_coco_512x448.onnx",
+      "engine_path": "apps/white_space/data/models",
       "model_path": "data/models",
       "confidence": 0.5,
       "overlap": 0.5,
