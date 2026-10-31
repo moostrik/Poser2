@@ -35,7 +35,37 @@ jobs:
         shell: bash
         run: |
           status=0
-          for dir in modules modules/settings modules/panel modules/utils modules/pose modules/tracker modules/camera modules/camera/oak modules/camera/vimba modules/camera/webcam modules/camera/replay modules/inference/detection modules/render modules/face modules/video modules/inout apps/white_space apps/hd_trio apps/deep_flow apps/smile apps/smile/audio apps/smile/cam apps/smile/comfy apps/smile/online apps/smile/player apps/smile/relay apps/smile/render apps/smile/save; do
+          for dir in modules modules/settings modules/panel modules/utils modules/pose modules/tracker modules/camera modules/camera/oak modules/camera/vimba modules/camera/webcam modules/camera/replay modules/inference/detection modules/render modules/face modules/video modules/inout apps/white_space apps/hd_trio apps/smileapps/smile/audio apps/smile/cam apps/smile/comfy apps/smile/online apps/smile/player apps/smile/relay apps/smile/render apps/smile/save; do
+            echo "::group::$dir"
+            .venv/Scripts/python -m unittest discover -s "$dir/tests" -t . || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+
+  # depthai 3 replaces depthai 2 in one install, so the OAK4 code gets an environment of its own (.venv-oak4 on a PC).
+  unit-oak4:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        shell: bash
+        run: |
+          uv venv --python 3.12
+          uv export --locked --no-hashes --no-annotate --no-emit-project --no-group oak --group oak4 --format requirements-txt \
+            | grep -v -E '^(-|torch|tensorrt|nvidia-)' > requirements-ci.txt
+          uv pip install -r requirements-ci.txt
+          uv pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
+
+      - name: Unit tests
+        shell: bash
+        run: |
+          status=0
+          for dir in apps/deep_flow modules/camera/oak4; do
             echo "::group::$dir"
             .venv/Scripts/python -m unittest discover -s "$dir/tests" -t . || status=1
             echo "::endgroup::"
