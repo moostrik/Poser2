@@ -326,21 +326,38 @@ def format_time(seconds: float) -> str:
     return f"{minutes}:{seconds - minutes * 60:04.1f}"
 
 
+# A press on the bar, heard before the range: left to itself, the range pulls the nearest handle to
+# the press, with any mouse button. Only the left button on a handle gets through; the left button
+# beside one sends where on the bar it was, as a fraction.
+BAR_PRESS: str = """(e) => {
+    if (!e.button && e.target.closest('.q-slider__thumb')) return;
+    e.stopPropagation();
+    e.preventDefault();
+    if (e.button) return;
+    const track = e.currentTarget.querySelector('.q-slider__track').getBoundingClientRect();
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    emit(Math.min(Math.max((x - track.left) / track.width, 0), 1));
+}"""
+
+
 class Timeline(Control):
     """One bar with two handles, filling from the in handle up to the position, and the three times below.
 
     The field holds the handles as fractions of the length; ``options`` names a field with the
     position and the length in seconds. The times follow a handle while it is dragged, and the
     field is written only when the handle is let go. Until then ``drag`` names the field that
-    hears where the dragged handle is, and it goes to -1 on release. The fill is a CSS variable on
-    the bar's parent, not on the range, so a position update leaves a drag alone.
+    hears where the dragged handle is, and it goes to -1 on release. A press on the bar beside the
+    handles moves neither: ``seek`` names the field that hears where it was, and it goes straight
+    back to -1. The fill is a CSS variable on the bar's parent, not on the range, so a position
+    update leaves a drag alone.
     """
     widget = Widget.timeline
 
     def build(self) -> None:
-        assert self.field.options is not None and self.field.drag is not None
+        assert self.field.options is not None and self.field.drag is not None and self.field.seek is not None
         self.position_field = self.field.options
         self.drag_field = self.field.drag
+        self.seek_field = self.field.seek
         self.position: list[float] = self._read_position()
         with ui.column().classes("w-full gap-0"):
             self.title()
@@ -357,6 +374,12 @@ class Timeline(Control):
         if not self.locked:
             _commit_while_dragging(self.range, self._drag)
             self.range.on("change", lambda e: self._release(e.args), [None])
+            for press in ("mousedown.capture", "touchstart.capture"):
+                self.bar.on(press, lambda e: self._seek(e.args), js_handler=BAR_PRESS)
+
+    def _seek(self, position: float) -> None:
+        setattr(self.settings, self.seek_field.name, position)
+        setattr(self.settings, self.seek_field.name, -1.0)
 
     def _drag(self, handles: dict[str, float]) -> None:
         """Pass on the handle that left where the field has it. Neither did for the throttle's last
@@ -368,7 +391,6 @@ class Timeline(Control):
             setattr(self.settings, self.drag_field.name, handles["max"])
 
     def _release(self, handles: dict[str, float]) -> None:
-        self._drag(handles)     # a click on the bar moves a handle with no drag before it
         self.commit([handles["min"], handles["max"]])
         setattr(self.settings, self.drag_field.name, -1.0)
 

@@ -88,6 +88,7 @@ class Field(Generic[T]):
     - ``options`` — the Field a control reads beside its own: the ``list[str]`` of options for
       ``Widget.text_select``, the position and length for ``Widget.timeline``.
     - ``drag`` — the Field a ``Widget.timeline`` writes while a handle is dragged.
+    - ``seek`` — the Field a ``Widget.timeline`` writes when the bar is pressed beside a handle.
 
     ``saved`` does change behaviour: ``False`` leaves the field out of ``to_dict``, for a value
     that belongs somewhere else than the preset.
@@ -151,6 +152,7 @@ class Field(Generic[T]):
         color: str = "primary",  # UI color hint (e.g. 'primary', 'red', '#00f')
         options: Field | None = None,  # the Field a control reads beside its own (text_select, timeline)
         drag: Field | None = None,     # the Field a control writes while dragged (timeline)
+        seek: Field | None = None,     # the Field a control writes when pressed beside a handle (timeline)
         saved: bool = True,            # False: left out of to_dict, so a preset does not hold it
     ) -> None:
         # Infer type from default value
@@ -187,6 +189,7 @@ class Field(Generic[T]):
         self.color = color
         self.options: Field | None = options
         self.drag: Field | None = drag
+        self.seek: Field | None = seek
         self.saved: bool = saved
         # Validate widget ↔ type compatibility
         if widget is not Widget.default and not widget.accepts(type_):

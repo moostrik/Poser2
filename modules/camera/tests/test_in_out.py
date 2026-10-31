@@ -176,6 +176,63 @@ class PlaybackTest(unittest.TestCase):
         self.player.settings.scrub = -1.0
         self.assertTrue(wait_for(lambda: len(loops) > told))
 
+    def seek_to(self, frame: int) -> None:
+        """Press the bar at a frame, as the timeline does, and wait for that frame to arrive."""
+        arrived: int = len(self.depths)
+        self.player.settings.seek = frame / self.COUNT
+        self.player.settings.seek = -1.0
+        self.assertTrue(wait_for(lambda: frame in self.depths[arrived:]), f'frame {frame}, last {self.depths[-1:]}')
+
+    def test_pressing_the_bar_plays_on_from_there_and_leaves_the_markers(self) -> None:
+        write_in_out(self.recording, [1 / 9, 8 / 9])
+        self.player.start()
+        self.assertTrue(wait_for(lambda: len(self.depths) > 5))
+        arrived: int = len(self.depths)
+        self.seek_to(50)
+        self.assertTrue(wait_for(lambda: 55 <= self.depths[-1] < 80))      # plays on, in step
+        self.assertLess(abs(self.colours[-1] - self.depths[-1]), 4)
+        played: list[int] = self.depths[arrived:]
+        self.assertEqual(played[played.index(50):], list(range(50, played[-1] + 1)))
+        self.assertEqual(self.player.settings.in_out, [1 / 9, 8 / 9])
+        self.assertEqual(read_in_out(self.recording), [1 / 9, 8 / 9])
+
+    def test_pressing_the_bar_is_no_loop_but_the_wrap_after_it_is(self) -> None:
+        loops: list[int] = []
+        self.player.add_loop_callback(lambda: loops.append(len(self.depths)))
+        write_in_out(self.recording, [0.0, 1 / 3])
+        self.player.start()
+        self.assertTrue(wait_for(lambda: len(loops) >= 1 and len(self.depths) > 3))
+        told: int = len(loops)
+        self.seek_to(5)
+        self.assertEqual(len(loops), told)
+        self.assertTrue(wait_for(lambda: len(loops) > told, 3.0))
+        self.assertTrue(wait_for(lambda: self.depths[-1] < 5))
+
+    def test_pressing_outside_the_markers_shows_the_place_and_plays_from_in(self) -> None:
+        write_in_out(self.recording, [1 / 3, 2 / 3])
+        self.player.start()
+        self.assertTrue(wait_for(lambda: len(self.depths) > 5))
+        for frame in (80, 5):
+            self.seek_to(frame)
+            arrived: int = len(self.depths)
+            self.assertTrue(wait_for(lambda: len(self.depths) > arrived + 2 and 30 <= self.depths[-1] < 60, 3.0), f'after {frame}, last {self.depths[-1:]}')
+        self.assertEqual(self.player.settings.in_out, [1 / 3, 2 / 3])
+
+    def test_pressing_the_same_place_twice_goes_there_twice(self) -> None:
+        self.player.start()
+        self.assertTrue(wait_for(lambda: len(self.depths) > 5))
+        self.seek_to(40)
+        self.assertTrue(wait_for(lambda: self.depths[-1] > 44))
+        self.seek_to(40)
+
+    def test_nothing_playing_no_press(self) -> None:
+        self.player.start()
+        self.assertTrue(wait_for(lambda: self.depths))
+        self.player.settings.stop = True
+        self.assertTrue(wait_for(lambda: self.player.active_folder == ''))
+        self.player.settings.seek = 0.5
+        self.assertEqual(self.player.seek_target, 0.0)
+
     def test_nothing_playing_nothing_paused(self) -> None:
         self.player.start()
         self.assertTrue(wait_for(lambda: self.depths))

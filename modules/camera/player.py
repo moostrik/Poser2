@@ -6,7 +6,9 @@ with the streams it has, whatever `video_frame_types` asks for.
 
 The markers belong to the recording: each folder keeps its own in a file, so they survive a restart
 and a change of preset. Dragging one pauses playback and shows the frame under it, the newest one
-asked for as fast as a frame can be fetched; letting go plays from the in marker."""
+asked for as fast as a frame can be fetched; letting go plays from the in marker. Pressing the bar
+beside them moves only the playhead: playback goes on from there, and a place outside the markers
+shows its frame and plays from the in marker."""
 
 import json
 from threading import Thread, Event, Lock
@@ -52,7 +54,8 @@ class PlayerSettings(BaseSettings):
     replay:             Field[bool]             = Field(False, access=Field.INIT, description="Play on the host without an OAK device: detector and tracker in software")
     playhead:           Field[list[float]]      = Field([0.0, 0.0], access=Field.READ, visible=False, description="Playhead and length of the recording (s)")
     scrub:              Field[float]            = Field(-1.0, visible=False, saved=False, description="Where the dragged marker is, as a fraction of the length; -1 when none is")
-    in_out:             Field[list[float]]      = Field([0.0, 1.0], widget=Widget.timeline, options=playhead, drag=scrub, saved=False, label="In / Out", newline=True,
+    seek:               Field[float]            = Field(-1.0, visible=False, saved=False, description="Where the bar was pressed, as a fraction of the length; -1 otherwise")
+    in_out:             Field[list[float]]      = Field([0.0, 1.0], widget=Widget.timeline, options=playhead, drag=scrub, seek=seek, saved=False, label="In / Out", newline=True,
                                                         description="Plays between the two handles; each recording keeps its own")
     current_chunk:      Field[int]              = Field(0, access=Field.READ, description="Current chunk", newline=True)
     max_chunks:         Field[int]              = Field(0, access=Field.READ, description="Total chunks")
@@ -97,6 +100,7 @@ class State(Enum):
     STOPPING = auto()
     NEXT = auto()
     SCRUB = auto()
+    SEEKING = auto()
 
 class MessageType(Enum):
     START = auto()
@@ -104,6 +108,7 @@ class MessageType(Enum):
     NEXT = auto()
     SCRUB = auto()
     RESUME = auto()
+    SEEK = auto()
 
 class Message():
     def __init__(self, state: MessageType, value: str = '', prepare: bool = False) -> None:
@@ -139,6 +144,8 @@ class Player(Thread):
         self.load_chunk: int = -1
         self.scrub_target: float = -1.0     # where the dragged marker is,
         self.scrub_shown: float = -1.0      # and the last place a frame was fetched for
+        self.seek_target: float = 0.0       # where the bar was pressed,
+        self.seek_outside: bool = False     # and whether that is outside the markers
         self.num_chunks: int = 0
         self.chunk_frames: list[int] = []
         self.start_chunk: int = 0
@@ -182,6 +189,7 @@ class Player(Thread):
         self.settings.bind(PlayerSettings.folder, self._on_folder_changed)
         self.settings.bind(PlayerSettings.in_out, self._on_in_out)
         self.settings.bind(PlayerSettings.scrub, self._on_scrub)
+        self.settings.bind(PlayerSettings.seek, self._on_seek)
         self.settings.bind(PlayerSettings.refresh, self._on_refresh_path)
         self.settings.bind(PlayerSettings.video_path, self._on_refresh_path)
 
@@ -226,6 +234,17 @@ class Player(Thread):
                     self._set_load_chunk(-1)
                     self._set_play_chunk(-1)
                     state = State.LOAD
+                if message and message.state == MessageType.SEEK and state in (State.LOAD, State.LOADING, State.PLAYING, State.SEEKING):
+                    self._stop()
+                    self._load_seek()
+                    state = State.SEEKING
+                if state == State.SEEKING and self._finished_loading():
+                    self._start(loop=False)
+                    sleep(0.1) # waiting a bit reduces drift
+                    if self.seek_outside:
+                        self._set_load_chunk(self.start_chunk - 1)      # so the next load is the in marker's
+                    self._load()
+                    state = State.PLAYING
                 if state == State.SCRUB:
                     self._update_scrub()
                 if state == State.LOAD:
@@ -295,7 +314,8 @@ class Player(Thread):
         self.loaders.append(player)
         self.load_types.add(frame_type)
 
-    def _start(self, scrub: bool = False) -> None:
+    def _start(self, loop: bool = True) -> None:
+        """Play what is loaded. ``loop``: the loop callbacks may hear of it, at the in marker."""
         for p in self.players:
             p.stop()
             self.closers.append(p)
@@ -314,7 +334,7 @@ class Player(Thread):
 
         with self.playback_lock:
             at_in_marker: bool = self.load_chunk == self.start_chunk
-        if at_in_marker and not scrub:
+        if at_in_marker and loop:
             for callback in self.loop_callbacks:
                 try:
                     callback()
@@ -326,7 +346,7 @@ class Player(Thread):
         position by then: a drag outruns the fetching, and the frames between do not matter."""
         if self.loaders:
             if self._finished_loading():
-                self._start(scrub=True)
+                self._start(loop=False)
             return
         with self.playback_lock:
             target: float = self.scrub_target
@@ -338,6 +358,26 @@ class Player(Thread):
         chunk, frame = self._locate(chunk_frames, min(round(target * total), total - 1))
         self._set_load_chunk(chunk)
         self._load_chunk(frame, frame + 1)
+
+    def _load_seek(self) -> None:
+        """The readers from the pressed place on, up to the out marker. Outside the markers there is
+        only that frame to play."""
+        with self.playback_lock:
+            target: float = self.seek_target
+            chunk_frames: list[int] = self.chunk_frames
+            start_chunk, start_offset = self.start_chunk, self.start_offset
+            end_chunk, end_offset = self.end_chunk, self.end_offset
+        total: int = sum(chunk_frames)
+        if total <= 0:
+            return
+        place: int = min(round(target * total), total - 1)
+        chunk, frame = self._locate(chunk_frames, place)
+        self.seek_outside = not sum(chunk_frames[:start_chunk]) + start_offset <= place < sum(chunk_frames[:end_chunk]) + end_offset
+        self._set_load_chunk(chunk)
+        if self.seek_outside:
+            self._load_chunk(frame, frame + 1)
+        else:
+            self._load_chunk(frame, end_offset if chunk == end_chunk else None)
 
     def _stop(self) -> None:
         self._set_play_chunk(-1)
@@ -591,6 +631,14 @@ class Player(Thread):
         with self.playback_lock:
             self.scrub_target = value
         self.state_messages.put(Message(MessageType.SCRUB))
+
+    def _on_seek(self, value: float) -> None:
+        """The bar pressed, or back at -1. Without a recording playing there is nothing to move."""
+        if value < 0.0 or not self.active_folder:
+            return
+        with self.playback_lock:
+            self.seek_target = value
+        self.state_messages.put(Message(MessageType.SEEK))
 
     def update_gui(self, frame_id: int = 0) -> None:
         # Settings writes run share propagation and callbacks on this (reader) thread; a GUI

@@ -370,7 +370,7 @@ The iGPU decodes both `P720` streams together at more than 670 fps color and 170
 
 `replay.Camera` emits both streams and rebuilds `H` from the tagged lens and each frame's recorded tilt, plus the live `tilt.offset`. The recorded frames are already mirrored, so the lens's `cx` is mirrored for this and `flip_h` stays off.
 
-Dragging a marker on the player's bar pauses playback and shows the frame under it, the newest position as fast as a frame can be fetched. Letting go plays from the in marker. Each recording keeps its markers in `in_out.json` in its folder.
+Dragging a marker on the player's bar pauses playback and shows the frame under it, the newest position as fast as a frame can be fetched. Letting go plays from the in marker. Pressing the bar anywhere else moves only the playhead: playback goes on from there to the out marker, and a place outside the markers shows its frame and plays from the in marker. Each recording keeps its markers in `in_out.json` in its folder.
 
 ### Detector in replay
 
