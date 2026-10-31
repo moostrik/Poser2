@@ -45,6 +45,19 @@ class Subdivision:
         rect: Rect = self.get_rect(key, index)
         return int(rect.width), int(rect.height)
 
+def best_grid(count: int, src_aspect_ratio: float, dst_width: int, dst_height: int) -> tuple[int, int]:
+    """The (columns, rows) that show `count` cells of one aspect ratio largest in the destination."""
+    best: tuple[int, int] = (count, 1)
+    best_area: float = -1.0
+    for columns in range(1, max(1, count) + 1):
+        rows: int = math.ceil(count / columns)
+        cell_width: float = min(dst_width / columns, dst_height / rows * src_aspect_ratio)
+        area: float = cell_width * cell_width / src_aspect_ratio
+        if area > best_area:
+            best, best_area = (columns, rows), area
+    return best
+
+
 def make_subdivision(subdivision_rows: list[SubdivisionRow], dst_width: int, dst_height: int, align_center: bool) -> Subdivision:
 
     dst_aspect_ratio: float = dst_width / dst_height

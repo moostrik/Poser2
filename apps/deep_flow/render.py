@@ -6,7 +6,7 @@ from typing import cast
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId
-from modules.render import layers as ls, make_subdivision, SubdivisionRow, Subdivision
+from modules.render import layers as ls, make_subdivision, best_grid, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
 
 from .render_board import RenderBoard
@@ -112,11 +112,8 @@ class DeepFlowRender(RenderBase):
             self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.board, settings.data.b, settings.colors)
             self.L[Layers.data_time][i] = ls.MotionTimeRenderer(i, self.board)
 
-        # Split-view composition: left panel + right panel side by side
-        self.subdivision_rows: list[SubdivisionRow] = [
-            SubdivisionRow(name='panels', columns=2, rows=1, src_aspect_ratio=OUTPUT_WIDTH / OUTPUT_HEIGHT, padding=Point2f(1.0, 1.0)),
-        ]
-        self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, True)
+        # Split view: the left and right panels side by side or stacked, whichever shows them larger
+        self.subdivision: Subdivision = self._make_layout(settings.window.width, settings.window.height)
 
         # The render rate of each tick feeds the fluid's time step
         self._last_tick: float = 0.0
@@ -128,8 +125,15 @@ class DeepFlowRender(RenderBase):
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
+    @staticmethod
+    def _make_layout(width: int, height: int) -> Subdivision:
+        aspect: float = OUTPUT_WIDTH / OUTPUT_HEIGHT
+        columns, rows = best_grid(2, aspect, width, height)
+        panels = SubdivisionRow(name='panels', columns=columns, rows=rows, src_aspect_ratio=aspect, padding=Point2f(1.0, 1.0))
+        return make_subdivision([panels], width, height, True)
+
     def on_main_window_resize(self, width: int, height: int) -> None:
-        self.subdivision = make_subdivision(self.subdivision_rows, width, height, True)
+        self.subdivision = self._make_layout(width, height)
         self.allocate_window_renders()
 
     def allocate(self) -> None:
