@@ -43,6 +43,14 @@ LARGE_LAYERS: list[Layers] = [
     Layers.composite,
 ]
 
+# The source layer that says when a center layer has a new frame
+FLOW_SOURCES: dict[Layers, Layers] = {
+    Layers.center_cam:        Layers.cam_image,
+    Layers.center_depth:      Layers.cam_depth,
+    Layers.center_mask:       Layers.cam_mask,
+    Layers.center_foreground: Layers.cam_foreground,
+}
+
 OUTPUT_WIDTH: int = 1080
 OUTPUT_HEIGHT: int = 1920
 
@@ -182,10 +190,12 @@ class DeepFlowRender(RenderBase):
 
         flow_key: Layers = self.settings.flow.inputs.flow
         density_key: Layers = self.settings.flow.inputs.density
+        flow_source_key: Layers = FLOW_SOURCES.get(flow_key, flow_key)
         for i, _flow_layer in self.L[Layers.flow].items():
             flow_layer = cast(ls.FlowLayer, _flow_layer)
             if flow_key in self.L and i in self.L[flow_key]:
                 flow_layer.set_flow_input(self.L[flow_key][i].texture)
+                flow_layer.set_flow_source(self.L[flow_source_key][i])
             if density_key in self.L and i in self.L[density_key]:
                 flow_layer.set_density_input(self.L[density_key][i].texture)
 

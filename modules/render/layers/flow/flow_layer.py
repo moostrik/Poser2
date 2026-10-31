@@ -9,8 +9,6 @@ from ..layer_base import LayerBase
 from modules.board import HasFrames
 from modules.pose import Frame, AngleMotion
 
-from ..source import MaskSourceLayer
-
 from modules.settings import Field, BaseSettings, Group
 from modules.flow import (
     OpticalFlow, OpticalFlowSettings,
@@ -88,19 +86,20 @@ class FlowLayer(LayerBase):
         fluid.add_temperature(flow.temperature)
     """
 
-    def __init__(self, cam_id: int, board: HasFrames, mask_source: MaskSourceLayer, flow_input: Texture, density_input: Texture, settings: FlowLayerSettings | None = None) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, flow_source: LayerBase, flow_input: Texture, density_input: Texture, settings: FlowLayerSettings | None = None) -> None:
         """Initialize flow layer.
 
         Args:
             cam_id: Camera ID
             board: Board for pose data
-            mask_source: Mask source layer for optical flow update
-            mask: Mask texture for optical flow input
+            flow_source: The source layer behind the flow input; optical flow runs when it has a new frame
+            flow_input: Texture for optical flow input
+            density_input: Texture for density and temperature input
             settings: Layer configuration
         """
         self._cam_id: int = cam_id
         self._board: HasFrames = board
-        self._mask_source: MaskSourceLayer = mask_source
+        self._flow_source: LayerBase = flow_source
         self._flow_input: Texture = flow_input
         self._density_input: Texture = density_input
         self.settings: FlowLayerSettings = settings or FlowLayerSettings()
@@ -146,6 +145,9 @@ class FlowLayer(LayerBase):
 
     def set_flow_input(self, texture: Texture) -> None:
         self._flow_input = texture
+
+    def set_flow_source(self, layer: LayerBase) -> None:
+        self._flow_source = layer
 
     def set_density_input(self, texture: Texture) -> None:
         self._density_input = texture
@@ -197,7 +199,7 @@ class FlowLayer(LayerBase):
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
-        if self._mask_source.dirty:
+        if self._flow_source.dirty:
             # pass
             # Stage 1: Optical flow
             self._optical_flow.set_input(self._flow_input)
@@ -214,7 +216,6 @@ class FlowLayer(LayerBase):
         self._density_bridge.set_color(self._density_input)
         # self._density_bridge.update(motion)
         self._density_bridge.set_velocity(self._velocity_trail.velocity)
-        # self._density_bridge.set_velocity(self._mask_source.texture)
         self._density_bridge.update()
 
         self._temperature_bridge.set_color(self._density_input)
