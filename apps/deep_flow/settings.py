@@ -66,6 +66,8 @@ class Layers(IntEnum):
     color_mask =    auto()
     flow =          auto()
     fluid3d =       auto()
+    flow_b =        auto()
+    fluid3d_b =     auto()
     composite =     auto()
 
 
@@ -255,6 +257,7 @@ class CenterGroup(BaseSettings):
 
 class RenderSettings(BaseSettings):
     stage  : Field[Stage]                        = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")
+    b_enabled: Field[bool]                       = Field(False, description="Second flow and fluid on the same input: A left, B right")
     layer  : Group[LayerGroup]                   = Group(LayerGroup)
     data   : Group[DataGroup]                    = Group(DataGroup)
     preview: Group[PreviewGroup]                 = Group(PreviewGroup)
@@ -262,6 +265,8 @@ class RenderSettings(BaseSettings):
     depth  : Group[layers.DepthSourceLayerSettings] = Group(layers.DepthSourceLayerSettings)
     flow   : Group[_FlowLayerSettings]           = Group(_FlowLayerSettings, share=[stage])
     fluid3d: Group[layers.Fluid3DLayerSettings]  = Group(layers.Fluid3DLayerSettings, share=[stage])
+    flow_b   : Group[layers.FlowLayerSettings]    = Group(layers.FlowLayerSettings, share=[stage])
+    fluid3d_b: Group[layers.Fluid3DLayerSettings] = Group(layers.Fluid3DLayerSettings, share=[stage])
     colors : Group[ColorSettings]                = Group(ColorSettings)
     window : Group[WindowSettings]               = Group(WindowSettings)
 

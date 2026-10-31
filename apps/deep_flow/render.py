@@ -43,6 +43,12 @@ LARGE_LAYERS: list[Layers] = [
     Layers.composite,
 ]
 
+# The second flow and fluid of an A/B comparison: allocated and updated only while render.b_enabled is on
+B_LAYERS: list[Layers] = [
+    Layers.flow_b,
+    Layers.fluid3d_b,
+]
+
 # The source layer that says when a center layer has a new frame
 FLOW_SOURCES: dict[Layers, Layers] = {
     Layers.center_cam:        Layers.cam_image,
@@ -89,6 +95,7 @@ class DeepFlowRender(RenderBase):
         settings.data.b.use_history_color = True
 
         flows: dict[int, ls.FlowLayer] = {}
+        flows_b: dict[int, ls.FlowLayer] = {}
         cmt: dict[int, Texture] = {}
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.board)
@@ -111,8 +118,10 @@ class DeepFlowRender(RenderBase):
             ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,   center_foreground.texture, cmt, settings.center.color,     settings.colors)
             flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,   cam_mask,  center_mask.texture, center_foreground.texture, settings.flow)
             fluid3d =       self.L[Layers.fluid3d][i] =     ls.Fluid3DLayer(        i, self.board,   flows,                      settings.fluid3d,           settings.colors)
+            flows_b[i] =    self.L[Layers.flow_b][i] =      ls.FlowLayer(           i, self.board,   cam_mask,  center_mask.texture, center_foreground.texture, settings.flow_b)
+            self.L[Layers.fluid3d_b][i] =                   ls.Fluid3DLayer(        i, self.board,   flows_b,                    settings.fluid3d_b,         settings.colors)
 
-            composite =     self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid3d, ms_mask],         settings.layer.composite)
+            composite =    self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid3d, ms_mask],         settings.layer.composite)
 
             self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.board, settings.data.a, settings.colors)
             self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.board, settings.data.a, settings.colors)
@@ -130,6 +139,8 @@ class DeepFlowRender(RenderBase):
         # A reset asked for from another thread, applied at the next update on the GL thread
         self._reset_fluid: Event = Event()
 
+        self._b_allocated: bool = False
+
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
@@ -146,6 +157,8 @@ class DeepFlowRender(RenderBase):
 
     def allocate(self) -> None:
         for layer_type, cam_dict in self.L.items():
+            if layer_type in B_LAYERS:
+                continue
             for layer in cam_dict.values():
                 if layer_type in LARGE_LAYERS:
                     layer.allocate(OUTPUT_WIDTH * 2, OUTPUT_HEIGHT * 2, GL_RGBA16F)
@@ -162,13 +175,29 @@ class DeepFlowRender(RenderBase):
                 self.L[layer_type][i].allocate(w, h, GL_RGBA)
 
     def deallocate(self) -> None:
-        for cam_dict in self.L.values():
+        self._set_b_allocated(False)
+        for layer_type, cam_dict in self.L.items():
+            if layer_type in B_LAYERS:
+                continue
             for layer in cam_dict.values():
                 layer.deallocate()
 
+    def _set_b_allocated(self, allocated: bool) -> None:
+        if allocated == self._b_allocated:
+            return
+        self._b_allocated = allocated
+        for layer_type in B_LAYERS:
+            for layer in self.L[layer_type].values():
+                if allocated:
+                    layer.allocate(OUTPUT_WIDTH * 2, OUTPUT_HEIGHT * 2, GL_RGBA16F)
+                else:
+                    layer.deallocate()
+
     def _measure_fps(self, now: float) -> None:
         if self._last_tick > 0.0 and now > self._last_tick:
-            self.settings.fluid3d.fluid_flow.fps = min(240.0, 1.0 / (now - self._last_tick))
+            fps: float = min(240.0, 1.0 / (now - self._last_tick))
+            self.settings.fluid3d.fluid_flow.fps = fps
+            self.settings.fluid3d_b.fluid_flow.fps = fps
         self._last_tick = now
 
     def reset_fluid(self) -> None:
@@ -178,26 +207,32 @@ class DeepFlowRender(RenderBase):
     def update(self) -> None:
         self._notify_update()
 
+        b_enabled: bool = self.settings.b_enabled
+        self._set_b_allocated(b_enabled)
+        flow_types: list[Layers] = [Layers.flow, Layers.flow_b] if b_enabled else [Layers.flow]
+
         if self._reset_fluid.is_set():
             self._reset_fluid.clear()
-            for layer_type in (Layers.flow, Layers.fluid3d):
+            for layer_type in [Layers.flow, Layers.fluid3d] + (B_LAYERS if b_enabled else []):
                 for layer in self.L[layer_type].values():
                     cast(ls.FlowLayer | ls.Fluid3DLayer, layer).reset()
 
-        self._left_layers = self.settings.layer.select.left
-        self._right_layers = self.settings.layer.select.right
-        self._output_layers = self.settings.layer.select.output
+        select = self.settings.layer.select
+        self._left_layers = [Layers.fluid3d] if b_enabled else self._without_b(select.left)
+        self._right_layers = [Layers.fluid3d_b] if b_enabled else self._without_b(select.right)
+        self._output_layers = self._without_b(select.output)
 
         flow_key: Layers = self.settings.flow.inputs.flow
         density_key: Layers = self.settings.flow.inputs.density
         flow_source_key: Layers = FLOW_SOURCES.get(flow_key, flow_key)
-        for i, _flow_layer in self.L[Layers.flow].items():
-            flow_layer = cast(ls.FlowLayer, _flow_layer)
-            if flow_key in self.L and i in self.L[flow_key]:
-                flow_layer.set_flow_input(self.L[flow_key][i].texture)
-                flow_layer.set_flow_source(self.L[flow_source_key][i])
-            if density_key in self.L and i in self.L[density_key]:
-                flow_layer.set_density_input(self.L[density_key][i].texture)
+        for flow_type in flow_types:
+            for i, _flow_layer in self.L[flow_type].items():
+                flow_layer = cast(ls.FlowLayer, _flow_layer)
+                if flow_key in self.L and i in self.L[flow_key]:
+                    flow_layer.set_flow_input(self.L[flow_key][i].texture)
+                    flow_layer.set_flow_source(self.L[flow_source_key][i])
+                if density_key in self.L and i in self.L[density_key]:
+                    flow_layer.set_density_input(self.L[density_key][i].texture)
 
         for i, _composite_layer in self.L[Layers.composite].items():
             composite_layer = cast(ls.CompositeLayer, _composite_layer)
@@ -209,11 +244,16 @@ class DeepFlowRender(RenderBase):
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[Layers] = set()
-        for layer_type in self._update_layers + self._interface_layers + self._left_layers + self._right_layers + self._output_layers:
+        b_layers: list[Layers] = B_LAYERS if b_enabled else []
+        for layer_type in self._update_layers + b_layers + self._interface_layers + self._left_layers + self._right_layers + self._output_layers:
             if layer_type not in seen:
                 seen.add(layer_type)
                 for layer in self.L[layer_type].values():
                     layer.update()
+
+    def _without_b(self, layer_types: list[Layers]) -> list[Layers]:
+        """A selection without the B layers while they are not allocated."""
+        return [layer_type for layer_type in layer_types if self._b_allocated or layer_type not in B_LAYERS]
 
     def draw_main(self, width: int, height: int) -> None:
         clear_color()
