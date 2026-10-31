@@ -10,7 +10,7 @@ from modules.render import layers as ls, make_subdivision, best_grid, grid_cell_
 from modules.utils import Rect, Point2f, HotReloadMethods
 
 from .render_board import RenderBoard
-from .settings import Layers, RenderSettings
+from .settings import ABView, Layers, RenderSettings
 
 
 UPDATE_LAYERS: list[Layers] = [
@@ -238,8 +238,10 @@ class DeepFlowRender(RenderBase):
                     cast(ls.FlowLayer | ls.Fluid3DLayer, layer).reset()
 
         select = self.settings.layer.select
-        self._left_layers = [Layers.fluid3d] if b_enabled else self._without_b(select.left)
-        self._right_layers = [Layers.fluid3d_b] if b_enabled else self._without_b(select.right)
+        a_layer: Layers = Layers.flow if self.settings.a_view == ABView.FLOW else Layers.fluid3d
+        b_layer: Layers = Layers.flow_b if self.settings.b_view == ABView.FLOW else Layers.fluid3d_b
+        self._left_layers = [a_layer] if b_enabled else self._without_b(select.left)
+        self._right_layers = [b_layer] if b_enabled else self._without_b(select.right)
         self._output_layers = self._without_b(select.output)
         self._update_layout()
 

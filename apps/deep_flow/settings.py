@@ -71,6 +71,11 @@ class Layers(IntEnum):
     composite =     auto()
 
 
+class ABView(IntEnum):
+    FLUID = 0       # the side's fluid
+    FLOW =  auto()  # the side's flow layer, in its draw_mode
+
+
 # ---------------------------------------------------------------------------
 #  Layer selection settings (split view)
 # ---------------------------------------------------------------------------
@@ -258,6 +263,8 @@ class CenterGroup(BaseSettings):
 class RenderSettings(BaseSettings):
     stage  : Field[Stage]                        = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")
     b_enabled: Field[bool]                       = Field(False, description="Second flow and fluid on the same input: A left, B right")
+    a_view : Field[ABView]                       = Field(ABView.FLUID, description="What A's side of the A/B view shows")
+    b_view : Field[ABView]                       = Field(ABView.FLUID, description="What B's side of the A/B view shows")
     layer  : Group[LayerGroup]                   = Group(LayerGroup)
     data   : Group[DataGroup]                    = Group(DataGroup)
     preview: Group[PreviewGroup]                 = Group(PreviewGroup)
