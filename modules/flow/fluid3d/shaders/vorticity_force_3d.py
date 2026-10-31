@@ -1,9 +1,9 @@
 """VorticityForce3D - 3D vorticity confinement force."""
 from __future__ import annotations
 
-from OpenGL.GL import GL_RGBA16F, glUniform1f, glUniform1i, glUniform3f, glUniform3i, glUseProgram
+from OpenGL.GL import GL_RGBA16F, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform3f, glUniform3i, glUseProgram
 
-from modules.gl import Texture3D, ComputeShader
+from modules.gl import Texture, Texture3D, ComputeShader
 
 
 class VorticityForce3D(ComputeShader):
@@ -18,7 +18,9 @@ class VorticityForce3D(ComputeShader):
 
     def use(self, curl: Texture3D, obstacle: Texture3D, force_out: Texture3D,
             grid_scale: float, aspect: float, z_spacing: float,
-            timestep: float, has_obstacles: bool = True) -> None:
+            timestep: float, has_obstacles: bool = True,
+            spin: Texture | None = None, spin_step: float = 0.0,
+            spin_layer: float = 0.0, spin_spread: float = 0.001) -> None:
         """Compute vorticity confinement force.
 
         Args:
@@ -30,6 +32,10 @@ class VorticityForce3D(ComputeShader):
             z_spacing: Sim-grid Z cell size in sim texels (dz/dx)
             timestep: Vorticity strength * dt
             has_obstacles: Whether obstacle logic is active
+            spin: 2D curl (R16F) added as force at the injection depth; None = no spin input
+            spin_step: Spin strength * dt
+            spin_layer: Normalized depth [0, 1] of the injection
+            spin_spread: Gaussian sigma in normalized depth units
         """
         if not self.allocated or not self.shader_program:
             return
@@ -39,6 +45,14 @@ class VorticityForce3D(ComputeShader):
         self.bind_texture_3d(0, curl, "uCurl")
         self.bind_texture_3d(1, obstacle, "uObstacle")
         self.bind_image_3d_write(0, force_out, GL_RGBA16F)
+
+        glUniform1f(self.get_uniform_loc("uSpinStep"), spin_step if spin is not None else 0.0)
+        if spin is not None:
+            glActiveTexture(GL_TEXTURE2)
+            glBindTexture(GL_TEXTURE_2D, spin.tex_id)
+            glUniform1i(self.get_uniform_loc("uSpin"), 2)
+            glUniform1f(self.get_uniform_loc("uSpinLayer"), spin_layer)
+            glUniform1f(self.get_uniform_loc("uSpinSpread"), spin_spread)
 
         dx = grid_scale
         dy = grid_scale * aspect

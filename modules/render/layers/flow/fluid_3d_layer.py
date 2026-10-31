@@ -219,6 +219,14 @@ class Fluid3DLayer(LayerBase):
             # Add the flow as one velocity input (3D synthesizes w from it)
             self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength)
 
+            # The kinetic bridge's push of a starting motion, and its curl for the vorticity force
+            onset: Texture | None = flow_layer.onset
+            if onset is not None:
+                self._fluid_flow.add_velocity(onset, vel_strength)
+            spin: Texture | None = flow_layer.spin
+            if spin is not None and isinstance(self._fluid_flow, FluidFlow3D):
+                self._fluid_flow.set_spin(spin, flow_layer.settings.kinetic_bridge.spin * vel_strength)
+
             # Add density to per-camera channel (R=cam0, G=cam1, B=cam2, A=cam3)
             channel: int = cam_id % 4
             # self._fluid_flow.add_density_channel(flow_layer.magnitude, channel, den_strength)

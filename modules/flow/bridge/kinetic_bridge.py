@@ -12,7 +12,7 @@ from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil
 from ..shaders import Trail, GaussianBlur
 from .kinetics import decay_weight
-from .shaders import KineticEmission, KineticHold, KineticInput, KineticProjection, KineticVelocity
+from .shaders import KineticCurl, KineticEmission, KineticHold, KineticInput, KineticOnset, KineticProjection, KineticVelocity
 
 
 class BlurPosition(IntEnum):
@@ -31,6 +31,8 @@ class KineticBridgeSettings(BaseSettings):
     release_hold = Field(100.0, min=0.0, max=1000.0, description="Decay of the held release (ms)")
     emission_gain = Field(1.0, min=0.0, max=20.0, description="Ink emitted per unit of held release")
     drop_velocity = Field(1.0, min=0.0, max=1.0, description="How far a release blends the velocity to the slow trail")
+    onset_force = Field(0.5, min=0.0, max=10.0, description="Velocity added along the motion per unit of onset")
+    spin = Field(0.0, min=0.0, max=60.0, description="Vorticity force from the motion's own curl at the injection depth")
 
 
 class KineticBridge(FlowBase):
@@ -46,6 +48,8 @@ class KineticBridge(FlowBase):
         4. Project fast - slow on the direction of the motion → acceleration, turn (R16F)
         5. Peak-hold the release, max(0, -acceleration) → emission (R16F), the density bridge's alpha
         6. Blend the fast trail toward the slow one where it releases → velocity (RG16F)
+        7. max(0, acceleration) along the fast trail → onset (RG16F), a second velocity input
+        8. 2D curl of the fast trail → curl (R16F), the extra input to the fluid's vorticity force
     """
 
     def __init__(self, settings: KineticBridgeSettings | None = None) -> None:
@@ -62,6 +66,8 @@ class KineticBridge(FlowBase):
         self._turn_fbo: Fbo = Fbo()
         self._held_release_fbo: SwapFbo = SwapFbo()
         self._emission_fbo: Fbo = Fbo()
+        self._onset_fbo: Fbo = Fbo()
+        self._curl_fbo: Fbo = Fbo()
 
         self._input_shader: KineticInput = KineticInput()
         self._trail_shader: Trail = Trail()
@@ -70,6 +76,8 @@ class KineticBridge(FlowBase):
         self._hold_shader: KineticHold = KineticHold()
         self._emission_shader: KineticEmission = KineticEmission()
         self._velocity_shader: KineticVelocity = KineticVelocity()
+        self._onset_shader: KineticOnset = KineticOnset()
+        self._curl_shader: KineticCurl = KineticCurl()
 
     @property
     def velocity(self) -> Texture:
@@ -111,6 +119,16 @@ class KineticBridge(FlowBase):
         """Ink emitted (R16F), the density bridge's alpha."""
         return self._emission_fbo
 
+    @property
+    def onset(self) -> Texture:
+        """The push of a starting motion (RG16F), a second velocity input for the fluid."""
+        return self._onset_fbo
+
+    @property
+    def curl(self) -> Texture:
+        """2D curl of the fast trail (R16F)."""
+        return self._curl_fbo
+
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate all fields at the bridge resolution.
 
@@ -127,6 +145,8 @@ class KineticBridge(FlowBase):
         self._turn_fbo.allocate(width, height, GL_R16F)
         self._held_release_fbo.allocate(width, height, GL_R16F)
         self._emission_fbo.allocate(width, height, GL_R16F)
+        self._onset_fbo.allocate(width, height, GL_RG16F)
+        self._curl_fbo.allocate(width, height, GL_R16F)
         self.reset()
 
         self._input_shader.allocate()
@@ -136,6 +156,8 @@ class KineticBridge(FlowBase):
         self._hold_shader.allocate()
         self._emission_shader.allocate()
         self._velocity_shader.allocate()
+        self._onset_shader.allocate()
+        self._curl_shader.allocate()
 
     def deallocate(self) -> None:
         """Release all resources."""
@@ -146,6 +168,8 @@ class KineticBridge(FlowBase):
         self._turn_fbo.deallocate()
         self._held_release_fbo.deallocate()
         self._emission_fbo.deallocate()
+        self._onset_fbo.deallocate()
+        self._curl_fbo.deallocate()
         self._input_shader.deallocate()
         self._trail_shader.deallocate()
         self._blur_shader.deallocate()
@@ -153,6 +177,8 @@ class KineticBridge(FlowBase):
         self._hold_shader.deallocate()
         self._emission_shader.deallocate()
         self._velocity_shader.deallocate()
+        self._onset_shader.deallocate()
+        self._curl_shader.deallocate()
 
     def reset(self) -> None:
         """Reset all fields to zero."""
@@ -163,6 +189,8 @@ class KineticBridge(FlowBase):
         FlowUtil.zero(self._turn_fbo)
         FlowUtil.zero(self._held_release_fbo)
         FlowUtil.zero(self._emission_fbo)
+        FlowUtil.zero(self._onset_fbo)
+        FlowUtil.zero(self._curl_fbo)
 
     def set_velocity(self, velocity: Texture) -> None:
         """Set the new optical flow frame."""
@@ -207,6 +235,16 @@ class KineticBridge(FlowBase):
         self._output_fbo.begin()
         self._velocity_shader.use(self.fast, self.slow, self.acceleration, s.drop_velocity)
         self._output_fbo.end()
+
+        if s.onset_force > 0.0:
+            self._onset_fbo.begin()
+            self._onset_shader.use(self.fast, self.acceleration, s.onset_force)
+            self._onset_fbo.end()
+
+        if s.spin > 0.0:
+            self._curl_fbo.begin()
+            self._curl_shader.use(self.fast)
+            self._curl_fbo.end()
 
     def _advance_trail(self, trail: SwapFbo, weight: float, blur: bool) -> None:
         """One unit-gain Ema step: weight * previous + (1 - weight) * scale * input."""

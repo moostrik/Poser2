@@ -155,6 +155,20 @@ class FlowLayer(LayerBase):
         return self._velocity_trail.velocity
 
     @property
+    def onset(self) -> Texture | None:
+        """Second velocity input (RG16F) for fluid simulation; None when the bridge has none."""
+        if self.settings.bridge == FlowBridge.KINETIC and self.settings.kinetic_bridge.onset_force > 0.0:
+            return self._kinetic_bridge.onset
+        return None
+
+    @property
+    def spin(self) -> Texture | None:
+        """2D curl (R16F) for the fluid's vorticity force; None when the bridge has none."""
+        if self.settings.bridge == FlowBridge.KINETIC and self.settings.kinetic_bridge.spin > 0.0:
+            return self._kinetic_bridge.curl
+        return None
+
+    @property
     def density(self) -> Texture:
         """Colored density output (RGBA16F) for fluid simulation."""
         return self._density_bridge.density

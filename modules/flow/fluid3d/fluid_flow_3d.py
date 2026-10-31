@@ -110,6 +110,10 @@ class FluidFlow3D:
         # Tracked-head eye offset for the composite (set_eye, polled per frame)
         self._eye_person: tuple[float, float] = (0.0, 0.0)
 
+        # 2D curl for the vorticity force (set_spin, read once by the next update)
+        self._spin: Texture | None = None
+        self._spin_strength: float = 0.0
+
         self._allocated: bool = False
 
         self._reset_pending: bool = False
@@ -456,23 +460,28 @@ class FluidFlow3D:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _confine_vorticity(self) -> None:
-        """Vorticity confinement (curl → force → add to velocity)."""
-        if self.settings.velocity.vorticity <= 0.0 or self.settings.velocity.vorticity_radius <= 0.0:
+        """Vorticity confinement (curl → force → add to velocity), plus the spin input if one is set."""
+        spin: Texture | None = self._spin
+        spin_step: float = self._spin_strength * self._dt
+        self._spin = None
+        confine: bool = self.settings.velocity.vorticity > 0.0 and self.settings.velocity.vorticity_radius > 0.0
+        if not confine and spin is None:
             return
 
         vorticity_radius = self.settings.velocity.vorticity_radius * self._grid_scale
-        vorticity_force = self.settings.velocity.vorticity * self._dt
+        vorticity_force = self.settings.velocity.vorticity * self._dt if confine else 0.0
 
         # a. Compute curl
-        self._vorticity_curl_shader.use(
-            self._velocity.texture,
-            self._simulation_obstacle,
-            self._curl_vol,
-            self._grid_scale, self._aspect, self._z_spacing,
-            vorticity_radius,
-            has_obstacles=self._has_obstacles
-        )
-        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        if confine:
+            self._vorticity_curl_shader.use(
+                self._velocity.texture,
+                self._simulation_obstacle,
+                self._curl_vol,
+                self._grid_scale, self._aspect, self._z_spacing,
+                vorticity_radius,
+                has_obstacles=self._has_obstacles
+            )
+            glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
         # b. Compute confinement force
         self._vorticity_force_shader.use(
@@ -481,7 +490,11 @@ class FluidFlow3D:
             self._vorticity_force_vol,
             self._grid_scale, self._aspect, self._z_spacing,
             vorticity_force,
-            has_obstacles=self._has_obstacles
+            has_obstacles=self._has_obstacles,
+            spin=spin,
+            spin_step=spin_step,
+            spin_layer=self.settings.depth.injection_layer,
+            spin_spread=self.settings.depth.injection_spread,
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
@@ -779,6 +792,11 @@ class FluidFlow3D:
             vel.push, vel.squeeze, vel.dampen_threshold
         )
         glMemoryBarrier(_BARRIER_IMAGE)
+
+    def set_spin(self, texture: Texture, strength: float) -> None:
+        """Store a 2D curl for the vorticity force of the next update, at the injection depth."""
+        self._spin = texture
+        self._spin_strength = strength
 
     def set_velocity(self, texture: Texture, strength: float = 1.0) -> None:
         """Set (replace) 3D velocity volume from 2D texture.
