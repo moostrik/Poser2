@@ -5,14 +5,14 @@ their difference projected on the direction of the motion. Runs on each new opti
 """
 from enum import IntEnum
 
-from OpenGL.GL import GL_R16F, GL_RG16F
+from OpenGL.GL import GL_R16F, GL_R32F, GL_RG16F
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil
 from ..shaders import Trail, GaussianBlur
 from .kinetics import decay_weight
-from .shaders import KineticCurl, KineticEmission, KineticHold, KineticInput, KineticOnset, KineticProjection, KineticVelocity
+from .shaders import KineticCurl, KineticEmission, KineticHold, KineticInput, KineticOnset, KineticProjection, KineticReservoir, KineticVelocity
 
 
 class BlurPosition(IntEnum):
@@ -33,6 +33,8 @@ class KineticBridgeSettings(BaseSettings):
     drop_velocity = Field(1.0, min=0.0, max=1.0, description="How far a release blends the velocity to the slow trail")
     onset_force = Field(0.5, min=0.0, max=10.0, description="Velocity added along the motion per unit of onset")
     spin = Field(0.0, min=0.0, max=60.0, description="Vorticity force from the motion's own curl at the injection depth")
+    reservoir_enabled = Field(False, description="Motion stores ink per pixel; a release spends it")
+    reservoir_leak = Field(4.0, min=0.1, max=60.0, description="Time constant of the reservoir's leak (s)")
 
 
 class KineticBridge(FlowBase):
@@ -46,7 +48,8 @@ class KineticBridge(FlowBase):
         2. Blur it (BlurPosition.BEFORE)
         3. Advance the fast and slow trails, blurring each inside its loop (BlurPosition.INSIDE)
         4. Project fast - slow on the direction of the motion → acceleration, turn (R16F)
-        5. Peak-hold the release, max(0, -acceleration) → emission (R16F), the density bridge's alpha
+        5. Peak-hold the release, max(0, -acceleration) → emission (R16F), the density bridge's alpha;
+           with the reservoir (R32F) motion stores the ink per pixel and the release spends it
         6. Blend the fast trail toward the slow one where it releases → velocity (RG16F)
         7. max(0, acceleration) along the fast trail → onset (RG16F), a second velocity input
         8. 2D curl of the fast trail → curl (R16F), the extra input to the fluid's vorticity force
@@ -65,6 +68,7 @@ class KineticBridge(FlowBase):
         self._acceleration_fbo: Fbo = Fbo()
         self._turn_fbo: Fbo = Fbo()
         self._held_release_fbo: SwapFbo = SwapFbo()
+        self._reservoir_fbo: SwapFbo = SwapFbo()
         self._emission_fbo: Fbo = Fbo()
         self._onset_fbo: Fbo = Fbo()
         self._curl_fbo: Fbo = Fbo()
@@ -74,6 +78,7 @@ class KineticBridge(FlowBase):
         self._blur_shader: GaussianBlur = GaussianBlur()
         self._projection_shader: KineticProjection = KineticProjection()
         self._hold_shader: KineticHold = KineticHold()
+        self._reservoir_shader: KineticReservoir = KineticReservoir()
         self._emission_shader: KineticEmission = KineticEmission()
         self._velocity_shader: KineticVelocity = KineticVelocity()
         self._onset_shader: KineticOnset = KineticOnset()
@@ -115,6 +120,11 @@ class KineticBridge(FlowBase):
         return self._held_release_fbo.texture
 
     @property
+    def reservoir(self) -> Texture:
+        """Ink stored per pixel (R32F)."""
+        return self._reservoir_fbo.texture
+
+    @property
     def emission(self) -> Texture:
         """Ink emitted (R16F), the density bridge's alpha."""
         return self._emission_fbo
@@ -144,6 +154,7 @@ class KineticBridge(FlowBase):
         self._acceleration_fbo.allocate(width, height, GL_R16F)
         self._turn_fbo.allocate(width, height, GL_R16F)
         self._held_release_fbo.allocate(width, height, GL_R16F)
+        self._reservoir_fbo.allocate(width, height, GL_R32F)        # a slow fill vanishes in 16 bits
         self._emission_fbo.allocate(width, height, GL_R16F)
         self._onset_fbo.allocate(width, height, GL_RG16F)
         self._curl_fbo.allocate(width, height, GL_R16F)
@@ -154,6 +165,7 @@ class KineticBridge(FlowBase):
         self._blur_shader.allocate()
         self._projection_shader.allocate()
         self._hold_shader.allocate()
+        self._reservoir_shader.allocate()
         self._emission_shader.allocate()
         self._velocity_shader.allocate()
         self._onset_shader.allocate()
@@ -167,6 +179,7 @@ class KineticBridge(FlowBase):
         self._acceleration_fbo.deallocate()
         self._turn_fbo.deallocate()
         self._held_release_fbo.deallocate()
+        self._reservoir_fbo.deallocate()
         self._emission_fbo.deallocate()
         self._onset_fbo.deallocate()
         self._curl_fbo.deallocate()
@@ -175,6 +188,7 @@ class KineticBridge(FlowBase):
         self._blur_shader.deallocate()
         self._projection_shader.deallocate()
         self._hold_shader.deallocate()
+        self._reservoir_shader.deallocate()
         self._emission_shader.deallocate()
         self._velocity_shader.deallocate()
         self._onset_shader.deallocate()
@@ -188,6 +202,7 @@ class KineticBridge(FlowBase):
         FlowUtil.zero(self._acceleration_fbo)
         FlowUtil.zero(self._turn_fbo)
         FlowUtil.zero(self._held_release_fbo)
+        FlowUtil.zero(self._reservoir_fbo)
         FlowUtil.zero(self._emission_fbo)
         FlowUtil.zero(self._onset_fbo)
         FlowUtil.zero(self._curl_fbo)
@@ -228,8 +243,15 @@ class KineticBridge(FlowBase):
         self._hold_shader.use(self.acceleration, self._held_release_fbo.back_texture, decay_weight(delta_time, s.release_hold))
         self._held_release_fbo.end()
 
+        if s.reservoir_enabled:
+            self._reservoir_fbo.swap()
+            self._reservoir_fbo.begin()
+            self._reservoir_shader.use(self._reservoir_fbo.back_texture, self.fast, self.held_release,
+                                       decay_weight(delta_time, s.reservoir_leak * 1000.0), delta_time, s.emission_gain)
+            self._reservoir_fbo.end()
+
         self._emission_fbo.begin()
-        self._emission_shader.use(self.held_release, s.emission_gain)
+        self._emission_shader.use(self.held_release, self.reservoir, s.emission_gain, s.reservoir_enabled)
         self._emission_fbo.end()
 
         self._output_fbo.begin()

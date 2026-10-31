@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import decay_weight, drop, hold_release, project
+from modules.flow import decay_weight, drop, fill_reservoir, hold_release, project
 
 
 def trails(flow: list[float], fast_time: float = 25.0, slow_time: float = 150.0, dt: float = 1 / 60) -> tuple[np.ndarray, np.ndarray]:
@@ -110,6 +110,21 @@ class ReleaseTest(unittest.TestCase):
     def test_no_slow_trail_divides_by_nothing(self) -> None:
         velocity = drop(np.zeros((1, 2)), np.zeros((1, 2)), np.array([0.0]), 1.0)
         np.testing.assert_allclose(velocity, np.zeros((1, 2)))
+
+
+class ReservoirTest(unittest.TestCase):
+    def test_motion_fills_it_by_speed_times_time(self) -> None:
+        self.assertAlmostEqual(fill_reservoir(np.zeros(1), np.array([2.0]), np.zeros(1), 1.0, 0.5, 1.0)[0], 1.0)
+
+    def test_it_leaks_without_motion(self) -> None:
+        self.assertAlmostEqual(fill_reservoir(np.array([1.0]), np.zeros(1), np.zeros(1), 0.5, 0.1, 1.0)[0], 0.5)
+
+    def test_a_release_drains_what_it_emits(self) -> None:
+        drained = fill_reservoir(np.array([1.0]), np.zeros(1), np.array([2.0]), 1.0, 0.1, 1.0)
+        self.assertAlmostEqual(drained[0], 0.8)
+
+    def test_it_never_goes_below_zero(self) -> None:
+        self.assertEqual(fill_reservoir(np.array([1.0]), np.zeros(1), np.array([100.0]), 1.0, 0.1, 1.0)[0], 0.0)
 
 
 if __name__ == '__main__':

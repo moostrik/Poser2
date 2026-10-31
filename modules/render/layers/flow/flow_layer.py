@@ -46,6 +46,7 @@ class FlowDrawMode(IntEnum):
         KINETIC_ACCELERATION - Along the motion in two colors: + onset warm, - release cold
         KINETIC_TURN - Across the motion in two colors
         KINETIC_HELD_RELEASE - The peak-held release
+        KINETIC_RESERVOIR - Ink stored per pixel
     """
     OPTICAL_INPUT = 0
     OPTICAL_OUTPUT = auto()
@@ -63,6 +64,7 @@ class FlowDrawMode(IntEnum):
     KINETIC_ACCELERATION = auto()
     KINETIC_TURN = auto()
     KINETIC_HELD_RELEASE = auto()
+    KINETIC_RESERVOIR = auto()
 
 
 class FlowLayerSettings(BaseSettings):
@@ -321,6 +323,7 @@ class FlowLayer(LayerBase):
             FlowDrawMode.KINETIC_ACCELERATION: self._kinetic_bridge.acceleration,
             FlowDrawMode.KINETIC_TURN: self._kinetic_bridge.turn,
             FlowDrawMode.KINETIC_HELD_RELEASE: self._kinetic_bridge.held_release,
+            FlowDrawMode.KINETIC_RESERVOIR: self._kinetic_bridge.reservoir,
         }
         return textures.get(self.settings.draw_mode)
 

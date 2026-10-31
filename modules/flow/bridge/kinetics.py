@@ -42,3 +42,9 @@ def drop(fast: np.ndarray, slow: np.ndarray, acceleration: np.ndarray, amount: f
     release: np.ndarray = np.maximum(0.0, -acceleration)
     weight: np.ndarray = np.clip(release / np.maximum(np.linalg.norm(slow, axis=-1), EPSILON), 0.0, 1.0)
     return fast + (slow - fast) * (amount * weight)[..., None]
+
+
+def fill_reservoir(reservoir: np.ndarray, speed: np.ndarray, held_release: np.ndarray, leak: float, dt: float, gain: float) -> np.ndarray:
+    """The next reservoir: motion fills it, it leaks, and what a release emits leaves it."""
+    filled: np.ndarray = reservoir * leak + speed * dt
+    return filled * np.maximum(0.0, 1.0 - held_release * gain * dt)
