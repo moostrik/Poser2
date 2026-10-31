@@ -62,6 +62,8 @@ class PlayerSettings(BaseSettings):
 # makes the `CameraFrame`, since the arrival time is its hand-over, not the decode. `readings` is
 # None for a recording without metadata.
 ClipFrameCallback: TypeAlias = Callable[[int, FrameType, ndarray, FrameReadings | None], None]
+# Playback (re)starting at the in marker: the first play of a folder and every loop, not a scrub.
+LoopCallback: TypeAlias = Callable[[], None]
 
 IN_OUT_FILE: str = 'in_out.json'        # in a recording's folder: its markers
 
@@ -171,6 +173,7 @@ class Player(Thread):
 
         self.playback_lock: Lock = Lock()
         self.frame_callbacks: list[ClipFrameCallback] = []
+        self.loop_callbacks: list[LoopCallback] = []
         self._gui_update_time: float = 0.0
 
         # Bind player settings callbacks
@@ -292,7 +295,7 @@ class Player(Thread):
         self.loaders.append(player)
         self.load_types.add(frame_type)
 
-    def _start(self) -> None:
+    def _start(self, scrub: bool = False) -> None:
         for p in self.players:
             p.stop()
             self.closers.append(p)
@@ -309,12 +312,21 @@ class Player(Thread):
             self.players.append(p)
         self.loaders.clear()
 
+        with self.playback_lock:
+            at_in_marker: bool = self.load_chunk == self.start_chunk
+        if at_in_marker and not scrub:
+            for callback in self.loop_callbacks:
+                try:
+                    callback()
+                except Exception:
+                    logger.exception("Player loop callback failed")
+
     def _update_scrub(self) -> None:
         """Show one frame of the dragged position through the normal readers, then the newest
         position by then: a drag outruns the fetching, and the frames between do not matter."""
         if self.loaders:
             if self._finished_loading():
-                self._start()
+                self._start(scrub=True)
             return
         with self.playback_lock:
             target: float = self.scrub_target
@@ -514,6 +526,14 @@ class Player(Thread):
             return
         if callback not in self.frame_callbacks:
             self.frame_callbacks.append(callback)
+
+    def add_loop_callback(self, callback: LoopCallback) -> None:
+        """Called on the player thread when playback starts at the in marker: keep it short."""
+        if self.running:
+            logger.warning('Player: cannot add callback while it is running')
+            return
+        if callback not in self.loop_callbacks:
+            self.loop_callbacks.append(callback)
 
     # STATIC METHODS
     @staticmethod

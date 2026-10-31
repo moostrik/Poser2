@@ -161,6 +161,21 @@ class PlaybackTest(unittest.TestCase):
         self.assertTrue(wait_for(lambda: 30 <= self.depths[-1] < 40))
         self.assertEqual(read_in_out(self.recording), [1 / 3, 1.0])
 
+    def test_a_loop_is_told_on_start_and_each_wrap_but_not_on_a_drag(self) -> None:
+        loops: list[int] = []
+        self.player.add_loop_callback(lambda: loops.append(len(self.depths)))
+        write_in_out(self.recording, [0.0, 1 / 3])        # 30 frames: a loop each second
+        self.player.start()
+        self.assertTrue(wait_for(lambda: len(loops) >= 2, 5.0))
+        self.assertEqual(loops[0], 0)
+        self.scrub_to(20)
+        told: int = len(loops)
+        for frame in (5, 25):
+            self.scrub_to(frame)
+        self.assertEqual(len(loops), told)
+        self.player.settings.scrub = -1.0
+        self.assertTrue(wait_for(lambda: len(loops) > told))
+
     def test_nothing_playing_nothing_paused(self) -> None:
         self.player.start()
         self.assertTrue(wait_for(lambda: self.depths))

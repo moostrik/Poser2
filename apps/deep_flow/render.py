@@ -1,5 +1,6 @@
 """Deep Flow render — split-view layer graph with 3D volumetric fluid."""
 
+from threading import Event
 from typing import cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
@@ -122,6 +123,9 @@ class DeepFlowRender(RenderBase):
             settings.fluid3d.fluid_flow.fps = fps
         settings.window.bind(WindowSettings.avg_fps, _propagate_fps)
 
+        # A reset asked for from another thread, applied at the next update on the GL thread
+        self._reset_fluid: Event = Event()
+
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
@@ -151,8 +155,18 @@ class DeepFlowRender(RenderBase):
             for layer in cam_dict.values():
                 layer.deallocate()
 
+    def reset_fluid(self) -> None:
+        """Clear the optical flow, the bridges and the fluid volume at the next update; any thread."""
+        self._reset_fluid.set()
+
     def update(self) -> None:
         self._notify_update()
+
+        if self._reset_fluid.is_set():
+            self._reset_fluid.clear()
+            for layer_type in (Layers.flow, Layers.fluid3d):
+                for layer in self.L[layer_type].values():
+                    cast(ls.FlowLayer | ls.Fluid3DLayer, layer).reset()
 
         self._left_layers = self.settings.layer.select.left
         self._right_layers = self.settings.layer.select.right

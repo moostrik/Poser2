@@ -121,6 +121,10 @@ class DeepFlowMain:
 
         self.render.add_update_callback(self._update_poses)
 
+        # Every loop of a recording starts on clear water, so two runs of one clip compare
+        if self.player:
+            self.player.add_loop_callback(self.render.reset_fluid)
+
     def start(self) -> None:
         self.panel_server.start()
 
