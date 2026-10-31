@@ -29,6 +29,7 @@ class CameraCheckSettings(BaseSettings):
                                           description="Slowest camera's frame capture to arrival on the PC")
     depth_latency:   Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Depth latency", unit="ms",
                                           description="Slowest camera's depth capture to arrival on the PC")
+    link:            Field[str]   = Field("", access=Field.READ, pinned=True, label="Link", description="How the cameras reach the PC")
 
 
 class CameraReadings(BaseSettings):
@@ -49,6 +50,7 @@ class RigCameraReadings(CameraReadings):
     cpu:              Field[float] = Field(0.0, access=Field.READ, newline=True, unit="%", description="Camera CPU use, all cores")
     memory:           Field[float] = Field(0.0, access=Field.READ, unit="%", description="Camera memory in use")
     temperature:      Field[float] = Field(0.0, access=Field.READ, unit="°C", description="Camera chip temperature, average")
+    link:             Field[str]   = Field("", access=Field.READ, description="How the camera reaches the PC; empty while closed")
     tracker_fps:      Field[float] = Field(0.0, access=Field.READ, newline=True, description="Tracker updates/s")
     tracker_latency:  Field[float] = Field(0.0, access=Field.READ, unit="ms", description="Frame capture to the tracklets' arrival on the PC")
     tracklets:      Field[int]   = Field(0, access=Field.READ, description="Active tracklets")

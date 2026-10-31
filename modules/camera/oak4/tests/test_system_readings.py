@@ -5,8 +5,11 @@ import unittest
 from types import SimpleNamespace
 from typing import Any
 
+import depthai as dai
+
 from modules.camera.oak4 import Oak4CameraSettings
 from modules.camera.oak4.camera import Camera
+from modules.camera.oak4.definitions import link_name
 
 
 class SystemReadingsTest(unittest.TestCase):
@@ -26,6 +29,20 @@ class SystemReadingsTest(unittest.TestCase):
         self.camera._close()
         readings = self.camera.settings.readings
         self.assertEqual((readings.cpu, readings.memory, readings.temperature), (0.0, 0.0, 0.0))
+
+    def test_a_closed_camera_shows_no_link(self) -> None:
+        self.camera.settings.readings.link = 'USB'
+        self.camera._close()
+        self.assertEqual(self.camera.settings.readings.link, '')
+
+
+class LinkNameTest(unittest.TestCase):
+    def test_the_two_routes_read_as_their_links(self) -> None:
+        self.assertEqual(link_name(dai.XLinkProtocol.X_LINK_USB_EP), 'USB')
+        self.assertEqual(link_name(dai.XLinkProtocol.X_LINK_TCP_IP), 'ETHERNET')
+
+    def test_another_route_keeps_its_own_name(self) -> None:
+        self.assertEqual(link_name(dai.XLinkProtocol.X_LINK_USB_VSC), 'X_LINK_USB_VSC')
 
 
 if __name__ == '__main__':

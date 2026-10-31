@@ -35,6 +35,7 @@ The pinned readouts measure capture to arrival on the PC.
 | Video         | 60 fps      | The camera or the link is not keeping up      |
 | Video latency | 28 to 29 ms | Check the link: Ethernet adds about 6 ms      |
 | Depth latency | 42 to 52 ms | Moves between phases of a run; this is normal |
+| Link          | USB         | Fell back to Ethernet; see [Open](#open)      |
 
 The camera's `readings` show its own `cpu`, `memory` and `temperature` on the line under `video_latency`, once a second (see [camera load](#camera-load)).
 
@@ -231,6 +232,21 @@ One sample each of `oakctl device stats`: idle, and with Deep Flow running on th
 
 The panel's `cpu`, `memory` and `temperature` come from depthai's `SystemLogger` node, which runs in the pipeline. It reports no power, no NPU load, and no NPU temperature; those need `oakctl`.
 
+## Player distance
+
+A player's distance can come from the camera's `SpatialDetectionNetwork` or from the PC, as the median of the depth in the middle half of the box. The camera's node costs almost nothing, and the two agree: over 1803 tracklets the camera's `z` minus the PC's median was -1 mm at the median, and 38 mm at p95.
+
+Capture to PC in ms, 30 s each over USB, in a dark room with `flood_light` at full and no player in view. The rows with boxes set the detector's confidence to 0.02, so it reports about one spurious box a frame and the node has work to do. Worst gap covers color, boxes and depth.
+
+| Detector                  | Boxes in frame | Color | Boxes | Boxes max | Depth | Worst gap | Camera CPU |
+|---------------------------|----------------|-------|-------|-----------|-------|-----------|------------|
+| `DetectionNetwork`        | None           | 29.8  | 36.2  | 53.1      | 45.6  | 36.3      | 48.8 %     |
+| `SpatialDetectionNetwork` | None           | 28.5  | 36.3  | 59.7      | 43.3  | 37.2      | 50.3 %     |
+| `DetectionNetwork`        | About 1        | 29.1  | 36.4  | 56.6      | 42.9  | 34.7      | 49.5 %     |
+| `SpatialDetectionNetwork` | About 1        | 29.2  | 36.7  | 63.0      | 43.9  | 43.3      | 50.4 %     |
+
+The node logs a warning on every frame, because the detector's stretched frame and the depth have different transforms and it remaps points. Its `z` is along the tilted axis. Recordings hold no camera `z`, so `-sim` needs the PC's reading either way.
+
 ## The frame
 
 The camera delivers one shape, 5:4 at the sensor mode's rows, so the depth model's 8:5 frame is used further across than a square would. There is no setting for it. The width is a multiple of 16 (`FRAME_WIDTH_ALIGNMENT`) because the iGPU's H.264 decoder hangs on any other width: 900 hangs, 896 and 720 play. A frame of another width cannot be replayed.
@@ -360,6 +376,7 @@ Dragging a marker on the player's bar pauses playback and shows the frame under 
 
 - NPU load is not read. depthai does not report it, and `oakctl device stats` gives `dsp` null with a pipeline running. `sysMonApp` on the camera reads the NPU through `/dev/fastrpc-cdsp`, which only the `system` user can open, and the ADB shell runs as `adb`, so it fails with a FastRPC error. It needs a root shell through `oakctl device unlock`, which has not been tried.
 - depthai once stopped listing the camera on USB after an app closed, and kept listing it on Ethernet, while ADB and Windows still saw it on USB. Every open fell back to Ethernet until `oakctl device reboot` brought USB back. The cause is not known.
+- `SpatialDetectionNetwork` has not been measured with a real player, whose larger box holds more depth pixels, or with several players. Which depth frame its `z` comes from is not known: boxes reach the PC before that frame's depth does.
 - Video min sometimes reads about 30 fps **(site fact)**. The cause is not known.
 - `center_depth` has not been seen with a player in view.
 - A standing player reading as one distance from head to feet has not been checked.

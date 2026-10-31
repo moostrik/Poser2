@@ -35,7 +35,7 @@ from .. import CameraResolution, CameraFrame, FrameReadings, RigCameraReadings, 
 from modules.utils import FPS, Rect
 
 from .control import DepthControl, SensorControl
-from .definitions import SENSOR_SOCKET, requested_size, get_device_list, find_device, link_resolution, log_connected_sensors, \
+from .definitions import SENSOR_SOCKET, requested_size, get_device_list, find_device, link_name, link_resolution, log_connected_sensors, \
     read_lens_calibration, imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL, ModelChain, CameraLink, DepthModel, \
     model_archives, TRACKING_STATUS, tracklet_keypoints, keypoints_in_frame, packed_nv12, smoothed_latency, \
     mirrored_roi, mirrored_keypoints
@@ -204,6 +204,7 @@ class Camera(Thread):
             return False
 
         logger.info(f'{self.device_id} OPEN over {info.protocol}')
+        self.settings.readings.link = link_name(info.protocol)
         log_connected_sensors(self.device, self.device_id)
         self._read_mount_calibration()
         self._last_frame = time.perf_counter() + FIRST_FRAME_GRACE
@@ -251,6 +252,7 @@ class Camera(Thread):
         readings.video_fps = readings.video_min_fps = readings.video_latency = 0.0
         readings.tracker_fps = readings.tracker_latency = readings.depth_fps = readings.depth_latency = 0.0
         readings.cpu = readings.memory = readings.temperature = 0.0
+        readings.link = ''
         readings.tracklets = 0
 
     def _setup_queues(self, outputs: PipelineOutputs) -> None:

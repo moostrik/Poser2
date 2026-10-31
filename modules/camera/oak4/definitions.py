@@ -143,6 +143,11 @@ LINK_PROTOCOLS: dict[CameraLink, dai.XLinkProtocol] = {
 }
 
 
+def link_name(protocol: dai.XLinkProtocol) -> str:
+    """The `CameraLink` a route is, as the readings show it; depthai's own name for any other route."""
+    return next((link.name for link, route in LINK_PROTOCOLS.items() if route == protocol), protocol.name)
+
+
 def find_device(device_id: str, link: CameraLink) -> dai.DeviceInfo | None:
     """This OAK4 on `link`, or on the link it does have with a warning; None when it is on neither.
     Chosen here because depthai's own pick by id is whichever it finds first."""

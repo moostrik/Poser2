@@ -44,7 +44,8 @@ class CameraCheck:
       rate are published as `video_fps_avg` and `video_min_fps`.
 
     The slowest camera's `video_latency` and `depth_latency` are published as they are, no verdict:
-    0 where a backend does not measure them.
+    0 where a backend does not measure them. So is `link`, each different link once: empty where a
+    backend does not report one.
 
     Which camera and axis is off is not repeated here: the renderer draws each camera's numbers
     on its own view (`CameraReadingsLayer`).
@@ -73,3 +74,4 @@ class CameraCheck:
                                         for camera, minimum in zip(self._cameras, minimums))
         self._settings.video_latency = max((camera.readings.video_latency for camera in self._cameras), default=0.0)
         self._settings.depth_latency = max((camera.readings.depth_latency for camera in self._cameras), default=0.0)
+        self._settings.link = ', '.join(sorted({camera.readings.link for camera in self._cameras if camera.readings.link}))
