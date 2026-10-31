@@ -7,7 +7,7 @@ from .shaders import SignedMap
 
 
 class SignedField(FieldBase):
-    """Visualize a scalar field in two colors, one per sign; settings.scale multiplies the value."""
+    """Visualize a scalar field in two colors, one per sign; settings.scalar_scale multiplies the value."""
 
     def __init__(self, settings: VisualizationFieldSettings | None = None) -> None:
         super().__init__()
@@ -39,5 +39,5 @@ class SignedField(FieldBase):
 
         self._shader.reload()
         self._fbo.begin()
-        self._shader.use(self._field_texture, self.settings.scale)
+        self._shader.use(self._field_texture, self.settings.scalar_scale)
         self._fbo.end()

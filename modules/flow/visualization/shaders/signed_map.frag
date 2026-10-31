@@ -14,5 +14,5 @@ const vec3 NEGATIVE = vec3(0.1, 0.5, 1.0);
 
 void main() {
     float value = texture(tex0, texCoord).r * scale;
-    fragColor = vec4((value >= 0.0 ? POSITIVE : NEGATIVE) * abs(value), 1.0);
+    fragColor = vec4((value >= 0.0 ? POSITIVE : NEGATIVE) * min(abs(value), 1.0), 1.0);   // clamped, so the hue survives
 }
