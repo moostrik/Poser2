@@ -4,7 +4,7 @@
 from enum import IntEnum, auto
 
 # Local application imports
-from modules.gl import Texture, Style, Blit
+from modules.gl import GpuTimer, Texture, Style, Blit
 from ..layer_base import LayerBase
 from modules.board import HasFrames
 from modules.pose import Frame, AngleMotion
@@ -112,6 +112,8 @@ class FlowLayer(LayerBase):
 
         self._visualizer: Visualizer = Visualizer(self.settings.visualization)
 
+        self._gpu_timer: GpuTimer = GpuTimer("GPU bridge")
+
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
     # ========== Output Access ==========
@@ -181,6 +183,7 @@ class FlowLayer(LayerBase):
         self._density_bridge.deallocate()
         self._temperature_bridge.deallocate()
         self._visualizer.deallocate()
+        self._gpu_timer.deallocate()
 
     def reset(self) -> None:
         """Reset all processing stages."""
@@ -198,6 +201,8 @@ class FlowLayer(LayerBase):
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
+
+        self._gpu_timer.begin()
 
         if self._flow_source.dirty:
             # pass
@@ -222,6 +227,7 @@ class FlowLayer(LayerBase):
         self._temperature_bridge.set_mask(self._velocity_magnitude.magnitude)
         self._temperature_bridge.update()
 
+        self._gpu_timer.end()
 
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 

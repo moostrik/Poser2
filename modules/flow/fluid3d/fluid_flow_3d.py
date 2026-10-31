@@ -26,7 +26,7 @@ import time
 
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_R16F, GL_R8, GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
 
-from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, Texture2DArray, SwapTexture2DArray, Profiler
+from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, Texture2DArray, SwapTexture2DArray, Profiler, GpuTimer
 from ..fluid.fluid_settings import FluidFlowSettings, DepthSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings, BoundaryMode
 from ..fluid.shaders import AddBoolean
 from ..flow_util import FlowUtil
@@ -123,6 +123,7 @@ class FluidFlow3D:
                    "advect_temp", "buoyancy", "advect_pres", "incompress",
                    "advect_den", "composite"],
         )
+        self._gpu_timer: GpuTimer = GpuTimer("GPU fluid")
 
         # ---- Volumetric fields (SwapTexture3D for ping-pong) ----
         # Velocity always uses Dirichlet (v=0 at walls); others configurable via _apply_boundary_modes().
@@ -274,6 +275,7 @@ class FluidFlow3D:
 
     def deallocate(self) -> None:
         """Release all GPU resources."""
+        self._gpu_timer.deallocate()
         self._velocity.deallocate()
         self._density.deallocate()
         self._temperature.deallocate()
@@ -355,6 +357,8 @@ class FluidFlow3D:
         self._z_spacing = spacing
         self._z_extent = (self._sim_depth * spacing) / max(1, self._simulation_width)
 
+        self._gpu_timer.begin()
+
         # Dampen velocity (clean input for all steps)
         vel: VelocitySettings = self.settings.velocity
         self._profiler.begin("dampen_vel")
@@ -399,6 +403,8 @@ class FluidFlow3D:
         self._profiler.begin("composite")
         self._composite_output()
         self._profiler.end("composite")
+
+        self._gpu_timer.end()
 
         self._profiler.report()
 
