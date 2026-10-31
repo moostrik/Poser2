@@ -24,6 +24,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_R16F, GL_R8, GL_R
 
 from modules.gl import Texture, SwapFbo, Fbo, Profiler
 from .. import FlowUtil
+from ..time_step import TimeStep
 from .fluid_settings import FluidFlowSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings, BoundaryMode
 from .shaders import (
     Advect, Divergence, Gradient,
@@ -77,6 +78,7 @@ class FluidFlow:
 
         self._reference_dt: float = 1.0 / 60.0  # iteration scaling baseline (60fps)
         self._dt: float = self._reference_dt
+        self._time_step: TimeStep = TimeStep()
 
         self._has_obstacles: bool = False
 
@@ -265,7 +267,7 @@ class FluidFlow:
         self._handle_deferred_actions()
 
         # Per-frame state
-        self._dt = 1.0 / max(1, self.settings.fps)
+        self._step_time()
 
         # Dampen velocity (clean input for all steps)
         vel: VelocitySettings = self.settings.velocity
@@ -601,6 +603,18 @@ class FluidFlow:
 
     # ========== Internal helpers ==========
 
+    @property
+    def dt(self) -> float:
+        """The time step of the last update (s)."""
+        return self._dt
+
+    def _step_time(self) -> None:
+        s = self.settings
+        self._dt = self._time_step.update(s.time_step, s.fps, s.fixed_fps, s.fps_smoothing)
+        step_fps: float = round(1.0 / self._dt, 1)
+        if step_fps != s.step_fps:
+            s.step_fps = step_fps
+
     def _scale_iterations(self, base_iterations: int) -> int:
         """Scale solver iterations proportionally to dt.
 
@@ -640,7 +654,7 @@ class FluidFlow:
         """Add to velocity field. Applies settingsvelocity.input_strength and delta_time."""
         if not self._allocated:
             return
-        dt = 1.0 / max(1, self.settings.fps)
+        dt = self._dt
         effective = strength * self.settings.velocity.input_strength * dt
         FlowUtil.add(self._velocity_fbo, texture, effective)
 
@@ -679,7 +693,7 @@ class FluidFlow:
         """Add to density field. Applies settingsdensity.input_strength and delta_time."""
         if not self._allocated:
             return
-        dt = 1.0 / max(1, self.settings.fps)
+        dt = self._dt
         effective = strength * self.settings.density.input_strength * dt
         FlowUtil.add(self._density_fbo, texture, effective)
 
@@ -693,7 +707,7 @@ class FluidFlow:
         """Add single-channel texture to one of the density channels. Applies settingsdensity.input_strength and delta_time."""
         if not self._allocated:
             return
-        dt = 1.0 / max(1, self.settings.fps)
+        dt = self._dt
         effective = strength * self.settings.density.input_strength * dt
         FlowUtil.add_channel(self._density_fbo, texture, channel, effective)
 
@@ -720,7 +734,7 @@ class FluidFlow:
         """Add to temperature field. Applies settingstemperature.input_strength and delta_time."""
         if not self._allocated:
             return
-        dt = 1.0 / max(1, self.settings.fps)
+        dt = self._dt
         effective = strength * self.settings.temperature.input_strength * dt
         FlowUtil.add(self._temperature_fbo, texture, effective)
 

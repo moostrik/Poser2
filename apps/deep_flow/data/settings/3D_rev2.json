@@ -394,6 +394,9 @@
         "profile": false,
         "width": 540,
         "height": 960,
+        "time_step": "MEASURED",
+        "fixed_fps": 60.0,
+        "fps_smoothing": 1.0,
         "speed": 0.4,
         "depth": {
           "depth": 16,

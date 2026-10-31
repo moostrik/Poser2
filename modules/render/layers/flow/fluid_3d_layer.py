@@ -250,7 +250,7 @@ class Fluid3DLayer(LayerBase):
                 target_x = (float(head[0]) - 0.5) * 2.0
                 target_y = float(head[1]) - 0.5
         # ~0.4 s ease keeps keypoint jitter out of the eye (render thread only)
-        dt = 1.0 / max(1, self.settings.fluid_flow.fps)
+        dt = self._fluid_flow.dt
         k = 1.0 - 0.01 ** (dt / 0.4)
         self._eye_x += (target_x - self._eye_x) * k
         self._eye_y += (target_y - self._eye_y) * k

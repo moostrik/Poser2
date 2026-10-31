@@ -8,6 +8,8 @@ from enum import IntEnum
 
 from modules.settings import Field, BaseSettings, Widget, Group
 
+from ..time_step import TimeStepMode
+
 
 class BoundaryMode(IntEnum):
     OPEN   = 0  # Dirichlet — zero value at boundary (field escapes / absorbing)
@@ -108,7 +110,11 @@ class FluidFlowSettings(BaseSettings):
     # ---- Grid dimensions (multiples of 32) ----
     width: Field[int]               = Field(1024,   min=32,     max=4096,   step=32,    description="Simulation grid width")
     height: Field[int]              = Field(576,    min=32,     max=4096,   step=32,    description="Simulation grid height")
-    fps: Field[int]                 = Field(60,     min=1,      max=240,    description="Current average FPS for dt calculation (bound from WindowManager)", access=Field.READ)
+    time_step: Field[TimeStepMode]  = Field(TimeStepMode.MEASURED,                  description="Step by the measured render rate, or by a fixed rate")
+    fixed_fps: Field[float]         = Field(60.0,   min=1.0,    max=240.0,              description="Steps per second in fixed mode (fps)")
+    fps_smoothing: Field[float]     = Field(1.0,    min=0.0,    max=10.0,               description="Smoothing of the measured rate in measured mode (s); 0 follows each frame")
+    fps: Field[float]               = Field(60.0,   min=1.0,    max=240.0,              description="Render rate of the last frame (fps)", access=Field.READ, visible=False)
+    step_fps: Field[float]          = Field(60.0,                                       description="Rate the simulation steps at (fps)", access=Field.READ)
     speed: Field[float]             = Field(1.0,    min=0.0,    max=5.0,    description="Base fluid transport rate")
 
     # ---- Field groups ----

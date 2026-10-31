@@ -30,6 +30,7 @@ from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, Texture2DArra
 from ..fluid.fluid_settings import FluidFlowSettings, DepthSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings, BoundaryMode
 from ..fluid.shaders import AddBoolean
 from ..flow_util import FlowUtil
+from ..time_step import TimeStep
 from .shaders import (
     Advect3D, Advect3DDensity, Divergence3D, Gradient3D,
     JacobiPressure3D, JacobiDiffusion3D,
@@ -98,6 +99,7 @@ class FluidFlow3D:
 
         self._reference_dt: float = 1.0 / 60.0  # iteration scaling baseline (60fps)
         self._dt: float = self._reference_dt
+        self._time_step: TimeStep = TimeStep()
 
         # Z metric, recomputed per update from depth.spacing (one physical slab, two layer counts)
         self._z_spacing: float = 1.0  # sim-grid dz in sim texels (solvers)
@@ -346,7 +348,7 @@ class FluidFlow3D:
         self._handle_deferred_actions()
 
         # Per-frame state
-        self._dt = 1.0 / max(1, self.settings.fps)
+        self._step_time()
 
         # Z metric from live settings: solvers see sim-grid cell size, advection sees slab thickness
         spacing = max(1.0, self.settings.depth.spacing)
@@ -714,6 +716,18 @@ class FluidFlow3D:
 
     # ========== Internal helpers ==========
 
+    @property
+    def dt(self) -> float:
+        """The time step of the last update (s)."""
+        return self._dt
+
+    def _step_time(self) -> None:
+        s = self.settings
+        self._dt = self._time_step.update(s.time_step, s.fps, s.fixed_fps, s.fps_smoothing)
+        step_fps: float = round(1.0 / self._dt, 1)
+        if step_fps != s.step_fps:
+            s.step_fps = step_fps
+
     def _scale_iterations(self, base_iterations: int) -> int:
         """Scale solver iterations proportionally to dt.
 
@@ -749,7 +763,7 @@ class FluidFlow3D:
         if not self._allocated:
             return
         vel = self.settings.velocity
-        dt = 1.0 / max(1, self.settings.fps)
+        dt = self._dt
         self._inject_flow_shader.use(
             texture, self._velocity.texture,
             self.settings.depth.injection_layer,
@@ -781,7 +795,7 @@ class FluidFlow3D:
         """Inject 2D density texture into 3D density volume. Applies settingsdensity.input_strength and delta_time."""
         if not self._allocated:
             return
-        dt = 1.0 / max(1, self.settings.fps)
+        dt = self._dt
         effective = strength * self.settings.density.input_strength * dt
         self._inject_density_shader.use(
             texture, self._density.texture,
@@ -820,7 +834,7 @@ class FluidFlow3D:
         """
         if not self._allocated:
             return
-        dt = 1.0 / max(1, self.settings.fps)
+        dt = self._dt
         effective = strength * self.settings.density.input_strength * dt
         self._inject_density_channel_shader.use(
             texture, self._density.texture,
@@ -835,7 +849,7 @@ class FluidFlow3D:
         """Inject 2D temperature texture into 3D temperature volume. Applies settingstemperature.input_strength and delta_time."""
         if not self._allocated:
             return
-        dt = 1.0 / max(1, self.settings.fps)
+        dt = self._dt
         effective = strength * self.settings.temperature.input_strength * dt
         self._inject_shader.use(
             texture, self._temperature.texture,

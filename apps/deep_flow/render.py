@@ -5,7 +5,7 @@ from typing import cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId, WindowSettings
+from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId
 from modules.render import layers as ls, make_subdivision, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
 
@@ -118,10 +118,9 @@ class DeepFlowRender(RenderBase):
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, True)
 
-        # Propagate window fps to fluid simulation settings
-        def _propagate_fps(fps: int) -> None:
-            settings.fluid3d.fluid_flow.fps = fps
-        settings.window.bind(WindowSettings.avg_fps, _propagate_fps)
+        # The render rate of each tick feeds the fluid's time step
+        self._last_tick: float = 0.0
+        self.add_update_callback(self._measure_fps)
 
         # A reset asked for from another thread, applied at the next update on the GL thread
         self._reset_fluid: Event = Event()
@@ -154,6 +153,11 @@ class DeepFlowRender(RenderBase):
         for cam_dict in self.L.values():
             for layer in cam_dict.values():
                 layer.deallocate()
+
+    def _measure_fps(self, now: float) -> None:
+        if self._last_tick > 0.0 and now > self._last_tick:
+            self.settings.fluid3d.fluid_flow.fps = min(240.0, 1.0 / (now - self._last_tick))
+        self._last_tick = now
 
     def reset_fluid(self) -> None:
         """Clear the optical flow, the bridges and the fluid volume at the next update; any thread."""
