@@ -8,5 +8,7 @@ from .kinetic_input import KineticInput
 from .kinetic_onset import KineticOnset
 from .kinetic_projection import KineticProjection
 from .kinetic_reservoir import KineticReservoir
+from .kinetic_strip_shader import KineticStripShader
+from .kinetic_summary import KineticSummary
 from .kinetic_velocity import KineticVelocity
 from .temperature_bridge_shader import TemperatureBridgeShader

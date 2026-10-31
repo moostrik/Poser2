@@ -3,8 +3,11 @@
 # Standard library imports
 from enum import IntEnum, auto
 
+# Third-party imports
+from OpenGL.GL import GL_VIEWPORT, glGetIntegerv
+
 # Local application imports
-from modules.gl import GpuTimer, Texture, Style, Blit
+from modules.gl import GpuTimer, Texture, Style, Blit, Text
 from ..layer_base import LayerBase
 from modules.board import HasFrames
 from modules.pose import Frame, AngleMotion
@@ -13,7 +16,7 @@ from modules.settings import Field, BaseSettings, Group
 from modules.flow import (
     OpticalFlow, OpticalFlowSettings,
     VelocitySmoothTrail, SmoothTrailSettings,
-    KineticBridge, KineticBridgeSettings,
+    KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES,
     Magnitude, VelocityMagnitude,
     TemperatureBridge, TemperatureBridgeSettings,
     DensityBridge, DensityBridgeSettings,
@@ -47,6 +50,11 @@ class FlowDrawMode(IntEnum):
         KINETIC_TURN - Across the motion in two colors
         KINETIC_HELD_RELEASE - The peak-held release
         KINETIC_RESERVOIR - Ink stored per pixel
+        KINETIC_VELOCITY - The velocity the fluid gets, after drop_velocity (RG16F)
+        KINETIC_EMISSION - The ink the density bridge gets
+        KINETIC_ONSET - The second velocity input (RG16F)
+        KINETIC_CURL - The fast trail's 2D curl in two colors
+        KINETIC_STRIP - Speed, onset, release and emission over the last seconds
     """
     OPTICAL_INPUT = 0
     OPTICAL_OUTPUT = auto()
@@ -65,6 +73,11 @@ class FlowDrawMode(IntEnum):
     KINETIC_TURN = auto()
     KINETIC_HELD_RELEASE = auto()
     KINETIC_RESERVOIR = auto()
+    KINETIC_VELOCITY = auto()
+    KINETIC_EMISSION = auto()
+    KINETIC_ONSET = auto()
+    KINETIC_CURL = auto()
+    KINETIC_STRIP = auto()
 
 
 class FlowLayerSettings(BaseSettings):
@@ -134,6 +147,8 @@ class FlowLayer(LayerBase):
         self._temperature_bridge: TemperatureBridge = TemperatureBridge(self.settings.temperature_bridge)
 
         self._visualizer: Visualizer = Visualizer(self.settings.visualization)
+        self._kinetic_strip: KineticStrip = KineticStrip()
+        self._strip_text: Text = Text()
 
         self._gpu_timer: GpuTimer = GpuTimer("GPU bridge")
 
@@ -221,6 +236,8 @@ class FlowLayer(LayerBase):
         self._temperature_bridge.allocate(sim_width, sim_height)
 
         self._visualizer.allocate(width, height)
+        self._kinetic_strip.allocate()
+        self._strip_text.allocate(font_size=18)
 
     def deallocate(self) -> None:
         """Deallocate all resources."""
@@ -231,6 +248,8 @@ class FlowLayer(LayerBase):
         self._density_bridge.deallocate()
         self._temperature_bridge.deallocate()
         self._visualizer.deallocate()
+        self._kinetic_strip.deallocate()
+        self._strip_text.deallocate()
         self._gpu_timer.deallocate()
 
     def reset(self) -> None:
@@ -239,6 +258,7 @@ class FlowLayer(LayerBase):
         self._velocity_trail.reset()
         self._kinetic_bridge.reset()
         self._density_bridge.reset()
+        self._kinetic_strip.reset()
         self._flow_interval = 0.0
 
     # ========== Processing ==========
@@ -270,6 +290,11 @@ class FlowLayer(LayerBase):
             if new_flow:
                 self._kinetic_bridge.set_velocity(self._optical_flow.velocity)
                 self._kinetic_bridge.update(self._flow_interval)
+                if self.settings.kinetic_bridge.spin > 0.0 or self.settings.draw_mode == FlowDrawMode.KINETIC_CURL:
+                    self._kinetic_bridge.update_curl()
+                if self.settings.draw_mode == FlowDrawMode.KINETIC_STRIP:
+                    bridge: KineticBridge = self._kinetic_bridge
+                    self._kinetic_strip.update(bridge.fast, bridge.acceleration, bridge.emission, self.settings.visualization.strip_scale)
             velocity = self._kinetic_bridge.velocity
             ink = self._kinetic_bridge.emission
         else:
@@ -313,7 +338,19 @@ class FlowLayer(LayerBase):
         Style.set_blend_mode(self.settings.blend_mode)
         if self.texture.allocated:
             Blit.use(self.texture)
+        if self.settings.draw_mode == FlowDrawMode.KINETIC_STRIP and self._strip_text.allocated:
+            self._draw_strip_labels()
         Style.pop_style()
+
+    def _draw_strip_labels(self) -> None:
+        """The name of each lane of the kinetic strip, at its top left."""
+        vp = glGetIntegerv(GL_VIEWPORT)
+        w, h = int(vp[2]), int(vp[3])
+        if w <= 0 or h <= 0:
+            return
+        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        for lane, name in enumerate(KINETIC_STRIP_LANES):
+            self._strip_text.draw_box_text(8, lane * h // len(KINETIC_STRIP_LANES) + 8, name, (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 0.0, 0.6), w, h)
 
     # ========== Texture Selection ==========
 
@@ -324,7 +361,12 @@ class FlowLayer(LayerBase):
             FlowDrawMode.KINETIC_TURN: self._kinetic_bridge.turn,
             FlowDrawMode.KINETIC_HELD_RELEASE: self._kinetic_bridge.held_release,
             FlowDrawMode.KINETIC_RESERVOIR: self._kinetic_bridge.reservoir,
+            FlowDrawMode.KINETIC_EMISSION: self._kinetic_bridge.emission,
+            FlowDrawMode.KINETIC_CURL: self._kinetic_bridge.curl,
         }
+        if self.settings.bridge == FlowBridge.KINETIC:
+            # On this bridge the density bridge's second input is the emission, not a velocity
+            textures[FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY] = self._density_bridge.velocity_input
         return textures.get(self.settings.draw_mode)
 
     def _get_draw_texture(self) -> Texture:
@@ -332,8 +374,8 @@ class FlowLayer(LayerBase):
         textures = {
             FlowDrawMode.OPTICAL_INPUT: self._optical_flow.color_input,
             FlowDrawMode.OPTICAL_OUTPUT: self._optical_flow.velocity,
-            FlowDrawMode.SMOOTH_VELOCITY_INPUT: self._velocity_trail.velocity_input,
-            FlowDrawMode.SMOOTH_VELOCITY_OUTPUT: self._velocity_trail.velocity,
+            FlowDrawMode.SMOOTH_VELOCITY_INPUT: self._kinetic_bridge.velocity_input if self.settings.bridge == FlowBridge.KINETIC else self._velocity_trail.velocity_input,
+            FlowDrawMode.SMOOTH_VELOCITY_OUTPUT: self.velocity,
             FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE: self._velocity_magnitude.magnitude,
             FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR: self._density_bridge.color_input,
             FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY: self._density_bridge.velocity_input,
@@ -343,5 +385,8 @@ class FlowLayer(LayerBase):
             FlowDrawMode.TEMPERATURE_BRIDGE_OUTPUT: self._temperature_bridge.temperature,
             FlowDrawMode.KINETIC_FAST: self._kinetic_bridge.fast,
             FlowDrawMode.KINETIC_SLOW: self._kinetic_bridge.slow,
+            FlowDrawMode.KINETIC_VELOCITY: self._kinetic_bridge.velocity,
+            FlowDrawMode.KINETIC_ONSET: self._kinetic_bridge.onset,
+            FlowDrawMode.KINETIC_STRIP: self._kinetic_strip.texture,
         }
         return textures.get(self.settings.draw_mode, self._density_input)

@@ -263,10 +263,13 @@ class KineticBridge(FlowBase):
             self._onset_shader.use(self.fast, self.acceleration, s.onset_force)
             self._onset_fbo.end()
 
-        if s.spin > 0.0:
-            self._curl_fbo.begin()
-            self._curl_shader.use(self.fast)
-            self._curl_fbo.end()
+    def update_curl(self) -> None:
+        """Compute the curl of the fast trail, for the spin input or its debug view."""
+        if not self._allocated:
+            return
+        self._curl_fbo.begin()
+        self._curl_shader.use(self.fast)
+        self._curl_fbo.end()
 
     def _advance_trail(self, trail: SwapFbo, weight: float, blur: bool) -> None:
         """One unit-gain Ema step: weight * previous + (1 - weight) * scale * input."""
