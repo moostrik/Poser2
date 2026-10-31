@@ -6,7 +6,7 @@ from typing import cast
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId
-from modules.render import layers as ls, make_subdivision, best_grid, SubdivisionRow, Subdivision
+from modules.render import layers as ls, make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
 
 from .render_board import RenderBoard
@@ -129,8 +129,10 @@ class DeepFlowRender(RenderBase):
             self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.board, settings.data.b, settings.colors)
             self.L[Layers.data_time][i] = ls.MotionTimeRenderer(i, self.board)
 
-        # Split view: the left and right panels side by side or stacked, whichever shows them larger
-        self.subdivision: Subdivision = self._make_layout(settings.window.width, settings.window.height)
+        # Split view: the left and right panels side by side or stacked, whichever shows what they hold larger
+        self._window_size: tuple[int, int] = (settings.window.width, settings.window.height)
+        self._panel_aspect_ratios: list[float] = self._read_panel_aspect_ratios()
+        self.subdivision: Subdivision = self._make_layout()
 
         # The render rate of each tick feeds the fluid's time step
         self._last_tick: float = 0.0
@@ -144,15 +146,33 @@ class DeepFlowRender(RenderBase):
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
-    @staticmethod
-    def _make_layout(width: int, height: int) -> Subdivision:
-        aspect: float = OUTPUT_WIDTH / OUTPUT_HEIGHT
-        columns, rows = best_grid(2, aspect, width, height)
-        panels = SubdivisionRow(name='panels', columns=columns, rows=rows, src_aspect_ratio=aspect, padding=Point2f(1.0, 1.0))
+    def _make_layout(self) -> Subdivision:
+        width, height = self._window_size
+        aspect_ratios: list[float] = self._panel_aspect_ratios
+        columns, rows = best_grid(aspect_ratios, width, height)
+        aspect_ratio: float = grid_cell_aspect_ratio(aspect_ratios, columns, rows, width, height)
+        panels = SubdivisionRow(name='panels', columns=columns, rows=rows, src_aspect_ratio=aspect_ratio, padding=Point2f(1.0, 1.0))
         return make_subdivision([panels], width, height, True)
 
+    def _read_panel_aspect_ratios(self) -> list[float]:
+        """The shape of each panel, the shape of its first layer."""
+        aspect_ratios: list[float] = []
+        for layer_types in (self._left_layers, self._right_layers):
+            width, height = self._layer_size(layer_types[0]) if layer_types else (OUTPUT_WIDTH, OUTPUT_HEIGHT)
+            aspect_ratios.append(width / height)
+        return aspect_ratios
+
+    def _update_layout(self) -> None:
+        """Rebuild the layout when a panel's shape has changed."""
+        aspect_ratios: list[float] = self._read_panel_aspect_ratios()
+        if aspect_ratios != self._panel_aspect_ratios:
+            self._panel_aspect_ratios = aspect_ratios
+            self.subdivision = self._make_layout()
+            self.allocate_window_renders()
+
     def on_main_window_resize(self, width: int, height: int) -> None:
-        self.subdivision = self._make_layout(width, height)
+        self._window_size = (width, height)
+        self.subdivision = self._make_layout()
         self.allocate_window_renders()
 
     def allocate(self) -> None:
@@ -221,6 +241,7 @@ class DeepFlowRender(RenderBase):
         self._left_layers = [Layers.fluid3d] if b_enabled else self._without_b(select.left)
         self._right_layers = [Layers.fluid3d_b] if b_enabled else self._without_b(select.right)
         self._output_layers = self._without_b(select.output)
+        self._update_layout()
 
         flow_key: Layers = self.settings.flow.inputs.flow
         density_key: Layers = self.settings.flow.inputs.density

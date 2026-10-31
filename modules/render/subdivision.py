@@ -45,17 +45,29 @@ class Subdivision:
         rect: Rect = self.get_rect(key, index)
         return int(rect.width), int(rect.height)
 
-def best_grid(count: int, src_aspect_ratio: float, dst_width: int, dst_height: int) -> tuple[int, int]:
-    """The (columns, rows) that show `count` cells of one aspect ratio largest in the destination."""
+def _fit_size(aspect_ratio: float, dst_width: float, dst_height: float) -> tuple[float, float]:
+    width: float = min(dst_width, dst_height * aspect_ratio)
+    return width, width / aspect_ratio
+
+
+def best_grid(cell_aspect_ratios: list[float], dst_width: int, dst_height: int) -> tuple[int, int]:
+    """The (columns, rows) that show cells of these aspect ratios with the largest total area in the destination."""
+    count: int = len(cell_aspect_ratios)
     best: tuple[int, int] = (count, 1)
     best_area: float = -1.0
-    for columns in range(1, max(1, count) + 1):
+    for columns in range(1, count + 1):
         rows: int = math.ceil(count / columns)
-        cell_width: float = min(dst_width / columns, dst_height / rows * src_aspect_ratio)
-        area: float = cell_width * cell_width / src_aspect_ratio
+        sizes = [_fit_size(aspect_ratio, dst_width / columns, dst_height / rows) for aspect_ratio in cell_aspect_ratios]
+        area: float = sum(width * height for width, height in sizes)
         if area > best_area:
             best, best_area = (columns, rows), area
     return best
+
+
+def grid_cell_aspect_ratio(cell_aspect_ratios: list[float], columns: int, rows: int, dst_width: int, dst_height: int) -> float:
+    """The aspect ratio of the smallest grid cell that holds each of these cells at its fitted size."""
+    sizes = [_fit_size(aspect_ratio, dst_width / columns, dst_height / rows) for aspect_ratio in cell_aspect_ratios]
+    return max(width for width, _ in sizes) / max(height for _, height in sizes)
 
 
 def make_subdivision(subdivision_rows: list[SubdivisionRow], dst_width: int, dst_height: int, align_center: bool) -> Subdivision:
