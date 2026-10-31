@@ -51,6 +51,7 @@ class Fluid3DLayerSettings(BaseSettings):
     max_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
     sim_engine: Field[FluidSimEngine] =     Field(FluidSimEngine.FLUID_3D)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
+    scale_by_motion: Field[bool] =          Field(True, description="Scale velocity and density by the player's motion; off is full strength")
 
     fluid_flow    = Group(FluidFlowSettings)
 
@@ -205,7 +206,10 @@ class Fluid3DLayer(LayerBase):
         vel_strength: float
         den_strength: float
         for cam_id, flow_layer in self._flow_layers.items():
-            if cam_id == self._cam_id:
+            if not self.settings.scale_by_motion:
+                vel_strength = 1.0
+                den_strength = 1.0
+            elif cam_id == self._cam_id:
                 vel_strength = motion
                 den_strength = motion
             else:
@@ -250,7 +254,7 @@ class Fluid3DLayer(LayerBase):
                 target_x = (float(head[0]) - 0.5) * 2.0
                 target_y = float(head[1]) - 0.5
         # ~0.4 s ease keeps keypoint jitter out of the eye (render thread only)
-        dt = 1.0 / max(1, self.settings.fluid_flow.fps)
+        dt = self._fluid_flow.dt
         k = 1.0 - 0.01 ** (dt / 0.4)
         self._eye_x += (target_x - self._eye_x) * k
         self._eye_y += (target_y - self._eye_y) * k

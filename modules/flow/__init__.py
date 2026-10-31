@@ -20,6 +20,9 @@ from .bridge import     DensityBridge, DensityBridgeSettings, Magnitude, Velocit
 # Visualization
 from .visualization import VisualizationFieldSettings, Visualizer, VelocityField
 
+# Time step shared by the 2D and 3D fluid
+from .time_step import TimeStep, TimeStepMode
+
 # 2D fluid simulation
 from .fluid import FluidFlow, FluidFlowSettings, DepthSettings
 

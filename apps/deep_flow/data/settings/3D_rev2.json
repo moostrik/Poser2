@@ -235,11 +235,8 @@
         "right": [
           "fluid3d"
         ],
-        "composite": [
+        "output": [
           "fluid3d"
-        ],
-        "final": [
-          "composite"
         ]
       },
       "composite": {
@@ -394,6 +391,100 @@
         "profile": false,
         "width": 540,
         "height": 960,
+        "time_step": "MEASURED",
+        "fixed_fps": 60.0,
+        "fps_smoothing": 1.0,
+        "speed": 0.4,
+        "depth": {
+          "depth": 16,
+          "sim_depth": 32,
+          "spacing": 3.0,
+          "absorption": 35.68,
+          "injection_layer": 0.0,
+          "injection_spread": 0.13,
+          "boundary": "OPEN"
+        },
+        "velocity": {
+          "input_strength": 1.35,
+          "self_advection": 0.2,
+          "fade_time": 16.32,
+          "dampen_threshold": 26.61,
+          "dampen_time": 5.52,
+          "vorticity": 0.0,
+          "vorticity_radius": 3.0,
+          "viscosity": 100.0,
+          "viscosity_iter": 15
+        },
+        "density": {
+          "input_strength": 0.62,
+          "speed_offset": 0.1,
+          "fade_time": 20.63,
+          "dampen_threshold": 2.6,
+          "dampen_time": 3.63,
+          "boundary": "CLOSED"
+        },
+        "temperature": {
+          "input_strength": 2.0,
+          "speed_offset": 1.04,
+          "fade_time": 3.0,
+          "buoyancy": 0.0,
+          "weight": 2.0,
+          "ambient": 0.0,
+          "boundary": "CLOSED"
+        },
+        "pressure": {
+          "speed": 0.66,
+          "fade_time": 3.45,
+          "iterations": 40,
+          "boundary": "OPEN"
+        }
+      }
+    },
+    "flow_b": {
+      "fps": 60.0,
+      "draw_mode": "SMOOTH_VELOCITY_OUTPUT",
+      "blend_mode": "ADD",
+      "width": 896,
+      "height": 1600,
+      "visualization": {
+        "toggle_scalar": false,
+        "scale": 1.0,
+        "spacing": 20.0,
+        "element_length": 40.0,
+        "element_width": 1.0
+      },
+      "optical_flow": {
+        "offset": 3,
+        "threshold": 0.09,
+        "strength_x": 3.3,
+        "strength_y": 3.3,
+        "boost": 0.4
+      },
+      "velocity_trail": {
+        "scale": 1.0,
+        "trail_weight": 0.93,
+        "blur_radius": 0.0,
+        "blur_steps": 4
+      },
+      "density_bridge": {
+        "saturation": 1.02,
+        "brightness": 1.07
+      },
+      "temperature_bridge": {
+        "scale": 0.5
+      }
+    },
+    "fluid3d_b": {
+      "max_players": 1,
+      "sim_engine": "FLUID_3D",
+      "blend_mode": "ADD",
+      "fluid_flow": {
+        "profile": false,
+        "width": 540,
+        "height": 960,
+        "time_step": "MEASURED",
+        "fixed_fps": 60.0,
+        "fps_smoothing": 1.0,
         "speed": 0.4,
         "depth": {
           "depth": 16,

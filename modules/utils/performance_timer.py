@@ -130,6 +130,11 @@ class PerformanceTimer:
             self.count = 0
 
     @classmethod
+    def session_active(cls) -> bool:
+        """Whether a timing session is keeping samples."""
+        return cls._session_active
+
+    @classmethod
     def start_session(cls) -> None:
         """Start keeping every sample of every timer, dropping those of an earlier session."""
         with cls._registry_lock:

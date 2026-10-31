@@ -5,7 +5,7 @@ from typing import cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId, WindowSettings
+from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId
 from modules.board import HasFrames
 from modules.camera import RigCameraSettings, CameraCheckSettings
 from modules.render import ColorSettings, layers as ls, make_subdivision, SubdivisionRow, Subdivision
@@ -122,10 +122,9 @@ class HDTrioRender(RenderBase):
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, False)
 
-        # Propagate window fps to fluid simulation settings
-        def _propagate_fps(fps: int) -> None:
-            settings.fluid.fluid_flow.fps = fps
-        settings.window.bind(WindowSettings.avg_fps, _propagate_fps)
+        # The render rate of each tick feeds the fluid's time step
+        self._last_tick: float = 0.0
+        self.add_update_callback(self._measure_fps)
 
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
@@ -171,6 +170,11 @@ class HDTrioRender(RenderBase):
         for cam_dict in self.L.values():
             for layer in cam_dict.values():
                 layer.deallocate()
+
+    def _measure_fps(self, now: float) -> None:
+        if self._last_tick > 0.0 and now > self._last_tick:
+            self.settings.fluid.fluid_flow.fps = min(240.0, 1.0 / (now - self._last_tick))
+        self._last_tick = now
 
     def update(self) -> None:
         self._notify_update()
