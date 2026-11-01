@@ -1,7 +1,7 @@
 """InjectFlow3D - Inject the 2D flow as a full 3D velocity (u, v measured; w synthesized)."""
 from __future__ import annotations
 
-from OpenGL.GL import GL_RGBA16F, GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform3i, glUseProgram
+from OpenGL.GL import GL_RGBA16F, GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform3i, glUseProgram
 
 from modules.gl import Texture, Texture3D, ComputeShader
 
@@ -25,7 +25,8 @@ class InjectFlow3D(ComputeShader):
     def use(self, flow_2d: Texture, volume: Texture3D,
             target_layer: float, spread: float,
             strength_xy: float, strength_w: float,
-            push: float, squeeze: float, w_clamp: float) -> None:
+            push: float, squeeze: float, w_clamp: float,
+            depth: Texture | None = None, depth_channel: int = 0, depth_mix: float = 0.0) -> None:
         """Inject the flow into the velocity volume.
 
         Args:
@@ -38,6 +39,9 @@ class InjectFlow3D(ComputeShader):
             push: W synthesis — gain on |flow| (signed; + = away from viewer)
             squeeze: W synthesis — gain on -divergence (signed)
             w_clamp: Abs clamp on the synthesized W
+            depth: Velocity toward the camera, the measured W; None = synthesized only
+            depth_channel: Its channel
+            depth_mix: 0 = synthesized W, 1 = measured W
         """
         if not self.allocated or not self.shader_program:
             return
@@ -47,6 +51,13 @@ class InjectFlow3D(ComputeShader):
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, flow_2d.tex_id)
         glUniform1i(self.get_uniform_loc("uInput"), 0)
+
+        glUniform1f(self.get_uniform_loc("uDepthMix"), depth_mix if depth is not None else 0.0)
+        if depth is not None:
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, depth.tex_id)
+            glUniform1i(self.get_uniform_loc("uDepth"), 1)
+            glUniform1i(self.get_uniform_loc("uDepthChannel"), depth_channel)
 
         self.bind_image_3d_readwrite(0, volume, GL_RGBA16F)
 

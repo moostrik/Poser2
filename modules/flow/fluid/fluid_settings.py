@@ -21,6 +21,7 @@ class VelocitySettings(BaseSettings):
     input_strength: Field[float]    = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="Multiplier applied to the measured (x, y) flow input")
     squeeze: Field[float]           = Field(0.0,    min=-10.0,  max=10.0,   color="cyan",           description="W from flow convergence; positive: looming pushes ink to the viewer (3D)")
     push: Field[float]              = Field(0.0,    min=-2.0,   max=2.0,    color="light-blue",     description="W synthesis: flow magnitude; positive = away from viewer (3D only)")
+    depth_mix: Field[float]         = Field(0.0,    min=0.0,    max=1.0,    color="light-green",    description="W from the camera's depth: 0 is push and squeeze alone, 1 is measured alone (3D only)")
     self_advection: Field[float]    = Field(0.01,   min=0.0,    max=1.0,    color="blue-grey",      description="How much velocity advects itself. Keep low for stability.")
     fade_time: Field[float]         = Field(30.0,   min=0.1,    max=60.0,   color="deep-blue",      description="Seconds until velocity fades to ~1%")
     dampen_threshold: Field[float]  = Field(5.0,    min=0.1,    max=50.0,   color="cyan",           description="Magnitude above which velocity is dampened")

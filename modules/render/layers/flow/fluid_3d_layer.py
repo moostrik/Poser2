@@ -217,12 +217,19 @@ class Fluid3DLayer(LayerBase):
                 den_strength = m_s[cam_id]
 
             # Add the flow as one velocity input (3D synthesizes w from it)
-            self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength)
-
-            # The kinetic bridge's push of a starting motion, and its curl for the vorticity force
+            # and the kinetic bridge's push of a starting motion, each with its measured w if there is depth
             onset: Texture | None = flow_layer.onset
-            if onset is not None:
-                self._fluid_flow.add_velocity(onset, vel_strength)
+            if isinstance(self._fluid_flow, FluidFlow3D):
+                depth_velocity: Texture | None = flow_layer.depth_velocity
+                self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength, depth_velocity)
+                if onset is not None:
+                    self._fluid_flow.add_velocity(onset, vel_strength, onset if depth_velocity is not None else None, 2)
+            else:
+                self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength)
+                if onset is not None:
+                    self._fluid_flow.add_velocity(onset, vel_strength)
+
+            # The kinetic bridge's curl for the vorticity force
             spin: Texture | None = flow_layer.spin
             if spin is not None and isinstance(self._fluid_flow, FluidFlow3D):
                 self._fluid_flow.set_spin(spin, flow_layer.settings.kinetic_bridge.spin * vel_strength)
