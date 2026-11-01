@@ -14,7 +14,7 @@ from .optical import OpticalFlow, OpticalFlowSettings
 
 # Bridge layers
 from .bridge import     DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
-                        BlurPosition, KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES, decay_weight, project, hold_release, drop, fill_reservoir, smooth_depth, depth_speed, \
+                        BlurPosition, KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES, decay_weight, project, stop_gate, hold_release, drop, fill_reservoir, smooth_depth, depth_speed, \
                         DepthVelocity, DepthVelocitySettings, \
                         SmoothTrail, VelocitySmoothTrail, DepthSmoothTrail, SmoothTrailSettings, \
                         TemperatureBridge, TemperatureBridgeSettings

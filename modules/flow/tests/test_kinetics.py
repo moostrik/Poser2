@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import decay_weight, depth_speed, drop, fill_reservoir, hold_release, project, smooth_depth
+from modules.flow import decay_weight, depth_speed, drop, fill_reservoir, hold_release, project, smooth_depth, stop_gate
 
 
 def trails(flow: list[float], fast_time: float = 25.0, slow_time: float = 150.0, dt: float = 1 / 60) -> tuple[np.ndarray, np.ndarray]:
@@ -126,6 +126,26 @@ class ReleaseTest(unittest.TestCase):
     def test_no_slow_trail_divides_by_nothing(self) -> None:
         velocity = drop(np.zeros((1, 2)), np.zeros((1, 2)), np.array([0.0]), 1.0)
         np.testing.assert_allclose(velocity, np.zeros((1, 2)))
+
+
+class StopGateTest(unittest.TestCase):
+    def test_a_steady_patch_lets_nothing_through(self) -> None:
+        self.assertEqual(stop_gate(np.array([1.0]), np.array([1.0]), 1.0)[0], 0.0)
+
+    def test_a_stopped_patch_lets_all_through(self) -> None:
+        self.assertEqual(stop_gate(np.array([0.0]), np.array([1.0]), 1.0)[0], 1.0)
+
+    def test_a_speeding_patch_lets_nothing_through(self) -> None:
+        self.assertEqual(stop_gate(np.array([2.0]), np.array([1.0]), 1.0)[0], 0.0)
+
+    def test_strength_0_is_no_gate(self) -> None:
+        self.assertEqual(stop_gate(np.array([1.0]), np.array([1.0]), 0.0)[0], 1.0)
+
+    def test_no_motion_divides_by_nothing(self) -> None:
+        self.assertEqual(stop_gate(np.array([0.0]), np.array([0.0]), 1.0)[0], 0.0)
+
+    def test_the_gate_scales_a_new_release(self) -> None:
+        self.assertAlmostEqual(hold_release(np.array([-2.0]), np.zeros(1), 0.5, 0.25)[0], 0.5)
 
 
 class DepthTest(unittest.TestCase):

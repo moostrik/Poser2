@@ -4,15 +4,16 @@ Reads the motion's change instead of its speed: two trails on the optical flow, 
 their difference projected on the direction of the motion. Runs on each new optical flow frame.
 """
 from enum import IntEnum
+import math
 
-from OpenGL.GL import GL_R16F, GL_R32F, GL_RG16F, GL_RGBA16F
+from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R16F, GL_R32F, GL_RG16F, GL_RGBA16F, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil
 from ..shaders import Trail, GaussianBlur
 from .kinetics import decay_weight
-from .shaders import KineticCurl, KineticEmission, KineticHold, KineticInput, KineticOnset, KineticProjection, KineticReservoir, KineticVelocity, Projection
+from .shaders import KineticCurl, KineticEmission, KineticHold, KineticInput, KineticOnset, KineticPatch, KineticProjection, KineticReservoir, KineticVelocity, Projection
 
 
 class BlurPosition(IntEnum):
@@ -28,6 +29,8 @@ class KineticBridgeSettings(BaseSettings):
     blur_position: Field[BlurPosition] = Field(BlurPosition.BEFORE, description="Blur the flow once before the trails, or inside each trail")
     blur_radius = Field(2.0, min=0.0, max=10.0, description="Gaussian blur radius in pixels")
     blur_steps = Field(2, min=0, max=8, description="Number of Gaussian blur passes")
+    stop_gate = Field(0.0, min=0.0, max=1.0, description="How far a release must be a slowdown of its patch; 0 lets all through")
+    stop_tile = Field(128.0, min=8.0, max=1024.0, description="Size of a stop gate patch (pixels of the bridge)")
     release_hold = Field(100.0, min=0.0, max=1000.0, description="Decay of the held release (ms)")
     emission_gain = Field(1.0, min=0.0, max=20.0, description="Ink emitted per unit of held release")
     drop_velocity = Field(1.0, min=0.0, max=1.0, description="How far a release blends the velocity to the slow trail")
@@ -49,7 +52,8 @@ class KineticBridge(FlowBase):
         2. Blur it (BlurPosition.BEFORE)
         3. Advance the fast and slow trails, blurring each inside its loop (BlurPosition.INSIDE)
         4. Project fast - slow on the direction of the motion → acceleration, turn (R16F)
-        5. Peak-hold the release, max(0, -acceleration) → emission (R16F), the density bridge's alpha;
+        5. Peak-hold the release, max(0, -acceleration) → emission (R16F), the density bridge's alpha,
+           through the stop gate where that is on: patch mean speeds (RG16F, mipmapped) say a patch is slowing;
            with the reservoir (R32F) motion stores the ink per pixel and the release spends it
         6. Blend the fast trail toward the slow one where it releases → velocity (RG16F), depth_velocity (R16F)
         7. max(0, acceleration) along the fast trail → onset (RGBA16F, xyz), a second velocity input
@@ -72,6 +76,7 @@ class KineticBridge(FlowBase):
         self._turn_fbo: Fbo = Fbo()
         self._depth_velocity_fbo: Fbo = Fbo()
         self._depth_acceleration_fbo: Fbo = Fbo()
+        self._patch_fbo: Fbo = Fbo()
         self._held_release_fbo: SwapFbo = SwapFbo()
         self._reservoir_fbo: SwapFbo = SwapFbo()
         self._emission_fbo: Fbo = Fbo()
@@ -82,6 +87,7 @@ class KineticBridge(FlowBase):
         self._trail_shader: Trail = Trail()
         self._blur_shader: GaussianBlur = GaussianBlur()
         self._projection_shader: KineticProjection = KineticProjection()
+        self._patch_shader: KineticPatch = KineticPatch()
         self._hold_shader: KineticHold = KineticHold()
         self._reservoir_shader: KineticReservoir = KineticReservoir()
         self._emission_shader: KineticEmission = KineticEmission()
@@ -170,6 +176,12 @@ class KineticBridge(FlowBase):
         self._turn_fbo.allocate(width, height, GL_R16F)
         self._depth_velocity_fbo.allocate(width, height, GL_R16F)
         self._depth_acceleration_fbo.allocate(width, height, GL_R16F)
+        self._patch_fbo.allocate(width // 2, height // 2, GL_RG16F)
+        glBindTexture(GL_TEXTURE_2D, self._patch_fbo.tex_id)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glGenerateMipmap(GL_TEXTURE_2D)
+        glBindTexture(GL_TEXTURE_2D, 0)
         self._held_release_fbo.allocate(width, height, GL_R16F)
         self._reservoir_fbo.allocate(width, height, GL_R32F)        # a slow fill vanishes in 16 bits
         self._emission_fbo.allocate(width, height, GL_R16F)
@@ -181,6 +193,7 @@ class KineticBridge(FlowBase):
         self._trail_shader.allocate()
         self._blur_shader.allocate()
         self._projection_shader.allocate()
+        self._patch_shader.allocate()
         self._hold_shader.allocate()
         self._reservoir_shader.allocate()
         self._emission_shader.allocate()
@@ -197,6 +210,7 @@ class KineticBridge(FlowBase):
         self._turn_fbo.deallocate()
         self._depth_velocity_fbo.deallocate()
         self._depth_acceleration_fbo.deallocate()
+        self._patch_fbo.deallocate()
         self._held_release_fbo.deallocate()
         self._reservoir_fbo.deallocate()
         self._emission_fbo.deallocate()
@@ -206,6 +220,7 @@ class KineticBridge(FlowBase):
         self._trail_shader.deallocate()
         self._blur_shader.deallocate()
         self._projection_shader.deallocate()
+        self._patch_shader.deallocate()
         self._hold_shader.deallocate()
         self._reservoir_shader.deallocate()
         self._emission_shader.deallocate()
@@ -260,9 +275,18 @@ class KineticBridge(FlowBase):
         self._projection_shader.use(self.fast, self.slow, Projection.TURN)
         self._turn_fbo.end()
 
+        if s.stop_gate > 0.0:
+            self._patch_fbo.begin()
+            self._patch_shader.use(self.fast, self.slow)
+            self._patch_fbo.end()
+            glBindTexture(GL_TEXTURE_2D, self._patch_fbo.tex_id)
+            glGenerateMipmap(GL_TEXTURE_2D)
+            glBindTexture(GL_TEXTURE_2D, 0)
+
         self._held_release_fbo.swap()
         self._held_release_fbo.begin()
-        self._hold_shader.use(self.acceleration, self._held_release_fbo.back_texture, decay_weight(delta_time, s.release_hold))
+        self._hold_shader.use(self.acceleration, self._held_release_fbo.back_texture, decay_weight(delta_time, s.release_hold),
+                              self._patch_fbo, s.stop_gate, math.log2(s.stop_tile) - 1.0)      # the patch texture is half size
         self._held_release_fbo.end()
 
         if s.reservoir_enabled:

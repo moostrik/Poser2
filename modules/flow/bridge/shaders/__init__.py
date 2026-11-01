@@ -8,6 +8,7 @@ from .kinetic_emission import KineticEmission
 from .kinetic_hold import KineticHold
 from .kinetic_input import KineticInput
 from .kinetic_onset import KineticOnset
+from .kinetic_patch import KineticPatch
 from .kinetic_projection import KineticProjection, Projection
 from .kinetic_reservoir import KineticReservoir
 from .kinetic_strip_shader import KineticStripShader

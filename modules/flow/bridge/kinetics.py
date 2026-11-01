@@ -45,9 +45,19 @@ def project(fast: np.ndarray, slow: np.ndarray) -> tuple[np.ndarray, np.ndarray]
     return acceleration, turn
 
 
-def hold_release(acceleration: np.ndarray, held: np.ndarray, decay: float) -> np.ndarray:
-    """The peak-held release: the new release, or what remains of the last one when that is more."""
-    return np.maximum(np.maximum(0.0, -acceleration), held * decay)
+def stop_gate(patch_fast: np.ndarray, patch_slow: np.ndarray, strength: float) -> np.ndarray:
+    """How much of a release counts, from a patch's mean speeds: how far the patch is slowing down, 0..1.
+
+    A limb moving steadily keeps its patch's mean speed, whatever it does to single pixels; a stop lowers it.
+    Strength 0 lets every release through.
+    """
+    slowdown: np.ndarray = np.clip((patch_slow - patch_fast) / np.maximum(patch_slow, EPSILON), 0.0, 1.0)
+    return 1.0 + (slowdown - 1.0) * strength
+
+
+def hold_release(acceleration: np.ndarray, held: np.ndarray, decay: float, gate: np.ndarray | float = 1.0) -> np.ndarray:
+    """The peak-held release: the new release through the gate, or what remains of the last one when that is more."""
+    return np.maximum(np.maximum(0.0, -acceleration) * gate, held * decay)
 
 
 def drop(fast: np.ndarray, slow: np.ndarray, acceleration: np.ndarray, amount: float) -> np.ndarray:
