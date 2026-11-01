@@ -403,6 +403,9 @@
         "flow": "center_foreground",
         "density": "center_foreground"
       },
+      "depth_velocity": {
+        "scale": 1.0
+      },
       "visualization": {
         "toggle_scalar": false,
         "scale": 1.0,
@@ -466,6 +469,7 @@
         },
         "velocity": {
           "input_strength": 0.57,
+          "depth_mix": 0.5,
           "squeeze": 0.0,
           "push": 0.5,
           "self_advection": 0.2,
@@ -534,6 +538,9 @@
         "blur_radius": 0.0,
         "blur_steps": 4
       },
+      "depth_velocity": {
+        "scale": 1.0
+      },
       "kinetic_bridge": {
         "scale": 14.0,
         "emission_gain": 3.5
@@ -581,6 +588,7 @@
         },
         "velocity": {
           "input_strength": 0.57,
+          "depth_mix": 0.5,
           "squeeze": 0.0,
           "push": 0.5,
           "self_advection": 0.2,
