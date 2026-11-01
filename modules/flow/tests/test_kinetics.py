@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import decay_weight, depth_speed, drop, fill_reservoir, hold_release, project, smooth_depth, stop_gate
+from modules.flow import dead_zone, decay_weight, depth_speed, drop, fill_reservoir, hold_release, project, smooth_depth, stop_gate
 
 
 def trails(flow: list[float], fast_time: float = 25.0, slow_time: float = 150.0, dt: float = 1 / 60) -> tuple[np.ndarray, np.ndarray]:
@@ -149,6 +149,9 @@ class StopGateTest(unittest.TestCase):
 
 
 class DepthTest(unittest.TestCase):
+    def test_the_dead_zone_clears_the_floor_and_stays_continuous(self) -> None:
+        np.testing.assert_allclose(dead_zone(np.array([0.05, -0.05, 0.3, -0.3]), 0.1), [0.0, 0.0, 0.2, -0.2])
+
     def test_coming_closer_is_positive(self) -> None:
         self.assertAlmostEqual(depth_speed(np.array([1.9]), np.array([2.0]), 0.1, 0.5)[0], 1.0)
 

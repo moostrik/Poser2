@@ -355,7 +355,13 @@ class FlowLayer(LayerBase):
         if new_flow:
             self._flow_interval = 0.0
 
-        self._velocity_magnitude.set_input(velocity)
+        speed: Texture = velocity       # what the magnitude reads: 3D with depth
+        if depth_enabled:
+            speed = self._depth_velocity.process_speed(velocity, self._bridge_depth_velocity)
+            if self.settings.bridge == FlowBridge.TRAIL:
+                ink = speed
+
+        self._velocity_magnitude.set_input(speed)
         self._velocity_magnitude.update()
 
         # self._density_bridge.set_color(self._flow_input)

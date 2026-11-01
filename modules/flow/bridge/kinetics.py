@@ -27,6 +27,11 @@ def depth_speed(smoothed: np.ndarray, previous: np.ndarray, dt: float, jump: flo
     return np.where(moving, -change / dt, 0.0)
 
 
+def dead_zone(value: np.ndarray, width: float) -> np.ndarray:
+    """A signed field with `width` taken off its size, 0 below it: the noise floor goes, and what is above stays continuous."""
+    return np.sign(value) * np.maximum(np.abs(value) - width, 0.0)
+
+
 def direction(fast: np.ndarray, slow: np.ndarray) -> np.ndarray:
     """Unit direction of the motion, per pixel (..., 2): the fast trail's, the slow one's when the fast trail has stopped."""
     fast_length: np.ndarray = np.linalg.norm(fast, axis=-1, keepdims=True)
