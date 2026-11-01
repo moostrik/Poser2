@@ -543,7 +543,9 @@
       },
       "kinetic_bridge": {
         "scale": 14.0,
-        "emission_gain": 3.5
+        "stop_gate": 1.0,
+        "stop_tile": 256.0,
+        "emission_gain": 20.0
       },
       "density_bridge": {
         "saturation": 1.02,
