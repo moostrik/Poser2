@@ -15,7 +15,7 @@ class KineticReservoir(Shader):
 
         Args:
             previous: Previous reservoir
-            fast: RG fast trail
+            fast: RGB fast trail
             held_release: Held release in the red channel
             leak: What remains after the leak this update
             dt: Seconds this update

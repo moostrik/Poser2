@@ -3,20 +3,28 @@
 Projects the difference of the fast and slow trails on the direction of the motion.
 """
 
+from enum import IntEnum
+
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
-class KineticProjection(Shader):
-    """Writes fast - slow along the motion (acceleration) or across it (turn) to the red channel."""
+class Projection(IntEnum):
+    ACCELERATION =       0     # along the motion
+    TURN =               1     # across it
+    DEPTH_ACCELERATION = 2     # the z of fast - slow
 
-    def use(self, fast: Texture, slow: Texture, turn: bool) -> None:
+
+class KineticProjection(Shader):
+    """Writes fast - slow projected as asked to the red channel."""
+
+    def use(self, fast: Texture, slow: Texture, mode: Projection) -> None:
         """Project the trail difference.
 
         Args:
-            fast: RG fast trail
-            slow: RG slow trail
-            turn: Output the turn instead of the acceleration
+            fast: RGB fast trail
+            slow: RGB slow trail
+            mode: The projection
         """
         if not self.allocated or not self.shader_program:
             return
@@ -32,6 +40,6 @@ class KineticProjection(Shader):
 
         glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform1i(self.get_uniform_loc("tex1"), 1)
-        glUniform1i(self.get_uniform_loc("turn"), 1 if turn else 0)
+        glUniform1i(self.get_uniform_loc("mode"), int(mode))
 
         draw_quad()

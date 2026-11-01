@@ -8,13 +8,13 @@ from modules.gl import Shader, draw_quad, Texture
 
 
 class KineticOnset(Shader):
-    """Writes max(0, acceleration) * strength along the fast trail to RG."""
+    """Writes max(0, acceleration) * strength along the fast trail to RGB."""
 
     def use(self, fast: Texture, acceleration: Texture, strength: float) -> None:
         """Compose the onset force.
 
         Args:
-            fast: RG fast trail
+            fast: RGB fast trail
             acceleration: Signed acceleration in the red channel
             strength: Onset force
         """

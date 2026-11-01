@@ -5,14 +5,14 @@ their difference projected on the direction of the motion. Runs on each new opti
 """
 from enum import IntEnum
 
-from OpenGL.GL import GL_R16F, GL_R32F, GL_RG16F
+from OpenGL.GL import GL_R16F, GL_R32F, GL_RG16F, GL_RGBA16F
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil
 from ..shaders import Trail, GaussianBlur
 from .kinetics import decay_weight
-from .shaders import KineticCurl, KineticEmission, KineticHold, KineticInput, KineticOnset, KineticProjection, KineticReservoir, KineticVelocity
+from .shaders import KineticCurl, KineticEmission, KineticHold, KineticInput, KineticOnset, KineticProjection, KineticReservoir, KineticVelocity, Projection
 
 
 class BlurPosition(IntEnum):
@@ -41,17 +41,18 @@ class KineticBridge(FlowBase):
     """Two trails on the optical flow and their difference along and across the motion.
 
     The trails are unit-gain Emas, so they meet on a steady motion and fast - slow is the change alone.
-    The gain of the trail bridge, 1 / (1 - trail_weight), is in `scale` here.
+    The gain of the trail bridge, 1 / (1 - trail_weight), is in `scale` here. With a depth velocity
+    the trails are 3D, so a motion that starts or stops toward the camera reads like any other.
 
     Pipeline:
-        1. Receive the optical flow via set_velocity() → input_fbo (RG16F)
+        1. Receive the optical flow and the depth velocity via set_velocity() → input_fbo (RGBA16F, xyz)
         2. Blur it (BlurPosition.BEFORE)
         3. Advance the fast and slow trails, blurring each inside its loop (BlurPosition.INSIDE)
         4. Project fast - slow on the direction of the motion → acceleration, turn (R16F)
         5. Peak-hold the release, max(0, -acceleration) → emission (R16F), the density bridge's alpha;
            with the reservoir (R32F) motion stores the ink per pixel and the release spends it
-        6. Blend the fast trail toward the slow one where it releases → velocity (RG16F)
-        7. max(0, acceleration) along the fast trail → onset (RG16F), a second velocity input
+        6. Blend the fast trail toward the slow one where it releases → velocity (RG16F), depth_velocity (R16F)
+        7. max(0, acceleration) along the fast trail → onset (RGBA16F, xyz), a second velocity input
         8. 2D curl of the fast trail → curl (R16F), the extra input to the fluid's vorticity force
     """
 
@@ -60,13 +61,17 @@ class KineticBridge(FlowBase):
 
         self.settings: KineticBridgeSettings = settings or KineticBridgeSettings()
 
-        self._input_internal_format = GL_RG16F
+        self._input_internal_format = GL_RGBA16F
         self._output_internal_format = GL_RG16F
+
+        self._has_depth: bool = False
 
         self._fast_fbo: SwapFbo = SwapFbo()
         self._slow_fbo: SwapFbo = SwapFbo()
         self._acceleration_fbo: Fbo = Fbo()
         self._turn_fbo: Fbo = Fbo()
+        self._depth_velocity_fbo: Fbo = Fbo()
+        self._depth_acceleration_fbo: Fbo = Fbo()
         self._held_release_fbo: SwapFbo = SwapFbo()
         self._reservoir_fbo: SwapFbo = SwapFbo()
         self._emission_fbo: Fbo = Fbo()
@@ -95,14 +100,24 @@ class KineticBridge(FlowBase):
         return self._input
 
     @property
+    def depth_velocity(self) -> Texture:
+        """Velocity toward the camera for the fluid (R16F)."""
+        return self._depth_velocity_fbo
+
+    @property
     def fast(self) -> Texture:
-        """Fast trail (RG16F)."""
+        """Fast trail (RGBA16F, xyz)."""
         return self._fast_fbo.texture
 
     @property
     def slow(self) -> Texture:
-        """Slow trail (RG16F)."""
+        """Slow trail (RGBA16F, xyz)."""
         return self._slow_fbo.texture
+
+    @property
+    def depth_acceleration(self) -> Texture:
+        """The z of fast - slow (R16F), positive when the motion toward the camera grows."""
+        return self._depth_acceleration_fbo
 
     @property
     def acceleration(self) -> Texture:
@@ -131,7 +146,7 @@ class KineticBridge(FlowBase):
 
     @property
     def onset(self) -> Texture:
-        """The push of a starting motion (RG16F), a second velocity input for the fluid."""
+        """The push of a starting motion (RGBA16F, xyz), a second velocity input for the fluid."""
         return self._onset_fbo
 
     @property
@@ -149,14 +164,16 @@ class KineticBridge(FlowBase):
             output_height: Optional velocity output height (defaults to height)
         """
         super().allocate(width, height, output_width, output_height)
-        self._fast_fbo.allocate(width, height, GL_RG16F)
-        self._slow_fbo.allocate(width, height, GL_RG16F)
+        self._fast_fbo.allocate(width, height, GL_RGBA16F)
+        self._slow_fbo.allocate(width, height, GL_RGBA16F)
         self._acceleration_fbo.allocate(width, height, GL_R16F)
         self._turn_fbo.allocate(width, height, GL_R16F)
+        self._depth_velocity_fbo.allocate(width, height, GL_R16F)
+        self._depth_acceleration_fbo.allocate(width, height, GL_R16F)
         self._held_release_fbo.allocate(width, height, GL_R16F)
         self._reservoir_fbo.allocate(width, height, GL_R32F)        # a slow fill vanishes in 16 bits
         self._emission_fbo.allocate(width, height, GL_R16F)
-        self._onset_fbo.allocate(width, height, GL_RG16F)
+        self._onset_fbo.allocate(width, height, GL_RGBA16F)
         self._curl_fbo.allocate(width, height, GL_R16F)
         self.reset()
 
@@ -178,6 +195,8 @@ class KineticBridge(FlowBase):
         self._slow_fbo.deallocate()
         self._acceleration_fbo.deallocate()
         self._turn_fbo.deallocate()
+        self._depth_velocity_fbo.deallocate()
+        self._depth_acceleration_fbo.deallocate()
         self._held_release_fbo.deallocate()
         self._reservoir_fbo.deallocate()
         self._emission_fbo.deallocate()
@@ -201,16 +220,19 @@ class KineticBridge(FlowBase):
         FlowUtil.zero(self._slow_fbo)
         FlowUtil.zero(self._acceleration_fbo)
         FlowUtil.zero(self._turn_fbo)
+        FlowUtil.zero(self._depth_velocity_fbo)
+        FlowUtil.zero(self._depth_acceleration_fbo)
         FlowUtil.zero(self._held_release_fbo)
         FlowUtil.zero(self._reservoir_fbo)
         FlowUtil.zero(self._emission_fbo)
         FlowUtil.zero(self._onset_fbo)
         FlowUtil.zero(self._curl_fbo)
 
-    def set_velocity(self, velocity: Texture) -> None:
-        """Set the new optical flow frame."""
+    def set_velocity(self, velocity: Texture, depth_velocity: Texture | None = None) -> None:
+        """Set the new optical flow frame, and the velocity toward the camera if there is depth."""
+        self._has_depth = depth_velocity is not None
         self._input_fbo.begin()
-        self._input_shader.use(velocity)
+        self._input_shader.use(velocity, depth_velocity)
         self._input_fbo.end()
 
     def update(self, delta_time: float = 1.0 / 60.0) -> None:
@@ -231,11 +253,11 @@ class KineticBridge(FlowBase):
         self._advance_trail(self._slow_fbo, decay_weight(delta_time, s.slow_time), not blur_before)
 
         self._acceleration_fbo.begin()
-        self._projection_shader.use(self.fast, self.slow, False)
+        self._projection_shader.use(self.fast, self.slow, Projection.ACCELERATION)
         self._acceleration_fbo.end()
 
         self._turn_fbo.begin()
-        self._projection_shader.use(self.fast, self.slow, True)
+        self._projection_shader.use(self.fast, self.slow, Projection.TURN)
         self._turn_fbo.end()
 
         self._held_release_fbo.swap()
@@ -258,10 +280,23 @@ class KineticBridge(FlowBase):
         self._velocity_shader.use(self.fast, self.slow, self.acceleration, s.drop_velocity)
         self._output_fbo.end()
 
+        if self._has_depth:
+            self._depth_velocity_fbo.begin()
+            self._velocity_shader.use(self.fast, self.slow, self.acceleration, s.drop_velocity, True)
+            self._depth_velocity_fbo.end()
+
         if s.onset_force > 0.0:
             self._onset_fbo.begin()
             self._onset_shader.use(self.fast, self.acceleration, s.onset_force)
             self._onset_fbo.end()
+
+    def update_depth_acceleration(self) -> None:
+        """Compute the z of fast - slow, for its debug view."""
+        if not self._allocated:
+            return
+        self._depth_acceleration_fbo.begin()
+        self._projection_shader.use(self.fast, self.slow, Projection.DEPTH_ACCELERATION)
+        self._depth_acceleration_fbo.end()
 
     def update_curl(self) -> None:
         """Compute the curl of the fast trail, for the spin input or its debug view."""

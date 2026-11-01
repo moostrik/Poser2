@@ -47,16 +47,17 @@ class FlowDrawMode(IntEnum):
         TEMPERATURE_BRIDGE_OUTPUT - Temperature field (R32F)
 
     Kinetic bridge:
-        KINETIC_FAST / KINETIC_SLOW - The two trails (RG16F)
+        KINETIC_FAST / KINETIC_SLOW - The two trails (RGBA16F, xyz); arrows of xy
         KINETIC_ACCELERATION - Along the motion in two colors: + onset warm, - release cold
         KINETIC_TURN - Across the motion in two colors
         KINETIC_HELD_RELEASE - The peak-held release
         KINETIC_RESERVOIR - Ink stored per pixel
         KINETIC_VELOCITY - The velocity the fluid gets, after drop_velocity (RG16F)
         KINETIC_EMISSION - The ink the density bridge gets
-        KINETIC_ONSET - The second velocity input (RG16F)
+        KINETIC_ONSET - The second velocity input (RGBA16F, xyz); arrows of xy
         KINETIC_CURL - The fast trail's 2D curl in two colors
         KINETIC_STRIP - Speed, onset, release and emission over the last seconds
+        KINETIC_DEPTH_ACCELERATION - The z of fast - slow: red toward the camera, green away
     """
     OPTICAL_INPUT = 0
     OPTICAL_OUTPUT = auto()
@@ -81,10 +82,11 @@ class FlowDrawMode(IntEnum):
     KINETIC_CURL = auto()
     KINETIC_STRIP = auto()
     SMOOTH_VELOCITY_DEPTH = auto()
+    KINETIC_DEPTH_ACCELERATION = auto()
 
 
-DEPTH_DRAW_MODES: set[FlowDrawMode] = {FlowDrawMode.SMOOTH_VELOCITY_DEPTH}                      # red and green
-VECTOR_DRAW_MODES: set[FlowDrawMode] = set()    # arrows, whatever the texture's format
+DEPTH_DRAW_MODES: set[FlowDrawMode] = {FlowDrawMode.SMOOTH_VELOCITY_DEPTH, FlowDrawMode.KINETIC_DEPTH_ACCELERATION}     # red and green
+VECTOR_DRAW_MODES: set[FlowDrawMode] = {FlowDrawMode.KINETIC_FAST, FlowDrawMode.KINETIC_SLOW, FlowDrawMode.KINETIC_ONSET}   # arrows, whatever the texture's format
 
 
 class FlowLayerSettings(BaseSettings):
@@ -194,6 +196,8 @@ class FlowLayer(LayerBase):
 
     @property
     def _bridge_depth_velocity(self) -> Texture:
+        if self.settings.bridge == FlowBridge.KINETIC:
+            return self._kinetic_bridge.depth_velocity
         return self._depth_trail.depth_velocity
 
     @property
@@ -328,8 +332,10 @@ class FlowLayer(LayerBase):
         ink: Texture    # what the density bridge reads as alpha, through its length
         if self.settings.bridge == FlowBridge.KINETIC:
             if new_flow:
-                self._kinetic_bridge.set_velocity(self._optical_flow.velocity)
+                self._kinetic_bridge.set_velocity(self._optical_flow.velocity, self._depth_velocity.depth_velocity if depth_enabled else None)
                 self._kinetic_bridge.update(self._flow_interval)
+                if self.settings.draw_mode == FlowDrawMode.KINETIC_DEPTH_ACCELERATION:
+                    self._kinetic_bridge.update_depth_acceleration()
                 if self.settings.kinetic_bridge.spin > 0.0 or self.settings.draw_mode == FlowDrawMode.KINETIC_CURL:
                     self._kinetic_bridge.update_curl()
                 if self.settings.draw_mode == FlowDrawMode.KINETIC_STRIP:
@@ -407,6 +413,7 @@ class FlowLayer(LayerBase):
             FlowDrawMode.KINETIC_EMISSION: self._kinetic_bridge.emission,
             FlowDrawMode.KINETIC_CURL: self._kinetic_bridge.curl,
             FlowDrawMode.SMOOTH_VELOCITY_DEPTH: self._bridge_depth_velocity,
+            FlowDrawMode.KINETIC_DEPTH_ACCELERATION: self._kinetic_bridge.depth_acceleration,
         }
         if self.settings.bridge == FlowBridge.KINETIC:
             # On this bridge the density bridge's second input is the emission, not a velocity
@@ -419,6 +426,8 @@ class FlowLayer(LayerBase):
             return None, 0
         if self.settings.draw_mode in (FlowDrawMode.SMOOTH_VELOCITY_OUTPUT, FlowDrawMode.KINETIC_VELOCITY):
             return self.depth_velocity, 0
+        if self.settings.draw_mode in VECTOR_DRAW_MODES:
+            return self._get_draw_texture(), 2      # z is the texture's own blue channel
         return None, 0
 
     def _get_draw_texture(self) -> Texture:

@@ -14,7 +14,7 @@ class KineticSummary(Shader):
         """Pack the fields.
 
         Args:
-            fast: RG fast trail
+            fast: RGB fast trail
             acceleration: Signed acceleration in the red channel
             emission: Emission in the red channel
         """

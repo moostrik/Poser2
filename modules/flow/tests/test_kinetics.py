@@ -49,6 +49,22 @@ class ProjectTest(unittest.TestCase):
         _, turn_right = project(np.array([[1.0, -0.5]]), np.array([[1.0, 0.0]]))
         self.assertAlmostEqual(turn_right[0], -turn[0])
 
+    def test_stopping_toward_the_camera_is_a_release(self) -> None:
+        fast, slow = np.array([[0.0, 0.0, 0.0]]), np.array([[0.0, 0.0, 2.0]])
+        acceleration, _ = project(fast, slow)
+        self.assertAlmostEqual(acceleration[0], -2.0)
+
+    def test_starting_toward_the_camera_is_an_onset(self) -> None:
+        fast, slow = np.array([[0.0, 0.0, 2.0]]), np.array([[0.0, 0.0, 1.0]])
+        acceleration, _ = project(fast, slow)
+        self.assertAlmostEqual(acceleration[0], 1.0)
+
+    def test_without_z_the_projection_is_the_2d_one(self) -> None:
+        fast, slow = np.array([[1.0, 0.5]]), np.array([[0.2, 0.7]])
+        flat = project(fast, slow)
+        lifted = project(np.array([[1.0, 0.5, 0.0]]), np.array([[0.2, 0.7, 0.0]]))
+        np.testing.assert_allclose(flat, lifted)
+
     def test_a_steady_motion_is_silent(self) -> None:
         fast, slow = trails([1.0] * 240)
         acceleration, turn = project(fast, slow)
@@ -139,8 +155,8 @@ class DepthTest(unittest.TestCase):
         rng = np.random.default_rng(0)
         weight: float = decay_weight(1 / 60, 60.0)
         for approach, expected in ((0.0, 0.0), (1.0, 1.0)):                 # m/s
-            depth = 2.0 - approach * np.arange(300) / 60
-            noisy = depth + rng.normal(0.0, 0.012, 300)
+            depth = 2.0 - approach * np.arange(90) / 60
+            noisy = depth + rng.normal(0.0, 0.012, 90)
             smoothed, speeds = np.array([noisy[0]]), []
             for value in noisy[1:]:
                 last = smoothed
