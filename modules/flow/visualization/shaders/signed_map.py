@@ -10,12 +10,13 @@ from modules.gl import Shader, draw_quad, Texture
 class SignedMap(Shader):
     """Maps a scalar field to a warm color when positive and a cold one when negative."""
 
-    def use(self, field: Texture, scale: float) -> None:
+    def use(self, field: Texture, scale: float, depth: bool = False) -> None:
         """Draw the field.
 
         Args:
             field: Scalar field in the red channel
             scale: Multiplier on the value
+            depth: Red toward the camera and green away, instead of warm and cold
         """
         if not self.allocated or not self.shader_program:
             return
@@ -29,5 +30,6 @@ class SignedMap(Shader):
 
         glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform1f(self.get_uniform_loc("scale"), scale)
+        glUniform1i(self.get_uniform_loc("depth"), 1 if depth else 0)
 
         draw_quad()

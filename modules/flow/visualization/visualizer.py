@@ -72,8 +72,11 @@ class Visualizer:
         else:
             raise RuntimeError("Visualizer: no texture available, call process() first")
 
-    def process(self, texture: Texture) -> None:
-        """Process texture for visualization (FBO operations happen here)."""
+    def process(self, texture: Texture, vector: bool = False, depth: Texture | None = None, depth_channel: int = 0) -> None:
+        """Process texture for visualization (FBO operations happen here).
+
+        `vector` draws its xy as a velocity whatever its format; a channel of `depth` colors the arrows.
+        """
         self._use_signed_field = False
         if not self._allocated or not texture.allocated:
             self._current_texture = None
@@ -87,20 +90,20 @@ class Visualizer:
 
         # Visualize 2-channel velocity data (RG32F)
         # Always visualized since raw output can contain negatives
-        if num_channels <= 2:
+        if num_channels <= 2 or vector:
             self._use_velocity_field = True
             # Sync scale with velocity visualization
             self.velocity_field.settings.scale = self.settings.scale
 
             # Render visualization to FBO
-            self.velocity_field.set(texture)
+            self.velocity_field.set(texture, depth, depth_channel)
             self.velocity_field.update()
         else:
             # RGB/RGBA (3-4 channels): passthrough, no FBO needed
             self._use_velocity_field = False
 
-    def process_signed(self, texture: Texture) -> None:
-        """Process a scalar texture for the two-color visualization."""
+    def process_signed(self, texture: Texture, depth: bool = False) -> None:
+        """Process a scalar texture for the two-color visualization; `depth` is red toward the camera, green away."""
         if not self._allocated or not texture.allocated:
             self._current_texture = None
             self._use_velocity_field = False
@@ -110,7 +113,7 @@ class Visualizer:
         self._current_texture = texture
         self._use_velocity_field = False
         self._use_signed_field = True
-        self.signed_field.set(texture)
+        self.signed_field.set(texture, depth)
         self.signed_field.update()
 
     def _on_settings_changed(self) -> None:

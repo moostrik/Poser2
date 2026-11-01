@@ -31,6 +31,8 @@ class VelocityField(FieldBase):
         self.settings.bind_all(lambda v: self._on_settings_changed())
 
         self._velocity_texture: Texture | None = None
+        self._depth_texture: Texture | None = None
+        self._depth_channel: int = 0
 
         # Shaders
         self._direction_shader: VelocityDirectionMap = VelocityDirectionMap()
@@ -76,13 +78,18 @@ class VelocityField(FieldBase):
                 self.settings.scale,
                 self.settings.spacing,
                 self.settings.element_length,
-                self.settings.element_width
+                self.settings.element_width,
+                self._depth_texture,
+                self._depth_channel,
+                self.settings.scalar_scale
             )
         self._fbo.end()
 
-    def set(self, texture: Texture) -> None:
-        """Set the velocity field texture to visualize."""
+    def set(self, texture: Texture, depth: Texture | None = None, depth_channel: int = 0) -> None:
+        """Set the velocity field texture to visualize, and the channel of `depth` that colors its arrows, if any."""
         self._velocity_texture = texture
+        self._depth_texture = depth
+        self._depth_channel = depth_channel
         self._needs_update = True
 
     def _on_settings_changed(self) -> None:

@@ -15,6 +15,7 @@ class SignedField(FieldBase):
         self.settings: VisualizationFieldSettings = settings or VisualizationFieldSettings()
 
         self._field_texture: Texture | None = None
+        self._depth: bool = False
 
         self._shader: SignedMap = SignedMap()
 
@@ -28,9 +29,10 @@ class SignedField(FieldBase):
         self._shader.deallocate()
         super().deallocate()
 
-    def set(self, texture: Texture) -> None:
-        """Set the scalar field to visualize."""
+    def set(self, texture: Texture, depth: bool = False) -> None:
+        """Set the scalar field to visualize; `depth` draws it red toward the camera and green away."""
         self._field_texture = texture
+        self._depth = depth
 
     def update(self) -> None:
         """Render the field to the internal FBO."""
@@ -39,5 +41,5 @@ class SignedField(FieldBase):
 
         self._shader.reload()
         self._fbo.begin()
-        self._shader.use(self._field_texture, self.settings.scalar_scale)
+        self._shader.use(self._field_texture, self.settings.scalar_scale, self._depth)
         self._fbo.end()

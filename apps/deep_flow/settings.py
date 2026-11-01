@@ -56,6 +56,7 @@ class Layers(IntEnum):
     center_mask =   auto()
     center_foreground = auto()
     center_pose =   auto()
+    center_metres = auto()
     # data layers
     data_B_W =      auto()
     data_B_F =      auto()

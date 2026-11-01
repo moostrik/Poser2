@@ -4,7 +4,7 @@ Visualizes velocity field using procedural arrows without geometry shaders.
 Ported from ofxFlowTools visualization concepts.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, GL_VIEWPORT, glActiveTexture, glBindTexture, glGetIntegerv, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, GL_VIEWPORT, glActiveTexture, glBindTexture, glGetIntegerv, glUniform1f, glUniform1i, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 import logging
@@ -18,7 +18,8 @@ class VelocityArrowField(Shader):
     """
 
     def use(self, velocity_tex: Texture, scale: float = 1.0,
-            spacing: float = 8.0, arrow_length: float = 8.0, arrow_thickness: float = 0.8) -> None:
+            spacing: float = 8.0, arrow_length: float = 8.0, arrow_thickness: float = 0.8,
+            depth: Texture | None = None, depth_channel: int = 0, depth_scale: float = 1.0) -> None:
         """Render arrow field visualization to FBO.
 
         Args:
@@ -28,6 +29,9 @@ class VelocityArrowField(Shader):
             grid_spacing: Distance between arrow centers in pixels
             arrow_scale: Arrow length in pixels (e.g., 50 = 50 pixel long arrows)
             arrow_thickness: Arrow line thickness in pixels
+            depth: Velocity toward the camera, colors each arrow red toward and green away; None = white
+            depth_channel: Its channel
+            depth_scale: Multiplier on it; 1 after scaling is the full color
         """
         if not self.allocated or not self.shader_program:
             logger.warning("VelocityArrowField shader not allocated or shader program missing.")
@@ -46,6 +50,13 @@ class VelocityArrowField(Shader):
         # Bind input texture
         glActiveTexture(GL_TEXTURE0)
         glBindTexture(GL_TEXTURE_2D, velocity_tex.tex_id)
+        if depth is not None:
+            glActiveTexture(GL_TEXTURE1)
+            glBindTexture(GL_TEXTURE_2D, depth.tex_id)
+            glUniform1i(self.get_uniform_loc("tex1"), 1)
+            glUniform1i(self.get_uniform_loc("depth_channel"), depth_channel)
+            glUniform1f(self.get_uniform_loc("depth_scale"), depth_scale)
+        glUniform1i(self.get_uniform_loc("has_depth"), 1 if depth is not None else 0)
 
         # Configure shader uniforms (using cached locations)
 

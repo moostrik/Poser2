@@ -14,6 +14,19 @@ def decay_weight(dt: float, time: float) -> float:
     return math.exp(-dt * 1000.0 / time)
 
 
+def smooth_depth(depth: np.ndarray, previous: np.ndarray, weight: float, jump: float) -> np.ndarray:
+    """Depth in metres through an Ema, 0 where there is none; a pixel that jumps by `jump` restarts from the new depth."""
+    tracked: np.ndarray = (depth > 0.0) & (previous > 0.0) & (np.abs(depth - previous) <= jump)
+    return np.where(tracked, previous * weight + depth * (1.0 - weight), depth)
+
+
+def depth_speed(smoothed: np.ndarray, previous: np.ndarray, dt: float, jump: float) -> np.ndarray:
+    """Velocity toward the camera in m/s; 0 without depth at both frames, and at a jump."""
+    change: np.ndarray = smoothed - previous
+    moving: np.ndarray = (smoothed > 0.0) & (previous > 0.0) & (np.abs(change) <= jump)
+    return np.where(moving, -change / dt, 0.0)
+
+
 def direction(fast: np.ndarray, slow: np.ndarray) -> np.ndarray:
     """Unit direction of the motion, per pixel (..., 2): the fast trail's, the slow one's when the fast trail has stopped."""
     fast_length: np.ndarray = np.linalg.norm(fast, axis=-1, keepdims=True)

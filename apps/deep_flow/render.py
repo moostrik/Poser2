@@ -23,6 +23,7 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.center_geometry,
     Layers.center_mask,
     Layers.center_depth,
+    Layers.center_metres,
     Layers.center_foreground,
     Layers.center_pose,
 
@@ -112,6 +113,7 @@ class DeepFlowRender(RenderBase):
             cmt[i] = center_mask.texture
             center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image.texture,  cmt[i], settings.center.cam)
             self.L[Layers.center_depth][i] =                ls.CenterCamLayer(      i, center_geometry, cam_depth.texture,  cmt[i], settings.center.depth)
+            self.L[Layers.center_metres][i] =               ls.CenterCamLayer(      i, center_geometry, cam_depth.depth,    cmt[i], settings.center.depth)  # metres in red, the mask in alpha
             center_foreground = self.L[Layers.center_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, cam_foreground.texture, cmt[i], settings.center.foreground, settings.colors)
             center_pose =   self.L[Layers.center_pose][i] = ls.CenterPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
 
@@ -253,6 +255,7 @@ class DeepFlowRender(RenderBase):
             for i, _flow_layer in self.L[flow_type].items():
                 flow_layer = cast(ls.FlowLayer, _flow_layer)
                 flow_layer.set_time_step(1.0 / fluid.fluid_flow.step_fps)
+                flow_layer.set_depth_input(self.L[Layers.center_metres][i].texture)
                 if flow_key in self.L and i in self.L[flow_key]:
                     flow_layer.set_flow_input(self.L[flow_key][i].texture)
                     flow_layer.set_flow_source(self.L[flow_source_key][i])
@@ -270,7 +273,9 @@ class DeepFlowRender(RenderBase):
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[Layers] = set()
         b_layers: list[Layers] = B_LAYERS if b_enabled else []
-        for layer_type in self._update_layers + b_layers + self._interface_layers + self._left_layers + self._right_layers + self._output_layers:
+        depth_enabled: bool = self.settings.flow.depth_velocity.scale > 0.0 or (b_enabled and self.settings.flow_b.depth_velocity.scale > 0.0)
+        update_layers: list[Layers] = [layer_type for layer_type in self._update_layers if depth_enabled or layer_type != Layers.center_metres]
+        for layer_type in update_layers + b_layers + self._interface_layers + self._left_layers + self._right_layers + self._output_layers:
             if layer_type not in seen:
                 seen.add(layer_type)
                 for layer in self.L[layer_type].values():

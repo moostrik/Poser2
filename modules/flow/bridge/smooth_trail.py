@@ -4,7 +4,7 @@ Provides temporal smoothing (trail effect) and spatial smoothing (Gaussian blur)
 for any field type (velocity, density, etc).
 """
 
-from OpenGL.GL import GL_RG16F, GL_RGBA16F
+from OpenGL.GL import GL_R16F, GL_RG16F, GL_RGBA16F
 
 from modules.gl import Texture
 from modules.settings import Field, BaseSettings
@@ -150,3 +150,15 @@ class VelocitySmoothTrail(SmoothTrail):
     def set_velocity(self, velocity: Texture) -> None:
         """Alias for .set_input with velocity scaling."""
         self.set_input(velocity)
+
+
+class DepthSmoothTrail(SmoothTrail):
+    """Convenience class: Trail preset for the signed velocity toward the camera, one channel."""
+
+    def __init__(self, settings: SmoothTrailSettings | None = None) -> None:
+        super().__init__(GL_R16F, settings)
+
+    @property
+    def depth_velocity(self) -> Texture:
+        """Smoothed velocity toward the camera."""
+        return self._output

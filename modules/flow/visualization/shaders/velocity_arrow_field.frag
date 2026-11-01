@@ -6,6 +6,10 @@
 // Procedural arrow rendering without geometry shaders
 
 uniform sampler2D tex0;
+uniform sampler2D tex1;             // Velocity toward the camera, read only with has_depth
+uniform bool has_depth;             // Color each arrow by it: red toward the camera, green away
+uniform int depth_channel;          // Its channel in tex1
+uniform float depth_scale;          // Multiplier on it; 1 after scaling is the full color
 uniform float scale;
 uniform float grid_spacing;         // in pixels
 uniform float arrow_length;         // in pixels
@@ -69,6 +73,7 @@ void main() {
     vec2 pixel = gl_FragCoord.xy;
 
     float min_dist = 1e10;
+    float arrow_depth = 0.0;    // of the nearest arrow
 
     // Check arrows from nearby grid cells (to allow arrows longer than grid spacing)
     // Max arrow reach = arrow_length * scale (assuming velocity magnitude <= 1.0)
@@ -89,7 +94,10 @@ void main() {
 
             // Calculate arrow distance
             float dist = arrow(local_pos, velocity, arrow_length, arrow_thickness);
-            min_dist = min(min_dist, dist);
+            if (dist < min_dist) {
+                min_dist = dist;
+                if (has_depth) arrow_depth = texture(tex1, grid_uv)[depth_channel] * depth_scale;
+            }
         }
     }
 
@@ -99,6 +107,10 @@ void main() {
 
     // Simple color (matching original shader style)
     vec3 color = vec3(1.0, 1.0, 1.0);
+    if (arrow_depth != 0.0) {
+        vec3 depth_color = arrow_depth > 0.0 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
+        color = mix(color, depth_color, min(abs(arrow_depth), 1.0));
+    }
 
     // Premultiply alpha to avoid dark edges
     fragColor = vec4(color * alpha, alpha);

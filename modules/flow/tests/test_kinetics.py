@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import decay_weight, drop, fill_reservoir, hold_release, project
+from modules.flow import decay_weight, depth_speed, drop, fill_reservoir, hold_release, project, smooth_depth
 
 
 def trails(flow: list[float], fast_time: float = 25.0, slow_time: float = 150.0, dt: float = 1 / 60) -> tuple[np.ndarray, np.ndarray]:
@@ -110,6 +110,43 @@ class ReleaseTest(unittest.TestCase):
     def test_no_slow_trail_divides_by_nothing(self) -> None:
         velocity = drop(np.zeros((1, 2)), np.zeros((1, 2)), np.array([0.0]), 1.0)
         np.testing.assert_allclose(velocity, np.zeros((1, 2)))
+
+
+class DepthTest(unittest.TestCase):
+    def test_coming_closer_is_positive(self) -> None:
+        self.assertAlmostEqual(depth_speed(np.array([1.9]), np.array([2.0]), 0.1, 0.5)[0], 1.0)
+
+    def test_going_away_is_negative(self) -> None:
+        self.assertAlmostEqual(depth_speed(np.array([2.1]), np.array([2.0]), 0.1, 0.5)[0], -1.0)
+
+    def test_a_silhouette_edge_is_no_motion(self) -> None:
+        self.assertEqual(depth_speed(np.array([1.2]), np.array([3.0]), 0.1, 0.1)[0], 0.0)
+
+    def test_no_depth_at_either_frame_is_no_motion(self) -> None:
+        self.assertEqual(depth_speed(np.array([0.0]), np.array([2.0]), 0.1, 5.0)[0], 0.0)
+        self.assertEqual(depth_speed(np.array([2.0]), np.array([0.0]), 0.1, 5.0)[0], 0.0)
+
+    def test_smoothing_halves_a_step_at_half_weight(self) -> None:
+        self.assertAlmostEqual(smooth_depth(np.array([2.1]), np.array([2.0]), 0.5, 0.5)[0], 2.05)
+
+    def test_a_jump_restarts_and_then_reads_as_no_motion(self) -> None:
+        previous = np.array([3.0])
+        smoothed = smooth_depth(np.array([1.2]), previous, 0.9, 0.1)
+        self.assertAlmostEqual(smoothed[0], 1.2)
+        self.assertEqual(depth_speed(smoothed, previous, 0.1, 0.1)[0], 0.0)
+
+    def test_noise_averages_out_and_a_real_approach_survives(self) -> None:
+        rng = np.random.default_rng(0)
+        weight: float = decay_weight(1 / 60, 60.0)
+        for approach, expected in ((0.0, 0.0), (1.0, 1.0)):                 # m/s
+            depth = 2.0 - approach * np.arange(300) / 60
+            noisy = depth + rng.normal(0.0, 0.012, 300)
+            smoothed, speeds = np.array([noisy[0]]), []
+            for value in noisy[1:]:
+                last = smoothed
+                smoothed = smooth_depth(np.array([value]), last, weight, 0.1)
+                speeds.append(depth_speed(smoothed, last, 1 / 60, 0.1)[0])
+            self.assertAlmostEqual(float(np.mean(speeds[30:])), expected, delta=0.1)
 
 
 class ReservoirTest(unittest.TestCase):

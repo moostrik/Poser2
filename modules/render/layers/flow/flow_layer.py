@@ -15,7 +15,8 @@ from modules.pose import Frame, AngleMotion
 from modules.settings import Field, BaseSettings, Group
 from modules.flow import (
     OpticalFlow, OpticalFlowSettings,
-    VelocitySmoothTrail, SmoothTrailSettings,
+    VelocitySmoothTrail, DepthSmoothTrail, SmoothTrailSettings,
+    DepthVelocity, DepthVelocitySettings,
     KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES,
     Magnitude, VelocityMagnitude,
     TemperatureBridge, TemperatureBridgeSettings,
@@ -40,7 +41,8 @@ class FlowDrawMode(IntEnum):
 
     Outputs:
         OPTICAL_OUTPUT - Raw optical flow velocity (RG32F)
-        SMOOTH_VELOCITY_OUTPUT - Smoothed velocity (RG32F)
+        SMOOTH_VELOCITY_OUTPUT - Smoothed velocity (RG32F); with depth, arrows red toward the camera, green away
+        SMOOTH_VELOCITY_DEPTH - Velocity toward the camera: red toward, green away
         DENSITY_BRIDGE_OUTPUT - Colored density (RGBA32F)
         TEMPERATURE_BRIDGE_OUTPUT - Temperature field (R32F)
 
@@ -78,6 +80,11 @@ class FlowDrawMode(IntEnum):
     KINETIC_ONSET = auto()
     KINETIC_CURL = auto()
     KINETIC_STRIP = auto()
+    SMOOTH_VELOCITY_DEPTH = auto()
+
+
+DEPTH_DRAW_MODES: set[FlowDrawMode] = {FlowDrawMode.SMOOTH_VELOCITY_DEPTH}                      # red and green
+VECTOR_DRAW_MODES: set[FlowDrawMode] = set()    # arrows, whatever the texture's format
 
 
 class FlowLayerSettings(BaseSettings):
@@ -92,6 +99,7 @@ class FlowLayerSettings(BaseSettings):
 
     visualization      = Group(VisualizationFieldSettings)
     optical_flow       = Group(OpticalFlowSettings)
+    depth_velocity     = Group(DepthVelocitySettings)
     velocity_trail     = Group(SmoothTrailSettings)
     kinetic_bridge     = Group(KineticBridgeSettings)
     density_bridge     = Group(DensityBridgeSettings)
@@ -140,7 +148,10 @@ class FlowLayer(LayerBase):
         self.settings: FlowLayerSettings = settings or FlowLayerSettings()
 
         self._optical_flow: OpticalFlow = OpticalFlow(self.settings.optical_flow)
+        self._depth_input: Texture | None = None
+        self._depth_velocity: DepthVelocity = DepthVelocity(self.settings.depth_velocity)
         self._velocity_trail: VelocitySmoothTrail = VelocitySmoothTrail(self.settings.velocity_trail)
+        self._depth_trail: DepthSmoothTrail = DepthSmoothTrail(self.settings.velocity_trail)
         self._kinetic_bridge: KineticBridge = KineticBridge(self.settings.kinetic_bridge)
         self._velocity_magnitude: VelocityMagnitude = VelocityMagnitude()
         self._density_bridge: DensityBridge = DensityBridge(self.settings.density_bridge)
@@ -170,6 +181,20 @@ class FlowLayer(LayerBase):
         if self.settings.bridge == FlowBridge.KINETIC:
             return self._kinetic_bridge.velocity
         return self._velocity_trail.velocity
+
+    @property
+    def depth_enabled(self) -> bool:
+        """Whether depth reaches the bridge: a scale above 0 and a source that has it."""
+        return self.settings.depth_velocity.scale > 0.0 and self._depth_input is not None and self._depth_input.allocated
+
+    @property
+    def depth_velocity(self) -> Texture | None:
+        """Signed velocity toward the camera (R16F) for fluid simulation; None without depth."""
+        return self._bridge_depth_velocity if self.depth_enabled else None
+
+    @property
+    def _bridge_depth_velocity(self) -> Texture:
+        return self._depth_trail.depth_velocity
 
     @property
     def onset(self) -> Texture | None:
@@ -211,6 +236,10 @@ class FlowLayer(LayerBase):
     def set_density_input(self, texture: Texture) -> None:
         self._density_input = texture
 
+    def set_depth_input(self, texture: Texture) -> None:
+        """Depth for the velocity toward the camera: metres in red, the player's mask in alpha."""
+        self._depth_input = texture
+
     def set_time_step(self, dt: float) -> None:
         """The dt of one tick, polled by the kinetic bridge; the fluid's step, so a fixed step compares runs."""
         self._time_step = dt
@@ -229,7 +258,9 @@ class FlowLayer(LayerBase):
         sim_height = self.settings.height
 
         self._optical_flow.allocate(sim_width, sim_height)
+        self._depth_velocity.allocate(sim_width, sim_height)
         self._velocity_trail.allocate(sim_width, sim_height, width, height)
+        self._depth_trail.allocate(sim_width, sim_height)
         self._kinetic_bridge.allocate(sim_width, sim_height)
         self._velocity_magnitude.allocate(sim_width, sim_height)
         self._density_bridge.allocate(width, height)
@@ -242,7 +273,9 @@ class FlowLayer(LayerBase):
     def deallocate(self) -> None:
         """Deallocate all resources."""
         self._optical_flow.deallocate()
+        self._depth_velocity.deallocate()
         self._velocity_trail.deallocate()
+        self._depth_trail.deallocate()
         self._kinetic_bridge.deallocate()
         self._velocity_magnitude.deallocate()
         self._density_bridge.deallocate()
@@ -255,7 +288,9 @@ class FlowLayer(LayerBase):
     def reset(self) -> None:
         """Reset all processing stages."""
         self._optical_flow.reset()
+        self._depth_velocity.reset()
         self._velocity_trail.reset()
+        self._depth_trail.reset()
         self._kinetic_bridge.reset()
         self._density_bridge.reset()
         self._kinetic_strip.reset()
@@ -283,6 +318,11 @@ class FlowLayer(LayerBase):
             self._optical_flow.set_input(self._flow_input)
             self._optical_flow.update()
 
+        depth_enabled: bool = self.depth_enabled
+        if new_flow and depth_enabled:
+            assert self._depth_input is not None
+            self._depth_velocity.update_depth(self._depth_input, self._flow_interval)
+
         # Stage 2: Bridges
         velocity: Texture
         ink: Texture    # what the density bridge reads as alpha, through its length
@@ -302,6 +342,9 @@ class FlowLayer(LayerBase):
             self._velocity_trail.update()
             velocity = self._velocity_trail.velocity
             ink = velocity
+            if depth_enabled:
+                self._depth_trail.set_input(self._depth_velocity.depth_velocity)
+                self._depth_trail.update()
 
         if new_flow:
             self._flow_interval = 0.0
@@ -325,9 +368,9 @@ class FlowLayer(LayerBase):
 
         signed: Texture | None = self._get_signed_texture()
         if signed is not None:
-            self._visualizer.process_signed(signed)
+            self._visualizer.process_signed(signed, self.settings.draw_mode in DEPTH_DRAW_MODES)
         else:
-            self._visualizer.process(self._get_draw_texture())
+            self._visualizer.process(self._get_draw_texture(), self.settings.draw_mode in VECTOR_DRAW_MODES, *self._get_arrow_depth())
         Style.pop_style()
 
     # ========== Rendering ==========
@@ -363,11 +406,20 @@ class FlowLayer(LayerBase):
             FlowDrawMode.KINETIC_RESERVOIR: self._kinetic_bridge.reservoir,
             FlowDrawMode.KINETIC_EMISSION: self._kinetic_bridge.emission,
             FlowDrawMode.KINETIC_CURL: self._kinetic_bridge.curl,
+            FlowDrawMode.SMOOTH_VELOCITY_DEPTH: self._bridge_depth_velocity,
         }
         if self.settings.bridge == FlowBridge.KINETIC:
             # On this bridge the density bridge's second input is the emission, not a velocity
             textures[FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY] = self._density_bridge.velocity_input
         return textures.get(self.settings.draw_mode)
+
+    def _get_arrow_depth(self) -> tuple[Texture | None, int]:
+        """The texture and channel holding the z of the field in draw_mode, for the color of its arrows."""
+        if not self.depth_enabled:
+            return None, 0
+        if self.settings.draw_mode in (FlowDrawMode.SMOOTH_VELOCITY_OUTPUT, FlowDrawMode.KINETIC_VELOCITY):
+            return self.depth_velocity, 0
+        return None, 0
 
     def _get_draw_texture(self) -> Texture:
         """Get texture to draw based on draw_mode."""
