@@ -72,10 +72,10 @@ class Visualizer:
         else:
             raise RuntimeError("Visualizer: no texture available, call process() first")
 
-    def process(self, texture: Texture, vector: bool = False, depth: Texture | None = None, depth_channel: int = 0) -> None:
+    def process(self, texture: Texture, vector: bool = False) -> None:
         """Process texture for visualization (FBO operations happen here).
 
-        `vector` draws its xy as a velocity whatever its format; a channel of `depth` colors the arrows.
+        `vector` draws it as a velocity whatever its format: with three or more channels, a 3D one.
         """
         self._use_signed_field = False
         if not self._allocated or not texture.allocated:
@@ -96,14 +96,14 @@ class Visualizer:
             self.velocity_field.settings.scale = self.settings.scale
 
             # Render visualization to FBO
-            self.velocity_field.set(texture, depth, depth_channel)
+            self.velocity_field.set(texture)
             self.velocity_field.update()
         else:
             # RGB/RGBA (3-4 channels): passthrough, no FBO needed
             self._use_velocity_field = False
 
-    def process_signed(self, texture: Texture, depth: bool = False) -> None:
-        """Process a scalar texture for the two-color visualization; `depth` is red toward the camera, green away."""
+    def process_signed(self, texture: Texture, depth: bool = False, channel: int = 0) -> None:
+        """Process a scalar texture for the two-color visualization: its `channel`; `depth` is red toward the camera, green away."""
         if not self._allocated or not texture.allocated:
             self._current_texture = None
             self._use_velocity_field = False
@@ -113,7 +113,7 @@ class Visualizer:
         self._current_texture = texture
         self._use_velocity_field = False
         self._use_signed_field = True
-        self.signed_field.set(texture, depth)
+        self.signed_field.set(texture, depth, channel)
         self.signed_field.update()
 
     def _on_settings_changed(self) -> None:

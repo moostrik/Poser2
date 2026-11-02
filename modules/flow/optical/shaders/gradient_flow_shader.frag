@@ -1,21 +1,19 @@
 #version 460 core
 
-// Optical Flow Shader - Multi-Scale via Mipmaps
-// Computes Lucas-Kanade style optical flow at multiple scales
+// Gradient Flow Shader
+// Per pixel, the brightness change along the brightness gradient, averaged over three mip levels:
+// the motion along the gradient, as a strength. Times `strength`, with `threshold` taken off its
+// length. Ported from ofxFlowTools ftOpticalFlowShader
 
-uniform sampler2D tex0;  // Current frame (luminance) - needs mipmaps!
-uniform sampler2D tex1;  // Previous frame (luminance) - needs mipmaps!
+uniform sampler2D tex0;  // Previous luminance, mipmapped
+uniform sampler2D tex1;  // Current luminance, mipmapped
 
-uniform vec2 offset;     // Gradient sample offset (normalized)
-uniform float threshold; // Motion threshold
-uniform vec2 force;      // Force/strength multiplier
-uniform float power;     // Power curve for magnitude
+uniform vec2 offset;     // Gradient sample offset (uv)
+uniform float threshold; // Taken off the length, after strength
+uniform vec2 strength;   // x and y multiplier (negative inverts)
 
 const int numLevels = 3;   // Number of mip levels to sample (1-4)
-// const vec4 levelWeights = vec4(1.0f, 0.5f, 0.25f, 0.125f); // Weights for each level
 const vec4 levelWeights = vec4(0.25f, 0.5f, 1.0f, 1.0f); // Weights for each level
-// const vec4 levelWeights = vec4(1.f, 1.f, 1.0f, 1.0f); // Weights for each level
-
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -50,8 +48,7 @@ void main() {
     vec2 totalFlow = vec2(0.0);
     float totalWeight = 0.0;
 
-    // Sample multiple mip levels
-    // LOD 0 = full res, LOD 1 = half, LOD 2 = quarter, etc.
+    // LOD 0 = full res, LOD 1 = half, LOD 2 = quarter
     for (int i = 0; i < numLevels && i < 4; i++) {
         float lod = float(i);
         float scale = pow(2.0, lod);  // Offset scales with LOD
@@ -63,19 +60,12 @@ void main() {
         totalWeight += weight;
     }
 
-    vec2 flow = totalFlow / (totalWeight + TINY);
+    vec2 flow = totalFlow / (totalWeight + TINY) * strength;
 
-    // Apply force
-    flow *= force;
-
-    // Apply threshold and power curve
+    // The threshold off the length; the direction stays
     float magnitude = length(flow);
-    magnitude = max(magnitude - threshold, 0.0);  // Simpler threshold
-    magnitude = pow(magnitude, power);
-
-    // Scale flow by new magnitude, then clamp
-    flow = (length(flow) > TINY) ? (flow / length(flow)) * magnitude : vec2(0.0);
-    flow = clamp(flow, vec2(-1.0), vec2(1.0));
+    float kept = max(magnitude - threshold, 0.0);
+    flow = magnitude > TINY ? flow / magnitude * kept : vec2(0.0);
 
     fragColor = vec4(flow, 0.0, 1.0);
 }

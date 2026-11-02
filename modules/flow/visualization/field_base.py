@@ -21,6 +21,7 @@ class VisualizationFieldSettings(BaseSettings):
     spacing = Field(20.0, min=4.0, max=64.0, description="Distance between elements (pixels)")
     element_length = Field(40.0, description="Arrow element length")
     element_width = Field(1.0, min=0.5, max=2.5, description="Element line width")
+    dot_min = Field(0.0, min=0.0, max=20.0, description="Smallest dot at a 3D arrow's end (px); 0 vanishes without z")
 
 
 class FieldBase(ABC):

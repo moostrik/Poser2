@@ -2,7 +2,7 @@
   "max_players": 1,
   "num_cams": 1,
   "input_fps": 50.0,
-  "mask_source": "DEPTH",
+  "mask_source": "RVM",
   "camera": {
     "keyframe_interval": 50,
     "color": true,
@@ -130,7 +130,7 @@
     },
     "segmentation": {
       "resolution": "ULTRA",
-      "enabled": false,
+      "enabled": true,
       "reset_interval": 480
     },
     "optical_flow": {
@@ -409,12 +409,12 @@
     },
     "flow": {
       "fps": 60.0,
-      "draw_mode": "OPTICAL_OUTPUT",
+      "draw_mode": "VELOCITY",
       "blend_mode": "ADD",
       "width": 448,
       "height": 800,
       "bridge": "KINETIC",
-      "motion": "RGBD_FLOW",
+      "motion": "LUCAS_KANADE_FLOW",
       "inputs": {
         "flow": "center_capture",
         "density": "center_capture",
@@ -427,38 +427,38 @@
         "strip_scale": 1.0,
         "spacing": 20.0,
         "element_length": 40.0,
-        "element_width": 1.0
+        "element_width": 1.0,
+        "dot_min": 0.0
       },
-      "optical_flow": {
+      "gradient_flow": {
         "offset": 3,
         "threshold": 0.1,
         "strength_x": 1.0,
         "strength_y": 1.0,
-        "boost": 0.0
+        "strength_z": 1.0
       },
-      "lucas_kanade": {
+      "lucas_kanade_flow": {
         "levels": 3,
         "window": 2,
         "regularizer": 0.0215,
         "threshold": 0.5,
-        "displacement_scale": 0.15,
         "strength_x": 1.0,
         "strength_y": 1.0,
-        "boost": 0.0
+        "strength_z": 1.0
       },
       "depth_velocity": {
-        "scale": 1.0,
         "smooth_time": 60.0,
         "jump": 0.1,
         "blur_radius": 4.0,
         "blur_steps": 2,
-        "dead_zone": 0.12
+        "threshold": 0.12
       },
       "velocity_trail": {
         "scale": 0.25,
         "trail_weight": 0.93,
         "blur_radius": 0.0,
-        "blur_steps": 4
+        "blur_steps": 4,
+        "boost": 0.0
       },
       "kinetic_bridge": {
         "scale": 10.0,

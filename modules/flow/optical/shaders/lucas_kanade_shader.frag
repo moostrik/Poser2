@@ -2,7 +2,7 @@
 
 // Lucas–Kanade, one mip level: refines the displacement so far (uv per frame) by the shift that carries
 // the previous frame, warped by it, onto the current one, solved over a (2·window+1)² window of this
-// level's texels. Run from the coarsest level to the finest. The numpy reference is lucas_kanade.lucas_kanade
+// level's texels. Run from the coarsest level to the finest. The numpy reference is lucas_kanade_flow.lucas_kanade
 
 uniform sampler2D previous;     // luminance, mipmapped
 uniform sampler2D current;      // luminance, mipmapped

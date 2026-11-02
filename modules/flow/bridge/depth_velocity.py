@@ -1,38 +1,36 @@
 """Depth Velocity.
 
-What optical flow cannot measure: the player's velocity toward the camera, from the depth image.
+What the image cannot measure: the player's velocity toward the camera, from the depth image.
 Frame to frame depth is mostly noise, so it is smoothed before it is differenced. Only the player
 counts, and a pixel that jumps is an edge, not motion: a limb passing over a pixel is not z motion.
+Both optical flows use it for their z, each scaling it by its own `strength_z`.
 """
 from OpenGL.GL import GL_R16F, GL_R32F
 
-from modules.gl import Fbo, Texture
+from modules.gl import Texture
 from modules.settings import Field, BaseSettings
-from .. import FlowBase, FlowUtil
+from .. import FlowBase
 from ..shaders import GaussianBlur
 from .kinetics import decay_weight
-from .shaders import DepthDeadZone, DepthSmooth, DepthVelocityShader, Speed3D
+from .shaders import DepthSmooth, DepthThreshold, DepthVelocityShader
 
 
 class DepthVelocitySettings(BaseSettings):
     """Configuration for the depth velocity."""
-    scale = Field(0.0, min=0.0, max=10.0, description="Converts m/s toward the camera to simulation velocity; 0 is off")
     smooth_time = Field(60.0, min=0.0, max=500.0, description="Smoothing of the depth before it is differenced (ms)")
     jump = Field(0.1, min=0.01, max=1.0, description="Depth change per frame above which a pixel is an edge (m)")
     blur_radius = Field(4.0, min=0.0, max=10.0, description="Gaussian blur radius in pixels")
     blur_steps = Field(2, min=0, max=8, description="Number of Gaussian blur passes")
-    dead_zone = Field(0.1, min=0.0, max=1.0, description="Velocity toward the camera taken off as noise floor (m/s)")
+    threshold = Field(0.1, min=0.0, max=1.0, description="Velocity toward the camera taken off as noise floor (m/s)")
 
 
 class DepthVelocity(FlowBase):
-    """Signed velocity toward the camera (R16F), positive toward it.
+    """Signed velocity toward the camera in m/s (R16F), positive toward it.
 
-    Pipeline, on each new optical flow frame:
+    Pipeline, on each new flow frame:
         1. Smooth the depth → the input SwapFbo (R32F, metres, 0 off the player)
         2. Difference it with the last one → output_fbo (R16F)
         3. Blur it, and take the noise floor off
-
-    `process_speed` gives the bridges the 3D speed that the density and temperature bridges read.
     """
 
     def __init__(self, settings: DepthVelocitySettings | None = None) -> None:
@@ -46,49 +44,35 @@ class DepthVelocity(FlowBase):
         self._smooth_shader: DepthSmooth = DepthSmooth()
         self._velocity_shader: DepthVelocityShader = DepthVelocityShader()
         self._blur_shader: GaussianBlur = GaussianBlur()
-        self._dead_zone_shader: DepthDeadZone = DepthDeadZone()
-        self._speed_shader: Speed3D = Speed3D()
-
-        self._speed_fbo: Fbo = Fbo()
+        self._threshold_shader: DepthThreshold = DepthThreshold()
 
     @property
     def depth_velocity(self) -> Texture:
-        """Velocity toward the camera (R16F)."""
+        """Velocity toward the camera in m/s (R16F)."""
         return self._output
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         super().allocate(width, height, output_width, output_height)
-        self._speed_fbo.allocate(width, height, GL_R16F)
         self._smooth_shader.allocate()
         self._velocity_shader.allocate()
         self._blur_shader.allocate()
-        self._dead_zone_shader.allocate()
-        self._speed_shader.allocate()
+        self._threshold_shader.allocate()
 
     def deallocate(self) -> None:
         super().deallocate()
-        self._speed_fbo.deallocate()
         self._smooth_shader.deallocate()
         self._velocity_shader.deallocate()
         self._blur_shader.deallocate()
-        self._dead_zone_shader.deallocate()
-        self._speed_shader.deallocate()
-
-    def process_speed(self, velocity: Texture, depth_velocity: Texture) -> Texture:
-        """The speed of a bridge's (x, y) and z (R16F): its length reads like a velocity's."""
-        self._speed_fbo.begin()
-        self._speed_shader.use(velocity, depth_velocity)
-        self._speed_fbo.end()
-        return self._speed_fbo
+        self._threshold_shader.deallocate()
 
     def update_depth(self, depth: Texture, delta_time: float, displacement: Texture | None = None) -> None:
-        """Advance on a new optical flow frame: smooth, then difference.
+        """Advance on a new flow frame: smooth, then difference.
 
         Args:
             depth: Metres in red, mask in alpha
-            delta_time: Seconds since the previous optical flow frame
+            delta_time: Seconds since the previous flow frame
             displacement: How far each pixel moved since then (uv); when given, the smoothing and the
-                difference follow it, so depth is measured along the motion (RGB-D flow)
+                difference follow it, so depth is measured along the motion (Lucas–Kanade flow)
         """
         if not self._allocated:
             return
@@ -100,7 +84,7 @@ class DepthVelocity(FlowBase):
         self._input_fbo.end()
 
         self._output_fbo.begin()
-        self._velocity_shader.use(self._input_fbo.texture, self._input_fbo.back_texture, delta_time, s.jump, s.scale, displacement)
+        self._velocity_shader.use(self._input_fbo.texture, self._input_fbo.back_texture, delta_time, s.jump, displacement)
         self._output_fbo.end()
 
         if s.blur_radius > 0.0:
@@ -111,8 +95,8 @@ class DepthVelocity(FlowBase):
                     self._blur_shader.use(self._output_fbo.back_texture, s.blur_radius, horizontal)
                     self._output_fbo.end()
 
-        if s.dead_zone > 0.0:
+        if s.threshold > 0.0:
             self._output_fbo.swap()
             self._output_fbo.begin()
-            self._dead_zone_shader.use(self._output_fbo.back_texture, s.dead_zone * s.scale)
+            self._threshold_shader.use(self._output_fbo.back_texture, s.threshold)
             self._output_fbo.end()

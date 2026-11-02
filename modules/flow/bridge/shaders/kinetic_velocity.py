@@ -8,9 +8,9 @@ from modules.gl import Shader, draw_quad, Texture
 
 
 class KineticVelocity(Shader):
-    """Writes the xy of mix(fast, slow, drop * release weight) to RG, or its z to R."""
+    """Writes mix(fast, slow, drop * release weight) to RGB."""
 
-    def use(self, fast: Texture, slow: Texture, acceleration: Texture, drop: float, depth: bool = False) -> None:
+    def use(self, fast: Texture, slow: Texture, acceleration: Texture, drop: float) -> None:
         """Compose the velocity output.
 
         Args:
@@ -18,7 +18,6 @@ class KineticVelocity(Shader):
             slow: RGB slow trail
             acceleration: Signed acceleration in the red channel
             drop: How far a full release blends to the slow trail, 0..1
-            depth: Write the z to red instead of the xy to RG
         """
         if not self.allocated or not self.shader_program:
             return
@@ -38,6 +37,5 @@ class KineticVelocity(Shader):
         glUniform1i(self.get_uniform_loc("tex1"), 1)
         glUniform1i(self.get_uniform_loc("tex2"), 2)
         glUniform1f(self.get_uniform_loc("drop"), drop)
-        glUniform1i(self.get_uniform_loc("depth"), 1 if depth else 0)
 
         draw_quad()

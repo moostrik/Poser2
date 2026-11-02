@@ -5,6 +5,7 @@
 
 uniform sampler2D tex0;
 uniform float scale;
+uniform bool xyz;       // A 3D velocity: x, y, z as red, green, blue around grey
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -17,6 +18,12 @@ vec3 hsv2rgb(vec3 c) {
 }
 
 void main() {
+    if (xyz) {
+        vec3 velocity = texture(tex0, texCoord).xyz * scale;
+        fragColor = vec4(clamp(0.5 + 0.5 * velocity, 0.0, 1.0), 1.0);
+        return;
+    }
+
     vec2 velocity = texture(tex0, texCoord).xy * scale;
 
     // Calculate magnitude and angle

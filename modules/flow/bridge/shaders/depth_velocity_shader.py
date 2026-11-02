@@ -10,15 +10,14 @@ from modules.gl import Shader, draw_quad, Texture
 class DepthVelocityShader(Shader):
     """Writes the signed velocity toward the camera to the red channel."""
 
-    def use(self, depth: Texture, previous: Texture, dt: float, jump: float, scale: float, displacement: Texture | None = None) -> None:
-        """Difference two depths.
+    def use(self, depth: Texture, previous: Texture, dt: float, jump: float, displacement: Texture | None = None) -> None:
+        """Difference two depths, in m/s.
 
         Args:
             depth: Smoothed depth
             previous: Previous smoothed depth
             dt: Seconds between them
             jump: More change than this is an edge (m)
-            scale: Converts m/s to simulation velocity
             displacement: uv per frame; when given, the previous depth is taken where the pixel came from
         """
         if not self.allocated or not self.shader_program:
@@ -45,6 +44,5 @@ class DepthVelocityShader(Shader):
         glUniform1i(self.get_uniform_loc("warp"), int(warp))
         glUniform1f(self.get_uniform_loc("dt"), dt)
         glUniform1f(self.get_uniform_loc("jump"), jump)
-        glUniform1f(self.get_uniform_loc("scale"), scale)
 
         draw_quad()

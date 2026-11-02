@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import advect, dead_zone, decay_weight, depth_speed, displacement_velocity, drop, fill_reservoir, hold_release, project, smooth_depth, stop_gate
+from modules.flow import advect, decay_weight, depth_speed, depth_threshold, drop, fill_reservoir, hold_release, project, smooth_depth, stop_gate
 
 
 def trails(flow: list[float], fast_time: float = 25.0, slow_time: float = 150.0, dt: float = 1 / 60) -> tuple[np.ndarray, np.ndarray]:
@@ -128,20 +128,6 @@ class ReleaseTest(unittest.TestCase):
         np.testing.assert_allclose(velocity, np.zeros((1, 2)))
 
 
-class DisplacementTest(unittest.TestCase):
-    def test_a_width_per_second_is_one(self) -> None:
-        velocity = displacement_velocity(np.array([0.1, 0.0]), 0.1, 200, 100, 1.0)
-        np.testing.assert_allclose(velocity, [1.0, 0.0])
-
-    def test_vertical_motion_is_counted_in_widths(self) -> None:
-        # 10 pixels down in a 200x100 image is 0.1 of the height, 0.05 of the width
-        velocity = displacement_velocity(np.array([0.0, 0.1]), 1.0, 200, 100, 1.0)
-        np.testing.assert_allclose(velocity, [0.0, 0.05])
-
-    def test_scale_multiplies(self) -> None:
-        np.testing.assert_allclose(displacement_velocity(np.array([0.1, 0.0]), 1.0, 10, 10, 3.0), [0.3, 0.0])
-
-
 class AdvectTest(unittest.TestCase):
     def test_no_amount_leaves_the_field(self) -> None:
         field = np.random.default_rng(0).random((8, 8, 2))
@@ -198,8 +184,8 @@ class StopGateTest(unittest.TestCase):
 
 
 class DepthTest(unittest.TestCase):
-    def test_the_dead_zone_clears_the_floor_and_stays_continuous(self) -> None:
-        np.testing.assert_allclose(dead_zone(np.array([0.05, -0.05, 0.3, -0.3]), 0.1), [0.0, 0.0, 0.2, -0.2])
+    def test_the_threshold_clears_the_floor_and_stays_continuous(self) -> None:
+        np.testing.assert_allclose(depth_threshold(np.array([0.05, -0.05, 0.3, -0.3]), 0.1), [0.0, 0.0, 0.2, -0.2])
 
     def test_coming_closer_is_positive(self) -> None:
         self.assertAlmostEqual(depth_speed(np.array([1.9]), np.array([2.0]), 0.1, 0.5)[0], 1.0)

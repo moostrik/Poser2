@@ -6,6 +6,7 @@ Ported from ofxFlowTools ftVisualizationField.h
 
 from modules.gl import Texture
 
+from .. import FlowUtil
 from .field_base import FieldBase, VisualizationFieldSettings
 from .shaders import VelocityDirectionMap, VelocityArrowField
 
@@ -16,11 +17,14 @@ class VelocityField(FieldBase):
     """Visualize velocity/flow fields using color encoding or arrows.
 
     Supports two visualization modes:
-    - Direction Map: HSV color encoding (direction->hue, magnitude->saturation)
-    - Arrow Field: Procedural arrow field (grid-based sampling)
+    - Direction Map: HSV color encoding (direction->hue, magnitude->saturation);
+      a 3D velocity as x, y, z in red, green, blue around grey
+    - Arrow Field: Procedural arrow field (grid-based sampling);
+      a 3D velocity as a line with a dot at its end that grows with z, red toward the camera, green away
 
     toggle_scalar switches between the two modes.
     scale acts as a general multiplier for both modes.
+    A texture with three or more channels is drawn as a 3D velocity.
     """
 
     def __init__(self, settings: VisualizationFieldSettings | None = None) -> None:
@@ -31,8 +35,6 @@ class VelocityField(FieldBase):
         self.settings.bind_all(lambda v: self._on_settings_changed())
 
         self._velocity_texture: Texture | None = None
-        self._depth_texture: Texture | None = None
-        self._depth_channel: int = 0
 
         # Shaders
         self._direction_shader: VelocityDirectionMap = VelocityDirectionMap()
@@ -63,13 +65,14 @@ class VelocityField(FieldBase):
         #     return
 
         self._needs_update = False
+        xyz: bool = FlowUtil.get_num_channels(self._velocity_texture.internal_format) >= 3
 
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._fbo.begin()
         if self.settings.toggle_scalar:
             # Direction map mode
             self._direction_shader.reload()
-            self._direction_shader.use(self._velocity_texture, self.settings.scale)
+            self._direction_shader.use(self._velocity_texture, self.settings.scale, xyz)
         else:
             # Arrow field mode
             self._arrow_shader.reload()
@@ -79,17 +82,14 @@ class VelocityField(FieldBase):
                 self.settings.spacing,
                 self.settings.element_length,
                 self.settings.element_width,
-                self._depth_texture,
-                self._depth_channel,
-                self.settings.scalar_scale
+                xyz,
+                self.settings.dot_min
             )
         self._fbo.end()
 
-    def set(self, texture: Texture, depth: Texture | None = None, depth_channel: int = 0) -> None:
-        """Set the velocity field texture to visualize, and the channel of `depth` that colors its arrows, if any."""
+    def set(self, texture: Texture) -> None:
+        """Set the velocity field texture to visualize; three or more channels are a 3D velocity."""
         self._velocity_texture = texture
-        self._depth_texture = depth
-        self._depth_channel = depth_channel
         self._needs_update = True
 
     def _on_settings_changed(self) -> None:

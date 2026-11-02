@@ -218,14 +218,15 @@ class Fluid3DLayer(LayerBase):
 
             # Add the flow as one velocity input (3D synthesizes w from it)
             # and the kinetic bridge's push of a starting motion, each with its measured w if there is depth
-            onset: Texture | None = flow_layer.onset
+            velocity: Texture = flow_layer.smooth_velocity
+            onset: Texture | None = flow_layer.onset_velocity
             if isinstance(self._fluid_flow, FluidFlow3D):
-                depth_velocity: Texture | None = flow_layer.depth_velocity
-                self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength, depth_velocity)
+                depth: bool = flow_layer.depth_enabled     # z in each texture's blue channel
+                self._fluid_flow.add_velocity(velocity, vel_strength, velocity if depth else None, 2)
                 if onset is not None:
-                    self._fluid_flow.add_velocity(onset, vel_strength, onset if depth_velocity is not None else None, 2)
+                    self._fluid_flow.add_velocity(onset, vel_strength, onset if depth else None, 2)
             else:
-                self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength)
+                self._fluid_flow.add_velocity(velocity, vel_strength)
                 if onset is not None:
                     self._fluid_flow.add_velocity(onset, vel_strength)
 

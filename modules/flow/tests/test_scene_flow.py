@@ -1,11 +1,12 @@
-"""Scene flow's numpy references: Lucas–Kanade finds how far an image moved, and depth followed along
-that displacement reads no motion toward the camera for a surface that only slides sideways."""
+"""The Lucas–Kanade flow's numpy references: it finds how far an image moved, gives that as a velocity,
+and depth followed along that displacement reads no motion toward the camera for a surface that only
+slides sideways. Also the trail bridge's shaping of a velocity."""
 
 import unittest
 
 import numpy as np
 
-from modules.flow import depth_speed, lucas_kanade, shape_displacement, threshold_displacement, warped
+from modules.flow import depth_speed, displacement_velocity, lucas_kanade, shape_velocity, threshold_displacement, warped
 
 SIZE: int = 64
 
@@ -52,18 +53,35 @@ class ThresholdTest(unittest.TestCase):
         np.testing.assert_allclose(threshold_displacement(np.array([[0.3, -0.2]]), 0.0), [[0.3, -0.2]])
 
 
+class DisplacementVelocityTest(unittest.TestCase):
+    def test_a_width_per_second_is_one(self) -> None:
+        velocity = displacement_velocity(np.array([0.1, 0.0]), 0.1, 200, 100, (1.0, 1.0))
+        np.testing.assert_allclose(velocity, [1.0, 0.0])
+
+    def test_vertical_motion_is_counted_in_widths(self) -> None:
+        # 10 pixels down in a 200x100 image is 0.1 of the height, 0.05 of the width
+        velocity = displacement_velocity(np.array([0.0, 0.1]), 1.0, 200, 100, (1.0, 1.0))
+        np.testing.assert_allclose(velocity, [0.0, 0.05])
+
+    def test_strength_multiplies_each_axis(self) -> None:
+        np.testing.assert_allclose(displacement_velocity(np.array([0.1, 0.1]), 1.0, 10, 10, (3.0, -1.0)), [0.3, -0.1])
+
+
 class ShapeTest(unittest.TestCase):
     def test_the_trail_bridge_sees_what_the_old_shaping_gave(self) -> None:
         # The shaping took its threshold after scale and strength: max(|d| * scale - 0.1, 0) at scale 0.2.
-        # Taken off the displacement first as 0.1 / 0.2 = 0.5 px, the trail bridge's velocity is the same.
+        # Taken off the displacement first as 0.1 / 0.2 = 0.5 px, then scaled, the trail bridge's velocity is the same.
         displacement = np.array([[0.3, 0.0], [1.0, 0.0], [2.0, 1.0], [6.0, -8.0]])
         old_length = np.maximum(np.linalg.norm(displacement * 0.2, axis=-1, keepdims=True) - 0.1, 0.0)
         old = np.clip(np.divide(displacement, np.linalg.norm(displacement, axis=-1, keepdims=True)) * old_length, -1.0, 1.0)
-        new = shape_displacement(threshold_displacement(displacement, 0.5), 0.2, (1.0, 1.0), 1.0)
+        new = shape_velocity(threshold_displacement(displacement, 0.5) * 0.2, 1.0)
         np.testing.assert_allclose(new, old, atol=1e-9)
 
     def test_the_velocity_is_clamped(self) -> None:
-        self.assertEqual(float(shape_displacement(np.array([[50.0, 0.0]]), 0.2, (1.0, 1.0), 1.0)[0, 0]), 1.0)
+        self.assertEqual(float(shape_velocity(np.array([[10.0, 0.0]]), 1.0)[0, 0]), 1.0)
+
+    def test_boost_lifts_small_motions(self) -> None:
+        np.testing.assert_allclose(shape_velocity(np.array([[0.25, 0.0]]), 0.5), [[0.5, 0.0]])
 
 
 class WarpedDepthTest(unittest.TestCase):

@@ -215,7 +215,7 @@ class FluidLayer(LayerBase):
                 den_strength = m_s[cam_id]
 
             # Add velocity from each flow layer
-            self._fluid_flow.add_velocity(flow_layer.velocity, vel_strength)
+            self._fluid_flow.add_velocity(flow_layer.smooth_velocity, vel_strength)
 
             # Add density to per-camera channel (R=cam0, G=cam1, B=cam2, A=cam3)
             channel: int = cam_id % 4

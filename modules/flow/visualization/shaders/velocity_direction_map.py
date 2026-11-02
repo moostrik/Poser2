@@ -1,6 +1,7 @@
 """Velocity Direction Map shader.
 
-Visualizes velocity field using HSV color encoding where direction maps to hue.
+Visualizes velocity field using HSV color encoding where direction maps to hue; a 3D velocity as
+x, y, z in red, green, blue around grey.
 Ported from ofxFlowTools ftVelocityFieldShader.h
 """
 
@@ -14,16 +15,16 @@ logger = logging.getLogger(__name__)
 class VelocityDirectionMap(Shader):
     """Visualize velocity field using HSV color encoding.
 
-    Direction -> Hue, Magnitude -> Saturation/Value
+    Direction -> Hue, Magnitude -> Saturation/Value; with xyz, x/y/z -> red/green/blue around grey
     """
 
-    def use(self, velocity_tex: Texture, scale: float = 1.0) -> None:
+    def use(self, velocity_tex: Texture, scale: float = 1.0, xyz: bool = False) -> None:
         """Render velocity visualization to FBO.
 
         Args:
-            target_fbo: Target framebuffer (use screen FBO for direct rendering)
-            velocity_tex: Velocity texture (RG = XY velocity)
+            velocity_tex: Velocity texture (RG = XY velocity, B = z with xyz)
             scale: Velocity scale multiplier
+            xyz: Draw x, y, z as red, green, blue around grey
         """
         if not self.allocated or not self.shader_program:
             logger.warning("VelocityDirectionMap shader not allocated or shader program missing.")
@@ -42,6 +43,7 @@ class VelocityDirectionMap(Shader):
         # Configure shader uniforms (using cached locations)
         glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform1f(self.get_uniform_loc("scale"), scale)
+        glUniform1i(self.get_uniform_loc("xyz"), 1 if xyz else 0)
 
         # Render
         draw_quad()

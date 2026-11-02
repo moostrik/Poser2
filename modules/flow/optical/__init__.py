@@ -1,4 +1,4 @@
 """Optical flow computation."""
 
-from .optical_flow import OpticalFlow, OpticalFlowSettings
-from .lucas_kanade import LucasKanade, LucasKanadeSettings, lucas_kanade, threshold_displacement, shape_displacement
+from .gradient_flow import GradientFlow, GradientFlowSettings
+from .lucas_kanade_flow import LucasKanadeFlow, LucasKanadeFlowSettings, lucas_kanade, threshold_displacement, displacement_velocity

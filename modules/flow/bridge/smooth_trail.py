@@ -4,20 +4,23 @@ Provides temporal smoothing (trail effect) and spatial smoothing (Gaussian blur)
 for any field type (velocity, density, etc).
 """
 
-from OpenGL.GL import GL_R16F, GL_RG16F, GL_RGBA16F
+import numpy as np
+from OpenGL.GL import GL_RGBA16F
 
 from modules.gl import Texture
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil
 from ..shaders import Trail, GaussianBlur
+from .shaders import ShapeVelocity
 
 
 class SmoothTrailSettings(BaseSettings):
     """Configuration for trail smoothing."""
-    scale = Field(1.0, min=-10.0, max=10.0, description="Converts optical flow to simulation velocity")
+    scale = Field(1.0, min=-10.0, max=10.0, description="Converts the flow's velocity to simulation velocity")
     trail_weight = Field(0.9, min=0.0, max=0.99, description="Temporal smoothing (0=no trail, 0.99=long trail)")
     blur_radius = Field(8.0, min=0.0, max=10.0, description="Gaussian blur radius in pixels")
     blur_steps = Field(4, min=0, max=8, description="Number of Gaussian blur passes")
+    boost = Field(0.0, min=-0.5, max=0.9, description="Power boost for small motions")
 
 
 class SmoothTrail(FlowBase):
@@ -125,40 +128,43 @@ class SmoothTrail(FlowBase):
 
 
 class VelocitySmoothTrail(SmoothTrail):
-    """Convenience class: Trail preset for velocity fields with scaling."""
+    """The trail bridge: a flow's 3D velocity, its x/y shaped (`boost`, clamped to ±1), through one 3D trail."""
 
     def __init__(self, settings: SmoothTrailSettings | None = None) -> None:
-        """Initialize velocity smoothing.
+        super().__init__(GL_RGBA16F, settings)
+        self._shape_shader: ShapeVelocity = ShapeVelocity()
 
-        Args:
-            scale: Velocity scale (converts optical flow to simulation velocity)
-            settings: Optional trail configuration
-        """
-        super().__init__(GL_RG16F, settings)
-
-    # Convenience aliases for velocity-specific usage
     @property
-    def velocity(self) -> Texture:
-        """Smoothed velocity output."""
+    def smooth_velocity(self) -> Texture:
+        """The smoothed velocity, xyz (RGBA16F)."""
         return self._output
 
     @property
     def velocity_input(self) -> Texture:
-        """Raw velocity input buffer."""
+        """The shaped velocity the trail reads."""
         return self._input
 
+    def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
+        super().allocate(width, height, output_width, output_height)
+        self._shape_shader.allocate()
+
+    def deallocate(self) -> None:
+        super().deallocate()
+        self._shape_shader.deallocate()
+
     def set_velocity(self, velocity: Texture) -> None:
-        """Alias for .set_input with velocity scaling."""
-        self.set_input(velocity)
+        """Take a flow's 3D velocity, its x/y shaped, as the trail's next input."""
+        if not self._allocated:
+            return
+        self._input_fbo.begin()
+        self._shape_shader.use(velocity, 1.0 - self.settings.boost)
+        self._input_fbo.end()
 
 
-class DepthSmoothTrail(SmoothTrail):
-    """Convenience class: Trail preset for the signed velocity toward the camera, one channel."""
+# ── numpy reference ─────────────────────────────────────────────────────
 
-    def __init__(self, settings: SmoothTrailSettings | None = None) -> None:
-        super().__init__(GL_R16F, settings)
-
-    @property
-    def depth_velocity(self) -> Texture:
-        """Smoothed velocity toward the camera."""
-        return self._output
+def shape_velocity(velocity: np.ndarray, power: float) -> np.ndarray:
+    """A velocity (..., 2) with its length to `power`, clamped to ±1 per axis. Mirrors shape_velocity.frag on x/y."""
+    length: np.ndarray = np.linalg.norm(velocity, axis=-1, keepdims=True)
+    shaped: np.ndarray = np.divide(velocity * length ** power, length, out=np.zeros_like(velocity), where=length > 1e-4)
+    return np.clip(shaped, -1.0, 1.0)

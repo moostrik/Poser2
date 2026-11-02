@@ -1,10 +1,11 @@
 """Density Bridge.
 
-Combines RGB density with velocity magnitude for fluid simulation.
+Combines RGB density with an amount, its alpha, for fluid simulation: the speed on the trail
+bridge, the emission on the kinetic bridge.
 
 Ported from ofxFlowTools ftDensityBridgeFlow.h
 """
-from OpenGL.GL import GL_RG32F, GL_RGBA16F
+from OpenGL.GL import GL_R32F, GL_RGBA16F
 
 from modules.gl import Texture, SwapFbo
 from modules.settings import Field, BaseSettings
@@ -20,20 +21,14 @@ class DensityBridgeSettings(BaseSettings):
 
 
 class DensityBridge(FlowBase):
-    """Density bridge with velocity-driven alpha channel.
+    """Density bridge with an alpha channel from an amount.
 
     Pipeline:
-        1. Receive RGB density via set_density() → input_fbo (RGBA32F)
-        2. Receive pre-smoothed velocity via set_velocity() → velocity_fbo (RG32F)
-        3. Combine density RGB + velocity magnitude → RGBA with alpha
+        1. Receive RGB density via set_color() → input_fbo (RGBA16F)
+        2. Receive the amount via set_alpha() → alpha_fbo (R32F)
+        3. Combine density RGB + amount → RGBA with alpha
         4. Apply HSV adjustments (saturation, brightness)
-        5. Output RGBA32F density via .density property
-
-    Data flow:
-        Density RGB → set_density() → input_fbo (RGBA32F)
-        Smoothed Velocity → set_velocity() → velocity_fbo (RG32F)
-        Combine → DensityBridgeShader → output_fbo (RGBA32F)
-        HSV adjust → output_fbo (in-place)
+        5. Output RGBA16F density via .density property
     """
 
     def __init__(self, settings: DensityBridgeSettings | None = None) -> None:
@@ -45,8 +40,7 @@ class DensityBridge(FlowBase):
         self._input_internal_format = GL_RGBA16F   # RGB density input
         self._output_internal_format = GL_RGBA16F  # RGBA density output
 
-        # Velocity storage
-        self._velocity_fbo: SwapFbo = SwapFbo()
+        self._alpha_fbo: SwapFbo = SwapFbo()
 
         # Shaders
         self._density_bridge_shader: DensityBridgeShader = DensityBridgeShader()
@@ -63,9 +57,9 @@ class DensityBridge(FlowBase):
         return self._input
 
     @property
-    def velocity_input(self) -> Texture:
-        """Velocity input buffer."""
-        return self._velocity_fbo.texture
+    def alpha_input(self) -> Texture:
+        """The amount the alpha is made from."""
+        return self._alpha_fbo.texture
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate density bridge FBOs.
@@ -77,14 +71,14 @@ class DensityBridge(FlowBase):
             output_height: Optional output height (defaults to height)
         """
         super().allocate(width, height, output_width, output_height)
-        self._velocity_fbo.allocate(width, height, GL_RG32F)
+        self._alpha_fbo.allocate(width, height, GL_R32F)
         self._density_bridge_shader.allocate()
         self._hsv_shader.allocate()
 
     def deallocate(self) -> None:
         """Release all FBO resources."""
         super().deallocate()
-        self._velocity_fbo.deallocate()
+        self._alpha_fbo.deallocate()
         self._density_bridge_shader.deallocate()
         self._hsv_shader.deallocate()
 
@@ -92,14 +86,14 @@ class DensityBridge(FlowBase):
         """Set RGB density input (replaces current)."""
         FlowUtil.blit(self._input_fbo, color)
 
-    def set_velocity(self, velocity: Texture) -> None:
-        """Set pre-smoothed velocity input (from VelocityBridge)."""
-        FlowUtil.blit(self._velocity_fbo, velocity)
+    def set_alpha(self, amount: Texture) -> None:
+        """Set the amount the alpha is made from (red)."""
+        FlowUtil.blit(self._alpha_fbo, amount)
 
     def reset(self) -> None:
         """Reset all FBOs to zero."""
         super().reset()
-        FlowUtil.zero(self._velocity_fbo)
+        FlowUtil.zero(self._alpha_fbo)
 
     def update(self, speed: float = 1.0) -> None:
         """Update density bridge processing.
@@ -110,11 +104,11 @@ class DensityBridge(FlowBase):
         if not self._allocated:
             return
 
-        # Stage 1: Combine density RGB + velocity magnitude
+        # Stage 1: Combine density RGB + the amount
         self._output_fbo.begin()
         self._density_bridge_shader.use(
             self._input,                    # Density RGB from input_fbo
-            self._velocity_fbo.texture,    # Pre-smoothed velocity
+            self._alpha_fbo.texture,        # The amount
             speed                             # Speed multiplier for alpha
         )
         self._output_fbo.end()

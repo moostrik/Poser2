@@ -5,7 +5,7 @@ Outputs scalar magnitude to R channel.
 
 Ported from ofxFlowTools ftVelocityMaskFlow.h
 """
-from OpenGL.GL import GL_R32F, GL_RG32F, GL_RGBA16F
+from OpenGL.GL import GL_R32F, GL_RGBA16F
 
 from modules.gl import Texture
 from .. import FlowBase, FlowUtil
@@ -79,10 +79,10 @@ class Magnitude(FlowBase):
 
 
 class VelocityMagnitude(Magnitude):
-    """Convenience class: Magnitude preset for velocity fields (RG32F)."""
+    """Convenience class: Magnitude preset for velocity fields, xyz (RGBA16F): the 3D speed."""
 
     def __init__(self) -> None:
-        super().__init__(GL_RG32F)
+        super().__init__(GL_RGBA16F)
 
     def set_velocity(self, velocity: Texture) -> None:
         """Alias for .set_input (velocity-specific terminology)."""

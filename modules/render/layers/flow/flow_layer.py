@@ -4,22 +4,21 @@
 from enum import IntEnum, auto
 
 # Third-party imports
-from OpenGL.GL import GL_R16F, GL_RG16F, GL_RG32F, GL_RGBA16F, GL_VIEWPORT, glGetIntegerv
+from OpenGL.GL import GL_RGBA16F, GL_VIEWPORT, glGetIntegerv
 
 # Local application imports
 from modules.gl import Fbo, GpuTimer, Texture, Style, Blit, Text
 from ..layer_base import LayerBase
 from ...shaders import MaskMultiply
 from modules.board import HasFrames
-from modules.pose import Frame, AngleMotion
 
 from modules.settings import Field, BaseSettings, Group
 from modules.flow import (
-    OpticalFlow, OpticalFlowSettings, LucasKanade, LucasKanadeSettings,
-    VelocitySmoothTrail, DepthSmoothTrail, SmoothTrailSettings,
+    GradientFlow, GradientFlowSettings, LucasKanadeFlow, LucasKanadeFlowSettings,
+    VelocitySmoothTrail, SmoothTrailSettings,
     DepthVelocity, DepthVelocitySettings,
     KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES,
-    Magnitude, VelocityMagnitude,
+    VelocityMagnitude,
     TemperatureBridge, TemperatureBridgeSettings,
     DensityBridge, DensityBridgeSettings,
     Visualizer, VisualizationFieldSettings
@@ -30,8 +29,8 @@ from modules.utils import HotReloadMethods
 
 class Motion(IntEnum):
     """How the flow measures motion."""
-    OPTICAL =   0   # motion strength per pixel, from the image (OpticalFlow)
-    RGBD_FLOW = 1   # scene flow from color and depth: displacement from the image (LucasKanade), depth followed along it
+    GRADIENT_FLOW =     0   # the motion along the brightness gradient, as a strength (GradientFlow); z at the pixel
+    LUCAS_KANADE_FLOW = 1   # how far each pixel moved (LucasKanadeFlow); z along that motion
 
 
 class FlowBridge(IntEnum):
@@ -41,38 +40,41 @@ class FlowBridge(IntEnum):
 
 
 class FlowDrawMode(IntEnum):
-    """Draw modes for FlowLayer.
+    """Draw modes for FlowLayer. A 3D velocity (xyz) draws as lines with a dot that grows with z, red
+    toward the camera and green away; as scalars, x/y/z as red/green/blue around grey.
 
     Inputs:
-        OPTICAL_INPUT - Luminance frames fed to optical flow
+        LUMINANCE - The newest luminance frame of the flow `motion` picks
 
     Outputs:
-        OPTICAL_OUTPUT - The measured motion before the mask gate: x/y from `motion` (OPTICAL or RGBD_FLOW); with depth, arrows red toward the camera, green away
-        SMOOTH_VELOCITY_OUTPUT - Smoothed velocity (RG32F); with depth, arrows red toward the camera, green away
-        SMOOTH_VELOCITY_DEPTH - Velocity toward the camera: red toward, green away
-        DENSITY_BRIDGE_OUTPUT - Colored density (RGBA32F)
-        TEMPERATURE_BRIDGE_OUTPUT - Temperature field (R32F)
+        VELOCITY - The flow's 3D velocity, before the mask gate
+        SMOOTH_VELOCITY_INPUT - What the bridge reads: the gated velocity (shaped on the trail bridge)
+        SMOOTH_VELOCITY_OUTPUT - The bridge's smoothed 3D velocity, what the fluid gets
+        SMOOTH_VELOCITY_DEPTH - Its z: red toward the camera, green away
+        DENSITY_BRIDGE_INPUT_ALPHA - The amount the density's alpha is made from: speed (trail) or emission (kinetic)
+        DENSITY_BRIDGE_OUTPUT - Colored density (RGBA16F)
+        TEMPERATURE_BRIDGE_OUTPUT - Temperature field (R16F)
 
     Kinetic bridge:
-        KINETIC_FAST / KINETIC_SLOW - The two trails (RGBA16F, xyz); arrows of xy
+        KINETIC_FAST / KINETIC_SLOW - The two trails (RGBA16F, xyz)
         KINETIC_ACCELERATION - Along the motion in two colors: + onset warm, - release cold
         KINETIC_TURN - Across the motion in two colors
         KINETIC_HELD_RELEASE - The peak-held release
         KINETIC_RESERVOIR - Ink stored per pixel
-        KINETIC_VELOCITY - The velocity the fluid gets, after drop_velocity (RG16F)
+        KINETIC_VELOCITY - The velocity the fluid gets, after drop_velocity (RGBA16F, xyz)
         KINETIC_EMISSION - The ink the density bridge gets
-        KINETIC_ONSET - The second velocity input (RGBA16F, xyz); arrows of xy
+        KINETIC_ONSET - The second velocity input (RGBA16F, xyz)
         KINETIC_CURL - The fast trail's 2D curl in two colors
         KINETIC_STRIP - Speed, onset, release and emission over the last seconds
         KINETIC_DEPTH_ACCELERATION - The z of fast - slow: red toward the camera, green away
     """
-    OPTICAL_INPUT = 0
-    OPTICAL_OUTPUT = auto()
+    LUMINANCE = 0
+    VELOCITY = auto()
     SMOOTH_VELOCITY_INPUT = auto()
     SMOOTH_VELOCITY_OUTPUT = auto()
     SMOOTH_VELOCITY_MAGNITUDE = auto()
     DENSITY_BRIDGE_INPUT_COLOR = auto()
-    DENSITY_BRIDGE_INPUT_VELOCITY = auto()
+    DENSITY_BRIDGE_INPUT_ALPHA = auto()
     DENSITY_BRIDGE_OUTPUT = auto()
     TEMPERATURE_BRIDGE_INPUT_COLOR = auto()
     TEMPERATURE_BRIDGE_INPUT_MASK = auto()
@@ -93,7 +95,10 @@ class FlowDrawMode(IntEnum):
 
 
 DEPTH_DRAW_MODES: set[FlowDrawMode] = {FlowDrawMode.SMOOTH_VELOCITY_DEPTH, FlowDrawMode.KINETIC_DEPTH_ACCELERATION}     # red and green
-VECTOR_DRAW_MODES: set[FlowDrawMode] = {FlowDrawMode.KINETIC_FAST, FlowDrawMode.KINETIC_SLOW, FlowDrawMode.KINETIC_ONSET}   # arrows, whatever the texture's format
+VECTOR_DRAW_MODES: set[FlowDrawMode] = {       # 3D velocities, drawn as velocities whatever the texture's format
+    FlowDrawMode.VELOCITY, FlowDrawMode.SMOOTH_VELOCITY_INPUT, FlowDrawMode.SMOOTH_VELOCITY_OUTPUT,
+    FlowDrawMode.KINETIC_FAST, FlowDrawMode.KINETIC_SLOW, FlowDrawMode.KINETIC_VELOCITY, FlowDrawMode.KINETIC_ONSET,
+}
 
 
 class FlowLayerSettings(BaseSettings):
@@ -105,11 +110,11 @@ class FlowLayerSettings(BaseSettings):
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
     bridge: Field[FlowBridge] =             Field(FlowBridge.TRAIL, description="The bridge the fluid reads")
-    motion: Field[Motion] =                 Field(Motion.OPTICAL, description="How motion is measured: per-pixel strength, or from color and depth (RGB-D)")
+    motion: Field[Motion] =                 Field(Motion.GRADIENT_FLOW, description="How motion is measured: along the brightness gradient, or how far each pixel moved")
 
     visualization      = Group(VisualizationFieldSettings)
-    optical_flow       = Group(OpticalFlowSettings)
-    lucas_kanade       = Group(LucasKanadeSettings)
+    gradient_flow      = Group(GradientFlowSettings)
+    lucas_kanade_flow  = Group(LucasKanadeFlowSettings)
     depth_velocity     = Group(DepthVelocitySettings)
     velocity_trail     = Group(SmoothTrailSettings)
     kinetic_bridge     = Group(KineticBridgeSettings)
@@ -120,22 +125,22 @@ class FlowLayerSettings(BaseSettings):
 class FlowLayer(LayerBase):
     """Flow processing layer with optical flow and bridges.
 
-    Computes optical flow and prepares velocity/density/temperature for fluid simulation:
-    1. OpticalFlow: Computes motion from source frames
-    2. VelocitySmoothTrail or KineticBridge (settings.bridge): The velocity for the fluid
-    3. DensityBridge: Combines RGB density with velocity info
+    Measures the motion and prepares velocity/density/temperature for fluid simulation:
+    1. GradientFlow or LucasKanadeFlow (settings.motion): the 3D velocity (xyz), z from the depth
+    2. VelocitySmoothTrail or KineticBridge (settings.bridge): the smoothed velocity for the fluid
+    3. DensityBridge: Combines RGB density with an amount as its alpha
     4. TemperatureBridge: Generates temperature field
 
     Output textures for FluidLayer:
-        - velocity: Smoothed velocity (RG16F)
+        - smooth_velocity: Smoothed velocity, xyz (RGBA16F)
         - density: Colored density (RGBA16F)
         - temperature: Temperature field (R16F)
 
     Usage:
-        flow = FlowLayer(cam_id, board, mask, motion, colors, settings)
+        flow = FlowLayer(cam_id, board, flow_source, flow_input, density_input, settings)
         flow.update()
         # Access outputs for fluid simulation:
-        fluid.add_velocity(flow.velocity)
+        fluid.add_velocity(flow.smooth_velocity)
         fluid.add_density(flow.density)
         fluid.add_temperature(flow.temperature)
     """
@@ -146,7 +151,7 @@ class FlowLayer(LayerBase):
         Args:
             cam_id: Camera ID
             board: Board for pose data
-            flow_source: The source layer behind the flow input; optical flow runs when it has a new frame
+            flow_source: The source layer behind the flow input; the flow measures when it has a new frame
             flow_input: Texture for optical flow input
             density_input: Texture for density and temperature input
             settings: Layer configuration
@@ -158,19 +163,17 @@ class FlowLayer(LayerBase):
         self._density_input: Texture = density_input
         self.settings: FlowLayerSettings = settings or FlowLayerSettings()
 
-        self._optical_flow: OpticalFlow = OpticalFlow(self.settings.optical_flow)
-        self._lucas_kanade: LucasKanade = LucasKanade(self.settings.lucas_kanade)
-        self._measured_velocity: Texture = self._optical_flow.velocity     # the motion measure's velocity, before the gate
+        self._depth_velocity: DepthVelocity = DepthVelocity(self.settings.depth_velocity)     # z for both flows
+        self._gradient_flow: GradientFlow = GradientFlow(self.settings.gradient_flow, self._depth_velocity)
+        self._lucas_kanade_flow: LucasKanadeFlow = LucasKanadeFlow(self.settings.lucas_kanade_flow, self._depth_velocity)
+        self._motion: Motion = self.settings.motion     # the flow that measured last; a switch restarts the other
+        self._velocity: Texture = self._gradient_flow.velocity     # the velocity of the flow `motion` picks, before the gate
         self._depth_input: Texture | None = None
         self._mask_input: Texture | None = None
         self._gate_shader: MaskMultiply = MaskMultiply()
-        self._gated_velocity: Fbo = Fbo()   # the optical flow's velocity times the mask
-        self._gated_displacement: Fbo = Fbo()   # the RGB-D displacement times the mask, the kinetic bridge's linear flow
-        self._gated_depth_velocity: Fbo = Fbo()     # the depth velocity times the mask
+        self._gated_velocity: Fbo = Fbo()   # the flow's velocity times the mask
         self._gated_color: Fbo = Fbo()      # the density input times the mask
-        self._depth_velocity: DepthVelocity = DepthVelocity(self.settings.depth_velocity)
         self._velocity_trail: VelocitySmoothTrail = VelocitySmoothTrail(self.settings.velocity_trail)
-        self._depth_trail: DepthSmoothTrail = DepthSmoothTrail(self.settings.velocity_trail)
         self._kinetic_bridge: KineticBridge = KineticBridge(self.settings.kinetic_bridge)
         self._velocity_magnitude: VelocityMagnitude = VelocityMagnitude()
         self._density_bridge: DensityBridge = DensityBridge(self.settings.density_bridge)
@@ -198,33 +201,27 @@ class FlowLayer(LayerBase):
         return self._visualizer.texture
 
     @property
-    def velocity(self) -> Texture:
-        """Velocity output (RG16F) for fluid simulation."""
+    def smooth_velocity(self) -> Texture:
+        """Smoothed velocity, xyz (RGBA16F), for fluid simulation; z is 0 without depth."""
         if self.settings.bridge == FlowBridge.KINETIC:
-            return self._kinetic_bridge.velocity
-        return self._velocity_trail.velocity
+            return self._kinetic_bridge.smooth_velocity
+        return self._velocity_trail.smooth_velocity
+
+    @property
+    def uses_depth(self) -> bool:
+        """Whether the flow `motion` picks measures z: its strength_z is above 0."""
+        return self._flow.settings.strength_z > 0.0
 
     @property
     def depth_enabled(self) -> bool:
-        """Whether depth reaches the bridge: a scale above 0 and a source that has it."""
-        return self.settings.depth_velocity.scale > 0.0 and self._depth_input is not None and self._depth_input.allocated
+        """Whether z reaches the bridge: the flow measures it and a source has depth."""
+        return self.uses_depth and self._depth_input is not None and self._depth_input.allocated
 
     @property
-    def depth_velocity(self) -> Texture | None:
-        """Signed velocity toward the camera (R16F) for fluid simulation; None without depth."""
-        return self._bridge_depth_velocity if self.depth_enabled else None
-
-    @property
-    def _bridge_depth_velocity(self) -> Texture:
-        if self.settings.bridge == FlowBridge.KINETIC:
-            return self._kinetic_bridge.depth_velocity
-        return self._depth_trail.depth_velocity
-
-    @property
-    def onset(self) -> Texture | None:
-        """Second velocity input (RG16F) for fluid simulation; None when the bridge has none."""
+    def onset_velocity(self) -> Texture | None:
+        """Second velocity input, xyz (RGBA16F), for fluid simulation; None when the bridge has none."""
         if self.settings.bridge == FlowBridge.KINETIC and self.settings.kinetic_bridge.onset_force > 0.0:
-            return self._kinetic_bridge.onset
+            return self._kinetic_bridge.onset_velocity
         return None
 
     @property
@@ -241,13 +238,20 @@ class FlowLayer(LayerBase):
 
     @property
     def magnitude(self) -> Texture:
-        """Velocity magnitude output (RR16F) for fluid simulation."""
+        """The smoothed velocity's 3D speed (R32F) for fluid simulation."""
         return self._velocity_magnitude.magnitude
 
     @property
     def temperature(self) -> Texture:
         """Temperature output (R16F) for fluid simulation."""
         return self._temperature_bridge.temperature
+
+    @property
+    def _flow(self) -> GradientFlow | LucasKanadeFlow:
+        """The flow `motion` picks."""
+        if self.settings.motion == Motion.LUCAS_KANADE_FLOW:
+            return self._lucas_kanade_flow
+        return self._gradient_flow
 
     # ========== Input Setters ==========
 
@@ -261,10 +265,9 @@ class FlowLayer(LayerBase):
         self._density_input = texture
 
     def set_mask_input(self, texture: Texture | None) -> None:
-        """The player's mask (red, 0 to 1) on the flow's view, or None for no gate. It gates the optical
-        flow's velocity, the depth velocity and the density color after they are measured, so they run on
-        the whole image: a jittery mask edge then only scales what passes, it never reads as motion, and
-        needs no blending."""
+        """The player's mask (red, 0 to 1) on the flow's view, or None for no gate. It gates the flow's
+        3D velocity and the density color after they are measured, so they run on the whole image: a
+        jittery mask edge then only scales what passes, it never reads as motion, and needs no blending."""
         self._mask_input = texture
 
     def set_depth_input(self, texture: Texture) -> None:
@@ -312,27 +315,21 @@ class FlowLayer(LayerBase):
         flow_width, flow_height = self._flow_size = (self.settings.width, self.settings.height)
         output_width, output_height = self._output_size
 
-        self._optical_flow.allocate(flow_width, flow_height)
-        self._lucas_kanade.allocate(flow_width, flow_height)
-        self._gated_velocity.allocate(flow_width, flow_height, GL_RG16F)
-        self._gated_displacement.allocate(flow_width, flow_height, GL_RG32F)
-        self._gated_depth_velocity.allocate(flow_width, flow_height, GL_R16F)
         self._depth_velocity.allocate(flow_width, flow_height)
+        self._gradient_flow.allocate(flow_width, flow_height)
+        self._lucas_kanade_flow.allocate(flow_width, flow_height)
+        self._gated_velocity.allocate(flow_width, flow_height, GL_RGBA16F)
         self._velocity_trail.allocate(flow_width, flow_height, output_width, output_height)
-        self._depth_trail.allocate(flow_width, flow_height)
         self._kinetic_bridge.allocate(flow_width, flow_height)
         self._velocity_magnitude.allocate(flow_width, flow_height)
         self._temperature_bridge.allocate(flow_width, flow_height)
 
     def _deallocate_flow(self) -> None:
-        self._optical_flow.deallocate()
-        self._lucas_kanade.deallocate()
-        self._gated_velocity.deallocate()
-        self._gated_displacement.deallocate()
-        self._gated_depth_velocity.deallocate()
         self._depth_velocity.deallocate()
+        self._gradient_flow.deallocate()
+        self._lucas_kanade_flow.deallocate()
+        self._gated_velocity.deallocate()
         self._velocity_trail.deallocate()
-        self._depth_trail.deallocate()
         self._kinetic_bridge.deallocate()
         self._velocity_magnitude.deallocate()
         self._temperature_bridge.deallocate()
@@ -348,11 +345,10 @@ class FlowLayer(LayerBase):
 
     def reset(self) -> None:
         """Reset all processing stages."""
-        self._optical_flow.reset()
-        self._lucas_kanade.reset()
+        self._gradient_flow.reset()
+        self._lucas_kanade_flow.reset()
         self._depth_velocity.reset()
         self._velocity_trail.reset()
-        self._depth_trail.reset()
         self._kinetic_bridge.reset()
         self._density_bridge.reset()
         self._kinetic_strip.reset()
@@ -364,10 +360,6 @@ class FlowLayer(LayerBase):
         """Update optical flow and bridges."""
         self._follow_flow_size()
 
-        # Get motion data from pose
-        pose: Frame | None = self._board.get_frame(self.settings.stage, self._cam_id)
-        motion = pose[AngleMotion].value if pose is not None and AngleMotion in pose else 0.0
-
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
@@ -377,46 +369,27 @@ class FlowLayer(LayerBase):
         self._flow_interval += self._time_step
 
         mask: Texture | None = self._mask_input if self._mask_input is not None and self._mask_input.allocated else None
-        motion: Motion = self.settings.motion
-        depth_enabled: bool = self.depth_enabled
+        flow: GradientFlow | LucasKanadeFlow = self._flow
+        if self.settings.motion != self._motion:
+            # The other flow's frames and the smoothed depth are from before it stopped measuring
+            self._motion = self.settings.motion
+            flow.reset()
+            self._depth_velocity.reset()
         if new_flow:
-            # Stage 1: motion, on the whole image; the mask gates its velocity afterwards
-            self._optical_flow.set_input(self._flow_input)     # keeps the luminance frames the image measures read
-            if motion == Motion.RGBD_FLOW:
-                if self._optical_flow.ready:
-                    self._lucas_kanade.update(self._optical_flow.previous_frame, self._optical_flow.frame)
-                self._measured_velocity = self._lucas_kanade.velocity
-            else:
-                self._optical_flow.update()
-                self._measured_velocity = self._optical_flow.velocity
+            # Stage 1: the flow's 3D velocity, on the whole image; the mask gates it afterwards
+            flow.set_input(self._flow_input)
+            flow.update(self._depth_input if self.depth_enabled else None, self._flow_interval)
+            self._velocity = flow.velocity
             if mask is not None:
-                self._gate(self._measured_velocity, mask, self._gated_velocity)
-                if motion == Motion.RGBD_FLOW:
-                    self._gate(self._lucas_kanade.displacement, mask, self._gated_displacement)
-        flow_velocity: Texture = self._gated_velocity if mask is not None else self._measured_velocity
-        # The kinetic bridge reads the RGB-D displacement linearly; the trail bridge keeps the shaped flow
-        displacement: Texture | None = None
-        if motion == Motion.RGBD_FLOW:
-            displacement = self._gated_displacement if mask is not None else self._lucas_kanade.displacement
-
-        if new_flow and depth_enabled:
-            assert self._depth_input is not None
-            # RGB-D: depth measured along each pixel's displacement, not at a fixed pixel
-            self._depth_velocity.update_depth(self._depth_input, self._flow_interval,
-                                              self._lucas_kanade.displacement if motion == Motion.RGBD_FLOW else None)
-            if mask is not None:
-                self._gate(self._depth_velocity.depth_velocity, mask, self._gated_depth_velocity)
-        depth_velocity: Texture = self._gated_depth_velocity if mask is not None else self._depth_velocity.depth_velocity
+                self._gate(self._velocity, mask, self._gated_velocity)
+        velocity: Texture = self._gated_velocity if mask is not None else self._velocity
 
         # Stage 2: Bridges
-        velocity: Texture
-        ink: Texture    # what the density bridge reads as alpha, through its length
         if self.settings.bridge == FlowBridge.KINETIC:
             if new_flow:
-                if displacement is not None:
-                    self._kinetic_bridge.set_displacement(displacement, depth_velocity if depth_enabled else None)
-                else:
-                    self._kinetic_bridge.set_velocity(flow_velocity, depth_velocity if depth_enabled else None)
+                # Lucas–Kanade's velocity is a distance, so the trails can travel with it
+                distance_scale: float | None = self.settings.lucas_kanade_flow.strength_x if self.settings.motion == Motion.LUCAS_KANADE_FLOW else None
+                self._kinetic_bridge.set_velocity(velocity, distance_scale)
                 self._kinetic_bridge.update(self._flow_interval)
                 if self.settings.draw_mode == FlowDrawMode.KINETIC_DEPTH_ACCELERATION:
                     self._kinetic_bridge.update_depth_acceleration()
@@ -425,28 +398,18 @@ class FlowLayer(LayerBase):
                 if self.settings.draw_mode == FlowDrawMode.KINETIC_STRIP:
                     bridge: KineticBridge = self._kinetic_bridge
                     self._kinetic_strip.update(bridge.fast, bridge.acceleration, bridge.emission, self.settings.visualization.strip_scale)
-            velocity = self._kinetic_bridge.velocity
-            ink = self._kinetic_bridge.emission
         else:
-            self._velocity_trail.set_velocity(flow_velocity)
+            self._velocity_trail.set_velocity(velocity)
             self._velocity_trail.update()
-            velocity = self._velocity_trail.velocity
-            ink = velocity
-            if depth_enabled:
-                self._depth_trail.set_input(depth_velocity)
-                self._depth_trail.update()
 
         if new_flow:
             self._flow_interval = 0.0
 
-        speed: Texture = velocity       # what the magnitude reads: 3D with depth
-        if depth_enabled:
-            speed = self._depth_velocity.process_speed(velocity, self._bridge_depth_velocity)
-            if self.settings.bridge == FlowBridge.TRAIL:
-                ink = speed
-
-        self._velocity_magnitude.set_input(speed)
+        self._velocity_magnitude.set_input(self.smooth_velocity)
         self._velocity_magnitude.update()
+
+        # The amount the density bridge makes its alpha from: the kinetic bridge's emission, or the trail's speed
+        alpha: Texture = self._kinetic_bridge.emission if self.settings.bridge == FlowBridge.KINETIC else self._velocity_magnitude.magnitude
 
         # The density color, gated like the velocity: where the bridges spread velocity past the mask,
         # no background color comes along
@@ -456,7 +419,7 @@ class FlowLayer(LayerBase):
             density_color = self._gated_color
 
         self._density_bridge.set_color(density_color)
-        self._density_bridge.set_velocity(ink)
+        self._density_bridge.set_alpha(alpha)
         self._density_bridge.update()
 
         self._temperature_bridge.set_color(density_color)
@@ -467,11 +430,11 @@ class FlowLayer(LayerBase):
 
         Style.set_blend_mode(Style.BlendMode.ALPHA)
 
-        signed: Texture | None = self._get_signed_texture()
+        signed: tuple[Texture, int] | None = self._get_signed_texture()
         if signed is not None:
-            self._visualizer.process_signed(signed, self.settings.draw_mode in DEPTH_DRAW_MODES)
+            self._visualizer.process_signed(signed[0], self.settings.draw_mode in DEPTH_DRAW_MODES, signed[1])
         else:
-            self._visualizer.process(self._get_draw_texture(), self.settings.draw_mode in VECTOR_DRAW_MODES, *self._get_arrow_depth())
+            self._visualizer.process(self._get_draw_texture(), self.settings.draw_mode in VECTOR_DRAW_MODES)
         Style.pop_style()
 
     def _gate(self, source: Texture, mask: Texture, target: Fbo) -> None:
@@ -504,53 +467,38 @@ class FlowLayer(LayerBase):
 
     # ========== Texture Selection ==========
 
-    def _get_signed_texture(self) -> Texture | None:
-        """The scalar field to draw in two colors, None when draw_mode is another kind of texture."""
-        textures = {
-            FlowDrawMode.KINETIC_ACCELERATION: self._kinetic_bridge.acceleration,
-            FlowDrawMode.KINETIC_TURN: self._kinetic_bridge.turn,
-            FlowDrawMode.KINETIC_HELD_RELEASE: self._kinetic_bridge.held_release,
-            FlowDrawMode.KINETIC_RESERVOIR: self._kinetic_bridge.reservoir,
-            FlowDrawMode.KINETIC_EMISSION: self._kinetic_bridge.emission,
-            FlowDrawMode.KINETIC_CURL: self._kinetic_bridge.curl,
-            FlowDrawMode.SMOOTH_VELOCITY_DEPTH: self._bridge_depth_velocity,
-            FlowDrawMode.KINETIC_DEPTH_ACCELERATION: self._kinetic_bridge.depth_acceleration,
+    def _get_signed_texture(self) -> tuple[Texture, int] | None:
+        """The scalar field to draw in two colors and its channel, None when draw_mode is another kind of texture."""
+        textures: dict[FlowDrawMode, tuple[Texture, int]] = {
+            FlowDrawMode.KINETIC_ACCELERATION: (self._kinetic_bridge.acceleration, 0),
+            FlowDrawMode.KINETIC_TURN: (self._kinetic_bridge.turn, 0),
+            FlowDrawMode.KINETIC_HELD_RELEASE: (self._kinetic_bridge.held_release, 0),
+            FlowDrawMode.KINETIC_RESERVOIR: (self._kinetic_bridge.reservoir, 0),
+            FlowDrawMode.KINETIC_EMISSION: (self._kinetic_bridge.emission, 0),
+            FlowDrawMode.KINETIC_CURL: (self._kinetic_bridge.curl, 0),
+            FlowDrawMode.SMOOTH_VELOCITY_DEPTH: (self.smooth_velocity, 2),       # its z
+            FlowDrawMode.KINETIC_DEPTH_ACCELERATION: (self._kinetic_bridge.depth_acceleration, 0),
+            FlowDrawMode.DENSITY_BRIDGE_INPUT_ALPHA: (self._density_bridge.alpha_input, 0),
         }
-        if self.settings.bridge == FlowBridge.KINETIC:
-            # On this bridge the density bridge's second input is the emission, not a velocity
-            textures[FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY] = self._density_bridge.velocity_input
         return textures.get(self.settings.draw_mode)
-
-    def _get_arrow_depth(self) -> tuple[Texture | None, int]:
-        """The texture and channel holding the z of the field in draw_mode, for the color of its arrows."""
-        if not self.depth_enabled:
-            return None, 0
-        if self.settings.draw_mode == FlowDrawMode.OPTICAL_OUTPUT:
-            return self._depth_velocity.depth_velocity, 0     # the measured z, as the measured x/y beside it
-        if self.settings.draw_mode in (FlowDrawMode.SMOOTH_VELOCITY_OUTPUT, FlowDrawMode.KINETIC_VELOCITY):
-            return self.depth_velocity, 0
-        if self.settings.draw_mode in VECTOR_DRAW_MODES:
-            return self._get_draw_texture(), 2      # z is the texture's own blue channel
-        return None, 0
 
     def _get_draw_texture(self) -> Texture:
         """Get texture to draw based on draw_mode."""
         textures = {
-            FlowDrawMode.OPTICAL_INPUT: self._optical_flow.color_input,
-            FlowDrawMode.OPTICAL_OUTPUT: self._measured_velocity,
+            FlowDrawMode.LUMINANCE: self._flow.luminance,
+            FlowDrawMode.VELOCITY: self._velocity,
             FlowDrawMode.SMOOTH_VELOCITY_INPUT: self._kinetic_bridge.velocity_input if self.settings.bridge == FlowBridge.KINETIC else self._velocity_trail.velocity_input,
-            FlowDrawMode.SMOOTH_VELOCITY_OUTPUT: self.velocity,
+            FlowDrawMode.SMOOTH_VELOCITY_OUTPUT: self.smooth_velocity,
             FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE: self._velocity_magnitude.magnitude,
             FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR: self._density_bridge.color_input,
-            FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY: self._density_bridge.velocity_input,
             FlowDrawMode.DENSITY_BRIDGE_OUTPUT: self._density_bridge.density,
             FlowDrawMode.TEMPERATURE_BRIDGE_INPUT_COLOR: self._temperature_bridge.color_input,
             FlowDrawMode.TEMPERATURE_BRIDGE_INPUT_MASK: self._temperature_bridge.mask_input,
             FlowDrawMode.TEMPERATURE_BRIDGE_OUTPUT: self._temperature_bridge.temperature,
             FlowDrawMode.KINETIC_FAST: self._kinetic_bridge.fast,
             FlowDrawMode.KINETIC_SLOW: self._kinetic_bridge.slow,
-            FlowDrawMode.KINETIC_VELOCITY: self._kinetic_bridge.velocity,
-            FlowDrawMode.KINETIC_ONSET: self._kinetic_bridge.onset,
+            FlowDrawMode.KINETIC_VELOCITY: self._kinetic_bridge.smooth_velocity,
+            FlowDrawMode.KINETIC_ONSET: self._kinetic_bridge.onset_velocity,
             FlowDrawMode.KINETIC_STRIP: self._kinetic_strip.texture,
         }
         return textures.get(self.settings.draw_mode, self._density_input)

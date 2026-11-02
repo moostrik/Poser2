@@ -3,7 +3,7 @@
 // The noise floor off a displacement (uv per frame): its length in pixels loses `threshold`, and
 // below it is 0. Below the threshold is the solve's jitter on a still surface, not motion. The
 // direction is kept, and what is above stays continuous. The numpy reference is
-// lucas_kanade.threshold_displacement
+// lucas_kanade_flow.threshold_displacement
 
 uniform sampler2D displacement;
 uniform float threshold;    // px per frame

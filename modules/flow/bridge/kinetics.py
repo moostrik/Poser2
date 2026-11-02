@@ -37,17 +37,9 @@ def warped(previous: np.ndarray, displacement: np.ndarray) -> np.ndarray:
     return previous[y, x]
 
 
-def dead_zone(value: np.ndarray, width: float) -> np.ndarray:
-    """A signed field with `width` taken off its size, 0 below it: the noise floor goes, and what is above stays continuous."""
-    return np.sign(value) * np.maximum(np.abs(value) - width, 0.0)
-
-
-def displacement_velocity(displacement: np.ndarray, dt: float, width: int, height: int, scale: float) -> np.ndarray:
-    """A displacement in uv per frame (..., 2) as a velocity in image widths per second, the fluid's unit, times `scale`.
-
-    v is uv of the height, so it is taken to widths first: a square motion stays square.
-    """
-    return displacement * np.array([1.0, height / width]) / dt * scale
+def depth_threshold(value: np.ndarray, threshold: float) -> np.ndarray:
+    """A signed field with `threshold` taken off its size, 0 below it: the noise floor goes, and what is above stays continuous."""
+    return np.sign(value) * np.maximum(np.abs(value) - threshold, 0.0)
 
 
 def advect(field: np.ndarray, displacement: np.ndarray, amount: float) -> np.ndarray:

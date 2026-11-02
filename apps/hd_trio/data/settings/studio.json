@@ -536,18 +536,18 @@
         "element_length": 40.0,
         "element_width": 1.0
       },
-      "optical_flow": {
+      "gradient_flow": {
         "offset": 3,
         "threshold": 0.0,
         "strength_x": 3.3,
-        "strength_y": 3.3,
-        "boost": 0.0
+        "strength_y": 3.3
       },
       "velocity_trail": {
         "scale": 1.54,
         "trail_weight": 0.9,
         "blur_radius": 8.0,
-        "blur_steps": 4
+        "blur_steps": 4,
+        "boost": 0.0
       },
       "density_bridge": {
         "saturation": 1.2,

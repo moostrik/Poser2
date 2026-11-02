@@ -13,7 +13,7 @@ from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil
 from ..shaders import Trail, GaussianBlur
 from .kinetics import decay_weight
-from .shaders import KineticAdvect, KineticCurl, KineticEmission, KineticHold, KineticInput, KineticOnset, KineticPatch, KineticProjection, KineticReservoir, KineticVelocity, Projection
+from .shaders import KineticAdvect, KineticCurl, KineticEmission, KineticHold, KineticOnset, KineticPatch, KineticProjection, KineticReservoir, KineticVelocity, Projection
 
 
 class BlurPosition(IntEnum):
@@ -23,9 +23,8 @@ class BlurPosition(IntEnum):
 
 class KineticBridgeSettings(BaseSettings):
     """Configuration for the kinetic bridge."""
-    scale = Field(10.0, min=-50.0, max=50.0, description="Converts optical flow to simulation velocity")
-    displacement_scale = Field(1.0, min=0.0, max=20.0, description="Multiplier on an RGB-D displacement, in image widths per second")
-    advect = Field(0.0, min=0.0, max=1.0, description="How far the trails travel with the motion (RGB-D displacement only); 0 holds them in place")
+    scale = Field(10.0, min=-50.0, max=50.0, description="Converts the flow's velocity to simulation velocity")
+    advect = Field(0.0, min=0.0, max=1.0, description="How far the trails travel with the motion (Lucas–Kanade flow only); 0 holds them in place")
     fast_time = Field(25.0, min=0.0, max=500.0, description="Fast trail time constant (ms)")
     slow_time = Field(150.0, min=0.0, max=1000.0, description="Slow trail time constant (ms)")
     blur_position: Field[BlurPosition] = Field(BlurPosition.BEFORE, description="Blur the flow once before the trails, or inside each trail")
@@ -46,25 +45,24 @@ class KineticBridge(FlowBase):
     """Two trails on the optical flow and their difference along and across the motion.
 
     The trails are unit-gain Emas, so they meet on a steady motion and fast - slow is the change alone.
-    The gain of the trail bridge, 1 / (1 - trail_weight), is in `scale` here. With a depth velocity
-    the trails are 3D, so a motion that starts or stops toward the camera reads like any other.
+    The gain of the trail bridge, 1 / (1 - trail_weight), is in `scale` here. The flow's velocity is 3D,
+    so a motion that starts or stops toward the camera reads like any other.
 
-    The flow is either the shaped optical flow (set_velocity) or an RGB-D displacement (set_displacement),
-    which reads linearly, unclamped, in image widths per second times `displacement_scale`. With a
-    displacement the trails can travel with the motion (`advect`): each update they move first along the
+    It reads the flow's velocity linearly, unclamped. When that velocity is a distance (the Lucas–Kanade
+    flow), the trails can travel with the motion (`advect`): each update they move first along the
     fast trail's velocity, so a steadily moving limb carries its trails and leaves no wake, and only a
     real stop leaves fast and slow apart.
 
     Pipeline:
-        1. Take the flow and the depth velocity → input_fbo (RGBA16F, xyz)
+        1. Take the flow's velocity → input_fbo (RGBA16F, xyz)
         2. Blur it (BlurPosition.BEFORE)
         3. Move the trails with the motion (advect), then advance them, blurring each inside its loop (BlurPosition.INSIDE)
         4. Project fast - slow on the direction of the motion → acceleration, turn (R16F)
         5. Peak-hold the release, max(0, -acceleration) → emission (R16F), the density bridge's alpha,
            through the stop gate where that is on: patch mean speeds (RG16F, mipmapped) say a patch is slowing;
            with the reservoir (R32F) motion stores the ink per pixel and the release spends it
-        6. Blend the fast trail toward the slow one where it releases → velocity (RG16F), depth_velocity (R16F)
-        7. max(0, acceleration) along the fast trail → onset (RGBA16F, xyz), a second velocity input
+        6. Blend the fast trail toward the slow one where it releases → smooth_velocity (RGBA16F, xyz)
+        7. max(0, acceleration) along the fast trail → onset_velocity (RGBA16F, xyz), a second velocity input
         8. 2D curl of the fast trail → curl (R16F), the extra input to the fluid's vorticity force
     """
 
@@ -74,19 +72,15 @@ class KineticBridge(FlowBase):
         self.settings: KineticBridgeSettings = settings or KineticBridgeSettings()
 
         self._input_internal_format = GL_RGBA16F
-        self._output_internal_format = GL_RG16F
+        self._output_internal_format = GL_RGBA16F
 
-        self._has_depth: bool = False
-        # The flow of the next update, set_velocity or set_displacement, read when update knows the time step
-        self._flow: Texture | None = None
-        self._depth_input: Texture | None = None
-        self._is_displacement: bool = False
+        # The flow's velocity per image width per second, for `advect`; None when it is no distance
+        self._distance_scale: float | None = None
 
         self._fast_fbo: SwapFbo = SwapFbo()
         self._slow_fbo: SwapFbo = SwapFbo()
         self._acceleration_fbo: Fbo = Fbo()
         self._turn_fbo: Fbo = Fbo()
-        self._depth_velocity_fbo: Fbo = Fbo()
         self._depth_acceleration_fbo: Fbo = Fbo()
         self._patch_fbo: Fbo = Fbo()
         self._held_release_fbo: SwapFbo = SwapFbo()
@@ -95,7 +89,6 @@ class KineticBridge(FlowBase):
         self._onset_fbo: Fbo = Fbo()
         self._curl_fbo: Fbo = Fbo()
 
-        self._input_shader: KineticInput = KineticInput()
         self._advect_shader: KineticAdvect = KineticAdvect()
         self._trail_shader: Trail = Trail()
         self._blur_shader: GaussianBlur = GaussianBlur()
@@ -109,19 +102,14 @@ class KineticBridge(FlowBase):
         self._curl_shader: KineticCurl = KineticCurl()
 
     @property
-    def velocity(self) -> Texture:
-        """Velocity output for the fluid (RG16F)."""
+    def smooth_velocity(self) -> Texture:
+        """Velocity output for the fluid, xyz (RGBA16F)."""
         return self._output
 
     @property
     def velocity_input(self) -> Texture:
-        """Optical flow input buffer, blurred when BlurPosition.BEFORE."""
+        """The flow's velocity, blurred when BlurPosition.BEFORE."""
         return self._input
-
-    @property
-    def depth_velocity(self) -> Texture:
-        """Velocity toward the camera for the fluid (R16F)."""
-        return self._depth_velocity_fbo
 
     @property
     def fast(self) -> Texture:
@@ -164,7 +152,7 @@ class KineticBridge(FlowBase):
         return self._emission_fbo
 
     @property
-    def onset(self) -> Texture:
+    def onset_velocity(self) -> Texture:
         """The push of a starting motion (RGBA16F, xyz), a second velocity input for the fluid."""
         return self._onset_fbo
 
@@ -187,7 +175,6 @@ class KineticBridge(FlowBase):
         self._slow_fbo.allocate(width, height, GL_RGBA16F)
         self._acceleration_fbo.allocate(width, height, GL_R16F)
         self._turn_fbo.allocate(width, height, GL_R16F)
-        self._depth_velocity_fbo.allocate(width, height, GL_R16F)
         self._depth_acceleration_fbo.allocate(width, height, GL_R16F)
         self._patch_fbo.allocate(width // 2, height // 2, GL_RG16F)
         glBindTexture(GL_TEXTURE_2D, self._patch_fbo.tex_id)
@@ -202,7 +189,6 @@ class KineticBridge(FlowBase):
         self._curl_fbo.allocate(width, height, GL_R16F)
         self.reset()
 
-        self._input_shader.allocate()
         self._advect_shader.allocate()
         self._trail_shader.allocate()
         self._blur_shader.allocate()
@@ -222,7 +208,6 @@ class KineticBridge(FlowBase):
         self._slow_fbo.deallocate()
         self._acceleration_fbo.deallocate()
         self._turn_fbo.deallocate()
-        self._depth_velocity_fbo.deallocate()
         self._depth_acceleration_fbo.deallocate()
         self._patch_fbo.deallocate()
         self._held_release_fbo.deallocate()
@@ -230,7 +215,6 @@ class KineticBridge(FlowBase):
         self._emission_fbo.deallocate()
         self._onset_fbo.deallocate()
         self._curl_fbo.deallocate()
-        self._input_shader.deallocate()
         self._advect_shader.deallocate()
         self._trail_shader.deallocate()
         self._blur_shader.deallocate()
@@ -250,7 +234,6 @@ class KineticBridge(FlowBase):
         FlowUtil.zero(self._slow_fbo)
         FlowUtil.zero(self._acceleration_fbo)
         FlowUtil.zero(self._turn_fbo)
-        FlowUtil.zero(self._depth_velocity_fbo)
         FlowUtil.zero(self._depth_acceleration_fbo)
         FlowUtil.zero(self._held_release_fbo)
         FlowUtil.zero(self._reservoir_fbo)
@@ -258,38 +241,26 @@ class KineticBridge(FlowBase):
         FlowUtil.zero(self._onset_fbo)
         FlowUtil.zero(self._curl_fbo)
 
-    def set_velocity(self, velocity: Texture, depth_velocity: Texture | None = None) -> None:
-        """Set the shaped optical flow of the next update, and the velocity toward the camera if there is depth."""
-        self._flow = velocity
-        self._depth_input = depth_velocity
-        self._is_displacement = False
+    def set_velocity(self, velocity: Texture, distance_scale: float | None = None) -> None:
+        """Take a flow's 3D velocity as the next input.
 
-    def set_displacement(self, displacement: Texture, depth_velocity: Texture | None = None) -> None:
-        """Set the displacement (uv per frame) of the next update, read linearly, and the velocity toward the camera."""
-        self._flow = displacement
-        self._depth_input = depth_velocity
-        self._is_displacement = True
-
-    def _take_input(self, delta_time: float) -> None:
-        """The flow and depth velocity into input_fbo; a displacement as image widths per second."""
-        if self._flow is None:
-            return
-        flow_scale: tuple[float, float] = (1.0, 1.0)
-        if self._is_displacement:
-            per_second: float = self.settings.displacement_scale / max(delta_time, 1e-6)
-            flow_scale = (per_second, per_second * self._flow.height / max(self._flow.width, 1))     # v in widths
-        self._has_depth = self._depth_input is not None
-        self._input_fbo.begin()
-        self._input_shader.use(self._flow, self._depth_input, flow_scale)
-        self._input_fbo.end()
+        Args:
+            velocity: x, y, z (RGB)
+            distance_scale: The velocity per image width per second when it is a distance (the Lucas–Kanade
+                flow's `strength_x`), for `advect`; None when it is no distance, which holds the trails in place
+        """
+        FlowUtil.blit(self._input_fbo, velocity)
+        self._distance_scale = distance_scale
 
     def _carry(self, delta_time: float) -> tuple[float, float] | None:
         """uv per frame per unit of trail velocity, times `advect`; None when the trails stay in place."""
         s: KineticBridgeSettings = self.settings
-        gain: float = s.scale * s.displacement_scale
-        if s.advect <= 0.0 or not self._is_displacement or abs(gain) < 1e-6:
+        if s.advect <= 0.0 or self._distance_scale is None:
             return None
-        per_unit: float = s.advect * delta_time / gain      # a trail holds scale * widths per second
+        gain: float = s.scale * self._distance_scale
+        if abs(gain) < 1e-6:
+            return None
+        per_unit: float = s.advect * delta_time / gain      # a trail holds scale * distance_scale * widths per second
         return per_unit, per_unit * self._input_fbo.width / max(self._input_fbo.height, 1)
 
     def _advect(self, field: SwapFbo, carrier: Texture, carry: tuple[float, float]) -> None:
@@ -309,7 +280,6 @@ class KineticBridge(FlowBase):
             return
 
         s: KineticBridgeSettings = self.settings
-        self._take_input(delta_time)
         blur_before: bool = s.blur_position == BlurPosition.BEFORE
         if blur_before:
             self._blur(self._input_fbo)
@@ -361,11 +331,6 @@ class KineticBridge(FlowBase):
         self._output_fbo.begin()
         self._velocity_shader.use(self.fast, self.slow, self.acceleration, s.drop_velocity)
         self._output_fbo.end()
-
-        if self._has_depth:
-            self._depth_velocity_fbo.begin()
-            self._velocity_shader.use(self.fast, self.slow, self.acceleration, s.drop_velocity, True)
-            self._depth_velocity_fbo.end()
 
         if s.onset_force > 0.0:
             self._onset_fbo.begin()
