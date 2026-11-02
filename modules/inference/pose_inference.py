@@ -16,7 +16,7 @@ from modules.utils import Broadcast
 
 from . import crop, pose
 from .crop_extractor import CropExtractor
-from .source import ImageDict
+from .source import GpuImageCallback, ImageDict
 from .uploader import Uploader
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,10 @@ class PoseInference(FrameDictCallbackMixin):
         images, prev_images, timestamps = self._uploader.snapshot()
         self._camera_images_callbacks(images)
         self._crop_extractor.process(frames, images, prev_images, timestamps)
+
+    def add_gpu_image_callback(self, callback: GpuImageCallback) -> None:
+        """Every color frame as it is uploaded (the camera's thread), with its capture time."""
+        self._uploader.add_gpu_image_callback(callback)
 
     def add_camera_images_callback(self, callback: Callable[[ImageDict], None]) -> None:
         """The GPU images of each batch, before the crops are cut."""

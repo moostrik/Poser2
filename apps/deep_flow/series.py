@@ -7,6 +7,8 @@ class Series(IntEnum):
     CAMERA_INTERVAL =       0       # ms between video frames as the camera stamped them
     POSE_LATENCY_RAW =      auto()  # ms from a pose's capture to its keypoints out of the model (RAW stage)
     POSE_LATENCY_SMOOTH =   auto()  # ms from a pose's capture to the SMOOTH stage
+    CAPTURE_LATENCY =       auto()  # ms from a capture (color, depth, poses of one moment) to the board
+    POSES_UNSYNCED =        auto()  # 1 where a capture with a player carried older poses than its own
     SEGMENTATION_INTERVAL = auto()  # ms between results that carry masks
     SEGMENTATION_LATENCY =  auto()  # ms from the camera frame to its masks on the board
     SEGMENTATION_TIME =     auto()  # ms of inference per batch

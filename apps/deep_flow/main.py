@@ -16,7 +16,7 @@ from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
 from modules.pose import configure_features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import segmentation, optical_flow, detection, PoseInference
+from modules.inference import segmentation, optical_flow, detection, PoseInference, Capture, CaptureSync
 from modules.pose import FrameDict
 from modules.utils import PerformanceTimer
 
@@ -80,6 +80,7 @@ class DeepFlowMain:
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
         self.pose_inference = PoseInference(p.image_crop, p.pose)        # the crop and the pose model, the frame domain's async step
+        self.capture_sync = CaptureSync(p.capture_sync)                  # the color, depth and poses of one moment, for the render
 
         for camera in self.cameras:
             if self.recorder:
@@ -87,6 +88,7 @@ class DeepFlowMain:
             camera.add_frame_callback(self.pose_inference.set_camera_frame)
             camera.add_frame_callback(self.frame_sync_bang.submit_frame)
             camera.add_frame_callback(self._on_camera_frame)
+            camera.add_frame_callback(self.capture_sync.submit_depth)
             camera.add_tracklet_callback(self.tracker.submit_cam_tracklets)
             camera.add_tracklet_callback(self.board.set_camera_tracklets)
             camera.add_tracklet_callback(self.tracklet_sync_bang.submit_tracklets)
@@ -117,6 +119,11 @@ class DeepFlowMain:
         self.pipeline.add_frames_callback(Stage.RAW, partial(self._on_pose_frames, Series.POSE_LATENCY_RAW))
         self.pipeline.add_frames_callback(Stage.SMOOTH, partial(self._on_pose_frames, Series.POSE_LATENCY_SMOOTH))
 
+        # CAPTURE SYNC — each uploaded image, its depth and its SMOOTH poses, as one capture on the board
+        self.pose_inference.add_gpu_image_callback(self.capture_sync.submit_image)
+        self.pipeline.add_frames_callback(Stage.SMOOTH, self.capture_sync.submit_poses)
+        self.capture_sync.add_capture_callback(self._on_capture)
+
         # CAMERA CHECK — the camera's IMU reading and frame rate against the preset, as pinned indicators
         self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
 
@@ -146,6 +153,7 @@ class DeepFlowMain:
 
         self.tracker.start()
         self.pose_inference.start()
+        self.capture_sync.start()
         self.segmentation_predictor.start()
         self.optical_flow_predictor.start()
 
@@ -160,13 +168,19 @@ class DeepFlowMain:
         self.render.start()
 
     def _on_camera_frame(self, frame: CameraFrame) -> None:
-        if frame.kind == FrameType.DEPTH:
-            self.board.set_camera_depth(frame)
+        if frame.kind != FrameType.VIDEO:
             return
         last: float | None = self._last_camera_frame.get(frame.cam_id)
         self._last_camera_frame[frame.cam_id] = frame.timestamp
         if last is not None:
             self.board.submit_time_sample(Series.CAMERA_INTERVAL, (frame.timestamp - last) * 1000.0, frame.timestamp)
+
+    def _on_capture(self, capture: Capture) -> None:
+        self.board.set_capture(capture)
+        now: float = time.perf_counter()        # when the capture reaches the board: the end of the latency
+        self.board.submit_time_sample(Series.CAPTURE_LATENCY, (now - capture.timestamp) * 1000.0, now)
+        if capture.poses:
+            self.board.submit_time_sample(Series.POSES_UNSYNCED, 0.0 if capture.poses_synced else 1.0, now)
 
     def _on_segmentation(self, poses: FrameDict, masks: segmentation.ImageDict) -> None:
         self.board.set_segmentation_images(masks)
@@ -220,6 +234,7 @@ class DeepFlowMain:
         self.osc_sound.stop()
 
         self.pose_inference.stop()
+        self.capture_sync.stop()
         if self.person_detector is not None:
             self.person_detector.stop()
         self.segmentation_predictor.stop()

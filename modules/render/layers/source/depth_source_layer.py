@@ -1,17 +1,21 @@
 # Standard library imports
 from enum import IntEnum
+from typing import TYPE_CHECKING
 
 # Third-party imports
 import numpy as np
 from OpenGL.GL import GL_NEAREST, GL_R32F, GL_RGBA16F
 
 # Local application imports
-from modules.board import HasCameraDepth
+from modules.board import HasCaptures
 from modules.camera import CameraFrame
 from modules.gl import Fbo, Image, Texture
 from modules.settings import BaseSettings, Field
 from ..layer_base import LayerBase, DataCache
 from ...shaders import DepthView, DepthWarp
+
+if TYPE_CHECKING:
+    from modules.inference import Capture
 
 
 class DepthDrawMode(IntEnum):
@@ -34,12 +38,12 @@ def depth_metres(depth: np.ndarray) -> np.ndarray:
 
 class DepthSourceLayer(LayerBase):
     """The camera's depth on the view of the camera image, straightened and mirrored as that image
-    is: `depth` in metres, `texture` as a picture (`DepthDrawMode`). Stays empty on a source without
-    depth."""
+    is: `depth` in metres, `texture` as a picture (`DepthDrawMode`). The depth of the newest capture,
+    so it belongs with that capture's image and poses. Stays empty on a source without depth."""
 
-    def __init__(self, cam_id: int, board: HasCameraDepth, cam_texture: Texture, settings: DepthSourceLayerSettings) -> None:
+    def __init__(self, cam_id: int, board: HasCaptures, cam_texture: Texture, settings: DepthSourceLayerSettings) -> None:
         self._cam_id: int = cam_id
-        self._board: HasCameraDepth = board
+        self._board: HasCaptures = board
         self._cam_texture: Texture = cam_texture
         self.settings: DepthSourceLayerSettings = settings
         self._source: Image = Image(interpolation=GL_NEAREST)   # an edge never reads as a distance in between
@@ -76,7 +80,8 @@ class DepthSourceLayer(LayerBase):
 
     def update(self) -> None:
         self._dirty = False
-        frame: CameraFrame | None = self._board.get_camera_depth(self._cam_id)
+        capture: "Capture | None" = self._board.get_capture(self._cam_id)
+        frame: CameraFrame | None = capture.depth if capture is not None else None
         self._data_cache.set(frame)
 
         if self._data_cache.lost:

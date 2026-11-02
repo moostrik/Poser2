@@ -8,7 +8,7 @@ import torch.nn.functional as F
 
 from modules.camera import CameraFrame, FrameType
 from modules.utils import PerformanceTimer
-from .source import ImageDict, TimestampDict
+from .source import GpuImage, GpuImageCallback, ImageDict, TimestampDict
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +65,12 @@ class Uploader:
             name="GPU Image Upload  ", sample_count=200, report_interval=100,
             color="green", omit_init=25,
         )
+        self._gpu_image_callbacks: list[GpuImageCallback] = []     # run in registration order, on the uploading thread
+
+    def add_gpu_image_callback(self, callback: GpuImageCallback) -> None:
+        """Every uploaded image, with its capture time and the event that says it is written."""
+        if callback not in self._gpu_image_callbacks:
+            self._gpu_image_callbacks.append(callback)
 
     def set_image(self, frame: CameraFrame) -> None:
         """Upload a camera frame to GPU. Only VIDEO frames are stored.
@@ -101,6 +107,8 @@ class Uploader:
                 rgb = self._straightened(cam_id, rgb, frame.homography)
             if frame.flip_h:
                 rgb = rgb.flip(-1)
+            ready: torch.cuda.Event = torch.cuda.Event()
+            ready.record(self._stream)
         with self._lock:
             if cam_id in self._gpu_images:
                 self._prev_gpu_images[cam_id] = self._gpu_images[cam_id]
@@ -108,6 +116,13 @@ class Uploader:
             self._timestamps[cam_id] = frame.timestamp
 
         self._accumulated_upload_ms += (time.perf_counter() - start) * 1000.0
+
+        gpu_image: GpuImage = GpuImage(cam_id, frame.timestamp, rgb, ready)
+        for callback in self._gpu_image_callbacks:
+            try:
+                callback(gpu_image)
+            except Exception:
+                logger.exception("Error in GPU image callback")
 
     def _straightened(self, cam_id: int, rgb: torch.Tensor, homography: np.ndarray) -> torch.Tensor:
         """`rgb` drawn through the homography. The grid is made once per homography."""
