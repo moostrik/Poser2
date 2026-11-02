@@ -4,6 +4,7 @@ Runs in `.venv-oak4`, the depthai 3 venv (`scripts\\install.bat oak4`), on one O
 recordings on the host with the replay backend, with no camera attached.
 """
 
+import time
 from functools import partial
 
 from modules.camera import CameraFrame, CameraSource, CameraCheck, FrameType, Player, Recorder, Sync, replay
@@ -16,8 +17,11 @@ from modules.tracker import OnePerCamTracker, PosesFromTracklets
 from modules.pose import configure_features
 from modules.pose.pipeline import Domain, PosePipeline
 from modules.inference import segmentation, optical_flow, detection, PoseInference
+from modules.pose import FrameDict
+from modules.utils import PerformanceTimer
 
 from .render_board import RenderBoard
+from .series import Series, TIMER_SERIES
 from .pose.pipeline import pipeline_spec
 from .settings import Settings, Stage
 from .render import DeepFlowRender
@@ -100,7 +104,7 @@ class DeepFlowMain:
         self.pose_inference.add_camera_images_callback(self.board.set_camera_images)
         self.pose_inference.add_crop_callback(self.segmentation_predictor.submit)
         self.pose_inference.add_crop_callback(self.optical_flow_predictor.submit)
-        self.segmentation_predictor.add_segmentation_callback(lambda _f, masks: self.board.set_segmentation_images(masks))
+        self.segmentation_predictor.add_segmentation_callback(self._on_segmentation)
 
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. The camera's frame bang drives the frame
         # domain through the tracklet poses; the render tick drives the output domain (LERP). Every stage's frames
@@ -124,6 +128,11 @@ class DeepFlowMain:
         # Every loop of a recording starts on clear water, so two runs of one clip compare
         if self.player:
             self.player.add_loop_callback(self.render.reset_fluid)
+
+        # TIME SERIES — the timings the time series layer plots
+        self._last_camera_frame: dict[int, float] = {}
+        self._last_masks: float = 0.0
+        PerformanceTimer.add_sample_callback(self._on_timer_sample)
 
     def start(self) -> None:
         self.panel_server.start()
@@ -151,6 +160,30 @@ class DeepFlowMain:
     def _on_camera_frame(self, frame: CameraFrame) -> None:
         if frame.kind == FrameType.DEPTH:
             self.board.set_camera_depth(frame)
+            return
+        last: float | None = self._last_camera_frame.get(frame.cam_id)
+        self._last_camera_frame[frame.cam_id] = frame.timestamp
+        if last is not None:
+            self.board.submit_time_sample(Series.CAMERA_INTERVAL, (frame.timestamp - last) * 1000.0, frame.timestamp)
+
+    def _on_segmentation(self, poses: FrameDict, masks: segmentation.ImageDict) -> None:
+        self.board.set_segmentation_images(masks)
+        now: float = time.perf_counter()        # when the masks reach the board: the end of the latency
+        if not masks:
+            if poses:
+                self.board.submit_time_sample(Series.MASK_MISSING, 1.0, now)
+            return
+        self.board.submit_time_sample(Series.MASK_MISSING, 0.0, now)
+        if self._last_masks > 0.0:
+            self.board.submit_time_sample(Series.SEGMENTATION_INTERVAL, (now - self._last_masks) * 1000.0, now)
+        self._last_masks = now
+        oldest: float = min(frame.timestamp for frame in poses.values())
+        self.board.submit_time_sample(Series.SEGMENTATION_LATENCY, (now - oldest) * 1000.0, now)
+
+    def _on_timer_sample(self, name: str, time_ms: float, timestamp: float) -> None:
+        series: Series | None = TIMER_SERIES.get(name)
+        if series is not None:
+            self.board.submit_time_sample(series, time_ms, timestamp)
 
     def _update_poses(self, now: float) -> None:
         """The render tick drives the pipeline's output domain (LERP) at the frame's time."""
@@ -161,6 +194,7 @@ class DeepFlowMain:
             return
         self.is_running = False
 
+        PerformanceTimer.remove_sample_callback(self._on_timer_sample)
         self.panel_server.stop()
 
         self.render.stop()

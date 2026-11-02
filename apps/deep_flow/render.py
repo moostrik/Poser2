@@ -130,6 +130,7 @@ class DeepFlowRender(RenderBase):
             self.L[Layers.data_B_W][i]  = ls.FeatureWindowLayer(i, self.board, settings.data.b, settings.colors)
             self.L[Layers.data_B_F][i]  = ls.FeatureFrameLayer( i, self.board, settings.data.b, settings.colors)
             self.L[Layers.data_time][i] = ls.MotionTimeRenderer(i, self.board)
+            self.L[Layers.time_series][i] = ls.TimeSeriesLayer(self.board, settings.time_series)
 
         # Split view: the left and right panels side by side or stacked, whichever shows what they hold larger
         self._window_size: tuple[int, int] = (settings.window.width, settings.window.height)

@@ -58,6 +58,7 @@ class Layers(IntEnum):
     center_pose =   auto()
     center_metres = auto()
     # data layers
+    time_series =   auto()
     data_B_W =      auto()
     data_B_F =      auto()
     data_A_W =      auto()
@@ -275,6 +276,7 @@ class RenderSettings(BaseSettings):
     fluid3d: Group[layers.Fluid3DLayerSettings]  = Group(layers.Fluid3DLayerSettings, share=[stage])
     flow_b   : Group[layers.FlowLayerSettings]    = Group(layers.FlowLayerSettings, share=[stage])
     fluid3d_b: Group[layers.Fluid3DLayerSettings] = Group(layers.Fluid3DLayerSettings, share=[stage])
+    time_series: Group[layers.TimeSeriesLayerSettings] = Group(layers.TimeSeriesLayerSettings)
     colors : Group[ColorSettings]                = Group(ColorSettings)
     window : Group[WindowSettings]               = Group(WindowSettings)
 
