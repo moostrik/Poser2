@@ -114,6 +114,8 @@ class DeepFlowMain:
             self.pipeline.add_frames_callback(stage, partial(self.board.set_frames, stage))
             self.pipeline.add_frames_callback(stage, partial(self.osc_sound.submit_frames, stage))
             self.board.set_window_source(stage, self.pipeline.window(stage))
+        self.pipeline.add_frames_callback(Stage.RAW, partial(self._on_pose_frames, Series.POSE_LATENCY_RAW))
+        self.pipeline.add_frames_callback(Stage.SMOOTH, partial(self._on_pose_frames, Series.POSE_LATENCY_SMOOTH))
 
         # CAMERA CHECK — the camera's IMU reading and frame rate against the preset, as pinned indicators
         self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
@@ -179,6 +181,14 @@ class DeepFlowMain:
         self._last_masks = now
         oldest: float = min(frame.timestamp for frame in poses.values())
         self.board.submit_time_sample(Series.SEGMENTATION_LATENCY, (now - oldest) * 1000.0, now)
+
+    def _on_pose_frames(self, series: Series, poses: FrameDict) -> None:
+        """A stage's poses as they come out: how long after their capture."""
+        if not poses:
+            return
+        now: float = time.perf_counter()        # when the poses come out of the stage: the end of the latency
+        newest: float = max(frame.timestamp for frame in poses.values())
+        self.board.submit_time_sample(series, (now - newest) * 1000.0, now)
 
     def _on_timer_sample(self, name: str, time_ms: float, timestamp: float) -> None:
         series: Series | None = TIMER_SERIES.get(name)

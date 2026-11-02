@@ -122,6 +122,8 @@ Measured over 90 s, deep_flow's setup (P720 color NV12 at 60 fps, the detector, 
 
 The color and mono sensors are synchronized: they end their exposures together. The middle of the exposure lies half the exposure before the stamp, so a color frame's motion is centered up to 8 ms earlier than depth's at long exposures **(deduction)**. On Windows `dai.Clock` and `perf_counter` read one counter; `capture_time` does not depend on it.
 
+depthai maps the device's clock onto the host's again about every 8 s, in steps of 0.01 to 0.24 ms, measured over three opens of 25 s from the first message. Once, in a run started seconds after another process had closed the camera, more than half the messages carried a capture time after now. That did not happen in five other opens and is not explained. A capture time after now cannot be, so `capture_time` stamps such a message with its arrival and logs a warning once.
+
 ### What arrives
 
 | Stream    | Size          | Rate   | Capture to PC, median (p95) |
@@ -419,5 +421,6 @@ The times cover preprocessing on the CPU, inference and decoding. At 60 Hz the G
 - `auto_exposure_lock` did not hold: with it on, `exposure_compensation` +9 still moved ISO to 16585. Whether it holds against a change of light has not been tested.
 - `exposure_region`, `auto_balance_lock` and `anti_banding` changed nothing in a dark room, where exposure was already at its ceiling and nothing flickered. They need a test with light. `chroma_denoise` 4 lowered mean luma from 24.0 to 22.1, so it does reach the sensor.
 - The temporal filter has only been measured on a still scene. How far depth trails a moving player has not been measured.
+- Why one run's capture times lay after now ([Capture time](#capture-time)): perhaps a camera reopened seconds after another process closed it.
 - A manual exposure past the frame time is reported as asked and the rate stays at 60 fps, up to 100000 µs, which cannot be real. In a dark room the picture's brightness did not follow exposure at all, so the real top needs a test with light.
 - `test_a_split_keeps_the_streams_in_step_across_chunks` fails about 2 runs in 5, because a split lands 1 to 3 frames early. No frames are lost: 50 of 50 in all three streams.

@@ -1,5 +1,6 @@
 import time
 import logging
+from threading import Lock
 
 import numpy as np
 import torch
@@ -7,7 +8,7 @@ import torch.nn.functional as F
 
 from modules.camera import CameraFrame, FrameType
 from modules.utils import PerformanceTimer
-from .source import ImageDict
+from .source import ImageDict, TimestampDict
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,8 @@ class Uploader:
 
     Maintains a previous-frame buffer per camera for use by downstream
     processors (e.g. optical flow). Call snapshot() once per tick to
-    synchronize the CUDA stream and retrieve both buffers.
+    synchronize the CUDA stream and retrieve both buffers, with the current
+    images' capture times.
 
     Input:  BGR uint8 (H, W, 3), grayscale uint8 (H, W) or packed NV12 uint8 (H * 3 / 2, W)
     Output: float16 RGB CHW [0, 1] tensors keyed by cam_id
@@ -54,6 +56,8 @@ class Uploader:
     def __init__(self) -> None:
         self._gpu_images: dict[int, torch.Tensor] = {}
         self._prev_gpu_images: dict[int, torch.Tensor] = {}
+        self._timestamps: TimestampDict = {}
+        self._lock: Lock = Lock()       # an image and its time are stored and read together
         self._warp_grids: dict[int, tuple[np.ndarray, torch.Tensor]] = {}   # each camera's homography and its grid
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
         self._accumulated_upload_ms: float = 0.0
@@ -65,7 +69,7 @@ class Uploader:
     def set_image(self, frame: CameraFrame) -> None:
         """Upload a camera frame to GPU. Only VIDEO frames are stored.
 
-        Shifts current to previous before uploading the new frame. The image is BGR uint8
+        Shifts current to previous as the new frame is stored, with its capture time. The image is BGR uint8
         (H, W, 3), grayscale uint8 (H, W) or packed NV12, converted, straightened and flipped here
         on the GPU so the camera's thread does none of it.
         """
@@ -77,9 +81,6 @@ class Uploader:
         start = time.perf_counter()
 
         with torch.cuda.stream(self._stream):
-            if cam_id in self._gpu_images:
-                self._prev_gpu_images[cam_id] = self._gpu_images[cam_id]
-
             gpu_img = torch.from_numpy(image).cuda(non_blocking=True)
             if frame.nv12:
                 rows: int = image.shape[0] * 2 // 3
@@ -98,7 +99,13 @@ class Uploader:
                 )
             if frame.homography is not None:
                 rgb = self._straightened(cam_id, rgb, frame.homography)
-            self._gpu_images[cam_id] = rgb.flip(-1) if frame.flip_h else rgb
+            if frame.flip_h:
+                rgb = rgb.flip(-1)
+        with self._lock:
+            if cam_id in self._gpu_images:
+                self._prev_gpu_images[cam_id] = self._gpu_images[cam_id]
+            self._gpu_images[cam_id] = rgb
+            self._timestamps[cam_id] = frame.timestamp
 
         self._accumulated_upload_ms += (time.perf_counter() - start) * 1000.0
 
@@ -111,28 +118,33 @@ class Uploader:
             self._warp_grids[cam_id] = cached
         return F.grid_sample(rgb.unsqueeze(0).float(), cached[1], align_corners=False)[0].to(dtype=torch.float16)
 
-    def snapshot(self) -> tuple[ImageDict, ImageDict]:
-        """Synchronize the upload stream and return current and previous GPU images.
+    def snapshot(self) -> tuple[ImageDict, ImageDict, TimestampDict]:
+        """Synchronize the upload stream and return the current and previous GPU images, and the
+        current images' capture times.
 
         Returns:
-            (current, previous) both as ImageDict keyed by cam_id.
+            (current, previous, timestamps), each keyed by cam_id.
         """
         # Copy references BEFORE synchronizing to avoid a race with concurrent set_image
         # calls. A set_image arriving after the copy updates _gpu_images but those new
         # tensors are not included here; synchronize() then guarantees the captured
         # tensors are fully uploaded and safe to read.
-        images_snapshot: ImageDict = dict(self._gpu_images)
-        prev_snapshot: ImageDict = dict(self._prev_gpu_images)
+        with self._lock:
+            images_snapshot: ImageDict = dict(self._gpu_images)
+            prev_snapshot: ImageDict = dict(self._prev_gpu_images)
+            timestamps_snapshot: TimestampDict = dict(self._timestamps)
 
         self._stream.synchronize()
 
         self._timer.add_time(self._accumulated_upload_ms, report=False)
         self._accumulated_upload_ms = 0.0
 
-        return images_snapshot, prev_snapshot
+        return images_snapshot, prev_snapshot, timestamps_snapshot
 
     def reset(self) -> None:
         """Clear all stored GPU images."""
-        self._gpu_images.clear()
-        self._prev_gpu_images.clear()
+        with self._lock:
+            self._gpu_images.clear()
+            self._prev_gpu_images.clear()
+            self._timestamps.clear()
         self._warp_grids.clear()

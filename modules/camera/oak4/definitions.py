@@ -181,11 +181,24 @@ def packed_nv12(frame: dai.ImgFrame) -> np.ndarray:
 LATENCY_SMOOTHING: float = 0.1      # how hard each frame pulls the latency reading
 
 
+_future_capture_warned: bool = False     # a capture time after now is logged once per run
+
+
 def capture_time(message: dai.ImgFrame | dai.Tracklets | dai.ImgDetections) -> float:
     """The message's moment of capture, the end of the exposure, on `time.perf_counter()`: now less
     the message's age on depthai's clock, which holds the device's capture time on the host's. The
-    two clocks need no common origin; on Windows they are one counter, 3 µs apart (OAK4.md)."""
-    return time.perf_counter() - (dai.Clock.now() - message.getTimestamp()).total_seconds()
+    two clocks need no common origin; on Windows they are one counter, 3 µs apart (OAK4.md). A
+    capture time after now cannot be, so such a message is stamped with its arrival instead."""
+    global _future_capture_warned
+    now: float = time.perf_counter()
+    latency: float = (dai.Clock.now() - message.getTimestamp()).total_seconds()
+    if latency >= 0.0:
+        return now - latency
+    if not _future_capture_warned:
+        _future_capture_warned = True
+        logger.warning(f'a message was captured {-latency * 1000.0:.1f} ms in the future by depthai\'s clock: '
+                       f'stamped with its arrival (logged once)')
+    return now
 
 
 def smoothed_latency(previous: float, message: dai.ImgFrame | dai.Tracklets) -> float:

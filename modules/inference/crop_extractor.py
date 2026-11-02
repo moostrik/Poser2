@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 from modules.pose import BBox, FrameDict, replace
 from .crop import Image, CropImageDict, ImageCallback, Settings
-from .source import ImageDict
+from .source import ImageDict, TimestampDict
 from modules.utils import Rect, Point2f
 
 logger = logging.getLogger(__name__)
@@ -16,7 +16,9 @@ class CropExtractor:
 
     Receives ImageDict and prev-images from Uploader, plus a FrameDict
     with BBox features. For each pose, crops the current image and optionally
-    the previous image at the same bbox for optical-flow use.
+    the previous image at the same bbox for optical-flow use. The pose leaves
+    with the crop as its box and the image's capture time as its stamp, so its
+    keypoints, box and time all belong to the one image.
 
     All tensors are float16 RGB CHW [0, 1] at a fixed output resolution.
     """
@@ -31,6 +33,7 @@ class CropExtractor:
         poses: FrameDict,
         images: ImageDict,
         prev_images: ImageDict,
+        timestamps: TimestampDict,
     ) -> None:
         """Crop images for each pose and notify callbacks.
 
@@ -38,6 +41,7 @@ class CropExtractor:
             poses:       FrameDict with BBox features, keyed by track_id
             images:      Current GPU images (from Uploader.snapshot)
             prev_images: Previous GPU images (from Uploader.snapshot)
+            timestamps:  The current images' capture times (from Uploader.snapshot)
         """
         cropped_poses: FrameDict = {}
         crop_images: CropImageDict = {}
@@ -71,7 +75,7 @@ class CropExtractor:
                         prev_crop = self._gpu_crop_resize(prev_img, crop_roi, prev_w, prev_h)
 
                     normalized_roi = crop_roi.scale(Point2f(1.0 / img_width, 1.0 / img_height))
-                    cropped_poses[track_id] = replace(pose, {BBox: BBox.from_rect(normalized_roi)})
+                    cropped_poses[track_id] = replace(pose, {BBox: BBox.from_rect(normalized_roi)}, timestamps.get(cam_id, pose.timestamp))
                     crop_images[track_id] = Image(
                         crop=crop_tensor,
                         prev_crop=prev_crop,

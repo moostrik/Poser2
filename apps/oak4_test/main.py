@@ -97,7 +97,7 @@ class Oak4TestMain:
 
     def _frame_bang(self, now: float) -> None:
         """The camera's frame bang: the newest image to the board, and the tracklets' poses into the pipeline."""
-        images, _ = self.uploader.snapshot()
+        images, _, _ = self.uploader.snapshot()
         self.board.set_camera_images(images)
         self.poses_from_tracklets.process(now)
 
