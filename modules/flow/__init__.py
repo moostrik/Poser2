@@ -10,7 +10,8 @@ from .flow_base import FlowBase
 from .flow_util import FlowUtil
 
 # Optical flow
-from .optical import OpticalFlow, OpticalFlowSettings, LucasKanade, LucasKanadeSettings, lucas_kanade
+from .optical import OpticalFlow, OpticalFlowSettings, LucasKanade, LucasKanadeSettings, lucas_kanade, \
+    RangeFlow, RangeFlowSettings, range_flow
 
 # Bridge layers
 from .bridge import     DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \

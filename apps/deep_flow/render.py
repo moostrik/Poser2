@@ -302,8 +302,9 @@ class DeepFlowRender(RenderBase):
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[Layers] = set()
         b_layers: list[Layers] = B_LAYERS if b_enabled else []
-        depth_enabled: bool = self.settings.flow.depth_velocity.scale > 0.0 or (b_enabled and self.settings.flow_b.depth_velocity.scale > 0.0)
-        update_layers: list[Layers] = [layer_type for layer_type in self._update_layers if depth_enabled or layer_type != Layers.center_depth]
+        flow_settings = [self.settings.flow] + ([self.settings.flow_b] if b_enabled else [])
+        depth_needed: bool = any(f.depth_velocity.scale > 0.0 or f.motion == ls.Motion.RANGE_FLOW for f in flow_settings)    # range flow's x/y are from depth
+        update_layers: list[Layers] = [layer_type for layer_type in self._update_layers if depth_needed or layer_type != Layers.center_depth]
         for layer_type in update_layers + b_layers + self._interface_layers + self._left_layers + self._right_layers + self._output_layers:
             if layer_type not in seen:
                 seen.add(layer_type)

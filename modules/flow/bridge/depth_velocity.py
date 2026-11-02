@@ -11,7 +11,7 @@ from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil
 from ..shaders import GaussianBlur
 from .kinetics import decay_weight
-from .shaders import DepthDeadZone, DepthSmooth, DepthVelocityShader, Speed3D
+from .shaders import DepthDeadZone, DepthSmooth, DepthVelocityShader, RangeToward, Speed3D
 
 
 class DepthVelocitySettings(BaseSettings):
@@ -28,8 +28,9 @@ class DepthVelocity(FlowBase):
     """Signed velocity toward the camera (R16F), positive toward it.
 
     Pipeline, on each new optical flow frame:
-        1. Smooth the depth → the input SwapFbo (R32F, metres, 0 off the player)
-        2. Difference it with the last one → output_fbo (R16F)
+        1. Smooth the depth → the input SwapFbo (R32F, metres, 0 off the player): `smooth`
+        2. Difference it with the last one → output_fbo (R16F): `difference`; or take range flow's
+           velocity toward the camera instead, measured from the same two smoothed depths: `take_range`
         3. Blur it, and take the noise floor off
 
     `process_speed` gives the bridges the 3D speed that the density and temperature bridges read.
@@ -45,6 +46,7 @@ class DepthVelocity(FlowBase):
 
         self._smooth_shader: DepthSmooth = DepthSmooth()
         self._velocity_shader: DepthVelocityShader = DepthVelocityShader()
+        self._range_shader: RangeToward = RangeToward()
         self._blur_shader: GaussianBlur = GaussianBlur()
         self._dead_zone_shader: DepthDeadZone = DepthDeadZone()
         self._speed_shader: Speed3D = Speed3D()
@@ -61,6 +63,7 @@ class DepthVelocity(FlowBase):
         self._speed_fbo.allocate(width, height, GL_R16F)
         self._smooth_shader.allocate()
         self._velocity_shader.allocate()
+        self._range_shader.allocate()
         self._blur_shader.allocate()
         self._dead_zone_shader.allocate()
         self._speed_shader.allocate()
@@ -70,6 +73,7 @@ class DepthVelocity(FlowBase):
         self._speed_fbo.deallocate()
         self._smooth_shader.deallocate()
         self._velocity_shader.deallocate()
+        self._range_shader.deallocate()
         self._blur_shader.deallocate()
         self._dead_zone_shader.deallocate()
         self._speed_shader.deallocate()
@@ -81,8 +85,18 @@ class DepthVelocity(FlowBase):
         self._speed_fbo.end()
         return self._speed_fbo
 
+    @property
+    def smoothed(self) -> Texture:
+        """The newest smoothed depth (R32F, metres, 0 for none)."""
+        return self._input_fbo.texture
+
+    @property
+    def previous_smoothed(self) -> Texture:
+        """The smoothed depth before it."""
+        return self._input_fbo.back_texture
+
     def update_depth(self, depth: Texture, delta_time: float, displacement: Texture | None = None) -> None:
-        """Advance on a new optical flow frame.
+        """Advance on a new optical flow frame: smooth, then difference.
 
         Args:
             depth: Metres in red, mask in alpha
@@ -90,20 +104,41 @@ class DepthVelocity(FlowBase):
             displacement: How far each pixel moved since then (uv); when given, the smoothing and the
                 difference follow it, so depth is measured along the motion (scene flow)
         """
+        self.smooth(depth, delta_time, displacement)
+        self.difference(delta_time, displacement)
+
+    def smooth(self, depth: Texture, delta_time: float, displacement: Texture | None = None) -> None:
+        """Advance the smoothed depth (`smoothed`) on a new frame; with `displacement`, along it."""
         if not self._allocated:
             return
-
         s: DepthVelocitySettings = self.settings
-
         self._input_fbo.swap()
         self._input_fbo.begin()
         self._smooth_shader.use(depth, self._input_fbo.back_texture, decay_weight(delta_time, s.smooth_time), s.jump, displacement)
         self._input_fbo.end()
 
+    def difference(self, delta_time: float, displacement: Texture | None = None) -> None:
+        """The velocity toward the camera from the last two smoothed depths; with `displacement`, along it."""
+        if not self._allocated:
+            return
+        s: DepthVelocitySettings = self.settings
         self._output_fbo.begin()
         self._velocity_shader.use(self._input_fbo.texture, self._input_fbo.back_texture, delta_time, s.jump, s.scale, displacement)
         self._output_fbo.end()
+        self._finish()
 
+    def take_range(self, motion: Texture) -> None:
+        """The velocity toward the camera measured by range flow (`RangeFlow.motion`, B in m/s), in place of the difference."""
+        if not self._allocated:
+            return
+        self._output_fbo.begin()
+        self._range_shader.use(motion, self.settings.scale)
+        self._output_fbo.end()
+        self._finish()
+
+    def _finish(self) -> None:
+        """Blur the velocity, and take the noise floor off."""
+        s: DepthVelocitySettings = self.settings
         if s.blur_radius > 0.0:
             for _ in range(s.blur_steps):
                 for horizontal in (True, False):

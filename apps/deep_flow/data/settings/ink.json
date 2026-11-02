@@ -46,8 +46,8 @@
         "brightness": 0,
         "contrast": 0,
         "saturation": 0,
-        "denoise": 2,
-        "chroma_denoise": 0,
+        "denoise": 4,
+        "chroma_denoise": 4,
         "sharpness": 0,
         "dot_projector": 0.0,
         "flood_light": 1.0
@@ -407,17 +407,17 @@
     },
     "depth_mask": {
       "near": 0.5,
-      "far": 1.5,
+      "far": 12.0,
       "edge": 0.1
     },
     "flow": {
       "fps": 60.0,
-      "draw_mode": "OPTICAL_OUTPUT",
+      "draw_mode": "SMOOTH_VELOCITY_OUTPUT",
       "blend_mode": "ADD",
       "width": 896,
       "height": 1600,
       "bridge": "KINETIC",
-      "motion": "OPTICAL",
+      "motion": "RANGE_FLOW",
       "inputs": {
         "flow": "center_capture",
         "density": "center_capture",
@@ -434,15 +434,21 @@
       },
       "optical_flow": {
         "offset": 3,
-        "threshold": 0.09,
-        "strength_x": 3.3,
-        "strength_y": 3.3,
-        "boost": 0.4
+        "threshold": 0.0,
+        "strength_x": 1.0,
+        "strength_y": 1.0,
+        "boost": 0.0
       },
       "lucas_kanade": {
         "levels": 3,
         "window": 2,
         "regularizer": 0.001,
+        "displacement_scale": 0.1
+      },
+      "range_flow": {
+        "levels": 3,
+        "window": 2,
+        "regularizer": 0.0001,
         "displacement_scale": 0.1
       },
       "depth_velocity": {
@@ -498,8 +504,8 @@
         "fps_smoothing": 1.0,
         "speed": 0.4,
         "depth": {
-          "depth": 8,
-          "sim_depth": 8,
+          "depth": 1,
+          "sim_depth": 1,
           "spacing": 4.0,
           "emission": 1.16,
           "gamma": 0.99,
@@ -590,6 +596,12 @@
         "regularizer": 0.001,
         "displacement_scale": 0.1
       },
+      "range_flow": {
+        "levels": 3,
+        "window": 2,
+        "regularizer": 0.0001,
+        "displacement_scale": 0.1
+      },
       "depth_velocity": {
         "scale": 1.0,
         "smooth_time": 60.0,
@@ -643,8 +655,8 @@
         "fps_smoothing": 1.0,
         "speed": 0.4,
         "depth": {
-          "depth": 8,
-          "sim_depth": 8,
+          "depth": 1,
+          "sim_depth": 1,
           "spacing": 4.0,
           "emission": 1.16,
           "gamma": 0.99,
