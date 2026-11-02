@@ -3,14 +3,14 @@
 Keeps the player's depth through an Ema, restarting a pixel that jumps.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
 class DepthSmooth(Shader):
     """Writes the smoothed depth in metres to the red channel, 0 off the player."""
 
-    def use(self, depth: Texture, previous: Texture, weight: float, jump: float) -> None:
+    def use(self, depth: Texture, previous: Texture, weight: float, jump: float, displacement: Texture | None = None) -> None:
         """Advance the smoothed depth.
 
         Args:
@@ -18,6 +18,7 @@ class DepthSmooth(Shader):
             previous: Previous smoothed depth
             weight: Weight of the previous value
             jump: More change than this per frame is an edge (m)
+            displacement: uv per frame; when given, the previous value is taken where the pixel came from
         """
         if not self.allocated or not self.shader_program:
             return
@@ -31,8 +32,16 @@ class DepthSmooth(Shader):
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, previous.tex_id)
 
+        warp: bool = displacement is not None and displacement.allocated
+        if warp:
+            assert displacement is not None
+            glActiveTexture(GL_TEXTURE2)
+            glBindTexture(GL_TEXTURE_2D, displacement.tex_id)
+
         glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform1i(self.get_uniform_loc("tex1"), 1)
+        glUniform1i(self.get_uniform_loc("displacement"), 2)
+        glUniform1i(self.get_uniform_loc("warp"), int(warp))
         glUniform1f(self.get_uniform_loc("weight"), weight)
         glUniform1f(self.get_uniform_loc("jump"), jump)
 

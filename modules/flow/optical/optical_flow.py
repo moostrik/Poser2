@@ -60,6 +60,21 @@ class OpticalFlow(FlowBase):
         """Density input texture (luminance)."""
         return self._input_fbo.texture
 
+    @property
+    def frame(self) -> Texture:
+        """The newest luminance frame, mipmapped."""
+        return self._input_fbo.texture
+
+    @property
+    def previous_frame(self) -> Texture:
+        """The luminance frame before it, mipmapped."""
+        return self._input_fbo.back_texture
+
+    @property
+    def ready(self) -> bool:
+        """Two frames are in: motion can be measured between them."""
+        return self._allocated and self._frame_count >= 2
+
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate optical flow layer."""
 

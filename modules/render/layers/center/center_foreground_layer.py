@@ -110,7 +110,7 @@ class CenterForegroundLayer(LayerBase):
             self._blend_fbo.swap()
             self._blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
 
-        if self._geometry.crop_pose_points is None or not self._foreground_texture.allocated:
+        if not self._geometry.ready or not self._foreground_texture.allocated:
             return
 
         Style.push_style()

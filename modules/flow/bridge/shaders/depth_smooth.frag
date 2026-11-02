@@ -4,10 +4,14 @@
 // Depth through an Ema, because frame to frame it is mostly noise. Only the player counts: the
 // source holds metres in red and the mask in alpha, and a few texels of mask must hold on each
 // side, so a mask edge never reads as a distance in between. A pixel that jumps, as at a silhouette,
-// restarts from the new depth. The numpy reference is kinetics.smooth_depth
+// restarts from the new depth. With `warp` the previous value is the one where the pixel came from,
+// `displacement` (uv per frame) back, taken nearest so an edge never mixes two distances. The numpy
+// reference is kinetics.smooth_depth, with kinetics.warped for the warp
 
 uniform sampler2D tex0;  // Depth: metres R, mask A
 uniform sampler2D tex1;  // Previous smoothed depth R
+uniform sampler2D displacement;     // uv per frame (RG), with warp
+uniform bool warp;
 uniform float weight;    // Weight of the previous value
 uniform float jump;      // More change than this per frame is an edge (m)
 
@@ -21,6 +25,15 @@ float depth_at(vec2 uv) {
     return texel.a > 0.5 ? texel.r : 0.0;
 }
 
+float previous_at(vec2 uv) {
+    if (!warp) {
+        return texture(tex1, uv).r;
+    }
+    ivec2 size = textureSize(tex1, 0);
+    ivec2 from = clamp(ivec2(floor((uv - texture(displacement, uv).xy) * vec2(size))), ivec2(0), size - 1);
+    return texelFetch(tex1, from, 0).r;
+}
+
 void main() {
     vec2 step_uv = MARGIN / vec2(textureSize(tex1, 0));
     float depth = depth_at(texCoord);
@@ -31,7 +44,7 @@ void main() {
         return;
     }
 
-    float previous = texture(tex1, texCoord).r;
+    float previous = previous_at(texCoord);
     bool tracked = previous > 0.0 && abs(depth - previous) <= jump;
     fragColor = vec4(tracked ? mix(depth, previous, weight) : depth, 0.0, 0.0, 1.0);
 }

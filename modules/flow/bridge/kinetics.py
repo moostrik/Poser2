@@ -27,6 +27,16 @@ def depth_speed(smoothed: np.ndarray, previous: np.ndarray, dt: float, jump: flo
     return np.where(moving, -change / dt, 0.0)
 
 
+def warped(previous: np.ndarray, displacement: np.ndarray) -> np.ndarray:
+    """`previous` where each pixel came from: `displacement` (H, W, 2, pixels per frame, x along
+    columns, y along rows) back, nearest, clamped at the edges; what the depth shaders read with warp."""
+    h, w = previous.shape
+    rows, columns = np.mgrid[0:h, 0:w]
+    x: np.ndarray = np.clip(np.floor(columns + 0.5 - displacement[..., 0]).astype(int), 0, w - 1)
+    y: np.ndarray = np.clip(np.floor(rows + 0.5 - displacement[..., 1]).astype(int), 0, h - 1)
+    return previous[y, x]
+
+
 def dead_zone(value: np.ndarray, width: float) -> np.ndarray:
     """A signed field with `width` taken off its size, 0 below it: the noise floor goes, and what is above stays continuous."""
     return np.sign(value) * np.maximum(np.abs(value) - width, 0.0)

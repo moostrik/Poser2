@@ -75,7 +75,7 @@ class CenterCamLayer(LayerBase):
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             return
 
-        if self._geometry.crop_pose_points is None or not self._cam_texture.allocated:
+        if not self._geometry.ready or not self._cam_texture.allocated:
             return
 
         # Render camera image with ROI from anchor calculator. Cleared first: a source with

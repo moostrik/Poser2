@@ -74,7 +74,7 @@ class CenterDepthLayer(LayerBase):
             self._masked.clear()
             return
         source: Texture = self._depth_source.depth
-        if self._geometry.crop_pose_points is None or not source.allocated:
+        if not self._geometry.ready or not source.allocated:
             return
 
         Style.push_style()

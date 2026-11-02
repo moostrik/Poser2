@@ -7,7 +7,7 @@
     "keyframe_interval": 60,
     "color": true,
     "resolution": "P720",
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "fov": 102.0,
     "split_seconds": 60,
@@ -28,8 +28,8 @@
       },
       "sensor": {
         "exposure": 16277,
-        "iso": 5832,
-        "auto_exposure": true,
+        "iso": 4402,
+        "auto_exposure": false,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
         "auto_iso_limit": 16585,
@@ -40,13 +40,13 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 7622,
-        "auto_balance": true,
+        "balance": 4348,
+        "auto_balance": false,
         "auto_balance_lock": false,
         "brightness": 0,
         "contrast": 0,
         "saturation": 0,
-        "denoise": 0,
+        "denoise": 2,
         "chroma_denoise": 0,
         "sharpness": 0,
         "dot_projector": 0.0,
@@ -129,7 +129,7 @@
       "resolution": "STANDARD"
     },
     "segmentation": {
-      "resolution": "EXTREME",
+      "resolution": "ULTRA",
       "enabled": false,
       "reset_interval": 480
     },
@@ -269,20 +269,19 @@
   },
   "render": {
     "stage": "LERP",
-    "b_enabled": false,
-    "a_view": "FLUID",
-    "b_view": "FLUID",
+    "b_enabled": true,
+    "a_view": "FLOW",
+    "b_view": "FLOW",
     "layer": {
       "select": {
         "left": [
-          "center_foreground"
+          "flow"
         ],
         "right": [
-          "center_mask"
+          "flow_b"
         ],
         "output": [
-          "cam_image",
-          "cam_depth"
+          "cam_image"
         ]
       },
       "composite": {
@@ -346,7 +345,11 @@
         "target_size": 0.27,
         "dst_aspectratio": 0.5625,
         "torso_upright": false,
-        "snap_point": "FEET"
+        "snap_point": "FEET",
+        "follow_pose": false,
+        "fixed_x": 0.5,
+        "fixed_y": 0.5,
+        "fixed_height": 1.0
       },
       "mask": {
         "blend_factor": 1.0,
@@ -409,11 +412,12 @@
     },
     "flow": {
       "fps": 60.0,
-      "draw_mode": "KINETIC_CURL",
+      "draw_mode": "OPTICAL_OUTPUT",
       "blend_mode": "ADD",
       "width": 896,
       "height": 1600,
       "bridge": "KINETIC",
+      "motion": "OPTICAL",
       "inputs": {
         "flow": "center_capture",
         "density": "center_capture",
@@ -435,8 +439,14 @@
         "strength_y": 3.3,
         "boost": 0.4
       },
+      "lucas_kanade": {
+        "levels": 3,
+        "window": 2,
+        "regularizer": 0.001,
+        "displacement_scale": 0.1
+      },
       "depth_velocity": {
-        "scale": 0.0,
+        "scale": 1.0,
         "smooth_time": 60.0,
         "jump": 0.1,
         "blur_radius": 4.0,
@@ -488,8 +498,8 @@
         "fps_smoothing": 1.0,
         "speed": 0.4,
         "depth": {
-          "depth": 20,
-          "sim_depth": 32,
+          "depth": 8,
+          "sim_depth": 8,
           "spacing": 4.0,
           "emission": 1.16,
           "gamma": 0.99,
@@ -556,7 +566,8 @@
       "blend_mode": "ADD",
       "width": 896,
       "height": 1600,
-      "bridge": "TRAIL",
+      "bridge": "KINETIC",
+      "motion": "SCENE_FLOW",
       "visualization": {
         "toggle_scalar": false,
         "scale": 1.0,
@@ -569,12 +580,18 @@
       "optical_flow": {
         "offset": 3,
         "threshold": 0.09,
-        "strength_x": 3.3,
-        "strength_y": 3.3,
-        "boost": 0.4
+        "strength_x": 1.0,
+        "strength_y": 1.0,
+        "boost": 0.0
+      },
+      "lucas_kanade": {
+        "levels": 3,
+        "window": 2,
+        "regularizer": 0.001,
+        "displacement_scale": 0.1
       },
       "depth_velocity": {
-        "scale": 0.0,
+        "scale": 1.0,
         "smooth_time": 60.0,
         "jump": 0.1,
         "blur_radius": 4.0,
@@ -583,7 +600,7 @@
       },
       "velocity_trail": {
         "scale": 1.0,
-        "trail_weight": 0.93,
+        "trail_weight": 0.59,
         "blur_radius": 0.0,
         "blur_steps": 4
       },
@@ -626,8 +643,8 @@
         "fps_smoothing": 1.0,
         "speed": 0.4,
         "depth": {
-          "depth": 20,
-          "sim_depth": 32,
+          "depth": 8,
+          "sim_depth": 8,
           "spacing": 4.0,
           "emission": 1.16,
           "gamma": 0.99,

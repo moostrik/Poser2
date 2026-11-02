@@ -10,11 +10,11 @@ from .flow_base import FlowBase
 from .flow_util import FlowUtil
 
 # Optical flow
-from .optical import OpticalFlow, OpticalFlowSettings
+from .optical import OpticalFlow, OpticalFlowSettings, LucasKanade, LucasKanadeSettings, lucas_kanade
 
 # Bridge layers
 from .bridge import     DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
-                        BlurPosition, KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES, decay_weight, project, stop_gate, hold_release, drop, fill_reservoir, smooth_depth, depth_speed, dead_zone, \
+                        BlurPosition, KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES, decay_weight, project, stop_gate, hold_release, drop, fill_reservoir, smooth_depth, depth_speed, warped, dead_zone, \
                         DepthVelocity, DepthVelocitySettings, \
                         SmoothTrail, VelocitySmoothTrail, DepthSmoothTrail, SmoothTrailSettings, \
                         TemperatureBridge, TemperatureBridgeSettings

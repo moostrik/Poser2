@@ -11,7 +11,7 @@ from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOf
                       TimeSeriesLayer, TimeSeriesLayerSettings, \
                       FeatureFrameLayer, FeatureWindowLayer, MotionTimeRenderer, MotionTimeRendererSettings, \
                       PoseLineLayer, PoseLineLayerSettings
-from .flow import     FlowLayer, FlowLayerSettings, FlowDrawMode, FlowBridge, \
+from .flow import     FlowLayer, FlowLayerSettings, FlowDrawMode, FlowBridge, Motion, \
                       FluidLayer, FluidLayerSettings, FluidDrawMode, \
                       Fluid3DLayer, Fluid3DLayerSettings
 from .generic import  CompositeLayer, CompositeLayerSettings, LutSettings, \

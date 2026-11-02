@@ -37,6 +37,17 @@ class CenterGeometrySettings(BaseSettings):
     dst_aspectratio:    Field[float] = Field(0.5625, min=0.5, max=2.0, description="Output aspect ratio (9/16 = 0.5625)")
     torso_upright:      Field[bool] = Field(True, description="Straighten the torso to vertical; off, it tilts with the body", newline=True)
     snap_point:         Field[SnapPoint] = Field(SnapPoint.SHOULDERS, description="Body point pinned in the frame; scale and rotation from the torso")
+    follow_pose:        Field[bool] = Field(True, description="The view follows the pose; off, it is a fixed window of the camera image", newline=True)
+    fixed_x:            Field[float] = Field(0.5, min=0.0, max=1.0, description="Fixed window's center across the camera image")
+    fixed_y:            Field[float] = Field(0.5, min=0.0, max=1.0, description="Fixed window's center down the camera image")
+    fixed_height:       Field[float] = Field(1.0, min=0.05, max=2.0, description="Fixed window's height, as a fraction of the camera image's")
+
+
+def fixed_window(center_x: float, center_y: float, height: float, output_aspect: float, cam_aspect: float) -> Rect:
+    """A window of the camera image (uv, y down) centered at (`center_x`, `center_y`), `height` of the
+    image's height tall, `output_aspect` wide over tall in pixels; `cam_aspect` is the image's width over its height."""
+    width: float = height * output_aspect / cam_aspect
+    return Rect(center_x - width / 2.0, center_y - height / 2.0, width, height)
 
 
 @dataclass
@@ -95,8 +106,15 @@ class CenterGeometry(LayerBase):
 
     @property
     def lost(self) -> bool:
-        """Whether pose data was lost since last update."""
-        return self._data_cache.lost
+        """Whether the view was lost since last update: the pose went, while the view follows it."""
+        return self.settings.follow_pose and self._data_cache.lost
+
+    @property
+    def ready(self) -> bool:
+        """Whether the view is defined: placed by a pose while following it, always when fixed."""
+        if self.settings.follow_pose:
+            return self._transformed_points is not None
+        return self._cam_texture.allocated
 
     @property
     def image_geometry(self) -> CamGeometry:
@@ -137,6 +155,9 @@ class CenterGeometry(LayerBase):
         # Get pose data
         pose: Frame | None = self._board.get_frame(self.settings.stage, self._cam_id)
         self._data_cache.set(pose)
+        if not self.settings.follow_pose:
+            self._update_fixed(pose)
+            return
         if self._data_cache.idle:
             return
 
@@ -248,6 +269,41 @@ class CenterGeometry(LayerBase):
         self._transformed_points = CenterGeometry._transform_points(
             pose[Points2D], bbox, pin_img, cam_aspect, cam_rotation_img, cam_crop_roi_img
         )
+
+    def _update_fixed(self, pose: Frame | None) -> None:
+        """The fixed window of the camera image, whatever the pose; the pose only places its points in it,
+        and the window in its crop for a source on the crop."""
+        cam_height: int = self._cam_texture.height
+        if cam_height <= 0:
+            return
+        cam_aspect: float = self._cam_texture.width / cam_height
+        s: CenterGeometrySettings = self.settings
+        window: Rect = fixed_window(s.fixed_x, s.fixed_y, s.fixed_height, s.dst_aspectratio, cam_aspect)
+        center: Point2f = Point2f(s.fixed_x, s.fixed_y)
+
+        self._cam_geometry = CamGeometry(
+            crop_roi=Rect(window.x, CenterGeometry._image_to_texture_y(window.y + window.height), window.width, window.height),
+            rotation=0.0,
+            rotation_center=CenterGeometry._image_to_texture_point(center)
+        )
+
+        if pose is None:
+            self._transformed_points = None
+            return
+        bbox: Rect = pose[BBox].to_rect()
+        if bbox.width > 0 and bbox.height > 0:
+            # The same window in the pose's crop, for a source on the crop (RVM's mask)
+            x: float = (window.x - bbox.x) / bbox.width
+            y: float = (window.y - bbox.y) / bbox.height
+            width: float = window.width / bbox.width
+            height: float = window.height / bbox.height
+            self._bbox_geometry = BboxGeometry(
+                crop_roi=Rect(x, 1.0 - y - height, width, height),
+                rotation=0.0,
+                rotation_center=Point2f(x + width / 2.0, 1.0 - y - height / 2.0),
+                aspect=bbox.width * cam_aspect / bbox.height
+            )
+        self._transformed_points = CenterGeometry._transform_points(pose[Points2D], bbox, center, cam_aspect, 0.0, window)
 
     @staticmethod
     def _get_midpoint(points: Points2D, left_landmark: PointLandmark, right_landmark: PointLandmark) -> Point2f | None:

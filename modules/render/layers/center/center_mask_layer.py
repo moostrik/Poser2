@@ -81,7 +81,7 @@ class CenterMaskLayer(LayerBase):
             self._mask_blur_fbo.clear_all()
             return
 
-        if self._geometry.crop_pose_points is None or not self._mask_src.allocated:
+        if not self._geometry.ready or not self._mask_src.allocated:
             return
 
         Style.push_style()

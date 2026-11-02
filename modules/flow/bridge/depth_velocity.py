@@ -81,12 +81,14 @@ class DepthVelocity(FlowBase):
         self._speed_fbo.end()
         return self._speed_fbo
 
-    def update_depth(self, depth: Texture, delta_time: float) -> None:
+    def update_depth(self, depth: Texture, delta_time: float, displacement: Texture | None = None) -> None:
         """Advance on a new optical flow frame.
 
         Args:
             depth: Metres in red, mask in alpha
             delta_time: Seconds since the previous optical flow frame
+            displacement: How far each pixel moved since then (uv); when given, the smoothing and the
+                difference follow it, so depth is measured along the motion (scene flow)
         """
         if not self._allocated:
             return
@@ -95,11 +97,11 @@ class DepthVelocity(FlowBase):
 
         self._input_fbo.swap()
         self._input_fbo.begin()
-        self._smooth_shader.use(depth, self._input_fbo.back_texture, decay_weight(delta_time, s.smooth_time), s.jump)
+        self._smooth_shader.use(depth, self._input_fbo.back_texture, decay_weight(delta_time, s.smooth_time), s.jump, displacement)
         self._input_fbo.end()
 
         self._output_fbo.begin()
-        self._velocity_shader.use(self._input_fbo.texture, self._input_fbo.back_texture, delta_time, s.jump, s.scale)
+        self._velocity_shader.use(self._input_fbo.texture, self._input_fbo.back_texture, delta_time, s.jump, s.scale, displacement)
         self._output_fbo.end()
 
         if s.blur_radius > 0.0:
