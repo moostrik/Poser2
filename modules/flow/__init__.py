@@ -14,7 +14,7 @@ from .optical import OpticalFlow, OpticalFlowSettings, LucasKanade, LucasKanadeS
 
 # Bridge layers
 from .bridge import     DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
-                        BlurPosition, KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES, decay_weight, project, stop_gate, hold_release, drop, fill_reservoir, smooth_depth, depth_speed, warped, dead_zone, \
+                        BlurPosition, KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES, decay_weight, project, stop_gate, hold_release, drop, fill_reservoir, smooth_depth, depth_speed, warped, dead_zone, displacement_velocity, advect, \
                         DepthVelocity, DepthVelocitySettings, \
                         SmoothTrail, VelocitySmoothTrail, DepthSmoothTrail, SmoothTrailSettings, \
                         TemperatureBridge, TemperatureBridgeSettings

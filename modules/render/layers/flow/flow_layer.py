@@ -4,7 +4,7 @@
 from enum import IntEnum, auto
 
 # Third-party imports
-from OpenGL.GL import GL_R16F, GL_RG16F, GL_RGBA16F, GL_VIEWPORT, glGetIntegerv
+from OpenGL.GL import GL_R16F, GL_RG16F, GL_RG32F, GL_RGBA16F, GL_VIEWPORT, glGetIntegerv
 
 # Local application imports
 from modules.gl import Fbo, GpuTimer, Texture, Style, Blit, Text
@@ -165,6 +165,7 @@ class FlowLayer(LayerBase):
         self._mask_input: Texture | None = None
         self._gate_shader: MaskMultiply = MaskMultiply()
         self._gated_velocity: Fbo = Fbo()   # the optical flow's velocity times the mask
+        self._gated_displacement: Fbo = Fbo()   # the RGB-D displacement times the mask, the kinetic bridge's linear flow
         self._gated_depth_velocity: Fbo = Fbo()     # the depth velocity times the mask
         self._gated_color: Fbo = Fbo()      # the density input times the mask
         self._depth_velocity: DepthVelocity = DepthVelocity(self.settings.depth_velocity)
@@ -314,6 +315,7 @@ class FlowLayer(LayerBase):
         self._optical_flow.allocate(flow_width, flow_height)
         self._lucas_kanade.allocate(flow_width, flow_height)
         self._gated_velocity.allocate(flow_width, flow_height, GL_RG16F)
+        self._gated_displacement.allocate(flow_width, flow_height, GL_RG32F)
         self._gated_depth_velocity.allocate(flow_width, flow_height, GL_R16F)
         self._depth_velocity.allocate(flow_width, flow_height)
         self._velocity_trail.allocate(flow_width, flow_height, output_width, output_height)
@@ -326,6 +328,7 @@ class FlowLayer(LayerBase):
         self._optical_flow.deallocate()
         self._lucas_kanade.deallocate()
         self._gated_velocity.deallocate()
+        self._gated_displacement.deallocate()
         self._gated_depth_velocity.deallocate()
         self._depth_velocity.deallocate()
         self._velocity_trail.deallocate()
@@ -388,7 +391,13 @@ class FlowLayer(LayerBase):
                 self._measured_velocity = self._optical_flow.velocity
             if mask is not None:
                 self._gate(self._measured_velocity, mask, self._gated_velocity)
+                if motion == Motion.RGBD_FLOW:
+                    self._gate(self._lucas_kanade.displacement, mask, self._gated_displacement)
         flow_velocity: Texture = self._gated_velocity if mask is not None else self._measured_velocity
+        # The kinetic bridge reads the RGB-D displacement linearly; the trail bridge keeps the shaped flow
+        displacement: Texture | None = None
+        if motion == Motion.RGBD_FLOW:
+            displacement = self._gated_displacement if mask is not None else self._lucas_kanade.displacement
 
         if new_flow and depth_enabled:
             assert self._depth_input is not None
@@ -404,7 +413,10 @@ class FlowLayer(LayerBase):
         ink: Texture    # what the density bridge reads as alpha, through its length
         if self.settings.bridge == FlowBridge.KINETIC:
             if new_flow:
-                self._kinetic_bridge.set_velocity(flow_velocity, depth_velocity if depth_enabled else None)
+                if displacement is not None:
+                    self._kinetic_bridge.set_displacement(displacement, depth_velocity if depth_enabled else None)
+                else:
+                    self._kinetic_bridge.set_velocity(flow_velocity, depth_velocity if depth_enabled else None)
                 self._kinetic_bridge.update(self._flow_interval)
                 if self.settings.draw_mode == FlowDrawMode.KINETIC_DEPTH_ACCELERATION:
                     self._kinetic_bridge.update_depth_acceleration()

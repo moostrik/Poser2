@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import dead_zone, decay_weight, depth_speed, drop, fill_reservoir, hold_release, project, smooth_depth, stop_gate
+from modules.flow import advect, dead_zone, decay_weight, depth_speed, displacement_velocity, drop, fill_reservoir, hold_release, project, smooth_depth, stop_gate
 
 
 def trails(flow: list[float], fast_time: float = 25.0, slow_time: float = 150.0, dt: float = 1 / 60) -> tuple[np.ndarray, np.ndarray]:
@@ -126,6 +126,55 @@ class ReleaseTest(unittest.TestCase):
     def test_no_slow_trail_divides_by_nothing(self) -> None:
         velocity = drop(np.zeros((1, 2)), np.zeros((1, 2)), np.array([0.0]), 1.0)
         np.testing.assert_allclose(velocity, np.zeros((1, 2)))
+
+
+class DisplacementTest(unittest.TestCase):
+    def test_a_width_per_second_is_one(self) -> None:
+        velocity = displacement_velocity(np.array([0.1, 0.0]), 0.1, 200, 100, 1.0)
+        np.testing.assert_allclose(velocity, [1.0, 0.0])
+
+    def test_vertical_motion_is_counted_in_widths(self) -> None:
+        # 10 pixels down in a 200x100 image is 0.1 of the height, 0.05 of the width
+        velocity = displacement_velocity(np.array([0.0, 0.1]), 1.0, 200, 100, 1.0)
+        np.testing.assert_allclose(velocity, [0.0, 0.05])
+
+    def test_scale_multiplies(self) -> None:
+        np.testing.assert_allclose(displacement_velocity(np.array([0.1, 0.0]), 1.0, 10, 10, 3.0), [0.3, 0.0])
+
+
+class AdvectTest(unittest.TestCase):
+    def test_no_amount_leaves_the_field(self) -> None:
+        field = np.random.default_rng(0).random((8, 8, 2))
+        np.testing.assert_allclose(advect(field, np.full((8, 8, 2), 0.25), 0.0), field)
+
+    def test_a_field_moves_with_its_displacement(self) -> None:
+        field = np.zeros((1, 8, 1))
+        field[0, 2] = 1.0
+        moved = advect(field, np.tile([2 / 8, 0.0], (1, 8, 1)), 1.0)       # two pixels right
+        self.assertEqual(int(np.argmax(moved[0, :, 0])), 4)
+
+    def test_trails_carried_by_the_fast_trail_stay_quiet_on_a_steady_moving_limb(self) -> None:
+        # A bar of speed 1 moving 1 pixel per frame. Held in place, the trails differ wherever it passes and its
+        # wake reads as a release. Carried by the fast trail, the wake moves on with the bar: a pixel it left takes
+        # its value from behind, so fast and slow agree and little reads as a release. (Carried by the frame's
+        # displacement instead, a pixel the bar left has none and keeps its trail: the wake stays.)
+        width, frames = 96, 50
+        fast_weight, slow_weight = decay_weight(1 / 60, 25.0), decay_weight(1 / 60, 150.0)
+        results: dict[float, float] = {}
+        for amount in (0.0, 1.0):
+            fast = np.zeros((1, width, 2)); slow = np.zeros((1, width, 2))
+            released: float = 0.0
+            for frame in range(frames):
+                flow = np.zeros((1, width, 2))
+                flow[0, 10 + frame:14 + frame, 0] = 1.0
+                carry = fast / width                                        # trail speed 1 is 1 pixel per frame here
+                slow = advect(slow, carry, amount); fast = advect(fast, carry, amount)
+                fast = fast_weight * fast + (1.0 - fast_weight) * flow
+                slow = slow_weight * slow + (1.0 - slow_weight) * flow
+                acceleration, _ = project(fast[0], slow[0])
+                released += float(np.maximum(0.0, -acceleration).sum())
+            results[amount] = released
+        self.assertLess(results[1.0], results[0.0] * 0.3)
 
 
 class StopGateTest(unittest.TestCase):
