@@ -27,7 +27,7 @@ def depth_to_p012(depth: np.ndarray) -> bytes:
     return luma.tobytes() + chroma.tobytes()
 
 
-def p012_to_depth(raw: bytes, width: int, height: int) -> np.ndarray:
+def p012_to_depth(raw: bytes | bytearray, width: int, height: int) -> np.ndarray:
     """One `p012le` frame as uint16 millimetres (H, W), 0 where there is no depth."""
     luma: np.ndarray = np.frombuffer(raw, np.uint16, width * height).reshape(height, width)
     depth: np.ndarray = (luma >> 4) * DEPTH_STEP_MM

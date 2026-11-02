@@ -158,8 +158,9 @@ class StreamReader:
             if end_frame is not None and frame_count >= end_frame:
                 break
             try:
-                in_bytes = self.ffmpeg_process.stdout.read(self.bytes_per_frame)
-                if not in_bytes:
+                # A bytearray, not bytes: an array over bytes is read-only, and torch warns on it
+                in_bytes = bytearray(self.bytes_per_frame)
+                if self.ffmpeg_process.stdout.readinto(in_bytes) < self.bytes_per_frame:
                     # print ('End of stream', self.frame_type)
                     break
             except ffmpeg.Error as e:
