@@ -3,7 +3,8 @@ from .layer_base import LayerBase, DataCache
 from .cam import      BBoxRenderer, BBoxRendererSettings, CameraReadingsLayer, CropLayer, CropLayerSettings, \
                       PoseRenderer, PoseRendererSettings, PoseCompositor, PoseCompositorSettings, \
                       TrackerCompositor, TrackerCompositorSettings, TrackletRenderer
-from .center import   CenterGeometry, CenterGeometrySettings, SnapPoint, SourceSpace, CenterCamLayer, CenterCamLayerSettings, \
+from .center import   CenterGeometry, CenterGeometrySettings, SnapPoint, SourceSpace, CenterDepthLayer, CenterDepthLayerSettings, \
+                      CenterCamLayer, CenterCamLayerSettings, \
                       CenterMaskLayer, CenterMaskLayerSettings, CenterForegroundLayer, CenterForegroundLayerSettings, \
                       CenterPoseLayer, CenterPoseLayerSettings
 from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOffset, FEATURE_MAP, TRACK_COLOR_FEATURES, \
@@ -19,4 +20,4 @@ from .panorama import Compositor, PanoramaLayerSettings, PanoramaBlend, Part, \
                       GridRenderer, LabelRenderer, MarkRenderer, SeamRenderer, \
                       StitchRenderer, Mark, MarkContext, build_marks, strip_spans
 from .source import   CropSourceLayer, DepthSourceLayer, DepthSourceLayerSettings, DepthDrawMode, ForegroundSourceLayer, \
-                      ImageSourceLayer, MaskSourceLayer, CaptureImageLayer, DepthMaskLayer, DepthMaskLayerSettings, DepthForegroundLayer
+                      ImageSourceLayer, MaskSourceLayer, CaptureImageLayer, DepthMaskLayer, DepthMaskLayerSettings

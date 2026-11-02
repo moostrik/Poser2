@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 
 # Third-party imports
 import numpy as np
-from OpenGL.GL import GL_NEAREST, GL_R32F, GL_RGBA16F
+from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_NEAREST, GL_R32F, GL_RGBA16F
 
 # Local application imports
 from modules.board import HasCaptures
@@ -47,7 +47,7 @@ class DepthSourceLayer(LayerBase):
         self._cam_texture: Texture = cam_texture
         self.settings: DepthSourceLayerSettings = settings
         self._source: Image = Image(interpolation=GL_NEAREST)   # an edge never reads as a distance in between
-        self._depth: Fbo = Fbo(interpolation=GL_NEAREST)
+        self._depth: Fbo = Fbo(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))     # beyond the image: no depth
         self._view: Fbo = Fbo()
         self._warp_shader: DepthWarp = DepthWarp()
         self._shader: DepthView = DepthView()

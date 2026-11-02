@@ -1,4 +1,5 @@
 from .center_geometry import         CenterGeometry, CenterGeometrySettings, SnapPoint, SourceSpace
+from .center_depth_layer import      CenterDepthLayer, CenterDepthLayerSettings
 from .center_cam_layer import        CenterCamLayer, CenterCamLayerSettings
 from .center_mask_layer import       CenterMaskLayer, CenterMaskLayerSettings
 from .center_foreground_layer import CenterForegroundLayer, CenterForegroundLayerSettings

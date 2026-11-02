@@ -22,7 +22,11 @@ class PoseCompositorSettings(BaseSettings):
 
 
 class PoseCompositor(LayerBase):
-    def __init__(self, track_id: int, board: Any, cam_texture: Texture, settings: PoseCompositorSettings, color_settings: ColorSettings) -> None:
+    """The crop with the pose lines over it. `gpu_crop` is the app's crop source layer (the model's
+    input), shared rather than uploaded a second time; the app updates it before this layer."""
+
+    def __init__(self, track_id: int, board: Any, cam_texture: Texture, gpu_crop: CropSourceLayer, settings: PoseCompositorSettings,
+                 color_settings: ColorSettings) -> None:
         self._track_id: int = track_id
         self.settings: PoseCompositorSettings = settings or PoseCompositorSettings()
         self._fbo: Fbo = Fbo()
@@ -30,7 +34,7 @@ class PoseCompositor(LayerBase):
         # Camera crop layers (one of these will be used based on settings)
         crop_settings: CropLayerSettings = CropLayerSettings(stage=self.settings.stage)
         self._cam_crop_layer: CropLayer = CropLayer(track_id, board, cam_texture, crop_settings)
-        self._gpu_crop_layer: CropSourceLayer = CropSourceLayer(track_id, board)
+        self._gpu_crop_layer: CropSourceLayer = gpu_crop
 
         # Pose line layers - RAW (black, thickest), SMOOTH (white, medium), LERP (color, thin)
         # RAW = 3x thickness, drawn first (back layer)
@@ -73,7 +77,6 @@ class PoseCompositor(LayerBase):
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)
         self._cam_crop_layer.allocate(width, height, internal_format)
-        self._gpu_crop_layer.allocate(width, height, internal_format)
         self._pose_raw_layer.allocate(width, height, internal_format)
         self._pose_smooth_layer.allocate(width, height, internal_format)
         self._pose_lerp_layer.allocate(width, height, internal_format)
@@ -81,7 +84,6 @@ class PoseCompositor(LayerBase):
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._cam_crop_layer.deallocate()
-        self._gpu_crop_layer.deallocate()
         self._pose_raw_layer.deallocate()
         self._pose_smooth_layer.deallocate()
         self._pose_lerp_layer.deallocate()
@@ -89,7 +91,8 @@ class PoseCompositor(LayerBase):
     def update(self) -> None:
         # Update all layers
         crop_layer = self._gpu_crop_layer if self.settings.use_gpu_crop else self._cam_crop_layer
-        crop_layer.update()
+        if crop_layer is self._cam_crop_layer:
+            crop_layer.update()     # its own; the shared GPU crop is updated by the app
         self._pose_raw_layer.update()
         self._pose_smooth_layer.update()
         self._pose_lerp_layer.update()

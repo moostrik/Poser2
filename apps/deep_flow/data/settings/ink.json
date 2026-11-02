@@ -2,6 +2,7 @@
   "max_players": 1,
   "num_cams": 1,
   "input_fps": 60.0,
+  "mask_source": "DEPTH",
   "camera": {
     "keyframe_interval": 60,
     "color": true,
@@ -129,7 +130,7 @@
     },
     "segmentation": {
       "resolution": "EXTREME",
-      "enabled": true,
+      "enabled": false,
       "reset_interval": 480
     },
     "optical_flow": {
@@ -277,7 +278,7 @@
           "center_foreground"
         ],
         "right": [
-          "center_depth_foreground"
+          "center_mask"
         ],
         "output": [
           "cam_image",
@@ -348,8 +349,8 @@
         "snap_point": "FEET"
       },
       "mask": {
-        "blend_factor": 0.2,
-        "dilation_steps": -3,
+        "blend_factor": 1.0,
+        "dilation_steps": 0,
         "blur_steps": 0,
         "blur_radius": 1.0
       },
@@ -361,33 +362,13 @@
       "capture": {
         "blend_factor": 1.0,
         "mask_opacity": 1.0,
-        "use_mask": true
+        "use_mask": false
       },
       "depth": {
-        "blend_factor": 1.0,
-        "mask_opacity": 1.0,
-        "use_mask": true
+        "use_mask": true,
+        "mask_opacity": 1.0
       },
       "foreground": {
-        "blend_factor": 0.2,
-        "exposure": 0.99,
-        "gamma": 1.0,
-        "offset": 0.0,
-        "contrast": 1.1,
-        "saturation": 1.78,
-        "levels": 3,
-        "smoothness": 0.0,
-        "colorize": 0.0,
-        "sharpen": 0.42,
-        "use_mask": true
-      },
-      "depth_mask": {
-        "blend_factor": 1.0,
-        "dilation_steps": 0,
-        "blur_steps": 0,
-        "blur_radius": 1.0
-      },
-      "depth_foreground": {
         "blend_factor": 0.2,
         "exposure": 0.99,
         "gamma": 1.0,
@@ -436,7 +417,7 @@
       "inputs": {
         "flow": "center_capture",
         "density": "center_capture",
-        "mask": "center_depth_mask"
+        "mask": "center_mask"
       },
       "visualization": {
         "toggle_scalar": false,

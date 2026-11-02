@@ -23,7 +23,7 @@ from modules.utils import PerformanceTimer
 from .render_board import RenderBoard
 from .series import Series, TIMER_SERIES
 from .pose.pipeline import pipeline_spec
-from .settings import Settings, Stage
+from .settings import MaskSource, Settings, Stage
 from .render import DeepFlowRender
 
 APP_NAME = 'deep_flow'
@@ -95,7 +95,10 @@ class DeepFlowMain:
 
         # DETECTION
         self.poses_from_tracklets = PosesFromTracklets(p.tracklets, max_players)
-        self.segmentation_predictor  = segmentation.Predictor(p.segmentation)
+        # RVM only when it is the mask source: with the depth mask it is not loaded at all
+        self.segmentation_predictor: segmentation.Predictor | None = None
+        if self.settings.mask_source == MaskSource.RVM:
+            self.segmentation_predictor = segmentation.Predictor(p.segmentation)
         self.optical_flow_predictor  = optical_flow.Predictor(p.optical_flow)
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
@@ -104,9 +107,10 @@ class DeepFlowMain:
 
         # The segmentation and the optical flow read the same crops the pose model gets.
         self.pose_inference.add_camera_images_callback(self.board.set_camera_images)
-        self.pose_inference.add_crop_callback(self.segmentation_predictor.submit)
+        if self.segmentation_predictor is not None:
+            self.pose_inference.add_crop_callback(self.segmentation_predictor.submit)
+            self.segmentation_predictor.add_segmentation_callback(self._on_segmentation)
         self.pose_inference.add_crop_callback(self.optical_flow_predictor.submit)
-        self.segmentation_predictor.add_segmentation_callback(self._on_segmentation)
 
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. The camera's frame bang drives the frame
         # domain through the tracklet poses; the render tick drives the output domain (LERP). Every stage's frames
@@ -128,7 +132,7 @@ class DeepFlowMain:
         self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
 
         # RENDER
-        self.render = DeepFlowRender(self.board, self.settings.render, num_cams=len(self.cameras), max_players=max_players)
+        self.render = DeepFlowRender(self.board, self.settings.render, self.settings.mask_source, num_cams=len(self.cameras), max_players=max_players)
         self.render.add_exit_callback(self.stop)
         self.render.add_update_callback(self.camera_check.update)
 
@@ -154,7 +158,8 @@ class DeepFlowMain:
         self.tracker.start()
         self.pose_inference.start()
         self.capture_sync.start()
-        self.segmentation_predictor.start()
+        if self.segmentation_predictor is not None:
+            self.segmentation_predictor.start()
         self.optical_flow_predictor.start()
 
         self.osc_sound.start()
@@ -237,7 +242,8 @@ class DeepFlowMain:
         self.capture_sync.stop()
         if self.person_detector is not None:
             self.person_detector.stop()
-        self.segmentation_predictor.stop()
+        if self.segmentation_predictor is not None:
+            self.segmentation_predictor.stop()
         self.optical_flow_predictor.stop()
 
         for camera in self.cameras:

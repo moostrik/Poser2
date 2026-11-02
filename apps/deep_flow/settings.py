@@ -47,8 +47,6 @@ class Layers(IntEnum):
     cam_crop =      auto()
     cam_depth =     auto()
     capture_image = auto()
-    depth_mask =    auto()
-    depth_foreground = auto()
     # composite layers
     tracker =       auto()
     pose =          auto()
@@ -59,10 +57,7 @@ class Layers(IntEnum):
     center_depth =  auto()
     center_mask =   auto()
     center_foreground = auto()
-    center_depth_mask = auto()
-    center_depth_foreground = auto()
     center_pose =   auto()
-    center_metres = auto()
     # data layers
     time_series =   auto()
     data_B_W =      auto()
@@ -77,6 +72,12 @@ class Layers(IntEnum):
     flow_b =        auto()
     fluid3d_b =     auto()
     composite =     auto()
+
+
+class MaskSource(IntEnum):
+    """Where the player's mask comes from, chosen at start-up."""
+    DEPTH = 0       # the depth band (`DepthMaskLayer`), on the camera image
+    RVM =   auto()  # the RVM segmentation model, on the pose's crop
 
 
 class ABView(IntEnum):
@@ -243,7 +244,7 @@ class _CenterGeometrySettings(layers.CenterGeometrySettings):
 class FluidInputSettings(BaseSettings):
     flow:    Field[Layers] = Field(Layers.center_capture,    description="Texture used as optical flow input")
     density: Field[Layers] = Field(Layers.center_capture,    description="Texture used as density and temperature input")
-    mask:    Field[Layers] = Field(Layers.center_depth_mask, description="Mask that gates the flow's velocity and density")
+    mask:    Field[Layers] = Field(Layers.center_mask,       description="Mask that gates the flow's velocity and density")
 
 class _FlowLayerSettings(layers.FlowLayerSettings):
     inputs: Group[FluidInputSettings] = Group(FluidInputSettings)
@@ -266,10 +267,8 @@ class CenterGroup(BaseSettings):
     mask      : Group[layers.CenterMaskLayerSettings]       = Group(layers.CenterMaskLayerSettings)
     cam       : Group[layers.CenterCamLayerSettings]        = Group(layers.CenterCamLayerSettings)
     capture   : Group[layers.CenterCamLayerSettings]        = Group(layers.CenterCamLayerSettings)
-    depth     : Group[layers.CenterCamLayerSettings]        = Group(layers.CenterCamLayerSettings)
+    depth     : Group[layers.CenterDepthLayerSettings]      = Group(layers.CenterDepthLayerSettings)
     foreground: Group[layers.CenterForegroundLayerSettings] = Group(layers.CenterForegroundLayerSettings)
-    depth_mask: Group[layers.CenterMaskLayerSettings]       = Group(layers.CenterMaskLayerSettings)
-    depth_foreground: Group[layers.CenterForegroundLayerSettings] = Group(layers.CenterForegroundLayerSettings)
     pose      : Group[layers.CenterPoseLayerSettings]       = Group(layers.CenterPoseLayerSettings)
     color     : Group[layers.MSColorMaskLayerSettings]      = Group(layers.MSColorMaskLayerSettings)
 
@@ -301,6 +300,7 @@ class Settings(BaseSettings):
     max_players:        Field[int]   = Field(1, access=Field.INIT, visible=False)
     num_cams:           Field[int]   = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
     input_fps:          Field[float] = Field(60.0, min=1.0, max=120.0, access=Field.INIT)
+    mask_source:        Field[MaskSource] = Field(MaskSource.DEPTH, access=Field.INIT, description="Where the player's mask comes from (restart to change)")
 
     camera: Group[Oak4Group]      = Group(Oak4Group, share=[num_cams, input_fps.as_('fps')])
     pose  : Group[PoseGroup]      = Group(PoseGroup, share=[max_players, input_fps.as_('frequency')])

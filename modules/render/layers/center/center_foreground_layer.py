@@ -4,7 +4,7 @@
 from modules.settings import Field, BaseSettings
 from ..layer_base import LayerBase
 from .center_geometry import CenterGeometry, SourceSpace
-from ...shaders import DrawRoi, Blend, MaskApply, CelShade, HueShift
+from ...shaders import DrawRoi, Blend, MaskApply, MaskMultiply, CelShade, HueShift
 from modules.gl import Fbo, SwapFbo, Texture, Style, shaders
 from ...color_settings import ColorSettings
 
@@ -32,16 +32,19 @@ class CenterForegroundLayerSettings(BaseSettings):
 class CenterForegroundLayer(LayerBase):
     """Renders foreground image cropped and rotated with temporal blending.
 
-    `space` says whether the foreground is on the pose's crop or on the camera image. Optionally
-    applies mask texture for compositing.
+    `space` says whether the foreground is on the pose's crop or on the camera image. With
+    `premultiply` the source is a whole image, and the mask multiplies it right after the cut-out, so
+    the look starts from the player's colors on black as from a masked source (RVM's is). Optionally
+    applies mask texture as alpha for compositing.
     """
 
     def __init__(self, cam_id: int, geometry: CenterGeometry, foreground_texture: Texture, mask_texture: Texture, space: SourceSpace,
-                 settings: CenterForegroundLayerSettings, color_settings: ColorSettings) -> None:
+                 premultiply: bool, settings: CenterForegroundLayerSettings, color_settings: ColorSettings) -> None:
         self._cam_id: int = cam_id
         self._geometry: CenterGeometry = geometry
         self._foreground_texture: Texture = foreground_texture
         self._space: SourceSpace = space
+        self._premultiply: bool = premultiply
         self._mask_texture: Texture = mask_texture
         self._color_settings: ColorSettings = color_settings
 
@@ -50,6 +53,7 @@ class CenterForegroundLayer(LayerBase):
 
         # FBOs
         self._roi_fbo: Fbo = Fbo()
+        self._premultiplied_fbo: Fbo = Fbo()    # the cut-out times the mask, with `premultiply`
         self._blend_fbo: SwapFbo = SwapFbo()
         self._effect_fbo: SwapFbo = SwapFbo()
 
@@ -60,6 +64,7 @@ class CenterForegroundLayer(LayerBase):
         self._hue_shift_shader = HueShift()
         self._sharpen_shader = shaders.Sharpen()
         self._mask_shader = MaskApply()
+        self._premultiply_shader = MaskMultiply()
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -70,6 +75,9 @@ class CenterForegroundLayer(LayerBase):
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._roi_fbo.allocate(width, height, internal_format)
+        if self._premultiply:
+            self._premultiplied_fbo.allocate(width, height, internal_format)
+            self._premultiply_shader.allocate()
         self._blend_fbo.allocate(width, height, internal_format)
         self._effect_fbo.allocate(width, height, internal_format)
 
@@ -83,6 +91,8 @@ class CenterForegroundLayer(LayerBase):
 
     def deallocate(self) -> None:
         self._roi_fbo.deallocate()
+        self._premultiplied_fbo.deallocate()
+        self._premultiply_shader.deallocate()
         self._blend_fbo.deallocate()
         self._effect_fbo.deallocate()
 
@@ -111,12 +121,20 @@ class CenterForegroundLayer(LayerBase):
         self._roi_shader.use(self._foreground_texture, *self._geometry.source_roi(self._space, self._foreground_texture))
         self._roi_fbo.end()
 
+        # A whole image: the player's colors on black, as a masked source arrives
+        source: Texture = self._roi_fbo.texture
+        if self._premultiply and self._mask_texture.allocated:
+            self._premultiplied_fbo.begin()
+            self._premultiply_shader.use(self._roi_fbo.texture, self._mask_texture)
+            self._premultiplied_fbo.end()
+            source = self._premultiplied_fbo.texture
+
         # Temporal blending
         self._blend_fbo.swap()
         self._blend_fbo.begin()
         self._blend_shader.use(
             self._blend_fbo.back_texture,
-            self._roi_fbo.texture,
+            source,
             self.settings.blend_factor
         )
         self._blend_fbo.end()

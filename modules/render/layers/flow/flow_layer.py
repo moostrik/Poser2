@@ -4,7 +4,7 @@
 from enum import IntEnum, auto
 
 # Third-party imports
-from OpenGL.GL import GL_RG16F, GL_RGBA16F, GL_VIEWPORT, glGetIntegerv
+from OpenGL.GL import GL_R16F, GL_RG16F, GL_RGBA16F, GL_VIEWPORT, glGetIntegerv
 
 # Local application imports
 from modules.gl import Fbo, GpuTimer, Texture, Style, Blit, Text
@@ -155,6 +155,7 @@ class FlowLayer(LayerBase):
         self._mask_input: Texture | None = None
         self._gate_shader: MaskMultiply = MaskMultiply()
         self._gated_velocity: Fbo = Fbo()   # the optical flow's velocity times the mask
+        self._gated_depth_velocity: Fbo = Fbo()     # the depth velocity times the mask
         self._gated_color: Fbo = Fbo()      # the density input times the mask
         self._depth_velocity: DepthVelocity = DepthVelocity(self.settings.depth_velocity)
         self._velocity_trail: VelocitySmoothTrail = VelocitySmoothTrail(self.settings.velocity_trail)
@@ -247,12 +248,14 @@ class FlowLayer(LayerBase):
 
     def set_mask_input(self, texture: Texture | None) -> None:
         """The player's mask (red, 0 to 1) on the flow's view, or None for no gate. It gates the optical
-        flow's velocity and the density color after the flow, so the flow runs on the whole image: a
-        jittery mask edge then only scales what passes, it never reads as motion, and needs no blending."""
+        flow's velocity, the depth velocity and the density color after they are measured, so they run on
+        the whole image: a jittery mask edge then only scales what passes, it never reads as motion, and
+        needs no blending."""
         self._mask_input = texture
 
     def set_depth_input(self, texture: Texture) -> None:
-        """Depth for the velocity toward the camera: metres in red, the player's mask in alpha."""
+        """Depth for the velocity toward the camera: metres in red, and in alpha where depth counts (the
+        player's mask, or everywhere when `set_mask_input` gates the result instead)."""
         self._depth_input = texture
 
     def set_time_step(self, dt: float) -> None:
@@ -274,6 +277,7 @@ class FlowLayer(LayerBase):
 
         self._optical_flow.allocate(sim_width, sim_height)
         self._gated_velocity.allocate(sim_width, sim_height, GL_RG16F)
+        self._gated_depth_velocity.allocate(sim_width, sim_height, GL_R16F)
         self._gated_color.allocate(width, height, GL_RGBA16F)
         self._gate_shader.allocate()
         self._depth_velocity.allocate(sim_width, sim_height)
@@ -292,6 +296,7 @@ class FlowLayer(LayerBase):
         """Deallocate all resources."""
         self._optical_flow.deallocate()
         self._gated_velocity.deallocate()
+        self._gated_depth_velocity.deallocate()
         self._gated_color.deallocate()
         self._gate_shader.deallocate()
         self._depth_velocity.deallocate()
@@ -346,13 +351,16 @@ class FlowLayer(LayerBase):
         if new_flow and depth_enabled:
             assert self._depth_input is not None
             self._depth_velocity.update_depth(self._depth_input, self._flow_interval)
+            if mask is not None:
+                self._gate(self._depth_velocity.depth_velocity, mask, self._gated_depth_velocity)
+        depth_velocity: Texture = self._gated_depth_velocity if mask is not None else self._depth_velocity.depth_velocity
 
         # Stage 2: Bridges
         velocity: Texture
         ink: Texture    # what the density bridge reads as alpha, through its length
         if self.settings.bridge == FlowBridge.KINETIC:
             if new_flow:
-                self._kinetic_bridge.set_velocity(flow_velocity, self._depth_velocity.depth_velocity if depth_enabled else None)
+                self._kinetic_bridge.set_velocity(flow_velocity, depth_velocity if depth_enabled else None)
                 self._kinetic_bridge.update(self._flow_interval)
                 if self.settings.draw_mode == FlowDrawMode.KINETIC_DEPTH_ACCELERATION:
                     self._kinetic_bridge.update_depth_acceleration()
@@ -369,7 +377,7 @@ class FlowLayer(LayerBase):
             velocity = self._velocity_trail.velocity
             ink = velocity
             if depth_enabled:
-                self._depth_trail.set_input(self._depth_velocity.depth_velocity)
+                self._depth_trail.set_input(depth_velocity)
                 self._depth_trail.update()
 
         if new_flow:
