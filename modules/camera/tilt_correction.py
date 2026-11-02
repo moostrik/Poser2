@@ -12,6 +12,10 @@ from .settings import TiltCorrectionSettings
 # and a picture that followed it would shimmer.
 TILT_STEP: float = 0.25
 
+# uv with its rows turned over, its own inverse: the frame's rows run opposite to the lens's and the
+# IMU's, as seen on the rig.
+FLIP_V: np.ndarray = np.array([[1.0, 0.0, 0.0], [0.0, -1.0, 1.0], [0.0, 0.0, 1.0]])
+
 
 class TiltCorrection:
     """Keeps the current homography. `update` makes a new array only for a real change, and a
@@ -32,4 +36,4 @@ class TiltCorrection:
         angle: float = tilt + self.settings.offset
         if math.isnan(self._tilt) or abs(angle - self._tilt) >= TILT_STEP:
             self._tilt = angle
-            self.homography = tilt_homography(intrinsics, size, angle)
+            self.homography = FLIP_V @ tilt_homography(intrinsics, size, angle) @ FLIP_V

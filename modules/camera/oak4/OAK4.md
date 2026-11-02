@@ -323,7 +323,7 @@ The filter's latency is the latency of a message: a moving body's depth lags by 
 
 For a camera above a big screen, looking down. A tilt is a pure rotation about the camera, so where a pixel lands does not depend on its distance. One homography therefore serves color, depth and boxes, with no point cloud and no holes.
 
-`H = K' R K⁻¹`, normalized uv to uv (`tilt_homography` in [geometry.py](../geometry.py)). `K` is the delivered lens and `R` the tilt. `K'` refits the picture to the frame, because plain `K` at 30° moves the frame's center by 0.58 focal lengths, about 310 of 720 rows.
+`H = K' R K⁻¹`, normalized uv to uv (`tilt_homography` in [geometry.py](../geometry.py)). `K` is the delivered lens and `R` the tilt. The frame's rows run opposite to the lens's and the IMU's **(site fact)**, so `TiltCorrection` makes `H` in their rows and turns it over to the frame's (`FLIP_V`). That is the opposite tilt on the lens with its center row mirrored. `K'` refits the picture to the frame, because plain `K` at 30° moves the frame's center by 0.58 focal lengths, about 310 of 720 rows.
 
 Depth pixels move by `H`, and their values change too. Depth is measured along the tilted axis, so a standing player of 1.8 m at 30° reads as leaning by 0.9 m. The corrected depth is `z' = z × w`, with `w` from `H`'s third row, the distance along the level axis.
 

@@ -3,7 +3,9 @@
 import math
 import unittest
 
-from modules.camera import TiltCorrection, TiltCorrectionSettings
+import numpy as np
+
+from modules.camera import TiltCorrection, TiltCorrectionSettings, tilt_homography
 
 LENS: list[list[float]] = [[538.0, 0.0, 450.0], [0.0, 538.0, 360.0], [0.0, 0.0, 1.0]]
 SIZE: tuple[int, int] = (900, 720)
@@ -34,6 +36,13 @@ class TiltCorrectionTest(unittest.TestCase):
         self.settings.offset = 5.0
         self.correction.update(-30.0, LENS, SIZE)
         self.assertIsNot(self.correction.homography, first)
+
+    def test_the_frame_rows_run_against_the_lens(self) -> None:
+        """Turning the rows over is the opposite tilt on the lens with its center row mirrored."""
+        self.correction.update(-30.0, LENS, SIZE)
+        assert self.correction.homography is not None
+        mirrored: list[list[float]] = [[538.0, 0.0, 450.0], [0.0, 538.0, SIZE[1] - 360.0], [0.0, 0.0, 1.0]]
+        np.testing.assert_array_almost_equal(self.correction.homography, tilt_homography(mirrored, SIZE, 30.0))
 
     def test_no_reading_no_lens_or_no_correction_is_no_homography(self) -> None:
         self.correction.update(math.nan, LENS, SIZE)
