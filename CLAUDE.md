@@ -71,6 +71,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 ## Performance
 
 - Treat latency as a first-order concern
+- Choose a data path by its latency measured from capture to arrival; a held frame rate doesn't show it
 - Prefer vectorized numpy operations and avoid unnecessary copies
 
 ## Types
