@@ -69,8 +69,6 @@ class Layers(IntEnum):
     color_mask =    auto()
     flow =          auto()
     fluid3d =       auto()
-    flow_b =        auto()
-    fluid3d_b =     auto()
     composite =     auto()
 
 
@@ -78,11 +76,6 @@ class MaskSource(IntEnum):
     """Where the player's mask comes from, chosen at start-up."""
     DEPTH = 0       # the depth band (`DepthMaskLayer`), on the camera image
     RVM =   auto()  # the RVM segmentation model, on the pose's crop
-
-
-class ABView(IntEnum):
-    FLUID = 0       # the side's fluid
-    FLOW =  auto()  # the side's flow layer, in its draw_mode
 
 
 # ---------------------------------------------------------------------------
@@ -274,9 +267,6 @@ class CenterGroup(BaseSettings):
 
 class RenderSettings(BaseSettings):
     stage  : Field[Stage]                        = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")
-    b_enabled: Field[bool]                       = Field(False, description="Second flow and fluid on the same input: A left, B right")
-    a_view : Field[ABView]                       = Field(ABView.FLUID, description="What A's side of the A/B view shows")
-    b_view : Field[ABView]                       = Field(ABView.FLUID, description="What B's side of the A/B view shows")
     layer  : Group[LayerGroup]                   = Group(LayerGroup)
     data   : Group[DataGroup]                    = Group(DataGroup)
     preview: Group[PreviewGroup]                 = Group(PreviewGroup)
@@ -285,8 +275,6 @@ class RenderSettings(BaseSettings):
     depth_mask: Group[layers.DepthMaskLayerSettings] = Group(layers.DepthMaskLayerSettings)
     flow   : Group[_FlowLayerSettings]           = Group(_FlowLayerSettings, share=[stage])
     fluid3d: Group[layers.Fluid3DLayerSettings]  = Group(layers.Fluid3DLayerSettings, share=[stage])
-    flow_b   : Group[layers.FlowLayerSettings]    = Group(layers.FlowLayerSettings, share=[stage])
-    fluid3d_b: Group[layers.Fluid3DLayerSettings] = Group(layers.Fluid3DLayerSettings, share=[stage])
     time_series: Group[layers.TimeSeriesLayerSettings] = Group(layers.TimeSeriesLayerSettings)
     colors : Group[ColorSettings]                = Group(ColorSettings)
     window : Group[WindowSettings]               = Group(WindowSettings)

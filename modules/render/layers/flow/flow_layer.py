@@ -15,7 +15,7 @@ from modules.pose import Frame, AngleMotion
 
 from modules.settings import Field, BaseSettings, Group
 from modules.flow import (
-    OpticalFlow, OpticalFlowSettings, LucasKanade, LucasKanadeSettings, RangeFlow, RangeFlowSettings,
+    OpticalFlow, OpticalFlowSettings, LucasKanade, LucasKanadeSettings,
     VelocitySmoothTrail, DepthSmoothTrail, SmoothTrailSettings,
     DepthVelocity, DepthVelocitySettings,
     KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES,
@@ -30,9 +30,8 @@ from modules.utils import HotReloadMethods
 
 class Motion(IntEnum):
     """How the flow measures motion."""
-    OPTICAL =    0  # motion strength per pixel, from the image (OpticalFlow)
-    SCENE_FLOW = 1  # displacement from the image (LucasKanade), and depth followed along it
-    RANGE_FLOW = 2  # displacement and depth change from the depth alone, one equation (RangeFlow)
+    OPTICAL =   0   # motion strength per pixel, from the image (OpticalFlow)
+    RGBD_FLOW = 1   # scene flow from color and depth: displacement from the image (LucasKanade), depth followed along it
 
 
 class FlowBridge(IntEnum):
@@ -48,7 +47,7 @@ class FlowDrawMode(IntEnum):
         OPTICAL_INPUT - Luminance frames fed to optical flow
 
     Outputs:
-        OPTICAL_OUTPUT - The measured motion before the mask gate: x/y from `motion` (OPTICAL, SCENE_FLOW or RANGE_FLOW); with depth, arrows red toward the camera, green away
+        OPTICAL_OUTPUT - The measured motion before the mask gate: x/y from `motion` (OPTICAL or RGBD_FLOW); with depth, arrows red toward the camera, green away
         SMOOTH_VELOCITY_OUTPUT - Smoothed velocity (RG32F); with depth, arrows red toward the camera, green away
         SMOOTH_VELOCITY_DEPTH - Velocity toward the camera: red toward, green away
         DENSITY_BRIDGE_OUTPUT - Colored density (RGBA32F)
@@ -106,12 +105,11 @@ class FlowLayerSettings(BaseSettings):
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
     bridge: Field[FlowBridge] =             Field(FlowBridge.TRAIL, description="The bridge the fluid reads")
-    motion: Field[Motion] =                 Field(Motion.OPTICAL, description="How motion is measured: per-pixel strength, scene flow, or range flow")
+    motion: Field[Motion] =                 Field(Motion.OPTICAL, description="How motion is measured: per-pixel strength, or from color and depth (RGB-D)")
 
     visualization      = Group(VisualizationFieldSettings)
     optical_flow       = Group(OpticalFlowSettings)
     lucas_kanade       = Group(LucasKanadeSettings)
-    range_flow         = Group(RangeFlowSettings)
     depth_velocity     = Group(DepthVelocitySettings)
     velocity_trail     = Group(SmoothTrailSettings)
     kinetic_bridge     = Group(KineticBridgeSettings)
@@ -162,7 +160,6 @@ class FlowLayer(LayerBase):
 
         self._optical_flow: OpticalFlow = OpticalFlow(self.settings.optical_flow)
         self._lucas_kanade: LucasKanade = LucasKanade(self.settings.lucas_kanade)
-        self._range_flow: RangeFlow = RangeFlow(self.settings.range_flow)
         self._measured_velocity: Texture = self._optical_flow.velocity     # the motion measure's velocity, before the gate
         self._depth_input: Texture | None = None
         self._mask_input: Texture | None = None
@@ -186,6 +183,9 @@ class FlowLayer(LayerBase):
 
         self._time_step: float = 1.0 / 60.0     # dt of one tick
         self._flow_interval: float = 0.0        # time since the last optical flow frame (s), counted in ticks
+
+        self._flow_size: tuple[int, int] = (0, 0)       # the size the flow runs at; follows settings.width/height
+        self._output_size: tuple[int, int] = (0, 0)     # the layer's allocation size
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
@@ -281,27 +281,15 @@ class FlowLayer(LayerBase):
         """Allocate all processing stages.
 
         Args:
-            width: Processing width
-            height: Processing height
+            width: Output width (density, visualization)
+            height: Output height
             internal_format: Ignored (formats determined by each stage)
         """
-        sim_width = self.settings.width
-        sim_height = self.settings.height
-
-        self._optical_flow.allocate(sim_width, sim_height)
-        self._lucas_kanade.allocate(sim_width, sim_height)
-        self._range_flow.allocate(sim_width, sim_height)
-        self._gated_velocity.allocate(sim_width, sim_height, GL_RG16F)
-        self._gated_depth_velocity.allocate(sim_width, sim_height, GL_R16F)
+        self._output_size = (width, height)
+        self._allocate_flow()
         self._gated_color.allocate(width, height, GL_RGBA16F)
         self._gate_shader.allocate()
-        self._depth_velocity.allocate(sim_width, sim_height)
-        self._velocity_trail.allocate(sim_width, sim_height, width, height)
-        self._depth_trail.allocate(sim_width, sim_height)
-        self._kinetic_bridge.allocate(sim_width, sim_height)
-        self._velocity_magnitude.allocate(sim_width, sim_height)
         self._density_bridge.allocate(width, height)
-        self._temperature_bridge.allocate(sim_width, sim_height)
 
         self._visualizer.allocate(width, height)
         self._kinetic_strip.allocate()
@@ -309,30 +297,56 @@ class FlowLayer(LayerBase):
 
     def deallocate(self) -> None:
         """Deallocate all resources."""
-        self._optical_flow.deallocate()
-        self._lucas_kanade.deallocate()
-        self._range_flow.deallocate()
-        self._gated_velocity.deallocate()
-        self._gated_depth_velocity.deallocate()
+        self._deallocate_flow()
         self._gated_color.deallocate()
         self._gate_shader.deallocate()
-        self._depth_velocity.deallocate()
-        self._velocity_trail.deallocate()
-        self._depth_trail.deallocate()
-        self._kinetic_bridge.deallocate()
-        self._velocity_magnitude.deallocate()
         self._density_bridge.deallocate()
-        self._temperature_bridge.deallocate()
         self._visualizer.deallocate()
         self._kinetic_strip.deallocate()
         self._strip_text.deallocate()
         self._gpu_timer.deallocate()
 
+    def _allocate_flow(self) -> None:
+        """Allocate the stages that run at the flow's size (settings.width/height)."""
+        flow_width, flow_height = self._flow_size = (self.settings.width, self.settings.height)
+        output_width, output_height = self._output_size
+
+        self._optical_flow.allocate(flow_width, flow_height)
+        self._lucas_kanade.allocate(flow_width, flow_height)
+        self._gated_velocity.allocate(flow_width, flow_height, GL_RG16F)
+        self._gated_depth_velocity.allocate(flow_width, flow_height, GL_R16F)
+        self._depth_velocity.allocate(flow_width, flow_height)
+        self._velocity_trail.allocate(flow_width, flow_height, output_width, output_height)
+        self._depth_trail.allocate(flow_width, flow_height)
+        self._kinetic_bridge.allocate(flow_width, flow_height)
+        self._velocity_magnitude.allocate(flow_width, flow_height)
+        self._temperature_bridge.allocate(flow_width, flow_height)
+
+    def _deallocate_flow(self) -> None:
+        self._optical_flow.deallocate()
+        self._lucas_kanade.deallocate()
+        self._gated_velocity.deallocate()
+        self._gated_depth_velocity.deallocate()
+        self._depth_velocity.deallocate()
+        self._velocity_trail.deallocate()
+        self._depth_trail.deallocate()
+        self._kinetic_bridge.deallocate()
+        self._velocity_magnitude.deallocate()
+        self._temperature_bridge.deallocate()
+        self._flow_size = (0, 0)
+
+    def _follow_flow_size(self) -> None:
+        """Reallocate the flow's stages when settings.width/height changed, and start them from rest."""
+        if self._flow_size == (0, 0) or self._flow_size == (self.settings.width, self.settings.height):
+            return
+        self._deallocate_flow()
+        self._allocate_flow()
+        self.reset()
+
     def reset(self) -> None:
         """Reset all processing stages."""
         self._optical_flow.reset()
         self._lucas_kanade.reset()
-        self._range_flow.reset()
         self._depth_velocity.reset()
         self._velocity_trail.reset()
         self._depth_trail.reset()
@@ -345,6 +359,8 @@ class FlowLayer(LayerBase):
 
     def update(self) -> None:
         """Update optical flow and bridges."""
+        self._follow_flow_size()
+
         # Get motion data from pose
         pose: Frame | None = self._board.get_frame(self.settings.stage, self._cam_id)
         motion = pose[AngleMotion].value if pose is not None and AngleMotion in pose else 0.0
@@ -363,16 +379,7 @@ class FlowLayer(LayerBase):
         if new_flow:
             # Stage 1: motion, on the whole image; the mask gates its velocity afterwards
             self._optical_flow.set_input(self._flow_input)     # keeps the luminance frames the image measures read
-            if motion == Motion.RANGE_FLOW:
-                # from depth alone: x/y and the velocity toward the camera from the same two smoothed depths
-                if self._depth_input is not None and self._depth_input.allocated:
-                    self._depth_velocity.smooth(self._depth_input, self._flow_interval)
-                    self._range_flow.update(self._depth_velocity.previous_smoothed, self._depth_velocity.smoothed, self._flow_interval,
-                                            self.settings.depth_velocity.jump, self.settings.optical_flow)
-                    if depth_enabled:
-                        self._depth_velocity.take_range(self._range_flow.motion)
-                self._measured_velocity = self._range_flow.velocity
-            elif motion == Motion.SCENE_FLOW:
+            if motion == Motion.RGBD_FLOW:
                 if self._optical_flow.ready:
                     self._lucas_kanade.update(self._optical_flow.previous_frame, self._optical_flow.frame, self.settings.optical_flow)
                 self._measured_velocity = self._lucas_kanade.velocity
@@ -385,10 +392,9 @@ class FlowLayer(LayerBase):
 
         if new_flow and depth_enabled:
             assert self._depth_input is not None
-            if motion != Motion.RANGE_FLOW:
-                # scene flow: depth measured along each pixel's displacement, not at a fixed pixel
-                self._depth_velocity.update_depth(self._depth_input, self._flow_interval,
-                                                  self._lucas_kanade.displacement if motion == Motion.SCENE_FLOW else None)
+            # RGB-D: depth measured along each pixel's displacement, not at a fixed pixel
+            self._depth_velocity.update_depth(self._depth_input, self._flow_interval,
+                                              self._lucas_kanade.displacement if motion == Motion.RGBD_FLOW else None)
             if mask is not None:
                 self._gate(self._depth_velocity.depth_velocity, mask, self._gated_depth_velocity)
         depth_velocity: Texture = self._gated_depth_velocity if mask is not None else self._depth_velocity.depth_velocity

@@ -4,7 +4,6 @@ from .density_bridge_shader import DensityBridgeShader
 from .depth_dead_zone import DepthDeadZone
 from .depth_smooth import DepthSmooth
 from .depth_velocity_shader import DepthVelocityShader
-from .range_toward import RangeToward
 from .kinetic_curl import KineticCurl
 from .kinetic_emission import KineticEmission
 from .kinetic_hold import KineticHold
