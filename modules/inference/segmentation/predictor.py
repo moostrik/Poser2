@@ -29,9 +29,10 @@ class Predictor:
     Batches are processed asynchronously on GPU. Under load, pending batches may
     be dropped by the Segmentation queue to maintain real-time performance.
 
-    Broadcasts (FrameDict, GPUFrameDict) with masks attached via callbacks. If a batch
-    is dropped, the original frames are forwarded without masks to maintain data flow.
-    Masks stay on GPU to avoid unnecessary CPU transfers.
+    Broadcasts (FrameDict, GPUFrameDict) with masks attached via callbacks. A dropped batch
+    broadcasts nothing: a newer one is already waiting, and an empty broadcast would read
+    as no player and blank the masks until it arrives. Frames without crops are forwarded
+    without masks. Masks stay on GPU to avoid unnecessary CPU transfers.
 
     This design prioritizes low latency over data completeness, making it suitable
     for real-time visualization where recent data is more valuable than old data.
@@ -113,8 +114,8 @@ class Predictor:
     def _on_segmentation_result(self, output: SegmentationOutput) -> None:
         """Callback from Segmentation thread when results are ready or dropped.
 
-        Forwards (FrameDict, GPUFrameDict) with masks attached. If batch was dropped,
-        forwards original frames without masks to maintain data flow.
+        Forwards (FrameDict, GPUFrameDict) with masks attached. A dropped batch forwards
+        nothing, so the last masks stay until the newer batch's arrive.
         """
         # Retrieve and remove pending frames for this batch
         with self._lock:
@@ -125,8 +126,11 @@ class Predictor:
 
         poses, crops = pending
 
-        # If batch was dropped or no masks, forward empty dict to maintain data flow
-        if not output.processed or output.mask_tensor is None or output.fgr_tensor is None:
+        if not output.processed:
+            return
+
+        # A processed batch without masks forwards an empty dict
+        if output.mask_tensor is None or output.fgr_tensor is None:
             self._notify_callbacks(poses, {})
             return
 
