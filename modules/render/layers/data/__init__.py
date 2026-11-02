@@ -3,3 +3,4 @@ from .feature_frame_layer import FeatureFrameLayer
 from .feature_window_layer import FeatureWindowLayer
 from .motion_time_renderer import MotionTimeRenderer, MotionTimeRendererSettings
 from .pose_line_layer import     PoseLineLayer, PoseLineLayerSettings
+from .time_series_layer import TimeSeriesLayer, TimeSeriesLayerSettings

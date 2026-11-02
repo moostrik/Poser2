@@ -1,10 +1,14 @@
 import threading
+import time
 import weakref
 import numpy as np
-from typing import ClassVar
+from typing import Callable, ClassVar, TypeAlias
 
 import logging
 logger = logging.getLogger(__name__)
+
+# A sample as it is added: the timer's name, the time (ms) and when it was added (perf_counter s)
+TimerSampleCallback: TypeAlias = Callable[[str, float, float], None]
 
 
 class PerformanceTimer:
@@ -13,11 +17,14 @@ class PerformanceTimer:
     Every timer also takes part in the timing session: between `start_session()` and
     `stop_session()` each sample is kept, and `stop_session()` returns the statistics of the
     whole session per timer name (timers that share a name are pooled).
+
+    Sample callbacks hear every sample of every timer as it is added, on the adding thread.
     """
 
     _registry: ClassVar[weakref.WeakSet['PerformanceTimer']] = weakref.WeakSet()
     _registry_lock: ClassVar[threading.Lock] = threading.Lock()
     _session_active: ClassVar[bool] = False
+    _sample_callbacks: ClassVar[list[TimerSampleCallback]] = []
 
     # ANSI color codes
     COLORS = {
@@ -87,6 +94,33 @@ class PerformanceTimer:
         # Print report OUTSIDE the lock to avoid deadlock
         if report and should_report:
             self._print_report()
+
+        callbacks: list[TimerSampleCallback] = PerformanceTimer._sample_callbacks
+        if callbacks:
+            name: str = self.name.strip()
+            now: float = time.perf_counter()
+            for callback in callbacks:
+                try:
+                    callback(name, time_ms, now)
+                except Exception:
+                    logger.exception("Error in timer sample callback")
+
+    @classmethod
+    def add_sample_callback(cls, callback: TimerSampleCallback) -> None:
+        """Hear every sample of every timer."""
+        with cls._registry_lock:
+            if callback not in cls._sample_callbacks:
+                cls._sample_callbacks = cls._sample_callbacks + [callback]     # replaced, never changed: add_time reads it unlocked
+
+    @classmethod
+    def remove_sample_callback(cls, callback: TimerSampleCallback) -> None:
+        with cls._registry_lock:
+            cls._sample_callbacks = [c for c in cls._sample_callbacks if c is not callback]
+
+    @classmethod
+    def has_sample_callbacks(cls) -> bool:
+        """Whether anything hears the samples: GPU timers measure only while something does."""
+        return bool(cls._sample_callbacks)
 
     def get_average(self) -> float:
         """Get average time over collected samples."""

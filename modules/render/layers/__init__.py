@@ -7,6 +7,7 @@ from .center import   CenterGeometry, CenterGeometrySettings, SnapPoint, CenterC
                       CenterMaskLayer, CenterMaskLayerSettings, CenterForegroundLayer, CenterForegroundLayerSettings, \
                       CenterPoseLayer, CenterPoseLayerSettings
 from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOffset, FEATURE_MAP, TRACK_COLOR_FEATURES, \
+                      TimeSeriesLayer, TimeSeriesLayerSettings, \
                       FeatureFrameLayer, FeatureWindowLayer, MotionTimeRenderer, MotionTimeRendererSettings, \
                       PoseLineLayer, PoseLineLayerSettings
 from .flow import     FlowLayer, FlowLayerSettings, FlowDrawMode, FlowBridge, \

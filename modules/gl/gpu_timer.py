@@ -9,7 +9,8 @@ QUERY_COUNT: int = 8    # samples that can wait for the GPU; with all of them wa
 class GpuTimer:
     """The GPU time of a block of GL work, as samples of a `PerformanceTimer` of that name.
 
-    Runs only during a timing session; outside one, `begin` and `end` touch no GL. The results of timer
+    Runs only during a timing session or while timer samples have a listener; otherwise `begin` and `end`
+    touch no GL. The results of timer
     queries are read a few frames later, when the GPU has them, so nothing waits. Only one block can be
     open at a time. Must be called from the GL thread.
     """
@@ -22,7 +23,7 @@ class GpuTimer:
         self._open: bool = False
 
     def begin(self) -> None:
-        if not PerformanceTimer.session_active():
+        if not PerformanceTimer.session_active() and not PerformanceTimer.has_sample_callbacks():
             return
         if not self._queries:
             self._queries = [int(query) for query in glGenQueries(QUERY_COUNT)]

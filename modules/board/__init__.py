@@ -22,3 +22,4 @@ from .camera_tracklets import       HasCameraTracklets, CameraTrackletStoreMixin
 from .sequencer_state import        HasSequencerState, SequencerStateStoreMixin
 from .tracklets import              HasTracklets, TrackletStoreMixin
 from .observations import           HasObservations, ObservationStoreMixin
+from .time_series import            HasTimeSeries, TimeSeriesStoreMixin
