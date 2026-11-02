@@ -102,17 +102,35 @@ Measure before changing the path. A held frame rate says nothing about latency. 
 
 ## Latency
 
-Latency is `dai.Clock.now()` minus the message's timestamp, on depthai's clock, because the message's timestamp is. It is the one duration in the app not on `perf_counter`.
+Latency is `dai.Clock.now()` minus the message's timestamp, on depthai's clock, because the message's timestamp is.
+
+### Capture time
+
+Every frame and tracklet message is stamped with its moment of capture on `perf_counter` (`definitions.capture_time`): now less the message's latency. The message's timestamp is the end of the exposure. Color and depth of one capture carry the same time, so time pairs them (`CAPTURE_TOLERANCE`, 2 ms). Sequence numbers do not: depth's skip while every frame arrives.
+
+Measured over 90 s, deep_flow's setup (P720 color NV12 at 60 fps, the detector, NEURAL_480, flood light 1.0), USB:
+
+| Measure                                  | Result                                        |
+|------------------------------------------|-----------------------------------------------|
+| Depth against the nearest color capture  | median 0.11 ms, p95 0.12 ms                   |
+| Depth without a color frame within 1 ms  | 4 of 5407, all in the first 30 ms after start |
+| Tracklets against their color frame      | same time and sequence number, 5103 of 5103   |
+| `perf_counter` minus `dai.Clock`         | −3 µs, std 6 µs, no drift                     |
+| Frame interval, stamped at capture       | 16.17 to 16.78 ms                             |
+| Frame interval, stamped at arrival       | color 0.5 to 33 ms, depth 2.6 to 28 ms        |
+| Exposure, color (auto) / mono            | 0.3 to 16.3 ms / 3 ms                         |
+
+The color and mono sensors are synchronized: they end their exposures together. The middle of the exposure lies half the exposure before the stamp, so a color frame's motion is centered up to 8 ms earlier than depth's at long exposures **(deduction)**. On Windows `dai.Clock` and `perf_counter` read one counter; `capture_time` does not depend on it.
 
 ### What arrives
 
-| Stream | Size          | Rate   | Capture to PC        |
-|--------|---------------|--------|----------------------|
-| Color  | 896x720       | 60 fps | 28 to 29 ms          |
-| Boxes  | 640x512 input | 60 fps | 35 ms                |
-| Depth  | 374x300       | 60 fps | 42 to 52 ms, mean 46 |
+| Stream    | Size          | Rate   | Capture to PC, median (p95) |
+|-----------|---------------|--------|-----------------------------|
+| Color     | 896x720       | 60 fps | 28.8 (31.1) ms              |
+| Tracklets | 640x512 input | 60 fps | 35.4 (38.6) ms              |
+| Depth     | 374x300       | 60 fps | 41.5 (50.4) ms              |
 
-The worst gap between depth frames is 27.5 ms, measured at 900x720 without undistortion. Depth arrives about 18 ms after color, so a moving body's depth trails its image by about a frame **(deduction)**.
+Measured with the capture time above. The worst gap between depth frames is 27.5 ms, measured at 900x720 without undistortion. Depth arrives about 13 ms after the color frame captured with it and carries that frame's time.
 
 ### Detector size
 
@@ -320,7 +338,7 @@ The whole picture stays in the frame, which leaves wedges without picture at the
 
 ## Recording and replay
 
-The format is in [chunk.py](../chunk.py) and [depth_frame.py](../../video/depth_frame.py). Each chunk is one self-contained `.mkv`: stream 0 color, stream 1 depth, fixed info in the tags and per-frame readings attached. Recording starts at the first depth frame, and each color frame takes the newest depth, so both streams have equal frame counts. This is the pairing the app shows live.
+The format is in [chunk.py](../chunk.py) and [depth_frame.py](../../video/depth_frame.py). Each chunk is one self-contained `.mkv`: stream 0 color, stream 1 depth, fixed info in the tags and per-frame readings attached. Recording starts at the first depth frame, and each depth frame is written with the color frame captured with it ([Capture time](#capture-time)), so both streams have equal frame counts. A color frame whose depth never comes is left out. Recordings made before capture times paired each color frame with the newest depth, which was captured one or two frames earlier **(deduction)**. Replay plays a recorded frame's color and depth with one time.
 
 Encoding runs on the iGPU because it does nothing else in the installation **(site fact)**, so recording stays out of the way of the show.
 

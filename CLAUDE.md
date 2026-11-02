@@ -65,7 +65,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 ## Time
 
 - Read `time.perf_counter()` for every stamp and duration; `time.time()` and `monotonic()` step 15.6 ms on Windows, coarser than a frame
-- Stamp a frame once, where the backend hands it over, and take time from the frame or the tick downstream instead of reading a clock
+- Stamp a frame once, where the backend hands it over, with its moment of capture where the device reports one, else its arrival; downstream, take time from the frame or the tick instead of reading a clock
 - Use the wall clock only for file names and log lines
 
 ## Performance

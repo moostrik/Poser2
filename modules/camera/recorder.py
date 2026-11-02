@@ -3,12 +3,14 @@ files named `<cam>_<kind>_<chunk>` in a folder named after the start time, writt
 and moved into place chunk by chunk.
 
 With DEPTH in `video_frame_types` a chunk ends as one `<cam>_<chunk>.mkv` (`chunk.merge_chunk`): each
-colour frame is written with the newest depth, the pairing the app shows live, so the two streams
-count alike, and a metadata line per frame goes beside them. Before the first depth arrives nothing
-is written. Recordings hold what the camera delivered, mirrored and not straightened, so the
+depth frame is written with the color frame captured with it, their timestamps within
+`CAPTURE_TOLERANCE`, so the two streams count alike, and a metadata line per frame goes beside them.
+A color frame waits for its depth, which arrives later, and one whose depth never comes is left
+out, as is everything before the first depth. Recordings hold what the camera delivered, mirrored and not straightened, so the
 correction can still be tuned on them. Both streams share `keyframe_interval`: a seek in a chunk goes
 to a colour keyframe, so a depth stream with its keyframes elsewhere comes back with its references missing."""
 
+from collections import deque
 from threading import Thread, Lock, Event
 from pathlib import Path
 import shutil
@@ -21,7 +23,7 @@ from modules.settings import BaseSettings, Field, Widget
 from modules.video import CoderType, CoderFormat, DEPTH_ENCODER, encoder_name, StreamWriter
 
 from .chunk import METADATA_SUFFIX, ChunkInfo, finish_unmerged, info_line, merge_chunk, readings_line
-from .frame import FrameType, CameraFrame, mirrored_image
+from .frame import CAPTURE_TOLERANCE, FrameType, CameraFrame, mirrored_image
 
 import logging
 logger = logging.getLogger(__name__)
@@ -56,6 +58,7 @@ FRAME_TYPE_LABELS: dict[FrameType, str] = {
 }
 METADATA_LABEL: str = 'M'
 DEPTH_SUFFIX: str = '.mkv'
+WAITING_VIDEO: int = 8      # color frames a camera's depth may lag; it arrives about one frame later
 
 
 def make_file_name(cam_id: int, frame_type: FrameType, chunk: int, suffix: str) -> str:
@@ -91,7 +94,8 @@ class Recorder(Thread):
         self.with_depth: bool = FrameType.DEPTH in settings.video_frame_types
         self.recorders: dict[int, dict[FrameType, StreamWriter]] = {}
         self.frames: dict[int, Queue[tuple[CameraFrame, CameraFrame | None]]] = {}    # a colour frame and its depth
-        self.newest_depth: dict[int, CameraFrame | None] = {}
+        self.waiting_video: dict[int, deque[CameraFrame]] = {}      # color frames whose depth has not arrived yet
+        self.waiting_lock: Lock = Lock()                            # video and depth arrive on different threads
         self.metadata: dict[int, TextIO] = {}
         self.metadata_frames: dict[int, int] = {}       # the frames of the chunk so far, per camera
         self.folder_path: Path | None = None
@@ -99,7 +103,7 @@ class Recorder(Thread):
         for c in range(settings.num_cams):
             self.recorders[c] = {}
             self.frames[c] = Queue()
-            self.newest_depth[c] = None
+            self.waiting_video[c] = deque(maxlen=WAITING_VIDEO)
             for t in self.settings.video_frame_types:
                 vcodec: str = DEPTH_ENCODER if t == FrameType.DEPTH else encoder_name(settings.video_format, settings.video_encoder)
                 self.recorders[c][t] = StreamWriter(vcodec, settings.keyframe_interval, settings.video_quality)
@@ -178,8 +182,10 @@ class Recorder(Thread):
 
         self.chunk_index = 0
 
+        with self.waiting_lock:
+            for waiting in self.waiting_video.values():
+                waiting.clear()
         for c in range(self.settings.num_cams):
-            self.newest_depth[c] = None
             for t in self.settings.video_frame_types:
                 self.recorders[c][t].start(str(self._stream_path(c, t, self.chunk_index)), self.settings.fps)
         if self.with_depth:
@@ -258,10 +264,11 @@ class Recorder(Thread):
                 logger.warning("Temp folder not empty, leaving: %s", self.folder_path)
 
     def _update_recording(self) -> None:
-        if self.split_requested.is_set():
+        split: bool = self.split_requested.is_set()      # read first: what was queued before the request ends its chunk
+        self._write_queued()
+        if split:
             self.split_requested.clear()
             self._do_split()
-        self._write_queued()
 
     def _write_queued(self) -> None:
         """Everything queued, on every pass: with depth two streams arrive per camera at the full
@@ -304,17 +311,29 @@ class Recorder(Thread):
 
     # EXTERNAL METHODS
     def submit_frame(self, frame: CameraFrame) -> None:
-        """A camera's frame callback: queued while recording, of the kinds the recorder writes. A
-        depth frame is only held; each colour frame takes the newest along."""
+        """A camera's frame callback: queued while recording, of the kinds the recorder writes. With
+        depth a color frame waits, and each depth frame takes the color frame captured with it."""
         if frame.kind not in self.settings.video_frame_types or self._get_state() != RecState.REC:
             return
-        if frame.kind == FrameType.DEPTH:
-            self.newest_depth[frame.cam_id] = frame
+        if not self.with_depth:
+            self.frames[frame.cam_id].put((frame, None))
             return
-        depth: CameraFrame | None = self.newest_depth[frame.cam_id]
-        if self.with_depth and depth is None:
-            return
-        self.frames[frame.cam_id].put((frame, depth))
+        video: CameraFrame | None = None
+        with self.waiting_lock:
+            waiting: deque[CameraFrame] = self.waiting_video[frame.cam_id]
+            if frame.kind == FrameType.VIDEO:
+                waiting.append(frame)
+                return
+            while waiting:
+                candidate: CameraFrame = waiting.popleft()
+                if abs(candidate.timestamp - frame.timestamp) <= CAPTURE_TOLERANCE:
+                    video = candidate
+                    break
+                if candidate.timestamp > frame.timestamp:
+                    waiting.appendleft(candidate)      # captured after this depth: it waits for its own
+                    break
+        if video is not None:
+            self.frames[frame.cam_id].put((video, frame))
 
     # SETTINGS CALLBACKS
     def _on_enabled(self, value: bool) -> None:

@@ -44,8 +44,8 @@ def record(root: Path, count: int) -> Path:
     while rec._get_state() != RecState.REC and time.perf_counter() < deadline:
         time.sleep(0.01)
     for i in range(count):
-        rec.submit_frame(depth_frame(1000 + i * 30))
         rec.submit_frame(video_frame(i))
+        rec.submit_frame(depth_frame(1000 + i * 30, float(i)))
         time.sleep(0.002)
     rec.settings.stop = True
     while rec._get_state() != RecState.IDLE and time.perf_counter() < deadline + 10.0:

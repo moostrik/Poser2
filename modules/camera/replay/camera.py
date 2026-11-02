@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 class Detection(Protocol):
     """What the detector reports for one frame: `modules.inference.detection.Detection`."""
     cam_id: int
+    timestamp: float
     boxes: list[Rect]
 
 
@@ -34,7 +35,7 @@ class PersonDetector(Protocol):
     """A person detector the camera submits frames to and hears back from, on the detector's
     thread: `modules.inference.detection.PersonDetector`. Named here so the contract does not import
     the inference package."""
-    def submit(self, cam_id: int, image: np.ndarray) -> None: ...
+    def submit(self, cam_id: int, image: np.ndarray, timestamp: float) -> None: ...
     def add_detection_callback(self, callback) -> None: ...
 
 
@@ -53,6 +54,7 @@ class Camera:
         self.tracker: BoxTracker | None = tracker if detector is not None else None
         self.running: bool = False
         self.tilt_correction: TiltCorrection | None = TiltCorrection(tilt) if tilt is not None else None
+        self._video_timestamp: float | None = None     # the stamp of the recorded frame being handed over
 
         self.video_fps: FPS = FPS(120)
         self.tracklet_fps: FPS = FPS(120)
@@ -100,20 +102,24 @@ class Camera:
     # ── Hand-over ──────────────────────────────────────────────────────
 
     def _clip_callback(self, cam_id: int, frame_type: FrameType, image: np.ndarray, readings: FrameReadings | None) -> None:
-        """A decoded clip frame, on the player's thread: stamped here, to the callbacks and the detector."""
+        """A decoded clip frame, on the player's thread: stamped here, to the callbacks and the detector.
+        The player hands a recorded frame's video first, so its depth takes the video's stamp: one
+        capture, one time."""
         if not self.running or cam_id != self.id:
             return
         if frame_type == FrameType.VIDEO:
+            self._video_timestamp = time.perf_counter()
             self.video_fps.processed()
             self.settings.readings.video_fps = self.video_fps.get_rate_average()
             self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
             self._update_tilt(readings)
+        timestamp: float = self._video_timestamp if self._video_timestamp is not None else time.perf_counter()
         homography: np.ndarray | None = self.tilt_correction.homography if self.tilt_correction is not None else None
-        frame = CameraFrame(cam_id=self.id, kind=frame_type, image=image, timestamp=time.perf_counter(), homography=homography)
+        frame = CameraFrame(cam_id=self.id, kind=frame_type, image=image, timestamp=timestamp, homography=homography)
         for c in self.frame_callbacks:
             c(frame)
         if self.detector is not None and frame_type == FrameType.VIDEO:
-            self.detector.submit(self.id, image)
+            self.detector.submit(self.id, image, timestamp)
 
     def _update_tilt(self, readings: FrameReadings | None) -> None:
         """The recorded tilt on the recorded lens. The frames were stored mirrored, so the lens is."""
@@ -128,17 +134,17 @@ class Camera:
 
     def _on_detection(self, detection: Detection) -> None:
         """The detector's boxes for one frame, on its thread: through the tracker, out as the
-        contract's tracklets with the time of this message, an empty list included."""
+        contract's tracklets with that frame's time, an empty list included."""
         if not self.running or detection.cam_id != self.id or self.tracker is None:
             return
-        now: float = time.perf_counter()
+        timestamp: float = detection.timestamp
         self.tracklet_fps.processed()
         self.settings.readings.tracker_fps = self.tracklet_fps.get_rate_average()
         homography: np.ndarray | None = self.tilt_correction.homography if self.tilt_correction is not None else None
         tracklets: list[CameraTracklet] = [
             CameraTracklet(cam_id=self.id, id=t.id, status=t.status, roi=corrected_roi(t.roi, homography) if homography is not None else t.roi,
-                           age=t.age, timestamp=now)
+                           age=t.age, timestamp=timestamp)
             for t in self.tracker.update(detection.boxes)]
         self.settings.readings.tracklets = len(tracklets)
         for c in self.tracklet_callbacks:
-            c(self.id, tracklets, now)
+            c(self.id, tracklets, timestamp)

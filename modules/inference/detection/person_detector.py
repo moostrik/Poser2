@@ -50,7 +50,7 @@ class PersonDetector(Thread):
         self._ready: Event = Event()
 
         self._lock: Lock = Lock()
-        self._pending: dict[int, np.ndarray] = {}      # the newest frame per camera, waiting
+        self._pending: dict[int, tuple[np.ndarray, float]] = {}    # the newest frame per camera with its time, waiting
         self._dropped: int = 0
 
         self._callback_lock: Lock = Lock()
@@ -80,14 +80,14 @@ class PersonDetector(Thread):
             if callback not in self._callbacks:
                 self._callbacks.append(callback)
 
-    def submit(self, cam_id: int, image: np.ndarray) -> None:
-        """A frame to look at, on the caller's thread; the newest per camera is kept."""
+    def submit(self, cam_id: int, image: np.ndarray, timestamp: float) -> None:
+        """A frame to look at, with its time, on the caller's thread; the newest per camera is kept."""
         if not self.is_ready:
             return
         with self._lock:
             if cam_id in self._pending:
                 self._dropped += 1
-            self._pending[cam_id] = image
+            self._pending[cam_id] = (image, timestamp)
         self._wake.set()
 
     def run(self) -> None:
@@ -112,19 +112,19 @@ class PersonDetector(Thread):
         self._ready.set()
         logger.info("Person detector: %s ready", self.settings.model)
 
-    def _claim(self) -> dict[int, np.ndarray]:
+    def _claim(self) -> dict[int, tuple[np.ndarray, float]]:
         with self._lock:
             pending = self._pending
             self._pending = {}
             return pending
 
     def _process(self) -> None:
-        pending: dict[int, np.ndarray] = self._claim()
+        pending: dict[int, tuple[np.ndarray, float]] = self._claim()
         if not pending:
             return
         start: float = time.perf_counter()
         cam_ids: list[int] = list(pending.keys())
-        batch: np.ndarray = np.stack([self._preprocess(pending[cam_id]) for cam_id in cam_ids])
+        batch: np.ndarray = np.stack([self._preprocess(pending[cam_id][0]) for cam_id in cam_ids])
         output: np.ndarray = self._runner.infer(batch)
         confidence: float = self.settings.confidence
         overlap: float = self.settings.overlap
@@ -132,7 +132,8 @@ class PersonDetector(Thread):
         for i, cam_id in enumerate(cam_ids):
             boxes, scores = person_boxes(output[i], confidence, overlap)
             rects: np.ndarray = normalise(boxes, self.width, self.height)
-            detections.append(Detection(cam_id=cam_id, boxes=[Rect(*map(float, r)) for r in rects], scores=[float(s) for s in scores]))
+            detections.append(Detection(cam_id=cam_id, timestamp=pending[cam_id][1], boxes=[Rect(*map(float, r)) for r in rects],
+                                        scores=[float(s) for s in scores]))
         self._timer.add_time((time.perf_counter() - start) * 1000.0, report=self.settings.verbose)
         with self._callback_lock:
             callbacks = list(self._callbacks)

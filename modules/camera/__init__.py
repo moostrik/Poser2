@@ -1,5 +1,5 @@
 from .source import         CameraSource, CameraFrameCallback, TrackletCallback
-from .frame import          FrameType, FrameReadings, CameraFrame, mirrored_image
+from .frame import          CAPTURE_TOLERANCE, FrameType, FrameReadings, CameraFrame, mirrored_image
 from .tracklet import       TrackingStatus, CameraTracklet
 from .settings import       CameraSettings, CameraReadings, RigCameraSettings, RigCameraReadings, CameraCheckSettings, TiltCorrectionSettings
 from .camera_check import   CameraCheck, FPS_TOLERANCE, MIN_RATE_FACTOR, mount_deviation, fps_deviation

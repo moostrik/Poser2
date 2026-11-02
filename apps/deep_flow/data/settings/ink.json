@@ -81,7 +81,7 @@
       "replay": true
     },
     "person_detector": {
-      "model_type": "ONNX",
+      "model_type": "TRT",
       "resolution": "R640X512",
       "model_path": "data/models",
       "engine_path": "apps/deep_flow/data/models",
@@ -266,14 +266,15 @@
   "render": {
     "stage": "LERP",
     "b_enabled": false,
+    "a_view": "FLUID",
+    "b_view": "FLUID",
     "layer": {
       "select": {
         "left": [
-          "cam_image",
-          "cam_depth"
+          "center_foreground"
         ],
         "right": [
-          "cam_image"
+          "flow"
         ],
         "output": [
           "cam_image",
@@ -395,10 +396,11 @@
     },
     "flow": {
       "fps": 60.0,
-      "draw_mode": "SMOOTH_VELOCITY_OUTPUT",
+      "draw_mode": "KINETIC_CURL",
       "blend_mode": "ADD",
       "width": 896,
       "height": 1600,
+      "bridge": "KINETIC",
       "inputs": {
         "flow": "center_foreground",
         "density": "center_foreground"
@@ -406,6 +408,8 @@
       "visualization": {
         "toggle_scalar": false,
         "scale": 1.0,
+        "scalar_scale": 0.2,
+        "strip_scale": 1.0,
         "spacing": 20.0,
         "element_length": 40.0,
         "element_width": 1.0
@@ -417,11 +421,36 @@
         "strength_y": 3.3,
         "boost": 0.4
       },
+      "depth_velocity": {
+        "scale": 0.0,
+        "smooth_time": 60.0,
+        "jump": 0.1,
+        "blur_radius": 4.0,
+        "blur_steps": 2,
+        "dead_zone": 0.1
+      },
       "velocity_trail": {
         "scale": 1.0,
         "trail_weight": 0.93,
         "blur_radius": 0.0,
         "blur_steps": 4
+      },
+      "kinetic_bridge": {
+        "scale": 10.0,
+        "fast_time": 25.0,
+        "slow_time": 150.0,
+        "blur_position": "BEFORE",
+        "blur_radius": 2.0,
+        "blur_steps": 2,
+        "stop_gate": 0.0,
+        "stop_tile": 128.0,
+        "release_hold": 100.0,
+        "emission_gain": 1.0,
+        "drop_velocity": 1.0,
+        "onset_force": 0.5,
+        "spin": 0.0,
+        "reservoir_enabled": false,
+        "reservoir_leak": 4.0
       },
       "density_bridge": {
         "saturation": 1.02,
@@ -468,6 +497,7 @@
           "input_strength": 0.57,
           "squeeze": 0.0,
           "push": 0.5,
+          "depth_mix": 0.0,
           "self_advection": 0.2,
           "fade_time": 12.0,
           "dampen_threshold": 10.0,
@@ -512,9 +542,12 @@
       "blend_mode": "ADD",
       "width": 896,
       "height": 1600,
+      "bridge": "TRAIL",
       "visualization": {
         "toggle_scalar": false,
         "scale": 1.0,
+        "scalar_scale": 0.2,
+        "strip_scale": 1.0,
         "spacing": 20.0,
         "element_length": 40.0,
         "element_width": 1.0
@@ -526,11 +559,36 @@
         "strength_y": 3.3,
         "boost": 0.4
       },
+      "depth_velocity": {
+        "scale": 0.0,
+        "smooth_time": 60.0,
+        "jump": 0.1,
+        "blur_radius": 4.0,
+        "blur_steps": 2,
+        "dead_zone": 0.1
+      },
       "velocity_trail": {
         "scale": 1.0,
         "trail_weight": 0.93,
         "blur_radius": 0.0,
         "blur_steps": 4
+      },
+      "kinetic_bridge": {
+        "scale": 10.0,
+        "fast_time": 25.0,
+        "slow_time": 150.0,
+        "blur_position": "BEFORE",
+        "blur_radius": 2.0,
+        "blur_steps": 2,
+        "stop_gate": 0.0,
+        "stop_tile": 128.0,
+        "release_hold": 100.0,
+        "emission_gain": 1.0,
+        "drop_velocity": 1.0,
+        "onset_force": 0.5,
+        "spin": 0.0,
+        "reservoir_enabled": false,
+        "reservoir_leak": 4.0
       },
       "density_bridge": {
         "saturation": 1.02,
@@ -577,6 +635,7 @@
           "input_strength": 0.57,
           "squeeze": 0.0,
           "push": 0.5,
+          "depth_mix": 0.0,
           "self_advection": 0.2,
           "fade_time": 12.0,
           "dampen_threshold": 10.0,
@@ -614,6 +673,13 @@
           "boundary": "OPEN"
         }
       }
+    },
+    "time_series": {
+      "window": 10.0,
+      "max_values": [
+        0.0
+      ],
+      "line_width": 2.0
     },
     "colors": {
       "player_0": {

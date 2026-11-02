@@ -24,8 +24,8 @@ def video_frame(i: int) -> CameraFrame:
                        intrinsics=LENS)
 
 
-def depth_frame(value: int) -> CameraFrame:
-    return CameraFrame(0, FrameType.DEPTH, np.full((300, 374), value, np.uint16), 0.0)
+def depth_frame(value: int, timestamp: float) -> CameraFrame:
+    return CameraFrame(0, FrameType.DEPTH, np.full((300, 374), value, np.uint16), timestamp)
 
 
 def recorder(types: list[FrameType], temp: str = 'temp', output: str = 'out', data_path: str = '', keyframe_interval: int = 1) -> Recorder:
@@ -55,18 +55,30 @@ class PairingTest(unittest.TestCase):
     def tearDown(self) -> None:
         self.recorder.settings.unbind(RecorderSettings.start, self.recorder._on_start)
 
-    def test_a_colour_frame_takes_the_newest_depth(self) -> None:
-        self.recorder.submit_frame(depth_frame(1000))
-        self.recorder.submit_frame(depth_frame(2000))
-        self.recorder.submit_frame(video_frame(0))
-        _, depth = self.recorder.frames[0].get_nowait()
-        self.assertEqual(int(depth.image[0, 0]), 2000)
+    def test_a_depth_frame_takes_the_color_frame_captured_with_it(self) -> None:
+        for i in range(3):
+            self.recorder.submit_frame(video_frame(i))         # color arrives first
+        self.recorder.submit_frame(depth_frame(1000, 1.0005))   # within the tolerance of frame 1
+        video, depth = self.recorder.frames[0].get_nowait()
+        self.assertEqual(video.timestamp, 1.0)
+        self.assertEqual(int(depth.image[0, 0]), 1000)
+        self.assertTrue(self.recorder.frames[0].empty())
 
-    def test_one_depth_frame_serves_every_colour_frame_until_the_next(self) -> None:
-        self.recorder.submit_frame(depth_frame(1000))
-        self.recorder.submit_frame(video_frame(0))
-        self.recorder.submit_frame(video_frame(1))
-        self.assertEqual(self.recorder.frames[0].qsize(), 2)
+    def test_a_color_frame_whose_depth_never_comes_is_left_out(self) -> None:
+        for i in range(3):
+            self.recorder.submit_frame(video_frame(i))
+        self.recorder.submit_frame(depth_frame(1000, 2.0))      # frame 1's depth was dropped
+        video, _ = self.recorder.frames[0].get_nowait()
+        self.assertEqual(video.timestamp, 2.0)
+        self.assertTrue(self.recorder.frames[0].empty())
+
+    def test_a_color_frame_captured_after_the_depth_waits_for_its_own(self) -> None:
+        self.recorder.submit_frame(video_frame(5))
+        self.recorder.submit_frame(depth_frame(1000, 4.0))      # no color frame of its own
+        self.assertTrue(self.recorder.frames[0].empty())
+        self.recorder.submit_frame(depth_frame(2000, 5.0))
+        video, depth = self.recorder.frames[0].get_nowait()
+        self.assertEqual((video.timestamp, int(depth.image[0, 0])), (5.0, 2000))
 
     def test_nothing_is_recorded_before_the_first_depth(self) -> None:
         self.recorder.submit_frame(video_frame(0))
@@ -110,16 +122,16 @@ class RoundTripTest(unittest.TestCase):
                 time.sleep(0.01)
             time.sleep(0.1)
             for i in range(30):
-                rec.submit_frame(depth_frame(1000 + i * 30))
                 rec.submit_frame(video_frame(i))
+                rec.submit_frame(depth_frame(1000 + i * 30, float(i)))
                 time.sleep(0.002)
             RecorderSettings.split.fire(rec.settings)
             while rec.split_requested.is_set() and time.perf_counter() < deadline:
                 time.sleep(0.01)
             time.sleep(0.2)
             for i in range(30, 50):
-                rec.submit_frame(depth_frame(1000 + i * 30))
                 rec.submit_frame(video_frame(i))
+                rec.submit_frame(depth_frame(1000 + i * 30, float(i)))
                 time.sleep(0.002)
             rec.settings.stop = True
             while rec._get_state() != RecState.IDLE and time.perf_counter() < deadline + 10.0:
@@ -147,8 +159,8 @@ class RoundTripTest(unittest.TestCase):
             while rec._get_state() != RecState.REC and time.perf_counter() < deadline:
                 time.sleep(0.01)
             for i in range(count):
-                rec.submit_frame(depth_frame(1000 + i * 30))
                 rec.submit_frame(video_frame(i))
+                rec.submit_frame(depth_frame(1000 + i * 30, float(i)))
                 time.sleep(0.002)
             rec.settings.stop = True
             while rec._get_state() != RecState.IDLE and time.perf_counter() < deadline + 10.0:

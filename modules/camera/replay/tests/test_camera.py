@@ -1,5 +1,5 @@
 """Tests for the replay camera: the clip frames become stamped contract frames, the detector's
-boxes become tracklets through the tracker, with the message time, and the readings follow."""
+boxes become tracklets through the tracker, with their frame's time, and the readings follow."""
 
 import time
 import unittest
@@ -28,24 +28,25 @@ class FakePlayer:
 
 class FakePersonDetector:
     def __init__(self) -> None:
-        self.submitted: list[tuple[int, np.ndarray]] = []
+        self.submitted: list[tuple[int, np.ndarray, float]] = []
         self.callbacks = []
 
-    def submit(self, cam_id: int, image: np.ndarray) -> None:
-        self.submitted.append((cam_id, image))
+    def submit(self, cam_id: int, image: np.ndarray, timestamp: float) -> None:
+        self.submitted.append((cam_id, image, timestamp))
 
     def add_detection_callback(self, callback) -> None:
         self.callbacks.append(callback)
 
-    def report(self, cam_id: int, boxes: list[Rect]) -> None:
+    def report(self, cam_id: int, boxes: list[Rect], timestamp: float = 0.0) -> None:
         for c in self.callbacks:
-            c(FakeDetection(cam_id, boxes))
+            c(FakeDetection(cam_id, boxes, timestamp))
 
 
 class FakeDetection:
-    def __init__(self, cam_id: int, boxes: list[Rect]) -> None:
+    def __init__(self, cam_id: int, boxes: list[Rect], timestamp: float) -> None:
         self.cam_id = cam_id
         self.boxes = boxes
+        self.timestamp = timestamp
 
 
 class FakeTracker:
@@ -76,12 +77,18 @@ class ReplayCameraTest(unittest.TestCase):
         self.assertEqual(self.frames[0].cam_id, 1)
         self.assertIs(self.frames[0].image, image)
         self.assertGreaterEqual(self.frames[0].timestamp, before)
-        self.assertEqual(self.detector.submitted, [(1, image)])
+        self.assertEqual(self.detector.submitted, [(1, image, self.frames[0].timestamp)])
         self.assertTrue(self.camera.connected)
 
-    def test_the_detector_boxes_become_tracklets_with_the_message_time(self) -> None:
-        before = time.perf_counter()
-        self.detector.report(1, [Rect(0.1, 0.2, 0.3, 0.4), Rect(0.5, 0.5, 0.2, 0.3)])
+    def test_a_recorded_frame_s_depth_takes_its_video_s_time(self) -> None:
+        self.player.push(1, np.zeros((4, 6, 3), dtype=np.uint8))
+        time.sleep(0.003)
+        self.player.push(1, np.zeros((4, 6), dtype=np.uint16), FrameType.DEPTH)
+        self.assertEqual([f.kind for f in self.frames], [FrameType.VIDEO, FrameType.DEPTH])
+        self.assertEqual(self.frames[1].timestamp, self.frames[0].timestamp)
+
+    def test_the_detector_boxes_become_tracklets_with_their_frame_s_time(self) -> None:
+        self.detector.report(1, [Rect(0.1, 0.2, 0.3, 0.4), Rect(0.5, 0.5, 0.2, 0.3)], 12.5)
         self.detector.report(0, [Rect(0.1, 0.2, 0.3, 0.4)])         # not this camera
         self.assertEqual(len(self.messages), 1)
         cam_id, tracklets, t = self.messages[0]
@@ -89,7 +96,7 @@ class ReplayCameraTest(unittest.TestCase):
         self.assertEqual([tr.id for tr in tracklets], [0, 1])
         self.assertEqual(tracklets[0].roi, Rect(0.1, 0.2, 0.3, 0.4))
         self.assertEqual(tracklets[0].cam_id, 1)
-        self.assertGreaterEqual(t, before)
+        self.assertEqual(t, 12.5)
         self.assertTrue(all(tr.timestamp == t for tr in tracklets))
         self.assertEqual(self.settings.readings.tracklets, 2)
 

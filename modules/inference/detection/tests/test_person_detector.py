@@ -75,12 +75,13 @@ class PersonDetectorTest(unittest.TestCase):
         self.detector.stop()
         logging.disable(logging.NOTSET)
 
-    def test_every_submitted_frame_gets_its_detection_with_boxes_normalised_to_the_frame(self) -> None:
-        self.detector.submit(0, np.zeros((600, 800, 3), dtype=np.uint8))       # colour, another size
-        self.detector.submit(2, np.zeros((300, 400), dtype=np.uint8))          # gray
+    def test_every_submitted_frame_gets_its_detection_with_boxes_normalised_to_the_frame_and_its_time(self) -> None:
+        self.detector.submit(0, np.zeros((600, 800, 3), dtype=np.uint8), 1.5)  # colour, another size
+        self.detector.submit(2, np.zeros((300, 400), dtype=np.uint8), 2.5)     # gray
         self.assertTrue(wait_for(lambda: len(self.detections) == 2))
         by_cam = {d.cam_id: d for d in self.detections}
         self.assertEqual(set(by_cam), {0, 2})
+        self.assertEqual((by_cam[0].timestamp, by_cam[2].timestamp), (1.5, 2.5))
         for d in by_cam.values():
             self.assertEqual(len(d.boxes), 1)                                   # the 0.2 one is under the threshold
             self.assertEqual(d.boxes[0], Rect(0.375, 0.25, 0.25, 0.5))
@@ -95,7 +96,7 @@ class PersonDetectorTest(unittest.TestCase):
 
     def test_the_threshold_is_read_at_use(self) -> None:
         self.settings.confidence = 0.1
-        self.detector.submit(0, np.zeros((448, 512, 3), dtype=np.uint8))
+        self.detector.submit(0, np.zeros((448, 512, 3), dtype=np.uint8), 0.0)
         self.assertTrue(wait_for(lambda: len(self.detections) == 1))
         self.assertEqual(len(self.detections[0].boxes), 2)
 

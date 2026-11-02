@@ -21,8 +21,9 @@ class CameraTracklet:
     """Device-neutral: what a camera's object tracker says about one track, in its own frame.
 
     `id` is the device tracker's id for the track and `age` its age in frames; `roi` is normalised
-    to the delivered frame; `timestamp` is the host arrival time of the message (`time.perf_counter()`,
-    stamped by the backend at hand-over, the same for every tracklet of one message). `keypoints`
+    to the delivered frame; `timestamp` is the capture time of the frame the tracker looked at, the
+    frame's own `CameraFrame.timestamp` (oak4, replay), else the message's arrival; the same for
+    every tracklet of one message. `keypoints`
     is None unless the camera runs a pose model (OAK4): then float32 (17, 3), the body landmarks in
     the pose's order (`modules.pose.PointLandmark`, COCO), each x and y normalised to the delivered
     frame like `roi`, and its score.

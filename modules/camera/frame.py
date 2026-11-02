@@ -1,9 +1,12 @@
-"""A camera frame as the contract hands it on: the image with its origin, kind and arrival time."""
+"""A camera frame as the contract hands it on: the image with its origin, kind and capture time."""
 
 from dataclasses import dataclass
 from enum import Enum
 
 import numpy as np
+
+
+CAPTURE_TOLERANCE: float = 0.002   # s: frames of one capture carry timestamps this close (OAK4: 0.12 ms apart)
 
 
 class FrameType(Enum):
@@ -28,9 +31,11 @@ class FrameReadings:
 class CameraFrame:
     """One frame from one camera.
 
-    `timestamp` is the host's arrival time on the one clock, `time.perf_counter()`, stamped by the
-    backend at hand-over; camera timestamps are not used, and everything downstream takes its
-    time from the frame instead of reading a clock (the wall clock is for file names only).
+    `timestamp` is the moment of capture on the one clock, `time.perf_counter()`, stamped by the
+    backend at hand-over: the end of the exposure where the backend knows it (oak4), else the
+    arrival. A depth frame and the video frame captured with it carry timestamps within
+    `CAPTURE_TOLERANCE`, so time pairs them. Everything downstream takes its time from the frame
+    instead of reading a clock (the wall clock is for file names only).
     `image` is BGR uint8 (H, W, 3) or gray uint8 (H, W), as the backend delivers it; with `nv12` it is
     packed NV12 uint8 (H * 3 / 2, W): the Y rows, then the interleaved UV rows, which a consumer
     converts where it is cheapest. A DEPTH frame's `image` is uint16 millimetres (H, W), 0 where
