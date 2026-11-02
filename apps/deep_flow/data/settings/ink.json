@@ -441,7 +441,7 @@
         "window": 2,
         "regularizer": 0.0215,
         "threshold": 0.5,
-        "displacement_scale": 0.2,
+        "displacement_scale": 0.15,
         "strength_x": 1.0,
         "strength_y": 1.0,
         "boost": 0.0
@@ -452,10 +452,10 @@
         "jump": 0.1,
         "blur_radius": 4.0,
         "blur_steps": 2,
-        "dead_zone": 0.1
+        "dead_zone": 0.12
       },
       "velocity_trail": {
-        "scale": 1.0,
+        "scale": 0.25,
         "trail_weight": 0.93,
         "blur_radius": 0.0,
         "blur_steps": 4
