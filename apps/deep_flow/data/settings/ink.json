@@ -147,6 +147,9 @@
       "output_height": 1024,
       "enable_prev_crop": false
     },
+    "capture_sync": {
+      "pose_wait": 10.0
+    },
     "angle_extractor": {
       "aspect_ratio": 0.75
     },
@@ -274,7 +277,7 @@
           "center_foreground"
         ],
         "right": [
-          "flow"
+          "center_depth_foreground"
         ],
         "output": [
           "cam_image",
@@ -355,12 +358,36 @@
         "mask_opacity": 1.0,
         "use_mask": true
       },
+      "capture": {
+        "blend_factor": 1.0,
+        "mask_opacity": 1.0,
+        "use_mask": true
+      },
       "depth": {
         "blend_factor": 1.0,
         "mask_opacity": 1.0,
         "use_mask": true
       },
       "foreground": {
+        "blend_factor": 0.2,
+        "exposure": 0.99,
+        "gamma": 1.0,
+        "offset": 0.0,
+        "contrast": 1.1,
+        "saturation": 1.78,
+        "levels": 3,
+        "smoothness": 0.0,
+        "colorize": 0.0,
+        "sharpen": 0.42,
+        "use_mask": true
+      },
+      "depth_mask": {
+        "blend_factor": 1.0,
+        "dilation_steps": 0,
+        "blur_steps": 0,
+        "blur_radius": 1.0
+      },
+      "depth_foreground": {
         "blend_factor": 0.2,
         "exposure": 0.99,
         "gamma": 1.0,
@@ -394,6 +421,11 @@
       "near": 0.3,
       "far": 12.0
     },
+    "depth_mask": {
+      "near": 0.5,
+      "far": 1.5,
+      "edge": 0.1
+    },
     "flow": {
       "fps": 60.0,
       "draw_mode": "KINETIC_CURL",
@@ -402,8 +434,9 @@
       "height": 1600,
       "bridge": "KINETIC",
       "inputs": {
-        "flow": "center_foreground",
-        "density": "center_foreground"
+        "flow": "center_capture",
+        "density": "center_capture",
+        "mask": "center_depth_mask"
       },
       "visualization": {
         "toggle_scalar": false,

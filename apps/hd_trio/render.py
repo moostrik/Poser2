@@ -90,10 +90,10 @@ class HDTrioRender(RenderBase):
             self.L[Layers.cam_readings][i] =                 ls.CameraReadingsLayer( cameras[i], camera_check)
 
             center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, self.board,      cam_image.texture,          settings.center.geometry)
-            center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask.texture,           settings.center.mask)
+            center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask.texture,       ls.SourceSpace.CROP, settings.center.mask)
             cmt[i] = center_mask.texture
             center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image.texture,  cmt[i], settings.center.cam)
-            center_foreground = self.L[Layers.center_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, cam_foreground.texture, cmt[i], settings.center.foreground, settings.colors)
+            center_foreground = self.L[Layers.center_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, cam_foreground.texture, cmt[i], ls.SourceSpace.CROP, settings.center.foreground, settings.colors)
             center_pose =   self.L[Layers.center_pose][i] = ls.CenterPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
 
             intro_geometry = self._intro_geometries[i] =     ls.CenterGeometry(      i, cast(HasFrames, self._intro_proxy), cam_image.texture, settings.center.geometry)

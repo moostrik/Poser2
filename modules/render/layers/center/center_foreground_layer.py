@@ -3,7 +3,7 @@
 # Local application imports
 from modules.settings import Field, BaseSettings
 from ..layer_base import LayerBase
-from .center_geometry import CenterGeometry
+from .center_geometry import CenterGeometry, SourceSpace
 from ...shaders import DrawRoi, Blend, MaskApply, CelShade, HueShift
 from modules.gl import Fbo, SwapFbo, Texture, Style, shaders
 from ...color_settings import ColorSettings
@@ -32,13 +32,16 @@ class CenterForegroundLayerSettings(BaseSettings):
 class CenterForegroundLayer(LayerBase):
     """Renders foreground image cropped and rotated with temporal blending.
 
-    Uses bbox_geometry for rendering. Optionally applies mask texture for compositing.
+    `space` says whether the foreground is on the pose's crop or on the camera image. Optionally
+    applies mask texture for compositing.
     """
 
-    def __init__(self, cam_id: int, geometry: CenterGeometry, foreground_texture: Texture, mask_texture: Texture, settings: CenterForegroundLayerSettings, color_settings: ColorSettings) -> None:
+    def __init__(self, cam_id: int, geometry: CenterGeometry, foreground_texture: Texture, mask_texture: Texture, space: SourceSpace,
+                 settings: CenterForegroundLayerSettings, color_settings: ColorSettings) -> None:
         self._cam_id: int = cam_id
         self._geometry: CenterGeometry = geometry
         self._foreground_texture: Texture = foreground_texture
+        self._space: SourceSpace = space
         self._mask_texture: Texture = mask_texture
         self._color_settings: ColorSettings = color_settings
 
@@ -91,27 +94,21 @@ class CenterForegroundLayer(LayerBase):
         self._mask_shader.deallocate()
 
     def update(self) -> None:
-        """Render foreground crop using bbox geometry, with temporal blending and optional mask."""
+        """Render the foreground centered by CenterGeometry in its space, with temporal blending and optional mask."""
         if self._geometry.lost:
             self._blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._blend_fbo.swap()
             self._blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
 
-        if self._geometry.crop_pose_points is None:
+        if self._geometry.crop_pose_points is None or not self._foreground_texture.allocated:
             return
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
-        # Render foreground with bbox ROI
+        # Render foreground with its ROI
         self._roi_fbo.begin()
-        self._roi_shader.use(
-            self._foreground_texture,
-            self._geometry.bbox_geometry.crop_roi,
-            self._geometry.bbox_geometry.rotation,
-            self._geometry.bbox_geometry.rotation_center,
-            self._geometry.bbox_geometry.aspect
-        )
+        self._roi_shader.use(self._foreground_texture, *self._geometry.source_roi(self._space, self._foreground_texture))
         self._roi_fbo.end()
 
         # Temporal blending

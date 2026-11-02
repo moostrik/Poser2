@@ -9,6 +9,9 @@ from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, Mon
 from modules.render import layers as ls, make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
 
+from modules.board import HasFrames
+
+from .capture_poses import CapturePoses
 from .render_board import RenderBoard
 from .settings import ABView, Layers, RenderSettings
 
@@ -19,12 +22,19 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.cam_foreground,
     Layers.cam_crop,
     Layers.cam_depth,
+    Layers.capture_image,
+    Layers.depth_mask,          # after the depth it cuts
+    Layers.depth_foreground,    # after the image and the mask it multiplies
 
     Layers.center_geometry,
     Layers.center_mask,
     Layers.center_depth,
     Layers.center_metres,
     Layers.center_foreground,
+    Layers.center_depth_mask,
+    Layers.center_depth_foreground,
+    Layers.center_capture,      # a flow input: the capture's image, unmasked
+    Layers.center_cam,          # a flow input: the newest image, unmasked (RVM's side)
     Layers.center_pose,
 
     Layers.color_mask,
@@ -53,9 +63,12 @@ B_LAYERS: list[Layers] = [
 # The source layer that says when a center layer has a new frame
 FLOW_SOURCES: dict[Layers, Layers] = {
     Layers.center_cam:        Layers.cam_image,
+    Layers.center_capture:    Layers.capture_image,
     Layers.center_depth:      Layers.cam_depth,
     Layers.center_mask:       Layers.cam_mask,
     Layers.center_foreground: Layers.cam_foreground,
+    Layers.center_depth_mask:       Layers.depth_mask,
+    Layers.center_depth_foreground: Layers.depth_foreground,
 }
 
 OUTPUT_WIDTH: int = 1080
@@ -68,6 +81,9 @@ SHAPE_LAYERS: dict[Layers, Layers] = {
     Layers.cam_foreground: Layers.cam_foreground,
     Layers.cam_crop:       Layers.cam_crop,
     Layers.cam_depth:      Layers.cam_depth,
+    Layers.capture_image:  Layers.capture_image,
+    Layers.depth_mask:     Layers.depth_mask,
+    Layers.depth_foreground: Layers.depth_foreground,
     Layers.tracker:        Layers.cam_image,  # camera stretched into a panel-sized FBO
     Layers.pose:           Layers.cam_crop,   # crop stretched into a panel-sized FBO
 }
@@ -104,17 +120,25 @@ class DeepFlowRender(RenderBase):
             cam_foreground = self.L[Layers.cam_foreground][i] = ls.ForegroundSourceLayer(i, self.board)
             cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.board)
             cam_depth =     self.L[Layers.cam_depth][i] =   ls.DepthSourceLayer(    i, self.board,   cam_image.texture,          settings.depth)
+            capture_image = self.L[Layers.capture_image][i] = ls.CaptureImageLayer(i, self.board)
+            depth_mask =    self.L[Layers.depth_mask][i] =  ls.DepthMaskLayer(      cam_depth,                                  settings.depth_mask)
+            depth_foreground = self.L[Layers.depth_foreground][i] = ls.DepthForegroundLayer(capture_image, depth_mask)
 
             tracker_compositor = self.L[Layers.tracker][i] = ls.TrackerCompositor(  i, self.board,   cam_image.texture,          settings.preview.tracker,   settings.colors)
             pose_compositor = self.L[Layers.pose][i] =      ls.PoseCompositor(      i, self.board,   cam_image.texture,          settings.preview.pose,      settings.colors)
 
-            center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, self.board,  cam_image.texture,           settings.center.geometry)
-            center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask.texture,           settings.center.mask)
+            # placed by the pose of the capture it shows, so view, image and depth are one moment
+            center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, cast(HasFrames, CapturePoses(self.board)), cam_image.texture, settings.center.geometry)
+            center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask.texture,       ls.SourceSpace.CROP, settings.center.mask)
             cmt[i] = center_mask.texture
             center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image.texture,  cmt[i], settings.center.cam)
             self.L[Layers.center_depth][i] =                ls.CenterCamLayer(      i, center_geometry, cam_depth.texture,  cmt[i], settings.center.depth)
             self.L[Layers.center_metres][i] =               ls.CenterCamLayer(      i, center_geometry, cam_depth.depth,    cmt[i], settings.center.depth)  # metres in red, the mask in alpha
-            center_foreground = self.L[Layers.center_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, cam_foreground.texture, cmt[i], settings.center.foreground, settings.colors)
+            center_foreground = self.L[Layers.center_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, cam_foreground.texture, cmt[i], ls.SourceSpace.CROP, settings.center.foreground, settings.colors)
+            center_depth_mask = self.L[Layers.center_depth_mask][i] = ls.CenterMaskLayer(i, center_geometry, depth_mask.texture, ls.SourceSpace.IMAGE, settings.center.depth_mask)
+            self.L[Layers.center_depth_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, depth_foreground.texture, center_depth_mask.texture,
+                                                                                 ls.SourceSpace.IMAGE, settings.center.depth_foreground, settings.colors)
+            self.L[Layers.center_capture][i] =              ls.CenterCamLayer(      i, center_geometry, capture_image.texture, center_depth_mask.texture, settings.center.capture)
             center_pose =   self.L[Layers.center_pose][i] = ls.CenterPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
 
             ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,   center_foreground.texture, cmt, settings.center.color,     settings.colors)
@@ -250,6 +274,7 @@ class DeepFlowRender(RenderBase):
 
         flow_key: Layers = self.settings.flow.inputs.flow
         density_key: Layers = self.settings.flow.inputs.density
+        mask_key: Layers = self.settings.flow.inputs.mask
         flow_source_key: Layers = FLOW_SOURCES.get(flow_key, flow_key)
         for flow_type in flow_types:
             fluid = self.settings.fluid3d if flow_type == Layers.flow else self.settings.fluid3d_b
@@ -262,6 +287,7 @@ class DeepFlowRender(RenderBase):
                     flow_layer.set_flow_source(self.L[flow_source_key][i])
                 if density_key in self.L and i in self.L[density_key]:
                     flow_layer.set_density_input(self.L[density_key][i].texture)
+                flow_layer.set_mask_input(self.L[mask_key][i].texture if mask_key in self.L and i in self.L[mask_key] else None)
 
         for i, _composite_layer in self.L[Layers.composite].items():
             composite_layer = cast(ls.CompositeLayer, _composite_layer)

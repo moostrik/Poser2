@@ -104,6 +104,16 @@ class CaptureSyncTest(unittest.TestCase):
         self.assertEqual([c.timestamp for c in self.captures], [1.0 + FRAME])
         self.assertEqual(self.settings.misses, 1)
 
+    def test_a_capture_passed_over_while_waiting_for_poses_is_skipped_not_missed(self) -> None:
+        self.sync.submit_poses(poses(1.0 - FRAME))              # a player is in view
+        self.sync.submit_image(image(1.0))
+        self.sync.submit_depth(depth(1.0))                      # waits for its poses
+        self.sync.submit_image(image(1.0 + FRAME))
+        self.sync.submit_depth(depth(1.0 + FRAME))              # the newer one waits instead
+        self.sync.submit_poses(poses(1.0 + FRAME))
+        self.assertEqual([c.timestamp for c in self.captures], [1.0 + FRAME])
+        self.assertEqual((self.settings.misses, self.settings.skipped), (0, 1))
+
     def test_cameras_are_matched_apart(self) -> None:
         self.sync.submit_image(image(1.0, cam_id=0))
         self.sync.submit_depth(depth(1.0, cam_id=1))

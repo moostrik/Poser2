@@ -15,6 +15,12 @@ from modules.utils import Rect, Point2f
 from modules.gl import Texture
 
 
+class SourceSpace(IntEnum):
+    """The space a centered layer's source texture is in."""
+    CROP  = 0   # the pose's crop (a model's output on it, as RVM's mask): `bbox_geometry`
+    IMAGE = 1   # the camera image (the image itself, depth on its view): `image_geometry`
+
+
 class SnapPoint(IntEnum):
     """Body landmark that stays pinned in the output frame."""
     SHOULDERS = 0
@@ -101,6 +107,16 @@ class CenterGeometry(LayerBase):
     def bbox_geometry(self) -> BboxGeometry:
         """Bbox rendering geometry for mask/flow (crop ROI, rotation, rotation center, aspect)."""
         return self._bbox_geometry
+
+    def source_roi(self, space: SourceSpace, source: Texture) -> tuple[Rect, float, Point2f, float]:
+        """What `DrawRoi` takes to center a texture in `space`: its ROI, rotation, rotation center and
+        aspect. The camera image's aspect is the source texture's own."""
+        if space == SourceSpace.CROP:
+            bbox: BboxGeometry = self._bbox_geometry
+            return bbox.crop_roi, bbox.rotation, bbox.rotation_center, bbox.aspect
+        image: CamGeometry = self._cam_geometry
+        aspect: float = source.width / source.height if source.height > 0 else 1.0
+        return image.crop_roi, image.rotation, image.rotation_center, aspect
 
     @property
     def crop_pose_points(self) -> Points2D | None:

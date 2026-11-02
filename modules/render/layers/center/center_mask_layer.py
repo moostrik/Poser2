@@ -6,7 +6,7 @@ from OpenGL.GL import GL_R16F
 # Local application imports
 from modules.settings import Field, BaseSettings
 from ..layer_base import LayerBase
-from .center_geometry import CenterGeometry
+from .center_geometry import CenterGeometry, SourceSpace
 from ...shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur, MaskDilate, MaskErode
 from modules.gl import Fbo, SwapFbo, Texture, Style
 
@@ -20,12 +20,14 @@ class CenterMaskLayerSettings(BaseSettings):
 
 
 class CenterMaskLayer(LayerBase):
-    """Renders mask image cropped and rotated with temporal blending and blur."""
+    """Renders mask image cropped and rotated with temporal blending and blur. `space` says whether
+    the mask is on the pose's crop or on the camera image."""
 
-    def __init__(self, cam_id: int, geometry: CenterGeometry, mask_texture: Texture, settings: CenterMaskLayerSettings | None = None) -> None:
+    def __init__(self, cam_id: int, geometry: CenterGeometry, mask_texture: Texture, space: SourceSpace, settings: CenterMaskLayerSettings | None = None) -> None:
         self._cam_id: int = cam_id
         self._geometry: CenterGeometry = geometry
         self._mask_src: Texture = mask_texture
+        self._space: SourceSpace = space
 
         # Configuration
         self.settings: CenterMaskLayerSettings = settings or CenterMaskLayerSettings()
@@ -73,13 +75,13 @@ class CenterMaskLayer(LayerBase):
         self._mask_blur_shader.deallocate()
 
     def update(self) -> None:
-        """Render mask crop using bbox geometry from CenterGeometry."""
+        """Render the mask centered by CenterGeometry, in the mask's space."""
         if self._geometry.lost:
             self._blend_fbo.clear_all()
             self._mask_blur_fbo.clear_all()
             return
 
-        if self._geometry.crop_pose_points is None:
+        if self._geometry.crop_pose_points is None or not self._mask_src.allocated:
             return
 
         Style.push_style()
@@ -87,13 +89,7 @@ class CenterMaskLayer(LayerBase):
 
         # Render ROI to temp buffer
         self._roi_fbo.begin()
-        self._roi_shader.use(
-            self._mask_src,
-            self._geometry.bbox_geometry.crop_roi,
-            self._geometry.bbox_geometry.rotation,
-            self._geometry.bbox_geometry.rotation_center,
-            self._geometry.bbox_geometry.aspect
-        )
+        self._roi_shader.use(self._mask_src, *self._geometry.source_roi(self._space, self._mask_src))
         self._roi_fbo.end()
 
         # Temporal blending

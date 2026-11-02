@@ -4,9 +4,10 @@ The three arrive on their own threads at their own times: the image as it is upl
 video thread), the depth frame about 13 ms later (its own thread), the poses out of a pipeline stage
 (the model's thread), measured to arrive with the depth. Each is kept a few frames per camera and
 matched by capture time within `CAPTURE_TOLERANCE`. A capture is complete with its image and its
-depth; while a player is in view it waits up to `pose_wait` for its own poses, else it takes the
-newest poses from before it, so a missing pose never holds it longer. The wait runs on this sync's
-own thread: no submit blocks, and a capture goes out on whichever thread completes it.
+depth. While the poses keep up, the newest as new as the last capture, it waits up to `pose_wait`
+for its own; otherwise (nobody in view, or the poses behind) it takes the newest poses from before
+it at once, so a missing pose never holds it longer. The wait runs on this sync's own thread: no
+submit blocks, and a capture goes out on whichever thread completes it.
 """
 
 import logging
@@ -31,6 +32,7 @@ class CaptureSyncSettings(BaseSettings):
     """Configuration for CaptureSync."""
     pose_wait: Field[float] = Field(10.0, min=0.0, max=50.0, step=0.5, description="Longest a capture waits for its own poses (ms)")
     misses:    Field[int]   = Field(0, access=Field.READ, description="Depth frames that found no image")
+    skipped:   Field[int]   = Field(0, access=Field.READ, description="Captures passed over for a newer one while waiting for poses")
 
 
 @dataclass
@@ -55,9 +57,9 @@ class CaptureSync(Thread):
         self._depths: dict[int, deque[CameraFrame]] = defaultdict(lambda: deque(maxlen=KEPT))
         self._poses: dict[int, deque[tuple[float, FrameDict]]] = defaultdict(lambda: deque(maxlen=KEPT))
         self._last: dict[int, float] = {}               # the capture time of each camera's last capture
-        self._players: dict[int, bool] = {}             # poses came for the camera since a capture last went without
         self._waiting: dict[int, _Waiting] = {}
         self._misses: int = 0
+        self._skipped: int = 0
         self._callbacks: list[CaptureCallback] = []     # run in registration order
 
     def add_capture_callback(self, callback: CaptureCallback) -> None:
@@ -115,7 +117,6 @@ class CaptureSync(Thread):
         with self._lock:
             for cam_id, cam_poses in by_cam.items():
                 self._poses[cam_id].append((max(pose.timestamp for pose in cam_poses.values()), cam_poses))
-                self._players[cam_id] = True
                 captures.append(self._match(cam_id))
         for capture in captures:
             self._emit(capture)
@@ -124,7 +125,7 @@ class CaptureSync(Thread):
 
     def _match(self, cam_id: int) -> Capture | None:
         """The newest moment of this camera with its image and its depth, newer than its last capture:
-        out with its poses, or waiting for them while a player is in view."""
+        out with its poses, or waiting for them while the poses keep up."""
         last: float = self._last.get(cam_id, float('-inf'))
         for depth in reversed(self._depths[cam_id]):
             if depth.timestamp <= last + CAPTURE_TOLERANCE:
@@ -136,7 +137,7 @@ class CaptureSync(Thread):
             if poses is not None:
                 return self._capture(image, depth, poses, True)
             pose_wait: float = self.settings.pose_wait / 1000.0
-            if self._players.get(cam_id, False) and pose_wait > 0.0:
+            if pose_wait > 0.0 and self._poses_keep_up(cam_id, last):
                 waiting: _Waiting | None = self._waiting.get(cam_id)
                 if waiting is None or waiting.depth is not depth:
                     self._waiting[cam_id] = _Waiting(image, depth, time.perf_counter() + pose_wait)
@@ -155,7 +156,6 @@ class CaptureSync(Thread):
         if remaining > 0.0:
             self._wake.wait(remaining)
             return None
-        self._players[cam_id] = False       # no poses in time: until poses come again, nobody is waited for
         return self._capture(waiting.image, waiting.depth, self._poses_before(cam_id, waiting.depth.timestamp), False)
 
     def _capture(self, image: GpuImage, depth: CameraFrame, poses: FrameDict, synced: bool) -> Capture:
@@ -165,13 +165,22 @@ class CaptureSync(Thread):
         self._waiting.pop(cam_id, None)
         depths: deque[CameraFrame] = self._depths[cam_id]
         while depths and depths[0].timestamp <= timestamp + CAPTURE_TOLERANCE:
-            if depths[0].timestamp < timestamp - CAPTURE_TOLERANCE:
-                self._misses += 1               # an older depth frame never met its image
-            depths.popleft()
+            older: CameraFrame = depths.popleft()
+            if older.timestamp < timestamp - CAPTURE_TOLERANCE:
+                if self._image_at(cam_id, older.timestamp) is None:
+                    self._misses += 1           # it never met its image
+                else:
+                    self._skipped += 1          # it was complete, but waited for poses until a newer one went out
         images: deque[GpuImage] = self._images[cam_id]
         while images and images[0].timestamp <= timestamp + CAPTURE_TOLERANCE:
             images.popleft()
         return Capture(cam_id=cam_id, timestamp=timestamp, image=image, depth=depth, poses=poses, poses_synced=synced)
+
+    def _poses_keep_up(self, cam_id: int, last: float) -> bool:
+        """The camera's newest poses are as new as its last capture: the next ones are on their way.
+        False with nobody in view, and while the poses run a frame or more behind."""
+        poses: deque[tuple[float, FrameDict]] = self._poses[cam_id]
+        return bool(poses) and poses[-1][0] >= last - CAPTURE_TOLERANCE
 
     def _image_at(self, cam_id: int, timestamp: float) -> GpuImage | None:
         for image in self._images[cam_id]:
@@ -200,6 +209,8 @@ class CaptureSync(Thread):
             return
         if self.settings.misses != self._misses:
             self.settings.misses = self._misses
+        if self.settings.skipped != self._skipped:
+            self.settings.skipped = self._skipped
         for callback in self._callbacks:
             try:
                 callback(capture)

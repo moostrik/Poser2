@@ -46,15 +46,21 @@ class Layers(IntEnum):
     cam_foreground = auto()
     cam_crop =      auto()
     cam_depth =     auto()
+    capture_image = auto()
+    depth_mask =    auto()
+    depth_foreground = auto()
     # composite layers
     tracker =       auto()
     pose =          auto()
     # center layers
     center_geometry = auto()
     center_cam =    auto()
+    center_capture = auto()
     center_depth =  auto()
     center_mask =   auto()
     center_foreground = auto()
+    center_depth_mask = auto()
+    center_depth_foreground = auto()
     center_pose =   auto()
     center_metres = auto()
     # data layers
@@ -232,11 +238,12 @@ class _PoseCompositorSettings(layers.PoseCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for camera crop")
 
 class _CenterGeometrySettings(layers.CenterGeometrySettings):
-    stage: Field[Stage] = Field(Stage.SMOOTH, description="Pose data pipeline stage")
+    stage: Field[Stage] = Field(Stage.SMOOTH, visible=False, description="Unused: the view follows the capture's poses (SMOOTH)")
 
 class FluidInputSettings(BaseSettings):
-    flow:    Field[Layers] = Field(Layers.center_mask,       description="Texture used as optical flow input")
-    density: Field[Layers] = Field(Layers.center_foreground, description="Texture used as density and temperature input")
+    flow:    Field[Layers] = Field(Layers.center_capture,    description="Texture used as optical flow input")
+    density: Field[Layers] = Field(Layers.center_capture,    description="Texture used as density and temperature input")
+    mask:    Field[Layers] = Field(Layers.center_depth_mask, description="Mask that gates the flow's velocity and density")
 
 class _FlowLayerSettings(layers.FlowLayerSettings):
     inputs: Group[FluidInputSettings] = Group(FluidInputSettings)
@@ -258,8 +265,11 @@ class CenterGroup(BaseSettings):
     geometry  : Group[_CenterGeometrySettings]              = Group(_CenterGeometrySettings)
     mask      : Group[layers.CenterMaskLayerSettings]       = Group(layers.CenterMaskLayerSettings)
     cam       : Group[layers.CenterCamLayerSettings]        = Group(layers.CenterCamLayerSettings)
+    capture   : Group[layers.CenterCamLayerSettings]        = Group(layers.CenterCamLayerSettings)
     depth     : Group[layers.CenterCamLayerSettings]        = Group(layers.CenterCamLayerSettings)
     foreground: Group[layers.CenterForegroundLayerSettings] = Group(layers.CenterForegroundLayerSettings)
+    depth_mask: Group[layers.CenterMaskLayerSettings]       = Group(layers.CenterMaskLayerSettings)
+    depth_foreground: Group[layers.CenterForegroundLayerSettings] = Group(layers.CenterForegroundLayerSettings)
     pose      : Group[layers.CenterPoseLayerSettings]       = Group(layers.CenterPoseLayerSettings)
     color     : Group[layers.MSColorMaskLayerSettings]      = Group(layers.MSColorMaskLayerSettings)
 
@@ -273,6 +283,7 @@ class RenderSettings(BaseSettings):
     preview: Group[PreviewGroup]                 = Group(PreviewGroup)
     center : Group[CenterGroup]                  = Group(CenterGroup)
     depth  : Group[layers.DepthSourceLayerSettings] = Group(layers.DepthSourceLayerSettings)
+    depth_mask: Group[layers.DepthMaskLayerSettings] = Group(layers.DepthMaskLayerSettings)
     flow   : Group[_FlowLayerSettings]           = Group(_FlowLayerSettings, share=[stage])
     fluid3d: Group[layers.Fluid3DLayerSettings]  = Group(layers.Fluid3DLayerSettings, share=[stage])
     flow_b   : Group[layers.FlowLayerSettings]    = Group(layers.FlowLayerSettings, share=[stage])

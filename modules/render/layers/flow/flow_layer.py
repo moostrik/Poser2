@@ -4,11 +4,12 @@
 from enum import IntEnum, auto
 
 # Third-party imports
-from OpenGL.GL import GL_VIEWPORT, glGetIntegerv
+from OpenGL.GL import GL_RG16F, GL_RGBA16F, GL_VIEWPORT, glGetIntegerv
 
 # Local application imports
-from modules.gl import GpuTimer, Texture, Style, Blit, Text
+from modules.gl import Fbo, GpuTimer, Texture, Style, Blit, Text
 from ..layer_base import LayerBase
+from ...shaders import MaskMultiply
 from modules.board import HasFrames
 from modules.pose import Frame, AngleMotion
 
@@ -151,6 +152,10 @@ class FlowLayer(LayerBase):
 
         self._optical_flow: OpticalFlow = OpticalFlow(self.settings.optical_flow)
         self._depth_input: Texture | None = None
+        self._mask_input: Texture | None = None
+        self._gate_shader: MaskMultiply = MaskMultiply()
+        self._gated_velocity: Fbo = Fbo()   # the optical flow's velocity times the mask
+        self._gated_color: Fbo = Fbo()      # the density input times the mask
         self._depth_velocity: DepthVelocity = DepthVelocity(self.settings.depth_velocity)
         self._velocity_trail: VelocitySmoothTrail = VelocitySmoothTrail(self.settings.velocity_trail)
         self._depth_trail: DepthSmoothTrail = DepthSmoothTrail(self.settings.velocity_trail)
@@ -240,6 +245,12 @@ class FlowLayer(LayerBase):
     def set_density_input(self, texture: Texture) -> None:
         self._density_input = texture
 
+    def set_mask_input(self, texture: Texture | None) -> None:
+        """The player's mask (red, 0 to 1) on the flow's view, or None for no gate. It gates the optical
+        flow's velocity and the density color after the flow, so the flow runs on the whole image: a
+        jittery mask edge then only scales what passes, it never reads as motion, and needs no blending."""
+        self._mask_input = texture
+
     def set_depth_input(self, texture: Texture) -> None:
         """Depth for the velocity toward the camera: metres in red, the player's mask in alpha."""
         self._depth_input = texture
@@ -262,6 +273,9 @@ class FlowLayer(LayerBase):
         sim_height = self.settings.height
 
         self._optical_flow.allocate(sim_width, sim_height)
+        self._gated_velocity.allocate(sim_width, sim_height, GL_RG16F)
+        self._gated_color.allocate(width, height, GL_RGBA16F)
+        self._gate_shader.allocate()
         self._depth_velocity.allocate(sim_width, sim_height)
         self._velocity_trail.allocate(sim_width, sim_height, width, height)
         self._depth_trail.allocate(sim_width, sim_height)
@@ -277,6 +291,9 @@ class FlowLayer(LayerBase):
     def deallocate(self) -> None:
         """Deallocate all resources."""
         self._optical_flow.deallocate()
+        self._gated_velocity.deallocate()
+        self._gated_color.deallocate()
+        self._gate_shader.deallocate()
         self._depth_velocity.deallocate()
         self._velocity_trail.deallocate()
         self._depth_trail.deallocate()
@@ -316,11 +333,14 @@ class FlowLayer(LayerBase):
         new_flow: bool = self._flow_source.dirty
         self._flow_interval += self._time_step
 
+        mask: Texture | None = self._mask_input if self._mask_input is not None and self._mask_input.allocated else None
         if new_flow:
-            # pass
-            # Stage 1: Optical flow
+            # Stage 1: Optical flow, on the whole image; the mask gates its velocity afterwards
             self._optical_flow.set_input(self._flow_input)
             self._optical_flow.update()
+            if mask is not None:
+                self._gate(self._optical_flow.velocity, mask, self._gated_velocity)
+        flow_velocity: Texture = self._gated_velocity if mask is not None else self._optical_flow.velocity
 
         depth_enabled: bool = self.depth_enabled
         if new_flow and depth_enabled:
@@ -332,7 +352,7 @@ class FlowLayer(LayerBase):
         ink: Texture    # what the density bridge reads as alpha, through its length
         if self.settings.bridge == FlowBridge.KINETIC:
             if new_flow:
-                self._kinetic_bridge.set_velocity(self._optical_flow.velocity, self._depth_velocity.depth_velocity if depth_enabled else None)
+                self._kinetic_bridge.set_velocity(flow_velocity, self._depth_velocity.depth_velocity if depth_enabled else None)
                 self._kinetic_bridge.update(self._flow_interval)
                 if self.settings.draw_mode == FlowDrawMode.KINETIC_DEPTH_ACCELERATION:
                     self._kinetic_bridge.update_depth_acceleration()
@@ -344,7 +364,7 @@ class FlowLayer(LayerBase):
             velocity = self._kinetic_bridge.velocity
             ink = self._kinetic_bridge.emission
         else:
-            self._velocity_trail.set_velocity(self._optical_flow.velocity)
+            self._velocity_trail.set_velocity(flow_velocity)
             self._velocity_trail.update()
             velocity = self._velocity_trail.velocity
             ink = velocity
@@ -364,13 +384,18 @@ class FlowLayer(LayerBase):
         self._velocity_magnitude.set_input(speed)
         self._velocity_magnitude.update()
 
-        # self._density_bridge.set_color(self._flow_input)
-        self._density_bridge.set_color(self._density_input)
-        # self._density_bridge.update(motion)
+        # The density color, gated like the velocity: where the bridges spread velocity past the mask,
+        # no background color comes along
+        density_color: Texture = self._density_input
+        if mask is not None and self._density_input.allocated:
+            self._gate(self._density_input, mask, self._gated_color)
+            density_color = self._gated_color
+
+        self._density_bridge.set_color(density_color)
         self._density_bridge.set_velocity(ink)
         self._density_bridge.update()
 
-        self._temperature_bridge.set_color(self._density_input)
+        self._temperature_bridge.set_color(density_color)
         self._temperature_bridge.set_mask(self._velocity_magnitude.magnitude)
         self._temperature_bridge.update()
 
@@ -384,6 +409,12 @@ class FlowLayer(LayerBase):
         else:
             self._visualizer.process(self._get_draw_texture(), self.settings.draw_mode in VECTOR_DRAW_MODES, *self._get_arrow_depth())
         Style.pop_style()
+
+    def _gate(self, source: Texture, mask: Texture, target: Fbo) -> None:
+        """`source` times the mask's red into `target`."""
+        target.begin()
+        self._gate_shader.use(source, mask)
+        target.end()
 
     # ========== Rendering ==========
 
