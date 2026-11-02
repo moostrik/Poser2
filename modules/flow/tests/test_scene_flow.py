@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import depth_speed, lucas_kanade, warped
+from modules.flow import depth_speed, lucas_kanade, shape_displacement, threshold_displacement, warped
 
 SIZE: int = 64
 
@@ -39,6 +39,31 @@ class LucasKanadeTest(unittest.TestCase):
     def test_a_flat_image_solves_to_no_motion(self) -> None:
         flat = np.full((SIZE, SIZE), 0.5)
         self.assertLess(float(np.abs(lucas_kanade(flat, flat)).max()), 1e-6)
+
+
+class ThresholdTest(unittest.TestCase):
+    def test_jitter_below_the_threshold_is_no_motion(self) -> None:
+        np.testing.assert_array_equal(threshold_displacement(np.array([[0.2, 0.1]]), 0.5), [[0.0, 0.0]])
+
+    def test_the_threshold_comes_off_the_length_and_the_direction_stays(self) -> None:
+        np.testing.assert_allclose(threshold_displacement(np.array([[3.0, 4.0]]), 1.0), [[2.4, 3.2]])
+
+    def test_no_threshold_leaves_it(self) -> None:
+        np.testing.assert_allclose(threshold_displacement(np.array([[0.3, -0.2]]), 0.0), [[0.3, -0.2]])
+
+
+class ShapeTest(unittest.TestCase):
+    def test_the_trail_bridge_sees_what_the_old_shaping_gave(self) -> None:
+        # The shaping took its threshold after scale and strength: max(|d| * scale - 0.1, 0) at scale 0.2.
+        # Taken off the displacement first as 0.1 / 0.2 = 0.5 px, the trail bridge's velocity is the same.
+        displacement = np.array([[0.3, 0.0], [1.0, 0.0], [2.0, 1.0], [6.0, -8.0]])
+        old_length = np.maximum(np.linalg.norm(displacement * 0.2, axis=-1, keepdims=True) - 0.1, 0.0)
+        old = np.clip(np.divide(displacement, np.linalg.norm(displacement, axis=-1, keepdims=True)) * old_length, -1.0, 1.0)
+        new = shape_displacement(threshold_displacement(displacement, 0.5), 0.2, (1.0, 1.0), 1.0)
+        np.testing.assert_allclose(new, old, atol=1e-9)
+
+    def test_the_velocity_is_clamped(self) -> None:
+        self.assertEqual(float(shape_displacement(np.array([[50.0, 0.0]]), 0.2, (1.0, 1.0), 1.0)[0, 0]), 1.0)
 
 
 class WarpedDepthTest(unittest.TestCase):

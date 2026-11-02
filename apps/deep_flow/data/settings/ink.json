@@ -440,7 +440,11 @@
         "levels": 3,
         "window": 2,
         "regularizer": 0.0215,
-        "displacement_scale": 0.2
+        "threshold": 0.5,
+        "displacement_scale": 0.2,
+        "strength_x": 1.0,
+        "strength_y": 1.0,
+        "boost": 0.0
       },
       "depth_velocity": {
         "scale": 1.0,

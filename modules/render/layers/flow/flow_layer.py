@@ -384,7 +384,7 @@ class FlowLayer(LayerBase):
             self._optical_flow.set_input(self._flow_input)     # keeps the luminance frames the image measures read
             if motion == Motion.RGBD_FLOW:
                 if self._optical_flow.ready:
-                    self._lucas_kanade.update(self._optical_flow.previous_frame, self._optical_flow.frame, self.settings.optical_flow)
+                    self._lucas_kanade.update(self._optical_flow.previous_frame, self._optical_flow.frame)
                 self._measured_velocity = self._lucas_kanade.velocity
             else:
                 self._optical_flow.update()

@@ -3,11 +3,17 @@
 Where `OpticalFlow` gives a motion strength per pixel (the brightness change along the gradient),
 this gives how far the image moved: a window of gradients per pixel, solved for the shift that
 carries the previous frame onto the current one, first on the coarsest mip level, then refined once
-per finer level with the previous frame warped by the estimate so far. The result is a displacement
-in uv per frame, which `DepthVelocity` follows to measure depth along the motion, and a velocity for
-the bridges, shaped as `OpticalFlow` shapes its own (`strength`, `threshold`, `boost`).
+per finer level with the previous frame warped by the estimate so far. It owns all of its settings:
+the measure, the noise floor and the shaping; it reads nothing of `OpticalFlow`'s.
 
-`lucas_kanade` below is the numpy reference of the shader (lucas_kanade_shader.frag).
+It gives two things, both at the flow's size:
+    displacement - how far each pixel moved, in uv per frame, with `threshold` (px per frame) taken
+                   off its length: below it is the solve's jitter, not motion. Linear, unclamped: the
+                   kinetic bridge reads it, and `DepthVelocity` follows it to measure depth along the motion
+    velocity     - that displacement shaped for the trail bridge: px per frame × `displacement_scale`
+                   × `strength`, the power curve of `boost`, clamped to ±1
+
+`lucas_kanade`, `threshold_displacement` and `shape_displacement` below are the numpy references of the shaders.
 """
 
 import numpy as np
@@ -16,8 +22,7 @@ from OpenGL.GL import GL_RG16F, GL_RG32F
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import BaseSettings, Field
 
-from .optical_flow import OpticalFlowSettings
-from .shaders import DisplacementVelocity, LucasKanadeShader
+from .shaders import DisplacementThreshold, DisplacementVelocity, LucasKanadeShader
 
 
 class LucasKanadeSettings(BaseSettings):
@@ -25,60 +30,74 @@ class LucasKanadeSettings(BaseSettings):
     levels:             Field[int]   = Field(3, min=1, max=5, description="Mip levels, coarse to fine; more follows faster motion")
     window:             Field[int]   = Field(2, min=1, max=4, description="Window radius in texels per level (2 = 5x5)")
     regularizer:        Field[float] = Field(0.001, min=0.0, max=0.1, step=0.0005, description="Damps the solve where the window has no texture")
-    displacement_scale: Field[float] = Field(0.1, min=0.0, max=2.0, step=0.01, description="Flow velocity per pixel of displacement per frame")
+    threshold:          Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="Displacement below this is noise, taken off the rest (px per frame)")
+    displacement_scale: Field[float] = Field(0.1, min=0.0, max=2.0, step=0.01, description="Trail bridge velocity per pixel of displacement per frame")
+    strength_x:         Field[float] = Field(1.0, min=-10.0, max=10.0, description="Trail bridge X multiplier (negative inverts)")
+    strength_y:         Field[float] = Field(1.0, min=-10.0, max=10.0, description="Trail bridge Y multiplier (negative inverts)")
+    boost:              Field[float] = Field(0.0, min=-0.5, max=0.9, description="Trail bridge power boost for small motions")
 
 
 class LucasKanade:
-    """The displacement (uv per frame, RG32F) of the current luminance frame from the previous one,
-    and its velocity for the bridges (RG16F), both at the flow's size."""
+    """The thresholded displacement (uv per frame, RG32F) of the current luminance frame from the
+    previous one, and its shaped velocity for the trail bridge (RG16F)."""
 
     def __init__(self, settings: LucasKanadeSettings) -> None:
         self.settings: LucasKanadeSettings = settings
-        self._displacement: SwapFbo = SwapFbo()
+        self._solve: SwapFbo = SwapFbo()            # the displacement as solved, level by level
+        self._displacement: Fbo = Fbo()             # with the noise floor taken off
         self._velocity: Fbo = Fbo()
         self._shader: LucasKanadeShader = LucasKanadeShader()
+        self._threshold_shader: DisplacementThreshold = DisplacementThreshold()
         self._velocity_shader: DisplacementVelocity = DisplacementVelocity()
 
     @property
     def displacement(self) -> Texture:
-        """How far each pixel moved since the previous frame, in uv."""
-        return self._displacement.texture
+        """How far each pixel moved since the previous frame, in uv, the noise floor taken off."""
+        return self._displacement
 
     @property
     def velocity(self) -> Texture:
-        """The displacement shaped for the bridges."""
+        """The displacement shaped for the trail bridge."""
         return self._velocity
 
     def allocate(self, width: int, height: int) -> None:
+        self._solve.allocate(width, height, GL_RG32F)
         self._displacement.allocate(width, height, GL_RG32F)
         self._velocity.allocate(width, height, GL_RG16F)
         self._shader.allocate()
+        self._threshold_shader.allocate()
         self._velocity_shader.allocate()
         self.reset()
 
     def deallocate(self) -> None:
+        self._solve.deallocate()
         self._displacement.deallocate()
         self._velocity.deallocate()
         self._shader.deallocate()
+        self._threshold_shader.deallocate()
         self._velocity_shader.deallocate()
 
     def reset(self) -> None:
-        self._displacement.clear_all()
+        self._solve.clear_all()
+        self._displacement.clear()
         self._velocity.clear()
 
-    def update(self, previous: Texture, current: Texture, shaping: OpticalFlowSettings) -> None:
-        """Measure the displacement from `previous` to `current` (mipmapped luminance), then shape it."""
+    def update(self, previous: Texture, current: Texture) -> None:
+        """Measure the displacement from `previous` to `current` (mipmapped luminance), take the noise floor off, then shape it."""
         s: LucasKanadeSettings = self.settings
-        self._displacement.clear()                          # the coarsest level starts from no motion
+        self._solve.clear()                                 # the coarsest level starts from no motion
         for level in reversed(range(s.levels)):
-            self._displacement.swap()
-            self._displacement.begin()
-            self._shader.use(previous, current, self._displacement.back_texture, level, s.window, s.regularizer)
-            self._displacement.end()
+            self._solve.swap()
+            self._solve.begin()
+            self._shader.use(previous, current, self._solve.back_texture, level, s.window, s.regularizer)
+            self._solve.end()
+
+        self._displacement.begin()
+        self._threshold_shader.use(self._solve.texture, s.threshold)
+        self._displacement.end()
 
         self._velocity.begin()
-        self._velocity_shader.use(self._displacement.texture, s.displacement_scale, shaping.strength_x, shaping.strength_y,
-                                  shaping.threshold, 1.0 - shaping.boost)
+        self._velocity_shader.use(self._displacement, s.displacement_scale, s.strength_x, s.strength_y, 1.0 - s.boost)
         self._velocity.end()
 
 
@@ -139,3 +158,19 @@ def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, win
         dy = np.where(np.abs(det) > 1e-12, -(sxx * syt - sxy * sxt) / safe, 0.0)
         d = d + np.stack((dx / lw, dy / lh), axis=-1)
     return d * np.array([w, h])
+
+
+def threshold_displacement(displacement: np.ndarray, threshold: float) -> np.ndarray:
+    """A displacement (..., 2) in pixels with `threshold` pixels taken off its length, 0 below it. Mirrors displacement_threshold.frag."""
+    length: np.ndarray = np.linalg.norm(displacement, axis=-1, keepdims=True)
+    kept: np.ndarray = np.maximum(length - threshold, 0.0)
+    return np.divide(displacement * kept, length, out=np.zeros_like(displacement), where=length > 1e-12)
+
+
+def shape_displacement(displacement: np.ndarray, scale: float, strength: tuple[float, float], power: float) -> np.ndarray:
+    """A thresholded displacement (..., 2) in pixels as the trail bridge's velocity: × scale × strength,
+    the length to `power`, clamped to ±1 per axis. Mirrors displacement_velocity.frag."""
+    flow: np.ndarray = displacement * scale * np.array(strength)
+    length: np.ndarray = np.linalg.norm(flow, axis=-1, keepdims=True)
+    shaped: np.ndarray = np.divide(flow * length ** power, length, out=np.zeros_like(flow), where=length > 1e-4)
+    return np.clip(shaped, -1.0, 1.0)
