@@ -16,12 +16,12 @@ from .shaders import ShapeVelocity
 
 class TrailBridgeSettings(BaseSettings):
     """Configuration for the trail bridge."""
+    limit = Field(4.0, min=0.5, max=20.0, description="Soft limit on the x/y speed before scale (widths/s)")
     scale = Field(1.0, min=-10.0, max=10.0, description="Converts the flow's velocity to simulation velocity")
     trail_weight = Field(0.9, min=0.0, max=0.99, description="Temporal smoothing (0=no trail, 0.99=long trail)")
     blur_radius = Field(8.0, min=0.0, max=10.0, description="Gaussian blur radius in pixels")
     blur_steps = Field(4, min=0, max=8, description="Number of Gaussian blur passes")
     boost = Field(0.0, min=-0.5, max=0.9, description="Power boost for small motions")
-    limit = Field(4.0, min=0.5, max=20.0, description="Soft limit on the x/y speed before scale (widths/s)")
 
 
 class TrailBridge(FlowBase):
