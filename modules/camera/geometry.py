@@ -12,6 +12,8 @@ import numpy as np
 
 from modules.utils import Rect
 
+from .frame import DepthAlignment
+
 import logging
 logger = logging.getLogger(__name__)
 
@@ -682,3 +684,50 @@ def mirrored_intrinsics(intrinsics: list[list[float]], width: int) -> list[list[
     mirrored: list[list[float]] = [list(row) for row in intrinsics]
     mirrored[0][2] = width - mirrored[0][2]
     return mirrored
+
+
+# ---------------------------------------------------------------------------
+#  Depth alignment: the depth camera's pixels on the video frame
+# ---------------------------------------------------------------------------
+# Depth is measured from a stereo camera a few centimetres beside the video camera, so a point lands
+# in the video frame shifted by an amount that depends on its distance. The GPU moves each depth
+# pixel there and keeps the nearest where two land on one pixel; the background a near object
+# uncovers stays empty, because the depth camera never saw it.
+
+MIRROR_X: np.ndarray = np.diag([-1.0, 1.0, 1.0, 1.0])
+
+
+def depth_projection(alignment: DepthAlignment | None, size: tuple[int, int]) -> tuple[np.ndarray, np.ndarray]:
+    """For a depth frame of `size`: `to_ray` (3x3), a pixel (x, y, 1) to its ray at unit depth, and
+    `to_uv` (3x4), a point on that ray to the video frame's homogeneous uv, whose third coordinate
+    is the point's depth along the video camera's axis. uv puts pixel i's center at (i + 0.5) / width,
+    as the GPU samples it. Without an alignment the depth is on the video's view already and each
+    pixel goes to its own uv."""
+    width, height = size
+    if alignment is None:
+        to_ray: np.ndarray = np.array([[1.0 / width, 0.0, 0.5 / width], [0.0, 1.0 / height, 0.5 / height], [0.0, 0.0, 1.0]])
+        return to_ray, np.hstack([np.eye(3), np.zeros((3, 1))])
+    color_w, color_h = alignment.color_size
+    lens: np.ndarray = np.array(alignment.color_intrinsics, dtype=np.float64) + np.array([[0.0, 0.0, 0.5], [0.0, 0.0, 0.5], [0.0, 0.0, 0.0]])
+    to_uv: np.ndarray = np.diag([1.0 / color_w, 1.0 / color_h, 1.0]) @ lens @ np.array(alignment.to_color, dtype=np.float64)[:3]
+    return np.linalg.inv(np.array(alignment.intrinsics, dtype=np.float64)), to_uv
+
+
+def mirrored_alignment(alignment: DepthAlignment, width: int) -> DepthAlignment:
+    """The alignment of a depth frame `width` wide stored mirrored left to right, as a recording
+    stores it: both lenses' centers mirrored and the move turned with them."""
+    def mirrored(lens: list[list[float]], size: int) -> list[list[float]]:
+        flipped: list[list[float]] = [list(row) for row in lens]
+        flipped[0][2] = size - 1 - flipped[0][2]
+        return flipped
+    to_color: np.ndarray = MIRROR_X @ np.array(alignment.to_color, dtype=np.float64) @ MIRROR_X
+    return DepthAlignment(mirrored(alignment.intrinsics, width), mirrored(alignment.color_intrinsics, alignment.color_size[0]),
+                          alignment.color_size, to_color.tolist())
+
+
+def aligned_depth_size(size: tuple[int, int], alignment: DepthAlignment | None) -> tuple[int, int]:
+    """The size of depth on the video's view: its own rows, and an even width at the video's aspect."""
+    if alignment is None:
+        return size
+    color_w, color_h = alignment.color_size
+    return (round(size[1] * color_w / color_h / 2.0) * 2, size[1])

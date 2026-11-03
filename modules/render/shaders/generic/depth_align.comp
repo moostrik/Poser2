@@ -1,0 +1,63 @@
+#version 460 core
+
+// Depth in metres on the video frame's view, as a level camera would have measured it. Stage 0 runs
+// over the depth camera's pixels: each goes to its point in space, into the video frame
+// (`geometry.depth_projection`), through the tilt homography and the mirror, and lands on the 2x2
+// output pixels around it, the nearest kept by an atomic minimum on the float's bits (positive floats
+// order as their bits do). Stage 1 runs over the output: what landed becomes metres, the rest 0, and
+// the minimum is reset for the next frame. Image rows run down, texture rows up.
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(r32ui, binding = 0) uniform coherent uimage2D nearest;
+layout(r32f, binding = 1) uniform writeonly image2D aligned;
+
+uniform sampler2D depth;        // metres on the depth camera's view, 0 for no depth
+uniform mat3 toRay;             // depth pixel to its ray at unit depth
+uniform mat4x3 toUv;            // point to the video frame's homogeneous uv; z is the depth along the video axis
+uniform mat3 toCorrected;       // uv to straightened uv
+uniform bool flipH;
+uniform ivec2 depthSize;
+uniform ivec2 alignedSize;
+uniform int stage;
+
+const uint EMPTY = 0xFFFFFFFFu;
+
+void splat(ivec2 pixel) {
+    if (any(greaterThanEqual(pixel, depthSize))) return;
+    float metres = texelFetch(depth, ivec2(pixel.x, depthSize.y - 1 - pixel.y), 0).r;
+    if (metres <= 0.0) return;
+    vec3 video = toUv * vec4(metres * (toRay * vec3(pixel, 1.0)), 1.0);
+    if (video.z <= 0.0) return;
+    vec3 corrected = toCorrected * vec3(video.xy / video.z, 1.0);
+    if (corrected.z <= 0.0) return;
+    vec2 uv = corrected.xy / corrected.z;
+    if (flipH) uv.x = 1.0 - uv.x;
+
+    uint level = floatBitsToUint(video.z * corrected.z);
+    ivec2 corner = ivec2(floor(uv * vec2(alignedSize) - 0.5));
+    for (int dy = 0; dy < 2; ++dy) {
+        for (int dx = 0; dx < 2; ++dx) {
+            ivec2 target = corner + ivec2(dx, dy);
+            if (all(greaterThanEqual(target, ivec2(0))) && all(lessThan(target, alignedSize))) {
+                imageAtomicMin(nearest, ivec2(target.x, alignedSize.y - 1 - target.y), level);
+            }
+        }
+    }
+}
+
+void resolve(ivec2 pixel) {
+    if (any(greaterThanEqual(pixel, alignedSize))) return;
+    uint level = imageLoad(nearest, pixel).r;
+    imageStore(aligned, pixel, vec4(level == EMPTY ? 0.0 : uintBitsToFloat(level), 0.0, 0.0, 1.0));
+    imageStore(nearest, pixel, uvec4(EMPTY));
+}
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (stage == 0) {
+        splat(pixel);
+    } else {
+        resolve(pixel);
+    }
+}

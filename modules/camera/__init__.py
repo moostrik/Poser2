@@ -1,5 +1,5 @@
 from .source import         CameraSource, CameraFrameCallback, TrackletCallback
-from .frame import          CAPTURE_TOLERANCE, FrameType, FrameReadings, CameraFrame, mirrored_image
+from .frame import          CAPTURE_TOLERANCE, FrameType, FrameReadings, DepthAlignment, CameraFrame, mirrored_image
 from .tracklet import       TrackingStatus, CameraTracklet
 from .settings import       CameraSettings, CameraReadings, RigCameraSettings, RigCameraReadings, CameraCheckSettings, TiltCorrectionSettings
 from .camera_check import   CameraCheck, FPS_TOLERANCE, MIN_RATE_FACTOR, mount_deviation, fps_deviation
@@ -9,7 +9,8 @@ from .geometry import       CameraResolution, RESOLUTION_SIZES, MONO_RESOLUTIONS
                             WARP_MESH, FrameWindow, frame_window, horizon_row, frame_fov, lens_field, lens_deviation, \
                             warp_mesh_points, frame_coverage, coverage_summary, orientation_from_gravity, \
                             imu_to_camera, unroll_imu_frame, tilt_homography, homography_points, \
-                            corrected_roi, corrected_keypoints, mirrored_intrinsics
+                            corrected_roi, corrected_keypoints, mirrored_intrinsics, depth_projection, \
+                            mirrored_alignment, aligned_depth_size
 from .tilt_correction import TiltCorrection, TILT_STEP
 from .sync import           Sync, SyncSettings
 from .chunk import          ChunkInfo, ChunkMetadata, merge_chunk, read_metadata, finish_unmerged

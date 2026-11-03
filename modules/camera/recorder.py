@@ -282,16 +282,17 @@ class Recorder(Thread):
                 self.recorders[c][frame.kind].submit_frame(mirrored_image(frame) if frame.flip_h else frame.image, frame.nv12)
                 if depth is not None:
                     self.recorders[c][depth.kind].submit_frame(mirrored_image(depth) if depth.flip_h else depth.image)
-                    self._write_metadata(c, frame)
+                    self._write_metadata(c, frame, depth)
 
-    def _write_metadata(self, cam_id: int, frame: CameraFrame) -> None:
+    def _write_metadata(self, cam_id: int, frame: CameraFrame, depth: CameraFrame) -> None:
         file: TextIO | None = self.metadata.get(cam_id)
         if file is None:
             return
         count: int = self.metadata_frames[cam_id]
         if count == 0:
             height: int = frame.image.shape[0] * 2 // 3 if frame.nv12 else frame.image.shape[0]
-            file.write(info_line(ChunkInfo(frame.image.shape[1], height, frame.intrinsics, frame.flip_h, self.settings.fps)))
+            file.write(info_line(ChunkInfo(frame.image.shape[1], height, frame.intrinsics, frame.flip_h, self.settings.fps,
+                                           depth.alignment)))
         if frame.readings is not None:
             file.write(readings_line(count, frame.timestamp, frame.readings))
         self.metadata_frames[cam_id] = count + 1

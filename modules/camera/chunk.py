@@ -10,12 +10,12 @@ import logging
 import shutil
 import subprocess
 import tempfile
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from modules.video import popen
 
-from .frame import FrameReadings
+from .frame import DepthAlignment, FrameReadings
 
 logger = logging.getLogger(__name__)
 
@@ -25,12 +25,15 @@ METADATA_SUFFIX: str = '.jsonl'
 
 @dataclass(frozen=True)
 class ChunkInfo:
-    """What stays the same through a chunk: the first line of its metadata, and its tags."""
+    """What stays the same through a chunk: the first line of its metadata, and its tags.
+    `depth_alignment` is the depth's, as the camera gave it, before the mirror; None for depth
+    recorded on the video's view already."""
     width: int
     height: int
     intrinsics: list[list[float]] | None
     flip_h: bool
     fps: float
+    depth_alignment: DepthAlignment | None = None
 
 
 @dataclass(frozen=True)
@@ -40,8 +43,18 @@ class ChunkMetadata:
 
 
 def info_line(info: ChunkInfo) -> str:
+    alignment: dict | None = asdict(info.depth_alignment) if info.depth_alignment is not None else None
     return json.dumps({'width': info.width, 'height': info.height, 'intrinsics': info.intrinsics,
-                       'flip_h': info.flip_h, 'fps': info.fps}) + '\n'
+                       'flip_h': info.flip_h, 'fps': info.fps, 'depth_alignment': alignment}) + '\n'
+
+
+def chunk_info(values: dict) -> ChunkInfo:
+    """The info line's values as a `ChunkInfo`."""
+    alignment: dict | None = values.pop('depth_alignment', None)
+    depth_alignment: DepthAlignment | None = None
+    if alignment is not None:
+        depth_alignment = DepthAlignment(**{**alignment, 'color_size': tuple(alignment['color_size'])})
+    return ChunkInfo(**values, depth_alignment=depth_alignment)
 
 
 def readings_line(frame: int, timestamp: float, readings: FrameReadings) -> str:
@@ -57,7 +70,7 @@ def parse_metadata(text: str) -> ChunkMetadata:
     readings: list[FrameReadings] = []
     try:
         if lines:
-            info = ChunkInfo(**json.loads(lines[0]))
+            info = chunk_info(json.loads(lines[0]))
         for line in lines[1:]:
             values: dict = json.loads(line)
             readings.append(FrameReadings(values['tilt'], values['roll'], values['exposure'], values['iso']))
@@ -81,8 +94,9 @@ def merge_chunk(video: Path, depth: Path, metadata: Path, output: Path) -> bool:
     info: ChunkInfo | None = parse_metadata(metadata.read_text(encoding='utf-8')).info
     tags: list[str] = []
     if info is not None:
+        alignment: dict | None = asdict(info.depth_alignment) if info.depth_alignment is not None else None
         for key, value in (('width', info.width), ('height', info.height), ('fps', info.fps), ('flip_h', info.flip_h),
-                           ('intrinsics', json.dumps(info.intrinsics))):
+                           ('intrinsics', json.dumps(info.intrinsics)), ('depth_alignment', json.dumps(alignment))):
             tags += ['-metadata', f'{key}={value}']
     done: bool = _run(['-y', '-i', str(video), '-i', str(depth), '-map', '0:v:0', '-map', '1:v:0', '-c', 'copy',
                        '-attach', str(metadata), '-metadata:s:t:0', f'mimetype={METADATA_MIMETYPE}', *tags, str(output)])

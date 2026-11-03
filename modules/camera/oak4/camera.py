@@ -6,8 +6,9 @@ queues on the node outputs, on depthai's callback thread, which is where the fra
 become the contract's and get their host time. The device runs the chain `model_chain` names.
 DETECTOR gives boxes only; with a pose chain a tracklet carries its keypoints: from its own
 detection in the one-model chain, or, in the two-model chain, from the pose of its crop, joined to
-it by frame (`PoseJoin`). With `depth_model` it also delivers depth aligned to the frames, as DEPTH
-frames. The sensor controls are `SensorControl`'s for as long as the device is open.
+it by frame (`PoseJoin`). With `depth_model` it also delivers depth, as DEPTH frames on the left
+camera's view, each with the `DepthAlignment` that puts it on the frames' view on the GPU. The
+sensor controls are `SensorControl`'s for as long as the device is open.
 
 The frame leaves here untouched where it can: an NV12 frame goes on packed, and the GPU upload
 converts, straightens and mirrors it, so this thread does no color work. The camera cannot do
@@ -29,7 +30,7 @@ from typing import cast
 import depthai as dai
 from numpy import ndarray
 
-from .. import CameraResolution, CameraFrame, FrameReadings, RigCameraReadings, CameraTracklet, FrameType, CameraFrameCallback, \
+from .. import CameraResolution, CameraFrame, DepthAlignment, FrameReadings, RigCameraReadings, CameraTracklet, FrameType, CameraFrameCallback, \
     TrackletCallback, orientation_from_gravity, frame_window, frame_coverage, coverage_summary, \
     delivered_height, lens_field, lens_deviation, imu_to_camera, unroll_imu_frame, TiltCorrection, corrected_roi, corrected_keypoints
 from modules.utils import FPS, Rect
@@ -122,6 +123,10 @@ class Camera(Thread):
         # TILT CORRECTION — the direct frame's lens, read off its first frame.
         self._intrinsics: list[list[float]] | None = None
         self.tilt_correction: TiltCorrection = TiltCorrection(settings.tilt)
+
+        # DEPTH ALIGNMENT — made from the first depth frame and the first video frame's transformation.
+        self._video_transformation: dai.ImgTransformation | None = None
+        self._alignment: DepthAlignment | None = None
 
     @property
     def readings(self) -> RigCameraReadings:
@@ -218,9 +223,12 @@ class Camera(Thread):
 
     def _take_link(self, info: dai.DeviceInfo) -> None:
         """The frame this link carries. A reopen can land on the other link, so the lens read off the
-        last frame and the homography made from it go too: the next frame brings them back."""
+        last frame and the homography and depth alignment made from it go too: the next frames bring
+        them back."""
         self._set_resolution(link_resolution(info.protocol, self.settings.resolution, self.settings.ethernet_resolution))
         self._intrinsics = None
+        self._video_transformation = None
+        self._alignment = None
         self.tilt_correction.update(math.nan, None, self.frame_size)
 
     def _close(self) -> None:
@@ -335,6 +343,8 @@ class Camera(Thread):
             self.control.readback(msg)
         if self.pose_join is not None:
             self._frame_transformation = msg.getTransformation()
+        if self._video_transformation is None:
+            self._video_transformation = msg.getTransformation()
         if msg.getType() == dai.ImgFrame.Type.NV12:
             if self._intrinsics is None:
                 self._intrinsics = msg.getTransformation().getIntrinsicMatrix()
@@ -348,14 +358,29 @@ class Camera(Thread):
         return FrameReadings(readings.tilt_measured, readings.roll_measured, self.settings.sensor.exposure, self.settings.sensor.iso)
 
     def _depth_callback(self, name: str, msg: dai.ImgFrame) -> None:
-        """The hand-over of the aligned depth: uint16 millimetres, on the frames' own view, with the
-        capture time of the video frame taken with it (the sensors end their exposures together)."""
+        """The hand-over of the depth: uint16 millimetres on the left camera's view, with the capture
+        time of the video frame taken with it (the sensors end their exposures together). Until a
+        video frame has said where depth lands in it, there is nothing to put it on."""
         timestamp: float = capture_time(msg)
         readings: RigCameraReadings = self.settings.readings
         readings.depth_latency = smoothed_latency(readings.depth_latency, msg)
         self.depth_fps.processed()
         readings.depth_fps = self.depth_fps.get_rate_average()
-        self._emit_frame(FrameType.DEPTH, msg.getFrame().copy(), timestamp)
+        alignment: DepthAlignment | None = self._depth_alignment(msg)
+        if alignment is None:
+            return
+        self._emit_frame(FrameType.DEPTH, msg.getFrame().copy(), timestamp, alignment=alignment)
+
+    def _depth_alignment(self, msg: dai.ImgFrame) -> DepthAlignment | None:
+        """Where this camera's depth lands in its video frames, made once from the calibration the
+        frames' transformations carry; None until a video frame has come with its lens."""
+        if self._alignment is None and self._video_transformation is not None and self._intrinsics is not None:
+            depth: dai.ImgTransformation = msg.getTransformation()
+            to_color = depth.getExtrinsicsTransformationMatrixTo(self._video_transformation, False, dai.LengthUnit.METER)
+            self._alignment = DepthAlignment(depth.getIntrinsicMatrix(), self._intrinsics, self.frame_size, [list(row) for row in to_color])
+            logger.info(f'{self.device_id} depth {msg.getWidth()}x{msg.getHeight()} to the frames: '
+                        f'{[round(v, 4) for v in (row[3] for row in to_color[:3])]} m')
+        return self._alignment
 
     def _tracklet(self, tracklet: dai.Tracklet, keypoints: ndarray | None, timestamp: float) -> CameraTracklet:
         """One device tracklet as the contract's, straightened and mirrored when the frames are."""
@@ -438,11 +463,12 @@ class Camera(Thread):
         self.settings.readings.roll_measured = roll - self.settings.readings.roll_offset
         self.tilt_correction.update(tilt, self._intrinsics, self.frame_size)
 
-    def _emit_frame(self, kind: FrameType, image: ndarray, timestamp: float, nv12: bool = False, readings: FrameReadings | None = None) -> None:
+    def _emit_frame(self, kind: FrameType, image: ndarray, timestamp: float, nv12: bool = False, readings: FrameReadings | None = None,
+                    alignment: DepthAlignment | None = None) -> None:
         """The hand-over: the frame, with its capture time (`capture_time`), goes to every callback."""
         frame = CameraFrame(cam_id=self.id, kind=kind, image=image, timestamp=timestamp,
                             nv12=nv12, flip_h=self.flip_on_host, homography=self.tilt_correction.homography,
-                            readings=readings, intrinsics=self._intrinsics)
+                            readings=readings, intrinsics=self._intrinsics, alignment=alignment)
         for c in self.frame_callbacks:
             c(frame)
 

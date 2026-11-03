@@ -109,6 +109,7 @@ class DeepFlowMain:
         self.pose_inference.add_camera_images_callback(self.board.set_camera_images)
         if self.segmentation_predictor is not None:
             self.pose_inference.add_crop_callback(self.segmentation_predictor.submit)
+            self.segmentation_predictor.add_segmentation_callback(self.capture_sync.submit_masks)
             self.segmentation_predictor.add_segmentation_callback(self._on_segmentation)
         self.pose_inference.add_crop_callback(self.optical_flow_predictor.submit)
 
@@ -123,7 +124,7 @@ class DeepFlowMain:
         self.pipeline.add_frames_callback(Stage.RAW, partial(self._on_pose_frames, Series.POSE_LATENCY_RAW))
         self.pipeline.add_frames_callback(Stage.SMOOTH, partial(self._on_pose_frames, Series.POSE_LATENCY_SMOOTH))
 
-        # CAPTURE SYNC — each uploaded image, its depth and its SMOOTH poses, as one capture on the board
+        # CAPTURE SYNC — each uploaded image, its depth, its SMOOTH poses and its masks, as one capture on the board
         self.pose_inference.add_gpu_image_callback(self.capture_sync.submit_image)
         self.pipeline.add_frames_callback(Stage.SMOOTH, self.capture_sync.submit_poses)
         self.capture_sync.add_capture_callback(self._on_capture)
@@ -182,14 +183,18 @@ class DeepFlowMain:
 
     def _on_capture(self, capture: Capture) -> None:
         self.board.set_capture(capture)
+        if capture.masks:
+            self.board.set_segmentation_images(capture.masks)       # the layers draw the capture's own masks
         now: float = time.perf_counter()        # when the capture reaches the board: the end of the latency
         self.board.submit_time_sample(Series.CAPTURE_LATENCY, (now - capture.timestamp) * 1000.0, now)
         if capture.poses:
             self.board.submit_time_sample(Series.POSES_UNSYNCED, 0.0 if capture.poses_synced else 1.0, now)
+        if capture.masks:
+            self.board.submit_time_sample(Series.MASKS_UNSYNCED, 0.0 if capture.masks_synced else 1.0, now)
 
     def _on_segmentation(self, poses: FrameDict, masks: segmentation.ImageDict) -> None:
-        self.board.set_segmentation_images(masks)
-        now: float = time.perf_counter()        # when the masks reach the board: the end of the latency
+        """RVM's timing; the masks reach the board through the capture sync."""
+        now: float = time.perf_counter()        # when the masks come out of RVM: the end of the latency
         if not masks:
             if poses:
                 self.board.submit_time_sample(Series.MASK_MISSING, 1.0, now)

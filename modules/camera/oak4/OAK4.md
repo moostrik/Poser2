@@ -12,7 +12,7 @@ Every number assumes this configuration unless its table says otherwise:
 | Link     | USB, reading 5 Gbps                                     |
 | Frame    | `P720`, 60 fps, 896x720 NV12, undistorted               |
 | Boxes    | `model_chain` `DETECTOR`: yolov8n, 640x512              |
-| Depth    | `depth_model` `NEURAL_480`, aligned to 374x300          |
+| Depth    | `depth_model` `NEURAL_480`, 480x300, aligned on the GPU |
 | PC       | i7-13700K with UHD 770, RTX 4090                        |
 
 ## Operating
@@ -130,7 +130,7 @@ depthai maps the device's clock onto the host's again about every 8 s, in steps 
 |-----------|---------------|--------|-----------------------------|
 | Color     | 896x720       | 60 fps | 28.8 (31.1) ms              |
 | Tracklets | 640x512 input | 60 fps | 35.4 (38.6) ms              |
-| Depth     | 374x300       | 60 fps | 41.5 (50.4) ms              |
+| Depth     | 480x300       | 60 fps | 36.9 (46.8) ms, no detector |
 
 Measured with the capture time above. The worst gap between depth frames is 27.5 ms, measured at 900x720 without undistortion. Depth arrives about 13 ms after the color frame captured with it and carries that frame's time.
 
@@ -231,8 +231,8 @@ The load on the link:
 | Stream                | Rate                      |
 |-----------------------|---------------------------|
 | Color, 896x720 NV12   | 464 Mbit/s before padding |
-| Depth, 374x300 uint16 | 108 Mbit/s                |
-| Together              | 572 Mbit/s                |
+| Depth, 480x300 uint16 | 138 Mbit/s                |
+| Together              | 602 Mbit/s                |
 | Ethernet, expected    | About 800 Mbit/s          |
 
 The stream rates are calculated from the frame sizes **(deduction)**, before the chip's row padding. The Ethernet figure is from the Luxonis docs.
@@ -285,7 +285,18 @@ That gives a view of about 79.6° by 67.6° **(deduction)**. The color sensor sp
 
 ## Depth
 
-Neural Depth runs on the camera off 640x400 mono frames, and `ImageAlign` puts it on the delivered frame. Depth is uint16 millimeters, with 0 for no depth. The black shadow bands beside near objects are stereo occlusion, which alignment does not remove.
+Neural Depth runs on the camera off 640x400 mono frames and arrives as 480x300 uint16 millimeters on the left mono camera's view, with 0 for no depth. Each depth frame carries its `DepthAlignment`: both lenses and the move from the left camera to the color camera, 3.76 cm sideways, read once from the calibration the frames carry. The `DepthAlign` compute shader puts depth on the color view on the GPU, together with the tilt correction and the mirror: each depth pixel goes to its point in space and into the color frame, the nearest point wins where two land on one pixel, and a pixel nothing lands on stays 0. The output is 374x300, the depth's rows at the color frame's aspect (`aligned_depth_size`).
+
+Next to a near object the color camera sees background the left camera could not, so that band has no depth. It is about `538 px × 3.76 cm × (1/Z_near − 1/Z_far)` wide, 12 px for a player at 1 m before a wall at 2.5 m. The black shadow bands beside near objects are this band and the stereo occlusion.
+
+`ImageAlign`, the camera's own alignment and its only one on RVC4, fills part of that band with the near object's depth, so a player grows 10 to 20 color pixels on one side at about 1 m **(measured)**. It also delays depth: capture to PC at 60 fps, beside color, without the detector:
+
+| Depth           | Median  | p95     |
+|-----------------|---------|---------|
+| Neural Depth    | 36.9 ms | 46.8 ms |
+| `ImageAlign`    | 45.0 ms | 51.5 ms |
+
+The GPU pass takes 0.13 ms and matches a float64 reference on captured frames: the same empty pixels, values within 6 mm. Recordings store the depth on its own view with its alignment in the chunk info; recordings made before hold depth already on the color view and no alignment, and play through the same pass.
 
 `DepthSourceLayer` turns it into float32 meters, straightens it, and exposes it as `depth` for use as data; `texture` is its view. The view's colormap matches depthai's `colorizeDepthFrame` defaults: JET on a log scale from 0.3 to 12 m, which puts the detail close to the camera.
 
@@ -331,7 +342,7 @@ Depth pixels move by `H`, and their values change too. Depth is measured along t
 |-------|-------------------------------------------|
 | `H`   | `TiltCorrection`, at the IMU's 5 Hz       |
 | Color | `Uploader`, `grid_sample`                 |
-| Depth | `DepthWarp` shader, nearest sample        |
+| Depth | `DepthAlign` compute shader               |
 | Boxes | `corrected_roi` and `corrected_keypoints` |
 
 `H` is rebuilt only when the angle moves by 0.25° or more (`TILT_STEP`), since a picture that followed the noisy IMU would shimmer. The correction runs on the PC for two reasons: the chip warps grey frames only (Luxonis docs), and `ImageManip`'s four-point transform needs the BGR path (see [color path](#color-path)).
@@ -424,3 +435,4 @@ The times cover preprocessing on the CPU, inference and decoding. At 60 Hz the G
 - Why one run's capture times lay after now ([Capture time](#capture-time)): perhaps a camera reopened seconds after another process closed it.
 - A manual exposure past the frame time is reported as asked and the rate stays at 60 fps, up to 100000 µs, which cannot be real. In a dark room the picture's brightness did not follow exposure at all, so the real top needs a test with light.
 - `test_a_split_keeps_the_streams_in_step_across_chunks` fails about 2 runs in 5, because a split lands 1 to 3 frames early. No frames are lost: 50 of 50 in all three streams.
+- The camera is planned to run standalone, as an OAK App **(site fact)**. Depth alignment then needs a home: `ImageAlign` is the only alignment on the camera and fattens near objects ([Depth](#depth)), and its firmware cannot be changed. The options are to keep sending raw depth with its `DepthAlignment` to a PC that runs `DepthAlign`, or to run the same reprojection as a host node on the camera's CPU, whose speed for 144,000 points a frame has not been measured. A Script node is too slow for it **(deduction)**.

@@ -5,8 +5,8 @@ tracker on the host, so `-sim` needs no OAK plugged in.
 The detector and the tracker are the app's to give (`modules/inference/detection` and the
 `Tracker` beside this file); without a detector the camera is frames only, as a rig without
 `yolo` is. The device's warp is not applied here: a replay plays what was recorded. A recording
-with depth and metadata plays as the camera did: depth frames too, and with `tilt` the frames
-straightened from the recorded tilt plus the live offset, boxes with them.
+with depth and metadata plays as the camera did: depth frames too, with the recorded alignment,
+and with `tilt` the frames straightened from the recorded tilt plus the live offset, boxes with them.
 """
 
 import logging
@@ -17,8 +17,8 @@ import numpy as np
 
 from modules.utils import FPS, Rect
 
-from .. import CameraFrame, CameraTracklet, CameraFrameCallback, ChunkInfo, FrameReadings, FrameType, Player, RigCameraReadings, RigCameraSettings, \
-    TiltCorrection, TiltCorrectionSettings, TrackletCallback, corrected_roi, mirrored_intrinsics
+from .. import CameraFrame, CameraTracklet, CameraFrameCallback, ChunkInfo, DepthAlignment, FrameReadings, FrameType, Player, RigCameraReadings, \
+    RigCameraSettings, TiltCorrection, TiltCorrectionSettings, TrackletCallback, corrected_roi, mirrored_alignment, mirrored_intrinsics
 from .tracker import Track
 
 logger = logging.getLogger(__name__)
@@ -55,6 +55,7 @@ class Camera:
         self.running: bool = False
         self.tilt_correction: TiltCorrection | None = TiltCorrection(tilt) if tilt is not None else None
         self._video_timestamp: float | None = None     # the stamp of the recorded frame being handed over
+        self._alignment: tuple[ChunkInfo | None, DepthAlignment | None] = (None, None)    # a chunk's info and its depth's alignment
 
         self.video_fps: FPS = FPS(120)
         self.tracklet_fps: FPS = FPS(120)
@@ -115,11 +116,23 @@ class Camera:
             self._update_tilt(readings)
         timestamp: float = self._video_timestamp if self._video_timestamp is not None else time.perf_counter()
         homography: np.ndarray | None = self.tilt_correction.homography if self.tilt_correction is not None else None
-        frame = CameraFrame(cam_id=self.id, kind=frame_type, image=image, timestamp=timestamp, homography=homography)
+        alignment: DepthAlignment | None = self._depth_alignment(image.shape[1]) if frame_type == FrameType.DEPTH else None
+        frame = CameraFrame(cam_id=self.id, kind=frame_type, image=image, timestamp=timestamp, homography=homography, alignment=alignment)
         for c in self.frame_callbacks:
             c(frame)
         if self.detector is not None and frame_type == FrameType.VIDEO:
             self.detector.submit(self.id, image, timestamp)
+
+    def _depth_alignment(self, width: int) -> DepthAlignment | None:
+        """The recorded depth's alignment, mirrored as its frames were stored; one object per chunk,
+        so the GPU keeps what it derives from it."""
+        info: ChunkInfo | None = self.player.get_chunk_info(self.id)
+        if info is None or info.depth_alignment is None:
+            return None
+        if self._alignment[0] is not info:
+            alignment: DepthAlignment = mirrored_alignment(info.depth_alignment, width) if info.flip_h else info.depth_alignment
+            self._alignment = (info, alignment)
+        return self._alignment[1]
 
     def _update_tilt(self, readings: FrameReadings | None) -> None:
         """The recorded tilt on the recorded lens. The frames were stored mirrored, so the lens is."""

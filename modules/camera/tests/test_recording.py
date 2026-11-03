@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 
 from modules import video
-from modules.camera import CameraFrame, ChunkInfo, FrameReadings, FrameType, Player, PlayerSettings, Recorder, RecorderSettings, \
+from modules.camera import CameraFrame, ChunkInfo, DepthAlignment, FrameReadings, FrameType, Player, PlayerSettings, Recorder, RecorderSettings, \
     make_chunk_name, read_metadata
 from modules.camera.chunk import info_line, parse_metadata, readings_line
 from modules.camera.recorder import RecState
@@ -103,6 +103,12 @@ class MetadataTest(unittest.TestCase):
         self.assertEqual(metadata.info, info)
         self.assertEqual(metadata.readings[0], FrameReadings(-30.0, 1.0, 1000, 100))
         self.assertTrue(math.isnan(metadata.readings[1].tilt))
+
+    def test_the_depth_alignment_reads_back(self) -> None:
+        alignment = DepthAlignment([[212.4, 0.0, 240.6], [0.0, 212.4, 149.4], [0.0, 0.0, 1.0]], LENS, (896, 720),
+                                   [[1.0, 0.0, 0.0, -0.0376], [0.0, 1.0, 0.0, 0.0], [0.0, 0.0, 1.0, 0.0], [0.0, 0.0, 0.0, 1.0]])
+        info = ChunkInfo(896, 720, LENS, True, 60.0, alignment)
+        self.assertEqual(parse_metadata(info_line(info)).info, info)
 
     def test_a_line_cut_off_by_a_crash_ends_the_list(self) -> None:
         text = info_line(ChunkInfo(900, 720, LENS, True, 60.0)) + readings_line(0, 1.5, FrameReadings(-30.0, 1.0, 1000, 100)) + '{"frame": 1, "ti'

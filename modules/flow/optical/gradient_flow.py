@@ -3,7 +3,8 @@
 Per pixel, the brightness change along the brightness gradient between two frames: the motion along
 the gradient, as a strength rather than a distance. One equation per pixel, so only that component.
 x/y are scaled to the flow's velocity by `strength_x`/`strength_y`, then `threshold` comes off their
-length; z is the depth change at the pixel (`DepthVelocity`) times `strength_z`.
+length; z is the depth change at the pixel (`DepthVelocity`) times `strength_z`. With `use_mask`, the
+velocity is multiplied by the mask.
 Ported from ofxFlowTools ftOpticalFlow.h
 """
 from OpenGL.GL import GL_RG16F, GL_RGBA16F
@@ -23,6 +24,7 @@ class GradientFlowSettings(BaseSettings):
     strength_x = Field(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)")
     strength_y = Field(3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
     strength_z = Field(0.0, min=0.0, max=10.0, description="Velocity per m/s toward the camera; 0 is no depth")
+    use_mask = Field(False, description="Multiply the velocity by the mask")
 
 
 class GradientFlow:
@@ -31,6 +33,7 @@ class GradientFlow:
     def __init__(self, settings: GradientFlowSettings, depth_velocity: DepthVelocity) -> None:
         self.settings: GradientFlowSettings = settings
         self._depth_velocity: DepthVelocity = depth_velocity     # shared with the other flow; only the active one advances it
+        self._mask: Texture | None = None
 
         self._frames: LuminanceFrames = LuminanceFrames()
         self._xy: Fbo = Fbo()
@@ -72,6 +75,10 @@ class GradientFlow:
         """Take `texture` as the newest frame."""
         self._frames.set_input(texture)
 
+    def set_mask(self, texture: Texture | None) -> None:
+        """The player's mask (red, 0 to 1) the velocity is multiplied by with `use_mask`, or None for no mask."""
+        self._mask = texture
+
     def update(self, depth: Texture | None, delta_time: float) -> None:
         """Measure between the newest two frames.
 
@@ -91,6 +98,7 @@ class GradientFlow:
         if depth is not None:
             self._depth_velocity.update_depth(depth, delta_time)
 
+        mask: Texture | None = self._mask if s.use_mask and self._mask is not None and self._mask.allocated else None
         self._velocity.begin()
-        self._compose_shader.use(self._xy, self._depth_velocity.depth_velocity if depth is not None else None, (1.0, 1.0, s.strength_z))
+        self._compose_shader.use(self._xy, self._depth_velocity.depth_velocity if depth is not None else None, (1.0, 1.0, s.strength_z), mask)
         self._velocity.end()

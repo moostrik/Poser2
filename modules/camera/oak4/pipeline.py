@@ -23,7 +23,7 @@ import depthai as dai
 from .. import CameraResolution, frame_size, WARP_MESH, warp_mesh_points
 
 from .definitions import SENSOR_SOCKET, STEREO_SOCKETS, STEREO_SIZE, DEPTH_MODELS, DepthModel, requested_size, \
-    direct_size, depth_size, IMU_RATE_HZ, SYSTEM_RATE_HZ, nn_frame_type, POSE_CONFIDENCE_THRESHOLD, POSE_OVERLAP_THRESHOLD, \
+    direct_size, IMU_RATE_HZ, SYSTEM_RATE_HZ, nn_frame_type, POSE_CONFIDENCE_THRESHOLD, POSE_OVERLAP_THRESHOLD, \
     POSE_CROP_PADDING, TRACKER_PERSON_LABEL, TRACKER_TYPE
 
 logger = logging.getLogger(__name__)
@@ -110,7 +110,7 @@ def build_pipeline(
     depth: dai.Node.Output | None = None
     depth_config: dai.Node.Input | None = None
     if depth_model != DepthModel.OFF:
-        depth, depth_config = add_depth(pipeline, frames, fps, depth_model, out_size)
+        depth, depth_config = add_depth(pipeline, fps, depth_model)
     return PipelineOutputs(video=frames, control=camera.inputControl, imu=imu, system=add_system_logger(pipeline),
                            tracklets=tracklets, poses=poses, depth=depth, depth_config=depth_config, flip_on_host=color and mount.flip_h)
 
@@ -211,21 +211,15 @@ def add_pose_chain(pipeline: dai.Pipeline, frames: dai.Node.Output, fps: float, 
     return tracklets, gather.out
 
 
-def add_depth(pipeline: dai.Pipeline, frames: dai.Node.Output, fps: float, model: DepthModel,
-              frame: tuple[int, int]) -> tuple[dai.Node.Output, dai.Node.Input]:
-    """Neural Depth off the stereo pair, aligned on the camera to the delivered frame, so the host
-    takes it on the frame's own view. Aligned at the model's rows (`depth_size`), which keeps the
-    link's load down: uint16 at 60 fps. `ImageAlign` reads `frames` once, for its metadata, so the
-    depth waits for nothing from the color branch. Returns the depth and Neural Depth's config input."""
+def add_depth(pipeline: dai.Pipeline, fps: float, model: DepthModel) -> tuple[dai.Node.Output, dai.Node.Input]:
+    """Neural Depth off the stereo pair, on the left camera's view at the model's size. The GPU puts
+    it on the delivered frame's view (`DepthAlignment`): `ImageAlign` fills the background a near
+    object uncovers with that object's depth, and costs time on the camera. Returns the depth and
+    Neural Depth's config input."""
     left, right = [pipeline.create(dai.node.Camera).build(socket, sensorFps=fps).requestOutput(STEREO_SIZE, fps=fps)
                    for socket in STEREO_SOCKETS]
-    neural: dai.node.NeuralDepth = pipeline.create(dai.node.NeuralDepth).build(left, right, DEPTH_MODELS[model][0])
-    align: dai.node.ImageAlign = pipeline.create(dai.node.ImageAlign)
-    align.setOutputSize(*depth_size(model, frame))
-    align.setOutKeepAspectRatio(False)
-    neural.depth.link(align.input)
-    frames.link(align.inputAlignTo)
-    return align.outputAligned, neural.inputConfig
+    neural: dai.node.NeuralDepth = pipeline.create(dai.node.NeuralDepth).build(left, right, DEPTH_MODELS[model])
+    return neural.depth, neural.inputConfig
 
 
 def add_imu(pipeline: dai.Pipeline) -> dai.Node.Output:

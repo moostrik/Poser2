@@ -8,7 +8,8 @@ level with the previous frame warped by the estimate so far.
 The displacement (uv per frame) stays inside: `threshold` (px per frame) comes off its length, as
 below it is the solve's jitter, not motion, and the depth change is measured along it, so a surface
 sliding sideways over a slope reads no motion toward the camera. Out comes one 3D velocity: x/y in
-image widths per second times `strength_x`/`strength_y`, z in m/s times `strength_z`.
+image widths per second times `strength_x`/`strength_y`, z in m/s times `strength_z`. With `use_mask`,
+the velocity is multiplied by the mask.
 
 `lucas_kanade`, `threshold_displacement` and `displacement_velocity` below are the numpy references of the shaders.
 """
@@ -33,6 +34,7 @@ class LucasKanadeFlowSettings(BaseSettings):
     strength_x:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, x (negative inverts)")
     strength_y:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, y (negative inverts)")
     strength_z:  Field[float] = Field(0.0, min=0.0, max=10.0, description="Velocity per m/s toward the camera; 0 is no depth")
+    use_mask:    Field[bool]  = Field(False, description="Multiply the velocity by the mask")
 
 
 class LucasKanadeFlow:
@@ -41,6 +43,7 @@ class LucasKanadeFlow:
     def __init__(self, settings: LucasKanadeFlowSettings, depth_velocity: DepthVelocity) -> None:
         self.settings: LucasKanadeFlowSettings = settings
         self._depth_velocity: DepthVelocity = depth_velocity     # shared with the other flow; only the active one advances it
+        self._mask: Texture | None = None
 
         self._frames: LuminanceFrames = LuminanceFrames()
         self._solve: SwapFbo = SwapFbo()            # the displacement as solved, level by level
@@ -89,6 +92,10 @@ class LucasKanadeFlow:
         """Take `texture` as the newest frame."""
         self._frames.set_input(texture)
 
+    def set_mask(self, texture: Texture | None) -> None:
+        """The player's mask (red, 0 to 1) the velocity is multiplied by with `use_mask`, or None for no mask."""
+        self._mask = texture
+
     def update(self, depth: Texture | None, delta_time: float) -> None:
         """Measure between the newest two frames.
 
@@ -118,9 +125,10 @@ class LucasKanadeFlow:
         # uv per frame as image widths per second: v is uv of the height, so a square motion stays square
         per_second: float = 1.0 / max(delta_time, 1e-6)
         aspect: float = self._displacement.height / max(self._displacement.width, 1)
+        mask: Texture | None = self._mask if s.use_mask and self._mask is not None and self._mask.allocated else None
         self._velocity.begin()
         self._compose_shader.use(self._displacement, self._depth_velocity.depth_velocity if depth is not None else None,
-                                 (s.strength_x * per_second, s.strength_y * per_second * aspect, s.strength_z))
+                                 (s.strength_x * per_second, s.strength_y * per_second * aspect, s.strength_z), mask)
         self._velocity.end()
 
 

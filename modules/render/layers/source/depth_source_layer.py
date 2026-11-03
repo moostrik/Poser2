@@ -4,15 +4,15 @@ from typing import TYPE_CHECKING
 
 # Third-party imports
 import numpy as np
-from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_NEAREST, GL_R32F, GL_RGBA16F
+from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_NEAREST, GL_R32F, GL_R32UI, GL_RGBA16F
 
 # Local application imports
 from modules.board import HasCaptures
-from modules.camera import CameraFrame
+from modules.camera import CameraFrame, DepthAlignment, aligned_depth_size, depth_projection
 from modules.gl import Fbo, Image, Texture
 from modules.settings import BaseSettings, Field
 from ..layer_base import LayerBase, DataCache
-from ...shaders import DepthView, DepthWarp
+from ...shaders import DepthAlign, DepthView
 
 if TYPE_CHECKING:
     from modules.inference import Capture
@@ -37,9 +37,10 @@ def depth_metres(depth: np.ndarray) -> np.ndarray:
 
 
 class DepthSourceLayer(LayerBase):
-    """The camera's depth on the view of the camera image, straightened and mirrored as that image
-    is: `depth` in metres, `texture` as a picture (`DepthDrawMode`). The depth of the newest capture,
-    so it belongs with that capture's image and poses. Stays empty on a source without depth."""
+    """The camera's depth on the view of the camera image, aligned to it (`DepthAlign`), straightened
+    and mirrored as that image is: `depth` in metres, `texture` as a picture (`DepthDrawMode`). The
+    depth of the newest capture, so it belongs with that capture's image and poses. Stays empty on a
+    source without depth."""
 
     def __init__(self, cam_id: int, board: HasCaptures, cam_texture: Texture, settings: DepthSourceLayerSettings) -> None:
         self._cam_id: int = cam_id
@@ -47,10 +48,12 @@ class DepthSourceLayer(LayerBase):
         self._cam_texture: Texture = cam_texture
         self.settings: DepthSourceLayerSettings = settings
         self._source: Image = Image(interpolation=GL_NEAREST)   # an edge never reads as a distance in between
-        self._depth: Fbo = Fbo(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))     # beyond the image: no depth
+        self._nearest: Texture = Texture(interpolation=GL_NEAREST)
+        self._depth: Texture = Texture(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))     # beyond the image: no depth
         self._view: Fbo = Fbo()
-        self._warp_shader: DepthWarp = DepthWarp()
+        self._align_shader: DepthAlign = DepthAlign()
         self._shader: DepthView = DepthView()
+        self._projection: tuple[DepthAlignment | None, np.ndarray, np.ndarray] | None = None   # an alignment and what it makes
         self._data_cache: DataCache[CameraFrame] = DataCache[CameraFrame]()
         self._dirty: bool = False
 
@@ -68,14 +71,15 @@ class DepthSourceLayer(LayerBase):
         return self._dirty
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
-        self._warp_shader.allocate()
+        self._align_shader.allocate()
         self._shader.allocate()     # the textures on the first frame, at its size
 
     def deallocate(self) -> None:
         self._source.deallocate()
+        self._nearest.deallocate()
         self._depth.deallocate()
         self._view.deallocate()
-        self._warp_shader.deallocate()
+        self._align_shader.deallocate()
         self._shader.deallocate()
 
     def update(self) -> None:
@@ -92,13 +96,18 @@ class DepthSourceLayer(LayerBase):
 
         self._source.set_image(depth_metres(frame.image))
         self._source.update()
+        size: tuple[int, int] = (frame.image.shape[1], frame.image.shape[0])
         if not self._view.allocated:
-            self._depth.allocate(frame.image.shape[1], frame.image.shape[0], GL_R32F)
-            self._view.allocate(frame.image.shape[1], frame.image.shape[0], GL_RGBA16F)
+            width, height = aligned_depth_size(size, frame.alignment)
+            self._nearest.allocate(width, height, GL_R32UI)
+            DepthAlign.clear(self._nearest)
+            self._depth.allocate(width, height, GL_R32F)
+            self._view.allocate(width, height, GL_RGBA16F)
 
-        self._depth.begin()
-        self._warp_shader.use(self._source, frame.homography, frame.flip_h)
-        self._depth.end()
+        if self._projection is None or self._projection[0] is not frame.alignment:
+            self._projection = (frame.alignment, *depth_projection(frame.alignment, size))
+        _, to_ray, to_uv = self._projection
+        self._align_shader.use(self._source, self._nearest, self._depth, to_ray, to_uv, frame.homography, frame.flip_h)
 
         self._view.clear()          # no depth is transparent, so it must not leave the last frame showing
         self._view.begin()

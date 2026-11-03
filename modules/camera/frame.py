@@ -28,6 +28,17 @@ class FrameReadings:
 
 
 @dataclass(frozen=True)
+class DepthAlignment:
+    """Where a depth frame's pixels land in the video frame: the depth camera's 3x3 lens in pixels,
+    the video's lens and size, and the move from the depth camera to the video camera (4x4,
+    metres). What `geometry.depth_projection` turns into the GPU's alignment."""
+    intrinsics: list[list[float]]
+    color_intrinsics: list[list[float]]
+    color_size: tuple[int, int]
+    to_color: list[list[float]]
+
+
+@dataclass(frozen=True)
 class CameraFrame:
     """One frame from one camera.
 
@@ -39,7 +50,8 @@ class CameraFrame:
     `image` is BGR uint8 (H, W, 3) or gray uint8 (H, W), as the backend delivers it; with `nv12` it is
     packed NV12 uint8 (H * 3 / 2, W): the Y rows, then the interleaved UV rows, which a consumer
     converts where it is cheapest. A DEPTH frame's `image` is uint16 millimetres (H, W), 0 where
-    there is no depth, on the same view as the VIDEO frames. `flip_h` says the image still has to
+    there is no depth: on its own camera's view with `alignment`, which the GPU puts on the VIDEO
+    frames' view, else already on that view. `flip_h` says the image still has to
     be mirrored, because the device could not: the GPU upload does it, anything off the GPU takes
     `mirrored_image`. `homography` (`geometry.tilt_homography`, uv to uv) says the image still has
     to be straightened, before that mirror; one array stands for one correction, so a consumer
@@ -55,6 +67,7 @@ class CameraFrame:
     homography: np.ndarray | None = None
     readings: FrameReadings | None = None
     intrinsics: list[list[float]] | None = None
+    alignment: DepthAlignment | None = None
 
 
 def mirrored_image(frame: CameraFrame) -> np.ndarray:

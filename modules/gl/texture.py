@@ -1,4 +1,4 @@
-from OpenGL.GL import Constant, GL_BGR, GL_BGRA, GL_CLAMP_TO_EDGE, GL_FLOAT, GL_HALF_FLOAT, GL_LINEAR, GL_NONE, GL_ONE, GL_R16F, GL_R32F, GL_R8, GL_RED, GL_RG, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE, glBindTexture, glClearTexImage, glDeleteTextures, glGenTextures, glGetTexImage, glTexImage2D, glTexParameterf, glTexParameterfv, glTexParameteri
+from OpenGL.GL import Constant, GL_BGR, GL_BGRA, GL_CLAMP_TO_EDGE, GL_FLOAT, GL_HALF_FLOAT, GL_LINEAR, GL_NONE, GL_ONE, GL_R16F, GL_R32F, GL_R32UI, GL_R8, GL_RED, GL_RED_INTEGER, GL_UNSIGNED_INT, GL_RG, GL_RG16F, GL_RG32F, GL_RG8, GL_RGB, GL_RGB16F, GL_RGB32F, GL_RGB8, GL_RGBA, GL_RGBA16F, GL_RGBA32F, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE, glBindTexture, glClearTexImage, glDeleteTextures, glGenTextures, glGetTexImage, glTexImage2D, glTexParameterf, glTexParameterfv, glTexParameteri
 import logging
 import numpy as np
 
@@ -66,6 +66,7 @@ def get_format(internal_format) -> Constant:
     if internal_format == GL_R8: return GL_RED
     if internal_format == GL_R16F: return GL_RED
     if internal_format == GL_R32F: return GL_RED
+    if internal_format == GL_R32UI: return GL_RED_INTEGER
     if internal_format == GL_RG8: return GL_RG
     if internal_format == GL_RG16F: return GL_RG
     if internal_format == GL_RG32F: return GL_RG
@@ -85,6 +86,7 @@ def get_data_type(internal_format) -> Constant:
     if internal_format == GL_R8: return GL_UNSIGNED_BYTE
     if internal_format == GL_R16F: return GL_FLOAT
     if internal_format == GL_R32F: return GL_FLOAT
+    if internal_format == GL_R32UI: return GL_UNSIGNED_INT
     if internal_format == GL_RG8: return GL_UNSIGNED_BYTE
     if internal_format == GL_RG16F: return GL_FLOAT
     if internal_format == GL_RG32F: return GL_FLOAT

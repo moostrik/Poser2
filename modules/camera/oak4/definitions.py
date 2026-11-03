@@ -43,18 +43,11 @@ class DepthModel(IntEnum):
     NEURAL_480 = 3      # 480x300: 42 to 44 ms, and the boxes 8 ms later
 
 
-DEPTH_MODELS: dict[DepthModel, tuple[dai.DeviceModelZoo, int]] = {  # the model and its rows
-    DepthModel.NEURAL_288: (dai.DeviceModelZoo.NEURAL_DEPTH_288X180, 180),
-    DepthModel.NEURAL_384: (dai.DeviceModelZoo.NEURAL_DEPTH_384X240, 240),
-    DepthModel.NEURAL_480: (dai.DeviceModelZoo.NEURAL_DEPTH_480X300, 300),
+DEPTH_MODELS: dict[DepthModel, dai.DeviceModelZoo] = {
+    DepthModel.NEURAL_288: dai.DeviceModelZoo.NEURAL_DEPTH_288X180,
+    DepthModel.NEURAL_384: dai.DeviceModelZoo.NEURAL_DEPTH_384X240,
+    DepthModel.NEURAL_480: dai.DeviceModelZoo.NEURAL_DEPTH_480X300,
 }
-
-
-def depth_size(model: DepthModel, frame: tuple[int, int]) -> tuple[int, int]:
-    """The aligned depth's size for a delivered `frame`: the model's rows, which is all the detail
-    it has, and an even width at the frame's aspect."""
-    rows: int = DEPTH_MODELS[model][1]
-    return (round(rows * frame[0] / frame[1] / 2.0) * 2, rows)
 
 
 def requested_size(color: bool, resolution: CameraResolution) -> tuple[int, int]:

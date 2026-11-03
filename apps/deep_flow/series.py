@@ -9,8 +9,9 @@ class Series(IntEnum):
     POSE_LATENCY_SMOOTH =   auto()  # ms from a pose's capture to the SMOOTH stage
     CAPTURE_LATENCY =       auto()  # ms from a capture (color, depth, poses of one moment) to the board
     POSES_UNSYNCED =        auto()  # 1 where a capture with a player carried older poses than its own
+    MASKS_UNSYNCED =        auto()  # 1 where a capture with masks carried older masks than its own
     SEGMENTATION_INTERVAL = auto()  # ms between results that carry masks
-    SEGMENTATION_LATENCY =  auto()  # ms from the camera frame to its masks on the board
+    SEGMENTATION_LATENCY =  auto()  # ms from the camera frame to its masks out of RVM
     SEGMENTATION_TIME =     auto()  # ms of inference per batch
     MASK_MISSING =          auto()  # 1 where a result carried no mask while there were players
     RENDER_INTERVAL =       auto()  # ms between render ticks

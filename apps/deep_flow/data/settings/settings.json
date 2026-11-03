@@ -2,7 +2,7 @@
   "max_players": 1,
   "num_cams": 1,
   "input_fps": 50.0,
-  "mask_source": "RVM",
+  "mask_source": "DEPTH",
   "camera": {
     "keyframe_interval": 50,
     "color": true,
@@ -130,7 +130,7 @@
     },
     "segmentation": {
       "resolution": "ULTRA",
-      "enabled": true,
+      "enabled": false,
       "reset_interval": 480
     },
     "optical_flow": {
@@ -149,7 +149,8 @@
       "enable_prev_crop": false
     },
     "capture_sync": {
-      "pose_wait": 10.0
+      "pose_wait": 10.0,
+      "mask_wait": 8.0
     },
     "angle_extractor": {
       "aspect_ratio": 0.75
@@ -275,7 +276,9 @@
           "flow"
         ],
         "right": [
-          "fluid3d"
+          "center_mask",
+          "center_foreground",
+          "cam_depth"
         ],
         "output": [
           "cam_image"
@@ -404,12 +407,12 @@
     },
     "depth_mask": {
       "near": 0.5,
-      "far": 12.0,
+      "far": 1.1,
       "edge": 0.1
     },
     "flow": {
       "fps": 60.0,
-      "draw_mode": "VELOCITY",
+      "draw_mode": "SMOOTH_VELOCITY_OUTPUT",
       "blend_mode": "ADD",
       "width": 448,
       "height": 800,
@@ -422,12 +425,12 @@
       },
       "visualization": {
         "toggle_scalar": false,
-        "scale": 1.0,
-        "scalar_scale": 2.95,
-        "strip_scale": 1.0,
-        "spacing": 20.0,
+        "scale": 1.07,
+        "scalar_scale": 2.32,
+        "strip_scale": 5.76,
+        "spacing": 30.0,
         "element_length": 40.0,
-        "element_width": 1.0,
+        "element_width": 2.5,
         "dot_min": 0.0
       },
       "gradient_flow": {
@@ -435,7 +438,8 @@
         "threshold": 0.1,
         "strength_x": 1.0,
         "strength_y": 1.0,
-        "strength_z": 1.0
+        "strength_z": 1.0,
+        "use_mask": true
       },
       "lucas_kanade_flow": {
         "levels": 3,
@@ -444,7 +448,8 @@
         "threshold": 0.5,
         "strength_x": 1.0,
         "strength_y": 1.0,
-        "strength_z": 1.0
+        "strength_z": 1.0,
+        "use_mask": true
       },
       "depth_velocity": {
         "smooth_time": 60.0,
@@ -462,6 +467,7 @@
       },
       "kinetic_bridge": {
         "scale": 10.0,
+        "advect": 0.0,
         "fast_time": 25.0,
         "slow_time": 150.0,
         "blur_position": "BEFORE",

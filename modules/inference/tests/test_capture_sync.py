@@ -1,4 +1,4 @@
-"""CaptureSync: the image, the depth and the poses of one moment of capture, matched by time; without a GPU or a camera."""
+"""CaptureSync: the image, the depth, the poses and the masks of one moment of capture, matched by time; without a GPU or a camera."""
 
 import time
 import unittest
@@ -8,7 +8,7 @@ import numpy as np
 import torch
 
 from modules.camera import CameraFrame, FrameType
-from modules.inference import Capture, CaptureSync, CaptureSyncSettings, GpuImage
+from modules.inference import Capture, CaptureSync, CaptureSyncSettings, GpuImage, segmentation
 from modules.pose import BBox, Frame, FrameDict
 from modules.utils import Rect
 
@@ -25,6 +25,11 @@ def depth(t: float, cam_id: int = 0) -> CameraFrame:
 
 def poses(t: float, cam_id: int = 0) -> FrameDict:
     return {0: Frame(track_id=0, cam_id=cam_id, timestamp=t, features={BBox: BBox.from_rect(Rect(0.2, 0.2, 0.5, 0.5))})}
+
+
+def masks(t: float, cam_id: int = 0) -> tuple[FrameDict, segmentation.ImageDict]:
+    """RVM's result for the frame captured at `t`: the poses it was cut for, and their masks."""
+    return poses(t, cam_id), {0: segmentation.Image(mask=torch.full((1,), t), foreground=torch.zeros(1))}
 
 
 def wait_for(condition, timeout: float = 1.0) -> bool:
@@ -113,6 +118,51 @@ class CaptureSyncTest(unittest.TestCase):
         self.sync.submit_poses(poses(1.0 + FRAME))
         self.assertEqual([c.timestamp for c in self.captures], [1.0 + FRAME])
         self.assertEqual((self.settings.misses, self.settings.skipped), (0, 1))
+
+    def test_masks_in_before_the_depth_are_synced(self) -> None:
+        self.sync.submit_image(image(1.0))
+        self.sync.submit_poses(poses(1.0))
+        self.sync.submit_masks(*masks(1.0))
+        self.sync.submit_depth(depth(1.0))
+        self.assertEqual(len(self.captures), 1)
+        self.assertTrue(self.captures[0].masks_synced)
+        self.assertEqual(float(self.captures[0].masks[0].mask[0]), 1.0)
+
+    def test_while_masks_come_in_the_capture_waits_for_its_own(self) -> None:
+        self.sync.submit_masks(*masks(1.0 - FRAME))             # RVM is running
+        self.sync.submit_image(image(1.0))
+        self.sync.submit_poses(poses(1.0))
+        self.sync.submit_depth(depth(1.0))
+        self.assertEqual(self.captures, [])                     # its masks are still on their way
+        self.sync.submit_masks(*masks(1.0))
+        self.assertEqual(len(self.captures), 1)
+        self.assertTrue(self.captures[0].poses_synced and self.captures[0].masks_synced)
+
+    def test_masks_that_do_not_come_in_time_leave_the_capture_with_the_ones_before(self) -> None:
+        self.settings.mask_wait = 5.0
+        self.sync.submit_masks(*masks(1.0 - FRAME))
+        self.sync.submit_image(image(1.0))
+        self.sync.submit_poses(poses(1.0))
+        start: float = time.perf_counter()
+        self.sync.submit_depth(depth(1.0))
+        self.assertTrue(wait_for(lambda: len(self.captures) == 1))
+        self.assertGreaterEqual(time.perf_counter() - start, 0.004)
+        self.assertTrue(self.captures[0].poses_synced)
+        self.assertFalse(self.captures[0].masks_synced)
+        self.assertAlmostEqual(float(self.captures[0].masks[0].mask[0]), 1.0 - FRAME, places=5)
+
+    def test_without_masks_the_capture_does_not_wait_for_them(self) -> None:
+        self.sync.submit_image(image(1.0))
+        self.sync.submit_poses(poses(1.0))
+        self.sync.submit_depth(depth(1.0))                      # no RVM: nothing to wait for
+        self.assertEqual(len(self.captures), 1)
+        self.assertEqual((self.captures[0].masks, self.captures[0].masks_synced), ({}, False))
+
+    def test_a_result_without_masks_passes(self) -> None:
+        self.sync.submit_masks(poses(1.0), {})                  # RVM found no mask: nothing to sync
+        self.sync.submit_image(image(1.0))
+        self.sync.submit_depth(depth(1.0))
+        self.assertEqual(len(self.captures), 1)
 
     def test_cameras_are_matched_apart(self) -> None:
         self.sync.submit_image(image(1.0, cam_id=0))

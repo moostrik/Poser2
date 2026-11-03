@@ -6,7 +6,7 @@ from .draw_circles import      DrawCircles
 from .density_colorize import  DensityColorize
 from .depth_mask import        DepthMask
 from .depth_view import        DepthView
-from .depth_warp import        DepthWarp
+from .depth_align import       DepthAlign
 from .edge_sketch import       EdgeSketch
 from .detail_threshold import  DetailThreshold
 from .cel_shade import         CelShade
