@@ -1,14 +1,14 @@
-"""Save what the depth track gets, frame by frame, from one loop of a recording, for depth_track_compare.
+"""Save what the Lucas–Kanade flow gets, frame by frame, from one loop of a recording, for depth_track_compare.
 
     python scripts/depth_track_capture.py RECORDING [--out temp/depth_track]
 
 Runs deep_flow on the recording (as -sim, without the panel), from the start of its loop to the next,
-with the preset's settings. Each call into the Lucas–Kanade flow's depth track is saved to
-OUT/RECORDING/: `depth_NNNN.npy` (the depth it got, m, at the flow's size, before the step filter),
-`moved_NNNN.npy` (the displacement it is carried by, uv per frame), `mask_NNNN.npy` (the player's
-mask), and `calls.json` (each call's arguments and its moment, `t`, in seconds). The track starts
-over at the loop's start, so the saved calls follow from no track. About 2.4 GB for 15 seconds at
-the flow's 448×800: delete it when done with it. This is the one step that runs the app.
+with the preset's settings and the Lucas–Kanade flow. Each measure of the flow is saved to
+OUT/RECORDING/: `luminance_NNNN.npy` (the newest luminance frame, 0 to 1), `depth_NNNN.npy` (the
+depth it got, m, at the flow's size, before the step filter), `mask_NNNN.npy` (the player's mask),
+and `calls.json`: each measure's arguments and its moment, `t`, in seconds, and the flow's settings.
+The compare replays them from no motion. About 3 GB for
+15 seconds at the flow's 448×800: delete it when done with it. This is the one step that runs the app.
 """
 
 import ctypes
@@ -30,10 +30,9 @@ from OpenGL.raw.GL.VERSION.GL_1_1 import glGetTexImage as raw_get_tex_image  # n
 
 from modules.log_config import setup_logging, install_excepthooks  # noqa: E402
 from modules.gl import Fbo, Style  # noqa: E402
-from modules.flow import DepthVelocity, FlowUtil  # noqa: E402
+from modules.flow import FlowUtil, LucasKanadeFlow  # noqa: E402
 from modules.render.layers.flow.flow_layer import OpticalFlowMethod  # noqa: E402
 from apps.deep_flow.main import DeepFlowMain  # noqa: E402
-from apps.deep_flow.settings import Layers  # noqa: E402
 
 LOOP_TIMEOUT: float = 60.0      # seconds a loop may take before the capture gives up
 
@@ -68,29 +67,25 @@ def main() -> int:
         glBindTexture(GL_TEXTURE_2D, 0)
         return array
 
-    update_depth = DepthVelocity.update_depth
+    update = LucasKanadeFlow.update
 
-    def saved(self, depth, delta_time, view_span, depth_step, window, time_, threshold, tolerance, dead_zone, catch_up_time,
-              motion_floor, displacement=None):
-        if starting.is_set():                     # on the render thread: the loop starts from no track
+    def saved(self, depth, delta_time, view_span, depth_step) -> None:
+        if starting.is_set():                     # on the render thread: the loop starts here
             starting.clear()
-            self.reset()
             recording.set()
-        if recording.is_set() and displacement is not None:
-            w, h = self._input_fbo.width, self._input_fbo.height
+        if recording.is_set() and depth is not None:
+            luminance = self._frames.luminance
+            w, h = luminance.width, luminance.height
             index = len(calls)
-            layer = app.render.L[Layers.flow].get(0)
-            mask = layer._mask_input if layer is not None and layer._mask_input is not None and layer._mask_input.allocated else None
+            mask = self._mask if self._mask is not None and self._mask.allocated else None
+            np.save(out_dir / f'luminance_{index:04d}.npy', read('luminance', luminance, w, h)[..., 0])
             np.save(out_dir / f'depth_{index:04d}.npy', read('depth', depth, w, h)[..., 0])
-            np.save(out_dir / f'moved_{index:04d}.npy', read('moved', displacement, w, h)[..., :2])
             np.save(out_dir / f'mask_{index:04d}.npy', (read('mask', mask, w, h)[..., 0] > 0.5) if mask is not None else np.ones((h, w), bool))
-            calls.append(dict(t=time.perf_counter(), delta_time=delta_time, view_span=view_span, depth_step=list(depth_step), window=window,
-                              time=time_, threshold=threshold, tolerance=tolerance, dead_zone=dead_zone, catch_up_time=catch_up_time,
-                              motion_floor=motion_floor, width=w, height=h))
-        update_depth(self, depth, delta_time, view_span, depth_step, window, time_, threshold, tolerance, dead_zone, catch_up_time,
-                     motion_floor, displacement)
+            calls.append(dict(t=time.perf_counter(), delta_time=delta_time, view_span=view_span, depth_step=list(depth_step),
+                              width=w, height=h, settings=self.settings.to_dict()))
+        update(self, depth, delta_time, view_span, depth_step)
 
-    DepthVelocity.update_depth = saved
+    LucasKanadeFlow.update = saved
     app = DeepFlowMain(simulation=True, interface=False)
     app.settings.render.flow.optical_flow.method = OpticalFlowMethod.LUCAS_KANADE
     loops = threading.Semaphore(0)
@@ -110,7 +105,7 @@ def main() -> int:
             pass
         loops.acquire(timeout=LOOP_TIMEOUT)       # the next loop: one loop recorded
         recording.clear()
-        (out_dir / 'calls.json').write_text(json.dumps(calls))
+        (out_dir / 'calls.json').write_text(json.dumps(calls, default=str))
         print(f'{len(calls)} frames to {out_dir}', flush=True)
         app.stop()
 
