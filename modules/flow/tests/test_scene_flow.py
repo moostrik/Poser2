@@ -73,7 +73,7 @@ class FollowZTimeTest(unittest.TestCase):
         z: list[float] = []
         for step in frames:
             disparity += step
-            state = track_depth(np.full((4, 4), 1.0 / disparity), state, np.zeros((4, 4, 2)), self.DT, 0, (1.0, 1.0), 1.0, 50.0, 1.0, 0.0)
+            state, _ = track_depth(np.full((4, 4), 1.0 / disparity), state, np.zeros((4, 4, 2)), np.zeros((4, 4, 2)), self.DT, 0, (1.0, 1.0), 1.0, 50.0, 1.0, 0.0, 0.0, 0.5)
             z.append(float(state[1, 1, 2]) * self.DT)                        # the rate, per frame
         xy = [float(f[1, 1, 0]) for f in self.follow([np.full((4, 4, 2), step) for step in frames])]
         np.testing.assert_allclose(xy, z, atol=1e-9)

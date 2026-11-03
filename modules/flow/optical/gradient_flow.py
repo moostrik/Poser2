@@ -114,7 +114,7 @@ class GradientFlow:
 
         if depth is not None:
             self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, s.z_window, s.z_time,
-                                              s.z_threshold, s.z_tolerance, s.z_dead_zone)
+                                              s.z_threshold, s.z_tolerance, s.z_dead_zone, 0.0, 0.0)     # no displacement to catch up with
 
         # z in view widths per frame as view widths per second
         per_second: float = 1.0 / max(delta_time, 1e-6)

@@ -45,6 +45,7 @@ class LucasKanadeFlowSettings(BaseSettings):
     z_window:       Field[int]   = Field(1, min=0, max=4, description="z window radius in depth samples (1 = 3x3)", newline=True)
     z_threshold:    Field[float] = Field(0.5, min=0.0, max=10.0, step=0.05, description="z motion below this is noise, taken off the rest (px per frame)")
     z_dead_zone:    Field[float] = Field(0.0, min=0.0, max=0.05, step=0.001, description="Depth z wanders without reading as motion; past it, full speed (m); 0 is off")
+    z_catch_up_time: Field[float] = Field(0.0, min=0.0, max=50.0, step=0.5, description="Time z follows a fast push over, where the image moves too (ms); 0 is off")
     z_time:         Field[float] = Field(50.0, min=0.0, max=1000.0, description="Time over which z averages (ms); 0 is the change of two frames")
     z_tolerance:    Field[float] = Field(0.1, min=0.01, max=1.0, description="Depth further than this is another surface: not averaged in, z starts over (m)")
     strength_x:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, x (negative inverts)", newline=True)
@@ -159,7 +160,8 @@ class LucasKanadeFlow:
 
         if depth is not None:
             self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, s.z_window, s.z_time,
-                                              s.z_threshold, s.z_tolerance, s.z_dead_zone, self._solve.texture)
+                                              s.z_threshold, s.z_tolerance, s.z_dead_zone, s.z_catch_up_time, s.xy_threshold,
+                                              self._solve.texture)
 
         xy: Texture = self._displacement
         if s.xy_follow_z_time:

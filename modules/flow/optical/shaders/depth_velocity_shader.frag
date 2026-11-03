@@ -13,17 +13,28 @@
 // the track is read linear between the texels that hold one of the same surface, within `tolerance`
 // of the measurement, so a track is never carried across an edge. With `dead_zone` above 0, z is 0
 // while the tracked depth stays within it of its anchor; past it, z at its full speed, and the anchor
-// follows at `dead_zone` behind (a backlash); a track that starts over is anchored anew. The numpy
-// reference is depth_velocity.track_depth
+// follows at `dead_zone` behind (a backlash); a track that starts over is anchored anew.
+// Catching up, with `catch_up_time` above 0: Emas of the miss of the prediction, signed and its size;
+// where the miss keeps one way (the signed mean as large as the size, over twice the dead zone) and the
+// image moves (the 3×3 displacement past `motion_floor`), the time the track follows over blends from
+// `time` toward `catch_up_time`; and the carry takes each texel's depth a frame on by its rate. Run
+// twice on the same inputs: with `catch_up_pass` it writes this frame's Emas, without it the track.
+// The numpy reference is depth_velocity.track_depth
 
 uniform sampler2D tex0;  // Depth now R (m)
 uniform sampler2D tex1;  // The track the frame before: z, disparity (1/m), rate (1/m per second), anchor (m)
+uniform sampler2D tex2;  // The catch-up the frame before: Emas of the miss, signed and its size (m)
 uniform sampler2D displacement;     // uv per frame (RG), with warp
 uniform bool warp;
+uniform bool catch_up_pass;         // Write the catch-up instead of the track
 uniform vec2 depth_step; // uv between two depth samples
 uniform int window;      // Radius in depth samples
 uniform float tolerance; // Depth further than this is another surface (m)
 uniform float alpha;     // Weight of a full window's measurement on the disparity
+uniform float time;      // Time the track follows over (ms); 0 takes the measurement whole
+uniform float catch_up_time;        // Time it follows over while catching up (ms); 0 is never
+uniform float ema;       // Weight of a new miss on its Emas
+uniform float motion_floor;         // Displacement the image must move by to catch up (px per frame)
 uniform float delta_time;           // Seconds since the last depth
 uniform float view_span; // Metres one view width spans per metre of depth
 uniform float dead_zone; // Depth the track wanders within its anchor without z (m); 0 is none
@@ -37,24 +48,50 @@ float depth_at(vec2 uv) {
     return texelFetch(tex0, texel, 0).r;
 }
 
-// The track's disparity, rate and anchor at `position` (texels, centres at integers), of the texels
-// that hold one of the measurement's surface, within `tolerance` of it; none of them: no track
-vec3 carried(vec2 position, float measured_depth) {
+// The track's disparity, rate and anchor (xyz) at `position` (texels, centres at integers), of the
+// texels that hold one of the measurement's surface, within `tolerance` of it, each taken `ahead`
+// seconds on by its rate; their catch-up in `catch_up`. None of them: no track
+vec3 carried(vec2 position, float measured_depth, float ahead, out vec2 catch_up) {
     ivec2 size = textureSize(tex1, 0);
     ivec2 base = ivec2(floor(position));
     vec2 f = position - vec2(base);
     vec3 sum = vec3(0.0);
+    vec2 sum_catch_up = vec2(0.0);
     float total = 0.0;
     for (int dy = 0; dy <= 1; dy++) {
         for (int dx = 0; dx <= 1; dx++) {
-            vec4 texel = texelFetch(tex1, clamp(base + ivec2(dx, dy), ivec2(0), size - 1), 0);
-            bool same = texel.g > 0.0 && abs(1.0 / texel.g - measured_depth) <= tolerance;
+            ivec2 at = clamp(base + ivec2(dx, dy), ivec2(0), size - 1);
+            vec4 texel = texelFetch(tex1, at, 0);
+            bool same = texel.g > 0.0 && abs(1.0 / (texel.g + texel.b * ahead) - measured_depth) <= tolerance;
             float weight = (dx == 0 ? 1.0 - f.x : f.x) * (dy == 0 ? 1.0 - f.y : f.y) * float(same);
             sum += weight * texel.gba;
+            sum_catch_up += weight * texelFetch(tex2, at, 0).rg;
             total += weight;
         }
     }
+    catch_up = total > 1e-9 ? sum_catch_up / total : vec2(0.0);
     return total > 1e-9 ? sum / total : vec3(0.0);
+}
+
+// How far the track is catching up, 0 to 1: the signed Ema over the size's and twice the dead zone,
+// from 0.3 to 1 at 0.7, smoothly
+float catch_up_share(float signed_mean, float size_mean) {
+    float index = abs(signed_mean) / (size_mean + 2.0 * max(dead_zone, 0.005));
+    return smoothstep(0.3, 0.7, index);
+}
+
+// Whether the image moves here: the largest displacement of the 3×3 texels past `motion_floor` (px)
+bool moving(vec2 size) {
+    ivec2 at = ivec2(floor(texCoord * size));
+    ivec2 last_texel = ivec2(size) - 1;
+    float largest = 0.0;
+    for (int j = -1; j <= 1; j++) {
+        for (int i = -1; i <= 1; i++) {
+            vec2 d = texelFetch(displacement, clamp(at + ivec2(i, j), ivec2(0), last_texel), 0).xy * size;
+            largest = max(largest, length(d));
+        }
+    }
+    return largest > motion_floor;
 }
 
 void main() {
@@ -79,16 +116,31 @@ void main() {
     float measurement = total / float(max(kept, 1));
     float share = float(kept) / (side * side);
 
+    bool catching = catch_up_time > 0.0;
     vec2 moved = warp ? texture(displacement, texCoord).xy : vec2(0.0);
     vec2 size = vec2(textureSize(tex1, 0));
-    vec3 track = carried(texCoord * size - 0.5 - moved * size, 1.0 / measurement);
+    vec2 last;
+    vec3 track = carried(texCoord * size - 0.5 - moved * size, 1.0 / measurement, catching ? delta_time : 0.0, last);
     float predicted = track.x > 0.0 ? track.x + track.y * delta_time : 0.0;
+    float miss = predicted > 0.0 ? 1.0 / measurement - 1.0 / predicted : 0.0;      // m
 
-    if (predicted <= 0.0 || abs(1.0 / measurement - 1.0 / predicted) > tolerance) {
+    bool follows = predicted > 0.0 && abs(miss) <= tolerance;
+    vec2 emas = follows ? last + ema * (vec2(miss, abs(miss)) - last) : vec2(0.0);
+    if (catch_up_pass) {
+        fragColor = vec4(emas, 0.0, 1.0);
+        return;
+    }
+    if (!follows) {
         fragColor = vec4(0.0, measurement, 0.0, 1.0 / measurement);
         return;
     }
-    float a = alpha * share;
+    float full = alpha;
+    if (catching) {
+        float opened = catch_up_share(emas.x, emas.y) * float(warp && moving(size));
+        float follow_time = time + opened * (catch_up_time - time);
+        full = time > 0.0 ? 1.0 - exp(-delta_time * 1000.0 / max(follow_time, 1e-6)) : 1.0;
+    }
+    float a = full * share;
     float b = a * a / (2.0 - a);
     float residual = measurement - predicted;
     float disparity = predicted + a * residual;

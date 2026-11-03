@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import depth_threshold, filter_depth_steps, track_depth, track_weights
+from modules.flow import catch_up_share, color_motion, depth_threshold, filter_depth_steps, track_depth, track_weights
 
 SIZE: int = 24
 SPAN: float = 0.5       # metres a view width spans per metre of depth
@@ -28,12 +28,15 @@ def interior(field: np.ndarray, margin: int = 8) -> np.ndarray:
 
 
 def track(depths: list[np.ndarray], moved: np.ndarray | None = None, window: int = 2, step: tuple[float, float] = STEP,
-          tolerance: float = TOLERANCE, time: float = 0.0, span: float = SPAN, dead_zone: float = 0.0) -> list[np.ndarray]:
+          tolerance: float = TOLERANCE, time: float = 0.0, span: float = SPAN, dead_zone: float = 0.0,
+          catch_up_time: float = 0.0, dt: float = DT) -> list[np.ndarray]:
     """The track after each depth frame, from no track."""
     state: np.ndarray = np.zeros(depths[0].shape + (4,))
+    catch_up: np.ndarray = np.zeros(depths[0].shape + (2,))
     states: list[np.ndarray] = []
     for depth in depths:
-        state = track_depth(depth, state, still(depth.shape) if moved is None else moved, DT, window, step, tolerance, time, span, dead_zone)
+        state, catch_up = track_depth(depth, state, catch_up, still(depth.shape) if moved is None else moved, dt, window, step, tolerance,
+                                      time, span, dead_zone, catch_up_time, 0.5)
         states.append(state)
     return states
 
@@ -221,6 +224,87 @@ class WeightsTest(unittest.TestCase):
 
     def test_the_share_of_the_window_scales_the_correction(self) -> None:
         self.assertAlmostEqual(float(track_weights(DT, 0.0, 0.5)[0]), 0.5)
+
+
+class CatchUpTest(unittest.TestCase):
+    """With z_catch_up_time, a track that keeps missing one way where the image moves follows faster,
+    as much as it keeps missing that way."""
+    MOVING: np.ndarray = np.tile([1.0, 0.0], (SIZE, SIZE, 1))     # the image moving a pixel per frame, as a hand's edges do
+
+    @staticmethod
+    def approach(speed: float, frames: int = 50) -> list[np.ndarray]:
+        # still at 2 m, then toward the camera at 40 m/s² up to `speed`, 50 fps
+        v, d, depths = 0.0, 2.0, []
+        for frame in range(frames):
+            v = min(v + 40.0 * 0.02, speed) if frame >= 5 else 0.0
+            d -= v * 0.02
+            depths.append(uniform(max(d, 0.6)))
+        return depths
+
+    def follow(self, speed: float, catch_up_time: float, moving: bool = True) -> list[np.ndarray]:
+        return track(self.approach(speed), moved=self.MOVING if moving else None, window=0, time=50.0, dead_zone=0.02,
+                     catch_up_time=catch_up_time, dt=0.02)
+
+    @staticmethod
+    def restarts(states: list[np.ndarray]) -> int:
+        return sum(1 for before, now in zip(states[6:], states[7:]) if float(before[1, 1, 1]) > 0 and float(now[1, 1, 2]) == 0.0
+                   and float(now[1, 1, 1]) < 1.0 / 0.6)
+
+    def test_a_fast_approach_to_6_m_s_is_followed_without_starting_over(self) -> None:
+        for speed in (3.0, 4.0, 6.0):
+            self.assertGreater(self.restarts(self.follow(speed, 0.0)), 0)       # today: it starts over and over
+            self.assertEqual(self.restarts(self.follow(speed, 12.5)), 0)
+
+    def test_without_color_motion_it_does_not_catch_up(self) -> None:
+        np.testing.assert_array_equal(np.stack(self.follow(4.0, 12.5, moving=False)), np.stack(self.follow(4.0, 0.0, moving=False)))
+
+    def test_color_motion_is_the_largest_of_the_3x3_past_the_floor(self) -> None:
+        moved = still()
+        moved[10, 10] = (0.6, 0.0)
+        motion = color_motion(moved, 0.5)
+        self.assertTrue(motion[9:12, 9:12].all())
+        self.assertEqual(int(motion.sum()), 9)
+
+    def test_off_is_the_track_as_it_was(self) -> None:
+        rng = np.random.default_rng(9)
+        depths = [2.0 + rng.normal(0.0, 0.03, (SIZE, SIZE)) for _ in range(10)] + self.approach(3.0)[:20]
+        state, catch_up, plain = np.zeros((SIZE, SIZE, 4)), np.zeros((SIZE, SIZE, 2)), []
+        for depth in depths:
+            state, catch_up = track_depth(depth, state, catch_up, still(), DT, 1, STEP, 0.1, 50.0, SPAN, 0.02, 0.0, 0.5)
+            plain.append(state)
+        for a, b in zip(plain, track(depths, window=1, tolerance=0.1, time=50.0, dead_zone=0.02)):
+            np.testing.assert_array_equal(a, b)
+
+    def test_a_flip_jitter_at_a_still_edge_reads_as_today(self) -> None:
+        # one-frame jumps of 3–9 cm, back the next frame, where the image does not move
+        rng = np.random.default_rng(10)
+        depths, off = [], False
+        for _ in range(200):
+            off = (not off) and rng.random() < 0.3
+            depths.append(uniform(0.7 + (rng.uniform(0.03, 0.09) * rng.choice((-1.0, 1.0)) if off else 0.0)))
+        np.testing.assert_array_equal(np.stack(track(depths, window=0, time=50.0, dead_zone=0.02, catch_up_time=12.5)),
+                                      np.stack(track(depths, window=0, time=50.0, dead_zone=0.02)))
+
+    def test_a_flip_jitter_cancels_out_in_the_catch_up_share(self) -> None:
+        rng = np.random.default_rng(11)
+        signed, size, shares = np.zeros(1), np.zeros(1), []
+        for _ in range(300):
+            miss = rng.choice((-1.0, 1.0)) * rng.uniform(0.03, 0.09) if rng.random() < 0.3 else 0.0
+            signed, size = signed + 0.33 * (miss - signed), size + 0.33 * (abs(miss) - size)
+            shares.append(float(catch_up_share(signed, size, 0.02)[0]))
+        self.assertLess(float(np.mean(shares)), 0.1)
+
+    def test_a_push_raises_the_catch_up_share(self) -> None:
+        state, catch_up, shares = np.zeros((4, 4, 4)), np.zeros((4, 4, 2)), []
+        for depth in self.approach(4.0, 25):
+            state, catch_up = track_depth(depth[:4, :4], state, catch_up, self.MOVING[:4, :4], 0.02, 0, STEP, 0.1, 50.0, SPAN, 0.02, 12.5, 0.5)
+            shares.append(float(catch_up_share(catch_up[..., 0], catch_up[..., 1], 0.02)[1, 1]))
+        self.assertGreater(max(shares), 0.5)                                  # it opens, and closes as it catches up
+
+    def test_a_new_surface_still_starts_over(self) -> None:
+        states = track([uniform(1.0)] * 6 + [uniform(0.7)], moved=self.MOVING, window=0, time=50.0, dead_zone=0.02, catch_up_time=12.5, dt=0.02)
+        self.assertEqual(float(states[-1][1, 1, 2]), 0.0)
+        np.testing.assert_allclose(states[-1][1, 1, 1], 1.0 / 0.7)
 
 
 class StepFilterTest(unittest.TestCase):
