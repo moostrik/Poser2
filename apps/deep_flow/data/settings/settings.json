@@ -422,13 +422,13 @@
       "optical_flow": {
         "method": "LUCAS_KANADE",
         "lucas_kanade": {
-          "xy_levels": 1,
+          "xy_levels": 3,
           "xy_regularizer": 0.0195,
           "xy_window": 2,
           "xy_threshold": 0.5,
           "z_window": 1,
-          "z_time": 50.0,
           "z_threshold": 0.5,
+          "z_time": 50.0,
           "z_tolerance": 0.1,
           "strength_x": 1.0,
           "strength_y": 1.0,
@@ -438,11 +438,12 @@
         "gradient": {
           "offset": 3,
           "threshold": 0.1,
-          "z_window": 2,
-          "z_threshold": 2.4,
-          "z_tolerance": 0.04,
           "strength_x": 1.0,
           "strength_y": 1.0,
+          "z_window": 2,
+          "z_threshold": 2.4,
+          "z_time": 50.0,
+          "z_tolerance": 0.04,
           "strength_z": 1.0,
           "use_mask": true
         }

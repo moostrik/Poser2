@@ -40,15 +40,15 @@ class LucasKanadeFlowSettings(BaseSettings):
     xy_regularizer: Field[float] = Field(0.001, min=0.0, max=0.1, step=0.0005, description="Damps the x/y solve where the window has no texture")
     xy_window:      Field[int]   = Field(2, min=1, max=4, description="x/y window radius in texels per level (2 = 5x5)", newline=True)
     xy_threshold:   Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="Displacement below this is noise, taken off the rest (px per frame)")
+    xy_follow_z_time: Field[bool] = Field(False, description="x/y follows z's time, so both lag alike")
     z_window:       Field[int]   = Field(1, min=0, max=4, description="z window radius in depth samples (1 = 3x3)", newline=True)
-    z_time:         Field[float] = Field(50.0, min=0.0, max=1000.0, description="Time over which z averages (ms); 0 is the change of two frames")
     z_threshold:    Field[float] = Field(0.5, min=0.0, max=10.0, step=0.05, description="z motion below this is noise, taken off the rest (px per frame)")
+    z_time:         Field[float] = Field(50.0, min=0.0, max=1000.0, description="Time over which z averages (ms); 0 is the change of two frames")
     z_tolerance:    Field[float] = Field(0.1, min=0.01, max=1.0, description="Depth further than this is another surface: not averaged in, z starts over (m)")
     strength_x:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, x (negative inverts)", newline=True)
     strength_y:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, y (negative inverts)")
     strength_z:  Field[float] = Field(0.0, min=0.0, max=10.0, description="Velocity per view width per second toward the camera; 1 balances it with x/y, 0 is no depth")
     use_mask:    Field[bool]  = Field(False, description="Multiply the velocity by the mask", newline=True)
-    xy_follow_z_time: Field[bool] = Field(False, description="x/y follows z's time, so both lag alike")
 
 
 class LucasKanadeFlow:
