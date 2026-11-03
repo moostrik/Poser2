@@ -13,18 +13,25 @@ corrected each frame by the mean over `z_window` depth samples and averaged over
 view widths per second the same way. Out comes one 3D velocity: x/y times `strength_x`/`strength_y`,
 z times `strength_z`. With `use_mask`, the velocity is multiplied by the mask.
 
-`lucas_kanade`, `threshold_displacement` and `displacement_velocity` below are the numpy references of the shaders.
+z lags its motion by the time it averages over. With `xy_follow_z_time`, x/y goes through the same
+filter over `z_time` before its threshold, carried along the displacement as z is, so both lag
+alike. A displacement is a step of position, so the filter is the same one: with a steady frame
+interval and a full z window, x/y answers a change of speed exactly as z does. The tracks are
+carried by the measured displacement either way.
+
+`lucas_kanade`, `threshold_displacement`, `filter_displacement` and `displacement_velocity` below are
+the numpy references of the shaders.
 """
 
 import numpy as np
-from OpenGL.GL import GL_RG32F, GL_RGBA16F
+from OpenGL.GL import GL_RG32F, GL_RGBA16F, GL_RGBA32F
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import BaseSettings, Field
 from .. import FlowUtil
-from .depth_velocity import DepthVelocity
+from .depth_velocity import DepthVelocity, track_weights
 from .luminance_frames import LuminanceFrames
-from .shaders import ComposeVelocity, DisplacementThreshold, LucasKanadeShader
+from .shaders import ComposeVelocity, DisplacementFilter, DisplacementThreshold, LucasKanadeShader
 
 
 class LucasKanadeFlowSettings(BaseSettings):
@@ -41,6 +48,7 @@ class LucasKanadeFlowSettings(BaseSettings):
     strength_y:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, y (negative inverts)")
     strength_z:  Field[float] = Field(0.0, min=0.0, max=10.0, description="Velocity per view width per second toward the camera; 1 balances it with x/y, 0 is no depth")
     use_mask:    Field[bool]  = Field(False, description="Multiply the velocity by the mask", newline=True)
+    xy_follow_z_time: Field[bool] = Field(False, description="x/y follows z's time, so both lag alike")
 
 
 class LucasKanadeFlow:
@@ -54,9 +62,13 @@ class LucasKanadeFlow:
         self._frames: LuminanceFrames = LuminanceFrames()
         self._solve: SwapFbo = SwapFbo()            # the displacement as solved, level by level
         self._displacement: Fbo = Fbo()             # with the noise floor taken off
+        self._filtered: SwapFbo = SwapFbo()         # with xy_follow_z_time: the filter, its displacement and position error
+        self._followed: Fbo = Fbo()                 # the filtered displacement with the noise floor taken off
+        self._following: bool = False
         self._velocity: Fbo = Fbo()
         self._shader: LucasKanadeShader = LucasKanadeShader()
         self._threshold_shader: DisplacementThreshold = DisplacementThreshold()
+        self._filter_shader: DisplacementFilter = DisplacementFilter()
         self._compose_shader: ComposeVelocity = ComposeVelocity()
 
     @property
@@ -79,9 +91,12 @@ class LucasKanadeFlow:
         self._frames.allocate(width, height)
         self._solve.allocate(width, height, GL_RG32F)
         self._displacement.allocate(width, height, GL_RG32F)
+        self._filtered.allocate(width, height, GL_RGBA32F)
+        self._followed.allocate(width, height, GL_RG32F)
         self._velocity.allocate(width, height, GL_RGBA16F)
         self._shader.allocate()
         self._threshold_shader.allocate()
+        self._filter_shader.allocate()
         self._compose_shader.allocate()
         self.reset()
 
@@ -90,9 +105,12 @@ class LucasKanadeFlow:
         self._frames.deallocate()
         self._solve.deallocate()
         self._displacement.deallocate()
+        self._filtered.deallocate()
+        self._followed.deallocate()
         self._velocity.deallocate()
         self._shader.deallocate()
         self._threshold_shader.deallocate()
+        self._filter_shader.deallocate()
         self._compose_shader.deallocate()
 
     def reset(self) -> None:
@@ -100,6 +118,8 @@ class LucasKanadeFlow:
         self._frames.reset()
         self._solve.clear_all()
         self._displacement.clear()
+        self._filtered.clear_all()
+        self._followed.clear()
         self._velocity.clear()
 
     def set_input(self, texture: Texture) -> None:
@@ -139,13 +159,30 @@ class LucasKanadeFlow:
             self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, s.z_window, s.z_time,
                                               s.z_threshold, s.z_tolerance, self._displacement)
 
+        xy: Texture = self._displacement
+        if s.xy_follow_z_time:
+            if not self._following:
+                self._filtered.clear_all()                  # from no motion, not from when it was last on
+                self._following = True
+            alpha, _ = track_weights(delta_time, s.z_time, 1.0)
+            self._filtered.swap()
+            self._filtered.begin()
+            self._filter_shader.use(self._solve.texture, self._filtered.back_texture, self._displacement, float(alpha))
+            self._filtered.end()
+            self._followed.begin()
+            self._threshold_shader.use(self._filtered.texture, s.xy_threshold)
+            self._followed.end()
+            xy = self._followed
+        else:
+            self._following = False
+
         # uv per frame as image widths per second: v is uv of the height, so a square motion stays square;
         # z is in view widths per frame already
         per_second: float = 1.0 / max(delta_time, 1e-6)
         aspect: float = self._displacement.height / max(self._displacement.width, 1)
         mask: Texture | None = self._mask if s.use_mask and self._mask is not None and self._mask.allocated else None
         self._velocity.begin()
-        self._compose_shader.use(self._displacement, self._depth_velocity.depth_velocity if depth is not None else None,
+        self._compose_shader.use(xy, self._depth_velocity.depth_velocity if depth is not None else None,
                                  (s.strength_x * per_second, s.strength_y * per_second * aspect, s.strength_z * per_second), mask)
         self._velocity.end()
 
@@ -214,6 +251,25 @@ def threshold_displacement(displacement: np.ndarray, threshold: float) -> np.nda
     length: np.ndarray = np.linalg.norm(displacement, axis=-1, keepdims=True)
     kept: np.ndarray = np.maximum(length - threshold, 0.0)
     return np.divide(displacement * kept, length, out=np.zeros_like(displacement), where=length > 1e-12)
+
+
+def filter_displacement(displacement: np.ndarray, state: np.ndarray, carry: np.ndarray, alpha: float) -> np.ndarray:
+    """The filter x/y goes through with xy_follow_z_time, one frame on (H, W, 4): the filtered
+    displacement (x, y, pixels per frame) and the position error (x, y, pixels). Mirrors
+    displacement_filter.frag.
+
+    The depth track's alpha–beta filter, on positions that step by `displacement` (H, W, 2, pixels
+    per frame) each frame: the state (zeros to start) is carried from where each pixel was `carry`
+    back, linear between texels, its displacement predicts the step, and the residual corrects it by
+    `alpha` and alpha² / (2 − alpha), as a full window corrects z.
+    """
+    h, w = displacement.shape[:2]
+    rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
+    x, y = columns - carry[..., 0], rows - carry[..., 1]
+    carried: np.ndarray = np.stack([_bilinear(state[..., channel], x, y) for channel in range(4)], axis=-1)
+    beta: float = alpha * alpha / (2.0 - alpha)
+    residual: np.ndarray = displacement - carried[..., 2:] - carried[..., :2]
+    return np.concatenate((carried[..., :2] + beta * residual, -(1.0 - alpha) * residual), axis=-1)
 
 
 def displacement_velocity(displacement: np.ndarray, dt: float, width: int, height: int, strength: tuple[float, float]) -> np.ndarray:

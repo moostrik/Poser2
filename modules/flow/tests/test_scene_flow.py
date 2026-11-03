@@ -1,11 +1,11 @@
 """The Lucas–Kanade flow's numpy references: it finds how far an image moved and gives that as a
-velocity. Also the trail bridge's shaping of a velocity. Its depth is tested in test_depth_velocity."""
+velocity, and with xy_follow_z_time filters it as z is. Also the trail bridge's shaping of a velocity. Its depth is tested in test_depth_velocity."""
 
 import unittest
 
 import numpy as np
 
-from modules.flow import displacement_velocity, lucas_kanade, shape_velocity, threshold_displacement
+from modules.flow import displacement_velocity, filter_displacement, lucas_kanade, shape_velocity, threshold_displacement, track_depth, track_weights
 
 SIZE: int = 64
 
@@ -50,6 +50,60 @@ class ThresholdTest(unittest.TestCase):
 
     def test_no_threshold_leaves_it(self) -> None:
         np.testing.assert_allclose(threshold_displacement(np.array([[0.3, -0.2]]), 0.0), [[0.3, -0.2]])
+
+
+class FollowZTimeTest(unittest.TestCase):
+    """x/y through the depth track's filter, with xy_follow_z_time."""
+    DT: float = 1.0 / 30.0
+
+    def follow(self, steps: list[np.ndarray], carry: np.ndarray | None = None, time: float = 50.0) -> list[np.ndarray]:
+        alpha = float(track_weights(self.DT, time, 1.0)[0])
+        state = np.zeros(steps[0].shape[:2] + (4,))
+        out: list[np.ndarray] = []
+        for step in steps:
+            state = filter_displacement(step, state, np.zeros_like(step) if carry is None else carry, alpha)
+            out.append(state[..., :2])
+        return out
+
+    def test_a_change_of_speed_lags_as_z_does(self) -> None:
+        # z: still for 10 frames, then 0.01 of disparity per frame; x/y: the same steps as a displacement
+        frames: list[float] = [0.0] * 10 + [0.01] * 20
+        disparity: float = 0.5
+        state = np.zeros((4, 4, 3))
+        z: list[float] = []
+        for step in frames:
+            disparity += step
+            state = track_depth(np.full((4, 4), 1.0 / disparity), state, np.zeros((4, 4, 2)), self.DT, 0, (1.0, 1.0), 1.0, 50.0, 1.0)
+            z.append(float(state[1, 1, 2]) * self.DT)                        # the rate, per frame
+        xy = [float(f[1, 1, 0]) for f in self.follow([np.full((4, 4, 2), step) for step in frames])]
+        np.testing.assert_allclose(xy, z, atol=1e-9)
+
+    def test_no_time_is_the_measurement(self) -> None:
+        rng = np.random.default_rng(2)
+        steps = [rng.normal(0.0, 1.0, (4, 4, 2)) for _ in range(5)]
+        for measured, followed in zip(steps, self.follow(steps, time=0.0)):
+            np.testing.assert_allclose(followed, measured, atol=1e-12)
+
+    def test_still_jitter_is_quieter(self) -> None:
+        rng = np.random.default_rng(3)
+        steps = [rng.normal(0.0, 0.2, (8, 8, 2)) for _ in range(120)]
+        followed = np.stack(self.follow(steps)[60:])
+        self.assertLess(float(np.std(followed)), 0.2 * 0.5)
+
+    def test_a_steady_motion_settles_on_its_speed(self) -> None:
+        self.assertAlmostEqual(float(self.follow([np.full((4, 4, 2), 1.5)] * 40)[-1][1, 1, 0]), 1.5, places=3)
+
+    def test_carried_along_its_motion_a_moving_bar_keeps_its_speed(self) -> None:
+        # a bar 4 pixels wide moving 1 pixel per frame: carried along, its filter goes with it and settles
+        width, frames = 64, 40
+        alpha = float(track_weights(self.DT, 50.0, 1.0)[0])
+        state = np.zeros((1, width, 4))
+        for frame in range(frames):
+            step = np.zeros((1, width, 2))
+            step[0, 10 + frame:14 + frame, 0] = 1.0
+            state = filter_displacement(step, state, step, alpha)
+        self.assertGreater(float(state[0, 10 + frames - 1:14 + frames - 1, 0].min()), 0.8)
+        self.assertTrue(np.isfinite(state).all())
 
 
 class DisplacementVelocityTest(unittest.TestCase):
