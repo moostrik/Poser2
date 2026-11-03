@@ -20,7 +20,7 @@ class VelocityField(FieldBase):
     - Direction Map: HSV color encoding (direction->hue, magnitude->saturation);
       a 3D velocity as x, y, z in red, green, blue around grey
     - Arrow Field: Procedural arrow field (grid-based sampling);
-      one blob per grid point, a round body for z (red toward the camera, green away) and a bulb on a stem for x/y
+      a 3D velocity as the arrow with a ring for z (radius |z| / pi on its scale), red toward the camera, green away
 
     toggle_scalar switches between the two modes.
     scale acts as a general multiplier for both modes.
@@ -79,6 +79,7 @@ class VelocityField(FieldBase):
             self._arrow_shader.use(
                 self._velocity_texture,
                 self.settings.scale,
+                self.settings.z_scale,
                 self.settings.spacing,
                 self.settings.element_length,
                 self.settings.element_width,
