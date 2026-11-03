@@ -21,8 +21,8 @@ window.panel = (function () {
       if (document.getElementById("shutdown-overlay")) return;
       const overlay = document.createElement("div");
       overlay.id = "shutdown-overlay";
-      overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9998;"
-        + "backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);";
+      overlay.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:9998;"
+        + "backdrop-filter:blur(1px);-webkit-backdrop-filter:blur(1px);";
       const box = document.createElement("div");
       box.style.cssText = "position:absolute;left:50%;top:calc((100vh - " + drawerHeight + ") / 2);"
         + "transform:translate(-50%, -50%);text-align:center;color:#e4e4e7";

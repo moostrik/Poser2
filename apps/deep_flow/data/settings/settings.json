@@ -7,7 +7,7 @@
     "keyframe_interval": 50,
     "color": true,
     "resolution": "P720",
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "fov": 80.0,
     "split_seconds": 60,
@@ -53,7 +53,7 @@
         "flood_light": 1.0
       },
       "depth": {
-        "confidence": 50,
+        "confidence": 51,
         "edge": 0,
         "temporal_filter": false,
         "temporal_alpha": 0.4,
@@ -77,7 +77,7 @@
         "DEPTH"
       ],
       "apply_warp": false,
-      "folder": "20261031-221821_Flick",
+      "folder": "20261103-183454_still",
       "sim_passthrough": false,
       "replay": true
     },
@@ -276,8 +276,7 @@
           "flow"
         ],
         "right": [
-          "center_depth",
-          "center_mask"
+          "center_depth"
         ],
         "output": [
           "cam_image"
@@ -426,8 +425,10 @@
           "xy_regularizer": 0.0195,
           "xy_window": 2,
           "xy_threshold": 0.5,
-          "z_window": 1,
-          "z_threshold": 0.5,
+          "xy_follow_z_time": false,
+          "z_window": 2,
+          "z_threshold": 1.0,
+          "z_dead_zone": 0.017,
           "z_time": 50.0,
           "z_tolerance": 0.1,
           "strength_x": 1.0,
@@ -442,6 +443,7 @@
           "strength_y": 1.0,
           "z_window": 2,
           "z_threshold": 2.4,
+          "z_dead_zone": 0.0,
           "z_time": 50.0,
           "z_tolerance": 0.04,
           "strength_z": 1.0,
