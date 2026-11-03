@@ -188,6 +188,11 @@ class MotionFeature(BaseSettings):
 #  Pose pipeline group (no similarity — single player)
 # ---------------------------------------------------------------------------
 
+class _SegmentationSettings(inference.segmentation.Settings):
+    """No switch here: RVM runs whenever it is the mask source (`Settings.mask_source`)."""
+    enabled: Field[bool] = Field(True, access=Field.READ, visible=False)
+
+
 class PoseGroup(BaseSettings):
     max_players:          Field[int]                  = Field(1, min=1, max=16, access=Field.INIT)
     model_type:         Field[inference.ModelType]  = Field(inference.ModelType.TRT, access=Field.INIT)
@@ -200,7 +205,7 @@ class PoseGroup(BaseSettings):
     _feature_share: list = [frequency, output_frequency]
 
     pose           : Group[inference.pose.Settings]          = Group(inference.pose.Settings, share=_batch_share)
-    segmentation   : Group[inference.segmentation.Settings]  = Group(inference.segmentation.Settings, share=_batch_share)
+    segmentation   : Group[_SegmentationSettings]            = Group(_SegmentationSettings, share=_batch_share)
     optical_flow   : Group[inference.optical_flow.Settings]  = Group(inference.optical_flow.Settings, share=_batch_share)
     tracklets      : Group[PosesFromTrackletsSettings]       = Group(PosesFromTrackletsSettings)
     image_crop     : Group[inference.crop.Settings]          = Group(inference.crop.Settings, share=[max_players])
@@ -287,7 +292,7 @@ class Settings(BaseSettings):
     max_players:        Field[int]   = Field(1, access=Field.INIT, visible=False)
     num_cams:           Field[int]   = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
     input_fps:          Field[float] = Field(60.0, min=1.0, max=120.0, access=Field.INIT)
-    mask_source:        Field[MaskSource] = Field(MaskSource.DEPTH, access=Field.INIT, description="Where the player's mask comes from (restart to change)")
+    mask_source:        Field[MaskSource] = Field(MaskSource.DEPTH, access=Field.INIT, description="Where the player's mask comes from; RVM runs only for RVM (restart to change)")
 
     camera: Group[Oak4Group]      = Group(Oak4Group, share=[num_cams, input_fps.as_('fps')])
     pose  : Group[PoseGroup]      = Group(PoseGroup, share=[max_players, input_fps.as_('frequency')])

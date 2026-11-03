@@ -130,7 +130,6 @@
     },
     "segmentation": {
       "resolution": "ULTRA",
-      "enabled": false,
       "reset_interval": 480
     },
     "optical_flow": {
