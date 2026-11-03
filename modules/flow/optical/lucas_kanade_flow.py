@@ -20,8 +20,15 @@ interval and a full z window, x/y answers a change of speed exactly as z does. T
 carried by the displacement as solved, before `xy_threshold`: a slide too slow for the output
 still moves the tracks with it, or on a slope it would read as z.
 
-`lucas_kanade`, `threshold_displacement`, `filter_displacement` and `displacement_velocity` below are
-the numpy references of the shaders.
+Three ways to a firmer solve, each off by default: `xy_iterations` solves each level more than once,
+each from the last, as one linear step misses a large shift; `xy_median` takes the 5×5 median of the
+displacement after each level, so one level's outliers do not grow on the next; and `xy_round_trip`
+solves the way back as well, current onto previous, and keeps the displacement only where the round
+trip comes back to within it (px): where a surface is covered or uncovered, at a silhouette or a
+hand over the body, there is no motion and the depth track is held in place.
+
+`lucas_kanade`, `median_displacement`, `round_trip_displacement`, `threshold_displacement`,
+`filter_displacement` and `displacement_velocity` below are the numpy references of the shaders.
 """
 
 import numpy as np
@@ -32,7 +39,7 @@ from modules.settings import BaseSettings, Field
 from .. import FlowUtil
 from .depth_velocity import DepthVelocity, track_weights
 from .luminance_frames import LuminanceFrames
-from .shaders import ComposeVelocity, DisplacementFilter, DisplacementThreshold, LucasKanadeShader
+from .shaders import ComposeVelocity, DisplacementRoundTrip, DisplacementFilter, DisplacementMedian, DisplacementThreshold, LucasKanadeShader
 
 
 class LucasKanadeFlowSettings(BaseSettings):
@@ -40,6 +47,9 @@ class LucasKanadeFlowSettings(BaseSettings):
     xy_levels:      Field[int]   = Field(3, min=1, max=5, description="Mip levels of the x/y solve, coarse to fine; more follows faster motion")
     xy_regularizer: Field[float] = Field(0.001, min=0.0, max=0.1, step=0.0005, description="Damps the x/y solve where the window has no texture")
     xy_window:      Field[int]   = Field(2, min=1, max=4, description="x/y window radius in texels per level (2 = 5x5)", newline=True)
+    xy_iterations:  Field[int]   = Field(1, min=1, max=5, description="x/y solves per mip level, each from the last")
+    xy_median:      Field[bool]  = Field(False, description="5x5 median of the displacement after each mip level")
+    xy_round_trip:  Field[float] = Field(0.0, min=0.0, max=5.0, step=0.1, description="Largest forward-backward miss before x/y is dropped (px); 0 is off")
     xy_threshold:   Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="Displacement below this is noise, taken off the rest (px per frame)")
     xy_follow_z_time: Field[bool] = Field(False, description="x/y follows z's time, so both lag alike")
     z_window:       Field[int]   = Field(1, min=0, max=4, description="z window radius in depth samples (1 = 3x3)", newline=True)
@@ -64,6 +74,8 @@ class LucasKanadeFlow:
 
         self._frames: LuminanceFrames = LuminanceFrames()
         self._solve: SwapFbo = SwapFbo()            # the displacement as solved, level by level
+        self._backward: SwapFbo = SwapFbo()         # with xy_round_trip: the current frame onto the previous
+        self._round_tripped: Fbo = Fbo()                  # with xy_round_trip: the solve where its round trip comes back
         self._displacement: Fbo = Fbo()             # with the noise floor taken off
         self._filtered: SwapFbo = SwapFbo()         # with xy_follow_z_time: the filter, its displacement and position error
         self._followed: Fbo = Fbo()                 # the filtered displacement with the noise floor taken off
@@ -71,6 +83,8 @@ class LucasKanadeFlow:
         self._velocity: Fbo = Fbo()
         self._shader: LucasKanadeShader = LucasKanadeShader()
         self._threshold_shader: DisplacementThreshold = DisplacementThreshold()
+        self._median_shader: DisplacementMedian = DisplacementMedian()
+        self._round_trip_shader: DisplacementRoundTrip = DisplacementRoundTrip()
         self._filter_shader: DisplacementFilter = DisplacementFilter()
         self._compose_shader: ComposeVelocity = ComposeVelocity()
 
@@ -93,12 +107,16 @@ class LucasKanadeFlow:
         self._depth_velocity.allocate(width, height)
         self._frames.allocate(width, height)
         self._solve.allocate(width, height, GL_RG32F)
+        self._backward.allocate(width, height, GL_RG32F)
+        self._round_tripped.allocate(width, height, GL_RG32F)
         self._displacement.allocate(width, height, GL_RG32F)
         self._filtered.allocate(width, height, GL_RGBA32F)
         self._followed.allocate(width, height, GL_RG32F)
         self._velocity.allocate(width, height, GL_RGBA16F)
         self._shader.allocate()
         self._threshold_shader.allocate()
+        self._median_shader.allocate()
+        self._round_trip_shader.allocate()
         self._filter_shader.allocate()
         self._compose_shader.allocate()
         self.reset()
@@ -107,12 +125,16 @@ class LucasKanadeFlow:
         self._depth_velocity.deallocate()
         self._frames.deallocate()
         self._solve.deallocate()
+        self._backward.deallocate()
+        self._round_tripped.deallocate()
         self._displacement.deallocate()
         self._filtered.deallocate()
         self._followed.deallocate()
         self._velocity.deallocate()
         self._shader.deallocate()
         self._threshold_shader.deallocate()
+        self._median_shader.deallocate()
+        self._round_trip_shader.deallocate()
         self._filter_shader.deallocate()
         self._compose_shader.deallocate()
 
@@ -120,6 +142,8 @@ class LucasKanadeFlow:
         self._depth_velocity.reset()
         self._frames.reset()
         self._solve.clear_all()
+        self._backward.clear_all()
+        self._round_tripped.clear()
         self._displacement.clear()
         self._filtered.clear_all()
         self._followed.clear()
@@ -132,6 +156,24 @@ class LucasKanadeFlow:
     def set_mask(self, texture: Texture | None) -> None:
         """The player's mask (red, 0 to 1) the velocity is multiplied by with `use_mask`, or None for no mask."""
         self._mask = texture
+
+    def _pyramid(self, solve: SwapFbo, previous: Texture, current: Texture) -> None:
+        """The displacement carrying `previous` onto `current`, coarse to fine, into `solve`: `xy_iterations`
+        solves per level, each from the last, and with `xy_median` the 5×5 median after each level."""
+        s: LucasKanadeFlowSettings = self.settings
+        solve.clear()                                       # the coarsest level starts from no motion
+        for level in reversed(range(s.xy_levels)):
+            for _ in range(s.xy_iterations):
+                solve.swap()
+                solve.begin()
+                self._shader.use(previous, current, solve.back_texture, level, s.xy_window, s.xy_regularizer)
+                solve.end()
+            if s.xy_median:
+                spacing: float = float(2 ** level)          # a level's texel apart
+                solve.swap()
+                solve.begin()
+                self._median_shader.use(solve.back_texture, (spacing / solve.width, spacing / solve.height))
+                solve.end()
 
     def update(self, depth: Texture | None, delta_time: float, view_span: float, depth_step: tuple[float, float]) -> None:
         """Measure between the newest two frames.
@@ -147,21 +189,23 @@ class LucasKanadeFlow:
             return
         s: LucasKanadeFlowSettings = self.settings
 
-        self._solve.clear()                                 # the coarsest level starts from no motion
-        for level in reversed(range(s.xy_levels)):
-            self._solve.swap()
-            self._solve.begin()
-            self._shader.use(self._frames.previous_luminance, self._frames.luminance, self._solve.back_texture, level, s.xy_window, s.xy_regularizer)
-            self._solve.end()
+        self._pyramid(self._solve, self._frames.previous_luminance, self._frames.luminance)
+        solved: Texture = self._solve.texture
+        if s.xy_round_trip > 0.0:                                # the way back, and the forward solve where it returns
+            self._pyramid(self._backward, self._frames.luminance, self._frames.previous_luminance)
+            self._round_tripped.begin()
+            self._round_trip_shader.use(self._solve.texture, self._backward.texture, s.xy_round_trip)
+            self._round_tripped.end()
+            solved = self._round_tripped
 
         self._displacement.begin()
-        self._threshold_shader.use(self._solve.texture, s.xy_threshold)
+        self._threshold_shader.use(solved, s.xy_threshold)
         self._displacement.end()
 
         if depth is not None:
             self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, s.z_window, s.z_time,
                                               s.z_threshold, s.z_tolerance, s.z_dead_zone, s.z_catch_up_time, s.xy_threshold,
-                                              self._solve.texture)
+                                              solved)
 
         xy: Texture = self._displacement
         if s.xy_follow_z_time:
@@ -171,7 +215,7 @@ class LucasKanadeFlow:
             alpha, _ = track_weights(delta_time, s.z_time, 1.0)
             self._filtered.swap()
             self._filtered.begin()
-            self._filter_shader.use(self._solve.texture, self._filtered.back_texture, self._solve.texture, float(alpha))
+            self._filter_shader.use(solved, self._filtered.back_texture, solved, float(alpha))
             self._filtered.end()
             self._followed.begin()
             self._threshold_shader.use(self._filtered.texture, s.xy_threshold)
@@ -216,10 +260,51 @@ def _bilinear(image: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
     return top * (1.0 - fy) + bottom * fy
 
 
-def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, window: int = 2, regularizer: float = 0.001) -> np.ndarray:
+def _solve_level(p_image: np.ndarray, c_image: np.ndarray, d: np.ndarray, u: np.ndarray, v: np.ndarray, window: int,
+                 regularizer: float) -> np.ndarray:
+    """One solve on one level: the displacement so far (uv) refined by the window's shift. Mirrors the shader."""
+    h, w = u.shape
+    lh, lw = c_image.shape
+    sxx = sxy = syy = sxt = syt = np.zeros((h, w))
+    for j in range(-window, window + 1):
+        for i in range(-window, window + 1):
+            px, py = u * lw - 0.5 + i, v * lh - 0.5 + j
+            qx, qy = px - d[..., 0] * lw, py - d[..., 1] * lh
+            gx = 0.25 * (_bilinear(c_image, px + 1, py) - _bilinear(c_image, px - 1, py)
+                         + _bilinear(p_image, qx + 1, qy) - _bilinear(p_image, qx - 1, qy))
+            gy = 0.25 * (_bilinear(c_image, px, py + 1) - _bilinear(c_image, px, py - 1)
+                         + _bilinear(p_image, qx, qy + 1) - _bilinear(p_image, qx, qy - 1))
+            gt = _bilinear(c_image, px, py) - _bilinear(p_image, qx, qy)
+            sxx, sxy, syy = sxx + gx * gx, sxy + gx * gy, syy + gy * gy
+            sxt, syt = sxt + gx * gt, syt + gy * gt
+    sxx, syy = sxx + regularizer, syy + regularizer
+    det: np.ndarray = sxx * syy - sxy * sxy
+    safe: np.ndarray = np.where(np.abs(det) > 1e-12, det, 1.0)
+    dx = np.where(np.abs(det) > 1e-12, -(syy * sxt - sxy * syt) / safe, 0.0)
+    dy = np.where(np.abs(det) > 1e-12, -(sxx * syt - sxy * sxt) / safe, 0.0)
+    return d + np.stack((dx / lw, dy / lh), axis=-1)
+
+
+def median_displacement(displacement: np.ndarray, spacing: float) -> np.ndarray:
+    """The displacement (H, W, 2), each component the median of its 5×5 samples `spacing` pixels apart,
+    nearest, clamped at the edges. Mirrors displacement_median.frag."""
+    h, w = displacement.shape[:2]
+    rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
+    samples: list[np.ndarray] = []
+    for j in range(-2, 3):
+        for i in range(-2, 3):
+            y = np.clip(np.floor(rows + 0.5 + j * spacing).astype(int), 0, h - 1)
+            x = np.clip(np.floor(columns + 0.5 + i * spacing).astype(int), 0, w - 1)
+            samples.append(displacement[y, x])
+    return np.median(np.stack(samples), axis=0)
+
+
+def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, window: int = 2, regularizer: float = 0.001,
+                 iterations: int = 1, median: bool = False) -> np.ndarray:
     """The displacement (H, W, 2) in pixels per frame, x along columns and y along rows, that carries
-    `previous` onto `current`: coarse to fine over `levels` mip levels, one solve per level over a
-    (2·window+1)² window, the previous frame warped by the estimate so far. Mirrors the shader."""
+    `previous` onto `current`: coarse to fine over `levels` mip levels, `iterations` solves per level
+    over a (2·window+1)² window, the previous frame warped by the estimate so far; with `median`, after
+    each level the 5×5 median of the displacement, a level's texel apart. Mirrors the shaders."""
     h, w = current.shape
     previous_levels: list[np.ndarray] = _pyramid(previous.astype(np.float64), levels)
     current_levels: list[np.ndarray] = _pyramid(current.astype(np.float64), levels)
@@ -227,27 +312,23 @@ def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, win
     u, v = (columns + 0.5) / w, (rows + 0.5) / h            # each output pixel's uv
     d: np.ndarray = np.zeros((h, w, 2))                     # the displacement in uv
     for level in reversed(range(levels)):
-        p_image, c_image = previous_levels[level], current_levels[level]
-        lh, lw = c_image.shape
-        sxx = sxy = syy = sxt = syt = np.zeros((h, w))
-        for j in range(-window, window + 1):
-            for i in range(-window, window + 1):
-                px, py = u * lw - 0.5 + i, v * lh - 0.5 + j
-                qx, qy = px - d[..., 0] * lw, py - d[..., 1] * lh
-                gx = 0.25 * (_bilinear(c_image, px + 1, py) - _bilinear(c_image, px - 1, py)
-                             + _bilinear(p_image, qx + 1, qy) - _bilinear(p_image, qx - 1, qy))
-                gy = 0.25 * (_bilinear(c_image, px, py + 1) - _bilinear(c_image, px, py - 1)
-                             + _bilinear(p_image, qx, qy + 1) - _bilinear(p_image, qx, qy - 1))
-                gt = _bilinear(c_image, px, py) - _bilinear(p_image, qx, qy)
-                sxx, sxy, syy = sxx + gx * gx, sxy + gx * gy, syy + gy * gy
-                sxt, syt = sxt + gx * gt, syt + gy * gt
-        sxx, syy = sxx + regularizer, syy + regularizer
-        det: np.ndarray = sxx * syy - sxy * sxy
-        safe: np.ndarray = np.where(np.abs(det) > 1e-12, det, 1.0)
-        dx = np.where(np.abs(det) > 1e-12, -(syy * sxt - sxy * syt) / safe, 0.0)
-        dy = np.where(np.abs(det) > 1e-12, -(sxx * syt - sxy * sxt) / safe, 0.0)
-        d = d + np.stack((dx / lw, dy / lh), axis=-1)
+        for _ in range(iterations):
+            d = _solve_level(previous_levels[level], current_levels[level], d, u, v, window, regularizer)
+        if median:
+            d = median_displacement(d, float(2 ** level))
     return d * np.array([w, h])
+
+
+def round_trip_displacement(forward: np.ndarray, backward: np.ndarray, largest_miss: float) -> np.ndarray:
+    """The forward displacement (H, W, 2, pixels per frame) where it comes back: the backward one,
+    read linear where the pixel was in the previous frame, cancels it to within `largest_miss` pixels; 0 where it does not,
+    as where a surface is covered or uncovered. Mirrors displacement_round_trip.frag."""
+    h, w = forward.shape[:2]
+    rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
+    x, y = columns - forward[..., 0], rows - forward[..., 1]          # where the pixel was in the previous frame
+    back: np.ndarray = np.stack([_bilinear(backward[..., c], x, y) for c in range(2)], axis=-1)
+    returns: np.ndarray = np.linalg.norm(forward + back, axis=-1) <= largest_miss
+    return np.where(returns[..., None], forward, 0.0)
 
 
 def threshold_displacement(displacement: np.ndarray, threshold: float) -> np.ndarray:

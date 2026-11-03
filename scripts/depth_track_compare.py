@@ -40,7 +40,7 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_FALSE, GL_FLOAT,
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from modules.gl import Blit, Fbo, Texture  # noqa: E402
 from modules.flow import (FlowUtil, LucasKanadeFlow, LucasKanadeFlowSettings, SignedField, VelocityField,  # noqa: E402
-                          VisualizationFieldSettings, filter_depth_steps, lucas_kanade, track_depth)
+                          VisualizationFieldSettings, round_trip_displacement, filter_depth_steps, lucas_kanade, track_depth)
 
 SEGMENTS: dict[str, tuple[float, float]] = {'still': (1.0, 5.0), 'slow': (5.0, 10.0), 'fast': (10.0, 1e9)}
 VIEWS: dict[int, str] = {1: 'z of the track', 2: 'z after the threshold', 3: 'depth', 4: 'velocity direction', 5: 'velocity arrows'}
@@ -241,7 +241,7 @@ class Side:
         return self.signed.texture
 
 
-def verify(frames: Frames, changed: dict[str, object]) -> int:
+def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> int:
     """A's first frames on the GPU against the numpy references: the x/y solve, and the depth track carried by it."""
     context(False, 64, 64)
     w, h = frames.width, frames.height
@@ -249,16 +249,21 @@ def verify(frames: Frames, changed: dict[str, object]) -> int:
     s = side.settings
     luminance, depth_texture, mask_texture = Texture(), Texture(), Texture()
     state, catch_up, previous = np.zeros((h, w, 4)), np.zeros((h, w, 2)), None
-    for k in range(min(30, len(frames))):
+    last = min(frames_to_check, len(frames)) - 1
+    for k in range(last + 1):
         lum, depth, mask = frames.load(k)
         upload(luminance, lum); upload(depth_texture, depth); upload(mask_texture, mask.astype(np.float32))
         side.step(frames, k, luminance, depth_texture, mask_texture)
         if previous is None:
             previous = lum
             continue
-        solve = read_back(side.flow._solve.texture)[..., :2] * np.array([w, h])                  # px per frame
-        now, then = np.round(lum * 255.0) / 255.0, np.round(previous * 255.0) / 255.0            # as the R8 frames hold them
-        reference = lucas_kanade(then.astype(np.float64), now.astype(np.float64), s.xy_levels, s.xy_window, s.xy_regularizer)
+        solved = side.flow._round_tripped.texture if s.xy_round_trip > 0.0 else side.flow._solve.texture
+        solve = read_back(solved)[..., :2] * np.array([w, h])                                    # px per frame
+        now, then = (np.round(f * 255.0).astype(np.float64) / 255.0 for f in (lum, previous))    # as the R8 frames hold them
+        reference = lucas_kanade(then, now, s.xy_levels, s.xy_window, s.xy_regularizer, s.xy_iterations, s.xy_median)
+        if s.xy_round_trip > 0.0:
+            reference = round_trip_displacement(reference, lucas_kanade(now, then, s.xy_levels, s.xy_window, s.xy_regularizer, s.xy_iterations,
+                                                                   s.xy_median), s.xy_round_trip)
         previous = lum
         c = frames.calls[k]
         step = (c['depth_step'][0] * w, c['depth_step'][1] * h) if c['depth_step'][0] > 0 else (1.0, 1.0)
@@ -266,7 +271,7 @@ def verify(frames: Frames, changed: dict[str, object]) -> int:
                                       c['delta_time'], s.z_window, step, s.z_tolerance, s.z_time, c['view_span'], s.z_dead_zone,
                                       s.z_catch_up_time, s.xy_threshold)
         gpu = read_back(side.flow.depth_velocity.difference)
-        if k % 5 == 0 or k == 29:
+        if k % 5 == 0 or k == last:
             dxy = np.linalg.norm(solve - reference, axis=-1)
             held = (gpu[..., 1] > 0) | (state[..., 1] > 0)
             dz = np.abs(state[..., 0] - gpu[..., 0])[held] * w
@@ -284,6 +289,7 @@ def main() -> int:
     parser.add_argument('--b', action='append', default=[], metavar='NAME=VALUE', help="override one of B's settings")
     parser.add_argument('--fast', action='store_true', help='one loop without the window, then the measures')
     parser.add_argument('--verify', action='store_true', help="A's first frames against the numpy references")
+    parser.add_argument('--verify-frames', type=int, default=30, help='how many frames --verify checks (default 30; the numpy reference is slow)')
     parser.add_argument('--scale', type=float, default=0.9, help='window size per pixel of the frames (default 0.9)')
     parser.add_argument('--loops', type=int, default=0, help='stop after this many loops (default: until esc)')
     parser.add_argument('--view', type=int, choices=sorted(VIEWS), default=1, help='the view to start in (default 1)')
@@ -291,7 +297,7 @@ def main() -> int:
     args = parser.parse_args()
     frames = Frames(args.frames)
     if args.verify:
-        return verify(frames, overrides(args.a))
+        return verify(frames, overrides(args.a), args.verify_frames)
 
     w, h = frames.width, frames.height
     panel_w, panel_h = int(w * args.scale), int(h * args.scale)
