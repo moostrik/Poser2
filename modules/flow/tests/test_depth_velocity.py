@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import depth_threshold, track_depth, track_weights
+from modules.flow import depth_threshold, filter_depth_steps, track_depth, track_weights
 
 SIZE: int = 24
 SPAN: float = 0.5       # metres a view width spans per metre of depth
@@ -221,6 +221,50 @@ class WeightsTest(unittest.TestCase):
 
     def test_the_share_of_the_window_scales_the_correction(self) -> None:
         self.assertAlmostEqual(float(track_weights(DT, 0.0, 0.5)[0]), 0.5)
+
+
+class StepFilterTest(unittest.TestCase):
+    """Before the track, a sample whose 3×3 depth samples span two surfaces has no depth."""
+
+    def test_a_flat_or_sloping_surface_is_unchanged(self) -> None:
+        rows, columns = np.mgrid[0:SIZE, 0:SIZE].astype(np.float64)
+        flat, slope = uniform(1.0), 1.0 + 0.02 * columns               # 2 cm per sample, under the tolerance
+        np.testing.assert_array_equal(filter_depth_steps(flat, STEP, TOLERANCE), flat)
+        np.testing.assert_array_equal(filter_depth_steps(slope, STEP, TOLERANCE), slope)
+
+    def test_a_silhouette_loses_a_band_a_sample_wide_on_each_side(self) -> None:
+        depth = uniform(2.0)
+        depth[:, :SIZE // 2] = 0.7                                       # the player on the left, the wall on the right
+        kept = filter_depth_steps(depth, STEP, TOLERANCE)
+        self.assertTrue(np.all(kept[:, SIZE // 2 - 1:SIZE // 2 + 1] == 0.0))
+        np.testing.assert_array_equal(kept[:, :SIZE // 2 - 1], 0.7)
+        np.testing.assert_array_equal(kept[:, SIZE // 2 + 1:], 2.0)
+
+    def test_the_band_is_one_depth_sample_wide_at_its_spacing(self) -> None:
+        depth = uniform(2.0)
+        depth[:, :12] = 0.7
+        kept = filter_depth_steps(depth, (3.0, 3.0), TOLERANCE)        # depth samples three pixels apart
+        self.assertTrue(np.all(kept[:, 9:15] == 0.0))
+        self.assertTrue(np.all(kept[:, :9] == 0.7) and np.all(kept[:, 15:] == 2.0))
+
+    def test_no_depth_beside_it_is_no_step(self) -> None:
+        depth = uniform(1.0)
+        depth[:, :SIZE // 2] = 0.0
+        np.testing.assert_array_equal(filter_depth_steps(depth, STEP, TOLERANCE), depth)
+
+    def test_a_silhouette_jittering_between_its_two_surfaces_reads_no_z(self) -> None:
+        # the edge's depth flips between the player and the wall from frame to frame; the rest is still
+        rng = np.random.default_rng(8)
+        depths = []
+        for _ in range(60):
+            depth = uniform(2.0)
+            depth[:, :SIZE // 2] = 0.7
+            flip = rng.random(SIZE) < 0.5
+            depth[flip, SIZE // 2] = 0.7
+            depth[:, SIZE // 2 - 1] = np.where(rng.random(SIZE) < 0.3, 0.7 + rng.uniform(0.02, 0.09, SIZE), 0.7)
+            depths.append(filter_depth_steps(depth, STEP, TOLERANCE))
+        states = track(depths, window=1, time=50.0, dead_zone=0.02)
+        self.assertEqual(max(float(np.abs(s[..., 0]).max()) for s in states), 0.0)
 
 
 class DepthThresholdTest(unittest.TestCase):

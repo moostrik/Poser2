@@ -27,16 +27,21 @@ z comes in view widths per frame, over the metres one view width spans at the de
 per metre), and `threshold` comes off it. Each optical flow owns one for its z, with its own
 `z_*` settings, and turns it into view widths per second times its own `strength_z`.
 
-`track_depth` and `depth_threshold` below are the numpy references of the shaders.
+At a silhouette, stereo depth jitters between the two surfaces by more than the dead zone, from
+frame to frame. So before the track, a depth sample whose 3×3 depth samples span a step beyond
+`tolerance` has no depth: the same test of "another surface" as the window's. Along each silhouette
+a band a depth sample wide reads no z; the player's mask cuts there anyway.
+
+`filter_depth_steps`, `track_depth` and `depth_threshold` below are the numpy references of the shaders.
 """
 import math
 
 import numpy as np
 from OpenGL.GL import GL_R16F, GL_R32F, GL_RGBA32F
 
-from modules.gl import SwapFbo, Texture
+from modules.gl import Fbo, SwapFbo, Texture
 from .. import FlowBase, FlowUtil
-from .shaders import DepthThreshold, DepthVelocityShader
+from .shaders import DepthStepFilter, DepthThreshold, DepthVelocityShader
 
 
 def track_weights(delta_time: float, time: float, share: float | np.ndarray) -> tuple[float | np.ndarray, float | np.ndarray]:
@@ -52,7 +57,8 @@ class DepthVelocity(FlowBase):
     """Signed motion toward the camera in view widths per frame (R16F), positive toward it.
 
     Pipeline, on each new flow frame:
-        1. Take the depth → the input SwapFbo (R32F, metres, at the flow's size, nearest)
+        1. Take the depth → the raw Fbo (R32F, metres, at the flow's size, nearest), and without
+           its edges → the input SwapFbo
         2. Correct the track carried from the last one → the track SwapFbo (RGBA32F: z, disparity, rate, anchor)
         3. Take the noise floor off z → output_fbo (R16F)
     """
@@ -63,9 +69,11 @@ class DepthVelocity(FlowBase):
         self._input_internal_format = GL_R32F
         self._output_internal_format = GL_R16F
 
+        self._step_filter_shader: DepthStepFilter = DepthStepFilter()
         self._velocity_shader: DepthVelocityShader = DepthVelocityShader()
         self._threshold_shader: DepthThreshold = DepthThreshold()
 
+        self._raw: Fbo = Fbo()                   # the depth as it came, before its edges are taken off
         self._track: SwapFbo = SwapFbo()
 
     @property
@@ -81,14 +89,18 @@ class DepthVelocity(FlowBase):
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         super().allocate(width, height, output_width, output_height)
+        self._raw.allocate(width, height, GL_R32F)
         self._track.allocate(width, height, GL_RGBA32F)
         self._track.clear_all()
+        self._step_filter_shader.allocate()
         self._velocity_shader.allocate()
         self._threshold_shader.allocate()
 
     def deallocate(self) -> None:
         super().deallocate()
+        self._raw.deallocate()
         self._track.deallocate()
+        self._step_filter_shader.deallocate()
         self._velocity_shader.deallocate()
         self._threshold_shader.deallocate()
 
@@ -119,8 +131,11 @@ class DepthVelocity(FlowBase):
         step: tuple[float, float] = depth_step if depth_step[0] > 0.0 and depth_step[1] > 0.0 else (1.0 / width, 1.0 / height)
         alpha, _ = track_weights(delta_time, time, 1.0)
 
+        FlowUtil.blit(self._raw, depth)
         self._input_fbo.swap()
-        FlowUtil.blit(self._input_fbo, depth)
+        self._input_fbo.begin()
+        self._step_filter_shader.use(self._raw, step, tolerance)
+        self._input_fbo.end()
 
         self._track.swap()
         self._track.begin()
@@ -220,6 +235,27 @@ def track_depth(depth: np.ndarray, state: np.ndarray, displacement: np.ndarray, 
     else:
         anchor = tracked
     return np.where(measured[..., None], np.stack((z, disparity, rate, anchor), axis=-1), 0.0)
+
+
+def filter_depth_steps(depth: np.ndarray, step: tuple[float, float], tolerance: float) -> np.ndarray:
+    """The depth (H, W, m) without its edges: a sample whose 3×3 depth samples, `step` pixels apart
+    (x, y), span a step beyond `tolerance` (m) from the nearest to the furthest has no depth (0).
+    At a silhouette that is the band where stereo depth jitters between the two surfaces. Mirrors
+    depth_step_filter.frag."""
+    h, w = depth.shape
+    rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
+    near: np.ndarray = np.full((h, w), np.inf)
+    far: np.ndarray = np.zeros((h, w))
+    for j in (-1, 0, 1):
+        for i in (-1, 0, 1):
+            x = np.clip(np.floor(columns + 0.5 + i * step[0]).astype(int), 0, w - 1)
+            y = np.clip(np.floor(rows + 0.5 + j * step[1]).astype(int), 0, h - 1)
+            sample: np.ndarray = depth[y, x]
+            valid: np.ndarray = sample > 0.0
+            near = np.where(valid, np.minimum(near, sample), near)
+            far = np.where(valid, np.maximum(far, sample), far)
+    edge: np.ndarray = np.isfinite(near) & (far - near > tolerance)
+    return np.where(edge, 0.0, depth)
 
 
 def depth_threshold(value: np.ndarray, threshold: float) -> np.ndarray:
