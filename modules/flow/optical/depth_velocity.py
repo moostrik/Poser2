@@ -19,7 +19,7 @@ the plain change between two frames.
 
 z comes in view widths per frame, over the metres one view width spans at the depth (`view_span`
 per metre), and `threshold` comes off it. Each optical flow owns one for its z, with its own
-`depth_*` settings, and turns it into view widths per second times its own `strength_z`.
+`z_*` settings, and turns it into view widths per second times its own `strength_z`.
 
 `track_depth` and `depth_threshold` below are the numpy references of the shaders.
 """

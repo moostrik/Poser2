@@ -3,7 +3,7 @@
 Per pixel, the brightness change along the brightness gradient between two frames: the motion along
 the gradient, as a strength rather than a distance. One equation per pixel, so only that component.
 x/y are scaled to the flow's velocity by `strength_x`/`strength_y`, then `threshold` comes off their
-length; z is its own `DepthVelocity`'s depth track, held in place (its `depth_*` settings), in view
+length; z is its own `DepthVelocity`'s depth track, held in place (its `z_*` settings), in view
 widths per second times `strength_z`. With `use_mask`, the velocity is multiplied by the mask.
 Ported from ofxFlowTools ftOpticalFlow.h
 """
@@ -23,10 +23,10 @@ class GradientFlowSettings(BaseSettings):
     threshold = Field(0.0, min=0.0, max=0.2, description="Motion detection threshold")
     strength_x = Field(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)")
     strength_y = Field(3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
-    depth_window = Field(1, min=0, max=4, description="Depth window radius in depth samples (1 = 3x3)", newline=True)
-    depth_threshold = Field(0.5, min=0.0, max=10.0, step=0.05, description="Depth motion below this is noise, taken off the rest (px per frame)")
-    depth_time = Field(50.0, min=0.0, max=1000.0, description="Time over which the depth track averages (ms); 0 is the change of two frames")
-    depth_tolerance = Field(0.1, min=0.01, max=1.0, description="Depth further than this is another surface: not averaged in, the track starts over (m)")
+    z_window = Field(1, min=0, max=4, description="z window radius in depth samples (1 = 3x3)", newline=True)
+    z_threshold = Field(0.5, min=0.0, max=10.0, step=0.05, description="z motion below this is noise, taken off the rest (px per frame)")
+    z_time = Field(50.0, min=0.0, max=1000.0, description="Time over which z averages (ms); 0 is the change of two frames")
+    z_tolerance = Field(0.1, min=0.01, max=1.0, description="Depth further than this is another surface: not averaged in, z starts over (m)")
     strength_x = Field(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)", newline=True)
     strength_y = Field(3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
     strength_z = Field(0.0, min=0.0, max=10.0, description="Velocity per view width per second toward the camera; 0 is no depth")
@@ -112,8 +112,8 @@ class GradientFlow:
         self._xy.end()
 
         if depth is not None:
-            self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, s.depth_window, s.depth_time,
-                                              s.depth_threshold, s.depth_tolerance)
+            self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, s.z_window, s.z_time,
+                                              s.z_threshold, s.z_tolerance)
 
         # z in view widths per frame as view widths per second
         per_second: float = 1.0 / max(delta_time, 1e-6)
