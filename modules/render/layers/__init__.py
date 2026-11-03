@@ -20,4 +20,4 @@ from .panorama import Compositor, PanoramaLayerSettings, PanoramaBlend, Part, \
                       GridRenderer, LabelRenderer, MarkRenderer, SeamRenderer, \
                       StitchRenderer, Mark, MarkContext, build_marks, strip_spans
 from .source import   CropSourceLayer, DepthSourceLayer, DepthSourceLayerSettings, DepthDrawMode, ForegroundSourceLayer, \
-                      ImageSourceLayer, MaskSourceLayer, CaptureImageLayer, DepthMaskLayer, DepthMaskLayerSettings
+                      ImageSourceLayer, MaskSourceLayer, CaptureImageLayer, DepthMaskLayer

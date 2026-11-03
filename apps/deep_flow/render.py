@@ -118,7 +118,7 @@ class DeepFlowRender(RenderBase):
             cam_mask: ls.LayerBase
             foreground_source: Texture
             if depth_source:
-                cam_mask = self.L[Layers.cam_mask][i] =     ls.DepthMaskLayer(      cam_depth,                                  settings.depth_mask)
+                cam_mask = self.L[Layers.cam_mask][i] =     ls.DepthMaskLayer(      cam_depth)
                 foreground_source = capture_image.texture   # masked in the center view (`premultiply`)
             else:
                 cam_mask = self.L[Layers.cam_mask][i] =     ls.MaskSourceLayer(     i, self.board)

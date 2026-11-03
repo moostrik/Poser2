@@ -3,27 +3,18 @@ from OpenGL.GL import GL_R16F
 
 # Local application imports
 from modules.gl import Fbo, Style, Texture
-from modules.settings import BaseSettings, Field
 from ..layer_base import LayerBase
 from .depth_source_layer import DepthSourceLayer
 from ...shaders import DepthMask
 
 
-class DepthMaskLayerSettings(BaseSettings):
-    """The band of depth that is the player."""
-    near: Field[float] = Field(0.5, min=0.0, max=12.0, step=0.05, description="Nearest depth kept as the player (m)")
-    far:  Field[float] = Field(4.0, min=0.1, max=12.0, step=0.05, description="Farthest depth kept as the player (m)")
-    edge: Field[float] = Field(0.1, min=0.0, max=1.0, step=0.01, description="Soft falloff beyond near and far (m)")
-
-
 class DepthMaskLayer(LayerBase):
-    """The player cut from the capture's depth: 1 where the depth lies from `near` to `far`, soft over
-    `edge` beyond, 0 without depth. On the view of the camera image, at the depth's size, read
+    """The player cut from the capture's depth: 1 where the depth lies from the depth source's `near`
+    to `far`, 0 outside or without depth. On the view of the camera image, at the depth's size, read
     linearly, so the depth's few rows soften instead of stepping. New with each depth frame."""
 
-    def __init__(self, depth: DepthSourceLayer, settings: DepthMaskLayerSettings) -> None:
+    def __init__(self, depth: DepthSourceLayer) -> None:
         self._depth: DepthSourceLayer = depth
-        self.settings: DepthMaskLayerSettings = settings
         self._fbo: Fbo = Fbo()
         self._shader: DepthMask = DepthMask()
         self._dirty: bool = False
@@ -54,7 +45,7 @@ class DepthMaskLayer(LayerBase):
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         self._fbo.begin()
-        self._shader.use(depth, self.settings.near, self.settings.far, self.settings.edge)
+        self._shader.use(depth, self._depth.settings.near, self._depth.settings.far)
         self._fbo.end()
         Style.pop_style()
         self._dirty = True

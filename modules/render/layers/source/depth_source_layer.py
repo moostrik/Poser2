@@ -25,10 +25,10 @@ class DepthDrawMode(IntEnum):
 
 
 class DepthSourceLayerSettings(BaseSettings):
-    """How depth is shown; the range and the color map are depthai's `colorizeDepthFrame` defaults."""
+    """The player's band of depth, which the mask cuts and the picture is colored over; the color map is depthai's `colorizeDepthFrame`."""
     draw_mode: Field[DepthDrawMode] = Field(DepthDrawMode.COLOR, description="How depth is drawn")
-    near:      Field[float]         = Field(0.3, min=0.1, max=12.0, step=0.1, description="Start of the color map (m)")
-    far:       Field[float]         = Field(12.0, min=0.5, max=20.0, step=0.5, description="End of the color map (m)")
+    near:      Field[float]         = Field(0.5, min=0.1, max=12.0, step=0.05, description="Nearest depth that is the player (m)")
+    far:       Field[float]         = Field(4.0, min=0.1, max=12.0, step=0.05, description="Farthest depth that is the player (m)")
 
 
 def depth_metres(depth: np.ndarray) -> np.ndarray:

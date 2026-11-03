@@ -3,8 +3,8 @@ from modules.gl import Shader, draw_quad, Texture
 
 
 class DepthMask(Shader):
-    def use(self, depth: Texture, near: float, far: float, edge: float) -> None:
-        """The player cut from `depth` (metres, 0 for none): the band from `near` to `far`, soft over `edge` beyond it."""
+    def use(self, depth: Texture, near: float, far: float) -> None:
+        """The player cut from `depth` (metres, 0 for none): the band from `near` to `far`."""
         if not self.allocated or not self.shader_program or not depth.allocated:
             return
 
@@ -16,6 +16,5 @@ class DepthMask(Shader):
         glUniform1i(self.get_uniform_loc("depth"), 0)
         glUniform1f(self.get_uniform_loc("nearDepth"), near)
         glUniform1f(self.get_uniform_loc("farDepth"), far)
-        glUniform1f(self.get_uniform_loc("edge"), edge)
 
         draw_quad()
