@@ -350,6 +350,14 @@ def lens_field(focal: float, width: int) -> float:
     return math.degrees(width / focal) if focal > 0.0 else float('nan')
 
 
+def rectilinear_field(focal: float, cx: float, width: int) -> float:
+    """The field (degrees) an undistorted frame of `focal` px and optical center `cx` spans
+    across its `width` px, edge to edge."""
+    if focal <= 0.0:
+        return float('nan')
+    return math.degrees(math.atan((cx + 0.5) / focal) + math.atan((width - cx - 0.5) / focal))
+
+
 def lens_deviation(focal: float, cx: float, cy: float, src_size: tuple[int, int],
                    mode_width: int, fov_h: float, lens_fov: float = 0.0,
                    lens_center: tuple[float, float] = (0.0, 0.0)) -> float:

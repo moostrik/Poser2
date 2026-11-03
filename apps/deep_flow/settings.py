@@ -106,7 +106,7 @@ class Oak4Group(BaseSettings):
     resolution:         Field[CameraResolution]  = Field(CameraResolution.P1080, access=Field.INIT, description="Delivered size on USB; the sensor mode follows it")
     sim_enabled:        Field[bool]              = Field(False, access=Field.INIT, description="Enable simulation mode")
     model_path:         Field[str]               = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
-    fov:                Field[float]             = Field(102.0, access=Field.INIT, description="Camera horizontal FOV over the full sensor width (°)")  # OAK4 Pro W, IMX586 across 1280 px, from the unit's calibration (`readings.fov_factory`)
+    fov:                Field[float]             = Field(80.0, access=Field.INIT, description="Field (°) the grey frame's warp spans across the sensor width; color brings its own lens")
 
     start:              Field[bool]              = Field(False, widget=Widget.button, description="Start recording")
     stop:               Field[bool]              = Field(False, widget=Widget.button, description="Stop recording")

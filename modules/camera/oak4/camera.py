@@ -32,7 +32,7 @@ from numpy import ndarray
 
 from .. import CameraResolution, CameraFrame, DepthAlignment, FrameReadings, RigCameraReadings, CameraTracklet, FrameType, CameraFrameCallback, \
     TrackletCallback, orientation_from_gravity, frame_window, frame_coverage, coverage_summary, \
-    delivered_height, lens_field, lens_deviation, imu_to_camera, unroll_imu_frame, TiltCorrection, corrected_roi, corrected_keypoints
+    delivered_height, lens_field, rectilinear_field, lens_deviation, imu_to_camera, unroll_imu_frame, TiltCorrection, corrected_roi, corrected_keypoints
 from modules.utils import FPS, Rect
 
 from .control import DepthControl, SensorControl
@@ -187,7 +187,8 @@ class Camera(Thread):
             return False
 
         self._take_link(info)
-        self._log_frame_geometry()
+        if not self.color:
+            self._log_frame_geometry()
         try:
             self.device = dai.Device(info)
         except Exception as e:
@@ -295,8 +296,8 @@ class Camera(Thread):
             self.depth_control = DepthControl(self.settings.depth, outputs.depth_config.createInputQueue())
 
     def _log_frame_geometry(self) -> None:
-        """The window the warp delivers and where the sensor covers it, pure geometry from the
-        preset, logged so a rig check reads the horizon row off the log."""
+        """The window the grey frame's warp delivers and where the sensor covers it, pure geometry
+        from the preset, logged so a rig check reads the horizon row off the log."""
         src: tuple[int, int] = requested_size(self.color, self.resolution)
         out: tuple[int, int] = self.frame_size
         window = frame_window(src, out, src[0], self.mount.fov_h, 0.0,
@@ -310,10 +311,11 @@ class Camera(Thread):
                     f'{coverage_summary(coverage, out, src[0], self.mount.fov_h, self.mount.flip_h)}')
 
     def _read_mount_calibration(self) -> None:
-        """One-shot at open: what this unit says about its own lens and its IMU's orientation."""
+        """One-shot at open: what this unit says about its own lens and its IMU's orientation. The
+        lens against the preset's is the grey frame's warp's concern; a color frame brings its own."""
         assert self.device is not None
         src: tuple[int, int] = requested_size(self.color, self.resolution)
-        lens = read_lens_calibration(self.device, SENSOR_SOCKET, src, self.device_id)
+        lens = None if self.color else read_lens_calibration(self.device, SENSOR_SOCKET, src, self.device_id)
         if lens is not None:
             focal, cx, cy = lens
             field: float = lens_field(focal, src[0])
@@ -348,7 +350,8 @@ class Camera(Thread):
         if msg.getType() == dai.ImgFrame.Type.NV12:
             if self._intrinsics is None:
                 self._intrinsics = msg.getTransformation().getIntrinsicMatrix()
-                logger.info(f'{self.device_id} delivered lens: {self._intrinsics}')
+                self.settings.readings.fov_factory = rectilinear_field(self._intrinsics[0][0], self._intrinsics[0][2], self.frame_size[0])
+                logger.info(f'{self.device_id} delivered lens: {self._intrinsics}, field {self.settings.readings.fov_factory:.1f} deg')
             self._emit_frame(FrameType.VIDEO, packed_nv12(msg), timestamp, nv12=True, readings=self._frame_readings())
         else:
             self._emit_frame(FrameType.VIDEO, msg.getCvFrame(), timestamp, readings=self._frame_readings())

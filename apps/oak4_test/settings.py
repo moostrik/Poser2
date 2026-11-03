@@ -56,7 +56,7 @@ class Oak4Group(BaseSettings):
     color:          Field[bool]              = Field(True, access=Field.INIT, description="Color frames (False = grey off the same sensor)")
     resolution:     Field[CameraResolution]  = Field(CameraResolution.P800, access=Field.INIT, description="Delivered size before the crop")
     model_path:     Field[str]               = Field("data/models", access=Field.INIT, visible=False, description="Model files directory")
-    fov:            Field[float]             = Field(127.0, access=Field.INIT, description="Camera horizontal FOV over the full sensor width (°)")
+    fov:            Field[float]             = Field(127.0, access=Field.INIT, description="Field (°) the grey frame's warp spans across the sensor width; color brings its own lens")
 
     _cam_share: list = [fps, color, resolution, model_path, fov]
     cam_0        : Group[Oak4CameraSettings]       = Group(Oak4CameraSettings, share=_cam_share)

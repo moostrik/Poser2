@@ -14,7 +14,7 @@ import numpy as np
 from modules.camera import (
     WARP_MESH, degrees_per_pixel, frame_fov, warp_mesh_points, horizon_row,
     FrameWindow, frame_window, frame_coverage, coverage_summary,
-    output_focal, source_lens, lens_field, lens_deviation,
+    output_focal, source_lens, lens_field, rectilinear_field, lens_deviation,
     CameraResolution, resolve_resolution,
     mono_frame_size, color_frame_size, mode_size, frame_size, full_frame_height, aligned_height,
 )
@@ -145,6 +145,12 @@ class SourceLensTest(unittest.TestCase):
         self.assertAlmostEqual(lens_field(UNITS['F124D9D600'][0], 1280), 127.5, delta=0.05)
         self.assertAlmostEqual(lens_field(756.0, 1280), 97.0, delta=0.1)
         self.assertTrue(math.isnan(lens_field(0.0, 1280)))
+
+    def test_rectilinear_field_reads_an_undistorted_frame(self) -> None:
+        # The OAK4's delivered color lens at 896 x 720.
+        self.assertAlmostEqual(rectilinear_field(538.1, 449.3, 896), 79.6, delta=0.05)
+        self.assertAlmostEqual(rectilinear_field(448.0, 447.5, 896), 90.0, places=9)
+        self.assertTrue(math.isnan(rectilinear_field(0.0, 447.5, 896)))
 
     def test_lens_deviation_names_the_outlier(self) -> None:
         # Unit F124's optical centre sits 24 px left of the frame centre, 14 px from the shared

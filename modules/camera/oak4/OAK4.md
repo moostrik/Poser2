@@ -279,7 +279,7 @@ Lens of the delivered frame, as tagged on a recording, in pixels:
 |-------|-------|-------|-------|
 | 538.1 | 538.0 | 449.3 | 369.8 |
 
-That gives a view of about 79.6° by 67.6° **(deduction)**. The color sensor spans 95° and the stereo pair 127° (Luxonis docs), so the whole frame has depth. Depth has about 291 rows of real detail inside the 720 rows, since the frame spans about 775 of the 800 mono rows **(deduction)**.
+That gives a view of about 79.6° by 67.6° **(deduction)**, and `readings.fov_factory` reports the horizontal figure from the first frame's lens (`rectilinear_field`). The color frame takes its lens from the camera; `fov` and the `lens_*` settings shape only the grey frame's warp. The color sensor spans 95° and the stereo pair 127° (Luxonis docs), so the whole frame has depth. Depth has about 291 rows of real detail inside the 720 rows, since the frame spans about 775 of the 800 mono rows **(deduction)**.
 
 `HORIZONTAL_MIRROR` has no effect on this camera: the mirrored frame matches the plain one. So the PC mirrors, and the backend mirrors boxes and keypoints to match. There is no vertical flip for color: `flip_v` logs a warning and does nothing.
 

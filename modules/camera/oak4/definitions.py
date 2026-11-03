@@ -252,8 +252,7 @@ def read_lens_calibration(device: dai.Device, socket: dai.CameraBoardSocket, siz
                           device_id: str = '') -> tuple[float, float, float] | None:
     """This unit's lens from its factory calibration: (focal px/rad, cx, cy) at `size`, or None
     when the device carries none, which is not an error. Read so each unit's deviation from the
-    preset's shared lens can be reported (`lens_deviation`), and so the lens the unit ships with
-    is known: `lens_field` of `fx` tells the 95 degree wide lens from the 66 degree standard one."""
+    preset's shared lens can be reported (`lens_deviation`)."""
     try:
         calibration = device.readCalibration()
         matrix = calibration.getCameraIntrinsics(socket, size[0], size[1])
