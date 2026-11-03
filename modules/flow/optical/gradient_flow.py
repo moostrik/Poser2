@@ -3,8 +3,8 @@
 Per pixel, the brightness change along the brightness gradient between two frames: the motion along
 the gradient, as a strength rather than a distance. One equation per pixel, so only that component.
 x/y are scaled to the flow's velocity by `strength_x`/`strength_y`, then `threshold` comes off their
-length; z is its own `DepthVelocity`'s depth track, held in place (`depth_settings`), in view widths
-per second times `strength_z`. With `use_mask`, the velocity is multiplied by the mask.
+length; z is its own `DepthVelocity`'s depth track, held in place (its `depth_*` settings), in view
+widths per second times `strength_z`. With `use_mask`, the velocity is multiplied by the mask.
 Ported from ofxFlowTools ftOpticalFlow.h
 """
 from OpenGL.GL import GL_RG16F, GL_RGBA16F
@@ -12,7 +12,7 @@ from OpenGL.GL import GL_RG16F, GL_RGBA16F
 from modules.gl import Fbo, Texture
 from modules.settings import Field, BaseSettings
 from .. import FlowUtil
-from .depth_velocity import DepthVelocity, DepthVelocitySettings
+from .depth_velocity import DepthVelocity
 from .luminance_frames import LuminanceFrames
 from .shaders import ComposeVelocity, GradientFlowShader
 
@@ -23,6 +23,12 @@ class GradientFlowSettings(BaseSettings):
     threshold = Field(0.0, min=0.0, max=0.2, description="Motion detection threshold")
     strength_x = Field(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)")
     strength_y = Field(3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
+    depth_window = Field(1, min=0, max=4, description="Depth window radius in depth samples (1 = 3x3)", newline=True)
+    depth_threshold = Field(0.5, min=0.0, max=10.0, step=0.05, description="Depth motion below this is noise, taken off the rest (px per frame)")
+    depth_time = Field(50.0, min=0.0, max=1000.0, description="Time over which the depth track averages (ms); 0 is the change of two frames")
+    depth_tolerance = Field(0.1, min=0.01, max=1.0, description="Depth further than this is another surface: not averaged in, the track starts over (m)")
+    strength_x = Field(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)", newline=True)
+    strength_y = Field(3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
     strength_z = Field(0.0, min=0.0, max=10.0, description="Velocity per view width per second toward the camera; 0 is no depth")
     use_mask = Field(False, description="Multiply the velocity by the mask")
 
@@ -30,9 +36,8 @@ class GradientFlowSettings(BaseSettings):
 class GradientFlow:
     """The 3D velocity (RGBA16F, xyz) between the newest two frames of its input."""
 
-    def __init__(self, settings: GradientFlowSettings, depth_settings: DepthVelocitySettings) -> None:
+    def __init__(self, settings: GradientFlowSettings) -> None:
         self.settings: GradientFlowSettings = settings
-        self.depth_settings: DepthVelocitySettings = depth_settings
         self._depth_velocity: DepthVelocity = DepthVelocity()
         self._mask: Texture | None = None
 
@@ -107,8 +112,8 @@ class GradientFlow:
         self._xy.end()
 
         if depth is not None:
-            d: DepthVelocitySettings = self.depth_settings
-            self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, d.window, d.time, d.threshold, d.tolerance)
+            self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, s.depth_window, s.depth_time,
+                                              s.depth_threshold, s.depth_tolerance)
 
         # z in view widths per frame as view widths per second
         per_second: float = 1.0 / max(delta_time, 1e-6)

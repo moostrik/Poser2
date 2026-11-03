@@ -35,7 +35,7 @@ class LucasKanadeFlowSettings(BaseSettings):
     xy_threshold:   Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="Displacement below this is noise, taken off the rest (px per frame)")
     depth_window:    Field[int]   = Field(1, min=0, max=4, description="Depth window radius in depth samples (1 = 3x3)", newline=True)
     depth_time:      Field[float] = Field(50.0, min=0.0, max=1000.0, description="Time over which the depth track averages (ms); 0 is the change of two frames")
-    depth_threshold: Field[float] = Field(0.1, min=0.0, max=10.0, step=0.05, description="Depth motion below this is noise, taken off the rest (px per frame)")
+    depth_threshold: Field[float] = Field(0.5, min=0.0, max=10.0, step=0.05, description="Depth motion below this is noise, taken off the rest (px per frame)")
     depth_tolerance: Field[float] = Field(0.1, min=0.01, max=1.0, description="Depth further than this is another surface: not averaged in, the track starts over (m)")
     strength_x:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, x (negative inverts)", newline=True)
     strength_y:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, y (negative inverts)")

@@ -438,15 +438,13 @@
         "gradient": {
           "offset": 3,
           "threshold": 0.1,
+          "depth_window": 2,
+          "depth_threshold": 2.4,
+          "depth_tolerance": 0.04,
           "strength_x": 1.0,
           "strength_y": 1.0,
           "strength_z": 1.0,
           "use_mask": true
-        },
-        "depth_velocity": {
-          "window": 2,
-          "threshold": 2.4,
-          "tolerance": 0.04
         }
       },
       "flow_bridge": {

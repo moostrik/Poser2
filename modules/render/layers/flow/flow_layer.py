@@ -17,7 +17,6 @@ from modules.settings import Field, BaseSettings, Group
 from modules.flow import (
     GradientFlow, GradientFlowSettings, LucasKanadeFlow, LucasKanadeFlowSettings,
     TrailBridge, TrailBridgeSettings,
-    DepthVelocitySettings,
     KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES,
     VelocityMagnitude,
     TemperatureBridge, TemperatureBridgeSettings,
@@ -114,12 +113,11 @@ VECTOR_DRAW_MODES: set[FlowDrawMode] = {       # 3D velocities, drawn as velocit
 
 
 class OpticalFlowSettings(BaseSettings):
-    """How the optical flow measures the 3D velocity: its method, and z from the depth."""
+    """How the optical flow measures the 3D velocity: its method, and each method's settings, z from the depth included."""
     method: Field[OpticalFlowMethod] =  Field(OpticalFlowMethod.GRADIENT, description="How motion is measured: along the brightness gradient, or how far each pixel moved")
 
     lucas_kanade   = Group(LucasKanadeFlowSettings)
     gradient       = Group(GradientFlowSettings)
-    depth_velocity = Group(DepthVelocitySettings)
 
 
 class FlowBridgeSettings(BaseSettings):
@@ -187,7 +185,7 @@ class FlowLayer(LayerBase):
 
         optical_flow: OpticalFlowSettings = self.settings.optical_flow
         bridge: FlowBridgeSettings = self.settings.flow_bridge
-        self._gradient_flow: GradientFlow = GradientFlow(optical_flow.gradient, optical_flow.depth_velocity)
+        self._gradient_flow: GradientFlow = GradientFlow(optical_flow.gradient)
         self._lucas_kanade_flow: LucasKanadeFlow = LucasKanadeFlow(optical_flow.lucas_kanade)
         self._optical_flow_method: OpticalFlowMethod = optical_flow.method     # the flow that measured last; a switch restarts the other
         self._velocity: Texture = self._gradient_flow.velocity     # the velocity of the flow the method picks

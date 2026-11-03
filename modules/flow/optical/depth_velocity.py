@@ -6,10 +6,11 @@ z is tracked instead of differenced: each pixel holds a depth and its rate, carr
 from frame to frame, and each new depth only corrects them (an alpha–beta filter). Over `time` (ms)
 the corrections average out, so z is the rate of many frames rather than the step of two.
 
-The track is held in disparity (1 / depth): stereo depth noise is about constant there, so one
-tolerance and one threshold hold at every distance. Each frame, the measurement is the mean
-disparity over a window of depth samples, of those within `tolerance` of the pixel's depth (not the
-background beside the player); it corrects the track by the share of the window it holds, so a
+The track is held in disparity (1 / depth), where stereo depth noise is about constant. `tolerance`
+is in metres, as it tells surfaces apart: a hand 10 cm before the chest is 10 cm at any distance;
+the depth noise grows with distance, so far away more of it reads as another surface. Each frame,
+the measurement is the mean disparity over a window of depth samples, of those within `tolerance`
+of the pixel's depth (not the background beside the player); it corrects the track by the share of the window it holds, so a
 thin window at a silhouette corrects little and the track coasts on. The track comes from where the
 pixel was a displacement back (in place without one), so a surface sliding sideways keeps its own
 depth. Where the measurement is further than `tolerance` from the track's prediction, as a limb
@@ -17,8 +18,8 @@ passing over the pixel, the track starts over with no rate. With `time` 0 and a 
 the plain change between two frames.
 
 z comes in view widths per frame, over the metres one view width spans at the depth (`view_span`
-per metre), and `threshold` comes off it. Each optical flow owns one for its z, and turns it into
-view widths per second times its own `strength_z`.
+per metre), and `threshold` comes off it. Each optical flow owns one for its z, with its own
+`depth_*` settings, and turns it into view widths per second times its own `strength_z`.
 
 `track_depth` and `depth_threshold` below are the numpy references of the shaders.
 """
@@ -28,17 +29,8 @@ import numpy as np
 from OpenGL.GL import GL_R16F, GL_R32F, GL_RGBA32F
 
 from modules.gl import SwapFbo, Texture
-from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil
 from .shaders import DepthThreshold, DepthVelocityShader
-
-
-class DepthVelocitySettings(BaseSettings):
-    """Configuration for the depth velocity of a flow that has no depth settings of its own."""
-    window = Field(1, min=0, max=4, description="Window radius in depth samples (1 = 3x3)")
-    time = Field(50.0, min=0.0, max=1000.0, description="Time over which the depth track averages (ms); 0 is the change of two frames")
-    threshold = Field(0.1, min=0.0, max=10.0, step=0.05, description="Depth motion below this is noise, taken off the rest (px per frame)")
-    tolerance = Field(0.1, min=0.01, max=1.0, description="Depth further than this is another surface: not averaged in, the track starts over (m)")
 
 
 def track_weights(delta_time: float, time: float, share: float | np.ndarray) -> tuple[float | np.ndarray, float | np.ndarray]:
