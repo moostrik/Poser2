@@ -1,7 +1,7 @@
 """Trail Bridge.
 
-The flow bridge's velocity as one trail: a flow's 3D velocity, its x/y shaped (`boost`, clamped to
-±1), smoothed in time (the trail blend) and in space (Gaussian blur).
+The flow bridge's velocity as one trail: a flow's 3D velocity, its x/y shaped (`boost`, soft `limit`),
+smoothed in time (the trail blend) and in space (Gaussian blur).
 """
 
 import numpy as np
@@ -21,10 +21,11 @@ class TrailBridgeSettings(BaseSettings):
     blur_radius = Field(8.0, min=0.0, max=10.0, description="Gaussian blur radius in pixels")
     blur_steps = Field(4, min=0, max=8, description="Number of Gaussian blur passes")
     boost = Field(0.0, min=-0.5, max=0.9, description="Power boost for small motions")
+    limit = Field(4.0, min=0.5, max=20.0, description="Soft limit on the x/y speed before scale (widths/s)")
 
 
 class TrailBridge(FlowBase):
-    """The trail bridge: a flow's 3D velocity, its x/y shaped (`boost`, clamped to ±1), through one 3D trail.
+    """The trail bridge: a flow's 3D velocity, its x/y shaped (`boost`, soft `limit`), through one 3D trail.
 
     Pipeline:
         1. Shape the velocity into the input FBO (`set_velocity`)
@@ -85,7 +86,7 @@ class TrailBridge(FlowBase):
         if not self._allocated:
             return
         self._input_fbo.begin()
-        self._shape_shader.use(velocity, 1.0 - self.settings.boost)
+        self._shape_shader.use(velocity, 1.0 - self.settings.boost, self.settings.limit)
         self._input_fbo.end()
 
     def update(self) -> None:
