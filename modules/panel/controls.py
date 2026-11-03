@@ -237,6 +237,13 @@ class Control:
             return self.field.step
         return 1 if self.field.type_ is int else 0.01
 
+    def decimals(self) -> int:
+        """The decimals a value is shown with: none for an int field, else as many as the step has."""
+        if self.field.type_ is int:
+            return 0
+        step = self.step()
+        return max(0, -math.floor(math.log10(step))) if step > 0 else 2
+
 
 CONTROLS: dict[Widget, type[Control]] = {}     # filled by Control.__init_subclass__
 
@@ -446,7 +453,7 @@ class Slider(Control):
             with ui.row().classes("w-full items-center justify-between flex-nowrap"):
                 self.title(classes="flex-1 truncate")
                 self.input = ui.number(
-                    value=self.shown, step=step, format="%.0f" if field.type_ is int else "%.2f",
+                    value=self.shown, step=step, format=f"%.{self.decimals()}f",
                 ).props("dense borderless" + self.lock()).classes("w-16")
             self.slider = ui.slider(
                 min=field.min, max=field.max, step=step, value=self.shown,
@@ -561,8 +568,7 @@ class Number(Control):
 
     def build(self) -> None:
         self.input = self.tooltip(ui.number(
-            label=self.label, value=self.shown, step=self.step(),
-            format="%.0f" if self.field.type_ is int else "%.2f",
+            label=self.label, value=self.shown, step=self.step(), format=f"%.{self.decimals()}f",
         ).props("dense outlined" + self.lock()).classes("w-24"))
         if not self.locked:
             _commit_typed(self.input, lambda val: self.commit(self.field.type_(val)) if val is not None else None)
@@ -581,13 +587,13 @@ class KnobControl(Control):
         step = self.step()
         # The knob shows its value as it is, so a value that is not on the step's grid (a read-only
         # knob fed by the app) is shown to the step's decimals and not with a float's tail.
-        self.decimals = 0 if field.type_ is int else max(0, -math.floor(math.log10(step))) if step > 0 else 2
+        self._decimals = self.decimals()
         # The title goes into the knob's caption, above the value and beside the dial.
         with Knob(
             self._rounded(self.shown),
             min=field.min if field.min is not None else 0,
             max=field.max if field.max is not None else 100,
-            step=step, default=field.default, decimals=self.decimals, readonly=self.locked,
+            step=step, default=field.default, decimals=self._decimals, readonly=self.locked,
         ) as self.knob:
             self.title(classes="truncate max-w-full")
         if not self.locked:
@@ -599,7 +605,7 @@ class KnobControl(Control):
             self.knob.on_change(on_change)
 
     def _rounded(self, v: Any) -> Any:
-        return self.field.type_(round(v, self.decimals)) if v is not None else v
+        return self.field.type_(round(v, self._decimals)) if v is not None else v
 
     def show(self, value: Any) -> None:
         self.knob.set_value(self._rounded(value))
