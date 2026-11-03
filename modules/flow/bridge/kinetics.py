@@ -14,35 +14,6 @@ def decay_weight(dt: float, time: float) -> float:
     return math.exp(-dt * 1000.0 / time)
 
 
-def smooth_depth(depth: np.ndarray, previous: np.ndarray, weight: float, jump: float) -> np.ndarray:
-    """Depth in metres through an Ema, 0 where there is none; a pixel that jumps by `jump` restarts from the new depth."""
-    tracked: np.ndarray = (depth > 0.0) & (previous > 0.0) & (np.abs(depth - previous) <= jump)
-    return np.where(tracked, previous * weight + depth * (1.0 - weight), depth)
-
-
-def depth_displacement(smoothed: np.ndarray, previous: np.ndarray, jump: float, view_span: float) -> np.ndarray:
-    """Motion toward the camera in view widths per frame: the depth change over the metres one view width
-    spans there, `smoothed × view_span`; 0 without depth at both frames, at a jump, and without a span."""
-    change: np.ndarray = smoothed - previous
-    moving: np.ndarray = (smoothed > 0.0) & (previous > 0.0) & (np.abs(change) <= jump) & (view_span > 0.0)
-    return np.where(moving, -change / np.where(moving, smoothed * view_span, 1.0), 0.0)
-
-
-def warped(previous: np.ndarray, displacement: np.ndarray) -> np.ndarray:
-    """`previous` where each pixel came from: `displacement` (H, W, 2, pixels per frame, x along
-    columns, y along rows) back, nearest, clamped at the edges; what the depth shaders read with warp."""
-    h, w = previous.shape
-    rows, columns = np.mgrid[0:h, 0:w]
-    x: np.ndarray = np.clip(np.floor(columns + 0.5 - displacement[..., 0]).astype(int), 0, w - 1)
-    y: np.ndarray = np.clip(np.floor(rows + 0.5 - displacement[..., 1]).astype(int), 0, h - 1)
-    return previous[y, x]
-
-
-def depth_threshold(value: np.ndarray, threshold: float) -> np.ndarray:
-    """A signed field with `threshold` taken off its size, 0 below it: the noise floor goes, and what is above stays continuous."""
-    return np.sign(value) * np.maximum(np.abs(value) - threshold, 0.0)
-
-
 def advect(field: np.ndarray, displacement: np.ndarray, amount: float) -> np.ndarray:
     """`field` (H, W, C) moved along `displacement` (H, W, 2, uv per frame) by `amount`: each pixel takes the
     value from where it came from, linear between pixels, clamped at the edges. Mirrors kinetic_advect.frag."""

@@ -1,9 +1,6 @@
 """Bridge-specific shaders."""
 
 from .density_bridge_shader import DensityBridgeShader
-from .depth_smooth import DepthSmooth
-from .depth_threshold import DepthThreshold
-from .depth_velocity_shader import DepthVelocityShader
 from .kinetic_advect import KineticAdvect
 from .kinetic_curl import KineticCurl
 from .kinetic_emission import KineticEmission

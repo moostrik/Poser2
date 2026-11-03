@@ -250,8 +250,12 @@ class DeepFlowRender(RenderBase):
             flow_layer = cast(ls.FlowLayer, _flow_layer)
             flow_layer.set_time_step(1.0 / self.settings.fluid3d.fluid_flow.step_fps)
             flow_layer.set_depth_input(cast(ls.CenterDepthLayer, self.L[Layers.center_depth][i]).depth)
-            view_width: float = cast(ls.CenterGeometry, self.L[Layers.center_geometry][i]).image_geometry.crop_roi.width
-            flow_layer.set_view_span(view_width * self._image_span)
+            crop: Rect = cast(ls.CenterGeometry, self.L[Layers.center_geometry][i]).image_geometry.crop_roi
+            flow_layer.set_view_span(crop.width * self._image_span)
+            # one of the depth's own samples in the view; the depth is coarser than the view, stretched onto it
+            depth: Texture = cast(ls.DepthSourceLayer, self.L[Layers.cam_depth][i]).depth
+            if depth.allocated and crop.width > 0.0 and crop.height > 0.0:
+                flow_layer.set_depth_step((1.0 / (depth.width * crop.width), 1.0 / (depth.height * crop.height)))
             if flow_key in self.L and i in self.L[flow_key] and i in self.L[flow_source_key]:
                 flow_layer.set_flow_input(self.L[flow_key][i].texture)
                 flow_layer.set_flow_source(self.L[flow_source_key][i])

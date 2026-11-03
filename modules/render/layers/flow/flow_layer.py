@@ -17,7 +17,7 @@ from modules.settings import Field, BaseSettings, Group
 from modules.flow import (
     GradientFlow, GradientFlowSettings, LucasKanadeFlow, LucasKanadeFlowSettings,
     TrailBridge, TrailBridgeSettings,
-    DepthVelocity, DepthVelocitySettings,
+    DepthVelocitySettings,
     KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES,
     VelocityMagnitude,
     TemperatureBridge, TemperatureBridgeSettings,
@@ -48,6 +48,10 @@ class FlowDrawMode(IntEnum):
 
     Inputs:
         LUMINANCE - The newest luminance frame of the flow the optical flow's method picks
+
+    Depth (red toward the camera, green away, in px per frame: 1 is full color at scalar_scale 1):
+        DEPTH_DIFFERENCE - The flow's z over its depth window, before the threshold
+        DEPTH_VELOCITY - The flow's z after the threshold, before strength_z and the mask
 
     Outputs:
         VELOCITY - The flow's 3D velocity, times the mask with its use_mask
@@ -95,9 +99,14 @@ class FlowDrawMode(IntEnum):
     KINETIC_STRIP = auto()
     SMOOTH_VELOCITY_DEPTH = auto()
     KINETIC_DEPTH_ACCELERATION = auto()
+    DEPTH_DIFFERENCE = auto()
+    DEPTH_VELOCITY = auto()
 
 
-DEPTH_DRAW_MODES: set[FlowDrawMode] = {FlowDrawMode.SMOOTH_VELOCITY_DEPTH, FlowDrawMode.KINETIC_DEPTH_ACCELERATION}     # red and green
+DEPTH_DRAW_MODES: set[FlowDrawMode] = {     # red and green
+    FlowDrawMode.SMOOTH_VELOCITY_DEPTH, FlowDrawMode.KINETIC_DEPTH_ACCELERATION, FlowDrawMode.DEPTH_DIFFERENCE, FlowDrawMode.DEPTH_VELOCITY,
+}
+PIXEL_DRAW_MODES: set[FlowDrawMode] = {FlowDrawMode.DEPTH_DIFFERENCE, FlowDrawMode.DEPTH_VELOCITY}     # view widths per frame, shown in px per frame
 VECTOR_DRAW_MODES: set[FlowDrawMode] = {       # 3D velocities, drawn as velocities whatever the texture's format
     FlowDrawMode.VELOCITY, FlowDrawMode.SMOOTH_VELOCITY_INPUT, FlowDrawMode.SMOOTH_VELOCITY_OUTPUT,
     FlowDrawMode.KINETIC_FAST, FlowDrawMode.KINETIC_SLOW, FlowDrawMode.KINETIC_VELOCITY, FlowDrawMode.KINETIC_ONSET,
@@ -178,9 +187,8 @@ class FlowLayer(LayerBase):
 
         optical_flow: OpticalFlowSettings = self.settings.optical_flow
         bridge: FlowBridgeSettings = self.settings.flow_bridge
-        self._depth_velocity: DepthVelocity = DepthVelocity(optical_flow.depth_velocity)     # z for both flows
-        self._gradient_flow: GradientFlow = GradientFlow(optical_flow.gradient, self._depth_velocity)
-        self._lucas_kanade_flow: LucasKanadeFlow = LucasKanadeFlow(optical_flow.lucas_kanade, self._depth_velocity)
+        self._gradient_flow: GradientFlow = GradientFlow(optical_flow.gradient, optical_flow.depth_velocity)
+        self._lucas_kanade_flow: LucasKanadeFlow = LucasKanadeFlow(optical_flow.lucas_kanade)
         self._optical_flow_method: OpticalFlowMethod = optical_flow.method     # the flow that measured last; a switch restarts the other
         self._velocity: Texture = self._gradient_flow.velocity     # the velocity of the flow the method picks
         self._depth_input: Texture | None = None
@@ -201,6 +209,7 @@ class FlowLayer(LayerBase):
 
         self._time_step: float = 1.0 / 60.0     # dt of one tick
         self._view_span: float = 0.0            # metres a view width spans per metre of depth; 0 reads no z
+        self._depth_step: tuple[float, float] = (0.0, 0.0)     # uv between two depth samples; 0 takes one flow texel
         self._warned_view_span: bool = False
         self._flow_interval: float = 0.0        # time since the last optical flow frame (s), counted in ticks
 
@@ -292,8 +301,8 @@ class FlowLayer(LayerBase):
         self._lucas_kanade_flow.set_mask(texture)
 
     def set_depth_input(self, texture: Texture) -> None:
-        """Depth for the velocity toward the camera: metres in red, and in alpha where depth counts (the
-        player's mask, or everywhere when `set_mask_input` gates the result instead)."""
+        """Depth for the velocity toward the camera: metres in red, 0 where there is none, on the flow's
+        view; `set_mask_input` gates the result to the player."""
         self._depth_input = texture
 
     def set_time_step(self, dt: float) -> None:
@@ -304,6 +313,11 @@ class FlowLayer(LayerBase):
         """The metres one width of the flow's view spans per metre of depth, polled: it puts z in view
         widths like x/y. Set it per tick, as the view can follow the pose."""
         self._view_span = span
+
+    def set_depth_step(self, step: tuple[float, float]) -> None:
+        """The uv between two of the depth's own samples in the flow's view, polled: z's window steps by
+        it, so it covers real samples, not copies. Set it per tick, as the view can follow the pose."""
+        self._depth_step = step
 
     # ========== Lifecycle Methods ==========
 
@@ -341,7 +355,6 @@ class FlowLayer(LayerBase):
         flow_width, flow_height = self._flow_size = (self.settings.width, self.settings.height)
         output_width, output_height = self._output_size
 
-        self._depth_velocity.allocate(flow_width, flow_height)
         self._gradient_flow.allocate(flow_width, flow_height)
         self._lucas_kanade_flow.allocate(flow_width, flow_height)
         self._trail_bridge.allocate(flow_width, flow_height, output_width, output_height)
@@ -350,7 +363,6 @@ class FlowLayer(LayerBase):
         self._temperature_bridge.allocate(flow_width, flow_height)
 
     def _deallocate_flow(self) -> None:
-        self._depth_velocity.deallocate()
         self._gradient_flow.deallocate()
         self._lucas_kanade_flow.deallocate()
         self._trail_bridge.deallocate()
@@ -371,7 +383,6 @@ class FlowLayer(LayerBase):
         """Reset all processing stages."""
         self._gradient_flow.reset()
         self._lucas_kanade_flow.reset()
-        self._depth_velocity.reset()
         self._trail_bridge.reset()
         self._kinetic_bridge.reset()
         self._density_bridge.reset()
@@ -397,17 +408,16 @@ class FlowLayer(LayerBase):
         kinetic: bool = self.settings.flow_bridge.method == FlowBridgeMethod.KINETIC
         flow: GradientFlow | LucasKanadeFlow = self._flow
         if optical_flow.method != self._optical_flow_method:
-            # The other flow's frames and the smoothed depth are from before it stopped measuring
+            # The other flow's frames and depth are from before it stopped measuring
             self._optical_flow_method = optical_flow.method
             flow.reset()
-            self._depth_velocity.reset()
         if new_flow:
             # Stage 1: the flow's 3D velocity, on the whole image; with its use_mask, times the mask
             flow.set_input(self._flow_input)
             if self.depth_enabled and self._view_span <= 0.0 and not self._warned_view_span:
                 self._warned_view_span = True
                 logger.warning("FlowLayer %d: depth is on but no view span is set (set_view_span), so z reads no motion", self._cam_id)
-            flow.update(self._depth_input if self.depth_enabled else None, self._flow_interval, self._view_span)
+            flow.update(self._depth_input if self.depth_enabled else None, self._flow_interval, self._view_span, self._depth_step)
             self._velocity = flow.velocity
 
         # Stage 2: The flow bridge
@@ -458,7 +468,8 @@ class FlowLayer(LayerBase):
 
         signed: tuple[Texture, int] | None = self._get_signed_texture()
         if signed is not None:
-            self._visualizer.process_signed(signed[0], self.settings.draw_mode in DEPTH_DRAW_MODES, signed[1])
+            unit: float = float(self._flow_size[0]) if self.settings.draw_mode in PIXEL_DRAW_MODES else 1.0
+            self._visualizer.process_signed(signed[0], self.settings.draw_mode in DEPTH_DRAW_MODES, signed[1], unit)
         else:
             self._visualizer.process(self._get_draw_texture(), self.settings.draw_mode in VECTOR_DRAW_MODES)
         Style.pop_style()
@@ -503,6 +514,8 @@ class FlowLayer(LayerBase):
             FlowDrawMode.KINETIC_EMISSION: (self._kinetic_bridge.emission, 0),
             FlowDrawMode.KINETIC_CURL: (self._kinetic_bridge.curl, 0),
             FlowDrawMode.SMOOTH_VELOCITY_DEPTH: (self.smooth_velocity, 2),       # its z
+            FlowDrawMode.DEPTH_DIFFERENCE: (self._flow.depth_velocity.difference, 0),
+            FlowDrawMode.DEPTH_VELOCITY: (self._flow.depth_velocity.depth_velocity, 0),
             FlowDrawMode.KINETIC_DEPTH_ACCELERATION: (self._kinetic_bridge.depth_acceleration, 0),
             FlowDrawMode.DENSITY_BRIDGE_INPUT_ALPHA: (self._density_bridge.alpha_input, 0),
         }

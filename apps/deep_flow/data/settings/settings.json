@@ -53,11 +53,11 @@
         "flood_light": 1.0
       },
       "depth": {
-        "confidence": 125,
-        "edge": 10,
+        "confidence": 50,
+        "edge": 0,
         "temporal_filter": false,
         "temporal_alpha": 0.4,
-        "temporal_delta": 100,
+        "temporal_delta": 46,
         "near": 0.0,
         "far": 12.0
       },
@@ -276,9 +276,8 @@
           "flow"
         ],
         "right": [
-          "center_mask",
-          "center_foreground",
-          "cam_depth"
+          "center_depth",
+          "center_mask"
         ],
         "output": [
           "cam_image"
@@ -353,7 +352,7 @@
       },
       "mask": {
         "blend_factor": 1.0,
-        "dilation_steps": 0,
+        "dilation_steps": -5,
         "blur_steps": 0,
         "blur_radius": 1.0
       },
@@ -406,12 +405,12 @@
       "far": 12.0
     },
     "depth_mask": {
-      "near": 0.5,
+      "near": 0.0,
       "far": 1.1,
       "edge": 0.1
     },
     "flow": {
-      "draw_mode": "SMOOTH_VELOCITY_OUTPUT",
+      "draw_mode": "VELOCITY",
       "blend_mode": "ADD",
       "width": 448,
       "height": 800,
@@ -423,10 +422,14 @@
       "optical_flow": {
         "method": "LUCAS_KANADE",
         "lucas_kanade": {
-          "levels": 3,
-          "window": 2,
-          "regularizer": 0.0215,
-          "threshold": 0.5,
+          "xy_levels": 1,
+          "xy_regularizer": 0.0195,
+          "xy_window": 2,
+          "xy_threshold": 0.5,
+          "depth_window": 4,
+          "depth_threshold": 1.35,
+          "depth_tolerance": 0.1,
+          "depth_coverage": 0.5,
           "strength_x": 1.0,
           "strength_y": 1.0,
           "strength_z": 1.0,
@@ -441,15 +444,14 @@
           "use_mask": true
         },
         "depth_velocity": {
-          "smooth_time": 60.0,
-          "jump": 0.1,
-          "blur_radius": 4.0,
-          "blur_steps": 2,
-          "threshold": 1.8
+          "window": 2,
+          "threshold": 2.4,
+          "tolerance": 0.04,
+          "coverage": 0.5
         }
       },
       "flow_bridge": {
-        "method": "KINETIC",
+        "method": "TRAIL",
         "trail": {
           "scale": 0.25,
           "trail_weight": 0.93,
@@ -486,7 +488,7 @@
       "visualization": {
         "toggle_scalar": false,
         "scale": 1.07,
-        "scalar_scale": 2.32,
+        "scalar_scale": 1.0,
         "strip_scale": 5.76,
         "spacing": 30.0,
         "element_length": 40.0,

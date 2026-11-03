@@ -1,12 +1,11 @@
-"""The Lucas–Kanade flow's numpy references: it finds how far an image moved, gives that as a velocity,
-and depth followed along that displacement reads no motion toward the camera for a surface that only
-slides sideways. Also the trail bridge's shaping of a velocity."""
+"""The Lucas–Kanade flow's numpy references: it finds how far an image moved and gives that as a
+velocity. Also the trail bridge's shaping of a velocity. Its depth is tested in test_depth_velocity."""
 
 import unittest
 
 import numpy as np
 
-from modules.flow import depth_displacement, displacement_velocity, lucas_kanade, shape_velocity, threshold_displacement, warped
+from modules.flow import displacement_velocity, lucas_kanade, shape_velocity, threshold_displacement
 
 SIZE: int = 64
 
@@ -82,26 +81,6 @@ class ShapeTest(unittest.TestCase):
 
     def test_boost_lifts_small_motions(self) -> None:
         np.testing.assert_allclose(shape_velocity(np.array([[0.25, 0.0]]), 0.5), [[0.5, 0.0]])
-
-
-class WarpedDepthTest(unittest.TestCase):
-    def test_a_surface_sliding_sideways_over_a_slope_reads_no_motion_toward_the_camera_along_its_motion(self) -> None:
-        rows, columns = np.mgrid[0:SIZE, 0:SIZE].astype(np.float64)
-        previous = 2.0 + 0.01 * columns                 # a slope: 1 cm per pixel
-        current = 2.0 + 0.01 * (columns - 3.0)          # slid 3 pixels to the right
-        displacement = np.zeros((SIZE, SIZE, 2))
-        displacement[..., 0] = 3.0
-        at_pixel = interior(depth_displacement(current, previous, 0.1, 0.5))
-        along = interior(depth_displacement(current, warped(previous, displacement), 0.1, 0.5))
-        self.assertGreater(float(np.abs(at_pixel).min()), 0.02)     # 3 cm per frame at about 2.3 m read as 0.026 view widths
-        self.assertLess(float(np.abs(along).max()), 1e-9)
-
-    def test_a_surface_moving_toward_the_camera_still_reads_so(self) -> None:
-        previous = np.full((SIZE, SIZE), 2.0)
-        current = np.full((SIZE, SIZE), 1.99)           # 1 cm closer
-        displacement = np.zeros((SIZE, SIZE, 2))
-        motion = depth_displacement(current, warped(previous, displacement), 0.1, 0.5)
-        self.assertAlmostEqual(float(motion.mean()), 0.01 / (1.99 * 0.5), places=9)
 
 
 if __name__ == '__main__':

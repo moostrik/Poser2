@@ -1,6 +1,6 @@
 """Depth Threshold shader.
 
-Takes the noise floor off the velocity toward the camera.
+Takes the noise floor off the motion toward the camera.
 """
 
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram

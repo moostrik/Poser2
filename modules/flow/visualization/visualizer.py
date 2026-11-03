@@ -102,8 +102,9 @@ class Visualizer:
             # RGB/RGBA (3-4 channels): passthrough, no FBO needed
             self._use_velocity_field = False
 
-    def process_signed(self, texture: Texture, depth: bool = False, channel: int = 0) -> None:
-        """Process a scalar texture for the two-color visualization: its `channel`; `depth` is red toward the camera, green away."""
+    def process_signed(self, texture: Texture, depth: bool = False, channel: int = 0, unit: float = 1.0) -> None:
+        """Process a scalar texture for the two-color visualization: its `channel`; `depth` is red toward the camera, green away;
+        `unit` turns its values into the unit shown."""
         if not self._allocated or not texture.allocated:
             self._current_texture = None
             self._use_velocity_field = False
@@ -113,7 +114,7 @@ class Visualizer:
         self._current_texture = texture
         self._use_velocity_field = False
         self._use_signed_field = True
-        self.signed_field.set(texture, depth, channel)
+        self.signed_field.set(texture, depth, channel, unit)
         self.signed_field.update()
 
     def _on_settings_changed(self) -> None:

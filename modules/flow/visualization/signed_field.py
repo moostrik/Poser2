@@ -17,6 +17,7 @@ class SignedField(FieldBase):
         self._field_texture: Texture | None = None
         self._depth: bool = False
         self._channel: int = 0
+        self._unit: float = 1.0
 
         self._shader: SignedMap = SignedMap()
 
@@ -30,11 +31,13 @@ class SignedField(FieldBase):
         self._shader.deallocate()
         super().deallocate()
 
-    def set(self, texture: Texture, depth: bool = False, channel: int = 0) -> None:
-        """Set the scalar field to visualize, in `channel`; `depth` draws it red toward the camera and green away."""
+    def set(self, texture: Texture, depth: bool = False, channel: int = 0, unit: float = 1.0) -> None:
+        """Set the scalar field to visualize, in `channel`; `depth` draws it red toward the camera and green away.
+        `unit` turns the field's values into the unit shown, so 1 of it is full color at scalar_scale 1."""
         self._field_texture = texture
         self._depth = depth
         self._channel = channel
+        self._unit = unit
 
     def update(self) -> None:
         """Render the field to the internal FBO."""
@@ -43,5 +46,5 @@ class SignedField(FieldBase):
 
         self._shader.reload()
         self._fbo.begin()
-        self._shader.use(self._field_texture, self.settings.scalar_scale, self._depth, self._channel)
+        self._shader.use(self._field_texture, self.settings.scalar_scale * self._unit, self._depth, self._channel)
         self._fbo.end()

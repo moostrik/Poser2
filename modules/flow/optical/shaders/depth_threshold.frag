@@ -1,7 +1,7 @@
 #version 460 core
 
 // Depth Threshold Shader
-// Takes the noise floor off a signed field, continuously. The numpy reference is kinetics.depth_threshold
+// Takes the noise floor off a signed field, continuously. The numpy reference is depth_velocity.depth_threshold
 
 uniform sampler2D tex0;  // Motion toward the camera R
 uniform float threshold; // Size taken off, in the field's units

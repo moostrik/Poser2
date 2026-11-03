@@ -3,8 +3,8 @@
 Per pixel, the brightness change along the brightness gradient between two frames: the motion along
 the gradient, as a strength rather than a distance. One equation per pixel, so only that component.
 x/y are scaled to the flow's velocity by `strength_x`/`strength_y`, then `threshold` comes off their
-length; z is the depth change at the pixel (`DepthVelocity`) in view widths per second times
-`strength_z`. With `use_mask`, the velocity is multiplied by the mask.
+length; z is the depth change at the pixel over its own `DepthVelocity`'s window (`depth_settings`),
+in view widths per second times `strength_z`. With `use_mask`, the velocity is multiplied by the mask.
 Ported from ofxFlowTools ftOpticalFlow.h
 """
 from OpenGL.GL import GL_RG16F, GL_RGBA16F
@@ -12,7 +12,7 @@ from OpenGL.GL import GL_RG16F, GL_RGBA16F
 from modules.gl import Fbo, Texture
 from modules.settings import Field, BaseSettings
 from .. import FlowUtil
-from ..bridge import DepthVelocity
+from .depth_velocity import DepthVelocity, DepthVelocitySettings
 from .luminance_frames import LuminanceFrames
 from .shaders import ComposeVelocity, GradientFlowShader
 
@@ -30,9 +30,10 @@ class GradientFlowSettings(BaseSettings):
 class GradientFlow:
     """The 3D velocity (RGBA16F, xyz) between the newest two frames of its input."""
 
-    def __init__(self, settings: GradientFlowSettings, depth_velocity: DepthVelocity) -> None:
+    def __init__(self, settings: GradientFlowSettings, depth_settings: DepthVelocitySettings) -> None:
         self.settings: GradientFlowSettings = settings
-        self._depth_velocity: DepthVelocity = depth_velocity     # shared with the other flow; only the active one advances it
+        self.depth_settings: DepthVelocitySettings = depth_settings
+        self._depth_velocity: DepthVelocity = DepthVelocity()
         self._mask: Texture | None = None
 
         self._frames: LuminanceFrames = LuminanceFrames()
@@ -51,7 +52,13 @@ class GradientFlow:
         """x/y and z (RGBA16F)."""
         return self._velocity
 
+    @property
+    def depth_velocity(self) -> DepthVelocity:
+        """Its z, before `strength_z` and the mask."""
+        return self._depth_velocity
+
     def allocate(self, width: int, height: int) -> None:
+        self._depth_velocity.allocate(width, height)
         self._frames.allocate(width, height)
         self._xy.allocate(width, height, GL_RG16F)
         self._velocity.allocate(width, height, GL_RGBA16F)
@@ -60,6 +67,7 @@ class GradientFlow:
         self.reset()
 
     def deallocate(self) -> None:
+        self._depth_velocity.deallocate()
         self._frames.deallocate()
         self._xy.deallocate()
         self._velocity.deallocate()
@@ -67,6 +75,7 @@ class GradientFlow:
         self._compose_shader.deallocate()
 
     def reset(self) -> None:
+        self._depth_velocity.reset()
         self._frames.reset()
         FlowUtil.zero(self._xy)
         FlowUtil.zero(self._velocity)
@@ -79,13 +88,14 @@ class GradientFlow:
         """The player's mask (red, 0 to 1) the velocity is multiplied by with `use_mask`, or None for no mask."""
         self._mask = texture
 
-    def update(self, depth: Texture | None, delta_time: float, view_span: float) -> None:
+    def update(self, depth: Texture | None, delta_time: float, view_span: float, depth_step: tuple[float, float]) -> None:
         """Measure between the newest two frames.
 
         Args:
-            depth: Metres in red, mask in alpha; None without depth (z is 0)
+            depth: Metres in red; None without depth (z is 0)
             delta_time: Seconds since the previous frame
             view_span: Metres one view width spans per metre of depth, for z
+            depth_step: uv between two depth samples in the flow's view, for z
         """
         if not self._frames.ready:
             FlowUtil.zero(self._velocity)
@@ -97,7 +107,8 @@ class GradientFlow:
         self._xy.end()
 
         if depth is not None:
-            self._depth_velocity.update_depth(depth, delta_time, view_span)
+            d: DepthVelocitySettings = self.depth_settings
+            self._depth_velocity.update_depth(depth, view_span, depth_step, d.window, d.threshold, d.tolerance, d.coverage)
 
         # z in view widths per frame as view widths per second
         per_second: float = 1.0 / max(delta_time, 1e-6)

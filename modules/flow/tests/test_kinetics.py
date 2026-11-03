@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import advect, decay_weight, depth_displacement, depth_threshold, drop, fill_reservoir, hold_release, project, smooth_depth, stop_gate
+from modules.flow import advect, decay_weight, drop, fill_reservoir, hold_release, project, stop_gate
 
 
 def trails(flow: list[float], fast_time: float = 25.0, slow_time: float = 150.0, dt: float = 1 / 60) -> tuple[np.ndarray, np.ndarray]:
@@ -181,57 +181,6 @@ class StopGateTest(unittest.TestCase):
 
     def test_the_gate_scales_a_new_release(self) -> None:
         self.assertAlmostEqual(hold_release(np.array([-2.0]), np.zeros(1), 0.5, 0.25)[0], 0.5)
-
-
-class DepthTest(unittest.TestCase):
-    def test_the_threshold_clears_the_floor_and_stays_continuous(self) -> None:
-        np.testing.assert_allclose(depth_threshold(np.array([0.05, -0.05, 0.3, -0.3]), 0.1), [0.0, 0.0, 0.2, -0.2])
-
-    def test_coming_closer_is_positive(self) -> None:
-        # 10 cm closer at 1.9 m, where a view width of span 0.5 is 0.95 m
-        self.assertAlmostEqual(depth_displacement(np.array([1.9]), np.array([2.0]), 0.5, 0.5)[0], 0.1 / 0.95)
-
-    def test_going_away_is_negative(self) -> None:
-        self.assertAlmostEqual(depth_displacement(np.array([2.1]), np.array([2.0]), 0.5, 0.5)[0], -0.1 / 1.05)
-
-    def test_the_same_step_further_away_is_smaller_like_a_sideways_one(self) -> None:
-        near = depth_displacement(np.array([1.99]), np.array([2.0]), 0.1, 0.5)[0]
-        far = depth_displacement(np.array([3.99]), np.array([4.0]), 0.1, 0.5)[0]
-        self.assertAlmostEqual(far / near, 1.99 / 3.99)
-
-    def test_a_silhouette_edge_is_no_motion(self) -> None:
-        self.assertEqual(depth_displacement(np.array([1.2]), np.array([3.0]), 0.1, 0.5)[0], 0.0)
-
-    def test_no_depth_at_either_frame_is_no_motion(self) -> None:
-        self.assertEqual(depth_displacement(np.array([0.0]), np.array([2.0]), 5.0, 0.5)[0], 0.0)
-        self.assertEqual(depth_displacement(np.array([2.0]), np.array([0.0]), 5.0, 0.5)[0], 0.0)
-
-    def test_no_view_span_is_no_motion(self) -> None:
-        self.assertEqual(depth_displacement(np.array([1.9]), np.array([2.0]), 0.5, 0.0)[0], 0.0)
-
-    def test_smoothing_halves_a_step_at_half_weight(self) -> None:
-        self.assertAlmostEqual(smooth_depth(np.array([2.1]), np.array([2.0]), 0.5, 0.5)[0], 2.05)
-
-    def test_a_jump_restarts_and_then_reads_as_no_motion(self) -> None:
-        previous = np.array([3.0])
-        smoothed = smooth_depth(np.array([1.2]), previous, 0.9, 0.1)
-        self.assertAlmostEqual(smoothed[0], 1.2)
-        self.assertEqual(depth_displacement(smoothed, previous, 0.1, 0.5)[0], 0.0)
-
-    def test_noise_averages_out_and_a_real_approach_survives(self) -> None:
-        rng = np.random.default_rng(0)
-        weight: float = decay_weight(1 / 60, 60.0)
-        span: float = 0.5
-        for approach, expected in ((0.0, 0.0), (1.0, 1.0)):                 # m/s
-            depth = 2.0 - approach * np.arange(90) / 60
-            noisy = depth + rng.normal(0.0, 0.012, 90)
-            smoothed, speeds = np.array([noisy[0]]), []
-            for value in noisy[1:]:
-                last = smoothed
-                smoothed = smooth_depth(np.array([value]), last, weight, 0.1)
-                # back to m/s: view widths per frame times the metres of a view width, per second
-                speeds.append(depth_displacement(smoothed, last, 0.1, span)[0] * smoothed[0] * span * 60)
-            self.assertAlmostEqual(float(np.mean(speeds[30:])), expected, delta=0.1)
 
 
 class ReservoirTest(unittest.TestCase):

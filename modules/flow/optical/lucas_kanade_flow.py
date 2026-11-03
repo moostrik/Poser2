@@ -5,12 +5,13 @@ this gives how far the image moved: a window of gradients per pixel, solved for 
 the previous frame onto the current one, first on the coarsest mip level, then refined once per finer
 level with the previous frame warped by the estimate so far.
 
-The displacement (uv per frame) stays inside: `threshold` (px per frame) comes off its length, as
-below it is the solve's jitter, not motion, and the depth change is measured along it, so a surface
-sliding sideways over a slope reads no motion toward the camera. The depth change comes in view widths
-per frame like the displacement, so all three become view widths per second the same way. Out comes
-one 3D velocity: x/y times `strength_x`/`strength_y`, z times `strength_z`. With `use_mask`, the
-velocity is multiplied by the mask.
+The displacement (uv per frame) stays inside: `xy_threshold` (px per frame) comes off its length, as
+below it is the solve's jitter, not motion. z is measured the same way, over a window: its own
+`DepthVelocity` takes the depth change along the displacement over `depth_window` depth samples, so a
+surface sliding sideways over a slope reads no motion toward the camera, and `depth_threshold` comes
+off it. The depth change comes in view widths per frame like the displacement, so all three become
+view widths per second the same way. Out comes one 3D velocity: x/y times `strength_x`/`strength_y`,
+z times `strength_z`. With `use_mask`, the velocity is multiplied by the mask.
 
 `lucas_kanade`, `threshold_displacement` and `displacement_velocity` below are the numpy references of the shaders.
 """
@@ -21,29 +22,33 @@ from OpenGL.GL import GL_RG32F, GL_RGBA16F
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import BaseSettings, Field
 from .. import FlowUtil
-from ..bridge import DepthVelocity
+from .depth_velocity import DepthVelocity
 from .luminance_frames import LuminanceFrames
 from .shaders import ComposeVelocity, DisplacementThreshold, LucasKanadeShader
 
 
 class LucasKanadeFlowSettings(BaseSettings):
     """Configuration for the Lucas–Kanade flow."""
-    levels:      Field[int]   = Field(3, min=1, max=5, description="Mip levels, coarse to fine; more follows faster motion")
-    window:      Field[int]   = Field(2, min=1, max=4, description="Window radius in texels per level (2 = 5x5)")
-    regularizer: Field[float] = Field(0.001, min=0.0, max=0.1, step=0.0005, description="Damps the solve where the window has no texture")
-    threshold:   Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="Displacement below this is noise, taken off the rest (px per frame)")
-    strength_x:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, x (negative inverts)")
+    xy_levels:      Field[int]   = Field(3, min=1, max=5, description="Mip levels of the x/y solve, coarse to fine; more follows faster motion")
+    xy_regularizer: Field[float] = Field(0.001, min=0.0, max=0.1, step=0.0005, description="Damps the x/y solve where the window has no texture")
+    xy_window:      Field[int]   = Field(2, min=1, max=4, description="x/y window radius in texels per level (2 = 5x5)", newline=True)
+    xy_threshold:   Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="Displacement below this is noise, taken off the rest (px per frame)")
+    depth_window:    Field[int]   = Field(2, min=0, max=4, description="Depth window radius in depth samples (2 = 5x5)", newline=True)
+    depth_threshold: Field[float] = Field(0.5, min=0.0, max=10.0, step=0.05, description="Depth motion below this is noise, taken off the rest (px per frame)")
+    depth_tolerance: Field[float] = Field(0.1, min=0.01, max=1.0, description="Neighbours further than this in depth are not averaged in (m)")
+    depth_coverage:  Field[float] = Field(0.5, min=0.0, max=1.0, step=0.05, description="Share of the depth window averaged in that z needs; less reads 0")
+    strength_x:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, x (negative inverts)", newline=True)
     strength_y:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, y (negative inverts)")
     strength_z:  Field[float] = Field(0.0, min=0.0, max=10.0, description="Velocity per view width per second toward the camera; 1 balances it with x/y, 0 is no depth")
-    use_mask:    Field[bool]  = Field(False, description="Multiply the velocity by the mask")
+    use_mask:    Field[bool]  = Field(False, description="Multiply the velocity by the mask", newline=True)
 
 
 class LucasKanadeFlow:
     """The 3D velocity (RGBA16F, xyz) between the newest two frames of its input."""
 
-    def __init__(self, settings: LucasKanadeFlowSettings, depth_velocity: DepthVelocity) -> None:
+    def __init__(self, settings: LucasKanadeFlowSettings) -> None:
         self.settings: LucasKanadeFlowSettings = settings
-        self._depth_velocity: DepthVelocity = depth_velocity     # shared with the other flow; only the active one advances it
+        self._depth_velocity: DepthVelocity = DepthVelocity()
         self._mask: Texture | None = None
 
         self._frames: LuminanceFrames = LuminanceFrames()
@@ -64,7 +69,13 @@ class LucasKanadeFlow:
         """x/y in image widths per second and z, each times its strength (RGBA16F)."""
         return self._velocity
 
+    @property
+    def depth_velocity(self) -> DepthVelocity:
+        """Its z, before `strength_z` and the mask."""
+        return self._depth_velocity
+
     def allocate(self, width: int, height: int) -> None:
+        self._depth_velocity.allocate(width, height)
         self._frames.allocate(width, height)
         self._solve.allocate(width, height, GL_RG32F)
         self._displacement.allocate(width, height, GL_RG32F)
@@ -75,6 +86,7 @@ class LucasKanadeFlow:
         self.reset()
 
     def deallocate(self) -> None:
+        self._depth_velocity.deallocate()
         self._frames.deallocate()
         self._solve.deallocate()
         self._displacement.deallocate()
@@ -84,6 +96,7 @@ class LucasKanadeFlow:
         self._compose_shader.deallocate()
 
     def reset(self) -> None:
+        self._depth_velocity.reset()
         self._frames.reset()
         self._solve.clear_all()
         self._displacement.clear()
@@ -97,13 +110,14 @@ class LucasKanadeFlow:
         """The player's mask (red, 0 to 1) the velocity is multiplied by with `use_mask`, or None for no mask."""
         self._mask = texture
 
-    def update(self, depth: Texture | None, delta_time: float, view_span: float) -> None:
+    def update(self, depth: Texture | None, delta_time: float, view_span: float, depth_step: tuple[float, float]) -> None:
         """Measure between the newest two frames.
 
         Args:
-            depth: Metres in red, mask in alpha; None without depth (z is 0)
+            depth: Metres in red; None without depth (z is 0)
             delta_time: Seconds since the previous frame
             view_span: Metres one view width spans per metre of depth, for z
+            depth_step: uv between two depth samples in the flow's view, for z
         """
         if not self._frames.ready:
             FlowUtil.zero(self._velocity)
@@ -111,18 +125,19 @@ class LucasKanadeFlow:
         s: LucasKanadeFlowSettings = self.settings
 
         self._solve.clear()                                 # the coarsest level starts from no motion
-        for level in reversed(range(s.levels)):
+        for level in reversed(range(s.xy_levels)):
             self._solve.swap()
             self._solve.begin()
-            self._shader.use(self._frames.previous_luminance, self._frames.luminance, self._solve.back_texture, level, s.window, s.regularizer)
+            self._shader.use(self._frames.previous_luminance, self._frames.luminance, self._solve.back_texture, level, s.xy_window, s.xy_regularizer)
             self._solve.end()
 
         self._displacement.begin()
-        self._threshold_shader.use(self._solve.texture, s.threshold)
+        self._threshold_shader.use(self._solve.texture, s.xy_threshold)
         self._displacement.end()
 
         if depth is not None:
-            self._depth_velocity.update_depth(depth, delta_time, view_span, self._displacement)
+            self._depth_velocity.update_depth(depth, view_span, depth_step, s.depth_window, s.depth_threshold,
+                                              s.depth_tolerance, s.depth_coverage, self._displacement)
 
         # uv per frame as image widths per second: v is uv of the height, so a square motion stays square;
         # z is in view widths per frame already
