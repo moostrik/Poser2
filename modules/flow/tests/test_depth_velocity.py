@@ -31,10 +31,9 @@ def track(depths: list[np.ndarray], moved: np.ndarray | None = None, window: int
           tolerance: float = TOLERANCE, time: float = 0.0, span: float = SPAN, dead_zone: float = 0.0) -> list[np.ndarray]:
     """The track after each depth frame, from no track."""
     state: np.ndarray = np.zeros(depths[0].shape + (4,))
-    miss: np.ndarray = np.zeros(depths[0].shape)
     states: list[np.ndarray] = []
     for depth in depths:
-        state, miss = track_depth(depth, state, miss, still(depth.shape) if moved is None else moved, DT, window, step, tolerance, time, span, dead_zone)
+        state = track_depth(depth, state, still(depth.shape) if moved is None else moved, DT, window, step, tolerance, time, span, dead_zone)
         states.append(state)
     return states
 
@@ -183,37 +182,17 @@ class DeadZoneTest(unittest.TestCase):
         self.assertEqual(max(float(np.abs(s[..., 0]).max()) for s in track(depths, window=0, time=50.0, dead_zone=self.ZONE)), 0.0)
 
     def test_a_real_motion_comes_through_at_full_speed_past_the_zone(self) -> None:
-        # still, then up to 1 m/s toward the camera at 10 m/s²: the first 5 mm read nothing, then z
-        # as without the zone, within a few % while the track settles, and the same once it has
-        speed, depth, depths = 0.0, 0.9, []
-        for frame in range(25):
-            speed = min(speed + 10.0 * DT, 1.0) if frame >= 5 else 0.0
-            depth -= speed * DT
-            depths.append(uniform(depth))
-        zoned = [float(s[1, 1, 0]) for s in track(depths, window=0, tolerance=0.5, time=50.0, dead_zone=self.ZONE)]
-        free = [float(s[1, 1, 0]) for s in track(depths, window=0, tolerance=0.5, time=50.0)]
-        self.assertEqual(zoned[5], 0.0)                                         # within the zone
-        for i in range(7, 25):
-            self.assertAlmostEqual(zoned[i] / free[i], 1.0, delta=0.03)
-        self.assertAlmostEqual(zoned[-1] / free[-1], 1.0, places=3)
-
-    def test_a_sudden_start_is_one_frame_late(self) -> None:
-        # a jump past the zone at once: the frame it starts is not taken, the next one is
-        depths = [uniform(0.9 - max(frame - 5, 0) * 1.0 * DT) for frame in range(20)]
-        zoned = [float(s[1, 1, 0]) for s in track(depths, window=0, tolerance=0.5, time=50.0, dead_zone=self.ZONE)]
-        free = [float(s[1, 1, 0]) for s in track(depths, window=0, tolerance=0.5, time=50.0)]
-        self.assertEqual(zoned[6], 0.0)
-        self.assertGreater(zoned[7], 0.5 * free[7])
-        self.assertAlmostEqual(zoned[-1] / free[-1], 1.0, delta=0.01)
-
-    def test_a_depth_off_for_one_frame_reads_nothing(self) -> None:
-        # as the edge's depth jitters: a jump of 2–10 cm that is back the next frame, never twice in a row
-        rng = np.random.default_rng(6)
-        depths, off = [], False
-        for _ in range(200):
-            off = (not off) and rng.random() < 0.2
-            depths.append(uniform(0.7 + (rng.uniform(0.02, 0.1) * rng.choice((-1.0, 1.0)) if off else 0.0)))
-        self.assertEqual(max(float(np.abs(s[..., 0]).max()) for s in track(depths, window=0, time=50.0, dead_zone=0.02)), 0.0)
+        # still, then 1 m/s toward the camera: the first 5 mm read nothing, then z as without the zone
+        depths = [uniform(0.9 - (max(frame - 5, 0) * 1.0 * DT)) for frame in range(20)]
+        zoned = track(depths, window=0, tolerance=0.5, time=50.0, dead_zone=self.ZONE)
+        free = track(depths, window=0, tolerance=0.5, time=50.0)
+        start: float = 1.0 / float(free[4][1, 1, 1])
+        past = [i for i, s in enumerate(free) if start - 1.0 / float(s[1, 1, 1]) > self.ZONE + 1e-6]
+        self.assertTrue(past and past[0] < 12)
+        before = [i for i in range(5, past[0])]
+        self.assertTrue(all(float(zoned[i][1, 1, 0]) == 0.0 for i in before))
+        for i in past:
+            self.assertAlmostEqual(float(zoned[i][1, 1, 0]), float(free[i][1, 1, 0]), places=12)
 
     def test_no_zone_is_the_track_as_it_was(self) -> None:
         rng = np.random.default_rng(5)

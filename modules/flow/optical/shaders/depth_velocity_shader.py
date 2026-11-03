@@ -4,22 +4,20 @@ One frame of the depth track: the motion toward the camera in view widths per fr
 disparity carried along the motion and corrected by the mean over a window of depth samples.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
 class DepthVelocityShader(Shader):
     """Writes the track: z (view widths per frame), disparity (1/m), its rate (1/m per second) and its anchor (m)."""
 
-    def use(self, depth: Texture, track: Texture, miss: Texture, miss_pass: bool, alpha: float, delta_time: float, view_span: float,
-            depth_step: tuple[float, float], window: int, tolerance: float, dead_zone: float, displacement: Texture | None = None) -> None:
-        """Correct the track by the new depth, or with `miss_pass` write this frame's miss.
+    def use(self, depth: Texture, track: Texture, alpha: float, delta_time: float, view_span: float, depth_step: tuple[float, float],
+            window: int, tolerance: float, dead_zone: float, displacement: Texture | None = None) -> None:
+        """Correct the track by the new depth.
 
         Args:
             depth: Depth now (m)
             track: The track the frame before
-            miss: The miss the frame before (m)
-            miss_pass: Write this frame's miss (R, m) instead of the track
             alpha: Weight of a full window's measurement on the disparity (1 takes it whole)
             delta_time: Seconds since the last depth
             view_span: Metres one view width spans per metre of depth; 0 or less reads no motion
@@ -31,7 +29,7 @@ class DepthVelocityShader(Shader):
         """
         if not self.allocated or not self.shader_program:
             return
-        if not depth.allocated or not track.allocated or not miss.allocated:
+        if not depth.allocated or not track.allocated:
             return
 
         glUseProgram(self.shader_program)
@@ -40,8 +38,6 @@ class DepthVelocityShader(Shader):
         glBindTexture(GL_TEXTURE_2D, depth.tex_id)
         glActiveTexture(GL_TEXTURE1)
         glBindTexture(GL_TEXTURE_2D, track.tex_id)
-        glActiveTexture(GL_TEXTURE3)
-        glBindTexture(GL_TEXTURE_2D, miss.tex_id)
 
         warp: bool = displacement is not None and displacement.allocated
         if warp:
@@ -52,8 +48,6 @@ class DepthVelocityShader(Shader):
         glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform1i(self.get_uniform_loc("tex1"), 1)
         glUniform1i(self.get_uniform_loc("displacement"), 2)
-        glUniform1i(self.get_uniform_loc("tex2"), 3)
-        glUniform1i(self.get_uniform_loc("miss_pass"), int(miss_pass))
         glUniform1i(self.get_uniform_loc("warp"), int(warp))
         glUniform2f(self.get_uniform_loc("depth_step"), *depth_step)
         glUniform1i(self.get_uniform_loc("window"), window)
