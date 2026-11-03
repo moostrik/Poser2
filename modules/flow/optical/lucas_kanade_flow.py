@@ -17,7 +17,8 @@ z lags its motion by the time it averages over. With `xy_follow_z_time`, x/y goe
 filter over `z_time` before its threshold, carried along the displacement as z is, so both lag
 alike. A displacement is a step of position, so the filter is the same one: with a steady frame
 interval and a full z window, x/y answers a change of speed exactly as z does. The tracks are
-carried by the measured displacement either way.
+carried by the displacement as solved, before `xy_threshold`: a slide too slow for the output
+still moves the tracks with it, or on a slope it would read as z.
 
 `lucas_kanade`, `threshold_displacement`, `filter_displacement` and `displacement_velocity` below are
 the numpy references of the shaders.
@@ -157,7 +158,7 @@ class LucasKanadeFlow:
 
         if depth is not None:
             self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, s.z_window, s.z_time,
-                                              s.z_threshold, s.z_tolerance, self._displacement)
+                                              s.z_threshold, s.z_tolerance, self._solve.texture)
 
         xy: Texture = self._displacement
         if s.xy_follow_z_time:
@@ -167,7 +168,7 @@ class LucasKanadeFlow:
             alpha, _ = track_weights(delta_time, s.z_time, 1.0)
             self._filtered.swap()
             self._filtered.begin()
-            self._filter_shader.use(self._solve.texture, self._filtered.back_texture, self._displacement, float(alpha))
+            self._filter_shader.use(self._solve.texture, self._filtered.back_texture, self._solve.texture, float(alpha))
             self._filtered.end()
             self._followed.begin()
             self._threshold_shader.use(self._filtered.texture, s.xy_threshold)

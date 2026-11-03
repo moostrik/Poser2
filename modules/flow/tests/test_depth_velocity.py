@@ -134,6 +134,18 @@ class CarriedTest(unittest.TestCase):
         self.assertGreater(float(np.abs(interior(z([before, after]))).min()), 0.02)      # held in place, 3 cm per frame
         self.assertLess(float(np.abs(interior(z([before, after], moved=moved))).max()), 1e-9)
 
+    def test_a_slow_slide_over_a_slope_reads_no_z_carried_by_its_displacement(self) -> None:
+        # 0.4 pixels per frame, below the x/y threshold: carried by the displacement as solved it reads
+        # (almost) nothing; carried by the thresholded one, which is 0 here, the slope reads as z
+        rows, columns = np.mgrid[0:SIZE, 0:SIZE].astype(np.float64)
+        depths = [2.0 + 0.01 * (columns - 0.4 * frame) for frame in range(10)]
+        moved = still()
+        moved[..., 0] = 0.4
+        carried = interior(z(depths, moved=moved, window=0, time=50.0))
+        held = interior(z(depths, window=0, time=50.0))
+        self.assertLess(float(np.abs(carried).max()), 1e-4)
+        self.assertGreater(float(np.abs(held).min()), 1e-3)
+
     def test_a_hand_sliding_over_the_chest_reads_no_z_at_its_edge(self) -> None:
         # the hand at 0.85 m over the chest at 1 m, its edge 1 pixel right per frame; the flow at the
         # edge smears to 1.3 pixels, so the track is carried from between hand and chest texels. Taken
