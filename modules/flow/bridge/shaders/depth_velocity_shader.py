@@ -1,6 +1,6 @@
 """Depth Velocity shader.
 
-The velocity toward the camera, from two smoothed depths.
+The motion toward the camera in view widths per frame, from two smoothed depths.
 """
 
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
@@ -8,15 +8,15 @@ from modules.gl import Shader, draw_quad, Texture
 
 
 class DepthVelocityShader(Shader):
-    """Writes the signed velocity toward the camera to the red channel."""
+    """Writes the signed motion toward the camera to the red channel."""
 
-    def use(self, depth: Texture, previous: Texture, dt: float, jump: float, displacement: Texture | None = None) -> None:
-        """Difference two depths, in m/s.
+    def use(self, depth: Texture, previous: Texture, view_span: float, jump: float, displacement: Texture | None = None) -> None:
+        """Difference two depths, in view widths per frame.
 
         Args:
             depth: Smoothed depth
             previous: Previous smoothed depth
-            dt: Seconds between them
+            view_span: Metres one view width spans per metre of depth; 0 or less reads no motion
             jump: More change than this is an edge (m)
             displacement: uv per frame; when given, the previous depth is taken where the pixel came from
         """
@@ -42,7 +42,7 @@ class DepthVelocityShader(Shader):
         glUniform1i(self.get_uniform_loc("tex1"), 1)
         glUniform1i(self.get_uniform_loc("displacement"), 2)
         glUniform1i(self.get_uniform_loc("warp"), int(warp))
-        glUniform1f(self.get_uniform_loc("dt"), dt)
+        glUniform1f(self.get_uniform_loc("view_span"), view_span)
         glUniform1f(self.get_uniform_loc("jump"), jump)
 
         draw_quad()

@@ -1,6 +1,7 @@
 """Flow Layer - optical flow computation and velocity/density/temperature bridges."""
 
 # Standard library imports
+import logging
 from enum import IntEnum, auto
 
 # Third-party imports
@@ -25,6 +26,8 @@ from modules.flow import (
 )
 
 from modules.utils import HotReloadMethods
+
+logger = logging.getLogger(__name__)
 
 
 class OpticalFlowMethod(IntEnum):
@@ -197,6 +200,8 @@ class FlowLayer(LayerBase):
         self._gpu_timer: GpuTimer = GpuTimer("GPU bridge")
 
         self._time_step: float = 1.0 / 60.0     # dt of one tick
+        self._view_span: float = 0.0            # metres a view width spans per metre of depth; 0 reads no z
+        self._warned_view_span: bool = False
         self._flow_interval: float = 0.0        # time since the last optical flow frame (s), counted in ticks
 
         self._flow_size: tuple[int, int] = (0, 0)       # the size the flow runs at; follows settings.width/height
@@ -294,6 +299,11 @@ class FlowLayer(LayerBase):
     def set_time_step(self, dt: float) -> None:
         """The dt of one tick, polled by the kinetic bridge; the fluid's step, so a fixed step compares runs."""
         self._time_step = dt
+
+    def set_view_span(self, span: float) -> None:
+        """The metres one width of the flow's view spans per metre of depth, polled: it puts z in view
+        widths like x/y. Set it per tick, as the view can follow the pose."""
+        self._view_span = span
 
     # ========== Lifecycle Methods ==========
 
@@ -394,7 +404,10 @@ class FlowLayer(LayerBase):
         if new_flow:
             # Stage 1: the flow's 3D velocity, on the whole image; with its use_mask, times the mask
             flow.set_input(self._flow_input)
-            flow.update(self._depth_input if self.depth_enabled else None, self._flow_interval)
+            if self.depth_enabled and self._view_span <= 0.0 and not self._warned_view_span:
+                self._warned_view_span = True
+                logger.warning("FlowLayer %d: depth is on but no view span is set (set_view_span), so z reads no motion", self._cam_id)
+            flow.update(self._depth_input if self.depth_enabled else None, self._flow_interval, self._view_span)
             self._velocity = flow.velocity
 
         # Stage 2: The flow bridge

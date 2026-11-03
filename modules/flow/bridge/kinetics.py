@@ -20,11 +20,12 @@ def smooth_depth(depth: np.ndarray, previous: np.ndarray, weight: float, jump: f
     return np.where(tracked, previous * weight + depth * (1.0 - weight), depth)
 
 
-def depth_speed(smoothed: np.ndarray, previous: np.ndarray, dt: float, jump: float) -> np.ndarray:
-    """Velocity toward the camera in m/s; 0 without depth at both frames, and at a jump."""
+def depth_displacement(smoothed: np.ndarray, previous: np.ndarray, jump: float, view_span: float) -> np.ndarray:
+    """Motion toward the camera in view widths per frame: the depth change over the metres one view width
+    spans there, `smoothed × view_span`; 0 without depth at both frames, at a jump, and without a span."""
     change: np.ndarray = smoothed - previous
-    moving: np.ndarray = (smoothed > 0.0) & (previous > 0.0) & (np.abs(change) <= jump)
-    return np.where(moving, -change / dt, 0.0)
+    moving: np.ndarray = (smoothed > 0.0) & (previous > 0.0) & (np.abs(change) <= jump) & (view_span > 0.0)
+    return np.where(moving, -change / np.where(moving, smoothed * view_span, 1.0), 0.0)
 
 
 def warped(previous: np.ndarray, displacement: np.ndarray) -> np.ndarray:

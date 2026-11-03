@@ -1,5 +1,6 @@
 """Deep Flow render — split-view layer graph with 3D volumetric fluid."""
 
+import math
 from threading import Event
 from typing import cast
 
@@ -79,12 +80,14 @@ SHAPE_LAYERS: dict[Layers, Layers] = {
 
 
 class DeepFlowRender(RenderBase):
-    def __init__(self, board: RenderBoard, settings: RenderSettings, mask_source: MaskSource, num_cams: int = 1, max_players: int = 1) -> None:
+    def __init__(self, board: RenderBoard, settings: RenderSettings, mask_source: MaskSource, fov: float, num_cams: int = 1, max_players: int = 1) -> None:
+        """`fov` is the camera image's horizontal field (degrees), for the metres a view width spans."""
         super().__init__(settings.window)
         self.max_players: int = max_players
         self.num_cams: int = num_cams
         self.settings: RenderSettings = settings
         self._flow_sources: dict[Layers, Layers] = flow_sources(mask_source)
+        self._image_span: float = 2.0 * math.tan(math.radians(fov) / 2.0)     # metres the camera image spans per metre of depth
 
         self.board: RenderBoard = board
 
@@ -247,6 +250,8 @@ class DeepFlowRender(RenderBase):
             flow_layer = cast(ls.FlowLayer, _flow_layer)
             flow_layer.set_time_step(1.0 / self.settings.fluid3d.fluid_flow.step_fps)
             flow_layer.set_depth_input(cast(ls.CenterDepthLayer, self.L[Layers.center_depth][i]).depth)
+            view_width: float = cast(ls.CenterGeometry, self.L[Layers.center_geometry][i]).image_geometry.crop_roi.width
+            flow_layer.set_view_span(view_width * self._image_span)
             if flow_key in self.L and i in self.L[flow_key] and i in self.L[flow_source_key]:
                 flow_layer.set_flow_input(self.L[flow_key][i].texture)
                 flow_layer.set_flow_source(self.L[flow_source_key][i])

@@ -415,6 +415,11 @@
       "blend_mode": "ADD",
       "width": 448,
       "height": 800,
+      "inputs": {
+        "flow": "center_capture",
+        "density": "center_capture",
+        "mask": "center_mask"
+      },
       "optical_flow": {
         "method": "LUCAS_KANADE",
         "lucas_kanade": {
@@ -440,7 +445,7 @@
           "jump": 0.1,
           "blur_radius": 4.0,
           "blur_steps": 2,
-          "threshold": 0.12
+          "threshold": 1.8
         }
       },
       "flow_bridge": {
@@ -486,11 +491,6 @@
         "spacing": 30.0,
         "element_length": 40.0,
         "element_width": 2.5
-      },
-      "inputs": {
-        "flow": "center_capture",
-        "density": "center_capture",
-        "mask": "center_mask"
       }
     },
     "fluid3d": {

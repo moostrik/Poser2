@@ -70,4 +70,4 @@ depth cam pose synchony detection
 
 
 ## HINTS
-* je moeder
+* .\.venv-oak4\Scripts\Activate.ps1
