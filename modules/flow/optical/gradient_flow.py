@@ -3,8 +3,8 @@
 Per pixel, the brightness change along the brightness gradient between two frames: the motion along
 the gradient, as a strength rather than a distance. One equation per pixel, so only that component.
 x/y are scaled to the flow's velocity by `strength_x`/`strength_y`, then `threshold` comes off their
-length; z is the depth change at the pixel over its own `DepthVelocity`'s window (`depth_settings`),
-in view widths per second times `strength_z`. With `use_mask`, the velocity is multiplied by the mask.
+length; z is its own `DepthVelocity`'s depth track, held in place (`depth_settings`), in view widths
+per second times `strength_z`. With `use_mask`, the velocity is multiplied by the mask.
 Ported from ofxFlowTools ftOpticalFlow.h
 """
 from OpenGL.GL import GL_RG16F, GL_RGBA16F
@@ -108,7 +108,7 @@ class GradientFlow:
 
         if depth is not None:
             d: DepthVelocitySettings = self.depth_settings
-            self._depth_velocity.update_depth(depth, view_span, depth_step, d.window, d.threshold, d.tolerance, d.coverage)
+            self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, d.window, d.time, d.threshold, d.tolerance)
 
         # z in view widths per frame as view widths per second
         per_second: float = 1.0 / max(delta_time, 1e-6)

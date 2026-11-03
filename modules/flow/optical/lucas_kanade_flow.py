@@ -6,10 +6,10 @@ the previous frame onto the current one, first on the coarsest mip level, then r
 level with the previous frame warped by the estimate so far.
 
 The displacement (uv per frame) stays inside: `xy_threshold` (px per frame) comes off its length, as
-below it is the solve's jitter, not motion. z is measured the same way, over a window: its own
-`DepthVelocity` takes the depth change along the displacement over `depth_window` depth samples, so a
-surface sliding sideways over a slope reads no motion toward the camera, and `depth_threshold` comes
-off it. The depth change comes in view widths per frame like the displacement, so all three become
+below it is the solve's jitter, not motion. z comes from its own `DepthVelocity`: a depth track carried along
+the displacement, so a surface sliding sideways over a slope reads no motion toward the camera,
+corrected each frame by the mean over `depth_window` depth samples and averaged over `depth_time`;
+`depth_threshold` comes off it. The depth change comes in view widths per frame like the displacement, so all three become
 view widths per second the same way. Out comes one 3D velocity: x/y times `strength_x`/`strength_y`,
 z times `strength_z`. With `use_mask`, the velocity is multiplied by the mask.
 
@@ -33,10 +33,10 @@ class LucasKanadeFlowSettings(BaseSettings):
     xy_regularizer: Field[float] = Field(0.001, min=0.0, max=0.1, step=0.0005, description="Damps the x/y solve where the window has no texture")
     xy_window:      Field[int]   = Field(2, min=1, max=4, description="x/y window radius in texels per level (2 = 5x5)", newline=True)
     xy_threshold:   Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="Displacement below this is noise, taken off the rest (px per frame)")
-    depth_window:    Field[int]   = Field(2, min=0, max=4, description="Depth window radius in depth samples (2 = 5x5)", newline=True)
-    depth_threshold: Field[float] = Field(0.5, min=0.0, max=10.0, step=0.05, description="Depth motion below this is noise, taken off the rest (px per frame)")
-    depth_tolerance: Field[float] = Field(0.1, min=0.01, max=1.0, description="Neighbours further than this in depth are not averaged in (m)")
-    depth_coverage:  Field[float] = Field(0.5, min=0.0, max=1.0, step=0.05, description="Share of the depth window averaged in that z needs; less reads 0")
+    depth_window:    Field[int]   = Field(1, min=0, max=4, description="Depth window radius in depth samples (1 = 3x3)", newline=True)
+    depth_time:      Field[float] = Field(50.0, min=0.0, max=1000.0, description="Time over which the depth track averages (ms); 0 is the change of two frames")
+    depth_threshold: Field[float] = Field(0.1, min=0.0, max=10.0, step=0.05, description="Depth motion below this is noise, taken off the rest (px per frame)")
+    depth_tolerance: Field[float] = Field(0.1, min=0.01, max=1.0, description="Depth further than this is another surface: not averaged in, the track starts over (m)")
     strength_x:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, x (negative inverts)", newline=True)
     strength_y:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, y (negative inverts)")
     strength_z:  Field[float] = Field(0.0, min=0.0, max=10.0, description="Velocity per view width per second toward the camera; 1 balances it with x/y, 0 is no depth")
@@ -136,8 +136,8 @@ class LucasKanadeFlow:
         self._displacement.end()
 
         if depth is not None:
-            self._depth_velocity.update_depth(depth, view_span, depth_step, s.depth_window, s.depth_threshold,
-                                              s.depth_tolerance, s.depth_coverage, self._displacement)
+            self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, s.depth_window, s.depth_time,
+                                              s.depth_threshold, s.depth_tolerance, self._displacement)
 
         # uv per frame as image widths per second: v is uv of the height, so a square motion stays square;
         # z is in view widths per frame already

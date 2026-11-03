@@ -50,7 +50,7 @@ class FlowDrawMode(IntEnum):
         LUMINANCE - The newest luminance frame of the flow the optical flow's method picks
 
     Depth (red toward the camera, green away, in px per frame: 1 is full color at scalar_scale 1):
-        DEPTH_DIFFERENCE - The flow's z over its depth window, before the threshold
+        DEPTH_DIFFERENCE - The flow's tracked z, before the threshold
         DEPTH_VELOCITY - The flow's z after the threshold, before strength_z and the mask
 
     Outputs:

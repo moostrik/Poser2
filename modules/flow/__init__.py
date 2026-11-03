@@ -10,7 +10,7 @@ from .flow_base import FlowBase
 from .flow_util import FlowUtil
 
 # Optical flow
-from .optical import DepthVelocity, DepthVelocitySettings, window_depth_displacement, depth_threshold, \
+from .optical import DepthVelocity, DepthVelocitySettings, track_depth, track_weights, depth_threshold, \
                      GradientFlow, GradientFlowSettings, LucasKanadeFlow, LucasKanadeFlowSettings, lucas_kanade, threshold_displacement, displacement_velocity
 
 # Bridge layers
