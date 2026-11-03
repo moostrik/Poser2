@@ -11,11 +11,13 @@
 // span, it is empty. z is the rate over the metres one view width spans there, `depth × view_span`,
 // in view widths per frame. Depth is read nearest, so an edge never reads as a distance in between;
 // the track is read linear between the texels that hold one of the same surface, within `tolerance`
-// of the measurement, so a track is never carried across an edge. The numpy reference is
-// depth_velocity.track_depth
+// of the measurement, so a track is never carried across an edge. With `dead_zone` above 0, z is 0
+// while the tracked depth stays within it of its anchor; past it, z at its full speed, and the anchor
+// follows at `dead_zone` behind (a backlash); a track that starts over is anchored anew. The numpy
+// reference is depth_velocity.track_depth
 
 uniform sampler2D tex0;  // Depth now R (m)
-uniform sampler2D tex1;  // The track the frame before: z, disparity (1/m), rate (1/m per second)
+uniform sampler2D tex1;  // The track the frame before: z, disparity (1/m), rate (1/m per second), anchor (m)
 uniform sampler2D displacement;     // uv per frame (RG), with warp
 uniform bool warp;
 uniform vec2 depth_step; // uv between two depth samples
@@ -24,6 +26,7 @@ uniform float tolerance; // Depth further than this is another surface (m)
 uniform float alpha;     // Weight of a full window's measurement on the disparity
 uniform float delta_time;           // Seconds since the last depth
 uniform float view_span; // Metres one view width spans per metre of depth
+uniform float dead_zone; // Depth the track wanders within its anchor without z (m); 0 is none
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -34,24 +37,24 @@ float depth_at(vec2 uv) {
     return texelFetch(tex0, texel, 0).r;
 }
 
-// The track's disparity and rate at `position` (texels, centres at integers), of the texels that hold
-// one of the measurement's surface, within `tolerance` of it; none of them: no track
-vec2 carried(vec2 position, float measured_depth) {
+// The track's disparity, rate and anchor at `position` (texels, centres at integers), of the texels
+// that hold one of the measurement's surface, within `tolerance` of it; none of them: no track
+vec3 carried(vec2 position, float measured_depth) {
     ivec2 size = textureSize(tex1, 0);
     ivec2 base = ivec2(floor(position));
     vec2 f = position - vec2(base);
-    vec2 sum = vec2(0.0);
+    vec3 sum = vec3(0.0);
     float total = 0.0;
     for (int dy = 0; dy <= 1; dy++) {
         for (int dx = 0; dx <= 1; dx++) {
             vec4 texel = texelFetch(tex1, clamp(base + ivec2(dx, dy), ivec2(0), size - 1), 0);
             bool same = texel.g > 0.0 && abs(1.0 / texel.g - measured_depth) <= tolerance;
             float weight = (dx == 0 ? 1.0 - f.x : f.x) * (dy == 0 ? 1.0 - f.y : f.y) * float(same);
-            sum += weight * texel.gb;
+            sum += weight * texel.gba;
             total += weight;
         }
     }
-    return total > 1e-9 ? sum / total : vec2(0.0);
+    return total > 1e-9 ? sum / total : vec3(0.0);
 }
 
 void main() {
@@ -78,11 +81,11 @@ void main() {
 
     vec2 moved = warp ? texture(displacement, texCoord).xy : vec2(0.0);
     vec2 size = vec2(textureSize(tex1, 0));
-    vec2 track = carried(texCoord * size - 0.5 - moved * size, 1.0 / measurement);
+    vec3 track = carried(texCoord * size - 0.5 - moved * size, 1.0 / measurement);
     float predicted = track.x > 0.0 ? track.x + track.y * delta_time : 0.0;
 
     if (predicted <= 0.0 || abs(1.0 / measurement - 1.0 / predicted) > tolerance) {
-        fragColor = vec4(0.0, measurement, 0.0, 1.0);
+        fragColor = vec4(0.0, measurement, 0.0, 1.0 / measurement);
         return;
     }
     float a = alpha * share;
@@ -90,5 +93,19 @@ void main() {
     float residual = measurement - predicted;
     float disparity = predicted + a * residual;
     float rate = track.y + b * residual / delta_time;
-    fragColor = vec4(rate * delta_time / (disparity * view_span), disparity, rate, 1.0);
+    float z = rate * delta_time / (disparity * view_span);
+
+    float tracked = 1.0 / disparity;
+    float anchor = track.z > 0.0 ? track.z : tracked;
+    if (dead_zone > 0.0) {
+        float offset = tracked - anchor;
+        if (abs(offset) > dead_zone) {
+            anchor = tracked - sign(offset) * dead_zone;
+        } else {
+            z = 0.0;
+        }
+    } else {
+        anchor = tracked;
+    }
+    fragColor = vec4(z, disparity, rate, anchor);
 }

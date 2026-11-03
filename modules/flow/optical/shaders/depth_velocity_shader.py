@@ -9,10 +9,10 @@ from modules.gl import Shader, draw_quad, Texture
 
 
 class DepthVelocityShader(Shader):
-    """Writes the track: z (view widths per frame), disparity (1/m) and its rate (1/m per second)."""
+    """Writes the track: z (view widths per frame), disparity (1/m), its rate (1/m per second) and its anchor (m)."""
 
     def use(self, depth: Texture, track: Texture, alpha: float, delta_time: float, view_span: float, depth_step: tuple[float, float],
-            window: int, tolerance: float, displacement: Texture | None = None) -> None:
+            window: int, tolerance: float, dead_zone: float, displacement: Texture | None = None) -> None:
         """Correct the track by the new depth.
 
         Args:
@@ -24,6 +24,7 @@ class DepthVelocityShader(Shader):
             depth_step: uv between two depth samples
             window: Radius in depth samples
             tolerance: Depth further than this is another surface: not averaged in, the track starts over (m)
+            dead_zone: Depth the track wanders within its anchor without z (m); 0 is none
             displacement: uv per frame; when given, the track is carried from where each pixel came from
         """
         if not self.allocated or not self.shader_program:
@@ -54,5 +55,6 @@ class DepthVelocityShader(Shader):
         glUniform1f(self.get_uniform_loc("alpha"), alpha)
         glUniform1f(self.get_uniform_loc("delta_time"), delta_time)
         glUniform1f(self.get_uniform_loc("view_span"), view_span)
+        glUniform1f(self.get_uniform_loc("dead_zone"), dead_zone)
 
         draw_quad()

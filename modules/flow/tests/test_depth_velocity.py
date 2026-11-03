@@ -28,12 +28,12 @@ def interior(field: np.ndarray, margin: int = 8) -> np.ndarray:
 
 
 def track(depths: list[np.ndarray], moved: np.ndarray | None = None, window: int = 2, step: tuple[float, float] = STEP,
-          tolerance: float = TOLERANCE, time: float = 0.0, span: float = SPAN) -> list[np.ndarray]:
+          tolerance: float = TOLERANCE, time: float = 0.0, span: float = SPAN, dead_zone: float = 0.0) -> list[np.ndarray]:
     """The track after each depth frame, from no track."""
-    state: np.ndarray = np.zeros(depths[0].shape + (3,))
+    state: np.ndarray = np.zeros(depths[0].shape + (4,))
     states: list[np.ndarray] = []
     for depth in depths:
-        state = track_depth(depth, state, still(depth.shape) if moved is None else moved, DT, window, step, tolerance, time, span)
+        state = track_depth(depth, state, still(depth.shape) if moved is None else moved, DT, window, step, tolerance, time, span, dead_zone)
         states.append(state)
     return states
 
@@ -164,6 +164,50 @@ class CarriedTest(unittest.TestCase):
         moved = still()
         moved[..., 0] = 2.0
         np.testing.assert_allclose(interior(z([uniform(2.0), uniform(1.99)], moved=moved)), 0.005 / SPAN)
+
+
+class DeadZoneTest(unittest.TestCase):
+    """Within the dead zone of its anchor the track reads no z; past it, full speed."""
+    ZONE: float = 0.005
+
+    def test_a_wander_within_the_zone_reads_nothing(self) -> None:
+        # ±3 mm over 400 ms, as a stereo surface wanders; without the zone it reads as z
+        depths = [uniform(0.7 + 0.003 * np.sin(2 * np.pi * frame * DT / 0.4)) for frame in range(60)]
+        self.assertEqual(max(float(np.abs(s[..., 0]).max()) for s in track(depths, window=0, time=50.0, dead_zone=self.ZONE)), 0.0)
+        self.assertGreater(max(float(np.abs(s[..., 0]).max()) for s in track(depths, window=0, time=50.0)), 0.0)
+
+    def test_depth_steps_read_nothing(self) -> None:
+        rng = np.random.default_rng(4)
+        depths = [uniform(0.7 + 0.001 * float(rng.integers(0, 2))) for _ in range(60)]
+        self.assertEqual(max(float(np.abs(s[..., 0]).max()) for s in track(depths, window=0, time=50.0, dead_zone=self.ZONE)), 0.0)
+
+    def test_a_real_motion_comes_through_at_full_speed_past_the_zone(self) -> None:
+        # still, then 1 m/s toward the camera: the first 5 mm read nothing, then z as without the zone
+        depths = [uniform(0.9 - (max(frame - 5, 0) * 1.0 * DT)) for frame in range(20)]
+        zoned = track(depths, window=0, tolerance=0.5, time=50.0, dead_zone=self.ZONE)
+        free = track(depths, window=0, tolerance=0.5, time=50.0)
+        start: float = 1.0 / float(free[4][1, 1, 1])
+        past = [i for i, s in enumerate(free) if start - 1.0 / float(s[1, 1, 1]) > self.ZONE + 1e-6]
+        self.assertTrue(past and past[0] < 12)
+        before = [i for i in range(5, past[0])]
+        self.assertTrue(all(float(zoned[i][1, 1, 0]) == 0.0 for i in before))
+        for i in past:
+            self.assertAlmostEqual(float(zoned[i][1, 1, 0]), float(free[i][1, 1, 0]), places=12)
+
+    def test_no_zone_is_the_track_as_it_was(self) -> None:
+        rng = np.random.default_rng(5)
+        depths = [2.0 + rng.normal(0.0, 0.03, (SIZE, SIZE)) for _ in range(10)]
+        for zoned, free in zip(track(depths, time=50.0, tolerance=1.0, dead_zone=0.0), track(depths, time=50.0, tolerance=1.0)):
+            np.testing.assert_array_equal(zoned[..., :3], free[..., :3])
+            np.testing.assert_allclose(zoned[..., 3], np.where(free[..., 1] > 0, 1.0 / np.where(free[..., 1] > 0, free[..., 1], 1.0), 0.0))
+
+    def test_a_track_that_starts_over_is_anchored_anew(self) -> None:
+        # the chest at 1 m, then a hand at 0.7 m over it: the track starts over, anchored at the hand,
+        # and the hand's own wander reads nothing
+        depths = [uniform(1.0)] * 5 + [uniform(0.7 + 0.003 * (frame % 2)) for frame in range(10)]
+        states = track(depths, window=0, time=50.0, dead_zone=self.ZONE)
+        np.testing.assert_allclose(states[5][..., 3], 0.7)
+        self.assertEqual(max(float(np.abs(s[..., 0]).max()) for s in states), 0.0)
 
 
 class WeightsTest(unittest.TestCase):
