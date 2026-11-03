@@ -1,7 +1,7 @@
-"""Trail - general temporal and spatial smoothing.
+"""Trail Bridge.
 
-Provides temporal smoothing (trail effect) and spatial smoothing (Gaussian blur)
-for any field type (velocity, density, etc).
+The flow bridge's velocity as one trail: a flow's 3D velocity, its x/y shaped (`boost`, clamped to
+±1), smoothed in time (the trail blend) and in space (Gaussian blur).
 """
 
 import numpy as np
@@ -9,13 +9,13 @@ from OpenGL.GL import GL_RGBA16F
 
 from modules.gl import Texture
 from modules.settings import Field, BaseSettings
-from .. import FlowBase, FlowUtil
+from .. import FlowBase
 from ..shaders import Trail, GaussianBlur
 from .shaders import ShapeVelocity
 
 
-class SmoothTrailSettings(BaseSettings):
-    """Configuration for trail smoothing."""
+class TrailBridgeSettings(BaseSettings):
+    """Configuration for the trail bridge."""
     scale = Field(1.0, min=-10.0, max=10.0, description="Converts the flow's velocity to simulation velocity")
     trail_weight = Field(0.9, min=0.0, max=0.99, description="Temporal smoothing (0=no trail, 0.99=long trail)")
     blur_radius = Field(8.0, min=0.0, max=10.0, description="Gaussian blur radius in pixels")
@@ -23,42 +23,44 @@ class SmoothTrailSettings(BaseSettings):
     boost = Field(0.0, min=-0.5, max=0.9, description="Power boost for small motions")
 
 
-class SmoothTrail(FlowBase):
-    """General temporal and spatial smoothing processor.
-
-    Provides temporal smoothing (trail effect) and spatial smoothing (Gaussian blur)
-    for any field. Works with any texture format (RG, RGB, RGBA).
+class TrailBridge(FlowBase):
+    """The trail bridge: a flow's 3D velocity, its x/y shaped (`boost`, clamped to ±1), through one 3D trail.
 
     Pipeline:
-        1. Blend new input with previous trail (temporal smoothing)
-        2. Apply Gaussian blur passes (spatial smoothing)
-        3. Output smoothed field
+        1. Shape the velocity into the input FBO (`set_velocity`)
+        2. Blend it with the previous trail (temporal smoothing)
+        3. Apply Gaussian blur passes (spatial smoothing)
 
     FBOs (from FlowBase):
-        - input_fbo: Receives input
-        - output_fbo: Stores smoothed output
+        - input_fbo: The shaped velocity
+        - output_fbo: The smoothed velocity
     """
 
-    def __init__(self, format: int = GL_RGBA16F, settings: SmoothTrailSettings | None = None) -> None:
-        """Initialize trail processor."""
+    def __init__(self, settings: TrailBridgeSettings | None = None) -> None:
         super().__init__()
 
-        # Define formats
-        self._input_internal_format = format
-        self._output_internal_format = format
+        self._input_internal_format = GL_RGBA16F
+        self._output_internal_format = GL_RGBA16F
 
-        self.settings: SmoothTrailSettings = settings or SmoothTrailSettings()
+        self.settings: TrailBridgeSettings = settings or TrailBridgeSettings()
 
         # Shaders
+        self._shape_shader: ShapeVelocity = ShapeVelocity()
         self._trail_shader: Trail = Trail()
         self._blur_shader: GaussianBlur = GaussianBlur()
 
-    def set_input(self, input_field: Texture) -> None:
-        """Set input field with optional scaling."""
-        FlowUtil.blit(self._input_fbo, input_field)
+    @property
+    def smooth_velocity(self) -> Texture:
+        """The smoothed velocity, xyz (RGBA16F)."""
+        return self._output
+
+    @property
+    def velocity_input(self) -> Texture:
+        """The shaped velocity the trail reads."""
+        return self._input
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
-        """Allocate trail processor.
+        """Allocate the trail.
 
         Args:
             width: Field width
@@ -67,27 +69,27 @@ class SmoothTrail(FlowBase):
             output_height: Optional output height (defaults to height)
         """
         super().allocate(width, height, output_width, output_height)
-
-        # Allocate shaders
+        self._shape_shader.allocate()
         self._trail_shader.allocate()
         self._blur_shader.allocate()
 
     def deallocate(self) -> None:
         """Deallocate all resources."""
         super().deallocate()
+        self._shape_shader.deallocate()
         self._trail_shader.deallocate()
         self._blur_shader.deallocate()
 
-    def reset(self) -> None:
-        """Reset all buffers to zero."""
-        super().reset()
+    def set_velocity(self, velocity: Texture) -> None:
+        """Take a flow's 3D velocity, its x/y shaped, as the trail's next input."""
+        if not self._allocated:
+            return
+        self._input_fbo.begin()
+        self._shape_shader.use(velocity, 1.0 - self.settings.boost)
+        self._input_fbo.end()
 
-    def update(self, delta_time: float = 1.0) -> None:
-        """Process field with temporal and spatial smoothing.
-
-        Args:
-            delta_time: Unused (kept for FlowBase compatibility)
-        """
+    def update(self) -> None:
+        """Advance the trail with the input: temporal, then spatial smoothing."""
         if not self._allocated:
             return
 
@@ -125,40 +127,6 @@ class SmoothTrail(FlowBase):
                     horizontal=False
                 )
                 self._output_fbo.end()
-
-
-class VelocitySmoothTrail(SmoothTrail):
-    """The trail bridge: a flow's 3D velocity, its x/y shaped (`boost`, clamped to ±1), through one 3D trail."""
-
-    def __init__(self, settings: SmoothTrailSettings | None = None) -> None:
-        super().__init__(GL_RGBA16F, settings)
-        self._shape_shader: ShapeVelocity = ShapeVelocity()
-
-    @property
-    def smooth_velocity(self) -> Texture:
-        """The smoothed velocity, xyz (RGBA16F)."""
-        return self._output
-
-    @property
-    def velocity_input(self) -> Texture:
-        """The shaped velocity the trail reads."""
-        return self._input
-
-    def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
-        super().allocate(width, height, output_width, output_height)
-        self._shape_shader.allocate()
-
-    def deallocate(self) -> None:
-        super().deallocate()
-        self._shape_shader.deallocate()
-
-    def set_velocity(self, velocity: Texture) -> None:
-        """Take a flow's 3D velocity, its x/y shaped, as the trail's next input."""
-        if not self._allocated:
-            return
-        self._input_fbo.begin()
-        self._shape_shader.use(velocity, 1.0 - self.settings.boost)
-        self._input_fbo.end()
 
 
 # ── numpy reference ─────────────────────────────────────────────────────

@@ -15,7 +15,7 @@ from modules.board import HasFrames
 from modules.settings import Field, BaseSettings, Group
 from modules.flow import (
     GradientFlow, GradientFlowSettings, LucasKanadeFlow, LucasKanadeFlowSettings,
-    VelocitySmoothTrail, SmoothTrailSettings,
+    TrailBridge, TrailBridgeSettings,
     DepthVelocity, DepthVelocitySettings,
     KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES,
     VelocityMagnitude,
@@ -27,14 +27,14 @@ from modules.flow import (
 from modules.utils import HotReloadMethods
 
 
-class Motion(IntEnum):
-    """How the flow measures motion."""
-    GRADIENT_FLOW =     0   # the motion along the brightness gradient, as a strength (GradientFlow); z at the pixel
-    LUCAS_KANADE_FLOW = 1   # how far each pixel moved (LucasKanadeFlow); z along that motion
+class OpticalFlowMethod(IntEnum):
+    """How the optical flow measures motion."""
+    GRADIENT =     0    # the motion along the brightness gradient, as a strength (GradientFlow); z at the pixel
+    LUCAS_KANADE = 1    # how far each pixel moved (LucasKanadeFlow); z along that motion
 
 
-class FlowBridge(IntEnum):
-    """Which bridge produces the velocity, density and temperature the fluid reads."""
+class FlowBridgeMethod(IntEnum):
+    """How the flow bridge makes the velocity the fluid reads and the amount the density reads."""
     TRAIL = 0       # a smoothed velocity, ink where there is speed
     KINETIC = auto()  # two trails, reading the change of the motion
 
@@ -44,7 +44,7 @@ class FlowDrawMode(IntEnum):
     on the arrow's scale, red toward the camera and green away; as scalars, x/y/z as red/green/blue around grey.
 
     Inputs:
-        LUMINANCE - The newest luminance frame of the flow `motion` picks
+        LUMINANCE - The newest luminance frame of the flow the optical flow's method picks
 
     Outputs:
         VELOCITY - The flow's 3D velocity, times the mask with its use_mask
@@ -101,33 +101,43 @@ VECTOR_DRAW_MODES: set[FlowDrawMode] = {       # 3D velocities, drawn as velocit
 }
 
 
+class OpticalFlowSettings(BaseSettings):
+    """How the optical flow measures the 3D velocity: its method, and z from the depth."""
+    method: Field[OpticalFlowMethod] =  Field(OpticalFlowMethod.GRADIENT, description="How motion is measured: along the brightness gradient, or how far each pixel moved")
+
+    lucas_kanade   = Group(LucasKanadeFlowSettings)
+    gradient       = Group(GradientFlowSettings)
+    depth_velocity = Group(DepthVelocitySettings)
+
+
+class FlowBridgeSettings(BaseSettings):
+    """How the flow bridge turns the optical flow into the fluid's velocity, density and temperature."""
+    method: Field[FlowBridgeMethod] =   Field(FlowBridgeMethod.TRAIL, description="How the bridge makes the fluid's velocity and the density's amount: one trail, or two trails reading the change of the motion")
+
+    trail       = Group(TrailBridgeSettings)
+    kinetic     = Group(KineticBridgeSettings)
+    density     = Group(DensityBridgeSettings)
+    temperature = Group(TemperatureBridgeSettings)
+
+
 class FlowLayerSettings(BaseSettings):
-    """Configuration for FlowLayer (optical flow + bridges)."""
-    stage: Field[int] =                     Field(0, description="Pipeline stage for pose data")
-    fps: Field[float] =                     Field(60.0, min=1.0, max=240.0)
+    """Configuration for FlowLayer (optical flow + flow bridge)."""
     draw_mode: Field[FlowDrawMode] =        Field(FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
-    bridge: Field[FlowBridge] =             Field(FlowBridge.TRAIL, description="The bridge the fluid reads")
-    motion: Field[Motion] =                 Field(Motion.GRADIENT_FLOW, description="How motion is measured: along the brightness gradient, or how far each pixel moved")
 
-    visualization      = Group(VisualizationFieldSettings)
-    gradient_flow      = Group(GradientFlowSettings)
-    lucas_kanade_flow  = Group(LucasKanadeFlowSettings)
-    depth_velocity     = Group(DepthVelocitySettings)
-    velocity_trail     = Group(SmoothTrailSettings)
-    kinetic_bridge     = Group(KineticBridgeSettings)
-    density_bridge     = Group(DensityBridgeSettings)
-    temperature_bridge = Group(TemperatureBridgeSettings)
+    optical_flow  = Group(OpticalFlowSettings)
+    flow_bridge   = Group(FlowBridgeSettings)
+    visualization = Group(VisualizationFieldSettings)
 
 
 class FlowLayer(LayerBase):
-    """Flow processing layer with optical flow and bridges.
+    """Flow processing layer with the optical flow and the flow bridge.
 
     Measures the motion and prepares velocity/density/temperature for fluid simulation:
-    1. GradientFlow or LucasKanadeFlow (settings.motion): the 3D velocity (xyz), z from the depth
-    2. VelocitySmoothTrail or KineticBridge (settings.bridge): the smoothed velocity for the fluid
+    1. GradientFlow or LucasKanadeFlow (settings.optical_flow.method): the 3D velocity (xyz), z from the depth
+    2. TrailBridge or KineticBridge (settings.flow_bridge.method): the smoothed velocity for the fluid
     3. DensityBridge: Combines RGB density with an amount as its alpha
     4. TemperatureBridge: Generates temperature field
 
@@ -163,20 +173,22 @@ class FlowLayer(LayerBase):
         self._density_input: Texture = density_input
         self.settings: FlowLayerSettings = settings or FlowLayerSettings()
 
-        self._depth_velocity: DepthVelocity = DepthVelocity(self.settings.depth_velocity)     # z for both flows
-        self._gradient_flow: GradientFlow = GradientFlow(self.settings.gradient_flow, self._depth_velocity)
-        self._lucas_kanade_flow: LucasKanadeFlow = LucasKanadeFlow(self.settings.lucas_kanade_flow, self._depth_velocity)
-        self._motion: Motion = self.settings.motion     # the flow that measured last; a switch restarts the other
-        self._velocity: Texture = self._gradient_flow.velocity     # the velocity of the flow `motion` picks
+        optical_flow: OpticalFlowSettings = self.settings.optical_flow
+        bridge: FlowBridgeSettings = self.settings.flow_bridge
+        self._depth_velocity: DepthVelocity = DepthVelocity(optical_flow.depth_velocity)     # z for both flows
+        self._gradient_flow: GradientFlow = GradientFlow(optical_flow.gradient, self._depth_velocity)
+        self._lucas_kanade_flow: LucasKanadeFlow = LucasKanadeFlow(optical_flow.lucas_kanade, self._depth_velocity)
+        self._optical_flow_method: OpticalFlowMethod = optical_flow.method     # the flow that measured last; a switch restarts the other
+        self._velocity: Texture = self._gradient_flow.velocity     # the velocity of the flow the method picks
         self._depth_input: Texture | None = None
         self._mask_input: Texture | None = None
         self._gate_shader: MaskMultiply = MaskMultiply()
         self._gated_color: Fbo = Fbo()      # the density input times the mask
-        self._velocity_trail: VelocitySmoothTrail = VelocitySmoothTrail(self.settings.velocity_trail)
-        self._kinetic_bridge: KineticBridge = KineticBridge(self.settings.kinetic_bridge)
+        self._trail_bridge: TrailBridge = TrailBridge(bridge.trail)
+        self._kinetic_bridge: KineticBridge = KineticBridge(bridge.kinetic)
         self._velocity_magnitude: VelocityMagnitude = VelocityMagnitude()
-        self._density_bridge: DensityBridge = DensityBridge(self.settings.density_bridge)
-        self._temperature_bridge: TemperatureBridge = TemperatureBridge(self.settings.temperature_bridge)
+        self._density_bridge: DensityBridge = DensityBridge(bridge.density)
+        self._temperature_bridge: TemperatureBridge = TemperatureBridge(bridge.temperature)
 
         self._visualizer: Visualizer = Visualizer(self.settings.visualization)
         self._kinetic_strip: KineticStrip = KineticStrip()
@@ -202,13 +214,13 @@ class FlowLayer(LayerBase):
     @property
     def smooth_velocity(self) -> Texture:
         """Smoothed velocity, xyz (RGBA16F), for fluid simulation; z is 0 without depth."""
-        if self.settings.bridge == FlowBridge.KINETIC:
+        if self.settings.flow_bridge.method == FlowBridgeMethod.KINETIC:
             return self._kinetic_bridge.smooth_velocity
-        return self._velocity_trail.smooth_velocity
+        return self._trail_bridge.smooth_velocity
 
     @property
     def uses_depth(self) -> bool:
-        """Whether the flow `motion` picks measures z: its strength_z is above 0."""
+        """Whether the flow the optical flow's method picks measures z: its strength_z is above 0."""
         return self._flow.settings.strength_z > 0.0
 
     @property
@@ -219,14 +231,16 @@ class FlowLayer(LayerBase):
     @property
     def onset_velocity(self) -> Texture | None:
         """Second velocity input, xyz (RGBA16F), for fluid simulation; None when the bridge has none."""
-        if self.settings.bridge == FlowBridge.KINETIC and self.settings.kinetic_bridge.onset_force > 0.0:
+        bridge: FlowBridgeSettings = self.settings.flow_bridge
+        if bridge.method == FlowBridgeMethod.KINETIC and bridge.kinetic.onset_force > 0.0:
             return self._kinetic_bridge.onset_velocity
         return None
 
     @property
     def spin(self) -> Texture | None:
         """2D curl (R16F) for the fluid's vorticity force; None when the bridge has none."""
-        if self.settings.bridge == FlowBridge.KINETIC and self.settings.kinetic_bridge.spin > 0.0:
+        bridge: FlowBridgeSettings = self.settings.flow_bridge
+        if bridge.method == FlowBridgeMethod.KINETIC and bridge.kinetic.spin > 0.0:
             return self._kinetic_bridge.curl
         return None
 
@@ -247,8 +261,8 @@ class FlowLayer(LayerBase):
 
     @property
     def _flow(self) -> GradientFlow | LucasKanadeFlow:
-        """The flow `motion` picks."""
-        if self.settings.motion == Motion.LUCAS_KANADE_FLOW:
+        """The flow the optical flow's method picks."""
+        if self.settings.optical_flow.method == OpticalFlowMethod.LUCAS_KANADE:
             return self._lucas_kanade_flow
         return self._gradient_flow
 
@@ -320,7 +334,7 @@ class FlowLayer(LayerBase):
         self._depth_velocity.allocate(flow_width, flow_height)
         self._gradient_flow.allocate(flow_width, flow_height)
         self._lucas_kanade_flow.allocate(flow_width, flow_height)
-        self._velocity_trail.allocate(flow_width, flow_height, output_width, output_height)
+        self._trail_bridge.allocate(flow_width, flow_height, output_width, output_height)
         self._kinetic_bridge.allocate(flow_width, flow_height)
         self._velocity_magnitude.allocate(flow_width, flow_height)
         self._temperature_bridge.allocate(flow_width, flow_height)
@@ -329,7 +343,7 @@ class FlowLayer(LayerBase):
         self._depth_velocity.deallocate()
         self._gradient_flow.deallocate()
         self._lucas_kanade_flow.deallocate()
-        self._velocity_trail.deallocate()
+        self._trail_bridge.deallocate()
         self._kinetic_bridge.deallocate()
         self._velocity_magnitude.deallocate()
         self._temperature_bridge.deallocate()
@@ -348,7 +362,7 @@ class FlowLayer(LayerBase):
         self._gradient_flow.reset()
         self._lucas_kanade_flow.reset()
         self._depth_velocity.reset()
-        self._velocity_trail.reset()
+        self._trail_bridge.reset()
         self._kinetic_bridge.reset()
         self._density_bridge.reset()
         self._kinetic_strip.reset()
@@ -369,10 +383,12 @@ class FlowLayer(LayerBase):
         self._flow_interval += self._time_step
 
         mask: Texture | None = self._mask_input if self._mask_input is not None and self._mask_input.allocated else None
+        optical_flow: OpticalFlowSettings = self.settings.optical_flow
+        kinetic: bool = self.settings.flow_bridge.method == FlowBridgeMethod.KINETIC
         flow: GradientFlow | LucasKanadeFlow = self._flow
-        if self.settings.motion != self._motion:
+        if optical_flow.method != self._optical_flow_method:
             # The other flow's frames and the smoothed depth are from before it stopped measuring
-            self._motion = self.settings.motion
+            self._optical_flow_method = optical_flow.method
             flow.reset()
             self._depth_velocity.reset()
         if new_flow:
@@ -381,23 +397,23 @@ class FlowLayer(LayerBase):
             flow.update(self._depth_input if self.depth_enabled else None, self._flow_interval)
             self._velocity = flow.velocity
 
-        # Stage 2: Bridges
-        if self.settings.bridge == FlowBridge.KINETIC:
+        # Stage 2: The flow bridge
+        if kinetic:
             if new_flow:
                 # Lucas–Kanade's velocity is a distance, so the trails can travel with it
-                distance_scale: float | None = self.settings.lucas_kanade_flow.strength_x if self.settings.motion == Motion.LUCAS_KANADE_FLOW else None
+                distance_scale: float | None = optical_flow.lucas_kanade.strength_x if optical_flow.method == OpticalFlowMethod.LUCAS_KANADE else None
                 self._kinetic_bridge.set_velocity(self._velocity, distance_scale)
                 self._kinetic_bridge.update(self._flow_interval)
                 if self.settings.draw_mode == FlowDrawMode.KINETIC_DEPTH_ACCELERATION:
                     self._kinetic_bridge.update_depth_acceleration()
-                if self.settings.kinetic_bridge.spin > 0.0 or self.settings.draw_mode == FlowDrawMode.KINETIC_CURL:
+                if self.settings.flow_bridge.kinetic.spin > 0.0 or self.settings.draw_mode == FlowDrawMode.KINETIC_CURL:
                     self._kinetic_bridge.update_curl()
                 if self.settings.draw_mode == FlowDrawMode.KINETIC_STRIP:
                     bridge: KineticBridge = self._kinetic_bridge
                     self._kinetic_strip.update(bridge.fast, bridge.acceleration, bridge.emission, self.settings.visualization.strip_scale)
         else:
-            self._velocity_trail.set_velocity(self._velocity)
-            self._velocity_trail.update()
+            self._trail_bridge.set_velocity(self._velocity)
+            self._trail_bridge.update()
 
         if new_flow:
             self._flow_interval = 0.0
@@ -406,7 +422,7 @@ class FlowLayer(LayerBase):
         self._velocity_magnitude.update()
 
         # The amount the density bridge makes its alpha from: the kinetic bridge's emission, or the trail's speed
-        alpha: Texture = self._kinetic_bridge.emission if self.settings.bridge == FlowBridge.KINETIC else self._velocity_magnitude.magnitude
+        alpha: Texture = self._kinetic_bridge.emission if kinetic else self._velocity_magnitude.magnitude
 
         # The density color, gated like the velocity: where the bridges spread velocity past the mask,
         # no background color comes along
@@ -484,7 +500,7 @@ class FlowLayer(LayerBase):
         textures = {
             FlowDrawMode.LUMINANCE: self._flow.luminance,
             FlowDrawMode.VELOCITY: self._velocity,
-            FlowDrawMode.SMOOTH_VELOCITY_INPUT: self._kinetic_bridge.velocity_input if self.settings.bridge == FlowBridge.KINETIC else self._velocity_trail.velocity_input,
+            FlowDrawMode.SMOOTH_VELOCITY_INPUT: self._kinetic_bridge.velocity_input if self.settings.flow_bridge.method == FlowBridgeMethod.KINETIC else self._trail_bridge.velocity_input,
             FlowDrawMode.SMOOTH_VELOCITY_OUTPUT: self.smooth_velocity,
             FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE: self._velocity_magnitude.magnitude,
             FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR: self._density_bridge.color_input,

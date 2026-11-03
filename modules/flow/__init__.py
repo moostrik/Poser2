@@ -16,7 +16,7 @@ from .optical import GradientFlow, GradientFlowSettings, LucasKanadeFlow, LucasK
 from .bridge import     DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
                         BlurPosition, KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES, decay_weight, project, stop_gate, hold_release, drop, fill_reservoir, smooth_depth, depth_speed, warped, depth_threshold, advect, \
                         DepthVelocity, DepthVelocitySettings, \
-                        SmoothTrail, VelocitySmoothTrail, SmoothTrailSettings, shape_velocity, \
+                        TrailBridge, TrailBridgeSettings, shape_velocity, \
                         TemperatureBridge, TemperatureBridgeSettings
 
 # Visualization

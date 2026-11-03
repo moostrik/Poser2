@@ -411,17 +411,72 @@
       "edge": 0.1
     },
     "flow": {
-      "fps": 60.0,
       "draw_mode": "SMOOTH_VELOCITY_OUTPUT",
       "blend_mode": "ADD",
       "width": 448,
       "height": 800,
-      "bridge": "KINETIC",
-      "motion": "LUCAS_KANADE_FLOW",
-      "inputs": {
-        "flow": "center_capture",
-        "density": "center_capture",
-        "mask": "center_mask"
+      "optical_flow": {
+        "method": "LUCAS_KANADE",
+        "lucas_kanade": {
+          "levels": 3,
+          "window": 2,
+          "regularizer": 0.0215,
+          "threshold": 0.5,
+          "strength_x": 1.0,
+          "strength_y": 1.0,
+          "strength_z": 1.0,
+          "use_mask": true
+        },
+        "gradient": {
+          "offset": 3,
+          "threshold": 0.1,
+          "strength_x": 1.0,
+          "strength_y": 1.0,
+          "strength_z": 1.0,
+          "use_mask": true
+        },
+        "depth_velocity": {
+          "smooth_time": 60.0,
+          "jump": 0.1,
+          "blur_radius": 4.0,
+          "blur_steps": 2,
+          "threshold": 0.12
+        }
+      },
+      "flow_bridge": {
+        "method": "KINETIC",
+        "trail": {
+          "scale": 0.25,
+          "trail_weight": 0.93,
+          "blur_radius": 0.0,
+          "blur_steps": 4,
+          "boost": 0.0
+        },
+        "kinetic": {
+          "scale": 10.0,
+          "advect": 0.0,
+          "fast_time": 25.0,
+          "slow_time": 150.0,
+          "blur_position": "BEFORE",
+          "blur_radius": 2.0,
+          "blur_steps": 2,
+          "stop_gate": 0.0,
+          "stop_tile": 128.0,
+          "release_hold": 100.0,
+          "emission_gain": 1.0,
+          "drop_velocity": 1.0,
+          "onset_force": 0.5,
+          "spin": 0.0,
+          "reservoir_enabled": false,
+          "reservoir_leak": 4.0
+        },
+        "density": {
+          "saturation": 1.02,
+          "brightness": 1.07
+        },
+        "temperature": {
+          "scale": 0.5
+        }
       },
       "visualization": {
         "toggle_scalar": false,
@@ -432,62 +487,10 @@
         "element_length": 40.0,
         "element_width": 2.5
       },
-      "gradient_flow": {
-        "offset": 3,
-        "threshold": 0.1,
-        "strength_x": 1.0,
-        "strength_y": 1.0,
-        "strength_z": 1.0,
-        "use_mask": true
-      },
-      "lucas_kanade_flow": {
-        "levels": 3,
-        "window": 2,
-        "regularizer": 0.0215,
-        "threshold": 0.5,
-        "strength_x": 1.0,
-        "strength_y": 1.0,
-        "strength_z": 1.0,
-        "use_mask": true
-      },
-      "depth_velocity": {
-        "smooth_time": 60.0,
-        "jump": 0.1,
-        "blur_radius": 4.0,
-        "blur_steps": 2,
-        "threshold": 0.12
-      },
-      "velocity_trail": {
-        "scale": 0.25,
-        "trail_weight": 0.93,
-        "blur_radius": 0.0,
-        "blur_steps": 4,
-        "boost": 0.0
-      },
-      "kinetic_bridge": {
-        "scale": 10.0,
-        "advect": 0.0,
-        "fast_time": 25.0,
-        "slow_time": 150.0,
-        "blur_position": "BEFORE",
-        "blur_radius": 2.0,
-        "blur_steps": 2,
-        "stop_gate": 0.0,
-        "stop_tile": 128.0,
-        "release_hold": 100.0,
-        "emission_gain": 1.0,
-        "drop_velocity": 1.0,
-        "onset_force": 0.5,
-        "spin": 0.0,
-        "reservoir_enabled": false,
-        "reservoir_leak": 4.0
-      },
-      "density_bridge": {
-        "saturation": 1.02,
-        "brightness": 1.07
-      },
-      "temperature_bridge": {
-        "scale": 0.5
+      "inputs": {
+        "flow": "center_capture",
+        "density": "center_capture",
+        "mask": "center_mask"
       }
     },
     "fluid3d": {

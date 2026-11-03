@@ -273,7 +273,7 @@ class RenderSettings(BaseSettings):
     center : Group[CenterGroup]                  = Group(CenterGroup)
     depth  : Group[layers.DepthSourceLayerSettings] = Group(layers.DepthSourceLayerSettings)
     depth_mask: Group[layers.DepthMaskLayerSettings] = Group(layers.DepthMaskLayerSettings)
-    flow   : Group[_FlowLayerSettings]           = Group(_FlowLayerSettings, share=[stage])
+    flow   : Group[_FlowLayerSettings]           = Group(_FlowLayerSettings)
     fluid3d: Group[layers.Fluid3DLayerSettings]  = Group(layers.Fluid3DLayerSettings, share=[stage])
     time_series: Group[layers.TimeSeriesLayerSettings] = Group(layers.TimeSeriesLayerSettings)
     colors : Group[ColorSettings]                = Group(ColorSettings)
