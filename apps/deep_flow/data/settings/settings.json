@@ -426,10 +426,10 @@
           "xy_regularizer": 0.0195,
           "xy_window": 2,
           "xy_threshold": 0.5,
-          "depth_window": 4,
-          "depth_threshold": 1.35,
+          "depth_window": 1,
+          "depth_time": 50.0,
+          "depth_threshold": 0.5,
           "depth_tolerance": 0.1,
-          "depth_coverage": 0.5,
           "strength_x": 1.0,
           "strength_y": 1.0,
           "strength_z": 1.0,
@@ -446,8 +446,7 @@
         "depth_velocity": {
           "window": 2,
           "threshold": 2.4,
-          "tolerance": 0.04,
-          "coverage": 0.5
+          "tolerance": 0.04
         }
       },
       "flow_bridge": {
