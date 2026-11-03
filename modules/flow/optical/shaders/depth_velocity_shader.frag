@@ -10,7 +10,8 @@
 // starts over with no rate (a limb passing over the pixel). Without depth at the pixel or without a
 // span, it is empty. z is the rate over the metres one view width spans there, `depth × view_span`,
 // in view widths per frame. Depth is read nearest, so an edge never reads as a distance in between;
-// the track is read linear between the texels that hold one. The numpy reference is
+// the track is read linear between the texels that hold one of the same surface, within `tolerance`
+// of the measurement, so a track is never carried across an edge. The numpy reference is
 // depth_velocity.track_depth
 
 uniform sampler2D tex0;  // Depth now R (m)
@@ -33,8 +34,9 @@ float depth_at(vec2 uv) {
     return texelFetch(tex0, texel, 0).r;
 }
 
-// The track's disparity and rate at `position` (texels, centres at integers), of the texels that hold one
-vec2 carried(vec2 position) {
+// The track's disparity and rate at `position` (texels, centres at integers), of the texels that hold
+// one of the measurement's surface, within `tolerance` of it; none of them: no track
+vec2 carried(vec2 position, float measured_depth) {
     ivec2 size = textureSize(tex1, 0);
     ivec2 base = ivec2(floor(position));
     vec2 f = position - vec2(base);
@@ -43,7 +45,8 @@ vec2 carried(vec2 position) {
     for (int dy = 0; dy <= 1; dy++) {
         for (int dx = 0; dx <= 1; dx++) {
             vec4 texel = texelFetch(tex1, clamp(base + ivec2(dx, dy), ivec2(0), size - 1), 0);
-            float weight = (dx == 0 ? 1.0 - f.x : f.x) * (dy == 0 ? 1.0 - f.y : f.y) * float(texel.g > 0.0);
+            bool same = texel.g > 0.0 && abs(1.0 / texel.g - measured_depth) <= tolerance;
+            float weight = (dx == 0 ? 1.0 - f.x : f.x) * (dy == 0 ? 1.0 - f.y : f.y) * float(same);
             sum += weight * texel.gb;
             total += weight;
         }
@@ -75,7 +78,7 @@ void main() {
 
     vec2 moved = warp ? texture(displacement, texCoord).xy : vec2(0.0);
     vec2 size = vec2(textureSize(tex1, 0));
-    vec2 track = carried(texCoord * size - 0.5 - moved * size);
+    vec2 track = carried(texCoord * size - 0.5 - moved * size, 1.0 / measurement);
     float predicted = track.x > 0.0 ? track.x + track.y * delta_time : 0.0;
 
     if (predicted <= 0.0 || abs(1.0 / measurement - 1.0 / predicted) > tolerance) {

@@ -13,7 +13,8 @@ the measurement is the mean disparity over a window of depth samples, of those w
 of the pixel's depth (not the background beside the player); it corrects the track by the share of the window it holds, so a
 thin window at a silhouette corrects little and the track coasts on. The track comes from where the
 pixel was a displacement back (in place without one), so a surface sliding sideways keeps its own
-depth. Where the measurement is further than `tolerance` from the track's prediction, as a limb
+depth, and only from the texels there of the same surface, within `tolerance` of the measurement:
+where the displacement is unsure, at an edge, a track is never carried over from the other side. Where the measurement is further than `tolerance` from the track's prediction, as a limb
 passing over the pixel, the track starts over with no rate. With `time` 0 and a full window it is
 the plain change between two frames.
 
@@ -128,10 +129,12 @@ class DepthVelocity(FlowBase):
 
 # ── numpy reference ─────────────────────────────────────────────────────
 
-def _carried(state: np.ndarray, displacement: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+def _carried(state: np.ndarray, displacement: np.ndarray, measurement: np.ndarray, tolerance: float) -> tuple[np.ndarray, np.ndarray]:
     """The track's disparity and rate (H, W) where each pixel was a displacement back: linear between
-    the four texels around it, of those that hold a track, as the shader reads them."""
+    the four texels around it, of those that hold a track of the same surface as the measurement,
+    within `tolerance` (m) of it, as the shader reads them. None of them: no track."""
     h, w = state.shape[:2]
+    measured_depth: np.ndarray = 1.0 / np.where(measurement > 0.0, measurement, np.inf)
     rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
     x, y = columns - displacement[..., 0], rows - displacement[..., 1]
     x0, y0 = np.floor(x).astype(int), np.floor(y).astype(int)
@@ -143,12 +146,14 @@ def _carried(state: np.ndarray, displacement: np.ndarray) -> tuple[np.ndarray, n
         for dx, wx in ((0, 1.0 - fx), (1, fx)):
             tx, ty = np.clip(x0 + dx, 0, w - 1), np.clip(y0 + dy, 0, h - 1)
             texel: np.ndarray = state[ty, tx]
-            weight: np.ndarray = wx * wy * (texel[..., 1] > 0.0)
+            held: np.ndarray = texel[..., 1] > 0.0
+            texel_depth: np.ndarray = 1.0 / np.where(held, texel[..., 1], 1.0)
+            weight: np.ndarray = wx * wy * (held & (measurement > 0.0) & (np.abs(texel_depth - measured_depth) <= tolerance))
             disparity += weight * texel[..., 1]
             rate += weight * texel[..., 2]
             total += weight
-    held: np.ndarray = total > 1e-9
-    return np.where(held, disparity / np.where(held, total, 1.0), 0.0), np.where(held, rate / np.where(held, total, 1.0), 0.0)
+    found: np.ndarray = total > 1e-9
+    return np.where(found, disparity / np.where(found, total, 1.0), 0.0), np.where(found, rate / np.where(found, total, 1.0), 0.0)
 
 
 def track_depth(depth: np.ndarray, state: np.ndarray, displacement: np.ndarray, delta_time: float, window: int,
@@ -160,9 +165,9 @@ def track_depth(depth: np.ndarray, state: np.ndarray, displacement: np.ndarray, 
     (zeros to start); `displacement` is how far each pixel moved (H, W, 2, pixels per frame, x along
     columns, y along rows); `step` is the pixels between two depth samples (x, y). The measurement is
     the mean disparity of the (2·window+1)² samples within `tolerance` of the pixel's depth; it
-    corrects the track carried from a displacement back by the share of the window it holds. Further
-    than `tolerance` from the prediction, or without a track there, the track starts over with no
-    rate. Without depth at the pixel or without a span, it is empty.
+    corrects the track carried from a displacement back, of the texels there within `tolerance` of
+    it, by the share of the window it holds. Further than `tolerance` from the prediction, or
+    without a track of its surface there, the track starts over with no rate. Without depth at the pixel or without a span, it is empty.
     """
     h, w = depth.shape
     rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
@@ -179,7 +184,7 @@ def track_depth(depth: np.ndarray, state: np.ndarray, displacement: np.ndarray, 
     measurement: np.ndarray = np.where(measured, total / np.maximum(kept, 1), 0.0)
     share: np.ndarray = kept / float((2 * window + 1) ** 2)
 
-    carried, carried_rate = _carried(state, displacement)
+    carried, carried_rate = _carried(state, displacement, measurement, tolerance)
     dt: float = max(delta_time, 1e-6)
     predicted: np.ndarray = np.where(carried > 0.0, carried + carried_rate * dt, 0.0)
     safe_measurement: np.ndarray = np.where(measured, measurement, 1.0)

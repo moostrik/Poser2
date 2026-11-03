@@ -134,6 +134,20 @@ class CarriedTest(unittest.TestCase):
         self.assertGreater(float(np.abs(interior(z([before, after]))).min()), 0.02)      # held in place, 3 cm per frame
         self.assertLess(float(np.abs(interior(z([before, after], moved=moved))).max()), 1e-9)
 
+    def test_a_hand_sliding_over_the_chest_reads_no_z_at_its_edge(self) -> None:
+        # the hand at 0.85 m over the chest at 1 m, its edge 1 pixel right per frame; the flow at the
+        # edge smears to 1.3 pixels, so the track is carried from between hand and chest texels. Taken
+        # only from the texels of its own surface, no pixel reads a motion toward the camera
+        depths: list[np.ndarray] = []
+        for frame in range(8):
+            depth = uniform(1.0)
+            depth[:, :8 + frame] = 0.85
+            depths.append(depth)
+        moved = still()
+        moved[..., 0] = 1.3
+        states = track(depths, moved=moved, window=0, time=50.0)
+        self.assertLess(max(float(np.abs(s[..., 0]).max()) for s in states), 1e-9)
+
     def test_a_surface_moving_toward_the_camera_along_its_motion_still_reads_so(self) -> None:
         moved = still()
         moved[..., 0] = 2.0
