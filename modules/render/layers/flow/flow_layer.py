@@ -40,8 +40,8 @@ class FlowBridge(IntEnum):
 
 
 class FlowDrawMode(IntEnum):
-    """Draw modes for FlowLayer. A 3D velocity (xyz) draws as lines with a dot that grows with z, red
-    toward the camera and green away; as scalars, x/y/z as red/green/blue around grey.
+    """Draw modes for FlowLayer. A 3D velocity (xyz) draws as white x/y arrows with a ring of radius |z|
+    on the arrow's scale, red toward the camera and green away; as scalars, x/y/z as red/green/blue around grey.
 
     Inputs:
         LUMINANCE - The newest luminance frame of the flow `motion` picks

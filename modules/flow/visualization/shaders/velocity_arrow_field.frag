@@ -1,9 +1,10 @@
 #version 460 core
 
 // Velocity Arrow Field Visualization
-// Procedural arrows without geometry shaders. A 2D velocity is a white arrow; a 3D velocity (xyz) is
-// a line for x/y with a dot at its end that grows with z, both white with no z, shading to red
-// toward the camera and green away. With no x/y the dot stays on the grid point, so z still shows
+// Procedural arrows without geometry shaders. A 2D velocity is a white arrow. A 3D velocity (xyz) is
+// the same white arrow for x/y with a ring around the grid point for z, its radius on the arrow's
+// scale: the tip lands on the ring when x/y and z are the same size. The ring is red toward the
+// camera and green away, and shows with no x/y
 
 uniform sampler2D tex0;
 uniform bool xyz;                   // A 3D velocity: z in the blue channel
@@ -11,7 +12,6 @@ uniform float scale;
 uniform float grid_spacing;         // in pixels
 uniform float arrow_length;         // in pixels
 uniform float arrow_thickness;
-uniform float dot_min;              // smallest dot radius (px), with xyz
 uniform vec2 resolution;
 
 in vec2 texCoord;
@@ -60,25 +60,30 @@ float arrow(vec2 p, vec2 velocity, float arrow_size, float thickness) {
     return min(shaft, min(head1, head2));
 }
 
-// Distance to a line for x/y with a dot at its end, its radius growing with z
-float line_dot(vec2 p, vec3 velocity, float arrow_size, float thickness) {
-    vec2 end = velocity.xy * arrow_size;
-    float line = length(end) < 0.001 ? 1e10 : line_segment(p, vec2(0.0), end, thickness);
-    float radius = dot_min + 0.5 * arrow_size * abs(velocity.z);
-    float dot_distance = radius > 0.0 ? length(p - end) - radius : 1e10;
-    return min(line, dot_distance);
+// Distance to a ring around the grid point, its radius |z| on the arrow's scale
+float ring(vec2 p, float z, float arrow_size, float thickness) {
+    float radius = arrow_size * abs(z);
+    if (radius < 0.001) return 1e10; // No ring for zero z
+    return abs(length(p) - radius) - thickness;
+}
+
+// Anti-aliased coverage of a shape from its distance, by derivative-based smoothing
+float coverage(float dist) {
+    float edge_width = max(fwidth(dist) * 0.5, 1e-4);
+    return 1.0 - smoothstep(-edge_width, edge_width, dist);
 }
 
 void main() {
     // Current pixel in screen space
     vec2 pixel = gl_FragCoord.xy;
 
-    float min_dist = 1e10;
-    float arrow_depth = 0.0;    // z of the nearest arrow
+    float arrow_dist = 1e10;
+    float ring_dist = 1e10;
+    float ring_depth = 0.0;     // z of the nearest ring
 
     // Check arrows from nearby grid cells (to allow arrows longer than grid spacing)
-    // Max reach = arrow_length (velocity magnitude <= 1.0), plus the dot with xyz
-    float reach = xyz ? 1.5 * arrow_length + dot_min : arrow_length;
+    // Max reach = arrow_length (velocity magnitude <= 1.0), the ring's too
+    float reach = arrow_length + arrow_thickness;
     int search_radius = min(int(ceil(reach / grid_spacing)) + 1, 8);
     for (int dy = -search_radius; dy <= search_radius; dy++) {
         for (int dx = -search_radius; dx <= search_radius; dx++) {
@@ -93,25 +98,23 @@ void main() {
             // Position relative to this grid center
             vec2 local_pos = pixel - grid_pos;
 
-            float dist = xyz ? line_dot(local_pos, velocity, arrow_length, arrow_thickness)
-                             : arrow(local_pos, velocity.xy, arrow_length, arrow_thickness);
-            if (dist < min_dist) {
-                min_dist = dist;
-                arrow_depth = xyz ? velocity.z : 0.0;
+            arrow_dist = min(arrow_dist, arrow(local_pos, velocity.xy, arrow_length, arrow_thickness));
+            if (xyz) {
+                float dist = ring(local_pos, velocity.z, arrow_length, arrow_thickness);
+                if (dist < ring_dist) {
+                    ring_dist = dist;
+                    ring_depth = velocity.z;
+                }
             }
         }
     }
 
-    // High-quality anti-aliasing using derivative-based smoothing
-    float edge_width = fwidth(min_dist) * 0.5;
-    float alpha = 1.0 - smoothstep(-edge_width, edge_width, min_dist);
+    float arrow_alpha = coverage(arrow_dist);
+    float ring_alpha = coverage(ring_dist);
+    vec3 ring_color = ring_depth > 0.0 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
 
-    vec3 color = vec3(1.0, 1.0, 1.0);
-    if (arrow_depth != 0.0) {
-        vec3 depth_color = arrow_depth > 0.0 ? vec3(1.0, 0.0, 0.0) : vec3(0.0, 1.0, 0.0);
-        color = mix(color, depth_color, min(abs(arrow_depth), 1.0));
-    }
-
-    // Premultiply alpha to avoid dark edges
-    fragColor = vec4(color * alpha, alpha);
+    // The ring in its color, the white arrow over it; premultiplied alpha to avoid dark edges
+    vec3 color = ring_color * ring_alpha * (1.0 - arrow_alpha) + vec3(arrow_alpha);
+    float alpha = arrow_alpha + ring_alpha * (1.0 - arrow_alpha);
+    fragColor = vec4(color, alpha);
 }

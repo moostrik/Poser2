@@ -9,7 +9,7 @@
     "resolution": "P720",
     "sim_enabled": false,
     "model_path": "data/models",
-    "fov": 102.0,
+    "fov": 80.0,
     "split_seconds": 60,
     "cam_0": {
       "device_id": "",
@@ -430,8 +430,7 @@
         "strip_scale": 5.76,
         "spacing": 30.0,
         "element_length": 40.0,
-        "element_width": 2.5,
-        "dot_min": 0.0
+        "element_width": 2.5
       },
       "gradient_flow": {
         "offset": 3,

@@ -15,13 +15,13 @@ class VelocityArrowField(Shader):
     """Visualize velocity field using procedural arrows.
 
     Samples velocity field on a grid and draws arrows in fragment shader: white arrows for a 2D
-    velocity; for a 3D one, a line for x/y with a dot at its end growing with z, red toward the
-    camera and green away.
+    velocity; for a 3D one, the white arrow for x/y with a ring around the grid point for z, its
+    radius on the arrow's scale, red toward the camera and green away.
     """
 
     def use(self, velocity_tex: Texture, scale: float = 1.0,
             spacing: float = 8.0, arrow_length: float = 8.0, arrow_thickness: float = 0.8,
-            xyz: bool = False, dot_min: float = 0.0) -> None:
+            xyz: bool = False) -> None:
         """Render arrow field visualization to FBO.
 
         Args:
@@ -30,8 +30,7 @@ class VelocityArrowField(Shader):
             spacing: Distance between arrow centers in pixels
             arrow_length: Arrow length in pixels at a velocity of 1
             arrow_thickness: Arrow line thickness in pixels
-            xyz: Draw a 3D velocity: a line with a dot that grows with z
-            dot_min: Smallest dot radius in pixels, with xyz
+            xyz: Draw a 3D velocity: the arrow with a ring of radius |z| on its scale
         """
         if not self.allocated or not self.shader_program:
             logger.warning("VelocityArrowField shader not allocated or shader program missing.")
@@ -58,7 +57,6 @@ class VelocityArrowField(Shader):
         glUniform1f(self.get_uniform_loc("grid_spacing"), spacing)
         glUniform1f(self.get_uniform_loc("arrow_length"), arrow_length)
         glUniform1f(self.get_uniform_loc("arrow_thickness"), arrow_thickness)
-        glUniform1f(self.get_uniform_loc("dot_min"), dot_min)
         glUniform2f(self.get_uniform_loc("resolution"), output_width, output_height)
 
         # Render
