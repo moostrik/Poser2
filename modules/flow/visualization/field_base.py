@@ -19,7 +19,7 @@ class VisualizationFieldSettings(BaseSettings):
     scalar_scale = Field(0.2, min=0.0, max=10.0, description="Multiplier on the two-color scalar views")
     strip_scale = Field(1.0, min=0.0, max=20.0, description="Multiplier on the kinetic strip's lanes")
     spacing = Field(20.0, min=4.0, max=64.0, description="Distance between elements (pixels)")
-    element_length = Field(40.0, description="Arrow element length")
+    element_length = Field(1.0, min=0.1, max=4.0, description="Blob size at speed 1 (cells)")
     element_width = Field(1.0, min=0.5, max=2.5, description="Element line width")
 
 

@@ -20,7 +20,7 @@ class VelocityField(FieldBase):
     - Direction Map: HSV color encoding (direction->hue, magnitude->saturation);
       a 3D velocity as x, y, z in red, green, blue around grey
     - Arrow Field: Procedural arrow field (grid-based sampling);
-      a 3D velocity as the arrow with a ring of radius |z| on its scale, red toward the camera, green away
+      one blob per grid point, a round body for z (red toward the camera, green away) and a bulb on a stem for x/y
 
     toggle_scalar switches between the two modes.
     scale acts as a general multiplier for both modes.
