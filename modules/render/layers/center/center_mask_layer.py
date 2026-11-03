@@ -9,6 +9,9 @@ from ..layer_base import LayerBase
 from .center_geometry import CenterGeometry, SourceSpace
 from ...shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur, MaskDilate, MaskErode
 from modules.gl import Fbo, SwapFbo, Texture, Style
+from modules.utils import Rect
+
+_FULL_ROI: Rect = Rect(0.0, 0.0, 1.0, 1.0)
 
 
 class CenterMaskLayerSettings(BaseSettings):
@@ -36,6 +39,7 @@ class CenterMaskLayer(LayerBase):
         self._roi_fbo: Fbo = Fbo()  # Single temp buffer for ROI
         self._blend_fbo: SwapFbo = SwapFbo()
         self._mask_blur_fbo: SwapFbo = SwapFbo()  # Used for AA output, dilation, and blur
+        self._mask_fbo: Fbo = Fbo()  # Output, one buffer however many passes swapped the blur buffer
 
         # Shaders
         self._roi_shader = DrawRoi()
@@ -48,12 +52,13 @@ class CenterMaskLayer(LayerBase):
     @property
     def texture(self) -> Texture:
         """Output texture for external use."""
-        return self._mask_blur_fbo.texture
+        return self._mask_fbo
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._roi_fbo.allocate(width, height, GL_R16F)
         self._blend_fbo.allocate(width, height, GL_R16F)
         self._mask_blur_fbo.allocate(width, height, GL_R16F)
+        self._mask_fbo.allocate(width, height, GL_R16F)
 
         self._roi_shader.allocate()
         self._mask_blend_shader.allocate()
@@ -66,6 +71,7 @@ class CenterMaskLayer(LayerBase):
         self._roi_fbo.deallocate()
         self._blend_fbo.deallocate()
         self._mask_blur_fbo.deallocate()
+        self._mask_fbo.deallocate()
 
         self._roi_shader.deallocate()
         self._mask_blend_shader.deallocate()
@@ -79,6 +85,7 @@ class CenterMaskLayer(LayerBase):
         if self._geometry.lost:
             self._blend_fbo.clear_all()
             self._mask_blur_fbo.clear_all()
+            self._mask_fbo.clear()
             return
 
         if not self._geometry.ready or not self._mask_src.allocated:
@@ -141,5 +148,10 @@ class CenterMaskLayer(LayerBase):
                 self.settings.blur_radius
             )
             self._mask_blur_fbo.end()
+
+        # Copy to the output, so readers holding `texture` see this frame's result
+        self._mask_fbo.begin()
+        self._roi_shader.use(self._mask_blur_fbo.texture, _FULL_ROI)
+        self._mask_fbo.end()
 
         Style.pop_style()

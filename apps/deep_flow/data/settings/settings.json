@@ -7,7 +7,7 @@
     "keyframe_interval": 50,
     "color": true,
     "resolution": "P720",
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "fov": 80.0,
     "split_seconds": 60,
@@ -351,7 +351,7 @@
       },
       "mask": {
         "blend_factor": 1.0,
-        "dilation_steps": -5,
+        "dilation_steps": -1,
         "blur_steps": 0,
         "blur_radius": 1.0
       },
@@ -428,7 +428,7 @@
           "xy_follow_z_time": false,
           "z_window": 2,
           "z_threshold": 1.0,
-          "z_dead_zone": 0.017,
+          "z_dead_zone": 0.02,
           "z_time": 50.0,
           "z_tolerance": 0.1,
           "strength_x": 1.0,
