@@ -21,7 +21,10 @@ the plain change between two frames.
 A surface's depth wanders by a few mm, and its steps are a mm; the track reads both as slow motion.
 With `dead_zone` (m), each pixel holds an anchor: while the track stays within the dead zone of it,
 z is 0; past it, z reads at its full speed and the anchor is dragged along behind, so a real motion
-loses only its first `dead_zone`.
+loses only its first `dead_zone`. At an edge the depth jitters by more than that: a sample is off by
+2–10 cm for one frame and back the next. So a miss of the prediction past the dead zone is taken
+only when the frame before missed the same way by half of it: the jitter coasts on the prediction,
+and a real step or sudden start is taken one frame late.
 
 z comes in view widths per frame, over the metres one view width spans at the depth (`view_span`
 per metre), and `threshold` comes off it. Each optical flow owns one for its z, with its own
@@ -53,7 +56,8 @@ class DepthVelocity(FlowBase):
 
     Pipeline, on each new flow frame:
         1. Take the depth → the input SwapFbo (R32F, metres, at the flow's size, nearest)
-        2. Correct the track carried from the last one → the track SwapFbo (RGBA32F: z, disparity, rate, anchor)
+        2. Correct the track carried from the last one → the track SwapFbo (RGBA32F: z, disparity, rate, anchor),
+           and in a second run of the same shader, this frame's miss of the prediction → the miss SwapFbo (R32F, m)
         3. Take the noise floor off z → output_fbo (R16F)
     """
 
@@ -67,6 +71,7 @@ class DepthVelocity(FlowBase):
         self._threshold_shader: DepthThreshold = DepthThreshold()
 
         self._track: SwapFbo = SwapFbo()
+        self._miss: SwapFbo = SwapFbo()          # how far each measurement was from its prediction (R32F, m)
 
     @property
     def depth_velocity(self) -> Texture:
@@ -83,18 +88,22 @@ class DepthVelocity(FlowBase):
         super().allocate(width, height, output_width, output_height)
         self._track.allocate(width, height, GL_RGBA32F)
         self._track.clear_all()
+        self._miss.allocate(width, height, GL_R32F)
+        self._miss.clear_all()
         self._velocity_shader.allocate()
         self._threshold_shader.allocate()
 
     def deallocate(self) -> None:
         super().deallocate()
         self._track.deallocate()
+        self._miss.deallocate()
         self._velocity_shader.deallocate()
         self._threshold_shader.deallocate()
 
     def reset(self) -> None:
         super().reset()
         self._track.clear_all()
+        self._miss.clear_all()
 
     def update_depth(self, depth: Texture, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
                      time: float, threshold: float, tolerance: float, dead_zone: float, displacement: Texture | None = None) -> None:
@@ -122,11 +131,14 @@ class DepthVelocity(FlowBase):
         self._input_fbo.swap()
         FlowUtil.blit(self._input_fbo, depth)
 
+        # both passes read the track and the miss of the frame before: first the track, then this frame's miss
         self._track.swap()
-        self._track.begin()
-        self._velocity_shader.use(self._input_fbo.texture, self._track.back_texture, float(alpha), max(delta_time, 1e-6),
-                                  view_span, step, window, tolerance, dead_zone, displacement)
-        self._track.end()
+        self._miss.swap()
+        for target, miss_pass in ((self._track, False), (self._miss, True)):
+            target.begin()
+            self._velocity_shader.use(self._input_fbo.texture, self._track.back_texture, self._miss.back_texture, miss_pass, float(alpha),
+                                      max(delta_time, 1e-6), view_span, step, window, tolerance, dead_zone, displacement)
+            target.end()
 
         self._output_fbo.begin()
         self._threshold_shader.use(self._track.texture, threshold / max(width, 1))     # px as view widths
@@ -135,11 +147,13 @@ class DepthVelocity(FlowBase):
 
 # ── numpy reference ─────────────────────────────────────────────────────
 
-def _carried(state: np.ndarray, displacement: np.ndarray, measurement: np.ndarray, tolerance: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """The track's disparity, rate and anchor (H, W) where each pixel was a displacement back: linear
-    between the four texels around it, of those that hold a track of the same surface as the
-    measurement, within `tolerance` (m) of it, as the shader reads them. None of them: no track."""
+def _carried(state: np.ndarray, miss: np.ndarray, displacement: np.ndarray, measurement: np.ndarray,
+             tolerance: float) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """The track's disparity, rate, anchor and last miss (H, W) where each pixel was a displacement
+    back: linear between the four texels around it, of those that hold a track of the same surface
+    as the measurement, within `tolerance` (m) of it, as the shader reads them. None of them: no track."""
     h, w = state.shape[:2]
+    carried_miss: np.ndarray = np.zeros((h, w))
     measured_depth: np.ndarray = 1.0 / np.where(measurement > 0.0, measurement, np.inf)
     rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
     x, y = columns - displacement[..., 0], rows - displacement[..., 1]
@@ -159,16 +173,19 @@ def _carried(state: np.ndarray, displacement: np.ndarray, measurement: np.ndarra
             disparity += weight * texel[..., 1]
             rate += weight * texel[..., 2]
             anchor += weight * texel[..., 3]
+            carried_miss += weight * miss[ty, tx]
             total += weight
     found: np.ndarray = total > 1e-9
     safe: np.ndarray = np.where(found, total, 1.0)
-    return np.where(found, disparity / safe, 0.0), np.where(found, rate / safe, 0.0), np.where(found, anchor / safe, 0.0)
+    return (np.where(found, disparity / safe, 0.0), np.where(found, rate / safe, 0.0), np.where(found, anchor / safe, 0.0),
+            np.where(found, carried_miss / safe, 0.0))
 
 
-def track_depth(depth: np.ndarray, state: np.ndarray, displacement: np.ndarray, delta_time: float, window: int,
-                step: tuple[float, float], tolerance: float, time: float, view_span: float, dead_zone: float) -> np.ndarray:
+def track_depth(depth: np.ndarray, state: np.ndarray, miss: np.ndarray, displacement: np.ndarray, delta_time: float, window: int,
+                step: tuple[float, float], tolerance: float, time: float, view_span: float, dead_zone: float) -> tuple[np.ndarray, np.ndarray]:
     """The depth track one frame on (H, W, 4): z in view widths per frame, disparity (1/m), its rate
-    (1/m per second) and its anchor (m), as the shader writes them.
+    (1/m per second) and its anchor (m); and its miss (H, W): how far the measurement was from the
+    prediction (m). As the shader writes them, in its two passes; `miss` is the one the frame before.
 
     `depth` is in metres (H, W), 0 where there is none; `state` is the track the frame before
     (zeros to start); `displacement` is how far each pixel moved (H, W, 2, pixels per frame, x along
@@ -178,7 +195,10 @@ def track_depth(depth: np.ndarray, state: np.ndarray, displacement: np.ndarray, 
     it, by the share of the window it holds. Further than `tolerance` from the prediction, or
     without a track of its surface there, the track starts over with no rate. Without depth at the pixel or without a span, it is empty.
     With `dead_zone` (m) above 0, z is 0 while the tracked depth stays within it of the anchor; past
-    it, z reads at its full speed and the anchor follows at `dead_zone` behind.
+    it, z reads at its full speed and the anchor follows at `dead_zone` behind. And a miss past the
+    dead zone is taken only when the frame before missed the same way by half of it: a depth that
+    is off for one frame and back, as at a jittery edge, coasts on its prediction; a real step or
+    sudden start is taken one frame late.
     """
     h, w = depth.shape
     rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
@@ -195,14 +215,21 @@ def track_depth(depth: np.ndarray, state: np.ndarray, displacement: np.ndarray, 
     measurement: np.ndarray = np.where(measured, total / np.maximum(kept, 1), 0.0)
     share: np.ndarray = kept / float((2 * window + 1) ** 2)
 
-    carried, carried_rate, carried_anchor = _carried(state, displacement, measurement, tolerance)
+    carried, carried_rate, carried_anchor, last = _carried(state, miss, displacement, measurement, tolerance)
     dt: float = max(delta_time, 1e-6)
     predicted: np.ndarray = np.where(carried > 0.0, carried + carried_rate * dt, 0.0)
     safe_measurement: np.ndarray = np.where(measured, measurement, 1.0)
     safe_predicted: np.ndarray = np.where(predicted > 0.0, predicted, 1.0)
-    follows: np.ndarray = measured & (predicted > 0.0) & (np.abs(1.0 / safe_measurement - 1.0 / safe_predicted) <= tolerance)
+    now_miss: np.ndarray = 1.0 / safe_measurement - 1.0 / safe_predicted      # the residual in metres
+    follows: np.ndarray = measured & (predicted > 0.0) & (np.abs(now_miss) <= tolerance)
 
-    alpha, beta = track_weights(delta_time, time, share)
+    # a miss past the dead zone counts only when the frame before missed the same way by half of it:
+    # a depth that is off for one frame and back is never taken, a real step or motion one frame late
+    taken: np.ndarray = np.ones(follows.shape)
+    if dead_zone > 0.0:
+        taken = ((np.abs(now_miss) <= dead_zone) | ((np.sign(now_miss) == np.sign(last)) & (np.abs(last) > 0.5 * dead_zone))).astype(np.float64)
+
+    alpha, beta = track_weights(delta_time, time, share * taken)
     residual: np.ndarray = measurement - predicted
     disparity: np.ndarray = np.where(follows, predicted + alpha * residual, measurement)
     rate: np.ndarray = np.where(follows, carried_rate + beta * residual / dt, 0.0)
@@ -219,7 +246,8 @@ def track_depth(depth: np.ndarray, state: np.ndarray, displacement: np.ndarray, 
         z = np.where(outside, z, 0.0)
     else:
         anchor = tracked
-    return np.where(measured[..., None], np.stack((z, disparity, rate, anchor), axis=-1), 0.0)
+    return (np.where(measured[..., None], np.stack((z, disparity, rate, anchor), axis=-1), 0.0),
+            np.where(follows, now_miss, 0.0))
 
 
 def depth_threshold(value: np.ndarray, threshold: float) -> np.ndarray:

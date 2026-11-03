@@ -69,11 +69,11 @@ class FollowZTimeTest(unittest.TestCase):
         # z: still for 10 frames, then 0.01 of disparity per frame; x/y: the same steps as a displacement
         frames: list[float] = [0.0] * 10 + [0.01] * 20
         disparity: float = 0.5
-        state = np.zeros((4, 4, 4))
+        state, miss = np.zeros((4, 4, 4)), np.zeros((4, 4))
         z: list[float] = []
         for step in frames:
             disparity += step
-            state = track_depth(np.full((4, 4), 1.0 / disparity), state, np.zeros((4, 4, 2)), self.DT, 0, (1.0, 1.0), 1.0, 50.0, 1.0, 0.0)
+            state, miss = track_depth(np.full((4, 4), 1.0 / disparity), state, miss, np.zeros((4, 4, 2)), self.DT, 0, (1.0, 1.0), 1.0, 50.0, 1.0, 0.0)
             z.append(float(state[1, 1, 2]) * self.DT)                        # the rate, per frame
         xy = [float(f[1, 1, 0]) for f in self.follow([np.full((4, 4, 2), step) for step in frames])]
         np.testing.assert_allclose(xy, z, atol=1e-9)
