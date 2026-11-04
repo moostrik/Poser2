@@ -4,9 +4,6 @@ The flow bridge's velocity as one trail: a flow's 3D velocity in image widths pe
 time and in space. Its output stays in widths per second; how hard it pushes the fluid is the fluid's
 (`input_strength`, `input_x`, `input_y`).
 
-x/y goes in as it is. z gets a soft `z_limit` first: what is left of z's noise after the flow is spikes
-at edges, which the limit caps.
-
 Before each step the trail moves with the motion it holds (`advect`): each pixel takes the trail from
 where its own x/y says it came from, so the average follows a moving limb instead of a fixed pixel,
 and a fast move is not cut off by a smoothing time longer than it takes to cross.
@@ -22,16 +19,15 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_RGBA16F
 
 from modules.gl import SwapFbo, Texture
 from modules.settings import Field, BaseSettings
-from ... import FlowBase
+from ... import FlowBase, FlowUtil
 from ...shaders import GaussianBlur
 from .kinetics import decay_weight
-from .shaders import KineticAdvect, ShapeVelocity, VelocityTrail
+from .shaders import KineticAdvect, VelocityTrail
 
 
 class VelocityTrailBridgeSettings(BaseSettings):
     """Configuration for the velocity trail bridge."""
-    z_limit = Field(4.0, min=0.1, max=4.0, step=0.05, description="Soft limit on z, widths/s (lower: smaller edge spikes)")
-    advect = Field(0.0, min=0.0, max=1.0, step=0.05, newline=True, description="How far the trail moves with its motion before each step; 0 = at a fixed pixel")
+    advect = Field(0.0, min=0.0, max=1.0, step=0.05, description="How far the trail moves with its motion before each step; 0 = at a fixed pixel")
     attack = Field(0.0, min=0.0, max=500.0, step=1.0, description="Smoothing time of a rising x/y speed, ms; 0 = as smooth (lower: quicker flicks)")
     smooth = Field(158.0, min=0.0, max=1000.0, step=1.0, description="Smoothing time, ms; the fall of x/y and all of z; 0 = none (higher: longer coast)")
     blur_radius = Field(0.0, min=0.0, max=10.0, newline=True, description="Gaussian blur radius in pixels; 0 = off")
@@ -39,16 +35,16 @@ class VelocityTrailBridgeSettings(BaseSettings):
 
 
 class VelocityTrailBridge(FlowBase):
-    """The velocity trail bridge: a flow's 3D velocity, z limited, through one 3D trail.
+    """The velocity trail bridge: a flow's 3D velocity through one 3D trail.
 
     Pipeline:
-        1. Take the velocity into the input FBO with z's soft limit (`set_velocity`)
+        1. Take the velocity into the input FBO (`set_velocity`)
         2. Move the previous trail with its own motion (`advect`), then blend the input in, a unit-gain Ema over
            `attack` or `smooth` (temporal smoothing)
         3. Blur it, `blur_steps` passes (spatial smoothing)
 
     FBOs (from FlowBase):
-        - input_fbo: The velocity, z limited
+        - input_fbo: The velocity
         - output_fbo: The smoothed velocity
     """
 
@@ -61,7 +57,6 @@ class VelocityTrailBridge(FlowBase):
         self.settings: VelocityTrailBridgeSettings = settings or VelocityTrailBridgeSettings()
 
         # Shaders
-        self._shape_shader: ShapeVelocity = ShapeVelocity()
         self._advect_shader: KineticAdvect = KineticAdvect()
         self._trail_shader: VelocityTrail = VelocityTrail()
         self._blur_shader: GaussianBlur = GaussianBlur()
@@ -73,7 +68,7 @@ class VelocityTrailBridge(FlowBase):
 
     @property
     def velocity_input(self) -> Texture:
-        """The velocity the trail reads, z limited."""
+        """The velocity the trail reads."""
         return self._input
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
@@ -89,7 +84,6 @@ class VelocityTrailBridge(FlowBase):
         # No velocity outside the image, as in the fluid: a trail that leaves it is gone, and the edge
         # doesn't copy itself back in through the advect and the blur
         self._output_fbo.set_wrap(GL_CLAMP_TO_BORDER, (0.0, 0.0, 0.0, 0.0))
-        self._shape_shader.allocate()
         self._advect_shader.allocate()
         self._trail_shader.allocate()
         self._blur_shader.allocate()
@@ -97,18 +91,15 @@ class VelocityTrailBridge(FlowBase):
     def deallocate(self) -> None:
         """Deallocate all resources."""
         super().deallocate()
-        self._shape_shader.deallocate()
         self._advect_shader.deallocate()
         self._trail_shader.deallocate()
         self._blur_shader.deallocate()
 
     def set_velocity(self, velocity: Texture) -> None:
-        """Take a flow's 3D velocity, z limited, as the trail's next input."""
+        """Take a flow's 3D velocity as the trail's next input."""
         if not self._allocated:
             return
-        self._input_fbo.begin()
-        self._shape_shader.use(velocity, self.settings.z_limit)
-        self._input_fbo.end()
+        FlowUtil.blit(self._input_fbo, velocity)
 
     def update(self, delta_time: float = 1.0 / 60.0) -> None:
         """Advance the trail with the input by `delta_time` (s): temporal, then spatial smoothing."""
@@ -145,13 +136,6 @@ class VelocityTrailBridge(FlowBase):
 
 
 # ── numpy reference ─────────────────────────────────────────────────────
-
-def shape_velocity(velocity: np.ndarray, z_limit: float) -> np.ndarray:
-    """A velocity (..., 3) with x/y as it is and z rolled off toward `z_limit` (z_limit · tanh(z / z_limit)).
-    Mirrors shape_velocity.frag."""
-    z: np.ndarray = z_limit * np.tanh(velocity[..., 2:3] / z_limit)
-    return np.concatenate((velocity[..., :2], z), axis=-1)
-
 
 def velocity_trail(previous: np.ndarray, velocity: np.ndarray, attack: float, release: float) -> np.ndarray:
     """One step of the trail (..., 3): x/y by `attack` where its speed rises above the trail's, else by

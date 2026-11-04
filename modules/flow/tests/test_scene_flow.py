@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import displacement_velocity, filter_displacement, lucas_kanade, shape_velocity, threshold_displacement, track_depth, track_weights, velocity_trail
+from modules.flow import displacement_velocity, filter_displacement, lucas_kanade, threshold_displacement, track_depth, track_weights, velocity_trail
 
 SIZE: int = 64
 
@@ -139,16 +139,6 @@ class DisplacementVelocityTest(unittest.TestCase):
 
     def test_strength_multiplies_each_axis(self) -> None:
         np.testing.assert_allclose(displacement_velocity(np.array([0.1, 0.1]), 1.0, 10, 10, (3.0, -1.0)), [0.3, -0.1])
-
-
-class ShapeTest(unittest.TestCase):
-    def test_xy_passes_as_it_is(self) -> None:
-        velocity = np.array([[0.05, 0.0, 0.01], [3.0, -4.0, 0.2]])
-        np.testing.assert_allclose(shape_velocity(velocity, 1000.0)[..., :2], velocity[..., :2])
-
-    def test_z_rolls_off_softly(self) -> None:
-        shaped = shape_velocity(np.array([[0.0, 0.0, -1.0], [0.0, 0.0, 0.001]]), 0.5)
-        np.testing.assert_allclose(shaped[:, 2], [-0.5 * np.tanh(2.0), 0.001], rtol=1e-5)
 
 
 class VelocityTrailTest(unittest.TestCase):
