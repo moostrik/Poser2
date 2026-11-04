@@ -123,7 +123,7 @@ class DepthVelocity(FlowBase):
 
     def update_depth(self, depth: Texture, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
                      smooth: float, threshold: float, tolerance: float, dead_zone: float, catch_up_smooth: float, motion_floor: float,
-                     displacement: Texture | None = None) -> None:
+                     displacement: Texture | None = None, catch_up_gate: bool = True, xy_gate: bool = False) -> None:
         """Advance on a new flow frame: correct the track by the new depth, then take the noise floor off.
 
         Args:
@@ -140,6 +140,8 @@ class DepthVelocity(FlowBase):
             motion_floor: Displacement the image must move by for the track to catch up (px per frame)
             displacement: How far each pixel moved since then (uv); when given, the track is carried
                 along the motion (Lucas–Kanade flow)
+            catch_up_gate: The track catches up only where the image moves too; off, wherever it keeps missing one way
+            xy_gate: z only where the image moves (its 3×3 displacement past `motion_floor`), with a displacement
         """
         if not self._allocated:
             return
@@ -159,12 +161,13 @@ class DepthVelocity(FlowBase):
         for target, catch_up_pass in ((self._track, False), (self._catch_up, True)):
             target.begin()
             self._velocity_shader.use(self._input_fbo.texture, self._track.back_texture, self._catch_up.back_texture, catch_up_pass,
-                                      float(alpha), smooth, catch_up_smooth, float(alpha), motion_floor, max(delta_time, 1e-6), view_span,
-                                      step, window, tolerance, dead_zone, displacement)
+                                      float(alpha), smooth, catch_up_smooth, float(alpha), motion_floor if catch_up_gate else -1.0,
+                                      max(delta_time, 1e-6), view_span, step, window, tolerance, dead_zone, displacement)
             target.end()
 
         self._output_fbo.begin()
-        self._threshold_shader.use(self._track.texture, threshold / max(width, 1))     # px as view widths
+        self._threshold_shader.use(self._track.texture, threshold / max(width, 1),     # px as view widths
+                                   displacement if xy_gate else None, motion_floor)
         self._output_fbo.end()
 
 
@@ -335,6 +338,9 @@ def filter_depth_steps(depth: np.ndarray, step: tuple[float, float], tolerance: 
     return np.where(edge, 0.0, depth)
 
 
-def depth_threshold(value: np.ndarray, threshold: float) -> np.ndarray:
-    """A signed field with `threshold` taken off its size, 0 below it: the noise floor goes, and what is above stays continuous."""
+def depth_threshold(value: np.ndarray, threshold: float, moving: np.ndarray | None = None) -> np.ndarray:
+    """A signed field with `threshold` taken off its size, 0 below it: the noise floor goes, and what is above stays continuous.
+    With `moving` (H, W, as `color_motion` gives it), 0 where the image does not move. Mirrors depth_threshold.frag."""
+    if moving is not None:
+        value = np.where(moving, value, 0.0)
     return np.sign(value) * np.maximum(np.abs(value) - threshold, 0.0)
