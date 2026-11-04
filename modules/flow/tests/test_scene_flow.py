@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import displacement_velocity, filter_displacement, lucas_kanade, median_displacement, shape_velocity, threshold_displacement, track_depth, track_weights
+from modules.flow import displacement_velocity, filter_displacement, lucas_kanade, median_displacement, shape_velocity, threshold_displacement, track_depth, track_weights, velocity_trail
 
 SIZE: int = 64
 
@@ -159,20 +159,35 @@ class DisplacementVelocityTest(unittest.TestCase):
 
 
 class ShapeTest(unittest.TestCase):
-    def test_the_trail_bridge_sees_what_the_old_shaping_gave(self) -> None:
-        # The shaping took its threshold after scale and strength: max(|d| * scale - 0.1, 0) at scale 0.2.
-        # Taken off the displacement first as 0.1 / 0.2 = 0.5 px, then scaled, the trail bridge's velocity is the same.
-        displacement = np.array([[0.3, 0.0], [1.0, 0.0], [2.0, 1.0], [6.0, -8.0]])
-        old_length = np.maximum(np.linalg.norm(displacement * 0.2, axis=-1, keepdims=True) - 0.1, 0.0)
-        old = np.clip(np.divide(displacement, np.linalg.norm(displacement, axis=-1, keepdims=True)) * old_length, -1.0, 1.0)
-        new = shape_velocity(threshold_displacement(displacement, 0.5) * 0.2, 1.0)
-        np.testing.assert_allclose(new, old, atol=1e-9)
+    def test_curve_one_is_linear_below_the_limit(self) -> None:
+        velocity = np.array([[0.05, 0.0, 0.01], [0.3, -0.4, 0.2]])
+        np.testing.assert_allclose(shape_velocity(velocity, 0.15, 1.0, 1000.0, 1000.0), velocity, rtol=1e-6)
 
-    def test_the_velocity_is_clamped(self) -> None:
-        self.assertEqual(float(shape_velocity(np.array([[10.0, 0.0]]), 1.0)[0, 0]), 1.0)
+    def test_the_pivot_stays_and_the_curve_bends_around_it(self) -> None:
+        shaped = shape_velocity(np.array([[0.15, 0.0, 0.0], [0.075, 0.0, 0.0], [0.45, 0.0, 0.0]]), 0.15, 2.0, 1000.0, 1000.0)
+        np.testing.assert_allclose(shaped[:, 0], [0.15, 0.0375, 1.35], rtol=1e-6)
 
-    def test_boost_lifts_small_motions(self) -> None:
-        np.testing.assert_allclose(shape_velocity(np.array([[0.25, 0.0]]), 0.5), [[0.5, 0.0]])
+    def test_the_direction_holds(self) -> None:
+        shaped = shape_velocity(np.array([[0.3, 0.4, 0.0]]), 0.15, 2.0, 1.0, 1.0)
+        np.testing.assert_allclose(shaped[0, 0] / shaped[0, 1], 0.75)
+
+    def test_the_limits_roll_off_softly(self) -> None:
+        shaped = shape_velocity(np.array([[2.0, 0.0, -1.0]]), 0.15, 1.0, 1.0, 0.5)
+        np.testing.assert_allclose(shaped[0, [0, 2]], [np.tanh(2.0), -0.5 * np.tanh(2.0)])
+
+    def test_z_stays_linear_on_the_curve(self) -> None:
+        shaped = shape_velocity(np.array([[0.45, 0.0, 0.01]]), 0.15, 2.0, 1000.0, 1000.0)
+        np.testing.assert_allclose(shaped[0, 2], 0.01, rtol=1e-4)
+
+
+class VelocityTrailTest(unittest.TestCase):
+    def test_a_rising_xy_follows_the_attack(self) -> None:
+        stepped = velocity_trail(np.zeros((1, 3)), np.array([[1.0, 0.0, 1.0]]), 0.1, 0.9)
+        np.testing.assert_allclose(stepped, [[0.9, 0.0, 0.1]])
+
+    def test_a_falling_xy_follows_the_release(self) -> None:
+        stepped = velocity_trail(np.array([[1.0, 0.0, 0.0]]), np.zeros((1, 3)), 0.1, 0.9)
+        np.testing.assert_allclose(stepped, [[0.9, 0.0, 0.0]])
 
 
 if __name__ == '__main__':

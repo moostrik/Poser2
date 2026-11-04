@@ -19,6 +19,8 @@ class BoundaryMode(IntEnum):
 class VelocitySettings(BaseSettings):
     """Velocity field parameters."""
     input_strength: Field[float]    = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="Multiplier applied to the measured (x, y) flow input")
+    input_x: Field[float]           = Field(1.0,    min=-2.0,   max=2.0,    step=0.05, color="teal",    description="x against y on top of input_strength; negative inverts (3D only)")
+    input_y: Field[float]           = Field(1.0,    min=-2.0,   max=2.0,    step=0.05, color="teal",    description="y against x on top of input_strength; negative inverts (3D only)")
     squeeze: Field[float]           = Field(0.0,    min=-10.0,  max=10.0,   color="cyan",           description="W from flow convergence; positive: looming pushes ink to the viewer (3D)")
     push: Field[float]              = Field(0.0,    min=-2.0,   max=2.0,    color="light-blue",     description="W synthesis: flow magnitude; positive = away from viewer (3D only)")
     depth_mix: Field[float]         = Field(0.0,    min=0.0,    max=1.0,    color="light-green",    description="W from the camera's depth: 0 is push and squeeze alone, 1 is measured alone (3D only)")

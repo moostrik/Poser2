@@ -774,7 +774,8 @@ class FluidFlow3D:
     def add_velocity(self, texture: Texture, strength: float = 1.0, depth: Texture | None = None, depth_channel: int = 0) -> None:
         """Inject the 2D flow as one 3D velocity into the gaussian birth slab.
 
-        (u, v) are the measured flow, gained by velocity.input_strength; w is
+        (u, v) are the measured flow, gained by velocity.input_strength times
+        velocity.input_x / input_y (the axes' balance, negative inverts); w is
         synthesized from the same flow:
         w = clamp(push * |flow| + squeeze * -div(flow), ±dampen_threshold),
         and blended by velocity.depth_mix with the measured velocity toward
@@ -789,7 +790,7 @@ class FluidFlow3D:
             texture, self._velocity.texture,
             self.settings.depth.injection_layer,
             self.settings.depth.injection_spread,
-            strength * vel.input_strength * dt,
+            (strength * vel.input_strength * vel.input_x * dt, strength * vel.input_strength * vel.input_y * dt),
             strength * dt,
             vel.push, vel.squeeze, vel.dampen_threshold,
             depth, depth_channel, vel.depth_mix

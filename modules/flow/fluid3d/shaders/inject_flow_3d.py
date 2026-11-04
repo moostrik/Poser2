@@ -1,7 +1,7 @@
 """InjectFlow3D - Inject the 2D flow as a full 3D velocity (u, v measured; w synthesized)."""
 from __future__ import annotations
 
-from OpenGL.GL import GL_RGBA16F, GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform3i, glUseProgram
+from OpenGL.GL import GL_RGBA16F, GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUniform3i, glUseProgram
 
 from modules.gl import Texture, Texture3D, ComputeShader
 
@@ -24,7 +24,7 @@ class InjectFlow3D(ComputeShader):
 
     def use(self, flow_2d: Texture, volume: Texture3D,
             target_layer: float, spread: float,
-            strength_xy: float, strength_w: float,
+            strength_xy: tuple[float, float], strength_w: float,
             push: float, squeeze: float, w_clamp: float,
             depth: Texture | None = None, depth_channel: int = 0, depth_mix: float = 0.0) -> None:
         """Inject the flow into the velocity volume.
@@ -34,7 +34,7 @@ class InjectFlow3D(ComputeShader):
             volume: 3D velocity volume (read-write; u,v,w = .xyz)
             target_layer: Normalized depth [0, 1] — center of injection
             spread: Gaussian sigma in normalized depth units
-            strength_xy: Gain on the measured components (strength * input_strength * dt)
+            strength_xy: Gain on the measured u and v (strength * input_strength * input_x / input_y * dt)
             strength_w: Gain on the synthesized component (strength * dt)
             push: W synthesis — gain on |flow| (signed; + = away from viewer)
             squeeze: W synthesis — gain on -divergence (signed)
@@ -63,7 +63,7 @@ class InjectFlow3D(ComputeShader):
 
         glUniform1f(self.get_uniform_loc("uTargetLayer"), target_layer)
         glUniform1f(self.get_uniform_loc("uSpread"), spread)
-        glUniform1f(self.get_uniform_loc("uStrengthXY"), strength_xy)
+        glUniform2f(self.get_uniform_loc("uStrengthXY"), *strength_xy)
         glUniform1f(self.get_uniform_loc("uStrengthW"), strength_w)
         glUniform1f(self.get_uniform_loc("uPush"), push)
         glUniform1f(self.get_uniform_loc("uSqueeze"), squeeze)

@@ -3,4 +3,4 @@
 from . import bridge_2d
 from .bridge_3d import DensityBridge, DensityBridgeSettings, BlurPosition, KineticBridge, KineticBridgeSettings, \
                        KineticStrip, KINETIC_STRIP_LANES, decay_weight, project, stop_gate, hold_release, drop, fill_reservoir, advect, \
-                       TrailBridge, TrailBridgeSettings, shape_velocity, Magnitude, VelocityMagnitude, TemperatureBridge, TemperatureBridgeSettings
+                       VelocityTrailBridge, VelocityTrailBridgeSettings, shape_velocity, velocity_trail, Magnitude, VelocityMagnitude, TemperatureBridge, TemperatureBridgeSettings

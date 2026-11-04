@@ -437,16 +437,15 @@
         }
       },
       "flow_bridge": {
-        "method": "TRAIL",
-        "trail": {
-          "scale_x": 1.0,
-          "scale_y": 1.0,
-          "scale_z": 1.0,
-          "boost": 0.0,
+        "method": "VELOCITY_TRAIL",
+        "velocity_trail": {
+          "pivot": 0.15,
+          "curve": 1.0,
           "limit": 4.0,
+          "z_limit": 4.0,
+          "attack": 0.0,
           "smooth": 230.0,
-          "blur_radius": 0.0,
-          "blur_steps": 4
+          "blur_radius": 0.0
         },
         "kinetic": {
           "scale_x": 10.0,

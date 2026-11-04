@@ -16,7 +16,7 @@ from modules.board import HasFrames
 from modules.settings import Field, BaseSettings, Group
 from modules.flow import (
     LucasKanadeFlow, LucasKanadeFlowSettings,
-    TrailBridge, TrailBridgeSettings,
+    VelocityTrailBridge, VelocityTrailBridgeSettings,
     KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES,
     VelocityMagnitude,
     TemperatureBridge, TemperatureBridgeSettings,
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 class FlowBridgeMethod(IntEnum):
     """How the flow bridge makes the velocity the fluid reads and the amount the density reads."""
-    TRAIL = 0       # a smoothed velocity, ink where there is speed
+    VELOCITY_TRAIL = 0  # a smoothed velocity, density where there is speed
     KINETIC = auto()  # two trails, reading the change of the motion
 
 
@@ -48,10 +48,10 @@ class Flow3DDrawMode(IntEnum):
 
     Outputs:
         VELOCITY - The flow's 3D velocity, times the mask with its use_mask
-        SMOOTH_VELOCITY_INPUT - What the bridge reads: the velocity (shaped on the trail bridge)
+        SMOOTH_VELOCITY_INPUT - What the bridge reads: the velocity (shaped on the velocity trail bridge)
         SMOOTH_VELOCITY_OUTPUT - The bridge's smoothed 3D velocity, what the fluid gets
         SMOOTH_VELOCITY_DEPTH - Its z: red toward the camera, green away
-        DENSITY_BRIDGE_INPUT_ALPHA - The amount the density's alpha is made from: speed (trail) or emission (kinetic)
+        DENSITY_BRIDGE_INPUT_ALPHA - The amount the density's alpha is made from: speed (velocity trail) or emission (kinetic)
         DENSITY_BRIDGE_OUTPUT - Colored density (RGBA16F)
         TEMPERATURE_BRIDGE_OUTPUT - Temperature field (R16F)
 
@@ -108,9 +108,9 @@ VECTOR_DRAW_MODES: set[Flow3DDrawMode] = {       # 3D velocities, drawn as veloc
 
 class FlowBridgeSettings(BaseSettings):
     """How the flow bridge turns the optical flow into the fluid's velocity, density and temperature."""
-    method: Field[FlowBridgeMethod] =   Field(FlowBridgeMethod.TRAIL, description="How the bridge makes the fluid's velocity and the density's amount: one trail, or two trails reading the change of the motion")
+    method: Field[FlowBridgeMethod] =   Field(FlowBridgeMethod.VELOCITY_TRAIL, description="How the bridge makes the fluid's velocity and the density's amount: one trail, or two trails reading the change of the motion")
 
-    trail       = Group(TrailBridgeSettings)
+    velocity_trail = Group(VelocityTrailBridgeSettings)
     kinetic     = Group(KineticBridgeSettings)
     density     = Group(DensityBridgeSettings)
     temperature = Group(TemperatureBridgeSettings)
@@ -133,7 +133,7 @@ class Flow3DLayer(LayerBase):
 
     Measures the motion and prepares velocity/density/temperature for fluid simulation:
     1. LucasKanadeFlow: the 3D velocity (xyz), z from the depth
-    2. TrailBridge or KineticBridge (settings.flow_bridge.method): the smoothed velocity for the fluid
+    2. VelocityTrailBridge or KineticBridge (settings.flow_bridge.method): the smoothed velocity for the fluid
     3. DensityBridge: Combines RGB density with an amount as its alpha
     4. TemperatureBridge: Generates temperature field
 
@@ -176,7 +176,7 @@ class Flow3DLayer(LayerBase):
         self._mask_input: Texture | None = None
         self._gate_shader: MaskMultiply = MaskMultiply()
         self._gated_color: Fbo = Fbo()      # the density input times the mask
-        self._trail_bridge: TrailBridge = TrailBridge(bridge.trail)
+        self._velocity_trail_bridge: VelocityTrailBridge = VelocityTrailBridge(bridge.velocity_trail)
         self._kinetic_bridge: KineticBridge = KineticBridge(bridge.kinetic)
         self._velocity_magnitude: VelocityMagnitude = VelocityMagnitude()
         self._density_bridge: DensityBridge = DensityBridge(bridge.density)
@@ -211,7 +211,7 @@ class Flow3DLayer(LayerBase):
         """Smoothed velocity, xyz (RGBA16F), for fluid simulation; z is 0 without depth."""
         if self.settings.flow_bridge.method == FlowBridgeMethod.KINETIC:
             return self._kinetic_bridge.smooth_velocity
-        return self._trail_bridge.smooth_velocity
+        return self._velocity_trail_bridge.smooth_velocity
 
     @property
     def depth_enabled(self) -> bool:
@@ -324,14 +324,14 @@ class Flow3DLayer(LayerBase):
         output_width, output_height = self._output_size
 
         self._flow.allocate(flow_width, flow_height)
-        self._trail_bridge.allocate(flow_width, flow_height, output_width, output_height)
+        self._velocity_trail_bridge.allocate(flow_width, flow_height, output_width, output_height)
         self._kinetic_bridge.allocate(flow_width, flow_height)
         self._velocity_magnitude.allocate(flow_width, flow_height)
         self._temperature_bridge.allocate(flow_width, flow_height)
 
     def _deallocate_flow(self) -> None:
         self._flow.deallocate()
-        self._trail_bridge.deallocate()
+        self._velocity_trail_bridge.deallocate()
         self._kinetic_bridge.deallocate()
         self._velocity_magnitude.deallocate()
         self._temperature_bridge.deallocate()
@@ -348,7 +348,7 @@ class Flow3DLayer(LayerBase):
     def reset(self) -> None:
         """Reset all processing stages."""
         self._flow.reset()
-        self._trail_bridge.reset()
+        self._velocity_trail_bridge.reset()
         self._kinetic_bridge.reset()
         self._density_bridge.reset()
         self._kinetic_strip.reset()
@@ -394,8 +394,8 @@ class Flow3DLayer(LayerBase):
                     bridge: KineticBridge = self._kinetic_bridge
                     self._kinetic_strip.update(bridge.fast, bridge.acceleration, bridge.emission, self.settings.visualization.strip_scale)
         else:
-            self._trail_bridge.set_velocity(self._velocity)
-            self._trail_bridge.update(self._time_step)
+            self._velocity_trail_bridge.set_velocity(self._velocity)
+            self._velocity_trail_bridge.update(self._time_step)
 
         if new_flow:
             self._flow_interval = 0.0
@@ -485,7 +485,7 @@ class Flow3DLayer(LayerBase):
         textures = {
             Flow3DDrawMode.LUMINANCE: self._flow.luminance,
             Flow3DDrawMode.VELOCITY: self._velocity,
-            Flow3DDrawMode.SMOOTH_VELOCITY_INPUT: self._kinetic_bridge.velocity_input if self.settings.flow_bridge.method == FlowBridgeMethod.KINETIC else self._trail_bridge.velocity_input,
+            Flow3DDrawMode.SMOOTH_VELOCITY_INPUT: self._kinetic_bridge.velocity_input if self.settings.flow_bridge.method == FlowBridgeMethod.KINETIC else self._velocity_trail_bridge.velocity_input,
             Flow3DDrawMode.SMOOTH_VELOCITY_OUTPUT: self.smooth_velocity,
             Flow3DDrawMode.SMOOTH_VELOCITY_MAGNITUDE: self._velocity_magnitude.magnitude,
             Flow3DDrawMode.DENSITY_BRIDGE_INPUT_COLOR: self._density_bridge.color_input,

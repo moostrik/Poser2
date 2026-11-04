@@ -1,20 +1,21 @@
-"""Shape Velocity shader: the trail bridge's power curve and limit on a velocity's x/y, then its scale per axis."""
+"""Shape Velocity shader: the velocity trail bridge's curve and limit on a velocity's x/y speed, and its limit on z."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform3f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
 class ShapeVelocity(Shader):
-    """Writes the velocity with its x/y length to `power`, rolled off softly toward `limit`, then x, y, z times `scale` (RGB)."""
+    """Writes the velocity with its x/y speed bent around `pivot` by `curve` and rolled off toward `limit`, z rolled off toward `z_limit` (RGB)."""
 
-    def use(self, velocity: Texture, power: float, limit: float, scale: tuple[float, float, float]) -> None:
+    def use(self, velocity: Texture, pivot: float, curve: float, limit: float, z_limit: float) -> None:
         """Shape `velocity`.
 
         Args:
-            velocity: x, y, z in RGB
-            power: Power curve on the x/y length
-            limit: The x/y length the roll-off approaches
-            scale: Multiplier on x, y and z, after the shaping
+            velocity: x, y, z in RGB, widths/s
+            pivot: x/y speed the curve leaves as it is
+            curve: Exponent on the x/y speed around the pivot
+            limit: The x/y speed the roll-off approaches
+            z_limit: The z the roll-off approaches
         """
         if not self.allocated or not self.shader_program or not velocity.allocated:
             return
@@ -25,8 +26,9 @@ class ShapeVelocity(Shader):
         glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
 
         glUniform1i(self.get_uniform_loc("tex0"), 0)
-        glUniform1f(self.get_uniform_loc("power"), power)
+        glUniform1f(self.get_uniform_loc("pivot"), max(pivot, 1e-3))
+        glUniform1f(self.get_uniform_loc("curve"), curve)
         glUniform1f(self.get_uniform_loc("limit"), max(limit, 1e-3))
-        glUniform3f(self.get_uniform_loc("scale"), *scale)
+        glUniform1f(self.get_uniform_loc("z_limit"), max(z_limit, 1e-3))
 
         draw_quad()

@@ -32,7 +32,7 @@ layout(rgba16f, binding = 0) uniform image3D uVolume;
 // Parameters
 uniform float uTargetLayer;  // Normalized depth [0, 1] — center of injection
 uniform float uSpread;       // Gaussian sigma in normalized depth units
-uniform float uStrengthXY;   // strength * input_strength * dt (measured components)
+uniform vec2  uStrengthXY;   // strength * input_strength * input_x / input_y * dt (measured components)
 uniform float uStrengthW;    // strength * dt (synthesized component)
 uniform float uPush;         // W synthesis: gain on |flow| (signed; + = away)
 uniform float uSqueeze;      // W synthesis: gain on -divergence (signed)
