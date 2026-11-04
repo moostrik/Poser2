@@ -50,7 +50,6 @@ widths per second.
 | Setting   | Default      | Range (step)    | For | Why                                    |
 |-----------|--------------|-----------------|-----|----------------------------------------|
 | edge      | 0.1 m        | 0.05–0.3 (0.01) | A   | halves the edge spikes                 |
-| guide     | off          | on/off          | –   | smooths more than it sharpens          |
 | window    | 7×7          | 1×1–9×9         | A   | the most samples averaged              |
 | tolerance | 0.2 m        | 0.05–0.5 (0.01) | B   | keeps a push's z                       |
 | smooth    | 50 ms        | 0–200 (1)       | A   | at 0 the still z noise is 15× higher   |
@@ -59,8 +58,6 @@ widths per second.
 | dead_zone | 0.02 m       | 0–0.05 (0.001)  | A   | takes the depth's wander               |
 | threshold | 1.0 px/frame | 0–5 (0.05)      | A   | with the dead zone, still z noise is 0 |
 
-- guide, on `standmoves`: push and sweep z both drop 7%, the still z noise stays about the same, and
-  it costs +0.14 ms. It does not separate a limb's edge from its motion.
 - tolerance at 0.05: a push loses 77% of its z, and the track restarts 6× as often while moving.
 - smooth: lower lags less; keep it as low as looks right.
 
@@ -70,6 +67,8 @@ widths per second.
   changed past the tolerance over 2 frames cuts the edge z, and a push's z by 26%.
 - It cannot be told by the depth's slope either. A weight on the slope cuts edges and pushes alike,
   by about 10%.
+- Sharpening the depth at the image's edges does not separate them. A luminance-guided joint bilateral
+  filter on the depth lowers push and sweep z alike, by 7%, for +0.14 ms.
 - A forward–backward check on x/y drops half the fast motion.
 - Iterations per level do less than one more level, at more GPU time.
 

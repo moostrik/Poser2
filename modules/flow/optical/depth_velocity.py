@@ -48,9 +48,7 @@ from OpenGL.GL import GL_R16F, GL_R32F, GL_RG32F, GL_RGBA32F
 
 from modules.gl import Fbo, SwapFbo, Texture
 from .. import FlowBase, FlowUtil
-from .shaders import DepthGuide, DepthStepFilter, DepthThreshold, DepthVelocityShader
-
-GUIDE_SPACING: float = 3.0      # flow texels between two taps of the guide's filter: 11 taps span 31 px, the width of a stereo ramp
+from .shaders import DepthStepFilter, DepthThreshold, DepthVelocityShader
 
 
 def track_weights(delta_time: float, smooth: float, share: float | np.ndarray) -> tuple[float | np.ndarray, float | np.ndarray]:
@@ -80,12 +78,10 @@ class DepthVelocity(FlowBase):
         self._output_internal_format = GL_R16F
 
         self._step_filter_shader: DepthStepFilter = DepthStepFilter()
-        self._guide_shader: DepthGuide = DepthGuide()
         self._velocity_shader: DepthVelocityShader = DepthVelocityShader()
         self._threshold_shader: DepthThreshold = DepthThreshold()
 
         self._raw: Fbo = Fbo()                   # the depth as it came, before its edges are taken off
-        self._guided: Fbo = Fbo()                # the depth sharpened at the image's edges, with a guide
         self._track: SwapFbo = SwapFbo()
         self._catch_up: SwapFbo = SwapFbo()      # the Emas of the miss of the prediction, signed and its size (RG32F, m)
 
@@ -103,24 +99,20 @@ class DepthVelocity(FlowBase):
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         super().allocate(width, height, output_width, output_height)
         self._raw.allocate(width, height, GL_R32F)
-        self._guided.allocate(width, height, GL_R32F)
         self._track.allocate(width, height, GL_RGBA32F)
         self._track.clear_all()
         self._catch_up.allocate(width, height, GL_RG32F)
         self._catch_up.clear_all()
         self._step_filter_shader.allocate()
-        self._guide_shader.allocate()
         self._velocity_shader.allocate()
         self._threshold_shader.allocate()
 
     def deallocate(self) -> None:
         super().deallocate()
         self._raw.deallocate()
-        self._guided.deallocate()
         self._track.deallocate()
         self._catch_up.deallocate()
         self._step_filter_shader.deallocate()
-        self._guide_shader.deallocate()
         self._velocity_shader.deallocate()
         self._threshold_shader.deallocate()
 
@@ -131,7 +123,7 @@ class DepthVelocity(FlowBase):
 
     def update_depth(self, depth: Texture, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
                      smooth: float, threshold: float, tolerance: float, dead_zone: float, catch_up_smooth: float, motion_floor: float,
-                     displacement: Texture | None = None, edge: float | None = None, guide: Texture | None = None) -> None:
+                     displacement: Texture | None = None, edge: float | None = None) -> None:
         """Advance on a new flow frame: correct the track by the new depth, then take the noise floor off.
 
         Args:
@@ -149,7 +141,6 @@ class DepthVelocity(FlowBase):
             displacement: How far each pixel moved since then (uv); when given, the track is carried
                 along the motion (Lucas–Kanade flow)
             edge: Depth step within a 3×3 of depth samples that marks an edge, dropped (m); None takes `tolerance`
-            guide: Luminance the depth is sharpened at the edges of, before the edges are taken off; None is no guide
         """
         if not self._allocated:
             return
@@ -158,15 +149,9 @@ class DepthVelocity(FlowBase):
         alpha, _ = track_weights(delta_time, smooth, 1.0)
 
         FlowUtil.blit(self._raw, depth)
-        source: Fbo = self._raw
-        if guide is not None:
-            self._guided.begin()
-            self._guide_shader.use(self._raw, guide, GUIDE_SPACING)
-            self._guided.end()
-            source = self._guided
         self._input_fbo.swap()
         self._input_fbo.begin()
-        self._step_filter_shader.use(source, step, tolerance if edge is None else edge)
+        self._step_filter_shader.use(self._raw, step, tolerance if edge is None else edge)
         self._input_fbo.end()
 
         # both runs read the track and the catch-up of the frame before: first the track, then the catch-up
@@ -328,31 +313,6 @@ def track_depth(depth: np.ndarray, state: np.ndarray, catch_up: np.ndarray, disp
         anchor = tracked
     return (np.where(measured[..., None], np.stack((z, disparity, rate, anchor), axis=-1), 0.0),
             np.stack((signed, size), axis=-1))
-
-
-GUIDE_RADIUS, GUIDE_SPACE, GUIDE_RANGE = 5, 8.0, 0.05     # as depth_guide.frag: taps to each side, Gaussians of distance (px) and luminance
-
-
-def guide_depth(depth: np.ndarray, luminance: np.ndarray, spacing: float = GUIDE_SPACING) -> np.ndarray:
-    """The depth (H, W, m) sharpened at the edges of `luminance` (H, W, 0 to 1), a joint bilateral
-    filter: the mean over (2·GUIDE_RADIUS+1)² taps `spacing` pixels apart, each weighed by a Gaussian
-    of its distance and of its luminance's difference from the center's. Taps without depth do not
-    count; a pixel without depth keeps none. Mirrors depth_guide.frag."""
-    h, w = depth.shape
-    rows, columns = np.mgrid[0:h, 0:w]
-    total: np.ndarray = np.zeros((h, w))
-    weights: np.ndarray = np.zeros((h, w))
-    for j in range(-GUIDE_RADIUS, GUIDE_RADIUS + 1):
-        for i in range(-GUIDE_RADIUS, GUIDE_RADIUS + 1):
-            ox, oy = i * spacing, j * spacing
-            y = np.clip(rows + int(np.round(oy)), 0, h - 1)
-            x = np.clip(columns + int(np.round(ox)), 0, w - 1)
-            sample: np.ndarray = depth[y, x]
-            difference: np.ndarray = luminance[y, x] - luminance
-            weight: np.ndarray = (sample > 0.0) * np.exp(-(ox * ox + oy * oy) / (2.0 * GUIDE_SPACE ** 2) - difference ** 2 / (2.0 * GUIDE_RANGE ** 2))
-            total += weight * sample
-            weights += weight
-    return np.where(depth > 0.0, total / np.maximum(weights, 1e-30), 0.0)
 
 
 def filter_depth_steps(depth: np.ndarray, step: tuple[float, float], tolerance: float) -> np.ndarray:
