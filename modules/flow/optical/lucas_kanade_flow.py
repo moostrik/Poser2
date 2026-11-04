@@ -51,7 +51,7 @@ class LucasKanadeFlowSettings(BaseSettings):
     xy_same_surface: Field[bool] = Field(False, newline=True, width=48, description="Patch counts only the center's surface (on: less smear, wide fast parts slower)")
     xy_threshold:   Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="x/y below this is noise, in px/frame (higher: less noise, less slow motion)")
     xy_median:      Field[Patch] = Field(Patch.ONE, min=Patch.ONE, max=Patch.FIVE, visible=False, description="Median size per level, 1×1 = off (larger: cleaner, more GPU)")  # hidden: kept for hd_trio's 2D LK at a lower resolution; delete it if it doesn't earn its place there
-    z_edge:         Field[float] = Field(0.1, min=0.05, max=0.3, step=0.005, newline=True, description="Edge depth step, m (lower: cleaner edges, fewer fingers)")
+    z_edge:         Field[float] = Field(0.1, min=0.05, max=0.3, step=0.01, newline=True, description="Edge depth step, m (lower: cleaner edges, fewer fingers)")
     z_window:       Field[Patch] = Field(Patch.THREE, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)")
     z_tolerance:    Field[float] = Field(0.1, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m (higher: fuller pushes, fewer splits)")
     z_restart_frames: Field[int] = Field(1, min=1, max=4, description="Frames a jump past z_tolerance may take, 1 = one (more: less wake z, fast pushes cut)")
@@ -61,9 +61,9 @@ class LucasKanadeFlowSettings(BaseSettings):
     z_dead_zone:    Field[float] = Field(0.0, min=0.0, max=0.05, step=0.001, newline=True, description="Depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
     z_threshold:    Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="z below this is noise, in px/frame (higher: less noise, less slow z)")
     use_mask:       Field[bool]  = Field(False, newline=True, width=48, description="Only the player moves the fluid (off: whole image)")
-    x_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, widget=Widget.knob, description="1 = true speed, image widths per second")
-    y_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, widget=Widget.knob, description="1 = true speed, image widths per second")
-    z_gain:         Field[float] = Field(0.0, min=-10.0, max=10.0, widget=Widget.knob, description="1 = true speed, on the x/y scale")
+    x_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, image widths per second")
+    y_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, image widths per second")
+    z_gain:         Field[float] = Field(0.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, on the x/y scale")
 
 
 class LucasKanadeFlow:
