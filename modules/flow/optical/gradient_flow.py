@@ -27,7 +27,7 @@ class GradientFlowSettings(BaseSettings):
     z_threshold = Field(0.5, min=0.0, max=10.0, step=0.05, description="z motion below this is noise, taken off the rest (px per frame)")
     z_dead_zone = Field(0.0, min=0.0, max=0.05, step=0.001, description="Depth z wanders without reading as motion; past it, full speed (m); 0 is off")
     z_smooth = Field(50.0, min=0.0, max=1000.0, description="Time z is smoothed over (ms); 0 is the change of two frames")
-    z_tolerance = Field(0.1, min=0.01, max=1.0, description="Depth further than this is another surface: not averaged in, z starts over (m)")
+    z_tolerance = Field(0.1, min=0.01, max=1.0, description="Depth further than this is another surface: z starts over, and an edge step this big is dropped (m)")
     strength_x = Field(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)", newline=True)
     strength_y = Field(3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
     strength_z = Field(0.0, min=0.0, max=10.0, description="Velocity per view width per second toward the camera; 0 is no depth")
