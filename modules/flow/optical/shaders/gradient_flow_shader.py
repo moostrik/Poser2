@@ -1,6 +1,6 @@
-"""Optical Flow shader.
+"""Gradient Flow shader.
 
-Computes sparse optical flow (Lucas-Kanade style) between two frames.
+The brightness change along the brightness gradient between two frames, over three mip levels.
 Ported from ofxFlowTools ftOpticalFlowShader.h
 """
 
@@ -11,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-class OpticalFlowMM(Shader):
+class GradientFlowShader(Shader):
     """Compute optical flow velocity field between two luminance frames."""
 
     def use(self, curr_tex: Texture, prev_tex: Texture,
@@ -30,10 +30,10 @@ class OpticalFlowMM(Shader):
             power: Power curve for magnitude (related to boost)
         """
         if not self.allocated or not self.shader_program:
-            logger.warning("OpticalFlow shader not allocated or shader program missing.")
+            logger.warning("GradientFlow shader not allocated or shader program missing.")
             return
         if not curr_tex.allocated or not prev_tex.allocated:
-            logger.warning("OpticalFlow shader: input textures not allocated.")
+            logger.warning("GradientFlow shader: input textures not allocated.")
             return
 
         # Activate shader program

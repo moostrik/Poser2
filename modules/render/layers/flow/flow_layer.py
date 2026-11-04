@@ -12,14 +12,7 @@ from modules.pose import Frame, AngleMotion
 from ..source import MaskSourceLayer
 
 from modules.settings import Field, BaseSettings, Group
-from modules.flow import (
-    OpticalFlow, OpticalFlowSettings,
-    VelocitySmoothTrail, SmoothTrailSettings,
-    Magnitude, VelocityMagnitude,
-    TemperatureBridge, TemperatureBridgeSettings,
-    DensityBridge, DensityBridgeSettings,
-    Visualizer, VisualizationFieldSettings
-)
+from modules.flow import GradientFlow, GradientFlowSettings, bridge_2d, Visualizer, VisualizationFieldSettings
 
 from modules.utils import HotReloadMethods
 
@@ -59,18 +52,18 @@ class FlowLayerSettings(BaseSettings):
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
 
     visualization      = Group(VisualizationFieldSettings)
-    optical_flow       = Group(OpticalFlowSettings)
-    velocity_trail     = Group(SmoothTrailSettings)
-    density_bridge     = Group(DensityBridgeSettings)
-    temperature_bridge = Group(TemperatureBridgeSettings)
+    optical_flow       = Group(GradientFlowSettings)
+    velocity_trail     = Group(bridge_2d.SmoothTrailSettings)
+    density_bridge     = Group(bridge_2d.DensityBridgeSettings)
+    temperature_bridge = Group(bridge_2d.TemperatureBridgeSettings)
 
 
 class FlowLayer(LayerBase):
     """Flow processing layer with optical flow and bridges.
 
     Computes optical flow and prepares velocity/density/temperature for fluid simulation:
-    1. OpticalFlow: Computes motion from source frames
-    2. VelocitySmoothTrail: Smooths velocity temporally
+    1. GradientFlow: Computes motion from source frames
+    2. VelocitySmoothTrail: Smooths velocity temporally (2–4 are the 2D bridge, bridge_2d)
     3. DensityBridge: Combines RGB density with velocity info
     4. TemperatureBridge: Generates temperature field
 
@@ -105,11 +98,11 @@ class FlowLayer(LayerBase):
         self._density_input: Texture = density_input
         self.settings: FlowLayerSettings = settings or FlowLayerSettings()
 
-        self._optical_flow: OpticalFlow = OpticalFlow(self.settings.optical_flow)
-        self._velocity_trail: VelocitySmoothTrail = VelocitySmoothTrail(self.settings.velocity_trail)
-        self._velocity_magnitude: VelocityMagnitude = VelocityMagnitude()
-        self._density_bridge: DensityBridge = DensityBridge(self.settings.density_bridge)
-        self._temperature_bridge: TemperatureBridge = TemperatureBridge(self.settings.temperature_bridge)
+        self._optical_flow: GradientFlow = GradientFlow(self.settings.optical_flow)
+        self._velocity_trail: bridge_2d.VelocitySmoothTrail = bridge_2d.VelocitySmoothTrail(self.settings.velocity_trail)
+        self._velocity_magnitude: bridge_2d.VelocityMagnitude = bridge_2d.VelocityMagnitude()
+        self._density_bridge: bridge_2d.DensityBridge = bridge_2d.DensityBridge(self.settings.density_bridge)
+        self._temperature_bridge: bridge_2d.TemperatureBridge = bridge_2d.TemperatureBridge(self.settings.temperature_bridge)
 
         self._visualizer: Visualizer = Visualizer(self.settings.visualization)
 
@@ -213,7 +206,8 @@ class FlowLayer(LayerBase):
         # self._density_bridge.set_color(self._flow_input)
         self._density_bridge.set_color(self._density_input)
         # self._density_bridge.update(motion)
-        self._density_bridge.set_alpha(self._velocity_magnitude.magnitude)
+        self._density_bridge.set_velocity(self._velocity_trail.velocity)
+        # self._density_bridge.set_velocity(self._mask_source.texture)
         self._density_bridge.update()
 
         self._temperature_bridge.set_color(self._density_input)
@@ -247,7 +241,7 @@ class FlowLayer(LayerBase):
             FlowDrawMode.SMOOTH_VELOCITY_OUTPUT: self._velocity_trail.velocity,
             FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE: self._velocity_magnitude.magnitude,
             FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR: self._density_bridge.color_input,
-            FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY: self._density_bridge.alpha_input,
+            FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY: self._density_bridge.velocity_input,
             FlowDrawMode.DENSITY_BRIDGE_OUTPUT: self._density_bridge.density,
             FlowDrawMode.TEMPERATURE_BRIDGE_INPUT_COLOR: self._temperature_bridge.color_input,
             FlowDrawMode.TEMPERATURE_BRIDGE_INPUT_MASK: self._temperature_bridge.mask_input,

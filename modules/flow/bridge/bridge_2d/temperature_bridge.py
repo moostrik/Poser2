@@ -11,13 +11,11 @@ Formula: temp = (warm - cold) * (1.0 - neutral * 0.5) * mask * speed
 
 Ported from ofxFlowTools ftTemperatureBridgeFlow.h
 """
-from dataclasses import dataclass, field
-
 from OpenGL.GL import GL_R16F, GL_R32F, GL_RGB16F
 
 from modules.gl import Texture, SwapFbo
 from modules.settings import Field, BaseSettings
-from .. import FlowBase, FlowUtil
+from ... import FlowBase, FlowUtil
 from .shaders import TemperatureBridgeShader
 
 
@@ -132,5 +130,3 @@ class TemperatureBridge(FlowBase):
             self.settings.scale
         )
         self._output_fbo.end()
-
-        # FlowUtil.blit(self._output_fbo, self.color_input)

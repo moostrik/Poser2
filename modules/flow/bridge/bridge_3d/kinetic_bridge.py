@@ -10,8 +10,8 @@ from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R16F, GL_R32F, GL_R
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import Field, BaseSettings
-from .. import FlowBase, FlowUtil
-from ..shaders import Trail, GaussianBlur
+from ... import FlowBase, FlowUtil
+from ...shaders import Trail, GaussianBlur
 from .kinetics import decay_weight
 from .shaders import KineticAdvect, KineticCurl, KineticEmission, KineticHold, KineticOnset, KineticPatch, KineticProjection, KineticReservoir, KineticVelocity, Projection, ScaleVelocity
 

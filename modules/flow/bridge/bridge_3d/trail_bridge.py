@@ -9,8 +9,8 @@ from OpenGL.GL import GL_RGBA16F
 
 from modules.gl import Texture
 from modules.settings import Field, BaseSettings
-from .. import FlowBase
-from ..shaders import Trail, GaussianBlur
+from ... import FlowBase
+from ...shaders import Trail, GaussianBlur
 from .kinetics import decay_weight
 from .shaders import ShapeVelocity
 

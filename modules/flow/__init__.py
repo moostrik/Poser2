@@ -11,12 +11,12 @@ from .flow_util import FlowUtil
 
 # Optical flow
 from .optical import DepthVelocity, catch_up_share, color_motion, filter_depth_steps, track_depth, track_weights, depth_threshold, \
-                     OpticalFlow, OpticalFlowSettings, LucasKanadeFlow, Patch, LucasKanadeFlowSettings, LucasKanadeSettings, DepthTrackSettings, lucas_kanade, median_displacement, threshold_displacement, filter_displacement, displacement_velocity
+                     GradientFlow, GradientFlowSettings, LucasKanadeFlow, Patch, LucasKanadeFlowSettings, LucasKanadeSettings, DepthTrackSettings, lucas_kanade, median_displacement, threshold_displacement, filter_displacement, displacement_velocity
 
-# Bridge layers
-from .bridge import     DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
+# Bridge layers: the 3D bridge by name, the 2D bridge as `bridge_2d` (bridge_2d.DensityBridge, ...)
+from .bridge import     bridge_2d, DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
                         BlurPosition, KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES, decay_weight, project, stop_gate, hold_release, drop, fill_reservoir, advect, \
-                        SmoothTrail, VelocitySmoothTrail, SmoothTrailSettings, TrailBridge, TrailBridgeSettings, shape_velocity, \
+                        TrailBridge, TrailBridgeSettings, shape_velocity, \
                         TemperatureBridge, TemperatureBridgeSettings
 
 # Visualization

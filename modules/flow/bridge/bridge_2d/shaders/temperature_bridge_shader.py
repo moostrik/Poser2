@@ -1,0 +1,45 @@
+"""Temperature Bridge Shader.
+
+Combines RGB color interpretation with velocity magnitude mask.
+R=warm, G=neutral dampening, B=cold
+"""
+
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from modules.gl import Shader, draw_quad, Texture
+
+import logging
+logger = logging.getLogger(__name__)
+
+
+class TemperatureBridgeShader(Shader):
+    """Temperature bridge: interprets RGB as warm/neutral/cold × mask."""
+
+    def use(self, color: Texture, mask: Texture, scale: float) -> None:
+        """Combine color interpretation with velocity magnitude mask.
+
+        Args:
+            color: RGB color (R=warm, G=neutral, B=cold)
+            mask: Velocity magnitude mask (R32F)
+            scale: Output multiplier
+        """
+        if not self.allocated or not self.shader_program:
+            logger.warning("TemperatureBridge shader not allocated or shader program missing.")
+            return
+        if not color.allocated or not mask.allocated:
+            logger.warning("TemperatureBridge shader: input texture(s) not allocated.")
+            return
+
+        glUseProgram(self.shader_program)
+
+        # Bind textures
+        glActiveTexture(GL_TEXTURE0)
+        glBindTexture(GL_TEXTURE_2D, color.tex_id)
+        glActiveTexture(GL_TEXTURE1)
+        glBindTexture(GL_TEXTURE_2D, mask.tex_id)
+
+        glUniform1i(self.get_uniform_loc("uColor"), 0)
+        glUniform1i(self.get_uniform_loc("uMask"), 1)
+        glUniform1f(self.get_uniform_loc("uScale"), scale)
+
+        # Draw
+        draw_quad()

@@ -1,6 +1,6 @@
-"""Optical Flow Layer.
+"""Gradient Flow: the 2D optical flow, as on main.
 
-Computes optical flow velocity field from input frames.
+Computes the velocity field along the brightness gradient between two frames: hd_trio's flow.
 Ported from ofxFlowTools ftOpticalFlow.h
 """
 from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R8, GL_RED, GL_RG16F, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
@@ -9,12 +9,12 @@ from modules.gl import Fbo, Texture, Blit
 
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil
-from .shaders import Luminance, OpticalFlowMM as OpticalFlowMMShader
+from .shaders import Luminance, GradientFlowShader
 
 from modules.utils import HotReloadMethods
 
 
-class OpticalFlowSettings(BaseSettings):
+class GradientFlowSettings(BaseSettings):
     offset = Field(3, min=1, max=10, description="Gradient sample offset in pixels")
     threshold = Field(0.0, min=0.0, max=0.2, description="Motion detection threshold")
     strength_x = Field(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)")
@@ -22,13 +22,13 @@ class OpticalFlowSettings(BaseSettings):
     boost = Field(0.0, min=-0.5, max=0.9, description="Power boost for small motions")
 
 
-class OpticalFlow(FlowBase):
-    """Compute optical flow velocity field from sequential frames.
+class GradientFlow(FlowBase):
+    """Compute the gradient flow's velocity field from sequential frames.
 
     Uses input_fbo as SwapFbo to store current and previous frames.
     """
 
-    def __init__(self, settings: OpticalFlowSettings | None = None) -> None:
+    def __init__(self, settings: GradientFlowSettings | None = None) -> None:
         super().__init__()
 
         # Define internal formats
@@ -36,7 +36,7 @@ class OpticalFlow(FlowBase):
         self._output_internal_format = GL_RG16F  # Velocity output
 
         # Configuration with change notification
-        self.settings: OpticalFlowSettings = settings or OpticalFlowSettings()
+        self.settings: GradientFlowSettings = settings or GradientFlowSettings()
         self.settings.bind_all(lambda v: self._on_settings_changed())
 
         # State
@@ -44,7 +44,7 @@ class OpticalFlow(FlowBase):
         self._needs_update: bool = False
 
         # Shaders
-        self._optical_flow_shader_mm: OpticalFlowMMShader = OpticalFlowMMShader()
+        self._gradient_flow_shader: GradientFlowShader = GradientFlowShader()
         self._luminance_shader: Luminance = Luminance()
 
         # hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -70,7 +70,7 @@ class OpticalFlow(FlowBase):
             glGenerateMipmap(GL_TEXTURE_2D)  # Initial generation
         glBindTexture(GL_TEXTURE_2D, 0)
 
-        self._optical_flow_shader_mm.allocate()
+        self._gradient_flow_shader.allocate()
         self._luminance_shader.allocate()
 
         self._frame_count = 0
@@ -79,7 +79,7 @@ class OpticalFlow(FlowBase):
     def deallocate(self) -> None:
         """Release all resources."""
         super().deallocate()
-        self._optical_flow_shader_mm.deallocate()
+        self._gradient_flow_shader.deallocate()
         self._luminance_shader.deallocate()
 
     def update(self, delta_time: float = 1.0) -> None:
@@ -103,11 +103,11 @@ class OpticalFlow(FlowBase):
         # Compute optical flow using settings values
         power = 1.0 - self.settings.boost
 
-        self._optical_flow_shader_mm.reload()
+        self._gradient_flow_shader.reload()
 
         # Pass output_fbo directly since it's now a Fbo
         self._output_fbo.begin()
-        self._optical_flow_shader_mm.use(
+        self._gradient_flow_shader.use(
             prev_frame,
             curr_frame,
             offset=self.settings.offset,
