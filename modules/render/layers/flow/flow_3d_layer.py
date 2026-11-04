@@ -2,6 +2,7 @@
 
 # Standard library imports
 import logging
+import time     # TEMP diagnostic
 from enum import IntEnum, auto
 from typing import Protocol, runtime_checkable
 
@@ -381,14 +382,49 @@ class Flow3DLayer(LayerBase):
         self._capture_timestamp = timestamp
         gap: float | None = timestamp - last if timestamp is not None and last is not None else None
         if gap is None or not 0.0 < gap < MAX_FRAME_INTERVAL:
-            return self._frame_period if self._frame_period is not None else self._flow_interval
+            interval: float = self._frame_period if self._frame_period is not None else self._flow_interval
+            self._diagnose(gap, interval, timestamp)   # TEMP diagnostic
+            return interval
         if self._frame_period is None:
             self._frame_period = gap
+            self._diagnose(gap, gap, timestamp)   # TEMP diagnostic
             return gap
         low, high = FRAME_PERIOD_BAND
+        raw: float = gap
         gap = min(max(gap, low * self._frame_period), high * self._frame_period)
         self._frame_period += FRAME_PERIOD_WEIGHT * (gap - self._frame_period)
+        self._diagnose(raw, gap, timestamp)   # TEMP diagnostic
         return gap
+
+    def _diagnose(self, gap: float | None, interval: float, timestamp: float | None) -> None:
+        """TEMP diagnostic: once a second, the flow intervals over that second and the raw stamp gaps, to the log."""
+        if not hasattr(self, '_diagnostic'):
+            self._diagnostic: dict = {'start': time.perf_counter(), 'intervals': [], 'gaps': [], 'clamped': 0, 'none': 0, 'ticks': [], 'stamps': set()}
+        d: dict = self._diagnostic
+        d['intervals'].append(interval * 1000.0)
+        d['ticks'].append(self._flow_interval * 1000.0)
+        if gap is None:
+            d['none'] += 1
+        else:
+            d['gaps'].append(gap * 1000.0)
+            if abs(gap - interval) > 1e-9:
+                d['clamped'] += 1
+        if timestamp is not None:
+            d['stamps'].add(timestamp)
+        now: float = time.perf_counter()
+        if now - d['start'] < 1.0:
+            return
+
+        def stats(values: list[float]) -> str:
+            if not values:
+                return 'none'
+            v = sorted(values)
+            return f'n {len(v)} min {v[0]:.1f} median {v[len(v) // 2]:.1f} max {v[-1]:.1f}'
+
+        logger.info("FLOW TIMING cam %d | interval %s | raw gap %s | ticks %s | clamped %d, no gap %d | distinct stamps %d of %d flow updates",
+                    self._cam_id, stats(d['intervals']), stats(d['gaps']), stats(d['ticks']), d['clamped'], d['none'],
+                    len(d['stamps']), len(d['intervals']))
+        self._diagnostic = {'start': now, 'intervals': [], 'gaps': [], 'clamped': 0, 'none': 0, 'ticks': [], 'stamps': set()}
 
     # ========== Processing ==========
 
