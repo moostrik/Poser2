@@ -27,10 +27,10 @@ class GradientFlowSettings(BaseSettings):
     z_smooth = Field(50.0, min=0.0, max=200.0, step=1.0, description="Smoothing time of z in ms, 0 = two-frame change (higher: less noise, more lag)")
     z_tolerance = Field(0.1, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m (higher: fuller pushes, fewer splits)")
     z_edge = Field(0.1, min=0.05, max=0.3, step=0.005, description="Edge depth step, m (lower: cleaner edges, fewer fingers)")
-    x_gain = Field(3.3, min=-10.0, max=10.0, description="x gain, negative inverts (higher: stronger, more clamping)", newline=True)
-    y_gain = Field(3.3, min=-10.0, max=10.0, description="y gain, negative inverts (higher: stronger, more clamping)")
-    z_gain = Field(0.0, min=-10.0, max=10.0, description="z gain (higher: stronger, more clamping)")
-    use_mask = Field(False, description="Only the player moves the fluid (off: whole image)")
+    use_mask = Field(False, description="Only the player moves the fluid (off: whole image)", newline=True)
+    x_gain = Field(3.3, min=-10.0, max=10.0, description="Multiplier on the gradient motion", newline=True)
+    y_gain = Field(3.3, min=-10.0, max=10.0, description="Multiplier on the gradient motion")
+    z_gain = Field(0.0, min=-10.0, max=10.0, description="1 = true speed, view widths per second")
 
 
 class GradientFlow:
