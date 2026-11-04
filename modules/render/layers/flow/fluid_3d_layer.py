@@ -1,7 +1,7 @@
 """Fluid3D Layer - 3D Navier-Stokes fluid simulation with cross-camera flow inputs.
 
 Volumetric extension of FluidLayer. Receives 2D velocity, density, and
-temperature from all FlowLayers and runs a full 3D Navier-Stokes simulation
+temperature from all Flow3DLayers and runs a full 3D Navier-Stokes simulation
 with gaussian depth injection.  The composited 2D density output is already
 RGB-coloured — no post-composite colorisation step is needed.
 """
@@ -25,7 +25,7 @@ from modules.flow import FluidFlow, FluidFlow3D, FluidFlowSettings
 
 from modules.utils import HotReloadMethods
 
-from .flow_layer import FlowLayer
+from .flow_3d_layer import Flow3DLayer
 from ...color_settings import ColorSettings
 
 class FluidSimEngine(IntEnum):
@@ -59,9 +59,9 @@ class Fluid3DLayerSettings(BaseSettings):
 class Fluid3DLayer(LayerBase):
     """3D fluid simulation layer with cross-camera flow inputs.
 
-    Receives velocity, density, and temperature from all FlowLayers and runs
+    Receives velocity, density, and temperature from all Flow3DLayers and runs
     a volumetric Navier-Stokes fluid simulation:
-    1. Aggregate inputs from connected FlowLayers
+    1. Aggregate inputs from connected Flow3DLayers
     2. Inject velocity, density (RGB colour baked in), temperature into the 3D volume
     3. Run 3D advection, pressure projection, viscosity, buoyancy, vorticity
     4. Composite the 3D density volume -> coloured 2D output
@@ -70,13 +70,13 @@ class Fluid3DLayer(LayerBase):
     output resolution); Composite3DDensity flattens it to the final RGBA16F 2D output.
 
     Cross-camera support:
-        Each Fluid3DLayer receives a dict of all FlowLayers, enabling
+        Each Fluid3DLayer receives a dict of all Flow3DLayers, enabling
         cross-camera influence (e.g., motion from camera 0 affecting
         fluid in camera 1's output).
 
     Usage:
         # In RenderManager:
-        flow_layers = {i: FlowLayer(...) for i in range(num_cams)}
+        flow_layers = {i: Flow3DLayer(...) for i in range(num_cams)}
         fluid3d = Fluid3DLayer(cam_id, board, flow_layers, colors, settings)
 
         # Each frame:
@@ -84,19 +84,19 @@ class Fluid3DLayer(LayerBase):
         density_texture = fluid3d.density
     """
 
-    def __init__(self, cam_id: int, board: HasFrames, flow_layers: dict[int, FlowLayer], settings: Fluid3DLayerSettings, color_settings: ColorSettings) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, flow_layers: dict[int, Flow3DLayer], settings: Fluid3DLayerSettings, color_settings: ColorSettings) -> None:
         """Initialize 3D fluid layer.
 
         Args:
             cam_id: Camera ID for this layer's output
             board: Board for pose data
-            flow_layers: Dict of all FlowLayers (cam_id -> FlowLayer)
+            flow_layers: Dict of all Flow3DLayers (cam_id -> Flow3DLayer)
             settings: Layer configuration
             color_settings: Per-camera colors for density colorization
         """
         self._cam_id: int = cam_id
         self._board: HasFrames = board
-        self._flow_layers: dict[int, FlowLayer] = flow_layers
+        self._flow_layers: dict[int, Flow3DLayer] = flow_layers
         self.settings: Fluid3DLayerSettings = settings or Fluid3DLayerSettings()
         self._color_settings: ColorSettings = color_settings
 

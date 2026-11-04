@@ -31,7 +31,7 @@ from OpenGL.raw.GL.VERSION.GL_1_1 import glGetTexImage as raw_get_tex_image  # n
 from modules.log_config import setup_logging, install_excepthooks  # noqa: E402
 from modules.gl import Fbo, Style  # noqa: E402
 from modules.flow import FlowUtil, LucasKanadeFlow  # noqa: E402
-from modules.render.layers.flow.flow_layer import OpticalFlowMethod  # noqa: E402
+from modules.render.layers import OpticalFlowMethod  # noqa: E402
 from apps.deep_flow.main import DeepFlowMain  # noqa: E402
 
 LOOP_TIMEOUT: float = 60.0      # seconds a loop may take before the capture gives up

@@ -104,7 +104,7 @@ class DeepFlowRender(RenderBase):
         settings.data.b.line_smooth = 6.0
         settings.data.b.use_history_color = True
 
-        flows: dict[int, ls.FlowLayer] = {}
+        flows: dict[int, ls.Flow3DLayer] = {}
         cmt: dict[int, Texture] = {}    # the center masks
         depth_source: bool = mask_source == MaskSource.DEPTH
         space: ls.SourceSpace = ls.SourceSpace.IMAGE if depth_source else ls.SourceSpace.CROP
@@ -140,7 +140,7 @@ class DeepFlowRender(RenderBase):
             center_pose =   self.L[Layers.center_pose][i] = ls.CenterPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
 
             ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,   center_foreground.texture, cmt, settings.center.color, settings.colors)
-            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,   cam_mask,  center_mask.texture, center_foreground.texture, settings.flow)
+            flows[i] =      self.L[Layers.flow][i] =        ls.Flow3DLayer(         i, self.board,   cam_mask,  center_mask.texture, center_foreground.texture, settings.flow)
             fluid3d =       self.L[Layers.fluid3d][i] =     ls.Fluid3DLayer(        i, self.board,   flows,                      settings.fluid3d,           settings.colors)
 
             composite =    self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid3d, ms_mask],         settings.layer.composite)
@@ -234,7 +234,7 @@ class DeepFlowRender(RenderBase):
             self._reset_fluid.clear()
             for layer_type in [Layers.flow, Layers.fluid3d]:
                 for layer in self.L[layer_type].values():
-                    cast(ls.FlowLayer | ls.Fluid3DLayer, layer).reset()
+                    cast(ls.Flow3DLayer | ls.Fluid3DLayer, layer).reset()
 
         select = self.settings.layer.select
         self._left_layers = select.left
@@ -247,7 +247,7 @@ class DeepFlowRender(RenderBase):
         mask_key: Layers = self.settings.flow.inputs.mask
         flow_source_key: Layers = self._flow_sources.get(flow_key, flow_key)
         for i, _flow_layer in self.L[Layers.flow].items():
-            flow_layer = cast(ls.FlowLayer, _flow_layer)
+            flow_layer = cast(ls.Flow3DLayer, _flow_layer)
             flow_layer.set_time_step(1.0 / self.settings.fluid3d.fluid_flow.step_fps)
             flow_layer.set_depth_input(cast(ls.CenterDepthLayer, self.L[Layers.center_depth][i]).depth)
             crop: Rect = cast(ls.CenterGeometry, self.L[Layers.center_geometry][i]).image_geometry.crop_roi
@@ -273,7 +273,7 @@ class DeepFlowRender(RenderBase):
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[Layers] = set()
-        depth_needed: bool = any(cast(ls.FlowLayer, layer).uses_depth for layer in self.L[Layers.flow].values())
+        depth_needed: bool = any(cast(ls.Flow3DLayer, layer).uses_depth for layer in self.L[Layers.flow].values())
         update_layers: list[Layers] = [layer_type for layer_type in self._update_layers if depth_needed or layer_type != Layers.center_depth]
         for layer_type in update_layers + self._interface_layers + self._left_layers + self._right_layers + self._output_layers:
             if layer_type not in seen:

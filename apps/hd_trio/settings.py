@@ -384,7 +384,7 @@ class RenderSettings(BaseSettings):
     preview: Group[PreviewGroup]              = Group(PreviewGroup)
     center : Group[CenterGroup]               = Group(CenterGroup, share=[similarity_scale])
     intro_sequence: Group[IntroSequenceSettings] = Group(IntroSequenceSettings)
-    flow   : Group[layers.FlowLayerSettings]  = Group(layers.FlowLayerSettings)
+    flow   : Group[layers.FlowLayerSettings]  = Group(layers.FlowLayerSettings, share=[stage])
     fluid  : Group[layers.FluidLayerSettings] = Group(layers.FluidLayerSettings, share=[stage, similarity_scale])
     colors : Group[ColorSettings]             = Group(ColorSettings)
     window : Group[WindowSettings]            = Group(WindowSettings)

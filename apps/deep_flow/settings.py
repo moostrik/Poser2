@@ -244,7 +244,7 @@ class FluidInputSettings(BaseSettings):
     density: Field[Layers] = Field(Layers.center_capture,    description="Texture used as density and temperature input")
     mask:    Field[Layers] = Field(Layers.center_mask,       description="Mask that gates the flow's velocity and density")
 
-class _FlowLayerSettings(layers.FlowLayerSettings):
+class _Flow3DLayerSettings(layers.Flow3DLayerSettings):
     inputs: Group[FluidInputSettings] = Group(FluidInputSettings)
 
 
@@ -277,7 +277,7 @@ class RenderSettings(BaseSettings):
     preview: Group[PreviewGroup]                 = Group(PreviewGroup)
     center : Group[CenterGroup]                  = Group(CenterGroup)
     depth  : Group[layers.DepthSourceLayerSettings] = Group(layers.DepthSourceLayerSettings)
-    flow   : Group[_FlowLayerSettings]           = Group(_FlowLayerSettings)
+    flow   : Group[_Flow3DLayerSettings]         = Group(_Flow3DLayerSettings)
     fluid3d: Group[layers.Fluid3DLayerSettings]  = Group(layers.Fluid3DLayerSettings, share=[stage])
     time_series: Group[layers.TimeSeriesLayerSettings] = Group(layers.TimeSeriesLayerSettings)
     colors : Group[ColorSettings]                = Group(ColorSettings)

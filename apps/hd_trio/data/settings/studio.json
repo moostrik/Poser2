@@ -524,40 +524,37 @@
       }
     },
     "flow": {
+      "fps": 60.0,
       "draw_mode": "SMOOTH_VELOCITY_OUTPUT",
       "blend_mode": "ADD",
       "width": 512,
       "height": 288,
-      "optical_flow": {
-        "gradient": {
-          "offset": 3,
-          "threshold": 0.0,
-          "x_gain": 3.3,
-          "y_gain": 3.3
-        }
-      },
-      "flow_bridge": {
-        "trail": {
-          "scale": 15.4,
-          "smooth": 158.0,
-          "blur_radius": 8.0,
-          "blur_steps": 4,
-          "boost": 0.0
-        },
-        "density": {
-          "saturation": 1.2,
-          "brightness": 2.0
-        },
-        "temperature": {
-          "scale": 0.5
-        }
-      },
       "visualization": {
         "toggle_scalar": false,
         "scale": 1.0,
         "spacing": 20.0,
         "element_length": 40.0,
         "element_width": 1.0
+      },
+      "optical_flow": {
+        "offset": 3,
+        "threshold": 0.0,
+        "strength_x": 3.3,
+        "strength_y": 3.3,
+        "boost": 0.0
+      },
+      "velocity_trail": {
+        "scale": 1.54,
+        "trail_weight": 0.9,
+        "blur_radius": 8.0,
+        "blur_steps": 4
+      },
+      "density_bridge": {
+        "saturation": 1.2,
+        "brightness": 2.0
+      },
+      "temperature_bridge": {
+        "scale": 0.5
       }
     },
     "fluid": {
