@@ -47,7 +47,7 @@ class LucasKanadeFlowSettings(BaseSettings):
     xy_levels:      Field[int]   = Field(3, min=3, max=5, description="Pyramid levels of the x/y solve, each doubles the reach (more: faster motion, more spill)")
     xy_damping:     Field[float] = Field(0.001, min=0.0, max=0.1, step=0.001, description="Damps x/y where the patch has little texture (higher: less noise, smaller motion)")
     xy_window:      Field[Patch] = Field(Patch.FIVE, min=Patch.THREE, max=Patch.NINE, description="x/y patch size (larger: cleaner, more spill)", newline=True)
-    xy_median:      Field[Patch] = Field(Patch.ONE, min=Patch.ONE, max=Patch.FIVE, description="Median size per level, 1×1 = off (larger: cleaner, more GPU)")
+    xy_median:      Field[Patch] = Field(Patch.ONE, min=Patch.ONE, max=Patch.FIVE, visible=False, description="Median size per level, 1×1 = off (larger: cleaner, more GPU)")  # hidden: kept for hd_trio's 2D LK at a lower resolution; delete it if it doesn't earn its place there
     xy_same_surface: Field[bool] = Field(False, description="Patch counts only the center's surface (on: less smear, wide fast parts slower)")
     xy_threshold:   Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="x/y below this is noise, in px/frame (higher: less noise, less slow motion)")
     z_window:       Field[Patch] = Field(Patch.THREE, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)", newline=True)
