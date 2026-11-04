@@ -34,7 +34,7 @@ import numpy as np
 from OpenGL.GL import GL_RG32F, GL_RGBA16F, GL_RGBA32F
 
 from modules.gl import Fbo, SwapFbo, Texture
-from modules.settings import BaseSettings, Field
+from modules.settings import BaseSettings, Field, Widget
 from .. import FlowUtil
 from .depth_velocity import DepthVelocity, track_weights
 from .luminance_frames import LuminanceFrames
@@ -54,14 +54,14 @@ class LucasKanadeFlowSettings(BaseSettings):
     z_window:       Field[Patch] = Field(Patch.THREE, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)")
     z_tolerance:    Field[float] = Field(0.1, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m (higher: fuller pushes, fewer splits)")
     z_smooth:       Field[float] = Field(50.0, min=0.0, max=200.0, step=1.0, newline=True, description="Smoothing time of z in ms, 0 = two-frame change (higher: less noise, more lag)")
-    z_catch_up:     Field[float] = Field(0.0, min=0.0, max=50.0, step=1.0, description="Shorter smoothing during a fast push, in ms, 0 = off (lower: quicker pushes)")
     xy_smooth:      Field[bool]  = Field(False, description="x/y smoothed over z_smooth, so both lag alike (on: less noise, more lag)")
+    z_catch_up:     Field[float] = Field(0.0, min=0.0, max=50.0, step=1.0, description="Shorter smoothing during a fast push, in ms, 0 = off (lower: quicker pushes)")
     z_dead_zone:    Field[float] = Field(0.0, min=0.0, max=0.05, step=0.001, newline=True, description="Depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
     z_threshold:    Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="z below this is noise, in px/frame (higher: less noise, less slow z)")
-    use_mask:       Field[bool]  = Field(False, description="Only the player moves the fluid (off: whole image)")
-    x_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, newline=True, description="1 = true speed, image widths per second")
-    y_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, description="1 = true speed, image widths per second")
-    z_gain:         Field[float] = Field(0.0, min=-10.0, max=10.0, description="1 = true speed, on the x/y scale")
+    use_mask:       Field[bool]  = Field(False, newline=True, description="Only the player moves the fluid (off: whole image)")
+    x_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, widget=Widget.knob, description="1 = true speed, image widths per second")
+    y_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, widget=Widget.knob, description="1 = true speed, image widths per second")
+    z_gain:         Field[float] = Field(0.0, min=-10.0, max=10.0, widget=Widget.knob, description="1 = true speed, on the x/y scale")
 
 
 class LucasKanadeFlow:
