@@ -58,7 +58,7 @@ class LucasKanadeFlowSettings(BaseSettings):
     z_edge:         Field[float] = Field(0.1, min=0.05, max=0.3, step=0.005, description="Edge depth step, m (lower: cleaner edges, fewer fingers)")
     x_gain:  Field[float] = Field(1.0, min=-10.0, max=10.0, description="x gain, negative inverts (higher: stronger, more clamping)", newline=True)
     y_gain:  Field[float] = Field(1.0, min=-10.0, max=10.0, description="y gain, negative inverts (higher: stronger, more clamping)")
-    z_gain:  Field[float] = Field(0.0, min=-10.0, max=10.0, description="z gain, 1 = x/y, negative inverts (higher: stronger z)")
+    z_gain:  Field[float] = Field(0.0, min=-10.0, max=10.0, description="z gain, 1 matches x/y (higher: stronger, more clamping)")
     use_mask:    Field[bool]  = Field(False, description="Only the player moves the fluid (off: whole image)", newline=True)
 
 
