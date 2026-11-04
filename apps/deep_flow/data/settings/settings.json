@@ -28,8 +28,8 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 361,
-        "auto_exposure": false,
+        "iso": 2061,
+        "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
         "auto_iso_limit": 16585,
@@ -40,8 +40,8 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 4348,
-        "auto_balance": false,
+        "balance": 5610,
+        "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
         "contrast": 0,
@@ -275,7 +275,7 @@
           "flow"
         ],
         "right": [
-          "center_depth"
+          "fluid3d"
         ],
         "output": [
           "cam_image"
@@ -413,17 +413,16 @@
         "mask": "center_mask"
       },
       "optical_flow": {
-        "use_mask": true,
+        "use_mask": false,
         "x": true,
         "y": true,
-        "z": true,
+        "z": false,
         "lucas_kanade": {
-          "levels": 3,
+          "levels": 4,
           "window": "SEVEN",
           "damping": 0.03,
           "same_surface": true,
-          "threshold": 0.5,
-          "median": "ONE"
+          "threshold": 1.1
         },
         "depth_track": {
           "edge": 0.1,
@@ -440,11 +439,11 @@
         "method": "VELOCITY_TRAIL",
         "velocity_trail": {
           "pivot": 0.15,
-          "curve": 1.0,
+          "curve": 1.4,
           "limit": 4.0,
           "z_limit": 4.0,
-          "attack": 0.0,
-          "smooth": 230.0,
+          "attack": 200.0,
+          "smooth": 1000.0,
           "blur_radius": 0.0
         },
         "kinetic": {
@@ -484,19 +483,19 @@
         }
       },
       "visualization": {
-        "toggle_scalar": false,
+        "toggle_scalar": true,
         "scale": 1.07,
         "scalar_scale": 1.0,
         "strip_scale": 5.76,
-        "spacing": 64.0,
+        "spacing": 4.0,
         "z_scale": 1.0,
         "element_length": 1.0,
-        "element_width": 2.5
+        "element_width": 0.83
       }
     },
     "fluid3d": {
       "max_players": 1,
-      "sim_engine": "FLUID_3D",
+      "sim_engine": "FLUID_2D",
       "blend_mode": "ADD",
       "scale_by_motion": true,
       "fluid_flow": {
@@ -529,6 +528,8 @@
         },
         "velocity": {
           "input_strength": 0.57,
+          "input_x": 1.0,
+          "input_y": 1.0,
           "squeeze": 0.0,
           "push": 0.5,
           "depth_mix": 0.0,
@@ -542,7 +543,7 @@
           "viscosity_iter": 15
         },
         "density": {
-          "input_strength": 1.1,
+          "input_strength": 9.63,
           "speed_offset": 0.0,
           "fade_time": 60.0,
           "evaporation": 0.05,
@@ -554,11 +555,11 @@
           "input_strength": 1.0,
           "speed_offset": 0.0,
           "fade_time": 12.0,
-          "buoyancy": 1.5,
+          "buoyancy": 0.0,
           "weight": 4.0,
           "gravity_x": 0.0,
           "gravity_y": 0.0,
-          "gravity_z": 1.0,
+          "gravity_z": 0.0,
           "ambient": 0.0,
           "boundary": "CLOSED"
         },

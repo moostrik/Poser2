@@ -3,6 +3,7 @@
 # Standard library imports
 import logging
 from enum import IntEnum, auto
+from typing import Protocol, runtime_checkable
 
 # Third-party imports
 from OpenGL.GL import GL_RGBA16F, GL_VIEWPORT, glGetIntegerv
@@ -27,6 +28,17 @@ from modules.flow import (
 from modules.utils import HotReloadMethods
 
 logger = logging.getLogger(__name__)
+
+MAX_FRAME_INTERVAL: float = 0.5     # s: a longer gap between two captures is a pause or a loop, not a frame's
+FRAME_PERIOD_BAND: tuple[float, float] = (0.5, 2.0)    # a capture gap is held to this share of the frame interval
+FRAME_PERIOD_WEIGHT: float = 0.05   # weight of a new gap on the frame interval's Ema
+
+
+@runtime_checkable
+class HasCaptureTime(Protocol):
+    """A flow source that keeps the capture time of the image it holds."""
+    @property
+    def timestamp(self) -> float | None: ...
 
 
 class FlowBridgeMethod(IntEnum):
@@ -192,7 +204,9 @@ class Flow3DLayer(LayerBase):
         self._view_span: float = 0.0            # metres a view width spans per metre of depth; 0 reads no z
         self._depth_step: tuple[float, float] = (0.0, 0.0)     # uv between two depth samples; 0 takes one flow texel
         self._warned_view_span: bool = False
-        self._flow_interval: float = 0.0        # time since the last optical flow frame (s), counted in ticks
+        self._flow_interval: float = 0.0        # time since the last optical flow frame (s), counted in ticks; on a new one, its capture interval
+        self._capture_timestamp: float | None = None    # the capture time of the last image the flow measured
+        self._frame_period: float | None = None         # the frame interval, an Ema of the capture gaps (s)
 
         self._flow_size: tuple[int, int] = (0, 0)       # the size the flow runs at; follows settings.width/height
         self._output_size: tuple[int, int] = (0, 0)     # the layer's allocation size
@@ -353,6 +367,28 @@ class Flow3DLayer(LayerBase):
         self._density_bridge.reset()
         self._kinetic_strip.reset()
         self._flow_interval = 0.0
+        self._capture_timestamp = None
+
+    def _frame_interval(self) -> float:
+        """Seconds between the image the flow measures now and the one before, from the capture times
+        the flow source keeps with its images (`HasCaptureTime`): counted in ticks, a frame that lands
+        a tick early or late reads a third shorter or longer, and its speed jumps by as much. A gap is
+        held to FRAME_PERIOD_BAND of the frame interval, an Ema of the gaps, so one odd stamp cannot
+        flash; where there is no gap of a frame (the first frame, after a reset, a recording that
+        loops, a source without capture times), the frame interval, or the tick count before there is one."""
+        timestamp: float | None = self._flow_source.timestamp if isinstance(self._flow_source, HasCaptureTime) else None
+        last: float | None = self._capture_timestamp
+        self._capture_timestamp = timestamp
+        gap: float | None = timestamp - last if timestamp is not None and last is not None else None
+        if gap is None or not 0.0 < gap < MAX_FRAME_INTERVAL:
+            return self._frame_period if self._frame_period is not None else self._flow_interval
+        if self._frame_period is None:
+            self._frame_period = gap
+            return gap
+        low, high = FRAME_PERIOD_BAND
+        gap = min(max(gap, low * self._frame_period), high * self._frame_period)
+        self._frame_period += FRAME_PERIOD_WEIGHT * (gap - self._frame_period)
+        return gap
 
     # ========== Processing ==========
 
@@ -372,6 +408,7 @@ class Flow3DLayer(LayerBase):
         kinetic: bool = self.settings.flow_bridge.method == FlowBridgeMethod.KINETIC
         flow: LucasKanadeFlow = self._flow
         if new_flow:
+            self._flow_interval = self._frame_interval()
             # Stage 1: the flow's 3D velocity, on the whole image; with its use_mask, times the mask
             flow.set_input(self._flow_input)
             if self.depth_enabled and self._view_span <= 0.0 and not self._warned_view_span:

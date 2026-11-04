@@ -23,10 +23,16 @@ class CaptureImageLayer(LayerBase):
         self._image: Tensor = Tensor()
         self._data_cache: DataCache["GpuImage"] = DataCache["GpuImage"]()
         self._dirty: bool = False
+        self._timestamp: float | None = None      # the capture time of the image it holds
 
     @property
     def texture(self) -> Texture:
         return self._image
+
+    @property
+    def timestamp(self) -> float | None:
+        """The capture time of the image it holds (`Capture.timestamp`), None before the first."""
+        return self._timestamp
 
     @property
     def dirty(self) -> bool:
@@ -44,8 +50,9 @@ class CaptureImageLayer(LayerBase):
 
         if self._data_cache.lost:
             self._image.clear()
+            self._timestamp = None
 
-        if self._data_cache.idle or gpu_image is None:
+        if self._data_cache.idle or gpu_image is None or capture is None:
             return
 
         # The image was written on the uploader's stream: wait for it there, and keep its memory
@@ -55,4 +62,5 @@ class CaptureImageLayer(LayerBase):
         gpu_image.image.record_stream(stream)
         self._image.set_tensor(gpu_image.image)
         self._image.update()
+        self._timestamp = capture.timestamp
         self._dirty = True
