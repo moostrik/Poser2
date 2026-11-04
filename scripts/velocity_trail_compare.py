@@ -5,7 +5,7 @@
 FRAMES is what depth_track_capture saved from one loop of a recording (temp/depth_track/RECORDING). No app
 and no camera: a hidden window gives the GL context, one `LucasKanadeFlow` measures the saved frames with the
 settings they were recorded with, and two `VelocityTrailBridge`, A and B, take its velocity; `--a` and
-`--b` set any of the trail's settings (pivot, curve, limit, z_limit, attack, smooth, blur_radius), the rest
+`--b` set any of the trail's settings (advect, smoothing, attack, beta, smooth, blur_radius, blur_steps), the rest
 as in deep_flow's preset. One loop, as fast as it goes; the trail steps once per flow frame, by its interval.
 
 Out comes one table per side, in widths per second, on the body (the mask, 12 px and more inside):
@@ -22,6 +22,7 @@ import json
 import sys
 import time
 from argparse import ArgumentParser
+from enum import Enum
 from pathlib import Path
 
 import cv2
@@ -39,16 +40,17 @@ SETTLE: float = 1.5      # s of the still part left out of its noise: the trail'
 PRESET: Path =Path(__file__).resolve().parent.parent / 'apps' / 'deep_flow' / 'data' / 'settings' / 'settings.json'
 
 
-def trail_settings(items: list[str]) -> tuple[VelocityTrailBridgeSettings, dict[str, float]]:
-    """The preset's trail settings with `items` (NAME=VALUE) set on them."""
+def trail_settings(items: list[str]) -> tuple[VelocityTrailBridgeSettings, dict[str, object]]:
+    """The preset's trail settings with `items` (NAME=VALUE, an enum by its name) set on them."""
     settings = VelocityTrailBridgeSettings()
     settings.update_from_dict(json.loads(PRESET.read_text())['render']['flow']['flow_bridge']['velocity_trail'])
-    changed: dict[str, float] = {}
+    changed: dict[str, object] = {}
     for item in items:
         name, value = item.split('=', 1)
         if name not in settings.fields:
             raise SystemExit(f'unknown setting {name}: one of {", ".join(settings.fields)}')
-        changed[name] = float(value)
+        kind = type(getattr(settings, name))
+        changed[name] = kind[value.upper()] if issubclass(kind, Enum) else kind(float(value))
         setattr(settings, name, changed[name])
     return settings, changed
 
@@ -118,7 +120,7 @@ def main() -> int:
     flow_settings.update_from_dict(recorded_settings(frames.calls[0]['settings']))
     flow = LucasKanadeFlow(flow_settings)
     flow.allocate(w, h)
-    sides: list[tuple[str, VelocityTrailBridge, dict[str, float], Measures]] = []
+    sides: list[tuple[str, VelocityTrailBridge, dict[str, object], Measures]] = []
     for name, items in (('A', args.a), ('B', args.b)):
         settings, changed = trail_settings(items)
         trail = VelocityTrailBridge(settings)

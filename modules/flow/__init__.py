@@ -16,7 +16,7 @@ from .optical import DepthVelocity, catch_up_share, color_motion, filter_depth_s
 # Bridge layers: the 3D bridge by name, the 2D bridge as `bridge_2d` (bridge_2d.DensityBridge, ...)
 from .bridge import     bridge_2d, DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
                         BlurPosition, KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES, decay_weight, project, stop_gate, hold_release, drop, fill_reservoir, advect, \
-                        VelocityTrailBridge, VelocityTrailBridgeSettings, velocity_trail, \
+                        VelocityTrailBridge, VelocityTrailBridgeSettings, Smoothing, velocity_trail, one_euro_rate, one_euro_trail, \
                         TemperatureBridge, TemperatureBridgeSettings
 
 # Visualization

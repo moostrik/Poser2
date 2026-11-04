@@ -8,27 +8,43 @@ Before each step the trail moves with the motion it holds (`advect`): each pixel
 where its own x/y says it came from, so the average follows a moving limb instead of a fixed pixel,
 and a fast move is not cut off by a smoothing time longer than it takes to cross.
 
-The smoothing is one unit-gain Ema per pixel. Where the x/y speed rises it follows over `attack`, else over
-`smooth`, so a flick reaches the fluid at full strength and a stop still coasts. z follows over `smooth`
-alone, so a one-frame spike is averaged instead of passed on. The blur runs `blur_steps` passes per tick inside the
+The smoothing is one unit-gain Ema per pixel, by `smoothing`:
+- ATTACK_RELEASE: where the x/y speed rises it follows over `attack`, else over `smooth`, so a flick
+  reaches the fluid at full strength and a stop still coasts.
+- ONE_EURO: the 1€ filter (Casiez, Roussel, Vogel, CHI 2012). x/y's cutoff grows with how fast it changes:
+  1 / (2π `smooth`) at rest plus `beta` per widths/s² of change, that rate low-passed at RATE_CUTOFF. A
+  steady or still motion is smoothed over `smooth`, a start or a stop follows at once, rising and falling alike.
+z follows over `smooth` alone in both, so a one-frame spike is averaged instead of passed on. The blur runs `blur_steps` passes per tick inside the
 Ema's loop, so its spread grows with the trail's memory.
 """
 
+import math
+from enum import IntEnum
+
 import numpy as np
-from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_RGBA16F
+from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_R16F, GL_RGBA16F
 
 from modules.gl import SwapFbo, Texture
 from modules.settings import Field, BaseSettings
 from ... import FlowBase, FlowUtil
 from ...shaders import GaussianBlur
 from .kinetics import decay_weight
-from .shaders import KineticAdvect, VelocityTrail
+from .shaders import KineticAdvect, OneEuroRate, OneEuroTrail, VelocityTrail
+
+RATE_CUTOFF: float = 1.0      # Hz, the 1€ filter's low-pass on the rate of change, its paper's default
+
+
+class Smoothing(IntEnum):
+    ATTACK_RELEASE = 0      # x/y rises over attack, falls over smooth
+    ONE_EURO = 1            # the 1€ filter: x/y's cutoff grows with its rate of change
 
 
 class VelocityTrailBridgeSettings(BaseSettings):
     """Configuration for the velocity trail bridge."""
     advect = Field(0.0, min=0.0, max=1.0, step=0.05, description="How far the trail moves with its motion before each step; 0 = at a fixed pixel")
-    attack = Field(0.0, min=0.0, max=500.0, step=1.0, description="Smoothing time of a rising x/y speed, ms; 0 = as smooth (lower: quicker flicks)")
+    smoothing: Field[Smoothing] = Field(Smoothing.ATTACK_RELEASE, newline=True, description="How x/y is smoothed: attack and release, or the 1€ filter")
+    attack = Field(0.0, min=0.0, max=500.0, step=1.0, description="ATTACK_RELEASE: smoothing time of a rising x/y speed, ms; 0 = as smooth (lower: quicker flicks)")
+    beta = Field(1.0, min=0.0, max=20.0, step=0.05, description="ONE_EURO: cutoff added per widths/s² of change, Hz (higher: less lag on starts and stops)")
     smooth = Field(158.0, min=0.0, max=1000.0, step=1.0, description="Smoothing time, ms; the fall of x/y and all of z; 0 = none (higher: longer coast)")
     blur_radius = Field(0.0, min=0.0, max=10.0, newline=True, description="Gaussian blur radius in pixels; 0 = off")
     blur_steps = Field(1, min=1, max=8, description="Gaussian blur passes per tick (more: wider spread)")
@@ -40,12 +56,13 @@ class VelocityTrailBridge(FlowBase):
     Pipeline:
         1. Take the velocity into the input FBO (`set_velocity`)
         2. Move the previous trail with its own motion (`advect`), then blend the input in, a unit-gain Ema over
-           `attack` or `smooth` (temporal smoothing)
+           `attack` or `smooth`, or the 1€ filter's adaptive time (temporal smoothing)
         3. Blur it, `blur_steps` passes (spatial smoothing)
 
     FBOs (from FlowBase):
         - input_fbo: The velocity
         - output_fbo: The smoothed velocity
+        - rate_fbo: ONE_EURO's rate of change of x/y (R16F, widths/s²)
     """
 
     def __init__(self, settings: VelocityTrailBridgeSettings | None = None) -> None:
@@ -56,9 +73,13 @@ class VelocityTrailBridge(FlowBase):
 
         self.settings: VelocityTrailBridgeSettings = settings or VelocityTrailBridgeSettings()
 
+        self._rate_fbo: SwapFbo = SwapFbo()
+
         # Shaders
         self._advect_shader: KineticAdvect = KineticAdvect()
         self._trail_shader: VelocityTrail = VelocityTrail()
+        self._rate_shader: OneEuroRate = OneEuroRate()
+        self._one_euro_shader: OneEuroTrail = OneEuroTrail()
         self._blur_shader: GaussianBlur = GaussianBlur()
 
     @property
@@ -84,16 +105,29 @@ class VelocityTrailBridge(FlowBase):
         # No velocity outside the image, as in the fluid: a trail that leaves it is gone, and the edge
         # doesn't copy itself back in through the advect and the blur
         self._output_fbo.set_wrap(GL_CLAMP_TO_BORDER, (0.0, 0.0, 0.0, 0.0))
+        self._rate_fbo.allocate(self._output_fbo.width, self._output_fbo.height, GL_R16F)
+        self._rate_fbo.set_wrap(GL_CLAMP_TO_BORDER, (0.0, 0.0, 0.0, 0.0))
+        FlowUtil.zero(self._rate_fbo)
         self._advect_shader.allocate()
         self._trail_shader.allocate()
+        self._rate_shader.allocate()
+        self._one_euro_shader.allocate()
         self._blur_shader.allocate()
 
     def deallocate(self) -> None:
         """Deallocate all resources."""
         super().deallocate()
+        self._rate_fbo.deallocate()
         self._advect_shader.deallocate()
         self._trail_shader.deallocate()
+        self._rate_shader.deallocate()
+        self._one_euro_shader.deallocate()
         self._blur_shader.deallocate()
+
+    def reset(self) -> None:
+        """Reset the trail and its rate to zero."""
+        super().reset()
+        FlowUtil.zero(self._rate_fbo)
 
     def set_velocity(self, velocity: Texture) -> None:
         """Take a flow's 3D velocity as the trail's next input."""
@@ -109,21 +143,41 @@ class VelocityTrailBridge(FlowBase):
 
         # Stage 1: The trail moves with its motion: x is widths/s, y widths/s on the x scale, so uv per step
         # is v * dt, and v * dt * width / height on y
+        one_euro: bool = s.smoothing == Smoothing.ONE_EURO
         if s.advect > 0.0:
             step: float = s.advect * delta_time
             fbo: SwapFbo = self._output_fbo
+            carry: tuple[float, float] = (step, step * fbo.width / max(fbo.height, 1))
+            if one_euro:                          # the rate travels with the trail it belongs to, along the trail before it moves
+                self._rate_fbo.swap()
+                self._rate_fbo.begin()
+                self._advect_shader.use(self._rate_fbo.back_texture, fbo.texture, carry)
+                self._rate_fbo.end()
             fbo.swap()
             fbo.begin()
-            self._advect_shader.use(fbo.back_texture, fbo.back_texture, (step, step * fbo.width / max(fbo.height, 1)))
+            self._advect_shader.use(fbo.back_texture, fbo.back_texture, carry)
             fbo.end()
 
         # Stage 2: Temporal smoothing, one unit-gain Ema step per pixel: weight * previous + (1 - weight) * input
         release: float = decay_weight(delta_time, s.smooth)
-        attack: float = decay_weight(delta_time, s.attack) if s.attack > 0.0 else release
-        self._output_fbo.swap()
-        self._output_fbo.begin()
-        self._trail_shader.use(self._output_fbo.back_texture, self._input_fbo.texture, attack, release)
-        self._output_fbo.end()
+        if one_euro:
+            self._rate_fbo.swap()
+            self._rate_fbo.begin()
+            self._rate_shader.use(self._output_fbo.texture, self._input_fbo.texture, self._rate_fbo.back_texture,
+                                  delta_time, math.exp(-delta_time * 2.0 * math.pi * RATE_CUTOFF))
+            self._rate_fbo.end()
+            min_cutoff: float = 1000.0 / (2.0 * math.pi * s.smooth) if s.smooth > 0.0 else 1e6
+            self._output_fbo.swap()
+            self._output_fbo.begin()
+            self._one_euro_shader.use(self._output_fbo.back_texture, self._input_fbo.texture, self._rate_fbo.texture,
+                                      min_cutoff, s.beta, delta_time, release)
+            self._output_fbo.end()
+        else:
+            attack: float = decay_weight(delta_time, s.attack) if s.attack > 0.0 else release
+            self._output_fbo.swap()
+            self._output_fbo.begin()
+            self._trail_shader.use(self._output_fbo.back_texture, self._input_fbo.texture, attack, release)
+            self._output_fbo.end()
 
         # Stage 3: Spatial smoothing (Gaussian blur), `blur_steps` passes
         if s.blur_radius > 0.0:
@@ -143,5 +197,22 @@ def velocity_trail(previous: np.ndarray, velocity: np.ndarray, attack: float, re
     rising: np.ndarray = np.linalg.norm(velocity[..., :2], axis=-1, keepdims=True) > np.linalg.norm(previous[..., :2], axis=-1, keepdims=True)
     weight_xy: np.ndarray = np.where(rising, attack, release)
     xy: np.ndarray = weight_xy * previous[..., :2] + (1.0 - weight_xy) * velocity[..., :2]
+    z: np.ndarray = release * previous[..., 2:3] + (1.0 - release) * velocity[..., 2:3]
+    return np.concatenate((xy, z), axis=-1)
+
+
+def one_euro_rate(previous: np.ndarray, velocity: np.ndarray, rate: np.ndarray, dt: float, weight: float) -> np.ndarray:
+    """The 1€ filter's rate (..., 1): |velocity - previous| on x/y over `dt`, low-passed with `rate` by
+    `weight`. Mirrors one_euro_rate.frag."""
+    now: np.ndarray = np.linalg.norm(velocity[..., :2] - previous[..., :2], axis=-1, keepdims=True) / max(dt, 1e-6)
+    return weight * rate + (1.0 - weight) * now
+
+
+def one_euro_trail(previous: np.ndarray, velocity: np.ndarray, rate: np.ndarray, min_cutoff: float, beta: float, dt: float,
+                   release: float) -> np.ndarray:
+    """One 1€ step of the trail (..., 3): x/y with the cutoff min_cutoff + beta * rate (Hz), z by `release`.
+    Mirrors one_euro_trail.frag."""
+    weight: np.ndarray = np.exp(-dt * 2.0 * np.pi * (min_cutoff + beta * rate))
+    xy: np.ndarray = weight * previous[..., :2] + (1.0 - weight) * velocity[..., :2]
     z: np.ndarray = release * previous[..., 2:3] + (1.0 - release) * velocity[..., 2:3]
     return np.concatenate((xy, z), axis=-1)
