@@ -434,7 +434,7 @@ class FlowLayer(LayerBase):
                     self._kinetic_strip.update(bridge.fast, bridge.acceleration, bridge.emission, self.settings.visualization.strip_scale)
         else:
             self._trail_bridge.set_velocity(self._velocity)
-            self._trail_bridge.update()
+            self._trail_bridge.update(self._time_step)
 
         if new_flow:
             self._flow_interval = 0.0

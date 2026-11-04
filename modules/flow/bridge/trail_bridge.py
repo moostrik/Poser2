@@ -1,7 +1,7 @@
 """Trail Bridge.
 
 The flow bridge's velocity as one trail: a flow's 3D velocity, its x/y shaped (`boost`, soft `limit`),
-smoothed in time (the trail blend) and in space (Gaussian blur).
+smoothed in time (a unit-gain Ema over `smooth`) and in space (Gaussian blur).
 """
 
 import numpy as np
@@ -11,14 +11,15 @@ from modules.gl import Texture
 from modules.settings import Field, BaseSettings
 from .. import FlowBase
 from ..shaders import Trail, GaussianBlur
+from .kinetics import decay_weight
 from .shaders import ShapeVelocity
 
 
 class TrailBridgeSettings(BaseSettings):
     """Configuration for the trail bridge."""
     limit = Field(4.0, min=0.5, max=20.0, description="Soft limit on the x/y speed before scale (widths/s)")
-    scale = Field(1.0, min=-10.0, max=10.0, description="Converts the flow's velocity to simulation velocity")
-    trail_weight = Field(0.9, min=0.0, max=0.99, description="Temporal smoothing (0=no trail, 0.99=long trail)")
+    scale = Field(10.0, min=-50.0, max=50.0, description="Converts the flow's velocity to simulation velocity")
+    smooth = Field(158.0, min=0.0, max=1000.0, step=1.0, description="Smoothing time, ms; 0 = none (higher: smoother, more lag)")
     blur_radius = Field(8.0, min=0.0, max=10.0, description="Gaussian blur radius in pixels")
     blur_steps = Field(4, min=0, max=8, description="Number of Gaussian blur passes")
     boost = Field(0.0, min=-0.5, max=0.9, description="Power boost for small motions")
@@ -29,7 +30,7 @@ class TrailBridge(FlowBase):
 
     Pipeline:
         1. Shape the velocity into the input FBO (`set_velocity`)
-        2. Blend it with the previous trail (temporal smoothing)
+        2. Blend it with the previous trail, a unit-gain Ema over `smooth` (temporal smoothing)
         3. Apply Gaussian blur passes (spatial smoothing)
 
     FBOs (from FlowBase):
@@ -89,20 +90,16 @@ class TrailBridge(FlowBase):
         self._shape_shader.use(velocity, 1.0 - self.settings.boost, self.settings.limit)
         self._input_fbo.end()
 
-    def update(self) -> None:
-        """Advance the trail with the input: temporal, then spatial smoothing."""
+    def update(self, delta_time: float = 1.0 / 60.0) -> None:
+        """Advance the trail with the input by `delta_time` (s): temporal, then spatial smoothing."""
         if not self._allocated:
             return
 
-        # Stage 1: Temporal smoothing (trail blend)
+        # Stage 1: Temporal smoothing, one unit-gain Ema step: weight * previous + (1 - weight) * scale * input
+        weight: float = decay_weight(delta_time, self.settings.smooth)
         self._output_fbo.swap()
         self._output_fbo.begin()
-        self._trail_shader.use(
-            self._output_fbo.back_texture,  # Previous trail
-            self._input_fbo.texture,        # New input
-            self.settings.trail_weight,
-            self.settings.scale                # Apply scaling on new input
-        )
+        self._trail_shader.use(self._output_fbo.back_texture, self._input_fbo.texture, weight, (1.0 - weight) * self.settings.scale)
         self._output_fbo.end()
 
         # Stage 2: Spatial smoothing (Gaussian blur)

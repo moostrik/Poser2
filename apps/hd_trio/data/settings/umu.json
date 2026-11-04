@@ -537,8 +537,8 @@
       },
       "flow_bridge": {
         "trail": {
-          "scale": 1.54,
-          "trail_weight": 0.9,
+          "scale": 15.4,
+          "smooth": 158.0,
           "blur_radius": 8.0,
           "blur_steps": 4,
           "boost": 0.0

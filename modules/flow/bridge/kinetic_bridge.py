@@ -45,7 +45,7 @@ class KineticBridge(FlowBase):
     """Two trails on the optical flow and their difference along and across the motion.
 
     The trails are unit-gain Emas, so they meet on a steady motion and fast - slow is the change alone.
-    The gain of the trail bridge, 1 / (1 - trail_weight), is in `scale` here. The flow's velocity is 3D,
+    Its trails are unit-gain Emas like the trail bridge's, so the gain is in `scale`. The flow's velocity is 3D,
     so a motion that starts or stops toward the camera reads like any other.
 
     It reads the flow's velocity linearly, unclamped. When that velocity is a distance (the Lucas–Kanade
