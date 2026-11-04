@@ -135,6 +135,7 @@ class Flow3DLayerSettings(BaseSettings):
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
+    stamped_interval: Field[bool] =         Field(True, description="TEMP: frame interval from capture stamps (off: render ticks)")
 
     optical_flow  = Group(LucasKanadeFlowSettings)
     flow_bridge   = Group(FlowBridgeSettings)
@@ -444,7 +445,9 @@ class Flow3DLayer(LayerBase):
         kinetic: bool = self.settings.flow_bridge.method == FlowBridgeMethod.KINETIC
         flow: LucasKanadeFlow = self._flow
         if new_flow:
-            self._flow_interval = self._frame_interval()
+            stamped: float = self._frame_interval()
+            if self.settings.stamped_interval:     # TEMP switch: off keeps the tick count, as before
+                self._flow_interval = stamped
             # Stage 1: the flow's 3D velocity, on the whole image; with its use_mask, times the mask
             flow.set_input(self._flow_input)
             if self.depth_enabled and self._view_span <= 0.0 and not self._warned_view_span:
