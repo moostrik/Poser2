@@ -123,8 +123,7 @@ class DepthVelocity(FlowBase):
 
     def update_depth(self, depth: Texture, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
                      smooth: float, threshold: float, tolerance: float, dead_zone: float, catch_up_smooth: float, motion_floor: float,
-                     displacement: Texture | None = None, catch_up_gate: bool = True, xy_gate: bool = False,
-                     half_speed: float = 0.0) -> None:
+                     displacement: Texture | None = None, catch_up_gate: bool = True, xy_gate: bool = False) -> None:
         """Advance on a new flow frame: correct the track by the new depth, then take the noise floor off.
 
         Args:
@@ -143,7 +142,6 @@ class DepthVelocity(FlowBase):
                 along the motion (Lucas–Kanade flow)
             catch_up_gate: The track catches up only where the image moves too; off, wherever it keeps missing one way
             xy_gate: z only where the image moves (its 3×3 displacement past `motion_floor`), with a displacement
-            half_speed: Depth speed at which `smooth` halves, as the track moves faster (m/s); 0 is off
         """
         if not self._allocated:
             return
@@ -164,7 +162,7 @@ class DepthVelocity(FlowBase):
             target.begin()
             self._velocity_shader.use(self._input_fbo.texture, self._track.back_texture, self._catch_up.back_texture, catch_up_pass,
                                       float(alpha), smooth, catch_up_smooth, float(alpha), motion_floor if catch_up_gate else -1.0,
-                                      max(delta_time, 1e-6), view_span, step, window, tolerance, dead_zone, displacement, half_speed)
+                                      max(delta_time, 1e-6), view_span, step, window, tolerance, dead_zone, displacement)
             target.end()
 
         self._output_fbo.begin()
@@ -240,7 +238,7 @@ def color_motion(displacement: np.ndarray, motion_floor: float) -> np.ndarray:
 
 def track_depth(depth: np.ndarray, state: np.ndarray, catch_up: np.ndarray, displacement: np.ndarray, delta_time: float, window: int,
                 step: tuple[float, float], tolerance: float, smooth: float, view_span: float, dead_zone: float,
-                catch_up_smooth: float, motion_floor: float, half_speed: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
+                catch_up_smooth: float, motion_floor: float) -> tuple[np.ndarray, np.ndarray]:
     """The depth track one frame on (H, W, 4): z in view widths per frame, disparity (1/m), its rate
     (1/m per second) and its anchor (m); and its catch-up (H, W, 2): the Emas of its miss of the
     prediction, signed and its size (m). As the shader writes them, in its two runs; `catch_up` is
@@ -258,9 +256,7 @@ def track_depth(depth: np.ndarray, state: np.ndarray, catch_up: np.ndarray, disp
     (ms) above 0, a track that keeps missing one way, as it lags a fast motion, follows over a time
     between `smooth` and `catch_up_smooth` by its `catch_up_share`, where the image moves (its
     `color_motion` past `motion_floor`, px per frame); and the carry takes each texel's depth a frame
-    on by its rate. 0 is neither. With `half_speed` (m/s) above 0, the time it follows over at rest is
-    `smooth` / (1 + speed / `half_speed`), with the track's own speed (m/s), as a One Euro filter's
-    cutoff rises with speed; the catch-up blends from there.
+    on by its rate. 0 is neither.
     """
     h, w = depth.shape
     rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
@@ -293,12 +289,9 @@ def track_depth(depth: np.ndarray, state: np.ndarray, catch_up: np.ndarray, disp
     ema: float = float(track_weights(delta_time, smooth, 1.0)[0])
     signed: np.ndarray = np.where(follows, carried_catch_up[..., 0] + ema * (miss - carried_catch_up[..., 0]), 0.0)
     size: np.ndarray = np.where(follows, carried_catch_up[..., 1] + ema * (np.abs(miss) - carried_catch_up[..., 1]), 0.0)
-    if catching or half_speed > 0.0:
-        speed: np.ndarray = np.where(carried > 0.0, np.abs(carried_rate) / np.where(carried > 0.0, carried, 1.0) ** 2, 0.0)   # m/s
-        rest: np.ndarray = smooth / (1.0 + speed / half_speed) if half_speed > 0.0 else np.full(depth.shape, smooth)
-        opened: np.ndarray = (catch_up_share(signed, size, dead_zone) * color_motion(displacement, motion_floor) if catching
-                              else np.zeros(depth.shape))
-        follow_time: np.ndarray = rest + opened * (catch_up_smooth - rest)
+    if catching:
+        opened: np.ndarray = catch_up_share(signed, size, dead_zone) * color_motion(displacement, motion_floor)
+        follow_time: np.ndarray = smooth + opened * (catch_up_smooth - smooth)
         full: np.ndarray = 1.0 - np.exp(-delta_time * 1000.0 / np.maximum(follow_time, 1e-6)) if smooth > 0.0 else np.ones_like(follow_time)
         alpha = full * share
         beta = alpha * alpha / (2.0 - alpha)

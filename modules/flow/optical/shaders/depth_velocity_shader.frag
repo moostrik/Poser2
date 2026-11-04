@@ -33,7 +33,6 @@ uniform float tolerance; // Depth further than this is another surface (m)
 uniform float alpha;     // Weight of a full window's measurement on the disparity
 uniform float smoothing;   // Time the track follows over (ms), `smooth` in Python (`smooth` is a GLSL keyword); 0 takes the measurement whole
 uniform float catch_up_smoothing;       // Time it follows over while catching up (ms); 0 is never
-uniform float half_speed;               // Depth speed at which the smoothing halves (m/s); 0 is off
 uniform float ema;       // Weight of a new miss on its Emas
 uniform float motion_floor;         // Displacement the image must move by to catch up (px per frame)
 uniform float delta_time;           // Seconds since the last depth
@@ -136,13 +135,9 @@ void main() {
         return;
     }
     float full = alpha;
-    if (catching || half_speed > 0.0) {
-        // with half_speed, the smoothing at rest shortens with the track's own speed (m/s), as a One
-        // Euro filter's cutoff rises with speed; the catch-up blends from there toward its own time
-        float speed = track.x > 0.0 ? abs(track.y) / (track.x * track.x) : 0.0;
-        float rest = half_speed > 0.0 ? smoothing / (1.0 + speed / half_speed) : smoothing;
-        float opened = catching ? catch_up_share(emas.x, emas.y) * float(warp && moving(size)) : 0.0;
-        float follow_time = rest + opened * (catch_up_smoothing - rest);
+    if (catching) {
+        float opened = catch_up_share(emas.x, emas.y) * float(warp && moving(size));
+        float follow_time = smoothing + opened * (catch_up_smoothing - smoothing);
         full = smoothing > 0.0 ? 1.0 - exp(-delta_time * 1000.0 / max(follow_time, 1e-6)) : 1.0;
     }
     float a = full * share;

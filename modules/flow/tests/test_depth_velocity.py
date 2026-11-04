@@ -29,14 +29,14 @@ def interior(field: np.ndarray, margin: int = 8) -> np.ndarray:
 
 def track(depths: list[np.ndarray], moved: np.ndarray | None = None, window: int = 2, step: tuple[float, float] = STEP,
           tolerance: float = TOLERANCE, smooth: float = 0.0, span: float = SPAN, dead_zone: float = 0.0,
-          catch_up_smooth: float = 0.0, dt: float = DT, motion_floor: float = 0.5, half_speed: float = 0.0) -> list[np.ndarray]:
+          catch_up_smooth: float = 0.0, dt: float = DT, motion_floor: float = 0.5) -> list[np.ndarray]:
     """The track after each depth frame, from no track; `motion_floor` -1 is z_catch_up_gate off."""
     state: np.ndarray = np.zeros(depths[0].shape + (4,))
     catch_up: np.ndarray = np.zeros(depths[0].shape + (2,))
     states: list[np.ndarray] = []
     for depth in depths:
         state, catch_up = track_depth(depth, state, catch_up, still(depth.shape) if moved is None else moved, dt, window, step, tolerance,
-                                      smooth, span, dead_zone, catch_up_smooth, motion_floor, half_speed)
+                                      smooth, span, dead_zone, catch_up_smooth, motion_floor)
         states.append(state)
     return states
 
@@ -309,23 +309,6 @@ class CatchUpTest(unittest.TestCase):
         states = track([uniform(1.0)] * 6 + [uniform(0.7)], moved=self.MOVING, window=0, smooth=50.0, dead_zone=0.02, catch_up_smooth=12.5, dt=0.02)
         self.assertEqual(float(states[-1][1, 1, 2]), 0.0)
         np.testing.assert_allclose(states[-1][1, 1, 1], 1.0 / 0.7)
-
-
-class HalfSpeedTest(unittest.TestCase):
-    """With z_half_speed, the smoothing shortens with the track's own depth speed, as a One Euro filter's."""
-
-    def test_a_fast_approach_is_followed_closer(self) -> None:
-        depths = CatchUpTest.approach(2.0)
-        plain = track(depths, window=0, smooth=50.0, dt=0.02)
-        quick = track(depths, window=0, smooth=50.0, dt=0.02, half_speed=0.5)
-        frame = 20                                                             # moving at full speed, before it reaches 0.6 m
-        behind = lambda states: abs(1.0 / float(states[frame][1, 1, 1]) - float(depths[frame][1, 1]))   # noqa: E731
-        self.assertLess(behind(quick), behind(plain) * 0.7)
-
-    def test_off_is_the_track_as_it_was(self) -> None:
-        depths = CatchUpTest.approach(2.0)
-        np.testing.assert_array_equal(np.stack(track(depths, window=0, smooth=50.0, half_speed=0.0)),
-                                      np.stack(track(depths, window=0, smooth=50.0)))
 
 
 class StepFilterTest(unittest.TestCase):
