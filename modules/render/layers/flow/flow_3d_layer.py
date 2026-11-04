@@ -2,6 +2,7 @@
 
 # Standard library imports
 import logging
+import math
 import time     # TEMP diagnostic
 from enum import IntEnum, auto
 from typing import Protocol, runtime_checkable
@@ -33,6 +34,27 @@ logger = logging.getLogger(__name__)
 MAX_FRAME_INTERVAL: float = 0.5     # s: a longer gap between two captures is a pause or a loop, not a frame's
 FRAME_PERIOD_BAND: tuple[float, float] = (0.5, 2.0)    # a capture gap is held to this share of the frame interval
 FRAME_PERIOD_WEIGHT: float = 0.05   # weight of a new gap on the frame interval's Ema
+
+
+def frame_interval(timestamp: float | None, last: float | None, period: float | None, ticks: float,
+                   time_step: float) -> tuple[float, float | None]:
+    """The interval (s) a flow frame divides its motion by, and the frame period one frame on: the
+    gap between the capture times `last` and `timestamp`, held to FRAME_PERIOD_BAND of `period` (an
+    Ema of the gaps); a gap that is not a frame's (none, not finite, 0 or less, a pause or a loop)
+    takes `period`, else `ticks` (the time counted in ticks), else `time_step`. Never 0, negative or
+    not finite."""
+    if period is not None and not (math.isfinite(period) and period > 0.0):
+        period = None
+    gap: float = timestamp - last if timestamp is not None and last is not None else math.nan
+    if not (math.isfinite(gap) and 0.0 < gap < MAX_FRAME_INTERVAL):
+        if period is not None:
+            return period, period
+        return (ticks if math.isfinite(ticks) and ticks > 0.0 else time_step), None
+    if period is None:
+        return gap, gap
+    low, high = FRAME_PERIOD_BAND
+    gap = min(max(gap, low * period), high * period)
+    return gap, period + FRAME_PERIOD_WEIGHT * (gap - period)
 
 
 @runtime_checkable
@@ -380,22 +402,11 @@ class Flow3DLayer(LayerBase):
         loops, a source without capture times), the frame interval, or the tick count before there is one."""
         timestamp: float | None = self._flow_source.timestamp if isinstance(self._flow_source, HasCaptureTime) else None
         last: float | None = self._capture_timestamp
-        self._capture_timestamp = timestamp
-        gap: float | None = timestamp - last if timestamp is not None and last is not None else None
-        if gap is None or not 0.0 < gap < MAX_FRAME_INTERVAL:
-            interval: float = self._frame_period if self._frame_period is not None else self._flow_interval
-            self._diagnose(gap, interval, timestamp)   # TEMP diagnostic
-            return interval
-        if self._frame_period is None:
-            self._frame_period = gap
-            self._diagnose(gap, gap, timestamp)   # TEMP diagnostic
-            return gap
-        low, high = FRAME_PERIOD_BAND
-        raw: float = gap
-        gap = min(max(gap, low * self._frame_period), high * self._frame_period)
-        self._frame_period += FRAME_PERIOD_WEIGHT * (gap - self._frame_period)
-        self._diagnose(raw, gap, timestamp)   # TEMP diagnostic
-        return gap
+        if timestamp is not None and math.isfinite(timestamp):
+            self._capture_timestamp = timestamp
+        interval, self._frame_period = frame_interval(timestamp, last, self._frame_period, self._flow_interval, self._time_step)
+        self._diagnose(timestamp - last if timestamp is not None and last is not None else None, interval, timestamp)   # TEMP diagnostic
+        return interval
 
     def _diagnose(self, gap: float | None, interval: float, timestamp: float | None) -> None:
         """TEMP diagnostic: once a second, the flow intervals over that second and the raw stamp gaps, to the log."""

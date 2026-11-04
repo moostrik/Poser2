@@ -62,5 +62,10 @@ void main() {
     syy += kept_damping;
     float det = sxx * syy - sxy * sxy;
     vec2 delta = abs(det) > 1e-12 ? -vec2(syy * sxt - sxy * syt, sxx * syt - sxy * sxt) / det : vec2(0.0);
+    // a level resolves at most its window's reach: a larger step is a nearly flat window's blow-up,
+    // which the finer levels would carry over the whole image; not finite is no step
+    if (any(isnan(delta)) || any(isinf(delta))) delta = vec2(0.0);
+    float reach = float(window + 1);
+    delta = clamp(delta, vec2(-reach), vec2(reach));
     fragColor = vec4(d + delta * texel, 0.0, 1.0);
 }

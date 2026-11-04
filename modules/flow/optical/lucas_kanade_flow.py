@@ -35,6 +35,8 @@ in metres and milliseconds do not.
 `displacement_velocity` below are the numpy references of the shaders.
 """
 
+import math
+
 import numpy as np
 from OpenGL.GL import GL_RG32F, GL_RGBA16F, GL_RGBA32F
 
@@ -47,6 +49,8 @@ from .patch import Patch
 from .shaders import ComposeVelocity, DisplacementFilter, DisplacementThreshold, LucasKanadeShader
 
 MAX_LEVELS: int = 9     # the most pyramid levels a solve has an Fbo for
+MIN_DELTA_TIME: float = 1e-3        # s: an interval at or below this is not a frame's
+FALLBACK_DELTA_TIME: float = 1.0 / 30.0     # s: the interval taken in its place
 
 
 class LucasKanadeSettings(BaseSettings):
@@ -231,7 +235,8 @@ class LucasKanadeFlow:
 
         # uv per frame as image widths per second: v is uv of the height, so a square motion stays square;
         # z is in view widths per frame already
-        per_second: float = 1.0 / max(delta_time, 1e-6)
+        # an interval that is not a frame's (0, negative, not finite) would scale every pixel at once
+        per_second: float = 1.0 / delta_time if math.isfinite(delta_time) and delta_time > MIN_DELTA_TIME else 1.0 / FALLBACK_DELTA_TIME
         aspect: float = self._displacement.height / max(self._displacement.width, 1)
         mask: Texture | None = self._mask if s.use_mask and self._mask is not None and self._mask.allocated else None
         self._velocity.begin()
@@ -300,6 +305,9 @@ def _solve_level(p_image: np.ndarray, c_image: np.ndarray, d: np.ndarray, u: np.
     safe: np.ndarray = np.where(np.abs(det) > 1e-12, det, 1.0)
     dx = np.where(np.abs(det) > 1e-12, -(syy * sxt - sxy * syt) / safe, 0.0)
     dy = np.where(np.abs(det) > 1e-12, -(sxx * syt - sxy * sxt) / safe, 0.0)
+    reach: float = float(window + 1)                         # a level resolves at most its window's reach
+    dx = np.clip(np.nan_to_num(dx, nan=0.0, posinf=0.0, neginf=0.0), -reach, reach)
+    dy = np.clip(np.nan_to_num(dy, nan=0.0, posinf=0.0, neginf=0.0), -reach, reach)
     return d + np.stack((dx / lw, dy / lh), axis=-1)
 
 

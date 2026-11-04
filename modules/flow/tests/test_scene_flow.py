@@ -40,6 +40,16 @@ class LucasKanadeTest(unittest.TestCase):
         flat = np.full((SIZE, SIZE), 0.5)
         self.assertLess(float(np.abs(lucas_kanade(flat, flat)).max()), 1e-6)
 
+    def test_a_nearly_flat_image_never_moves_past_the_levels_reach(self) -> None:
+        # a faint gradient and a faint change: the window is almost flat, the solve's step would blow up
+        rows, columns = np.mgrid[0:SIZE, 0:SIZE].astype(np.float64)
+        before = 0.5 + 1e-4 * columns
+        after = before + 1e-3 * np.sin(rows)
+        d = lucas_kanade(before, after, levels=4, window=2, damping=0.0)
+        reach = sum(3 * 2 ** level for level in range(4))     # (window + 1) texels a level, a level's texel 2^level px
+        self.assertTrue(np.all(np.isfinite(d)))
+        self.assertLessEqual(float(np.abs(d).max()), reach + 1e-9)
+
     def test_the_same_surface_keeps_the_background_still_beside_a_moving_strip(self) -> None:
         # a strip 12 px wide, 0.3 m before a still background, moving 2 px right: beside it the background is still
         still, moved = pattern(), pattern()
