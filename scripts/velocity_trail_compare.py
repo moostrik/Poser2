@@ -5,7 +5,7 @@
 FRAMES is what depth_track_capture saved from one loop of a recording (temp/depth_track/RECORDING). No app
 and no camera: a hidden window gives the GL context, one `LucasKanadeFlow` measures the saved frames with the
 settings they were recorded with, and two `VelocityTrailBridge`, A and B, take its velocity; `--a` and
-`--b` set any of the trail's settings (advect, smoothing, attack, beta, smooth, blur_radius, blur_steps), the rest
+`--b` set any of the trail's settings (advect, attack, smooth, blur_radius, blur_steps), the rest
 as in deep_flow's preset. One loop, as fast as it goes; the trail steps once per flow frame, by its interval.
 
 Out comes one table per side, in widths per second, on the body (the mask, 12 px and more inside):

@@ -28,7 +28,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 2061,
+        "iso": 2321,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -40,7 +40,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 5610,
+        "balance": 4051,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
@@ -278,7 +278,8 @@
           "fluid3d"
         ],
         "output": [
-          "cam_image"
+          "cam_image",
+          "cam_depth"
         ]
       },
       "composite": {
@@ -403,26 +404,26 @@
       "far": 1.7
     },
     "flow": {
-      "draw_mode": "VELOCITY",
+      "draw_mode": "SMOOTH_VELOCITY_OUTPUT",
       "blend_mode": "ADD",
       "width": 448,
       "height": 800,
       "inputs": {
         "flow": "center_capture",
-        "density": "center_capture",
+        "density": "center_foreground",
         "mask": "center_mask"
       },
       "optical_flow": {
-        "use_mask": false,
+        "use_mask": true,
         "x": true,
         "y": true,
-        "z": false,
+        "z": true,
         "lucas_kanade": {
-          "levels": 4,
+          "levels": 5,
           "window": "SEVEN",
           "damping": 0.03,
           "same_surface": true,
-          "threshold": 1.1
+          "threshold": 0.5
         },
         "depth_track": {
           "edge": 0.1,
@@ -438,10 +439,11 @@
       "flow_bridge": {
         "method": "VELOCITY_TRAIL",
         "velocity_trail": {
-          "z_limit": 4.0,
-          "attack": 200.0,
-          "smooth": 1000.0,
-          "blur_radius": 0.0
+          "advect": 1.0,
+          "attack": 1.0,
+          "smooth": 1.0,
+          "blur_radius": 4.43,
+          "blur_steps": 1
         },
         "kinetic": {
           "scale_x": 10.0,
@@ -473,21 +475,21 @@
         },
         "density": {
           "saturation": 1.02,
-          "brightness": 1.07
+          "brightness": 1.88
         },
         "temperature": {
           "scale": 0.5
         }
       },
       "visualization": {
-        "toggle_scalar": true,
+        "toggle_scalar": false,
         "scale": 1.07,
         "scalar_scale": 1.0,
         "strip_scale": 5.76,
-        "spacing": 4.0,
+        "spacing": 64.0,
         "z_scale": 1.0,
         "element_length": 1.0,
-        "element_width": 0.83
+        "element_width": 2.5
       }
     },
     "fluid3d": {
@@ -524,7 +526,7 @@
           "boundary": "CLOSED"
         },
         "velocity": {
-          "input_strength": 0.57,
+          "input_strength": 1.0,
           "input_x": 1.0,
           "input_y": 1.0,
           "squeeze": 0.0,
@@ -540,7 +542,7 @@
           "viscosity_iter": 15
         },
         "density": {
-          "input_strength": 9.63,
+          "input_strength": 1.0,
           "speed_offset": 0.0,
           "fade_time": 60.0,
           "evaporation": 0.05,

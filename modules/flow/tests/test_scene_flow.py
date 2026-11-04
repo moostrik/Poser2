@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import displacement_velocity, filter_displacement, lucas_kanade, threshold_displacement, track_depth, track_weights, velocity_trail, one_euro_rate, one_euro_trail
+from modules.flow import displacement_velocity, filter_displacement, lucas_kanade, threshold_displacement, track_depth, track_weights, velocity_trail
 
 SIZE: int = 64
 
@@ -149,22 +149,6 @@ class VelocityTrailTest(unittest.TestCase):
     def test_a_falling_xy_follows_the_release(self) -> None:
         stepped = velocity_trail(np.array([[1.0, 0.0, 0.0]]), np.zeros((1, 3)), 0.1, 0.9)
         np.testing.assert_allclose(stepped, [[0.9, 0.0, 0.0]])
-
-
-class OneEuroTest(unittest.TestCase):
-    def test_the_rate_is_the_change_over_dt_low_passed(self) -> None:
-        rate = one_euro_rate(np.zeros((1, 3)), np.array([[0.3, 0.4, 9.0]]), np.array([[1.0]]), 0.1, 0.5)
-        np.testing.assert_allclose(rate, [[0.5 * 1.0 + 0.5 * 5.0]])
-
-    def test_at_rest_the_cutoff_is_the_minimum(self) -> None:
-        stepped = one_euro_trail(np.array([[1.0, 0.0, 0.0]]), np.zeros((1, 3)), np.zeros((1, 1)), 1.0, 5.0, 0.1, 0.5)
-        np.testing.assert_allclose(stepped[0, 0], np.exp(-0.1 * 2.0 * np.pi))
-
-    def test_a_fast_change_follows_sooner(self) -> None:
-        still = one_euro_trail(np.zeros((1, 3)), np.array([[1.0, 0.0, 0.0]]), np.zeros((1, 1)), 1.0, 1.0, 0.016, 0.9)
-        moving = one_euro_trail(np.zeros((1, 3)), np.array([[1.0, 0.0, 0.0]]), np.array([[20.0]]), 1.0, 1.0, 0.016, 0.9)
-        self.assertGreater(moving[0, 0], still[0, 0] * 5.0)
-        np.testing.assert_allclose(moving[0, 2], still[0, 2])
 
 
 if __name__ == '__main__':

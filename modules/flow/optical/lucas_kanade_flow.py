@@ -15,9 +15,8 @@ along the displacement, so a surface sliding sideways over a slope reads no moti
 corrected each frame by the mean over `depth_track.window` depth samples and smoothed over
 `depth_track.smooth`; `depth_track.threshold` comes off it. The depth change comes in view
 widths per frame like the displacement, so all three become view widths per second the same way. Out
-comes one 3D velocity in true units, image widths per second; how hard it pushes the fluid is the
-bridge's. `x`, `y` and `z` switch an axis off (0) to look at the others. With `use_mask`, the velocity
-is multiplied by the mask.
+comes one 3D velocity in image widths per second times `x_gain`, `y_gain` and `z_gain` (1 = true speed,
+0 = that axis off, negative = inverted). With `use_mask`, the velocity is multiplied by the mask.
 
 z lags its motion by the time it is smoothed over. With `depth_track.xy_smooth`, x/y goes through the
 same filter over `depth_track.smooth` before its threshold, carried along the displacement as z is, so
@@ -41,7 +40,7 @@ import numpy as np
 from OpenGL.GL import GL_RG32F, GL_RGBA16F, GL_RGBA32F
 
 from modules.gl import Fbo, SwapFbo, Texture
-from modules.settings import BaseSettings, Field, Group
+from modules.settings import BaseSettings, Field, Group, Widget
 from .. import FlowUtil
 from .depth_velocity import DepthVelocity, track_weights
 from .luminance_frames import LuminanceFrames
@@ -77,9 +76,9 @@ class DepthTrackSettings(BaseSettings):
 class LucasKanadeFlowSettings(BaseSettings):
     """Configuration for the Lucas–Kanade flow: the mask and the axes, its x/y part and its z part."""
     use_mask:       Field[bool]  = Field(True, width=48, description="Only the player moves the fluid (off: whole image)")
-    x:              Field[bool]  = Field(True, description="x in the velocity (off: x is 0)")
-    y:              Field[bool]  = Field(True, description="y in the velocity (off: y is 0)")
-    z:              Field[bool]  = Field(True, description="z in the velocity (off: z is 0)")
+    x_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, image widths per second")
+    y_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, image widths per second")
+    z_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, on the x/y scale")
 
     lucas_kanade   = Group(LucasKanadeSettings)
     depth_track    = Group(DepthTrackSettings)
@@ -113,12 +112,12 @@ class LucasKanadeFlow:
 
     @property
     def velocity(self) -> Texture:
-        """x, y and z in image widths per second, 0 on an axis switched off (RGBA16F)."""
+        """x, y and z in image widths per second, each times its gain (RGBA16F)."""
         return self._velocity
 
     @property
     def depth_velocity(self) -> DepthVelocity:
-        """Its z, before the `z` switch and the mask."""
+        """Its z, before `z_gain` and the mask."""
         return self._depth_velocity
 
     def allocate(self, width: int, height: int) -> None:
@@ -241,7 +240,7 @@ class LucasKanadeFlow:
         mask: Texture | None = self._mask if s.use_mask and self._mask is not None and self._mask.allocated else None
         self._velocity.begin()
         self._compose_shader.use(xy, self._depth_velocity.depth_velocity if depth is not None else None,
-                                 (per_second * s.x, per_second * aspect * s.y, per_second * s.z), mask)
+                                 (per_second * s.x_gain, per_second * aspect * s.y_gain, per_second * s.z_gain), mask)
         self._velocity.end()
 
 
