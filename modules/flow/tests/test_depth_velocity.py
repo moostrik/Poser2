@@ -310,6 +310,13 @@ class CatchUpTest(unittest.TestCase):
 class StepFilterTest(unittest.TestCase):
     """Before the track, a sample whose 3×3 depth samples span two surfaces has no depth."""
 
+    def test_a_step_is_an_edge_by_the_edge_value(self) -> None:
+        # a hand 15 cm before the chest: an edge at z_edge 0.1, the same surface at 0.2
+        rows, columns = np.mgrid[0:SIZE, 0:SIZE]
+        depth = np.where(columns < SIZE // 2, 0.85, 1.0)
+        self.assertEqual(float(filter_depth_steps(depth, STEP, 0.1)[5, SIZE // 2]), 0.0)
+        self.assertEqual(float(filter_depth_steps(depth, STEP, 0.2)[5, SIZE // 2]), 1.0)
+
     def test_a_flat_or_sloping_surface_is_unchanged(self) -> None:
         rows, columns = np.mgrid[0:SIZE, 0:SIZE].astype(np.float64)
         flat, slope = uniform(1.0), 1.0 + 0.02 * columns               # 2 cm per sample, under the tolerance

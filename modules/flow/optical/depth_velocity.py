@@ -123,7 +123,7 @@ class DepthVelocity(FlowBase):
 
     def update_depth(self, depth: Texture, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
                      smooth: float, threshold: float, tolerance: float, dead_zone: float, catch_up_smooth: float, motion_floor: float,
-                     displacement: Texture | None = None) -> None:
+                     displacement: Texture | None = None, edge: float | None = None) -> None:
         """Advance on a new flow frame: correct the track by the new depth, then take the noise floor off.
 
         Args:
@@ -140,6 +140,7 @@ class DepthVelocity(FlowBase):
             motion_floor: Displacement the image must move by for the track to catch up (px per frame)
             displacement: How far each pixel moved since then (uv); when given, the track is carried
                 along the motion (Lucas–Kanade flow)
+            edge: Depth step within a 3×3 of depth samples that marks an edge, dropped (m); None takes `tolerance`
         """
         if not self._allocated:
             return
@@ -150,7 +151,7 @@ class DepthVelocity(FlowBase):
         FlowUtil.blit(self._raw, depth)
         self._input_fbo.swap()
         self._input_fbo.begin()
-        self._step_filter_shader.use(self._raw, step, tolerance)
+        self._step_filter_shader.use(self._raw, step, tolerance if edge is None else edge)
         self._input_fbo.end()
 
         # both runs read the track and the catch-up of the frame before: first the track, then the catch-up
