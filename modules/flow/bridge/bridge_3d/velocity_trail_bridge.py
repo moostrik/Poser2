@@ -10,6 +10,10 @@ at the pivot stays as it is, a faster one gets stronger and a slower one weaker;
 z stays linear, with its own soft `z_limit`: what is left of z's noise after the flow is spikes at edges,
 which a curve would make bigger and a limit caps.
 
+Before each step the trail moves with the motion it holds (`advect`): each pixel takes the trail from
+where its own x/y says it came from, so the average follows a moving limb instead of a fixed pixel,
+and a fast move is not cut off by a smoothing time longer than it takes to cross.
+
 The smoothing is one unit-gain Ema per pixel. Where the x/y speed rises it follows over `attack`, else over
 `smooth`, so a flick reaches the fluid at full strength and a stop still coasts. z follows over `smooth`
 alone, so a one-frame spike is averaged instead of passed on. The blur runs once per tick inside the
@@ -19,12 +23,12 @@ Ema's loop, so its spread grows with the trail's memory.
 import numpy as np
 from OpenGL.GL import GL_RGBA16F
 
-from modules.gl import Texture
+from modules.gl import SwapFbo, Texture
 from modules.settings import Field, BaseSettings
 from ... import FlowBase
 from ...shaders import GaussianBlur
 from .kinetics import decay_weight
-from .shaders import ShapeVelocity, VelocityTrail
+from .shaders import KineticAdvect, ShapeVelocity, VelocityTrail
 
 
 class VelocityTrailBridgeSettings(BaseSettings):
@@ -33,7 +37,8 @@ class VelocityTrailBridgeSettings(BaseSettings):
     curve = Field(1.0, min=0.5, max=3.0, step=0.05, description="Exponent on the x/y speed around the pivot; 1 = linear (higher: fast stronger, slow weaker)")
     limit = Field(4.0, min=0.0, max=4.0, step=0.05, description="Soft limit on the shaped x/y speed, widths/s; 0 = off")
     z_limit = Field(4.0, min=0.1, max=4.0, step=0.05, description="Soft limit on z, widths/s (lower: smaller edge spikes)")
-    attack = Field(0.0, min=0.0, max=500.0, step=1.0, newline=True, description="Smoothing time of a rising x/y speed, ms; 0 = as smooth (lower: quicker flicks)")
+    advect = Field(0.0, min=0.0, max=1.0, step=0.05, newline=True, description="How far the trail moves with its motion before each step; 0 = at a fixed pixel")
+    attack = Field(0.0, min=0.0, max=500.0, step=1.0, description="Smoothing time of a rising x/y speed, ms; 0 = as smooth (lower: quicker flicks)")
     smooth = Field(158.0, min=0.0, max=1000.0, step=1.0, description="Smoothing time, ms; the fall of x/y and all of z; 0 = none (higher: longer coast)")
     blur_radius = Field(0.0, min=0.0, max=10.0, newline=True, description="Gaussian blur radius in pixels, once per tick")
 
@@ -43,7 +48,8 @@ class VelocityTrailBridge(FlowBase):
 
     Pipeline:
         1. Shape the velocity into the input FBO (`set_velocity`): the x/y speed's curve and limit, z's limit
-        2. Blend it with the previous trail, a unit-gain Ema over `attack` or `smooth` (temporal smoothing)
+        2. Move the previous trail with its own motion (`advect`), then blend the input in, a unit-gain Ema over
+           `attack` or `smooth` (temporal smoothing)
         3. Blur it once (spatial smoothing)
 
     FBOs (from FlowBase):
@@ -61,6 +67,7 @@ class VelocityTrailBridge(FlowBase):
 
         # Shaders
         self._shape_shader: ShapeVelocity = ShapeVelocity()
+        self._advect_shader: KineticAdvect = KineticAdvect()
         self._trail_shader: VelocityTrail = VelocityTrail()
         self._blur_shader: GaussianBlur = GaussianBlur()
 
@@ -85,6 +92,7 @@ class VelocityTrailBridge(FlowBase):
         """
         super().allocate(width, height, output_width, output_height)
         self._shape_shader.allocate()
+        self._advect_shader.allocate()
         self._trail_shader.allocate()
         self._blur_shader.allocate()
 
@@ -92,6 +100,7 @@ class VelocityTrailBridge(FlowBase):
         """Deallocate all resources."""
         super().deallocate()
         self._shape_shader.deallocate()
+        self._advect_shader.deallocate()
         self._trail_shader.deallocate()
         self._blur_shader.deallocate()
 
@@ -110,7 +119,17 @@ class VelocityTrailBridge(FlowBase):
             return
         s: VelocityTrailBridgeSettings = self.settings
 
-        # Stage 1: Temporal smoothing, one unit-gain Ema step per pixel: weight * previous + (1 - weight) * input
+        # Stage 1: The trail moves with its motion: x is widths/s, y widths/s on the x scale, so uv per step
+        # is v * dt, and v * dt * width / height on y
+        if s.advect > 0.0:
+            step: float = s.advect * delta_time
+            fbo: SwapFbo = self._output_fbo
+            fbo.swap()
+            fbo.begin()
+            self._advect_shader.use(fbo.back_texture, fbo.back_texture, (step, step * fbo.width / max(fbo.height, 1)))
+            fbo.end()
+
+        # Stage 2: Temporal smoothing, one unit-gain Ema step per pixel: weight * previous + (1 - weight) * input
         release: float = decay_weight(delta_time, s.smooth)
         attack: float = decay_weight(delta_time, s.attack) if s.attack > 0.0 else release
         self._output_fbo.swap()
@@ -118,7 +137,7 @@ class VelocityTrailBridge(FlowBase):
         self._trail_shader.use(self._output_fbo.back_texture, self._input_fbo.texture, attack, release)
         self._output_fbo.end()
 
-        # Stage 2: Spatial smoothing (Gaussian blur), once
+        # Stage 3: Spatial smoothing (Gaussian blur), once
         if s.blur_radius > 0.0:
             for horizontal in (True, False):
                 self._output_fbo.swap()
