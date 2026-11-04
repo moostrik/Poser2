@@ -12,7 +12,7 @@ class DepthVelocityShader(Shader):
     """Writes the track: z (view widths per frame), disparity (1/m), its rate (1/m per second) and its
     anchor (m); or with `catch_up_pass`, the catch-up: the Emas of the miss of the prediction, signed and its size (m)."""
 
-    def use(self, depth: Texture, track: Texture, catch_up: Texture, catch_up_pass: bool, alpha: float, time: float, catch_up_time: float,
+    def use(self, depth: Texture, track: Texture, catch_up: Texture, catch_up_pass: bool, alpha: float, smooth: float, catch_up_smooth: float,
             ema: float, motion_floor: float, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
             tolerance: float, dead_zone: float, displacement: Texture | None = None) -> None:
         """Correct the track by the new depth, or with `catch_up_pass` write this frame's catch-up.
@@ -23,8 +23,8 @@ class DepthVelocityShader(Shader):
             catch_up: The catch-up the frame before
             catch_up_pass: Write the catch-up instead of the track
             alpha: Weight of a full window's measurement on the disparity (1 takes it whole)
-            time: Time the track follows over (ms); 0 takes the measurement whole
-            catch_up_time: Time it follows over while catching up (ms); 0 is never
+            smooth: Time the track follows over (ms); 0 takes the measurement whole
+            catch_up_smooth: Time it follows over while catching up (ms); 0 is never
             ema: Weight of a new miss on its Emas
             motion_floor: Displacement the image must move by to catch up (px per frame)
             delta_time: Seconds since the last depth
@@ -65,8 +65,8 @@ class DepthVelocityShader(Shader):
         glUniform1i(self.get_uniform_loc("window"), window)
         glUniform1f(self.get_uniform_loc("tolerance"), tolerance)
         glUniform1f(self.get_uniform_loc("alpha"), alpha)
-        glUniform1f(self.get_uniform_loc("time"), time)
-        glUniform1f(self.get_uniform_loc("catch_up_time"), catch_up_time)
+        glUniform1f(self.get_uniform_loc("smoothing"), smooth)
+        glUniform1f(self.get_uniform_loc("catch_up_smoothing"), catch_up_smooth)
         glUniform1f(self.get_uniform_loc("ema"), ema)
         glUniform1f(self.get_uniform_loc("motion_floor"), motion_floor)
         glUniform1f(self.get_uniform_loc("delta_time"), delta_time)

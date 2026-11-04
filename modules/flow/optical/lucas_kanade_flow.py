@@ -3,32 +3,31 @@
 Where the gradient flow gives a motion strength per pixel (the brightness change along the gradient),
 this gives how far the image moved: a window of gradients per pixel, solved for the shift that carries
 the previous frame onto the current one, first on the coarsest mip level, then refined once per finer
-level with the previous frame warped by the estimate so far.
+level with the previous frame warped by the estimate so far. With `xy_median`, the 5×5 median of the
+displacement after each level, so one level's outliers do not grow on the next.
 
 The displacement (uv per frame) stays inside: `xy_threshold` (px per frame) comes off its length, as
 below it is the solve's jitter, not motion. z comes from its own `DepthVelocity`: a depth track carried along
 the displacement, so a surface sliding sideways over a slope reads no motion toward the camera,
-corrected each frame by the mean over `z_window` depth samples and averaged over `z_time`;
+corrected each frame by the mean over `z_window` depth samples and smoothed over `z_smooth`;
 `z_threshold` comes off it. The depth change comes in view widths per frame like the displacement, so all three become
 view widths per second the same way. Out comes one 3D velocity: x/y times `strength_x`/`strength_y`,
 z times `strength_z`. With `use_mask`, the velocity is multiplied by the mask.
 
-z lags its motion by the time it averages over. With `xy_follow_z_time`, x/y goes through the same
-filter over `z_time` before its threshold, carried along the displacement as z is, so both lag
+z lags its motion by the time it is smoothed over. With `xy_follow_z`, x/y goes through the same
+filter over `z_smooth` before its threshold, carried along the displacement as z is, so both lag
 alike. A displacement is a step of position, so the filter is the same one: with a steady frame
 interval and a full z window, x/y answers a change of speed exactly as z does. The tracks are
 carried by the displacement as solved, before `xy_threshold`: a slide too slow for the output
 still moves the tracks with it, or on a slope it would read as z.
 
-Three ways to a firmer solve, each off by default: `xy_iterations` solves each level more than once,
-each from the last, as one linear step misses a large shift; `xy_median` takes the 5×5 median of the
-displacement after each level, so one level's outliers do not grow on the next; and `xy_round_trip`
-solves the way back as well, current onto previous, and keeps the displacement only where the round
-trip comes back to within it (px): where a surface is covered or uncovered, at a silhouette or a
-hand over the body, there is no motion and the depth track is held in place.
+The settings in flow pixels go with the flow's resolution: `xy_levels` (each level doubles the motion
+it follows, about 2 × 2^(levels − 1) px per frame at full size, so halving the resolution needs one
+level fewer for the same motion), `xy_window`, the median, `xy_threshold` and `z_threshold`. Those in
+metres and milliseconds do not.
 
-`lucas_kanade`, `median_displacement`, `round_trip_displacement`, `threshold_displacement`,
-`filter_displacement` and `displacement_velocity` below are the numpy references of the shaders.
+`lucas_kanade`, `median_displacement`, `threshold_displacement`, `filter_displacement` and
+`displacement_velocity` below are the numpy references of the shaders.
 """
 
 import numpy as np
@@ -39,25 +38,23 @@ from modules.settings import BaseSettings, Field
 from .. import FlowUtil
 from .depth_velocity import DepthVelocity, track_weights
 from .luminance_frames import LuminanceFrames
-from .shaders import ComposeVelocity, DisplacementRoundTrip, DisplacementFilter, DisplacementMedian, DisplacementThreshold, LucasKanadeShader
+from .shaders import ComposeVelocity, DisplacementFilter, DisplacementMedian, DisplacementThreshold, LucasKanadeShader
 
 
 class LucasKanadeFlowSettings(BaseSettings):
     """Configuration for the Lucas–Kanade flow."""
-    xy_levels:      Field[int]   = Field(3, min=1, max=5, description="Mip levels of the x/y solve, coarse to fine; more follows faster motion")
+    xy_levels:      Field[int]   = Field(3, min=3, max=5, description="Mip levels of the x/y solve, coarse to fine; more follows faster motion")
     xy_regularizer: Field[float] = Field(0.001, min=0.0, max=0.1, step=0.0005, description="Damps the x/y solve where the window has no texture")
     xy_window:      Field[int]   = Field(2, min=1, max=4, description="x/y window radius in texels per level (2 = 5x5)", newline=True)
-    xy_iterations:  Field[int]   = Field(1, min=1, max=5, description="x/y solves per mip level, each from the last")
     xy_median:      Field[bool]  = Field(False, description="5x5 median of the displacement after each mip level")
-    xy_round_trip:  Field[float] = Field(0.0, min=0.0, max=5.0, step=0.1, description="Largest forward-backward miss before x/y is dropped (px); 0 is off")
     xy_threshold:   Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="Displacement below this is noise, taken off the rest (px per frame)")
-    xy_follow_z_time: Field[bool] = Field(False, description="x/y follows z's time, so both lag alike")
+    xy_follow_z:    Field[bool]  = Field(False, description="x/y is smoothed as z is, so both lag alike")
     z_window:       Field[int]   = Field(1, min=0, max=4, description="z window radius in depth samples (1 = 3x3)", newline=True)
     z_threshold:    Field[float] = Field(0.5, min=0.0, max=10.0, step=0.05, description="z motion below this is noise, taken off the rest (px per frame)")
     z_dead_zone:    Field[float] = Field(0.0, min=0.0, max=0.05, step=0.001, description="Depth z wanders without reading as motion; past it, full speed (m); 0 is off")
-    z_catch_up_time: Field[float] = Field(0.0, min=0.0, max=50.0, step=0.5, description="Time z follows a fast push over, where the image moves too (ms); 0 is off")
-    z_time:         Field[float] = Field(50.0, min=0.0, max=1000.0, description="Time over which z averages (ms); 0 is the change of two frames")
-    z_tolerance:    Field[float] = Field(0.1, min=0.01, max=1.0, description="Depth further than this is another surface: not averaged in, z starts over (m)")
+    z_catch_up:     Field[float] = Field(0.0, min=0.0, max=50.0, step=0.5, description="Smoothing of z during a fast push, where the image moves too (ms); 0 is off")
+    z_smooth:       Field[float] = Field(50.0, min=0.0, max=200.0, description="Time z is smoothed over (ms); 0 is the change of two frames")
+    z_tolerance:    Field[float] = Field(0.1, min=0.1, max=0.5, description="Depth further than this is another surface: not averaged in, z starts over (m)")
     strength_x:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, x (negative inverts)", newline=True)
     strength_y:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, y (negative inverts)")
     strength_z:  Field[float] = Field(0.0, min=0.0, max=10.0, description="Velocity per view width per second toward the camera; 1 balances it with x/y, 0 is no depth")
@@ -74,17 +71,14 @@ class LucasKanadeFlow:
 
         self._frames: LuminanceFrames = LuminanceFrames()
         self._solve: SwapFbo = SwapFbo()            # the displacement as solved, level by level
-        self._backward: SwapFbo = SwapFbo()         # with xy_round_trip: the current frame onto the previous
-        self._round_tripped: Fbo = Fbo()                  # with xy_round_trip: the solve where its round trip comes back
         self._displacement: Fbo = Fbo()             # with the noise floor taken off
-        self._filtered: SwapFbo = SwapFbo()         # with xy_follow_z_time: the filter, its displacement and position error
+        self._filtered: SwapFbo = SwapFbo()         # with xy_follow_z: the filter, its displacement and position error
         self._followed: Fbo = Fbo()                 # the filtered displacement with the noise floor taken off
         self._following: bool = False
         self._velocity: Fbo = Fbo()
         self._shader: LucasKanadeShader = LucasKanadeShader()
         self._threshold_shader: DisplacementThreshold = DisplacementThreshold()
         self._median_shader: DisplacementMedian = DisplacementMedian()
-        self._round_trip_shader: DisplacementRoundTrip = DisplacementRoundTrip()
         self._filter_shader: DisplacementFilter = DisplacementFilter()
         self._compose_shader: ComposeVelocity = ComposeVelocity()
 
@@ -107,8 +101,6 @@ class LucasKanadeFlow:
         self._depth_velocity.allocate(width, height)
         self._frames.allocate(width, height)
         self._solve.allocate(width, height, GL_RG32F)
-        self._backward.allocate(width, height, GL_RG32F)
-        self._round_tripped.allocate(width, height, GL_RG32F)
         self._displacement.allocate(width, height, GL_RG32F)
         self._filtered.allocate(width, height, GL_RGBA32F)
         self._followed.allocate(width, height, GL_RG32F)
@@ -116,7 +108,6 @@ class LucasKanadeFlow:
         self._shader.allocate()
         self._threshold_shader.allocate()
         self._median_shader.allocate()
-        self._round_trip_shader.allocate()
         self._filter_shader.allocate()
         self._compose_shader.allocate()
         self.reset()
@@ -125,8 +116,6 @@ class LucasKanadeFlow:
         self._depth_velocity.deallocate()
         self._frames.deallocate()
         self._solve.deallocate()
-        self._backward.deallocate()
-        self._round_tripped.deallocate()
         self._displacement.deallocate()
         self._filtered.deallocate()
         self._followed.deallocate()
@@ -134,7 +123,6 @@ class LucasKanadeFlow:
         self._shader.deallocate()
         self._threshold_shader.deallocate()
         self._median_shader.deallocate()
-        self._round_trip_shader.deallocate()
         self._filter_shader.deallocate()
         self._compose_shader.deallocate()
 
@@ -142,8 +130,6 @@ class LucasKanadeFlow:
         self._depth_velocity.reset()
         self._frames.reset()
         self._solve.clear_all()
-        self._backward.clear_all()
-        self._round_tripped.clear()
         self._displacement.clear()
         self._filtered.clear_all()
         self._followed.clear()
@@ -158,16 +144,15 @@ class LucasKanadeFlow:
         self._mask = texture
 
     def _pyramid(self, solve: SwapFbo, previous: Texture, current: Texture) -> None:
-        """The displacement carrying `previous` onto `current`, coarse to fine, into `solve`: `xy_iterations`
-        solves per level, each from the last, and with `xy_median` the 5×5 median after each level."""
+        """The displacement carrying `previous` onto `current`, coarse to fine, into `solve`: one solve
+        per level, and with `xy_median` the 5×5 median after each level."""
         s: LucasKanadeFlowSettings = self.settings
         solve.clear()                                       # the coarsest level starts from no motion
         for level in reversed(range(s.xy_levels)):
-            for _ in range(s.xy_iterations):
-                solve.swap()
-                solve.begin()
-                self._shader.use(previous, current, solve.back_texture, level, s.xy_window, s.xy_regularizer)
-                solve.end()
+            solve.swap()
+            solve.begin()
+            self._shader.use(previous, current, solve.back_texture, level, s.xy_window, s.xy_regularizer)
+            solve.end()
             if s.xy_median:
                 spacing: float = float(2 ** level)          # a level's texel apart
                 solve.swap()
@@ -191,28 +176,22 @@ class LucasKanadeFlow:
 
         self._pyramid(self._solve, self._frames.previous_luminance, self._frames.luminance)
         solved: Texture = self._solve.texture
-        if s.xy_round_trip > 0.0:                                # the way back, and the forward solve where it returns
-            self._pyramid(self._backward, self._frames.luminance, self._frames.previous_luminance)
-            self._round_tripped.begin()
-            self._round_trip_shader.use(self._solve.texture, self._backward.texture, s.xy_round_trip)
-            self._round_tripped.end()
-            solved = self._round_tripped
 
         self._displacement.begin()
         self._threshold_shader.use(solved, s.xy_threshold)
         self._displacement.end()
 
         if depth is not None:
-            self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, s.z_window, s.z_time,
-                                              s.z_threshold, s.z_tolerance, s.z_dead_zone, s.z_catch_up_time, s.xy_threshold,
+            self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, s.z_window, s.z_smooth,
+                                              s.z_threshold, s.z_tolerance, s.z_dead_zone, s.z_catch_up, s.xy_threshold,
                                               solved)
 
         xy: Texture = self._displacement
-        if s.xy_follow_z_time:
+        if s.xy_follow_z:
             if not self._following:
                 self._filtered.clear_all()                  # from no motion, not from when it was last on
                 self._following = True
-            alpha, _ = track_weights(delta_time, s.z_time, 1.0)
+            alpha, _ = track_weights(delta_time, s.z_smooth, 1.0)
             self._filtered.swap()
             self._filtered.begin()
             self._filter_shader.use(solved, self._filtered.back_texture, solved, float(alpha))
@@ -300,11 +279,11 @@ def median_displacement(displacement: np.ndarray, spacing: float) -> np.ndarray:
 
 
 def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, window: int = 2, regularizer: float = 0.001,
-                 iterations: int = 1, median: bool = False) -> np.ndarray:
+                 median: bool = False) -> np.ndarray:
     """The displacement (H, W, 2) in pixels per frame, x along columns and y along rows, that carries
-    `previous` onto `current`: coarse to fine over `levels` mip levels, `iterations` solves per level
-    over a (2·window+1)² window, the previous frame warped by the estimate so far; with `median`, after
-    each level the 5×5 median of the displacement, a level's texel apart. Mirrors the shaders."""
+    `previous` onto `current`: coarse to fine over `levels` mip levels, one solve per level over a
+    (2·window+1)² window, the previous frame warped by the estimate so far; with `median`, after each
+    level the 5×5 median of the displacement, a level's texel apart. Mirrors the shaders."""
     h, w = current.shape
     previous_levels: list[np.ndarray] = _pyramid(previous.astype(np.float64), levels)
     current_levels: list[np.ndarray] = _pyramid(current.astype(np.float64), levels)
@@ -312,23 +291,10 @@ def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, win
     u, v = (columns + 0.5) / w, (rows + 0.5) / h            # each output pixel's uv
     d: np.ndarray = np.zeros((h, w, 2))                     # the displacement in uv
     for level in reversed(range(levels)):
-        for _ in range(iterations):
-            d = _solve_level(previous_levels[level], current_levels[level], d, u, v, window, regularizer)
+        d = _solve_level(previous_levels[level], current_levels[level], d, u, v, window, regularizer)
         if median:
             d = median_displacement(d, float(2 ** level))
     return d * np.array([w, h])
-
-
-def round_trip_displacement(forward: np.ndarray, backward: np.ndarray, largest_miss: float) -> np.ndarray:
-    """The forward displacement (H, W, 2, pixels per frame) where it comes back: the backward one,
-    read linear where the pixel was in the previous frame, cancels it to within `largest_miss` pixels; 0 where it does not,
-    as where a surface is covered or uncovered. Mirrors displacement_round_trip.frag."""
-    h, w = forward.shape[:2]
-    rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
-    x, y = columns - forward[..., 0], rows - forward[..., 1]          # where the pixel was in the previous frame
-    back: np.ndarray = np.stack([_bilinear(backward[..., c], x, y) for c in range(2)], axis=-1)
-    returns: np.ndarray = np.linalg.norm(forward + back, axis=-1) <= largest_miss
-    return np.where(returns[..., None], forward, 0.0)
 
 
 def threshold_displacement(displacement: np.ndarray, threshold: float) -> np.ndarray:
@@ -339,7 +305,7 @@ def threshold_displacement(displacement: np.ndarray, threshold: float) -> np.nda
 
 
 def filter_displacement(displacement: np.ndarray, state: np.ndarray, carry: np.ndarray, alpha: float) -> np.ndarray:
-    """The filter x/y goes through with xy_follow_z_time, one frame on (H, W, 4): the filtered
+    """The filter x/y goes through with xy_follow_z, one frame on (H, W, 4): the filtered
     displacement (x, y, pixels per frame) and the position error (x, y, pixels). Mirrors
     displacement_filter.frag.
 

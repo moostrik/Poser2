@@ -14,10 +14,10 @@
 // of the measurement, so a track is never carried across an edge. With `dead_zone` above 0, z is 0
 // while the tracked depth stays within it of its anchor; past it, z at its full speed, and the anchor
 // follows at `dead_zone` behind (a backlash); a track that starts over is anchored anew.
-// Catching up, with `catch_up_time` above 0: Emas of the miss of the prediction, signed and its size;
+// Catching up, with `catch_up_smoothing` above 0: Emas of the miss of the prediction, signed and its size;
 // where the miss keeps one way (the signed mean as large as the size, over twice the dead zone) and the
 // image moves (the 3×3 displacement past `motion_floor`), the time the track follows over blends from
-// `time` toward `catch_up_time`; and the carry takes each texel's depth a frame on by its rate. Run
+// `smoothing` toward `catch_up_smoothing`; and the carry takes each texel's depth a frame on by its rate. Run
 // twice on the same inputs: with `catch_up_pass` it writes this frame's Emas, without it the track.
 // The numpy reference is depth_velocity.track_depth
 
@@ -31,8 +31,8 @@ uniform vec2 depth_step; // uv between two depth samples
 uniform int window;      // Radius in depth samples
 uniform float tolerance; // Depth further than this is another surface (m)
 uniform float alpha;     // Weight of a full window's measurement on the disparity
-uniform float time;      // Time the track follows over (ms); 0 takes the measurement whole
-uniform float catch_up_time;        // Time it follows over while catching up (ms); 0 is never
+uniform float smoothing;   // Time the track follows over (ms), `smooth` in Python (`smooth` is a GLSL keyword); 0 takes the measurement whole
+uniform float catch_up_smoothing;       // Time it follows over while catching up (ms); 0 is never
 uniform float ema;       // Weight of a new miss on its Emas
 uniform float motion_floor;         // Displacement the image must move by to catch up (px per frame)
 uniform float delta_time;           // Seconds since the last depth
@@ -116,7 +116,7 @@ void main() {
     float measurement = total / float(max(kept, 1));
     float share = float(kept) / (side * side);
 
-    bool catching = catch_up_time > 0.0;
+    bool catching = catch_up_smoothing > 0.0;
     vec2 moved = warp ? texture(displacement, texCoord).xy : vec2(0.0);
     vec2 size = vec2(textureSize(tex1, 0));
     vec2 last;
@@ -137,8 +137,8 @@ void main() {
     float full = alpha;
     if (catching) {
         float opened = catch_up_share(emas.x, emas.y) * float(warp && moving(size));
-        float follow_time = time + opened * (catch_up_time - time);
-        full = time > 0.0 ? 1.0 - exp(-delta_time * 1000.0 / max(follow_time, 1e-6)) : 1.0;
+        float follow_time = smoothing + opened * (catch_up_smoothing - smoothing);
+        full = smoothing > 0.0 ? 1.0 - exp(-delta_time * 1000.0 / max(follow_time, 1e-6)) : 1.0;
     }
     float a = full * share;
     float b = a * a / (2.0 - a);

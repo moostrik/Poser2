@@ -5,7 +5,7 @@
 FRAMES is what depth_track_capture saved from one loop of a recording (temp/depth_track/RECORDING).
 No app and no camera: a window gives the GL context, and two `LucasKanadeFlow`, A and B, measure the
 saved frames with the settings they were recorded with; `--a` and `--b` override any of them by its
-name in the panel (xy_levels, xy_threshold, z_catch_up_time, ...). The window plays the loop at its
+name in the panel (xy_levels, xy_threshold, z_catch_up, ...). The window plays the loop at its
 recorded rate, again and again, A on the left, B on the right:
 
     1  z of the track, red toward the camera, green away     space  pause
@@ -14,12 +14,17 @@ recorded rate, again and again, A on the left, B on the right:
     4  the velocity's direction (x/y)                         esc    quit
     5  the velocity as arrows
 
-Each loop prints, for A and B, in the still part (1–5 s): x/y and z as the fluid gets them, at the
-edge (0–6 px inside the mask) and inside (12 px and more), and z on the table (outside, 16 px and
-more); in the slow (5–10 s) and fast (10 s on) parts, the body's x/y and how its z follows its real
-depth change; the restarts of the depth track, and the flow's time on the GPU per frame. `--fast`
-runs one loop without the window, as fast as it goes; `--verify` compares A's first frames with the
-numpy references instead.
+The loop splits into a still part and moves, each a slow half then a fast one: by `segments.json`
+beside the frames ({"still": [from, to], "moves": [[from, fast from, to], ...]}, seconds) where there
+is one, else by the frames' motion (the mean luminance change in the mask): the moves are where it
+rises above the still part's for a while, and a move's fast half is where it steps up most.
+
+Each loop prints, for A and B, in the still part: x/y and z as the fluid gets them, at the edge (0–6
+px inside the mask) and inside (12 px and more), and z on the table (outside, 16 px and more); per
+move, the body's x/y and z in its slow and fast half and fast over slow, how its z follows its real
+depth change, and the frames x/y takes to stop after it; the restarts of the depth track, and the
+flow's time on the GPU per frame. `--fast` runs one loop without the window, as fast as it goes;
+`--verify` compares A's first frames with the numpy references instead.
 """
 
 import ctypes
@@ -40,9 +45,13 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_FALSE, GL_FLOAT,
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from modules.gl import Blit, Fbo, Texture  # noqa: E402
 from modules.flow import (FlowUtil, LucasKanadeFlow, LucasKanadeFlowSettings, SignedField, VelocityField,  # noqa: E402
-                          VisualizationFieldSettings, round_trip_displacement, filter_depth_steps, lucas_kanade, track_depth)
+                          VisualizationFieldSettings, filter_depth_steps, lucas_kanade, track_depth)
 
-SEGMENTS: dict[str, tuple[float, float]] = {'still': (1.0, 5.0), 'slow': (5.0, 10.0), 'fast': (10.0, 1e9)}
+WARM_UP: float = 1.0          # s at the start the flows settle in, measured in no part
+SHORTEST_PAUSE: float = 1.0   # s of stillness that end a move
+RENAMED: dict[str, str] = {'z_time': 'z_smooth', 'z_catch_up_time': 'z_catch_up', 'xy_follow_z_time': 'xy_follow_z'}   # in frames saved before
+MOVED: float = 0.05          # luminance change of a pixel that moves
+MOVED_FRAMES: int = 5         # frames it changes that much in, over the loop
 VIEWS: dict[int, str] = {1: 'z of the track', 2: 'z after the threshold', 3: 'depth', 4: 'velocity direction', 5: 'velocity arrows'}
 
 
@@ -119,6 +128,14 @@ class Frames:
         self.width, self.height = self.calls[0]['width'], self.calls[0]['height']
         t = np.array([c['t'] for c in self.calls])
         self.t: np.ndarray = t - t[0]
+        motion = self.motion()
+        given = folder / 'segments.json'
+        if given.exists():
+            parts = json.loads(given.read_text())
+            self.still: tuple[float, float] = tuple(parts['still'])
+            self.moves: list[tuple[float, float, float]] = [tuple(move) for move in parts['moves']]
+        else:
+            self.still, self.moves = split_moves(self.t, motion)
 
     def __len__(self) -> int:
         return len(self.calls)
@@ -127,8 +144,66 @@ class Frames:
         return (np.load(self.folder / f'luminance_{k:04d}.npy').astype(np.float32), np.load(self.folder / f'depth_{k:04d}.npy').astype(np.float32),
                 np.load(self.folder / f'mask_{k:04d}.npy'))
 
+    def motion(self) -> np.ndarray:
+        """Per frame, the mean luminance change in the mask since the frame before (0 to 1). Also
+        `moved`: the pixels whose luminance changes by more than MOVED in MOVED_FRAMES frames or more,
+        so a still background in the mask can be told from the player."""
+        motion, before = np.zeros(len(self)), None
+        changes = np.zeros((self.height, self.width), np.int32)
+        for k in range(len(self)):
+            luminance, mask = np.load(self.folder / f'luminance_{k:04d}.npy').astype(np.float32), np.load(self.folder / f'mask_{k:04d}.npy')
+            if before is not None:
+                change = np.abs(luminance - before)
+                changes += change > MOVED
+                if mask.any():
+                    motion[k] = float(np.mean(change[mask]))
+            before = luminance
+        self.moved: np.ndarray = changes >= MOVED_FRAMES
+        return motion
+
     def segment(self, k: int) -> str:
-        return next((name for name, (lo, hi) in SEGMENTS.items() if lo <= self.t[k] < hi), '')
+        """'still', 'move N slow' or 'move N fast' (N from 1), or '' between them."""
+        t = self.t[k]
+        if self.still[0] <= t < self.still[1]:
+            return 'still'
+        for n, (begin, fast, end) in enumerate(self.moves, 1):
+            if begin <= t < end:
+                return f'move {n} {"slow" if t < fast else "fast"}'
+        return ''
+
+    def describe(self) -> str:
+        return (f'still {self.still[0]:.1f}-{self.still[1]:.1f} s; '
+                + '; '.join(f'move {n} {b:.1f}-{e:.1f} s, fast from {f:.1f}' for n, (b, f, e) in enumerate(self.moves, 1)))
+
+
+def split_moves(t: np.ndarray, motion: np.ndarray) -> tuple[tuple[float, float], list[tuple[float, float, float]]]:
+    """The still part and the moves (from, fast from, to; s) of a loop, from its motion per frame.
+
+    A move is where the motion, over 5 frames, is past the still part's (its first 2 s after the warm
+    up) by a tenth of the way to the loudest; pauses shorter than SHORTEST_PAUSE don't end one. Its
+    fast half begins where the motion steps up most: the split with the least spread on both sides."""
+    smooth = np.convolve(motion, np.ones(5) / 5, 'same')
+    calm = float(np.median(smooth[(t >= WARM_UP) & (t < WARM_UP + 2.0)]))
+    moving = smooth > calm + 0.1 * (float(np.percentile(smooth, 95)) - calm)
+    moving[t < WARM_UP] = False
+    edges = np.flatnonzero(np.diff(np.concatenate(([0], moving.astype(int), [0]))))
+    runs = [[int(a), int(b)] for a, b in zip(edges[::2], edges[1::2])]     # frames [a, b)
+    joined: list[list[int]] = []
+    for run in runs:
+        if joined and t[run[0]] - t[joined[-1][1] - 1] < SHORTEST_PAUSE:
+            joined[-1][1] = run[1]
+        else:
+            joined.append(run)
+    joined = [run for run in joined if t[run[1] - 1] - t[run[0]] >= 0.3]
+    moves: list[tuple[float, float, float]] = []
+    for a, b in joined:
+        part = smooth[a:b]
+        splits = range(3, len(part) - 2)
+        spread = [float(np.var(part[:i]) * i + np.var(part[i:]) * (len(part) - i)) for i in splits]
+        fast = a + (splits[int(np.argmin(spread))] if spread else len(part) // 2)
+        moves.append((float(t[a]), float(t[fast]), float(t[b - 1]) + 1e-6))
+    still_end = moves[0][0] if moves else float(t[-1])
+    return (WARM_UP, still_end), moves
 
 
 class Measures:
@@ -136,17 +211,23 @@ class Measures:
 
     def __init__(self) -> None:
         self.still: dict[str, list[np.ndarray]] = {'xy edge': [], 'xy inside': [], 'z edge': [], 'z inside': [], 'z table': []}
-        self.body_xy: dict[str, list[float]] = {'slow': [], 'fast': []}
-        self.body_z: list[float] = []
+        self.segments: list[str] = []
+        self.body_xy: list[float] = []            # px per frame, as the fluid gets it
+        self.moving_xy: list[float] = []          # the same on the body's pixels that move in the loop
+        self.body_z: list[float] = []             # the track's z, px per frame
+        self.moving_z: list[float] = []
+        self.mask_share: list[float] = []         # of the image, in the still part
+        self.static_share: list[float] = []       # of the mask that never moves, in the still part
         self.body_depth: list[float] = []
         self.times: list[float] = []
-        self.restarts: dict[str, list[float]] = {name: [] for name in SEGMENTS}
+        self.restarts: dict[str, list[float]] = {'still': [], 'moving': []}
         self.milliseconds: list[float] = []
         self._before: np.ndarray | None = None
 
     def add(self, t: float, segment: str, xy: np.ndarray, track: np.ndarray, z: np.ndarray, depth: np.ndarray, mask: np.ndarray,
-            milliseconds: float) -> None:
-        """`xy` and `z` are as the fluid gets them, in px per frame; `track` is the depth track's state."""
+            moved: np.ndarray, milliseconds: float) -> None:
+        """`xy` and `z` are as the fluid gets them, in px per frame; `track` is the depth track's state;
+        `moved` the pixels that move in the loop."""
         width = depth.shape[1]
         inside = cv2.distanceTransform(mask.astype(np.uint8), cv2.DIST_L2, 3)
         outside = cv2.distanceTransform((~mask).astype(np.uint8), cv2.DIST_L2, 3)
@@ -156,35 +237,58 @@ class Measures:
         if self._before is not None and segment:
             held = core & (self._before[..., 1] > 0)
             if held.any():                        # a track there the frame before that now has no rate: it started over
-                self.restarts[segment].append(float(np.mean((track[..., 2] == 0.0)[held] & (track[..., 1][held] > 0))))
+                restarted = float(np.mean((track[..., 2] == 0.0)[held] & (track[..., 1][held] > 0)))
+                self.restarts['still' if segment == 'still' else 'moving'].append(restarted)
         self._before = track
         self.milliseconds.append(milliseconds)
         self.times.append(t)
+        self.segments.append(segment)
         self.body_depth.append(near)
+        self.body_xy.append(float(np.mean(xy[core])) if core.any() else 0.0)
         self.body_z.append(float(np.mean(track[..., 0][core])) * width if core.any() else np.nan)
+        moving = core & moved
+        self.moving_xy.append(float(np.mean(xy[moving])) if moving.any() else 0.0)
+        self.moving_z.append(float(np.mean(track[..., 0][moving])) * width if moving.any() else np.nan)
         if segment == 'still':
+            self.mask_share.append(float(np.mean(mask)))
+            self.static_share.append(float(np.mean(~moved[mask])) if mask.any() else 0.0)
             self.still['xy edge'].append(xy[edge]); self.still['xy inside'].append(xy[core])
             self.still['z edge'].append(z[edge]); self.still['z inside'].append(z[core])
             self.still['z table'].append(z[(~mask) & (depth > 0) & (outside > 16) & (depth < near + 0.8)])
-        elif segment in self.body_xy and core.any():
-            self.body_xy[segment].append(float(np.mean(xy[core])))
 
-    def report(self, span: float, width: int) -> str:
+    def report(self, span: float, width: int, moves: int) -> str:
         lines: list[str] = []
         for name, parts in self.still.items():
             v = np.concatenate(parts) if parts else np.zeros(0)
             lines.append(f'still {name} >0 {np.mean(v > 0) if v.size else 0:.4f} p99 {np.percentile(v, 99) if v.size else 0:.2f}')
-        d, t = np.array(self.body_depth), np.array(self.times)
+        d, segments = np.array(self.body_depth), np.array(self.segments)
         real = np.zeros_like(d); real[1:] = -(d[1:] - d[:-1]) / (d[:-1] * span) * width
         kernel = np.ones(5) / 5
-        for name in ('slow', 'fast'):
-            lo, hi = SEGMENTS[name]
-            sel = (t >= lo) & (t < hi)
-            if sel.sum() < 10:
+        real = np.convolve(np.nan_to_num(real), kernel, 'same')
+        body_z = np.convolve(np.nan_to_num(np.array(self.body_z)), kernel, 'same')
+        body_xy, moving_xy = np.array(self.body_xy), np.array(self.moving_xy)
+        moving_z = np.convolve(np.nan_to_num(np.array(self.moving_z)), kernel, 'same')
+        lines.append(f'mask {np.mean(self.mask_share) * 100:.0f}% of the image, {np.mean(self.static_share) * 100:.0f}% of it never moves')
+
+        def halves(series: np.ndarray, slow: np.ndarray, fast: np.ndarray) -> str:
+            a, b = float(np.mean(np.abs(series[slow]))), float(np.mean(np.abs(series[fast])))
+            return f'{a:.2f} -> {b:.2f} x{b / max(a, 1e-6):.1f}'
+
+        for n in range(1, moves + 1):
+            slow, fast = segments == f'move {n} slow', segments == f'move {n} fast'
+            if fast.sum() < 3:
                 continue
-            r = np.convolve(np.nan_to_num(real), kernel, 'same')[sel]
-            z = np.convolve(np.nan_to_num(np.array(self.body_z)), kernel, 'same')[sel]
-            lines.append(f'{name} body xy {np.mean(self.body_xy[name]):.2f} | {name} z/real {np.dot(z, r) / max(np.dot(r, r), 1e-12):.2f} (corr {np.corrcoef(z, r)[0, 1]:.2f})')
+            move = slow | fast
+            after = np.flatnonzero(move)[-1] + 1
+            calm = body_xy[after:after + 60] <= 0.1 * float(np.max(body_xy[move]))
+            stop = f'xy stops {int(np.argmax(calm))} frames after' if calm.any() else 'xy not stopped in 60 frames'
+            if slow.sum() < 3:                    # a fast move alone, as before a freeze
+                lines.append(f'move {n}: fast xy {np.mean(body_xy[fast]):.2f} | {stop}')
+                continue
+            r, z = real[move], body_z[move]
+            lines.append(f'move {n} slow -> fast: xy {halves(body_xy, slow, fast)}, moving {halves(moving_xy, slow, fast)} | '
+                         f'z {halves(body_z, slow, fast)}, moving {halves(moving_z, slow, fast)}, real {halves(real, slow, fast)} | '
+                         f'z/real {np.dot(z, r) / max(np.dot(r, r), 1e-12):.2f} (corr {np.corrcoef(z, r)[0, 1]:.2f}) | {stop}')
         lines.append('restarts ' + ', '.join(f'{name} {np.mean(v) * 100:.2f}%' for name, v in self.restarts.items() if v))
         lines.append(f'{np.median(self.milliseconds):.2f} ms per frame')
         return '\n    '.join([' | '.join(lines[:5])] + lines[5:])
@@ -196,7 +300,7 @@ class Side:
     def __init__(self, name: str, recorded: dict, changed: dict[str, object], width: int, height: int, show: bool) -> None:
         self.name, self.changed = name, changed
         self.settings = LucasKanadeFlowSettings()
-        self.settings.update_from_dict(recorded)
+        self.settings.update_from_dict({RENAMED.get(key, key): value for key, value in recorded.items()})
         for key, value in changed.items():
             setattr(self.settings, key, value)
         self.flow = LucasKanadeFlow(self.settings)
@@ -257,19 +361,15 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
         if previous is None:
             previous = lum
             continue
-        solved = side.flow._round_tripped.texture if s.xy_round_trip > 0.0 else side.flow._solve.texture
-        solve = read_back(solved)[..., :2] * np.array([w, h])                                    # px per frame
+        solve = read_back(side.flow._solve.texture)[..., :2] * np.array([w, h])                  # px per frame
         now, then = (np.round(f * 255.0).astype(np.float64) / 255.0 for f in (lum, previous))    # as the R8 frames hold them
-        reference = lucas_kanade(then, now, s.xy_levels, s.xy_window, s.xy_regularizer, s.xy_iterations, s.xy_median)
-        if s.xy_round_trip > 0.0:
-            reference = round_trip_displacement(reference, lucas_kanade(now, then, s.xy_levels, s.xy_window, s.xy_regularizer, s.xy_iterations,
-                                                                   s.xy_median), s.xy_round_trip)
+        reference = lucas_kanade(then, now, s.xy_levels, s.xy_window, s.xy_regularizer, s.xy_median)
         previous = lum
         c = frames.calls[k]
         step = (c['depth_step'][0] * w, c['depth_step'][1] * h) if c['depth_step'][0] > 0 else (1.0, 1.0)
         state, catch_up = track_depth(filter_depth_steps(depth.astype(np.float64), step, s.z_tolerance), state, catch_up, solve.astype(np.float64),
-                                      c['delta_time'], s.z_window, step, s.z_tolerance, s.z_time, c['view_span'], s.z_dead_zone,
-                                      s.z_catch_up_time, s.xy_threshold)
+                                      c['delta_time'], s.z_window, step, s.z_tolerance, s.z_smooth, c['view_span'], s.z_dead_zone,
+                                      s.z_catch_up, s.xy_threshold)
         gpu = read_back(side.flow.depth_velocity.difference)
         if k % 5 == 0 or k == last:
             dxy = np.linalg.norm(solve - reference, axis=-1)
@@ -327,6 +427,7 @@ def main() -> int:
             glfw.set_window_should_close(window, True)
 
     glfw.set_key_callback(window, on_key)
+    print(frames.describe())
     for side in sides:
         print(f'{side.name}: {side.changed or "as recorded"}')
 
@@ -339,7 +440,7 @@ def main() -> int:
     while not glfw.window_should_close(window):
         if k >= len(frames):                      # the loop's end: its measures, and from no motion again
             for side in sides:
-                print(f'loop {loop} {side.name}: {side.measures.report(span, w)}', flush=True)
+                print(f'loop {loop} {side.name}: {side.measures.report(span, w, len(frames.moves))}', flush=True)
                 side.flow.reset()
                 side.measures = Measures()
             if args.fast or (args.loops and loop >= args.loops):
@@ -379,7 +480,7 @@ def main() -> int:
             z = np.abs(read_back(side.flow.depth_velocity.depth_velocity)[..., 0]) * w
             if side.settings.use_mask:
                 z = z * mask
-            side.measures.add(float(frames.t[k]), segment, xy, track, z, depth, mask, milliseconds)
+            side.measures.add(float(frames.t[k]), segment, xy, track, z, depth, mask, frames.moved, milliseconds)
 
         if not args.fast:
             shown = [side.show(controls['view'], depth_texture, controls['scale'], w) for side in sides]

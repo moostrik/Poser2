@@ -28,15 +28,15 @@ def interior(field: np.ndarray, margin: int = 8) -> np.ndarray:
 
 
 def track(depths: list[np.ndarray], moved: np.ndarray | None = None, window: int = 2, step: tuple[float, float] = STEP,
-          tolerance: float = TOLERANCE, time: float = 0.0, span: float = SPAN, dead_zone: float = 0.0,
-          catch_up_time: float = 0.0, dt: float = DT) -> list[np.ndarray]:
+          tolerance: float = TOLERANCE, smooth: float = 0.0, span: float = SPAN, dead_zone: float = 0.0,
+          catch_up_smooth: float = 0.0, dt: float = DT) -> list[np.ndarray]:
     """The track after each depth frame, from no track."""
     state: np.ndarray = np.zeros(depths[0].shape + (4,))
     catch_up: np.ndarray = np.zeros(depths[0].shape + (2,))
     states: list[np.ndarray] = []
     for depth in depths:
         state, catch_up = track_depth(depth, state, catch_up, still(depth.shape) if moved is None else moved, dt, window, step, tolerance,
-                                      time, span, dead_zone, catch_up_time, 0.5)
+                                      smooth, span, dead_zone, catch_up_smooth, 0.5)
         states.append(state)
     return states
 
@@ -47,7 +47,7 @@ def z(depths: list[np.ndarray], **kwargs) -> np.ndarray:
 
 
 class TwoFrameTest(unittest.TestCase):
-    """With no time and a full window, the track is the change between the last two frames."""
+    """With no smoothing and a full window, the track is the change between the last two frames."""
 
     def test_coming_closer_is_positive(self) -> None:
         # 2 m to 1.9 m: the disparity's change over the new disparity, (1 − 1.9 / 2), over the span
@@ -102,7 +102,7 @@ class TrackTest(unittest.TestCase):
         rng = np.random.default_rng(0)
         depths = [2.0 + rng.normal(0.0, 0.03, (SIZE, SIZE)) for _ in range(120)]
         differenced = np.std(np.stack([s[..., 0] for s in track(depths, window=0, tolerance=1.0)[60:]]))
-        tracked = np.std(np.stack([s[..., 0] for s in track(depths, window=0, tolerance=1.0, time=100.0)[60:]]))
+        tracked = np.std(np.stack([s[..., 0] for s in track(depths, window=0, tolerance=1.0, smooth=100.0)[60:]]))
         self.assertLess(float(tracked), float(differenced) * 0.3)
 
     def test_a_steady_move_toward_the_camera_settles_on_its_speed(self) -> None:
@@ -110,7 +110,7 @@ class TrackTest(unittest.TestCase):
         # metres the disparity's rate grows as the player comes closer, and the track lags it a little
         rate: float = (1.0 / 1.5 - 1.0 / 2.5) / 2.0
         depths = [uniform(1.0 / (1.0 / 2.5 + rate * DT * frame)) for frame in range(61)]
-        field = z(depths, tolerance=0.5, time=100.0)
+        field = z(depths, tolerance=0.5, smooth=100.0)
         expected: float = rate * DT / ((1.0 / 1.5) * SPAN)
         np.testing.assert_allclose(interior(field), expected, rtol=0.01)
 
@@ -144,8 +144,8 @@ class CarriedTest(unittest.TestCase):
         depths = [2.0 + 0.01 * (columns - 0.4 * frame) for frame in range(10)]
         moved = still()
         moved[..., 0] = 0.4
-        carried = interior(z(depths, moved=moved, window=0, time=50.0))
-        held = interior(z(depths, window=0, time=50.0))
+        carried = interior(z(depths, moved=moved, window=0, smooth=50.0))
+        held = interior(z(depths, window=0, smooth=50.0))
         self.assertLess(float(np.abs(carried).max()), 1e-4)
         self.assertGreater(float(np.abs(held).min()), 1e-3)
 
@@ -160,7 +160,7 @@ class CarriedTest(unittest.TestCase):
             depths.append(depth)
         moved = still()
         moved[..., 0] = 1.3
-        states = track(depths, moved=moved, window=0, time=50.0)
+        states = track(depths, moved=moved, window=0, smooth=50.0)
         self.assertLess(max(float(np.abs(s[..., 0]).max()) for s in states), 1e-9)
 
     def test_a_surface_moving_toward_the_camera_along_its_motion_still_reads_so(self) -> None:
@@ -176,19 +176,19 @@ class DeadZoneTest(unittest.TestCase):
     def test_a_wander_within_the_zone_reads_nothing(self) -> None:
         # ±3 mm over 400 ms, as a stereo surface wanders; without the zone it reads as z
         depths = [uniform(0.7 + 0.003 * np.sin(2 * np.pi * frame * DT / 0.4)) for frame in range(60)]
-        self.assertEqual(max(float(np.abs(s[..., 0]).max()) for s in track(depths, window=0, time=50.0, dead_zone=self.ZONE)), 0.0)
-        self.assertGreater(max(float(np.abs(s[..., 0]).max()) for s in track(depths, window=0, time=50.0)), 0.0)
+        self.assertEqual(max(float(np.abs(s[..., 0]).max()) for s in track(depths, window=0, smooth=50.0, dead_zone=self.ZONE)), 0.0)
+        self.assertGreater(max(float(np.abs(s[..., 0]).max()) for s in track(depths, window=0, smooth=50.0)), 0.0)
 
     def test_depth_steps_read_nothing(self) -> None:
         rng = np.random.default_rng(4)
         depths = [uniform(0.7 + 0.001 * float(rng.integers(0, 2))) for _ in range(60)]
-        self.assertEqual(max(float(np.abs(s[..., 0]).max()) for s in track(depths, window=0, time=50.0, dead_zone=self.ZONE)), 0.0)
+        self.assertEqual(max(float(np.abs(s[..., 0]).max()) for s in track(depths, window=0, smooth=50.0, dead_zone=self.ZONE)), 0.0)
 
     def test_a_real_motion_comes_through_at_full_speed_past_the_zone(self) -> None:
         # still, then 1 m/s toward the camera: the first 5 mm read nothing, then z as without the zone
         depths = [uniform(0.9 - (max(frame - 5, 0) * 1.0 * DT)) for frame in range(20)]
-        zoned = track(depths, window=0, tolerance=0.5, time=50.0, dead_zone=self.ZONE)
-        free = track(depths, window=0, tolerance=0.5, time=50.0)
+        zoned = track(depths, window=0, tolerance=0.5, smooth=50.0, dead_zone=self.ZONE)
+        free = track(depths, window=0, tolerance=0.5, smooth=50.0)
         start: float = 1.0 / float(free[4][1, 1, 1])
         past = [i for i, s in enumerate(free) if start - 1.0 / float(s[1, 1, 1]) > self.ZONE + 1e-6]
         self.assertTrue(past and past[0] < 12)
@@ -200,7 +200,7 @@ class DeadZoneTest(unittest.TestCase):
     def test_no_zone_is_the_track_as_it_was(self) -> None:
         rng = np.random.default_rng(5)
         depths = [2.0 + rng.normal(0.0, 0.03, (SIZE, SIZE)) for _ in range(10)]
-        for zoned, free in zip(track(depths, time=50.0, tolerance=1.0, dead_zone=0.0), track(depths, time=50.0, tolerance=1.0)):
+        for zoned, free in zip(track(depths, smooth=50.0, tolerance=1.0, dead_zone=0.0), track(depths, smooth=50.0, tolerance=1.0)):
             np.testing.assert_array_equal(zoned[..., :3], free[..., :3])
             np.testing.assert_allclose(zoned[..., 3], np.where(free[..., 1] > 0, 1.0 / np.where(free[..., 1] > 0, free[..., 1], 1.0), 0.0))
 
@@ -208,7 +208,7 @@ class DeadZoneTest(unittest.TestCase):
         # the chest at 1 m, then a hand at 0.7 m over it: the track starts over, anchored at the hand,
         # and the hand's own wander reads nothing
         depths = [uniform(1.0)] * 5 + [uniform(0.7 + 0.003 * (frame % 2)) for frame in range(10)]
-        states = track(depths, window=0, time=50.0, dead_zone=self.ZONE)
+        states = track(depths, window=0, smooth=50.0, dead_zone=self.ZONE)
         np.testing.assert_allclose(states[5][..., 3], 0.7)
         self.assertEqual(max(float(np.abs(s[..., 0]).max()) for s in states), 0.0)
 
@@ -227,7 +227,7 @@ class WeightsTest(unittest.TestCase):
 
 
 class CatchUpTest(unittest.TestCase):
-    """With z_catch_up_time, a track that keeps missing one way where the image moves follows faster,
+    """With z_catch_up, a track that keeps missing one way where the image moves follows faster,
     as much as it keeps missing that way."""
     MOVING: np.ndarray = np.tile([1.0, 0.0], (SIZE, SIZE, 1))     # the image moving a pixel per frame, as a hand's edges do
 
@@ -241,9 +241,9 @@ class CatchUpTest(unittest.TestCase):
             depths.append(uniform(max(d, 0.6)))
         return depths
 
-    def follow(self, speed: float, catch_up_time: float, moving: bool = True) -> list[np.ndarray]:
-        return track(self.approach(speed), moved=self.MOVING if moving else None, window=0, time=50.0, dead_zone=0.02,
-                     catch_up_time=catch_up_time, dt=0.02)
+    def follow(self, speed: float, catch_up_smooth: float, moving: bool = True) -> list[np.ndarray]:
+        return track(self.approach(speed), moved=self.MOVING if moving else None, window=0, smooth=50.0, dead_zone=0.02,
+                     catch_up_smooth=catch_up_smooth, dt=0.02)
 
     @staticmethod
     def restarts(states: list[np.ndarray]) -> int:
@@ -272,7 +272,7 @@ class CatchUpTest(unittest.TestCase):
         for depth in depths:
             state, catch_up = track_depth(depth, state, catch_up, still(), DT, 1, STEP, 0.1, 50.0, SPAN, 0.02, 0.0, 0.5)
             plain.append(state)
-        for a, b in zip(plain, track(depths, window=1, tolerance=0.1, time=50.0, dead_zone=0.02)):
+        for a, b in zip(plain, track(depths, window=1, tolerance=0.1, smooth=50.0, dead_zone=0.02)):
             np.testing.assert_array_equal(a, b)
 
     def test_a_flip_jitter_at_a_still_edge_reads_as_today(self) -> None:
@@ -282,8 +282,8 @@ class CatchUpTest(unittest.TestCase):
         for _ in range(200):
             off = (not off) and rng.random() < 0.3
             depths.append(uniform(0.7 + (rng.uniform(0.03, 0.09) * rng.choice((-1.0, 1.0)) if off else 0.0)))
-        np.testing.assert_array_equal(np.stack(track(depths, window=0, time=50.0, dead_zone=0.02, catch_up_time=12.5)),
-                                      np.stack(track(depths, window=0, time=50.0, dead_zone=0.02)))
+        np.testing.assert_array_equal(np.stack(track(depths, window=0, smooth=50.0, dead_zone=0.02, catch_up_smooth=12.5)),
+                                      np.stack(track(depths, window=0, smooth=50.0, dead_zone=0.02)))
 
     def test_a_flip_jitter_cancels_out_in_the_catch_up_share(self) -> None:
         rng = np.random.default_rng(11)
@@ -302,7 +302,7 @@ class CatchUpTest(unittest.TestCase):
         self.assertGreater(max(shares), 0.5)                                  # it opens, and closes as it catches up
 
     def test_a_new_surface_still_starts_over(self) -> None:
-        states = track([uniform(1.0)] * 6 + [uniform(0.7)], moved=self.MOVING, window=0, time=50.0, dead_zone=0.02, catch_up_time=12.5, dt=0.02)
+        states = track([uniform(1.0)] * 6 + [uniform(0.7)], moved=self.MOVING, window=0, smooth=50.0, dead_zone=0.02, catch_up_smooth=12.5, dt=0.02)
         self.assertEqual(float(states[-1][1, 1, 2]), 0.0)
         np.testing.assert_allclose(states[-1][1, 1, 1], 1.0 / 0.7)
 
@@ -347,7 +347,7 @@ class StepFilterTest(unittest.TestCase):
             depth[flip, SIZE // 2] = 0.7
             depth[:, SIZE // 2 - 1] = np.where(rng.random(SIZE) < 0.3, 0.7 + rng.uniform(0.02, 0.09, SIZE), 0.7)
             depths.append(filter_depth_steps(depth, STEP, TOLERANCE))
-        states = track(depths, window=1, time=50.0, dead_zone=0.02)
+        states = track(depths, window=1, smooth=50.0, dead_zone=0.02)
         self.assertEqual(max(float(np.abs(s[..., 0]).max()) for s in states), 0.0)
 
 

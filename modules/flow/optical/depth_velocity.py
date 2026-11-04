@@ -3,7 +3,7 @@
 What the image cannot measure: the player's motion toward the camera, from the depth image. One
 depth sample is mostly noise from frame to frame, and the change between two frames doubles it, so
 z is tracked instead of differenced: each pixel holds a depth and its rate, carried along the motion
-from frame to frame, and each new depth only corrects them (an alpha–beta filter). Over `time` (ms)
+from frame to frame, and each new depth only corrects them (an alpha–beta filter). Over `smooth` (ms)
 the corrections average out, so z is the rate of many frames rather than the step of two.
 
 The track is held in disparity (1 / depth), where stereo depth noise is about constant. `tolerance`
@@ -15,7 +15,7 @@ thin window at a silhouette corrects little and the track coasts on. The track c
 pixel was a displacement back (in place without one), so a surface sliding sideways keeps its own
 depth, and only from the texels there of the same surface, within `tolerance` of the measurement:
 where the displacement is unsure, at an edge, a track is never carried over from the other side. Where the measurement is further than `tolerance` from the track's prediction, as a limb
-passing over the pixel, the track starts over with no rate. With `time` 0 and a full window it is
+passing over the pixel, the track starts over with no rate. With `smooth` 0 and a full window it is
 the plain change between two frames.
 
 A surface's depth wanders by a few mm, and its steps are a mm; the track reads both as slow motion.
@@ -23,12 +23,12 @@ With `dead_zone` (m), each pixel holds an anchor: while the track stays within t
 z is 0; past it, z reads at its full speed and the anchor is dragged along behind, so a real motion
 loses only its first `dead_zone`.
 
-Averaged over `time`, the track lags a fast motion toward the camera; past `tolerance` it would start
-over and over. With `catch_up_time`, it catches up, as a tracker does a manoeuvring target: Emas of
+Averaged over `smooth`, the track lags a fast motion toward the camera; past `tolerance` it would start
+over and over. With `catch_up_smooth`, it catches up, as a tracker does a manoeuvring target: Emas of
 its miss of the prediction, signed and its size, tell a lag (it misses one way) from jitter (it
 misses both ways, and cancels out), and where the image moves too (`color_motion`: a still edge's
 jitter has none, a hand pushing forward moves its edges) the time it follows over blends toward
-`catch_up_time`. The carry then takes each texel's depth a frame on, where it lags to.
+`catch_up_smooth`. The carry then takes each texel's depth a frame on, where it lags to.
 
 z comes in view widths per frame, over the metres one view width spans at the depth (`view_span`
 per metre), and `threshold` comes off it. Each optical flow owns one for its z, with its own
@@ -51,11 +51,11 @@ from .. import FlowBase, FlowUtil
 from .shaders import DepthStepFilter, DepthThreshold, DepthVelocityShader
 
 
-def track_weights(delta_time: float, time: float, share: float | np.ndarray) -> tuple[float | np.ndarray, float | np.ndarray]:
+def track_weights(delta_time: float, smooth: float, share: float | np.ndarray) -> tuple[float | np.ndarray, float | np.ndarray]:
     """The alpha–beta filter's weights: alpha on the depth, beta on the rate, for a measurement that
-    holds `share` of its window. Alpha decays over `time` (ms), 1 at 0; beta is alpha² / (2 − alpha),
+    holds `share` of its window. Alpha decays over `smooth` (ms), 1 at 0; beta is alpha² / (2 − alpha),
     critically damped, so the rate settles without overshoot."""
-    alpha: float = 1.0 - math.exp(-delta_time * 1000.0 / time) if time > 0.0 else 1.0
+    alpha: float = 1.0 - math.exp(-delta_time * 1000.0 / smooth) if smooth > 0.0 else 1.0
     weighted = alpha * share
     return weighted, weighted * weighted / (2.0 - weighted)
 
@@ -122,7 +122,7 @@ class DepthVelocity(FlowBase):
         self._catch_up.clear_all()
 
     def update_depth(self, depth: Texture, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
-                     time: float, threshold: float, tolerance: float, dead_zone: float, catch_up_time: float, motion_floor: float,
+                     smooth: float, threshold: float, tolerance: float, dead_zone: float, catch_up_smooth: float, motion_floor: float,
                      displacement: Texture | None = None) -> None:
         """Advance on a new flow frame: correct the track by the new depth, then take the noise floor off.
 
@@ -132,11 +132,11 @@ class DepthVelocity(FlowBase):
             view_span: Metres one view width spans per metre of depth; 0 or less reads no motion
             depth_step: uv between two depth samples in the flow's view; 0 takes one flow texel
             window: Radius in depth samples
-            time: Time over which the track averages (ms); 0 is the change of two frames
+            smooth: Time over which the track averages (ms); 0 is the change of two frames
             threshold: Depth motion below this is noise, taken off the rest (px per frame)
             tolerance: Depth further than this is another surface: not averaged in, the track starts over (m)
             dead_zone: Depth the track wanders within its anchor without z (m); 0 is none
-            catch_up_time: Time over which the track follows while it catches up a motion (ms); 0 is never
+            catch_up_smooth: Time over which the track follows while it catches up a motion (ms); 0 is never
             motion_floor: Displacement the image must move by for the track to catch up (px per frame)
             displacement: How far each pixel moved since then (uv); when given, the track is carried
                 along the motion (Lucas–Kanade flow)
@@ -145,7 +145,7 @@ class DepthVelocity(FlowBase):
             return
         width, height = self._input_fbo.width, self._input_fbo.height
         step: tuple[float, float] = depth_step if depth_step[0] > 0.0 and depth_step[1] > 0.0 else (1.0 / width, 1.0 / height)
-        alpha, _ = track_weights(delta_time, time, 1.0)
+        alpha, _ = track_weights(delta_time, smooth, 1.0)
 
         FlowUtil.blit(self._raw, depth)
         self._input_fbo.swap()
@@ -159,7 +159,7 @@ class DepthVelocity(FlowBase):
         for target, catch_up_pass in ((self._track, False), (self._catch_up, True)):
             target.begin()
             self._velocity_shader.use(self._input_fbo.texture, self._track.back_texture, self._catch_up.back_texture, catch_up_pass,
-                                      float(alpha), time, catch_up_time, float(alpha), motion_floor, max(delta_time, 1e-6), view_span,
+                                      float(alpha), smooth, catch_up_smooth, float(alpha), motion_floor, max(delta_time, 1e-6), view_span,
                                       step, window, tolerance, dead_zone, displacement)
             target.end()
 
@@ -234,8 +234,8 @@ def color_motion(displacement: np.ndarray, motion_floor: float) -> np.ndarray:
 
 
 def track_depth(depth: np.ndarray, state: np.ndarray, catch_up: np.ndarray, displacement: np.ndarray, delta_time: float, window: int,
-                step: tuple[float, float], tolerance: float, time: float, view_span: float, dead_zone: float,
-                catch_up_time: float, motion_floor: float) -> tuple[np.ndarray, np.ndarray]:
+                step: tuple[float, float], tolerance: float, smooth: float, view_span: float, dead_zone: float,
+                catch_up_smooth: float, motion_floor: float) -> tuple[np.ndarray, np.ndarray]:
     """The depth track one frame on (H, W, 4): z in view widths per frame, disparity (1/m), its rate
     (1/m per second) and its anchor (m); and its catch-up (H, W, 2): the Emas of its miss of the
     prediction, signed and its size (m). As the shader writes them, in its two runs; `catch_up` is
@@ -249,9 +249,9 @@ def track_depth(depth: np.ndarray, state: np.ndarray, catch_up: np.ndarray, disp
     it, by the share of the window it holds. Further than `tolerance` from the prediction, or
     without a track of its surface there, the track starts over with no rate. Without depth at the pixel or without a span, it is empty.
     With `dead_zone` (m) above 0, z is 0 while the tracked depth stays within it of the anchor; past
-    it, z reads at its full speed and the anchor follows at `dead_zone` behind. With `catch_up_time`
+    it, z reads at its full speed and the anchor follows at `dead_zone` behind. With `catch_up_smooth`
     (ms) above 0, a track that keeps missing one way, as it lags a fast motion, follows over a time
-    between `time` and `catch_up_time` by its `catch_up_share`, where the image moves (its
+    between `smooth` and `catch_up_smooth` by its `catch_up_share`, where the image moves (its
     `color_motion` past `motion_floor`, px per frame); and the carry takes each texel's depth a frame
     on by its rate. 0 is neither.
     """
@@ -271,7 +271,7 @@ def track_depth(depth: np.ndarray, state: np.ndarray, catch_up: np.ndarray, disp
     share: np.ndarray = kept / float((2 * window + 1) ** 2)
 
     dt: float = max(delta_time, 1e-6)
-    catching: bool = catch_up_time > 0.0
+    catching: bool = catch_up_smooth > 0.0
     carried, carried_rate, carried_anchor, carried_catch_up = _carried(state, catch_up, displacement, measurement, tolerance,
                                                                        dt if catching else 0.0)
     predicted: np.ndarray = np.where(carried > 0.0, carried + carried_rate * dt, 0.0)
@@ -280,20 +280,20 @@ def track_depth(depth: np.ndarray, state: np.ndarray, catch_up: np.ndarray, disp
     miss: np.ndarray = np.where(measured & (predicted > 0.0), 1.0 / safe_measurement - 1.0 / safe_predicted, 0.0)   # m
     follows: np.ndarray = measured & (predicted > 0.0) & (np.abs(miss) <= tolerance)
 
-    # catching up (a manoeuvre, in tracking terms): the Emas of the miss over `time`, and the time the
-    # track follows over blended toward `catch_up_time` by how much the miss keeps one way, where the
+    # catching up (a manoeuvre, in tracking terms): the Emas of the miss over `smooth`, and the time the
+    # track follows over blended toward `catch_up_smooth` by how much the miss keeps one way, where the
     # image moves too; a still edge's jitter never catches up
-    ema: float = float(track_weights(delta_time, time, 1.0)[0])
+    ema: float = float(track_weights(delta_time, smooth, 1.0)[0])
     signed: np.ndarray = np.where(follows, carried_catch_up[..., 0] + ema * (miss - carried_catch_up[..., 0]), 0.0)
     size: np.ndarray = np.where(follows, carried_catch_up[..., 1] + ema * (np.abs(miss) - carried_catch_up[..., 1]), 0.0)
     if catching:
         opened: np.ndarray = catch_up_share(signed, size, dead_zone) * color_motion(displacement, motion_floor)
-        follow_time: np.ndarray = time + opened * (catch_up_time - time)
-        full: np.ndarray = 1.0 - np.exp(-delta_time * 1000.0 / np.maximum(follow_time, 1e-6)) if time > 0.0 else np.ones_like(follow_time)
+        follow_time: np.ndarray = smooth + opened * (catch_up_smooth - smooth)
+        full: np.ndarray = 1.0 - np.exp(-delta_time * 1000.0 / np.maximum(follow_time, 1e-6)) if smooth > 0.0 else np.ones_like(follow_time)
         alpha = full * share
         beta = alpha * alpha / (2.0 - alpha)
     else:
-        alpha, beta = track_weights(delta_time, time, share)
+        alpha, beta = track_weights(delta_time, smooth, share)
     residual: np.ndarray = measurement - predicted
     disparity: np.ndarray = np.where(follows, predicted + alpha * residual, measurement)
     rate: np.ndarray = np.where(follows, carried_rate + beta * residual / dt, 0.0)

@@ -26,7 +26,7 @@ class GradientFlowSettings(BaseSettings):
     z_window = Field(1, min=0, max=4, description="z window radius in depth samples (1 = 3x3)", newline=True)
     z_threshold = Field(0.5, min=0.0, max=10.0, step=0.05, description="z motion below this is noise, taken off the rest (px per frame)")
     z_dead_zone = Field(0.0, min=0.0, max=0.05, step=0.001, description="Depth z wanders without reading as motion; past it, full speed (m); 0 is off")
-    z_time = Field(50.0, min=0.0, max=1000.0, description="Time over which z averages (ms); 0 is the change of two frames")
+    z_smooth = Field(50.0, min=0.0, max=1000.0, description="Time z is smoothed over (ms); 0 is the change of two frames")
     z_tolerance = Field(0.1, min=0.01, max=1.0, description="Depth further than this is another surface: not averaged in, z starts over (m)")
     strength_x = Field(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)", newline=True)
     strength_y = Field(3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
@@ -113,7 +113,7 @@ class GradientFlow:
         self._xy.end()
 
         if depth is not None:
-            self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, s.z_window, s.z_time,
+            self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, s.z_window, s.z_smooth,
                                               s.z_threshold, s.z_tolerance, s.z_dead_zone, 0.0, 0.0)     # no displacement to catch up with
 
         # z in view widths per frame as view widths per second

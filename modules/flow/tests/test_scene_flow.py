@@ -1,11 +1,11 @@
 """The Lucas–Kanade flow's numpy references: it finds how far an image moved and gives that as a
-velocity, and with xy_follow_z_time filters it as z is. Also the trail bridge's shaping of a velocity. Its depth is tested in test_depth_velocity."""
+velocity, and with xy_follow_z filters it as z is. Also the trail bridge's shaping of a velocity. Its depth is tested in test_depth_velocity."""
 
 import unittest
 
 import numpy as np
 
-from modules.flow import round_trip_displacement, displacement_velocity, filter_displacement, lucas_kanade, median_displacement, shape_velocity, threshold_displacement, track_depth, track_weights
+from modules.flow import displacement_velocity, filter_displacement, lucas_kanade, median_displacement, shape_velocity, threshold_displacement, track_depth, track_weights
 
 SIZE: int = 64
 
@@ -19,10 +19,6 @@ def pattern(dx: float = 0.0, dy: float = 0.0) -> np.ndarray:
 
 def interior(field: np.ndarray, margin: int = 12) -> np.ndarray:
     return field[margin:-margin, margin:-margin]
-
-
-def still_field() -> np.ndarray:
-    return np.zeros((SIZE, SIZE, 2))
 
 
 class LucasKanadeTest(unittest.TestCase):
@@ -44,17 +40,6 @@ class LucasKanadeTest(unittest.TestCase):
         flat = np.full((SIZE, SIZE), 0.5)
         self.assertLess(float(np.abs(lucas_kanade(flat, flat)).max()), 1e-6)
 
-    def test_more_iterations_find_a_large_shift_on_one_level(self) -> None:
-        one = lucas_kanade(pattern(), pattern(3.0, 0.0), levels=1)
-        three = lucas_kanade(pattern(), pattern(3.0, 0.0), levels=1, iterations=3)
-        error = lambda d: abs(float(np.median(interior(d[..., 0]))) - 3.0)       # noqa: E731
-        self.assertLess(error(three), error(one) * 0.5)
-        self.assertAlmostEqual(float(np.median(interior(three[..., 0]))), 3.0, delta=0.3)
-
-    def test_one_iteration_and_no_median_is_the_solve_as_it_was(self) -> None:
-        np.testing.assert_array_equal(lucas_kanade(pattern(), pattern(2.0, 1.0), iterations=1, median=False),
-                                      lucas_kanade(pattern(), pattern(2.0, 1.0)))
-
     def test_the_median_keeps_a_shift(self) -> None:
         d = lucas_kanade(pattern(), pattern(2.0, -1.0), levels=3, median=True)
         self.assertAlmostEqual(float(np.median(interior(d[..., 0]))), 2.0, delta=0.3)
@@ -72,35 +57,6 @@ class MedianTest(unittest.TestCase):
         np.testing.assert_allclose(median_displacement(d, 2.0), d)
 
 
-class RoundTripTest(unittest.TestCase):
-    def test_a_round_trip_that_returns_keeps_the_motion(self) -> None:
-        forward = np.tile([2.0, 0.0], (SIZE, SIZE, 1))
-        np.testing.assert_allclose(round_trip_displacement(forward, -forward, 0.5), forward)
-
-    def test_where_the_way_back_disagrees_there_is_no_motion(self) -> None:
-        # a surface uncovered: forward says 2 px right, the way back from where it lands says nothing moved
-        forward = np.tile([2.0, 0.0], (SIZE, SIZE, 1))
-        backward = -forward.copy()
-        backward[:, 12:] = 0.0
-        kept = round_trip_displacement(forward, backward, 0.5)
-        self.assertTrue(np.all(kept[:, 14:] == 0.0))
-        np.testing.assert_allclose(kept[:, :8], forward[:, :8])
-
-    def test_the_way_back_is_read_where_the_pixel_was(self) -> None:
-        # a bar 5 px wide moving 3 px right: forward is 3 px where it is now, backward −3 px where it was
-        forward, backward = still_field(), still_field()
-        forward[:, 13:18] = (3.0, 0.0)
-        backward[:, 10:15] = (-3.0, 0.0)
-        kept = round_trip_displacement(forward, backward, 0.5)
-        np.testing.assert_allclose(kept[:, 13:18], forward[:, 13:18])
-
-    def test_a_real_shift_comes_back_through_the_solve(self) -> None:
-        forward = lucas_kanade(pattern(), pattern(1.5, -0.5))
-        backward = lucas_kanade(pattern(1.5, -0.5), pattern())
-        kept = round_trip_displacement(forward, backward, 0.5)
-        self.assertGreater(float(np.mean(np.linalg.norm(interior(kept), axis=-1) > 0)), 0.95)
-
-
 class ThresholdTest(unittest.TestCase):
     def test_jitter_below_the_threshold_is_no_motion(self) -> None:
         np.testing.assert_array_equal(threshold_displacement(np.array([[0.2, 0.1]]), 0.5), [[0.0, 0.0]])
@@ -112,12 +68,12 @@ class ThresholdTest(unittest.TestCase):
         np.testing.assert_allclose(threshold_displacement(np.array([[0.3, -0.2]]), 0.0), [[0.3, -0.2]])
 
 
-class FollowZTimeTest(unittest.TestCase):
-    """x/y through the depth track's filter, with xy_follow_z_time."""
+class FollowZTest(unittest.TestCase):
+    """x/y through the depth track's filter, with xy_follow_z."""
     DT: float = 1.0 / 30.0
 
-    def follow(self, steps: list[np.ndarray], carry: np.ndarray | None = None, time: float = 50.0) -> list[np.ndarray]:
-        alpha = float(track_weights(self.DT, time, 1.0)[0])
+    def follow(self, steps: list[np.ndarray], carry: np.ndarray | None = None, smooth: float = 50.0) -> list[np.ndarray]:
+        alpha = float(track_weights(self.DT, smooth, 1.0)[0])
         state = np.zeros(steps[0].shape[:2] + (4,))
         out: list[np.ndarray] = []
         for step in steps:
@@ -138,10 +94,10 @@ class FollowZTimeTest(unittest.TestCase):
         xy = [float(f[1, 1, 0]) for f in self.follow([np.full((4, 4, 2), step) for step in frames])]
         np.testing.assert_allclose(xy, z, atol=1e-9)
 
-    def test_no_time_is_the_measurement(self) -> None:
+    def test_no_smoothing_is_the_measurement(self) -> None:
         rng = np.random.default_rng(2)
         steps = [rng.normal(0.0, 1.0, (4, 4, 2)) for _ in range(5)]
-        for measured, followed in zip(steps, self.follow(steps, time=0.0)):
+        for measured, followed in zip(steps, self.follow(steps, smooth=0.0)):
             np.testing.assert_allclose(followed, measured, atol=1e-12)
 
     def test_still_jitter_is_quieter(self) -> None:
