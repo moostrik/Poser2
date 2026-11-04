@@ -439,34 +439,42 @@
       "flow_bridge": {
         "method": "TRAIL",
         "trail": {
-          "limit": 4.0,
           "scale_x": 1.0,
           "scale_y": 1.0,
           "scale_z": 1.0,
+          "boost": 0.0,
+          "limit": 4.0,
           "smooth": 230.0,
           "blur_radius": 0.0,
-          "blur_steps": 4,
-          "boost": 0.0
+          "blur_steps": 4
         },
         "kinetic": {
           "scale_x": 10.0,
           "scale_y": 10.0,
           "scale_z": 10.0,
-          "advect": 0.0,
-          "fast_time": 25.0,
-          "slow_time": 150.0,
-          "blur_position": "BEFORE",
-          "blur_radius": 2.0,
-          "blur_steps": 2,
-          "stop_gate": 0.0,
-          "stop_tile": 128.0,
-          "release_hold": 100.0,
-          "emission_gain": 1.0,
-          "drop_velocity": 1.0,
-          "onset_force": 0.5,
-          "spin": 0.0,
-          "reservoir_enabled": false,
-          "reservoir_leak": 4.0
+          "trails": {
+            "fast_smooth": 25.0,
+            "slow_smooth": 150.0,
+            "advect": 0.0,
+            "blur_position": "BEFORE",
+            "blur_radius": 2.0,
+            "blur_steps": 2
+          },
+          "release": {
+            "stop_gate": 0.0,
+            "stop_tile": 128.0,
+            "hold": 100.0,
+            "emission_gain": 1.0,
+            "drop_velocity": 1.0
+          },
+          "onset": {
+            "force": 0.5,
+            "spin": 0.0
+          },
+          "reservoir": {
+            "enabled": false,
+            "leak": 4.0
+          }
         },
         "density": {
           "saturation": 1.02,

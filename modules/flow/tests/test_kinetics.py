@@ -8,9 +8,9 @@ import numpy as np
 from modules.flow import advect, decay_weight, drop, fill_reservoir, hold_release, project, stop_gate
 
 
-def trails(flow: list[float], fast_time: float = 25.0, slow_time: float = 150.0, dt: float = 1 / 60) -> tuple[np.ndarray, np.ndarray]:
+def trails(flow: list[float], fast_smooth: float = 25.0, slow_smooth: float = 150.0, dt: float = 1 / 60) -> tuple[np.ndarray, np.ndarray]:
     """The two trails over a 1D speed along +x, one value per frame, shape (frames, 2)."""
-    fast_weight, slow_weight = decay_weight(dt, fast_time), decay_weight(dt, slow_time)
+    fast_weight, slow_weight = decay_weight(dt, fast_smooth), decay_weight(dt, slow_smooth)
     fast, slow = 0.0, 0.0
     fasts, slows = [], []
     for speed in flow:

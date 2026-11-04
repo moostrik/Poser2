@@ -9,7 +9,7 @@ import math
 from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R16F, GL_R32F, GL_RG16F, GL_RGBA16F, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
 
 from modules.gl import Fbo, SwapFbo, Texture
-from modules.settings import Field, BaseSettings
+from modules.settings import Field, BaseSettings, Group
 from ... import FlowBase, FlowUtil
 from ...shaders import Trail, GaussianBlur
 from .kinetics import decay_weight
@@ -21,26 +21,47 @@ class BlurPosition(IntEnum):
     INSIDE = 1      # blur inside each trail's feedback loop, as the trail bridge does
 
 
+class KineticTrailsSettings(BaseSettings):
+    """The kinetic bridge's two trails: how fast each follows, whether they travel with the motion, their blur."""
+    fast_smooth = Field(25.0, min=0.0, max=500.0, description="Fast trail smoothing time (ms)")
+    slow_smooth = Field(150.0, min=0.0, max=1000.0, description="Slow trail smoothing time (ms)")
+    advect = Field(0.0, min=0.0, max=1.0, description="How far the trails travel with the motion; 0 holds them in place")
+    blur_position: Field[BlurPosition] = Field(BlurPosition.BEFORE, newline=True, description="Blur the flow once before the trails, or inside each trail")
+    blur_radius = Field(2.0, min=0.0, max=10.0, description="Gaussian blur radius in pixels")
+    blur_steps = Field(2, min=0, max=8, description="Number of Gaussian blur passes")
+
+
+class KineticReleaseSettings(BaseSettings):
+    """A slowing motion: the release, held, the ink it emits and the velocity it drops."""
+    stop_gate = Field(0.0, min=0.0, max=1.0, description="How far a release must be a slowdown of its patch; 0 lets all through")
+    stop_tile = Field(128.0, min=8.0, max=1024.0, description="Size of a stop gate patch (pixels of the bridge)")
+    hold = Field(100.0, min=0.0, max=1000.0, newline=True, description="Decay of the held release (ms)")
+    emission_gain = Field(1.0, min=0.0, max=20.0, description="Ink emitted per unit of held release")
+    drop_velocity = Field(1.0, min=0.0, max=1.0, description="How far a release blends the velocity to the slow trail")
+
+
+class KineticOnsetSettings(BaseSettings):
+    """A starting motion: the push it adds and the spin from its curl."""
+    force = Field(0.5, min=0.0, max=10.0, description="Velocity added along the motion per unit of onset")
+    spin = Field(0.0, min=0.0, max=60.0, description="Vorticity force from the motion's own curl at the injection depth")
+
+
+class KineticReservoirSettings(BaseSettings):
+    """Ink stored per pixel by the motion, spent by a release."""
+    enabled = Field(False, description="Motion stores ink per pixel; a release spends it")
+    leak = Field(4.0, min=0.1, max=60.0, description="Time constant of the reservoir's leak (s)")
+
+
 class KineticBridgeSettings(BaseSettings):
-    """Configuration for the kinetic bridge."""
+    """Configuration for the kinetic bridge: its scale, then its trails, release, onset and reservoir."""
     scale_x = Field(10.0, min=-50.0, max=50.0, description="Converts the flow's x to simulation velocity")
     scale_y = Field(10.0, min=-50.0, max=50.0, description="Converts the flow's y to simulation velocity")
     scale_z = Field(10.0, min=-50.0, max=50.0, description="Converts the flow's z to simulation velocity")
-    advect = Field(0.0, min=0.0, max=1.0, description="How far the trails travel with the motion (Lucas–Kanade flow only); 0 holds them in place")
-    fast_time = Field(25.0, min=0.0, max=500.0, description="Fast trail time constant (ms)")
-    slow_time = Field(150.0, min=0.0, max=1000.0, description="Slow trail time constant (ms)")
-    blur_position: Field[BlurPosition] = Field(BlurPosition.BEFORE, description="Blur the flow once before the trails, or inside each trail")
-    blur_radius = Field(2.0, min=0.0, max=10.0, description="Gaussian blur radius in pixels")
-    blur_steps = Field(2, min=0, max=8, description="Number of Gaussian blur passes")
-    stop_gate = Field(0.0, min=0.0, max=1.0, description="How far a release must be a slowdown of its patch; 0 lets all through")
-    stop_tile = Field(128.0, min=8.0, max=1024.0, description="Size of a stop gate patch (pixels of the bridge)")
-    release_hold = Field(100.0, min=0.0, max=1000.0, description="Decay of the held release (ms)")
-    emission_gain = Field(1.0, min=0.0, max=20.0, description="Ink emitted per unit of held release")
-    drop_velocity = Field(1.0, min=0.0, max=1.0, description="How far a release blends the velocity to the slow trail")
-    onset_force = Field(0.5, min=0.0, max=10.0, description="Velocity added along the motion per unit of onset")
-    spin = Field(0.0, min=0.0, max=60.0, description="Vorticity force from the motion's own curl at the injection depth")
-    reservoir_enabled = Field(False, description="Motion stores ink per pixel; a release spends it")
-    reservoir_leak = Field(4.0, min=0.1, max=60.0, description="Time constant of the reservoir's leak (s)")
+
+    trails    = Group(KineticTrailsSettings)
+    release   = Group(KineticReleaseSettings)
+    onset     = Group(KineticOnsetSettings)
+    reservoir = Group(KineticReservoirSettings)
 
 
 class KineticBridge(FlowBase):
@@ -255,9 +276,9 @@ class KineticBridge(FlowBase):
         """uv per frame per unit of trail velocity, times `advect`, per axis; 0 on an axis scaled to 0, which
         holds no distance; None when the trails stay in place."""
         s: KineticBridgeSettings = self.settings
-        if s.advect <= 0.0 or (abs(s.scale_x) < 1e-6 and abs(s.scale_y) < 1e-6):
+        if s.trails.advect <= 0.0 or (abs(s.scale_x) < 1e-6 and abs(s.scale_y) < 1e-6):
             return None
-        step: float = s.advect * delta_time                 # a trail holds scale * widths per second
+        step: float = s.trails.advect * delta_time          # a trail holds scale * widths per second
         carry_x: float = step / s.scale_x if abs(s.scale_x) >= 1e-6 else 0.0
         carry_y: float = step / s.scale_y if abs(s.scale_y) >= 1e-6 else 0.0
         return carry_x, carry_y * self._input_fbo.width / max(self._input_fbo.height, 1)
@@ -279,7 +300,9 @@ class KineticBridge(FlowBase):
             return
 
         s: KineticBridgeSettings = self.settings
-        blur_before: bool = s.blur_position == BlurPosition.BEFORE
+        release: KineticReleaseSettings = s.release
+        reservoir: KineticReservoirSettings = s.reservoir
+        blur_before: bool = s.trails.blur_position == BlurPosition.BEFORE
         if blur_before:
             self._blur(self._input_fbo)
 
@@ -288,11 +311,11 @@ class KineticBridge(FlowBase):
         if carry is not None:
             self._advect(self._slow_fbo, self.fast, carry)
             self._advect(self._fast_fbo, self._fast_fbo.texture, carry)
-            if s.reservoir_enabled:
+            if reservoir.enabled:
                 self._advect(self._reservoir_fbo, self.fast, carry)
 
-        self._advance_trail(self._fast_fbo, decay_weight(delta_time, s.fast_time), not blur_before)
-        self._advance_trail(self._slow_fbo, decay_weight(delta_time, s.slow_time), not blur_before)
+        self._advance_trail(self._fast_fbo, decay_weight(delta_time, s.trails.fast_smooth), not blur_before)
+        self._advance_trail(self._slow_fbo, decay_weight(delta_time, s.trails.slow_smooth), not blur_before)
 
         self._acceleration_fbo.begin()
         self._projection_shader.use(self.fast, self.slow, Projection.ACCELERATION)
@@ -302,7 +325,7 @@ class KineticBridge(FlowBase):
         self._projection_shader.use(self.fast, self.slow, Projection.TURN)
         self._turn_fbo.end()
 
-        if s.stop_gate > 0.0:
+        if release.stop_gate > 0.0:
             self._patch_fbo.begin()
             self._patch_shader.use(self.fast, self.slow)
             self._patch_fbo.end()
@@ -312,28 +335,28 @@ class KineticBridge(FlowBase):
 
         self._held_release_fbo.swap()
         self._held_release_fbo.begin()
-        self._hold_shader.use(self.acceleration, self._held_release_fbo.back_texture, decay_weight(delta_time, s.release_hold),
-                              self._patch_fbo, s.stop_gate, math.log2(s.stop_tile) - 1.0)      # the patch texture is half size
+        self._hold_shader.use(self.acceleration, self._held_release_fbo.back_texture, decay_weight(delta_time, release.hold),
+                              self._patch_fbo, release.stop_gate, math.log2(release.stop_tile) - 1.0)      # the patch texture is half size
         self._held_release_fbo.end()
 
-        if s.reservoir_enabled:
+        if reservoir.enabled:
             self._reservoir_fbo.swap()
             self._reservoir_fbo.begin()
             self._reservoir_shader.use(self._reservoir_fbo.back_texture, self.fast, self.held_release,
-                                       decay_weight(delta_time, s.reservoir_leak * 1000.0), delta_time, s.emission_gain)
+                                       decay_weight(delta_time, reservoir.leak * 1000.0), delta_time, release.emission_gain)
             self._reservoir_fbo.end()
 
         self._emission_fbo.begin()
-        self._emission_shader.use(self.held_release, self.reservoir, s.emission_gain, s.reservoir_enabled)
+        self._emission_shader.use(self.held_release, self.reservoir, release.emission_gain, reservoir.enabled)
         self._emission_fbo.end()
 
         self._output_fbo.begin()
-        self._velocity_shader.use(self.fast, self.slow, self.acceleration, s.drop_velocity)
+        self._velocity_shader.use(self.fast, self.slow, self.acceleration, release.drop_velocity)
         self._output_fbo.end()
 
-        if s.onset_force > 0.0:
+        if s.onset.force > 0.0:
             self._onset_fbo.begin()
-            self._onset_shader.use(self.fast, self.acceleration, s.onset_force)
+            self._onset_shader.use(self.fast, self.acceleration, s.onset.force)
             self._onset_fbo.end()
 
     def update_depth_acceleration(self) -> None:
@@ -363,10 +386,10 @@ class KineticBridge(FlowBase):
 
     def _blur(self, field: SwapFbo) -> None:
         """Gaussian blur in place."""
-        radius: float = self.settings.blur_radius
+        radius: float = self.settings.trails.blur_radius
         if radius <= 0.0:
             return
-        for _ in range(self.settings.blur_steps):
+        for _ in range(self.settings.trails.blur_steps):
             for horizontal in (True, False):
                 field.swap()
                 field.begin()

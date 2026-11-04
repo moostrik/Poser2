@@ -233,7 +233,7 @@ class Fluid3DLayer(LayerBase):
             # The kinetic bridge's curl for the vorticity force
             spin: Texture | None = flow_layer.spin
             if spin is not None and isinstance(self._fluid_flow, FluidFlow3D):
-                self._fluid_flow.set_spin(spin, flow_layer.settings.flow_bridge.kinetic.spin * vel_strength)
+                self._fluid_flow.set_spin(spin, flow_layer.settings.flow_bridge.kinetic.onset.spin * vel_strength)
 
             # Add density to per-camera channel (R=cam0, G=cam1, B=cam2, A=cam3)
             channel: int = cam_id % 4

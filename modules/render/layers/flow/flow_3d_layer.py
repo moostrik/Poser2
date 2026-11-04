@@ -61,7 +61,7 @@ class Flow3DDrawMode(IntEnum):
         KINETIC_TURN - Across the motion in two colors
         KINETIC_HELD_RELEASE - The peak-held release
         KINETIC_RESERVOIR - Ink stored per pixel
-        KINETIC_VELOCITY - The velocity the fluid gets, after drop_velocity (RGBA16F, xyz)
+        KINETIC_VELOCITY - The velocity the fluid gets, after the release's drop_velocity (RGBA16F, xyz)
         KINETIC_EMISSION - The ink the density bridge gets
         KINETIC_ONSET - The second velocity input (RGBA16F, xyz)
         KINETIC_CURL - The fast trail's 2D curl in two colors
@@ -222,7 +222,7 @@ class Flow3DLayer(LayerBase):
     def onset_velocity(self) -> Texture | None:
         """Second velocity input, xyz (RGBA16F), for fluid simulation; None when the bridge has none."""
         bridge: FlowBridgeSettings = self.settings.flow_bridge
-        if bridge.method == FlowBridgeMethod.KINETIC and bridge.kinetic.onset_force > 0.0:
+        if bridge.method == FlowBridgeMethod.KINETIC and bridge.kinetic.onset.force > 0.0:
             return self._kinetic_bridge.onset_velocity
         return None
 
@@ -230,7 +230,7 @@ class Flow3DLayer(LayerBase):
     def spin(self) -> Texture | None:
         """2D curl (R16F) for the fluid's vorticity force; None when the bridge has none."""
         bridge: FlowBridgeSettings = self.settings.flow_bridge
-        if bridge.method == FlowBridgeMethod.KINETIC and bridge.kinetic.spin > 0.0:
+        if bridge.method == FlowBridgeMethod.KINETIC and bridge.kinetic.onset.spin > 0.0:
             return self._kinetic_bridge.curl
         return None
 
@@ -388,7 +388,7 @@ class Flow3DLayer(LayerBase):
                 self._kinetic_bridge.update(self._flow_interval)
                 if self.settings.draw_mode == Flow3DDrawMode.KINETIC_DEPTH_ACCELERATION:
                     self._kinetic_bridge.update_depth_acceleration()
-                if self.settings.flow_bridge.kinetic.spin > 0.0 or self.settings.draw_mode == Flow3DDrawMode.KINETIC_CURL:
+                if self.settings.flow_bridge.kinetic.onset.spin > 0.0 or self.settings.draw_mode == Flow3DDrawMode.KINETIC_CURL:
                     self._kinetic_bridge.update_curl()
                 if self.settings.draw_mode == Flow3DDrawMode.KINETIC_STRIP:
                     bridge: KineticBridge = self._kinetic_bridge
