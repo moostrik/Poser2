@@ -3,7 +3,6 @@
 # Standard library imports
 import logging
 import math
-import time     # TEMP diagnostic
 from enum import IntEnum, auto
 from typing import Protocol, runtime_checkable
 
@@ -34,7 +33,6 @@ logger = logging.getLogger(__name__)
 MAX_FRAME_INTERVAL: float = 0.5     # s: a longer gap between two captures is a pause or a loop, not a frame's
 FRAME_PERIOD_BAND: tuple[float, float] = (0.5, 2.0)    # a capture gap is held to this share of the frame interval
 FRAME_PERIOD_WEIGHT: float = 0.05   # weight of a new gap on the frame interval's Ema
-FLASH: float = 5.0                  # TEMP diagnostic: a frame's mean |x/y| past this times the running median is logged
 
 
 def frame_interval(timestamp: float | None, last: float | None, period: float | None, ticks: float,
@@ -158,7 +156,6 @@ class Flow3DLayerSettings(BaseSettings):
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
-    stamped_interval: Field[bool] =         Field(True, description="TEMP: frame interval from capture stamps (off: render ticks)")
 
     optical_flow  = Group(LucasKanadeFlowSettings)
     flow_bridge   = Group(FlowBridgeSettings)
@@ -406,71 +403,7 @@ class Flow3DLayer(LayerBase):
         if timestamp is not None and math.isfinite(timestamp):
             self._capture_timestamp = timestamp
         interval, self._frame_period = frame_interval(timestamp, last, self._frame_period, self._flow_interval, self._time_step)
-        self._diagnose(timestamp - last if timestamp is not None and last is not None else None, interval, timestamp)   # TEMP diagnostic
         return interval
-
-    def _probe_flash(self, stamped: float) -> None:
-        """TEMP diagnostic: each flow frame, the mean |x| and |y| of the velocity over an 8×8 blit; a
-        frame past FLASH times the running median logs its timing and the frame's before it."""
-        import numpy as np
-        from OpenGL.GL import GL_FLOAT, GL_RGBA, GL_RGBA32F, glReadPixels
-        from modules.flow import FlowUtil
-        if not hasattr(self, '_flash_fbo'):
-            self._flash_fbo: Fbo = Fbo()
-            self._flash_fbo.allocate(8, 8, GL_RGBA32F)
-            self._flash_means: list[float] = []
-            self._flash_last: dict | None = None
-        FlowUtil.blit(self._flash_fbo, self._velocity)
-        self._flash_fbo.begin()
-        pixels = np.asarray(glReadPixels(0, 0, 8, 8, GL_RGBA, GL_FLOAT), np.float32).reshape(8, 8, 4)
-        self._flash_fbo.end()
-        mean_x, mean_y, mean_z = (float(np.mean(np.abs(pixels[..., c]))) for c in range(3))
-        capture = getattr(self._board, 'get_capture', lambda cam_id: None)(self._cam_id)
-        info: dict = dict(stamp=self._capture_timestamp, interval_used=self._flow_interval, stamped=stamped,
-                          ticks_before=self._diagnostic['ticks'][-1] / 1000.0 if hasattr(self, '_diagnostic') and self._diagnostic['ticks'] else None,
-                          time_step=self._time_step, board_stamp=capture.timestamp if capture is not None else None,
-                          levels=self.settings.optical_flow.lucas_kanade.levels, x=mean_x, y=mean_y, z=mean_z,
-                          period=self._frame_period, finite=bool(np.all(np.isfinite(pixels))))
-        means: list[float] = self._flash_means
-        median: float = sorted(means)[len(means) // 2] if len(means) >= 10 else 0.0
-        if median > 0.0 and max(mean_x, mean_y) > FLASH * median:
-            logger.info("FLOW FLASH cam %d | now %s | before %s", self._cam_id,
-                        {k: (round(v, 5) if isinstance(v, float) else v) for k, v in info.items()},
-                        {k: (round(v, 5) if isinstance(v, float) else v) for k, v in (self._flash_last or {}).items()})
-        means.append(max(mean_x, mean_y))
-        if len(means) > 200:
-            means.pop(0)
-        self._flash_last = info
-
-    def _diagnose(self, gap: float | None, interval: float, timestamp: float | None) -> None:
-        """TEMP diagnostic: once a second, the flow intervals over that second and the raw stamp gaps, to the log."""
-        if not hasattr(self, '_diagnostic'):
-            self._diagnostic: dict = {'start': time.perf_counter(), 'intervals': [], 'gaps': [], 'clamped': 0, 'none': 0, 'ticks': [], 'stamps': set()}
-        d: dict = self._diagnostic
-        d['intervals'].append(interval * 1000.0)
-        d['ticks'].append(self._flow_interval * 1000.0)
-        if gap is None:
-            d['none'] += 1
-        else:
-            d['gaps'].append(gap * 1000.0)
-            if abs(gap - interval) > 1e-9:
-                d['clamped'] += 1
-        if timestamp is not None:
-            d['stamps'].add(timestamp)
-        now: float = time.perf_counter()
-        if now - d['start'] < 1.0:
-            return
-
-        def stats(values: list[float]) -> str:
-            if not values:
-                return 'none'
-            v = sorted(values)
-            return f'n {len(v)} min {v[0]:.1f} median {v[len(v) // 2]:.1f} max {v[-1]:.1f}'
-
-        logger.info("FLOW TIMING cam %d | interval %s | raw gap %s | ticks %s | clamped %d, no gap %d | distinct stamps %d of %d flow updates",
-                    self._cam_id, stats(d['intervals']), stats(d['gaps']), stats(d['ticks']), d['clamped'], d['none'],
-                    len(d['stamps']), len(d['intervals']))
-        self._diagnostic = {'start': now, 'intervals': [], 'gaps': [], 'clamped': 0, 'none': 0, 'ticks': [], 'stamps': set()}
 
     # ========== Processing ==========
 
@@ -490,9 +423,7 @@ class Flow3DLayer(LayerBase):
         kinetic: bool = self.settings.flow_bridge.method == FlowBridgeMethod.KINETIC
         flow: LucasKanadeFlow = self._flow
         if new_flow:
-            stamped: float = self._frame_interval()
-            if self.settings.stamped_interval:     # TEMP switch: off keeps the tick count, as before
-                self._flow_interval = stamped
+            self._flow_interval = self._frame_interval()
             # Stage 1: the flow's 3D velocity, on the whole image; with its use_mask, times the mask
             flow.set_input(self._flow_input)
             if self.depth_enabled and self._view_span <= 0.0 and not self._warned_view_span:
@@ -500,7 +431,6 @@ class Flow3DLayer(LayerBase):
                 logger.warning("Flow3DLayer %d: depth is on but no view span is set (set_view_span), so z reads no motion", self._cam_id)
             flow.update(self._depth_input if self.depth_enabled else None, self._flow_interval, self._view_span, self._depth_step)
             self._velocity = flow.velocity
-            self._probe_flash(stamped)   # TEMP diagnostic
 
         # Stage 2: The flow bridge
         if kinetic:
