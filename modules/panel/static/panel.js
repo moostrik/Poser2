@@ -60,6 +60,20 @@ window.panel = (function () {
     });
   }
 
+  // A number box marked with `data-step` (its field's step) steps by ten times it with Shift held.
+  // Its arrows and the arrow keys take the input's step, so each press sets it before the browser
+  // steps: the capture listeners run ahead of the default action.
+  function installShiftStep() {
+    function setStep(e) {
+      const input = e.target;
+      if (!(input instanceof HTMLInputElement) || !input.dataset.step) return;
+      const step = parseFloat(input.dataset.step);
+      input.step = String(e.shiftKey ? step * 10 : step);
+    }
+    document.addEventListener("keydown", setStep, true);
+    document.addEventListener("mousedown", setStep, true);
+  }
+
   // The pinned bar is scaled with a transform, which keeps its layout size: this gives the frame
   // around it the scaled height, and follows the bar when it wraps.
   function watchPinnedFrame() {
@@ -115,6 +129,7 @@ window.panel = (function () {
 
   return {
     installShutdownOverlay: installShutdownOverlay,
+    installShiftStep: installShiftStep,
     watchPinnedFrame: watchPinnedFrame,
     dragHandle: dragHandle,
     reportScroll: reportScroll,

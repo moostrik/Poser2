@@ -292,6 +292,8 @@ class Toggle(Control):
 
     def build(self) -> None:
         self.button = self.tooltip(ui.button(self.label).props("dense" + self.lock(readonly=False)))
+        if self.field.width is not None:
+            self.button.classes(f"w-{self.field.width} max-w-full")
         self.show(self.shown)
         if not self.locked:
             self.button.on_click(lambda: self.commit(not self.value()))
@@ -454,7 +456,7 @@ class Slider(Control):
                 self.title(classes="flex-1 truncate")
                 self.input = ui.number(
                     value=self.shown, step=step, format=f"%.{self.decimals()}f",
-                ).props("dense borderless" + self.lock()).classes("w-16")
+                ).props(f"dense borderless data-step={step}" + self.lock()).classes("w-16")
             self.slider = ui.slider(
                 min=field.min, max=field.max, step=step, value=self.shown,
             ).props(f"dense color={color}" + self.lock()).classes("w-full")
@@ -569,7 +571,7 @@ class Number(Control):
     def build(self) -> None:
         self.input = self.tooltip(ui.number(
             label=self.label, value=self.shown, step=self.step(), format=f"%.{self.decimals()}f",
-        ).props("dense outlined" + self.lock()).classes("w-24"))
+        ).props(f"dense outlined data-step={self.step()}" + self.lock()).classes("w-24"))
         if not self.locked:
             _commit_typed(self.input, lambda val: self.commit(self.field.type_(val)) if val is not None else None)
 

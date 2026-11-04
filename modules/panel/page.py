@@ -180,11 +180,13 @@ def local_ips() -> list[str]:
 
 
 def head(title: str) -> None:
-    """The page's stylesheet and script, and the overlay the script shows while the server is gone."""
+    """The page's stylesheet and script, the overlay the script shows while the server is gone, and
+    the Shift step of the number boxes."""
     ui.add_head_html(
         f'<link rel="stylesheet" href="{STATIC_URL}/panel.css">'
         f'<script src="{STATIC_URL}/panel.js"></script>'
-        f"<script>panel.installShutdownOverlay({_js(title)}, {_js(LOG_DRAWER_DEFAULT_HEIGHT)});</script>"
+        f"<script>panel.installShutdownOverlay({_js(title)}, {_js(LOG_DRAWER_DEFAULT_HEIGHT)});"
+        "panel.installShiftStep();</script>"
     )
 
 
