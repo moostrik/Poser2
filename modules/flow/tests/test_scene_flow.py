@@ -40,11 +40,6 @@ class LucasKanadeTest(unittest.TestCase):
         flat = np.full((SIZE, SIZE), 0.5)
         self.assertLess(float(np.abs(lucas_kanade(flat, flat)).max()), 1e-6)
 
-    def test_gaussian_weights_keep_a_shift(self) -> None:
-        d = lucas_kanade(pattern(), pattern(2.0, -1.0), levels=3, gaussian=True)
-        self.assertAlmostEqual(float(np.median(interior(d[..., 0]))), 2.0, delta=0.3)
-        self.assertAlmostEqual(float(np.median(interior(d[..., 1]))), -1.0, delta=0.3)
-
     def test_the_same_surface_keeps_the_background_still_beside_a_moving_strip(self) -> None:
         # a strip 12 px wide, 0.3 m before a still background, moving 2 px right: beside it the background is still
         still, moved = pattern(), pattern()

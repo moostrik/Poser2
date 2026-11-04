@@ -8,7 +8,7 @@ class LucasKanadeShader(Shader):
     """Writes the displacement so far, refined at one mip level, in uv per frame (RG)."""
 
     def use(self, previous: Texture, current: Texture, estimate: Texture, level: int, window: int, damping: float,
-            depth: Texture | None = None, tolerance: float = 0.0, gaussian: bool = False) -> None:
+            depth: Texture | None = None, tolerance: float = 0.0) -> None:
         """Refine `estimate` at mip `level`.
 
         Args:
@@ -20,7 +20,6 @@ class LucasKanadeShader(Shader):
             damping: Added to the window's gradient sums, so a flat window solves to no motion
             depth: Metres (R); when given, only the samples within `tolerance` of the centre's depth count
             tolerance: Same-surface depth difference (m), with depth
-            gaussian: Weight the samples by their distance from the centre
         """
         if not self.allocated or not self.shader_program:
             return
@@ -50,6 +49,5 @@ class LucasKanadeShader(Shader):
         glUniform1i(self.get_uniform_loc("depth"), 3)
         glUniform1i(self.get_uniform_loc("same_surface"), int(same_surface))
         glUniform1f(self.get_uniform_loc("tolerance"), tolerance)
-        glUniform1i(self.get_uniform_loc("gaussian"), int(gaussian))
 
         draw_quad()
