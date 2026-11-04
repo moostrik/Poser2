@@ -349,8 +349,9 @@ class FluidFlow:
         iterations = self._scale_iterations(self.settings.velocity.viscosity_iter)
 
         if self._use_compute_diffusion:
+            current: Texture = self._velocity_fbo.texture
             result = self._jacobi_diffusion_compute.solve(
-                self._velocity_fbo.texture,
+                current,
                 self._velocity_fbo.back_texture,
                 self._simulation_obstacle_fbo.texture,
                 self._grid_scale,
@@ -360,7 +361,7 @@ class FluidFlow:
                 iterations_per_dispatch=5,
                 has_obstacles=self._has_obstacles
             )
-            if result != self._velocity_fbo.texture:
+            if result is not current:          # the solve ended in the back buffer: make it the front
                 self._velocity_fbo.swap()
         else:
             for _ in range(iterations):
@@ -494,8 +495,9 @@ class FluidFlow:
         iterations = self._scale_iterations(self.settings.pressure.iterations)
 
         if self._use_compute_pressure:
+            current = self._pressure_fbo.texture
             result = self._jacobi_pressure_compute.solve(
-                self._pressure_fbo.texture,
+                current,
                 self._pressure_fbo.back_texture,
                 self._divergence_fbo.texture,
                 self._simulation_obstacle_fbo.texture,
@@ -505,7 +507,7 @@ class FluidFlow:
                 iterations_per_dispatch=5,
                 has_obstacles=self._has_obstacles
             )
-            if result != self._pressure_fbo.texture:
+            if result is not current:          # the solve ended in the back buffer: make it the front
                 self._pressure_fbo.swap()
         else:
             for _ in range(iterations):

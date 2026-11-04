@@ -45,6 +45,71 @@ class Fbo(Texture):
         # pass
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
+class StaleTextureError(RuntimeError):
+    """A SwapFbo buffer was used after its owner swapped: it holds another frame than it did."""
+
+
+class SwapTexture(Texture):
+    """One buffer of a SwapFbo as handed out by `texture` or `back_texture`: valid until the owner's
+    next swap. It reads as the buffer it was taken from; after a swap, a GL-facing use (its tex_id,
+    bind) raises `StaleTextureError`, so a buffer kept across a swap fails where it is used instead
+    of showing the image of another frame. Hold the owner and take its texture where it is used."""
+
+    def __init__(self, owner: 'SwapFbo', buffer: Fbo, swaps: int) -> None:
+        # no Texture.__init__: every field reads through to the buffer
+        self._owner: SwapFbo = owner
+        self._buffer: Fbo = buffer
+        self._swaps: int = swaps
+
+    def _checked(self) -> Fbo:
+        if self._owner._swaps != self._swaps:
+            raise StaleTextureError("a SwapFbo buffer was used after its owner swapped: hold the owner and read its "
+                                    ".texture where it is used, never keep the texture")
+        return self._buffer
+
+    @property
+    def tex_id(self) -> int:
+        return self._checked().tex_id
+
+    @property
+    def fbo_id(self) -> int:
+        return self._checked().fbo_id
+
+    @property
+    def width(self) -> int:
+        return self._buffer.width
+
+    @property
+    def height(self) -> int:
+        return self._buffer.height
+
+    @property
+    def internal_format(self) -> Constant:
+        return self._buffer.internal_format
+
+    @property
+    def format(self) -> Constant:
+        return self._buffer.format
+
+    @property
+    def data_type(self) -> Constant:
+        return self._buffer.data_type
+
+    @property
+    def allocated(self) -> bool:
+        return self._buffer.allocated
+
+    def bind(self) -> None:
+        self._checked().bind()
+
+    def unbind(self) -> None:
+        self._buffer.unbind()
+
+    def __getattr__(self, name: str):
+        # anything else a Texture has (read_to_numpy, set_wrap, ...), from the checked buffer
+        return getattr(self._checked(), name)
+
+
 class SwapFbo(Fbo):
     """Double-buffered FBO that swaps between two buffers.
 
@@ -59,6 +124,7 @@ class SwapFbo(Fbo):
         # Don't call super().__init__() - we manage internal FBOs
         self._fbos: list[Fbo] = [Fbo(interpolation, wrap, border_color), Fbo(interpolation, wrap, border_color)]
         self._swap_state: int = 0
+        self._swaps: int = 0        # counted, so a buffer handed out before a swap knows it is stale
 
     # Override all Fbo/Texture properties to delegate to current buffer
     @property
@@ -95,13 +161,14 @@ class SwapFbo(Fbo):
 
     @property
     def texture(self) -> Texture:
-        """Current write buffer."""
-        return self._fbos[self._swap_state]
+        """Current write buffer, valid until the next swap (`SwapTexture`). The SwapFbo itself, used as
+        a Texture, is always the current buffer."""
+        return SwapTexture(self, self._fbos[self._swap_state], self._swaps)
 
     @property
     def back_texture(self) -> Texture:
-        """Previous buffer for reading in ping-pong rendering."""
-        return self._fbos[1 - self._swap_state]
+        """Previous buffer for reading in ping-pong rendering, valid until the next swap (`SwapTexture`)."""
+        return SwapTexture(self, self._fbos[1 - self._swap_state], self._swaps)
 
     def allocate(self, width: int, height: int, internal_format) -> None:
         """Allocate both buffers with same parameters."""
@@ -116,6 +183,7 @@ class SwapFbo(Fbo):
     def swap(self) -> None:
         """Swap buffers (back becomes front)."""
         self._swap_state = 1 - self._swap_state
+        self._swaps += 1
 
     def begin(self) -> None:
         """Begin rendering to current buffer. Uses top-left origin."""
