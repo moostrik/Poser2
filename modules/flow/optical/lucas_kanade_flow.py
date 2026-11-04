@@ -44,7 +44,7 @@ from .shaders import ComposeVelocity, DisplacementFilter, DisplacementMedian, Di
 class LucasKanadeFlowSettings(BaseSettings):
     """Configuration for the Lucas–Kanade flow."""
     xy_levels:      Field[int]   = Field(3, min=3, max=5, description="Mip levels of the x/y solve, coarse to fine; more follows faster motion")
-    xy_damping: Field[float] = Field(0.001, min=0.0, max=0.1, step=0.0005, description="Damps the x/y solve where the window has no texture")
+    xy_damping:     Field[float] = Field(0.001, min=0.0, max=0.1, step=0.001, description="Damps the x/y solve where the window has no texture")
     xy_window:      Field[int]   = Field(2, min=1, max=4, description="x/y window radius in texels per level (2 = 5x5)", newline=True)
     xy_median:      Field[bool]  = Field(False, description="5x5 median of the displacement after each mip level")
     xy_threshold:   Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="Displacement below this is noise, taken off the rest (px per frame)")
@@ -52,10 +52,10 @@ class LucasKanadeFlowSettings(BaseSettings):
     z_window:       Field[int]   = Field(1, min=0, max=4, description="z window radius in depth samples (1 = 3x3)", newline=True)
     z_threshold:    Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="z motion below this is noise, taken off the rest (px per frame)")
     z_dead_zone:    Field[float] = Field(0.0, min=0.0, max=0.05, step=0.001, description="Depth z wanders without reading as motion; past it, full speed (m); 0 is off")
-    z_catch_up:     Field[float] = Field(0.0, min=0.0, max=50.0, step=0.5, description="Smoothing of z during a fast push, where the image moves too (ms); 0 is off")
-    z_smooth:       Field[float] = Field(50.0, min=0.0, max=200.0, description="Time z is smoothed over (ms); 0 is the change of two frames")
-    z_tolerance:    Field[float] = Field(0.1, min=0.05, max=0.5, description="Depth further than this is another surface: not averaged in, z starts over (m)")
-    z_edge:         Field[float] = Field(0.1, min=0.05, max=0.5, step=0.005, description="Depth step in a 3x3 of depth samples that marks an edge, dropped (m)")
+    z_catch_up:     Field[float] = Field(0.0, min=0.0, max=50.0, step=1.0, description="Smoothing of z during a fast push, where the image moves too (ms); 0 is off")
+    z_smooth:       Field[float] = Field(50.0, min=0.0, max=200.0, step=1.0, description="Time z is smoothed over (ms); 0 is the change of two frames")
+    z_tolerance:    Field[float] = Field(0.1, min=0.05, max=0.5, step=0.01, description="Depth further than this is another surface: not averaged in, z starts over (m)")
+    z_edge:         Field[float] = Field(0.1, min=0.05, max=0.3, step=0.005, description="Depth step in a 3x3 of depth samples that marks an edge, dropped (m)")
     x_gain:  Field[float] = Field(1.0, min=-10.0, max=10.0, description="Velocity per image width per second, x (negative inverts)", newline=True)
     y_gain:  Field[float] = Field(1.0, min=-10.0, max=10.0, description="Velocity per image width per second, y (negative inverts)")
     z_gain:  Field[float] = Field(0.0, min=-10.0, max=10.0, description="Velocity per view width per second toward the camera (negative inverts); 1 balances it with x/y, 0 is no depth")
