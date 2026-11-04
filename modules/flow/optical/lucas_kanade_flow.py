@@ -72,9 +72,9 @@ class DepthTrackSettings(BaseSettings):
 class LucasKanadeFlowSettings(BaseSettings):
     """Configuration for the Lucas–Kanade flow: the mask and the axes, its x/y part and its z part."""
     use_mask:       Field[bool]  = Field(False, width=48, description="Only the player moves the fluid (off: whole image)")
-    x:              Field[bool]  = Field(True, width=48, description="x in the velocity (off: x is 0)")
-    y:              Field[bool]  = Field(True, width=48, description="y in the velocity (off: y is 0)")
-    z:              Field[bool]  = Field(True, width=48, description="z in the velocity (off: z is 0)")
+    x:              Field[bool]  = Field(True, description="x in the velocity (off: x is 0)")
+    y:              Field[bool]  = Field(True, description="y in the velocity (off: y is 0)")
+    z:              Field[bool]  = Field(True, description="z in the velocity (off: z is 0)")
 
     lucas_kanade   = Group(LucasKanadeSettings)
     depth_track    = Group(DepthTrackSettings)
