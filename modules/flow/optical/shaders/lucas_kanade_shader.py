@@ -7,7 +7,7 @@ from modules.gl import Shader, draw_quad, Texture
 class LucasKanadeShader(Shader):
     """Writes the displacement so far, refined at one mip level, in uv per frame (RG)."""
 
-    def use(self, previous: Texture, current: Texture, estimate: Texture, level: int, window: int, regularizer: float) -> None:
+    def use(self, previous: Texture, current: Texture, estimate: Texture, level: int, window: int, damping: float) -> None:
         """Refine `estimate` at mip `level`.
 
         Args:
@@ -16,7 +16,7 @@ class LucasKanadeShader(Shader):
             estimate: The displacement from the coarser levels, uv per frame
             level: The mip level to solve at
             window: Window radius in texels of that level
-            regularizer: Added to the window's gradient sums, so a flat window solves to no motion
+            damping: Added to the window's gradient sums, so a flat window solves to no motion
         """
         if not self.allocated or not self.shader_program:
             return
@@ -37,6 +37,6 @@ class LucasKanadeShader(Shader):
         glUniform1i(self.get_uniform_loc("estimate"), 2)
         glUniform1i(self.get_uniform_loc("level"), level)
         glUniform1i(self.get_uniform_loc("window"), window)
-        glUniform1f(self.get_uniform_loc("regularizer"), regularizer)
+        glUniform1f(self.get_uniform_loc("damping"), damping)
 
         draw_quad()

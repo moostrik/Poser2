@@ -2,9 +2,9 @@
 
 Per pixel, the brightness change along the brightness gradient between two frames: the motion along
 the gradient, as a strength rather than a distance. One equation per pixel, so only that component.
-x/y are scaled to the flow's velocity by `strength_x`/`strength_y`, then `threshold` comes off their
+x/y are scaled to the flow's velocity by `x_gain`/`y_gain`, then `threshold` comes off their
 length; z is its own `DepthVelocity`'s depth track, held in place (its `z_*` settings), in view
-widths per second times `strength_z`. With `use_mask`, the velocity is multiplied by the mask.
+widths per second times `z_gain`. With `use_mask`, the velocity is multiplied by the mask.
 Ported from ofxFlowTools ftOpticalFlow.h
 """
 from OpenGL.GL import GL_RG16F, GL_RGBA16F
@@ -21,17 +21,15 @@ class GradientFlowSettings(BaseSettings):
     """Configuration for the gradient flow."""
     offset = Field(3, min=1, max=10, description="Gradient sample offset in pixels")
     threshold = Field(0.0, min=0.0, max=0.2, description="Motion detection threshold")
-    strength_x = Field(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)")
-    strength_y = Field(3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
     z_window = Field(1, min=0, max=4, description="z window radius in depth samples (1 = 3x3)", newline=True)
     z_threshold = Field(0.5, min=0.0, max=10.0, step=0.05, description="z motion below this is noise, taken off the rest (px per frame)")
     z_dead_zone = Field(0.0, min=0.0, max=0.05, step=0.001, description="Depth z wanders without reading as motion; past it, full speed (m); 0 is off")
     z_smooth = Field(50.0, min=0.0, max=1000.0, description="Time z is smoothed over (ms); 0 is the change of two frames")
     z_tolerance = Field(0.1, min=0.01, max=1.0, description="Depth further than this is another surface: not averaged in, z starts over (m)")
     z_edge = Field(0.1, min=0.05, max=0.5, step=0.005, description="Depth step in a 3x3 of depth samples that marks an edge, dropped (m)")
-    strength_x = Field(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)", newline=True)
-    strength_y = Field(3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
-    strength_z = Field(0.0, min=0.0, max=10.0, description="Velocity per view width per second toward the camera; 0 is no depth")
+    x_gain = Field(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)", newline=True)
+    y_gain = Field(3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
+    z_gain = Field(0.0, min=0.0, max=10.0, description="Velocity per view width per second toward the camera; 0 is no depth")
     use_mask = Field(False, description="Multiply the velocity by the mask")
 
 
@@ -61,7 +59,7 @@ class GradientFlow:
 
     @property
     def depth_velocity(self) -> DepthVelocity:
-        """Its z, before `strength_z` and the mask."""
+        """Its z, before `z_gain` and the mask."""
         return self._depth_velocity
 
     def allocate(self, width: int, height: int) -> None:
@@ -110,7 +108,7 @@ class GradientFlow:
         s: GradientFlowSettings = self.settings
 
         self._xy.begin()
-        self._shader.use(self._frames.previous_luminance, self._frames.luminance, s.offset, s.threshold, s.strength_x, s.strength_y)
+        self._shader.use(self._frames.previous_luminance, self._frames.luminance, s.offset, s.threshold, s.x_gain, s.y_gain)
         self._xy.end()
 
         if depth is not None:
@@ -122,5 +120,5 @@ class GradientFlow:
         per_second: float = 1.0 / max(delta_time, 1e-6)
         mask: Texture | None = self._mask if s.use_mask and self._mask is not None and self._mask.allocated else None
         self._velocity.begin()
-        self._compose_shader.use(self._xy, self._depth_velocity.depth_velocity if depth is not None else None, (1.0, 1.0, s.strength_z * per_second), mask)
+        self._compose_shader.use(self._xy, self._depth_velocity.depth_velocity if depth is not None else None, (1.0, 1.0, s.z_gain * per_second), mask)
         self._velocity.end()

@@ -11,8 +11,8 @@ below it is the solve's jitter, not motion. z comes from its own `DepthVelocity`
 the displacement, so a surface sliding sideways over a slope reads no motion toward the camera,
 corrected each frame by the mean over `z_window` depth samples and smoothed over `z_smooth`;
 `z_threshold` comes off it. The depth change comes in view widths per frame like the displacement, so all three become
-view widths per second the same way. Out comes one 3D velocity: x/y times `strength_x`/`strength_y`,
-z times `strength_z`. With `use_mask`, the velocity is multiplied by the mask.
+view widths per second the same way. Out comes one 3D velocity: x/y times `x_gain`/`y_gain`,
+z times `z_gain`. With `use_mask`, the velocity is multiplied by the mask.
 
 z lags its motion by the time it is smoothed over. With `xy_follow_z`, x/y goes through the same
 filter over `z_smooth` before its threshold, carried along the displacement as z is, so both lag
@@ -44,7 +44,7 @@ from .shaders import ComposeVelocity, DisplacementFilter, DisplacementMedian, Di
 class LucasKanadeFlowSettings(BaseSettings):
     """Configuration for the Lucas–Kanade flow."""
     xy_levels:      Field[int]   = Field(3, min=3, max=5, description="Mip levels of the x/y solve, coarse to fine; more follows faster motion")
-    xy_regularizer: Field[float] = Field(0.001, min=0.0, max=0.1, step=0.0005, description="Damps the x/y solve where the window has no texture")
+    xy_damping: Field[float] = Field(0.001, min=0.0, max=0.1, step=0.0005, description="Damps the x/y solve where the window has no texture")
     xy_window:      Field[int]   = Field(2, min=1, max=4, description="x/y window radius in texels per level (2 = 5x5)", newline=True)
     xy_median:      Field[bool]  = Field(False, description="5x5 median of the displacement after each mip level")
     xy_threshold:   Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="Displacement below this is noise, taken off the rest (px per frame)")
@@ -56,9 +56,9 @@ class LucasKanadeFlowSettings(BaseSettings):
     z_smooth:       Field[float] = Field(50.0, min=0.0, max=200.0, description="Time z is smoothed over (ms); 0 is the change of two frames")
     z_tolerance:    Field[float] = Field(0.1, min=0.1, max=0.5, description="Depth further than this is another surface: not averaged in, z starts over (m)")
     z_edge:         Field[float] = Field(0.1, min=0.05, max=0.5, step=0.005, description="Depth step in a 3x3 of depth samples that marks an edge, dropped (m)")
-    strength_x:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, x (negative inverts)", newline=True)
-    strength_y:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, y (negative inverts)")
-    strength_z:  Field[float] = Field(0.0, min=0.0, max=10.0, description="Velocity per view width per second toward the camera; 1 balances it with x/y, 0 is no depth")
+    x_gain:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, x (negative inverts)", newline=True)
+    y_gain:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, y (negative inverts)")
+    z_gain:  Field[float] = Field(0.0, min=0.0, max=10.0, description="Velocity per view width per second toward the camera; 1 balances it with x/y, 0 is no depth")
     use_mask:    Field[bool]  = Field(False, description="Multiply the velocity by the mask", newline=True)
 
 
@@ -95,7 +95,7 @@ class LucasKanadeFlow:
 
     @property
     def depth_velocity(self) -> DepthVelocity:
-        """Its z, before `strength_z` and the mask."""
+        """Its z, before `z_gain` and the mask."""
         return self._depth_velocity
 
     def allocate(self, width: int, height: int) -> None:
@@ -152,7 +152,7 @@ class LucasKanadeFlow:
         for level in reversed(range(s.xy_levels)):
             solve.swap()
             solve.begin()
-            self._shader.use(previous, current, solve.back_texture, level, s.xy_window, s.xy_regularizer)
+            self._shader.use(previous, current, solve.back_texture, level, s.xy_window, s.xy_damping)
             solve.end()
             if s.xy_median:
                 spacing: float = float(2 ** level)          # a level's texel apart
@@ -211,7 +211,7 @@ class LucasKanadeFlow:
         mask: Texture | None = self._mask if s.use_mask and self._mask is not None and self._mask.allocated else None
         self._velocity.begin()
         self._compose_shader.use(xy, self._depth_velocity.depth_velocity if depth is not None else None,
-                                 (s.strength_x * per_second, s.strength_y * per_second * aspect, s.strength_z * per_second), mask)
+                                 (s.x_gain * per_second, s.y_gain * per_second * aspect, s.z_gain * per_second), mask)
         self._velocity.end()
 
 
@@ -241,7 +241,7 @@ def _bilinear(image: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
 
 
 def _solve_level(p_image: np.ndarray, c_image: np.ndarray, d: np.ndarray, u: np.ndarray, v: np.ndarray, window: int,
-                 regularizer: float) -> np.ndarray:
+                 damping: float) -> np.ndarray:
     """One solve on one level: the displacement so far (uv) refined by the window's shift. Mirrors the shader."""
     h, w = u.shape
     lh, lw = c_image.shape
@@ -257,7 +257,7 @@ def _solve_level(p_image: np.ndarray, c_image: np.ndarray, d: np.ndarray, u: np.
             gt = _bilinear(c_image, px, py) - _bilinear(p_image, qx, qy)
             sxx, sxy, syy = sxx + gx * gx, sxy + gx * gy, syy + gy * gy
             sxt, syt = sxt + gx * gt, syt + gy * gt
-    sxx, syy = sxx + regularizer, syy + regularizer
+    sxx, syy = sxx + damping, syy + damping
     det: np.ndarray = sxx * syy - sxy * sxy
     safe: np.ndarray = np.where(np.abs(det) > 1e-12, det, 1.0)
     dx = np.where(np.abs(det) > 1e-12, -(syy * sxt - sxy * syt) / safe, 0.0)
@@ -279,7 +279,7 @@ def median_displacement(displacement: np.ndarray, spacing: float) -> np.ndarray:
     return np.median(np.stack(samples), axis=0)
 
 
-def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, window: int = 2, regularizer: float = 0.001,
+def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, window: int = 2, damping: float = 0.001,
                  median: bool = False) -> np.ndarray:
     """The displacement (H, W, 2) in pixels per frame, x along columns and y along rows, that carries
     `previous` onto `current`: coarse to fine over `levels` mip levels, one solve per level over a
@@ -292,7 +292,7 @@ def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, win
     u, v = (columns + 0.5) / w, (rows + 0.5) / h            # each output pixel's uv
     d: np.ndarray = np.zeros((h, w, 2))                     # the displacement in uv
     for level in reversed(range(levels)):
-        d = _solve_level(previous_levels[level], current_levels[level], d, u, v, window, regularizer)
+        d = _solve_level(previous_levels[level], current_levels[level], d, u, v, window, damping)
         if median:
             d = median_displacement(d, float(2 ** level))
     return d * np.array([w, h])

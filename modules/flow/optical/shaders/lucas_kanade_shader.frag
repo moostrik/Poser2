@@ -9,7 +9,7 @@ uniform sampler2D current;      // luminance, mipmapped
 uniform sampler2D estimate;     // displacement so far, uv per frame (RG)
 uniform int level;
 uniform int window;
-uniform float regularizer;
+uniform float damping;
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -38,8 +38,8 @@ void main() {
             syt += gy * gt;
         }
     }
-    sxx += regularizer;
-    syy += regularizer;
+    sxx += damping;
+    syy += damping;
     float det = sxx * syy - sxy * sxy;
     vec2 delta = abs(det) > 1e-12 ? -vec2(syy * sxt - sxy * syt, sxx * syt - sxy * sxt) / det : vec2(0.0);
     fragColor = vec4(d + delta * texel, 0.0, 1.0);

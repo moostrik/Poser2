@@ -532,8 +532,8 @@
         "gradient": {
           "offset": 3,
           "threshold": 0.0,
-          "strength_x": 3.3,
-          "strength_y": 3.3
+          "x_gain": 3.3,
+          "y_gain": 3.3
         }
       },
       "flow_bridge": {

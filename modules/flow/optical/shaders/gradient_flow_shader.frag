@@ -2,15 +2,15 @@
 
 // Gradient Flow Shader
 // Per pixel, the brightness change along the brightness gradient, averaged over three mip levels:
-// the motion along the gradient, as a strength. Times `strength`, with `threshold` taken off its
+// the motion along the gradient, as a strength. Times `gain`, with `threshold` taken off its
 // length. Ported from ofxFlowTools ftOpticalFlowShader
 
 uniform sampler2D tex0;  // Previous luminance, mipmapped
 uniform sampler2D tex1;  // Current luminance, mipmapped
 
 uniform vec2 offset;     // Gradient sample offset (uv)
-uniform float threshold; // Taken off the length, after strength
-uniform vec2 strength;   // x and y multiplier (negative inverts)
+uniform float threshold; // Taken off the length, after the gain
+uniform vec2 gain;       // x and y multiplier (negative inverts)
 
 const int numLevels = 3;   // Number of mip levels to sample (1-4)
 const vec4 levelWeights = vec4(0.25f, 0.5f, 1.0f, 1.0f); // Weights for each level
@@ -60,7 +60,7 @@ void main() {
         totalWeight += weight;
     }
 
-    vec2 flow = totalFlow / (totalWeight + TINY) * strength;
+    vec2 flow = totalFlow / (totalWeight + TINY) * gain;
 
     // The threshold off the length; the direction stays
     float magnitude = length(flow);

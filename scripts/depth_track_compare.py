@@ -49,7 +49,8 @@ from modules.flow import (FlowUtil, LucasKanadeFlow, LucasKanadeFlowSettings, Si
 
 WARM_UP: float = 1.0          # s at the start the flows settle in, measured in no part
 SHORTEST_PAUSE: float = 1.0   # s of stillness that end a move
-RENAMED: dict[str, str] = {'z_time': 'z_smooth', 'z_catch_up_time': 'z_catch_up', 'xy_follow_z_time': 'xy_follow_z'}   # in frames saved before
+RENAMED: dict[str, str] = {'z_time': 'z_smooth', 'z_catch_up_time': 'z_catch_up', 'xy_follow_z_time': 'xy_follow_z', 'xy_regularizer': 'xy_damping',
+                           'strength_x': 'x_gain', 'strength_y': 'y_gain', 'strength_z': 'z_gain'}   # in frames saved before
 MOVED: float = 0.05          # luminance change of a pixel that moves
 MOVED_FRAMES: int = 5         # frames it changes that much in, over the loop
 VIEWS: dict[int, str] = {1: 'z of the track', 2: 'z after the threshold', 3: 'depth', 4: 'velocity direction', 5: 'velocity arrows'}
@@ -322,8 +323,8 @@ class Side:
     def xy_px(self, velocity: np.ndarray, delta_time: float, width: int) -> np.ndarray:
         """The velocity's x/y (image widths per second, times the strengths) as px per frame."""
         s = self.settings
-        vx = velocity[..., 0] / (s.strength_x if s.strength_x else 1.0)
-        vy = velocity[..., 1] / (s.strength_y if s.strength_y else 1.0)
+        vx = velocity[..., 0] / (s.x_gain if s.x_gain else 1.0)
+        vy = velocity[..., 1] / (s.y_gain if s.y_gain else 1.0)
         return np.hypot(vx, vy) * delta_time * width
 
     def show(self, view: int, depth: Texture, scale: float, width: int) -> Texture | None:
@@ -363,7 +364,7 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
             continue
         solve = read_back(side.flow._solve.texture)[..., :2] * np.array([w, h])                  # px per frame
         now, then = (np.round(f * 255.0).astype(np.float64) / 255.0 for f in (lum, previous))    # as the R8 frames hold them
-        reference = lucas_kanade(then, now, s.xy_levels, s.xy_window, s.xy_regularizer, s.xy_median)
+        reference = lucas_kanade(then, now, s.xy_levels, s.xy_window, s.xy_damping, s.xy_median)
         previous = lum
         c = frames.calls[k]
         step = (c['depth_step'][0] * w, c['depth_step'][1] * h) if c['depth_step'][0] > 0 else (1.0, 1.0)

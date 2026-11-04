@@ -247,7 +247,7 @@ class KineticBridge(FlowBase):
         Args:
             velocity: x, y, z (RGB)
             distance_scale: The velocity per image width per second when it is a distance (the Lucas–Kanade
-                flow's `strength_x`), for `advect`; None when it is no distance, which holds the trails in place
+                flow's `x_gain`), for `advect`; None when it is no distance, which holds the trails in place
         """
         FlowUtil.blit(self._input_fbo, velocity)
         self._distance_scale = distance_scale

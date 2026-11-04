@@ -11,7 +11,7 @@ from modules.gl import Shader, draw_quad, Texture
 class GradientFlowShader(Shader):
     """Writes the x/y motion strength (RG), times strength, the threshold taken off its length."""
 
-    def use(self, previous: Texture, current: Texture, offset: int, threshold: float, strength_x: float, strength_y: float) -> None:
+    def use(self, previous: Texture, current: Texture, offset: int, threshold: float, x_gain: float, y_gain: float) -> None:
         """Measure between two frames.
 
         Args:
@@ -19,8 +19,8 @@ class GradientFlowShader(Shader):
             current: Current luminance frame, mipmapped
             offset: Gradient sample offset in pixels
             threshold: Taken off the length, after strength
-            strength_x: X multiplier (negative inverts)
-            strength_y: Y multiplier (negative inverts)
+            x_gain: X multiplier (negative inverts)
+            y_gain: Y multiplier (negative inverts)
         """
         if not self.allocated or not self.shader_program:
             return
@@ -38,6 +38,6 @@ class GradientFlowShader(Shader):
         glUniform1i(self.get_uniform_loc("tex1"), 1)
         glUniform2f(self.get_uniform_loc("offset"), float(offset) / previous.width, float(offset) / previous.height)
         glUniform1f(self.get_uniform_loc("threshold"), threshold)
-        glUniform2f(self.get_uniform_loc("strength"), strength_x, strength_y)
+        glUniform2f(self.get_uniform_loc("gain"), x_gain, y_gain)
 
         draw_quad()
