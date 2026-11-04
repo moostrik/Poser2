@@ -29,14 +29,14 @@ def interior(field: np.ndarray, margin: int = 8) -> np.ndarray:
 
 def track(depths: list[np.ndarray], moved: np.ndarray | None = None, window: int = 2, step: tuple[float, float] = STEP,
           tolerance: float = TOLERANCE, smooth: float = 0.0, span: float = SPAN, dead_zone: float = 0.0,
-          catch_up_smooth: float = 0.0, dt: float = DT, motion_floor: float = 0.5) -> list[np.ndarray]:
-    """The track after each depth frame, from no track; `motion_floor` -1 is z_catch_up_gate off."""
+          catch_up_smooth: float = 0.0, dt: float = DT) -> list[np.ndarray]:
+    """The track after each depth frame, from no track."""
     state: np.ndarray = np.zeros(depths[0].shape + (4,))
     catch_up: np.ndarray = np.zeros(depths[0].shape + (2,))
     states: list[np.ndarray] = []
     for depth in depths:
         state, catch_up = track_depth(depth, state, catch_up, still(depth.shape) if moved is None else moved, dt, window, step, tolerance,
-                                      smooth, span, dead_zone, catch_up_smooth, motion_floor)
+                                      smooth, span, dead_zone, catch_up_smooth, 0.5)
         states.append(state)
     return states
 
@@ -241,9 +241,9 @@ class CatchUpTest(unittest.TestCase):
             depths.append(uniform(max(d, 0.6)))
         return depths
 
-    def follow(self, speed: float, catch_up_smooth: float, moving: bool = True, motion_floor: float = 0.5) -> list[np.ndarray]:
+    def follow(self, speed: float, catch_up_smooth: float, moving: bool = True) -> list[np.ndarray]:
         return track(self.approach(speed), moved=self.MOVING if moving else None, window=0, smooth=50.0, dead_zone=0.02,
-                     catch_up_smooth=catch_up_smooth, dt=0.02, motion_floor=motion_floor)
+                     catch_up_smooth=catch_up_smooth, dt=0.02)
 
     @staticmethod
     def restarts(states: list[np.ndarray]) -> int:
@@ -257,10 +257,6 @@ class CatchUpTest(unittest.TestCase):
 
     def test_without_color_motion_it_does_not_catch_up(self) -> None:
         np.testing.assert_array_equal(np.stack(self.follow(4.0, 12.5, moving=False)), np.stack(self.follow(4.0, 0.0, moving=False)))
-
-    def test_with_the_gate_off_it_catches_up_without_color_motion(self) -> None:
-        self.assertGreater(self.restarts(self.follow(4.0, 0.0, moving=False)), 0)
-        self.assertEqual(self.restarts(self.follow(4.0, 12.5, moving=False, motion_floor=-1.0)), 0)
 
     def test_color_motion_is_the_largest_of_the_3x3_past_the_floor(self) -> None:
         moved = still()
@@ -358,10 +354,6 @@ class StepFilterTest(unittest.TestCase):
 class DepthThresholdTest(unittest.TestCase):
     def test_the_threshold_clears_the_floor_and_stays_continuous(self) -> None:
         np.testing.assert_allclose(depth_threshold(np.array([0.05, -0.05, 0.3, -0.3]), 0.1), [0.0, 0.0, 0.2, -0.2])
-
-    def test_with_the_xy_gate_z_goes_where_the_image_is_still(self) -> None:
-        moving = np.array([True, False, True, False])
-        np.testing.assert_allclose(depth_threshold(np.array([0.3, 0.3, -0.3, -0.3]), 0.1, moving), [0.2, 0.0, -0.2, 0.0])
 
 
 if __name__ == '__main__':
