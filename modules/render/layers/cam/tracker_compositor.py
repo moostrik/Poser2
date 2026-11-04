@@ -41,7 +41,7 @@ class TrackerCompositor(LayerBase):
 
     @property
     def texture(self) -> Texture:
-        return self._fbo.texture
+        return self._fbo
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._fbo.allocate(width, height, internal_format)

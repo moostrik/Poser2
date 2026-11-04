@@ -57,7 +57,7 @@ class FeatureWindowLayer(LayerBase):
 
     @property
     def texture(self) -> Texture:
-        return self._fbo.texture
+        return self._fbo
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         if width is None or height is None or internal_format is None:

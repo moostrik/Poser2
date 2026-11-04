@@ -97,7 +97,7 @@ class Compositor(LayerBase):
 
     @property
     def texture(self) -> Texture:
-        return self._fbo.texture
+        return self._fbo
 
     @property
     def target_fov(self) -> float:

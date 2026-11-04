@@ -855,17 +855,17 @@ class FluidFlow:
     @property
     def divergence(self) -> Texture:
         """R16F divergence field (intermediate)."""
-        return self._divergence_fbo.texture
+        return self._divergence_fbo
 
     @property
     def vorticity_curl(self) -> Texture:
         """R16F vorticity curl field."""
-        return self._vorticity_curl_fbo.texture
+        return self._vorticity_curl_fbo
 
     @property
     def buoyancy(self) -> Texture:
         """RG16F buoyancy force field."""
-        return self._buoyancy_fbo.texture
+        return self._buoyancy_fbo
 
     @property
     def obstacle(self) -> Texture:

@@ -88,7 +88,7 @@ class CompositeLayer(LayerBase):
     @property
     def texture(self) -> Texture:
         """Output texture (composited, before LUT - for chaining)."""
-        return self._composite_fbo.texture
+        return self._composite_fbo
 
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         """Allocate resources."""
