@@ -35,7 +35,8 @@ from modules.gl import Texture  # noqa: E402
 from modules.flow import LucasKanadeFlow, LucasKanadeFlowSettings, VelocityTrailBridge, VelocityTrailBridgeSettings  # noqa: E402
 from depth_track_compare import Frames, context, read_back, recorded_settings, upload  # noqa: E402
 
-PRESET: Path = Path(__file__).resolve().parent.parent / 'apps' / 'deep_flow' / 'data' / 'settings' / 'settings.json'
+SETTLE: float = 1.5      # s of the still part left out of its noise: the trail's memory of the flow's first frames
+PRESET: Path =Path(__file__).resolve().parent.parent / 'apps' / 'deep_flow' / 'data' / 'settings' / 'settings.json'
 
 
 def trail_settings(items: list[str]) -> tuple[VelocityTrailBridgeSettings, dict[str, float]]:
@@ -56,7 +57,7 @@ class Measures:
     """One side's measures over the loop."""
 
     def __init__(self) -> None:
-        self.noise: dict[str, list[np.ndarray]] = {'xy edge': [], 'xy inside': [], 'z edge': [], 'z inside': []}
+        self.noise: dict[str, list[np.ndarray]] = {'xy edge': [], 'xy inside': [], 'z edge': [], 'z inside': [], 'flow xy': [], 'flow z': []}
         self.segments: list[str] = []
         self.xy: list[float] = []           # the trail's |x/y| on the moving body pixels
         self.z: list[float] = []            # the trail's |z| there
@@ -75,6 +76,7 @@ class Measures:
         if segment == 'still':
             self.noise['xy edge'].append(xy[edge]); self.noise['xy inside'].append(xy[core])
             self.noise['z edge'].append(z[edge]); self.noise['z inside'].append(z[core])
+            self.noise['flow xy'].append(np.hypot(flow[..., 0], flow[..., 1])[core]); self.noise['flow z'].append(np.abs(flow[..., 2])[core])
 
     def report(self, moves: int) -> str:
         segments = np.array(self.segments)
@@ -94,6 +96,9 @@ class Measures:
                 lines.append(f'move {n} {axis:3s} {p99[axis + " edge"]:10.3f} {p99[axis + " inside"]:9.3f} {s_mean:7.3f} {f_mean:7.3f} '
                              f'{f_mean / max(s_mean, 1e-9):6.2f} {per_distance:8.2f} {f_mean / max(p99[axis + " inside"], 1e-9):8.1f} '
                              f'{through_slow:9.2f} {through_fast:9.2f}')
+        still = [np.concatenate(self.noise[name]) for name in ('flow xy', 'flow z')]
+        lines.append('flow still inside: ' + ', '.join(f'{axis} >0 {np.mean(v > 0):.4f} p99 {np.percentile(v, 99):.3f} p99.9 {np.percentile(v, 99.9):.3f} max {np.max(v):.3f}'
+                                                        for axis, v in zip(('xy', 'z'), still)))
         lines.append(f'GPU {np.median(self.milliseconds):.3f} ms per frame')
         return '\n    '.join(lines)
 
@@ -136,6 +141,8 @@ def main() -> int:
         core, edge = mask & (depth > 0) & (inside > 12), mask & (depth > 0) & (inside <= 6)
         moving = core & frames.moved
         segment = frames.segment(k)
+        if segment == 'still' and frames.t[k] < frames.still[0] + SETTLE:
+            segment = ''                          # the trails still let go of the flow's start
         for _, trail, _, measures in sides:
             glFinish()
             began = time.perf_counter()
