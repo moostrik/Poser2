@@ -18,7 +18,7 @@ Each bullet names the term to use and, after "not", the synonyms it replaces. A 
 - The sequencer's state on the board: `HasSequencerState`, `set_sequencer_state`, `get_sequencer_state`; not `HasSequence`, `set_sequence`
 - Feature words in full: `Velocity`, `Symmetry`, `Confidence`, `Foreground`, `DenseFlow`, `MotionTime`, `Temperature`, `Compositor`, `Geometry`; not `Vel`, `Sym`, `Conf`, `Frg`, `DFlow`, `MTime`, `TEMP`, `Comp`, `Geom`
 - Exponential moving average: `Ema`; not `EMA`
-- A time something is smoothed over (ms): `smooth` (`z_smooth`, `z_catch_up`, `xy_smooth`); not `time`
+- A time something is smoothed over (ms): `smooth` (the depth track's `smooth`, `catch_up` and `xy_smooth`); not `time`
 - American spelling: `center`, `visualization`, `color`; not `centre`, `visualisation`, `colour`
 
 ## Render

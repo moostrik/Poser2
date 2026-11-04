@@ -15,7 +15,7 @@ from modules.board import HasFrames
 
 from modules.settings import Field, BaseSettings, Group
 from modules.flow import (
-    GradientFlow, GradientFlowSettings, LucasKanadeFlow, LucasKanadeFlowSettings,
+    LucasKanadeFlow, LucasKanadeFlowSettings,
     TrailBridge, TrailBridgeSettings,
     KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES,
     VelocityMagnitude,
@@ -29,12 +29,6 @@ from modules.utils import HotReloadMethods
 logger = logging.getLogger(__name__)
 
 
-class OpticalFlowMethod(IntEnum):
-    """How the optical flow measures motion."""
-    GRADIENT =     0    # the motion along the brightness gradient, as a strength (GradientFlow); z at the pixel
-    LUCAS_KANADE = 1    # how far each pixel moved (LucasKanadeFlow); z along that motion
-
-
 class FlowBridgeMethod(IntEnum):
     """How the flow bridge makes the velocity the fluid reads and the amount the density reads."""
     TRAIL = 0       # a smoothed velocity, ink where there is speed
@@ -46,7 +40,7 @@ class Flow3DDrawMode(IntEnum):
     on the arrow's scale, red toward the camera and green away; as scalars, x/y/z as red/green/blue around grey.
 
     Inputs:
-        LUMINANCE - The newest luminance frame of the flow the optical flow's method picks
+        LUMINANCE - The newest luminance frame of the optical flow
 
     Depth (red toward the camera, green away, in px per frame: 1 is 76% color at scalar_scale 1):
         DEPTH_DIFFERENCE - The flow's tracked z, before the threshold
@@ -112,14 +106,6 @@ VECTOR_DRAW_MODES: set[Flow3DDrawMode] = {       # 3D velocities, drawn as veloc
 }
 
 
-class OpticalFlowSettings(BaseSettings):
-    """How the optical flow measures the 3D velocity: its method, and each method's settings, z from the depth included."""
-    method: Field[OpticalFlowMethod] =  Field(OpticalFlowMethod.GRADIENT, description="How motion is measured: along the brightness gradient, or how far each pixel moved")
-
-    lucas_kanade   = Group(LucasKanadeFlowSettings)
-    gradient       = Group(GradientFlowSettings)
-
-
 class FlowBridgeSettings(BaseSettings):
     """How the flow bridge turns the optical flow into the fluid's velocity, density and temperature."""
     method: Field[FlowBridgeMethod] =   Field(FlowBridgeMethod.TRAIL, description="How the bridge makes the fluid's velocity and the density's amount: one trail, or two trails reading the change of the motion")
@@ -137,7 +123,7 @@ class Flow3DLayerSettings(BaseSettings):
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
 
-    optical_flow  = Group(OpticalFlowSettings)
+    optical_flow  = Group(LucasKanadeFlowSettings)
     flow_bridge   = Group(FlowBridgeSettings)
     visualization = Group(VisualizationFieldSettings)
 
@@ -146,7 +132,7 @@ class Flow3DLayer(LayerBase):
     """Flow processing layer with the optical flow and the flow bridge.
 
     Measures the motion and prepares velocity/density/temperature for fluid simulation:
-    1. GradientFlow or LucasKanadeFlow (settings.optical_flow.method): the 3D velocity (xyz), z from the depth
+    1. LucasKanadeFlow: the 3D velocity (xyz), z from the depth
     2. TrailBridge or KineticBridge (settings.flow_bridge.method): the smoothed velocity for the fluid
     3. DensityBridge: Combines RGB density with an amount as its alpha
     4. TemperatureBridge: Generates temperature field
@@ -183,12 +169,9 @@ class Flow3DLayer(LayerBase):
         self._density_input: Texture = density_input
         self.settings: Flow3DLayerSettings = settings or Flow3DLayerSettings()
 
-        optical_flow: OpticalFlowSettings = self.settings.optical_flow
         bridge: FlowBridgeSettings = self.settings.flow_bridge
-        self._gradient_flow: GradientFlow = GradientFlow(optical_flow.gradient)
-        self._lucas_kanade_flow: LucasKanadeFlow = LucasKanadeFlow(optical_flow.lucas_kanade)
-        self._optical_flow_method: OpticalFlowMethod = optical_flow.method     # the flow that measured last; a switch restarts the other
-        self._velocity: Texture = self._gradient_flow.velocity     # the velocity of the flow the method picks
+        self._flow: LucasKanadeFlow = LucasKanadeFlow(self.settings.optical_flow)
+        self._velocity: Texture = self._flow.velocity
         self._depth_input: Texture | None = None
         self._mask_input: Texture | None = None
         self._gate_shader: MaskMultiply = MaskMultiply()
@@ -232,8 +215,8 @@ class Flow3DLayer(LayerBase):
 
     @property
     def uses_depth(self) -> bool:
-        """Whether the flow the optical flow's method picks measures z: its z_gain is above 0."""
-        return self._flow.settings.z_gain > 0.0
+        """Whether the optical flow measures z: its z_gain is above 0."""
+        return self.settings.optical_flow.z_gain > 0.0
 
     @property
     def depth_enabled(self) -> bool:
@@ -271,13 +254,6 @@ class Flow3DLayer(LayerBase):
         """Temperature output (R16F) for fluid simulation."""
         return self._temperature_bridge.temperature
 
-    @property
-    def _flow(self) -> GradientFlow | LucasKanadeFlow:
-        """The flow the optical flow's method picks."""
-        if self.settings.optical_flow.method == OpticalFlowMethod.LUCAS_KANADE:
-            return self._lucas_kanade_flow
-        return self._gradient_flow
-
     # ========== Input Setters ==========
 
     def set_flow_input(self, texture: Texture) -> None:
@@ -290,13 +266,12 @@ class Flow3DLayer(LayerBase):
         self._density_input = texture
 
     def set_mask_input(self, texture: Texture | None) -> None:
-        """The player's mask (red, 0 to 1) on the flow's view, or None for no gate. Each flow multiplies
+        """The player's mask (red, 0 to 1) on the flow's view, or None for no gate. The flow multiplies
         its 3D velocity by it with its use_mask, and the density color is gated by it, after they are
         measured, so they run on the whole image: a jittery mask edge then only scales what passes, it
         never reads as motion, and needs no blending."""
         self._mask_input = texture
-        self._gradient_flow.set_mask(texture)
-        self._lucas_kanade_flow.set_mask(texture)
+        self._flow.set_mask(texture)
 
     def set_depth_input(self, texture: Texture) -> None:
         """Depth for the velocity toward the camera: metres in red, 0 where there is none, on the flow's
@@ -353,16 +328,14 @@ class Flow3DLayer(LayerBase):
         flow_width, flow_height = self._flow_size = (self.settings.width, self.settings.height)
         output_width, output_height = self._output_size
 
-        self._gradient_flow.allocate(flow_width, flow_height)
-        self._lucas_kanade_flow.allocate(flow_width, flow_height)
+        self._flow.allocate(flow_width, flow_height)
         self._trail_bridge.allocate(flow_width, flow_height, output_width, output_height)
         self._kinetic_bridge.allocate(flow_width, flow_height)
         self._velocity_magnitude.allocate(flow_width, flow_height)
         self._temperature_bridge.allocate(flow_width, flow_height)
 
     def _deallocate_flow(self) -> None:
-        self._gradient_flow.deallocate()
-        self._lucas_kanade_flow.deallocate()
+        self._flow.deallocate()
         self._trail_bridge.deallocate()
         self._kinetic_bridge.deallocate()
         self._velocity_magnitude.deallocate()
@@ -379,8 +352,7 @@ class Flow3DLayer(LayerBase):
 
     def reset(self) -> None:
         """Reset all processing stages."""
-        self._gradient_flow.reset()
-        self._lucas_kanade_flow.reset()
+        self._flow.reset()
         self._trail_bridge.reset()
         self._kinetic_bridge.reset()
         self._density_bridge.reset()
@@ -402,13 +374,8 @@ class Flow3DLayer(LayerBase):
         self._flow_interval += self._time_step
 
         mask: Texture | None = self._mask_input if self._mask_input is not None and self._mask_input.allocated else None
-        optical_flow: OpticalFlowSettings = self.settings.optical_flow
         kinetic: bool = self.settings.flow_bridge.method == FlowBridgeMethod.KINETIC
-        flow: GradientFlow | LucasKanadeFlow = self._flow
-        if optical_flow.method != self._optical_flow_method:
-            # The other flow's frames and depth are from before it stopped measuring
-            self._optical_flow_method = optical_flow.method
-            flow.reset()
+        flow: LucasKanadeFlow = self._flow
         if new_flow:
             # Stage 1: the flow's 3D velocity, on the whole image; with its use_mask, times the mask
             flow.set_input(self._flow_input)
@@ -422,8 +389,7 @@ class Flow3DLayer(LayerBase):
         if kinetic:
             if new_flow:
                 # Lucas–Kanade's velocity is a distance, so the trails can travel with it
-                distance_scale: float | None = optical_flow.lucas_kanade.x_gain if optical_flow.method == OpticalFlowMethod.LUCAS_KANADE else None
-                self._kinetic_bridge.set_velocity(self._velocity, distance_scale)
+                self._kinetic_bridge.set_velocity(self._velocity, self.settings.optical_flow.x_gain)
                 self._kinetic_bridge.update(self._flow_interval)
                 if self.settings.draw_mode == Flow3DDrawMode.KINETIC_DEPTH_ACCELERATION:
                     self._kinetic_bridge.update_depth_acceleration()

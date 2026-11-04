@@ -12,7 +12,7 @@ from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOf
                       FeatureFrameLayer, FeatureWindowLayer, MotionTimeRenderer, MotionTimeRendererSettings, \
                       PoseLineLayer, PoseLineLayerSettings
 from .flow import     FlowLayer, FlowLayerSettings, FlowDrawMode, \
-                      Flow3DLayer, Flow3DLayerSettings, Flow3DDrawMode, OpticalFlowSettings, OpticalFlowMethod, FlowBridgeSettings, FlowBridgeMethod, \
+                      Flow3DLayer, Flow3DLayerSettings, Flow3DDrawMode, FlowBridgeSettings, FlowBridgeMethod, \
                       FluidLayer, FluidLayerSettings, FluidDrawMode, \
                       Fluid3DLayer, Fluid3DLayerSettings
 from .generic import  CompositeLayer, CompositeLayerSettings, LutSettings, \

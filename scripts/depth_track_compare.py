@@ -5,7 +5,7 @@
 FRAMES is what depth_track_capture saved from one loop of a recording (temp/depth_track/RECORDING).
 No app and no camera: a window gives the GL context, and two `LucasKanadeFlow`, A and B, measure the
 saved frames with the settings they were recorded with; `--a` and `--b` override any of them by its
-name in the panel (xy_levels, xy_threshold, z_catch_up, ...). The window plays the loop at its
+path in the panel (lucas_kanade.levels, lucas_kanade.threshold, depth_track.catch_up, z_gain, ...). The window plays the loop at its
 recorded rate, again and again, A on the left, B on the right:
 
     1  z of the track, red toward the camera, green away     space  pause
@@ -51,6 +51,11 @@ WARM_UP: float = 1.0          # s at the start the flows settle in, measured in 
 SHORTEST_PAUSE: float = 1.0   # s of stillness that end a move
 RENAMED: dict[str, str] = {'z_time': 'z_smooth', 'z_catch_up_time': 'z_catch_up', 'xy_follow_z_time': 'xy_smooth', 'xy_follow_z': 'xy_smooth', 'xy_regularizer': 'xy_damping',
                            'strength_x': 'x_gain', 'strength_y': 'y_gain', 'strength_z': 'z_gain'}   # in frames saved before
+GROUPED: dict[str, str] = {'xy_levels': 'lucas_kanade.levels', 'xy_window': 'lucas_kanade.window', 'xy_damping': 'lucas_kanade.damping',
+                           'xy_same_surface': 'lucas_kanade.same_surface', 'xy_threshold': 'lucas_kanade.threshold', 'xy_median': 'lucas_kanade.median',
+                           'z_edge': 'depth_track.edge', 'z_window': 'depth_track.window', 'z_tolerance': 'depth_track.tolerance',
+                           'z_restart_frames': 'depth_track.restart_frames', 'z_smooth': 'depth_track.smooth', 'xy_smooth': 'depth_track.xy_smooth',
+                           'z_catch_up': 'depth_track.catch_up', 'z_dead_zone': 'depth_track.dead_zone', 'z_threshold': 'depth_track.threshold'}   # in frames saved flat, before the groups
 MOVED: float = 0.05          # luminance change of a pixel that moves
 MOVED_FRAMES: int = 5         # frames it changes that much in, over the loop
 VIEWS: dict[int, str] = {1: 'z of the track', 2: 'z after the threshold', 3: 'depth', 4: 'velocity direction', 5: 'velocity arrows'}
@@ -106,14 +111,40 @@ def read_back(texture: Texture) -> np.ndarray:
     return pixels
 
 
+def recorded_settings(recorded: dict) -> dict:
+    """The settings a frame was saved with, as the settings' dict: saved flat before the groups, nested since."""
+    result: dict = {}
+    for key, value in recorded.items():
+        key = RENAMED.get(key, key)
+        *groups, name = GROUPED.get(key, key).split('.')
+        target: dict = result
+        for group in groups:
+            target = target.setdefault(group, {})
+        target[name] = value
+    return result
+
+
+def setting_owner(settings: LucasKanadeFlowSettings, path: str) -> tuple[object, str]:
+    """The settings object that holds the setting at `path` (lucas_kanade.levels) and its name there."""
+    *groups, name = path.split('.')
+    owner: object = settings
+    for group in groups:
+        owner = getattr(owner, group, None)
+        if owner is None:
+            raise SystemExit(f'unknown settings group {group} in {path}')
+    return owner, name
+
+
 def overrides(items: list[str]) -> dict[str, object]:
     defaults = LucasKanadeFlowSettings()
     result: dict[str, object] = {}
     for item in items:
         name, value = item.split('=', 1)
-        if name not in defaults.fields:
-            raise SystemExit(f'unknown setting {name}: one of {", ".join(defaults.fields)}')
-        kind = type(getattr(defaults, name))
+        owner, field = setting_owner(defaults, name)
+        fields = getattr(owner, 'fields')
+        if field not in fields:
+            raise SystemExit(f'unknown setting {name}: one of {", ".join(fields)}')
+        kind = type(getattr(owner, field))
         if issubclass(kind, Patch):                              # by name (SEVEN) or radius (3)
             result[name] = Patch[value.upper()] if value.isalpha() else Patch(int(value))
         else:
@@ -304,9 +335,10 @@ class Side:
     def __init__(self, name: str, recorded: dict, changed: dict[str, object], width: int, height: int, show: bool) -> None:
         self.name, self.changed = name, changed
         self.settings = LucasKanadeFlowSettings()
-        self.settings.update_from_dict({RENAMED.get(key, key): value for key, value in recorded.items()})
-        for key, value in changed.items():
-            setattr(self.settings, key, value)
+        self.settings.update_from_dict(recorded_settings(recorded))
+        for path, value in changed.items():
+            owner, name = setting_owner(self.settings, path)
+            setattr(owner, name, value)
         self.flow = LucasKanadeFlow(self.settings)
         self.flow.allocate(width, height)
         self.view_settings = VisualizationFieldSettings()
@@ -354,7 +386,7 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
     context(False, 64, 64)
     w, h = frames.width, frames.height
     side = Side('A', frames.calls[0]['settings'], changed, w, h, False)
-    s = side.settings
+    xy, z = side.settings.lucas_kanade, side.settings.depth_track
     luminance, depth_texture, mask_texture = Texture(), Texture(), Texture()
     state, catch_up, history, previous = np.zeros((h, w, 4)), np.zeros((h, w, 2)), np.zeros((h, w, 4)), None
     last = min(frames_to_check, len(frames)) - 1
@@ -367,15 +399,15 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
             continue
         solve = read_back(side.flow._solve.texture)[..., :2] * np.array([w, h])                  # px per frame
         now, then = (np.round(f * 255.0).astype(np.float64) / 255.0 for f in (lum, previous))    # as the R8 frames hold them
-        reference = lucas_kanade(then, now, s.xy_levels, s.xy_window, s.xy_damping, s.xy_median,
-                                 depth.astype(np.float64) if s.xy_same_surface else None, s.z_tolerance)
+        reference = lucas_kanade(then, now, xy.levels, xy.window, xy.damping, xy.median,
+                                 depth.astype(np.float64) if xy.same_surface else None, z.tolerance)
         previous = lum
         c = frames.calls[k]
         step = (c['depth_step'][0] * w, c['depth_step'][1] * h) if c['depth_step'][0] > 0 else (1.0, 1.0)
-        filtered = filter_depth_steps(depth.astype(np.float64), step, s.z_edge)
+        filtered = filter_depth_steps(depth.astype(np.float64), step, z.edge)
         state, catch_up = track_depth(filtered, state, catch_up, solve.astype(np.float64),
-                                      c['delta_time'], s.z_window, step, s.z_tolerance, s.z_smooth, c['view_span'], s.z_dead_zone,
-                                      s.z_catch_up, s.xy_threshold, history, s.z_restart_frames)
+                                      c['delta_time'], z.window, step, z.tolerance, z.smooth, c['view_span'], z.dead_zone,
+                                      z.catch_up, xy.threshold, history, z.restart_frames)
         history = shift_history(filtered, history)
         gpu = read_back(side.flow.depth_velocity.difference)
         if k % 5 == 0 or k == last:

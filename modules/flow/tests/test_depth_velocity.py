@@ -258,7 +258,7 @@ class WeightsTest(unittest.TestCase):
 
 
 class CatchUpTest(unittest.TestCase):
-    """With z_catch_up, a track that keeps missing one way where the image moves follows faster,
+    """With catch_up, a track that keeps missing one way where the image moves follows faster,
     as much as it keeps missing that way."""
     MOVING: np.ndarray = np.tile([1.0, 0.0], (SIZE, SIZE, 1))     # the image moving a pixel per frame, as a hand's edges do
 
@@ -342,7 +342,7 @@ class StepFilterTest(unittest.TestCase):
     """Before the track, a sample whose 3×3 depth samples span two surfaces has no depth."""
 
     def test_a_step_is_an_edge_by_the_edge_value(self) -> None:
-        # a hand 15 cm before the chest: an edge at z_edge 0.1, the same surface at 0.2
+        # a hand 15 cm before the chest: an edge at edge 0.1, the same surface at 0.2
         rows, columns = np.mgrid[0:SIZE, 0:SIZE]
         depth = np.where(columns < SIZE // 2, 0.85, 1.0)
         self.assertEqual(float(filter_depth_steps(depth, STEP, 0.1)[5, SIZE // 2]), 0.0)

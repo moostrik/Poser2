@@ -2,7 +2,6 @@
 
 from .luminance import Luminance
 from .optical_flow_mm import OpticalFlowMM
-from .gradient_flow_shader import GradientFlowShader
 from .lucas_kanade_shader import LucasKanadeShader
 from .displacement_threshold import DisplacementThreshold
 from .displacement_filter import DisplacementFilter
