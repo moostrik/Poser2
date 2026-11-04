@@ -56,9 +56,9 @@ class LucasKanadeFlowSettings(BaseSettings):
     z_smooth:       Field[float] = Field(50.0, min=0.0, max=200.0, step=1.0, description="Smoothing time of z in ms, 0 = two-frame change (higher: less noise, more lag)")
     z_tolerance:    Field[float] = Field(0.1, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m (higher: fuller pushes, fewer splits)")
     z_edge:         Field[float] = Field(0.1, min=0.05, max=0.3, step=0.005, description="Edge depth step, m (lower: cleaner edges, fewer fingers)")
-    x_gain:  Field[float] = Field(1.0, min=-10.0, max=10.0, description="Velocity in image widths per second, negative inverts (higher: stronger push, more clamping)", newline=True)
-    y_gain:  Field[float] = Field(1.0, min=-10.0, max=10.0, description="Velocity in image widths per second, negative inverts (higher: stronger push, more clamping)")
-    z_gain:  Field[float] = Field(0.0, min=-10.0, max=10.0, description="Velocity toward the camera, 1 matches x/y, negative inverts (higher: stronger z)")
+    x_gain:  Field[float] = Field(1.0, min=-10.0, max=10.0, description="x gain, negative inverts (higher: stronger, more clamping)", newline=True)
+    y_gain:  Field[float] = Field(1.0, min=-10.0, max=10.0, description="y gain, negative inverts (higher: stronger, more clamping)")
+    z_gain:  Field[float] = Field(0.0, min=-10.0, max=10.0, description="z gain, 1 = x/y, negative inverts (higher: stronger z)")
     use_mask:    Field[bool]  = Field(False, description="Only the player moves the fluid (off: whole image)", newline=True)
 
 

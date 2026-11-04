@@ -29,7 +29,7 @@ class GradientFlowSettings(BaseSettings):
     z_edge = Field(0.1, min=0.05, max=0.3, step=0.005, description="Edge depth step, m (lower: cleaner edges, fewer fingers)")
     x_gain = Field(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)", newline=True)
     y_gain = Field(3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
-    z_gain = Field(0.0, min=-10.0, max=10.0, description="Velocity toward the camera, negative inverts (higher: stronger z)")
+    z_gain = Field(0.0, min=-10.0, max=10.0, description="z gain, negative inverts (higher: stronger z)")
     use_mask = Field(False, description="Only the player moves the fluid (off: whole image)")
 
 
