@@ -12,7 +12,9 @@ the displacement, so a surface sliding sideways over a slope reads no motion tow
 corrected each frame by the mean over `z_window` depth samples and smoothed over `z_smooth`;
 `z_threshold` comes off it. With `z_catch_up`, z follows a fast push over a shorter time; it does so
 only where the image moves too, or with `z_catch_up_gate` off wherever the track keeps missing one way.
-With `z_xy_gate`, z is 0 where the image does not move (x/y past `xy_threshold` in 3×3). The depth change comes in view widths per frame like the displacement, so all three become
+With `z_xy_gate`, z is 0 where the image does not move (x/y past `xy_threshold` in 3×3). With
+`z_half_speed`, the smoothing shortens with the track's own depth speed, `z_smooth` / (1 + speed /
+`z_half_speed`), as a One Euro filter's does. The depth change comes in view widths per frame like the displacement, so all three become
 view widths per second the same way. Out comes one 3D velocity: x/y times `strength_x`/`strength_y`,
 z times `strength_z`. With `use_mask`, the velocity is multiplied by the mask.
 
@@ -57,6 +59,7 @@ class LucasKanadeFlowSettings(BaseSettings):
     z_catch_up:     Field[float] = Field(0.0, min=0.0, max=50.0, step=0.5, description="Smoothing of z during a fast push, where the image moves too (ms); 0 is off")
     z_catch_up_gate: Field[bool] = Field(True, description="z catches up only where the image moves too; off, wherever it lags")
     z_xy_gate:      Field[bool]  = Field(False, description="z only where the image moves (x/y past xy_threshold, 3x3)")
+    z_half_speed:   Field[float] = Field(0.0, min=0.0, max=5.0, step=0.05, description="Depth speed at which z_smooth halves (m/s); 0 is off")
     z_smooth:       Field[float] = Field(50.0, min=0.0, max=200.0, description="Time z is smoothed over (ms); 0 is the change of two frames")
     z_tolerance:    Field[float] = Field(0.1, min=0.1, max=0.5, description="Depth further than this is another surface: z starts over, and an edge step this big is dropped (m)")
     strength_x:  Field[float] = Field(1.0, min=-20.0, max=20.0, description="Velocity per image width per second, x (negative inverts)", newline=True)
@@ -188,7 +191,7 @@ class LucasKanadeFlow:
         if depth is not None:
             self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, s.z_window, s.z_smooth,
                                               s.z_threshold, s.z_tolerance, s.z_dead_zone, s.z_catch_up, s.xy_threshold,
-                                              solved, s.z_catch_up_gate, s.z_xy_gate)
+                                              solved, s.z_catch_up_gate, s.z_xy_gate, s.z_half_speed)
 
         xy: Texture = self._displacement
         if s.xy_follow_z:

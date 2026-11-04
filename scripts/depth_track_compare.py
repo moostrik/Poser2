@@ -369,7 +369,7 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
         step = (c['depth_step'][0] * w, c['depth_step'][1] * h) if c['depth_step'][0] > 0 else (1.0, 1.0)
         state, catch_up = track_depth(filter_depth_steps(depth.astype(np.float64), step, s.z_tolerance), state, catch_up, solve.astype(np.float64),
                                       c['delta_time'], s.z_window, step, s.z_tolerance, s.z_smooth, c['view_span'], s.z_dead_zone,
-                                      s.z_catch_up, s.xy_threshold)
+                                      s.z_catch_up, s.xy_threshold, s.z_half_speed)
         gpu = read_back(side.flow.depth_velocity.difference)
         if k % 5 == 0 or k == last:
             dxy = np.linalg.norm(solve - reference, axis=-1)
