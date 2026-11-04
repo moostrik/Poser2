@@ -46,7 +46,7 @@ from .shaders import ComposeVelocity, DisplacementFilter, DisplacementMedian, Di
 
 class LucasKanadeSettings(BaseSettings):
     """The x/y part: the Lucas–Kanade solve of the displacement."""
-    levels:         Field[int]   = Field(3, min=3, max=5, description="Pyramid levels of the x/y solve, each doubles the reach (more: faster motion, more spill)")
+    levels:         Field[int]   = Field(3, min=1, max=5, description="Pyramid levels of the x/y solve, each doubles the reach (more: faster motion, more spill)")
     window:         Field[Patch] = Field(Patch.SEVEN, min=Patch.THREE, max=Patch.NINE, description="x/y patch size (larger: cleaner, more spill)")
     damping:        Field[float] = Field(0.03, min=0.0, max=0.1, step=0.001, description="Damps x/y where the patch has little texture (higher: less noise, smaller motion)")
     same_surface:   Field[bool]  = Field(True, newline=True, width=48, description="Patch counts only the center's surface (on: less smear, wide fast parts slower)")

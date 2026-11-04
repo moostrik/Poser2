@@ -414,6 +414,9 @@
       },
       "optical_flow": {
         "use_mask": true,
+        "x": true,
+        "y": true,
+        "z": true,
         "lucas_kanade": {
           "levels": 3,
           "window": "SEVEN",
@@ -437,9 +440,9 @@
         "method": "TRAIL",
         "trail": {
           "limit": 4.0,
-          "scale_x": 3.57,
-          "scale_y": 3.57,
-          "scale_z": 3.57,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "scale_z": 1.0,
           "smooth": 230.0,
           "blur_radius": 0.0,
           "blur_steps": 4,
