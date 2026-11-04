@@ -14,6 +14,7 @@ from modules.settings import Field, BaseSettings
 from .. import FlowUtil
 from .depth_velocity import DepthVelocity
 from .luminance_frames import LuminanceFrames
+from .patch import Patch
 from .shaders import ComposeVelocity, GradientFlowShader
 
 
@@ -21,7 +22,7 @@ class GradientFlowSettings(BaseSettings):
     """Configuration for the gradient flow."""
     offset = Field(3, min=1, max=10, description="Gradient sample offset in pixels")
     threshold = Field(0.0, min=0.0, max=0.2, description="Motion detection threshold")
-    z_window = Field(1, min=0, max=4, description="Depth samples averaged per pixel, radius (larger: less noise, small parts blur)", newline=True)
+    z_window = Field(Patch.THREE, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)", newline=True)
     z_threshold = Field(0.5, min=0.0, max=5.0, step=0.05, description="z below this is noise, in px/frame (higher: less noise, less slow z)")
     z_dead_zone = Field(0.0, min=0.0, max=0.05, step=0.001, description="Depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
     z_smooth = Field(50.0, min=0.0, max=200.0, step=1.0, description="Smoothing time of z in ms, 0 = two-frame change (higher: less noise, more lag)")

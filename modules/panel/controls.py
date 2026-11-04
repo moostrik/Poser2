@@ -613,11 +613,22 @@ class KnobControl(Control):
 
 # -- enum controls -------------------------------------------------------------
 
+def enum_options(field: Field) -> dict[Enum, str]:
+    """An enum field's members and their labels: a member's own `label` where it has one, else its
+    name; with `min`/`max`, only the members whose value lies between them."""
+    members = list(cast(type[Enum], field.type_))
+    if field.min is not None:
+        members = [m for m in members if m.value >= field.min]
+    if field.max is not None:
+        members = [m for m in members if m.value <= field.max]
+    return {m: getattr(m, 'label', None) or generate_label(m.name) for m in members}
+
+
 class Select(Control):
     widget = Widget.select
 
     def build(self) -> None:
-        options = {m: generate_label(m.name) for m in cast(type[Enum], self.field.type_)}
+        options = enum_options(self.field)
         width = f"w-{self.field.width}" if self.field.width is not None else "w-48"
         self.select = self.tooltip(ui.select(options=options, value=self.shown, label=self.label).props(
             "dense outlined" + self.lock()
@@ -667,7 +678,7 @@ class Radio(Control):
     widget = Widget.radio
 
     def build(self) -> None:
-        options = {m: generate_label(m.name) for m in cast(type[Enum], self.field.type_)}
+        options = enum_options(self.field)
         with ui.column().classes("gap-1"):
             self.title()
             self.toggle = ui.toggle(options=options, value=self.shown).props("dense" + self.lock())

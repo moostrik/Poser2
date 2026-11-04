@@ -1,18 +1,19 @@
 #version 460 core
 
 // Displacement Median Shader
-// Each component of the displacement (uv per frame) as the median of its 5×5 samples, `spacing`
-// (uv) apart, nearest: one level's outliers go before the next level refines on them. The numpy
-// reference is lucas_kanade_flow.median_displacement
+// Each component of the displacement (uv per frame) as the median of its (2·radius+1)² samples,
+// `spacing` (uv) apart, nearest: one level's outliers go before the next level refines on them. The
+// numpy reference is lucas_kanade_flow.median_displacement
 
 uniform sampler2D displacement;
 uniform vec2 spacing;   // uv between two samples
+uniform int radius;     // 1 = 3×3, 2 = 5×5
 
 in vec2 texCoord;
 out vec4 fragColor;
 
-float median25(float values[25]) {
-    for (int i = 1; i < 25; i++) {          // insertion sort; 25 values
+float median(float values[25], int n) {
+    for (int i = 1; i < n; i++) {           // insertion sort; up to 25 values
         float value = values[i];
         int j = i - 1;
         while (j >= 0 && values[j] > value) {
@@ -21,7 +22,7 @@ float median25(float values[25]) {
         }
         values[j + 1] = value;
     }
-    return values[12];
+    return values[n / 2];
 }
 
 void main() {
@@ -29,8 +30,8 @@ void main() {
     float xs[25];
     float ys[25];
     int n = 0;
-    for (int j = -2; j <= 2; j++) {
-        for (int i = -2; i <= 2; i++) {
+    for (int j = -radius; j <= radius; j++) {
+        for (int i = -radius; i <= radius; i++) {
             vec2 uv = texCoord + vec2(i, j) * spacing;
             ivec2 texel = clamp(ivec2(floor(uv * vec2(size))), ivec2(0), size - 1);
             vec2 d = texelFetch(displacement, texel, 0).xy;
@@ -39,5 +40,5 @@ void main() {
             n++;
         }
     }
-    fragColor = vec4(median25(xs), median25(ys), 0.0, 1.0);
+    fragColor = vec4(median(xs, n), median(ys, n), 0.0, 1.0);
 }

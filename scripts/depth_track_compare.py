@@ -44,7 +44,7 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_FALSE, GL_FLOAT,
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from modules.gl import Blit, Fbo, Texture  # noqa: E402
-from modules.flow import (FlowUtil, LucasKanadeFlow, LucasKanadeFlowSettings, SignedField, VelocityField,  # noqa: E402
+from modules.flow import (FlowUtil, LucasKanadeFlow, LucasKanadeFlowSettings, Patch, SignedField, VelocityField,  # noqa: E402
                           VisualizationFieldSettings, filter_depth_steps, lucas_kanade, track_depth)
 
 WARM_UP: float = 1.0          # s at the start the flows settle in, measured in no part
@@ -114,7 +114,10 @@ def overrides(items: list[str]) -> dict[str, object]:
         if name not in defaults.fields:
             raise SystemExit(f'unknown setting {name}: one of {", ".join(defaults.fields)}')
         kind = type(getattr(defaults, name))
-        result[name] = value.lower() in ('1', 'true', 'on', 'yes') if kind is bool else kind(float(value)) if kind is int else kind(value)
+        if issubclass(kind, Patch):                              # by name (SEVEN) or radius (3)
+            result[name] = Patch[value.upper()] if value.isalpha() else Patch(int(value))
+        else:
+            result[name] = value.lower() in ('1', 'true', 'on', 'yes') if kind is bool else kind(float(value)) if kind is int else kind(value)
     return result
 
 

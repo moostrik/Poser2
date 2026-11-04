@@ -11,7 +11,7 @@ from .flow_util import FlowUtil
 
 # Optical flow
 from .optical import DepthVelocity, catch_up_share, color_motion, filter_depth_steps, track_depth, track_weights, depth_threshold, \
-                     GradientFlow, GradientFlowSettings, LucasKanadeFlow, LucasKanadeFlowSettings, lucas_kanade, median_displacement, threshold_displacement, filter_displacement, displacement_velocity
+                     GradientFlow, GradientFlowSettings, LucasKanadeFlow, Patch, LucasKanadeFlowSettings, lucas_kanade, median_displacement, threshold_displacement, filter_displacement, displacement_velocity
 
 # Bridge layers
 from .bridge import     DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \

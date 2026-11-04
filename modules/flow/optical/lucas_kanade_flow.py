@@ -3,7 +3,7 @@
 Where the gradient flow gives a motion strength per pixel (the brightness change along the gradient),
 this gives how far the image moved: a window of gradients per pixel, solved for the shift that carries
 the previous frame onto the current one, first on the coarsest mip level, then refined once per finer
-level with the previous frame warped by the estimate so far. With `xy_median`, the 5×5 median of the
+level with the previous frame warped by the estimate so far. With `xy_median`, the 3×3 or 5×5 median of the
 displacement after each level, so one level's outliers do not grow on the next.
 
 The displacement (uv per frame) stays inside: `xy_threshold` (px per frame) comes off its length, as
@@ -38,6 +38,7 @@ from modules.settings import BaseSettings, Field
 from .. import FlowUtil
 from .depth_velocity import DepthVelocity, track_weights
 from .luminance_frames import LuminanceFrames
+from .patch import Patch
 from .shaders import ComposeVelocity, DisplacementFilter, DisplacementMedian, DisplacementThreshold, LucasKanadeShader
 
 
@@ -45,11 +46,11 @@ class LucasKanadeFlowSettings(BaseSettings):
     """Configuration for the Lucas–Kanade flow."""
     xy_levels:      Field[int]   = Field(3, min=3, max=5, description="Pyramid levels of the x/y solve, each doubles the reach (more: faster motion, more spill)")
     xy_damping:     Field[float] = Field(0.001, min=0.0, max=0.1, step=0.001, description="Damps x/y where the patch has little texture (higher: less noise, smaller motion)")
-    xy_window:      Field[int]   = Field(2, min=1, max=4, description="x/y patch radius in pixels, 2 = 5×5 (larger: cleaner, more spill)", newline=True)
-    xy_median:      Field[bool]  = Field(False, description="5×5 median per level (on: cleaner, 2× GPU)")
+    xy_window:      Field[Patch] = Field(Patch.FIVE, min=Patch.THREE, max=Patch.NINE, description="x/y patch size (larger: cleaner, more spill)", newline=True)
+    xy_median:      Field[Patch] = Field(Patch.ONE, min=Patch.ONE, max=Patch.FIVE, description="Median size per level, 1×1 = off (larger: cleaner, more GPU)")
     xy_threshold:   Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="x/y below this is noise, in px/frame (higher: less noise, less slow motion)")
     xy_follow_z:    Field[bool]  = Field(False, description="Smooths x/y like z, so both lag alike (on: less noise, more lag)")
-    z_window:       Field[int]   = Field(1, min=0, max=4, description="Depth samples averaged per pixel, radius (larger: less noise, small parts blur)", newline=True)
+    z_window:       Field[Patch] = Field(Patch.THREE, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)", newline=True)
     z_threshold:    Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="z below this is noise, in px/frame (higher: less noise, less slow z)")
     z_dead_zone:    Field[float] = Field(0.0, min=0.0, max=0.05, step=0.001, description="Depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
     z_catch_up:     Field[float] = Field(0.0, min=0.0, max=50.0, step=1.0, description="Shorter smoothing during a fast push, in ms, 0 = off (lower: quicker pushes)")
@@ -146,7 +147,7 @@ class LucasKanadeFlow:
 
     def _pyramid(self, solve: SwapFbo, previous: Texture, current: Texture) -> None:
         """The displacement carrying `previous` onto `current`, coarse to fine, into `solve`: one solve
-        per level, and with `xy_median` the 5×5 median after each level."""
+        per level, and with `xy_median` the median after each level."""
         s: LucasKanadeFlowSettings = self.settings
         solve.clear()                                       # the coarsest level starts from no motion
         for level in reversed(range(s.xy_levels)):
@@ -158,7 +159,7 @@ class LucasKanadeFlow:
                 spacing: float = float(2 ** level)          # a level's texel apart
                 solve.swap()
                 solve.begin()
-                self._median_shader.use(solve.back_texture, (spacing / solve.width, spacing / solve.height))
+                self._median_shader.use(solve.back_texture, (spacing / solve.width, spacing / solve.height), int(s.xy_median))
                 solve.end()
 
     def update(self, depth: Texture | None, delta_time: float, view_span: float, depth_step: tuple[float, float]) -> None:
@@ -265,14 +266,14 @@ def _solve_level(p_image: np.ndarray, c_image: np.ndarray, d: np.ndarray, u: np.
     return d + np.stack((dx / lw, dy / lh), axis=-1)
 
 
-def median_displacement(displacement: np.ndarray, spacing: float) -> np.ndarray:
-    """The displacement (H, W, 2), each component the median of its 5×5 samples `spacing` pixels apart,
-    nearest, clamped at the edges. Mirrors displacement_median.frag."""
+def median_displacement(displacement: np.ndarray, spacing: float, radius: int = 2) -> np.ndarray:
+    """The displacement (H, W, 2), each component the median of its (2·radius+1)² samples `spacing`
+    pixels apart, nearest, clamped at the edges. Mirrors displacement_median.frag."""
     h, w = displacement.shape[:2]
     rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
     samples: list[np.ndarray] = []
-    for j in range(-2, 3):
-        for i in range(-2, 3):
+    for j in range(-radius, radius + 1):
+        for i in range(-radius, radius + 1):
             y = np.clip(np.floor(rows + 0.5 + j * spacing).astype(int), 0, h - 1)
             x = np.clip(np.floor(columns + 0.5 + i * spacing).astype(int), 0, w - 1)
             samples.append(displacement[y, x])
@@ -280,11 +281,11 @@ def median_displacement(displacement: np.ndarray, spacing: float) -> np.ndarray:
 
 
 def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, window: int = 2, damping: float = 0.001,
-                 median: bool = False) -> np.ndarray:
+                 median: int = 0) -> np.ndarray:
     """The displacement (H, W, 2) in pixels per frame, x along columns and y along rows, that carries
     `previous` onto `current`: coarse to fine over `levels` mip levels, one solve per level over a
     (2·window+1)² window, the previous frame warped by the estimate so far; with `median`, after each
-    level the 5×5 median of the displacement, a level's texel apart. Mirrors the shaders."""
+    level the median of the displacement over a (2·median+1)² patch, a level's texel apart. Mirrors the shaders."""
     h, w = current.shape
     previous_levels: list[np.ndarray] = _pyramid(previous.astype(np.float64), levels)
     current_levels: list[np.ndarray] = _pyramid(current.astype(np.float64), levels)
@@ -294,7 +295,7 @@ def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, win
     for level in reversed(range(levels)):
         d = _solve_level(previous_levels[level], current_levels[level], d, u, v, window, damping)
         if median:
-            d = median_displacement(d, float(2 ** level))
+            d = median_displacement(d, float(2 ** level), median)
     return d * np.array([w, h])
 
 
