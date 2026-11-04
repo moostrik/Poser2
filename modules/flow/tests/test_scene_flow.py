@@ -175,6 +175,10 @@ class ShapeTest(unittest.TestCase):
         shaped = shape_velocity(np.array([[2.0, 0.0, -1.0]]), 0.15, 1.0, 1.0, 0.5)
         np.testing.assert_allclose(shaped[0, [0, 2]], [np.tanh(2.0), -0.5 * np.tanh(2.0)])
 
+    def test_limit_zero_is_off(self) -> None:
+        shaped = shape_velocity(np.array([[0.45, 0.0, 0.0]]), 0.15, 3.0, 0.0, 1000.0)
+        np.testing.assert_allclose(shaped[0, 0], 0.45 * 9.0, rtol=1e-6)
+
     def test_z_stays_linear_on_the_curve(self) -> None:
         shaped = shape_velocity(np.array([[0.45, 0.0, 0.01]]), 0.15, 2.0, 1000.0, 1000.0)
         np.testing.assert_allclose(shaped[0, 2], 0.01, rtol=1e-4)

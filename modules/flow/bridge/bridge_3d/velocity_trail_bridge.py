@@ -5,7 +5,8 @@ smoothed in time and in space. Its output stays in widths per second; how hard i
 the fluid's (`input_strength`, `input_x`, `input_y`).
 
 The shape bends the x/y speed around `pivot` by `curve`: speed · (speed / pivot)^(curve − 1), so a move
-at the pivot stays as it is, a faster one gets stronger and a slower one weaker; then a soft `limit`.
+at the pivot stays as it is, a faster one gets stronger and a slower one weaker; then a soft `limit`
+(0 = none).
 z stays linear, with its own soft `z_limit`: what is left of z's noise after the flow is spikes at edges,
 which a curve would make bigger and a limit caps.
 
@@ -30,7 +31,7 @@ class VelocityTrailBridgeSettings(BaseSettings):
     """Configuration for the velocity trail bridge."""
     pivot = Field(0.15, min=0.01, max=1.0, step=0.01, description="x/y speed the curve leaves as it is, widths/s")
     curve = Field(1.0, min=0.5, max=3.0, step=0.05, description="Exponent on the x/y speed around the pivot; 1 = linear (higher: fast stronger, slow weaker)")
-    limit = Field(4.0, min=0.1, max=4.0, step=0.05, description="Soft limit on the shaped x/y speed, widths/s")
+    limit = Field(4.0, min=0.0, max=4.0, step=0.05, description="Soft limit on the shaped x/y speed, widths/s; 0 = off")
     z_limit = Field(4.0, min=0.1, max=4.0, step=0.05, description="Soft limit on z, widths/s (lower: smaller edge spikes)")
     attack = Field(0.0, min=0.0, max=500.0, step=1.0, newline=True, description="Smoothing time of a rising x/y speed, ms; 0 = as smooth (lower: quicker flicks)")
     smooth = Field(158.0, min=0.0, max=1000.0, step=1.0, description="Smoothing time, ms; the fall of x/y and all of z; 0 = none (higher: longer coast)")
@@ -130,11 +131,13 @@ class VelocityTrailBridge(FlowBase):
 
 def shape_velocity(velocity: np.ndarray, pivot: float, curve: float, limit: float, z_limit: float) -> np.ndarray:
     """A velocity (..., 3) with its x/y speed s bent to s · (s / pivot)^(curve − 1), then rolled off toward
-    `limit` (limit · tanh(s / limit)), the direction kept; z rolled off toward `z_limit`. Mirrors shape_velocity.frag."""
+    `limit` (limit · tanh(s / limit); 0 = none), the direction kept; z rolled off toward `z_limit`. Mirrors shape_velocity.frag."""
     xy: np.ndarray = velocity[..., :2]
     speed: np.ndarray = np.linalg.norm(xy, axis=-1, keepdims=True)
     safe: np.ndarray = np.maximum(speed, 1e-4)
-    shaped: np.ndarray = limit * np.tanh(speed * (safe / pivot) ** (curve - 1.0) / limit)
+    shaped: np.ndarray = speed * (safe / pivot) ** (curve - 1.0)
+    if limit > 0.0:
+        shaped = limit * np.tanh(shaped / limit)
     xy = np.where(speed > 1e-4, xy / safe * shaped, 0.0)
     z: np.ndarray = z_limit * np.tanh(velocity[..., 2:3] / z_limit)
     return np.concatenate((xy, z), axis=-1)
