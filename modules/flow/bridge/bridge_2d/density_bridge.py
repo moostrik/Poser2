@@ -65,7 +65,7 @@ class DensityBridge(FlowBase):
     @property
     def velocity_input(self) -> Texture:
         """Velocity input buffer."""
-        return self._velocity_fbo.texture
+        return self._velocity_fbo
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate density bridge FBOs.

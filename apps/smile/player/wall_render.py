@@ -180,7 +180,7 @@ class WallRender:
     @property
     def texture(self) -> Texture:
         """The wall as composited last (`update`), to blit into its window."""
-        return self._trail_fbo.texture
+        return self._trail_fbo
 
     # RENDER THREAD
     def allocate(self) -> None:

@@ -136,12 +136,12 @@ class KineticBridge(FlowBase):
     @property
     def fast(self) -> Texture:
         """Fast trail (RGBA16F, xyz)."""
-        return self._fast_fbo.texture
+        return self._fast_fbo
 
     @property
     def slow(self) -> Texture:
         """Slow trail (RGBA16F, xyz)."""
-        return self._slow_fbo.texture
+        return self._slow_fbo
 
     @property
     def depth_acceleration(self) -> Texture:
@@ -161,12 +161,12 @@ class KineticBridge(FlowBase):
     @property
     def held_release(self) -> Texture:
         """The peak-held release (R16F)."""
-        return self._held_release_fbo.texture
+        return self._held_release_fbo
 
     @property
     def reservoir(self) -> Texture:
         """Ink stored per pixel (R32F)."""
-        return self._reservoir_fbo.texture
+        return self._reservoir_fbo
 
     @property
     def emission(self) -> Texture:
@@ -283,11 +283,11 @@ class KineticBridge(FlowBase):
         carry_y: float = step / s.scale_y if abs(s.scale_y) >= 1e-6 else 0.0
         return carry_x, carry_y * self._input_fbo.width / max(self._input_fbo.height, 1)
 
-    def _advect(self, field: SwapFbo, carrier: Texture, carry: tuple[float, float]) -> None:
-        """Move `field` along the velocity in `carrier`."""
+    def _advect(self, field: SwapFbo, carrier: Texture | None, carry: tuple[float, float]) -> None:
+        """Move `field` along the velocity in `carrier`; None is the field's own motion, as it was before this step."""
         field.swap()
         field.begin()
-        self._advect_shader.use(field.back_texture, carrier, carry)
+        self._advect_shader.use(field.back_texture, carrier if carrier is not None else field.back_texture, carry)
         field.end()
 
     def update(self, delta_time: float = 1.0 / 60.0) -> None:
@@ -310,7 +310,7 @@ class KineticBridge(FlowBase):
         carry: tuple[float, float] | None = self._carry(delta_time)
         if carry is not None:
             self._advect(self._slow_fbo, self.fast, carry)
-            self._advect(self._fast_fbo, self._fast_fbo.texture, carry)
+            self._advect(self._fast_fbo, None, carry)
             if reservoir.enabled:
                 self._advect(self._reservoir_fbo, self.fast, carry)
 

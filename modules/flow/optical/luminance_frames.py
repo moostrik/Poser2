@@ -21,7 +21,7 @@ class LuminanceFrames:
     @property
     def luminance(self) -> Texture:
         """The newest luminance frame, mipmapped."""
-        return self._frames.texture
+        return self._frames
 
     @property
     def previous_luminance(self) -> Texture:

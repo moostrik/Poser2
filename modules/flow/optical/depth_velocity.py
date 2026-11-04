@@ -94,7 +94,7 @@ class DepthVelocity(FlowBase):
     def difference(self) -> Texture:
         """The track (RGBA32F): z before the threshold in red (view widths per frame), its disparity
         (1/m) in green, the disparity's rate (1/m per second) in blue and the dead zone's anchor (m) in alpha."""
-        return self._track.texture
+        return self._track
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         super().allocate(width, height, output_width, output_height)

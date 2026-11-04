@@ -59,7 +59,7 @@ class DensityBridge(FlowBase):
     @property
     def alpha_input(self) -> Texture:
         """The amount the alpha is made from."""
-        return self._alpha_fbo.texture
+        return self._alpha_fbo
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate density bridge FBOs.

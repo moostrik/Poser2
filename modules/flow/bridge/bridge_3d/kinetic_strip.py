@@ -28,7 +28,7 @@ class KineticStrip:
     @property
     def texture(self) -> Texture:
         """The plot (RGBA8)."""
-        return self._strip_fbo.texture
+        return self._strip_fbo
 
     def allocate(self) -> None:
         self._summary_fbo.allocate(SUMMARY_WIDTH, SUMMARY_HEIGHT, GL_RGBA16F)

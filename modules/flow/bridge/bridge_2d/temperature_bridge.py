@@ -74,7 +74,7 @@ class TemperatureBridge(FlowBase):
     @property
     def mask_input(self) -> Texture:
         """Velocity mask input buffer."""
-        return self._mask_fbo.texture
+        return self._mask_fbo
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate temperature bridge FBOs.

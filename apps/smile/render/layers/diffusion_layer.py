@@ -35,7 +35,7 @@ class DiffusionLayer(LayerBase):
 
     @property
     def texture(self) -> Texture:
-        return self._fbo.texture
+        return self._fbo
 
     def seed(self, texture: Texture) -> None:
         """Start the trail from this image (the capture)."""

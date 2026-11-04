@@ -835,22 +835,22 @@ class FluidFlow:
     @property
     def velocity(self) -> Texture:
         """RG16F velocity field."""
-        return self._velocity_fbo.texture
+        return self._velocity_fbo
 
     @property
     def density(self) -> Texture:
         """RGBA16F density/color field."""
-        return self._density_fbo.texture
+        return self._density_fbo
 
     @property
     def temperature(self) -> Texture:
         """R16F temperature field."""
-        return self._temperature_fbo.texture
+        return self._temperature_fbo
 
     @property
     def pressure(self) -> Texture:
         """R16F pressure field."""
-        return self._pressure_fbo.texture
+        return self._pressure_fbo
 
     @property
     def divergence(self) -> Texture:
@@ -870,7 +870,7 @@ class FluidFlow:
     @property
     def obstacle(self) -> Texture:
         """R8 obstacle mask."""
-        return self._density_obstacle_fbo.texture
+        return self._density_obstacle_fbo
 
     @property
     def sim_width(self) -> int:
