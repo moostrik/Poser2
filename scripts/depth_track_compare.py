@@ -51,7 +51,7 @@ WARM_UP: float = 1.0          # s at the start the flows settle in, measured in 
 SHORTEST_PAUSE: float = 1.0   # s of stillness that end a move
 RENAMED: dict[str, str] = {'z_time': 'z_smooth', 'z_catch_up_time': 'z_catch_up', 'xy_follow_z_time': 'xy_smooth', 'xy_follow_z': 'xy_smooth', 'xy_regularizer': 'xy_damping',
                            'strength_x': 'x_gain', 'strength_y': 'y_gain', 'strength_z': 'z_gain'}   # in frames saved before
-SWITCHED: dict[str, str] = {'x_gain': 'x', 'y_gain': 'y', 'z_gain': 'z'}   # in frames saved with gains: a gain of 0 is the axis off
+SWITCHED: dict[str, str] = {'x': 'x_gain', 'y': 'y_gain', 'z': 'z_gain'}   # in frames saved with axis switches: off is a gain of 0
 GROUPED: dict[str, str] = {'xy_levels': 'lucas_kanade.levels', 'xy_window': 'lucas_kanade.window', 'xy_damping': 'lucas_kanade.damping',
                            'xy_same_surface': 'lucas_kanade.same_surface', 'xy_threshold': 'lucas_kanade.threshold',
                            'z_edge': 'depth_track.edge', 'z_window': 'depth_track.window', 'z_tolerance': 'depth_track.tolerance',
@@ -118,7 +118,7 @@ def recorded_settings(recorded: dict) -> dict:
     for key, value in recorded.items():
         key = RENAMED.get(key, key)
         if key in SWITCHED:
-            key, value = SWITCHED[key], value != 0.0
+            key, value = SWITCHED[key], 1.0 if value else 0.0
         *groups, name = GROUPED.get(key, key).split('.')
         target: dict = result
         for group in groups:
@@ -359,8 +359,11 @@ class Side:
         self.flow.update(depth, c['delta_time'], c['view_span'], tuple(c['depth_step']))
 
     def xy_px(self, velocity: np.ndarray, delta_time: float, width: int) -> np.ndarray:
-        """The velocity's x/y (image widths per second) as px per frame."""
-        return np.hypot(velocity[..., 0], velocity[..., 1]) * delta_time * width
+        """The velocity's x/y (image widths per second, times the gains) as px per frame."""
+        s = self.settings
+        vx = velocity[..., 0] / (s.x_gain if s.x_gain else 1.0)
+        vy = velocity[..., 1] / (s.y_gain if s.y_gain else 1.0)
+        return np.hypot(vx, vy) * delta_time * width
 
     def show(self, view: int, depth: Texture, scale: float, width: int) -> Texture | None:
         if self.signed is None or self.velocity is None:

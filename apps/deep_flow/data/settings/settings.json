@@ -28,7 +28,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 2321,
+        "iso": 2033,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -40,7 +40,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 4051,
+        "balance": 3888,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
@@ -404,7 +404,7 @@
       "far": 1.7
     },
     "flow": {
-      "draw_mode": "SMOOTH_VELOCITY_OUTPUT",
+      "draw_mode": "VELOCITY",
       "blend_mode": "ADD",
       "width": 448,
       "height": 800,
@@ -415,14 +415,14 @@
       },
       "optical_flow": {
         "use_mask": true,
-        "x": true,
-        "y": true,
-        "z": true,
+        "x_gain": 1.0,
+        "y_gain": 1.0,
+        "z_gain": 1.0,
         "lucas_kanade": {
           "levels": 5,
           "window": "SEVEN",
           "damping": 0.03,
-          "same_surface": true,
+          "same_surface": false,
           "threshold": 0.5
         },
         "depth_track": {
@@ -437,7 +437,7 @@
         }
       },
       "flow_bridge": {
-        "method": "VELOCITY_TRAIL",
+        "method": "KINETIC",
         "velocity_trail": {
           "advect": 1.0,
           "attack": 1.0,
@@ -494,7 +494,7 @@
     },
     "fluid3d": {
       "max_players": 1,
-      "sim_engine": "FLUID_2D",
+      "sim_engine": "FLUID_3D",
       "blend_mode": "ADD",
       "scale_by_motion": true,
       "fluid_flow": {
@@ -506,8 +506,8 @@
         "fps_smoothing": 1.0,
         "speed": 0.4,
         "depth": {
-          "depth": 1,
-          "sim_depth": 1,
+          "depth": 16,
+          "sim_depth": 16,
           "spacing": 4.0,
           "emission": 1.16,
           "gamma": 0.99,

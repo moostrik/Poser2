@@ -73,70 +73,58 @@ class Flow3DDrawMode(IntEnum):
     """Draw modes for Flow3DLayer. A 3D velocity (xyz) draws as white x/y arrows with a ring of radius |z|
     on the arrow's scale, red toward the camera and green away; as scalars, x/y/z as red/green/blue around grey.
 
+    In pipeline order, each named after the panel group and the property it shows. z has no mode of its own:
+    it is the ring on every velocity's arrows.
+
     Inputs:
-        LUMINANCE - The newest luminance frame of the optical flow
+        INPUT_2D - The image the optical flow reads (inputs.flow)
+        INPUT_DEPTH - The depth image, metres
+        INPUT_MASK - The player's mask (inputs.mask)
 
-    Depth (red toward the camera, green away, in px per frame: 1 is 76% color at scalar_scale 1):
-        DEPTH_DIFFERENCE - The flow's tracked z, before the threshold
-        DEPTH_VELOCITY - The flow's z after the threshold, before the z switch and the mask
+    Optical flow:
+        OPTICAL_FLOW_VELOCITY - The flow's 3D velocity, times its gains and the mask
 
-    Outputs:
-        VELOCITY - The flow's 3D velocity, times the mask with its use_mask
-        SMOOTH_VELOCITY_INPUT - What the bridge reads: the velocity (shaped on the velocity trail bridge)
-        SMOOTH_VELOCITY_OUTPUT - The bridge's smoothed 3D velocity, what the fluid gets
-        SMOOTH_VELOCITY_DEPTH - Its z: red toward the camera, green away
-        DENSITY_BRIDGE_INPUT_ALPHA - The amount the density's alpha is made from: speed (velocity trail) or emission (kinetic)
-        DENSITY_BRIDGE_OUTPUT - Colored density (RGBA16F)
-        TEMPERATURE_BRIDGE_OUTPUT - Temperature field (R16F)
+    Outputs, what the fluid gets:
+        VELOCITY - The active bridge's smoothed 3D velocity
+        DENSITY - The colored density (RGBA16F)
+        TEMPERATURE - The temperature field, in two colors
 
-    Kinetic bridge:
+    Kinetic bridge (only while it runs):
         KINETIC_FAST / KINETIC_SLOW - The two trails (RGBA16F, xyz)
-        KINETIC_ACCELERATION - Along the motion in two colors: + onset warm, - release cold
-        KINETIC_TURN - Across the motion in two colors
+        KINETIC_ACCELERATION - fast - slow along the motion in two colors: + onset warm, - release cold
+        KINETIC_DEPTH_ACCELERATION - The z of fast - slow: red toward the camera, green away
+        KINETIC_TURN - fast - slow across the motion in two colors
         KINETIC_HELD_RELEASE - The peak-held release
-        KINETIC_RESERVOIR - Ink stored per pixel
-        KINETIC_VELOCITY - The velocity the fluid gets, after the release's drop_velocity (RGBA16F, xyz)
-        KINETIC_EMISSION - The ink the density bridge gets
-        KINETIC_ONSET - The second velocity input (RGBA16F, xyz)
+        KINETIC_RESERVOIR - Density stored per pixel
+        KINETIC_EMISSION - The density amount it emits
+        KINETIC_ONSET_VELOCITY - The second velocity input (RGBA16F, xyz)
         KINETIC_CURL - The fast trail's 2D curl in two colors
         KINETIC_STRIP - Speed, onset, release and emission over the last seconds
-        KINETIC_DEPTH_ACCELERATION - The z of fast - slow: red toward the camera, green away
     """
-    LUMINANCE = 0
+    INPUT_2D = 0
+    INPUT_DEPTH = auto()
+    INPUT_MASK = auto()
+    OPTICAL_FLOW_VELOCITY = auto()
     VELOCITY = auto()
-    SMOOTH_VELOCITY_INPUT = auto()
-    SMOOTH_VELOCITY_OUTPUT = auto()
-    SMOOTH_VELOCITY_MAGNITUDE = auto()
-    DENSITY_BRIDGE_INPUT_COLOR = auto()
-    DENSITY_BRIDGE_INPUT_ALPHA = auto()
-    DENSITY_BRIDGE_OUTPUT = auto()
-    TEMPERATURE_BRIDGE_INPUT_COLOR = auto()
-    TEMPERATURE_BRIDGE_INPUT_MASK = auto()
-    TEMPERATURE_BRIDGE_OUTPUT = auto()
+    DENSITY = auto()
+    TEMPERATURE = auto()
     KINETIC_FAST = auto()
     KINETIC_SLOW = auto()
     KINETIC_ACCELERATION = auto()
+    KINETIC_DEPTH_ACCELERATION = auto()
     KINETIC_TURN = auto()
     KINETIC_HELD_RELEASE = auto()
     KINETIC_RESERVOIR = auto()
-    KINETIC_VELOCITY = auto()
     KINETIC_EMISSION = auto()
-    KINETIC_ONSET = auto()
+    KINETIC_ONSET_VELOCITY = auto()
     KINETIC_CURL = auto()
     KINETIC_STRIP = auto()
-    SMOOTH_VELOCITY_DEPTH = auto()
-    KINETIC_DEPTH_ACCELERATION = auto()
-    DEPTH_DIFFERENCE = auto()
-    DEPTH_VELOCITY = auto()
 
 
-DEPTH_DRAW_MODES: set[Flow3DDrawMode] = {     # red and green
-    Flow3DDrawMode.SMOOTH_VELOCITY_DEPTH, Flow3DDrawMode.KINETIC_DEPTH_ACCELERATION, Flow3DDrawMode.DEPTH_DIFFERENCE, Flow3DDrawMode.DEPTH_VELOCITY,
-}
-PIXEL_DRAW_MODES: set[Flow3DDrawMode] = {Flow3DDrawMode.DEPTH_DIFFERENCE, Flow3DDrawMode.DEPTH_VELOCITY}     # view widths per frame, shown in px per frame
+DEPTH_DRAW_MODES: set[Flow3DDrawMode] = {Flow3DDrawMode.KINETIC_DEPTH_ACCELERATION}     # red toward the camera, green away
 VECTOR_DRAW_MODES: set[Flow3DDrawMode] = {       # 3D velocities, drawn as velocities whatever the texture's format
-    Flow3DDrawMode.VELOCITY, Flow3DDrawMode.SMOOTH_VELOCITY_INPUT, Flow3DDrawMode.SMOOTH_VELOCITY_OUTPUT,
-    Flow3DDrawMode.KINETIC_FAST, Flow3DDrawMode.KINETIC_SLOW, Flow3DDrawMode.KINETIC_VELOCITY, Flow3DDrawMode.KINETIC_ONSET,
+    Flow3DDrawMode.OPTICAL_FLOW_VELOCITY, Flow3DDrawMode.VELOCITY,
+    Flow3DDrawMode.KINETIC_FAST, Flow3DDrawMode.KINETIC_SLOW, Flow3DDrawMode.KINETIC_ONSET_VELOCITY,
 }
 
 
@@ -152,7 +140,7 @@ class FlowBridgeSettings(BaseSettings):
 
 class Flow3DLayerSettings(BaseSettings):
     """Configuration for Flow3DLayer (optical flow + flow bridge)."""
-    draw_mode: Field[Flow3DDrawMode] =      Field(Flow3DDrawMode.DENSITY_BRIDGE_INPUT_COLOR)
+    draw_mode: Field[Flow3DDrawMode] =      Field(Flow3DDrawMode.INPUT_2D)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
@@ -479,8 +467,7 @@ class Flow3DLayer(LayerBase):
 
         signed: tuple[Texture, int] | None = self._get_signed_texture()
         if signed is not None:
-            unit: float = float(self._flow_size[0]) if self.settings.draw_mode in PIXEL_DRAW_MODES else 1.0
-            self._visualizer.process_signed(signed[0], self.settings.draw_mode in DEPTH_DRAW_MODES, signed[1], unit)
+            self._visualizer.process_signed(signed[0], self.settings.draw_mode in DEPTH_DRAW_MODES, signed[1])
         else:
             self._visualizer.process(self._get_draw_texture(), self.settings.draw_mode in VECTOR_DRAW_MODES)
         Style.pop_style()
@@ -517,38 +504,31 @@ class Flow3DLayer(LayerBase):
 
     def _get_signed_texture(self) -> tuple[Texture, int] | None:
         """The scalar field to draw in two colors and its channel, None when draw_mode is another kind of texture."""
-        textures: dict[Flow3DDrawMode, tuple[Texture, int]] = {
+        textures: dict[Flow3DDrawMode, tuple[Texture | None, int]] = {
+            Flow3DDrawMode.INPUT_DEPTH: (self._depth_input, 0),
+            Flow3DDrawMode.INPUT_MASK: (self._mask_input, 0),
+            Flow3DDrawMode.TEMPERATURE: (self._temperature_bridge.temperature, 0),
             Flow3DDrawMode.KINETIC_ACCELERATION: (self._kinetic_bridge.acceleration, 0),
+            Flow3DDrawMode.KINETIC_DEPTH_ACCELERATION: (self._kinetic_bridge.depth_acceleration, 0),
             Flow3DDrawMode.KINETIC_TURN: (self._kinetic_bridge.turn, 0),
             Flow3DDrawMode.KINETIC_HELD_RELEASE: (self._kinetic_bridge.held_release, 0),
             Flow3DDrawMode.KINETIC_RESERVOIR: (self._kinetic_bridge.reservoir, 0),
             Flow3DDrawMode.KINETIC_EMISSION: (self._kinetic_bridge.emission, 0),
             Flow3DDrawMode.KINETIC_CURL: (self._kinetic_bridge.curl, 0),
-            Flow3DDrawMode.SMOOTH_VELOCITY_DEPTH: (self.smooth_velocity, 2),       # its z
-            Flow3DDrawMode.DEPTH_DIFFERENCE: (self._flow.depth_velocity.difference, 0),
-            Flow3DDrawMode.DEPTH_VELOCITY: (self._flow.depth_velocity.depth_velocity, 0),
-            Flow3DDrawMode.KINETIC_DEPTH_ACCELERATION: (self._kinetic_bridge.depth_acceleration, 0),
-            Flow3DDrawMode.DENSITY_BRIDGE_INPUT_ALPHA: (self._density_bridge.alpha_input, 0),
         }
-        return textures.get(self.settings.draw_mode)
+        texture, channel = textures.get(self.settings.draw_mode, (None, 0))
+        return (texture, channel) if texture is not None else None
 
     def _get_draw_texture(self) -> Texture:
         """Get texture to draw based on draw_mode."""
         textures = {
-            Flow3DDrawMode.LUMINANCE: self._flow.luminance,
-            Flow3DDrawMode.VELOCITY: self._velocity,
-            Flow3DDrawMode.SMOOTH_VELOCITY_INPUT: self._kinetic_bridge.velocity_input if self.settings.flow_bridge.method == FlowBridgeMethod.KINETIC else self._velocity_trail_bridge.velocity_input,
-            Flow3DDrawMode.SMOOTH_VELOCITY_OUTPUT: self.smooth_velocity,
-            Flow3DDrawMode.SMOOTH_VELOCITY_MAGNITUDE: self._velocity_magnitude.magnitude,
-            Flow3DDrawMode.DENSITY_BRIDGE_INPUT_COLOR: self._density_bridge.color_input,
-            Flow3DDrawMode.DENSITY_BRIDGE_OUTPUT: self._density_bridge.density,
-            Flow3DDrawMode.TEMPERATURE_BRIDGE_INPUT_COLOR: self._temperature_bridge.color_input,
-            Flow3DDrawMode.TEMPERATURE_BRIDGE_INPUT_MASK: self._temperature_bridge.mask_input,
-            Flow3DDrawMode.TEMPERATURE_BRIDGE_OUTPUT: self._temperature_bridge.temperature,
+            Flow3DDrawMode.INPUT_2D: self._flow_input,
+            Flow3DDrawMode.OPTICAL_FLOW_VELOCITY: self._velocity,
+            Flow3DDrawMode.VELOCITY: self.smooth_velocity,
+            Flow3DDrawMode.DENSITY: self._density_bridge.density,
             Flow3DDrawMode.KINETIC_FAST: self._kinetic_bridge.fast,
             Flow3DDrawMode.KINETIC_SLOW: self._kinetic_bridge.slow,
-            Flow3DDrawMode.KINETIC_VELOCITY: self._kinetic_bridge.smooth_velocity,
-            Flow3DDrawMode.KINETIC_ONSET: self._kinetic_bridge.onset_velocity,
+            Flow3DDrawMode.KINETIC_ONSET_VELOCITY: self._kinetic_bridge.onset_velocity,
             Flow3DDrawMode.KINETIC_STRIP: self._kinetic_strip.texture,
         }
-        return textures.get(self.settings.draw_mode, self._density_input)
+        return textures.get(self.settings.draw_mode, self._flow_input)

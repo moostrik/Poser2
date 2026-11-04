@@ -17,13 +17,12 @@ OAK4, and two recordings at 0.65–1.5 m: `stillslowfast` (still, then an arm sl
 
 ## optical_flow
 
-| Setting  | Default | Range  | For | Why                                    |
-|----------|---------|--------|-----|----------------------------------------|
-| use_mask | on      | on/off | C   | no x/y spill onto the background       |
-| x, y, z  | on      | on/off | –   | switch an axis off to look at the rest |
+| Setting                | Default | Range     | For | Why                                         |
+|------------------------|---------|-----------|-----|---------------------------------------------|
+| use_mask               | on      | on/off    | C   | no x/y spill onto the background            |
+| x_gain, y_gain, z_gain | 1       | −10 to 10 | –   | 1 = true speed, 0 = axis off, < 0 inverted  |
 
-How hard the flow pushes the fluid is the bridges' `scale_x/y/z`; the flow's velocity is in image
-widths per second.
+The flow's velocity is in image widths per second times its gains.
 
 ## lucas_kanade (x/y)
 
