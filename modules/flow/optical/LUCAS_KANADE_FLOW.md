@@ -1,61 +1,84 @@
 # Lucas–Kanade flow settings
 
-The settings of `LucasKanadeFlow`, in panel order, with their defaults. The defaults are the measured
-best for deep_flow's installation, in this order of importance: A least z noise, B a clear difference
-between slow and fast motion in x, y and z, C least smear. (m) is measured with
-`scripts/depth_track_compare.py` on recorded frames, on the GPU; (i) is inferred from the code. The
-whole flow takes about 2.0 ms per frame at 448×800 (m).
+The settings of `LucasKanadeFlow` (`lucas_kanade_flow.py`), in panel order, with their defaults and
+the reason for each. How the flow works is in the module docstrings of `lucas_kanade_flow.py` and
+`depth_velocity.py`.
+
+The defaults are the best measured for deep_flow, in this order of importance:
+
+- A: least z noise
+- B: a clear difference between slow and fast motion, in x, y and z
+- C: least smear
+
+Every number is measured with `scripts/depth_track_compare.py` on the GPU, unless marked
+**(deduction)**. The configuration: the flow at 448×800, deep_flow's preset, Neural Depth on an
+OAK4, and two recordings at 0.65–1.5 m: `stillslowfast` (still, then an arm slow and fast) and
+`standmoves` (arm sweeps, pushes toward the camera). The whole flow takes 2.0 ms per frame.
 
 ## optical_flow
 
-| Setting | Default | Range (step) | Panel text | Why |
-|---|---|---|---|---|
-| use_mask | on | on/off | Only the player moves the fluid (off: whole image) | C: no spill onto the background (m) |
-| x / y / z | on | on/off | x / y / z in the velocity (off: it is 0) | To look at one axis; how hard the flow pushes the fluid is the bridge's |
+| Setting  | Default | Range  | For | Why                                    |
+|----------|---------|--------|-----|----------------------------------------|
+| use_mask | on      | on/off | C   | no x/y spill onto the background       |
+| x, y, z  | on      | on/off | –   | switch an axis off to look at the rest |
+
+How hard the flow pushes the fluid is the bridges' `scale_x/y/z`; the flow's velocity is in image
+widths per second.
 
 ## lucas_kanade (x/y)
 
-| Setting | Default | Range (step) | Panel text | Why |
-|---|---|---|---|---|
-| levels | 3 | 1–5 (1) | Pyramid levels of the x/y solve, each doubles the reach (more: faster motion, more spill) | B: follows fast motion; 1–2 barely see motion at 448×800, 4 costs +0.14 ms and spills more (m) |
-| window | 7×7 | 3×3–9×9 | x/y patch size (larger: cleaner, more spill) | B: best fast ÷ noise, 4.4 vs 3.7 at 5×5 (m); smears more than 5×5, but B ranks above C |
-| damping | 0.03 | 0–0.1 (0.001) | Damps x/y where the patch has little texture (higher: less noise, smaller motion) | B: with the threshold, takes the x/y noise and keeps slow motion (m) |
-| same_surface | on | on/off | Patch counts only the center's surface (on: less smear, wide fast parts slower) | C: less smear where a hand is far in front, with a no-depth band between; +0.05 ms (m). No effect up close: the stereo depth ramps over ~30 px where a limb is ~20 cm before the body (m) |
-| threshold | 0.5 | 0–5 px/frame (0.05) | x/y below this is noise, in px/frame (higher: less noise, less slow motion) | B: the solve's jitter off, slow motion stays |
-| median | 1×1 (hidden) | 1×1–5×5 | Median size per level, 1×1 = off (larger: cleaner, more GPU) | Off: 3×3 +0.5 ms, 5×5 +1.5 ms for little gain (m). Kept for a 2D flow at a lower resolution |
+| Setting      | Default | Range (step)        | For | Why                                    |
+|--------------|---------|---------------------|-----|----------------------------------------|
+| levels       | 3       | 1–5 (1)             | B   | follows fast motion                    |
+| window       | 7×7     | 3×3–9×9             | B   | fast ÷ noise 4.4, against 3.7 at 5×5   |
+| damping      | 0.03    | 0–0.1 (0.001)       | B   | takes the x/y noise, keeps slow motion |
+| same_surface | on      | on/off              | C   | less smear, a hand far in front        |
+| threshold    | 0.5     | 0–5 px/frame (0.05) | B   | the solve's jitter off                 |
+| median       | 1×1     | 1×1–5×5, hidden     | –   | off: little gain for its GPU time      |
+
+- levels: 1 and 2 barely see motion at 448×800. 4 levels cost +0.14 ms and spill more.
+- window: 7×7 smears more than 5×5, but B ranks above C.
+- same_surface works only where a no-depth band separates the hand from what is behind it, as with a
+  hand held far out. Where a limb is about 20 cm before the body, Neural Depth ramps over about 30 px
+  instead of stepping, and the patch's samples stay within the tolerance; see [Open](#open). It costs
+  +0.05 ms.
+- median: 3×3 costs +0.5 ms and 5×5 +1.5 ms. It is kept for a 2D flow at a lower resolution
+  **(deduction)**.
 
 ## depth_track (z)
 
-| Setting | Default | Range (step) | Panel text | Why |
-|---|---|---|---|---|
-| edge | 0.1 m | 0.05–0.3 (0.01) | Edge depth step, m (lower: cleaner edges, fewer fingers) | A: halves the edge spikes (m) |
-| guide | off | on/off | Depth sharpened at the image's edges (on: crisper limbs, more GPU) | Tried: −7% z on pushes and sweeps alike, about the same noise, +0.14 ms (m); smooths more than it sharpens |
-| window | 7×7 | 1×1–9×9 | Depth averaging size (larger: less noise, small parts blur) | A: most samples averaged, least z noise |
-| tolerance | 0.2 m | 0.05–0.5 (0.01) | New-surface depth jump, m (higher: fuller pushes, fewer splits) | B: at 0.05 a push loses 77% and the track restarts 6× as often (m) |
-| smooth | 50 ms | 0–200 (1) | Smoothing time of z in ms, 0 = two-frame change (higher: less noise, more lag) | A: at 0 the still z noise is 15× higher (m); as low as looks right |
-| xy_smooth | off | on/off | x/y smoothed over smooth, so both lag alike (on: less noise, more lag) | B: x/y without extra lag |
-| catch_up | 8 ms | 0–50 (1) | Shorter smoothing during a fast push, in ms, 0 = off (lower: quicker pushes) | B: fast z 75% → 96%, still noise unchanged (m) |
-| dead_zone | 0.02 m | 0–0.05 (0.001) | Depth drift ignored before z counts as motion, in m (higher: less drift, slower start) | A: takes the depth's wander (m) |
-| threshold | 1.0 px/frame | 0–5 (0.05) | z below this is noise, in px/frame (higher: less noise, less slow z) | A: with the dead zone, the still z noise measures 0 (m) |
+| Setting   | Default      | Range (step)    | For | Why                                    |
+|-----------|--------------|-----------------|-----|----------------------------------------|
+| edge      | 0.1 m        | 0.05–0.3 (0.01) | A   | halves the edge spikes                 |
+| guide     | off          | on/off          | –   | smooths more than it sharpens          |
+| window    | 7×7          | 1×1–9×9         | A   | the most samples averaged              |
+| tolerance | 0.2 m        | 0.05–0.5 (0.01) | B   | keeps a push's z                       |
+| smooth    | 50 ms        | 0–200 (1)       | A   | at 0 the still z noise is 15× higher   |
+| xy_smooth | off          | on/off          | B   | x/y without extra lag                  |
+| catch_up  | 8 ms         | 0–50 (1)        | B   | fast z 75% → 96%, same still noise     |
+| dead_zone | 0.02 m       | 0–0.05 (0.001)  | A   | takes the depth's wander               |
+| threshold | 1.0 px/frame | 0–5 (0.05)      | A   | with the dead zone, still z noise is 0 |
 
-## Tried and removed
+- guide, on `standmoves`: push and sweep z both drop 7%, the still z noise stays about the same, and
+  it costs +0.14 ms. It does not separate a limb's edge from its motion.
+- tolerance at 0.05: a push loses 77% of its z, and the track restarts 6× as often while moving.
+- smooth: lower lags less; keep it as low as looks right.
 
-| What | Why it went |
-|---|---|
-| xy iterations | 4 levels do the same better and cheaper (m) |
-| xy round trip (forward–backward check) | Dropped half the fast motion, gained nothing (m) |
-| Gaussian-weighted patch | No gain over the plain patch (m) |
-| An x/y gate on z, a One-Euro filter on z | Both worse than catch_up (m) |
-| Restart over several frames | Cut the false z at a sweeping arm's edges, but also 26% of a push at 2 frames (m) |
-| Slope weight (PD-Flow style) | Cut edges and pushes alike, ~10% each (m) |
-| Gains on the flow | Moved to the bridges (scale_x/y/z); the flow is in true units |
+## Constraints
 
-## Known limits
+- The false z at an edge cannot be told from a push by time. Restarting the track where the depth
+  changed past the tolerance over 2 frames cuts the edge z, and a push's z by 26%.
+- It cannot be told by the depth's slope either. A weight on the slope cuts edges and pushes alike,
+  by about 10%.
+- A forward–backward check on x/y drops half the fast motion.
+- Iterations per level do less than one more level, at more GPU time.
 
-- A limb moving sideways in front of the body reads some false z at its edges: the leading edge
-  carries 43% of a sweep's z, the trailing edge 12% (m). The cause is the depth itself: Neural Depth
-  draws a ramp of ~30 px, not a step, where a limb is ~20 cm before the body (m), and the camera's
-  filters and confidence do not sharpen it. Accepted.
-- Range: the depth settings in metres (edge, tolerance, dead_zone) are tuned at 0.65–1.5 m. Stereo
-  noise grows with the square of the distance, so at 2–3.5 m they may need to be in disparity; this
+## Open
+
+- A limb moving sideways before the body reads false z at its edges: the leading edge carries 43% of a
+  sweep's z, the trailing edge 12%. The cause is the depth's ramp at the limb's edge. The camera's
+  temporal filter is off and its confidence does not sharpen the ramp. Accepted for now; the cue not
+  yet tried is a forward-splat count of the x/y motion (0 = uncovered, above 1 = covered).
+- Range: edge, tolerance and dead_zone are in metres and tuned at 0.65–1.5 m. Stereo noise grows with
+  the square of the distance, so at 2–3.5 m they may need to be in disparity **(deduction)**. This
   needs a recording at that distance.
