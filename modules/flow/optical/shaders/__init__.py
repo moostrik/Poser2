@@ -9,4 +9,5 @@ from .displacement_median import DisplacementMedian
 from .compose_velocity import ComposeVelocity
 from .depth_velocity_shader import DepthVelocityShader
 from .depth_step_filter import DepthStepFilter
+from .depth_history import DepthHistory
 from .depth_threshold import DepthThreshold

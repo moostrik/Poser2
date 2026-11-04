@@ -13,7 +13,10 @@
 // the track is read linear between the texels that hold one of the same surface, within `tolerance`
 // of the measurement, so a track is never carried across an edge. With `dead_zone` above 0, z is 0
 // while the tracked depth stays within it of its anchor; past it, z at its full speed, and the anchor
-// follows at `dead_zone` behind (a backlash); a track that starts over is anchored anew.
+// follows at `dead_zone` behind (a backlash); a track that starts over is anchored anew. With
+// `restart_frames` above 1, it also starts over where the depth at the pixel, in place, is further
+// than `tolerance` from its depth 2 to `restart_frames` frames before (`history`): a change that
+// ramps past `tolerance` over a few frames, as the background a moving limb uncovers.
 // Catching up, with `catch_up_smoothing` above 0: Emas of the miss of the prediction, signed and its size;
 // where the miss keeps one way (the signed mean as large as the size, over twice the dead zone) and the
 // image moves (the 3×3 displacement past `motion_floor`), the time the track follows over blends from
@@ -25,6 +28,8 @@ uniform sampler2D tex0;  // Depth now R (m)
 uniform sampler2D tex1;  // The track the frame before: z, disparity (1/m), rate (1/m per second), anchor (m)
 uniform sampler2D tex2;  // The catch-up the frame before: Emas of the miss, signed and its size (m)
 uniform sampler2D displacement;     // uv per frame (RG), with warp
+uniform sampler2D history;          // The depth 1 to 4 frames before, in place (m), at the track's size
+uniform int restart_frames;         // Frames back a depth change past `tolerance` starts the track over; 1 is the frame before only
 uniform bool warp;
 uniform bool catch_up_pass;         // Write the catch-up instead of the track
 uniform vec2 depth_step; // uv between two depth samples
@@ -125,6 +130,10 @@ void main() {
     float miss = predicted > 0.0 ? 1.0 / measurement - 1.0 / predicted : 0.0;      // m
 
     bool follows = predicted > 0.0 && abs(miss) <= tolerance;
+    vec4 before = texelFetch(history, ivec2(floor(texCoord * size)), 0);
+    for (int k = 1; k < restart_frames; k++) {
+        follows = follows && !(before[k] > 0.0 && abs(center - before[k]) > tolerance);
+    }
     vec2 emas = follows ? last + ema * (vec2(miss, abs(miss)) - last) : vec2(0.0);
     if (catch_up_pass) {
         fragColor = vec4(emas, 0.0, 1.0);

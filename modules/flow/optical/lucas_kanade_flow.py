@@ -9,7 +9,8 @@ displacement after each level, so one level's outliers do not grow on the next.
 The displacement (uv per frame) stays inside: `xy_threshold` (px per frame) comes off its length, as
 below it is the solve's jitter, not motion. z comes from its own `DepthVelocity`: a depth track carried along
 the displacement, so a surface sliding sideways over a slope reads no motion toward the camera,
-corrected each frame by the mean over `z_window` depth samples and smoothed over `z_smooth`;
+corrected each frame by the mean over `z_window` depth samples and smoothed over `z_smooth`,
+starting over where the depth changed past `z_tolerance` within `z_restart_frames` frames;
 `z_threshold` comes off it. The depth change comes in view widths per frame like the displacement, so all three become
 view widths per second the same way. Out comes one 3D velocity: x/y times `x_gain`/`y_gain`,
 z times `z_gain`. With `use_mask`, the velocity is multiplied by the mask.
@@ -53,6 +54,7 @@ class LucasKanadeFlowSettings(BaseSettings):
     z_edge:         Field[float] = Field(0.1, min=0.05, max=0.3, step=0.005, newline=True, description="Edge depth step, m (lower: cleaner edges, fewer fingers)")
     z_window:       Field[Patch] = Field(Patch.THREE, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)")
     z_tolerance:    Field[float] = Field(0.1, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m (higher: fuller pushes, fewer splits)")
+    z_restart_frames: Field[int] = Field(1, min=1, max=4, description="Frames a jump past z_tolerance may take, 1 = one (more: less wake z, fast pushes cut)")
     z_smooth:       Field[float] = Field(50.0, min=0.0, max=200.0, step=1.0, newline=True, description="Smoothing time of z in ms, 0 = two-frame change (higher: less noise, more lag)")
     xy_smooth:      Field[bool]  = Field(False, description="x/y smoothed over z_smooth, so both lag alike (on: less noise, more lag)")
     z_catch_up:     Field[float] = Field(0.0, min=0.0, max=50.0, step=1.0, description="Shorter smoothing during a fast push, in ms, 0 = off (lower: quicker pushes)")
@@ -188,7 +190,7 @@ class LucasKanadeFlow:
         if depth is not None:
             self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, s.z_window, s.z_smooth,
                                               s.z_threshold, s.z_tolerance, s.z_dead_zone, s.z_catch_up, s.xy_threshold,
-                                              solved, s.z_edge)
+                                              solved, s.z_edge, s.z_restart_frames)
 
         xy: Texture = self._displacement
         if s.xy_smooth:

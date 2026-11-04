@@ -45,7 +45,7 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_FALSE, GL_FLOAT,
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from modules.gl import Blit, Fbo, Texture  # noqa: E402
 from modules.flow import (FlowUtil, LucasKanadeFlow, LucasKanadeFlowSettings, Patch, SignedField, VelocityField,  # noqa: E402
-                          VisualizationFieldSettings, filter_depth_steps, lucas_kanade, track_depth)
+                          VisualizationFieldSettings, filter_depth_steps, lucas_kanade, shift_history, track_depth)
 
 WARM_UP: float = 1.0          # s at the start the flows settle in, measured in no part
 SHORTEST_PAUSE: float = 1.0   # s of stillness that end a move
@@ -356,7 +356,7 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
     side = Side('A', frames.calls[0]['settings'], changed, w, h, False)
     s = side.settings
     luminance, depth_texture, mask_texture = Texture(), Texture(), Texture()
-    state, catch_up, previous = np.zeros((h, w, 4)), np.zeros((h, w, 2)), None
+    state, catch_up, history, previous = np.zeros((h, w, 4)), np.zeros((h, w, 2)), np.zeros((h, w, 4)), None
     last = min(frames_to_check, len(frames)) - 1
     for k in range(last + 1):
         lum, depth, mask = frames.load(k)
@@ -372,9 +372,11 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
         previous = lum
         c = frames.calls[k]
         step = (c['depth_step'][0] * w, c['depth_step'][1] * h) if c['depth_step'][0] > 0 else (1.0, 1.0)
-        state, catch_up = track_depth(filter_depth_steps(depth.astype(np.float64), step, s.z_edge), state, catch_up, solve.astype(np.float64),
+        filtered = filter_depth_steps(depth.astype(np.float64), step, s.z_edge)
+        state, catch_up = track_depth(filtered, state, catch_up, solve.astype(np.float64),
                                       c['delta_time'], s.z_window, step, s.z_tolerance, s.z_smooth, c['view_span'], s.z_dead_zone,
-                                      s.z_catch_up, s.xy_threshold)
+                                      s.z_catch_up, s.xy_threshold, history, s.z_restart_frames)
+        history = shift_history(filtered, history)
         gpu = read_back(side.flow.depth_velocity.difference)
         if k % 5 == 0 or k == last:
             dxy = np.linalg.norm(solve - reference, axis=-1)

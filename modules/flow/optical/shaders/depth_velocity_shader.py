@@ -4,7 +4,7 @@ One frame of the depth track: the motion toward the camera in view widths per fr
 disparity carried along the motion and corrected by the mean over a window of depth samples.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -14,7 +14,7 @@ class DepthVelocityShader(Shader):
 
     def use(self, depth: Texture, track: Texture, catch_up: Texture, catch_up_pass: bool, alpha: float, smooth: float, catch_up_smooth: float,
             ema: float, motion_floor: float, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
-            tolerance: float, dead_zone: float, displacement: Texture | None = None) -> None:
+            tolerance: float, dead_zone: float, history: Texture, restart_frames: int, displacement: Texture | None = None) -> None:
         """Correct the track by the new depth, or with `catch_up_pass` write this frame's catch-up.
 
         Args:
@@ -33,11 +33,13 @@ class DepthVelocityShader(Shader):
             window: Radius in depth samples
             tolerance: Depth further than this is another surface: not averaged in, the track starts over (m)
             dead_zone: Depth the track wanders within its anchor without z (m); 0 is none
+            history: The depth 1 to 4 frames before, in place (m)
+            restart_frames: Frames back a depth change past `tolerance` starts the track over; 1 is the frame before only
             displacement: uv per frame; when given, the track is carried from where each pixel came from
         """
         if not self.allocated or not self.shader_program:
             return
-        if not depth.allocated or not track.allocated or not catch_up.allocated:
+        if not depth.allocated or not track.allocated or not catch_up.allocated or not history.allocated:
             return
 
         glUseProgram(self.shader_program)
@@ -48,6 +50,8 @@ class DepthVelocityShader(Shader):
         glBindTexture(GL_TEXTURE_2D, track.tex_id)
         glActiveTexture(GL_TEXTURE3)
         glBindTexture(GL_TEXTURE_2D, catch_up.tex_id)
+        glActiveTexture(GL_TEXTURE4)
+        glBindTexture(GL_TEXTURE_2D, history.tex_id)
 
         warp: bool = displacement is not None and displacement.allocated
         if warp:
@@ -59,6 +63,8 @@ class DepthVelocityShader(Shader):
         glUniform1i(self.get_uniform_loc("tex1"), 1)
         glUniform1i(self.get_uniform_loc("displacement"), 2)
         glUniform1i(self.get_uniform_loc("tex2"), 3)
+        glUniform1i(self.get_uniform_loc("history"), 4)
+        glUniform1i(self.get_uniform_loc("restart_frames"), restart_frames)
         glUniform1i(self.get_uniform_loc("warp"), int(warp))
         glUniform1i(self.get_uniform_loc("catch_up_pass"), int(catch_up_pass))
         glUniform2f(self.get_uniform_loc("depth_step"), *depth_step)
