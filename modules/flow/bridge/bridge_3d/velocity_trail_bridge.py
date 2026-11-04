@@ -16,7 +16,7 @@ and a fast move is not cut off by a smoothing time longer than it takes to cross
 
 The smoothing is one unit-gain Ema per pixel. Where the x/y speed rises it follows over `attack`, else over
 `smooth`, so a flick reaches the fluid at full strength and a stop still coasts. z follows over `smooth`
-alone, so a one-frame spike is averaged instead of passed on. The blur runs once per tick inside the
+alone, so a one-frame spike is averaged instead of passed on. The blur runs `blur_steps` passes per tick inside the
 Ema's loop, so its spread grows with the trail's memory.
 """
 
@@ -40,7 +40,8 @@ class VelocityTrailBridgeSettings(BaseSettings):
     advect = Field(0.0, min=0.0, max=1.0, step=0.05, newline=True, description="How far the trail moves with its motion before each step; 0 = at a fixed pixel")
     attack = Field(0.0, min=0.0, max=500.0, step=1.0, description="Smoothing time of a rising x/y speed, ms; 0 = as smooth (lower: quicker flicks)")
     smooth = Field(158.0, min=0.0, max=1000.0, step=1.0, description="Smoothing time, ms; the fall of x/y and all of z; 0 = none (higher: longer coast)")
-    blur_radius = Field(0.0, min=0.0, max=10.0, newline=True, description="Gaussian blur radius in pixels, once per tick")
+    blur_radius = Field(0.0, min=0.0, max=10.0, newline=True, description="Gaussian blur radius in pixels; 0 = off")
+    blur_steps = Field(1, min=1, max=8, description="Gaussian blur passes per tick (more: wider spread)")
 
 
 class VelocityTrailBridge(FlowBase):
@@ -50,7 +51,7 @@ class VelocityTrailBridge(FlowBase):
         1. Shape the velocity into the input FBO (`set_velocity`): the x/y speed's curve and limit, z's limit
         2. Move the previous trail with its own motion (`advect`), then blend the input in, a unit-gain Ema over
            `attack` or `smooth` (temporal smoothing)
-        3. Blur it once (spatial smoothing)
+        3. Blur it, `blur_steps` passes (spatial smoothing)
 
     FBOs (from FlowBase):
         - input_fbo: The shaped velocity
@@ -137,13 +138,14 @@ class VelocityTrailBridge(FlowBase):
         self._trail_shader.use(self._output_fbo.back_texture, self._input_fbo.texture, attack, release)
         self._output_fbo.end()
 
-        # Stage 3: Spatial smoothing (Gaussian blur), once
+        # Stage 3: Spatial smoothing (Gaussian blur), `blur_steps` passes
         if s.blur_radius > 0.0:
-            for horizontal in (True, False):
-                self._output_fbo.swap()
-                self._output_fbo.begin()
-                self._blur_shader.use(self._output_fbo.back_texture, s.blur_radius, horizontal=horizontal)
-                self._output_fbo.end()
+            for _ in range(s.blur_steps):
+                for horizontal in (True, False):
+                    self._output_fbo.swap()
+                    self._output_fbo.begin()
+                    self._blur_shader.use(self._output_fbo.back_texture, s.blur_radius, horizontal=horizontal)
+                    self._output_fbo.end()
 
 
 # ── numpy reference ─────────────────────────────────────────────────────
