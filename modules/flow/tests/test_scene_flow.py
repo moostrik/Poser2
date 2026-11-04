@@ -40,6 +40,22 @@ class LucasKanadeTest(unittest.TestCase):
         flat = np.full((SIZE, SIZE), 0.5)
         self.assertLess(float(np.abs(lucas_kanade(flat, flat)).max()), 1e-6)
 
+    def test_gaussian_weights_keep_a_shift(self) -> None:
+        d = lucas_kanade(pattern(), pattern(2.0, -1.0), levels=3, gaussian=True)
+        self.assertAlmostEqual(float(np.median(interior(d[..., 0]))), 2.0, delta=0.3)
+        self.assertAlmostEqual(float(np.median(interior(d[..., 1]))), -1.0, delta=0.3)
+
+    def test_the_same_surface_keeps_the_background_still_beside_a_moving_strip(self) -> None:
+        # a strip 12 px wide, 0.3 m before a still background, moving 2 px right: beside it the background is still
+        still, moved = pattern(), pattern()
+        moved[:, 26:38] = pattern(2.0, 0.0)[:, 26:38]
+        depth = np.full((SIZE, SIZE), 1.5)
+        depth[:, 26:38] = 1.2
+        plain = lucas_kanade(still, moved, levels=2, window=2)
+        surface = lucas_kanade(still, moved, levels=2, window=2, depth=depth, tolerance=0.2)
+        beside = slice(40, 44)                                      # background 2–6 px right of the strip
+        self.assertLess(float(np.abs(surface[16:48, beside, 0]).mean()), float(np.abs(plain[16:48, beside, 0]).mean()))
+
     def test_the_median_keeps_a_shift(self) -> None:
         d = lucas_kanade(pattern(), pattern(2.0, -1.0), levels=3, median=2)
         self.assertAlmostEqual(float(np.median(interior(d[..., 0]))), 2.0, delta=0.3)

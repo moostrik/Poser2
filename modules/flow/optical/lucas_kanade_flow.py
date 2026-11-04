@@ -48,6 +48,8 @@ class LucasKanadeFlowSettings(BaseSettings):
     xy_damping:     Field[float] = Field(0.001, min=0.0, max=0.1, step=0.001, description="Damps x/y where the patch has little texture (higher: less noise, smaller motion)")
     xy_window:      Field[Patch] = Field(Patch.FIVE, min=Patch.THREE, max=Patch.NINE, description="x/y patch size (larger: cleaner, more spill)", newline=True)
     xy_median:      Field[Patch] = Field(Patch.ONE, min=Patch.ONE, max=Patch.FIVE, description="Median size per level, 1×1 = off (larger: cleaner, more GPU)")
+    xy_same_surface: Field[bool] = Field(False, description="Only the patch's own surface by depth counts, z_tolerance (on: less smear at silhouettes)")
+    xy_gaussian:    Field[bool]  = Field(False, description="Gaussian weights in the patch (on: rim counts less, less smear)")
     xy_threshold:   Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="x/y below this is noise, in px/frame (higher: less noise, less slow motion)")
     xy_follow_z:    Field[bool]  = Field(False, description="Smooths x/y like z, so both lag alike (on: less noise, more lag)")
     z_window:       Field[Patch] = Field(Patch.THREE, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)", newline=True)
@@ -145,7 +147,7 @@ class LucasKanadeFlow:
         """The player's mask (red, 0 to 1) the velocity is multiplied by with `use_mask`, or None for no mask."""
         self._mask = texture
 
-    def _pyramid(self, solve: SwapFbo, previous: Texture, current: Texture) -> None:
+    def _pyramid(self, solve: SwapFbo, previous: Texture, current: Texture, depth: Texture | None) -> None:
         """The displacement carrying `previous` onto `current`, coarse to fine, into `solve`: one solve
         per level, and with `xy_median` the median after each level."""
         s: LucasKanadeFlowSettings = self.settings
@@ -153,7 +155,8 @@ class LucasKanadeFlow:
         for level in reversed(range(s.xy_levels)):
             solve.swap()
             solve.begin()
-            self._shader.use(previous, current, solve.back_texture, level, s.xy_window, s.xy_damping)
+            self._shader.use(previous, current, solve.back_texture, level, s.xy_window, s.xy_damping,
+                             depth if s.xy_same_surface else None, s.z_tolerance, s.xy_gaussian)
             solve.end()
             if s.xy_median:
                 spacing: float = float(2 ** level)          # a level's texel apart
@@ -176,7 +179,7 @@ class LucasKanadeFlow:
             return
         s: LucasKanadeFlowSettings = self.settings
 
-        self._pyramid(self._solve, self._frames.previous_luminance, self._frames.luminance)
+        self._pyramid(self._solve, self._frames.previous_luminance, self._frames.luminance, depth)
         solved: Texture = self._solve.texture
 
         self._displacement.begin()
@@ -242,23 +245,37 @@ def _bilinear(image: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
 
 
 def _solve_level(p_image: np.ndarray, c_image: np.ndarray, d: np.ndarray, u: np.ndarray, v: np.ndarray, window: int,
-                 damping: float) -> np.ndarray:
-    """One solve on one level: the displacement so far (uv) refined by the window's shift. Mirrors the shader."""
+                 damping: float, depth: np.ndarray | None = None, tolerance: float = 0.0, gaussian: bool = False) -> np.ndarray:
+    """One solve on one level: the displacement so far (uv) refined by the window's shift, its samples
+    weighted by the Gaussian and the same surface as the shader weights them. Mirrors the shader."""
     h, w = u.shape
     lh, lw = c_image.shape
     sxx = sxy = syy = sxt = syt = np.zeros((h, w))
+    total, count = np.zeros((h, w)), 0
+    sigma: float = max(window, 1) / 1.5
+    if depth is not None:
+        dh, dw = depth.shape
+        center = depth[np.clip(np.floor(v * dh).astype(int), 0, dh - 1), np.clip(np.floor(u * dw).astype(int), 0, dw - 1)]
     for j in range(-window, window + 1):
         for i in range(-window, window + 1):
             px, py = u * lw - 0.5 + i, v * lh - 0.5 + j
+            weight: np.ndarray = np.full((h, w), float(np.exp(-(i * i + j * j) / (2.0 * sigma * sigma))) if gaussian else 1.0)
+            if depth is not None:
+                su, sv = u + i / lw, v + j / lh
+                sample = depth[np.clip(np.floor(sv * dh).astype(int), 0, dh - 1), np.clip(np.floor(su * dw).astype(int), 0, dw - 1)]
+                same = (sample > 0.0) & (np.abs(sample - center) <= tolerance)
+                weight = np.where(center > 0.0, weight * same, weight)
+            total, count = total + weight, count + 1
             qx, qy = px - d[..., 0] * lw, py - d[..., 1] * lh
             gx = 0.25 * (_bilinear(c_image, px + 1, py) - _bilinear(c_image, px - 1, py)
                          + _bilinear(p_image, qx + 1, qy) - _bilinear(p_image, qx - 1, qy))
             gy = 0.25 * (_bilinear(c_image, px, py + 1) - _bilinear(c_image, px, py - 1)
                          + _bilinear(p_image, qx, qy + 1) - _bilinear(p_image, qx, qy - 1))
             gt = _bilinear(c_image, px, py) - _bilinear(p_image, qx, qy)
-            sxx, sxy, syy = sxx + gx * gx, sxy + gx * gy, syy + gy * gy
-            sxt, syt = sxt + gx * gt, syt + gy * gt
-    sxx, syy = sxx + damping, syy + damping
+            sxx, sxy, syy = sxx + weight * gx * gx, sxy + weight * gx * gy, syy + weight * gy * gy
+            sxt, syt = sxt + weight * gx * gt, syt + weight * gy * gt
+    kept_damping: np.ndarray = damping * total / count
+    sxx, syy = sxx + kept_damping, syy + kept_damping
     det: np.ndarray = sxx * syy - sxy * sxy
     safe: np.ndarray = np.where(np.abs(det) > 1e-12, det, 1.0)
     dx = np.where(np.abs(det) > 1e-12, -(syy * sxt - sxy * syt) / safe, 0.0)
@@ -281,11 +298,13 @@ def median_displacement(displacement: np.ndarray, spacing: float, radius: int = 
 
 
 def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, window: int = 2, damping: float = 0.001,
-                 median: int = 0) -> np.ndarray:
+                 median: int = 0, depth: np.ndarray | None = None, tolerance: float = 0.0, gaussian: bool = False) -> np.ndarray:
     """The displacement (H, W, 2) in pixels per frame, x along columns and y along rows, that carries
     `previous` onto `current`: coarse to fine over `levels` mip levels, one solve per level over a
     (2·window+1)² window, the previous frame warped by the estimate so far; with `median`, after each
-    level the median of the displacement over a (2·median+1)² patch, a level's texel apart. Mirrors the shaders."""
+    level the median of the displacement over a (2·median+1)² patch, a level's texel apart. With `depth`
+    (H, W, m), only the window's samples within `tolerance` of the centre's depth count; with
+    `gaussian`, the samples are weighted by their distance from the centre. Mirrors the shaders."""
     h, w = current.shape
     previous_levels: list[np.ndarray] = _pyramid(previous.astype(np.float64), levels)
     current_levels: list[np.ndarray] = _pyramid(current.astype(np.float64), levels)
@@ -293,7 +312,7 @@ def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, win
     u, v = (columns + 0.5) / w, (rows + 0.5) / h            # each output pixel's uv
     d: np.ndarray = np.zeros((h, w, 2))                     # the displacement in uv
     for level in reversed(range(levels)):
-        d = _solve_level(previous_levels[level], current_levels[level], d, u, v, window, damping)
+        d = _solve_level(previous_levels[level], current_levels[level], d, u, v, window, damping, depth, tolerance, gaussian)
         if median:
             d = median_displacement(d, float(2 ** level), median)
     return d * np.array([w, h])
