@@ -21,7 +21,7 @@ Ema's loop, so its spread grows with the trail's memory.
 """
 
 import numpy as np
-from OpenGL.GL import GL_RGBA16F
+from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_RGBA16F
 
 from modules.gl import SwapFbo, Texture
 from modules.settings import Field, BaseSettings
@@ -92,6 +92,9 @@ class VelocityTrailBridge(FlowBase):
             output_height: Optional output height (defaults to height)
         """
         super().allocate(width, height, output_width, output_height)
+        # No velocity outside the image, as in the fluid: a trail that leaves it is gone, and the edge
+        # doesn't copy itself back in through the advect and the blur
+        self._output_fbo.set_wrap(GL_CLAMP_TO_BORDER, (0.0, 0.0, 0.0, 0.0))
         self._shape_shader.allocate()
         self._advect_shader.allocate()
         self._trail_shader.allocate()
