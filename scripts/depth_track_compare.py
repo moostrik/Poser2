@@ -45,7 +45,7 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_FALSE, GL_FLOAT,
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from modules.gl import Blit, Fbo, Texture  # noqa: E402
 from modules.flow import (FlowUtil, LucasKanadeFlow, LucasKanadeFlowSettings, Patch, SignedField, VelocityField,  # noqa: E402
-                          VisualizationFieldSettings, filter_depth_steps, lucas_kanade, shift_history, track_depth)
+                          VisualizationFieldSettings, filter_depth_steps, lucas_kanade, track_depth)
 
 WARM_UP: float = 1.0          # s at the start the flows settle in, measured in no part
 SHORTEST_PAUSE: float = 1.0   # s of stillness that end a move
@@ -55,7 +55,7 @@ SWITCHED: dict[str, str] = {'x_gain': 'x', 'y_gain': 'y', 'z_gain': 'z'}   # in 
 GROUPED: dict[str, str] = {'xy_levels': 'lucas_kanade.levels', 'xy_window': 'lucas_kanade.window', 'xy_damping': 'lucas_kanade.damping',
                            'xy_same_surface': 'lucas_kanade.same_surface', 'xy_threshold': 'lucas_kanade.threshold', 'xy_median': 'lucas_kanade.median',
                            'z_edge': 'depth_track.edge', 'z_window': 'depth_track.window', 'z_tolerance': 'depth_track.tolerance',
-                           'z_restart_frames': 'depth_track.restart_frames', 'z_smooth': 'depth_track.smooth', 'xy_smooth': 'depth_track.xy_smooth',
+                           'z_smooth': 'depth_track.smooth', 'xy_smooth': 'depth_track.xy_smooth',
                            'z_catch_up': 'depth_track.catch_up', 'z_dead_zone': 'depth_track.dead_zone', 'z_threshold': 'depth_track.threshold'}   # in frames saved flat, before the groups
 MOVED: float = 0.05          # luminance change of a pixel that moves
 MOVED_FRAMES: int = 5         # frames it changes that much in, over the loop
@@ -388,7 +388,7 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
     side = Side('A', frames.calls[0]['settings'], changed, w, h, False)
     xy, z = side.settings.lucas_kanade, side.settings.depth_track
     luminance, depth_texture, mask_texture = Texture(), Texture(), Texture()
-    state, catch_up, history, previous = np.zeros((h, w, 4)), np.zeros((h, w, 2)), np.zeros((h, w, 4)), None
+    state, catch_up, previous = np.zeros((h, w, 4)), np.zeros((h, w, 2)), None
     last = min(frames_to_check, len(frames)) - 1
     for k in range(last + 1):
         lum, depth, mask = frames.load(k)
@@ -404,11 +404,9 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
         previous = lum
         c = frames.calls[k]
         step = (c['depth_step'][0] * w, c['depth_step'][1] * h) if c['depth_step'][0] > 0 else (1.0, 1.0)
-        filtered = filter_depth_steps(depth.astype(np.float64), step, z.edge)
-        state, catch_up = track_depth(filtered, state, catch_up, solve.astype(np.float64),
+        state, catch_up = track_depth(filter_depth_steps(depth.astype(np.float64), step, z.edge), state, catch_up, solve.astype(np.float64),
                                       c['delta_time'], z.window, step, z.tolerance, z.smooth, c['view_span'], z.dead_zone,
-                                      z.catch_up, xy.threshold, history, z.restart_frames, z.slope)
-        history = shift_history(filtered, history)
+                                      z.catch_up, xy.threshold)
         gpu = read_back(side.flow.depth_velocity.difference)
         if k % 5 == 0 or k == last:
             dxy = np.linalg.norm(solve - reference, axis=-1)

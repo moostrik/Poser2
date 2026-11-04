@@ -13,14 +13,7 @@
 // the track is read linear between the texels that hold one of the same surface, within `tolerance`
 // of the measurement, so a track is never carried across an edge. With `dead_zone` above 0, z is 0
 // while the tracked depth stays within it of its anchor; past it, z at its full speed, and the anchor
-// follows at `dead_zone` behind (a backlash); a track that starts over is anchored anew. With
-// `restart_frames` above 1, it also starts over where the depth at the pixel, in place, is further
-// than `tolerance` from its depth 2 to `restart_frames` frames before (`history`): a change that
-// ramps past `tolerance` over a few frames, as the background a moving limb uncovers.
-// With `slope_half` above 0, z fades where the depth surface is steep: its slope over the window
-// (depth over the metres across, from the samples `window` samples to either side, or the center
-// where one has no depth) weighs z by 1 / (1 + (slope / slope_half)²), half at `slope_half`. An edge
-// stereo smears over a few samples is steep, a palm facing the camera is flat.
+// follows at `dead_zone` behind (a backlash); a track that starts over is anchored anew.
 // Catching up, with `catch_up_smoothing` above 0: Emas of the miss of the prediction, signed and its size;
 // where the miss keeps one way (the signed mean as large as the size, over twice the dead zone) and the
 // image moves (the 3×3 displacement past `motion_floor`), the time the track follows over blends from
@@ -32,8 +25,6 @@ uniform sampler2D tex0;  // Depth now R (m)
 uniform sampler2D tex1;  // The track the frame before: z, disparity (1/m), rate (1/m per second), anchor (m)
 uniform sampler2D tex2;  // The catch-up the frame before: Emas of the miss, signed and its size (m)
 uniform sampler2D displacement;     // uv per frame (RG), with warp
-uniform sampler2D history;          // The depth 1 to 4 frames before, in place (m), at the track's size
-uniform int restart_frames;         // Frames back a depth change past `tolerance` starts the track over; 1 is the frame before only
 uniform bool warp;
 uniform bool catch_up_pass;         // Write the catch-up instead of the track
 uniform vec2 depth_step; // uv between two depth samples
@@ -47,7 +38,6 @@ uniform float motion_floor;         // Displacement the image must move by to ca
 uniform float delta_time;           // Seconds since the last depth
 uniform float view_span; // Metres one view width spans per metre of depth
 uniform float dead_zone; // Depth the track wanders within its anchor without z (m); 0 is none
-uniform float slope_half;           // Depth slope (m depth per m across) at which z is halved; 0 is no fade
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -56,29 +46,6 @@ float depth_at(vec2 uv) {
     ivec2 size = textureSize(tex0, 0);
     ivec2 texel = clamp(ivec2(floor(uv * vec2(size))), ivec2(0), size - 1);
     return texelFetch(tex0, texel, 0).r;
-}
-
-// The depth change per sample along `offset` (uv, `samples` depth samples): between the samples on
-// either side, or the center and the one that has depth; 0 without either
-float depth_change(vec2 offset, float samples, float center) {
-    float ahead = depth_at(texCoord + offset);
-    float behind = depth_at(texCoord - offset);
-    if (ahead > 0.0 && behind > 0.0) return (ahead - behind) / (2.0 * samples);
-    if (ahead > 0.0) return (ahead - center) / samples;
-    if (behind > 0.0) return (center - behind) / samples;
-    return 0.0;
-}
-
-// The weight of z on the depth surface's slope: 1 where it faces the camera, half at `slope_half`
-float slope_weight(float center) {
-    if (slope_half <= 0.0) return 1.0;
-    vec2 size = vec2(textureSize(tex1, 0));
-    float samples = float(max(window, 1));
-    float across = center * view_span;     // metres one uv across spans here
-    float slope_x = depth_change(vec2(depth_step.x * samples, 0.0), samples, center) / (across * depth_step.x);
-    float slope_y = depth_change(vec2(0.0, depth_step.y * samples), samples, center) / (across * depth_step.y * size.y / size.x);
-    float ratio = (slope_x * slope_x + slope_y * slope_y) / (slope_half * slope_half);
-    return 1.0 / (1.0 + ratio);
 }
 
 // The track's disparity, rate and anchor (xyz) at `position` (texels, centres at integers), of the
@@ -158,10 +125,6 @@ void main() {
     float miss = predicted > 0.0 ? 1.0 / measurement - 1.0 / predicted : 0.0;      // m
 
     bool follows = predicted > 0.0 && abs(miss) <= tolerance;
-    vec4 before = texelFetch(history, ivec2(floor(texCoord * size)), 0);
-    for (int k = 1; k < restart_frames; k++) {
-        follows = follows && !(before[k] > 0.0 && abs(center - before[k]) > tolerance);
-    }
     vec2 emas = follows ? last + ema * (vec2(miss, abs(miss)) - last) : vec2(0.0);
     if (catch_up_pass) {
         fragColor = vec4(emas, 0.0, 1.0);
@@ -196,5 +159,5 @@ void main() {
     } else {
         anchor = tracked;
     }
-    fragColor = vec4(z * slope_weight(center), disparity, rate, anchor);
+    fragColor = vec4(z, disparity, rate, anchor);
 }

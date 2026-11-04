@@ -16,18 +16,7 @@ pixel was a displacement back (in place without one), so a surface sliding sidew
 depth, and only from the texels there of the same surface, within `tolerance` of the measurement:
 where the displacement is unsure, at an edge, a track is never carried over from the other side. Where the measurement is further than `tolerance` from the track's prediction, as a limb
 passing over the pixel, the track starts over with no rate. With `smooth` 0 and a full window it is
-the plain change between two frames. A change that ramps past `tolerance` over a few frames, as the
-background a moving limb uncovers, never misses the prediction by that much in one; with
-`restart_frames` above 1, the track also starts over where the depth at the pixel, in place, is
-further than `tolerance` from its depth 2 to `restart_frames` frames before.
-
-An edge that stereo smears over a few samples stays under the edge filter's step at each, but the
-surface there is steep, and the track reads the smear moving with the edge as z. With `slope`, z
-fades with the surface's angle to the view: the depth's slope over the window, against the slope
-of a surface at `slope` degrees, weighs z by 1 / (1 + (tan angle / tan slope)²), half at `slope`.
-A palm facing the camera is flat and keeps its z; a part slanted toward `slope` loses some (as
-PD-Flow weighs its depth term down on steep depth, here on the slope in space only, as a push
-changes in time too).
+the plain change between two frames.
 
 A surface's depth wanders by a few mm, and its steps are a mm; the track reads both as slow motion.
 With `dead_zone` (m), each pixel holds an anchor: while the track stays within the dead zone of it,
@@ -50,7 +39,7 @@ frame to frame. So before the track, a depth sample whose 3×3 depth samples spa
 `tolerance` has no depth: the same test of "another surface" as the window's. Along each silhouette
 a band a depth sample wide reads no z; the player's mask cuts there anyway.
 
-`filter_depth_steps`, `track_depth`, `shift_history` and `depth_threshold` below are the numpy references of the shaders.
+`filter_depth_steps`, `track_depth` and `depth_threshold` below are the numpy references of the shaders.
 """
 import math
 
@@ -59,15 +48,7 @@ from OpenGL.GL import GL_R16F, GL_R32F, GL_RG32F, GL_RGBA32F
 
 from modules.gl import Fbo, SwapFbo, Texture
 from .. import FlowBase, FlowUtil
-from .shaders import DepthHistory, DepthStepFilter, DepthThreshold, DepthVelocityShader
-
-RESTART_FRAMES: int = 4     # the most frames back the restart compares with: the history's four channels
-
-
-def slope_half(slope: float) -> float:
-    """The depth slope (m depth per m across) of a surface at `slope` degrees to the view, at which
-    z is halved; 0 for 0 (no fade)."""
-    return math.tan(math.radians(min(slope, 89.9))) if slope > 0.0 else 0.0
+from .shaders import DepthStepFilter, DepthThreshold, DepthVelocityShader
 
 
 def track_weights(delta_time: float, smooth: float, share: float | np.ndarray) -> tuple[float | np.ndarray, float | np.ndarray]:
@@ -87,8 +68,7 @@ class DepthVelocity(FlowBase):
            its edges → the input SwapFbo
         2. Correct the track carried from the last one → the track SwapFbo (RGBA32F: z, disparity, rate, anchor),
            and in a second run of the same shader its catch-up → the catch-up SwapFbo (RG32F)
-        3. Move the depth's history one frame on → the history SwapFbo (RGBA32F: 1 to 4 frames before, m)
-        4. Take the noise floor off z → output_fbo (R16F)
+        3. Take the noise floor off z → output_fbo (R16F)
     """
 
     def __init__(self) -> None:
@@ -99,13 +79,11 @@ class DepthVelocity(FlowBase):
 
         self._step_filter_shader: DepthStepFilter = DepthStepFilter()
         self._velocity_shader: DepthVelocityShader = DepthVelocityShader()
-        self._history_shader: DepthHistory = DepthHistory()
         self._threshold_shader: DepthThreshold = DepthThreshold()
 
         self._raw: Fbo = Fbo()                   # the depth as it came, before its edges are taken off
         self._track: SwapFbo = SwapFbo()
         self._catch_up: SwapFbo = SwapFbo()      # the Emas of the miss of the prediction, signed and its size (RG32F, m)
-        self._history: SwapFbo = SwapFbo()       # the depth 1 to 4 frames before, in place (RGBA32F, m)
 
     @property
     def depth_velocity(self) -> Texture:
@@ -125,11 +103,8 @@ class DepthVelocity(FlowBase):
         self._track.clear_all()
         self._catch_up.allocate(width, height, GL_RG32F)
         self._catch_up.clear_all()
-        self._history.allocate(width, height, GL_RGBA32F)
-        self._history.clear_all()
         self._step_filter_shader.allocate()
         self._velocity_shader.allocate()
-        self._history_shader.allocate()
         self._threshold_shader.allocate()
 
     def deallocate(self) -> None:
@@ -137,22 +112,18 @@ class DepthVelocity(FlowBase):
         self._raw.deallocate()
         self._track.deallocate()
         self._catch_up.deallocate()
-        self._history.deallocate()
         self._step_filter_shader.deallocate()
         self._velocity_shader.deallocate()
-        self._history_shader.deallocate()
         self._threshold_shader.deallocate()
 
     def reset(self) -> None:
         super().reset()
         self._track.clear_all()
         self._catch_up.clear_all()
-        self._history.clear_all()
 
     def update_depth(self, depth: Texture, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
                      smooth: float, threshold: float, tolerance: float, dead_zone: float, catch_up_smooth: float, motion_floor: float,
-                     displacement: Texture | None = None, edge: float | None = None, restart_frames: int = 1,
-                     slope: float = 0.0) -> None:
+                     displacement: Texture | None = None, edge: float | None = None) -> None:
         """Advance on a new flow frame: correct the track by the new depth, then take the noise floor off.
 
         Args:
@@ -170,9 +141,6 @@ class DepthVelocity(FlowBase):
             displacement: How far each pixel moved since then (uv); when given, the track is carried
                 along the motion (Lucas–Kanade flow)
             edge: Depth step within a 3×3 of depth samples that marks an edge, dropped (m); None takes `tolerance`
-            restart_frames: Frames back a depth change past `tolerance` starts the track over, 1 to
-                `RESTART_FRAMES`; 1 is the frame before only
-            slope: Surface angle to the view at which z is halved (degrees); 0 is no fade
         """
         if not self._allocated:
             return
@@ -193,14 +161,8 @@ class DepthVelocity(FlowBase):
             target.begin()
             self._velocity_shader.use(self._input_fbo.texture, self._track.back_texture, self._catch_up.back_texture, catch_up_pass,
                                       float(alpha), smooth, catch_up_smooth, float(alpha), motion_floor, max(delta_time, 1e-6), view_span,
-                                      step, window, tolerance, dead_zone, self._history.texture,
-                                      min(max(restart_frames, 1), RESTART_FRAMES), slope_half(slope), displacement)
+                                      step, window, tolerance, dead_zone, displacement)
             target.end()
-
-        self._history.swap()
-        self._history.begin()
-        self._history_shader.use(self._input_fbo.texture, self._history.back_texture)
-        self._history.end()
 
         self._output_fbo.begin()
         self._threshold_shader.use(self._track.texture, threshold / max(width, 1))     # px as view widths
@@ -272,39 +234,9 @@ def color_motion(displacement: np.ndarray, motion_floor: float) -> np.ndarray:
     return largest > motion_floor
 
 
-def slope_weight(depth: np.ndarray, window: int, step: tuple[float, float], view_span: float, slope: float) -> np.ndarray:
-    """The weight of z on the depth surface's slope (H, W): 1 / (1 + (slope / slope_half(`slope`))²),
-    1 where it faces the camera, half on a surface at `slope` degrees to the view; all 1 for 0. The
-    slope is the depth change over the metres across, from the samples `window` (at least 1) samples
-    to either side, `step` pixels apart (x, y), or from the center and the one with depth; metres
-    across are `depth × view_span` per view width, the same along both axes."""
-    half: float = slope_half(slope)
-    h, w = depth.shape
-    if half <= 0.0 or view_span <= 0.0:
-        return np.ones((h, w))
-    rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
-    samples: int = max(window, 1)
-
-    def at(i: float, j: float) -> np.ndarray:
-        x = np.clip(np.floor(columns + 0.5 + i).astype(int), 0, w - 1)
-        y = np.clip(np.floor(rows + 0.5 + j).astype(int), 0, h - 1)
-        return depth[y, x]
-
-    def change(i: float, j: float) -> np.ndarray:
-        ahead, behind = at(i, j), at(-i, -j)
-        return np.where((ahead > 0.0) & (behind > 0.0), (ahead - behind) / (2.0 * samples),
-                        np.where(ahead > 0.0, (ahead - depth) / samples, np.where(behind > 0.0, (depth - behind) / samples, 0.0)))
-
-    per_pixel: np.ndarray = np.maximum(depth, 1e-9) * view_span / w      # metres across one pixel, along both axes
-    slope_x: np.ndarray = change(step[0] * samples, 0.0) / (per_pixel * step[0])
-    slope_y: np.ndarray = change(0.0, step[1] * samples) / (per_pixel * step[1])
-    return 1.0 / (1.0 + (slope_x * slope_x + slope_y * slope_y) / (half * half))
-
-
 def track_depth(depth: np.ndarray, state: np.ndarray, catch_up: np.ndarray, displacement: np.ndarray, delta_time: float, window: int,
                 step: tuple[float, float], tolerance: float, smooth: float, view_span: float, dead_zone: float,
-                catch_up_smooth: float, motion_floor: float, history: np.ndarray | None = None,
-                restart_frames: int = 1, slope: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
+                catch_up_smooth: float, motion_floor: float) -> tuple[np.ndarray, np.ndarray]:
     """The depth track one frame on (H, W, 4): z in view widths per frame, disparity (1/m), its rate
     (1/m per second) and its anchor (m); and its catch-up (H, W, 2): the Emas of its miss of the
     prediction, signed and its size (m). As the shader writes them, in its two runs; `catch_up` is
@@ -322,10 +254,7 @@ def track_depth(depth: np.ndarray, state: np.ndarray, catch_up: np.ndarray, disp
     (ms) above 0, a track that keeps missing one way, as it lags a fast motion, follows over a time
     between `smooth` and `catch_up_smooth` by its `catch_up_share`, where the image moves (its
     `color_motion` past `motion_floor`, px per frame); and the carry takes each texel's depth a frame
-    on by its rate. 0 is neither. With `restart_frames` above 1, the track also starts over where
-    `depth` is further than `tolerance` from `history` (H, W, 4: its depth 1 to 4 frames before, in
-    place, 0 where none, as `shift_history` keeps it) 2 to `restart_frames` frames before. With
-    `slope` (degrees) above 0, z is weighed by its `slope_weight`.
+    on by its rate. 0 is neither.
     """
     h, w = depth.shape
     rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
@@ -351,10 +280,6 @@ def track_depth(depth: np.ndarray, state: np.ndarray, catch_up: np.ndarray, disp
     safe_predicted: np.ndarray = np.where(predicted > 0.0, predicted, 1.0)
     miss: np.ndarray = np.where(measured & (predicted > 0.0), 1.0 / safe_measurement - 1.0 / safe_predicted, 0.0)   # m
     follows: np.ndarray = measured & (predicted > 0.0) & (np.abs(miss) <= tolerance)
-    if history is not None:
-        for k in range(1, min(max(restart_frames, 1), RESTART_FRAMES)):
-            before: np.ndarray = history[..., k]
-            follows &= ~((before > 0.0) & (np.abs(depth - before) > tolerance))
 
     # catching up (a manoeuvre, in tracking terms): the Emas of the miss over `smooth`, and the time the
     # track follows over blended toward `catch_up_smooth` by how much the miss keeps one way, where the
@@ -386,15 +311,8 @@ def track_depth(depth: np.ndarray, state: np.ndarray, catch_up: np.ndarray, disp
         z = np.where(outside, z, 0.0)
     else:
         anchor = tracked
-    z = z * slope_weight(depth, window, step, view_span, slope)
     return (np.where(measured[..., None], np.stack((z, disparity, rate, anchor), axis=-1), 0.0),
             np.stack((signed, size), axis=-1))
-
-
-def shift_history(depth: np.ndarray, history: np.ndarray) -> np.ndarray:
-    """The depth's history (H, W, 4, m) one frame on: `depth` (H, W) first, then the history's first
-    three. Mirrors depth_history.frag."""
-    return np.concatenate((depth[..., None], history[..., :3]), axis=-1)
 
 
 def filter_depth_steps(depth: np.ndarray, step: tuple[float, float], tolerance: float) -> np.ndarray:

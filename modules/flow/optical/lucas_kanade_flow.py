@@ -10,8 +10,7 @@ The displacement (uv per frame) stays inside: `lucas_kanade.threshold` (px per f
 as below it is the solve's jitter, not motion. z comes from its own `DepthVelocity`: a depth track carried
 along the displacement, so a surface sliding sideways over a slope reads no motion toward the camera,
 corrected each frame by the mean over `depth_track.window` depth samples and smoothed over
-`depth_track.smooth`, starting over where the depth changed past `depth_track.tolerance` within
-`depth_track.restart_frames` frames; `depth_track.threshold` comes off it. The depth change comes in view
+`depth_track.smooth`; `depth_track.threshold` comes off it. The depth change comes in view
 widths per frame like the displacement, so all three become view widths per second the same way. Out
 comes one 3D velocity in true units, image widths per second; how hard it pushes the fluid is the
 bridge's. `x`, `y` and `z` switch an axis off (0) to look at the others. With `use_mask`, the velocity
@@ -58,10 +57,8 @@ class LucasKanadeSettings(BaseSettings):
 class DepthTrackSettings(BaseSettings):
     """The z part: the depth track carried along the displacement."""
     edge:           Field[float] = Field(0.1, min=0.05, max=0.3, step=0.01, description="Edge depth step, m (lower: cleaner edges, fewer fingers)")
-    slope:          Field[float] = Field(0.0, min=0.0, max=89.0, step=1.0, description="Surface angle where z halves, degrees, 0 = off (lower: cleaner edges, slanted parts weaker)")
     window:         Field[Patch] = Field(Patch.THREE, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)")
     tolerance:      Field[float] = Field(0.1, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m (higher: fuller pushes, fewer splits)")
-    restart_frames: Field[int]   = Field(1, min=1, max=4, description="Frames a jump past tolerance may take, 1 = one (more: less wake z, fast pushes cut)")
     smooth:         Field[float] = Field(50.0, min=0.0, max=200.0, step=1.0, newline=True, description="Smoothing time of z in ms, 0 = two-frame change (higher: less noise, more lag)")
     xy_smooth:      Field[bool]  = Field(False, width=48, description="x/y smoothed over smooth, so both lag alike (on: less noise, more lag)")
     catch_up:       Field[float] = Field(0.0, min=0.0, max=50.0, step=1.0, description="Shorter smoothing during a fast push, in ms, 0 = off (lower: quicker pushes)")
@@ -206,7 +203,7 @@ class LucasKanadeFlow:
         if depth is not None:
             self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, z_s.window, z_s.smooth,
                                               z_s.threshold, z_s.tolerance, z_s.dead_zone, z_s.catch_up, xy_s.threshold,
-                                              solved, z_s.edge, z_s.restart_frames, z_s.slope)
+                                              solved, z_s.edge)
 
         xy: Texture = self._displacement
         if z_s.xy_smooth:

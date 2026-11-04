@@ -6,8 +6,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import catch_up_share, color_motion, depth_threshold, filter_depth_steps, shift_history, slope_weight, track_depth, \
-                         track_weights
+from modules.flow import catch_up_share, color_motion, depth_threshold, filter_depth_steps, track_depth, track_weights
 
 SIZE: int = 24
 SPAN: float = 0.5       # metres a view width spans per metre of depth
@@ -30,16 +29,14 @@ def interior(field: np.ndarray, margin: int = 8) -> np.ndarray:
 
 def track(depths: list[np.ndarray], moved: np.ndarray | None = None, window: int = 2, step: tuple[float, float] = STEP,
           tolerance: float = TOLERANCE, smooth: float = 0.0, span: float = SPAN, dead_zone: float = 0.0,
-          catch_up_smooth: float = 0.0, dt: float = DT, restart_frames: int = 1, slope: float = 0.0) -> list[np.ndarray]:
+          catch_up_smooth: float = 0.0, dt: float = DT) -> list[np.ndarray]:
     """The track after each depth frame, from no track."""
     state: np.ndarray = np.zeros(depths[0].shape + (4,))
     catch_up: np.ndarray = np.zeros(depths[0].shape + (2,))
-    history: np.ndarray = np.zeros(depths[0].shape + (4,))
     states: list[np.ndarray] = []
     for depth in depths:
         state, catch_up = track_depth(depth, state, catch_up, still(depth.shape) if moved is None else moved, dt, window, step, tolerance,
-                                      smooth, span, dead_zone, catch_up_smooth, 0.5, history, restart_frames, slope)
-        history = shift_history(depth, history)
+                                      smooth, span, dead_zone, catch_up_smooth, 0.5)
         states.append(state)
     return states
 
@@ -128,69 +125,6 @@ class TrackTest(unittest.TestCase):
         many = z([before, after], moved=moved, window=2, step=(3.0, 3.0), tolerance=1.0)
         ratio: float = float(np.std(many[12:-12, 12:-12]) / np.std(one[12:-12, 12:-12]))
         self.assertAlmostEqual(ratio, 1.0 / 5.0, delta=0.05)       # 25 samples
-
-
-def tilted(angle: float, near: float = 2.0) -> np.ndarray:
-    """A plane at `angle` degrees to the view along x: its depth grows by tan(angle) times the metres
-    across, `depth × SPAN / SIZE` a pixel, so it grows by a factor a pixel."""
-    return near * np.exp(np.tan(np.radians(angle)) * SPAN / SIZE * np.arange(SIZE))[None, :].repeat(SIZE, axis=0)
-
-
-class SlopeTest(unittest.TestCase):
-    """z fades with the depth surface's angle to the view: half at `slope` degrees."""
-
-    def test_a_surface_facing_the_camera_keeps_its_z(self) -> None:
-        np.testing.assert_array_equal(slope_weight(uniform(2.0), 2, STEP, SPAN, 45.0), 1.0)
-
-    def test_a_surface_at_the_slope_keeps_half(self) -> None:
-        np.testing.assert_allclose(interior(slope_weight(tilted(45.0), 2, STEP, SPAN, 45.0)), 0.5, atol=0.02)
-
-    def test_a_shallower_surface_keeps_more(self) -> None:
-        self.assertGreater(float(interior(slope_weight(tilted(20.0), 2, STEP, SPAN, 45.0)).min()), 0.85)
-
-    def test_an_edge_keeps_almost_nothing(self) -> None:
-        depth = uniform(1.0)
-        depth[:, SIZE // 2:] = 2.0
-        self.assertLess(float(slope_weight(depth, 2, STEP, SPAN, 45.0)[:, SIZE // 2].max()), 0.05)
-
-    def test_off_is_the_track_as_it_was(self) -> None:
-        depths = [tilted(30.0) - 0.02 * k for k in range(3)]
-        np.testing.assert_array_equal(track(depths, slope=0.0)[-1], track(depths)[-1])
-
-    def test_it_weighs_z_only_and_not_the_track(self) -> None:
-        depths = [tilted(30.0) - 0.02 * k for k in range(3)]
-        on, off = track(depths, slope=45.0)[-1], track(depths)[-1]
-        np.testing.assert_array_equal(on[..., 1:], off[..., 1:])
-        np.testing.assert_allclose(on[..., 0], off[..., 0] * slope_weight(depths[-1], 2, STEP, SPAN, 45.0))
-
-
-class RestartTest(unittest.TestCase):
-    """A depth that ramps past the tolerance over a few frames, as the background a moving limb uncovers."""
-    RAMP: list[np.ndarray] = [uniform(2.0 + 0.06 * k) for k in range(5)]     # 6 cm a frame, the tolerance 10 cm
-
-    def test_one_frame_follows_the_ramp_as_motion(self) -> None:
-        self.assertLess(float(interior(z(self.RAMP, restart_frames=1)).max()), -0.05)
-
-    def test_more_frames_start_the_track_over_once_the_ramp_is_past_the_tolerance(self) -> None:
-        states = track(self.RAMP, restart_frames=2)
-        self.assertLess(float(interior(states[1][..., 0]).max()), -0.05)    # 6 cm since the frame before: still followed
-        for state in states[2:]:                                            # 12 cm over two frames: over again
-            self.assertEqual(float(np.abs(interior(state[..., 0])).max()), 0.0)
-
-    def test_a_still_depth_never_starts_over(self) -> None:
-        states = track([uniform(2.0)] * 5, smooth=50.0, restart_frames=4)
-        self.assertTrue(np.all(interior(states[-1][..., 2]) == 0.0) and np.all(interior(states[-1][..., 1]) > 0.0))
-
-    def test_one_frame_is_the_track_without_a_history(self) -> None:
-        depths = [uniform(2.0 + 0.03 * k) for k in range(4)]
-        state, catch_up = np.zeros((SIZE, SIZE, 4)), np.zeros((SIZE, SIZE, 2))
-        for depth in depths:
-            state, catch_up = track_depth(depth, state, catch_up, still(), DT, 2, STEP, TOLERANCE, 50.0, SPAN, 0.0, 0.0, 0.5)
-        np.testing.assert_array_equal(track(depths, smooth=50.0, restart_frames=1)[-1], state)
-
-    def test_the_history_moves_one_frame_on(self) -> None:
-        history = shift_history(uniform(3.0), np.stack([uniform(d) for d in (1.0, 2.0, 0.0, 4.0)], axis=-1))
-        np.testing.assert_array_equal(history[0, 0], [3.0, 1.0, 2.0, 0.0])
 
 
 class CarriedTest(unittest.TestCase):
