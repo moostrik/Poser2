@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 MAX_FRAME_INTERVAL: float = 0.5     # s: a longer gap between two captures is a pause or a loop, not a frame's
 FRAME_PERIOD_BAND: tuple[float, float] = (0.5, 2.0)    # a capture gap is held to this share of the frame interval
 FRAME_PERIOD_WEIGHT: float = 0.05   # weight of a new gap on the frame interval's Ema
+FLASH: float = 5.0                  # TEMP diagnostic: a frame's mean |x/y| past this times the running median is logged
 
 
 def frame_interval(timestamp: float | None, last: float | None, period: float | None, ticks: float,
@@ -408,6 +409,39 @@ class Flow3DLayer(LayerBase):
         self._diagnose(timestamp - last if timestamp is not None and last is not None else None, interval, timestamp)   # TEMP diagnostic
         return interval
 
+    def _probe_flash(self, stamped: float) -> None:
+        """TEMP diagnostic: each flow frame, the mean |x| and |y| of the velocity over an 8×8 blit; a
+        frame past FLASH times the running median logs its timing and the frame's before it."""
+        import numpy as np
+        from OpenGL.GL import GL_FLOAT, GL_RGBA, GL_RGBA32F, glReadPixels
+        from modules.flow import FlowUtil
+        if not hasattr(self, '_flash_fbo'):
+            self._flash_fbo: Fbo = Fbo()
+            self._flash_fbo.allocate(8, 8, GL_RGBA32F)
+            self._flash_means: list[float] = []
+            self._flash_last: dict | None = None
+        FlowUtil.blit(self._flash_fbo, self._velocity)
+        self._flash_fbo.begin()
+        pixels = np.asarray(glReadPixels(0, 0, 8, 8, GL_RGBA, GL_FLOAT), np.float32).reshape(8, 8, 4)
+        self._flash_fbo.end()
+        mean_x, mean_y, mean_z = (float(np.mean(np.abs(pixels[..., c]))) for c in range(3))
+        capture = getattr(self._board, 'get_capture', lambda cam_id: None)(self._cam_id)
+        info: dict = dict(stamp=self._capture_timestamp, interval_used=self._flow_interval, stamped=stamped,
+                          ticks_before=self._diagnostic['ticks'][-1] / 1000.0 if hasattr(self, '_diagnostic') and self._diagnostic['ticks'] else None,
+                          time_step=self._time_step, board_stamp=capture.timestamp if capture is not None else None,
+                          levels=self.settings.optical_flow.lucas_kanade.levels, x=mean_x, y=mean_y, z=mean_z,
+                          period=self._frame_period, finite=bool(np.all(np.isfinite(pixels))))
+        means: list[float] = self._flash_means
+        median: float = sorted(means)[len(means) // 2] if len(means) >= 10 else 0.0
+        if median > 0.0 and max(mean_x, mean_y) > FLASH * median:
+            logger.info("FLOW FLASH cam %d | now %s | before %s", self._cam_id,
+                        {k: (round(v, 5) if isinstance(v, float) else v) for k, v in info.items()},
+                        {k: (round(v, 5) if isinstance(v, float) else v) for k, v in (self._flash_last or {}).items()})
+        means.append(max(mean_x, mean_y))
+        if len(means) > 200:
+            means.pop(0)
+        self._flash_last = info
+
     def _diagnose(self, gap: float | None, interval: float, timestamp: float | None) -> None:
         """TEMP diagnostic: once a second, the flow intervals over that second and the raw stamp gaps, to the log."""
         if not hasattr(self, '_diagnostic'):
@@ -466,6 +500,7 @@ class Flow3DLayer(LayerBase):
                 logger.warning("Flow3DLayer %d: depth is on but no view span is set (set_view_span), so z reads no motion", self._cam_id)
             flow.update(self._depth_input if self.depth_enabled else None, self._flow_interval, self._view_span, self._depth_step)
             self._velocity = flow.velocity
+            self._probe_flash(stamped)   # TEMP diagnostic
 
         # Stage 2: The flow bridge
         if kinetic:
