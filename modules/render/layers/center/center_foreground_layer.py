@@ -71,7 +71,7 @@ class CenterForegroundLayer(LayerBase):
     @property
     def texture(self) -> Texture:
         """Output texture for external use."""
-        return self._effect_fbo.texture
+        return self._effect_fbo        # the SwapFbo itself: always its newest image, safe to keep
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._roi_fbo.allocate(width, height, internal_format)
