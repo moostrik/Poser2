@@ -45,7 +45,7 @@ class VelocityTrailBridgeSettings(BaseSettings):
     smoothing: Field[Smoothing] = Field(Smoothing.ATTACK_RELEASE, newline=True, description="How x/y is smoothed: attack and release, or the 1€ filter")
     attack = Field(0.0, min=0.0, max=500.0, step=1.0, description="ATTACK_RELEASE: smoothing time of a rising x/y speed, ms; 0 = as smooth (lower: quicker flicks)")
     beta = Field(1.0, min=0.0, max=20.0, step=0.05, description="ONE_EURO: cutoff added per widths/s² of change, Hz (higher: less lag on starts and stops)")
-    smooth = Field(158.0, min=0.0, max=1000.0, step=1.0, description="Smoothing time, ms; the fall of x/y and all of z; 0 = none (higher: longer coast)")
+    smooth = Field(0.16, min=0.0, max=3.0, step=0.01, description="Smoothing time, s; the fall of x/y and all of z; 0 = none (higher: longer coast)")
     blur_radius = Field(0.0, min=0.0, max=10.0, newline=True, description="Gaussian blur radius in pixels; 0 = off")
     blur_steps = Field(1, min=1, max=8, description="Gaussian blur passes per tick (more: wider spread)")
 
@@ -159,14 +159,14 @@ class VelocityTrailBridge(FlowBase):
             fbo.end()
 
         # Stage 2: Temporal smoothing, one unit-gain Ema step per pixel: weight * previous + (1 - weight) * input
-        release: float = decay_weight(delta_time, s.smooth)
+        release: float = decay_weight(delta_time, s.smooth * 1000.0)
         if one_euro:
             self._rate_fbo.swap()
             self._rate_fbo.begin()
             self._rate_shader.use(self._output_fbo.texture, self._input_fbo.texture, self._rate_fbo.back_texture,
                                   delta_time, math.exp(-delta_time * 2.0 * math.pi * RATE_CUTOFF))
             self._rate_fbo.end()
-            min_cutoff: float = 1000.0 / (2.0 * math.pi * s.smooth) if s.smooth > 0.0 else 1e6
+            min_cutoff: float = 1.0 / (2.0 * math.pi * s.smooth) if s.smooth > 0.0 else 1e6
             self._output_fbo.swap()
             self._output_fbo.begin()
             self._one_euro_shader.use(self._output_fbo.back_texture, self._input_fbo.texture, self._rate_fbo.texture,
