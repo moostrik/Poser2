@@ -14,7 +14,8 @@ class DepthVelocityShader(Shader):
 
     def use(self, depth: Texture, track: Texture, catch_up: Texture, catch_up_pass: bool, alpha: float, smooth: float, catch_up_smooth: float,
             ema: float, motion_floor: float, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
-            tolerance: float, dead_zone: float, history: Texture, restart_frames: int, displacement: Texture | None = None) -> None:
+            tolerance: float, dead_zone: float, history: Texture, restart_frames: int, slope_half: float,
+            displacement: Texture | None = None) -> None:
         """Correct the track by the new depth, or with `catch_up_pass` write this frame's catch-up.
 
         Args:
@@ -35,6 +36,7 @@ class DepthVelocityShader(Shader):
             dead_zone: Depth the track wanders within its anchor without z (m); 0 is none
             history: The depth 1 to 4 frames before, in place (m)
             restart_frames: Frames back a depth change past `tolerance` starts the track over; 1 is the frame before only
+            slope_half: Depth slope (m depth per m across) at which z is halved; 0 is no fade
             displacement: uv per frame; when given, the track is carried from where each pixel came from
         """
         if not self.allocated or not self.shader_program:
@@ -78,5 +80,6 @@ class DepthVelocityShader(Shader):
         glUniform1f(self.get_uniform_loc("delta_time"), delta_time)
         glUniform1f(self.get_uniform_loc("view_span"), view_span)
         glUniform1f(self.get_uniform_loc("dead_zone"), dead_zone)
+        glUniform1f(self.get_uniform_loc("slope_half"), slope_half)
 
         draw_quad()

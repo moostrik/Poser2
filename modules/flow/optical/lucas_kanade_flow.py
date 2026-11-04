@@ -57,6 +57,7 @@ class LucasKanadeSettings(BaseSettings):
 class DepthTrackSettings(BaseSettings):
     """The z part: the depth track carried along the displacement."""
     edge:           Field[float] = Field(0.1, min=0.05, max=0.3, step=0.01, description="Edge depth step, m (lower: cleaner edges, fewer fingers)")
+    slope:          Field[float] = Field(0.0, min=0.0, max=89.0, step=1.0, description="Surface angle where z halves, degrees, 0 = off (lower: cleaner edges, slanted parts weaker)")
     window:         Field[Patch] = Field(Patch.THREE, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)")
     tolerance:      Field[float] = Field(0.1, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m (higher: fuller pushes, fewer splits)")
     restart_frames: Field[int]   = Field(1, min=1, max=4, description="Frames a jump past tolerance may take, 1 = one (more: less wake z, fast pushes cut)")
@@ -204,7 +205,7 @@ class LucasKanadeFlow:
         if depth is not None:
             self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, z_s.window, z_s.smooth,
                                               z_s.threshold, z_s.tolerance, z_s.dead_zone, z_s.catch_up, xy_s.threshold,
-                                              solved, z_s.edge, z_s.restart_frames)
+                                              solved, z_s.edge, z_s.restart_frames, z_s.slope)
 
         xy: Texture = self._displacement
         if z_s.xy_smooth:

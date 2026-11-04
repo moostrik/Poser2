@@ -407,7 +407,7 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
         filtered = filter_depth_steps(depth.astype(np.float64), step, z.edge)
         state, catch_up = track_depth(filtered, state, catch_up, solve.astype(np.float64),
                                       c['delta_time'], z.window, step, z.tolerance, z.smooth, c['view_span'], z.dead_zone,
-                                      z.catch_up, xy.threshold, history, z.restart_frames)
+                                      z.catch_up, xy.threshold, history, z.restart_frames, z.slope)
         history = shift_history(filtered, history)
         gpu = read_back(side.flow.depth_velocity.difference)
         if k % 5 == 0 or k == last:
