@@ -47,9 +47,9 @@ from .shaders import ComposeVelocity, DisplacementFilter, DisplacementMedian, Di
 class LucasKanadeSettings(BaseSettings):
     """The x/y part: the Lucas–Kanade solve of the displacement."""
     levels:         Field[int]   = Field(3, min=3, max=5, description="Pyramid levels of the x/y solve, each doubles the reach (more: faster motion, more spill)")
-    window:         Field[Patch] = Field(Patch.FIVE, min=Patch.THREE, max=Patch.NINE, description="x/y patch size (larger: cleaner, more spill)")
-    damping:        Field[float] = Field(0.001, min=0.0, max=0.1, step=0.001, description="Damps x/y where the patch has little texture (higher: less noise, smaller motion)")
-    same_surface:   Field[bool]  = Field(False, newline=True, width=48, description="Patch counts only the center's surface (on: less smear, wide fast parts slower)")
+    window:         Field[Patch] = Field(Patch.SEVEN, min=Patch.THREE, max=Patch.NINE, description="x/y patch size (larger: cleaner, more spill)")
+    damping:        Field[float] = Field(0.03, min=0.0, max=0.1, step=0.001, description="Damps x/y where the patch has little texture (higher: less noise, smaller motion)")
+    same_surface:   Field[bool]  = Field(True, newline=True, width=48, description="Patch counts only the center's surface (on: less smear, wide fast parts slower)")
     threshold:      Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="x/y below this is noise, in px/frame (higher: less noise, less slow motion)")
     median:         Field[Patch] = Field(Patch.ONE, min=Patch.ONE, max=Patch.FIVE, visible=False, description="Median size per level, 1×1 = off (larger: cleaner, more GPU)")  # hidden: kept for hd_trio's 2D LK at a lower resolution; delete it if it doesn't earn its place there
 
@@ -57,18 +57,18 @@ class LucasKanadeSettings(BaseSettings):
 class DepthTrackSettings(BaseSettings):
     """The z part: the depth track carried along the displacement."""
     edge:           Field[float] = Field(0.1, min=0.05, max=0.3, step=0.01, description="Edge depth step, m (lower: cleaner edges, fewer fingers)")
-    window:         Field[Patch] = Field(Patch.THREE, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)")
-    tolerance:      Field[float] = Field(0.1, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m (higher: fuller pushes, fewer splits)")
+    window:         Field[Patch] = Field(Patch.SEVEN, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)")
+    tolerance:      Field[float] = Field(0.2, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m (higher: fuller pushes, fewer splits)")
     smooth:         Field[float] = Field(50.0, min=0.0, max=200.0, step=1.0, newline=True, description="Smoothing time of z in ms, 0 = two-frame change (higher: less noise, more lag)")
     xy_smooth:      Field[bool]  = Field(False, width=48, description="x/y smoothed over smooth, so both lag alike (on: less noise, more lag)")
-    catch_up:       Field[float] = Field(0.0, min=0.0, max=50.0, step=1.0, description="Shorter smoothing during a fast push, in ms, 0 = off (lower: quicker pushes)")
-    dead_zone:      Field[float] = Field(0.0, min=0.0, max=0.05, step=0.001, newline=True, description="Depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
-    threshold:      Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="z below this is noise, in px/frame (higher: less noise, less slow z)")
+    catch_up:       Field[float] = Field(8.0, min=0.0, max=50.0, step=1.0, description="Shorter smoothing during a fast push, in ms, 0 = off (lower: quicker pushes)")
+    dead_zone:      Field[float] = Field(0.02, min=0.0, max=0.05, step=0.001, newline=True, description="Depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
+    threshold:      Field[float] = Field(1.0, min=0.0, max=5.0, step=0.05, description="z below this is noise, in px/frame (higher: less noise, less slow z)")
 
 
 class LucasKanadeFlowSettings(BaseSettings):
     """Configuration for the Lucas–Kanade flow: the mask and the axes, its x/y part and its z part."""
-    use_mask:       Field[bool]  = Field(False, width=48, description="Only the player moves the fluid (off: whole image)")
+    use_mask:       Field[bool]  = Field(True, width=48, description="Only the player moves the fluid (off: whole image)")
     x:              Field[bool]  = Field(True, description="x in the velocity (off: x is 0)")
     y:              Field[bool]  = Field(True, description="y in the velocity (off: y is 0)")
     z:              Field[bool]  = Field(True, description="z in the velocity (off: z is 0)")
