@@ -34,16 +34,16 @@ widths per second.
 | damping      | 0.03    | 0–0.1 (0.001)       | B   | takes the x/y noise, keeps slow motion |
 | same_surface | on      | on/off              | C   | less smear, a hand far in front        |
 | threshold    | 0.5     | 0–5 px/frame (0.05) | B   | the solve's jitter off                 |
-| median       | 1×1     | 1×1–5×5, hidden     | –   | off: little gain for its GPU time      |
 
-- levels: 1 and 2 barely see motion at 448×800. 4 levels cost +0.14 ms and spill more.
+- levels: 1 and 2 barely see motion at 448×800. Each level is solved at its own size (Bouguet's
+  pyramid), so more levels stay clean. 5 levels reach about 32 px per frame: on `stillslowfast` with
+  thresholds 0, fast x/y goes 0.51 → 1.30 and fast ÷ noise 3.6 → 5.3, for +0.33 ms; on `standmoves`
+  the sweep's z drops 2.04 → 1.55 and the push keeps its z.
 - window: 7×7 smears more than 5×5, but B ranks above C.
 - same_surface works only where a no-depth band separates the hand from what is behind it, as with a
   hand held far out. Where a limb is about 20 cm before the body, Neural Depth ramps over about 30 px
   instead of stepping, and the patch's samples stay within the tolerance; see [Open](#open). It costs
   +0.05 ms.
-- median: 3×3 costs +0.5 ms and 5×5 +1.5 ms. It is kept for a 2D flow at a lower resolution
-  **(deduction)**.
 
 ## depth_track (z)
 
@@ -71,6 +71,10 @@ widths per second.
   filter on the depth lowers push and sweep z alike, by 7%, for +0.14 ms.
 - A forward–backward check on x/y drops half the fast motion.
 - Iterations per level do less than one more level, at more GPU time.
+- Each level is solved at its own size. Solving every full-size pixel at a coarse level puts each
+  window a fraction of a texel off its neighbor's, and where a window is badly conditioned the solve
+  flips from pixel to pixel in rows and columns: streaks from 4 levels up. A median between levels
+  also removes them, at +0.35 ms or more, so there is none.
 
 ## Open
 

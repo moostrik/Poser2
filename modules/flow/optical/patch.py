@@ -1,4 +1,4 @@
-"""Patch: the square of pixels or samples a window or a median spans, by its radius."""
+"""Patch: the square of pixels or samples a window spans, by its radius."""
 
 from enum import IntEnum
 

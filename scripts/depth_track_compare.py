@@ -53,7 +53,7 @@ RENAMED: dict[str, str] = {'z_time': 'z_smooth', 'z_catch_up_time': 'z_catch_up'
                            'strength_x': 'x_gain', 'strength_y': 'y_gain', 'strength_z': 'z_gain'}   # in frames saved before
 SWITCHED: dict[str, str] = {'x_gain': 'x', 'y_gain': 'y', 'z_gain': 'z'}   # in frames saved with gains: a gain of 0 is the axis off
 GROUPED: dict[str, str] = {'xy_levels': 'lucas_kanade.levels', 'xy_window': 'lucas_kanade.window', 'xy_damping': 'lucas_kanade.damping',
-                           'xy_same_surface': 'lucas_kanade.same_surface', 'xy_threshold': 'lucas_kanade.threshold', 'xy_median': 'lucas_kanade.median',
+                           'xy_same_surface': 'lucas_kanade.same_surface', 'xy_threshold': 'lucas_kanade.threshold',
                            'z_edge': 'depth_track.edge', 'z_window': 'depth_track.window', 'z_tolerance': 'depth_track.tolerance',
                            'z_smooth': 'depth_track.smooth', 'xy_smooth': 'depth_track.xy_smooth',
                            'z_catch_up': 'depth_track.catch_up', 'z_dead_zone': 'depth_track.dead_zone', 'z_threshold': 'depth_track.threshold'}   # in frames saved flat, before the groups
@@ -399,7 +399,7 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
             continue
         solve = read_back(side.flow._solve.texture)[..., :2] * np.array([w, h])                  # px per frame
         now, then = (np.round(f * 255.0).astype(np.float64) / 255.0 for f in (lum, previous))    # as the R8 frames hold them
-        reference = lucas_kanade(then, now, xy.levels, xy.window, xy.damping, xy.median,
+        reference = lucas_kanade(then, now, xy.levels, xy.window, xy.damping,
                                  depth.astype(np.float64) if xy.same_surface else None, z.tolerance)
         previous = lum
         c = frames.calls[k]

@@ -7,8 +7,7 @@ level with the previous frame warped by the estimate so far. Each level is solve
 its own texels, and starts from the coarser level's displacement read linear (Bouguet's pyramidal
 Lucas–Kanade); solving every full-size pixel at a coarse level instead puts each window a fraction of a
 texel off its neighbour's, and where a window is badly conditioned that flips the solve from pixel to
-pixel, in rows and columns. With `lucas_kanade.median`, the 3×3 or 5×5
-median of the displacement after each level, so one level's outliers do not grow on the next.
+pixel, in rows and columns.
 
 The displacement (uv per frame) stays inside: `lucas_kanade.threshold` (px per frame) comes off its length,
 as below it is the solve's jitter, not motion. z comes from its own `DepthVelocity`: a depth track carried
@@ -29,10 +28,10 @@ still moves the tracks with it, or on a slope it would read as z.
 
 The settings in flow pixels go with the flow's resolution: `lucas_kanade.levels` (each level doubles the
 motion it follows, about 2 × 2^(levels − 1) px per frame at full size, so halving the resolution needs one
-level fewer for the same motion), its window, median and threshold, and `depth_track.threshold`. Those
+level fewer for the same motion), its window and threshold, and `depth_track.threshold`. Those
 in metres and milliseconds do not.
 
-`lucas_kanade`, `median_displacement`, `threshold_displacement`, `filter_displacement` and
+`lucas_kanade`, `threshold_displacement`, `filter_displacement` and
 `displacement_velocity` below are the numpy references of the shaders.
 """
 
@@ -45,7 +44,7 @@ from .. import FlowUtil
 from .depth_velocity import DepthVelocity, track_weights
 from .luminance_frames import LuminanceFrames
 from .patch import Patch
-from .shaders import ComposeVelocity, DisplacementFilter, DisplacementMedian, DisplacementThreshold, LucasKanadeShader
+from .shaders import ComposeVelocity, DisplacementFilter, DisplacementThreshold, LucasKanadeShader
 
 MAX_LEVELS: int = 9     # the most pyramid levels a solve has an Fbo for
 
@@ -57,7 +56,6 @@ class LucasKanadeSettings(BaseSettings):
     damping:        Field[float] = Field(0.03, min=0.0, max=0.1, step=0.001, description="Damps x/y where the patch has little texture (higher: less noise, smaller motion)")
     same_surface:   Field[bool]  = Field(True, newline=True, width=48, description="Patch counts only the center's surface (on: less smear, wide fast parts slower)")
     threshold:      Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="x/y below this is noise, in px/frame (higher: less noise, less slow motion)")
-    median:         Field[Patch] = Field(Patch.ONE, min=Patch.ONE, max=Patch.FIVE, visible=False, description="Median size per level, 1×1 = off (larger: cleaner, more GPU)")  # hidden: kept for hd_trio's 2D LK at a lower resolution; delete it if it doesn't earn its place there
 
 
 class DepthTrackSettings(BaseSettings):
@@ -101,7 +99,6 @@ class LucasKanadeFlow:
         self._velocity: Fbo = Fbo()
         self._shader: LucasKanadeShader = LucasKanadeShader()
         self._threshold_shader: DisplacementThreshold = DisplacementThreshold()
-        self._median_shader: DisplacementMedian = DisplacementMedian()
         self._filter_shader: DisplacementFilter = DisplacementFilter()
         self._compose_shader: ComposeVelocity = ComposeVelocity()
 
@@ -132,7 +129,6 @@ class LucasKanadeFlow:
         self._velocity.allocate(width, height, GL_RGBA16F)
         self._shader.allocate()
         self._threshold_shader.allocate()
-        self._median_shader.allocate()
         self._filter_shader.allocate()
         self._compose_shader.allocate()
         self.reset()
@@ -149,7 +145,6 @@ class LucasKanadeFlow:
         self._velocity.deallocate()
         self._shader.deallocate()
         self._threshold_shader.deallocate()
-        self._median_shader.deallocate()
         self._filter_shader.deallocate()
         self._compose_shader.deallocate()
 
@@ -175,7 +170,7 @@ class LucasKanadeFlow:
     def _pyramid(self, solve: SwapFbo, previous: Texture, current: Texture, depth: Texture | None) -> None:
         """The displacement carrying `previous` onto `current`, coarse to fine, into `solve`: one solve
         per level at that level's size, each from the coarser one's displacement read linear (uv, so
-        it needs no scaling), and with `median` the median after each level. The finest is `solve`."""
+        it needs no scaling). The finest is `solve`."""
         s: LucasKanadeSettings = self.settings.lucas_kanade
         estimate: Texture | None = None
         for level in reversed(range(min(s.levels, MAX_LEVELS))):
@@ -187,11 +182,6 @@ class LucasKanadeFlow:
             self._shader.use(previous, current, target.back_texture if estimate is None else estimate, level, s.window, s.damping,
                              depth if s.same_surface else None, self.settings.depth_track.tolerance)
             target.end()
-            if s.median:
-                target.swap()
-                target.begin()
-                self._median_shader.use(target.back_texture, (1.0 / target.width, 1.0 / target.height), int(s.median))
-                target.end()
             estimate = target.texture
 
     def update(self, depth: Texture | None, delta_time: float, view_span: float, depth_step: tuple[float, float]) -> None:
@@ -313,28 +303,13 @@ def _solve_level(p_image: np.ndarray, c_image: np.ndarray, d: np.ndarray, u: np.
     return d + np.stack((dx / lw, dy / lh), axis=-1)
 
 
-def median_displacement(displacement: np.ndarray, spacing: float, radius: int = 2) -> np.ndarray:
-    """The displacement (H, W, 2), each component the median of its (2·radius+1)² samples `spacing`
-    pixels apart, nearest, clamped at the edges. Mirrors displacement_median.frag."""
-    h, w = displacement.shape[:2]
-    rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
-    samples: list[np.ndarray] = []
-    for j in range(-radius, radius + 1):
-        for i in range(-radius, radius + 1):
-            y = np.clip(np.floor(rows + 0.5 + j * spacing).astype(int), 0, h - 1)
-            x = np.clip(np.floor(columns + 0.5 + i * spacing).astype(int), 0, w - 1)
-            samples.append(displacement[y, x])
-    return np.median(np.stack(samples), axis=0)
-
-
 def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, window: int = 2, damping: float = 0.001,
-                 median: int = 0, depth: np.ndarray | None = None, tolerance: float = 0.0) -> np.ndarray:
+                 depth: np.ndarray | None = None, tolerance: float = 0.0) -> np.ndarray:
     """The displacement (H, W, 2) in pixels per frame, x along columns and y along rows, that carries
     `previous` onto `current`: coarse to fine over `levels` mip levels, one solve per level over a
     (2·window+1)² window, each level solved at its own size from the coarser one's displacement read
-    linear, the previous frame warped by it; with `median`, after each level the median of the
-    displacement over a (2·median+1)² patch of that level. With `depth` (H, W, m), only the window's
-    samples within `tolerance` of the centre's depth count. Mirrors the shaders."""
+    linear, the previous frame warped by it. With `depth` (H, W, m), only the window's samples within
+    `tolerance` of the centre's depth count. Mirrors the shaders."""
     h, w = current.shape
     previous_levels: list[np.ndarray] = _pyramid(previous.astype(np.float64), levels)
     current_levels: list[np.ndarray] = _pyramid(current.astype(np.float64), levels)
@@ -349,8 +324,6 @@ def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, win
             ch, cw = d.shape[:2]
             start = np.stack([_bilinear(d[..., c], u * cw - 0.5, v * ch - 0.5) for c in range(2)], axis=-1)
         d = _solve_level(previous_levels[level], current_levels[level], start, u, v, window, damping, depth, tolerance)
-        if median:
-            d = median_displacement(d, 1.0, median)
     assert d is not None
     return d * np.array([w, h])
 

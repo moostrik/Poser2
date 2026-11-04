@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import displacement_velocity, filter_displacement, lucas_kanade, median_displacement, shape_velocity, threshold_displacement, track_depth, track_weights, velocity_trail
+from modules.flow import displacement_velocity, filter_displacement, lucas_kanade, shape_velocity, threshold_displacement, track_depth, track_weights, velocity_trail
 
 SIZE: int = 64
 
@@ -50,33 +50,6 @@ class LucasKanadeTest(unittest.TestCase):
         surface = lucas_kanade(still, moved, levels=2, window=2, depth=depth, tolerance=0.2)
         beside = slice(40, 44)                                      # background 2–6 px right of the strip
         self.assertLess(float(np.abs(surface[16:48, beside, 0]).mean()), float(np.abs(plain[16:48, beside, 0]).mean()))
-
-    def test_the_median_keeps_a_shift(self) -> None:
-        d = lucas_kanade(pattern(), pattern(2.0, -1.0), levels=3, median=2)
-        self.assertAlmostEqual(float(np.median(interior(d[..., 0]))), 2.0, delta=0.3)
-        self.assertAlmostEqual(float(np.median(interior(d[..., 1]))), -1.0, delta=0.3)
-
-
-class MedianTest(unittest.TestCase):
-    def test_a_lone_outlier_goes(self) -> None:
-        d = np.tile([1.0, 0.0], (SIZE, SIZE, 1))
-        d[10, 10] = (30.0, -30.0)
-        np.testing.assert_allclose(median_displacement(d, 1.0)[10, 10], [1.0, 0.0])
-
-    def test_a_steady_field_stays(self) -> None:
-        d = np.tile([0.4, -0.7], (SIZE, SIZE, 1))
-        np.testing.assert_allclose(median_displacement(d, 2.0), d)
-
-    def test_a_3x3_takes_a_lone_outlier_too(self) -> None:
-        d = np.tile([1.0, 0.0], (SIZE, SIZE, 1))
-        d[10, 10] = (30.0, -30.0)
-        np.testing.assert_allclose(median_displacement(d, 1.0, radius=1)[10, 10], [1.0, 0.0])
-
-    def test_a_3x3_keeps_a_line_2_px_wide_the_5x5_takes(self) -> None:
-        d = np.zeros((SIZE, SIZE, 2))
-        d[:, 20:22] = (1.0, 0.0)                    # a finger 2 px wide moving, around it still
-        self.assertEqual(float(median_displacement(d, 1.0, radius=1)[30, 20, 0]), 1.0)
-        self.assertEqual(float(median_displacement(d, 1.0, radius=2)[30, 20, 0]), 0.0)
 
 
 class ThresholdTest(unittest.TestCase):
