@@ -20,5 +20,5 @@ const vec3 AWAY = vec3(0.0, 1.0, 0.0);
 void main() {
     float value = texture(tex0, texCoord)[channel] * scale;
     vec3 color = value >= 0.0 ? (depth ? TOWARD : POSITIVE) : (depth ? AWAY : NEGATIVE);
-    fragColor = vec4(color * min(abs(value), 1.0), 1.0);   // clamped, so the hue survives
+    fragColor = vec4(color * tanh(abs(value)), 1.0);   // rolled off below 1, so the hue survives and more stays brighter
 }

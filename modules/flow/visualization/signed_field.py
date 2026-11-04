@@ -7,7 +7,7 @@ from .shaders import SignedMap
 
 
 class SignedField(FieldBase):
-    """Visualize a scalar field in two colors, one per sign; settings.scalar_scale multiplies the value."""
+    """Visualize a scalar field in two colors, one per sign, its brightness tanh of the value; settings.scalar_scale multiplies the value."""
 
     def __init__(self, settings: VisualizationFieldSettings | None = None) -> None:
         super().__init__()
@@ -33,7 +33,7 @@ class SignedField(FieldBase):
 
     def set(self, texture: Texture, depth: bool = False, channel: int = 0, unit: float = 1.0) -> None:
         """Set the scalar field to visualize, in `channel`; `depth` draws it red toward the camera and green away.
-        `unit` turns the field's values into the unit shown, so 1 of it is full color at scalar_scale 1."""
+        `unit` turns the field's values into the unit shown, so 1 of it is 76% color at scalar_scale 1 (tanh)."""
         self._field_texture = texture
         self._depth = depth
         self._channel = channel
