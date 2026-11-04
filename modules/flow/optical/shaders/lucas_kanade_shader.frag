@@ -2,7 +2,9 @@
 
 // Lucas–Kanade, one mip level: refines the displacement so far (uv per frame) by the shift that carries
 // the previous frame, warped by it, onto the current one, solved over a (2·window+1)² window of this
-// level's texels. Run from the coarsest level to the finest. With `same_surface`, a sample counts only where
+// level's texels. Run from the coarsest level to the finest, each into a target of its level's size, so
+// every window sits on the level's texel centers; `estimate` is the coarser level's solve, read linear
+// (uv, so it needs no scaling), or zeros at the coarsest. With `same_surface`, a sample counts only where
 // its depth is within `tolerance` of the centre's (so the background does not drag a silhouette along, at
 // every level), and `damping` scales with the share kept. The numpy reference is lucas_kanade_flow.lucas_kanade
 

@@ -3,7 +3,11 @@
 Where the gradient flow gives a motion strength per pixel (the brightness change along the gradient),
 this gives how far the image moved: a window of gradients per pixel, solved for the shift that carries
 the previous frame onto the current one, first on the coarsest mip level, then refined once per finer
-level with the previous frame warped by the estimate so far. With `lucas_kanade.median`, the 3×3 or 5×5
+level with the previous frame warped by the estimate so far. Each level is solved at its own size, on
+its own texels, and starts from the coarser level's displacement read linear (Bouguet's pyramidal
+Lucas–Kanade); solving every full-size pixel at a coarse level instead puts each window a fraction of a
+texel off its neighbour's, and where a window is badly conditioned that flips the solve from pixel to
+pixel, in rows and columns. With `lucas_kanade.median`, the 3×3 or 5×5
 median of the displacement after each level, so one level's outliers do not grow on the next.
 
 The displacement (uv per frame) stays inside: `lucas_kanade.threshold` (px per frame) comes off its length,
@@ -42,6 +46,8 @@ from .depth_velocity import DepthVelocity, track_weights
 from .luminance_frames import LuminanceFrames
 from .patch import Patch
 from .shaders import ComposeVelocity, DisplacementFilter, DisplacementMedian, DisplacementThreshold, LucasKanadeShader
+
+MAX_LEVELS: int = 9     # the most pyramid levels a solve has an Fbo for
 
 
 class LucasKanadeSettings(BaseSettings):
@@ -86,7 +92,8 @@ class LucasKanadeFlow:
         self._mask: Texture | None = None
 
         self._frames: LuminanceFrames = LuminanceFrames()
-        self._solve: SwapFbo = SwapFbo()            # the displacement as solved, level by level
+        self._solve: SwapFbo = SwapFbo()            # the displacement as solved, at full size: level 0
+        self._levels: list[SwapFbo] = [SwapFbo() for _ in range(1, MAX_LEVELS)]    # levels 1 and up, each at its own size
         self._displacement: Fbo = Fbo()             # with the noise floor taken off
         self._filtered: SwapFbo = SwapFbo()         # with xy_smooth: the filter, its displacement and position error
         self._followed: Fbo = Fbo()                 # the filtered displacement with the noise floor taken off
@@ -117,6 +124,8 @@ class LucasKanadeFlow:
         self._depth_velocity.allocate(width, height)
         self._frames.allocate(width, height)
         self._solve.allocate(width, height, GL_RG32F)
+        for level, fbo in enumerate(self._levels, start=1):
+            fbo.allocate(max(width >> level, 1), max(height >> level, 1), GL_RG32F)     # the size of the frames' mip level
         self._displacement.allocate(width, height, GL_RG32F)
         self._filtered.allocate(width, height, GL_RGBA32F)
         self._followed.allocate(width, height, GL_RG32F)
@@ -132,6 +141,8 @@ class LucasKanadeFlow:
         self._depth_velocity.deallocate()
         self._frames.deallocate()
         self._solve.deallocate()
+        for fbo in self._levels:
+            fbo.deallocate()
         self._displacement.deallocate()
         self._filtered.deallocate()
         self._followed.deallocate()
@@ -146,6 +157,8 @@ class LucasKanadeFlow:
         self._depth_velocity.reset()
         self._frames.reset()
         self._solve.clear_all()
+        for fbo in self._levels:
+            fbo.clear_all()
         self._displacement.clear()
         self._filtered.clear_all()
         self._followed.clear()
@@ -161,21 +174,25 @@ class LucasKanadeFlow:
 
     def _pyramid(self, solve: SwapFbo, previous: Texture, current: Texture, depth: Texture | None) -> None:
         """The displacement carrying `previous` onto `current`, coarse to fine, into `solve`: one solve
-        per level, and with `median` the median after each level."""
+        per level at that level's size, each from the coarser one's displacement read linear (uv, so
+        it needs no scaling), and with `median` the median after each level. The finest is `solve`."""
         s: LucasKanadeSettings = self.settings.lucas_kanade
-        solve.clear()                                       # the coarsest level starts from no motion
-        for level in reversed(range(s.levels)):
-            solve.swap()
-            solve.begin()
-            self._shader.use(previous, current, solve.back_texture, level, s.window, s.damping,
+        estimate: Texture | None = None
+        for level in reversed(range(min(s.levels, MAX_LEVELS))):
+            target: SwapFbo = solve if level == 0 else self._levels[level - 1]
+            if estimate is None:
+                target.clear_all()                          # the coarsest level starts from no motion
+            target.swap()
+            target.begin()
+            self._shader.use(previous, current, target.back_texture if estimate is None else estimate, level, s.window, s.damping,
                              depth if s.same_surface else None, self.settings.depth_track.tolerance)
-            solve.end()
+            target.end()
             if s.median:
-                spacing: float = float(2 ** level)          # a level's texel apart
-                solve.swap()
-                solve.begin()
-                self._median_shader.use(solve.back_texture, (spacing / solve.width, spacing / solve.height), int(s.median))
-                solve.end()
+                target.swap()
+                target.begin()
+                self._median_shader.use(target.back_texture, (1.0 / target.width, 1.0 / target.height), int(s.median))
+                target.end()
+            estimate = target.texture
 
     def update(self, depth: Texture | None, delta_time: float, view_span: float, depth_step: tuple[float, float]) -> None:
         """Measure between the newest two frames.
@@ -314,19 +331,27 @@ def lucas_kanade(previous: np.ndarray, current: np.ndarray, levels: int = 3, win
                  median: int = 0, depth: np.ndarray | None = None, tolerance: float = 0.0) -> np.ndarray:
     """The displacement (H, W, 2) in pixels per frame, x along columns and y along rows, that carries
     `previous` onto `current`: coarse to fine over `levels` mip levels, one solve per level over a
-    (2·window+1)² window, the previous frame warped by the estimate so far; with `median`, after each
-    level the median of the displacement over a (2·median+1)² patch, a level's texel apart. With `depth`
-    (H, W, m), only the window's samples within `tolerance` of the centre's depth count. Mirrors the shaders."""
+    (2·window+1)² window, each level solved at its own size from the coarser one's displacement read
+    linear, the previous frame warped by it; with `median`, after each level the median of the
+    displacement over a (2·median+1)² patch of that level. With `depth` (H, W, m), only the window's
+    samples within `tolerance` of the centre's depth count. Mirrors the shaders."""
     h, w = current.shape
     previous_levels: list[np.ndarray] = _pyramid(previous.astype(np.float64), levels)
     current_levels: list[np.ndarray] = _pyramid(current.astype(np.float64), levels)
-    rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
-    u, v = (columns + 0.5) / w, (rows + 0.5) / h            # each output pixel's uv
-    d: np.ndarray = np.zeros((h, w, 2))                     # the displacement in uv
+    d: np.ndarray | None = None                             # the displacement in uv, at the coarser level's size
     for level in reversed(range(levels)):
-        d = _solve_level(previous_levels[level], current_levels[level], d, u, v, window, damping, depth, tolerance)
+        lh, lw = current_levels[level].shape
+        rows, columns = np.mgrid[0:lh, 0:lw].astype(np.float64)
+        u, v = (columns + 0.5) / lw, (rows + 0.5) / lh      # this level's texel centers in uv
+        if d is None:
+            start: np.ndarray = np.zeros((lh, lw, 2))
+        else:
+            ch, cw = d.shape[:2]
+            start = np.stack([_bilinear(d[..., c], u * cw - 0.5, v * ch - 0.5) for c in range(2)], axis=-1)
+        d = _solve_level(previous_levels[level], current_levels[level], start, u, v, window, damping, depth, tolerance)
         if median:
-            d = median_displacement(d, float(2 ** level), median)
+            d = median_displacement(d, 1.0, median)
+    assert d is not None
     return d * np.array([w, h])
 
 
