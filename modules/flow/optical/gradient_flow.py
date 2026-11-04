@@ -21,16 +21,16 @@ class GradientFlowSettings(BaseSettings):
     """Configuration for the gradient flow."""
     offset = Field(3, min=1, max=10, description="Gradient sample offset in pixels")
     threshold = Field(0.0, min=0.0, max=0.2, description="Motion detection threshold")
-    z_window = Field(1, min=0, max=4, description="Depth averaging radius, depth samples, 1 = 3x3 (higher: less noise, less detail)", newline=True)
-    z_threshold = Field(0.5, min=0.0, max=5.0, step=0.05, description="z noise floor, taken off all motion, px per frame (higher: less noise, less slow z)")
-    z_dead_zone = Field(0.0, min=0.0, max=0.05, step=0.001, description="Depth drift ignored before z moves, m (higher: less drift, slower start)")
-    z_smooth = Field(50.0, min=0.0, max=200.0, step=1.0, description="Time z is smoothed over, ms; 0 is two frames (higher: less noise, more lag)")
-    z_tolerance = Field(0.1, min=0.05, max=0.5, step=0.01, description="Depth jump that counts as another surface, m (higher: fewer restarts, more mixing)")
-    z_edge = Field(0.1, min=0.05, max=0.3, step=0.005, description="Depth step in 3x3 that marks an edge, dropped, m (higher: more fingers kept, noisier edges)")
+    z_window = Field(1, min=0, max=4, description="Depth samples averaged per pixel, radius (larger: less noise, small parts blur)", newline=True)
+    z_threshold = Field(0.5, min=0.0, max=5.0, step=0.05, description="z below this is noise, in px/frame (higher: less noise, less slow z)")
+    z_dead_zone = Field(0.0, min=0.0, max=0.05, step=0.001, description="Depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
+    z_smooth = Field(50.0, min=0.0, max=200.0, step=1.0, description="Smoothing time of z in ms, 0 = two-frame change (higher: less noise, more lag)")
+    z_tolerance = Field(0.1, min=0.05, max=0.5, step=0.01, description="Depth jump that counts as another surface, z restarts, in m (higher: fuller fast pushes, fewer surfaces split)")
+    z_edge = Field(0.1, min=0.05, max=0.3, step=0.005, description="Depth step in a 3×3 that marks an edge, in m (lower: cleaner edges, fewer fingers)")
     x_gain = Field(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)", newline=True)
     y_gain = Field(3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")
-    z_gain = Field(0.0, min=-10.0, max=10.0, description="Velocity per view width per second toward the camera; negative inverts")
-    use_mask = Field(False, description="Velocity only inside the mask (on: player only)")
+    z_gain = Field(0.0, min=-10.0, max=10.0, description="Velocity toward the camera, negative inverts (higher: stronger z)")
+    use_mask = Field(False, description="Only the player moves the fluid (off: whole image)")
 
 
 class GradientFlow:
