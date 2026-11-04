@@ -257,10 +257,10 @@ class DeepFlowRender(RenderBase):
             if depth.allocated and crop.width > 0.0 and crop.height > 0.0:
                 flow_layer.set_depth_step((1.0 / (depth.width * crop.width), 1.0 / (depth.height * crop.height)))
             if flow_key in self.L and i in self.L[flow_key] and i in self.L[flow_source_key]:
-                flow_layer.set_flow_input(self.L[flow_key][i].texture)
+                flow_layer.set_flow_input(self.L[flow_key][i])
                 flow_layer.set_flow_source(self.L[flow_source_key][i])
             if density_key in self.L and i in self.L[density_key]:
-                flow_layer.set_density_input(self.L[density_key][i].texture)
+                flow_layer.set_density_input(self.L[density_key][i])
             flow_layer.set_mask_input(self.L[mask_key][i].texture if mask_key in self.L and i in self.L[mask_key] else None)
 
         for i, _composite_layer in self.L[Layers.composite].items():

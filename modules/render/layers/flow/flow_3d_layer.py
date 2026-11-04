@@ -201,6 +201,8 @@ class Flow3DLayer(LayerBase):
         self._flow_source: LayerBase = flow_source
         self._flow_input: Texture = flow_input
         self._density_input: Texture = density_input
+        self._flow_input_layer: LayerBase | None = None     # with set_flow_input, read at update instead
+        self._density_input_layer: LayerBase | None = None
         self.settings: Flow3DLayerSettings = settings or Flow3DLayerSettings()
 
         bridge: FlowBridgeSettings = self.settings.flow_bridge
@@ -287,14 +289,18 @@ class Flow3DLayer(LayerBase):
 
     # ========== Input Setters ==========
 
-    def set_flow_input(self, texture: Texture) -> None:
-        self._flow_input = texture
+    def set_flow_input(self, layer: LayerBase) -> None:
+        """The layer whose image the flow measures. Its texture is read at this layer's update, after
+        it rendered this tick: one taken before the updates is the buffer it swapped away from, a
+        tick old, and its image need not be the capture the flow's interval is stamped with."""
+        self._flow_input_layer = layer
 
     def set_flow_source(self, layer: LayerBase) -> None:
         self._flow_source = layer
 
-    def set_density_input(self, texture: Texture) -> None:
-        self._density_input = texture
+    def set_density_input(self, layer: LayerBase) -> None:
+        """The layer whose image the density reads; its texture is read at this layer's update, as the flow input's."""
+        self._density_input_layer = layer
 
     def set_mask_input(self, texture: Texture | None) -> None:
         """The player's mask (red, 0 to 1) on the flow's view, or None for no gate. The flow multiplies
@@ -416,6 +422,10 @@ class Flow3DLayer(LayerBase):
 
         self._gpu_timer.begin()
 
+        if self._flow_input_layer is not None:
+            self._flow_input = self._flow_input_layer.texture
+        if self._density_input_layer is not None:
+            self._density_input = self._density_input_layer.texture
         new_flow: bool = self._flow_source.dirty
         self._flow_interval += self._time_step
 
