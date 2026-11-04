@@ -1,7 +1,7 @@
 """Trail Bridge.
 
 The flow bridge's velocity as one trail: a flow's 3D velocity, its x/y shaped (`boost`, soft `limit`),
-smoothed in time (a unit-gain Ema over `smooth`) and in space (Gaussian blur).
+scaled per axis (`scale_x`, `scale_y`, `scale_z`), smoothed in time (a unit-gain Ema over `smooth`) and in space (Gaussian blur).
 """
 
 import numpy as np
@@ -18,7 +18,9 @@ from .shaders import ShapeVelocity
 class TrailBridgeSettings(BaseSettings):
     """Configuration for the trail bridge."""
     limit = Field(4.0, min=0.5, max=20.0, description="Soft limit on the x/y speed before scale (widths/s)")
-    scale = Field(10.0, min=-50.0, max=50.0, description="Converts the flow's velocity to simulation velocity")
+    scale_x = Field(10.0, min=-50.0, max=50.0, description="Converts the flow's x to simulation velocity")
+    scale_y = Field(10.0, min=-50.0, max=50.0, description="Converts the flow's y to simulation velocity")
+    scale_z = Field(10.0, min=-50.0, max=50.0, description="Converts the flow's z to simulation velocity")
     smooth = Field(158.0, min=0.0, max=1000.0, step=1.0, description="Smoothing time, ms; 0 = none (higher: smoother, more lag)")
     blur_radius = Field(8.0, min=0.0, max=10.0, description="Gaussian blur radius in pixels")
     blur_steps = Field(4, min=0, max=8, description="Number of Gaussian blur passes")
@@ -29,12 +31,12 @@ class TrailBridge(FlowBase):
     """The trail bridge: a flow's 3D velocity, its x/y shaped (`boost`, soft `limit`), through one 3D trail.
 
     Pipeline:
-        1. Shape the velocity into the input FBO (`set_velocity`)
+        1. Shape the velocity and scale it per axis into the input FBO (`set_velocity`)
         2. Blend it with the previous trail, a unit-gain Ema over `smooth` (temporal smoothing)
         3. Apply Gaussian blur passes (spatial smoothing)
 
     FBOs (from FlowBase):
-        - input_fbo: The shaped velocity
+        - input_fbo: The shaped, scaled velocity
         - output_fbo: The smoothed velocity
     """
 
@@ -58,7 +60,7 @@ class TrailBridge(FlowBase):
 
     @property
     def velocity_input(self) -> Texture:
-        """The shaped velocity the trail reads."""
+        """The shaped, scaled velocity the trail reads."""
         return self._input
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
@@ -83,11 +85,12 @@ class TrailBridge(FlowBase):
         self._blur_shader.deallocate()
 
     def set_velocity(self, velocity: Texture) -> None:
-        """Take a flow's 3D velocity, its x/y shaped, as the trail's next input."""
+        """Take a flow's 3D velocity, its x/y shaped, then scaled per axis, as the trail's next input."""
         if not self._allocated:
             return
+        s: TrailBridgeSettings = self.settings
         self._input_fbo.begin()
-        self._shape_shader.use(velocity, 1.0 - self.settings.boost, self.settings.limit)
+        self._shape_shader.use(velocity, 1.0 - s.boost, s.limit, (s.scale_x, s.scale_y, s.scale_z))
         self._input_fbo.end()
 
     def update(self, delta_time: float = 1.0 / 60.0) -> None:
@@ -95,11 +98,11 @@ class TrailBridge(FlowBase):
         if not self._allocated:
             return
 
-        # Stage 1: Temporal smoothing, one unit-gain Ema step: weight * previous + (1 - weight) * scale * input
+        # Stage 1: Temporal smoothing, one unit-gain Ema step: weight * previous + (1 - weight) * input
         weight: float = decay_weight(delta_time, self.settings.smooth)
         self._output_fbo.swap()
         self._output_fbo.begin()
-        self._trail_shader.use(self._output_fbo.back_texture, self._input_fbo.texture, weight, (1.0 - weight) * self.settings.scale)
+        self._trail_shader.use(self._output_fbo.back_texture, self._input_fbo.texture, weight, 1.0 - weight)
         self._output_fbo.end()
 
         # Stage 2: Spatial smoothing (Gaussian blur)

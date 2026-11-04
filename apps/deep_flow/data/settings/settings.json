@@ -414,9 +414,6 @@
       },
       "optical_flow": {
         "use_mask": true,
-        "x_gain": 1.0,
-        "y_gain": 1.0,
-        "z_gain": 1.0,
         "lucas_kanade": {
           "levels": 3,
           "window": "SEVEN",
@@ -440,14 +437,18 @@
         "method": "TRAIL",
         "trail": {
           "limit": 4.0,
-          "scale": 3.57,
+          "scale_x": 3.57,
+          "scale_y": 3.57,
+          "scale_z": 3.57,
           "smooth": 230.0,
           "blur_radius": 0.0,
           "blur_steps": 4,
           "boost": 0.0
         },
         "kinetic": {
-          "scale": 10.0,
+          "scale_x": 10.0,
+          "scale_y": 10.0,
+          "scale_z": 10.0,
           "advect": 0.0,
           "fast_time": 25.0,
           "slow_time": 150.0,

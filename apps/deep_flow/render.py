@@ -273,9 +273,7 @@ class DeepFlowRender(RenderBase):
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[Layers] = set()
-        depth_needed: bool = any(cast(ls.Flow3DLayer, layer).uses_depth for layer in self.L[Layers.flow].values())
-        update_layers: list[Layers] = [layer_type for layer_type in self._update_layers if depth_needed or layer_type != Layers.center_depth]
-        for layer_type in update_layers + self._interface_layers + self._left_layers + self._right_layers + self._output_layers:
+        for layer_type in self._update_layers + self._interface_layers + self._left_layers + self._right_layers + self._output_layers:
             if layer_type not in seen:
                 seen.add(layer_type)
                 for layer in self.L[layer_type].values():

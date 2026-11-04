@@ -43,7 +43,7 @@ jitter has none, a hand pushing forward moves its edges) the time it follows ove
 
 z comes in view widths per frame, over the metres one view width spans at the depth (`view_span`
 per metre), and `threshold` comes off it. The Lucas–Kanade flow owns one for its z, with its
-`depth_track` settings, and turns it into view widths per second times its `z_gain`.
+`depth_track` settings, and turns it into view widths per second.
 
 At a silhouette, stereo depth jitters between the two surfaces by more than the dead zone, from
 frame to frame. So before the track, a depth sample whose 3×3 depth samples span a step beyond

@@ -44,7 +44,7 @@ class Flow3DDrawMode(IntEnum):
 
     Depth (red toward the camera, green away, in px per frame: 1 is 76% color at scalar_scale 1):
         DEPTH_DIFFERENCE - The flow's tracked z, before the threshold
-        DEPTH_VELOCITY - The flow's z after the threshold, before z_gain and the mask
+        DEPTH_VELOCITY - The flow's z after the threshold, before the z switch and the mask
 
     Outputs:
         VELOCITY - The flow's 3D velocity, times the mask with its use_mask
@@ -214,14 +214,9 @@ class Flow3DLayer(LayerBase):
         return self._trail_bridge.smooth_velocity
 
     @property
-    def uses_depth(self) -> bool:
-        """Whether the optical flow measures z: its z_gain is above 0."""
-        return self.settings.optical_flow.z_gain > 0.0
-
-    @property
     def depth_enabled(self) -> bool:
-        """Whether z reaches the bridge: the flow measures it and a source has depth."""
-        return self.uses_depth and self._depth_input is not None and self._depth_input.allocated
+        """Whether the optical flow measures z: a source has depth. The flow's `z` switch only zeroes it in the velocity."""
+        return self._depth_input is not None and self._depth_input.allocated
 
     @property
     def onset_velocity(self) -> Texture | None:
@@ -389,7 +384,7 @@ class Flow3DLayer(LayerBase):
         if kinetic:
             if new_flow:
                 # Lucas–Kanade's velocity is a distance, so the trails can travel with it
-                self._kinetic_bridge.set_velocity(self._velocity, self.settings.optical_flow.x_gain)
+                self._kinetic_bridge.set_velocity(self._velocity)
                 self._kinetic_bridge.update(self._flow_interval)
                 if self.settings.draw_mode == Flow3DDrawMode.KINETIC_DEPTH_ACCELERATION:
                     self._kinetic_bridge.update_depth_acceleration()

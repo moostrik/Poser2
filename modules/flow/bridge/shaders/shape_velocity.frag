@@ -2,11 +2,12 @@
 
 // Shape Velocity Shader
 // The trail bridge's input: the x/y length to `power`, then rolled off softly toward `limit`
-// (limit * tanh(length / limit), so the direction holds); z passes as it is
+// (limit * tanh(length / limit), so the direction holds); z passes as it is. Then x, y and z times `scale`
 
 uniform sampler2D tex0;     // Velocity RGB
 uniform float power;        // Power curve on the x/y length
 uniform float limit;        // The x/y length the roll-off approaches
+uniform vec3 scale;         // Multiplier on x, y and z, after the shaping
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -21,5 +22,5 @@ void main() {
     float shaped = limit * tanh(pow(magnitude, power) / limit);
     flow = (magnitude > TINY) ? (flow / magnitude) * shaped : vec2(0.0);
 
-    fragColor = vec4(flow, velocity.z, 1.0);
+    fragColor = vec4(vec3(flow, velocity.z) * scale, 1.0);
 }

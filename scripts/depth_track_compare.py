@@ -5,7 +5,7 @@
 FRAMES is what depth_track_capture saved from one loop of a recording (temp/depth_track/RECORDING).
 No app and no camera: a window gives the GL context, and two `LucasKanadeFlow`, A and B, measure the
 saved frames with the settings they were recorded with; `--a` and `--b` override any of them by its
-path in the panel (lucas_kanade.levels, lucas_kanade.threshold, depth_track.catch_up, z_gain, ...). The window plays the loop at its
+path in the panel (lucas_kanade.levels, lucas_kanade.threshold, depth_track.catch_up, z, ...). The window plays the loop at its
 recorded rate, again and again, A on the left, B on the right:
 
     1  z of the track, red toward the camera, green away     space  pause
@@ -51,6 +51,7 @@ WARM_UP: float = 1.0          # s at the start the flows settle in, measured in 
 SHORTEST_PAUSE: float = 1.0   # s of stillness that end a move
 RENAMED: dict[str, str] = {'z_time': 'z_smooth', 'z_catch_up_time': 'z_catch_up', 'xy_follow_z_time': 'xy_smooth', 'xy_follow_z': 'xy_smooth', 'xy_regularizer': 'xy_damping',
                            'strength_x': 'x_gain', 'strength_y': 'y_gain', 'strength_z': 'z_gain'}   # in frames saved before
+SWITCHED: dict[str, str] = {'x_gain': 'x', 'y_gain': 'y', 'z_gain': 'z'}   # in frames saved with gains: a gain of 0 is the axis off
 GROUPED: dict[str, str] = {'xy_levels': 'lucas_kanade.levels', 'xy_window': 'lucas_kanade.window', 'xy_damping': 'lucas_kanade.damping',
                            'xy_same_surface': 'lucas_kanade.same_surface', 'xy_threshold': 'lucas_kanade.threshold', 'xy_median': 'lucas_kanade.median',
                            'z_edge': 'depth_track.edge', 'z_window': 'depth_track.window', 'z_tolerance': 'depth_track.tolerance',
@@ -116,6 +117,8 @@ def recorded_settings(recorded: dict) -> dict:
     result: dict = {}
     for key, value in recorded.items():
         key = RENAMED.get(key, key)
+        if key in SWITCHED:
+            key, value = SWITCHED[key], value != 0.0
         *groups, name = GROUPED.get(key, key).split('.')
         target: dict = result
         for group in groups:
@@ -356,11 +359,8 @@ class Side:
         self.flow.update(depth, c['delta_time'], c['view_span'], tuple(c['depth_step']))
 
     def xy_px(self, velocity: np.ndarray, delta_time: float, width: int) -> np.ndarray:
-        """The velocity's x/y (image widths per second, times the strengths) as px per frame."""
-        s = self.settings
-        vx = velocity[..., 0] / (s.x_gain if s.x_gain else 1.0)
-        vy = velocity[..., 1] / (s.y_gain if s.y_gain else 1.0)
-        return np.hypot(vx, vy) * delta_time * width
+        """The velocity's x/y (image widths per second) as px per frame."""
+        return np.hypot(velocity[..., 0], velocity[..., 1]) * delta_time * width
 
     def show(self, view: int, depth: Texture, scale: float, width: int) -> Texture | None:
         if self.signed is None or self.velocity is None:

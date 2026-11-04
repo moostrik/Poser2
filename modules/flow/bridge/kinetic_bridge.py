@@ -13,7 +13,7 @@ from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil
 from ..shaders import Trail, GaussianBlur
 from .kinetics import decay_weight
-from .shaders import KineticAdvect, KineticCurl, KineticEmission, KineticHold, KineticOnset, KineticPatch, KineticProjection, KineticReservoir, KineticVelocity, Projection
+from .shaders import KineticAdvect, KineticCurl, KineticEmission, KineticHold, KineticOnset, KineticPatch, KineticProjection, KineticReservoir, KineticVelocity, Projection, ScaleVelocity
 
 
 class BlurPosition(IntEnum):
@@ -23,7 +23,9 @@ class BlurPosition(IntEnum):
 
 class KineticBridgeSettings(BaseSettings):
     """Configuration for the kinetic bridge."""
-    scale = Field(10.0, min=-50.0, max=50.0, description="Converts the flow's velocity to simulation velocity")
+    scale_x = Field(10.0, min=-50.0, max=50.0, description="Converts the flow's x to simulation velocity")
+    scale_y = Field(10.0, min=-50.0, max=50.0, description="Converts the flow's y to simulation velocity")
+    scale_z = Field(10.0, min=-50.0, max=50.0, description="Converts the flow's z to simulation velocity")
     advect = Field(0.0, min=0.0, max=1.0, description="How far the trails travel with the motion (Lucas–Kanade flow only); 0 holds them in place")
     fast_time = Field(25.0, min=0.0, max=500.0, description="Fast trail time constant (ms)")
     slow_time = Field(150.0, min=0.0, max=1000.0, description="Slow trail time constant (ms)")
@@ -45,16 +47,17 @@ class KineticBridge(FlowBase):
     """Two trails on the optical flow and their difference along and across the motion.
 
     The trails are unit-gain Emas, so they meet on a steady motion and fast - slow is the change alone.
-    Its trails are unit-gain Emas like the trail bridge's, so the gain is in `scale`. The flow's velocity is 3D,
+    Its trails are unit-gain Emas like the trail bridge's, so the gain is in `scale_x`, `scale_y` and `scale_z`,
+    applied to the input. The flow's velocity is 3D,
     so a motion that starts or stops toward the camera reads like any other.
 
-    It reads the flow's velocity linearly, unclamped. When that velocity is a distance (the Lucas–Kanade
-    flow), the trails can travel with the motion (`advect`): each update they move first along the
+    It reads the flow's velocity linearly, unclamped, in image widths per second, so the trails can
+    travel with the motion (`advect`): each update they move first along the
     fast trail's velocity, so a steadily moving limb carries its trails and leaves no wake, and only a
     real stop leaves fast and slow apart.
 
     Pipeline:
-        1. Take the flow's velocity → input_fbo (RGBA16F, xyz)
+        1. Take the flow's velocity, scaled per axis → input_fbo (RGBA16F, xyz)
         2. Blur it (BlurPosition.BEFORE)
         3. Move the trails with the motion (advect), then advance them, blurring each inside its loop (BlurPosition.INSIDE)
         4. Project fast - slow on the direction of the motion → acceleration, turn (R16F)
@@ -74,9 +77,6 @@ class KineticBridge(FlowBase):
         self._input_internal_format = GL_RGBA16F
         self._output_internal_format = GL_RGBA16F
 
-        # The flow's velocity per image width per second, for `advect`; None when it is no distance
-        self._distance_scale: float | None = None
-
         self._fast_fbo: SwapFbo = SwapFbo()
         self._slow_fbo: SwapFbo = SwapFbo()
         self._acceleration_fbo: Fbo = Fbo()
@@ -89,6 +89,7 @@ class KineticBridge(FlowBase):
         self._onset_fbo: Fbo = Fbo()
         self._curl_fbo: Fbo = Fbo()
 
+        self._scale_shader: ScaleVelocity = ScaleVelocity()
         self._advect_shader: KineticAdvect = KineticAdvect()
         self._trail_shader: Trail = Trail()
         self._blur_shader: GaussianBlur = GaussianBlur()
@@ -108,7 +109,7 @@ class KineticBridge(FlowBase):
 
     @property
     def velocity_input(self) -> Texture:
-        """The flow's velocity, blurred when BlurPosition.BEFORE."""
+        """The flow's velocity, scaled per axis, blurred when BlurPosition.BEFORE."""
         return self._input
 
     @property
@@ -189,6 +190,7 @@ class KineticBridge(FlowBase):
         self._curl_fbo.allocate(width, height, GL_R16F)
         self.reset()
 
+        self._scale_shader.allocate()
         self._advect_shader.allocate()
         self._trail_shader.allocate()
         self._blur_shader.allocate()
@@ -215,6 +217,7 @@ class KineticBridge(FlowBase):
         self._emission_fbo.deallocate()
         self._onset_fbo.deallocate()
         self._curl_fbo.deallocate()
+        self._scale_shader.deallocate()
         self._advect_shader.deallocate()
         self._trail_shader.deallocate()
         self._blur_shader.deallocate()
@@ -241,27 +244,23 @@ class KineticBridge(FlowBase):
         FlowUtil.zero(self._onset_fbo)
         FlowUtil.zero(self._curl_fbo)
 
-    def set_velocity(self, velocity: Texture, distance_scale: float | None = None) -> None:
-        """Take a flow's 3D velocity as the next input.
-
-        Args:
-            velocity: x, y, z (RGB)
-            distance_scale: The velocity per image width per second when it is a distance (the Lucas–Kanade
-                flow's `x_gain`), for `advect`; None when it is no distance, which holds the trails in place
-        """
-        FlowUtil.blit(self._input_fbo, velocity)
-        self._distance_scale = distance_scale
+    def set_velocity(self, velocity: Texture) -> None:
+        """Take a flow's 3D velocity, x, y, z (RGB) in image widths per second, scaled per axis, as the next input."""
+        s: KineticBridgeSettings = self.settings
+        self._input_fbo.begin()
+        self._scale_shader.use(velocity, (s.scale_x, s.scale_y, s.scale_z))
+        self._input_fbo.end()
 
     def _carry(self, delta_time: float) -> tuple[float, float] | None:
-        """uv per frame per unit of trail velocity, times `advect`; None when the trails stay in place."""
+        """uv per frame per unit of trail velocity, times `advect`, per axis; 0 on an axis scaled to 0, which
+        holds no distance; None when the trails stay in place."""
         s: KineticBridgeSettings = self.settings
-        if s.advect <= 0.0 or self._distance_scale is None:
+        if s.advect <= 0.0 or (abs(s.scale_x) < 1e-6 and abs(s.scale_y) < 1e-6):
             return None
-        gain: float = s.scale * self._distance_scale
-        if abs(gain) < 1e-6:
-            return None
-        per_unit: float = s.advect * delta_time / gain      # a trail holds scale * distance_scale * widths per second
-        return per_unit, per_unit * self._input_fbo.width / max(self._input_fbo.height, 1)
+        step: float = s.advect * delta_time                 # a trail holds scale * widths per second
+        carry_x: float = step / s.scale_x if abs(s.scale_x) >= 1e-6 else 0.0
+        carry_y: float = step / s.scale_y if abs(s.scale_y) >= 1e-6 else 0.0
+        return carry_x, carry_y * self._input_fbo.width / max(self._input_fbo.height, 1)
 
     def _advect(self, field: SwapFbo, carrier: Texture, carry: tuple[float, float]) -> None:
         """Move `field` along the velocity in `carrier`."""
@@ -354,10 +353,10 @@ class KineticBridge(FlowBase):
         self._curl_fbo.end()
 
     def _advance_trail(self, trail: SwapFbo, weight: float, blur: bool) -> None:
-        """One unit-gain Ema step: weight * previous + (1 - weight) * scale * input."""
+        """One unit-gain Ema step: weight * previous + (1 - weight) * input."""
         trail.swap()
         trail.begin()
-        self._trail_shader.use(trail.back_texture, self._input, weight, (1.0 - weight) * self.settings.scale)
+        self._trail_shader.use(trail.back_texture, self._input, weight, 1.0 - weight)
         trail.end()
         if blur:
             self._blur(trail)
