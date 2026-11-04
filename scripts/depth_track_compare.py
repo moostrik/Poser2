@@ -45,7 +45,7 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_FALSE, GL_FLOAT,
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from modules.gl import Blit, Fbo, Texture  # noqa: E402
 from modules.flow import (FlowUtil, LucasKanadeFlow, LucasKanadeFlowSettings, Patch, SignedField, VelocityField,  # noqa: E402
-                          VisualizationFieldSettings, filter_depth_steps, lucas_kanade, track_depth)
+                          VisualizationFieldSettings, filter_depth_steps, guide_depth, lucas_kanade, track_depth)
 
 WARM_UP: float = 1.0          # s at the start the flows settle in, measured in no part
 SHORTEST_PAUSE: float = 1.0   # s of stillness that end a move
@@ -404,7 +404,8 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
         previous = lum
         c = frames.calls[k]
         step = (c['depth_step'][0] * w, c['depth_step'][1] * h) if c['depth_step'][0] > 0 else (1.0, 1.0)
-        state, catch_up = track_depth(filter_depth_steps(depth.astype(np.float64), step, z.edge), state, catch_up, solve.astype(np.float64),
+        measured = guide_depth(depth.astype(np.float64), now) if z.guide else depth.astype(np.float64)
+        state, catch_up = track_depth(filter_depth_steps(measured, step, z.edge), state, catch_up, solve.astype(np.float64),
                                       c['delta_time'], z.window, step, z.tolerance, z.smooth, c['view_span'], z.dead_zone,
                                       z.catch_up, xy.threshold)
         gpu = read_back(side.flow.depth_velocity.difference)

@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import catch_up_share, color_motion, depth_threshold, filter_depth_steps, track_depth, track_weights
+from modules.flow import catch_up_share, color_motion, depth_threshold, filter_depth_steps, guide_depth, track_depth, track_weights
 
 SIZE: int = 24
 SPAN: float = 0.5       # metres a view width spans per metre of depth
@@ -305,6 +305,31 @@ class CatchUpTest(unittest.TestCase):
         states = track([uniform(1.0)] * 6 + [uniform(0.7)], moved=self.MOVING, window=0, smooth=50.0, dead_zone=0.02, catch_up_smooth=12.5, dt=0.02)
         self.assertEqual(float(states[-1][1, 1, 2]), 0.0)
         np.testing.assert_allclose(states[-1][1, 1, 1], 1.0 / 0.7)
+
+
+class GuideTest(unittest.TestCase):
+    """The depth sharpened at the luminance's edges: a ramp becomes a step where the image has its edge."""
+    WIDTH: int = 64
+
+    def ramp(self) -> tuple[np.ndarray, np.ndarray]:
+        # an arm (dark, 0.84 m) before the body (light, 1.04 m); the depth ramps over 24 px across the image's edge
+        columns = np.arange(self.WIDTH)
+        depth = np.clip(1.04 - (columns - 20) * (0.2 / 24), 0.84, 1.04)[None, :].repeat(8, axis=0)
+        luminance = np.where(columns < 32, 0.8, 0.3)[None, :].repeat(8, axis=0)
+        return depth, luminance
+
+    def test_a_ramp_becomes_a_step_at_the_image_edge(self) -> None:
+        depth, luminance = self.ramp()
+        guided = guide_depth(depth, luminance)[4]
+        self.assertGreater(float(guided[30] - guided[33]), 2.0 * float(depth[4, 30] - depth[4, 33]))   # steeper across the edge
+        self.assertLess(float(np.abs(guided[36:44] - 0.84).max()), float(np.abs(depth[4, 36:44] - 0.84).max()))  # the arm's side nearer the arm
+
+    def test_no_depth_stays_no_depth_and_is_not_averaged_in(self) -> None:
+        depth = np.full((8, self.WIDTH), 1.0)
+        depth[:, :8] = 0.0
+        guided = guide_depth(depth, np.full((8, self.WIDTH), 0.5))
+        np.testing.assert_array_equal(guided[:, :8], 0.0)
+        np.testing.assert_allclose(guided[:, 8:], 1.0)
 
 
 class StepFilterTest(unittest.TestCase):

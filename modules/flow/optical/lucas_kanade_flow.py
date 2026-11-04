@@ -10,7 +10,8 @@ The displacement (uv per frame) stays inside: `lucas_kanade.threshold` (px per f
 as below it is the solve's jitter, not motion. z comes from its own `DepthVelocity`: a depth track carried
 along the displacement, so a surface sliding sideways over a slope reads no motion toward the camera,
 corrected each frame by the mean over `depth_track.window` depth samples and smoothed over
-`depth_track.smooth`; `depth_track.threshold` comes off it. The depth change comes in view
+`depth_track.smooth`; `depth_track.threshold` comes off it. With `depth_track.guide`, the depth is first
+sharpened at the luminance's edges, as stereo depth ramps over a few samples where a limb is before the body. The depth change comes in view
 widths per frame like the displacement, so all three become view widths per second the same way. Out
 comes one 3D velocity in true units, image widths per second; how hard it pushes the fluid is the
 bridge's. `x`, `y` and `z` switch an axis off (0) to look at the others. With `use_mask`, the velocity
@@ -57,6 +58,7 @@ class LucasKanadeSettings(BaseSettings):
 class DepthTrackSettings(BaseSettings):
     """The z part: the depth track carried along the displacement."""
     edge:           Field[float] = Field(0.1, min=0.05, max=0.3, step=0.01, description="Edge depth step, m (lower: cleaner edges, fewer fingers)")
+    guide:          Field[bool]  = Field(False, width=48, description="Depth sharpened at the image's edges (on: crisper limbs, more GPU)")
     window:         Field[Patch] = Field(Patch.SEVEN, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)")
     tolerance:      Field[float] = Field(0.2, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m (higher: fuller pushes, fewer splits)")
     smooth:         Field[float] = Field(50.0, min=0.0, max=200.0, step=1.0, newline=True, description="Smoothing time of z in ms, 0 = two-frame change (higher: less noise, more lag)")
@@ -203,7 +205,7 @@ class LucasKanadeFlow:
         if depth is not None:
             self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, z_s.window, z_s.smooth,
                                               z_s.threshold, z_s.tolerance, z_s.dead_zone, z_s.catch_up, xy_s.threshold,
-                                              solved, z_s.edge)
+                                              solved, z_s.edge, self._frames.luminance if z_s.guide else None)
 
         xy: Texture = self._displacement
         if z_s.xy_smooth:
