@@ -438,9 +438,6 @@
       "flow_bridge": {
         "method": "VELOCITY_TRAIL",
         "velocity_trail": {
-          "pivot": 0.15,
-          "curve": 1.4,
-          "limit": 4.0,
           "z_limit": 4.0,
           "attack": 200.0,
           "smooth": 1000.0,

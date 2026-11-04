@@ -142,29 +142,13 @@ class DisplacementVelocityTest(unittest.TestCase):
 
 
 class ShapeTest(unittest.TestCase):
-    def test_curve_one_is_linear_below_the_limit(self) -> None:
-        velocity = np.array([[0.05, 0.0, 0.01], [0.3, -0.4, 0.2]])
-        np.testing.assert_allclose(shape_velocity(velocity, 0.15, 1.0, 1000.0, 1000.0), velocity, rtol=1e-6)
+    def test_xy_passes_as_it_is(self) -> None:
+        velocity = np.array([[0.05, 0.0, 0.01], [3.0, -4.0, 0.2]])
+        np.testing.assert_allclose(shape_velocity(velocity, 1000.0)[..., :2], velocity[..., :2])
 
-    def test_the_pivot_stays_and_the_curve_bends_around_it(self) -> None:
-        shaped = shape_velocity(np.array([[0.15, 0.0, 0.0], [0.075, 0.0, 0.0], [0.45, 0.0, 0.0]]), 0.15, 2.0, 1000.0, 1000.0)
-        np.testing.assert_allclose(shaped[:, 0], [0.15, 0.0375, 1.35], rtol=1e-6)
-
-    def test_the_direction_holds(self) -> None:
-        shaped = shape_velocity(np.array([[0.3, 0.4, 0.0]]), 0.15, 2.0, 1.0, 1.0)
-        np.testing.assert_allclose(shaped[0, 0] / shaped[0, 1], 0.75)
-
-    def test_the_limits_roll_off_softly(self) -> None:
-        shaped = shape_velocity(np.array([[2.0, 0.0, -1.0]]), 0.15, 1.0, 1.0, 0.5)
-        np.testing.assert_allclose(shaped[0, [0, 2]], [np.tanh(2.0), -0.5 * np.tanh(2.0)])
-
-    def test_limit_zero_is_off(self) -> None:
-        shaped = shape_velocity(np.array([[0.45, 0.0, 0.0]]), 0.15, 3.0, 0.0, 1000.0)
-        np.testing.assert_allclose(shaped[0, 0], 0.45 * 9.0, rtol=1e-6)
-
-    def test_z_stays_linear_on_the_curve(self) -> None:
-        shaped = shape_velocity(np.array([[0.45, 0.0, 0.01]]), 0.15, 2.0, 1000.0, 1000.0)
-        np.testing.assert_allclose(shaped[0, 2], 0.01, rtol=1e-4)
+    def test_z_rolls_off_softly(self) -> None:
+        shaped = shape_velocity(np.array([[0.0, 0.0, -1.0], [0.0, 0.0, 0.001]]), 0.5)
+        np.testing.assert_allclose(shaped[:, 2], [-0.5 * np.tanh(2.0), 0.001], rtol=1e-5)
 
 
 class VelocityTrailTest(unittest.TestCase):

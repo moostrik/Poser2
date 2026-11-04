@@ -1,14 +1,11 @@
 """Velocity Trail Bridge.
 
-The flow bridge's velocity as one trail: a flow's 3D velocity in image widths per second, shaped,
-smoothed in time and in space. Its output stays in widths per second; how hard it pushes the fluid is
-the fluid's (`input_strength`, `input_x`, `input_y`).
+The flow bridge's velocity as one trail: a flow's 3D velocity in image widths per second, smoothed in
+time and in space. Its output stays in widths per second; how hard it pushes the fluid is the fluid's
+(`input_strength`, `input_x`, `input_y`).
 
-The shape bends the x/y speed around `pivot` by `curve`: speed · (speed / pivot)^(curve − 1), so a move
-at the pivot stays as it is, a faster one gets stronger and a slower one weaker; then a soft `limit`
-(0 = none).
-z stays linear, with its own soft `z_limit`: what is left of z's noise after the flow is spikes at edges,
-which a curve would make bigger and a limit caps.
+x/y goes in as it is. z gets a soft `z_limit` first: what is left of z's noise after the flow is spikes
+at edges, which the limit caps.
 
 Before each step the trail moves with the motion it holds (`advect`): each pixel takes the trail from
 where its own x/y says it came from, so the average follows a moving limb instead of a fixed pixel,
@@ -33,9 +30,6 @@ from .shaders import KineticAdvect, ShapeVelocity, VelocityTrail
 
 class VelocityTrailBridgeSettings(BaseSettings):
     """Configuration for the velocity trail bridge."""
-    pivot = Field(0.15, min=0.01, max=1.0, step=0.01, description="x/y speed the curve leaves as it is, widths/s")
-    curve = Field(1.0, min=0.5, max=3.0, step=0.05, description="Exponent on the x/y speed around the pivot; 1 = linear (higher: fast stronger, slow weaker)")
-    limit = Field(4.0, min=0.0, max=4.0, step=0.05, description="Soft limit on the shaped x/y speed, widths/s; 0 = off")
     z_limit = Field(4.0, min=0.1, max=4.0, step=0.05, description="Soft limit on z, widths/s (lower: smaller edge spikes)")
     advect = Field(0.0, min=0.0, max=1.0, step=0.05, newline=True, description="How far the trail moves with its motion before each step; 0 = at a fixed pixel")
     attack = Field(0.0, min=0.0, max=500.0, step=1.0, description="Smoothing time of a rising x/y speed, ms; 0 = as smooth (lower: quicker flicks)")
@@ -45,16 +39,16 @@ class VelocityTrailBridgeSettings(BaseSettings):
 
 
 class VelocityTrailBridge(FlowBase):
-    """The velocity trail bridge: a flow's 3D velocity, shaped, through one 3D trail.
+    """The velocity trail bridge: a flow's 3D velocity, z limited, through one 3D trail.
 
     Pipeline:
-        1. Shape the velocity into the input FBO (`set_velocity`): the x/y speed's curve and limit, z's limit
+        1. Take the velocity into the input FBO with z's soft limit (`set_velocity`)
         2. Move the previous trail with its own motion (`advect`), then blend the input in, a unit-gain Ema over
            `attack` or `smooth` (temporal smoothing)
         3. Blur it, `blur_steps` passes (spatial smoothing)
 
     FBOs (from FlowBase):
-        - input_fbo: The shaped velocity
+        - input_fbo: The velocity, z limited
         - output_fbo: The smoothed velocity
     """
 
@@ -79,7 +73,7 @@ class VelocityTrailBridge(FlowBase):
 
     @property
     def velocity_input(self) -> Texture:
-        """The shaped velocity the trail reads."""
+        """The velocity the trail reads, z limited."""
         return self._input
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
@@ -109,12 +103,11 @@ class VelocityTrailBridge(FlowBase):
         self._blur_shader.deallocate()
 
     def set_velocity(self, velocity: Texture) -> None:
-        """Take a flow's 3D velocity, shaped, as the trail's next input."""
+        """Take a flow's 3D velocity, z limited, as the trail's next input."""
         if not self._allocated:
             return
-        s: VelocityTrailBridgeSettings = self.settings
         self._input_fbo.begin()
-        self._shape_shader.use(velocity, s.pivot, s.curve, s.limit, s.z_limit)
+        self._shape_shader.use(velocity, self.settings.z_limit)
         self._input_fbo.end()
 
     def update(self, delta_time: float = 1.0 / 60.0) -> None:
@@ -153,18 +146,11 @@ class VelocityTrailBridge(FlowBase):
 
 # ── numpy reference ─────────────────────────────────────────────────────
 
-def shape_velocity(velocity: np.ndarray, pivot: float, curve: float, limit: float, z_limit: float) -> np.ndarray:
-    """A velocity (..., 3) with its x/y speed s bent to s · (s / pivot)^(curve − 1), then rolled off toward
-    `limit` (limit · tanh(s / limit); 0 = none), the direction kept; z rolled off toward `z_limit`. Mirrors shape_velocity.frag."""
-    xy: np.ndarray = velocity[..., :2]
-    speed: np.ndarray = np.linalg.norm(xy, axis=-1, keepdims=True)
-    safe: np.ndarray = np.maximum(speed, 1e-4)
-    shaped: np.ndarray = speed * (safe / pivot) ** (curve - 1.0)
-    if limit > 0.0:
-        shaped = limit * np.tanh(shaped / limit)
-    xy = np.where(speed > 1e-4, xy / safe * shaped, 0.0)
+def shape_velocity(velocity: np.ndarray, z_limit: float) -> np.ndarray:
+    """A velocity (..., 3) with x/y as it is and z rolled off toward `z_limit` (z_limit · tanh(z / z_limit)).
+    Mirrors shape_velocity.frag."""
     z: np.ndarray = z_limit * np.tanh(velocity[..., 2:3] / z_limit)
-    return np.concatenate((xy, z), axis=-1)
+    return np.concatenate((velocity[..., :2], z), axis=-1)
 
 
 def velocity_trail(previous: np.ndarray, velocity: np.ndarray, attack: float, release: float) -> np.ndarray:
