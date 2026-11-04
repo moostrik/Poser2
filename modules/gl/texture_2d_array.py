@@ -15,6 +15,7 @@ from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_HALF_FLOAT, GL_LINEAR, GL_N
 import numpy as np
 
 from .texture import get_format, get_data_type, get_channel_count, get_numpy_dtype
+from .swap_handle import SwapHandle
 
 
 class Texture2DArray:
@@ -193,21 +194,29 @@ class Texture2DArray:
         return pixels
 
 
-class SwapTexture2DArray:
+class SwapTexture2DArrayHandle(SwapHandle, Texture2DArray):
+    """One buffer of a SwapTexture2DArray as `texture` or `back_texture` hands it out, valid until
+    the owner's next swap (`swap_handle`)."""
+
+
+class SwapTexture2DArray(Texture2DArray):
     """Double-buffered 2D array texture for ping-pong compute operations.
 
     Same interface as SwapTexture3D but backed by GL_TEXTURE_2D_ARRAY.
+    Used as a Texture2DArray it is always its current buffer.
     """
 
     def __init__(self,
                  interpolation: int = GL_LINEAR,
                  wrap: int = GL_CLAMP_TO_EDGE,
                  border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
+        # no Texture2DArray.__init__: every field reads from the current buffer
         self._textures: list[Texture2DArray] = [
             Texture2DArray(interpolation, wrap, border_color),
             Texture2DArray(interpolation, wrap, border_color)
         ]
         self._swap_state: int = 0
+        self._swaps: int = 0        # counted, so a buffer handed out before a swap knows it is stale
 
     @property
     def allocated(self) -> bool:
@@ -243,13 +252,13 @@ class SwapTexture2DArray:
 
     @property
     def texture(self) -> Texture2DArray:
-        """Current write target."""
-        return self._textures[self._swap_state]
+        """Current write target, valid until the next swap (`SwapTexture2DArrayHandle`)."""
+        return SwapTexture2DArrayHandle(self, self._textures[self._swap_state], self._swaps)
 
     @property
     def back_texture(self) -> Texture2DArray:
-        """Previous buffer for reading."""
-        return self._textures[1 - self._swap_state]
+        """Previous buffer for reading, valid until the next swap (`SwapTexture2DArrayHandle`)."""
+        return SwapTexture2DArrayHandle(self, self._textures[1 - self._swap_state], self._swaps)
 
     def allocate(self, width: int, height: int, depth: int, internal_format) -> None:
         """Allocate both 2D array texture buffers."""
@@ -264,6 +273,7 @@ class SwapTexture2DArray:
     def swap(self) -> None:
         """Swap front/back buffers."""
         self._swap_state = 1 - self._swap_state
+        self._swaps += 1
 
     def bind(self) -> None:
         """Bind current texture."""

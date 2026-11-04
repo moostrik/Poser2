@@ -2,8 +2,7 @@
 
 import unittest
 
-from modules.gl import SwapFbo
-from modules.gl.fbo import StaleTextureError
+from modules.gl import SwapFbo, StaleTextureError
 
 
 class SwapTextureTest(unittest.TestCase):

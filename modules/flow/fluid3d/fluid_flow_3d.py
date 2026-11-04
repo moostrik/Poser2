@@ -445,8 +445,9 @@ class FluidFlow3D:
         viscosity_dt = self.settings.velocity.viscosity * (self._grid_scale ** 2) * self._dt
         iterations = self._scale_iterations(self.settings.velocity.viscosity_iter)
 
+        current: Texture3D = self._velocity.texture
         result = self._jacobi_diffusion_shader.solve(
-            self._velocity.texture,
+            current,
             self._velocity.back_texture,
             self._simulation_obstacle,
             self._grid_scale, self._aspect, self._z_spacing,
@@ -455,7 +456,7 @@ class FluidFlow3D:
             iterations_per_dispatch=5,
             has_obstacles=self._has_obstacles
         )
-        if result != self._velocity.texture:
+        if result is not current:
             self._velocity.swap()
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
@@ -587,8 +588,9 @@ class FluidFlow3D:
         # b. Solve Poisson equation for pressure
         iterations = self._scale_iterations(self.settings.pressure.iterations)
 
+        current_pressure: Texture3D = self._pressure.texture
         result = self._jacobi_pressure_shader.solve(
-            self._pressure.texture,
+            current_pressure,
             self._pressure.back_texture,
             self._divergence_vol,
             self._simulation_obstacle,
@@ -597,7 +599,7 @@ class FluidFlow3D:
             iterations_per_dispatch=5,
             has_obstacles=self._has_obstacles
         )
-        if result != self._pressure.texture:
+        if result is not current_pressure:
             self._pressure.swap()
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
@@ -978,22 +980,22 @@ class FluidFlow3D:
     @property
     def velocity_volume(self) -> Texture3D:
         """RGBA16F velocity volume (u,v,w in xyz)."""
-        return self._velocity.texture
+        return self._velocity
 
     @property
     def density_volume(self) -> Texture2DArray:
         """RGBA16F density volume (GL_TEXTURE_2D_ARRAY)."""
-        return self._density.texture
+        return self._density
 
     @property
     def temperature_volume(self) -> Texture3D:
         """R16F temperature volume."""
-        return self._temperature.texture
+        return self._temperature
 
     @property
     def pressure_volume(self) -> Texture3D:
         """R16F pressure volume."""
-        return self._pressure.texture
+        return self._pressure
 
     @property
     def obstacle_volume(self) -> Texture3D:
@@ -1023,7 +1025,7 @@ class FluidFlow3D:
     @property
     def velocity(self) -> Texture3D:
         """Alias for velocity_volume (primary field access)."""
-        return self._velocity.texture
+        return self._velocity
 
     @property
     def depth(self) -> int:

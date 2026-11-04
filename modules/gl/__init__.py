@@ -8,6 +8,7 @@ from .utils import Blit, clear_color, FpsCounter, fit
 
 # TEXTURE CLASSES
 from .texture import Texture
+from .swap_handle import StaleTextureError
 from .texture_3d import Texture3D, SwapTexture3D
 from .texture_2d_array import Texture2DArray, SwapTexture2DArray
 from .fbo import Fbo, SwapFbo

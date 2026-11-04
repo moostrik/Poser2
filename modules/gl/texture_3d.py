@@ -14,6 +14,7 @@ from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_HALF_FLOAT, GL_LINEAR, GL_N
 import numpy as np
 
 from .texture import get_format, get_data_type, get_channel_count, get_numpy_dtype
+from .swap_handle import SwapHandle
 
 
 class Texture3D:
@@ -200,21 +201,29 @@ class Texture3D:
         return pixels
 
 
-class SwapTexture3D:
+class SwapTexture3DHandle(SwapHandle, Texture3D):
+    """One buffer of a SwapTexture3D as `texture` or `back_texture` hands it out, valid until the
+    owner's next swap (`swap_handle`)."""
+
+
+class SwapTexture3D(Texture3D):
     """Double-buffered 3D texture for ping-pong compute operations.
 
     No FBO needed — all reads/writes done via imageLoad/imageStore in compute shaders.
+    Used as a Texture3D it is always its current buffer.
     """
 
     def __init__(self,
                  interpolation: int = GL_LINEAR,
                  wrap: int = GL_CLAMP_TO_EDGE,
                  border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)) -> None:
+        # no Texture3D.__init__: every field reads from the current buffer
         self._textures: list[Texture3D] = [
             Texture3D(interpolation, wrap, border_color),
             Texture3D(interpolation, wrap, border_color)
         ]
         self._swap_state: int = 0
+        self._swaps: int = 0        # counted, so a buffer handed out before a swap knows it is stale
 
     @property
     def allocated(self) -> bool:
@@ -250,13 +259,13 @@ class SwapTexture3D:
 
     @property
     def texture(self) -> Texture3D:
-        """Current write target."""
-        return self._textures[self._swap_state]
+        """Current write target, valid until the next swap (`SwapTexture3DHandle`)."""
+        return SwapTexture3DHandle(self, self._textures[self._swap_state], self._swaps)
 
     @property
     def back_texture(self) -> Texture3D:
-        """Previous buffer for reading."""
-        return self._textures[1 - self._swap_state]
+        """Previous buffer for reading, valid until the next swap (`SwapTexture3DHandle`)."""
+        return SwapTexture3DHandle(self, self._textures[1 - self._swap_state], self._swaps)
 
     def allocate(self, width: int, height: int, depth: int, internal_format) -> None:
         """Allocate both 3D texture buffers."""
@@ -271,6 +280,7 @@ class SwapTexture3D:
     def swap(self) -> None:
         """Swap front/back buffers."""
         self._swap_state = 1 - self._swap_state
+        self._swaps += 1
 
     def bind(self) -> None:
         """Bind current texture."""
