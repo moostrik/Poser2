@@ -14,7 +14,7 @@ corrected each frame by the mean over `z_window` depth samples and smoothed over
 view widths per second the same way. Out comes one 3D velocity: x/y times `x_gain`/`y_gain`,
 z times `z_gain`. With `use_mask`, the velocity is multiplied by the mask.
 
-z lags its motion by the time it is smoothed over. With `xy_follow_z`, x/y goes through the same
+z lags its motion by the time it is smoothed over. With `xy_smooth`, x/y goes through the same
 filter over `z_smooth` before its threshold, carried along the displacement as z is, so both lag
 alike. A displacement is a step of position, so the filter is the same one: with a steady frame
 interval and a full z window, x/y answers a change of speed exactly as z does. The tracks are
@@ -50,12 +50,12 @@ class LucasKanadeFlowSettings(BaseSettings):
     xy_median:      Field[Patch] = Field(Patch.ONE, min=Patch.ONE, max=Patch.FIVE, description="Median size per level, 1×1 = off (larger: cleaner, more GPU)")
     xy_same_surface: Field[bool] = Field(False, description="Patch counts only the center's surface (on: less smear, wide fast parts slower)")
     xy_threshold:   Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="x/y below this is noise, in px/frame (higher: less noise, less slow motion)")
-    xy_follow_z:    Field[bool]  = Field(False, description="Smooths x/y like z, so both lag alike (on: less noise, more lag)")
     z_window:       Field[Patch] = Field(Patch.THREE, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)", newline=True)
     z_threshold:    Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="z below this is noise, in px/frame (higher: less noise, less slow z)")
     z_dead_zone:    Field[float] = Field(0.0, min=0.0, max=0.05, step=0.001, description="Depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
     z_catch_up:     Field[float] = Field(0.0, min=0.0, max=50.0, step=1.0, description="Shorter smoothing during a fast push, in ms, 0 = off (lower: quicker pushes)")
     z_smooth:       Field[float] = Field(50.0, min=0.0, max=200.0, step=1.0, description="Smoothing time of z in ms, 0 = two-frame change (higher: less noise, more lag)")
+    xy_smooth:      Field[bool]  = Field(False, description="x/y smoothed over z_smooth, so both lag alike (on: less noise, more lag)")
     z_tolerance:    Field[float] = Field(0.1, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m (higher: fuller pushes, fewer splits)")
     z_edge:         Field[float] = Field(0.1, min=0.05, max=0.3, step=0.005, description="Edge depth step, m (lower: cleaner edges, fewer fingers)")
     use_mask:       Field[bool]  = Field(False, description="Only the player moves the fluid (off: whole image)", newline=True)
@@ -75,7 +75,7 @@ class LucasKanadeFlow:
         self._frames: LuminanceFrames = LuminanceFrames()
         self._solve: SwapFbo = SwapFbo()            # the displacement as solved, level by level
         self._displacement: Fbo = Fbo()             # with the noise floor taken off
-        self._filtered: SwapFbo = SwapFbo()         # with xy_follow_z: the filter, its displacement and position error
+        self._filtered: SwapFbo = SwapFbo()         # with xy_smooth: the filter, its displacement and position error
         self._followed: Fbo = Fbo()                 # the filtered displacement with the noise floor taken off
         self._following: bool = False
         self._velocity: Fbo = Fbo()
@@ -191,7 +191,7 @@ class LucasKanadeFlow:
                                               solved, s.z_edge)
 
         xy: Texture = self._displacement
-        if s.xy_follow_z:
+        if s.xy_smooth:
             if not self._following:
                 self._filtered.clear_all()                  # from no motion, not from when it was last on
                 self._following = True
@@ -323,7 +323,7 @@ def threshold_displacement(displacement: np.ndarray, threshold: float) -> np.nda
 
 
 def filter_displacement(displacement: np.ndarray, state: np.ndarray, carry: np.ndarray, alpha: float) -> np.ndarray:
-    """The filter x/y goes through with xy_follow_z, one frame on (H, W, 4): the filtered
+    """The filter x/y goes through with xy_smooth, one frame on (H, W, 4): the filtered
     displacement (x, y, pixels per frame) and the position error (x, y, pixels). Mirrors
     displacement_filter.frag.
 

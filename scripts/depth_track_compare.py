@@ -49,7 +49,7 @@ from modules.flow import (FlowUtil, LucasKanadeFlow, LucasKanadeFlowSettings, Pa
 
 WARM_UP: float = 1.0          # s at the start the flows settle in, measured in no part
 SHORTEST_PAUSE: float = 1.0   # s of stillness that end a move
-RENAMED: dict[str, str] = {'z_time': 'z_smooth', 'z_catch_up_time': 'z_catch_up', 'xy_follow_z_time': 'xy_follow_z', 'xy_regularizer': 'xy_damping',
+RENAMED: dict[str, str] = {'z_time': 'z_smooth', 'z_catch_up_time': 'z_catch_up', 'xy_follow_z_time': 'xy_smooth', 'xy_follow_z': 'xy_smooth', 'xy_regularizer': 'xy_damping',
                            'strength_x': 'x_gain', 'strength_y': 'y_gain', 'strength_z': 'z_gain'}   # in frames saved before
 MOVED: float = 0.05          # luminance change of a pixel that moves
 MOVED_FRAMES: int = 5         # frames it changes that much in, over the loop

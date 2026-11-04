@@ -1,7 +1,7 @@
 #version 460 core
 
 // Displacement Filter Shader
-// With xy_follow_z, x/y through the depth track's alpha–beta filter, so it lags as z does. The
+// With xy_smooth, x/y through the depth track's alpha–beta filter, so it lags as z does. The
 // positions step by the measured displacement each frame; the state is carried from where the pixel
 // was `carry` back, its displacement predicts the step, and the residual corrects it by alpha and
 // alpha² / (2 − alpha). Out: the filtered displacement (RG, uv per frame) and the position error (BA, uv).
