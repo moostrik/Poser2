@@ -171,7 +171,7 @@ class Texture2DArray:
         if not self.allocated:
             return None
 
-        dtype = get_numpy_dtype(self.data_type, self.internal_format)
+        dtype = get_numpy_dtype(self.data_type)
         if dtype is None:
             return None
 

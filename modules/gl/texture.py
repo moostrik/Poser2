@@ -5,24 +5,24 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
-def get_numpy_dtype(data_type: Constant, internal_format: Constant) -> type | None:
+def get_numpy_dtype(data_type: Constant) -> type | None:
     """Convert OpenGL data type to NumPy dtype.
+
+    A 16-bit float texture is read and written as GL_FLOAT, which GL converts to and from half
+    floats, so its array is float32 too; only GL_HALF_FLOAT data is float16.
 
     Args:
         data_type: OpenGL data type (e.g., GL_UNSIGNED_BYTE, GL_FLOAT)
-        internal_format: OpenGL internal format to distinguish float16 vs float32
 
     Returns:
         NumPy dtype (np.uint8, np.float16, np.float32) or None if unsupported
     """
     if data_type == GL_UNSIGNED_BYTE:
         return np.uint8
-    elif data_type == GL_FLOAT:
-        # Distinguish float16 vs float32 based on internal format
-        if internal_format in (GL_RGB16F, GL_RGBA16F, GL_R16F, GL_RG16F):
-            return np.float16
-        else:
-            return np.float32
+    if data_type == GL_FLOAT:
+        return np.float32
+    if data_type == GL_HALF_FLOAT:
+        return np.float16
     return None
 
 
@@ -203,7 +203,7 @@ class Texture():
             return None
 
         # Get NumPy dtype from GL types
-        dtype = get_numpy_dtype(self.data_type, self.internal_format)
+        dtype = get_numpy_dtype(self.data_type)
         if dtype is None:
             logger.warning("Unsupported data type %s", self.data_type)
             return None
