@@ -5,7 +5,6 @@ import logging
 
 # Local application imports
 from modules.flow import LucasKanadeFlow3D, LucasKanadeFlow3DSettings, DepthView
-from modules.settings import Group
 from modules.utils import HotReloadMethods
 from .motion_layer import MotionLayer, MotionLayerSettings, MotionInput, MotionOutput
 from .port import Port, TextureKind
@@ -13,9 +12,8 @@ from .port import Port, TextureKind
 logger = logging.getLogger(__name__)
 
 
-class Motion3DLayerSettings(MotionLayerSettings):
-    """Configuration for Motion3DLayer."""
-    lucas_kanade = Group(LucasKanadeFlow3DSettings)
+class Motion3DLayerSettings(LucasKanadeFlow3DSettings, MotionLayerSettings):
+    """Configuration for Motion3DLayer: the stage's settings and its flow's own, one panel, the stage's first."""
 
 
 class Motion3DLayer(MotionLayer):
@@ -25,7 +23,7 @@ class Motion3DLayer(MotionLayer):
         super().__init__(settings)
         self.settings: Motion3DLayerSettings = settings
         self._cam_id: int = cam_id
-        self._flow: LucasKanadeFlow3D = LucasKanadeFlow3D(settings.lucas_kanade)
+        self._flow: LucasKanadeFlow3D = LucasKanadeFlow3D(settings)
         self._warned_view_span: bool = False
 
         hot_reload = HotReloadMethods(self.__class__, True, True)

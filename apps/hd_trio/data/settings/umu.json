@@ -525,13 +525,11 @@
     "motion": {
       "width": 512,
       "height": 288,
-      "gradient": {
-        "offset": 3,
-        "threshold": 0.0,
-        "strength_x": 3.3,
-        "strength_y": 3.3,
-        "boost": 0.0
-      }
+      "offset": 3,
+      "threshold": 0.0,
+      "strength_x": 3.3,
+      "strength_y": 3.3,
+      "boost": 0.0
     },
     "monitor_a": {
       "stage": "BRIDGE",
@@ -562,6 +560,8 @@
       }
     },
     "bridge": {
+      "width": 2160,
+      "height": 3840,
       "trail": {
         "scale": 1.54,
         "trail_weight": 0.9,
@@ -578,7 +578,6 @@
     },
     "fluid": {
       "blend_mode": "ADD",
-      "fluid": {
         "profile": false,
         "width": 1088,
         "height": 1920,
@@ -620,7 +619,6 @@
           "iterations": 40,
           "boundary": "OPEN"
         }
-      }
     },
     "colors": {
       "player_0": {

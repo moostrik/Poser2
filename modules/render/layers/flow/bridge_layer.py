@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from OpenGL.GL import GL_RGBA16F
 
 from modules.gl import Fbo, Texture, Style
+from modules.settings import Field
 from ...shaders import DensityColor
 from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 
@@ -46,33 +47,31 @@ class BridgeOutput(StageOutput):
 
 class BridgeLayerSettings(StageLayerSettings):
     """What the 2D and the 3D bridge layer share; each adds its bridges' groups."""
+    width: Field[int] =     Field(2160, min=32, max=4096, step=32, description="Width the bridge writes its outputs at")
+    height: Field[int] =    Field(3840, min=32, max=4096, step=32, description="Height the bridge writes its outputs at")
 
 
 class BridgeLayer(StageLayer[BridgeInput, BridgeOutput]):
     """The bridge stage's layer. `update` makes the density's color and runs the bridges (`_bridge`).
-    The bridges run at the velocity's size, which the layer follows, the density at the layer's own
-    size. The layer draws nothing."""
+    The bridges' filters run at the velocity's size, which the layer follows; the outputs are written
+    at `settings.width` by `settings.height`, which it follows too. The layer draws nothing."""
 
     def __init__(self, settings: BridgeLayerSettings) -> None:
         super().__init__(settings)
         self.settings: BridgeLayerSettings = settings
         self._color: Fbo = Fbo()                        # the density's color: the image's RGB, or white, times the tint and the mask
         self._color_shader: DensityColor = DensityColor()
-        self._flow_size: tuple[int, int] = (0, 0)       # the size the bridges run at: the velocity's
-        self._output_size: tuple[int, int] = (0, 0)     # the layer's allocation size
+        self._flow_size: tuple[int, int] = (0, 0)       # the size the filters run at: the velocity's
+        self._output_size: tuple[int, int] = (0, 0)     # the size the outputs are written at: settings.width/height
 
     # ========== Lifecycle ==========
 
     def allocate(self, width: int, height: int, internal_format: int | None = None) -> None:
-        self._output_size = (width, height)
-        self._color.allocate(width, height, GL_RGBA16F)
+        """The size the app gives is not the bridge's: it writes at `settings.width` by `settings.height`."""
         self._color_shader.allocate()
 
     def deallocate(self) -> None:
-        if self._flow_size != (0, 0):
-            self._deallocate_stages()
-            self._flow_size = (0, 0)
-        self._color.deallocate()
+        self._deallocate_sizes()
         self._color_shader.deallocate()
         super().deallocate()
 
@@ -80,20 +79,28 @@ class BridgeLayer(StageLayer[BridgeInput, BridgeOutput]):
         """Start the bridges from rest."""
         self._reset_stages()
 
-    def _follow_flow_size(self, velocity: Texture) -> None:
-        """Allocate the bridges at the velocity's size, and again when it changes."""
-        size: tuple[int, int] = (velocity.width, velocity.height)
-        if size == self._flow_size:
+    def _follow_sizes(self, velocity: Texture) -> None:
+        """Allocate the bridges at the velocity's size and the output size, and again when either changes."""
+        flow_size: tuple[int, int] = (velocity.width, velocity.height)
+        output_size: tuple[int, int] = (self.settings.width, self.settings.height)
+        if (flow_size, output_size) == (self._flow_size, self._output_size):
             return
-        if self._flow_size != (0, 0):
-            self._deallocate_stages()
-        self._flow_size = size
-        self._allocate_stages(*size, *self._output_size)
+        self._deallocate_sizes()
+        self._flow_size, self._output_size = flow_size, output_size
+        self._color.allocate(*output_size, GL_RGBA16F)
+        self._allocate_stages(*flow_size, *output_size)
         self._reset_stages()
+
+    def _deallocate_sizes(self) -> None:
+        if self._flow_size == (0, 0):
+            return
+        self._deallocate_stages()
+        self._color.deallocate()
+        self._flow_size = self._output_size = (0, 0)
 
     @abstractmethod
     def _allocate_stages(self, width: int, height: int, output_width: int, output_height: int) -> None:
-        """Allocate the bridges at the velocity's size; `output_width` by `output_height` is the layer's."""
+        """Allocate the bridges' filters at the velocity's size and their outputs at `output_width` by `output_height`."""
 
     @abstractmethod
     def _deallocate_stages(self) -> None: ...
@@ -111,7 +118,7 @@ class BridgeLayer(StageLayer[BridgeInput, BridgeOutput]):
         input: BridgeInput | None = self._input
         if input is None or not input.velocity.allocated:
             return
-        self._follow_flow_size(input.velocity)
+        self._follow_sizes(input.velocity)
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)

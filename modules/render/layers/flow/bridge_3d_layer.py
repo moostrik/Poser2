@@ -27,7 +27,7 @@ class BridgeMethod(IntEnum):
 
 class Bridge3DLayerSettings(BridgeLayerSettings):
     """Configuration for Bridge3DLayer: the method and each bridge's group."""
-    method: Field[BridgeMethod] =           Field(BridgeMethod.VELOCITY_TRAIL, description="How the bridge makes the fluid's velocity and the density's amount: one trail, or two trails reading the change of the motion")
+    method: Field[BridgeMethod] =           Field(BridgeMethod.VELOCITY_TRAIL, newline=True, description="How the bridge makes the fluid's velocity and the density's amount: one trail, or two trails reading the change of the motion")
 
     trail       = Group(VelocityTrailBridgeSettings)
     kinetic     = Group(KineticBridgeSettings)
@@ -96,13 +96,8 @@ class Bridge3DLayer(BridgeLayer):
 
     # ========== Lifecycle ==========
 
-    def allocate(self, width: int, height: int, internal_format: int | None = None) -> None:
-        super().allocate(width, height, internal_format)
-        self._density_bridge.allocate(width, height)
-
     def deallocate(self) -> None:
         super().deallocate()
-        self._density_bridge.deallocate()
         self._gpu_timer.deallocate()
 
     def _allocate_stages(self, width: int, height: int, output_width: int, output_height: int) -> None:
@@ -110,12 +105,14 @@ class Bridge3DLayer(BridgeLayer):
         self._kinetic_bridge.allocate(width, height)
         self._velocity_magnitude.allocate(width, height)
         self._temperature_bridge.allocate(width, height)
+        self._density_bridge.allocate(output_width, output_height)
 
     def _deallocate_stages(self) -> None:
         self._trail_bridge.deallocate()
         self._kinetic_bridge.deallocate()
         self._velocity_magnitude.deallocate()
         self._temperature_bridge.deallocate()
+        self._density_bridge.deallocate()
 
     def _reset_stages(self) -> None:
         self._trail_bridge.reset()

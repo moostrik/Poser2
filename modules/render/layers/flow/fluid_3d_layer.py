@@ -10,16 +10,15 @@ from OpenGL.GL import GL_VIEWPORT, glGetIntegerv
 
 # Local application imports
 from modules.gl import Texture, Style, Text, Blit
-from modules.settings import Group
 from modules.flow import Fluid3D, Fluid3DSettings
 from modules.utils import HotReloadMethods
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidOutput, Injection
 from .port import Port, TextureKind
 
 
-class Fluid3DLayerSettings(FluidLayerSettings):
-    """Configuration for Fluid3DLayer."""
-    fluid = Group(Fluid3DSettings)
+class Fluid3DLayerSettings(Fluid3DSettings, FluidLayerSettings):
+    """Configuration for Fluid3DLayer: the stage's settings and its fluid's own, one panel, the stage's
+    first; the stage's width and height are the fluid's simulation grid."""
 
 
 class Fluid3DLayer(FluidLayer):
@@ -29,7 +28,7 @@ class Fluid3DLayer(FluidLayer):
     def __init__(self, settings: Fluid3DLayerSettings) -> None:
         super().__init__(settings)
         self.settings: Fluid3DLayerSettings = settings
-        self._fluid: Fluid3D = Fluid3D(settings.fluid)
+        self._fluid: Fluid3D = Fluid3D(settings)
         self._legend_text: Text = Text()     # legend for the debug layers view (hue = layer)
 
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -84,7 +83,7 @@ class Fluid3DLayer(FluidLayer):
         Style.set_blend_mode(self.settings.blend_mode)
         if self.texture.allocated:
             Blit.use(self.texture)
-        if self.settings.fluid.volume.debug_layers and self._legend_text.allocated:
+        if self.settings.volume.debug_layers and self._legend_text.allocated:
             self._draw_layer_legend()
         Style.pop_style()
 

@@ -41,7 +41,7 @@ FALLBACK_DELTA_TIME: float = 1.0 / 30.0     # s: the interval taken in its place
 
 class LucasKanadeFlow3DSettings(BaseSettings):
     """Configuration for the 3D Lucas–Kanade flow: the mask and the axes, its x/y solve and its depth velocity."""
-    use_mask:       Field[bool]  = Field(True, width=48, description="Only the player moves the fluid (off: whole image)")
+    use_mask:       Field[bool]  = Field(True, newline=True, width=48, description="Only the player moves the fluid (off: whole image)")
     x_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, image widths per second")
     y_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, image widths per second")
     z_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, on the x/y scale")

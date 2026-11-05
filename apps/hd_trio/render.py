@@ -226,7 +226,7 @@ class HDTrioRender(RenderBase):
             similarities: np.ndarray = (np.nan_to_num(pose[Similarity].values) if pose is not None and Similarity in pose
                                         else np.zeros(self.max_players)) * self.settings.similarity_scale
             # More motion, a faster fade
-            self.settings.fluid.fluid.density.fade_time = FADE_TIME_STILL - motion_value ** 2 * FADE_TIME_RANGE
+            self.settings.fluid.density.fade_time = FADE_TIME_STILL - motion_value ** 2 * FADE_TIME_RANGE
             injections: list[ls.Injection] = []
             for j, bridge in bridges.items():
                 output: ls.BridgeOutput = bridge.output

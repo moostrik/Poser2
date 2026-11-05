@@ -406,31 +406,31 @@
     "motion": {
       "width": 448,
       "height": 800,
-      "lucas_kanade": {
-        "use_mask": true,
-        "x_gain": 1.0,
-        "y_gain": 1.0,
-        "z_gain": 1.0,
-        "solve": {
-          "levels": 4,
-          "window": "SEVEN",
-          "damping": 0.03,
-          "same_surface": true,
-          "threshold": 0.5
-        },
-        "depth_velocity": {
-          "edge": 0.1,
-          "window": "SEVEN",
-          "tolerance": 0.2,
-          "smooth": 50.0,
-          "xy_smooth": true,
-          "catch_up": 8.0,
-          "dead_zone": 0.02,
-          "threshold": 1.0
-        }
+      "use_mask": true,
+      "x_gain": 1.0,
+      "y_gain": 1.0,
+      "z_gain": 1.0,
+      "solve": {
+        "levels": 4,
+        "window": "SEVEN",
+        "damping": 0.03,
+        "same_surface": true,
+        "threshold": 0.5
+      },
+      "depth_velocity": {
+        "edge": 0.1,
+        "window": "SEVEN",
+        "tolerance": 0.2,
+        "smooth": 50.0,
+        "xy_smooth": true,
+        "catch_up": 8.0,
+        "dead_zone": 0.02,
+        "threshold": 1.0
       }
     },
     "bridge": {
+      "width": 2160,
+      "height": 3840,
       "method": "VELOCITY_TRAIL",
       "trail": {
         "advect": 1.0,
@@ -517,7 +517,6 @@
     },
     "fluid": {
       "blend_mode": "ADD",
-      "fluid": {
         "profile": false,
         "width": 448,
         "height": 800,
@@ -586,7 +585,6 @@
           "iterations": 20,
           "boundary": "OPEN"
         }
-      }
     },
     "time_series": {
       "window": 10.0,

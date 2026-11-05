@@ -45,23 +45,17 @@ class Bridge2DLayer(BridgeLayer):
 
     # ========== Lifecycle ==========
 
-    def allocate(self, width: int, height: int, internal_format: int | None = None) -> None:
-        super().allocate(width, height, internal_format)
-        self._density_bridge.allocate(width, height)
-
-    def deallocate(self) -> None:
-        super().deallocate()
-        self._density_bridge.deallocate()
-
     def _allocate_stages(self, width: int, height: int, output_width: int, output_height: int) -> None:
         self._trail.allocate(width, height, output_width, output_height)
         self._velocity_magnitude.allocate(width, height)
         self._temperature_bridge.allocate(width, height)
+        self._density_bridge.allocate(output_width, output_height)
 
     def _deallocate_stages(self) -> None:
         self._trail.deallocate()
         self._velocity_magnitude.deallocate()
         self._temperature_bridge.deallocate()
+        self._density_bridge.deallocate()
 
     def _reset_stages(self) -> None:
         self._trail.reset()

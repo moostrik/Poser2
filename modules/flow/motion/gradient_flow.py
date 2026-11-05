@@ -15,7 +15,7 @@ from modules.utils import HotReloadMethods
 
 
 class GradientFlowSettings(BaseSettings):
-    offset = Field(3, min=1, max=10, description="Gradient sample offset in pixels")
+    offset = Field(3, min=1, max=10, newline=True, description="Gradient sample offset in pixels")
     threshold = Field(0.0, min=0.0, max=0.2, description="Motion detection threshold")
     strength_x = Field(3.3, min=-10.0, max=10.0, description="X velocity multiplier (negative inverts)")
     strength_y = Field(3.3, min=-10.0, max=10.0, description="Y velocity multiplier (negative inverts)")

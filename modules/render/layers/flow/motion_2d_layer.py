@@ -2,15 +2,13 @@
 
 # Local application imports
 from modules.flow import GradientFlow, GradientFlowSettings
-from modules.settings import Group
 from modules.utils import HotReloadMethods
 from .motion_layer import MotionLayer, MotionLayerSettings, MotionInput, MotionOutput
 from .port import Port, TextureKind
 
 
-class Motion2DLayerSettings(MotionLayerSettings):
-    """Configuration for Motion2DLayer."""
-    gradient = Group(GradientFlowSettings)
+class Motion2DLayerSettings(GradientFlowSettings, MotionLayerSettings):
+    """Configuration for Motion2DLayer: the stage's settings and its flow's own, one panel, the stage's first."""
 
 
 class Motion2DLayer(MotionLayer):
@@ -20,7 +18,7 @@ class Motion2DLayer(MotionLayer):
     def __init__(self, settings: Motion2DLayerSettings) -> None:
         super().__init__(settings)
         self.settings: Motion2DLayerSettings = settings
-        self._flow: GradientFlow = GradientFlow(settings.gradient)
+        self._flow: GradientFlow = GradientFlow(settings)
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 

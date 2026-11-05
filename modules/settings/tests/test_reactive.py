@@ -2791,5 +2791,36 @@ class TestValidateName(unittest.TestCase):
             presets.validate_name("../etc/passwd")
 
 
+class _OrderBase(BaseSettings):
+    reset = Field(False, widget=Widget.button)
+    width = Field(1)
+
+
+class _OrderMixin(BaseSettings):
+    gain = Field(1.0)
+    width = Field(2)
+    inner = Group(MinimalSettings)
+
+
+class _OrderChild(_OrderMixin, _OrderBase):
+    own = Field(0)
+
+
+class TestFieldOrder(unittest.TestCase):
+    """Fields and groups are listed base classes first; a name declared again keeps the base's place
+    and takes the most derived descriptor."""
+
+    def test_base_fields_come_first(self):
+        self.assertEqual(list(_OrderChild().fields), ['reset', 'width', 'gain', 'own'])
+
+    def test_a_redeclared_field_takes_the_most_derived_descriptor(self):
+        s = _OrderChild()
+        self.assertIs(s.fields['width'], _OrderMixin.width)
+        self.assertEqual(s.width, 2)
+
+    def test_groups_are_collected(self):
+        self.assertEqual(list(_OrderChild().children), ['inner'])
+
+
 if __name__ == "__main__":
     unittest.main()

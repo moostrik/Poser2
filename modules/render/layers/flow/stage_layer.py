@@ -22,8 +22,11 @@ class StageOutput:
 
 
 class StageLayerSettings(BaseSettings):
-    """What every stage layer's settings hold."""
+    """What every stage layer's settings hold, first on its panel: the reset and the stage's working
+    size, which each stage's settings declare again with its own meaning and default."""
     reset: Field[bool] =    Field(False, widget=Widget.button, description="Start the stage from rest")
+    width: Field[int] =     Field(512, min=32, max=4096, step=32, description="Working width")
+    height: Field[int] =    Field(288, min=32, max=4096, step=32, description="Working height")
 
 
 class StageLayer[I, O: StageOutput](LayerBase, ABC):

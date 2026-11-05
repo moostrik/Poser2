@@ -52,20 +52,26 @@ class BaseSettings:
         object.__setattr__(self, "_locks", {})
         object.__setattr__(self, "_children", {})
 
-        # Collect Field and Group descriptors from the class hierarchy
-        group_names: dict[str, None] = {}
-        for cls in type(self).__mro__:
+        # Collect Field and Group descriptors from the class hierarchy, base classes first, so a
+        # panel and a preset list a base's fields before a subclass's; a name a subclass declares
+        # again keeps the base's place and takes the subclass's descriptor
+        mro: tuple[type, ...] = type(self).__mro__
+        names: dict[str, None] = {}
+        for cls in reversed(mro):
             for attr_name, attr_value in vars(cls).items():
-                if attr_name.startswith("_"):
-                    continue
-                if isinstance(attr_value, Field) and attr_name not in self._fields:
-                    self._fields[attr_name] = attr_value
-                    default = attr_value.default
-                    self._values[attr_name] = copy.deepcopy(default) if isinstance(default, list) else default
-                    self._callbacks[attr_name] = []
-                    self._locks[attr_name] = threading.Lock()
-                elif isinstance(attr_value, Group) and attr_name not in group_names:
-                    group_names[attr_name] = None
+                if not attr_name.startswith("_") and isinstance(attr_value, (Field, Group)):
+                    names.setdefault(attr_name, None)
+        group_names: dict[str, None] = {}
+        for attr_name in names:
+            attr_value = next(vars(cls)[attr_name] for cls in mro if attr_name in vars(cls))
+            if isinstance(attr_value, Field):
+                self._fields[attr_name] = attr_value
+                default = attr_value.default
+                self._values[attr_name] = copy.deepcopy(default) if isinstance(default, list) else default
+                self._callbacks[attr_name] = []
+                self._locks[attr_name] = threading.Lock()
+            elif isinstance(attr_value, Group):
+                group_names[attr_name] = None
 
         # Apply kwargs (init_only fields are still writable here)
         for name, value in kwargs.items():

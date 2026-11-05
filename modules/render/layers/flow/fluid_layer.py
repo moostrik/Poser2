@@ -49,7 +49,7 @@ class FluidOutput(StageOutput):
 
 class FluidLayerSettings(StageLayerSettings):
     """What the 2D and the 3D fluid layer share; each adds its fluid's group."""
-    blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
+    blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD, newline=True)
 
 
 class FluidLayer(StageLayer[FluidInput, FluidOutput]):

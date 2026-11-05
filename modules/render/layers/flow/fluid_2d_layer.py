@@ -13,7 +13,6 @@ from OpenGL.GL import GL_RGBA16F
 
 # Local application imports
 from modules.gl import Fbo, Texture
-from modules.settings import Group
 from modules.flow import Fluid2D, Fluid2DSettings
 from modules.utils import HotReloadMethods
 from ...shaders import DensityColorize
@@ -25,9 +24,9 @@ logger = logging.getLogger(__name__)
 CHANNELS: int = 4       # the density's channels, one injection each
 
 
-class Fluid2DLayerSettings(FluidLayerSettings):
-    """Configuration for Fluid2DLayer."""
-    fluid: Group[Fluid2DSettings] = Group(Fluid2DSettings)
+class Fluid2DLayerSettings(Fluid2DSettings, FluidLayerSettings):
+    """Configuration for Fluid2DLayer: the stage's settings and its fluid's own, one panel, the stage's
+    first; the stage's width and height are the fluid's simulation grid."""
 
 
 class Fluid2DLayer(FluidLayer):
@@ -38,7 +37,7 @@ class Fluid2DLayer(FluidLayer):
     def __init__(self, settings: Fluid2DLayerSettings) -> None:
         super().__init__(settings)
         self.settings: Fluid2DLayerSettings = settings
-        self._fluid: Fluid2D = Fluid2D(settings.fluid)
+        self._fluid: Fluid2D = Fluid2D(settings)
         self._colors: list[tuple[float, float, float, float]] = [(0.0, 0.0, 0.0, 0.0)] * CHANNELS    # each channel's injection's color
         self._colorized: Fbo = Fbo()
         self._colorize_shader: DensityColorize = DensityColorize()

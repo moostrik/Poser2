@@ -44,13 +44,13 @@ class Channel(IntEnum):
 
 class MonitorLayerSettings(BaseSettings):
     """Configuration for MonitorLayer: what it shows and how."""
+    reset: Field[bool] =            Field(False, widget=Widget.button, description="Start the strip over")
     stage: Field[FlowStage] =       Field(FlowStage.BRIDGE, description="The stage whose texture is shown")
     names: Field[list[str]] =       Field([""], access=Field.READ, visible=False, description="The stage's textures")
     texture: Field[str] =           Field("velocity", widget=Widget.text_select, options=names, description="The texture shown")
     mode: Field[MonitorMode] =      Field(MonitorMode.AUTO, description="Drawn by its kind, or as an image, as arrows, as a signed scalar, or as a strip of its channels' amounts over time")
     channel: Field[Channel] =       Field(Channel.X, description="The channel the scalar mode shows")
     blend_mode: Field[Style.BlendMode] = Field(Style.BlendMode.ADD)
-    reset: Field[bool] =            Field(False, widget=Widget.button, description="Start the strip over")
 
     visualization = Group(VisualizationFieldSettings)
 
