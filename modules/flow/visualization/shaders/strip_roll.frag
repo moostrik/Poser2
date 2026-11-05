@@ -2,16 +2,21 @@
 
 // Strip Roll Shader
 // A rolling plot, drawn on the GPU so nothing is read back: everything moves one column left
-// and the last column gets one bar per lane, the frame-wide mean amount of that channel
+// and the last column gets one bar per lane, the frame-wide mean amount of that channel on a log
+// axis of three decades; four
+// lanes, or one channel's lane at full height. A channel the texture does not have reads as
+// sampled (a one-channel texture's grey swizzle repeats x, w is 1)
 
 uniform sampler2D tex0;  // Previous strip
 uniform sampler2D tex1;  // Summary, its top mip the mean amount of (x, y, z, w)
 uniform float scale;     // Multiplier on the bars
+uniform int channel;     // 0 to 3 for one lane, 4 for all four
 
 out vec4 fragColor;
 
-const int LANES = 4;
-const vec3 COLORS[LANES] = vec3[](vec3(1.0, 0.35, 0.3), vec3(0.3, 1.0, 0.4), vec3(0.3, 0.55, 1.0), vec3(1.0));
+const int ALL = 4;
+const float DECADES = 3.0;       // the lane's height: a mean times scale from 0.001 at the bottom to 1 at the top
+const vec3 COLORS[4] = vec3[](vec3(1.0, 0.35, 0.3), vec3(0.3, 1.0, 0.4), vec3(0.3, 0.55, 1.0), vec3(1.0));
 
 void main() {
     ivec2 size = textureSize(tex0, 0);
@@ -22,9 +27,11 @@ void main() {
     }
 
     vec4 means = textureLod(tex1, vec2(0.5), float(textureQueryLevels(tex1) - 1));
-    float lanes = float(pixel.y) * float(LANES) / float(size.y);
-    int lane = LANES - 1 - int(lanes);                      // the first lane on top
-    float height = fract(lanes);
-    bool bar = height < means[lane] * scale && height < 0.94;     // a gap between the lanes
+    int lanes = channel == ALL ? 4 : 1;
+    float position = float(pixel.y) * float(lanes) / float(size.y);
+    int lane = channel == ALL ? lanes - 1 - int(position) : channel;     // the first lane on top
+    float height = fract(position);
+    float level = clamp((log(max(means[lane] * scale, 1e-6)) / log(10.0) + DECADES) / DECADES, 0.0, 1.0);
+    bool bar = height < level * 0.94;                                   // a gap between the lanes
     fragColor = vec4(bar ? COLORS[lane] : vec3(0.0), 1.0);
 }

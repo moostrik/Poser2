@@ -76,7 +76,7 @@ class Bridge3DLayer(BridgeLayer):
                 'kinetic_fast': Port(bridge.fast, TextureKind.VELOCITY),
                 'kinetic_slow': Port(bridge.slow, TextureKind.VELOCITY),
                 'kinetic_acceleration': Port(bridge.acceleration, TextureKind.SCALAR),
-                'kinetic_depth_acceleration': Port(bridge.depth_acceleration, TextureKind.DEPTH),
+                'kinetic_depth_acceleration': Port(bridge.depth_acceleration, TextureKind.SCALAR),
                 'kinetic_turn': Port(bridge.turn, TextureKind.SCALAR),
                 'kinetic_held_release': Port(bridge.held_release, TextureKind.SCALAR),
                 'kinetic_reservoir': Port(bridge.reservoir, TextureKind.SCALAR),

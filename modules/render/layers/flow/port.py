@@ -14,13 +14,11 @@ from modules.flow import DepthView
 
 
 class TextureKind(IntEnum):
-    """How a texture is drawn when nothing else is asked: as the picture it is, as arrows (a 2D
-    velocity in RG, a 3D one in RGB with z as a ring), as a signed scalar in two colors, or as a
-    signed depth scalar, red toward the camera and green away."""
+    """How a texture is drawn when nothing else is asked: an image as the picture it is, a velocity
+    as arrows (a 2D one in RG, a 3D one in RGB with z as a ring), a scalar as a colormap centered on mid grey."""
     IMAGE = 0
     VELOCITY = auto()
     SCALAR = auto()
-    DEPTH = auto()
 
 
 @dataclass

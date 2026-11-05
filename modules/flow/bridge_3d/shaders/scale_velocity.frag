@@ -10,5 +10,5 @@ in vec2 texCoord;
 out vec4 fragColor;
 
 void main() {
-    fragColor = vec4(texture(tex0, texCoord).xyz * scale, 1.0);
+    fragColor = vec4(texture(tex0, texCoord).xyz * scale, 0.0);   // w unused
 }

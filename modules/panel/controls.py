@@ -626,15 +626,20 @@ def enum_options(field: Field) -> dict[Enum, str]:
     return {m: getattr(m, 'label', None) or generate_label(m.name) for m in members}
 
 
+def _size(select: ui.select, field: Field) -> None:
+    """A select's width: the field's `width` hint, else `w-48`."""
+    select.classes(f"w-{field.width if field.width is not None else 48} max-w-full")
+
+
 class Select(Control):
     widget = Widget.select
 
     def build(self) -> None:
         options = enum_options(self.field)
-        width = f"w-{self.field.width}" if self.field.width is not None else "w-48"
         self.select = self.tooltip(ui.select(options=options, value=self.shown, label=self.label).props(
             "dense outlined" + self.lock()
-        ).classes(f"{width} max-w-full"))
+        ))
+        _size(self.select, self.field)
         if not self.locked:
             self.select.on_value_change(lambda e: self.commit(e.value))
 
@@ -651,7 +656,8 @@ class TextSelect(Control):
         self.options = list(getattr(self.settings, self.options_field.name)) if self.options_field else []
         self.select = self.tooltip(ui.select(
             options=self.options, value=self.shown if self.shown in self.options else None, label=self.label,
-        ).props("dense outlined" + self.lock()).classes("w-48 max-w-full"))
+        ).props("dense outlined" + self.lock()))
+        _size(self.select, self.field)
         if not self.locked:
             def on_change(e):
                 if e.value is None:     # the select clears itself when its options change; not a choice

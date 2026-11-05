@@ -36,7 +36,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 | depth velocity       | the z of the 3D flow: the depth change along the x/y displacement, in view widths per second          | `DepthVelocity`, `DepthVelocitySettings`, group `depth_velocity`   |
 | 2D flow, 3D flow     | a system: a motion layer and a bridge layer per camera, a fluid layer per show output                 | `Motion2DLayer` + `Bridge2DLayer` + `Fluid2DLayer`; `…3D…`         |
 | 2D camera, 3D camera | an image and a mask; those and a depth image on the same view                                         | `MotionInput` without / with `depth`                               |
-| port                 | a stage's named texture with its kind: image, velocity, scalar, depth scalar; read from the kinds its input and output fields declare, plus its diagnostics | `Port`, `TextureKind`, `ports_of`                       |
+| port                 | a stage's named texture with its kind: image, velocity, scalar; read from the kinds its input and output fields declare, plus its diagnostics | `Port`, `TextureKind`, `ports_of`                       |
 | monitor              | a layer that shows one port of one stage, picked on the panel, drawn only while it is shown           | `MonitorLayer`, `monitor_a`, `monitor_b`                           |
 
 "bridge" is ofxFlowTools' word (`ftVelocityBridge`, `ftDensityBridge`, `ftTemperatureBridge`);
@@ -149,7 +149,7 @@ context of its own, would move the wait to the bridge, and the screen still show
 | `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, with `method` picking the trail or the kinetic bridge, whose curl is scaled by `onset.spin`)                            |
 | `FluidLayer` (ABC)                          | `StageLayer[FluidInput, FluidOutput]`; `_update()`: `_inject` each injection's velocity, density and temperature at its weight, `_step(dt)`; `texture`, the show. Knows injections, not cameras; reads no poses. The stage's reset is the fluid's only one |
 | `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's. `Fluid3DLayer` injects RGBA density, onset and spin, the velocity's z as the volume's w (its sign turned: w points away from the viewer), and takes the parallax eye the app steers by `set_eye(x, y)` |
-| `MonitorLayer`                              | `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's port names (`names`, the options of `texture`); `draw()` renders the port once per tick, however many panels show it, by its kind or by `mode` (image, arrows, scalar in two colors by `channel`, or strip: the mean amount of each channel over the last seconds, `Strip`), and nothing while not shown. Its `visualization` group holds the scale, spacing and arrows. Not a stage, since it has no output; its own `reset` button starts the strip over, the one mode with a history |
+| `MonitorLayer`                              | `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's port names (`names`, the options of `texture`); `draw()` renders the port once per tick, however many panels show it, by its kind or by `view`, and nothing while not shown; its views and settings are in [The monitor](#the-monitor). Not a stage, since it has no output and no `reset` |
 | `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass, each a `StageLayerSettings`: `reset`, then `width` and `height`, the stage's working size, first on every stage's panel. The motion's is the size its flow runs at, the bridge's the size it writes its outputs at (its filters follow the velocity's size), the fluid's its simulation grid (its density is at the size the app allocates). On the fluid layer `blend_mode`. A layer whose stage runs one component is that component's settings too (`Motion2DLayerSettings` is a `GradientFlowSettings`, `Motion3DLayerSettings` a `LucasKanadeFlow3DSettings`, the fluid layers' a `Fluid2DSettings` and a `Fluid3DSettings`), so the component's fields and groups sit on the stage's panel; the bridge layers, running several bridges, hold each as a group (`trail`, `kinetic`, `density`, `temperature`). No `draw_mode`, `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take `dt` from their input |
 
 The apps' render is a layer graph of `LayerBase` layers updated by one loop calling `update()`
@@ -178,15 +178,15 @@ any layer, and two show A beside B.
 | `modules/flow/fluid_3d/`        | `Fluid3D`, `Fluid3DSettings` with its own groups and `VolumeSettings`; `shaders/`                                                                          |
 | `modules/flow/shaders/`         | the shared fragment shaders, `AddBoolean` among them                                                                                                       |
 | `modules/flow/time_step.py`, `modules/flow/boundary_mode.py` | shared                                                                                                                        |
-| `modules/flow/visualization/`   | the monitors' drawing: `Visualizer` with its arrow and signed fields, `Strip`                                                                             |
-| `modules/render/layers/flow/`   | `port.py` (`Port`, `TextureKind`); `motion_layer.py` (`MotionInput`, `MotionOutput`, `MotionLayer`, `frame_interval`), `motion_2d_layer.py`, `motion_3d_layer.py`; `bridge_layer.py` (`BridgeInput`, `BridgeOutput`, `BridgeLayer`), `bridge_2d_layer.py`, `bridge_3d_layer.py`; `fluid_layer.py` (`Injection`, `FluidInput`, `FluidOutput`, `FluidLayer`), `fluid_2d_layer.py`, `fluid_3d_layer.py`; `monitor_layer.py` (`MonitorInput`, `MonitorLayer`, `FlowStage`, `MonitorMode`, `Channel`) |
+| `modules/flow/visualization/`   | the monitors' drawing: `Visualizer` (image, colormap, arrows and histogram into one FBO), `Strip`, `AxisOverlay` with `log_axis.py`, `ALL_CHANNELS`               |
+| `modules/render/layers/flow/`   | `port.py` (`Port`, `TextureKind`); `motion_layer.py` (`MotionInput`, `MotionOutput`, `MotionLayer`, `frame_interval`), `motion_2d_layer.py`, `motion_3d_layer.py`; `bridge_layer.py` (`BridgeInput`, `BridgeOutput`, `BridgeLayer`), `bridge_2d_layer.py`, `bridge_3d_layer.py`; `fluid_layer.py` (`Injection`, `FluidInput`, `FluidOutput`, `FluidLayer`), `fluid_2d_layer.py`, `fluid_3d_layer.py`; `monitor_layer.py` (`MonitorInput`, `MonitorLayer`, `MonitorLayerSettings`, `MonitorAdvancedSettings`, `FlowStage`, `MonitorView`, `Channel`, `ArrowSpacing`) |
 
 Neither `fluid_2d` nor `fluid_3d` imports the other. The settings group of each fluid is `fluid`.
 `motion/` has no `_2d` and `_3d` packages because its 3D flow is its 2D flow plus z:
 `LucasKanadeFlow3D` composes `LucasKanadeFlow` and `DepthVelocity`, where the bridges and the
 fluids are two implementations. The visualization is shared because it is not a stage: a monitor
-draws the port it is given, a 2-channel velocity as a 2D one and a 3- or 4-channel one as a 3D
-one (`VelocityField.update`), a scalar in two colors, any texture as a strip.
+draws the port it is given by its channels, whatever the stage: arrows of a 2-channel velocity
+are 2D and of a 3- or 4-channel one 3D (`Visualizer.process_arrows`).
 The shader loader finds a shader's source by its `.py` module name beside it
 (`modules/gl/shader.py`), so moved shaders need no edit.
 
@@ -221,7 +221,7 @@ The shader loader finds a shader's source by its `.py` module name beside it
   `TimeStep` smooths it over `fps_smoothing`, or steps fixed at `fixed_fps`. No `fps` or
   `step_fps` field: runtime data stays off the settings.
 - The stages draw nothing; the monitors draw, only while shown, once per tick. A port's kind says
-  how it is drawn when nothing else is asked; the monitor's `mode` overrides it.
+  how it is drawn when nothing else is asked; the monitor's `view` overrides it.
 - The 2D bridge keeps three classes the 3D bridge also has (`DensityBridge`, `TemperatureBridge`,
   `VelocityMagnitude`) as copies, until the 2D bridge is rebuilt.
 - The 3D fluid layer runs the 3D fluid only. Comparing the two fluids on one input means both
@@ -238,8 +238,82 @@ The shader loader finds a shader's source by its `.py` module name beside it
 - `modules/render/tests/test_stage_layer.py` checks, without GL, that a reset button asks and the
   stage's next update resets once before it runs, and asks nothing after `deallocate`.
 
+## The monitor
+
+The monitor's panel group (`MonitorLayerSettings`) says what is drawn; its `advanced` group
+(`MonitorAdvancedSettings`) says how. Neither has row breaks of its own; the panel wraps them.
+
+| Setting                  | Values                                                      | Means                                       |
+|--------------------------|-------------------------------------------------------------|---------------------------------------------|
+| `stage`                  | `MOTION`, `BRIDGE`, `FLUID`                                 | the stage whose port is shown               |
+| `texture`                | the stage's port names                                      | the port shown                              |
+| `view`                   | `AUTO`, `IMAGE`, `COLORMAP`, `ARROWS`, `HISTOGRAM`, `STRIP` | how the channels are drawn                  |
+| `channel`                | `X`, `Y`, `Z`, `W`, `ALL` (default)                         | which of the texture's channels are drawn   |
+| `advanced.scale`         | 0.01 to 100, a log slider                                   | multiplier on the values, in every view     |
+| `advanced.arrow_spacing` | 4, 8, 16, 32, 64, 128 (`ArrowSpacing`)                      | distance between arrows (pixels)            |
+| `advanced.legend`        | on (default), off                                           | the log axis, or the colormap's key         |
+| `advanced.blend_mode`    | a `Style.BlendMode`                                         | how the monitor is drawn over the panel     |
+
+An arrow reaches one spacing at speed 1 and at most two (the shader rolls its length off toward
+2), and its lines are spacing / 20 wide (`ARROW_WIDTH`), so the arrows keep their proportions at
+every spacing.
+
+The strip starts over when `stage`, `texture` or `channel` changes, or when `view` turns to
+`STRIP`, so it never shows another texture's history and needs no reset button.
+
+| View     | `ALL`                                                              | one channel                                   |
+|----------|--------------------------------------------------------------------|-----------------------------------------------|
+| `IMAGE`  | the texture as stored, times `scale`                               | that channel as grey, times `scale`           |
+| `COLORMAP` | x, y, z as red, green, blue around mid grey: grey is 0             | `ALL` with the other channels 0: x from grey toward red above 0 and toward cyan below, y green, z blue; w, which has no color in `ALL`, as grey |
+| `ARROWS` | the arrow of x and y, with the ring for z on a 3- or 4-channel texture (channel not read) | the same                |
+| `STRIP`  | four lanes, x, y, z, w: the frame-wide mean of each channel's amount (its absolute value; a signed mean cancels left against right), on a log axis | one lane, full height |
+| `HISTOGRAM` | four lanes, x, y, z, w: how many values fall where from −1 to 1 after `scale`, 0 in the middle, outside in the end bins | one lane, full height |
+
+`AUTO` is `IMAGE` for an image port, `ARROWS` for a velocity, `COLORMAP` for a scalar, the three
+kinds of `TextureKind`.
+
+- A channel the texture does not have reads as sampled in every view: a one-channel texture
+  repeats x in y and z (its grey swizzle, `modules/gl/texture.py`), a two-channel one has z 0, and
+  a missing w is 1.
+- The histogram's height is the log of a bin's count against the log of the samples, since most of
+  a flow is still and its zero bin would flatten every other. It counts 256 bins on a fixed grid of
+  256 × 256 samples on the GPU (`HistogramCount`, atomic adds), so its cost does not grow with the
+  texture and nothing is read back.
+- One `scale` serves every view, since each monitor has its own view and its own scale. z takes
+  `scale` like x and y, since the motion's `z_gain` already balances it.
+- The strip's height is logarithmic over three decades, `(log10(mean × scale) + 3) / 3`: a frame's
+  mean amount spans decades between a still player and a fast move, so a linear lane clips the one
+  or loses the other. `scale` slides the window; a bar a third taller is ten times the amount.
+- With `legend` on, the strip and the histogram show their log axis over the plot
+  (`AxisOverlay`): the lane names, a 2 px grey line at each round decade labeled with what it reads
+  (the strip's mean amount, 0.001, 0.01, 0.1, 1; the histogram's share of the samples, 0.01%,
+  0.1%, 1%, 10%), and the histogram's 0 and its ±1/`scale` limits. `COLORMAP` shows a color key
+  instead: a bar per channel shown (x, y, z on `ALL`) from −1/`scale` through 0 to +1/`scale` in
+  its colors. The legend is drawn into its own FBO only when the view, `channel` or `scale`
+  changes and blitted every draw, since `Text` builds and uploads each string's glyphs per draw;
+  the lines and labels come from `log_axis.py`, tested without GL in
+  `modules/flow/tests/test_log_axis.py`.
+- `Visualizer` draws into one FBO: `ChannelView` (image and colormap, the channel and the view as
+  uniforms), `VelocityArrowField`, and `HistogramCount` with `HistogramDraw`; `Strip` keeps its
+  own, and `AxisOverlay` its `LogGrid` and `ColormapKey`.
+  `scripts/depth_velocity_compare.py` draws through the same `Visualizer`.
+- There is no hue-by-direction map: it is 2D only, on black, with z unread, where `COLORMAP` on
+  `ALL` shows direction as a mix of red and green around grey, and z in blue.
+
 ## Open
 
 - hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
   the pose's motion, a settings field written per tick. A per-tick value on the fluid layer, as the
   eye is, would take it off the settings.
+- Unused channels written 0 in the whole flow module. The 3D motion's and the 3D bridge's
+  velocities write 0 in their unused w (`compose_velocity.frag`, `velocity_trail.frag`,
+  `scale_velocity.frag`, `kinetic_velocity.frag`, `kinetic_onset.frag`), so a monitor shows w as
+  nothing rather than a full strip lane and a histogram spike at 1 × `scale`. The rest of
+  `modules/flow` still writes 1.0 into unused channels, an alpha left from when the monitors
+  blitted textures as they are: among others `gradient_flow_shader.frag`,
+  `lucas_kanade_shader.frag`, `displacement_threshold.frag`, the kinetic scalars and
+  `magnitude_shader.frag`. It matters only where the target texture has that channel (an R16F
+  target drops it). Each wants its readers checked first, as the velocities' were: there the
+  trails, the kinetic shaders, `VelocityMagnitude` and `inject_flow_3d.comp` read xyz only,
+  `kinetic_advect.frag` carries the vec4 along unread, and `Fluid3D.set_velocity` has no caller.
+  The visualization's own shaders keep alpha 1, since they draw for the screen.

@@ -21,7 +21,7 @@ from .flow import     Port, TextureKind, ports_of, StageLayer, StageLayerSetting
                       Bridge3DLayer, Bridge3DLayerSettings, BridgeMethod, \
                       Fluid2DLayer, Fluid2DLayerSettings, \
                       Fluid3DLayer, Fluid3DLayerSettings, \
-                      MonitorLayer, MonitorLayerSettings, MonitorInput, MonitorMode, FlowStage, Channel
+                      MonitorLayer, MonitorLayerSettings, MonitorInput, MonitorView, FlowStage, Channel
 from .generic import  CompositeLayer, CompositeLayerSettings, LutSettings, \
                       MSColorMaskLayer, MSColorMaskLayerSettings
 from .panorama import Compositor, PanoramaLayerSettings, PanoramaBlend, Part, \

@@ -38,3 +38,4 @@ paths:
 - Minimize CPU-GPU synchronization points
 - Batch work where possible
 - Avoid unnecessary memory transfers between CPU and GPU
+- Draw text that changes less often than every frame into a cached FBO, redrawn only when its content changes; `Text` builds and uploads each string's glyphs on every draw

@@ -2,18 +2,19 @@
 it is shown.
 
 `MonitorInput` is what the app hands it each tick: every stage's ports. The monitor picks the stage
-and the texture by its own settings, and draws it by its kind or by the mode asked: as the picture it
-is, as arrows, as a signed scalar in two colors, or as a strip of its channels' amounts over time.
-It renders in `draw`, once per tick however many panels show it, and nothing in `update`."""
+and the texture by its own settings, and draws their channels, all or one, by the port's kind or by
+the view asked: as an image, as a colormap centered on grey, as arrows, as a strip of the channels'
+amounts over time, or as a histogram of their values, the last two under their log axis
+(`AxisOverlay`). It renders in `draw`, once per tick however many panels show it, and nothing in
+`update`."""
 
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
-from threading import Event
 
 from OpenGL.GL import GL_VIEWPORT, glGetIntegerv, glViewport
 
-from modules.gl import Texture, Style, Text, Blit
-from modules.flow import Visualizer, VisualizationFieldSettings, Strip, STRIP_LANES
+from modules.gl import Texture, Style, Blit
+from modules.flow import Visualizer, HISTOGRAM_TOTAL, Strip, ALL_CHANNELS, AxisOverlay, Axis
 from modules.settings import Field, BaseSettings, Group, Widget
 from ..layer_base import LayerBase
 from .port import Port, TextureKind
@@ -26,39 +27,70 @@ class FlowStage(IntEnum):
     FLUID = auto()
 
 
-class MonitorMode(IntEnum):
-    """How the monitor draws its texture: by the texture's kind, or as asked."""
+class MonitorView(IntEnum):
+    """How the monitor draws the channels: by the port's kind, or as asked."""
     AUTO = 0
     IMAGE = auto()
+    COLORMAP = auto()
     ARROWS = auto()
-    SCALAR = auto()
+    HISTOGRAM = auto()
     STRIP = auto()
 
 
 class Channel(IntEnum):
+    """The texture's channels the monitor draws: one, or all."""
     X = 0
     Y = auto()
     Z = auto()
     W = auto()
+    ALL = ALL_CHANNELS
+
+
+class ArrowSpacing(IntEnum):
+    """The distance between arrows, in pixels, in steps that double."""
+    SPACING_4 = 4
+    SPACING_8 = 8
+    SPACING_16 = 16
+    SPACING_32 = 32
+    SPACING_64 = 64
+    SPACING_128 = 128
+
+    @property
+    def label(self) -> str:
+        """The panel's text for it: the pixels."""
+        return str(self.value)
+
+
+class MonitorAdvancedSettings(BaseSettings):
+    """How the monitor draws: the scale, the arrows' spacing, the legend and the blend."""
+    scale: Field[float] =           Field(1.0, min=0.01, max=100.0, widget=Widget.log_slider, description="Multiplier on the values")
+    arrow_spacing: Field[ArrowSpacing] = Field(ArrowSpacing.SPACING_32, width=24, description="Distance between arrows (pixels)")
+    legend: Field[bool] =           Field(True, description="The strip's and histogram's log axis, the colormap's key")
+    blend_mode: Field[Style.BlendMode] = Field(Style.BlendMode.ADD, width=36, description="How the monitor is drawn over the panel")
 
 
 class MonitorLayerSettings(BaseSettings):
-    """Configuration for MonitorLayer: what it shows and how."""
-    reset: Field[bool] =            Field(False, widget=Widget.button, description="Start the strip over")
+    """Configuration for MonitorLayer: what it shows, and in `advanced` how."""
     stage: Field[FlowStage] =       Field(FlowStage.BRIDGE, description="The stage whose texture is shown")
     names: Field[list[str]] =       Field([""], access=Field.READ, visible=False, description="The stage's textures")
     texture: Field[str] =           Field("velocity", widget=Widget.text_select, options=names, description="The texture shown")
-    mode: Field[MonitorMode] =      Field(MonitorMode.AUTO, description="Drawn by its kind, or as an image, as arrows, as a signed scalar, or as a strip of its channels' amounts over time")
-    channel: Field[Channel] =       Field(Channel.X, description="The channel the scalar mode shows")
-    blend_mode: Field[Style.BlendMode] = Field(Style.BlendMode.ADD)
+    view: Field[MonitorView] =      Field(MonitorView.AUTO, description="By its kind, as an image, as a colormap centered on grey, as arrows, as a strip over time, or as a histogram")
+    channel: Field[Channel] =       Field(Channel.ALL, description="The channels drawn")
 
-    visualization = Group(VisualizationFieldSettings)
+    advanced = Group(MonitorAdvancedSettings)
 
 
 @dataclass
 class MonitorInput:
     """Every stage's ports, built by the app each tick; the monitor picks by its settings."""
     ports: dict[FlowStage, dict[str, Port]] = field(default_factory=dict)
+
+
+_AUTO_VIEWS: dict[TextureKind, MonitorView] = {
+    TextureKind.IMAGE: MonitorView.IMAGE,
+    TextureKind.VELOCITY: MonitorView.ARROWS,
+    TextureKind.SCALAR: MonitorView.COLORMAP,
+}
 
 
 class MonitorLayer(LayerBase):
@@ -68,34 +100,23 @@ class MonitorLayer(LayerBase):
     def __init__(self, settings: MonitorLayerSettings) -> None:
         self.settings: MonitorLayerSettings = settings
         self._input: MonitorInput | None = None
-        self._visualizer: Visualizer = Visualizer(settings.visualization)
+        self._visualizer: Visualizer = Visualizer()
         self._strip: Strip = Strip()
-        self._text: Text = Text()
+        self._axis_overlay: AxisOverlay = AxisOverlay()
+        self._axis: Axis | None = None          # the plot drawn last that has a legend
         self._rendered: bool = False            # this tick's port is drawn into the visualizer or the strip
-        self._strip_of: tuple[FlowStage, str] | None = None     # the port the strip plots; another one restarts it
+        self._strip_of: tuple[FlowStage, str, Channel] | None = None    # what the strip plots; anything else restarts it
         self._port: Port | None = None          # the port rendered last
-        self._image: Texture | None = None      # the port's texture itself, drawn as the picture it is
-        self._reset_asked: Event = Event()      # set by the panel's thread, taken by the render thread
-        settings.bind(MonitorLayerSettings.reset, self._ask_reset)
 
     def set_input(self, input: MonitorInput) -> None:
         """Every stage's ports, for the next draw."""
         self._input = input
 
-    def reset(self) -> None:
-        """Start the strip over; the other modes redraw every tick and hold nothing. Render thread only."""
-        self._strip.reset()
-
-    def _ask_reset(self, _: object = None) -> None:
-        self._reset_asked.set()
-
     @property
     def texture(self) -> Texture:
-        """The port as drawn last: the strip, the picture itself, or the visualizer's output."""
-        if self.settings.mode == MonitorMode.STRIP:
+        """The port as drawn last: the strip or the visualizer's output."""
+        if self.settings.view == MonitorView.STRIP:
             return self._strip.texture
-        if self._image is not None:
-            return self._image
         return self._visualizer.texture
 
     # ========== Lifecycle ==========
@@ -103,13 +124,12 @@ class MonitorLayer(LayerBase):
     def allocate(self, width: int, height: int, internal_format: int | None = None) -> None:
         self._visualizer.allocate(width, height)
         self._strip.allocate()
-        self._text.allocate(font_size=18)
+        self._axis_overlay.allocate()
 
     def deallocate(self) -> None:
-        self.settings.unbind(MonitorLayerSettings.reset, self._ask_reset)
         self._visualizer.deallocate()
         self._strip.deallocate()
-        self._text.deallocate()
+        self._axis_overlay.deallocate()
 
     # ========== Processing ==========
 
@@ -126,9 +146,6 @@ class MonitorLayer(LayerBase):
 
     def update(self) -> None:
         """Keep the panel's list of the stage's textures; the port is rendered at the first draw."""
-        if self._reset_asked.is_set():
-            self._reset_asked.clear()
-            self.reset()
         self._rendered = False
         names: list[str] = list(self._ports()) or [""]
         if names != self.settings.names:
@@ -137,23 +154,36 @@ class MonitorLayer(LayerBase):
     def _render(self) -> None:
         port: Port | None = self._pick()
         self._port = port
-        self._image = None
+        self._axis = None
+        view: MonitorView = self.settings.view
+        if view != MonitorView.STRIP:
+            self._strip_of = None               # the strip starts over when it is shown again
         if port is None:
             return
-        mode: MonitorMode = self.settings.mode
-        channel: int = int(self.settings.channel)
-        if mode == MonitorMode.STRIP:
-            shown: tuple[FlowStage, str] = (self.settings.stage, self.settings.texture)
+        settings: MonitorLayerSettings = self.settings
+        channel: Channel = settings.channel
+        scale: float = settings.advanced.scale
+        if view == MonitorView.AUTO:
+            view = _AUTO_VIEWS[port.kind]
+        if view == MonitorView.STRIP:
+            shown: tuple[FlowStage, str, Channel] = (self.settings.stage, self.settings.texture, channel)
             if shown != self._strip_of:
                 self._strip.reset()
                 self._strip_of = shown
-            self._strip.update(port.texture, self.settings.visualization.strip_scale)
-        elif mode == MonitorMode.IMAGE or (mode == MonitorMode.AUTO and port.kind == TextureKind.IMAGE):
-            self._image = port.texture          # whatever its channels: arrows come from the arrows mode only
-        elif mode == MonitorMode.ARROWS or (mode == MonitorMode.AUTO and port.kind == TextureKind.VELOCITY):
-            self._visualizer.process(port.texture, True)
+            self._strip.update(port.texture, scale, int(channel))
+            self._axis = Axis.STRIP
+        elif view == MonitorView.IMAGE:
+            self._visualizer.process_image(port.texture, scale, int(channel))
+        elif view == MonitorView.COLORMAP:
+            self._visualizer.process_colormap(port.texture, scale, int(channel))
+            self._axis = Axis.COLORMAP
+        elif view == MonitorView.HISTOGRAM:
+            self._visualizer.process_histogram(port.texture, scale, int(channel))
+            self._axis = Axis.HISTOGRAM
         else:
-            self._visualizer.process_signed(port.texture, port.kind == TextureKind.DEPTH, channel)
+            self._visualizer.process_arrows(port.texture, scale, float(settings.advanced.arrow_spacing.value))
+        if self._axis is not None and settings.advanced.legend:
+            self._axis_overlay.update(self._axis, int(channel), scale, HISTOGRAM_TOTAL)
 
     # ========== Rendering ==========
 
@@ -170,19 +200,10 @@ class MonitorLayer(LayerBase):
         if self._port is None:
             return
         Style.push_style()
-        Style.set_blend_mode(self.settings.blend_mode)
+        Style.set_blend_mode(self.settings.advanced.blend_mode)
         if self.texture.allocated:
             Blit.use(self.texture)
-        if self.settings.mode == MonitorMode.STRIP and self._text.allocated:
-            self._draw_lane_labels()
+        if self._axis is not None and self.settings.advanced.legend and self._axis_overlay.texture.allocated:
+            Style.set_blend_mode(Style.BlendMode.ALPHA)
+            Blit.use(self._axis_overlay.texture)
         Style.pop_style()
-
-    def _draw_lane_labels(self) -> None:
-        """The name of each lane of the strip, at its top left."""
-        vp = glGetIntegerv(GL_VIEWPORT)
-        w, h = int(vp[2]), int(vp[3])
-        if w <= 0 or h <= 0:
-            return
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
-        for lane, name in enumerate(STRIP_LANES):
-            self._text.draw_box_text(8, lane * h // len(STRIP_LANES) + 8, name, (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 0.0, 0.6), w, h)

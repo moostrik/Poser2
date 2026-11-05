@@ -21,5 +21,5 @@ void main() {
 
     // Current, not held: a new motion takes over the moment it starts
     float weight = clamp(release / max(length(slow), EPSILON), 0.0, 1.0);
-    fragColor = vec4(mix(fast, slow, drop * weight), 1.0);
+    fragColor = vec4(mix(fast, slow, drop * weight), 0.0);   // w unused
 }

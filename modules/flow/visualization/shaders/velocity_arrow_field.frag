@@ -3,16 +3,14 @@
 // Velocity Arrow Field Visualization
 // Procedural arrows without geometry shaders. A 2D velocity is a white arrow. A 3D velocity (xyz) is
 // the same white arrow for x/y with a ring around the grid point for z, red toward the camera and
-// green away, and shows with no x/y. Sizes are on the cell (spacing * element_length): at a speed
+// green away, and shows with no x/y. Sizes are on the cell, the grid spacing: at a speed
 // of 1 the arrow's tip reaches 1 cell and the ring's radius is 1/pi cell, so a ring draws as much
 // line as an arrow of the same value; faster, both roll off toward 2 cells
 
 uniform sampler2D tex0;
 uniform bool xyz;                   // A 3D velocity: z in the blue channel
 uniform float scale;
-uniform float z_scale;              // Multiplier on z alone
 uniform float grid_spacing;         // in pixels
-uniform float element_length;       // the cell's size, a ratio of grid_spacing
 uniform float arrow_thickness;
 uniform vec2 resolution;
 
@@ -81,7 +79,7 @@ float coverage(float dist) {
 void main() {
     // Current pixel in screen space
     vec2 pixel = gl_FragCoord.xy;
-    float cell = grid_spacing * element_length;
+    float cell = grid_spacing;
 
     float arrow_dist = 1e10;
     float ring_dist = 1e10;
@@ -99,7 +97,7 @@ void main() {
             // Sample velocity at this grid center, its size rolled off toward SIZE_LIMIT
             vec2 grid_uv = grid_pos / resolution;
             vec3 velocity = texture(tex0, grid_uv).xyz * scale;
-            velocity.z = xyz ? velocity.z * z_scale : 0.0;
+            velocity.z = xyz ? velocity.z : 0.0;
             float speed = length(velocity);
             if (speed > 0.001) velocity *= SIZE_LIMIT * tanh(speed / SIZE_LIMIT) / speed;
 

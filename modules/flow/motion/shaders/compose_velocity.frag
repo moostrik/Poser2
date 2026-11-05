@@ -21,5 +21,5 @@ void main() {
         velocity *= texture(tex2, texCoord).r;
     }
     bool finite = !any(isnan(velocity)) && !any(isinf(velocity));
-    fragColor = vec4(finite ? velocity : vec3(0.0), 1.0);
+    fragColor = vec4(finite ? velocity : vec3(0.0), 0.0);   // w unused
 }

@@ -21,5 +21,5 @@ void main() {
     vec2 xy = mix(velocity.xy, previous.xy, weight);
     float z = mix(velocity.z, previous.z, release);
 
-    fragColor = vec4(xy, z, 1.0);
+    fragColor = vec4(xy, z, 0.0);   // w unused
 }

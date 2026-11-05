@@ -18,5 +18,5 @@ void main() {
 
     float fast_length = length(fast);
     vec3 unit = fast_length > EPSILON ? fast / fast_length : vec3(0.0);
-    fragColor = vec4(unit * onset * strength, 1.0);
+    fragColor = vec4(unit * onset * strength, 0.0);   // w unused
 }

@@ -31,7 +31,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 4135,
+        "iso": 3167,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -43,7 +43,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 3667,
+        "balance": 3962,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
@@ -275,7 +275,7 @@
           "monitor_a"
         ],
         "right": [
-          "fluid"
+          "monitor_b"
         ],
         "output": [
           "cam_image",
@@ -552,35 +552,25 @@
     "monitor_a": {
       "stage": "MOTION",
       "texture": "velocity",
-      "mode": "AUTO",
-      "channel": "X",
-      "blend_mode": "ADD",
-      "visualization": {
-        "toggle_scalar": false,
-        "scale": 1.07,
-        "scalar_scale": 1.0,
-        "strip_scale": 5.76,
-        "spacing": 64.0,
-        "z_scale": 1.0,
-        "element_length": 1.0,
-        "element_width": 2.5
+      "view": "AUTO",
+      "channel": "ALL",
+      "advanced": {
+        "blend_mode": "ADD",
+        "legend": true,
+        "scale": 1.0,
+        "arrow_spacing": "SPACING_64"
       }
     },
     "monitor_b": {
-      "stage": "BRIDGE",
+      "stage": "MOTION",
       "texture": "velocity",
-      "mode": "AUTO",
-      "channel": "X",
-      "blend_mode": "ADD",
-      "visualization": {
-        "toggle_scalar": false,
-        "scale": 1.07,
-        "scalar_scale": 1.0,
-        "strip_scale": 5.76,
-        "spacing": 64.0,
-        "z_scale": 1.0,
-        "element_length": 1.0,
-        "element_width": 2.5
+      "view": "COLORMAP",
+      "channel": "ALL",
+      "advanced": {
+        "blend_mode": "ADD",
+        "legend": true,
+        "scale": 1.0,
+        "arrow_spacing": "SPACING_64"
       }
     },
     "time_series": {
@@ -675,7 +665,7 @@
       "secondary_list": [
         "M1"
       ],
-      "secondary_fullscreen": true,
+      "secondary_fullscreen": false,
       "fullscreen_mode": "WINDOWED",
       "fullscreen_mouse": false
     }

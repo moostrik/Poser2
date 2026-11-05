@@ -1,5 +1,5 @@
-"""The strip: a texture's four channels over time, a rolling plot of the frame-wide mean amount of
-x, y, z and w, one column per tick. It stays on the GPU, so the render thread never waits on a read."""
+"""The strip: a texture's channels over time, a rolling plot of the frame-wide mean amount (absolute
+value) of x, y, z and w, or of one of them, one column per tick, on a log axis of three decades. It stays on the GPU, so the render thread never waits on a read."""
 
 from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_RGBA16F, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
 
@@ -8,6 +8,7 @@ from .. import FlowUtil
 from .shaders import StripRoll, StripSummary
 
 LANES: tuple[str, ...] = ('x', 'y', 'z', 'w')      # top to bottom
+ALL_CHANNELS: int = 4           # the channel that stands for all four
 STRIP_WIDTH: int = 540          # columns: 9 s at 60 ticks per second
 STRIP_HEIGHT: int = 960
 SUMMARY_WIDTH: int = 128        # enough samples for a mean of fields with thin edges
@@ -49,8 +50,9 @@ class Strip:
     def reset(self) -> None:
         FlowUtil.zero(self._strip_fbo)
 
-    def update(self, texture: Texture, scale: float) -> None:
-        """Add one column: the mean amount of each of `texture`'s channels, times `scale`."""
+    def update(self, texture: Texture, scale: float, channel: int = ALL_CHANNELS) -> None:
+        """Add one column: the mean amount of each of `texture`'s channels, times `scale`, in four lanes,
+        or of `channel` (0 to 3) alone at full height."""
         self._summary_fbo.begin()
         self._summary_shader.use(texture)
         self._summary_fbo.end()
@@ -60,5 +62,5 @@ class Strip:
 
         self._strip_fbo.swap()
         self._strip_fbo.begin()
-        self._roll_shader.use(self._strip_fbo.back, self._summary_fbo, scale)
+        self._roll_shader.use(self._strip_fbo.back, self._summary_fbo, scale, channel)
         self._strip_fbo.end()

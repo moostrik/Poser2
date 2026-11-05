@@ -44,8 +44,8 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_FALSE, GL_FLOAT,
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from modules.gl import Blit, Fbo, Texture  # noqa: E402
-from modules.flow import (FlowUtil, LucasKanadeFlow3D, LucasKanadeFlow3DSettings, Patch, SignedField, VelocityField,  # noqa: E402
-                          VisualizationFieldSettings, filter_depth_steps, lucas_kanade, track_depth)
+from modules.flow import (FlowUtil, LucasKanadeFlow3D, LucasKanadeFlow3DSettings, Patch, Visualizer,  # noqa: E402
+                          filter_depth_steps, lucas_kanade, track_depth)
 
 WARM_UP: float = 1.0          # s at the start the flows settle in, measured in no part
 SHORTEST_PAUSE: float = 1.0   # s of stillness that end a move
@@ -60,7 +60,7 @@ GROUPED: dict[str, str] = {'xy_levels': 'solve.levels', 'xy_window': 'solve.wind
                            'z_catch_up': 'depth_velocity.catch_up', 'z_dead_zone': 'depth_velocity.dead_zone', 'z_threshold': 'depth_velocity.threshold'}   # in frames saved flat, before the groups
 MOVED: float = 0.05          # luminance change of a pixel that moves
 MOVED_FRAMES: int = 5         # frames it changes that much in, over the loop
-VIEWS: dict[int, str] = {1: 'z of the track', 2: 'z after the threshold', 3: 'depth', 4: 'velocity direction', 5: 'velocity arrows'}
+VIEWS: dict[int, str] = {1: 'z of the track', 2: 'z after the threshold', 3: 'depth', 4: 'velocity colormap', 5: 'velocity arrows'}
 
 
 def context(visible: bool, width: int, height: int):
@@ -345,12 +345,9 @@ class Side:
             setattr(owner, name, value)
         self.flow = LucasKanadeFlow3D(self.settings)
         self.flow.allocate(width, height)
-        self.view_settings = VisualizationFieldSettings()
-        self.signed = SignedField(self.view_settings) if show else None
-        self.velocity = VelocityField(VisualizationFieldSettings()) if show else None
-        if self.signed is not None and self.velocity is not None:
-            self.signed.allocate(width, height)
-            self.velocity.allocate(width, height)
+        self.visualizer = Visualizer() if show else None
+        if self.visualizer is not None:
+            self.visualizer.allocate(width, height)
         self.measures = Measures()
 
     def step(self, frames: Frames, k: int, luminance: Texture, depth: Texture, mask: Texture) -> None:
@@ -367,22 +364,18 @@ class Side:
         return np.hypot(vx, vy) * delta_time * width
 
     def show(self, view: int, depth: Texture, scale: float, width: int) -> Texture | None:
-        if self.signed is None or self.velocity is None:
+        if self.visualizer is None:
             return None
-        if view >= 4:
-            self.velocity.settings.toggle_scalar = view == 4
-            self.velocity.settings.scale = scale
-            self.velocity.set(self.flow.velocity)
-            self.velocity.update()
-            return self.velocity.texture
-        self.view_settings.scalar_scale = scale / 2.0
-        if view == 3:
-            self.signed.set(depth, depth=False, channel=0, unit=1.0)               # 2 m full
+        if view == 5:
+            self.visualizer.process_arrows(self.flow.velocity, scale, 20.0)
+        elif view == 4:
+            self.visualizer.process_colormap(self.flow.velocity, scale)
+        elif view == 3:
+            self.visualizer.process_colormap(depth, scale / 2.0, 0)                  # 2 m full
         else:
             tracked = self.flow.depth_velocity
-            self.signed.set(tracked.difference if view == 1 else tracked.depth_velocity, depth=True, channel=0, unit=float(width))  # 2 px per frame full
-        self.signed.update()
-        return self.signed.texture
+            self.visualizer.process_colormap(tracked.difference if view == 1 else tracked.depth_velocity, scale / 2.0 * width, 0)  # 2 px per frame full
+        return self.visualizer.texture
 
 
 def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> int:
