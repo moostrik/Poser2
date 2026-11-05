@@ -9,7 +9,7 @@ from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId
 from modules.flow import DepthView, hold_tick
 from modules.pose import Frame, Similarity, AngleMotion, Points2D, PointLandmark
-from modules.render import layers as ls, make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
+from modules.render import layers as ls, shaders, make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
 
 from modules.board import HasFrames
@@ -61,7 +61,8 @@ OUTPUT_WIDTH: int = 1080
 OUTPUT_HEIGHT: int = 1920
 
 EYE_EASE: float = 0.4           # s: the parallax eye's ease toward the tracked head, keeping keypoint jitter out
-MAIN_BACKGROUND: tuple[float, float, float, float] = (0.18, 0.18, 0.18, 1.0)    # the main window's grey, so a black layer shows against it
+BORDER: tuple[float, float, float, float] = (0.4, 0.4, 0.4, 1.0)    # the border around each layer in the main window, so a black layer shows
+BORDER_WIDTH: float = 2.0       # px
 
 # The layers that are not output-shaped, each with the layer whose texture holds its shape
 SHAPE_LAYERS: dict[Layers, Layers] = {
@@ -166,6 +167,9 @@ class DeepFlowRender(RenderBase):
         # A reset asked for from another thread, applied at the next update on the GL thread
         self._reset_fluid: Event = Event()
 
+        # The border around each layer in the main window
+        self._border: shaders.DrawRectangleOutline = shaders.DrawRectangleOutline()
+
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
@@ -206,6 +210,7 @@ class DeepFlowRender(RenderBase):
                 else:
                     layer.allocate(OUTPUT_WIDTH, OUTPUT_HEIGHT, GL_RGBA16F)
         self.allocate_window_renders()
+        self._border.allocate()
         Shader.enable_hot_reload()
 
     def allocate_window_renders(self) -> None:
@@ -219,6 +224,7 @@ class DeepFlowRender(RenderBase):
         for cam_dict in self.L.values():
             for layer in cam_dict.values():
                 layer.deallocate()
+        self._border.deallocate()
 
     def _measure_tick(self, now: float) -> None:
         if self._last_tick > 0.0:
@@ -348,7 +354,7 @@ class DeepFlowRender(RenderBase):
     # ========== Drawing ==========
 
     def draw_main(self, width: int, height: int) -> None:
-        clear_color(*MAIN_BACKGROUND)
+        clear_color()
 
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
@@ -381,6 +387,16 @@ class DeepFlowRender(RenderBase):
                 fit_x, fit_y, fit_width, fit_height = fit(*self._layer_size(layer_type), width, height)
                 glViewport(int(x + fit_x), int(y + fit_y), int(fit_width), int(fit_height))
                 self.L[layer_type][0].draw()
+                self._draw_border(fit_width, fit_height)
+
+    def _draw_border(self, width: float, height: float) -> None:
+        """A border around the current viewport, `width` by `height` pixels."""
+        if width <= 0 or height <= 0:
+            return
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        self._border.use(0.0, 0.0, 1.0, 1.0, *BORDER, BORDER_WIDTH / width, BORDER_WIDTH / height)
+        Style.pop_style()
 
     def _layer_size(self, layer_type: Layers) -> tuple[int, int]:
         if layer_type in SHAPE_LAYERS and 0 in self.L[SHAPE_LAYERS[layer_type]]:      # cam_foreground exists with RVM only

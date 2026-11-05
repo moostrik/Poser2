@@ -11,7 +11,7 @@ from modules.board import HasFrames
 from modules.camera import RigCameraSettings, CameraCheckSettings
 from modules.flow import hold_tick
 from modules.pose import Frame, Similarity, AngleMotion
-from modules.render import ColorSettings, layers as ls, make_subdivision, SubdivisionRow, Subdivision
+from modules.render import ColorSettings, layers as ls, shaders, make_subdivision, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, Color, HotReloadMethods
 
 from .render_board import RenderBoard
@@ -58,7 +58,8 @@ LARGE_LAYERS: list[Layers] = [
 
 FADE_TIME_STILL: float = 18.0   # s: the density's fade while the player stands still
 FADE_TIME_RANGE: float = 14.0   # s: how much faster it fades at full motion
-MAIN_BACKGROUND: tuple[float, float, float, float] = (0.18, 0.18, 0.18, 1.0)    # the main window's grey, so a black layer shows against it
+BORDER: tuple[float, float, float, float] = (0.4, 0.4, 0.4, 1.0)    # the border around each panel in the main window, so a black layer shows
+BORDER_WIDTH: float = 2.0       # px
 
 
 class HDTrioRender(RenderBase):
@@ -143,6 +144,9 @@ class HDTrioRender(RenderBase):
         self._dt: float = 1.0 / 60.0
         self.add_update_callback(self._measure_tick)
 
+        # The border around each panel in the main window
+        self._border: shaders.DrawRectangleOutline = shaders.DrawRectangleOutline()
+
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
         self.stage_reloader = HotReloadMethods(StageLayer, True, True)
@@ -175,6 +179,7 @@ class HDTrioRender(RenderBase):
                 else:
                     layer.allocate(1080, 1920, GL_RGBA16F)
         self.allocate_window_renders()
+        self._border.allocate()
         Shader.enable_hot_reload()
 
     def allocate_window_renders(self) -> None:
@@ -187,6 +192,7 @@ class HDTrioRender(RenderBase):
         for cam_dict in self.L.values():
             for layer in cam_dict.values():
                 layer.deallocate()
+        self._border.deallocate()
 
     def _measure_tick(self, now: float) -> None:
         if self._last_tick > 0.0:
@@ -293,7 +299,7 @@ class HDTrioRender(RenderBase):
             s.update(progress)
 
     def draw_main(self, width: int, height: int) -> None:
-        clear_color(*MAIN_BACKGROUND)
+        clear_color()
 
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
@@ -303,12 +309,23 @@ class HDTrioRender(RenderBase):
             glViewport(int(track_rect.x), int(height - track_rect.y - track_rect.height), int(track_rect.width), int(track_rect.height))
             for layer_type in self._interface_layers:
                 self.L[layer_type][i].draw()
+            self._draw_border(track_rect.width, track_rect.height)
 
         for i in range(self.num_cams):
             preview_rect: Rect = self.subdivision.get_rect('preview', i)
             glViewport(int(preview_rect.x), int(height - preview_rect.y - preview_rect.height), int(preview_rect.width), int(preview_rect.height))
             for layer_type in self._preview_layers:
                 self.L[layer_type][i].draw()
+            self._draw_border(preview_rect.width, preview_rect.height)
+
+    def _draw_border(self, width: float, height: float) -> None:
+        """A border around the current viewport, `width` by `height` pixels."""
+        if width <= 0 or height <= 0:
+            return
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        self._border.use(0.0, 0.0, 1.0, 1.0, *BORDER, BORDER_WIDTH / width, BORDER_WIDTH / height)
+        Style.pop_style()
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         clear_color()
