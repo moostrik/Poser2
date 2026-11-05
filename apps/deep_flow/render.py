@@ -7,7 +7,7 @@ import numpy as np
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId
-from modules.flow import DepthView
+from modules.flow import DepthView, hold_tick
 from modules.pose import Frame, Similarity, AngleMotion, Points2D, PointLandmark
 from modules.render import layers as ls, make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
@@ -56,7 +56,6 @@ LARGE_LAYERS: list[Layers] = [
 OUTPUT_WIDTH: int = 1080
 OUTPUT_HEIGHT: int = 1920
 
-MIN_TICK: float = 1.0 / 240.0   # s: a tick measured shorter is a clock step, not a frame
 EYE_EASE: float = 0.4           # s: the parallax eye's ease toward the tracked head, keeping keypoint jitter out
 
 # The layers that are not output-shaped, each with the layer whose texture holds its shape
@@ -148,8 +147,9 @@ class DeepFlowRender(RenderBase):
         self._panel_aspect_ratios: list[float] = self._read_panel_aspect_ratios()
         self.subdivision: Subdivision = self._make_layout()
 
-        # The length of each tick, the flow's dt
+        # The length of each tick, the flow's dt, held to twice the mean tick (`hold_tick`)
         self._last_tick: float = 0.0
+        self._tick_mean: float | None = None
         self._dt: float = 1.0 / 60.0
         self.add_update_callback(self._measure_tick)
 
@@ -214,8 +214,8 @@ class DeepFlowRender(RenderBase):
                 layer.deallocate()
 
     def _measure_tick(self, now: float) -> None:
-        if self._last_tick > 0.0 and now > self._last_tick:
-            self._dt = max(now - self._last_tick, MIN_TICK)
+        if self._last_tick > 0.0:
+            self._dt, self._tick_mean = hold_tick(now - self._last_tick, self._tick_mean)
         self._last_tick = now
 
     def reset_fluid(self) -> None:

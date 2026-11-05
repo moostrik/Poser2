@@ -1,8 +1,9 @@
 """The fluid's time step: fixed, or the measured tick through an Ema."""
 
+import math
 import unittest
 
-from modules.flow import TimeStep, TimeStepMode
+from modules.flow import TimeStep, TimeStepMode, hold_tick
 
 
 class TimeStepTest(unittest.TestCase):
@@ -27,9 +28,24 @@ class TimeStepTest(unittest.TestCase):
             dt = step.update(TimeStepMode.MEASURED, 1 / 30, 60.0, 1.0)
         self.assertAlmostEqual(dt, 1 / 30, delta=0.001)
 
-    def test_a_long_stall_steps_at_most_a_second(self) -> None:
-        step = TimeStep(60.0)
-        self.assertAlmostEqual(step.update(TimeStepMode.MEASURED, 5.0, 60.0, 0.0), 1.0)
+
+
+class HoldTickTest(unittest.TestCase):
+    def test_the_first_tick_sets_the_mean(self) -> None:
+        self.assertEqual(hold_tick(1 / 60, None), (1 / 60, 1 / 60))
+
+    def test_a_stall_is_held_to_twice_the_mean(self) -> None:
+        dt, mean = hold_tick(5.0, 1 / 60)
+        self.assertAlmostEqual(dt, 2 / 60)
+        self.assertGreater(mean, 1 / 60)
+        self.assertLess(mean, 2 / 60)
+
+    def test_a_clock_step_is_at_least_the_shortest_tick(self) -> None:
+        self.assertAlmostEqual(hold_tick(0.0, 1 / 60)[0], 1 / 240)
+
+    def test_a_tick_that_is_not_one_takes_the_mean(self) -> None:
+        self.assertAlmostEqual(hold_tick(math.nan, 1 / 50)[0], 1 / 50)
+        self.assertAlmostEqual(hold_tick(math.inf, None)[0], 1 / 240)
 
 
 if __name__ == '__main__':

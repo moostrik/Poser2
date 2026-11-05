@@ -101,8 +101,10 @@ view it takes at construction, and the `depth_step` from the sample size and its
 Two clocks. The motion layer measures between two camera frames, so its interval comes from
 `timestamp` (`frame_interval`, `motion_layer.py`, with `dt` as the fallback for a source without
 stamps). The bridge and the fluid run per render frame, so they step on `dt`, the tick's measured
-length, which the fluid's `TimeStep` smooths over `fps_smoothing`; a raw per-frame dt looks
-jittery in the sim **(site fact)**.
+length, which the app holds to at most twice the mean tick (`hold_tick`, `time_step.py`): a stall
+counts as one long frame and the rest is dropped, as a capture gap is held to twice the frame
+period. The fluid's `TimeStep` smooths it over `fps_smoothing`; a raw per-frame dt looks jittery
+in the sim **(site fact)**.
 
 A tick without a new camera frame measures nothing: the motion output holds what the last pair
 of frames gave, the tick's `dt` adds to the interval the next measurement covers, and the bridge
@@ -215,6 +217,25 @@ The shader loader finds a shader's source by its `.py` module name beside it
 
 ## Open
 
+- The views. Each stage draws its own views through its own visualizer every tick, shown or not:
+  the motion and the bridge layer each run one, where `main`'s one flow layer ran one. The next
+  change: each output carries `views`, its named textures with their kind (image, 2D velocity,
+  3D velocity, signed scalar), the stages draw nothing, and one or two view layers the app wires
+  to any output draw one named view each, only while it is shown, with the panel's choice built
+  from the connected names and the visualization settings on the view layer; two view layers
+  show A beside B. The kinetic strip becomes a general mode beside the scalar and the arrows: the
+  amount of a channel, x, y, z or w, over the last seconds.
+- The trail's output size. The 2D smooth trail and the 3D velocity trail bridge run their
+  smoothing and blur at the layer's output size (`allocate(width, height, output_width,
+  output_height)`), 2160 × 3840 in the large layers, while the flow measures at 512 × 288, so the
+  density bridge, at output size, reads a full-resolution velocity; the magnitude and the
+  temperature bridge sample it down. The bridge's GPU timer says what it costs; running the trail at
+  the flow's size with the density bridge sampling it up is the fix if it is the bridge's biggest cost.
+- The 2D overlap. Where two cameras' densities meet, the 2D fluid now adds their colors and
+  opacities with no cap, where `main` capped the brightness at white and took the stronger opacity.
+  A cap at white is one pass on the 2D fluid's density at its output; the opacity is summed in the
+  fluid and cannot be told apart again, which matters only where the density is composited by its
+  alpha.
 - hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
   the pose's motion, a settings field written per tick. A per-tick value on the fluid layer, as the
   eye is, would take it off the settings.

@@ -9,6 +9,7 @@ from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId
 from modules.board import HasFrames
 from modules.camera import RigCameraSettings, CameraCheckSettings
+from modules.flow import hold_tick
 from modules.pose import Frame, Similarity, AngleMotion
 from modules.render import ColorSettings, layers as ls, make_subdivision, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, Color, HotReloadMethods
@@ -51,7 +52,6 @@ LARGE_LAYERS: list[Layers] = [
     Layers.composite,
 ]
 
-MIN_TICK: float = 1.0 / 240.0   # s: a tick measured shorter is a clock step, not a frame
 FADE_TIME_STILL: float = 18.0   # s: the density's fade while the player stands still
 FADE_TIME_RANGE: float = 14.0   # s: how much faster it fades at full motion
 
@@ -130,8 +130,9 @@ class HDTrioRender(RenderBase):
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, False)
 
-        # The length of each tick, the flow's dt
+        # The length of each tick, the flow's dt, held to twice the mean tick (`hold_tick`)
         self._last_tick: float = 0.0
+        self._tick_mean: float | None = None
         self._dt: float = 1.0 / 60.0
         self.add_update_callback(self._measure_tick)
 
@@ -181,8 +182,8 @@ class HDTrioRender(RenderBase):
                 layer.deallocate()
 
     def _measure_tick(self, now: float) -> None:
-        if self._last_tick > 0.0 and now > self._last_tick:
-            self._dt = max(now - self._last_tick, MIN_TICK)
+        if self._last_tick > 0.0:
+            self._dt, self._tick_mean = hold_tick(now - self._last_tick, self._tick_mean)
         self._last_tick = now
 
     # ========== The flow's wiring ==========
