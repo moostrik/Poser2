@@ -26,7 +26,7 @@ class LuminanceFrames:
     @property
     def previous_luminance(self) -> Texture:
         """The luminance frame before it, mipmapped."""
-        return self._frames.back_texture
+        return self._frames.back
 
     @property
     def ready(self) -> bool:
@@ -35,7 +35,7 @@ class LuminanceFrames:
 
     def allocate(self, width: int, height: int) -> None:
         self._frames.allocate(width, height, GL_R8)
-        for texture in (self._frames.texture, self._frames.back_texture):
+        for texture in (self._frames, self._frames.back):
             glBindTexture(GL_TEXTURE_2D, texture.tex_id)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
@@ -65,7 +65,7 @@ class LuminanceFrames:
             self._shader.use(texture)
         self._frames.end()
 
-        glBindTexture(GL_TEXTURE_2D, self._frames.texture.tex_id)
+        glBindTexture(GL_TEXTURE_2D, self._frames.tex_id)
         glGenerateMipmap(GL_TEXTURE_2D)
         glBindTexture(GL_TEXTURE_2D, 0)
 

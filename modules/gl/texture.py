@@ -120,11 +120,6 @@ class Texture():
         self._wrap: int = wrap
         self._border_color: tuple[float, float, float, float] = border_color
 
-    @property
-    def texture(self) -> 'Texture':
-        """Convenience property for interface compatibility."""
-        return self
-
     def allocate(self, width: int, height: int, internal_format) -> None:
         """Allocate OpenGL texture with specified dimensions and format.
 

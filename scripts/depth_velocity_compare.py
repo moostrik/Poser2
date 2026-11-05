@@ -401,7 +401,7 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
         if previous is None:
             previous = lum
             continue
-        solve = read_back(side.flow._solve.texture)[..., :2] * np.array([w, h])                  # px per frame
+        solve = read_back(side.flow._solve)[..., :2] * np.array([w, h])                  # px per frame
         now, then = (np.round(f * 255.0).astype(np.float64) / 255.0 for f in (lum, previous))    # as the R8 frames hold them
         reference = lucas_kanade(then, now, xy.levels, xy.window, xy.damping,
                                  depth.astype(np.float64) if xy.same_surface else None, z.tolerance)

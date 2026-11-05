@@ -171,6 +171,6 @@ class CompositeLayer(LayerBase):
 
         # Apply LUT if loaded, otherwise just blit
         if self._lut_shader.lut_loaded and self.settings.lut.file and self.settings.lut.strength > 0:
-            self._lut_shader.use(self._composite_fbo.texture, self.settings.lut.strength)
+            self._lut_shader.use(self._composite_fbo, self.settings.lut.strength)
         else:
-            self._blit.use(self._composite_fbo.texture)
+            self._blit.use(self._composite_fbo)

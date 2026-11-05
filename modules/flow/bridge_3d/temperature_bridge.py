@@ -128,7 +128,7 @@ class TemperatureBridge(FlowBase):
         self._output_fbo.begin()
         self._temperature_bridge_shader.use(
             self._input,                    # RGB color (R=warm, G=neutral, B=cold)
-            self._mask_fbo.texture,        # Velocity magnitude mask
+            self._mask_fbo,        # Velocity magnitude mask
             self.settings.scale
         )
         self._output_fbo.end()

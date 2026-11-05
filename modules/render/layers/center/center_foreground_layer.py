@@ -132,18 +132,18 @@ class CenterForegroundLayer(LayerBase):
         self._roi_fbo.end()
 
         # A whole image: the player's colors on black, as a masked source arrives
-        source: Texture = self._roi_fbo.texture
+        source: Texture = self._roi_fbo
         if self._premultiply and self._mask_texture.allocated:
             self._premultiplied_fbo.begin()
-            self._premultiply_shader.use(self._roi_fbo.texture, self._mask_texture)
+            self._premultiply_shader.use(self._roi_fbo, self._mask_texture)
             self._premultiplied_fbo.end()
-            source = self._premultiplied_fbo.texture
+            source = self._premultiplied_fbo
 
         # Temporal blending
         self._blend_fbo.swap()
         self._blend_fbo.begin()
         self._blend_shader.use(
-            self._blend_fbo.back_texture,
+            self._blend_fbo.back,
             source,
             self.settings.blend_factor
         )
@@ -153,7 +153,7 @@ class CenterForegroundLayer(LayerBase):
         self._effect_fbo.swap()
         self._effect_fbo.begin()
         self._cel_shade_shader.use(
-            self._blend_fbo.texture,
+            self._blend_fbo,
             self.settings.exposure, self.settings.gamma, self.settings.offset,
             self.settings.contrast,
             self.settings.levels, self.settings.smoothness,
@@ -166,21 +166,21 @@ class CenterForegroundLayer(LayerBase):
             self._effect_fbo.swap()
             self._effect_fbo.begin()
             r, g, b = self._color_settings.track_colors[self._cam_id % len(self._color_settings.track_colors)].rgb
-            self._hue_shift_shader.use(self._effect_fbo.back_texture, r, g, b, self.settings.colorize)
+            self._hue_shift_shader.use(self._effect_fbo.back, r, g, b, self.settings.colorize)
             self._effect_fbo.end()
 
         # Sharpen
         if self.settings.sharpen > 0.0:
             self._effect_fbo.swap()
             self._effect_fbo.begin()
-            self._sharpen_shader.use(self._effect_fbo.back_texture, self.settings.sharpen)
+            self._sharpen_shader.use(self._effect_fbo.back, self.settings.sharpen)
             self._effect_fbo.end()
 
         # Mask
         if self._mask_texture and self.settings.use_mask:
             self._effect_fbo.swap()
             self._effect_fbo.begin()
-            self._mask_shader.use(self._effect_fbo.back_texture, self._mask_texture)
+            self._mask_shader.use(self._effect_fbo.back, self._mask_texture)
             self._effect_fbo.end()
 
         Style.pop_style()

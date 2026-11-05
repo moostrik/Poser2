@@ -274,8 +274,8 @@ class Fluid3D:
         """Project 2D obstacle source into both 3D obstacle volumes."""
         if not self._has_obstacles:
             return
-        self._inject_binary_shader.use(self._obstacle_source.texture, self._simulation_obstacle, mode=1)
-        self._inject_binary_shader.use(self._obstacle_source.texture, self._density_obstacle, mode=1)
+        self._inject_binary_shader.use(self._obstacle_source, self._simulation_obstacle, mode=1)
+        self._inject_binary_shader.use(self._obstacle_source, self._density_obstacle, mode=1)
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def deallocate(self) -> None:
@@ -417,7 +417,7 @@ class Fluid3D:
 
     def _add_force_to_velocity(self, force: Texture3D, strength: float = 1.0) -> None:
         """Add 3D force volume to velocity in-place (no swap needed)."""
-        self._add_shader.use(self._velocity.texture, force, strength)
+        self._add_shader.use(self._velocity, force, strength)
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def _advect_velocity(self) -> None:
@@ -427,9 +427,9 @@ class Fluid3D:
 
         self._velocity.swap()
         self._advect_shader.advect(
-            self._velocity.back_texture,
-            self._velocity.texture,
-            self._velocity.back_texture,
+            self._velocity.back,
+            self._velocity,
+            self._velocity.back,
             self._simulation_obstacle,
             self._aspect, self._z_extent,
             advect_step, dissipation,
@@ -446,10 +446,9 @@ class Fluid3D:
         viscosity_dt = self.settings.velocity.viscosity * (self._grid_scale ** 2) * self._dt
         iterations = self._scale_iterations(self.settings.velocity.viscosity_iter)
 
-        current: Texture3D = self._velocity.texture
         result = self._jacobi_diffusion_shader.solve(
-            current,
-            self._velocity.back_texture,
+            self._velocity,
+            self._velocity.back,
             self._simulation_obstacle,
             self._grid_scale, self._aspect, self._z_spacing,
             viscosity_dt,
@@ -457,7 +456,7 @@ class Fluid3D:
             iterations_per_dispatch=5,
             has_obstacles=self._has_obstacles
         )
-        if result is not current:
+        if result is not self._velocity:
             self._velocity.swap()
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
@@ -476,7 +475,7 @@ class Fluid3D:
         # a. Compute curl
         if confine:
             self._vorticity_curl_shader.use(
-                self._velocity.texture,
+                self._velocity,
                 self._simulation_obstacle,
                 self._curl_vol,
                 self._grid_scale, self._aspect, self._z_spacing,
@@ -514,9 +513,9 @@ class Fluid3D:
 
         self._temperature.swap()
         self._advect_shader.advect(
-            self._temperature.back_texture,
-            self._temperature.texture,
-            self._velocity.texture,
+            self._temperature.back,
+            self._temperature,
+            self._velocity,
             self._simulation_obstacle,
             self._aspect, self._z_extent,
             advect_step, dissipation,
@@ -541,8 +540,8 @@ class Fluid3D:
         gravity = (temp.gravity_x, temp.gravity_y, temp.gravity_z)
 
         self._buoyancy_density_shader.use(
-            self._temperature.texture,
-            self._density.texture,
+            self._temperature,
+            self._density,
             self._simulation_obstacle,
             self._buoyancy_force_vol,
             sigma, kappa, temp.ambient,
@@ -563,9 +562,9 @@ class Fluid3D:
 
         self._pressure.swap()
         self._advect_shader.advect(
-            self._pressure.back_texture,
-            self._pressure.texture,
-            self._velocity.texture,
+            self._pressure.back,
+            self._pressure,
+            self._velocity,
             self._simulation_obstacle,
             self._aspect, self._z_extent,
             advect_step, dissipation,
@@ -578,7 +577,7 @@ class Fluid3D:
         """Pressure projection (divergence → Jacobi solve → gradient subtraction)."""
         # a. Compute divergence
         self._divergence_shader.use(
-            self._velocity.texture,
+            self._velocity,
             self._simulation_obstacle,
             self._divergence_vol,
             self._grid_scale, self._aspect, self._z_spacing,
@@ -589,10 +588,9 @@ class Fluid3D:
         # b. Solve Poisson equation for pressure
         iterations = self._scale_iterations(self.settings.pressure.iterations)
 
-        current_pressure: Texture3D = self._pressure.texture
         result = self._jacobi_pressure_shader.solve(
-            current_pressure,
-            self._pressure.back_texture,
+            self._pressure,
+            self._pressure.back,
             self._divergence_vol,
             self._simulation_obstacle,
             self._grid_scale, self._aspect, self._z_spacing,
@@ -600,17 +598,17 @@ class Fluid3D:
             iterations_per_dispatch=5,
             has_obstacles=self._has_obstacles
         )
-        if result is not current_pressure:
+        if result is not self._pressure:
             self._pressure.swap()
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
         # c. Subtract pressure gradient from velocity
         self._velocity.swap()
         self._gradient_shader.use(
-            self._velocity.back_texture,
-            self._pressure.texture,
+            self._velocity.back,
+            self._pressure,
             self._simulation_obstacle,
-            self._velocity.texture,
+            self._velocity,
             self._grid_scale, self._aspect, self._z_spacing,
             has_obstacles=self._has_obstacles
         )
@@ -623,9 +621,9 @@ class Fluid3D:
 
         self._density.swap()
         self._advect_density_shader.advect(
-            self._density.back_texture,
-            self._density.texture,
-            self._velocity.texture,
+            self._density.back,
+            self._density,
+            self._velocity,
             self._density_obstacle,
             self._aspect, self._z_extent,
             advect_step, dissipation,
@@ -653,7 +651,7 @@ class Fluid3D:
             return
         factor = pow(0.01, delta_time / dampen_time)
         self._dampen_shader.use(
-            volume.texture, threshold, factor,
+            volume, threshold, factor,
             include_alpha=include_alpha,
             internal_format=internal_format
         )
@@ -677,7 +675,7 @@ class Fluid3D:
         eye = (drift[0] * (1.0 - k) + self._eye_person[0] * d.parallax * k,
                drift[1] * (1.0 - k) + self._eye_person[1] * d.parallax * k)
         self._composite_density_shader.use(
-            self._density.texture,
+            self._density,
             self._output_texture,
             emission=d.emission,
             gamma=d.gamma,
@@ -787,7 +785,7 @@ class Fluid3D:
         vel = self.settings.velocity
         dt = self._dt
         self._inject_flow_shader.use(
-            texture, self._velocity.texture,
+            texture, self._velocity,
             self.settings.volume.injection_layer,
             self.settings.volume.injection_spread,
             (strength * vel.gain * vel.input_x * dt, strength * vel.gain * vel.input_y * dt),
@@ -811,7 +809,7 @@ class Fluid3D:
             return
         self._velocity.clear_all()
         self._inject_shader.use(
-            texture, self._velocity.texture,
+            texture, self._velocity,
             self.settings.volume.injection_layer,
             self.settings.volume.injection_spread,
             strength, mode=1,
@@ -826,7 +824,7 @@ class Fluid3D:
         dt = self._dt
         effective = strength * self.settings.density.gain * dt
         self._inject_density_shader.use(
-            texture, self._density.texture,
+            texture, self._density,
             self.settings.volume.injection_layer,
             self.settings.volume.injection_spread,
             effective, mode=0,
@@ -840,7 +838,7 @@ class Fluid3D:
             return
         self._density.clear_all()
         self._inject_density_shader.use(
-            texture, self._density.texture,
+            texture, self._density,
             self.settings.volume.injection_layer,
             self.settings.volume.injection_spread,
             strength, mode=1,
@@ -865,7 +863,7 @@ class Fluid3D:
         dt = self._dt
         effective = strength * self.settings.density.gain * dt
         self._inject_density_channel_shader.use(
-            texture, self._density.texture,
+            texture, self._density,
             self.settings.volume.injection_layer,
             self.settings.volume.injection_spread,
             channel, effective, mode=0,
@@ -880,7 +878,7 @@ class Fluid3D:
         dt = self._dt
         effective = strength * self.settings.temperature.gain * dt
         self._inject_shader.use(
-            texture, self._temperature.texture,
+            texture, self._temperature,
             self.settings.volume.injection_layer,
             self.settings.volume.injection_spread,
             effective, mode=0,
@@ -894,7 +892,7 @@ class Fluid3D:
             return
         self._temperature.clear_all()
         self._inject_shader.use(
-            texture, self._temperature.texture,
+            texture, self._temperature,
             self.settings.volume.injection_layer,
             self.settings.volume.injection_spread,
             strength, mode=1,
@@ -907,7 +905,7 @@ class Fluid3D:
         if not self._allocated:
             return
         self._inject_shader.use(
-            texture, self._pressure.texture,
+            texture, self._pressure,
             self.settings.volume.injection_layer,
             self.settings.volume.injection_spread,
             strength, mode=0,
@@ -930,11 +928,11 @@ class Fluid3D:
         FlowUtil.zero(self._obstacle_source)
         self._obstacle_source.swap()
         self._obstacle_source.begin()
-        self._add_boolean_shader.use(self._obstacle_source.back_texture, texture)
+        self._add_boolean_shader.use(self._obstacle_source.back, texture)
         self._obstacle_source.end()
         # Project to 3D volumes
-        self._inject_binary_shader.use(self._obstacle_source.texture, self._simulation_obstacle, mode=1)
-        self._inject_binary_shader.use(self._obstacle_source.texture, self._density_obstacle, mode=1)
+        self._inject_binary_shader.use(self._obstacle_source, self._simulation_obstacle, mode=1)
+        self._inject_binary_shader.use(self._obstacle_source, self._density_obstacle, mode=1)
         glMemoryBarrier(_BARRIER_IMAGE)
         self._has_obstacles = True
 
@@ -951,11 +949,11 @@ class Fluid3D:
         # OR into 2D source
         self._obstacle_source.swap()
         self._obstacle_source.begin()
-        self._add_boolean_shader.use(self._obstacle_source.back_texture, texture)
+        self._add_boolean_shader.use(self._obstacle_source.back, texture)
         self._obstacle_source.end()
         # Regenerate 3D volumes from updated source
-        self._inject_binary_shader.use(self._obstacle_source.texture, self._simulation_obstacle, mode=1)
-        self._inject_binary_shader.use(self._obstacle_source.texture, self._density_obstacle, mode=1)
+        self._inject_binary_shader.use(self._obstacle_source, self._simulation_obstacle, mode=1)
+        self._inject_binary_shader.use(self._obstacle_source, self._density_obstacle, mode=1)
         glMemoryBarrier(_BARRIER_IMAGE)
         self._has_obstacles = True
 

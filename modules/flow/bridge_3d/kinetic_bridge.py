@@ -287,7 +287,7 @@ class KineticBridge(FlowBase):
         """Move `field` along the velocity in `carrier`; None is the field's own motion, as it was before this step."""
         field.swap()
         field.begin()
-        self._advect_shader.use(field.back_texture, carrier if carrier is not None else field.back_texture, carry)
+        self._advect_shader.use(field.back, carrier if carrier is not None else field.back, carry)
         field.end()
 
     def update(self, delta_time: float = 1.0 / 60.0) -> None:
@@ -335,14 +335,14 @@ class KineticBridge(FlowBase):
 
         self._held_release_fbo.swap()
         self._held_release_fbo.begin()
-        self._hold_shader.use(self.acceleration, self._held_release_fbo.back_texture, decay_weight(delta_time, release.hold),
+        self._hold_shader.use(self.acceleration, self._held_release_fbo.back, decay_weight(delta_time, release.hold),
                               self._patch_fbo, release.stop_gate, math.log2(release.stop_tile) - 1.0)      # the patch texture is half size
         self._held_release_fbo.end()
 
         if reservoir.enabled:
             self._reservoir_fbo.swap()
             self._reservoir_fbo.begin()
-            self._reservoir_shader.use(self._reservoir_fbo.back_texture, self.fast, self.held_release,
+            self._reservoir_shader.use(self._reservoir_fbo.back, self.fast, self.held_release,
                                        decay_weight(delta_time, reservoir.leak * 1000.0), delta_time, release.emission_gain)
             self._reservoir_fbo.end()
 
@@ -379,7 +379,7 @@ class KineticBridge(FlowBase):
         """One unit-gain Ema step: weight * previous + (1 - weight) * input."""
         trail.swap()
         trail.begin()
-        self._trail_shader.use(trail.back_texture, self._input, weight, 1.0 - weight)
+        self._trail_shader.use(trail.back, self._input, weight, 1.0 - weight)
         trail.end()
         if blur:
             self._blur(trail)
@@ -393,5 +393,5 @@ class KineticBridge(FlowBase):
             for horizontal in (True, False):
                 field.swap()
                 field.begin()
-                self._blur_shader.use(field.back_texture, radius, horizontal)
+                self._blur_shader.use(field.back, radius, horizontal)
                 field.end()

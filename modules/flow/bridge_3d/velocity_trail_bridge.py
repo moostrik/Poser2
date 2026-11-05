@@ -114,7 +114,7 @@ class VelocityTrailBridge(FlowBase):
             fbo: SwapFbo = self._output_fbo
             fbo.swap()
             fbo.begin()
-            self._advect_shader.use(fbo.back_texture, fbo.back_texture, (step, step * fbo.width / max(fbo.height, 1)))
+            self._advect_shader.use(fbo.back, fbo.back, (step, step * fbo.width / max(fbo.height, 1)))
             fbo.end()
 
         # Stage 2: Temporal smoothing, one unit-gain Ema step per pixel: weight * previous + (1 - weight) * input
@@ -122,7 +122,7 @@ class VelocityTrailBridge(FlowBase):
         attack: float = decay_weight(delta_time, s.attack) if s.attack > 0.0 else release
         self._output_fbo.swap()
         self._output_fbo.begin()
-        self._trail_shader.use(self._output_fbo.back_texture, self._input_fbo.texture, attack, release)
+        self._trail_shader.use(self._output_fbo.back, self._input_fbo, attack, release)
         self._output_fbo.end()
 
         # Stage 3: Spatial smoothing (Gaussian blur), `blur_steps` passes
@@ -131,7 +131,7 @@ class VelocityTrailBridge(FlowBase):
                 for horizontal in (True, False):
                     self._output_fbo.swap()
                     self._output_fbo.begin()
-                    self._blur_shader.use(self._output_fbo.back_texture, s.blur_radius, horizontal=horizontal)
+                    self._blur_shader.use(self._output_fbo.back, s.blur_radius, horizontal=horizontal)
                     self._output_fbo.end()
 
 

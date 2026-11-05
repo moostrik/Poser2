@@ -14,9 +14,9 @@ def blur(swap: SwapFbo, blur_h: shaders.BlurH, blur_v: shaders.BlurV, radius: fl
     """Separable blur of the current buffer, in place."""
     swap.swap()
     swap.begin()
-    blur_h.use(swap.back_texture, radius)
+    blur_h.use(swap.back, radius)
     swap.end()
     swap.swap()
     swap.begin()
-    blur_v.use(swap.back_texture, radius)
+    blur_v.use(swap.back, radius)
     swap.end()

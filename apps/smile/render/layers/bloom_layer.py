@@ -51,5 +51,5 @@ class BloomLayer(LayerBase):
         if not image.allocated or not camera.allocated:
             return
         self._fbo.begin()
-        self._omission.use(image, camera, self._mask.texture, bloom, omission)
+        self._omission.use(image, camera, self._mask, bloom, omission)
         self._fbo.end()

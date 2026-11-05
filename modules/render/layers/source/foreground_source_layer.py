@@ -26,7 +26,7 @@ class ForegroundSourceLayer(LayerBase):
 
     @property
     def texture(self) -> Texture:
-        return self._cuda_image.texture
+        return self._cuda_image
 
     @property
     def timestamp(self) -> float | None:

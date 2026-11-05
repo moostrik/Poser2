@@ -92,8 +92,8 @@ class SmoothTrail(FlowBase):
         self._output_fbo.swap()
         self._output_fbo.begin()
         self._trail_shader.use(
-            self._output_fbo.back_texture,  # Previous trail
-            self._input_fbo.texture,        # New input
+            self._output_fbo.back,  # Previous trail
+            self._input_fbo,        # New input
             self.settings.trail_weight,
             self.settings.scale                # Apply scaling on new input
         )
@@ -107,7 +107,7 @@ class SmoothTrail(FlowBase):
                 self._output_fbo.swap()
                 self._output_fbo.begin()
                 self._blur_shader.use(
-                    self._output_fbo.back_texture,
+                    self._output_fbo.back,
                     self.settings.blur_radius,
                     horizontal=True
                 )
@@ -117,7 +117,7 @@ class SmoothTrail(FlowBase):
                 self._output_fbo.swap()
                 self._output_fbo.begin()
                 self._blur_shader.use(
-                    self._output_fbo.back_texture,
+                    self._output_fbo.back,
                     self.settings.blur_radius,
                     horizontal=False
                 )

@@ -1,6 +1,5 @@
 from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_COLOR_ATTACHMENT0, GL_COLOR_BUFFER_BIT, GL_FRAMEBUFFER, GL_LINEAR, GL_TEXTURE_2D, glBindFramebuffer, glClear, glClearColor, glFramebufferTexture2D, glGenFramebuffers, glViewport
 from .texture import Texture
-from .swap_handle import SwapHandle
 
 _current_viewport: tuple[int, int, int, int] = (0, 0, 0, 0)
 
@@ -46,20 +45,12 @@ class Fbo(Texture):
         # pass
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
-class SwapFboHandle(SwapHandle, Fbo):
-    """One buffer of a SwapFbo as `texture` or `back_texture` hands it out, valid until the owner's
-    next swap (`swap_handle`)."""
-
-    @property
-    def fbo_id(self) -> int:
-        return self._checked().fbo_id
-
-
 class SwapFbo(Fbo):
     """Double-buffered FBO that swaps between two buffers.
 
-    Inherits from Fbo and delegates all properties to the current write buffer.
-    Use .texture for current buffer and .back_texture for previous buffer.
+    Inherits from Fbo and delegates all properties to the current write buffer, so used as a
+    texture it is always its current buffer; `back` is the other one, the previous, read inside the
+    pass that writes the current, never kept.
     """
 
     def __init__(self,
@@ -69,7 +60,6 @@ class SwapFbo(Fbo):
         # Don't call super().__init__() - we manage internal FBOs
         self._fbos: list[Fbo] = [Fbo(interpolation, wrap, border_color), Fbo(interpolation, wrap, border_color)]
         self._swap_state: int = 0
-        self._swaps: int = 0        # counted, so a buffer handed out before a swap knows it is stale
 
     # Override all Fbo/Texture properties to delegate to current buffer
     @property
@@ -105,15 +95,9 @@ class SwapFbo(Fbo):
         return self._fbos[0].allocated and self._fbos[1].allocated
 
     @property
-    def texture(self) -> Texture:
-        """Current write buffer, valid until the next swap (`SwapFboHandle`). The SwapFbo itself, used
-        as a Texture, is always the current buffer."""
-        return SwapFboHandle(self, self._fbos[self._swap_state], self._swaps)
-
-    @property
-    def back_texture(self) -> Texture:
-        """Previous buffer for reading in ping-pong rendering, valid until the next swap (`SwapFboHandle`)."""
-        return SwapFboHandle(self, self._fbos[1 - self._swap_state], self._swaps)
+    def back(self) -> Fbo:
+        """The other buffer, the previous one, to read while the current is written; it is the current one after the next swap."""
+        return self._fbos[1 - self._swap_state]
 
     def allocate(self, width: int, height: int, internal_format) -> None:
         """Allocate both buffers with same parameters."""
@@ -128,7 +112,6 @@ class SwapFbo(Fbo):
     def swap(self) -> None:
         """Swap buffers (back becomes front)."""
         self._swap_state = 1 - self._swap_state
-        self._swaps += 1
 
     def begin(self) -> None:
         """Begin rendering to current buffer. Uses top-left origin."""

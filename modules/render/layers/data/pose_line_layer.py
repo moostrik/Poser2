@@ -44,7 +44,7 @@ class PoseLineLayer(LayerBase):
 
     def draw(self) -> None:
         if self._fbo.allocated:
-            Blit.use(self._fbo.texture)
+            Blit.use(self._fbo)
 
     def update(self) -> None:
         pose: Frame | None = self._board.get_frame(self.settings.stage, self._track_id)

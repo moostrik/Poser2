@@ -135,10 +135,10 @@ class LucasKanadeFlow:
                 target.clear_all()                          # the coarsest level starts from no motion
             target.swap()
             target.begin()
-            self._shader.use(previous, current, target.back_texture if estimate is None else estimate, level, s.window, s.damping,
+            self._shader.use(previous, current, target.back if estimate is None else estimate, level, s.window, s.damping,
                              depth, tolerance)
             target.end()
-            estimate = target.texture
+            estimate = target
 
 
 # ── numpy reference ─────────────────────────────────────────────────────

@@ -298,7 +298,7 @@ class WallRender:
 
         self._trail_fbo.swap()
         self._trail_fbo.begin()
-        self._blend.use(self._image_fbo, self._trail_fbo.back_texture, trail)
+        self._blend.use(self._image_fbo, self._trail_fbo.back, trail)
         # a new sequence skips the trail: one white frame, then its first image
         for id in starts:
             glViewport(*self._rects[id])

@@ -90,7 +90,7 @@ class TimeSeriesLayer(LayerBase):
         self._shader.reload()
         self._fbo.begin()
         clear_color()
-        self._shader.use(self._image.texture, len(lanes), COLUMNS,
+        self._shader.use(self._image, len(lanes), COLUMNS,
                          self.settings.line_width * len(lanes) / max(self._fbo.height, 1), LANE_COLORS)
         self._fbo.end()
 

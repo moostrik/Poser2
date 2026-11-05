@@ -169,7 +169,7 @@ class MSColorMaskLayer(LayerBase):
         # print(motion)
 
         # Step 3: Composite - own (dodged) + others (tinted)
-        styled_textures: list[Texture] = [self._blend_fbo.texture]
+        styled_textures: list[Texture] = [self._blend_fbo]
         weights: list[float] = [motion]
 
         # Style.set_blend_mode(Style.BlendMode.ADD)

@@ -198,7 +198,7 @@ class Fluid2D:
         self._temperature_fbo.allocate(sim_w, sim_h, GL_R16F)
         self._pressure_fbo.allocate(sim_w, sim_h, GL_R16F)
         self._simulation_obstacle_fbo.allocate(sim_w, sim_h, GL_R8)
-        FlowUtil.blit(self._simulation_obstacle_fbo, self._density_obstacle_fbo.texture)
+        FlowUtil.blit(self._simulation_obstacle_fbo, self._density_obstacle_fbo)
 
         # Intermediate FBOs
         self._divergence_fbo.allocate(sim_w, sim_h, GL_R16F)
@@ -332,9 +332,9 @@ class Fluid2D:
         self._velocity_fbo.swap()
         self._velocity_fbo.begin()
         self._advect_shader.use(
-            self._velocity_fbo.back_texture,   # Source velocity (self-advection)
-            self._velocity_fbo.back_texture,   # Velocity
-            self._simulation_obstacle_fbo.texture,     # Obstacles
+            self._velocity_fbo.back,   # Source velocity (self-advection)
+            self._velocity_fbo.back,   # Velocity
+            self._simulation_obstacle_fbo,     # Obstacles
             self._aspect,
             advect_step,
             dissipation,
@@ -351,11 +351,11 @@ class Fluid2D:
         iterations = self._scale_iterations(self.settings.velocity.viscosity_iter)
 
         if self._use_compute_diffusion:
-            current: Texture = self._velocity_fbo.texture
+            current: Texture = self._velocity_fbo
             result = self._jacobi_diffusion_compute.solve(
                 current,
-                self._velocity_fbo.back_texture,
-                self._simulation_obstacle_fbo.texture,
+                self._velocity_fbo.back,
+                self._simulation_obstacle_fbo,
                 self._grid_scale,
                 self._aspect,
                 viscosity_dt,
@@ -370,8 +370,8 @@ class Fluid2D:
                 self._velocity_fbo.swap()
                 self._velocity_fbo.begin()
                 self._jacobi_diffusion_shader.use(
-                    self._velocity_fbo.back_texture,
-                    self._simulation_obstacle_fbo.texture,
+                    self._velocity_fbo.back,
+                    self._simulation_obstacle_fbo,
                     self._grid_scale,
                     self._aspect,
                     viscosity_dt,
@@ -390,8 +390,8 @@ class Fluid2D:
         # a. Compute curl
         self._vorticity_curl_fbo.begin()
         self._vorticity_curl_shader.use(
-            self._velocity_fbo.texture,
-            self._simulation_obstacle_fbo.texture,
+            self._velocity_fbo,
+            self._simulation_obstacle_fbo,
             self._grid_scale,
             self._aspect,
             vorticity_radius,
@@ -402,8 +402,8 @@ class Fluid2D:
         # b. Compute confinement force
         self._vorticity_force_fbo.begin()
         self._vorticity_force_shader.use(
-            self._vorticity_curl_fbo.texture,
-            self._simulation_obstacle_fbo.texture,
+            self._vorticity_curl_fbo,
+            self._simulation_obstacle_fbo,
             self._grid_scale,
             self._aspect,
             vorticity_force,
@@ -412,7 +412,7 @@ class Fluid2D:
         self._vorticity_force_fbo.end()
 
         # c. Add force to velocity
-        self._add_force_to_velocity(self._vorticity_force_fbo.texture)
+        self._add_force_to_velocity(self._vorticity_force_fbo)
 
     def _advect_temperature(self) -> None:
         """Advect & dissipate the temperature scalar field."""
@@ -426,9 +426,9 @@ class Fluid2D:
         self._temperature_fbo.swap()
         self._temperature_fbo.begin()
         self._advect_shader.use(
-            self._temperature_fbo.back_texture,
-            self._velocity_fbo.texture,
-            self._simulation_obstacle_fbo.texture,
+            self._temperature_fbo.back,
+            self._velocity_fbo,
+            self._simulation_obstacle_fbo,
             self._aspect,
             advect_step,
             dissipation,
@@ -446,10 +446,10 @@ class Fluid2D:
 
         self._buoyancy_fbo.begin()
         self._buoyancy_shader.use(
-            self._velocity_fbo.texture,
-            self._temperature_fbo.texture,
-            self._density_fbo.texture,
-            self._simulation_obstacle_fbo.texture,
+            self._velocity_fbo,
+            self._temperature_fbo,
+            self._density_fbo,
+            self._simulation_obstacle_fbo,
             sigma,
             kappa,
             self.settings.temperature.ambient,
@@ -457,7 +457,7 @@ class Fluid2D:
         )
         self._buoyancy_fbo.end()
 
-        self._add_force_to_velocity(self._buoyancy_fbo.texture)
+        self._add_force_to_velocity(self._buoyancy_fbo)
 
     def _advect_pressure(self) -> None:
         """Advect & dissipate pressure (optional, non-physical)."""
@@ -470,9 +470,9 @@ class Fluid2D:
         self._pressure_fbo.swap()
         self._pressure_fbo.begin()
         self._advect_shader.use(
-            self._pressure_fbo.back_texture,
-            self._velocity_fbo.texture,
-            self._simulation_obstacle_fbo.texture,
+            self._pressure_fbo.back,
+            self._velocity_fbo,
+            self._simulation_obstacle_fbo,
             self._aspect,
             advect_step,
             dissipation,
@@ -485,8 +485,8 @@ class Fluid2D:
         # a. Compute divergence
         self._divergence_fbo.begin()
         self._divergence_shader.use(
-            self._velocity_fbo.texture,
-            self._simulation_obstacle_fbo.texture,
+            self._velocity_fbo,
+            self._simulation_obstacle_fbo,
             self._grid_scale,
             self._aspect,
             has_obstacles=self._has_obstacles
@@ -497,12 +497,12 @@ class Fluid2D:
         iterations = self._scale_iterations(self.settings.pressure.iterations)
 
         if self._use_compute_pressure:
-            current = self._pressure_fbo.texture
+            current = self._pressure_fbo
             result = self._jacobi_pressure_compute.solve(
                 current,
-                self._pressure_fbo.back_texture,
-                self._divergence_fbo.texture,
-                self._simulation_obstacle_fbo.texture,
+                self._pressure_fbo.back,
+                self._divergence_fbo,
+                self._simulation_obstacle_fbo,
                 self._grid_scale,
                 self._aspect,
                 total_iterations=iterations,
@@ -516,9 +516,9 @@ class Fluid2D:
                 self._pressure_fbo.swap()
                 self._pressure_fbo.begin()
                 self._jacobi_pressure_shader.use(
-                    self._pressure_fbo.back_texture,
-                    self._divergence_fbo.texture,
-                    self._simulation_obstacle_fbo.texture,
+                    self._pressure_fbo.back,
+                    self._divergence_fbo,
+                    self._simulation_obstacle_fbo,
                     self._grid_scale,
                     self._aspect,
                     has_obstacles=self._has_obstacles
@@ -529,9 +529,9 @@ class Fluid2D:
         self._velocity_fbo.swap()
         self._velocity_fbo.begin()
         self._gradient_shader.use(
-            self._velocity_fbo.back_texture,
-            self._pressure_fbo.texture,
-            self._simulation_obstacle_fbo.texture,
+            self._velocity_fbo.back,
+            self._pressure_fbo,
+            self._simulation_obstacle_fbo,
             self._grid_scale,
             self._aspect,
             has_obstacles=self._has_obstacles
@@ -546,9 +546,9 @@ class Fluid2D:
         self._density_fbo.swap()
         self._density_fbo.begin()
         self._advect_shader.use(
-            self._density_fbo.back_texture,    # Source density
-            self._velocity_fbo.texture,        # Velocity
-            self._density_obstacle_fbo.texture, # Obstacles (full density resolution)
+            self._density_fbo.back,    # Source density
+            self._velocity_fbo,        # Velocity
+            self._density_obstacle_fbo, # Obstacles (full density resolution)
             self._aspect,
             advect_step,
             dissipation,
@@ -780,13 +780,13 @@ class Fluid2D:
         FlowUtil.zero(self._simulation_obstacle_fbo)
         self._simulation_obstacle_fbo.swap()
         self._simulation_obstacle_fbo.begin()
-        self._add_boolean_shader.use(self._simulation_obstacle_fbo.back_texture, texture)
+        self._add_boolean_shader.use(self._simulation_obstacle_fbo.back, texture)
         self._simulation_obstacle_fbo.end()
 
         FlowUtil.zero(self._density_obstacle_fbo)
         self._density_obstacle_fbo.swap()
         self._density_obstacle_fbo.begin()
-        self._add_boolean_shader.use(self._density_obstacle_fbo.back_texture, texture)
+        self._add_boolean_shader.use(self._density_obstacle_fbo.back, texture)
         self._density_obstacle_fbo.end()
 
         self._has_obstacles = True
@@ -803,12 +803,12 @@ class Fluid2D:
             return
         self._simulation_obstacle_fbo.swap()
         self._simulation_obstacle_fbo.begin()
-        self._add_boolean_shader.use(self._simulation_obstacle_fbo.back_texture, texture)
+        self._add_boolean_shader.use(self._simulation_obstacle_fbo.back, texture)
         self._simulation_obstacle_fbo.end()
 
         self._density_obstacle_fbo.swap()
         self._density_obstacle_fbo.begin()
-        self._add_boolean_shader.use(self._density_obstacle_fbo.back_texture, texture)
+        self._add_boolean_shader.use(self._density_obstacle_fbo.back, texture)
         self._density_obstacle_fbo.end()
 
         self._has_obstacles = True

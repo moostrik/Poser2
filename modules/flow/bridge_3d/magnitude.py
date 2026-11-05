@@ -72,10 +72,10 @@ class Magnitude(FlowBase):
 
         # Extract vector magnitude to R channel
         self._output_fbo.begin()
-        self._magnitude_shader.use(self._input.texture)
+        self._magnitude_shader.use(self._input)
         self._output_fbo.end()
 
-        # FlowUtil.magnitude(self._output_fbo, self._input.texture)
+        # FlowUtil.magnitude(self._output_fbo, self._input)
 
 
 class VelocityMagnitude(Magnitude):

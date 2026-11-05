@@ -150,10 +150,10 @@ class LucasKanadeFlow3D:
             alpha, _ = track_weights(delta_time, z_s.smooth, 1.0)
             self._filtered.swap()
             self._filtered.begin()
-            self._filter_shader.use(solved, self._filtered.back_texture, solved, float(alpha))
+            self._filter_shader.use(solved, self._filtered.back, solved, float(alpha))
             self._filtered.end()
             self._followed.begin()
-            self._threshold_shader.use(self._filtered.texture, xy_s.threshold)
+            self._threshold_shader.use(self._filtered, xy_s.threshold)
             self._followed.end()
             xy = self._followed
         else:

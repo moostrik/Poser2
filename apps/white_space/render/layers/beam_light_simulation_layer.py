@@ -80,5 +80,5 @@ class BeamLightSimulationLayer(layers.LayerBase):
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
         self.fbo_angles.begin()
-        self._shader.use(self.fbo_angles, self.image.texture, self.fbo_angles.width)
+        self._shader.use(self.fbo_angles, self.image, self.fbo_angles.width)
         self.fbo_angles.end()

@@ -49,7 +49,7 @@ class DiffusionLayer(LayerBase):
             return
         self._fbo.swap()
         self._fbo.begin()
-        self._blend.use(self._image, self._fbo.back_texture, trail)
+        self._blend.use(self._image, self._fbo.back, trail)
         self._fbo.end()
 
     def blur(self, radius: float) -> None:

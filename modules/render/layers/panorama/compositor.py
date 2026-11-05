@@ -212,7 +212,7 @@ class Compositor(LayerBase):
         # count on it, as they did when seams and grid drew here directly.
         glEnable(GL_BLEND)
         glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA)
-        Blit.use(self._static_fbo.texture)
+        Blit.use(self._static_fbo)
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)
 
     def _static_inputs(self, parts: list[Part], window: tuple[float, float]) -> tuple:

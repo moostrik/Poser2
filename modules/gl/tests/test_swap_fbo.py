@@ -1,45 +1,33 @@
-"""A SwapFbo's buffers as handed out: valid until the owner's next swap, then raising where they are used."""
+"""A SwapFbo is its current buffer; `back` is the other one, and they trade places at a swap."""
 
 import unittest
 
-from modules.gl import SwapFbo, StaleTextureError
+from modules.gl import SwapFbo
 
 
-class SwapTextureTest(unittest.TestCase):
-    def test_a_texture_taken_before_a_swap_raises_after_it(self) -> None:
-        fbo = SwapFbo()
-        texture = fbo.texture
-        fbo.swap()
-        with self.assertRaises(StaleTextureError):
-            texture.tex_id
-        with self.assertRaises(StaleTextureError):
-            texture.bind()
-
-    def test_a_texture_taken_after_the_swap_does_not(self) -> None:
-        fbo = SwapFbo()
-        fbo.swap()
-        texture = fbo.texture
-        self.assertEqual(texture.tex_id, fbo._fbos[fbo._swap_state].tex_id)
-
-    def test_the_back_texture_expires_the_same_way(self) -> None:
-        fbo = SwapFbo()
-        back = fbo.back_texture
-        self.assertEqual(back.tex_id, fbo._fbos[1 - fbo._swap_state].tex_id)
-        fbo.swap()
-        with self.assertRaises(StaleTextureError):
-            back.tex_id
-
+class SwapFboTest(unittest.TestCase):
     def test_the_swap_fbo_itself_is_always_the_current_buffer(self) -> None:
         fbo = SwapFbo()
-        for _ in range(3):
+        fbo._fbos[0].tex_id, fbo._fbos[1].tex_id = 3, 7
+        for expected in (7, 3, 7):
             fbo.swap()
-            self.assertEqual(fbo.tex_id, fbo._fbos[fbo._swap_state].tex_id)
+            self.assertEqual(fbo.tex_id, expected)
 
-    def test_sizes_and_formats_read_without_a_check(self) -> None:
+    def test_back_is_the_other_buffer(self) -> None:
         fbo = SwapFbo()
-        texture = fbo.texture
+        fbo._fbos[0].tex_id, fbo._fbos[1].tex_id = 3, 7
+        self.assertEqual(fbo.back.tex_id, 7)
         fbo.swap()
-        self.assertEqual((texture.width, texture.height, texture.allocated), (0, 0, False))
+        self.assertEqual((fbo.tex_id, fbo.back.tex_id), (7, 3))
+
+    def test_a_kept_back_buffer_is_the_current_one_after_a_swap(self) -> None:
+        fbo = SwapFbo()
+        back = fbo.back
+        fbo.swap()
+        self.assertIs(back, fbo._fbos[fbo._swap_state])
+
+    def test_a_swap_fbo_has_no_texture_property(self) -> None:
+        self.assertFalse(hasattr(SwapFbo(), 'texture'))
 
 
 if __name__ == '__main__':

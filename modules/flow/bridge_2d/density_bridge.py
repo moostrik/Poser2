@@ -114,7 +114,7 @@ class DensityBridge(FlowBase):
         self._output_fbo.begin()
         self._density_bridge_shader.use(
             self._input,                    # Density RGB from input_fbo
-            self._velocity_fbo.texture,    # Pre-smoothed velocity
+            self._velocity_fbo,    # Pre-smoothed velocity
             speed                             # Speed multiplier for alpha
         )
         self._output_fbo.end()
@@ -123,7 +123,7 @@ class DensityBridge(FlowBase):
         self._output_fbo.swap()
         self._output_fbo.begin()
         self._hsv_shader.use(
-            self._output_fbo.back_texture,
+            self._output_fbo.back,
             hue=0.0,
             saturation=self.settings.saturation,
             value=self.settings.brightness

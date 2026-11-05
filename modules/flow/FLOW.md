@@ -70,13 +70,13 @@ texture with its kind; the monitors' input is built from them. The layers hold n
 each other, and no input knows an output's type. A field is named with the same noun for the
 same kind of thing, in every input.
 
-A texture field holds the `Fbo`, `SwapFbo` or `Tensor` object itself, which stands for its
-current buffer, never a raw `.texture` or `.back_texture`: a swap's buffer expires at the next
-swap, and holding one raises `StaleTextureError` (`modules/gl/swap_handle.py`); `FlowBase` hands
-out its `SwapFbo`s for the same reason. That is what lets an input be built before the render
-loop: the object named in it is the one the stage before writes into during the loop, so the next
-stage reads this tick's result. Values that are not textures (`timestamp`, `dt`, the weight) come
-from the app, never from an output, or they would be the tick before's.
+A texture field holds the `Fbo`, `SwapFbo` or `Tensor` object itself; a swap is its current
+buffer, and its `back` is the other one, read inside the pass that writes the current and never
+kept, since the two trade places at the next swap. `FlowBase` hands out its `SwapFbo`s for the
+same reason. That is what lets an input be built before the render loop: the object named in it
+is the one the stage before writes into during the loop, so the next stage reads this tick's
+result. Values that are not textures (`timestamp`, `dt`, the weight) come from the app, never from
+an output, or they would be the tick before's.
 
 | Stage  | Input `@dataclass`, built by the app each tick                                                                                      | Output `@dataclass`, the stage's textures                                                                |
 |--------|-------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
@@ -228,15 +228,6 @@ The shader loader finds a shader's source by its `.py` module name beside it
 
 ## Open
 
-- The swap buffers hand out no handles. `SwapFbo.texture` names a buffer of a
-  thing that is a texture itself and hands out a handle that goes stale at the next swap; a
-  double buffer's one extra is the previous buffer, read while the current is written. The
-  change, in `modules/gl` and its readers: `SwapFbo.texture` and `Texture.texture` go, the
-  object itself is the current buffer; `back_texture` becomes `back`, still a handle valid until
-  the next swap; `SwapTexture3D` and `SwapTexture2DArray` the same; every reader follows (82
-  `back_texture` reads in 27 files, and the `.texture` reads on swap buffers among the flow's 91
-  `.texture` reads). A layer's `texture` keeps its meaning, the layer's output. The glossary
-  gets the term.
 - The trail's output size. The 2D smooth trail and the 3D velocity trail bridge run their
   smoothing and blur at the layer's output size (`allocate(width, height, output_width,
   output_height)`), 2160 × 3840 in the large layers, while the flow measures at 512 × 288, so the

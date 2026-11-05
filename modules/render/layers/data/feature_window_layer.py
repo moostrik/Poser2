@@ -85,9 +85,9 @@ class FeatureWindowLayer(LayerBase):
         if not self._is_active:
             return
         if self._fbo.allocated:
-            Blit.use(self._fbo.texture)
+            Blit.use(self._fbo)
             if self.draw_labels and self.settings.render_labels:
-                Blit.use(self._label_fbo.texture)
+                Blit.use(self._label_fbo)
 
     def update(self) -> None:
         """Update visualization from DataHub FeatureWindow."""
@@ -141,7 +141,7 @@ class FeatureWindowLayer(LayerBase):
         self._stream_step_pixels = stream_step * self._height
 
         self._shader.use(
-            self._image.texture,
+            self._image,
             num_samples,
             num_streams,
             stream_step,

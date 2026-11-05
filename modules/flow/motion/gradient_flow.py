@@ -56,14 +56,14 @@ class GradientFlow(FlowBase):
     @property
     def color_input(self) -> Texture:
         """Density input texture (luminance)."""
-        return self._input_fbo.texture
+        return self._input_fbo
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate optical flow layer."""
 
         super().allocate(width, height, output_width, output_height)
 
-        for tex in [self._input_fbo.texture, self._input_fbo.back_texture]:
+        for tex in [self._input_fbo, self._input_fbo.back]:
             glBindTexture(GL_TEXTURE_2D, tex.tex_id)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
@@ -97,8 +97,8 @@ class GradientFlow(FlowBase):
             return
 
         # Get current and previous frames from input_fbo using properties
-        curr_frame = self._input_fbo.texture      # Current buffer (Fbo)
-        prev_frame = self._input_fbo.back_texture # Previous buffer (Fbo)
+        curr_frame = self._input_fbo      # Current buffer (Fbo)
+        prev_frame = self._input_fbo.back # Previous buffer (Fbo)
 
         # Compute optical flow using settings values
         power = 1.0 - self.settings.boost
@@ -142,7 +142,7 @@ class GradientFlow(FlowBase):
             self._input_fbo.end()
 
         # Generate mipmaps after rendering to FBO
-        glBindTexture(GL_TEXTURE_2D, self._input_fbo.texture.tex_id)
+        glBindTexture(GL_TEXTURE_2D, self._input_fbo.tex_id)
         glGenerateMipmap(GL_TEXTURE_2D)
         glBindTexture(GL_TEXTURE_2D, 0)
 

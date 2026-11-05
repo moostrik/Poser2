@@ -107,8 +107,8 @@ class CenterCamLayer(LayerBase):
         self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._cam_blend_fbo.begin()
         self._blend_shader.use(
-            self._cam_blend_fbo.back_texture,
-            self._cam_fbo.texture,
+            self._cam_blend_fbo.back,
+            self._cam_fbo,
             self.settings.blend_factor
         )
         self._cam_blend_fbo.end()
@@ -118,7 +118,7 @@ class CenterCamLayer(LayerBase):
             self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._masked_fbo.begin()
             self._mask_shader.use(
-                self._cam_blend_fbo.texture,
+                self._cam_blend_fbo,
                 self._mask_texture,
                 self.settings.mask_opacity
             )

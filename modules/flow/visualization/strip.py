@@ -60,5 +60,5 @@ class Strip:
 
         self._strip_fbo.swap()
         self._strip_fbo.begin()
-        self._roll_shader.use(self._strip_fbo.back_texture, self._summary_fbo, scale)
+        self._roll_shader.use(self._strip_fbo.back, self._summary_fbo, scale)
         self._strip_fbo.end()

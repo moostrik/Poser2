@@ -85,7 +85,7 @@ class FlowUtil:
         # Swap and add: curr = prev + (src * strength)
         dst_fbo.swap()
         dst_fbo.begin()
-        FlowUtil._add_shader.use(dst_fbo.back_texture, src_texture, 1.0, strength)
+        FlowUtil._add_shader.use(dst_fbo.back, src_texture, 1.0, strength)
         dst_fbo.end()
 
     @staticmethod
@@ -169,7 +169,7 @@ class FlowUtil:
         # Swap and copy: preserve other channels from prev, replace target channel
         dst_fbo.swap()
         dst_fbo.begin()
-        FlowUtil._channel_copy_shader.use(dst_fbo.back_texture, src, channel)
+        FlowUtil._channel_copy_shader.use(dst_fbo.back, src, channel)
         dst_fbo.end()
 
     @staticmethod
@@ -193,7 +193,7 @@ class FlowUtil:
         # Swap and add: preserve other channels from prev, add to target channel
         dst_fbo.swap()
         dst_fbo.begin()
-        FlowUtil._channel_add_shader.use(dst_fbo.back_texture, src, channel, strength)
+        FlowUtil._channel_add_shader.use(dst_fbo.back, src, channel, strength)
         dst_fbo.end()
 
     @staticmethod
@@ -216,7 +216,7 @@ class FlowUtil:
         # Swap and clamp: read from back, write clamped to front
         dst_fbo.swap()
         dst_fbo.begin()
-        FlowUtil._clamp_shader.use(dst_fbo.back_texture, min_val, max_val)
+        FlowUtil._clamp_shader.use(dst_fbo.back, min_val, max_val)
         dst_fbo.end()
 
     @staticmethod
@@ -243,7 +243,7 @@ class FlowUtil:
         # Swap and dampen: read from back, write dampened to front
         dst_fbo.swap()
         dst_fbo.begin()
-        FlowUtil._dampen_shader.use(dst_fbo.back_texture, threshold, dampen_factor, include_alpha)
+        FlowUtil._dampen_shader.use(dst_fbo.back, threshold, dampen_factor, include_alpha)
         dst_fbo.end()
 
     # ========== Region Operations ==========
@@ -271,7 +271,7 @@ class FlowUtil:
 
         dst_fbo.swap()
         dst_fbo.begin()
-        FlowUtil._set_region_shader.use(dst_fbo.back_texture, src_texture, x, y, w, h, strength)
+        FlowUtil._set_region_shader.use(dst_fbo.back, src_texture, x, y, w, h, strength)
         dst_fbo.end()
 
     @staticmethod
@@ -298,7 +298,7 @@ class FlowUtil:
 
         dst_fbo.swap()
         dst_fbo.begin()
-        FlowUtil._channel_set_region_shader.use(dst_fbo.back_texture, src_texture, channel, x, y, w, h, strength)
+        FlowUtil._channel_set_region_shader.use(dst_fbo.back, src_texture, channel, x, y, w, h, strength)
         dst_fbo.end()
 
     @staticmethod
@@ -324,7 +324,7 @@ class FlowUtil:
 
         dst_fbo.swap()
         dst_fbo.begin()
-        FlowUtil._add_region_shader.use(dst_fbo.back_texture, src_texture, x, y, w, h, strength)
+        FlowUtil._add_region_shader.use(dst_fbo.back, src_texture, x, y, w, h, strength)
         dst_fbo.end()
 
     @staticmethod
@@ -352,7 +352,7 @@ class FlowUtil:
 
         dst_fbo.swap()
         dst_fbo.begin()
-        FlowUtil._channel_add_region_shader.use(dst_fbo.back_texture, src_texture, channel, x, y, w, h, strength)
+        FlowUtil._channel_add_region_shader.use(dst_fbo.back, src_texture, channel, x, y, w, h, strength)
         dst_fbo.end()
 
     @staticmethod

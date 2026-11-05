@@ -185,7 +185,7 @@ class VelocityEventBridge(FlowBase):
         for held, event, gate in ((self._start_fbo, Event.START, 0.0), (self._stop_fbo, Event.STOP, s.stop_gate)):
             held.swap()
             held.begin()
-            self._event_shader.use(self.fast, self.slow, held.back_texture, event, decay, self._patch_fbo, gate, lod)
+            self._event_shader.use(self.fast, self.slow, held.back, event, decay, self._patch_fbo, gate, lod)
             held.end()
 
         self._start_velocity_fbo.begin()
@@ -200,7 +200,7 @@ class VelocityEventBridge(FlowBase):
         """One unit-gain Ema step: weight * previous + (1 - weight) * input."""
         trail.swap()
         trail.begin()
-        self._trail_shader.use(trail.back_texture, self._input, weight, 1.0 - weight)
+        self._trail_shader.use(trail.back, self._input, weight, 1.0 - weight)
         trail.end()
 
 

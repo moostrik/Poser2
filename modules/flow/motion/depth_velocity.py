@@ -173,13 +173,13 @@ class DepthVelocity(FlowBase):
         self._catch_up.swap()
         for target, catch_up_pass in ((self._track, False), (self._catch_up, True)):
             target.begin()
-            self._velocity_shader.use(self._input_fbo.texture, self._track.back_texture, self._catch_up.back_texture, catch_up_pass,
+            self._velocity_shader.use(self._input_fbo, self._track.back, self._catch_up.back, catch_up_pass,
                                       float(alpha), smooth, catch_up_smooth, float(alpha), motion_floor, max(delta_time, 1e-6), view_span,
                                       step, window, tolerance, dead_zone, displacement)
             target.end()
 
         self._output_fbo.begin()
-        self._threshold_shader.use(self._track.texture, threshold / max(width, 1))     # px as view widths
+        self._threshold_shader.use(self._track, threshold / max(width, 1))     # px as view widths
         self._output_fbo.end()
 
 

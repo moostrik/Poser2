@@ -52,5 +52,5 @@ class RevealLayer(LayerBase):
         if not self._white.allocated or not image.allocated:
             return
         self._fbo.begin()
-        self._flash_out.use(image, self._white, self._mask.texture, flash)
+        self._flash_out.use(image, self._white, self._mask, flash)
         self._fbo.end()

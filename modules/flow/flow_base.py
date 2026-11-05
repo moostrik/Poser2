@@ -46,7 +46,7 @@ class FlowBase(ABC):
     @property
     def _output(self) -> Texture:
         """Protected: the output buffer, the `SwapFbo` itself, so it is always its current buffer and
-        can be held across a swap (`swap_handle`). Access via domain-specific properties in derived classes."""
+        can be held across a swap. Access via domain-specific properties in derived classes."""
         return self._output_fbo
 
     @property
@@ -113,11 +113,11 @@ class FlowBase(ABC):
 
     def draw_input(self) -> None:
         """Draw input buffer with auto-visualization."""
-        self._draw_with_visualization_field(self._input_fbo.texture)
+        self._draw_with_visualization_field(self._input_fbo)
 
     def draw_output(self) -> None:
         """Draw output buffer with auto-visualization (velocity=field, RGB=direct)."""
-        self._draw_with_visualization_field(self._output_fbo.texture)
+        self._draw_with_visualization_field(self._output_fbo)
 
     def _draw_with_visualization_field(self, texture: Texture) -> None:
         """Protected: Draw texture using auto-detecting Visualizer (lazy init)."""
