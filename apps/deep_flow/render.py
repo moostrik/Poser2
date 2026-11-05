@@ -1,12 +1,14 @@
-"""Deep Flow render — split-view layer graph with 3D volumetric fluid."""
+"""Deep Flow render — split-view layer graph with the 3D flow: motion, bridge and the volumetric fluid."""
 
 from threading import Event
 from typing import cast
 
+import numpy as np
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId
 from modules.flow import DepthView
+from modules.pose import Frame, Similarity, AngleMotion, Points2D, PointLandmark
 from modules.render import layers as ls, make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
 
@@ -14,7 +16,7 @@ from modules.board import HasFrames
 
 from .capture_poses import CapturePoses
 from .render_board import RenderBoard
-from .settings import Layers, MaskSource, RenderSettings
+from .settings import Layers, MaskSource, RenderSettings, FlowInputSettings
 
 
 UPDATE_LAYERS: list[Layers] = [
@@ -34,6 +36,7 @@ UPDATE_LAYERS: list[Layers] = [
 
     Layers.color_mask,
     Layers.motion,
+    Layers.bridge,
     Layers.fluid,
     Layers.composite,
 ]
@@ -45,6 +48,7 @@ INTERFACE_LAYERS: list[Layers] = [
 
 LARGE_LAYERS: list[Layers] = [
     Layers.motion,
+    Layers.bridge,
     Layers.fluid,
     Layers.composite,
 ]
@@ -65,6 +69,9 @@ def flow_sources(mask_source: MaskSource) -> dict[Layers, Layers]:
 
 OUTPUT_WIDTH: int = 1080
 OUTPUT_HEIGHT: int = 1920
+
+MIN_TICK: float = 1.0 / 240.0   # s: a tick measured shorter is a clock step, not a frame
+EYE_EASE: float = 0.4           # s: the parallax eye's ease toward the tracked head, keeping keypoint jitter out
 
 # The layers that are not output-shaped, each with the layer whose texture holds its shape
 SHAPE_LAYERS: dict[Layers, Layers] = {
@@ -103,7 +110,6 @@ class DeepFlowRender(RenderBase):
         settings.data.b.line_smooth = 6.0
         settings.data.b.use_history_color = True
 
-        flows: dict[int, ls.Motion3DLayer] = {}
         cmt: dict[int, Texture] = {}    # the center masks
         depth_source: bool = mask_source == MaskSource.DEPTH
         space: ls.SourceSpace = ls.SourceSpace.IMAGE if depth_source else ls.SourceSpace.CROP
@@ -139,8 +145,9 @@ class DeepFlowRender(RenderBase):
             center_pose =   self.L[Layers.center_pose][i] = ls.CenterPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
 
             ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,   center_foreground.texture, cmt, settings.center.color, settings.colors)
-            flows[i] =      self.L[Layers.motion][i] =        ls.Motion3DLayer(         i, self.board,   cam_mask,  center_mask.texture, center_foreground.texture, settings.motion)
-            fluid =       self.L[Layers.fluid][i] =     ls.Fluid3DLayer(        i, self.board,   flows,                      settings.fluid,           settings.colors)
+            self.L[Layers.motion][i] =                      ls.Motion3DLayer(       i, settings.motion)
+            self.L[Layers.bridge][i] =                      ls.Bridge3DLayer(       settings.bridge)
+            fluid =         self.L[Layers.fluid][i] =       ls.Fluid3DLayer(        settings.fluid)
 
             composite =    self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid, ms_mask],         settings.layer.composite)
 
@@ -156,10 +163,13 @@ class DeepFlowRender(RenderBase):
         self._panel_aspect_ratios: list[float] = self._read_panel_aspect_ratios()
         self.subdivision: Subdivision = self._make_layout()
 
-        # The render rate of each tick feeds the fluid's time step
+        # The length of each tick, the flow's dt
         self._last_tick: float = 0.0
-        self._dt: float = 1.0 / 60.0        # the last tick's length (s)
-        self.add_update_callback(self._measure_fps)
+        self._dt: float = 1.0 / 60.0
+        self.add_update_callback(self._measure_tick)
+
+        # The parallax eye per fluid, eased toward the tracked head
+        self._eyes: dict[int, tuple[float, float]] = {}
 
         # A reset asked for from another thread, applied at the next update on the GL thread
         self._reset_fluid: Event = Event()
@@ -218,10 +228,9 @@ class DeepFlowRender(RenderBase):
             for layer in cam_dict.values():
                 layer.deallocate()
 
-    def _measure_fps(self, now: float) -> None:
+    def _measure_tick(self, now: float) -> None:
         if self._last_tick > 0.0 and now > self._last_tick:
-            self._dt = max(now - self._last_tick, 1.0 / 240.0)
-            self.settings.fluid.fluid.fps = 1.0 / self._dt
+            self._dt = max(now - self._last_tick, MIN_TICK)
         self._last_tick = now
 
     def reset_fluid(self) -> None:
@@ -233,9 +242,9 @@ class DeepFlowRender(RenderBase):
 
         if self._reset_fluid.is_set():
             self._reset_fluid.clear()
-            for layer_type in [Layers.motion, Layers.fluid]:
+            for layer_type in [Layers.motion, Layers.bridge, Layers.fluid]:
                 for layer in self.L[layer_type].values():
-                    cast(ls.Motion3DLayer | ls.Fluid3DLayer, layer).reset()
+                    cast(ls.Motion3DLayer | ls.Bridge3DLayer | ls.Fluid3DLayer, layer).reset()
 
         select = self.settings.layer.select
         self._left_layers = select.left
@@ -243,24 +252,7 @@ class DeepFlowRender(RenderBase):
         self._output_layers = select.output
         self._update_layout()
 
-        flow_key: Layers = self.settings.motion.inputs.flow
-        density_key: Layers = self.settings.motion.inputs.density
-        mask_key: Layers = self.settings.motion.inputs.mask
-        flow_source_key: Layers = self._flow_sources.get(flow_key, flow_key)
-        for i, _flow_layer in self.L[Layers.motion].items():
-            flow_layer = cast(ls.Motion3DLayer, _flow_layer)
-            flow_layer.set_time_step(self._dt)
-            depth: DepthView = cast(ls.CenterDepthLayer, self.L[Layers.center_depth][i]).depth_view
-            flow_layer.set_depth_input(depth.texture)
-            flow_layer.set_view_span(depth.view_span)
-            if depth.depth_step != (0.0, 0.0):
-                flow_layer.set_depth_step(depth.depth_step)
-            if flow_key in self.L and i in self.L[flow_key] and i in self.L[flow_source_key]:
-                flow_layer.set_flow_input(self.L[flow_key][i].texture)
-                flow_layer.set_flow_source(self.L[flow_source_key][i])
-            if density_key in self.L and i in self.L[density_key]:
-                flow_layer.set_density_input(self.L[density_key][i].texture)
-            flow_layer.set_mask_input(self.L[mask_key][i].texture if mask_key in self.L and i in self.L[mask_key] else None)
+        self._wire_flow()
 
         for i, _composite_layer in self.L[Layers.composite].items():
             composite_layer = cast(ls.CompositeLayer, _composite_layer)
@@ -277,6 +269,80 @@ class DeepFlowRender(RenderBase):
                 seen.add(layer_type)
                 for layer in self.L[layer_type].values():
                     layer.update()
+
+    # ========== The flow's wiring ==========
+
+    def _layer(self, key: Layers, cam_id: int) -> ls.LayerBase | None:
+        return self.L[key][cam_id] if key in self.L and cam_id in self.L[key] else None
+
+    def _wire_flow(self) -> None:
+        """Build each stage's input from the layers the panel names and the stage before: a motion and
+        a bridge input per camera, a fluid input per fluid with one injection per bridge, at its weight."""
+        inputs: FlowInputSettings = self.settings.inputs
+        dt: float = self._dt
+        source_key: Layers = self._flow_sources.get(inputs.motion_image, inputs.motion_image)
+        bridges: dict[int, ls.Bridge3DLayer] = {i: cast(ls.Bridge3DLayer, layer) for i, layer in self.L[Layers.bridge].items()}
+
+        for i, _motion in self.L[Layers.motion].items():
+            motion = cast(ls.Motion3DLayer, _motion)
+            image: ls.LayerBase | None = self._layer(inputs.motion_image, i)
+            if image is None or i not in bridges:
+                continue
+            source: ls.LayerBase | None = self._layer(source_key, i)
+            timestamp: float | None = source.timestamp if isinstance(source, ls.HasCaptureTime) else None
+            color: ls.LayerBase | None = self._layer(inputs.bridge_image, i)
+            mask_layer: ls.LayerBase | None = self._layer(inputs.mask, i)
+            mask: Texture | None = mask_layer.texture if mask_layer is not None else None
+            depth: DepthView = cast(ls.CenterDepthLayer, self.L[Layers.center_depth][i]).depth_view
+            motion.set_input(ls.MotionInput(image.texture, timestamp, dt, depth, mask))
+            bridges[i].set_input(ls.BridgeInput(motion.output.velocity, dt, color.texture if color is not None else None, mask=mask))
+
+        for i, _fluid in self.L[Layers.fluid].items():
+            fluid = cast(ls.Fluid3DLayer, _fluid)
+            pose: Frame | None = self.board.get_frame(self.settings.stage, i)
+            injections: list[ls.Injection] = []
+            for j, bridge in bridges.items():
+                output: ls.BridgeOutput = bridge.output
+                injections.append(ls.Injection(output.velocity, output.density, output.temperature, output.onset, output.spin,
+                                               self._weight(pose, i, j)))
+            fluid.set_input(ls.FluidInput(dt, injections))
+            fluid.set_eye(*self._eye(i, pose, dt))
+
+    def _weight(self, pose: Frame | None, own_cam: int, cam_id: int) -> float:
+        """The share of camera `cam_id`'s bridge in camera `own_cam`'s fluid: its player's motion for the
+        fluid's own camera, the cross-camera similarity for another; 1 without `scale_by_motion`."""
+        if not self.settings.inputs.scale_by_motion:
+            return 1.0
+        if pose is None:
+            return 0.0
+        if cam_id == own_cam:
+            return float(pose[AngleMotion].value) if AngleMotion in pose else 0.0
+        if Similarity in pose:
+            similarities: np.ndarray = np.nan_to_num(pose[Similarity].values)
+            return float(similarities[cam_id]) if cam_id < len(similarities) else 0.0
+        return 0.0
+
+    def _eye(self, cam_id: int, pose: Frame | None, dt: float) -> tuple[float, float]:
+        """The parallax eye of camera `cam_id`'s fluid, eased toward the tracked head: the eyes' mean,
+        the nose when they are missing, easing back to center when both are. Offsets are ±1 across
+        the frame (vertical at half range)."""
+        target_x, target_y = 0.0, 0.0
+        if pose is not None and Points2D in pose:
+            pts = pose[Points2D].values
+            head = pts[[PointLandmark.left_eye, PointLandmark.right_eye]].mean(axis=0)
+            if np.isnan(head).any():
+                head = pts[PointLandmark.nose]
+            if not np.isnan(head).any():
+                target_x = (float(head[0]) - 0.5) * 2.0
+                target_y = float(head[1]) - 0.5
+        x, y = self._eyes.get(cam_id, (0.0, 0.0))
+        k: float = 1.0 - 0.01 ** (dt / EYE_EASE)
+        x += (target_x - x) * k
+        y += (target_y - y) * k
+        self._eyes[cam_id] = (x, y)
+        return x, y
+
+    # ========== Drawing ==========
 
     def draw_main(self, width: int, height: int) -> None:
         clear_color()

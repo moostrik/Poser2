@@ -15,7 +15,7 @@ Every number is measured with `scripts/depth_track_compare.py` on the GPU, unles
 OAK4, and two recordings at 0.65–1.5 m: `stillslowfast` (still, then an arm slow and fast) and
 `standmoves` (arm sweeps, pushes toward the camera). The whole flow takes 2.0 ms per frame.
 
-## optical_flow
+## lucas_kanade
 
 | Setting                | Default | Range     | For | Why                                         |
 |------------------------|---------|-----------|-----|---------------------------------------------|

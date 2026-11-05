@@ -86,11 +86,11 @@ class Side:
         self.name, rest = spec.split('=', 1)
         kind, _, items = rest.partition(':')
         self.kind = kind
-        preset = json.loads(PRESET.read_text())['render']['flow']['flow_bridge']
+        preset = json.loads(PRESET.read_text())['render']['bridge']
         self.changed: dict[str, object] = {}
         if kind == 'trail':
             self.settings: VelocityTrailBridgeSettings | KineticBridgeSettings | VelocityEventBridgeSettings = VelocityTrailBridgeSettings()
-            self.settings.update_from_dict(preset['velocity_trail'])
+            self.settings.update_from_dict(preset['trail'])
             self.bridge: VelocityTrailBridge | KineticBridge | VelocityEventBridge = VelocityTrailBridge(self.settings)
         elif kind == 'kinetic':
             self.settings = KineticBridgeSettings()

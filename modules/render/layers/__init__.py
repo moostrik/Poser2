@@ -11,11 +11,12 @@ from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOf
                       TimeSeriesLayer, TimeSeriesLayerSettings, \
                       FeatureFrameLayer, FeatureWindowLayer, MotionTimeRenderer, MotionTimeRendererSettings, \
                       PoseLineLayer, PoseLineLayerSettings
-from .flow import     MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, \
+from .flow import     MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, HasCaptureTime, \
                       BridgeInput, BridgeOutput, BridgeLayer, BridgeLayerSettings, \
                       Injection, FluidInput, FluidLayer, FluidLayerSettings, \
                       Motion2DLayer, Motion2DLayerSettings, Motion2DDrawMode, \
-                      Motion3DLayer, Motion3DLayerSettings, Motion3DDrawMode, FlowBridgeSettings, FlowBridgeMethod, \
+                      Motion3DLayer, Motion3DLayerSettings, Motion3DDrawMode, \
+                      Bridge3DLayer, Bridge3DLayerSettings, Bridge3DDrawMode, BridgeMethod, \
                       Fluid2DLayer, Fluid2DLayerSettings, Fluid2DDrawMode, \
                       Fluid3DLayer, Fluid3DLayerSettings
 from .generic import  CompositeLayer, CompositeLayerSettings, LutSettings, \

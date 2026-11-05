@@ -43,7 +43,7 @@ PRESET: Path =Path(__file__).resolve().parent.parent / 'apps' / 'deep_flow' / 'd
 def trail_settings(items: list[str]) -> tuple[VelocityTrailBridgeSettings, dict[str, object]]:
     """The preset's trail settings with `items` (NAME=VALUE, an enum by its name) set on them."""
     settings = VelocityTrailBridgeSettings()
-    settings.update_from_dict(json.loads(PRESET.read_text())['render']['flow']['flow_bridge']['velocity_trail'])
+    settings.update_from_dict(json.loads(PRESET.read_text())['render']['bridge']['trail'])
     changed: dict[str, object] = {}
     for item in items:
         name, value = item.split('=', 1)

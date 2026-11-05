@@ -367,12 +367,12 @@ class KineticBridge(FlowBase):
         self._projection_shader.use(self.fast, self.slow, Projection.DEPTH_ACCELERATION)
         self._depth_acceleration_fbo.end()
 
-    def update_curl(self) -> None:
-        """Compute the curl of the fast trail, for the spin input or its debug view."""
+    def update_curl(self, scale: float = 1.0) -> None:
+        """Compute the curl of the fast trail times `scale` (the spin setting), for the spin input or its debug view."""
         if not self._allocated:
             return
         self._curl_fbo.begin()
-        self._curl_shader.use(self.fast)
+        self._curl_shader.use(self.fast, scale)
         self._curl_fbo.end()
 
     def _advance_trail(self, trail: SwapFbo, weight: float, blur: bool) -> None:

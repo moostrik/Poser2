@@ -408,12 +408,7 @@
       "blend_mode": "ADD",
       "width": 448,
       "height": 800,
-      "inputs": {
-        "flow": "center_capture",
-        "density": "center_foreground",
-        "mask": "center_mask"
-      },
-      "optical_flow": {
+      "lucas_kanade": {
         "use_mask": true,
         "x_gain": 1.0,
         "y_gain": 1.0,
@@ -436,50 +431,62 @@
           "threshold": 1.0
         }
       },
-      "flow_bridge": {
-        "method": "VELOCITY_TRAIL",
-        "velocity_trail": {
-          "advect": 1.0,
-          "attack": 1.0,
-          "smooth": 1.0,
-          "blur_radius": 4.0,
-          "blur_steps": 4
+      "visualization": {
+        "toggle_scalar": false,
+        "scale": 1.07,
+        "scalar_scale": 1.0,
+        "strip_scale": 5.76,
+        "spacing": 64.0,
+        "z_scale": 1.0,
+        "element_length": 1.0,
+        "element_width": 2.5
+      }
+    },
+    "bridge": {
+      "draw_mode": "VELOCITY",
+      "blend_mode": "ADD",
+      "method": "VELOCITY_TRAIL",
+      "trail": {
+        "advect": 1.0,
+        "attack": 1.0,
+        "smooth": 1.0,
+        "blur_radius": 4.0,
+        "blur_steps": 4
+      },
+      "kinetic": {
+        "scale_x": 1.0,
+        "scale_y": 1.0,
+        "scale_z": 1.0,
+        "trails": {
+          "fast_smooth": 25.0,
+          "slow_smooth": 150.0,
+          "advect": 0.0,
+          "blur_position": "BEFORE",
+          "blur_radius": 2.0,
+          "blur_steps": 2
         },
-        "kinetic": {
-          "scale_x": 1.0,
-          "scale_y": 1.0,
-          "scale_z": 1.0,
-          "trails": {
-            "fast_smooth": 25.0,
-            "slow_smooth": 150.0,
-            "advect": 0.0,
-            "blur_position": "BEFORE",
-            "blur_radius": 2.0,
-            "blur_steps": 2
-          },
-          "release": {
-            "stop_gate": 0.0,
-            "stop_tile": 128.0,
-            "hold": 100.0,
-            "emission_gain": 1.0,
-            "drop_velocity": 1.0
-          },
-          "onset": {
-            "force": 0.5,
-            "spin": 0.0
-          },
-          "reservoir": {
-            "enabled": false,
-            "leak": 4.0
-          }
+        "release": {
+          "stop_gate": 0.0,
+          "stop_tile": 128.0,
+          "hold": 100.0,
+          "emission_gain": 1.0,
+          "drop_velocity": 1.0
         },
-        "density": {
-          "saturation": 1.0,
-          "brightness": 1.0
+        "onset": {
+          "force": 0.5,
+          "spin": 0.0
         },
-        "temperature": {
-          "scale": 0.5
+        "reservoir": {
+          "enabled": false,
+          "leak": 4.0
         }
+      },
+      "density": {
+        "saturation": 1.0,
+        "brightness": 1.0
+      },
+      "temperature": {
+        "scale": 0.5
       },
       "visualization": {
         "toggle_scalar": false,
@@ -492,10 +499,14 @@
         "element_width": 2.5
       }
     },
+    "inputs": {
+      "motion_image": "center_capture",
+      "bridge_image": "center_foreground",
+      "mask": "center_mask",
+      "scale_by_motion": true
+    },
     "fluid": {
-      "max_players": 1,
       "blend_mode": "ADD",
-      "scale_by_motion": true,
       "fluid": {
         "profile": false,
         "width": 448,

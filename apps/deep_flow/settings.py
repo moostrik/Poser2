@@ -68,6 +68,7 @@ class Layers(IntEnum):
     # composition layers
     color_mask =    auto()
     motion =        auto()
+    bridge =        auto()
     fluid =         auto()
     composite =     auto()
 
@@ -239,13 +240,12 @@ class _PoseCompositorSettings(layers.PoseCompositorSettings):
 class _CenterGeometrySettings(layers.CenterGeometrySettings):
     stage: Field[Stage] = Field(Stage.SMOOTH, visible=False, description="Unused: the view follows the capture's poses (SMOOTH)")
 
-class FluidInputSettings(BaseSettings):
-    flow:    Field[Layers] = Field(Layers.center_capture,    description="Texture used as optical flow input")
-    density: Field[Layers] = Field(Layers.center_capture,    description="Texture used as density and temperature input")
-    mask:    Field[Layers] = Field(Layers.center_mask,       description="Mask that gates the flow's velocity and density")
-
-class _Motion3DLayerSettings(layers.Motion3DLayerSettings):
-    inputs: Group[FluidInputSettings] = Group(FluidInputSettings)
+class FlowInputSettings(BaseSettings):
+    """Which layers feed the flow, chosen live, and how the fluid weights its injections."""
+    motion_image:    Field[Layers] = Field(Layers.center_capture,    description="The picture the motion is measured on")
+    bridge_image:    Field[Layers] = Field(Layers.center_foreground, description="The picture the density's color comes from")
+    mask:            Field[Layers] = Field(Layers.center_mask,       description="The mask that gates the velocity and the density's color")
+    scale_by_motion: Field[bool]   = Field(True, description="Weight each injection by the player's motion; off is full weight")
 
 
 class LayerGroup(BaseSettings):
@@ -277,8 +277,10 @@ class RenderSettings(BaseSettings):
     preview: Group[PreviewGroup]                 = Group(PreviewGroup)
     center : Group[CenterGroup]                  = Group(CenterGroup)
     depth  : Group[layers.DepthSourceLayerSettings] = Group(layers.DepthSourceLayerSettings)
-    motion : Group[_Motion3DLayerSettings]       = Group(_Motion3DLayerSettings)
-    fluid  : Group[layers.Fluid3DLayerSettings]  = Group(layers.Fluid3DLayerSettings, share=[stage])
+    inputs : Group[FlowInputSettings]            = Group(FlowInputSettings)
+    motion : Group[layers.Motion3DLayerSettings] = Group(layers.Motion3DLayerSettings)
+    bridge : Group[layers.Bridge3DLayerSettings] = Group(layers.Bridge3DLayerSettings)
+    fluid  : Group[layers.Fluid3DLayerSettings]  = Group(layers.Fluid3DLayerSettings)
     time_series: Group[layers.TimeSeriesLayerSettings] = Group(layers.TimeSeriesLayerSettings)
     colors : Group[ColorSettings]                = Group(ColorSettings)
     window : Group[WindowSettings]               = Group(WindowSettings)
