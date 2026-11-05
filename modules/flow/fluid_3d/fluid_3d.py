@@ -759,29 +759,21 @@ class Fluid3D:
 
     # ========== Input Methods (2D -> 3D injection) ==========
 
-    def add_velocity(self, texture: Texture, strength: float = 1.0, depth: Texture | None = None, depth_channel: int = 0) -> None:
-        """Inject the 2D flow as one 3D velocity into the gaussian birth slab.
-
-        (u, v) are the measured flow, gained by velocity.gain times
-        velocity.input_x / input_y (the axes' balance, negative inverts); w is
-        synthesized from the same flow:
-        w = clamp(push * |flow| + squeeze * -div(flow), ±dampen_threshold),
-        and blended by velocity.depth_mix with the measured velocity toward
-        the camera in `depth_channel` of `depth`, if there is one.
-        +W moves fluid away from the viewer (layer 0 is the front face).
+    def add_velocity(self, texture: Texture, strength: float = 1.0) -> None:
+        """Inject the 3D velocity (x, y on the image plane, z toward the camera) into the gaussian
+        birth slab, gained by velocity.gain, x and y also by velocity.input_x / input_y (the axes'
+        balance, negative inverts). The volume's w is -z: +W moves fluid away from the viewer
+        (layer 0 is the front face). Without depth, z is 0, and so is w.
         """
         if not self._allocated:
             return
         vel = self.settings.velocity
-        dt = self._dt
+        gain: float = strength * vel.gain * self._dt
         self._inject_flow_shader.use(
             texture, self._velocity,
             self.settings.volume.injection_layer,
             self.settings.volume.injection_spread,
-            (strength * vel.gain * vel.input_x * dt, strength * vel.gain * vel.input_y * dt),
-            strength * dt,
-            vel.push, vel.squeeze, vel.dampen_threshold,
-            depth, depth_channel, vel.depth_mix
+            (gain * vel.input_x, gain * vel.input_y, gain),
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 

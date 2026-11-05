@@ -64,9 +64,9 @@ class Fluid3DLayer(FluidLayer):
     def _inject(self, injection: Injection) -> None:
         fluid: Fluid3D = self._fluid
         # The velocity's z (blue) is the w; the onset likewise
-        fluid.add_velocity(injection.velocity, injection.weight, injection.velocity, 2)
+        fluid.add_velocity(injection.velocity, injection.weight)
         if injection.onset is not None:
-            fluid.add_velocity(injection.onset, injection.weight, injection.onset, 2)
+            fluid.add_velocity(injection.onset, injection.weight)
         if injection.spin is not None:
             fluid.set_spin(injection.spin, injection.weight)
         fluid.add_density(injection.density, injection.weight)

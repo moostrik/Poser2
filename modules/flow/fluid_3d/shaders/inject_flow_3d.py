@@ -1,18 +1,17 @@
-"""InjectFlow3D - Inject the 2D flow as a full 3D velocity (u, v measured; w synthesized)."""
+"""InjectFlow3D - Inject the 3D velocity (x, y on the image plane, z toward the camera) into the velocity volume."""
 from __future__ import annotations
 
-from OpenGL.GL import GL_RGBA16F, GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUniform3i, glUseProgram
+from OpenGL.GL import GL_RGBA16F, GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform3f, glUniform3i, glUseProgram
 
 from modules.gl import Texture, Texture3D, ComputeShader
 
 
 class InjectFlow3D(ComputeShader):
-    """Inject the 2D flow texture into the 3D velocity volume as one vec3 input.
+    """Inject the 3D velocity texture into the 3D velocity volume as one vec3 input.
 
-    (u, v) are the measured flow; w is synthesized from the same flow as
-    push * |flow| + squeeze * -divergence (clamped). All three components are
-    written into the gaussian birth slab and treated identically from then on.
-    +W moves fluid away from the viewer.
+    x and y are the image plane's; the volume's w is the velocity's -z, since z points toward the
+    camera and +W away from the viewer. All three are written into the gaussian birth slab and
+    treated identically from then on.
     """
 
     WORKGROUP_SIZE_X = 16
@@ -22,26 +21,16 @@ class InjectFlow3D(ComputeShader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, flow_2d: Texture, volume: Texture3D,
-            target_layer: float, spread: float,
-            strength_xy: tuple[float, float], strength_w: float,
-            push: float, squeeze: float, w_clamp: float,
-            depth: Texture | None = None, depth_channel: int = 0, depth_mix: float = 0.0) -> None:
-        """Inject the flow into the velocity volume.
+    def use(self, velocity: Texture, volume: Texture3D, target_layer: float, spread: float,
+            strength: tuple[float, float, float]) -> None:
+        """Inject the velocity into the velocity volume.
 
         Args:
-            flow_2d: 2D flow velocity texture (RG16F, normalized-width units)
+            velocity: 3D velocity texture (RGBA16F: x, y, z toward the camera; normalized-width units)
             volume: 3D velocity volume (read-write; u,v,w = .xyz)
             target_layer: Normalized depth [0, 1] — center of injection
             spread: Gaussian sigma in normalized depth units
-            strength_xy: Gain on the measured u and v (strength * gain * input_x / input_y * dt)
-            strength_w: Gain on the synthesized component (strength * dt)
-            push: W synthesis — gain on |flow| (signed; + = away from viewer)
-            squeeze: W synthesis — gain on -divergence (signed)
-            w_clamp: Abs clamp on the synthesized W
-            depth: Velocity toward the camera, the measured W; None = synthesized only
-            depth_channel: Its channel
-            depth_mix: 0 = synthesized W, 1 = measured W
+            strength: Gain on x, y and z (strength * gain * input_x, input_y, 1 * dt)
         """
         if not self.allocated or not self.shader_program:
             return
@@ -49,25 +38,14 @@ class InjectFlow3D(ComputeShader):
         glUseProgram(self.shader_program)
 
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, flow_2d.tex_id)
+        glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
         glUniform1i(self.get_uniform_loc("uInput"), 0)
-
-        glUniform1f(self.get_uniform_loc("uDepthMix"), depth_mix if depth is not None else 0.0)
-        if depth is not None:
-            glActiveTexture(GL_TEXTURE1)
-            glBindTexture(GL_TEXTURE_2D, depth.tex_id)
-            glUniform1i(self.get_uniform_loc("uDepth"), 1)
-            glUniform1i(self.get_uniform_loc("uDepthChannel"), depth_channel)
 
         self.bind_image_3d_readwrite(0, volume, GL_RGBA16F)
 
         glUniform1f(self.get_uniform_loc("uTargetLayer"), target_layer)
         glUniform1f(self.get_uniform_loc("uSpread"), spread)
-        glUniform2f(self.get_uniform_loc("uStrengthXY"), *strength_xy)
-        glUniform1f(self.get_uniform_loc("uStrengthW"), strength_w)
-        glUniform1f(self.get_uniform_loc("uPush"), push)
-        glUniform1f(self.get_uniform_loc("uSqueeze"), squeeze)
-        glUniform1f(self.get_uniform_loc("uWClamp"), w_clamp)
+        glUniform3f(self.get_uniform_loc("uStrength"), *strength)
         glUniform3i(self.get_uniform_loc("uSize"),
                     volume.width, volume.height, volume.depth)
 
