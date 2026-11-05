@@ -19,8 +19,8 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_RGBA16F
 
 from modules.gl import SwapFbo, Texture
 from modules.settings import Field, BaseSettings
-from ... import FlowBase, FlowUtil
-from ...shaders import GaussianBlur
+from .. import FlowBase, FlowUtil
+from ..shaders import GaussianBlur
 from .kinetics import decay_weight
 from .shaders import KineticAdvect, VelocityTrail
 

@@ -8,9 +8,9 @@ from OpenGL.GL import GL_RG32F, GL_RGBA16F
 
 from modules.gl import Texture, SwapFbo
 from modules.settings import Field, BaseSettings
-from ... import FlowBase, FlowUtil
+from .. import FlowBase, FlowUtil
 from .shaders import DensityBridgeShader
-from ...shaders.hsv import HSV
+from ..shaders.hsv import HSV
 
 
 class DensityBridgeSettings(BaseSettings):

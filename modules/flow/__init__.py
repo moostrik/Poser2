@@ -2,19 +2,20 @@
 
 All external code should import flow classes from this package, not from
 subpackages (e.g. ``from modules.flow import Fluid2D``, never
-``from modules.flow.fluid import Fluid2D``).
+``from modules.flow.fluid_2d import Fluid2D``).
 """
 
 # Base classes
 from .flow_base import FlowBase
 from .flow_util import FlowUtil
 
-# Optical flow
-from .optical import DepthVelocity, catch_up_share, color_motion, filter_depth_steps, track_depth, track_weights, depth_threshold, \
-                     GradientFlow, GradientFlowSettings, LucasKanadeFlow, Patch, LucasKanadeFlowSettings, LucasKanadeSettings, DepthTrackSettings, lucas_kanade,threshold_displacement, filter_displacement, displacement_velocity
+# Motion: the optical flow
+from .motion import DepthVelocity, catch_up_share, color_motion, filter_depth_steps, track_depth, track_weights, depth_threshold, \
+                    GradientFlow, GradientFlowSettings, LucasKanadeFlow, Patch, LucasKanadeFlowSettings, LucasKanadeSettings, DepthTrackSettings, lucas_kanade,threshold_displacement, filter_displacement, displacement_velocity
 
-# Bridge layers: the 3D bridge by name, the 2D bridge as `bridge_2d` (bridge_2d.DensityBridge, ...)
-from .bridge import     bridge_2d, DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
+# Bridges: the 3D bridge by name, the 2D bridge as `bridge_2d` (bridge_2d.DensityBridge, ...)
+from . import bridge_2d
+from .bridge_3d import  DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
                         BlurPosition, KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES, decay_weight, project, stop_gate, hold_release, drop, fill_reservoir, advect, \
                         VelocityTrailBridge, VelocityTrailBridgeSettings, velocity_trail, \
                         VelocityEventBridge, VelocityEventBridgeSettings, velocity_event, event_velocity, \
@@ -27,7 +28,7 @@ from .visualization import VisualizationFieldSettings, Visualizer, VelocityField
 from .time_step import TimeStep, TimeStepMode
 
 # 2D fluid simulation
-from .fluid import Fluid2D, FluidSettings, VolumeSettings
+from .fluid_2d import Fluid2D, FluidSettings, VolumeSettings
 
 # 3D fluid simulation
-from .fluid3d import Fluid3D
+from .fluid_3d import Fluid3D

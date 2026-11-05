@@ -27,7 +27,7 @@ import time
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_R16F, GL_R8, GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
 
 from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, Texture2DArray, SwapTexture2DArray, Profiler, GpuTimer
-from ..fluid.fluid_settings import FluidSettings, VolumeSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings, BoundaryMode
+from ..fluid_2d.fluid_settings import FluidSettings, VolumeSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings, BoundaryMode
 from ..shaders import AddBoolean
 from ..flow_util import FlowUtil
 from ..time_step import TimeStep

@@ -6,7 +6,7 @@ emission, one column per optical flow frame. It stays on the GPU, so the render 
 from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_RGBA16F, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
 
 from modules.gl import Fbo, SwapFbo, Texture
-from ... import FlowUtil
+from .. import FlowUtil
 from .shaders import KineticStripShader, KineticSummary
 
 LANES: tuple[str, ...] = ('speed', 'onset', 'release', 'emission')      # top to bottom

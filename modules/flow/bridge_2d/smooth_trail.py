@@ -8,8 +8,8 @@ from OpenGL.GL import GL_RG16F, GL_RGBA16F
 
 from modules.gl import Texture
 from modules.settings import Field, BaseSettings
-from ... import FlowBase, FlowUtil
-from ...shaders import Trail, GaussianBlur
+from .. import FlowBase, FlowUtil
+from ..shaders import Trail, GaussianBlur
 
 
 class SmoothTrailSettings(BaseSettings):

@@ -22,8 +22,8 @@ from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R16F, GL_RG16F, GL_
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import Field, BaseSettings
-from ... import FlowBase, FlowUtil
-from ...shaders import Trail
+from .. import FlowBase, FlowUtil
+from ..shaders import Trail
 from .kinetics import EPSILON, decay_weight, direction
 from .shaders import Event, KineticOnset, KineticPatch, ScaleVelocity, VelocityEvent
 
