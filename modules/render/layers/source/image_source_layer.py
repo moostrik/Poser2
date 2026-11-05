@@ -16,22 +16,16 @@ class ImageSourceLayer(LayerBase):
         self._board: HasCameraImages = board
         self._cuda_image: Tensor = Tensor()
         self._data_cache: DataCache[torch.Tensor] = DataCache[torch.Tensor]()
-        self._dirty: bool = False
 
     @property
     def texture(self) -> Texture:
         return self._cuda_image
-
-    @property
-    def dirty(self) -> bool:
-        return self._dirty
 
     def deallocate(self) -> None:
         if self._cuda_image.allocated:
             self._cuda_image.deallocate()
 
     def update(self) -> None:
-        self._dirty = False
         gpu_frame: torch.Tensor | None = self._board.get_camera_image(self._cam_id)
         self._data_cache.set(gpu_frame)
 
@@ -43,4 +37,3 @@ class ImageSourceLayer(LayerBase):
 
         self._cuda_image.set_tensor(gpu_frame)
         self._cuda_image.update()
-        self._dirty = True

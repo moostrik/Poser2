@@ -214,9 +214,9 @@ The shader loader finds a shader's source by its `.py` module name beside it
 - The image, the mask and the depth come pushed in the inputs: a GL texture lives on the render
   thread and is not board data. The layers read nothing from the board; the app's wiring pass
   reads the pose frames there for the weights and the eye.
-- The motion layer reads no layer's `dirty`: `MotionInput.timestamp` says whether the image is a
-  new camera frame. `LayerBase.dirty` stays as the source layers' change flag for their other
-  readers (`DepthMaskLayer`).
+- A layer has no change flag: a source layer's `timestamp`, the capture time of the frame it
+  holds, says whether it holds a new one. `MotionInput.timestamp` tells the motion layer, and
+  `DepthMaskLayer` reads its depth source's the same way.
 - The time step has one transport: the app hands the tick's `dt` in the inputs, and the fluid's
   `TimeStep` smooths it over `fps_smoothing`, or steps fixed at `fixed_fps`. No `fps` or
   `step_fps` field: runtime data stays off the settings.
@@ -240,9 +240,6 @@ The shader loader finds a shader's source by its `.py` module name beside it
 
 ## Open
 
-- `LayerBase.dirty` defaults to `True`. A layer that does not answer the question claims a new
-  frame every tick. No default, so a layer either says it or cannot be asked: a small change of
-  its own.
 - hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
   the pose's motion, a settings field written per tick. A per-tick value on the fluid layer, as the
   eye is, would take it off the settings.

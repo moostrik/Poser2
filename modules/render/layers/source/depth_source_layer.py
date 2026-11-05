@@ -55,7 +55,6 @@ class DepthSourceLayer(LayerBase):
         self._shader: DepthView = DepthView()
         self._projection: tuple[DepthAlignment | None, np.ndarray, np.ndarray] | None = None   # an alignment and what it makes
         self._data_cache: DataCache[CameraFrame] = DataCache[CameraFrame]()
-        self._dirty: bool = False
         self._timestamp: float | None = None     # the capture time of the depth frame it holds
 
     @property
@@ -79,10 +78,6 @@ class DepthSourceLayer(LayerBase):
             return (0.0, 0.0)
         return (1.0 / self._depth.width, 1.0 / self._depth.height)
 
-    @property
-    def dirty(self) -> bool:
-        return self._dirty
-
     def allocate(self, width: int | None = None, height: int | None = None, internal_format: int | None = None) -> None:
         self._align_shader.allocate()
         self._shader.allocate()     # the textures on the first frame, at its size
@@ -96,7 +91,6 @@ class DepthSourceLayer(LayerBase):
         self._shader.deallocate()
 
     def update(self) -> None:
-        self._dirty = False
         capture: "Capture | None" = self._board.get_capture(self._cam_id)
         frame: CameraFrame | None = capture.depth if capture is not None else None
         self._data_cache.set(frame)
@@ -128,4 +122,3 @@ class DepthSourceLayer(LayerBase):
         self._view.begin()
         self._shader.use(self._depth, self._cam_texture, self.settings.near, self.settings.far, self.settings.draw_mode)
         self._view.end()
-        self._dirty = True

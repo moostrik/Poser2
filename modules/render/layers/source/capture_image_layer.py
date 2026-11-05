@@ -22,7 +22,6 @@ class CaptureImageLayer(LayerBase):
         self._board: HasCaptures = board
         self._image: Tensor = Tensor()
         self._data_cache: DataCache["GpuImage"] = DataCache["GpuImage"]()
-        self._dirty: bool = False
         self._timestamp: float | None = None      # the capture time of the image it holds
 
     @property
@@ -34,16 +33,11 @@ class CaptureImageLayer(LayerBase):
         """The capture time of the image it holds (`Capture.timestamp`), None before the first."""
         return self._timestamp
 
-    @property
-    def dirty(self) -> bool:
-        return self._dirty
-
     def deallocate(self) -> None:
         if self._image.allocated:
             self._image.deallocate()
 
     def update(self) -> None:
-        self._dirty = False
         capture: "Capture | None" = self._board.get_capture(self._cam_id)
         gpu_image: "GpuImage | None" = capture.image if capture is not None else None
         self._data_cache.set(gpu_image)
@@ -63,4 +57,3 @@ class CaptureImageLayer(LayerBase):
         self._image.set_tensor(gpu_image.image)
         self._image.update()
         self._timestamp = capture.timestamp
-        self._dirty = True
