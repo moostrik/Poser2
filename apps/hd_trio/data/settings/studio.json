@@ -569,17 +569,8 @@
         "fixed_fps": 60.0,
         "fps_smoothing": 1.0,
         "speed": 1.0,
-        "volume": {
-          "layers": 4,
-          "sim_layers": 4,
-          "spacing": 8.0,
-          "absorption": 4.0,
-          "injection_layer": 1.0,
-          "injection_spread": 0.001,
-          "boundary": "CLOSED"
-        },
         "velocity": {
-          "input_strength": 0.73,
+          "gain":0.73,
           "self_advection": 0.01,
           "fade_time": 31.77,
           "dampen_threshold": 14.91,
@@ -590,7 +581,7 @@
           "viscosity_iter": 20
         },
         "density": {
-          "input_strength": 10.0,
+          "gain":10.0,
           "speed_offset": 0.0,
           "fade_time": 18.0,
           "dampen_threshold": 1.47,
@@ -598,11 +589,11 @@
           "boundary": "OPEN"
         },
         "temperature": {
-          "input_strength": 0.0,
+          "gain":0.0,
           "speed_offset": 0.0,
           "fade_time": 3.0,
           "buoyancy": 0.0,
-          "weight": 0.0,
+          "sink": 0.0,
           "ambient": 0.2,
           "boundary": "CLOSED"
         },

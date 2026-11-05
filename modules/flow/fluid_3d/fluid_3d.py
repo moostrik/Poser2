@@ -27,7 +27,8 @@ import time
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_R16F, GL_R8, GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
 
 from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, Texture2DArray, SwapTexture2DArray, Profiler, GpuTimer
-from ..fluid_2d.fluid_settings import FluidSettings, VolumeSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings, BoundaryMode
+from ..boundary_mode import BoundaryMode
+from .fluid_settings import Fluid3DSettings, VolumeSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings
 from ..shaders import AddBoolean
 from ..flow_util import FlowUtil
 from ..time_step import TimeStep
@@ -85,8 +86,8 @@ class Fluid3D:
         _output_texture:  Texture RGBA16F    (composited from 3D density)
     """
 
-    def __init__(self, settings: FluidSettings | None = None) -> None:
-        self.settings: FluidSettings = settings or FluidSettings()
+    def __init__(self, settings: Fluid3DSettings | None = None) -> None:
+        self.settings: Fluid3DSettings = settings or Fluid3DSettings()
 
         # ---- Simulation dimensions and state ---
         self._simulation_width: int = 0
@@ -175,12 +176,12 @@ class Fluid3D:
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
         # Bind settings actions
-        self.settings.bind(FluidSettings.reset_sim, lambda _: self._request_reset())
+        self.settings.bind(Fluid3DSettings.reset_sim, lambda _: self._request_reset())
         self.settings.volume.bind(VolumeSettings.layers, lambda _: self._request_reallocate())
         self.settings.volume.bind(VolumeSettings.sim_layers, lambda _: self._request_reallocate())
-        self.settings.bind(FluidSettings.width, lambda _: self._request_reallocate())
-        self.settings.bind(FluidSettings.height, lambda _: self._request_reallocate())
-        self.settings.bind(FluidSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
+        self.settings.bind(Fluid3DSettings.width, lambda _: self._request_reallocate())
+        self.settings.bind(Fluid3DSettings.height, lambda _: self._request_reallocate())
+        self.settings.bind(Fluid3DSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
         mark_boundary = lambda _: setattr(self, '_boundary_dirty', True)
         self.settings.density.bind(DensitySettings.boundary, mark_boundary)
         self.settings.temperature.bind(TemperatureSettings.boundary, mark_boundary)
@@ -532,11 +533,11 @@ class Fluid3D:
         with thermal buoyancy at 0.
         """
         temp = self.settings.temperature
-        if temp.buoyancy == 0.0 and temp.weight == 0.0:
+        if temp.buoyancy == 0.0 and temp.sink == 0.0:
             return
 
         sigma = self._dt * self._grid_scale * temp.buoyancy
-        kappa = self._dt * self._grid_scale * temp.weight
+        kappa = self._dt * self._grid_scale * temp.sink
         gravity = (temp.gravity_x, temp.gravity_y, temp.gravity_z)
 
         self._buoyancy_density_shader.use(
@@ -776,7 +777,7 @@ class Fluid3D:
     def add_velocity(self, texture: Texture, strength: float = 1.0, depth: Texture | None = None, depth_channel: int = 0) -> None:
         """Inject the 2D flow as one 3D velocity into the gaussian birth slab.
 
-        (u, v) are the measured flow, gained by velocity.input_strength times
+        (u, v) are the measured flow, gained by velocity.gain times
         velocity.input_x / input_y (the axes' balance, negative inverts); w is
         synthesized from the same flow:
         w = clamp(push * |flow| + squeeze * -div(flow), ±dampen_threshold),
@@ -792,7 +793,7 @@ class Fluid3D:
             texture, self._velocity.texture,
             self.settings.volume.injection_layer,
             self.settings.volume.injection_spread,
-            (strength * vel.input_strength * vel.input_x * dt, strength * vel.input_strength * vel.input_y * dt),
+            (strength * vel.gain * vel.input_x * dt, strength * vel.gain * vel.input_y * dt),
             strength * dt,
             vel.push, vel.squeeze, vel.dampen_threshold,
             depth, depth_channel, vel.depth_mix
@@ -822,11 +823,11 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def add_density(self, texture: Texture, strength: float = 1.0) -> None:
-        """Inject 2D density texture into 3D density volume. Applies settingsdensity.input_strength and delta_time."""
+        """Inject 2D density texture into 3D density volume. Applies settingsdensity.gain and delta_time."""
         if not self._allocated:
             return
         dt = self._dt
-        effective = strength * self.settings.density.input_strength * dt
+        effective = strength * self.settings.density.gain * dt
         self._inject_density_shader.use(
             texture, self._density.texture,
             self.settings.volume.injection_layer,
@@ -854,8 +855,8 @@ class Fluid3D:
                             strength: float = 1.0) -> None:
         """Inject single-channel 2D texture into one RGBA channel of the 3D density volume.
 
-        Uses gaussian depth spread centered at settings.z.injection_layer.
-        Applies settingsdensity.input_strength.
+        Uses gaussian depth spread centered at settings.volume.injection_layer.
+        Applies settingsdensity.gain.
 
         Args:
             texture: 2D source texture (reads .r component)
@@ -865,7 +866,7 @@ class Fluid3D:
         if not self._allocated:
             return
         dt = self._dt
-        effective = strength * self.settings.density.input_strength * dt
+        effective = strength * self.settings.density.gain * dt
         self._inject_density_channel_shader.use(
             texture, self._density.texture,
             self.settings.volume.injection_layer,
@@ -876,11 +877,11 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def add_temperature(self, texture: Texture, strength: float = 1.0) -> None:
-        """Inject 2D temperature texture into 3D temperature volume. Applies settingstemperature.input_strength and delta_time."""
+        """Inject 2D temperature texture into 3D temperature volume. Applies settingstemperature.gain and delta_time."""
         if not self._allocated:
             return
         dt = self._dt
-        effective = strength * self.settings.temperature.input_strength * dt
+        effective = strength * self.settings.temperature.gain * dt
         self._inject_shader.use(
             texture, self._temperature.texture,
             self.settings.volume.injection_layer,

@@ -2,7 +2,7 @@
 
 The flow bridge's velocity as one trail: a flow's 3D velocity in image widths per second, smoothed in
 time and in space. Its output stays in widths per second; how hard it pushes the fluid is the fluid's
-(`input_strength`, `input_x`, `input_y`).
+(`gain`, `input_x`, `input_y`).
 
 Before each step the trail moves with the motion it holds (`advect`): each pixel takes the trail from
 where its own x/y says it came from, so the average follows a moving limb instead of a fixed pixel,

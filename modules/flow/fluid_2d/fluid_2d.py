@@ -26,7 +26,8 @@ from modules.gl import Texture, SwapFbo, Fbo, Profiler
 from .. import FlowUtil
 from ..time_step import TimeStep
 from ..shaders import AddBoolean
-from .fluid_settings import FluidSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings, BoundaryMode
+from ..boundary_mode import BoundaryMode
+from .fluid_settings import Fluid2DSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings
 from .shaders import (
     Advect, Divergence, Gradient,
     JacobiPressure, JacobiPressureCompute, JacobiDiffusion, JacobiDiffusionCompute,
@@ -67,8 +68,8 @@ class Fluid2D:
         buoyancy:         Fbo RG16F
     """
 
-    def __init__(self, settings: FluidSettings | None = None) -> None:
-        self.settings: FluidSettings = settings or FluidSettings()
+    def __init__(self, settings: Fluid2DSettings | None = None) -> None:
+        self.settings: Fluid2DSettings = settings or Fluid2DSettings()
 
         # ---- Simulation dimensions and state ---
         self._simulation_width: int = 0
@@ -133,10 +134,10 @@ class Fluid2D:
         )
 
         # Bind settings actions
-        self.settings.bind(FluidSettings.reset_sim, lambda _: self._request_reset())
-        self.settings.bind(FluidSettings.width, lambda _: self._request_reallocate())
-        self.settings.bind(FluidSettings.height, lambda _: self._request_reallocate())
-        self.settings.bind(FluidSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
+        self.settings.bind(Fluid2DSettings.reset_sim, lambda _: self._request_reset())
+        self.settings.bind(Fluid2DSettings.width, lambda _: self._request_reallocate())
+        self.settings.bind(Fluid2DSettings.height, lambda _: self._request_reallocate())
+        self.settings.bind(Fluid2DSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
         mark_boundary = lambda _: setattr(self, '_boundary_dirty', True)
         self.settings.density.bind(DensitySettings.boundary, mark_boundary)
         self.settings.temperature.bind(TemperatureSettings.boundary, mark_boundary)
@@ -320,7 +321,7 @@ class Fluid2D:
     # ========== Pipeline Steps ==========
 
     def _add_force_to_velocity(self, force: Texture, strength: float = 1.0) -> None:
-        """Add force to velocity in-place (no input_strength or dt scaling)."""
+        """Add force to velocity in-place (no gain or dt scaling)."""
         FlowUtil.add(self._velocity_fbo, force, strength)
 
     def _advect_velocity(self) -> None:
@@ -441,7 +442,7 @@ class Fluid2D:
             return
 
         sigma = self._dt * self._grid_scale * self.settings.temperature.buoyancy
-        kappa = self._dt * self._grid_scale * self.settings.temperature.weight
+        kappa = self._dt * self._grid_scale * self.settings.temperature.sink
 
         self._buoyancy_fbo.begin()
         self._buoyancy_shader.use(
@@ -654,11 +655,11 @@ class Fluid2D:
         FlowUtil.set_region(self._velocity_fbo, texture, x, y, w, h, strength)
 
     def add_velocity(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add to velocity field. Applies settingsvelocity.input_strength and delta_time."""
+        """Add to velocity field. Applies settingsvelocity.gain and delta_time."""
         if not self._allocated:
             return
         dt = self._dt
-        effective = strength * self.settings.velocity.input_strength * dt
+        effective = strength * self.settings.velocity.gain * dt
         FlowUtil.add(self._velocity_fbo, texture, effective)
 
     def add_velocity_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
@@ -693,11 +694,11 @@ class Fluid2D:
         FlowUtil.set_channel_region(self._density_fbo, texture, channel, x, y, w, h, strength)
 
     def add_density(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add to density field. Applies settingsdensity.input_strength and delta_time."""
+        """Add to density field. Applies settingsdensity.gain and delta_time."""
         if not self._allocated:
             return
         dt = self._dt
-        effective = strength * self.settings.density.input_strength * dt
+        effective = strength * self.settings.density.gain * dt
         FlowUtil.add(self._density_fbo, texture, effective)
 
     def add_density_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
@@ -707,11 +708,11 @@ class Fluid2D:
         FlowUtil.add_region(self._density_fbo, texture, x, y, w, h, strength)
 
     def add_density_channel(self, texture: Texture, channel: int, strength: float = 1.0) -> None:
-        """Add single-channel texture to one of the density channels. Applies settingsdensity.input_strength and delta_time."""
+        """Add single-channel texture to one of the density channels. Applies settingsdensity.gain and delta_time."""
         if not self._allocated:
             return
         dt = self._dt
-        effective = strength * self.settings.density.input_strength * dt
+        effective = strength * self.settings.density.gain * dt
         FlowUtil.add_channel(self._density_fbo, texture, channel, effective)
 
     def add_density_channel_region(self, texture: Texture, channel: int, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
@@ -734,11 +735,11 @@ class Fluid2D:
         FlowUtil.set_region(self._temperature_fbo, texture, x, y, w, h, strength)
 
     def add_temperature(self, texture: Texture, strength: float = 1.0) -> None:
-        """Add to temperature field. Applies settingstemperature.input_strength and delta_time."""
+        """Add to temperature field. Applies settingstemperature.gain and delta_time."""
         if not self._allocated:
             return
         dt = self._dt
-        effective = strength * self.settings.temperature.input_strength * dt
+        effective = strength * self.settings.temperature.gain * dt
         FlowUtil.add(self._temperature_fbo, texture, effective)
 
     def add_temperature_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:

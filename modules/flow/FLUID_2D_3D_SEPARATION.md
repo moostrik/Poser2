@@ -3,7 +3,7 @@
 Two app-independent flow systems, each a pipeline of three stages, motion, bridge and fluid: the
 2D flow, a velocity on the image plane, and the 3D flow, a velocity with a component toward the
 camera. Either system takes either kind of camera. An app picks a system and wires its cameras
-to it. This document states the design and the steps that bring the code to it; steps 0 to 3
+to it. This document states the design and the steps that bring the code to it; steps 0 to 5
 have run.
 
 "Code" is what the files show; **(deduction)** marks what is inferred from them.
@@ -211,13 +211,11 @@ The distance between the code on `deep-flow-prep` and the design; the steps clos
 
 | Area          | Code                                                                                                                                                                                                                                                              |
 |---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| fluid         | `fluid_2d/` and `fluid_3d/` share `FluidSettings` (`fluid_2d/fluid_settings.py`); 2D-only fields (`density.dampen_*`) and 3D-only fields (`volume`, `squeeze`, `push`, `depth_mix`, `input_x/y`, `evaporation`, `gravity_*`) sit on both panels and in both presets |
-| fluid layer   | `Fluid3DLayer.sim_engine` swaps `Fluid2D` for `Fluid3D` on one settings object, with `isinstance` branches in `update`; `Fluid2DLayer` is one fluid per camera fed by every camera's flow layer, storing camera i's density in channel i (`Fluid2D.add_density_channel`) and coloring the channels with the track colors at the output (`DensityColorize`), so the 2D system takes at most four cameras |
+| fluid layer   | `Fluid2DLayer` is one fluid per camera fed by every camera's flow layer, storing camera i's density in channel i (`Fluid2D.add_density_channel`) and coloring the channels with the track colors at the output (`DensityColorize`), so the 2D system takes at most four cameras |
 | motion and bridge | one layer holds both stages: `Motion2DLayer` takes its mask as a source layer in the constructor and has no time step; `Motion3DLayer` has seven setters and 26 draw modes mixing the two stages' views; the outputs are `velocity` on one and `smooth_velocity` on the other |
 | optical flow  | `LucasKanadeFlow` holds the x/y solve and the depth track in one class, with `lucas_kanade` and `depth_track` as its settings groups                                                                                                                                 |
 | time step     | the apps write the measured tick rate into the fluid's `fps` field (`_measure_fps` in both `render.py`) and deep_flow reads `step_fps` back to step its motion layer; hd_trio's presets carry both READ fields                                                            |
 | policy        | `Fluid2DLayer` reads the board for each camera's weight (the pose's motion, the cross-camera similarity), the same value on velocity and density, injects temperature at 1, and sets `density.fade_time` from the motion; `Fluid3DLayer` reads the board for `scale_by_motion` and the parallax eye, and the motion layer's settings for `onset.spin` |
-| names         | the two fluids share one settings class, `FluidSettings`, in `fluid_2d/fluid_settings.py`; `fluid_3d.py` imports it from there                                                                                                                                                  |
 | new-frame signal | `LayerBase.dirty` defaults to `True`, so a center view (`CenterCamLayer`, redrawn every tick as the view follows the pose) claims a new frame on every tick; the flow asked it would measure between two ticks holding one camera frame, find no motion and count a one-tick interval. deep_flow therefore maps each view to the source behind it (`FLOW_SOURCES`) and hands the flow the texture from the view and the source for the signal and the stamp |
 
 ## Steps

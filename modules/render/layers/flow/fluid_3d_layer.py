@@ -20,7 +20,7 @@ from modules.board import HasFrames
 from modules.pose import Frame, Similarity, MotionGate, AngleMotion, Points2D, PointLandmark
 
 from modules.settings import Field, BaseSettings, Group
-from modules.flow import Fluid3D, FluidSettings
+from modules.flow import Fluid3D, Fluid3DSettings
 
 from modules.utils import HotReloadMethods
 
@@ -35,7 +35,7 @@ class Fluid3DLayerSettings(BaseSettings):
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
     scale_by_motion: Field[bool] =          Field(True, description="Scale velocity and density by the player's motion; off is full strength")
 
-    fluid    = Group(FluidSettings)
+    fluid    = Group(Fluid3DSettings)
 
 
 class Fluid3DLayer(LayerBase):

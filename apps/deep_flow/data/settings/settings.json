@@ -525,7 +525,7 @@
           "boundary": "CLOSED"
         },
         "velocity": {
-          "input_strength": 1.0,
+          "gain":1.0,
           "input_x": 1.0,
           "input_y": 1.0,
           "squeeze": 0.0,
@@ -541,20 +541,18 @@
           "viscosity_iter": 15
         },
         "density": {
-          "input_strength": 1.0,
+          "gain":1.0,
           "speed_offset": 0.0,
           "fade_time": 60.0,
           "evaporation": 0.05,
-          "dampen_threshold": 2.6,
-          "dampen_time": 3.63,
           "boundary": "CLOSED"
         },
         "temperature": {
-          "input_strength": 1.0,
+          "gain":1.0,
           "speed_offset": 0.0,
           "fade_time": 12.0,
           "buoyancy": 0.0,
-          "weight": 4.0,
+          "sink": 4.0,
           "gravity_x": 0.0,
           "gravity_y": 0.0,
           "gravity_z": 0.0,

@@ -34,7 +34,7 @@ class InjectFlow3D(ComputeShader):
             volume: 3D velocity volume (read-write; u,v,w = .xyz)
             target_layer: Normalized depth [0, 1] — center of injection
             spread: Gaussian sigma in normalized depth units
-            strength_xy: Gain on the measured u and v (strength * input_strength * input_x / input_y * dt)
+            strength_xy: Gain on the measured u and v (strength * gain * input_x / input_y * dt)
             strength_w: Gain on the synthesized component (strength * dt)
             push: W synthesis — gain on |flow| (signed; + = away from viewer)
             squeeze: W synthesis — gain on -divergence (signed)

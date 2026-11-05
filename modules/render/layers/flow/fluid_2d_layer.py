@@ -14,7 +14,7 @@ from modules.board import HasFrames
 from modules.pose import Frame, Similarity, MotionGate, AngleMotion
 
 from modules.settings import Field, BaseSettings, Group
-from modules.flow import Visualizer, VisualizationFieldSettings, Fluid2D, FluidSettings
+from modules.flow import Visualizer, VisualizationFieldSettings, Fluid2D, Fluid2DSettings
 from ...shaders import DensityColorize
 
 from modules.utils import HotReloadMethods
@@ -56,7 +56,7 @@ class Fluid2DLayerSettings(BaseSettings):
     draw_mode: Field[Fluid2DDrawMode] =       Field(Fluid2DDrawMode.DENSITY)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
 
-    fluid: Group[FluidSettings]            = Group(FluidSettings)
+    fluid: Group[Fluid2DSettings]            = Group(Fluid2DSettings)
     visualization: Group[VisualizationFieldSettings]= Group(VisualizationFieldSettings)
 
 
