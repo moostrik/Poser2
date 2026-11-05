@@ -72,6 +72,7 @@ class MonitorLayer(LayerBase):
         self._rendered: bool = False            # this tick's port is drawn into the visualizer or the strip
         self._strip_of: tuple[FlowStage, str] | None = None     # the port the strip plots; another one restarts it
         self._port: Port | None = None          # the port rendered last
+        self._image: Texture | None = None      # the port's texture itself, drawn as the picture it is
 
     def set_input(self, input: MonitorInput) -> None:
         """Every stage's ports, for the next draw."""
@@ -79,9 +80,11 @@ class MonitorLayer(LayerBase):
 
     @property
     def texture(self) -> Texture:
-        """The port as drawn last: the strip, or the visualizer's output."""
+        """The port as drawn last: the strip, the picture itself, or the visualizer's output."""
         if self.settings.mode == MonitorMode.STRIP:
             return self._strip.texture
+        if self._image is not None:
+            return self._image
         return self._visualizer.texture
 
     # ========== Lifecycle ==========
@@ -119,6 +122,7 @@ class MonitorLayer(LayerBase):
     def _render(self) -> None:
         port: Port | None = self._pick()
         self._port = port
+        self._image = None
         if port is None:
             return
         mode: MonitorMode = self.settings.mode
@@ -130,7 +134,7 @@ class MonitorLayer(LayerBase):
                 self._strip_of = shown
             self._strip.update(port.texture, self.settings.visualization.strip_scale)
         elif mode == MonitorMode.IMAGE or (mode == MonitorMode.AUTO and port.kind == TextureKind.IMAGE):
-            self._visualizer.process(port.texture)
+            self._image = port.texture          # whatever its channels: arrows come from the arrows mode only
         elif mode == MonitorMode.ARROWS or (mode == MonitorMode.AUTO and port.kind == TextureKind.VELOCITY):
             self._visualizer.process(port.texture, True)
         else:
