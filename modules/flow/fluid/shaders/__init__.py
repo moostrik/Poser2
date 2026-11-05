@@ -10,6 +10,5 @@ from .jacobi_diffusion_compute import JacobiDiffusionCompute
 from .vorticity_curl import VorticityCurl
 from .vorticity_force import VorticityForce
 from .buoyancy import Buoyancy
-from .add_boolean import AddBoolean
 
 

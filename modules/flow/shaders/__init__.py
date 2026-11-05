@@ -1,6 +1,7 @@
 """Shared flow shaders — used across bridge, fluid, and visualization layers."""
 
 from .add import Add
+from .add_boolean import AddBoolean
 from .add_region import AddRegion
 from .blit import Blit
 from .channel_add import ChannelAdd

@@ -25,11 +25,12 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_R16F, GL_R8, GL_R
 from modules.gl import Texture, SwapFbo, Fbo, Profiler
 from .. import FlowUtil
 from ..time_step import TimeStep
+from ..shaders import AddBoolean
 from .fluid_settings import FluidSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings, BoundaryMode
 from .shaders import (
     Advect, Divergence, Gradient,
     JacobiPressure, JacobiPressureCompute, JacobiDiffusion, JacobiDiffusionCompute,
-    VorticityCurl, VorticityForce, Buoyancy, AddBoolean
+    VorticityCurl, VorticityForce, Buoyancy
 )
 
 from modules.utils import HotReloadMethods
