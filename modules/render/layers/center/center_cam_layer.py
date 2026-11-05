@@ -2,7 +2,7 @@
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from ..layer_base import LayerBase
+from ..layer_base import LayerBase, HasCaptureTime
 from .center_geometry import CenterGeometry
 from ...shaders import Blend, DrawRoi, MaskApply
 
@@ -21,13 +21,15 @@ class CenterCamLayer(LayerBase):
 
     Reads anchor geometry from CenterGeometry and applies DrawRoi shader
     followed by temporal blending. Optionally applies mask texture for compositing.
+    `source` is the layer whose texture it draws; `timestamp` is that frame's capture time, forwarded.
     """
 
-    def __init__(self, cam_id: int, geometry: CenterGeometry, cam_texture: Texture, mask_texture: Texture, settings: CenterCamLayerSettings) -> None:
+    def __init__(self, cam_id: int, geometry: CenterGeometry, source: LayerBase, mask_texture: Texture, settings: CenterCamLayerSettings) -> None:
         self._cam_id: int = cam_id
         self._geometry: CenterGeometry = geometry
-        self._cam_texture: Texture = cam_texture
+        self._source: LayerBase = source
         self._mask_texture: Texture = mask_texture
+        self._timestamp: float | None = None     # the capture time of the frame drawn last
 
         # Configuration
         self.settings: CenterCamLayerSettings = settings or CenterCamLayerSettings()
@@ -47,6 +49,11 @@ class CenterCamLayer(LayerBase):
     def texture(self) -> Texture:
         """Output texture for external use."""
         return self._output_fbo        # the SwapFbo itself: always its newest image, safe to keep
+
+    @property
+    def timestamp(self) -> float | None:
+        """The capture time of the camera frame the view holds, its source's; None without one."""
+        return self._timestamp
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._cam_fbo.allocate(width, height, internal_format)
@@ -73,18 +80,21 @@ class CenterCamLayer(LayerBase):
             self._cam_blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
             if self._mask_texture and self.settings.use_mask:
                 self._masked_fbo.clear(0.0, 0.0, 0.0, 0.0)
+            self._timestamp = None
             return
 
-        if not self._geometry.ready or not self._cam_texture.allocated:
+        source: Texture = self._source.texture
+        if not self._geometry.ready or not source.allocated:
             return
+        self._timestamp = self._source.timestamp if isinstance(self._source, HasCaptureTime) else None
 
         # Render camera image with ROI from anchor calculator. Cleared first: a source with
         # transparent pixels (depth) must not leave the last frame showing through them.
-        cam_aspect: float = self._cam_texture.width / self._cam_texture.height
+        cam_aspect: float = source.width / source.height
         self._cam_fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._cam_fbo.begin()
         self._roi_shader.use(
-            self._cam_texture,
+            source,
             self._geometry.image_geometry.crop_roi,
             self._geometry.image_geometry.rotation,
             self._geometry.image_geometry.rotation_center,

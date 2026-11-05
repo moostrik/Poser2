@@ -2,7 +2,7 @@
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from ..layer_base import LayerBase
+from ..layer_base import LayerBase, HasCaptureTime
 from .center_geometry import CenterGeometry, SourceSpace
 from ...shaders import DrawRoi, Blend, MaskApply, MaskMultiply, CelShade, HueShift
 from modules.gl import Fbo, SwapFbo, Texture, Style, shaders
@@ -35,14 +35,16 @@ class CenterForegroundLayer(LayerBase):
     `space` says whether the foreground is on the pose's crop or on the camera image. With
     `premultiply` the source is a whole image, and the mask multiplies it right after the cut-out, so
     the look starts from the player's colors on black as from a masked source (RVM's is). Optionally
-    applies mask texture as alpha for compositing.
+    applies mask texture as alpha for compositing. `source` is the layer whose texture it draws;
+    `timestamp` is that frame's capture time, forwarded.
     """
 
-    def __init__(self, cam_id: int, geometry: CenterGeometry, foreground_texture: Texture, mask_texture: Texture, space: SourceSpace,
+    def __init__(self, cam_id: int, geometry: CenterGeometry, source: LayerBase, mask_texture: Texture, space: SourceSpace,
                  premultiply: bool, settings: CenterForegroundLayerSettings, color_settings: ColorSettings) -> None:
         self._cam_id: int = cam_id
         self._geometry: CenterGeometry = geometry
-        self._foreground_texture: Texture = foreground_texture
+        self._source: LayerBase = source
+        self._timestamp: float | None = None     # the capture time of the frame drawn last
         self._space: SourceSpace = space
         self._premultiply: bool = premultiply
         self._mask_texture: Texture = mask_texture
@@ -72,6 +74,11 @@ class CenterForegroundLayer(LayerBase):
     def texture(self) -> Texture:
         """Output texture for external use."""
         return self._effect_fbo        # the SwapFbo itself: always its newest image, safe to keep
+
+    @property
+    def timestamp(self) -> float | None:
+        """The capture time of the camera frame the foreground it holds was made from, its source's; None without one."""
+        return self._timestamp
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._roi_fbo.allocate(width, height, internal_format)
@@ -109,16 +116,19 @@ class CenterForegroundLayer(LayerBase):
             self._blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
             self._blend_fbo.swap()
             self._blend_fbo.clear(0.0, 0.0, 0.0, 0.0)
+            self._timestamp = None
 
-        if not self._geometry.ready or not self._foreground_texture.allocated:
+        source: Texture = self._source.texture
+        if not self._geometry.ready or not source.allocated:
             return
+        self._timestamp = self._source.timestamp if isinstance(self._source, HasCaptureTime) else None
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         # Render foreground with its ROI
         self._roi_fbo.begin()
-        self._roi_shader.use(self._foreground_texture, *self._geometry.source_roi(self._space, self._foreground_texture))
+        self._roi_shader.use(source, *self._geometry.source_roi(self._space, source))
         self._roi_fbo.end()
 
         # A whole image: the player's colors on black, as a masked source arrives

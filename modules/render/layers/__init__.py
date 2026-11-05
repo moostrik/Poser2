@@ -1,4 +1,4 @@
-from .layer_base import LayerBase, DataCache
+from .layer_base import LayerBase, DataCache, HasCaptureTime
 
 from .cam import      BBoxRenderer, BBoxRendererSettings, CameraReadingsLayer, CropLayer, CropLayerSettings, \
                       PoseRenderer, PoseRendererSettings, PoseCompositor, PoseCompositorSettings, \
@@ -11,7 +11,7 @@ from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOf
                       TimeSeriesLayer, TimeSeriesLayerSettings, \
                       FeatureFrameLayer, FeatureWindowLayer, MotionTimeRenderer, MotionTimeRendererSettings, \
                       PoseLineLayer, PoseLineLayerSettings
-from .flow import     MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, HasCaptureTime, \
+from .flow import     MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, \
                       BridgeInput, BridgeOutput, BridgeLayer, BridgeLayerSettings, \
                       Injection, FluidInput, FluidLayer, FluidLayerSettings, \
                       Motion2DLayer, Motion2DLayerSettings, Motion2DDrawMode, \

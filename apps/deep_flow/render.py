@@ -53,20 +53,6 @@ LARGE_LAYERS: list[Layers] = [
     Layers.composite,
 ]
 
-# The source layer that says when a center layer has a new frame; the foreground's is the mask source's (`flow_sources`)
-FLOW_SOURCES: dict[Layers, Layers] = {
-    Layers.center_cam:        Layers.cam_image,
-    Layers.center_capture:    Layers.capture_image,
-    Layers.center_depth:      Layers.cam_depth,
-    Layers.center_mask:       Layers.cam_mask,
-}
-
-
-def flow_sources(mask_source: MaskSource) -> dict[Layers, Layers]:
-    """FLOW_SOURCES with the foreground's source: RVM's foreground layer, or the capture's image."""
-    foreground: Layers = Layers.cam_foreground if mask_source == MaskSource.RVM else Layers.capture_image
-    return {**FLOW_SOURCES, Layers.center_foreground: foreground}
-
 OUTPUT_WIDTH: int = 1080
 OUTPUT_HEIGHT: int = 1920
 
@@ -93,7 +79,6 @@ class DeepFlowRender(RenderBase):
         self.max_players: int = max_players
         self.num_cams: int = num_cams
         self.settings: RenderSettings = settings
-        self._flow_sources: dict[Layers, Layers] = flow_sources(mask_source)
 
         self.board: RenderBoard = board
 
@@ -121,24 +106,24 @@ class DeepFlowRender(RenderBase):
 
             # The player's mask and the foreground's source, from the mask source chosen at start-up
             cam_mask: ls.LayerBase
-            foreground_source: Texture
+            foreground_source: ls.LayerBase
             if depth_source:
                 cam_mask = self.L[Layers.cam_mask][i] =     ls.DepthMaskLayer(      cam_depth)
-                foreground_source = capture_image.texture   # masked in the center view (`premultiply`)
+                foreground_source = capture_image           # masked in the center view (`premultiply`)
             else:
                 cam_mask = self.L[Layers.cam_mask][i] =     ls.MaskSourceLayer(     i, self.board)
                 cam_foreground = self.L[Layers.cam_foreground][i] = ls.ForegroundSourceLayer(i, self.board)
-                foreground_source = cam_foreground.texture  # RVM's, masked already
+                foreground_source = cam_foreground          # RVM's, masked already
 
             tracker_compositor = self.L[Layers.tracker][i] = ls.TrackerCompositor(  i, self.board,   cam_image.texture,          settings.preview.tracker,   settings.colors)
             pose_compositor = self.L[Layers.pose][i] =      ls.PoseCompositor(      i, self.board,   cam_image.texture, cam_crop, settings.preview.pose,      settings.colors)
 
             # placed by the pose of the capture it shows, so view, image and depth are one moment
             center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, cast(HasFrames, CapturePoses(self.board)), cam_image.texture, settings.center.geometry, fov)
-            center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask.texture,       space, settings.center.mask)
+            center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask,               space, settings.center.mask)
             cmt[i] = center_mask.texture
-            center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image.texture,  cmt[i], settings.center.cam)
-            center_capture = self.L[Layers.center_capture][i] = ls.CenterCamLayer(  i, center_geometry, capture_image.texture, cmt[i], settings.center.capture)
+            center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image,          cmt[i], settings.center.cam)
+            center_capture = self.L[Layers.center_capture][i] = ls.CenterCamLayer(  i, center_geometry, capture_image,      cmt[i], settings.center.capture)
             self.L[Layers.center_depth][i] =                ls.CenterDepthLayer(    i, center_geometry, cam_depth, center_capture, cmt[i], settings.center.depth, settings.depth)
             center_foreground = self.L[Layers.center_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, foreground_source, cmt[i], space, depth_source,
                                                                                                 settings.center.foreground, settings.colors)
@@ -280,7 +265,6 @@ class DeepFlowRender(RenderBase):
         a bridge input per camera, a fluid input per fluid with one injection per bridge, at its weight."""
         inputs: FlowInputSettings = self.settings.inputs
         dt: float = self._dt
-        source_key: Layers = self._flow_sources.get(inputs.motion_image, inputs.motion_image)
         bridges: dict[int, ls.Bridge3DLayer] = {i: cast(ls.Bridge3DLayer, layer) for i, layer in self.L[Layers.bridge].items()}
 
         for i, _motion in self.L[Layers.motion].items():
@@ -288,8 +272,7 @@ class DeepFlowRender(RenderBase):
             image: ls.LayerBase | None = self._layer(inputs.motion_image, i)
             if image is None or i not in bridges:
                 continue
-            source: ls.LayerBase | None = self._layer(source_key, i)
-            timestamp: float | None = source.timestamp if isinstance(source, ls.HasCaptureTime) else None
+            timestamp: float | None = image.timestamp if isinstance(image, ls.HasCaptureTime) else None
             color: ls.LayerBase | None = self._layer(inputs.bridge_image, i)
             mask_layer: ls.LayerBase | None = self._layer(inputs.mask, i)
             mask: Texture | None = mask_layer.texture if mask_layer is not None else None

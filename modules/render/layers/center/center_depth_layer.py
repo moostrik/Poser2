@@ -43,11 +43,17 @@ class CenterDepthLayer(LayerBase):
         self._view_shader: shaders.DepthView = shaders.DepthView()     # the depth as a picture
         self._mask_shader: MaskApply = MaskApply()
         self._output: Fbo = self._view
+        self._timestamp: float | None = None     # the capture time of the depth frame drawn last
 
     @property
     def depth(self) -> Texture:
         """Metres in red, unmasked; 0 where there is no depth."""
         return self._depth
+
+    @property
+    def timestamp(self) -> float | None:
+        """The capture time of the depth frame the view holds, its source's; None without one."""
+        return self._timestamp
 
     @property
     def depth_view(self) -> DepthView:
@@ -80,10 +86,12 @@ class CenterDepthLayer(LayerBase):
             self._depth.clear()
             self._view.clear()
             self._masked.clear()
+            self._timestamp = None
             return
         source: Texture = self._depth_source.depth
         if not self._geometry.ready or not source.allocated:
             return
+        self._timestamp = self._depth_source.timestamp
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)

@@ -1,4 +1,4 @@
-from .motion_layer import       MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, HasCaptureTime
+from .motion_layer import       MotionInput, MotionOutput, MotionLayer, MotionLayerSettings
 from .bridge_layer import       BridgeInput, BridgeOutput, BridgeLayer, BridgeLayerSettings
 from .fluid_layer import        Injection, FluidInput, FluidLayer, FluidLayerSettings
 from .motion_2d_layer import    Motion2DLayer, Motion2DLayerSettings, Motion2DDrawMode

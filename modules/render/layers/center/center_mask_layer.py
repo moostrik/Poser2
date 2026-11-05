@@ -5,7 +5,7 @@ from OpenGL.GL import GL_R16F
 
 # Local application imports
 from modules.settings import Field, BaseSettings
-from ..layer_base import LayerBase
+from ..layer_base import LayerBase, HasCaptureTime
 from .center_geometry import CenterGeometry, SourceSpace
 from ...shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur, MaskDilate, MaskErode
 from modules.gl import Fbo, SwapFbo, Texture, Style
@@ -24,13 +24,15 @@ class CenterMaskLayerSettings(BaseSettings):
 
 class CenterMaskLayer(LayerBase):
     """Renders mask image cropped and rotated with temporal blending and blur. `space` says whether
-    the mask is on the pose's crop or on the camera image."""
+    the mask is on the pose's crop or on the camera image. `source` is the layer whose texture it
+    draws; `timestamp` is that frame's capture time, forwarded."""
 
-    def __init__(self, cam_id: int, geometry: CenterGeometry, mask_texture: Texture, space: SourceSpace, settings: CenterMaskLayerSettings | None = None) -> None:
+    def __init__(self, cam_id: int, geometry: CenterGeometry, source: LayerBase, space: SourceSpace, settings: CenterMaskLayerSettings | None = None) -> None:
         self._cam_id: int = cam_id
         self._geometry: CenterGeometry = geometry
-        self._mask_src: Texture = mask_texture
+        self._source: LayerBase = source
         self._space: SourceSpace = space
+        self._timestamp: float | None = None     # the capture time of the frame drawn last
 
         # Configuration
         self.settings: CenterMaskLayerSettings = settings or CenterMaskLayerSettings()
@@ -53,6 +55,11 @@ class CenterMaskLayer(LayerBase):
     def texture(self) -> Texture:
         """Output texture for external use."""
         return self._mask_fbo
+
+    @property
+    def timestamp(self) -> float | None:
+        """The capture time of the camera frame the mask it holds was made from, its source's; None without one."""
+        return self._timestamp
 
     def allocate(self, width: int, height: int, internal_format: int) -> None:
         self._roi_fbo.allocate(width, height, GL_R16F)
@@ -86,17 +93,20 @@ class CenterMaskLayer(LayerBase):
             self._blend_fbo.clear_all()
             self._mask_blur_fbo.clear_all()
             self._mask_fbo.clear()
+            self._timestamp = None
             return
 
-        if not self._geometry.ready or not self._mask_src.allocated:
+        source: Texture = self._source.texture
+        if not self._geometry.ready or not source.allocated:
             return
+        self._timestamp = self._source.timestamp if isinstance(self._source, HasCaptureTime) else None
 
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
 
         # Render ROI to temp buffer
         self._roi_fbo.begin()
-        self._roi_shader.use(self._mask_src, *self._geometry.source_roi(self._space, self._mask_src))
+        self._roi_shader.use(source, *self._geometry.source_roi(self._space, source))
         self._roi_fbo.end()
 
         # Temporal blending

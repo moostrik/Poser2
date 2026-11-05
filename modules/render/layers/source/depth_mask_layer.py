@@ -18,10 +18,16 @@ class DepthMaskLayer(LayerBase):
         self._fbo: Fbo = Fbo()
         self._shader: DepthMask = DepthMask()
         self._dirty: bool = False
+        self._timestamp: float | None = None     # the capture time of the depth frame the mask is cut from
 
     @property
     def texture(self) -> Texture:
         return self._fbo
+
+    @property
+    def timestamp(self) -> float | None:
+        """The capture time of the depth frame the mask it holds is cut from, the depth source's; None before the first."""
+        return self._timestamp
 
     @property
     def dirty(self) -> bool:
@@ -48,4 +54,5 @@ class DepthMaskLayer(LayerBase):
         self._shader.use(depth, self._depth.settings.near, self._depth.settings.far)
         self._fbo.end()
         Style.pop_style()
+        self._timestamp = self._depth.timestamp
         self._dirty = True

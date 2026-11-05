@@ -11,7 +11,6 @@ give (`frame_interval`), and visualizes every tick."""
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 import math
-from typing import Protocol, runtime_checkable
 
 from modules.gl import Texture, Style, Blit
 from modules.flow import DepthView, Visualizer, VisualizationFieldSettings
@@ -42,13 +41,6 @@ def frame_interval(timestamp: float | None, last: float | None, period: float | 
     low, high = FRAME_PERIOD_BAND
     gap = min(max(gap, low * period), high * period)
     return gap, period + FRAME_PERIOD_WEIGHT * (gap - period)
-
-
-@runtime_checkable
-class HasCaptureTime(Protocol):
-    """A layer that keeps the capture time of the camera frame it holds."""
-    @property
-    def timestamp(self) -> float | None: ...
 
 
 @dataclass

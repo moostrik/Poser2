@@ -22,10 +22,16 @@ class ForegroundSourceLayer(LayerBase):
         self._cuda_image: Tensor = Tensor(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         self._data_cache: DataCache[torch.Tensor]= DataCache[torch.Tensor]()
         self._dirty: bool = False
+        self._timestamp: float | None = None     # the capture time of the frame the foreground was made from
 
     @property
     def texture(self) -> Texture:
         return self._cuda_image.texture
+
+    @property
+    def timestamp(self) -> float | None:
+        """The capture time of the camera frame the foreground it holds was made from (`segmentation.Image.timestamp`), None before the first."""
+        return self._timestamp
 
     @property
     def dirty(self) -> bool:
@@ -42,10 +48,12 @@ class ForegroundSourceLayer(LayerBase):
 
         if self._data_cache.lost:
             self._cuda_image.clear()
+            self._timestamp = None
 
-        if self._data_cache.idle or foreground is None:
+        if self._data_cache.idle or foreground is None or seg_image is None:
             return
 
         self._cuda_image.set_tensor(foreground)
         self._cuda_image.update()
+        self._timestamp = seg_image.timestamp
         self._dirty = True

@@ -56,10 +56,16 @@ class DepthSourceLayer(LayerBase):
         self._projection: tuple[DepthAlignment | None, np.ndarray, np.ndarray] | None = None   # an alignment and what it makes
         self._data_cache: DataCache[CameraFrame] = DataCache[CameraFrame]()
         self._dirty: bool = False
+        self._timestamp: float | None = None     # the capture time of the depth frame it holds
 
     @property
     def texture(self) -> Texture:
         return self._view
+
+    @property
+    def timestamp(self) -> float | None:
+        """The capture time of the depth frame it holds (`CameraFrame.timestamp`), None before the first."""
+        return self._timestamp
 
     @property
     def depth(self) -> Texture:
@@ -97,10 +103,12 @@ class DepthSourceLayer(LayerBase):
 
         if self._data_cache.lost:
             self._view.clear()
+            self._timestamp = None
 
         if self._data_cache.idle or frame is None:
             return
 
+        self._timestamp = frame.timestamp
         self._source.set_image(depth_metres(frame.image))
         self._source.update()
         size: tuple[int, int] = (frame.image.shape[1], frame.image.shape[0])

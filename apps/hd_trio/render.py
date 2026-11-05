@@ -85,11 +85,10 @@ class HDTrioRender(RenderBase):
         self._intro_color_proxy = FixedColorProxy(settings.intro_sequence)
         self._intro_geometries: dict[int, ls.CenterGeometry] = {}
 
-        self._mask_sources: dict[int, ls.MaskSourceLayer] = {}      # each camera's mask, with the capture time of its frame
         cmt: dict[int, Texture] = {}
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.board)
-            cam_mask =      self.L[Layers.cam_mask][i] =    self._mask_sources[i] = ls.MaskSourceLayer(i, self.board)
+            cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.board)
             cam_foreground = self.L[Layers.cam_foreground][i] = ls.ForegroundSourceLayer(i, self.board)
             cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.board)
 
@@ -98,10 +97,10 @@ class HDTrioRender(RenderBase):
             self.L[Layers.cam_readings][i] =                 ls.CameraReadingsLayer( cameras[i], camera_check)
 
             center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, self.board,      cam_image.texture,          settings.center.geometry)
-            center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask.texture,       ls.SourceSpace.CROP, settings.center.mask)
+            center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask,               ls.SourceSpace.CROP, settings.center.mask)
             cmt[i] = center_mask.texture
-            center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image.texture,  cmt[i], settings.center.cam)
-            center_foreground = self.L[Layers.center_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, cam_foreground.texture, cmt[i], ls.SourceSpace.CROP, False, settings.center.foreground, settings.colors)
+            center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image,          cmt[i], settings.center.cam)
+            center_foreground = self.L[Layers.center_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, cam_foreground, cmt[i], ls.SourceSpace.CROP, False, settings.center.foreground, settings.colors)
             center_pose =   self.L[Layers.center_pose][i] = ls.CenterPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
 
             intro_geometry = self._intro_geometries[i] =     ls.CenterGeometry(      i, cast(HasFrames, self._intro_proxy), cam_image.texture, settings.center.geometry)
@@ -201,7 +200,8 @@ class HDTrioRender(RenderBase):
             motion = cast(ls.Motion2DLayer, _motion)
             if i not in bridges:
                 continue
-            motion.set_input(ls.MotionInput(self.L[Layers.center_mask][i].texture, self._mask_sources[i].timestamp, dt))
+            mask_view: ls.LayerBase = self.L[Layers.center_mask][i]
+            motion.set_input(ls.MotionInput(mask_view.texture, mask_view.timestamp if isinstance(mask_view, ls.HasCaptureTime) else None, dt))
             color: Color = colors[i % len(colors)]
             bridges[i].set_input(ls.BridgeInput(motion.output.velocity, dt, color=(color.r, color.g, color.b)))
 

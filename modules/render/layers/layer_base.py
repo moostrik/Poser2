@@ -1,10 +1,18 @@
 # Standard library imports
 from abc import ABC, abstractmethod
-from typing import TypeVar, Generic
+from typing import TypeVar, Generic, Protocol, runtime_checkable
 
 # Local application imports
 from modules.utils import Rect
 from modules.gl import Texture, Blit
+
+
+@runtime_checkable
+class HasCaptureTime(Protocol):
+    """A layer that keeps the capture time of the camera frame its texture holds: a source from the
+    board, or a view that forwards its source's."""
+    @property
+    def timestamp(self) -> float | None: ...
 
 
 class LayerBase(ABC):
