@@ -17,6 +17,7 @@ from .optical import DepthVelocity, catch_up_share, color_motion, filter_depth_s
 from .bridge import     bridge_2d, DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
                         BlurPosition, KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES, decay_weight, project, stop_gate, hold_release, drop, fill_reservoir, advect, \
                         VelocityTrailBridge, VelocityTrailBridgeSettings, velocity_trail, \
+                        VelocityEventBridge, VelocityEventBridgeSettings, velocity_event, event_velocity, \
                         TemperatureBridge, TemperatureBridgeSettings
 
 # Visualization

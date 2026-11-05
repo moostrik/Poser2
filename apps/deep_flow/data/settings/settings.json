@@ -28,7 +28,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 2033,
+        "iso": 1126,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -40,7 +40,7 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 3888,
+        "balance": 4726,
         "auto_balance": true,
         "auto_balance_lock": false,
         "brightness": 0,
@@ -419,10 +419,10 @@
         "y_gain": 1.0,
         "z_gain": 1.0,
         "lucas_kanade": {
-          "levels": 5,
+          "levels": 4,
           "window": "SEVEN",
           "damping": 0.03,
-          "same_surface": false,
+          "same_surface": true,
           "threshold": 0.5
         },
         "depth_track": {
@@ -430,25 +430,25 @@
           "window": "SEVEN",
           "tolerance": 0.2,
           "smooth": 50.0,
-          "xy_smooth": false,
+          "xy_smooth": true,
           "catch_up": 8.0,
           "dead_zone": 0.02,
           "threshold": 1.0
         }
       },
       "flow_bridge": {
-        "method": "KINETIC",
+        "method": "VELOCITY_TRAIL",
         "velocity_trail": {
           "advect": 1.0,
           "attack": 1.0,
           "smooth": 1.0,
-          "blur_radius": 4.43,
-          "blur_steps": 1
+          "blur_radius": 4.0,
+          "blur_steps": 4
         },
         "kinetic": {
-          "scale_x": 10.0,
-          "scale_y": 10.0,
-          "scale_z": 10.0,
+          "scale_x": 1.0,
+          "scale_y": 1.0,
+          "scale_z": 1.0,
           "trails": {
             "fast_smooth": 25.0,
             "slow_smooth": 150.0,
@@ -474,8 +474,8 @@
           }
         },
         "density": {
-          "saturation": 1.02,
-          "brightness": 1.88
+          "saturation": 1.0,
+          "brightness": 1.0
         },
         "temperature": {
           "scale": 0.5
@@ -494,7 +494,7 @@
     },
     "fluid3d": {
       "max_players": 1,
-      "sim_engine": "FLUID_3D",
+      "sim_engine": "FLUID_2D",
       "blend_mode": "ADD",
       "scale_by_motion": true,
       "fluid_flow": {

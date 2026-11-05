@@ -5,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import displacement_velocity, filter_displacement, lucas_kanade, threshold_displacement, track_depth, track_weights, velocity_trail
+from modules.flow import displacement_velocity, filter_displacement, lucas_kanade, threshold_displacement, track_depth, track_weights, velocity_trail, velocity_event, event_velocity
 
 SIZE: int = 64
 
@@ -149,6 +149,34 @@ class VelocityTrailTest(unittest.TestCase):
     def test_a_falling_xy_follows_the_release(self) -> None:
         stepped = velocity_trail(np.array([[1.0, 0.0, 0.0]]), np.zeros((1, 3)), 0.1, 0.9)
         np.testing.assert_allclose(stepped, [[0.9, 0.0, 0.0]])
+
+
+class VelocityEventTest(unittest.TestCase):
+    STILL = np.zeros((1, 3))
+
+    def test_a_speeding_up_motion_is_a_start_not_a_stop(self) -> None:
+        fast, slow = np.array([[1.0, 0.0, 0.0]]), np.array([[0.25, 0.0, 0.0]])
+        np.testing.assert_allclose(velocity_event(fast, slow, np.zeros(1), 1.0, 0.0), [0.75])
+        np.testing.assert_allclose(velocity_event(fast, slow, np.zeros(1), -1.0, 0.0), [0.0])
+
+    def test_a_slowing_motion_is_a_stop_along_the_motion_it_ended(self) -> None:
+        fast, slow = self.STILL, np.array([[0.0, 0.5, 0.0]])
+        stop = velocity_event(fast, slow, np.zeros(1), -1.0, 0.0)
+        np.testing.assert_allclose(stop, [0.5])
+        np.testing.assert_allclose(event_velocity(slow, stop), [[0.0, 0.5, 0.0]])
+
+    def test_a_steady_motion_has_no_event(self) -> None:
+        moving = np.array([[0.3, -0.4, 0.0]])
+        for sign in (1.0, -1.0):
+            np.testing.assert_allclose(velocity_event(moving, moving, np.zeros(1), sign, 0.0), [0.0])
+
+    def test_a_held_event_decays_and_a_larger_one_takes_over(self) -> None:
+        np.testing.assert_allclose(velocity_event(self.STILL, self.STILL, np.array([1.0]), -1.0, 0.5), [0.5])
+        fast, slow = self.STILL, np.array([[2.0, 0.0, 0.0]])
+        np.testing.assert_allclose(velocity_event(fast, slow, np.array([1.0]), -1.0, 0.5), [2.0])
+
+    def test_the_gate_scales_a_stop(self) -> None:
+        np.testing.assert_allclose(velocity_event(self.STILL, np.array([[1.0, 0.0, 0.0]]), np.zeros(1), -1.0, 0.0, 0.25), [0.25])
 
 
 if __name__ == '__main__':

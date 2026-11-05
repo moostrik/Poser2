@@ -158,6 +158,26 @@ A setting left out of a row leaves that measure as in the preset rows above.
 | kinetic scale_z 0 | amount | 0.005 | 0.042 | 0.163 | 3.91 | 31.1 | | |
 | kinetic scale_z 0 | onset | 0.003 | 0.003 | 0.032 | 10.70 | 11.0 | | |
 
+### Stop amount from the trail, standmoves
+
+`stop` = max(0, |trail x/y| − |flow x/y|) per pixel, from the read-back trail and flow velocities (numpy, `scripts/bridge_compare.py`). Trail as the preset (advect 1, attack 1 ms, smooth 1.0 s, blur 4.43) unless named; kinetic with `release.stop_gate` 1 and `scale_z` 0, its `amount` being its emission. One run, standmoves, once per flow frame. Burst: s after a move's end until under 20% of that stop's peak. Ring: the 4–24 px outside the mask over the body, in the stop windows.
+
+| Side | Measure | Noise | Slow | Fast | Stop | Stop / fast | Burst s | Ring | GPU ms |
+|---|---|---|---|---|---|---|---|---|---|
+| trail preset | amount (speed) | 0.036 | 0.084 | 0.150 | 0.131 | 0.88 | 2.38 | 0.46 | 1.43 |
+| trail preset | stop | 0.032 | 0.043 | 0.068 | 0.110 | 1.63 | 1.42 | 0.41 | |
+| trail smooth 0.5 | stop | 0.006 | 0.029 | 0.053 | 0.073 | 1.38 | 0.67 | 0.30 | 1.48 |
+| trail blur 0 | stop | 0.021 | 0.043 | 0.076 | 0.105 | 1.40 | 1.42 | 0.18 | 0.71 |
+| trail smooth 0.5, blur 0 | stop | 0.005 | 0.030 | 0.060 | 0.071 | 1.19 | 0.69 | 0.16 | 0.71 |
+| kinetic stop_gate 1, scale_z 0 | amount (emission) | 0.000 | 0.002 | 0.004 | 0.012 | 2.92 | 0.24 | 0.18 | 1.98 |
+
+- The stop picks out stops better than the speed: 1.63 against 0.88 on the preset trail. The kinetic bridge with its stop gate stays higher at 2.92, with a far shorter burst (0.24 s).
+- The stop is not 0 while moving: during fast moves it is about half the trail's speed (0.068 vs 0.139). Inferred: the coast after each slowdown inside a move, and advect and blur carrying the trail where the flow has none.
+- The burst follows `smooth`: 1.42 s at 1.0, 0.67 s at 0.5.
+- The ring follows the blur: 0.41 with blur 4.43, 0.18 without, as low as the kinetic bridge's.
+- Noise at smooth 1.0 is likely still the trail letting go of the loop's start, which 1.5 s of settling doesn't cover at a 1 s smooth (inferred); at 0.5 it is 0.006.
+- Blur 4.43 doubles the trail's GPU time (0.71 → 1.43 ms).
+
 ## Open questions
 
 - **Curl and spin:** untested. They need a clip with a turning hand; the 20261031 Circle_Hand clip isn't on this machine.

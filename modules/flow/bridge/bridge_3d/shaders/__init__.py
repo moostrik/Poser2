@@ -13,5 +13,6 @@ from .kinetic_strip_shader import KineticStripShader
 from .kinetic_summary import KineticSummary
 from .kinetic_velocity import KineticVelocity
 from .scale_velocity import ScaleVelocity
+from .velocity_event import Event, VelocityEvent
 from .velocity_trail import VelocityTrail
 from .temperature_bridge_shader import TemperatureBridgeShader
