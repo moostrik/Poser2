@@ -67,8 +67,8 @@ class Layers(IntEnum):
     data_time =     auto()
     # composition layers
     color_mask =    auto()
-    flow =          auto()
-    fluid3d =       auto()
+    motion =        auto()
+    fluid =         auto()
     composite =     auto()
 
 
@@ -85,7 +85,7 @@ class MaskSource(IntEnum):
 class LayerSettings(BaseSettings):
     left:   Field[list[Layers]] = Field([Layers.composite],                  description="Layers drawn in the left viewport",  widget=Widget.playlist)
     right:  Field[list[Layers]] = Field([Layers.pose],                       description="Layers drawn in the right viewport", widget=Widget.playlist)
-    output: Field[list[Layers]] = Field([Layers.fluid3d, Layers.color_mask], description="Layers mixed into the show texture", widget=Widget.playlist)
+    output: Field[list[Layers]] = Field([Layers.fluid, Layers.color_mask], description="Layers mixed into the show texture", widget=Widget.playlist)
 
 
 # ---------------------------------------------------------------------------
@@ -244,7 +244,7 @@ class FluidInputSettings(BaseSettings):
     density: Field[Layers] = Field(Layers.center_capture,    description="Texture used as density and temperature input")
     mask:    Field[Layers] = Field(Layers.center_mask,       description="Mask that gates the flow's velocity and density")
 
-class _Flow3DLayerSettings(layers.Flow3DLayerSettings):
+class _Motion3DLayerSettings(layers.Motion3DLayerSettings):
     inputs: Group[FluidInputSettings] = Group(FluidInputSettings)
 
 
@@ -277,8 +277,8 @@ class RenderSettings(BaseSettings):
     preview: Group[PreviewGroup]                 = Group(PreviewGroup)
     center : Group[CenterGroup]                  = Group(CenterGroup)
     depth  : Group[layers.DepthSourceLayerSettings] = Group(layers.DepthSourceLayerSettings)
-    flow   : Group[_Flow3DLayerSettings]         = Group(_Flow3DLayerSettings)
-    fluid3d: Group[layers.Fluid3DLayerSettings]  = Group(layers.Fluid3DLayerSettings, share=[stage])
+    motion : Group[_Motion3DLayerSettings]       = Group(_Motion3DLayerSettings)
+    fluid  : Group[layers.Fluid3DLayerSettings]  = Group(layers.Fluid3DLayerSettings, share=[stage])
     time_series: Group[layers.TimeSeriesLayerSettings] = Group(layers.TimeSeriesLayerSettings)
     colors : Group[ColorSettings]                = Group(ColorSettings)
     window : Group[WindowSettings]               = Group(WindowSettings)

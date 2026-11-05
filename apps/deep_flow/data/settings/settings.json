@@ -272,10 +272,10 @@
     "layer": {
       "select": {
         "left": [
-          "flow"
+          "motion"
         ],
         "right": [
-          "fluid3d"
+          "fluid"
         ],
         "output": [
           "cam_image",
@@ -403,7 +403,7 @@
       "near": 0.1,
       "far": 1.7
     },
-    "flow": {
+    "motion": {
       "draw_mode": "VELOCITY",
       "blend_mode": "ADD",
       "width": 448,
@@ -492,12 +492,12 @@
         "element_width": 2.5
       }
     },
-    "fluid3d": {
+    "fluid": {
       "max_players": 1,
       "sim_engine": "FLUID_2D",
       "blend_mode": "ADD",
       "scale_by_motion": true,
-      "fluid_flow": {
+      "fluid": {
         "profile": false,
         "width": 448,
         "height": 800,
@@ -505,9 +505,9 @@
         "fixed_fps": 60.0,
         "fps_smoothing": 1.0,
         "speed": 0.4,
-        "depth": {
-          "depth": 16,
-          "sim_depth": 16,
+        "volume": {
+          "layers": 16,
+          "sim_layers": 16,
           "spacing": 4.0,
           "emission": 1.16,
           "gamma": 0.99,
@@ -519,8 +519,8 @@
           "perspective": 0.08,
           "drift_period": 60.0,
           "eye_tracking": 0.8,
-          "depth_blur": 0.25,
-          "debug_depth": false,
+          "layer_blur": 0.25,
+          "debug_layers": false,
           "injection_layer": 0.0,
           "injection_spread": 0.06,
           "boundary": "CLOSED"

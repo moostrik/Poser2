@@ -51,7 +51,7 @@ class TemperatureSettings(BaseSettings):
     speed_offset: Field[float]      = Field(0.0,    min=-5.0,   max=5.0,    color="blue-grey",      description="Added to base speed for temperature only. 0 = physically coupled.")
     fade_time: Field[float]         = Field(3.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until temperature fades to ~1%")
     buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Thermal buoyancy coefficient: hot (fresh) ink rises against gravity")
-    weight: Field[float]            = Field(4.0,    min=0.0,    max=20.0,   color="red",            description="Ink weight: dense ink sinks along gravity (3D only)")
+    weight: Field[float]            = Field(4.0,    min=0.0,    max=20.0,   color="red",            description="Weight of the density: it sinks along gravity (3D only)")
     gravity_x: Field[float]         = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction X (3D only)")
     gravity_y: Field[float]         = Field(1.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction Y; 1 = down the screen (3D only)")
     gravity_z: Field[float]         = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction Z; 1 = away from viewer (3D only)")
@@ -67,29 +67,29 @@ class PressureSettings(BaseSettings):
     boundary: Field[BoundaryMode]   = Field(BoundaryMode.OPEN,                                      description="Open: pressure escapes at edges (less sticky). Closed: pressure reflects")
 
 
-class DepthSettings(BaseSettings):
-    """Z-axis / volume parameters (ignored by 2D simulations)."""
-    depth: Field[int]               = Field(4,    min=1,    max=64,     description="Density depth layers (the stored ink volume)")
-    sim_depth: Field[int]           = Field(4,    min=1,    max=128,    description="Velocity/pressure/temperature depth layers (the sim grid)")
+class VolumeSettings(BaseSettings):
+    """The volume: the 3D fluid's z layers and the composite's look (ignored by the 2D fluid)."""
+    layers: Field[int]              = Field(4,    min=1,    max=64,     description="Density z layers (the stored density volume)")
+    sim_layers: Field[int]          = Field(4,    min=1,    max=128,    description="Velocity/pressure/temperature z layers (the sim grid)")
     spacing: Field[float]           = Field(4.0,  min=1.0,  max=64.0,   description="Z layer spacing in sim texels (low = lively depth, high = flat)")
-    emission: Field[float]          = Field(1.0,  min=0.0,  max=8.0,    color="amber",          description="Ink brightness gain per unit density")
+    emission: Field[float]          = Field(1.0,  min=0.0,  max=8.0,    color="amber",          description="Brightness gain per unit density")
     gamma: Field[float]             = Field(1.0,  min=0.5,  max=3.0,    color="orange",         description="Density response exponent: >1 hides thin haze, pops dense cores")
-    absorption: Field[float]        = Field(4.0,  min=0.01, max=50.0,   color="deep-orange",    description="Occlusion: extinction per unit density (near ink covers far ink)")
+    absorption: Field[float]        = Field(4.0,  min=0.01, max=50.0,   color="deep-orange",    description="Occlusion: extinction per unit density (near density covers far density)")
     glow: Field[float]              = Field(0.25, min=0.0,  max=1.0,    color="yellow",         description="Additive glow mix: 1 = legacy additive (depth invisible)")
-    tint: Field[float]              = Field(0.5,  min=0.0,  max=1.0,    color="light-blue",     description="Far ink shifts toward water colour (red absorbed first)")
+    tint: Field[float]              = Field(0.5,  min=0.0,  max=1.0,    color="light-blue",     description="Far density shifts toward water color (red absorbed first)")
     fog: Field[float]               = Field(0.5,  min=0.0,  max=4.0,    color="blue-grey",      description="Water extinction over the full depth; dims far layers")
     parallax: Field[float]          = Field(0.02, min=0.0,  max=0.1,    color="purple",         description="Virtual eye offset in UV units; layers shear with depth")
     perspective: Field[float]       = Field(0.15, min=0.0,  max=1.0,    color="deep-purple",    description="Per-layer shrink toward the vanishing point; 0 = flat")
     drift_period: Field[float]      = Field(45.0, min=0.0,  max=180.0,  color="indigo",         description="Seconds per orbit of the drifting eye; 0 = static offset")
     eye_tracking: Field[float]      = Field(0.0,  min=0.0,  max=1.0,    color="violet",         description="Parallax eye follows the tracked head; 0 = autonomous drift")
-    depth_blur: Field[float]        = Field(0.0,  min=0.0,  max=8.0,    color="brown",          description="Blur radius in texels at the back layer; 0 = off")
-    debug_depth: Field[bool]        = Field(False,                                              description="Show dominant depth layer as hue (red = back, violet = front)")
+    layer_blur: Field[float]        = Field(0.0,  min=0.0,  max=8.0,    color="brown",          description="Blur radius in texels at the back layer; 0 = off")
+    debug_layers: Field[bool]       = Field(False,                                              description="Show the dominant z layer as hue (red = back, violet = front)")
     injection_layer: Field[float]   = Field(1.0,  min=0.0,  max=1.0,    description="Normalized depth for 2D->3D injection center")
     injection_spread: Field[float]  = Field(0.001, min=0.001, max=0.5,   description="Gaussian sigma for depth spread during injection")
     boundary: Field[BoundaryMode]   = Field(BoundaryMode.CLOSED,                                    description="Z boundary (3D only). Closed: front/back reflect. Open: they absorb")
 
 
-class FluidFlowSettings(BaseSettings):
+class FluidSettings(BaseSettings):
     """Unified configuration for all fluid simulations (2D and 3D).
 
     Speed model:
@@ -101,9 +101,8 @@ class FluidFlowSettings(BaseSettings):
         Exponential frame-rate-independent decay: multiplier = 0.01^(dt/fade_time).
         fade_time=3.0 means the field retains ~1% after 3 seconds.
 
-    Z-axis:
-        3D simulations use the z sub-group for volume parameters.
-        2D simulations ignore it.
+    Volume:
+        The 3D fluid reads the volume group; the 2D fluid ignores it.
     """
 
     # ---- Actions ----
@@ -121,7 +120,7 @@ class FluidFlowSettings(BaseSettings):
     speed: Field[float]             = Field(1.0,    min=0.0,    max=5.0,    description="Base fluid transport rate")
 
     # ---- Field groups ----
-    depth: Group[DepthSettings]             = Group(DepthSettings)
+    volume: Group[VolumeSettings]           = Group(VolumeSettings)
     velocity: Group[VelocitySettings]       = Group(VelocitySettings)
     density: Group[DensitySettings]         = Group(DensitySettings)
     temperature: Group[TemperatureSettings] = Group(TemperatureSettings)

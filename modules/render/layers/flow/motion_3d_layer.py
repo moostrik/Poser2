@@ -69,8 +69,8 @@ class FlowBridgeMethod(IntEnum):
     KINETIC = auto()  # two trails, reading the change of the motion
 
 
-class Flow3DDrawMode(IntEnum):
-    """Draw modes for Flow3DLayer. A 3D velocity (xyz) draws as white x/y arrows with a ring of radius |z|
+class Motion3DDrawMode(IntEnum):
+    """Draw modes for Motion3DLayer. A 3D velocity (xyz) draws as white x/y arrows with a ring of radius |z|
     on the arrow's scale, red toward the camera and green away; as scalars, x/y/z as red/green/blue around grey.
 
     In pipeline order, each named after the panel group and the property it shows. z has no mode of its own:
@@ -121,10 +121,10 @@ class Flow3DDrawMode(IntEnum):
     KINETIC_STRIP = auto()
 
 
-DEPTH_DRAW_MODES: set[Flow3DDrawMode] = {Flow3DDrawMode.KINETIC_DEPTH_ACCELERATION}     # red toward the camera, green away
-VECTOR_DRAW_MODES: set[Flow3DDrawMode] = {       # 3D velocities, drawn as velocities whatever the texture's format
-    Flow3DDrawMode.OPTICAL_FLOW_VELOCITY, Flow3DDrawMode.VELOCITY,
-    Flow3DDrawMode.KINETIC_FAST, Flow3DDrawMode.KINETIC_SLOW, Flow3DDrawMode.KINETIC_ONSET_VELOCITY,
+DEPTH_DRAW_MODES: set[Motion3DDrawMode] = {Motion3DDrawMode.KINETIC_DEPTH_ACCELERATION}     # red toward the camera, green away
+VECTOR_DRAW_MODES: set[Motion3DDrawMode] = {       # 3D velocities, drawn as velocities whatever the texture's format
+    Motion3DDrawMode.OPTICAL_FLOW_VELOCITY, Motion3DDrawMode.VELOCITY,
+    Motion3DDrawMode.KINETIC_FAST, Motion3DDrawMode.KINETIC_SLOW, Motion3DDrawMode.KINETIC_ONSET_VELOCITY,
 }
 
 
@@ -138,9 +138,9 @@ class FlowBridgeSettings(BaseSettings):
     temperature = Group(TemperatureBridgeSettings)
 
 
-class Flow3DLayerSettings(BaseSettings):
-    """Configuration for Flow3DLayer (optical flow + flow bridge)."""
-    draw_mode: Field[Flow3DDrawMode] =      Field(Flow3DDrawMode.INPUT_2D)
+class Motion3DLayerSettings(BaseSettings):
+    """Configuration for Motion3DLayer (optical flow + flow bridge)."""
+    draw_mode: Field[Motion3DDrawMode] =      Field(Motion3DDrawMode.INPUT_2D)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
@@ -150,7 +150,7 @@ class Flow3DLayerSettings(BaseSettings):
     visualization = Group(VisualizationFieldSettings)
 
 
-class Flow3DLayer(LayerBase):
+class Motion3DLayer(LayerBase):
     """Flow processing layer with the optical flow and the flow bridge.
 
     Measures the motion and prepares velocity/density/temperature for fluid simulation:
@@ -165,7 +165,7 @@ class Flow3DLayer(LayerBase):
         - temperature: Temperature field (R16F)
 
     Usage:
-        flow = Flow3DLayer(cam_id, board, flow_source, flow_input, density_input, settings)
+        flow = Motion3DLayer(cam_id, board, flow_source, flow_input, density_input, settings)
         flow.update()
         # Access outputs for fluid simulation:
         fluid.add_velocity(flow.smooth_velocity)
@@ -173,7 +173,7 @@ class Flow3DLayer(LayerBase):
         fluid.add_temperature(flow.temperature)
     """
 
-    def __init__(self, cam_id: int, board: HasFrames, flow_source: LayerBase, flow_input: Texture, density_input: Texture, settings: Flow3DLayerSettings | None = None) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, flow_source: LayerBase, flow_input: Texture, density_input: Texture, settings: Motion3DLayerSettings | None = None) -> None:
         """Initialize flow layer.
 
         Args:
@@ -189,7 +189,7 @@ class Flow3DLayer(LayerBase):
         self._flow_source: LayerBase = flow_source
         self._flow_input: Texture = flow_input
         self._density_input: Texture = density_input
-        self.settings: Flow3DLayerSettings = settings or Flow3DLayerSettings()
+        self.settings: Motion3DLayerSettings = settings or Motion3DLayerSettings()
 
         bridge: FlowBridgeSettings = self.settings.flow_bridge
         self._flow: LucasKanadeFlow = LucasKanadeFlow(self.settings.optical_flow)
@@ -416,7 +416,7 @@ class Flow3DLayer(LayerBase):
             flow.set_input(self._flow_input)
             if self.depth_enabled and self._view_span <= 0.0 and not self._warned_view_span:
                 self._warned_view_span = True
-                logger.warning("Flow3DLayer %d: depth is on but no view span is set (set_view_span), so z reads no motion", self._cam_id)
+                logger.warning("Motion3DLayer %d: depth is on but no view span is set (set_view_span), so z reads no motion", self._cam_id)
             flow.update(self._depth_input if self.depth_enabled else None, self._flow_interval, self._view_span, self._depth_step)
             self._velocity = flow.velocity
 
@@ -426,11 +426,11 @@ class Flow3DLayer(LayerBase):
                 # Lucas–Kanade's velocity is a distance, so the trails can travel with it
                 self._kinetic_bridge.set_velocity(self._velocity)
                 self._kinetic_bridge.update(self._flow_interval)
-                if self.settings.draw_mode == Flow3DDrawMode.KINETIC_DEPTH_ACCELERATION:
+                if self.settings.draw_mode == Motion3DDrawMode.KINETIC_DEPTH_ACCELERATION:
                     self._kinetic_bridge.update_depth_acceleration()
-                if self.settings.flow_bridge.kinetic.onset.spin > 0.0 or self.settings.draw_mode == Flow3DDrawMode.KINETIC_CURL:
+                if self.settings.flow_bridge.kinetic.onset.spin > 0.0 or self.settings.draw_mode == Motion3DDrawMode.KINETIC_CURL:
                     self._kinetic_bridge.update_curl()
-                if self.settings.draw_mode == Flow3DDrawMode.KINETIC_STRIP:
+                if self.settings.draw_mode == Motion3DDrawMode.KINETIC_STRIP:
                     bridge: KineticBridge = self._kinetic_bridge
                     self._kinetic_strip.update(bridge.fast, bridge.acceleration, bridge.emission, self.settings.visualization.strip_scale)
         else:
@@ -486,7 +486,7 @@ class Flow3DLayer(LayerBase):
         Style.set_blend_mode(self.settings.blend_mode)
         if self.texture.allocated:
             Blit.use(self.texture)
-        if self.settings.draw_mode == Flow3DDrawMode.KINETIC_STRIP and self._strip_text.allocated:
+        if self.settings.draw_mode == Motion3DDrawMode.KINETIC_STRIP and self._strip_text.allocated:
             self._draw_strip_labels()
         Style.pop_style()
 
@@ -504,17 +504,17 @@ class Flow3DLayer(LayerBase):
 
     def _get_signed_texture(self) -> tuple[Texture, int] | None:
         """The scalar field to draw in two colors and its channel, None when draw_mode is another kind of texture."""
-        textures: dict[Flow3DDrawMode, tuple[Texture | None, int]] = {
-            Flow3DDrawMode.INPUT_DEPTH: (self._depth_input, 0),
-            Flow3DDrawMode.INPUT_MASK: (self._mask_input, 0),
-            Flow3DDrawMode.TEMPERATURE: (self._temperature_bridge.temperature, 0),
-            Flow3DDrawMode.KINETIC_ACCELERATION: (self._kinetic_bridge.acceleration, 0),
-            Flow3DDrawMode.KINETIC_DEPTH_ACCELERATION: (self._kinetic_bridge.depth_acceleration, 0),
-            Flow3DDrawMode.KINETIC_TURN: (self._kinetic_bridge.turn, 0),
-            Flow3DDrawMode.KINETIC_HELD_RELEASE: (self._kinetic_bridge.held_release, 0),
-            Flow3DDrawMode.KINETIC_RESERVOIR: (self._kinetic_bridge.reservoir, 0),
-            Flow3DDrawMode.KINETIC_EMISSION: (self._kinetic_bridge.emission, 0),
-            Flow3DDrawMode.KINETIC_CURL: (self._kinetic_bridge.curl, 0),
+        textures: dict[Motion3DDrawMode, tuple[Texture | None, int]] = {
+            Motion3DDrawMode.INPUT_DEPTH: (self._depth_input, 0),
+            Motion3DDrawMode.INPUT_MASK: (self._mask_input, 0),
+            Motion3DDrawMode.TEMPERATURE: (self._temperature_bridge.temperature, 0),
+            Motion3DDrawMode.KINETIC_ACCELERATION: (self._kinetic_bridge.acceleration, 0),
+            Motion3DDrawMode.KINETIC_DEPTH_ACCELERATION: (self._kinetic_bridge.depth_acceleration, 0),
+            Motion3DDrawMode.KINETIC_TURN: (self._kinetic_bridge.turn, 0),
+            Motion3DDrawMode.KINETIC_HELD_RELEASE: (self._kinetic_bridge.held_release, 0),
+            Motion3DDrawMode.KINETIC_RESERVOIR: (self._kinetic_bridge.reservoir, 0),
+            Motion3DDrawMode.KINETIC_EMISSION: (self._kinetic_bridge.emission, 0),
+            Motion3DDrawMode.KINETIC_CURL: (self._kinetic_bridge.curl, 0),
         }
         texture, channel = textures.get(self.settings.draw_mode, (None, 0))
         return (texture, channel) if texture is not None else None
@@ -522,13 +522,13 @@ class Flow3DLayer(LayerBase):
     def _get_draw_texture(self) -> Texture:
         """Get texture to draw based on draw_mode."""
         textures = {
-            Flow3DDrawMode.INPUT_2D: self._flow_input,
-            Flow3DDrawMode.OPTICAL_FLOW_VELOCITY: self._velocity,
-            Flow3DDrawMode.VELOCITY: self.smooth_velocity,
-            Flow3DDrawMode.DENSITY: self._density_bridge.density,
-            Flow3DDrawMode.KINETIC_FAST: self._kinetic_bridge.fast,
-            Flow3DDrawMode.KINETIC_SLOW: self._kinetic_bridge.slow,
-            Flow3DDrawMode.KINETIC_ONSET_VELOCITY: self._kinetic_bridge.onset_velocity,
-            Flow3DDrawMode.KINETIC_STRIP: self._kinetic_strip.texture,
+            Motion3DDrawMode.INPUT_2D: self._flow_input,
+            Motion3DDrawMode.OPTICAL_FLOW_VELOCITY: self._velocity,
+            Motion3DDrawMode.VELOCITY: self.smooth_velocity,
+            Motion3DDrawMode.DENSITY: self._density_bridge.density,
+            Motion3DDrawMode.KINETIC_FAST: self._kinetic_bridge.fast,
+            Motion3DDrawMode.KINETIC_SLOW: self._kinetic_bridge.slow,
+            Motion3DDrawMode.KINETIC_ONSET_VELOCITY: self._kinetic_bridge.onset_velocity,
+            Motion3DDrawMode.KINETIC_STRIP: self._kinetic_strip.texture,
         }
         return textures.get(self.settings.draw_mode, self._flow_input)

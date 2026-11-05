@@ -1,4 +1,4 @@
-"""FluidFlow - 2D Navier-Stokes fluid simulation.
+"""Fluid2D - 2D Navier-Stokes fluid simulation.
 
 All-fragment pipeline operating on GL_TEXTURE_2D FBOs with ping-pong
 buffers for iterative solvers.
@@ -25,7 +25,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_R16F, GL_R8, GL_R
 from modules.gl import Texture, SwapFbo, Fbo, Profiler
 from .. import FlowUtil
 from ..time_step import TimeStep
-from .fluid_settings import FluidFlowSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings, BoundaryMode
+from .fluid_settings import FluidSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings, BoundaryMode
 from .shaders import (
     Advect, Divergence, Gradient,
     JacobiPressure, JacobiPressureCompute, JacobiDiffusion, JacobiDiffusionCompute,
@@ -44,12 +44,12 @@ _BOUNDARY_GL: dict = {
 # 2D Fluid Simulation
 # ---------------------------------------------------------------------------
 
-class FluidFlow:
+class Fluid2D:
     """2D Navier-Stokes fluid simulation.
 
     Does NOT inherit FlowBase -- manages its own SwapFbo ping-pong
     buffers directly.  Provides a compatible public API with the 3D
-    FluidFlow3D where applicable.
+    Fluid3D where applicable.
 
     Fields:
         velocity:             SwapFbo RG16F    (u, v)
@@ -66,8 +66,8 @@ class FluidFlow:
         buoyancy:         Fbo RG16F
     """
 
-    def __init__(self, settings: FluidFlowSettings | None = None) -> None:
-        self.settings: FluidFlowSettings = settings or FluidFlowSettings()
+    def __init__(self, settings: FluidSettings | None = None) -> None:
+        self.settings: FluidSettings = settings or FluidSettings()
 
         # ---- Simulation dimensions and state ---
         self._simulation_width: int = 0
@@ -125,17 +125,17 @@ class FluidFlow:
 
         # ---- GPU profiling ----
         self._profiler: Profiler = Profiler(
-            lambda: f"FluidFlow {self._simulation_width}x{self._simulation_height}",
+            lambda: f"Fluid2D {self._simulation_width}x{self._simulation_height}",
             names=["dampen_vel", "advect_vel", "viscosity", "vorticity",
                    "advect_temp", "buoyancy", "advect_pres", "incompress",
                    "advect_den", "dampen_den"],
         )
 
         # Bind settings actions
-        self.settings.bind(FluidFlowSettings.reset_sim, lambda _: self._request_reset())
-        self.settings.bind(FluidFlowSettings.width, lambda _: self._request_reallocate())
-        self.settings.bind(FluidFlowSettings.height, lambda _: self._request_reallocate())
-        self.settings.bind(FluidFlowSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
+        self.settings.bind(FluidSettings.reset_sim, lambda _: self._request_reset())
+        self.settings.bind(FluidSettings.width, lambda _: self._request_reallocate())
+        self.settings.bind(FluidSettings.height, lambda _: self._request_reallocate())
+        self.settings.bind(FluidSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
         mark_boundary = lambda _: setattr(self, '_boundary_dirty', True)
         self.settings.density.bind(DensitySettings.boundary, mark_boundary)
         self.settings.temperature.bind(TemperatureSettings.boundary, mark_boundary)

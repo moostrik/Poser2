@@ -17,8 +17,8 @@ from modules.flow import GradientFlow, GradientFlowSettings, bridge_2d, Visualiz
 from modules.utils import HotReloadMethods
 
 
-class FlowDrawMode(IntEnum):
-    """Draw modes for FlowLayer.
+class Motion2DDrawMode(IntEnum):
+    """Draw modes for Motion2DLayer.
 
     Inputs:
         OPTICAL_INPUT - Luminance frames fed to optical flow
@@ -42,11 +42,11 @@ class FlowDrawMode(IntEnum):
     TEMPERATURE_BRIDGE_OUTPUT = auto()
 
 
-class FlowLayerSettings(BaseSettings):
-    """Configuration for FlowLayer (optical flow + bridges)."""
+class Motion2DLayerSettings(BaseSettings):
+    """Configuration for Motion2DLayer (optical flow + bridges)."""
     stage: Field[int] =                     Field(0, description="Pipeline stage for pose data")
     fps: Field[float] =                     Field(60.0, min=1.0, max=240.0)
-    draw_mode: Field[FlowDrawMode] =        Field(FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR)
+    draw_mode: Field[Motion2DDrawMode] =        Field(Motion2DDrawMode.DENSITY_BRIDGE_INPUT_COLOR)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
@@ -58,7 +58,7 @@ class FlowLayerSettings(BaseSettings):
     temperature_bridge = Group(bridge_2d.TemperatureBridgeSettings)
 
 
-class FlowLayer(LayerBase):
+class Motion2DLayer(LayerBase):
     """Flow processing layer with optical flow and bridges.
 
     Computes optical flow and prepares velocity/density/temperature for fluid simulation:
@@ -67,13 +67,13 @@ class FlowLayer(LayerBase):
     3. DensityBridge: Combines RGB density with velocity info
     4. TemperatureBridge: Generates temperature field
 
-    Output textures for FluidLayer:
+    Output textures for Fluid2DLayer:
         - velocity: Smoothed velocity (RG16F)
         - density: Colored density (RGBA16F)
         - temperature: Temperature field (R16F)
 
     Usage:
-        flow = FlowLayer(cam_id, board, mask, motion, colors, settings)
+        flow = Motion2DLayer(cam_id, board, mask, motion, colors, settings)
         flow.update()
         # Access outputs for fluid simulation:
         fluid.add_velocity(flow.velocity)
@@ -81,7 +81,7 @@ class FlowLayer(LayerBase):
         fluid.add_temperature(flow.temperature)
     """
 
-    def __init__(self, cam_id: int, board: HasFrames, mask_source: MaskSourceLayer, flow_input: Texture, density_input: Texture, settings: FlowLayerSettings | None = None) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, mask_source: MaskSourceLayer, flow_input: Texture, density_input: Texture, settings: Motion2DLayerSettings | None = None) -> None:
         """Initialize flow layer.
 
         Args:
@@ -96,7 +96,7 @@ class FlowLayer(LayerBase):
         self._mask_source: MaskSourceLayer = mask_source
         self._flow_input: Texture = flow_input
         self._density_input: Texture = density_input
-        self.settings: FlowLayerSettings = settings or FlowLayerSettings()
+        self.settings: Motion2DLayerSettings = settings or Motion2DLayerSettings()
 
         self._optical_flow: GradientFlow = GradientFlow(self.settings.optical_flow)
         self._velocity_trail: bridge_2d.VelocitySmoothTrail = bridge_2d.VelocitySmoothTrail(self.settings.velocity_trail)
@@ -235,16 +235,16 @@ class FlowLayer(LayerBase):
     def _get_draw_texture(self) -> Texture:
         """Get texture to draw based on draw_mode."""
         textures = {
-            FlowDrawMode.OPTICAL_INPUT: self._optical_flow.color_input,
-            FlowDrawMode.OPTICAL_OUTPUT: self._optical_flow.velocity,
-            FlowDrawMode.SMOOTH_VELOCITY_INPUT: self._velocity_trail.velocity_input,
-            FlowDrawMode.SMOOTH_VELOCITY_OUTPUT: self._velocity_trail.velocity,
-            FlowDrawMode.SMOOTH_VELOCITY_MAGNITUDE: self._velocity_magnitude.magnitude,
-            FlowDrawMode.DENSITY_BRIDGE_INPUT_COLOR: self._density_bridge.color_input,
-            FlowDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY: self._density_bridge.velocity_input,
-            FlowDrawMode.DENSITY_BRIDGE_OUTPUT: self._density_bridge.density,
-            FlowDrawMode.TEMPERATURE_BRIDGE_INPUT_COLOR: self._temperature_bridge.color_input,
-            FlowDrawMode.TEMPERATURE_BRIDGE_INPUT_MASK: self._temperature_bridge.mask_input,
-            FlowDrawMode.TEMPERATURE_BRIDGE_OUTPUT: self._temperature_bridge.temperature,
+            Motion2DDrawMode.OPTICAL_INPUT: self._optical_flow.color_input,
+            Motion2DDrawMode.OPTICAL_OUTPUT: self._optical_flow.velocity,
+            Motion2DDrawMode.SMOOTH_VELOCITY_INPUT: self._velocity_trail.velocity_input,
+            Motion2DDrawMode.SMOOTH_VELOCITY_OUTPUT: self._velocity_trail.velocity,
+            Motion2DDrawMode.SMOOTH_VELOCITY_MAGNITUDE: self._velocity_magnitude.magnitude,
+            Motion2DDrawMode.DENSITY_BRIDGE_INPUT_COLOR: self._density_bridge.color_input,
+            Motion2DDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY: self._density_bridge.velocity_input,
+            Motion2DDrawMode.DENSITY_BRIDGE_OUTPUT: self._density_bridge.density,
+            Motion2DDrawMode.TEMPERATURE_BRIDGE_INPUT_COLOR: self._temperature_bridge.color_input,
+            Motion2DDrawMode.TEMPERATURE_BRIDGE_INPUT_MASK: self._temperature_bridge.mask_input,
+            Motion2DDrawMode.TEMPERATURE_BRIDGE_OUTPUT: self._temperature_bridge.temperature,
         }
         return textures.get(self.settings.draw_mode, self._density_input)

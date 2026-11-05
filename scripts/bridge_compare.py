@@ -10,7 +10,7 @@ PATH=VALUE sets one of its settings by its panel path
 (trails.fast_smooth, release.stop_gate, onset.force, smooth, ...), the rest as in deep_flow's preset. Each
 bridge steps once per flow frame, by the frame's saved interval, as the kinetic bridge does in the app.
 
-What a side gives the fluid, as Flow3DLayer hands it over:
+What a side gives the fluid, as Motion3DLayer hands it over:
     velocity   its smooth_velocity, in image widths per second (the kinetic one divided by its scale_x)
     amount     the density's alpha: the trail's |velocity| (VelocityMagnitude), the kinetic bridge's emission
     onset      the kinetic bridge's onset_velocity, |xyz| (only with onset.force > 0)

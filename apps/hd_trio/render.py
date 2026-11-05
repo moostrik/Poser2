@@ -31,7 +31,7 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.center_pose,
 
     Layers.color_mask,
-    Layers.flow,
+    Layers.motion,
     Layers.fluid,
     # Layers.composite, -> updated via stage system
 ]
@@ -42,7 +42,7 @@ INTERFACE_LAYERS: list[Layers] = [
 ]
 
 LARGE_LAYERS: list[Layers] = [
-    Layers.flow,
+    Layers.motion,
     Layers.fluid,
     Layers.composite,
 ]
@@ -77,7 +77,7 @@ class HDTrioRender(RenderBase):
         self._intro_color_proxy = FixedColorProxy(settings.intro_sequence)
         self._intro_geometries: dict[int, ls.CenterGeometry] = {}
 
-        flows: dict[int, ls.FlowLayer] = {}
+        flows: dict[int, ls.Motion2DLayer] = {}
         cmt: dict[int, Texture] = {}
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.board)
@@ -100,8 +100,8 @@ class HDTrioRender(RenderBase):
             self.L[Layers.intro_pose][i] =                   ls.CenterPoseLayer(     i, intro_geometry,                             settings.intro_sequence.pose, cast(ColorSettings, self._intro_color_proxy))
 
             ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,      center_foreground.texture, cmt, settings.center.color,  settings.colors)
-            flows[i] =      self.L[Layers.flow][i] =        ls.FlowLayer(           i, self.board,      cam_mask,  center_mask.texture, center_foreground.texture, settings.flow)
-            fluid =         self.L[Layers.fluid][i] =       ls.FluidLayer(          i, self.board,      flows,                      settings.fluid,             settings.colors)
+            flows[i] =      self.L[Layers.motion][i] =        ls.Motion2DLayer(           i, self.board,      cam_mask,  center_mask.texture, center_foreground.texture, settings.motion)
+            fluid =         self.L[Layers.fluid][i] =       ls.Fluid2DLayer(          i, self.board,      flows,                      settings.fluid,             settings.colors)
 
             lut =           self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid, ms_mask],           settings.layer.composite)
 
@@ -173,7 +173,7 @@ class HDTrioRender(RenderBase):
 
     def _measure_fps(self, now: float) -> None:
         if self._last_tick > 0.0 and now > self._last_tick:
-            self.settings.fluid.fluid_flow.fps = min(240.0, 1.0 / (now - self._last_tick))
+            self.settings.fluid.fluid.fps = min(240.0, 1.0 / (now - self._last_tick))
         self._last_tick = now
 
     def update(self) -> None:

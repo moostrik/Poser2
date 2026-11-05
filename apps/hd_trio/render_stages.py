@@ -186,7 +186,7 @@ class FluidStage(StageLayer):
     def enter(self) -> None:
         self.set_geometry_stage(Stage.LERP)
         self.set_similarity_scale(0.0)
-        cast(ls.FluidLayer, self.layers[Layers.fluid]).reset()
+        cast(ls.Fluid2DLayer, self.layers[Layers.fluid]).reset()
 
     def update(self, progress: float) -> None:
         self.compose([

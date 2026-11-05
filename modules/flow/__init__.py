@@ -1,8 +1,8 @@
 """Flow processing package — canonical public API.
 
 All external code should import flow classes from this package, not from
-subpackages (e.g. ``from modules.flow import FluidFlow``, never
-``from modules.flow.fluid import FluidFlow``).
+subpackages (e.g. ``from modules.flow import Fluid2D``, never
+``from modules.flow.fluid import Fluid2D``).
 """
 
 # Base classes
@@ -27,7 +27,7 @@ from .visualization import VisualizationFieldSettings, Visualizer, VelocityField
 from .time_step import TimeStep, TimeStepMode
 
 # 2D fluid simulation
-from .fluid import FluidFlow, FluidFlowSettings, DepthSettings
+from .fluid import Fluid2D, FluidSettings, VolumeSettings
 
 # 3D fluid simulation
-from .fluid3d import FluidFlow3D
+from .fluid3d import Fluid3D

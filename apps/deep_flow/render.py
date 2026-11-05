@@ -33,8 +33,8 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.center_pose,
 
     Layers.color_mask,
-    Layers.flow,
-    Layers.fluid3d,
+    Layers.motion,
+    Layers.fluid,
     Layers.composite,
 ]
 
@@ -44,8 +44,8 @@ INTERFACE_LAYERS: list[Layers] = [
 ]
 
 LARGE_LAYERS: list[Layers] = [
-    Layers.flow,
-    Layers.fluid3d,
+    Layers.motion,
+    Layers.fluid,
     Layers.composite,
 ]
 
@@ -104,7 +104,7 @@ class DeepFlowRender(RenderBase):
         settings.data.b.line_smooth = 6.0
         settings.data.b.use_history_color = True
 
-        flows: dict[int, ls.Flow3DLayer] = {}
+        flows: dict[int, ls.Motion3DLayer] = {}
         cmt: dict[int, Texture] = {}    # the center masks
         depth_source: bool = mask_source == MaskSource.DEPTH
         space: ls.SourceSpace = ls.SourceSpace.IMAGE if depth_source else ls.SourceSpace.CROP
@@ -140,10 +140,10 @@ class DeepFlowRender(RenderBase):
             center_pose =   self.L[Layers.center_pose][i] = ls.CenterPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
 
             ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,   center_foreground.texture, cmt, settings.center.color, settings.colors)
-            flows[i] =      self.L[Layers.flow][i] =        ls.Flow3DLayer(         i, self.board,   cam_mask,  center_mask.texture, center_foreground.texture, settings.flow)
-            fluid3d =       self.L[Layers.fluid3d][i] =     ls.Fluid3DLayer(        i, self.board,   flows,                      settings.fluid3d,           settings.colors)
+            flows[i] =      self.L[Layers.motion][i] =        ls.Motion3DLayer(         i, self.board,   cam_mask,  center_mask.texture, center_foreground.texture, settings.motion)
+            fluid =       self.L[Layers.fluid][i] =     ls.Fluid3DLayer(        i, self.board,   flows,                      settings.fluid,           settings.colors)
 
-            composite =    self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid3d, ms_mask],         settings.layer.composite)
+            composite =    self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid, ms_mask],         settings.layer.composite)
 
             self.L[Layers.data_A_W][i]  = ls.FeatureWindowLayer(i, self.board, settings.data.a, settings.colors)
             self.L[Layers.data_A_F][i]  = ls.FeatureFrameLayer( i, self.board, settings.data.a, settings.colors)
@@ -220,7 +220,7 @@ class DeepFlowRender(RenderBase):
 
     def _measure_fps(self, now: float) -> None:
         if self._last_tick > 0.0 and now > self._last_tick:
-            self.settings.fluid3d.fluid_flow.fps = min(240.0, 1.0 / (now - self._last_tick))
+            self.settings.fluid.fluid.fps = min(240.0, 1.0 / (now - self._last_tick))
         self._last_tick = now
 
     def reset_fluid(self) -> None:
@@ -232,9 +232,9 @@ class DeepFlowRender(RenderBase):
 
         if self._reset_fluid.is_set():
             self._reset_fluid.clear()
-            for layer_type in [Layers.flow, Layers.fluid3d]:
+            for layer_type in [Layers.motion, Layers.fluid]:
                 for layer in self.L[layer_type].values():
-                    cast(ls.Flow3DLayer | ls.Fluid3DLayer, layer).reset()
+                    cast(ls.Motion3DLayer | ls.Fluid3DLayer, layer).reset()
 
         select = self.settings.layer.select
         self._left_layers = select.left
@@ -242,13 +242,13 @@ class DeepFlowRender(RenderBase):
         self._output_layers = select.output
         self._update_layout()
 
-        flow_key: Layers = self.settings.flow.inputs.flow
-        density_key: Layers = self.settings.flow.inputs.density
-        mask_key: Layers = self.settings.flow.inputs.mask
+        flow_key: Layers = self.settings.motion.inputs.flow
+        density_key: Layers = self.settings.motion.inputs.density
+        mask_key: Layers = self.settings.motion.inputs.mask
         flow_source_key: Layers = self._flow_sources.get(flow_key, flow_key)
-        for i, _flow_layer in self.L[Layers.flow].items():
-            flow_layer = cast(ls.Flow3DLayer, _flow_layer)
-            flow_layer.set_time_step(1.0 / self.settings.fluid3d.fluid_flow.step_fps)
+        for i, _flow_layer in self.L[Layers.motion].items():
+            flow_layer = cast(ls.Motion3DLayer, _flow_layer)
+            flow_layer.set_time_step(1.0 / self.settings.fluid.fluid.step_fps)
             flow_layer.set_depth_input(cast(ls.CenterDepthLayer, self.L[Layers.center_depth][i]).depth)
             crop: Rect = cast(ls.CenterGeometry, self.L[Layers.center_geometry][i]).image_geometry.crop_roi
             flow_layer.set_view_span(crop.width * self._image_span)

@@ -522,7 +522,7 @@
         "draw_anchors": true
       }
     },
-    "flow": {
+    "motion": {
       "fps": 60.0,
       "draw_mode": "SMOOTH_VELOCITY_OUTPUT",
       "blend_mode": "ADD",
@@ -560,7 +560,7 @@
       "max_players": 3,
       "draw_mode": "DENSITY",
       "blend_mode": "ADD",
-      "fluid_flow": {
+      "fluid": {
         "profile": false,
         "width": 1088,
         "height": 1920,
@@ -568,9 +568,9 @@
         "fixed_fps": 60.0,
         "fps_smoothing": 1.0,
         "speed": 0.5,
-        "depth": {
-          "depth": 4,
-          "sim_depth": 4,
+        "volume": {
+          "layers": 4,
+          "sim_layers": 4,
           "spacing": 8.0,
           "absorption": 4.0,
           "injection_layer": 1.0,
