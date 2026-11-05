@@ -73,7 +73,6 @@ class Fluid2DSettings(BaseSettings):
     fixed_fps: Field[float]         = Field(60.0,   min=1.0,    max=240.0,              description="Steps per second in fixed mode (fps)")
     fps_smoothing: Field[float]     = Field(1.0,    min=0.0,    max=10.0,               description="Smoothing of the measured rate in measured mode (s); 0 follows each frame")
     fps: Field[float]               = Field(60.0,   min=1.0,    max=240.0,              description="Render rate of the last frame (fps)", access=Field.READ, visible=False)
-    step_fps: Field[float]          = Field(60.0,                                       description="Rate the simulation steps at (fps)", access=Field.READ)
     speed: Field[float]             = Field(1.0,    min=0.0,    max=5.0,    description="Base fluid transport rate")
 
     # ---- Field groups ----

@@ -186,7 +186,7 @@ class Fluid3DLayer(LayerBase):
         self._update_eye(pose)
 
         # Update 3D fluid simulation (handles its own reallocation internally)
-        self._fluid.update()
+        self._fluid.update(1.0 / self.settings.fluid.fps)
 
         Style.pop_style()
 

@@ -158,6 +158,7 @@ class DeepFlowRender(RenderBase):
 
         # The render rate of each tick feeds the fluid's time step
         self._last_tick: float = 0.0
+        self._dt: float = 1.0 / 60.0        # the last tick's length (s)
         self.add_update_callback(self._measure_fps)
 
         # A reset asked for from another thread, applied at the next update on the GL thread
@@ -219,7 +220,8 @@ class DeepFlowRender(RenderBase):
 
     def _measure_fps(self, now: float) -> None:
         if self._last_tick > 0.0 and now > self._last_tick:
-            self.settings.fluid.fluid.fps = min(240.0, 1.0 / (now - self._last_tick))
+            self._dt = max(now - self._last_tick, 1.0 / 240.0)
+            self.settings.fluid.fluid.fps = 1.0 / self._dt
         self._last_tick = now
 
     def reset_fluid(self) -> None:
@@ -247,7 +249,7 @@ class DeepFlowRender(RenderBase):
         flow_source_key: Layers = self._flow_sources.get(flow_key, flow_key)
         for i, _flow_layer in self.L[Layers.motion].items():
             flow_layer = cast(ls.Motion3DLayer, _flow_layer)
-            flow_layer.set_time_step(1.0 / self.settings.fluid.fluid.step_fps)
+            flow_layer.set_time_step(self._dt)
             depth: DepthView = cast(ls.CenterDepthLayer, self.L[Layers.center_depth][i]).depth_view
             flow_layer.set_depth_input(depth.texture)
             flow_layer.set_view_span(depth.view_span)

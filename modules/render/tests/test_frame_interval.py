@@ -3,7 +3,7 @@
 import math
 import unittest
 
-from modules.render.layers.flow.motion_3d_layer import frame_interval
+from modules.render.layers.flow.motion_layer import frame_interval
 
 TICK: float = 1.0 / 60.0
 

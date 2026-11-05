@@ -260,8 +260,8 @@ class Fluid2D:
         self._temperature_fbo.clear_all()
         self._pressure_fbo.clear_all()
 
-    def update(self) -> None:
-        """Run one frame of the 2D fluid simulation pipeline."""
+    def update(self, dt: float) -> None:
+        """Run one frame of the 2D fluid simulation pipeline; `dt` is the tick's measured length (s)."""
         if not self._allocated:
             return
 
@@ -269,7 +269,7 @@ class Fluid2D:
         self._handle_deferred_actions()
 
         # Per-frame state
-        self._step_time()
+        self._step_time(dt)
 
         # Dampen velocity (clean input for all steps)
         vel: VelocitySettings = self.settings.velocity
@@ -612,12 +612,9 @@ class Fluid2D:
         """The time step of the last update (s)."""
         return self._dt
 
-    def _step_time(self) -> None:
+    def _step_time(self, dt: float) -> None:
         s = self.settings
-        self._dt = self._time_step.update(s.time_step, s.fps, s.fixed_fps, s.fps_smoothing)
-        step_fps: float = round(1.0 / self._dt, 1)
-        if step_fps != s.step_fps:
-            s.step_fps = step_fps
+        self._dt = self._time_step.update(s.time_step, dt, s.fixed_fps, s.fps_smoothing)
 
     def _scale_iterations(self, base_iterations: int) -> int:
         """Scale solver iterations proportionally to dt.

@@ -228,7 +228,7 @@ class Fluid2DLayer(LayerBase):
         prev_sw, prev_sh = self._fluid.sim_width, self._fluid.sim_height
 
         # Update fluid simulation (handles its own reallocation internally)
-        self._fluid.update()
+        self._fluid.update(1.0 / self.settings.fluid.fps)
 
         # Resize visualizer if sim dims changed
         if self._fluid.sim_width != prev_sw or self._fluid.sim_height != prev_sh:

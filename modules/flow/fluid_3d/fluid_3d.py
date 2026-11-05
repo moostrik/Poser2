@@ -346,8 +346,8 @@ class Fluid3D:
         self._temperature.clear_all()
         self._pressure.clear_all()
 
-    def update(self) -> None:
-        """Run one frame of the 3D fluid simulation pipeline."""
+    def update(self, dt: float) -> None:
+        """Run one frame of the 3D fluid simulation pipeline; `dt` is the tick's measured length (s)."""
         if not self._allocated:
             return
 
@@ -355,7 +355,7 @@ class Fluid3D:
         self._handle_deferred_actions()
 
         # Per-frame state
-        self._step_time()
+        self._step_time(dt)
 
         # Z metric from live settings: solvers see sim-grid cell size, advection sees slab thickness
         spacing = max(1.0, self.settings.volume.spacing)
@@ -743,12 +743,9 @@ class Fluid3D:
         """The time step of the last update (s)."""
         return self._dt
 
-    def _step_time(self) -> None:
+    def _step_time(self, dt: float) -> None:
         s = self.settings
-        self._dt = self._time_step.update(s.time_step, s.fps, s.fixed_fps, s.fps_smoothing)
-        step_fps: float = round(1.0 / self._dt, 1)
-        if step_fps != s.step_fps:
-            s.step_fps = step_fps
+        self._dt = self._time_step.update(s.time_step, dt, s.fixed_fps, s.fps_smoothing)
 
     def _scale_iterations(self, base_iterations: int) -> int:
         """Scale solver iterations proportionally to dt.

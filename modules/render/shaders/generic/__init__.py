@@ -4,6 +4,7 @@ from .tint import              Tint
 from .draw_roi import          DrawRoi
 from .draw_circles import      DrawCircles
 from .density_colorize import  DensityColorize
+from .density_color import     DensityColor
 from .depth_mask import        DepthMask
 from .depth_view import        DepthView
 from .depth_align import       DepthAlign

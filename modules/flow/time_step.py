@@ -9,8 +9,11 @@ class TimeStepMode(IntEnum):
     FIXED =    1    # one step of 1 / `fixed_fps` per frame, whatever the render rate: runs compare
 
 
+MAX_DT: float = 1.0     # s: a longer tick is a stall, stepped as one second
+
+
 class TimeStep:
-    """dt per tick. Plain arithmetic, no clock: the caller hands in the rate it measured."""
+    """dt per tick. Plain arithmetic, no clock: the caller hands in the tick's dt it measured."""
 
     def __init__(self, fps: float = 60.0) -> None:
         self._dt: float = 1.0 / fps
@@ -19,12 +22,13 @@ class TimeStep:
     def dt(self) -> float:
         return self._dt
 
-    def update(self, mode: TimeStepMode, measured_fps: float, fixed_fps: float, smoothing: float) -> float:
-        """Advance one tick and return its dt. `smoothing` is the Ema's time constant in seconds; 0 follows each tick."""
+    def update(self, mode: TimeStepMode, dt: float, fixed_fps: float, smoothing: float) -> float:
+        """Advance one tick and return its dt: `dt`, the tick's measured length (s), through the Ema,
+        or a fixed step. `smoothing` is the Ema's time constant in seconds; 0 follows each tick."""
         if mode == TimeStepMode.FIXED:
             self._dt = 1.0 / max(1.0, fixed_fps)
             return self._dt
-        raw: float = 1.0 / max(1.0, measured_fps)
+        raw: float = min(max(dt, 0.0), MAX_DT)
         if smoothing <= 0.0:
             self._dt = raw
         else:

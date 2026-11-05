@@ -27,33 +27,9 @@ from modules.flow import (
 )
 
 from modules.utils import HotReloadMethods
+from .motion_layer import frame_interval
 
 logger = logging.getLogger(__name__)
-
-MAX_FRAME_INTERVAL: float = 0.5     # s: a longer gap between two captures is a pause or a loop, not a frame's
-FRAME_PERIOD_BAND: tuple[float, float] = (0.5, 2.0)    # a capture gap is held to this share of the frame interval
-FRAME_PERIOD_WEIGHT: float = 0.05   # weight of a new gap on the frame interval's Ema
-
-
-def frame_interval(timestamp: float | None, last: float | None, period: float | None, ticks: float,
-                   time_step: float) -> tuple[float, float | None]:
-    """The interval (s) a flow frame divides its motion by, and the frame period one frame on: the
-    gap between the capture times `last` and `timestamp`, held to FRAME_PERIOD_BAND of `period` (an
-    Ema of the gaps); a gap that is not a frame's (none, not finite, 0 or less, a pause or a loop)
-    takes `period`, else `ticks` (the time counted in ticks), else `time_step`. Never 0, negative or
-    not finite."""
-    if period is not None and not (math.isfinite(period) and period > 0.0):
-        period = None
-    gap: float = timestamp - last if timestamp is not None and last is not None else math.nan
-    if not (math.isfinite(gap) and 0.0 < gap < MAX_FRAME_INTERVAL):
-        if period is not None:
-            return period, period
-        return (ticks if math.isfinite(ticks) and ticks > 0.0 else time_step), None
-    if period is None:
-        return gap, gap
-    low, high = FRAME_PERIOD_BAND
-    gap = min(max(gap, low * period), high * period)
-    return gap, period + FRAME_PERIOD_WEIGHT * (gap - period)
 
 
 @runtime_checkable

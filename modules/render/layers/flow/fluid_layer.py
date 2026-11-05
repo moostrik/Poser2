@@ -2,11 +2,17 @@
 
 `FluidInput` is what the app hands it each tick: `dt` and one `Injection` per bridge output the
 fluid takes. Both hold values only: a texture field holds the `Fbo`, `SwapFbo` or `Tensor` object
-itself, never a buffer taken from it. The fluid knows injections, not cameras."""
+itself, never a buffer taken from it. The fluid knows injections, not cameras.
 
+`FluidLayer` is the shape the 2D and the 3D fluid layer share: it injects each injection at its
+weight and steps the fluid on the input's `dt`."""
+
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from modules.gl import Texture
+from modules.gl import Texture, Style, Blit
+from modules.settings import Field, BaseSettings
+from ..layer_base import LayerBase
 
 
 @dataclass
@@ -28,3 +34,60 @@ class FluidInput:
     """What a fluid takes this tick: `dt`, the render tick's, and its injections."""
     dt: float
     injections: list[Injection] = field(default_factory=list)
+
+
+class FluidLayerSettings(BaseSettings):
+    """What the 2D and the 3D fluid layer share; each adds its fluid's group."""
+    blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
+
+
+class FluidLayer(LayerBase, ABC):
+    """The fluid stage's layer. `set_input` before the render loop; `update` injects each injection
+    (`_inject`), steps the fluid (`_step`) and draws its state (`_visualize`); `texture` is the show."""
+
+    def __init__(self, settings: FluidLayerSettings) -> None:
+        self.settings: FluidLayerSettings = settings
+        self._input: FluidInput | None = None
+
+    def set_input(self, input: FluidInput) -> None:
+        """What the fluid takes at its next update."""
+        self._input = input
+
+    @property
+    @abstractmethod
+    def texture(self) -> Texture: ...
+
+    @abstractmethod
+    def _inject(self, injection: Injection) -> None:
+        """Add the injection's velocity, density and temperature to the fluid at its weight."""
+
+    @abstractmethod
+    def _step(self, dt: float) -> None:
+        """Advance the fluid one tick."""
+
+    def _visualize(self) -> None:
+        """Draw the fluid's state the draw mode names; nothing where the fluid's density is the texture."""
+
+    # ========== Processing ==========
+
+    def update(self) -> None:
+        input: FluidInput | None = self._input
+        if input is None:
+            return
+
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.DISABLED)
+        for injection in input.injections:
+            self._inject(injection)
+        self._step(input.dt)
+        self._visualize()
+        Style.pop_style()
+
+    # ========== Rendering ==========
+
+    def draw(self) -> None:
+        Style.push_style()
+        Style.set_blend_mode(self.settings.blend_mode)
+        if self.texture.allocated:
+            Blit.use(self.texture)
+        Style.pop_style()

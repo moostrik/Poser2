@@ -39,13 +39,15 @@ class FlowBase(ABC):
 
     @property
     def _input(self) -> Texture:
-        """Protected: Input buffer texture. Access via domain-specific properties in derived classes."""
-        return self._input_fbo.texture
+        """Protected: the input buffer, the `SwapFbo` itself, so it is always its current buffer and
+        can be held across a swap. Access via domain-specific properties in derived classes."""
+        return self._input_fbo
 
     @property
     def _output(self) -> Texture:
-        """Protected: Output buffer texture. Access via domain-specific properties in derived classes."""
-        return self._output_fbo.texture
+        """Protected: the output buffer, the `SwapFbo` itself, so it is always its current buffer and
+        can be held across a swap (`swap_handle`). Access via domain-specific properties in derived classes."""
+        return self._output_fbo
 
     @property
     def allocated(self) -> bool:
