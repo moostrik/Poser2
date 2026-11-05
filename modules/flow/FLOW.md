@@ -227,6 +227,15 @@ The shader loader finds a shader's source by its `.py` module name beside it
   from the connected names and the visualization settings on the view layer; two view layers
   show A beside B. The kinetic strip becomes a general mode beside the scalar and the arrows: the
   amount of a channel, x, y, z or w, over the last seconds.
+- The swap buffers hand out no handles, after the views. `SwapFbo.texture` names a buffer of a
+  thing that is a texture itself and hands out a handle that goes stale at the next swap; a
+  double buffer's one extra is the previous buffer, read while the current is written. The
+  change, in `modules/gl` and its readers: `SwapFbo.texture` and `Texture.texture` go, the
+  object itself is the current buffer; `back_texture` becomes `back`, still a handle valid until
+  the next swap; `SwapTexture3D` and `SwapTexture2DArray` the same; every reader follows (82
+  `back_texture` reads in 27 files, and the `.texture` reads on swap buffers among the flow's 91
+  `.texture` reads). A layer's `texture` keeps its meaning, the layer's output. The glossary
+  gets the term.
 - The trail's output size. The 2D smooth trail and the 3D velocity trail bridge run their
   smoothing and blur at the layer's output size (`allocate(width, height, output_width,
   output_height)`), 2160 × 3840 in the large layers, while the flow measures at 512 × 288, so the
