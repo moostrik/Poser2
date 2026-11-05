@@ -239,14 +239,6 @@ The shader loader finds a shader's source by its `.py` module name beside it
 
 ## Open
 
-- The trail's output size. The 2D smooth trail and the 3D velocity trail bridge run their
-  smoothing and blur at the bridge's `width` by `height`, 2160 × 3840 in both apps' presets, while
-  the flow measures at 512 × 288, so the density bridge reads a full-resolution velocity; the
-  magnitude and the temperature bridge sample it down. The bridge's GPU timer says what it costs;
-  lowering the bridge's size toward the flow's is the fix if it is the bridge's biggest cost.
-- hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
-  the pose's motion, a settings field written per tick. A per-tick value on the fluid layer, as the
-  eye is, would take it off the settings.
 - The wait for vsync. A frame is measured at the first render tick after it arrives, up to one
   60 Hz tick later. Measuring on arrival means the motion stage on its own thread, driven by the
   camera, with its own GL context: the one GL outside the render thread. To measure the
@@ -261,3 +253,6 @@ The shader loader finds a shader's source by its `.py` module name beside it
   one; removing them changes the show and is a change of its own.
 - A 2D bridge after a 3D motion, or the reverse, is expressible: a `BridgeInput` holds a velocity
   texture, and a 2D bridge reads its x and y. Nothing needs a mixed pair.
+- hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
+  the pose's motion, a settings field written per tick. A per-tick value on the fluid layer, as the
+  eye is, would take it off the settings.
