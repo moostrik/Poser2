@@ -533,7 +533,7 @@
         "toggle_scalar": false,
         "scale": 1.0,
         "spacing": 20.0,
-        "element_length": 40.0,
+        "element_length": 2.0,
         "element_width": 1.0
       },
       "optical_flow": {
@@ -617,7 +617,7 @@
         "toggle_scalar": false,
         "scale": 1.0,
         "spacing": 20.0,
-        "element_length": 40.0,
+        "element_length": 2.0,
         "element_width": 1.0
       }
     },
