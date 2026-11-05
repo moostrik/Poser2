@@ -80,6 +80,32 @@ class FixedViewTest(unittest.TestCase):
         self.assertFalse(self.geometry.ready)
 
 
+class DepthViewTest(unittest.TestCase):
+    """The view's share of the camera's field of view, and the depth's sample step in the view."""
+
+    def setUp(self) -> None:
+        self.settings = CenterGeometrySettings()
+        self.settings.follow_pose = False
+        self.settings.fixed_height = 0.5
+        self.geometry = CenterGeometry(0, cast(HasFrames, FakeBoard()), cast(Texture, FakeTexture()), self.settings, fov=90.0)
+        self.geometry.update()
+
+    def test_the_span_is_the_crops_share_of_the_image_span(self) -> None:
+        crop = self.geometry.image_geometry.crop_roi
+        self.assertAlmostEqual(self.geometry.view_span, crop.width * 2.0)      # 90°: the image spans 2 m per metre of depth
+
+    def test_the_depth_step_is_a_sample_over_the_crop(self) -> None:
+        crop = self.geometry.image_geometry.crop_roi
+        step = self.geometry.depth_step((1.0 / 320.0, 1.0 / 200.0))
+        self.assertAlmostEqual(step[0], 1.0 / 320.0 / crop.width)
+        self.assertAlmostEqual(step[1], 1.0 / 200.0 / crop.height)
+
+    def test_no_field_of_view_spans_nothing(self) -> None:
+        geometry = CenterGeometry(0, cast(HasFrames, FakeBoard()), cast(Texture, FakeTexture()), self.settings)
+        geometry.update()
+        self.assertEqual(geometry.view_span, 0.0)
+
+
 class FixedWindowTest(unittest.TestCase):
     def test_a_full_height_window_is_centered_with_the_output_aspect_in_pixels(self) -> None:
         cam_aspect: float = 896.0 / 720.0

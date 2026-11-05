@@ -1,12 +1,12 @@
 """Deep Flow render — split-view layer graph with 3D volumetric fluid."""
 
-import math
 from threading import Event
 from typing import cast
 
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId
+from modules.flow import DepthView
 from modules.render import layers as ls, make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, HotReloadMethods
 
@@ -87,7 +87,6 @@ class DeepFlowRender(RenderBase):
         self.num_cams: int = num_cams
         self.settings: RenderSettings = settings
         self._flow_sources: dict[Layers, Layers] = flow_sources(mask_source)
-        self._image_span: float = 2.0 * math.tan(math.radians(fov) / 2.0)     # metres the camera image spans per metre of depth
 
         self.board: RenderBoard = board
 
@@ -129,7 +128,7 @@ class DeepFlowRender(RenderBase):
             pose_compositor = self.L[Layers.pose][i] =      ls.PoseCompositor(      i, self.board,   cam_image.texture, cam_crop, settings.preview.pose,      settings.colors)
 
             # placed by the pose of the capture it shows, so view, image and depth are one moment
-            center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, cast(HasFrames, CapturePoses(self.board)), cam_image.texture, settings.center.geometry)
+            center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, cast(HasFrames, CapturePoses(self.board)), cam_image.texture, settings.center.geometry, fov)
             center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask.texture,       space, settings.center.mask)
             cmt[i] = center_mask.texture
             center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image.texture,  cmt[i], settings.center.cam)
@@ -249,13 +248,11 @@ class DeepFlowRender(RenderBase):
         for i, _flow_layer in self.L[Layers.motion].items():
             flow_layer = cast(ls.Motion3DLayer, _flow_layer)
             flow_layer.set_time_step(1.0 / self.settings.fluid.fluid.step_fps)
-            flow_layer.set_depth_input(cast(ls.CenterDepthLayer, self.L[Layers.center_depth][i]).depth)
-            crop: Rect = cast(ls.CenterGeometry, self.L[Layers.center_geometry][i]).image_geometry.crop_roi
-            flow_layer.set_view_span(crop.width * self._image_span)
-            # one of the depth's own samples in the view; the depth is coarser than the view, stretched onto it
-            depth: Texture = cast(ls.DepthSourceLayer, self.L[Layers.cam_depth][i]).depth
-            if depth.allocated and crop.width > 0.0 and crop.height > 0.0:
-                flow_layer.set_depth_step((1.0 / (depth.width * crop.width), 1.0 / (depth.height * crop.height)))
+            depth: DepthView = cast(ls.CenterDepthLayer, self.L[Layers.center_depth][i]).depth_view
+            flow_layer.set_depth_input(depth.texture)
+            flow_layer.set_view_span(depth.view_span)
+            if depth.depth_step != (0.0, 0.0):
+                flow_layer.set_depth_step(depth.depth_step)
             if flow_key in self.L and i in self.L[flow_key] and i in self.L[flow_source_key]:
                 flow_layer.set_flow_input(self.L[flow_key][i].texture)
                 flow_layer.set_flow_source(self.L[flow_source_key][i])

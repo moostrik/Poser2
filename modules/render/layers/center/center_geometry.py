@@ -76,10 +76,12 @@ class CenterGeometry(LayerBase):
     is what turns them into true proportions.
     """
 
-    def __init__(self, cam_id: int, board: HasFrames, cam_texture: Texture, settings: CenterGeometrySettings | None = None) -> None:
+    def __init__(self, cam_id: int, board: HasFrames, cam_texture: Texture, settings: CenterGeometrySettings | None = None, fov: float = 0.0) -> None:
+        """`fov` is the camera image's horizontal field of view (degrees), for `view_span`; 0 for a camera without depth."""
         self._cam_id: int = cam_id
         self._board: HasFrames = board
         self._cam_texture: Texture = cam_texture
+        self._image_span: float = 2.0 * math.tan(math.radians(fov) / 2.0)     # metres the camera image spans per metre of depth
         self._data_cache: DataCache[Frame] = DataCache[Frame]()
 
         # Configuration
@@ -125,6 +127,20 @@ class CenterGeometry(LayerBase):
     def bbox_geometry(self) -> BboxGeometry:
         """Bbox rendering geometry for mask/flow (crop ROI, rotation, rotation center, aspect)."""
         return self._bbox_geometry
+
+    @property
+    def view_span(self) -> float:
+        """The metres one width of the view spans per metre of depth: the crop's share of the camera
+        image's field of view; 0 without a field of view."""
+        return self._cam_geometry.crop_roi.width * self._image_span
+
+    def depth_step(self, sample_size: tuple[float, float]) -> tuple[float, float]:
+        """The uv between two samples in the view, for a texture on the camera image whose samples are
+        `sample_size` (uv) apart; (0, 0) while the view has no size."""
+        crop: Rect = self._cam_geometry.crop_roi
+        if crop.width <= 0.0 or crop.height <= 0.0:
+            return (0.0, 0.0)
+        return (sample_size[0] / crop.width, sample_size[1] / crop.height)
 
     def source_roi(self, space: SourceSpace, source: Texture) -> tuple[Rect, float, Point2f, float]:
         """What `DrawRoi` takes to center a texture in `space`: its ROI, rotation, rotation center and

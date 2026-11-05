@@ -5,11 +5,13 @@ from OpenGL.GL import GL_NEAREST, GL_R32F, GL_RGBA16F
 
 # Local application imports
 from modules.gl import Fbo, Style, Texture
+from modules.flow import DepthView
 from modules.settings import BaseSettings, Field
 from ..layer_base import LayerBase
 from ..source import DepthSourceLayer, DepthSourceLayerSettings
 from .center_geometry import CenterGeometry, SourceSpace
-from ...shaders import DepthView, DrawRoi, MaskApply
+from ... import shaders
+from ...shaders import DrawRoi, MaskApply
 
 
 class CenterDepthLayerSettings(BaseSettings):
@@ -38,7 +40,7 @@ class CenterDepthLayer(LayerBase):
         self._view: Fbo = Fbo()
         self._masked: Fbo = Fbo()
         self._roi_shader: DrawRoi = DrawRoi()
-        self._view_shader: DepthView = DepthView()
+        self._view_shader: shaders.DepthView = shaders.DepthView()     # the depth as a picture
         self._mask_shader: MaskApply = MaskApply()
         self._output: Fbo = self._view
 
@@ -46,6 +48,12 @@ class CenterDepthLayer(LayerBase):
     def depth(self) -> Texture:
         """Metres in red, unmasked; 0 where there is no depth."""
         return self._depth
+
+    @property
+    def depth_view(self) -> DepthView:
+        """The depth as the flow measures z from it: `depth`, with the view's span and the uv between
+        two of the depth's own samples in it."""
+        return DepthView(self._depth, self._geometry.view_span, self._geometry.depth_step(self._depth_source.sample_size))
 
     @property
     def texture(self) -> Texture:

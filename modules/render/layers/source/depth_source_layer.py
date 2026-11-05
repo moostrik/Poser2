@@ -67,6 +67,13 @@ class DepthSourceLayer(LayerBase):
         return self._depth
 
     @property
+    def sample_size(self) -> tuple[float, float]:
+        """The uv one depth sample covers on the camera image; (0, 0) before the first frame."""
+        if not self._depth.allocated or self._depth.width <= 0 or self._depth.height <= 0:
+            return (0.0, 0.0)
+        return (1.0 / self._depth.width, 1.0 / self._depth.height)
+
+    @property
     def dirty(self) -> bool:
         return self._dirty
 
