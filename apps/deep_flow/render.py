@@ -361,11 +361,11 @@ class DeepFlowRender(RenderBase):
 
         # Left panel
         left_rect: Rect = self.subdivision.get_rect('panels', 0)
-        self._draw_fit(self._left_layers, left_rect.x, height - left_rect.y - left_rect.height, left_rect.width, left_rect.height)
+        self._draw_fit(self._left_layers, left_rect.x, height - left_rect.y - left_rect.height, left_rect.width, left_rect.height, True)
 
         # Right panel
         right_rect: Rect = self.subdivision.get_rect('panels', 1)
-        self._draw_fit(self._right_layers, right_rect.x, height - right_rect.y - right_rect.height, right_rect.width, right_rect.height)
+        self._draw_fit(self._right_layers, right_rect.x, height - right_rect.y - right_rect.height, right_rect.width, right_rect.height, True)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
         clear_color()
@@ -378,8 +378,8 @@ class DeepFlowRender(RenderBase):
 
         Style.pop_style()
 
-    def _draw_fit(self, layer_types: list[Layers], x: float, y: float, width: float, height: float) -> None:
-        """Draw each layer into a GL rect (origin bottom left) at its own shape, centered."""
+    def _draw_fit(self, layer_types: list[Layers], x: float, y: float, width: float, height: float, border: bool = False) -> None:
+        """Draw each layer into a GL rect (origin bottom left) at its own shape, centered; with `border`, a border around each."""
         if width <= 0 or height <= 0:
             return
         for layer_type in layer_types:
@@ -387,7 +387,8 @@ class DeepFlowRender(RenderBase):
                 fit_x, fit_y, fit_width, fit_height = fit(*self._layer_size(layer_type), width, height)
                 glViewport(int(x + fit_x), int(y + fit_y), int(fit_width), int(fit_height))
                 self.L[layer_type][0].draw()
-                self._draw_border(fit_width, fit_height)
+                if border:
+                    self._draw_border(fit_width, fit_height)
 
     def _draw_border(self, width: float, height: float) -> None:
         """A border around the current viewport, `width` by `height` pixels."""
