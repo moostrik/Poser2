@@ -70,6 +70,8 @@ class Layers(IntEnum):
     motion =        auto()
     bridge =        auto()
     fluid =         auto()
+    monitor_a =     auto()
+    monitor_b =     auto()
     composite =     auto()
 
 
@@ -281,6 +283,8 @@ class RenderSettings(BaseSettings):
     motion : Group[layers.Motion3DLayerSettings] = Group(layers.Motion3DLayerSettings)
     bridge : Group[layers.Bridge3DLayerSettings] = Group(layers.Bridge3DLayerSettings)
     fluid  : Group[layers.Fluid3DLayerSettings]  = Group(layers.Fluid3DLayerSettings)
+    monitor_a: Group[layers.MonitorLayerSettings] = Group(layers.MonitorLayerSettings)
+    monitor_b: Group[layers.MonitorLayerSettings] = Group(layers.MonitorLayerSettings)
     time_series: Group[layers.TimeSeriesLayerSettings] = Group(layers.TimeSeriesLayerSettings)
     colors : Group[ColorSettings]                = Group(ColorSettings)
     window : Group[WindowSettings]               = Group(WindowSettings)

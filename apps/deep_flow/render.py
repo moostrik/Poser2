@@ -38,6 +38,8 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.motion,
     Layers.bridge,
     Layers.fluid,
+    Layers.monitor_a,
+    Layers.monitor_b,
     Layers.composite,
 ]
 
@@ -50,6 +52,8 @@ LARGE_LAYERS: list[Layers] = [
     Layers.motion,
     Layers.bridge,
     Layers.fluid,
+    Layers.monitor_a,
+    Layers.monitor_b,
     Layers.composite,
 ]
 
@@ -132,6 +136,8 @@ class DeepFlowRender(RenderBase):
             self.L[Layers.motion][i] =                      ls.Motion3DLayer(       i, settings.motion)
             self.L[Layers.bridge][i] =                      ls.Bridge3DLayer(       settings.bridge)
             fluid =         self.L[Layers.fluid][i] =       ls.Fluid3DLayer(        settings.fluid)
+            self.L[Layers.monitor_a][i] =                   ls.MonitorLayer(        settings.monitor_a)
+            self.L[Layers.monitor_b][i] =                   ls.MonitorLayer(        settings.monitor_b)
 
             composite =    self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid, ms_mask],         settings.layer.composite)
 
@@ -262,7 +268,8 @@ class DeepFlowRender(RenderBase):
 
     def _wire_flow(self) -> None:
         """Build each stage's input from the layers the panel names and the stage before: a motion and
-        a bridge input per camera, a fluid input per fluid with one injection per bridge, at its weight."""
+        a bridge input per camera, a fluid input per fluid with one injection per bridge, at its weight,
+        and the monitors' input from every stage's ports."""
         inputs: FlowInputSettings = self.settings.inputs
         dt: float = self._dt
         bridges: dict[int, ls.Bridge3DLayer] = {i: cast(ls.Bridge3DLayer, layer) for i, layer in self.L[Layers.bridge].items()}
@@ -290,6 +297,18 @@ class DeepFlowRender(RenderBase):
                                                self._weight(pose, i, j)))
             fluid.set_input(ls.FluidInput(dt, injections))
             fluid.set_eye(*self._eye(i, pose, dt))
+
+        for i, _motion in self.L[Layers.motion].items():
+            if i not in bridges or i not in self.L[Layers.fluid]:
+                continue
+            textures: dict[ls.FlowStage, dict[str, ls.Port]] = {
+                ls.FlowStage.MOTION: cast(ls.Motion3DLayer, _motion).output.textures,
+                ls.FlowStage.BRIDGE: bridges[i].output.textures,
+                ls.FlowStage.FLUID: cast(ls.Fluid3DLayer, self.L[Layers.fluid][i]).output.textures,
+            }
+            for key in (Layers.monitor_a, Layers.monitor_b):
+                if i in self.L[key]:
+                    cast(ls.MonitorLayer, self.L[key][i]).set_input(ls.MonitorInput(textures))
 
     def _weight(self, pose: Frame | None, own_cam: int, cam_id: int) -> float:
         """The share of camera `cam_id`'s bridge in camera `own_cam`'s fluid: its player's motion for the

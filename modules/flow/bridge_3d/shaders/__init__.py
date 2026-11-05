@@ -9,8 +9,6 @@ from .kinetic_onset import KineticOnset
 from .kinetic_patch import KineticPatch
 from .kinetic_projection import KineticProjection, Projection
 from .kinetic_reservoir import KineticReservoir
-from .kinetic_strip_shader import KineticStripShader
-from .kinetic_summary import KineticSummary
 from .kinetic_velocity import KineticVelocity
 from .scale_velocity import ScaleVelocity
 from .velocity_event import Event, VelocityEvent

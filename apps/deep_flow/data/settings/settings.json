@@ -272,7 +272,7 @@
     "layer": {
       "select": {
         "left": [
-          "motion"
+          "monitor_a"
         ],
         "right": [
           "fluid"
@@ -404,8 +404,6 @@
       "far": 1.7
     },
     "motion": {
-      "draw_mode": "VELOCITY",
-      "blend_mode": "ADD",
       "width": 448,
       "height": 800,
       "lucas_kanade": {
@@ -430,21 +428,9 @@
           "dead_zone": 0.02,
           "threshold": 1.0
         }
-      },
-      "visualization": {
-        "toggle_scalar": false,
-        "scale": 1.07,
-        "scalar_scale": 1.0,
-        "strip_scale": 5.76,
-        "spacing": 64.0,
-        "z_scale": 1.0,
-        "element_length": 1.0,
-        "element_width": 2.5
       }
     },
     "bridge": {
-      "draw_mode": "VELOCITY",
-      "blend_mode": "ADD",
       "method": "VELOCITY_TRAIL",
       "trail": {
         "advect": 1.0,
@@ -487,7 +473,31 @@
       },
       "temperature": {
         "scale": 0.5
-      },
+      }
+    },
+    "monitor_a": {
+      "stage": "MOTION",
+      "texture": "velocity",
+      "mode": "AUTO",
+      "channel": "X",
+      "blend_mode": "ADD",
+      "visualization": {
+        "toggle_scalar": false,
+        "scale": 1.07,
+        "scalar_scale": 1.0,
+        "strip_scale": 5.76,
+        "spacing": 64.0,
+        "z_scale": 1.0,
+        "element_length": 1.0,
+        "element_width": 2.5
+      }
+    },
+    "monitor_b": {
+      "stage": "BRIDGE",
+      "texture": "velocity",
+      "mode": "AUTO",
+      "channel": "X",
+      "blend_mode": "ADD",
       "visualization": {
         "toggle_scalar": false,
         "scale": 1.07,

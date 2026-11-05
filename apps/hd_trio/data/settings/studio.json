@@ -383,7 +383,7 @@
       "select": {
         "preview": [
           "fluid",
-          "motion",
+          "monitor_a",
           "data_B_W"
         ],
         "final": [
@@ -524,17 +524,8 @@
       }
     },
     "motion": {
-      "draw_mode": "VELOCITY",
-      "blend_mode": "ADD",
       "width": 512,
       "height": 288,
-      "visualization": {
-        "toggle_scalar": false,
-        "scale": 1.0,
-        "spacing": 20.0,
-        "element_length": 2.0,
-        "element_width": 1.0
-      },
       "gradient": {
         "offset": 3,
         "threshold": 0.0,
@@ -543,8 +534,11 @@
         "boost": 0.0
       }
     },
-    "bridge": {
-      "draw_mode": "VELOCITY",
+    "monitor_a": {
+      "stage": "BRIDGE",
+      "texture": "velocity",
+      "mode": "AUTO",
+      "channel": "X",
       "blend_mode": "ADD",
       "visualization": {
         "toggle_scalar": false,
@@ -552,7 +546,23 @@
         "spacing": 20.0,
         "element_length": 2.0,
         "element_width": 1.0
-      },
+      }
+    },
+    "monitor_b": {
+      "stage": "FLUID",
+      "texture": "density",
+      "mode": "AUTO",
+      "channel": "X",
+      "blend_mode": "ADD",
+      "visualization": {
+        "toggle_scalar": false,
+        "scale": 1.0,
+        "spacing": 20.0,
+        "element_length": 2.0,
+        "element_width": 1.0
+      }
+    },
+    "bridge": {
       "trail": {
         "scale": 1.54,
         "trail_weight": 0.9,
@@ -568,7 +578,6 @@
       }
     },
     "fluid": {
-      "draw_mode": "DENSITY",
       "blend_mode": "ADD",
       "fluid": {
         "profile": false,
@@ -612,13 +621,6 @@
           "iterations": 40,
           "boundary": "OPEN"
         }
-      },
-      "visualization": {
-        "toggle_scalar": false,
-        "scale": 1.0,
-        "spacing": 20.0,
-        "element_length": 2.0,
-        "element_width": 1.0
       }
     },
     "colors": {

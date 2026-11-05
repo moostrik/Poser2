@@ -1,17 +1,17 @@
 #version 460 core
 
-// Kinetic Strip Shader
+// Strip Roll Shader
 // A rolling plot, drawn on the GPU so nothing is read back: everything moves one column left
-// and the last column gets one bar per lane, the frame-wide mean of that lane's field
+// and the last column gets one bar per lane, the frame-wide mean amount of that channel
 
 uniform sampler2D tex0;  // Previous strip
-uniform sampler2D tex1;  // Summary, its top mip the mean (speed, onset, release, emission)
+uniform sampler2D tex1;  // Summary, its top mip the mean amount of (x, y, z, w)
 uniform float scale;     // Multiplier on the bars
 
 out vec4 fragColor;
 
 const int LANES = 4;
-const vec3 COLORS[LANES] = vec3[](vec3(1.0), vec3(1.0, 0.45, 0.1), vec3(0.1, 0.5, 1.0), vec3(1.0, 0.85, 0.3));
+const vec3 COLORS[LANES] = vec3[](vec3(1.0, 0.35, 0.3), vec3(0.3, 1.0, 0.4), vec3(0.3, 0.55, 1.0), vec3(1.0));
 
 void main() {
     ivec2 size = textureSize(tex0, 0);

@@ -8,16 +8,18 @@ from pathlib import Path
 
 from modules.settings import BaseSettings, Group
 from modules.render.layers import Motion2DLayerSettings, Bridge2DLayerSettings, Fluid2DLayerSettings, \
-                                  Motion3DLayerSettings, Bridge3DLayerSettings, Fluid3DLayerSettings
+                                  Motion3DLayerSettings, Bridge3DLayerSettings, Fluid3DLayerSettings, MonitorLayerSettings
 
 ROOT: Path = Path(__file__).resolve().parents[3]
 PRESETS_2D: list[Path] = [ROOT / 'apps' / 'hd_trio' / 'data' / 'settings' / name for name in ('studio.json', 'umu.json')]
 PRESETS_3D: list[Path] = [ROOT / 'apps' / 'deep_flow' / 'data' / 'settings' / 'settings.json']
 SOURCES: list[Path] = [ROOT / 'modules' / 'flow', ROOT / 'modules' / 'render' / 'layers' / 'flow']
-STAGES: tuple[str, ...] = ('motion', 'bridge', 'fluid')
+STAGES: tuple[str, ...] = ('motion', 'bridge', 'fluid', 'monitor_a', 'monitor_b')
 SYSTEMS: dict[str, dict[str, type[BaseSettings]]] = {
-    '2D': {'motion': Motion2DLayerSettings, 'bridge': Bridge2DLayerSettings, 'fluid': Fluid2DLayerSettings},
-    '3D': {'motion': Motion3DLayerSettings, 'bridge': Bridge3DLayerSettings, 'fluid': Fluid3DLayerSettings},
+    '2D': {'motion': Motion2DLayerSettings, 'bridge': Bridge2DLayerSettings, 'fluid': Fluid2DLayerSettings,
+           'monitor_a': MonitorLayerSettings, 'monitor_b': MonitorLayerSettings},
+    '3D': {'motion': Motion3DLayerSettings, 'bridge': Bridge3DLayerSettings, 'fluid': Fluid3DLayerSettings,
+           'monitor_a': MonitorLayerSettings, 'monitor_b': MonitorLayerSettings},
 }
 
 

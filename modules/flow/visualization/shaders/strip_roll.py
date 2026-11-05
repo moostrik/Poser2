@@ -1,13 +1,13 @@
-"""Kinetic Strip shader.
+"""Strip Roll shader.
 
-Rolls the strip one column and draws the new one from the summary's top mip.
+Rolls the strip one column and draws the new one from the summary's top mip, one lane per channel.
 """
 
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
-class KineticStripShader(Shader):
+class StripRoll(Shader):
     """Writes the previous strip moved one column left, with the new column at the right."""
 
     def use(self, previous: Texture, summary: Texture, scale: float) -> None:
@@ -15,7 +15,7 @@ class KineticStripShader(Shader):
 
         Args:
             previous: Previous strip
-            summary: Summary texture with mipmaps
+            summary: Summary texture with mipmaps, its top mip the mean amount per channel
             scale: Multiplier on the bars
         """
         if not self.allocated or not self.shader_program:

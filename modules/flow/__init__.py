@@ -17,13 +17,13 @@ from .motion import DepthView, DepthVelocity, DepthVelocitySettings, catch_up_sh
 # Bridges: the 3D bridge by name, the 2D bridge as `bridge_2d` (bridge_2d.DensityBridge, ...)
 from . import bridge_2d
 from .bridge_3d import  DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
-                        BlurPosition, KineticBridge, KineticBridgeSettings, KineticStrip, KINETIC_STRIP_LANES, decay_weight, project, stop_gate, hold_release, drop, fill_reservoir, advect, \
+                        BlurPosition, KineticBridge, KineticBridgeSettings, decay_weight, project, stop_gate, hold_release, drop, fill_reservoir, advect, \
                         VelocityTrailBridge, VelocityTrailBridgeSettings, velocity_trail, \
                         VelocityEventBridge, VelocityEventBridgeSettings, velocity_event, event_velocity, \
                         TemperatureBridge, TemperatureBridgeSettings
 
 # Visualization
-from .visualization import VisualizationFieldSettings, Visualizer, VelocityField, SignedField
+from .visualization import VisualizationFieldSettings, Visualizer, VelocityField, SignedField, Strip, STRIP_LANES
 
 # Shared by the 2D and 3D fluid
 from .time_step import TimeStep, TimeStepMode, hold_tick

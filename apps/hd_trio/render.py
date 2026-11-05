@@ -37,6 +37,8 @@ UPDATE_LAYERS: list[Layers] = [
     Layers.motion,
     Layers.bridge,
     Layers.fluid,
+    Layers.monitor_a,
+    Layers.monitor_b,
     # Layers.composite, -> updated via stage system
 ]
 
@@ -49,6 +51,8 @@ LARGE_LAYERS: list[Layers] = [
     Layers.motion,
     Layers.bridge,
     Layers.fluid,
+    Layers.monitor_a,
+    Layers.monitor_b,
     Layers.composite,
 ]
 
@@ -110,6 +114,8 @@ class HDTrioRender(RenderBase):
             self.L[Layers.motion][i] =                      ls.Motion2DLayer(       settings.motion)
             self.L[Layers.bridge][i] =                      ls.Bridge2DLayer(       settings.bridge)
             fluid =         self.L[Layers.fluid][i] =       ls.Fluid2DLayer(        settings.fluid)
+            self.L[Layers.monitor_a][i] =                   ls.MonitorLayer(        settings.monitor_a)
+            self.L[Layers.monitor_b][i] =                   ls.MonitorLayer(        settings.monitor_b)
 
             lut =           self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid, ms_mask],           settings.layer.composite)
 
@@ -221,6 +227,18 @@ class HDTrioRender(RenderBase):
                 color: Color = colors[j % len(colors)]
                 injections.append(ls.Injection(output.velocity, output.density, output.temperature, weight=weight, color=(color.r, color.g, color.b)))
             fluid.set_input(ls.FluidInput(dt, injections))
+
+        for i, _motion in self.L[Layers.motion].items():
+            if i not in bridges or i not in self.L[Layers.fluid]:
+                continue
+            textures: dict[ls.FlowStage, dict[str, ls.Port]] = {
+                ls.FlowStage.MOTION: cast(ls.Motion2DLayer, _motion).output.textures,
+                ls.FlowStage.BRIDGE: bridges[i].output.textures,
+                ls.FlowStage.FLUID: cast(ls.Fluid2DLayer, self.L[Layers.fluid][i]).output.textures,
+            }
+            for key in (Layers.monitor_a, Layers.monitor_b):
+                if i in self.L[key]:
+                    cast(ls.MonitorLayer, self.L[key][i]).set_input(ls.MonitorInput(textures))
 
     def update(self) -> None:
         self._notify_update()

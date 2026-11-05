@@ -6,16 +6,17 @@ from it, so an input built before the render loop names the object the stage bef
 
 `MotionLayer` is the shape the 2D and the 3D motion layer share: it measures once per camera frame,
 when the input's `timestamp` differs from the one it measured last, over the interval the stamps
-give (`frame_interval`), and visualizes every tick."""
+give (`frame_interval`). It draws nothing; the monitors draw its output's `textures`."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 
-from modules.gl import Texture, Style, Blit
-from modules.flow import DepthView, Visualizer, VisualizationFieldSettings
-from modules.settings import Field, BaseSettings, Group
+from modules.gl import Texture, Style
+from modules.flow import DepthView
+from modules.settings import Field, BaseSettings
 from ..layer_base import LayerBase
+from .port import Port
 
 MAX_FRAME_INTERVAL: float = 0.5     # s: a longer gap between two captures is a pause or a loop, not a frame's
 FRAME_PERIOD_BAND: tuple[float, float] = (0.5, 2.0)    # a capture gap is held to this share of the frame interval
@@ -60,35 +61,31 @@ class MotionInput:
 @dataclass
 class MotionOutput:
     """The motion stage's textures: `velocity` (x, y, z) in view widths per second, gated by the mask
-    with the flow's `use_mask`; z is 0 without depth."""
+    with the flow's `use_mask`, z 0 without depth; and `textures`, its ports for the monitors, the
+    velocity and what it measured on."""
     velocity: Texture
+    textures: dict[str, Port] = field(default_factory=dict)
 
 
 class MotionLayerSettings(BaseSettings):
-    """What the 2D and the 3D motion layer share; each adds its `draw_mode` and its optical flow's group."""
-    blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
+    """What the 2D and the 3D motion layer share; each adds its optical flow's group."""
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
-
-    visualization = Group(VisualizationFieldSettings)
 
 
 class MotionLayer(LayerBase, ABC):
     """The motion stage's layer. `set_input` before the render loop; `update` measures on a new camera
-    frame (`_measure`) and visualizes (`_visualize`); `output` is the stage's textures. The subclass
-    holds its optical flow in `_allocate_stages`, `_deallocate_stages`, `_reset_stages`, `_measure`
-    and `_visualize`; the flow runs at `settings.width` by `settings.height` and follows a change of
-    them, the visualization at the layer's own size."""
+    frame (`_measure`); `output` is the stage's textures. The subclass holds its optical flow in
+    `_allocate_stages`, `_deallocate_stages`, `_reset_stages` and `_measure`; the flow runs at
+    `settings.width` by `settings.height` and follows a change of them. The layer draws nothing."""
 
     def __init__(self, settings: MotionLayerSettings) -> None:
         self.settings: MotionLayerSettings = settings
         self._input: MotionInput | None = None
-        self._visualizer: Visualizer = Visualizer(settings.visualization)
         self._timestamp: float | None = None        # the capture time of the frame measured last
         self._frame_period: float | None = None     # the frame interval, an Ema of the capture gaps (s)
         self._ticks: float = 0.0                    # time counted in ticks since the last measurement (s)
         self._flow_size: tuple[int, int] = (0, 0)   # the size the flow runs at; follows settings.width/height
-        self._output_size: tuple[int, int] = (0, 0) # the layer's allocation size
 
     def set_input(self, input: MotionInput) -> None:
         """What the layer measures on at its next update."""
@@ -97,23 +94,16 @@ class MotionLayer(LayerBase, ABC):
     @property
     @abstractmethod
     def output(self) -> MotionOutput:
-        """The stage's textures, allocated once; what the bridge's input is built from."""
+        """The stage's textures, allocated once; what the bridge's and the monitors' inputs are built from."""
         ...
-
-    @property
-    def texture(self) -> Texture:
-        return self._visualizer.texture
 
     # ========== Lifecycle ==========
 
     def allocate(self, width: int, height: int, internal_format: int | None = None) -> None:
-        self._output_size = (width, height)
         self._allocate_flow()
-        self._visualizer.allocate(width, height)
 
     def deallocate(self) -> None:
         self._deallocate_flow()
-        self._visualizer.deallocate()
 
     def reset(self) -> None:
         """Start the flow from rest: the next frame is a first frame."""
@@ -124,7 +114,7 @@ class MotionLayer(LayerBase, ABC):
 
     def _allocate_flow(self) -> None:
         flow_width, flow_height = self._flow_size = (self.settings.width, self.settings.height)
-        self._allocate_stages(flow_width, flow_height, *self._output_size)
+        self._allocate_stages(flow_width, flow_height)
 
     def _deallocate_flow(self) -> None:
         self._deallocate_stages()
@@ -139,8 +129,8 @@ class MotionLayer(LayerBase, ABC):
         self.reset()
 
     @abstractmethod
-    def _allocate_stages(self, width: int, height: int, output_width: int, output_height: int) -> None:
-        """Allocate the optical flow at the flow's size; `output_width` by `output_height` is the layer's."""
+    def _allocate_stages(self, width: int, height: int) -> None:
+        """Allocate the optical flow at the flow's size."""
 
     @abstractmethod
     def _deallocate_stages(self) -> None: ...
@@ -152,10 +142,6 @@ class MotionLayer(LayerBase, ABC):
     def _measure(self, input: MotionInput, interval: float) -> None:
         """Measure the velocity between the frame measured last and `input.image`, `interval` seconds apart."""
 
-    @abstractmethod
-    def _visualize(self, input: MotionInput) -> None:
-        """Draw the texture `settings.draw_mode` names through the visualizer."""
-
     # ========== Processing ==========
 
     def update(self) -> None:
@@ -164,26 +150,16 @@ class MotionLayer(LayerBase, ABC):
             return
         self._follow_flow_size()
 
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
-
         self._ticks += input.dt
         if input.timestamp is None or input.timestamp != self._timestamp:
+            Style.push_style()
+            Style.set_blend_mode(Style.BlendMode.DISABLED)
             interval, self._frame_period = frame_interval(input.timestamp, self._timestamp, self._frame_period, self._ticks, input.dt)
             if input.timestamp is not None and math.isfinite(input.timestamp):
                 self._timestamp = input.timestamp
             self._measure(input, interval)
             self._ticks = 0.0
-
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
-        self._visualize(input)
-        Style.pop_style()
-
-    # ========== Rendering ==========
+            Style.pop_style()
 
     def draw(self) -> None:
-        Style.push_style()
-        Style.set_blend_mode(self.settings.blend_mode)
-        if self.texture.allocated:
-            Blit.use(self.texture)
-        Style.pop_style()
+        """A stage draws nothing; a monitor draws its textures."""

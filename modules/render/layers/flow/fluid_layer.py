@@ -1,11 +1,13 @@
 """The fluid stage: the layer that runs the Navier–Stokes simulation on what the bridges give it.
 
 `FluidInput` is what the app hands it each tick: `dt` and one `Injection` per bridge output the
-fluid takes. Both hold values only: a texture field holds the `Fbo`, `SwapFbo` or `Tensor` object
-itself, never a buffer taken from it. The fluid knows injections, not cameras.
+fluid takes. `FluidOutput` is what it hands out. All hold values only: a texture field holds the
+`Fbo`, `SwapFbo` or `Tensor` object itself, never a buffer taken from it. The fluid knows
+injections, not cameras.
 
 `FluidLayer` is the shape the 2D and the 3D fluid layer share: it injects each injection at its
-weight and steps the fluid on the input's `dt`."""
+weight and steps the fluid on the input's `dt`. Its texture is the show, which the composite draws;
+the monitors draw its output's `textures`."""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -13,6 +15,7 @@ from dataclasses import dataclass, field
 from modules.gl import Texture, Style, Blit
 from modules.settings import Field, BaseSettings
 from ..layer_base import LayerBase
+from .port import Port
 
 
 @dataclass
@@ -39,6 +42,13 @@ class FluidInput:
     injections: list[Injection] = field(default_factory=list)
 
 
+@dataclass
+class FluidOutput:
+    """The fluid stage's textures: `density`, the show, and `textures`, its ports for the monitors."""
+    density: Texture
+    textures: dict[str, Port] = field(default_factory=dict)
+
+
 class FluidLayerSettings(BaseSettings):
     """What the 2D and the 3D fluid layer share; each adds its fluid's group."""
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
@@ -46,7 +56,7 @@ class FluidLayerSettings(BaseSettings):
 
 class FluidLayer(LayerBase, ABC):
     """The fluid stage's layer. `set_input` before the render loop; `update` injects each injection
-    (`_inject`), steps the fluid (`_step`) and draws its state (`_visualize`); `texture` is the show."""
+    (`_inject`) and steps the fluid (`_step`); `output` is the stage's textures; `texture` is the show."""
 
     def __init__(self, settings: FluidLayerSettings) -> None:
         self.settings: FluidLayerSettings = settings
@@ -58,7 +68,15 @@ class FluidLayer(LayerBase, ABC):
 
     @property
     @abstractmethod
-    def texture(self) -> Texture: ...
+    def output(self) -> FluidOutput:
+        """The stage's textures, allocated once; what the monitors' inputs are built from."""
+        ...
+
+    @property
+    @abstractmethod
+    def texture(self) -> Texture:
+        """The show: the output's density."""
+        ...
 
     @abstractmethod
     def _inject(self, injection: Injection) -> None:
@@ -67,9 +85,6 @@ class FluidLayer(LayerBase, ABC):
     @abstractmethod
     def _step(self, dt: float) -> None:
         """Advance the fluid one tick."""
-
-    def _visualize(self) -> None:
-        """Draw the fluid's state the draw mode names; nothing where the fluid's density is the texture."""
 
     # ========== Processing ==========
 
@@ -83,7 +98,6 @@ class FluidLayer(LayerBase, ABC):
         for injection in input.injections:
             self._inject(injection)
         self._step(input.dt)
-        self._visualize()
         Style.pop_style()
 
     # ========== Rendering ==========

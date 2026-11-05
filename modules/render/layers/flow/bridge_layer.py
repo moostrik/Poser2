@@ -5,19 +5,20 @@ only: a texture field holds the `Fbo`, `SwapFbo` or `Tensor` object itself, neve
 from it.
 
 `BridgeLayer` is the shape the 2D and the 3D bridge layer share: it steps its bridges every tick on
-the input's `dt` (they are filters in time, so a velocity held between camera frames reads right),
-makes the density's color from the image, the tint and the mask, and visualizes."""
+the input's `dt` (they are filters in time, so a velocity held between camera frames reads right)
+and makes the density's color from the image, the tint and the mask. It draws nothing; the monitors
+draw its output's `textures`."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from OpenGL.GL import GL_RGBA16F
 
-from modules.gl import Fbo, Texture, Style, Blit
-from modules.flow import Visualizer, VisualizationFieldSettings
-from modules.settings import Field, BaseSettings, Group
+from modules.gl import Fbo, Texture, Style
+from modules.settings import BaseSettings
 from ..layer_base import LayerBase
 from ...shaders import DensityColor
+from .port import Port
 
 
 @dataclass
@@ -35,33 +36,30 @@ class BridgeInput:
 
 @dataclass
 class BridgeOutput:
-    """The bridge stage's textures, what the fluid injects: `velocity`; `density`, RGBA, the amount
-    times the color, with the amount as alpha; `temperature`; `onset`, a second velocity, or None;
-    `spin`, a curl at its `spin` setting, or None."""
+    """The bridge stage's textures, what the fluid injects: `velocity`; `density`, in 2D the amount
+    alone, in 3D RGBA, the amount times the color, with the amount as alpha; `temperature`; `onset`,
+    a second velocity, or None; `spin`, a curl at its `spin` setting, or None; and `textures`, its
+    ports for the monitors."""
     velocity: Texture
     density: Texture
     temperature: Texture
     onset: Texture | None = None
     spin: Texture | None = None
+    textures: dict[str, Port] = field(default_factory=dict)
 
 
 class BridgeLayerSettings(BaseSettings):
-    """What the 2D and the 3D bridge layer share; each adds its `draw_mode` and its bridges' groups."""
-    blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
-
-    visualization = Group(VisualizationFieldSettings)
+    """What the 2D and the 3D bridge layer share; each adds its bridges' groups."""
 
 
 class BridgeLayer(LayerBase, ABC):
     """The bridge stage's layer. `set_input` before the render loop; `update` makes the density's
-    color, runs the bridges (`_bridge`) and visualizes (`_visualize`); `output` is the stage's
-    textures. The bridges run at the velocity's size, which the layer follows, the density and the
-    visualization at the layer's own size."""
+    color and runs the bridges (`_bridge`); `output` is the stage's textures. The bridges run at the
+    velocity's size, which the layer follows, the density at the layer's own size. The layer draws nothing."""
 
     def __init__(self, settings: BridgeLayerSettings) -> None:
         self.settings: BridgeLayerSettings = settings
         self._input: BridgeInput | None = None
-        self._visualizer: Visualizer = Visualizer(settings.visualization)
         self._color: Fbo = Fbo()                        # the density's color: the image's RGB, or white, times the tint and the mask
         self._color_shader: DensityColor = DensityColor()
         self._flow_size: tuple[int, int] = (0, 0)       # the size the bridges run at: the velocity's
@@ -74,12 +72,8 @@ class BridgeLayer(LayerBase, ABC):
     @property
     @abstractmethod
     def output(self) -> BridgeOutput:
-        """The stage's textures, allocated once; what the fluid's injections are built from."""
+        """The stage's textures, allocated once; what the fluid's injections and the monitors' inputs are built from."""
         ...
-
-    @property
-    def texture(self) -> Texture:
-        return self._visualizer.texture
 
     # ========== Lifecycle ==========
 
@@ -87,7 +81,6 @@ class BridgeLayer(LayerBase, ABC):
         self._output_size = (width, height)
         self._color.allocate(width, height, GL_RGBA16F)
         self._color_shader.allocate()
-        self._visualizer.allocate(width, height)
 
     def deallocate(self) -> None:
         if self._flow_size != (0, 0):
@@ -95,7 +88,6 @@ class BridgeLayer(LayerBase, ABC):
             self._flow_size = (0, 0)
         self._color.deallocate()
         self._color_shader.deallocate()
-        self._visualizer.deallocate()
 
     def reset(self) -> None:
         """Start the bridges from rest."""
@@ -126,10 +118,6 @@ class BridgeLayer(LayerBase, ABC):
     def _bridge(self, input: BridgeInput, color: Texture) -> None:
         """Run the bridges on `input.velocity`, stepping `input.dt`; `color` is the density's color."""
 
-    @abstractmethod
-    def _visualize(self, input: BridgeInput) -> None:
-        """Draw the texture `settings.draw_mode` names through the visualizer."""
-
     # ========== Processing ==========
 
     def update(self) -> None:
@@ -146,15 +134,7 @@ class BridgeLayer(LayerBase, ABC):
         self._color.end()
         self._bridge(input, self._color)
 
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
-        self._visualize(input)
         Style.pop_style()
-
-    # ========== Rendering ==========
 
     def draw(self) -> None:
-        Style.push_style()
-        Style.set_blend_mode(self.settings.blend_mode)
-        if self.texture.allocated:
-            Blit.use(self.texture)
-        Style.pop_style()
+        """A stage draws nothing; a monitor draws its textures."""

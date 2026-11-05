@@ -36,6 +36,8 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 | depth velocity       | the z of the 3D flow: the depth change along the x/y displacement, in view widths per second          | `DepthVelocity`, `DepthVelocitySettings`, group `depth_velocity`   |
 | 2D flow, 3D flow     | a system: a motion layer and a bridge layer per camera, a fluid layer per show output                 | `Motion2DLayer` + `Bridge2DLayer` + `Fluid2DLayer`; `…3D…`         |
 | 2D camera, 3D camera | an image and a mask; those and a depth image on the same view                                         | `MotionInput` without / with `depth`                               |
+| port                 | a stage's named texture with its kind: image, velocity, scalar, depth scalar; every output lists its ports as `textures` | `Port`, `TextureKind`                                 |
+| monitor              | a layer that shows one port of one stage, picked on the panel, drawn only while it is shown           | `MonitorLayer`, `monitor_a`, `monitor_b`                           |
 
 "bridge" is ofxFlowTools' word (`ftVelocityBridge`, `ftDensityBridge`, `ftTemperatureBridge`);
 it says where the stage sits, and the glossary defines what it does.
@@ -62,9 +64,11 @@ textures and numbers, never an output; the fluid's input holds its injections as
 `Injection`, each values. The app's wiring pass builds each input new every tick, copying into
 it what the stage reads from the output of the stage before and from the camera layers, and sets
 it on the layer before the render loop. The output holds the stage's textures, allocated once,
-and the layer hands it out as `output`. The layers hold no reference to each other, and no input
-knows an output's type. A field is named with the same noun for the same kind of thing, in every
-input.
+and the layer hands it out as `output`; an output is a stage's only way out. Every output also
+carries `textures`, the stage's ports, what it computed and the inputs it drew from, each a
+texture with its kind; the monitors' input is built from them. The layers hold no reference to
+each other, and no input knows an output's type. A field is named with the same noun for the
+same kind of thing, in every input.
 
 A texture field holds the `Fbo`, `SwapFbo` or `Tensor` object itself, which stands for its
 current buffer, never a raw `.texture` or `.back_texture`: a swap's buffer expires at the next
@@ -76,9 +80,10 @@ from the app, never from an output, or they would be the tick before's.
 
 | Stage  | Input `@dataclass`, built by the app each tick                                                                                      | Output `@dataclass`, the stage's textures                                                                |
 |--------|-------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
-| motion | `MotionInput`: `image`, the picture the velocity is measured on by its brightness; `timestamp`, the capture time of the camera frame `image` holds, the frame's identity; `dt`, the render tick's; `depth`, a `DepthView` or `None`; `mask`, or `None` | `MotionOutput`: `velocity` (x, y, z), gated by `mask` with the 3D flow's `use_mask`; z is 0 without depth |
-| bridge | `BridgeInput`: `velocity`, from the motion output; `dt`; `image`, or `None`, the picture whose RGB colors the density; `color`, an RGB tint on it, white by default; `mask`, or `None`, which gates the image | `BridgeOutput`: `velocity`; `density`, what the fluid injects: in 2D the amount alone, the trail's speed (R); in 3D RGBA, the amount (the kinetic emission or the speed) times `color`, times the image's RGB where there is one, with the amount as alpha; `temperature`; `onset` or `None`; `spin`, the curl at its `spin` setting, or `None` |
-| fluid  | `FluidInput`: `dt`, and `injections`, a list of `Injection`: `velocity`, `density`, `temperature`, `onset`, `spin`, from one bridge output, with `weight`, 0 to 1, the injection's share of the fluid's velocity, density and temperature, as a layer's weight in the light renderer's mix, and `color`, the color the 2D fluid gives the injection's density at its output; the app builds one injection per bridge it wants in that fluid | the layer's `texture`: the show                                                       |
+| motion | `MotionInput`: `image`, the picture the velocity is measured on by its brightness; `timestamp`, the capture time of the camera frame `image` holds, the frame's identity; `dt`, the render tick's; `depth`, a `DepthView` or `None`; `mask`, or `None` | `MotionOutput`: `velocity` (x, y, z), gated by `mask` with the 3D flow's `use_mask`; z is 0 without depth; `textures` |
+| bridge | `BridgeInput`: `velocity`, from the motion output; `dt`; `image`, or `None`, the picture whose RGB colors the density; `color`, an RGB tint on it, white by default; `mask`, or `None`, which gates the image | `BridgeOutput`: `velocity`; `density`, what the fluid injects: in 2D the amount alone, the trail's speed (R); in 3D RGBA, the amount (the kinetic emission or the speed) times `color`, times the image's RGB where there is one, with the amount as alpha; `temperature`; `onset` or `None`; `spin`, the curl at its `spin` setting, or `None`; `textures` |
+| fluid  | `FluidInput`: `dt`, and `injections`, a list of `Injection`: `velocity`, `density`, `temperature`, `onset`, `spin`, from one bridge output, with `weight`, 0 to 1, the injection's share of the fluid's velocity, density and temperature, as a layer's weight in the light renderer's mix, and `color`, the color the 2D fluid gives the injection's density at its output; the app builds one injection per bridge it wants in that fluid | `FluidOutput`: `density`, the show, which the composite draws as the layer's `texture`; `textures` |
+| monitor | `MonitorInput`: `textures`, every stage's ports keyed by stage; the monitor picks by its own `stage` and `texture` | none: it draws                                                                                           |
 
 The motion layer measures once per camera frame: when `timestamp` differs from the one it last
 measured; a source without stamps (`None`) measures every tick. A gap wider than a frame period
@@ -127,13 +132,14 @@ waits for the next vsync, up to one 60 Hz tick, before it is measured.
 
 | Class                                       | Role                                                                                                                                                                                  |
 |---------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `MotionLayer` (ABC)                         | `set_input(MotionInput)` before the render loop; `update()` as the template method: `_measure` on a new frame, `_visualize`; `output: MotionOutput`. Holds the visualizer, the allocate and resize pattern; the flow runs at `settings.width` by `settings.height` |
+| `MotionLayer` (ABC)                         | `set_input(MotionInput)` before the render loop; `update()` as the template method: `_measure` on a new frame; `output: MotionOutput`. Holds the allocate and resize pattern; the flow runs at `settings.width` by `settings.height`. Draws nothing |
 | `Motion2DLayer`, `Motion3DLayer`            | the subclasses, each on its optical flow (`GradientFlow`; `LucasKanadeFlow3D`). The 2D flow's velocity is per frame, not per second, and it reads no mask, until the 2D flow moves to the Lucas–Kanade solve |
-| `BridgeLayer` (ABC)                         | `set_input(BridgeInput)`; `update()`: the density's color (`DensityColor`: the image, or white, times the tint, gated by the mask), `_bridge` the input's velocity into velocity, density and temperature, `_visualize`; `output: BridgeOutput`. The bridges run at the velocity's size, which the layer follows |
+| `BridgeLayer` (ABC)                         | `set_input(BridgeInput)`; `update()`: the density's color (`DensityColor`: the image, or white, times the tint, gated by the mask), `_bridge` the input's velocity into velocity, density and temperature; `output: BridgeOutput`. The bridges run at the velocity's size, which the layer follows. Draws nothing |
 | `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, with `method` picking the trail or the kinetic bridge, whose curl is scaled by `onset.spin`)                            |
-| `FluidLayer` (ABC)                          | `set_input(FluidInput)`; `update()`: `_inject` each injection's velocity, density and temperature at its weight, `_step(dt)`, `_visualize`; `texture`. Knows injections, not cameras; reads no poses |
-| `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's; it draws the field `draw_mode` names through its visualizer. `Fluid3DLayer` injects RGBA density, onset and spin, and takes the parallax eye the app steers by `set_eye(x, y)` |
-| `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass: `blend_mode`, `visualization`, and on the motion layer `width`, `height`; each subclass adds its `draw_mode` and the stage's own settings as a group named after its method (`gradient`, `lucas_kanade`; `trail`, `kinetic`, `density`, `temperature`; `fluid`). No `stage`, `max_players` or `fps`: the layers read no poses and take `dt` from their input |
+| `FluidLayer` (ABC)                          | `set_input(FluidInput)`; `update()`: `_inject` each injection's velocity, density and temperature at its weight, `_step(dt)`; `output: FluidOutput`; `texture`, the show. Knows injections, not cameras; reads no poses |
+| `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's. `Fluid3DLayer` injects RGBA density, onset and spin, and takes the parallax eye the app steers by `set_eye(x, y)` |
+| `MonitorLayer`                              | `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's port names (`names`, the options of `texture`); `draw()` renders the port once per tick, however many panels show it, by its kind or by `mode` (image, arrows, scalar in two colors by `channel`, or strip: the mean amount of each channel over the last seconds, `Strip`), and nothing while not shown. Its `visualization` group holds the scale, spacing and arrows |
+| `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass: on the motion layer `width`, `height`; on the fluid layer `blend_mode`; each subclass adds the stage's own settings as a group named after its method (`gradient`, `lucas_kanade`; `trail`, `kinetic`, `density`, `temperature`; `fluid`). No `draw_mode`, `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take `dt` from their input |
 
 The apps' render is a layer graph of `LayerBase` layers updated by one loop calling `update()`
 on each (`apps/deep_flow/render.py`, `apps/hd_trio/render.py`), with a wiring pass before it
@@ -146,7 +152,9 @@ color, and weights the own camera's injection by the player's motion and another
 cross-camera similarity times `similarity_scale`; deep_flow picks the layers on
 its panel, live, one `Layers` field per picture (`motion_image`, `bridge_image`, `mask`) in its
 `inputs` group with `scale_by_motion` (`apps/deep_flow/settings.py`), reads the fields each tick,
-and steers the eye toward the tracked head.
+and steers the eye toward the tracked head. Both apps give each camera two monitors, `monitor_a`
+and `monitor_b`, each handed every stage's `textures`; they go into the panel's select lists like
+any layer, and two show A beside B.
 
 ## Packages
 
@@ -158,15 +166,16 @@ and steers the eye toward the tracked head.
 | `modules/flow/fluid_2d/`        | `Fluid2D`, `Fluid2DSettings` with its own `VelocitySettings`, `DensitySettings`, `TemperatureSettings`, `PressureSettings`; `shaders/`                     |
 | `modules/flow/fluid_3d/`        | `Fluid3D`, `Fluid3DSettings` with its own groups and `VolumeSettings`; `shaders/`                                                                          |
 | `modules/flow/shaders/`         | the shared fragment shaders, `AddBoolean` among them                                                                                                       |
-| `modules/flow/time_step.py`, `modules/flow/boundary_mode.py`, `modules/flow/visualization/` | shared                                                                                         |
-| `modules/render/layers/flow/`   | `motion_layer.py` (`MotionInput`, `MotionOutput`, `MotionLayer`, `frame_interval`), `motion_2d_layer.py`, `motion_3d_layer.py`; `bridge_layer.py` (`BridgeInput`, `BridgeOutput`, `BridgeLayer`), `bridge_2d_layer.py`, `bridge_3d_layer.py`; `fluid_layer.py` (`Injection`, `FluidInput`, `FluidLayer`), `fluid_2d_layer.py`, `fluid_3d_layer.py` |
+| `modules/flow/time_step.py`, `modules/flow/boundary_mode.py` | shared                                                                                                                        |
+| `modules/flow/visualization/`   | the monitors' drawing: `Visualizer` with its arrow and signed fields, `Strip`                                                                             |
+| `modules/render/layers/flow/`   | `port.py` (`Port`, `TextureKind`); `motion_layer.py` (`MotionInput`, `MotionOutput`, `MotionLayer`, `frame_interval`), `motion_2d_layer.py`, `motion_3d_layer.py`; `bridge_layer.py` (`BridgeInput`, `BridgeOutput`, `BridgeLayer`), `bridge_2d_layer.py`, `bridge_3d_layer.py`; `fluid_layer.py` (`Injection`, `FluidInput`, `FluidOutput`, `FluidLayer`), `fluid_2d_layer.py`, `fluid_3d_layer.py`; `monitor_layer.py` (`MonitorInput`, `MonitorLayer`, `FlowStage`, `MonitorMode`, `Channel`) |
 
 Neither `fluid_2d` nor `fluid_3d` imports the other. The settings group of each fluid is `fluid`.
 `motion/` has no `_2d` and `_3d` packages because its 3D flow is its 2D flow plus z:
 `LucasKanadeFlow3D` composes `LucasKanadeFlow` and `DepthVelocity`, where the bridges and the
-fluids are two implementations. The visualization is shared because it is not a stage: it draws
-the texture it is given, a 2-channel one as a 2D velocity and a 3- or 4-channel one as a 3D
-velocity (`VelocityField.update`), and the signed views serve the 3D flow's scalars.
+fluids are two implementations. The visualization is shared because it is not a stage: a monitor
+draws the port it is given, a 2-channel velocity as a 2D one and a 3- or 4-channel one as a 3D
+one (`VelocityField.update`), a scalar in two colors, any texture as a strip.
 The shader loader finds a shader's source by its `.py` module name beside it
 (`modules/gl/shader.py`), so moved shaders need no edit.
 
@@ -201,8 +210,8 @@ The shader loader finds a shader's source by its `.py` module name beside it
 - The time step has one transport: the app hands the tick's `dt` in the inputs, and the fluid's
   `TimeStep` smooths it over `fps_smoothing`, or steps fixed at `fixed_fps`. No `fps` or
   `step_fps` field: runtime data stays off the settings.
-- One `Visualizer` serves both systems: it draws a 2-channel texture as a 2D velocity and a 3- or
-  4-channel one as a 3D velocity (`VelocityField.update`). The signed views belong to the 3D flow.
+- The stages draw nothing; the monitors draw, only while shown, once per tick. A port's kind says
+  how it is drawn when nothing else is asked; the monitor's `mode` overrides it.
 - The 2D bridge keeps three classes the 3D bridge also has (`DensityBridge`, `TemperatureBridge`,
   `VelocityMagnitude`) as copies, until the 2D bridge is rebuilt.
 - The 3D fluid layer runs the 3D fluid only. Comparing the two fluids on one input means both
@@ -219,15 +228,7 @@ The shader loader finds a shader's source by its `.py` module name beside it
 
 ## Open
 
-- The views. Each stage draws its own views through its own visualizer every tick, shown or not:
-  the motion and the bridge layer each run one, where `main`'s one flow layer ran one. The next
-  change: each output carries `views`, its named textures with their kind (image, 2D velocity,
-  3D velocity, signed scalar), the stages draw nothing, and one or two view layers the app wires
-  to any output draw one named view each, only while it is shown, with the panel's choice built
-  from the connected names and the visualization settings on the view layer; two view layers
-  show A beside B. The kinetic strip becomes a general mode beside the scalar and the arrows: the
-  amount of a channel, x, y, z or w, over the last seconds.
-- The swap buffers hand out no handles, after the views. `SwapFbo.texture` names a buffer of a
+- The swap buffers hand out no handles. `SwapFbo.texture` names a buffer of a
   thing that is a texture itself and hands out a handle that goes stale at the next swap; a
   double buffer's one extra is the previous buffer, read while the current is written. The
   change, in `modules/gl` and its readers: `SwapFbo.texture` and `Texture.texture` go, the

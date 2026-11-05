@@ -1,29 +1,15 @@
 """The 2D motion layer: the gradient flow, x/y from the image, as on main."""
 
-# Standard library imports
-from enum import IntEnum, auto
-
 # Local application imports
 from modules.flow import GradientFlow, GradientFlowSettings
-from modules.settings import Field, Group
+from modules.settings import Group
 from modules.utils import HotReloadMethods
 from .motion_layer import MotionLayer, MotionLayerSettings, MotionInput, MotionOutput
-
-
-class Motion2DDrawMode(IntEnum):
-    """Draw modes for Motion2DLayer.
-
-    IMAGE - The luminance the flow measures on
-    VELOCITY - The flow's velocity (RG)
-    """
-    IMAGE = 0
-    VELOCITY = auto()
+from .port import Port, TextureKind
 
 
 class Motion2DLayerSettings(MotionLayerSettings):
     """Configuration for Motion2DLayer."""
-    draw_mode: Field[Motion2DDrawMode] =    Field(Motion2DDrawMode.VELOCITY)
-
     gradient = Group(GradientFlowSettings)
 
 
@@ -40,11 +26,14 @@ class Motion2DLayer(MotionLayer):
 
     @property
     def output(self) -> MotionOutput:
-        return MotionOutput(self._flow.velocity)
+        return MotionOutput(self._flow.velocity, {
+            'image': Port(self._flow.color_input, TextureKind.IMAGE),
+            'velocity': Port(self._flow.velocity, TextureKind.VELOCITY),
+        })
 
     # ========== The flow ==========
 
-    def _allocate_stages(self, width: int, height: int, output_width: int, output_height: int) -> None:
+    def _allocate_stages(self, width: int, height: int) -> None:
         self._flow.allocate(width, height)
 
     def _deallocate_stages(self) -> None:
@@ -56,9 +45,3 @@ class Motion2DLayer(MotionLayer):
     def _measure(self, input: MotionInput, interval: float) -> None:
         self._flow.set_input(input.image)
         self._flow.update()
-
-    def _visualize(self, input: MotionInput) -> None:
-        if self.settings.draw_mode == Motion2DDrawMode.IMAGE:
-            self._visualizer.process(self._flow.color_input)
-        else:
-            self._visualizer.process(self._flow.velocity)
