@@ -9,13 +9,12 @@ injections, not cameras.
 weight and steps the fluid on the input's `dt`. Its texture is the show, which the composite draws;
 the monitors draw its output's `textures`."""
 
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass, field
 
 from modules.gl import Texture, Style, Blit
-from modules.settings import Field, BaseSettings
-from ..layer_base import LayerBase
-from .port import Port
+from modules.settings import Field
+from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 
 
 @dataclass
@@ -43,34 +42,23 @@ class FluidInput:
 
 
 @dataclass
-class FluidOutput:
-    """The fluid stage's textures: `density`, the show, and `textures`, its ports for the monitors."""
+class FluidOutput(StageOutput):
+    """The fluid stage's textures: `density`, the show."""
     density: Texture
-    textures: dict[str, Port] = field(default_factory=dict)
 
 
-class FluidLayerSettings(BaseSettings):
+class FluidLayerSettings(StageLayerSettings):
     """What the 2D and the 3D fluid layer share; each adds its fluid's group."""
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
 
 
-class FluidLayer(LayerBase, ABC):
-    """The fluid stage's layer. `set_input` before the render loop; `update` injects each injection
-    (`_inject`) and steps the fluid (`_step`); `output` is the stage's textures; `texture` is the show."""
+class FluidLayer(StageLayer[FluidInput, FluidOutput]):
+    """The fluid stage's layer. `update` injects each injection (`_inject`) and steps the fluid
+    (`_step`); `texture` is the show."""
 
     def __init__(self, settings: FluidLayerSettings) -> None:
+        super().__init__(settings)
         self.settings: FluidLayerSettings = settings
-        self._input: FluidInput | None = None
-
-    def set_input(self, input: FluidInput) -> None:
-        """What the fluid takes at its next update."""
-        self._input = input
-
-    @property
-    @abstractmethod
-    def output(self) -> FluidOutput:
-        """The stage's textures, allocated once; what the monitors' inputs are built from."""
-        ...
 
     @property
     @abstractmethod
@@ -88,7 +76,7 @@ class FluidLayer(LayerBase, ABC):
 
     # ========== Processing ==========
 
-    def update(self) -> None:
+    def _update(self) -> None:
         input: FluidInput | None = self._input
         if input is None:
             return

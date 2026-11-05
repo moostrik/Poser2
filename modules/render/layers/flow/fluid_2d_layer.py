@@ -54,7 +54,7 @@ class Fluid2DLayer(FluidLayer):
     @property
     def output(self) -> FluidOutput:
         fluid: Fluid2D = self._fluid
-        return FluidOutput(self._colorized, {
+        return FluidOutput(self._colorized, textures={
             'density': Port(self._colorized, TextureKind.IMAGE),
             'density_channels': Port(fluid.density, TextureKind.IMAGE),
             'velocity': Port(fluid.velocity, TextureKind.VELOCITY),
@@ -77,13 +77,14 @@ class Fluid2DLayer(FluidLayer):
         self._fluid.deallocate()
         self._colorized.deallocate()
         self._colorize_shader.deallocate()
+        super().deallocate()
 
     def reset(self) -> None:
         self._fluid.reset()
 
     # ========== Processing ==========
 
-    def update(self) -> None:
+    def _update(self) -> None:
         input: FluidInput | None = self._input
         if input is not None:
             self._colors = [(*injection.color, 1.0) for injection in input.injections[:CHANNELS]]
@@ -91,7 +92,7 @@ class Fluid2DLayer(FluidLayer):
             if len(input.injections) > CHANNELS and not self._warned_channels:
                 self._warned_channels = True
                 logger.warning("Fluid2DLayer: %d injections, the density has %d channels; the rest add no density", len(input.injections), CHANNELS)
-        super().update()
+        super()._update()
 
     def _inject(self, injection: Injection) -> None:
         fluid: Fluid2D = self._fluid

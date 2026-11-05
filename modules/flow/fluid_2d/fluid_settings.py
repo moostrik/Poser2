@@ -1,7 +1,7 @@
 """The 2D fluid's settings: one group per field (velocity, density, temperature, pressure), with
 the field's name as the group's, so the field names carry no prefix."""
 
-from modules.settings import Field, BaseSettings, Widget, Group
+from modules.settings import Field, BaseSettings, Group
 
 from ..boundary_mode import BoundaryMode
 from ..time_step import TimeStepMode
@@ -62,8 +62,7 @@ class Fluid2DSettings(BaseSettings):
         fade_time=3.0 means the field retains ~1% after 3 seconds.
     """
 
-    # ---- Actions ----
-    reset_sim: Field[bool] = Field(False, widget=Widget.button, description="Reset all simulation fields to zero")
+    # ---- Profiling ----
     profile: Field[bool] = Field(False, description="Enable per-pass GPU timing (uses glFinish; serializes pipeline)")
 
     # ---- Grid dimensions (multiples of 32) ----

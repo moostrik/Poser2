@@ -242,7 +242,7 @@ class DeepFlowRender(RenderBase):
             self._reset_fluid.clear()
             for layer_type in [Layers.motion, Layers.bridge, Layers.fluid]:
                 for layer in self.L[layer_type].values():
-                    cast(ls.Motion3DLayer | ls.Bridge3DLayer | ls.Fluid3DLayer, layer).reset()
+                    cast(ls.StageLayer, layer).reset()
 
         select = self.settings.layer.select
         self._left_layers = select.left

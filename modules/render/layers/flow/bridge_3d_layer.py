@@ -91,7 +91,7 @@ class Bridge3DLayer(BridgeLayer):
             self._velocity, self._density_bridge.density, self._temperature_bridge.temperature,
             bridge.onset_velocity if self._kinetic and kinetic.onset.force > 0.0 else None,
             bridge.curl if self._kinetic and kinetic.onset.spin > 0.0 else None,
-            textures,
+            textures=textures,
         )
 
     # ========== Lifecycle ==========

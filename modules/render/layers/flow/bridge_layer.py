@@ -9,16 +9,14 @@ the input's `dt` (they are filters in time, so a velocity held between camera fr
 and makes the density's color from the image, the tint and the mask. It draws nothing; the monitors
 draw its output's `textures`."""
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from abc import abstractmethod
+from dataclasses import dataclass
 
 from OpenGL.GL import GL_RGBA16F
 
 from modules.gl import Fbo, Texture, Style
-from modules.settings import BaseSettings
-from ..layer_base import LayerBase
 from ...shaders import DensityColor
-from .port import Port
+from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 
 
 @dataclass
@@ -35,45 +33,33 @@ class BridgeInput:
 
 
 @dataclass
-class BridgeOutput:
+class BridgeOutput(StageOutput):
     """The bridge stage's textures, what the fluid injects: `velocity`; `density`, in 2D the amount
     alone, in 3D RGBA, the amount times the color, with the amount as alpha; `temperature`; `onset`,
-    a second velocity, or None; `spin`, a curl at its `spin` setting, or None; and `textures`, its
-    ports for the monitors."""
+    a second velocity, or None; `spin`, a curl at its `spin` setting, or None."""
     velocity: Texture
     density: Texture
     temperature: Texture
     onset: Texture | None = None
     spin: Texture | None = None
-    textures: dict[str, Port] = field(default_factory=dict)
 
 
-class BridgeLayerSettings(BaseSettings):
+class BridgeLayerSettings(StageLayerSettings):
     """What the 2D and the 3D bridge layer share; each adds its bridges' groups."""
 
 
-class BridgeLayer(LayerBase, ABC):
-    """The bridge stage's layer. `set_input` before the render loop; `update` makes the density's
-    color and runs the bridges (`_bridge`); `output` is the stage's textures. The bridges run at the
-    velocity's size, which the layer follows, the density at the layer's own size. The layer draws nothing."""
+class BridgeLayer(StageLayer[BridgeInput, BridgeOutput]):
+    """The bridge stage's layer. `update` makes the density's color and runs the bridges (`_bridge`).
+    The bridges run at the velocity's size, which the layer follows, the density at the layer's own
+    size. The layer draws nothing."""
 
     def __init__(self, settings: BridgeLayerSettings) -> None:
+        super().__init__(settings)
         self.settings: BridgeLayerSettings = settings
-        self._input: BridgeInput | None = None
         self._color: Fbo = Fbo()                        # the density's color: the image's RGB, or white, times the tint and the mask
         self._color_shader: DensityColor = DensityColor()
         self._flow_size: tuple[int, int] = (0, 0)       # the size the bridges run at: the velocity's
         self._output_size: tuple[int, int] = (0, 0)     # the layer's allocation size
-
-    def set_input(self, input: BridgeInput) -> None:
-        """What the layer bridges at its next update."""
-        self._input = input
-
-    @property
-    @abstractmethod
-    def output(self) -> BridgeOutput:
-        """The stage's textures, allocated once; what the fluid's injections and the monitors' inputs are built from."""
-        ...
 
     # ========== Lifecycle ==========
 
@@ -88,6 +74,7 @@ class BridgeLayer(LayerBase, ABC):
             self._flow_size = (0, 0)
         self._color.deallocate()
         self._color_shader.deallocate()
+        super().deallocate()
 
     def reset(self) -> None:
         """Start the bridges from rest."""
@@ -120,7 +107,7 @@ class BridgeLayer(LayerBase, ABC):
 
     # ========== Processing ==========
 
-    def update(self) -> None:
+    def _update(self) -> None:
         input: BridgeInput | None = self._input
         if input is None or not input.velocity.allocated:
             return

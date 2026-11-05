@@ -8,6 +8,7 @@ It renders in `draw`, once per tick however many panels show it, and nothing in 
 
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
+from threading import Event
 
 from OpenGL.GL import GL_VIEWPORT, glGetIntegerv, glViewport
 
@@ -49,6 +50,7 @@ class MonitorLayerSettings(BaseSettings):
     mode: Field[MonitorMode] =      Field(MonitorMode.AUTO, description="Drawn by its kind, or as an image, as arrows, as a signed scalar, or as a strip of its channels' amounts over time")
     channel: Field[Channel] =       Field(Channel.X, description="The channel the scalar mode shows")
     blend_mode: Field[Style.BlendMode] = Field(Style.BlendMode.ADD)
+    reset: Field[bool] =            Field(False, widget=Widget.button, description="Start the strip over")
 
     visualization = Group(VisualizationFieldSettings)
 
@@ -73,10 +75,19 @@ class MonitorLayer(LayerBase):
         self._strip_of: tuple[FlowStage, str] | None = None     # the port the strip plots; another one restarts it
         self._port: Port | None = None          # the port rendered last
         self._image: Texture | None = None      # the port's texture itself, drawn as the picture it is
+        self._reset_asked: Event = Event()      # set by the panel's thread, taken by the render thread
+        settings.bind(MonitorLayerSettings.reset, self._ask_reset)
 
     def set_input(self, input: MonitorInput) -> None:
         """Every stage's ports, for the next draw."""
         self._input = input
+
+    def reset(self) -> None:
+        """Start the strip over; the other modes redraw every tick and hold nothing. Render thread only."""
+        self._strip.reset()
+
+    def _ask_reset(self, _: object = None) -> None:
+        self._reset_asked.set()
 
     @property
     def texture(self) -> Texture:
@@ -95,6 +106,7 @@ class MonitorLayer(LayerBase):
         self._text.allocate(font_size=18)
 
     def deallocate(self) -> None:
+        self.settings.unbind(MonitorLayerSettings.reset, self._ask_reset)
         self._visualizer.deallocate()
         self._strip.deallocate()
         self._text.deallocate()
@@ -114,6 +126,9 @@ class MonitorLayer(LayerBase):
 
     def update(self) -> None:
         """Keep the panel's list of the stage's textures; the port is rendered at the first draw."""
+        if self._reset_asked.is_set():
+            self._reset_asked.clear()
+            self.reset()
         self._rendered = False
         names: list[str] = list(self._ports()) or [""]
         if names != self.settings.names:

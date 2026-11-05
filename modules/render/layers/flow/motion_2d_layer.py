@@ -26,7 +26,7 @@ class Motion2DLayer(MotionLayer):
 
     @property
     def output(self) -> MotionOutput:
-        return MotionOutput(self._flow.velocity, {
+        return MotionOutput(self._flow.velocity, textures={
             'image': Port(self._flow.color_input, TextureKind.IMAGE),
             'velocity': Port(self._flow.velocity, TextureKind.VELOCITY),
         })

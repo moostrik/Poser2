@@ -41,7 +41,7 @@ class Motion3DLayer(MotionLayer):
             if input.mask is not None:
                 textures['mask'] = Port(input.mask, TextureKind.SCALAR)
         textures['velocity'] = Port(self._flow.velocity, TextureKind.VELOCITY)
-        return MotionOutput(self._flow.velocity, textures)
+        return MotionOutput(self._flow.velocity, textures=textures)
 
     # ========== The flow ==========
 

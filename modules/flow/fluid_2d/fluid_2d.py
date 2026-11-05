@@ -86,7 +86,6 @@ class Fluid2D:
 
         self._allocated: bool = False
 
-        self._reset_pending: bool = False
         self._reallocate_pending: bool = False
         self._boundary_dirty: bool = False
 
@@ -134,7 +133,6 @@ class Fluid2D:
         )
 
         # Bind settings actions
-        self.settings.bind(Fluid2DSettings.reset_sim, lambda _: self._request_reset())
         self.settings.bind(Fluid2DSettings.width, lambda _: self._request_reallocate())
         self.settings.bind(Fluid2DSettings.height, lambda _: self._request_reallocate())
         self.settings.bind(Fluid2DSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
@@ -589,17 +587,9 @@ class Fluid2D:
             if self._simulation_width != old_w or self._simulation_height != old_h:
                 self._allocate_simulation_fields()
 
-        if self._reset_pending:
-            self._reset_pending = False
-            self.reset()
-
         if self._boundary_dirty:
             self._boundary_dirty = False
             self._apply_boundary_modes()
-
-    def _request_reset(self) -> None:
-        """Thread-safe reset request — deferred to next update() on the GL thread."""
-        self._reset_pending = True
 
     def _request_reallocate(self) -> None:
         """Thread-safe reallocation request — deferred to next update() on the GL thread."""

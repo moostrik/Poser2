@@ -1,4 +1,5 @@
 from .port import               Port, TextureKind
+from .stage_layer import        StageLayer, StageLayerSettings, StageOutput
 from .motion_layer import       MotionInput, MotionOutput, MotionLayer, MotionLayerSettings
 from .bridge_layer import       BridgeInput, BridgeOutput, BridgeLayer, BridgeLayerSettings
 from .fluid_layer import        Injection, FluidInput, FluidOutput, FluidLayer, FluidLayerSettings

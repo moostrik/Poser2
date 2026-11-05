@@ -8,15 +8,14 @@ from it, so an input built before the render loop names the object the stage bef
 when the input's `timestamp` differs from the one it measured last, over the interval the stamps
 give (`frame_interval`). It draws nothing; the monitors draw its output's `textures`."""
 
-from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from abc import abstractmethod
+from dataclasses import dataclass
 import math
 
 from modules.gl import Texture, Style
 from modules.flow import DepthView
-from modules.settings import Field, BaseSettings
-from ..layer_base import LayerBase
-from .port import Port
+from modules.settings import Field
+from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 
 MAX_FRAME_INTERVAL: float = 0.5     # s: a longer gap between two captures is a pause or a loop, not a frame's
 FRAME_PERIOD_BAND: tuple[float, float] = (0.5, 2.0)    # a capture gap is held to this share of the frame interval
@@ -59,43 +58,30 @@ class MotionInput:
 
 
 @dataclass
-class MotionOutput:
+class MotionOutput(StageOutput):
     """The motion stage's textures: `velocity` (x, y, z) in view widths per second, gated by the mask
-    with the flow's `use_mask`, z 0 without depth; and `textures`, its ports for the monitors, the
-    velocity and what it measured on."""
+    with the flow's `use_mask`, z 0 without depth; its ports are the velocity and what it measured on."""
     velocity: Texture
-    textures: dict[str, Port] = field(default_factory=dict)
 
 
-class MotionLayerSettings(BaseSettings):
+class MotionLayerSettings(StageLayerSettings):
     """What the 2D and the 3D motion layer share; each adds its optical flow's group."""
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
 
 
-class MotionLayer(LayerBase, ABC):
-    """The motion stage's layer. `set_input` before the render loop; `update` measures on a new camera
-    frame (`_measure`); `output` is the stage's textures. The subclass holds its optical flow in
-    `_allocate_stages`, `_deallocate_stages`, `_reset_stages` and `_measure`; the flow runs at
-    `settings.width` by `settings.height` and follows a change of them. The layer draws nothing."""
+class MotionLayer(StageLayer[MotionInput, MotionOutput]):
+    """The motion stage's layer. `update` measures on a new camera frame (`_measure`). The subclass
+    holds its optical flow in `_allocate_stages`, `_deallocate_stages`, `_reset_stages` and `_measure`;
+    the flow runs at `settings.width` by `settings.height` and follows a change of them. The layer draws nothing."""
 
     def __init__(self, settings: MotionLayerSettings) -> None:
+        super().__init__(settings)
         self.settings: MotionLayerSettings = settings
-        self._input: MotionInput | None = None
         self._timestamp: float | None = None        # the capture time of the frame measured last
         self._frame_period: float | None = None     # the frame interval, an Ema of the capture gaps (s)
         self._ticks: float = 0.0                    # time counted in ticks since the last measurement (s)
         self._flow_size: tuple[int, int] = (0, 0)   # the size the flow runs at; follows settings.width/height
-
-    def set_input(self, input: MotionInput) -> None:
-        """What the layer measures on at its next update."""
-        self._input = input
-
-    @property
-    @abstractmethod
-    def output(self) -> MotionOutput:
-        """The stage's textures, allocated once; what the bridge's and the monitors' inputs are built from."""
-        ...
 
     # ========== Lifecycle ==========
 
@@ -104,6 +90,7 @@ class MotionLayer(LayerBase, ABC):
 
     def deallocate(self) -> None:
         self._deallocate_flow()
+        super().deallocate()
 
     def reset(self) -> None:
         """Start the flow from rest: the next frame is a first frame."""
@@ -144,7 +131,7 @@ class MotionLayer(LayerBase, ABC):
 
     # ========== Processing ==========
 
-    def update(self) -> None:
+    def _update(self) -> None:
         input: MotionInput | None = self._input
         if input is None:
             return

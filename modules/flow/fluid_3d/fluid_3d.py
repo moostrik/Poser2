@@ -117,7 +117,6 @@ class Fluid3D:
 
         self._allocated: bool = False
 
-        self._reset_pending: bool = False
         self._reallocate_pending: bool = False
         self._boundary_dirty: bool = False
 
@@ -176,7 +175,6 @@ class Fluid3D:
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
         # Bind settings actions
-        self.settings.bind(Fluid3DSettings.reset_sim, lambda _: self._request_reset())
         self.settings.volume.bind(VolumeSettings.layers, lambda _: self._request_reallocate())
         self.settings.volume.bind(VolumeSettings.sim_layers, lambda _: self._request_reallocate())
         self.settings.bind(Fluid3DSettings.width, lambda _: self._request_reallocate())
@@ -718,17 +716,9 @@ class Fluid3D:
             if depth_changed:
                 self._allocate_density_fields()
 
-        if self._reset_pending:
-            self._reset_pending = False
-            self.reset()
-
         if self._boundary_dirty:
             self._boundary_dirty = False
             self._apply_boundary_modes()
-
-    def _request_reset(self) -> None:
-        """Thread-safe reset request — deferred to next update() on the GL thread."""
-        self._reset_pending = True
 
     def _request_reallocate(self) -> None:
         """Thread-safe reallocation request — deferred to next update() on the GL thread."""

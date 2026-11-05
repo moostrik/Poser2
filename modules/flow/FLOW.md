@@ -55,7 +55,11 @@ the 2D bridge is rebuilt on the Lucas–Kanade flow.
 The design follows the light renderer (`apps/white_space/light/`): a stage's input is one
 `@dataclass` built for it each tick, its output one `@dataclass` of its own textures, an abstract
 layer with a template method holds what the two kinds share, and each kind is a subclass. One
-layer per stage, so the layers are the packages.
+layer per stage, so the layers are the packages. Above the three abstract layers, `StageLayer`
+states what a stage is: an input, an output that carries its ports, and a reset. Only the
+interface is shared: the templates differ, the motion running per camera frame and the bridge and
+fluid per tick. Inputs have no common base, since each stage reads its own fields and nothing takes
+any stage's input.
 
 ### Inputs and outputs
 
@@ -132,14 +136,15 @@ waits for the next vsync, up to one 60 Hz tick, before it is measured.
 
 | Class                                       | Role                                                                                                                                                                                  |
 |---------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `MotionLayer` (ABC)                         | `set_input(MotionInput)` before the render loop; `update()` as the template method: `_measure` on a new frame; `output: MotionOutput`. Holds the allocate and resize pattern; the flow runs at `settings.width` by `settings.height`. Draws nothing |
+| `StageLayer[I, O]` (ABC)                    | `set_input(I)` before the render loop; `output: O`, a `StageOutput`, whose `textures` (keyword only) are the stage's ports; `reset()`, from rest; `update()` takes a reset the panel's `reset` button asked for, on the render thread, then runs `_update()`. Unbinds the button in `deallocate()` |
+| `MotionLayer` (ABC)                         | `StageLayer[MotionInput, MotionOutput]`; `_update()` as the template method: `_measure` on a new frame. Holds the allocate and resize pattern; the flow runs at `settings.width` by `settings.height`. Draws nothing |
 | `Motion2DLayer`, `Motion3DLayer`            | the subclasses, each on its optical flow (`GradientFlow`; `LucasKanadeFlow3D`). The 2D flow's velocity is per frame, not per second, and it reads no mask, until the 2D flow moves to the Lucas–Kanade solve |
-| `BridgeLayer` (ABC)                         | `set_input(BridgeInput)`; `update()`: the density's color (`DensityColor`: the image, or white, times the tint, gated by the mask), `_bridge` the input's velocity into velocity, density and temperature; `output: BridgeOutput`. The bridges run at the velocity's size, which the layer follows. Draws nothing |
+| `BridgeLayer` (ABC)                         | `StageLayer[BridgeInput, BridgeOutput]`; `_update()`: the density's color (`DensityColor`: the image, or white, times the tint, gated by the mask), `_bridge` the input's velocity into velocity, density and temperature. The bridges run at the velocity's size, which the layer follows. Draws nothing |
 | `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, with `method` picking the trail or the kinetic bridge, whose curl is scaled by `onset.spin`)                            |
-| `FluidLayer` (ABC)                          | `set_input(FluidInput)`; `update()`: `_inject` each injection's velocity, density and temperature at its weight, `_step(dt)`; `output: FluidOutput`; `texture`, the show. Knows injections, not cameras; reads no poses |
+| `FluidLayer` (ABC)                          | `StageLayer[FluidInput, FluidOutput]`; `_update()`: `_inject` each injection's velocity, density and temperature at its weight, `_step(dt)`; `texture`, the show. Knows injections, not cameras; reads no poses. The stage's reset is the fluid's only one |
 | `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's. `Fluid3DLayer` injects RGBA density, onset and spin, and takes the parallax eye the app steers by `set_eye(x, y)` |
-| `MonitorLayer`                              | `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's port names (`names`, the options of `texture`); `draw()` renders the port once per tick, however many panels show it, by its kind or by `mode` (image, arrows, scalar in two colors by `channel`, or strip: the mean amount of each channel over the last seconds, `Strip`), and nothing while not shown. Its `visualization` group holds the scale, spacing and arrows |
-| `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass: on the motion layer `width`, `height`; on the fluid layer `blend_mode`; each subclass adds the stage's own settings as a group named after its method (`gradient`, `lucas_kanade`; `trail`, `kinetic`, `density`, `temperature`; `fluid`). No `draw_mode`, `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take `dt` from their input |
+| `MonitorLayer`                              | `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's port names (`names`, the options of `texture`); `draw()` renders the port once per tick, however many panels show it, by its kind or by `mode` (image, arrows, scalar in two colors by `channel`, or strip: the mean amount of each channel over the last seconds, `Strip`), and nothing while not shown. Its `visualization` group holds the scale, spacing and arrows. Not a stage, since it has no output; its own `reset` button starts the strip over, the one mode with a history |
+| `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass, each a `StageLayerSettings` with its `reset` button: on the motion layer `width`, `height`; on the fluid layer `blend_mode`; each subclass adds the stage's own settings as a group named after its method (`gradient`, `lucas_kanade`; `trail`, `kinetic`, `density`, `temperature`; `fluid`). No `draw_mode`, `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take `dt` from their input |
 
 The apps' render is a layer graph of `LayerBase` layers updated by one loop calling `update()`
 on each (`apps/deep_flow/render.py`, `apps/hd_trio/render.py`), with a wiring pass before it
@@ -225,6 +230,8 @@ The shader loader finds a shader's source by its `.py` module name beside it
 - `modules/render/tests/test_flow_systems.py` loads each app preset into its system's stage
   settings and fails on an unknown key, and fails on a field of the flow's settings that no code
   in `modules/flow` or `modules/render/layers/flow` names: such a field is dead **(deduction)**.
+- `modules/render/tests/test_stage_layer.py` checks, without GL, that a reset button asks and the
+  stage's next update resets once before it runs, and asks nothing after `deallocate`.
 
 ## Open
 
