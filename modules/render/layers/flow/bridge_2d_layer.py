@@ -16,9 +16,9 @@ class Bridge2DDrawMode(IntEnum):
 
     VELOCITY_INPUT - The velocity the trail reads
     VELOCITY - The smoothed velocity (RG), what the fluid gets
-    SPEED - The smoothed velocity's magnitude, the density's amount
+    SPEED - The smoothed velocity's magnitude, the density's amount, what the fluid gets
     COLOR - The density's color
-    DENSITY - The colored density (RGBA), what the fluid gets
+    DENSITY - The density bridge's colored density (RGBA), a view
     TEMPERATURE - The temperature field, what the fluid gets
     """
     VELOCITY_INPUT = 0
@@ -40,7 +40,8 @@ class Bridge2DLayerSettings(BridgeLayerSettings):
 
 class Bridge2DLayer(BridgeLayer):
     """The 2D bridge layer: the smooth trail for the fluid's velocity, its speed as the density's
-    amount colored by the density's color, the temperature from the color where there is speed."""
+    amount, the temperature from the density's color where there is speed; the density bridge colors
+    the amount for its view only."""
 
     def __init__(self, settings: Bridge2DLayerSettings) -> None:
         super().__init__(settings)
@@ -54,7 +55,8 @@ class Bridge2DLayer(BridgeLayer):
 
     @property
     def output(self) -> BridgeOutput:
-        return BridgeOutput(self._trail.velocity, self._density_bridge.density, self._temperature_bridge.temperature)
+        """The density is the amount alone, the smoothed velocity's speed (R); the 2D fluid colors it at its output."""
+        return BridgeOutput(self._trail.velocity, self._velocity_magnitude.magnitude, self._temperature_bridge.temperature)
 
     # ========== Lifecycle ==========
 

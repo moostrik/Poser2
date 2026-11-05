@@ -698,6 +698,16 @@ class Fluid2D:
         effective = strength * self.settings.density.gain * dt
         FlowUtil.add(self._density_fbo, texture, effective)
 
+    def add_density_channel(self, texture: Texture, channel: int, strength: float = 1.0) -> None:
+        """Add a one-channel texture, an amount, to one channel of the density: `channel` 0 to 3 is
+        R, G, B, A. Applies density.gain and delta_time. The channels keep injections apart until the
+        output colors them."""
+        if not self._allocated:
+            return
+        dt = self._dt
+        effective = strength * self.settings.density.gain * dt
+        FlowUtil.add_channel(self._density_fbo, texture, channel, effective)
+
     def add_density_region(self, texture: Texture, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
         """Add density to a specific region."""
         if not self._allocated:

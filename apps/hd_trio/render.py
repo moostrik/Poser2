@@ -190,9 +190,10 @@ class HDTrioRender(RenderBase):
 
     def _wire_flow(self) -> None:
         """Build each stage's input: a motion input per camera on its centered mask, with the capture
-        time of the frame the mask was made from; a bridge input with the camera's track color; a fluid
-        input per screen with one injection per camera's bridge, the own camera's at the player's
-        motion, another's at the cross-camera similarity times `similarity_scale`."""
+        time of the frame the mask was made from; a bridge input with the centered foreground as the
+        picture behind the density and the temperature; a fluid input per screen with one injection
+        per camera's bridge in the camera's track color, the own camera's at the player's motion,
+        another's at the cross-camera similarity times `similarity_scale`."""
         dt: float = self._dt
         colors: list[Color] = self.settings.colors.track_colors
         bridges: dict[int, ls.Bridge2DLayer] = {i: cast(ls.Bridge2DLayer, layer) for i, layer in self.L[Layers.bridge].items()}
@@ -203,8 +204,7 @@ class HDTrioRender(RenderBase):
                 continue
             mask_view: ls.LayerBase = self.L[Layers.center_mask][i]
             motion.set_input(ls.MotionInput(mask_view.texture, mask_view.timestamp if isinstance(mask_view, ls.HasCaptureTime) else None, dt))
-            color: Color = colors[i % len(colors)]
-            bridges[i].set_input(ls.BridgeInput(motion.output.velocity, dt, color=(color.r, color.g, color.b)))
+            bridges[i].set_input(ls.BridgeInput(motion.output.velocity, dt, self.L[Layers.center_foreground][i].texture))
 
         for i, _fluid in self.L[Layers.fluid].items():
             fluid = cast(ls.Fluid2DLayer, _fluid)
@@ -218,7 +218,8 @@ class HDTrioRender(RenderBase):
             for j, bridge in bridges.items():
                 output: ls.BridgeOutput = bridge.output
                 weight: float = motion_value if j == i else (float(similarities[j]) if j < len(similarities) else 0.0)
-                injections.append(ls.Injection(output.velocity, output.density, output.temperature, weight=weight))
+                color: Color = colors[j % len(colors)]
+                injections.append(ls.Injection(output.velocity, output.density, output.temperature, weight=weight, color=(color.r, color.g, color.b)))
             fluid.set_input(ls.FluidInput(dt, injections))
 
     def update(self) -> None:

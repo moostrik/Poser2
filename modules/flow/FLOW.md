@@ -77,8 +77,8 @@ from the app, never from an output, or they would be the tick before's.
 | Stage  | Input `@dataclass`, built by the app each tick                                                                                      | Output `@dataclass`, the stage's textures                                                                |
 |--------|-------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
 | motion | `MotionInput`: `image`, the picture the velocity is measured on by its brightness; `timestamp`, the capture time of the camera frame `image` holds, the frame's identity; `dt`, the render tick's; `depth`, a `DepthView` or `None`; `mask`, or `None` | `MotionOutput`: `velocity` (x, y, z), gated by `mask` with the 3D flow's `use_mask`; z is 0 without depth |
-| bridge | `BridgeInput`: `velocity`, from the motion output; `dt`; `image`, or `None`, the picture whose RGB colors the density; `color`, an RGB tint on it, white by default; `mask`, or `None`, which gates the image | `BridgeOutput`: `velocity`; `density`, RGBA, what the fluid injects: the amount (the trail's speed in 2D; the kinetic emission or the speed in 3D) times `color`, times the image's RGB where there is one, with the amount as alpha; `temperature`; `onset` or `None`; `spin`, the curl at its `spin` setting, or `None` |
-| fluid  | `FluidInput`: `dt`, and `injections`, a list of `Injection`: `velocity`, `density`, `temperature`, `onset`, `spin`, from one bridge output, with `weight`, 0 to 1, the injection's share of the fluid's velocity, density and temperature, as a layer's weight in the light renderer's mix; the app builds one injection per bridge it wants in that fluid | the layer's `texture`: the show                                                       |
+| bridge | `BridgeInput`: `velocity`, from the motion output; `dt`; `image`, or `None`, the picture whose RGB colors the density; `color`, an RGB tint on it, white by default; `mask`, or `None`, which gates the image | `BridgeOutput`: `velocity`; `density`, what the fluid injects: in 2D the amount alone, the trail's speed (R); in 3D RGBA, the amount (the kinetic emission or the speed) times `color`, times the image's RGB where there is one, with the amount as alpha; `temperature`; `onset` or `None`; `spin`, the curl at its `spin` setting, or `None` |
+| fluid  | `FluidInput`: `dt`, and `injections`, a list of `Injection`: `velocity`, `density`, `temperature`, `onset`, `spin`, from one bridge output, with `weight`, 0 to 1, the injection's share of the fluid's velocity, density and temperature, as a layer's weight in the light renderer's mix, and `color`, the color the 2D fluid gives the injection's density at its output; the app builds one injection per bridge it wants in that fluid | the layer's `texture`: the show                                                       |
 
 The motion layer measures once per camera frame: when `timestamp` differs from the one it last
 measured; a source without stamps (`None`) measures every tick. A gap wider than a frame period
@@ -132,7 +132,7 @@ waits for the next vsync, up to one 60 Hz tick, before it is measured.
 | `BridgeLayer` (ABC)                         | `set_input(BridgeInput)`; `update()`: the density's color (`DensityColor`: the image, or white, times the tint, gated by the mask), `_bridge` the input's velocity into velocity, density and temperature, `_visualize`; `output: BridgeOutput`. The bridges run at the velocity's size, which the layer follows |
 | `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, with `method` picking the trail or the kinetic bridge, whose curl is scaled by `onset.spin`)                            |
 | `FluidLayer` (ABC)                          | `set_input(FluidInput)`; `update()`: `_inject` each injection's velocity, density and temperature at its weight, `_step(dt)`, `_visualize`; `texture`. Knows injections, not cameras; reads no poses |
-| `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid, both injecting RGBA density; `Fluid2DLayer` draws the field `draw_mode` names through its visualizer; `Fluid3DLayer` also injects onset and spin and takes the parallax eye the app steers by `set_eye(x, y)` |
+| `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's; it draws the field `draw_mode` names through its visualizer. `Fluid3DLayer` injects RGBA density, onset and spin, and takes the parallax eye the app steers by `set_eye(x, y)` |
 | `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass: `blend_mode`, `visualization`, and on the motion layer `width`, `height`; each subclass adds its `draw_mode` and the stage's own settings as a group named after its method (`gradient`, `lucas_kanade`; `trail`, `kinetic`, `density`, `temperature`; `fluid`). No `stage`, `max_players` or `fps`: the layers read no poses and take `dt` from their input |
 
 The apps' render is a layer graph of `LayerBase` layers updated by one loop calling `update()`
@@ -140,9 +140,10 @@ on each (`apps/deep_flow/render.py`, `apps/hd_trio/render.py`), with a wiring pa
 (`_wire_flow`). The wiring pass builds a motion and a bridge input per camera and a fluid input
 per fluid layer, with one injection per bridge that fluid takes, and sets them; the loop, which
 `UPDATE_LAYERS` orders motion, bridge, fluid, stays uniform. Which layers feed the inputs is app
-policy: hd_trio wires fixed layers, measures on its centered mask, gives each bridge the camera's
-track color and no image, and weights the own camera's injection by the player's motion and
-another's by the cross-camera similarity times `similarity_scale`; deep_flow picks the layers on
+policy: hd_trio wires fixed layers, measures on its centered mask, gives each bridge the centered
+foreground as the picture behind its density and temperature, each injection the camera's track
+color, and weights the own camera's injection by the player's motion and another's by the
+cross-camera similarity times `similarity_scale`; deep_flow picks the layers on
 its panel, live, one `Layers` field per picture (`motion_image`, `bridge_image`, `mask`) in its
 `inputs` group with `scale_by_motion` (`apps/deep_flow/settings.py`), reads the fields each tick,
 and steers the eye toward the tracked head.
@@ -177,12 +178,13 @@ The shader loader finds a shader's source by its `.py` module name beside it
   the 2D optical flow moves to the Lucas–Kanade solve: its velocity is per frame and it has no
   velocity gate. hd_trio measures on the mask itself (`apps/hd_trio/render.py`), so a gate would
   change nothing there **(deduction)**.
-- The fluid knows injections, not cameras. The 2D density is RGBA colored by the bridge, from the
-  app's track colors in hd_trio; the 2D fluid stores no channel per camera and colors nothing at
-  its output, so a 2D system takes any number of cameras. Advection and fade are linear per
-  channel, so the picture is the same as coloring at the output; where cameras overlap the alpha
-  is the sum, not the max, there is no clamp of V at 1, and `density.dampen_*` reads the color's
-  length **(deduction)**.
+- The fluid knows injections, not cameras. The 2D fluid keeps its injections apart until its
+  output, one density channel each, so a 2D fluid takes four injections at most, and colors them
+  there with each injection's color, as `main` colored its cameras: where two meet the brightness
+  is capped at white and the opacity is the stronger one's. hd_trio looks as it did on `main`
+  **(deduction)**: the fluid receives the same velocity at the same weight, the same amount per
+  channel, the same temperature and the same colors. The 3D fluid takes the density colored by
+  the bridge, any number of injections.
 - The inputs and outputs are the contract and the base classes hold the two kinds to one shape;
   there are no `Protocol`s for the boundaries. Shared code lives in the base, never in a shared
   concrete class.
@@ -231,11 +233,6 @@ The shader loader finds a shader's source by its `.py` module name beside it
   density bridge, at output size, reads a full-resolution velocity; the magnitude and the
   temperature bridge sample it down. The bridge's GPU timer says what it costs; running the trail at
   the flow's size with the density bridge sampling it up is the fix if it is the bridge's biggest cost.
-- The 2D overlap. Where two cameras' densities meet, the 2D fluid now adds their colors and
-  opacities with no cap, where `main` capped the brightness at white and took the stronger opacity.
-  A cap at white is one pass on the 2D fluid's density at its output; the opacity is summed in the
-  fluid and cannot be told apart again, which matters only where the density is composited by its
-  alpha.
 - hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
   the pose's motion, a settings field written per tick. A per-tick value on the fluid layer, as the
   eye is, would take it off the settings.
