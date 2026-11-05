@@ -61,6 +61,7 @@ OUTPUT_WIDTH: int = 1080
 OUTPUT_HEIGHT: int = 1920
 
 EYE_EASE: float = 0.4           # s: the parallax eye's ease toward the tracked head, keeping keypoint jitter out
+MAIN_BACKGROUND: tuple[float, float, float, float] = (0.18, 0.18, 0.18, 1.0)    # the main window's grey, so a black layer shows against it
 
 # The layers that are not output-shaped, each with the layer whose texture holds its shape
 SHAPE_LAYERS: dict[Layers, Layers] = {
@@ -347,7 +348,7 @@ class DeepFlowRender(RenderBase):
     # ========== Drawing ==========
 
     def draw_main(self, width: int, height: int) -> None:
-        clear_color()
+        clear_color(*MAIN_BACKGROUND)
 
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)

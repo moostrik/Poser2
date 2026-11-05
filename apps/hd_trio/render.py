@@ -58,6 +58,7 @@ LARGE_LAYERS: list[Layers] = [
 
 FADE_TIME_STILL: float = 18.0   # s: the density's fade while the player stands still
 FADE_TIME_RANGE: float = 14.0   # s: how much faster it fades at full motion
+MAIN_BACKGROUND: tuple[float, float, float, float] = (0.18, 0.18, 0.18, 1.0)    # the main window's grey, so a black layer shows against it
 
 
 class HDTrioRender(RenderBase):
@@ -292,7 +293,7 @@ class HDTrioRender(RenderBase):
             s.update(progress)
 
     def draw_main(self, width: int, height: int) -> None:
-        clear_color()
+        clear_color(*MAIN_BACKGROUND)
 
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)

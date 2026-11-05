@@ -9,7 +9,7 @@ It renders in `draw`, once per tick however many panels show it, and nothing in 
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
 
-from OpenGL.GL import GL_VIEWPORT, glGetIntegerv
+from OpenGL.GL import GL_VIEWPORT, glGetIntegerv, glViewport
 
 from modules.gl import Texture, Style, Text, Blit
 from modules.flow import Visualizer, VisualizationFieldSettings, Strip, STRIP_LANES
@@ -140,10 +140,13 @@ class MonitorLayer(LayerBase):
 
     def draw(self) -> None:
         if not self._rendered:
+            # Rendering into the port's FBOs sets the viewport to their size; the panel's comes back after
+            viewport = glGetIntegerv(GL_VIEWPORT)
             Style.push_style()
             Style.set_blend_mode(Style.BlendMode.DISABLED)
             self._render()
             Style.pop_style()
+            glViewport(int(viewport[0]), int(viewport[1]), int(viewport[2]), int(viewport[3]))
             self._rendered = True
         if self._port is None:
             return
