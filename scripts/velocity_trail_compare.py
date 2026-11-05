@@ -2,8 +2,8 @@
 
     python scripts/velocity_trail_compare.py FRAMES [--a NAME=VALUE ...] [--b NAME=VALUE ...]
 
-FRAMES is what depth_track_capture saved from one loop of a recording (temp/depth_track/RECORDING). No app
-and no camera: a hidden window gives the GL context, one `LucasKanadeFlow` measures the saved frames with the
+FRAMES is what depth_velocity_capture saved from one loop of a recording (temp/depth_velocity/RECORDING). No app
+and no camera: a hidden window gives the GL context, one `LucasKanadeFlow3D` measures the saved frames with the
 settings they were recorded with, and two `VelocityTrailBridge`, A and B, take its velocity; `--a` and
 `--b` set any of the trail's settings (advect, attack, smooth, blur_radius, blur_steps), the rest
 as in deep_flow's preset. One loop, as fast as it goes; the trail steps once per flow frame, by its interval.
@@ -33,8 +33,8 @@ from OpenGL.GL import glFinish
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from modules.gl import Texture  # noqa: E402
-from modules.flow import LucasKanadeFlow, LucasKanadeFlowSettings, VelocityTrailBridge, VelocityTrailBridgeSettings  # noqa: E402
-from depth_track_compare import Frames, context, read_back, recorded_settings, upload  # noqa: E402
+from modules.flow import LucasKanadeFlow3D, LucasKanadeFlow3DSettings, VelocityTrailBridge, VelocityTrailBridgeSettings  # noqa: E402
+from depth_velocity_compare import Frames, context, read_back, recorded_settings, upload  # noqa: E402
 
 SETTLE: float = 1.5      # s of the still part left out of its noise: the trail's memory of the flow's first frames
 PRESET: Path =Path(__file__).resolve().parent.parent / 'apps' / 'deep_flow' / 'data' / 'settings' / 'settings.json'
@@ -116,9 +116,9 @@ def main() -> int:
     w, h = frames.width, frames.height
     context(False, 64, 64)
 
-    flow_settings = LucasKanadeFlowSettings()
+    flow_settings = LucasKanadeFlow3DSettings()
     flow_settings.update_from_dict(recorded_settings(frames.calls[0]['settings']))
-    flow = LucasKanadeFlow(flow_settings)
+    flow = LucasKanadeFlow3D(flow_settings)
     flow.allocate(w, h)
     sides: list[tuple[str, VelocityTrailBridge, dict[str, object], Measures]] = []
     for name, items in (('A', args.a), ('B', args.b)):

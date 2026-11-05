@@ -1,8 +1,8 @@
 # Lucas–Kanade flow settings
 
-The settings of `LucasKanadeFlow` (`lucas_kanade_flow.py`), in panel order, with their defaults and
-the reason for each. How the flow works is in the module docstrings of `lucas_kanade_flow.py` and
-`depth_velocity.py`.
+The settings of `LucasKanadeFlow3D` (`lucas_kanade_flow_3d.py`), in panel order, with their defaults and
+the reason for each. How the flow works is in the module docstrings of `lucas_kanade_flow_3d.py`,
+`lucas_kanade_flow.py` (the x/y solve) and `depth_velocity.py` (z).
 
 The defaults are the best measured for deep_flow, in this order of importance:
 
@@ -10,7 +10,7 @@ The defaults are the best measured for deep_flow, in this order of importance:
 - B: a clear difference between slow and fast motion, in x, y and z
 - C: least smear
 
-Every number is measured with `scripts/depth_track_compare.py` on the GPU, unless marked
+Every number is measured with `scripts/depth_velocity_compare.py` on the GPU, unless marked
 **(deduction)**. The configuration: the flow at 448×800, deep_flow's preset, Neural Depth on an
 OAK4, and two recordings at 0.65–1.5 m: `stillslowfast` (still, then an arm slow and fast) and
 `standmoves` (arm sweeps, pushes toward the camera). The whole flow takes 2.0 ms per frame.
@@ -24,7 +24,7 @@ OAK4, and two recordings at 0.65–1.5 m: `stillslowfast` (still, then an arm sl
 
 The flow's velocity is in image widths per second times its gains.
 
-## lucas_kanade (x/y)
+## solve (x/y)
 
 | Setting      | Default | Range (step)        | For | Why                                    |
 |--------------|---------|---------------------|-----|----------------------------------------|
@@ -44,7 +44,7 @@ The flow's velocity is in image widths per second times its gains.
   instead of stepping, and the patch's samples stay within the tolerance; see [Open](#open). It costs
   +0.05 ms.
 
-## depth_track (z)
+## depth_velocity (z)
 
 | Setting   | Default      | Range (step)    | For | Why                                    |
 |-----------|--------------|-----------------|-----|----------------------------------------|

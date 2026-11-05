@@ -10,8 +10,9 @@ from .flow_base import FlowBase
 from .flow_util import FlowUtil
 
 # Motion: the optical flow
-from .motion import DepthView, DepthVelocity, catch_up_share, color_motion, filter_depth_steps, track_depth, track_weights, depth_threshold, \
-                    GradientFlow, GradientFlowSettings, LucasKanadeFlow, Patch, LucasKanadeFlowSettings, LucasKanadeSettings, DepthTrackSettings, lucas_kanade,threshold_displacement, filter_displacement, displacement_velocity
+from .motion import DepthView, DepthVelocity, DepthVelocitySettings, catch_up_share, color_motion, filter_depth_steps, track_depth, track_weights, depth_threshold, \
+                    GradientFlow, GradientFlowSettings, Patch, LucasKanadeFlow, LucasKanadeFlowSettings, lucas_kanade, threshold_displacement, \
+                    LucasKanadeFlow3D, LucasKanadeFlow3DSettings, filter_displacement, displacement_velocity
 
 # Bridges: the 3D bridge by name, the 2D bridge as `bridge_2d` (bridge_2d.DensityBridge, ...)
 from . import bridge_2d

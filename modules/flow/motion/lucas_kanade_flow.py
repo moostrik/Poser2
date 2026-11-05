@@ -1,4 +1,4 @@
-"""Lucas–Kanade Flow: how far each pixel moved between two luminance frames, coarse to fine.
+"""Lucas–Kanade Flow: how far each pixel moved between two luminance frames, coarse to fine; the x/y solve.
 
 Where the gradient flow gives a motion strength per pixel (the brightness change along the gradient),
 this gives how far the image moved: a window of gradients per pixel, solved for the shift that carries
@@ -9,51 +9,32 @@ Lucas–Kanade); solving every full-size pixel at a coarse level instead puts ea
 texel off its neighbour's, and where a window is badly conditioned that flips the solve from pixel to
 pixel, in rows and columns.
 
-The displacement (uv per frame) stays inside: `lucas_kanade.threshold` (px per frame) comes off its length,
-as below it is the solve's jitter, not motion. z comes from its own `DepthVelocity`: a depth track carried
-along the displacement, so a surface sliding sideways over a slope reads no motion toward the camera,
-corrected each frame by the mean over `depth_track.window` depth samples and smoothed over
-`depth_track.smooth`; `depth_track.threshold` comes off it. The depth change comes in view
-widths per frame like the displacement, so all three become view widths per second the same way. Out
-comes one 3D velocity in image widths per second times `x_gain`, `y_gain` and `z_gain` (1 = true speed,
-0 = that axis off, negative = inverted). With `use_mask`, the velocity is multiplied by the mask.
+Out comes the displacement in uv per frame: `solved`, as solved, and `displacement`, with `threshold`
+(px per frame) taken off its length, as below it is the solve's jitter, not motion. With a depth and
+`same_surface`, only the window's samples within a tolerance of the centre's depth count.
+`LucasKanadeFlow3D` composes this solve with the depth velocity into a 3D velocity.
 
-z lags its motion by the time it is smoothed over. With `depth_track.xy_smooth`, x/y goes through the
-same filter over `depth_track.smooth` before its threshold, carried along the displacement as z is, so
-both lag alike. A displacement is a step of position, so the filter is the same one: with a steady frame
-interval and a full z window, x/y answers a change of speed exactly as z does. The tracks are
-carried by the displacement as solved, before `lucas_kanade.threshold`: a slide too slow for the output
-still moves the tracks with it, or on a slope it would read as z.
+The settings in flow pixels go with the flow's resolution: `levels` (each level doubles the motion it
+follows, about 2 × 2^(levels − 1) px per frame at full size, so halving the resolution needs one level
+fewer for the same motion), `window` and `threshold`.
 
-The settings in flow pixels go with the flow's resolution: `lucas_kanade.levels` (each level doubles the
-motion it follows, about 2 × 2^(levels − 1) px per frame at full size, so halving the resolution needs one
-level fewer for the same motion), its window and threshold, and `depth_track.threshold`. Those
-in metres and milliseconds do not.
-
-`lucas_kanade`, `threshold_displacement`, `filter_displacement` and
-`displacement_velocity` below are the numpy references of the shaders.
+`lucas_kanade` and `threshold_displacement` below are the numpy references of the shaders.
 """
 
-import math
-
 import numpy as np
-from OpenGL.GL import GL_RG32F, GL_RGBA16F, GL_RGBA32F
+from OpenGL.GL import GL_RG32F
 
 from modules.gl import Fbo, SwapFbo, Texture
-from modules.settings import BaseSettings, Field, Group, Widget
-from .. import FlowUtil
-from .depth_velocity import DepthVelocity, track_weights
+from modules.settings import BaseSettings, Field
 from .luminance_frames import LuminanceFrames
 from .patch import Patch
-from .shaders import ComposeVelocity, DisplacementFilter, DisplacementThreshold, LucasKanadeShader
+from .shaders import DisplacementThreshold, LucasKanadeShader
 
 MAX_LEVELS: int = 9     # the most pyramid levels a solve has an Fbo for
-MIN_DELTA_TIME: float = 1e-3        # s: an interval at or below this is not a frame's
-FALLBACK_DELTA_TIME: float = 1.0 / 30.0     # s: the interval taken in its place
 
 
-class LucasKanadeSettings(BaseSettings):
-    """The x/y part: the Lucas–Kanade solve of the displacement."""
+class LucasKanadeFlowSettings(BaseSettings):
+    """The x/y solve of the displacement."""
     levels:         Field[int]   = Field(3, min=1, max=5, description="Pyramid levels of the x/y solve, each doubles the reach (more: faster motion, more spill)")
     window:         Field[Patch] = Field(Patch.SEVEN, min=Patch.THREE, max=Patch.NINE, description="x/y patch size (larger: cleaner, more spill)")
     damping:        Field[float] = Field(0.03, min=0.0, max=0.1, step=0.001, description="Damps x/y where the patch has little texture (higher: less noise, smaller motion)")
@@ -61,49 +42,22 @@ class LucasKanadeSettings(BaseSettings):
     threshold:      Field[float] = Field(0.5, min=0.0, max=5.0, step=0.05, description="x/y below this is noise, in px/frame (higher: less noise, less slow motion)")
 
 
-class DepthTrackSettings(BaseSettings):
-    """The z part: the depth track carried along the displacement."""
-    edge:           Field[float] = Field(0.1, min=0.05, max=0.3, step=0.01, description="Edge depth step, m (lower: cleaner edges, fewer fingers)")
-    window:         Field[Patch] = Field(Patch.SEVEN, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)")
-    tolerance:      Field[float] = Field(0.2, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m (higher: fuller pushes, fewer splits)")
-    smooth:         Field[float] = Field(50.0, min=0.0, max=200.0, step=1.0, newline=True, description="Smoothing time of z in ms, 0 = two-frame change (higher: less noise, more lag)")
-    xy_smooth:      Field[bool]  = Field(False, width=48, description="x/y smoothed over smooth, so both lag alike (on: less noise, more lag)")
-    catch_up:       Field[float] = Field(8.0, min=0.0, max=50.0, step=1.0, description="Shorter smoothing during a fast push, in ms, 0 = off (lower: quicker pushes)")
-    dead_zone:      Field[float] = Field(0.02, min=0.0, max=0.05, step=0.001, newline=True, description="Depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
-    threshold:      Field[float] = Field(1.0, min=0.0, max=5.0, step=0.05, description="z below this is noise, in px/frame (higher: less noise, less slow z)")
-
-
-class LucasKanadeFlowSettings(BaseSettings):
-    """Configuration for the Lucas–Kanade flow: the mask and the axes, its x/y part and its z part."""
-    use_mask:       Field[bool]  = Field(True, width=48, description="Only the player moves the fluid (off: whole image)")
-    x_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, image widths per second")
-    y_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, image widths per second")
-    z_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, on the x/y scale")
-
-    lucas_kanade   = Group(LucasKanadeSettings)
-    depth_track    = Group(DepthTrackSettings)
-
-
 class LucasKanadeFlow:
-    """The 3D velocity (RGBA16F, xyz) between the newest two frames of its input."""
+    """The displacement (RG32F, uv per frame) between the newest two frames of its input."""
 
     def __init__(self, settings: LucasKanadeFlowSettings) -> None:
         self.settings: LucasKanadeFlowSettings = settings
-        self._depth_velocity: DepthVelocity = DepthVelocity()
-        self._mask: Texture | None = None
-
         self._frames: LuminanceFrames = LuminanceFrames()
         self._solve: SwapFbo = SwapFbo()            # the displacement as solved, at full size: level 0
         self._levels: list[SwapFbo] = [SwapFbo() for _ in range(1, MAX_LEVELS)]    # levels 1 and up, each at its own size
         self._displacement: Fbo = Fbo()             # with the noise floor taken off
-        self._filtered: SwapFbo = SwapFbo()         # with xy_smooth: the filter, its displacement and position error
-        self._followed: Fbo = Fbo()                 # the filtered displacement with the noise floor taken off
-        self._following: bool = False
-        self._velocity: Fbo = Fbo()
         self._shader: LucasKanadeShader = LucasKanadeShader()
         self._threshold_shader: DisplacementThreshold = DisplacementThreshold()
-        self._filter_shader: DisplacementFilter = DisplacementFilter()
-        self._compose_shader: ComposeVelocity = ComposeVelocity()
+
+    @property
+    def ready(self) -> bool:
+        """Whether it holds two frames to measure between."""
+        return self._frames.ready
 
     @property
     def luminance(self) -> Texture:
@@ -111,70 +65,69 @@ class LucasKanadeFlow:
         return self._frames.luminance
 
     @property
-    def velocity(self) -> Texture:
-        """x, y and z in image widths per second, each times its gain (RGBA16F)."""
-        return self._velocity
+    def previous_luminance(self) -> Texture:
+        """The luminance frame before the newest."""
+        return self._frames.previous_luminance
 
     @property
-    def depth_velocity(self) -> DepthVelocity:
-        """Its z, before `z_gain` and the mask."""
-        return self._depth_velocity
+    def solved(self) -> Texture:
+        """The displacement as solved (RG32F, uv per frame), before the threshold."""
+        return self._solve
+
+    @property
+    def displacement(self) -> Texture:
+        """The displacement (RG32F, uv per frame) with `threshold` taken off its length."""
+        return self._displacement
 
     def allocate(self, width: int, height: int) -> None:
-        self._depth_velocity.allocate(width, height)
         self._frames.allocate(width, height)
         self._solve.allocate(width, height, GL_RG32F)
         for level, fbo in enumerate(self._levels, start=1):
             fbo.allocate(max(width >> level, 1), max(height >> level, 1), GL_RG32F)     # the size of the frames' mip level
         self._displacement.allocate(width, height, GL_RG32F)
-        self._filtered.allocate(width, height, GL_RGBA32F)
-        self._followed.allocate(width, height, GL_RG32F)
-        self._velocity.allocate(width, height, GL_RGBA16F)
         self._shader.allocate()
         self._threshold_shader.allocate()
-        self._filter_shader.allocate()
-        self._compose_shader.allocate()
         self.reset()
 
     def deallocate(self) -> None:
-        self._depth_velocity.deallocate()
         self._frames.deallocate()
         self._solve.deallocate()
         for fbo in self._levels:
             fbo.deallocate()
         self._displacement.deallocate()
-        self._filtered.deallocate()
-        self._followed.deallocate()
-        self._velocity.deallocate()
         self._shader.deallocate()
         self._threshold_shader.deallocate()
-        self._filter_shader.deallocate()
-        self._compose_shader.deallocate()
 
     def reset(self) -> None:
-        self._depth_velocity.reset()
         self._frames.reset()
         self._solve.clear_all()
         for fbo in self._levels:
             fbo.clear_all()
         self._displacement.clear()
-        self._filtered.clear_all()
-        self._followed.clear()
-        self._velocity.clear()
 
     def set_input(self, texture: Texture) -> None:
         """Take `texture` as the newest frame."""
         self._frames.set_input(texture)
 
-    def set_mask(self, texture: Texture | None) -> None:
-        """The player's mask (red, 0 to 1) the velocity is multiplied by with `use_mask`, or None for no mask."""
-        self._mask = texture
+    def update(self, depth: Texture | None = None, tolerance: float = 0.0) -> None:
+        """Solve the displacement between the newest two frames; with `depth` (metres in red) and
+        `same_surface`, a window counts only the samples within `tolerance` of its centre's depth."""
+        if not self._frames.ready:
+            self._solve.clear_all()
+            self._displacement.clear()
+            return
+        s: LucasKanadeFlowSettings = self.settings
+        self._pyramid(self._solve, self._frames.previous_luminance, self._frames.luminance, depth if s.same_surface else None, tolerance)
 
-    def _pyramid(self, solve: SwapFbo, previous: Texture, current: Texture, depth: Texture | None) -> None:
+        self._displacement.begin()
+        self._threshold_shader.use(self._solve, s.threshold)
+        self._displacement.end()
+
+    def _pyramid(self, solve: SwapFbo, previous: Texture, current: Texture, depth: Texture | None, tolerance: float) -> None:
         """The displacement carrying `previous` onto `current`, coarse to fine, into `solve`: one solve
         per level at that level's size, each from the coarser one's displacement read linear (uv, so
         it needs no scaling). The finest is `solve`."""
-        s: LucasKanadeSettings = self.settings.lucas_kanade
+        s: LucasKanadeFlowSettings = self.settings
         estimate: Texture | None = None
         for level in reversed(range(min(s.levels, MAX_LEVELS))):
             target: SwapFbo = solve if level == 0 else self._levels[level - 1]
@@ -183,65 +136,9 @@ class LucasKanadeFlow:
             target.swap()
             target.begin()
             self._shader.use(previous, current, target.back_texture if estimate is None else estimate, level, s.window, s.damping,
-                             depth if s.same_surface else None, self.settings.depth_track.tolerance)
+                             depth, tolerance)
             target.end()
             estimate = target.texture
-
-    def update(self, depth: Texture | None, delta_time: float, view_span: float, depth_step: tuple[float, float]) -> None:
-        """Measure between the newest two frames.
-
-        Args:
-            depth: Metres in red; None without depth (z is 0)
-            delta_time: Seconds since the previous frame
-            view_span: Metres one view width spans per metre of depth, for z
-            depth_step: uv between two depth samples in the flow's view, for z
-        """
-        if not self._frames.ready:
-            FlowUtil.zero(self._velocity)
-            return
-        s: LucasKanadeFlowSettings = self.settings
-        xy_s: LucasKanadeSettings = s.lucas_kanade
-        z_s: DepthTrackSettings = s.depth_track
-
-        self._pyramid(self._solve, self._frames.previous_luminance, self._frames.luminance, depth)
-        solved: Texture = self._solve.texture
-
-        self._displacement.begin()
-        self._threshold_shader.use(solved, xy_s.threshold)
-        self._displacement.end()
-
-        if depth is not None:
-            self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, z_s.window, z_s.smooth,
-                                              z_s.threshold, z_s.tolerance, z_s.dead_zone, z_s.catch_up, xy_s.threshold,
-                                              solved, z_s.edge)
-
-        xy: Texture = self._displacement
-        if z_s.xy_smooth:
-            if not self._following:
-                self._filtered.clear_all()                  # from no motion, not from when it was last on
-                self._following = True
-            alpha, _ = track_weights(delta_time, z_s.smooth, 1.0)
-            self._filtered.swap()
-            self._filtered.begin()
-            self._filter_shader.use(solved, self._filtered.back_texture, solved, float(alpha))
-            self._filtered.end()
-            self._followed.begin()
-            self._threshold_shader.use(self._filtered.texture, xy_s.threshold)
-            self._followed.end()
-            xy = self._followed
-        else:
-            self._following = False
-
-        # uv per frame as image widths per second: v is uv of the height, so a square motion stays square;
-        # z is in view widths per frame already
-        # an interval that is not a frame's (0, negative, not finite) would scale every pixel at once
-        per_second: float = 1.0 / delta_time if math.isfinite(delta_time) and delta_time > MIN_DELTA_TIME else 1.0 / FALLBACK_DELTA_TIME
-        aspect: float = self._displacement.height / max(self._displacement.width, 1)
-        mask: Texture | None = self._mask if s.use_mask and self._mask is not None and self._mask.allocated else None
-        self._velocity.begin()
-        self._compose_shader.use(xy, self._depth_velocity.depth_velocity if depth is not None else None,
-                                 (per_second * s.x_gain, per_second * aspect * s.y_gain, per_second * s.z_gain), mask)
-        self._velocity.end()
 
 
 # ── numpy reference ─────────────────────────────────────────────────────
@@ -340,30 +237,3 @@ def threshold_displacement(displacement: np.ndarray, threshold: float) -> np.nda
     length: np.ndarray = np.linalg.norm(displacement, axis=-1, keepdims=True)
     kept: np.ndarray = np.maximum(length - threshold, 0.0)
     return np.divide(displacement * kept, length, out=np.zeros_like(displacement), where=length > 1e-12)
-
-
-def filter_displacement(displacement: np.ndarray, state: np.ndarray, carry: np.ndarray, alpha: float) -> np.ndarray:
-    """The filter x/y goes through with depth_track.xy_smooth, one frame on (H, W, 4): the filtered
-    displacement (x, y, pixels per frame) and the position error (x, y, pixels). Mirrors
-    displacement_filter.frag.
-
-    The depth track's alpha–beta filter, on positions that step by `displacement` (H, W, 2, pixels
-    per frame) each frame: the state (zeros to start) is carried from where each pixel was `carry`
-    back, linear between texels, its displacement predicts the step, and the residual corrects it by
-    `alpha` and alpha² / (2 − alpha), as a full window corrects z.
-    """
-    h, w = displacement.shape[:2]
-    rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
-    x, y = columns - carry[..., 0], rows - carry[..., 1]
-    carried: np.ndarray = np.stack([_bilinear(state[..., channel], x, y) for channel in range(4)], axis=-1)
-    beta: float = alpha * alpha / (2.0 - alpha)
-    residual: np.ndarray = displacement - carried[..., 2:] - carried[..., :2]
-    return np.concatenate((carried[..., :2] + beta * residual, -(1.0 - alpha) * residual), axis=-1)
-
-
-def displacement_velocity(displacement: np.ndarray, dt: float, width: int, height: int, strength: tuple[float, float]) -> np.ndarray:
-    """A displacement in uv per frame (..., 2) as a velocity in image widths per second, times `strength`.
-
-    v is uv of the height, so it is taken to widths first: a square motion stays square.
-    """
-    return displacement * np.array([1.0, height / width]) / dt * np.array(strength)

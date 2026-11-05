@@ -31,8 +31,8 @@ jitter has none, a hand pushing forward moves its edges) the time it follows ove
 `catch_up_smooth`. The carry then takes each texel's depth a frame on, where it lags to.
 
 z comes in view widths per frame, over the metres one view width spans at the depth (`view_span`
-per metre), and `threshold` comes off it. The Lucas–Kanade flow owns one for its z, with its
-`depth_track` settings, and turns it into view widths per second.
+per metre), and `threshold` comes off it. The 3D Lucas–Kanade flow owns one for its z, with its
+`depth_velocity` settings (`DepthVelocitySettings`), and turns it into view widths per second.
 
 At a silhouette, stereo depth jitters between the two surfaces by more than the dead zone, from
 frame to frame. So before the track, a depth sample whose 3×3 depth samples span a step beyond
@@ -47,8 +47,22 @@ import numpy as np
 from OpenGL.GL import GL_R16F, GL_R32F, GL_RG32F, GL_RGBA32F
 
 from modules.gl import Fbo, SwapFbo, Texture
+from modules.settings import BaseSettings, Field
 from .. import FlowBase, FlowUtil
+from .patch import Patch
 from .shaders import DepthStepFilter, DepthThreshold, DepthVelocityShader
+
+
+class DepthVelocitySettings(BaseSettings):
+    """The z part: the depth velocity, a depth track carried along the displacement."""
+    edge:           Field[float] = Field(0.1, min=0.05, max=0.3, step=0.01, description="Edge depth step, m (lower: cleaner edges, fewer fingers)")
+    window:         Field[Patch] = Field(Patch.SEVEN, min=Patch.ONE, max=Patch.NINE, description="Depth averaging size (larger: less noise, small parts blur)")
+    tolerance:      Field[float] = Field(0.2, min=0.05, max=0.5, step=0.01, description="New-surface depth jump, m (higher: fuller pushes, fewer splits)")
+    smooth:         Field[float] = Field(50.0, min=0.0, max=200.0, step=1.0, newline=True, description="Smoothing time of z in ms, 0 = two-frame change (higher: less noise, more lag)")
+    xy_smooth:      Field[bool]  = Field(False, width=48, description="x/y smoothed over smooth, so both lag alike (on: less noise, more lag)")
+    catch_up:       Field[float] = Field(8.0, min=0.0, max=50.0, step=1.0, description="Shorter smoothing during a fast push, in ms, 0 = off (lower: quicker pushes)")
+    dead_zone:      Field[float] = Field(0.02, min=0.0, max=0.05, step=0.001, newline=True, description="Depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
+    threshold:      Field[float] = Field(1.0, min=0.0, max=5.0, step=0.05, description="z below this is noise, in px/frame (higher: less noise, less slow z)")
 
 
 def track_weights(delta_time: float, smooth: float, share: float | np.ndarray) -> tuple[float | np.ndarray, float | np.ndarray]:

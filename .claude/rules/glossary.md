@@ -18,7 +18,8 @@ Each bullet names the term to use and, after "not", the synonyms it replaces. A 
 - The sequencer's state on the board: `HasSequencerState`, `set_sequencer_state`, `get_sequencer_state`; not `HasSequence`, `set_sequence`
 - Feature words in full: `Velocity`, `Symmetry`, `Confidence`, `Foreground`, `DenseFlow`, `MotionTime`, `Temperature`, `Compositor`, `Geometry`; not `Vel`, `Sym`, `Conf`, `Frg`, `DFlow`, `MTime`, `TEMP`, `Comp`, `Geom`
 - Exponential moving average: `Ema`; not `EMA`
-- A time something is smoothed over (ms): `smooth` (the depth track's `smooth`, `catch_up` and `xy_smooth`); not `time`
+- A time something is smoothed over (ms): `smooth` (the depth velocity's `smooth`, `catch_up` and `xy_smooth`); not `time`
+- The z of the 3D flow: `depth_velocity` (`DepthVelocity`, `DepthVelocitySettings`); not `depth_track`. `depth` is the camera's depth
 - American spelling: `center`, `visualization`, `color`; not `centre`, `visualisation`, `colour`
 
 ## Render
@@ -42,6 +43,8 @@ Each bullet names the term to use and, after "not", the synonyms it replaces. A 
 - An app's renderer: `<App>Render`
 - The camera count at an app's root: `num_cams`, separate from `max_players`
 - The gate on the group's similarity: "group sync" (`group_sync`, `GroupSync`, `GroupSyncGate`); not "full sync". The OSC address stays `/global/sync`
+- The flow stages in an app's settings and `Layers`: `motion`, `bridge`, `fluid`; not `flow`, `fluid3d`, `fluid_flow`
+- The 3D fluid's z layers: `volume` (`VolumeSettings`); not `depth`, which is the camera's depth
 
 ## smile
 

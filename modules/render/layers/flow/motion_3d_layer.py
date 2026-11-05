@@ -5,7 +5,7 @@ import logging
 from enum import IntEnum, auto
 
 # Local application imports
-from modules.flow import LucasKanadeFlow, LucasKanadeFlowSettings, DepthView
+from modules.flow import LucasKanadeFlow3D, LucasKanadeFlow3DSettings, DepthView
 from modules.settings import Field, Group
 from modules.utils import HotReloadMethods
 from .motion_layer import MotionLayer, MotionLayerSettings, MotionInput, MotionOutput
@@ -32,17 +32,17 @@ class Motion3DLayerSettings(MotionLayerSettings):
     """Configuration for Motion3DLayer."""
     draw_mode: Field[Motion3DDrawMode] =    Field(Motion3DDrawMode.VELOCITY)
 
-    lucas_kanade = Group(LucasKanadeFlowSettings)
+    lucas_kanade = Group(LucasKanadeFlow3DSettings)
 
 
 class Motion3DLayer(MotionLayer):
-    """The 3D motion layer: `LucasKanadeFlow` on the input's image, z from its depth, gated by its mask."""
+    """The 3D motion layer: `LucasKanadeFlow3D` on the input's image, z from its depth, gated by its mask."""
 
     def __init__(self, cam_id: int, settings: Motion3DLayerSettings) -> None:
         super().__init__(settings)
         self.settings: Motion3DLayerSettings = settings
         self._cam_id: int = cam_id
-        self._flow: LucasKanadeFlow = LucasKanadeFlow(settings.lucas_kanade)
+        self._flow: LucasKanadeFlow3D = LucasKanadeFlow3D(settings.lucas_kanade)
         self._warned_view_span: bool = False
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
@@ -63,7 +63,7 @@ class Motion3DLayer(MotionLayer):
         self._flow.reset()
 
     def _measure(self, input: MotionInput, interval: float) -> None:
-        flow: LucasKanadeFlow = self._flow
+        flow: LucasKanadeFlow3D = self._flow
         flow.set_input(input.image)
         flow.set_mask(input.mask)
         depth: DepthView | None = input.depth

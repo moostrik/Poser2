@@ -1,11 +1,11 @@
 """Play saved frames through the Lucas–Kanade flow's shaders, A beside B, and measure both.
 
-    python scripts/depth_track_compare.py FRAMES [--a NAME=VALUE ...] [--b NAME=VALUE ...] [--fast] [--verify]
+    python scripts/depth_velocity_compare.py FRAMES [--a NAME=VALUE ...] [--b NAME=VALUE ...] [--fast] [--verify]
 
-FRAMES is what depth_track_capture saved from one loop of a recording (temp/depth_track/RECORDING).
-No app and no camera: a window gives the GL context, and two `LucasKanadeFlow`, A and B, measure the
+FRAMES is what depth_velocity_capture saved from one loop of a recording (temp/depth_velocity/RECORDING).
+No app and no camera: a window gives the GL context, and two `LucasKanadeFlow3D`, A and B, measure the
 saved frames with the settings they were recorded with; `--a` and `--b` override any of them by its
-path in the panel (lucas_kanade.levels, lucas_kanade.threshold, depth_track.catch_up, z, ...). The window plays the loop at its
+path in the panel (solve.levels, solve.threshold, depth_velocity.catch_up, z, ...). The window plays the loop at its
 recorded rate, again and again, A on the left, B on the right:
 
     1  z of the track, red toward the camera, green away     space  pause
@@ -22,7 +22,7 @@ rises above the still part's for a while, and a move's fast half is where it ste
 Each loop prints, for A and B, in the still part: x/y and z as the fluid gets them, at the edge (0–6
 px inside the mask) and inside (12 px and more), and z on the table (outside, 16 px and more); per
 move, the body's x/y and z in its slow and fast half and fast over slow, how its z follows its real
-depth change, and the frames x/y takes to stop after it; the restarts of the depth track, and the
+depth change, and the frames x/y takes to stop after it; the restarts of the depth velocity, and the
 flow's time on the GPU per frame. `--fast` runs one loop without the window, as fast as it goes;
 `--verify` compares A's first frames with the numpy references instead.
 """
@@ -44,19 +44,20 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_COLOR_BUFFER_BIT, GL_FALSE, GL_FLOAT,
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from modules.gl import Blit, Fbo, Texture  # noqa: E402
-from modules.flow import (FlowUtil, LucasKanadeFlow, LucasKanadeFlowSettings, Patch, SignedField, VelocityField,  # noqa: E402
+from modules.flow import (FlowUtil, LucasKanadeFlow3D, LucasKanadeFlow3DSettings, Patch, SignedField, VelocityField,  # noqa: E402
                           VisualizationFieldSettings, filter_depth_steps, lucas_kanade, track_depth)
 
 WARM_UP: float = 1.0          # s at the start the flows settle in, measured in no part
 SHORTEST_PAUSE: float = 1.0   # s of stillness that end a move
 RENAMED: dict[str, str] = {'z_time': 'z_smooth', 'z_catch_up_time': 'z_catch_up', 'xy_follow_z_time': 'xy_smooth', 'xy_follow_z': 'xy_smooth', 'xy_regularizer': 'xy_damping',
-                           'strength_x': 'x_gain', 'strength_y': 'y_gain', 'strength_z': 'z_gain'}   # in frames saved before
+                           'strength_x': 'x_gain', 'strength_y': 'y_gain', 'strength_z': 'z_gain',
+                           'lucas_kanade': 'solve', 'depth_track': 'depth_velocity'}   # in frames saved before
 SWITCHED: dict[str, str] = {'x': 'x_gain', 'y': 'y_gain', 'z': 'z_gain'}   # in frames saved with axis switches: off is a gain of 0
-GROUPED: dict[str, str] = {'xy_levels': 'lucas_kanade.levels', 'xy_window': 'lucas_kanade.window', 'xy_damping': 'lucas_kanade.damping',
-                           'xy_same_surface': 'lucas_kanade.same_surface', 'xy_threshold': 'lucas_kanade.threshold',
-                           'z_edge': 'depth_track.edge', 'z_window': 'depth_track.window', 'z_tolerance': 'depth_track.tolerance',
-                           'z_smooth': 'depth_track.smooth', 'xy_smooth': 'depth_track.xy_smooth',
-                           'z_catch_up': 'depth_track.catch_up', 'z_dead_zone': 'depth_track.dead_zone', 'z_threshold': 'depth_track.threshold'}   # in frames saved flat, before the groups
+GROUPED: dict[str, str] = {'xy_levels': 'solve.levels', 'xy_window': 'solve.window', 'xy_damping': 'solve.damping',
+                           'xy_same_surface': 'solve.same_surface', 'xy_threshold': 'solve.threshold',
+                           'z_edge': 'depth_velocity.edge', 'z_window': 'depth_velocity.window', 'z_tolerance': 'depth_velocity.tolerance',
+                           'z_smooth': 'depth_velocity.smooth', 'xy_smooth': 'depth_velocity.xy_smooth',
+                           'z_catch_up': 'depth_velocity.catch_up', 'z_dead_zone': 'depth_velocity.dead_zone', 'z_threshold': 'depth_velocity.threshold'}   # in frames saved flat, before the groups
 MOVED: float = 0.05          # luminance change of a pixel that moves
 MOVED_FRAMES: int = 5         # frames it changes that much in, over the loop
 VIEWS: dict[int, str] = {1: 'z of the track', 2: 'z after the threshold', 3: 'depth', 4: 'velocity direction', 5: 'velocity arrows'}
@@ -71,7 +72,7 @@ def context(visible: bool, width: int, height: int):
     glfw.window_hint(glfw.CONTEXT_VERSION_MINOR, 6)
     glfw.window_hint(glfw.OPENGL_PROFILE, glfw.OPENGL_CORE_PROFILE)
     glfw.window_hint(glfw.RESIZABLE, glfw.FALSE)
-    window = glfw.create_window(width, height, 'depth track', None, None)
+    window = glfw.create_window(width, height, 'depth velocity', None, None)
     if not window:
         raise RuntimeError('no GL window')
     glfw.make_context_current(window)
@@ -127,8 +128,8 @@ def recorded_settings(recorded: dict) -> dict:
     return result
 
 
-def setting_owner(settings: LucasKanadeFlowSettings, path: str) -> tuple[object, str]:
-    """The settings object that holds the setting at `path` (lucas_kanade.levels) and its name there."""
+def setting_owner(settings: LucasKanadeFlow3DSettings, path: str) -> tuple[object, str]:
+    """The settings object that holds the setting at `path` (solve.levels) and its name there."""
     *groups, name = path.split('.')
     owner: object = settings
     for group in groups:
@@ -139,7 +140,7 @@ def setting_owner(settings: LucasKanadeFlowSettings, path: str) -> tuple[object,
 
 
 def overrides(items: list[str]) -> dict[str, object]:
-    defaults = LucasKanadeFlowSettings()
+    defaults = LucasKanadeFlow3DSettings()
     result: dict[str, object] = {}
     for item in items:
         name, value = item.split('=', 1)
@@ -161,7 +162,7 @@ class Frames:
     def __init__(self, folder: Path) -> None:
         self.folder = folder
         if not (folder / 'luminance_0000.npy').exists():
-            raise SystemExit(f'{folder} has no luminance: capture it again with depth_track_capture')
+            raise SystemExit(f'{folder} has no luminance: capture it again with depth_velocity_capture')
         self.calls: list[dict] = json.loads((folder / 'calls.json').read_text())
         self.width, self.height = self.calls[0]['width'], self.calls[0]['height']
         t = np.array([c['t'] for c in self.calls])
@@ -264,7 +265,7 @@ class Measures:
 
     def add(self, t: float, segment: str, xy: np.ndarray, track: np.ndarray, z: np.ndarray, depth: np.ndarray, mask: np.ndarray,
             moved: np.ndarray, milliseconds: float) -> None:
-        """`xy` and `z` are as the fluid gets them, in px per frame; `track` is the depth track's state;
+        """`xy` and `z` are as the fluid gets them, in px per frame; `track` is the depth velocity's state;
         `moved` the pixels that move in the loop."""
         width = depth.shape[1]
         inside = cv2.distanceTransform(mask.astype(np.uint8), cv2.DIST_L2, 3)
@@ -337,12 +338,12 @@ class Side:
 
     def __init__(self, name: str, recorded: dict, changed: dict[str, object], width: int, height: int, show: bool) -> None:
         self.name, self.changed = name, changed
-        self.settings = LucasKanadeFlowSettings()
+        self.settings = LucasKanadeFlow3DSettings()
         self.settings.update_from_dict(recorded_settings(recorded))
         for path, value in changed.items():
             owner, name = setting_owner(self.settings, path)
             setattr(owner, name, value)
-        self.flow = LucasKanadeFlow(self.settings)
+        self.flow = LucasKanadeFlow3D(self.settings)
         self.flow.allocate(width, height)
         self.view_settings = VisualizationFieldSettings()
         self.signed = SignedField(self.view_settings) if show else None
@@ -385,11 +386,11 @@ class Side:
 
 
 def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> int:
-    """A's first frames on the GPU against the numpy references: the x/y solve, and the depth track carried by it."""
+    """A's first frames on the GPU against the numpy references: the x/y solve, and the depth velocity carried by it."""
     context(False, 64, 64)
     w, h = frames.width, frames.height
     side = Side('A', frames.calls[0]['settings'], changed, w, h, False)
-    xy, z = side.settings.lucas_kanade, side.settings.depth_track
+    xy, z = side.settings.solve, side.settings.depth_velocity
     luminance, depth_texture, mask_texture = Texture(), Texture(), Texture()
     state, catch_up, previous = np.zeros((h, w, 4)), np.zeros((h, w, 2)), None
     last = min(frames_to_check, len(frames)) - 1

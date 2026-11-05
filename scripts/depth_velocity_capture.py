@@ -1,6 +1,6 @@
-"""Save what the Lucas–Kanade flow gets, frame by frame, from one loop of a recording, for depth_track_compare.
+"""Save what the Lucas–Kanade flow gets, frame by frame, from one loop of a recording, for depth_velocity_compare.
 
-    python scripts/depth_track_capture.py RECORDING [--out temp/depth_track]
+    python scripts/depth_velocity_capture.py RECORDING [--out temp/depth_velocity]
 
 Runs deep_flow on the recording (as -sim, without the panel), from the start of its loop to the next,
 with the preset's settings and the Lucas–Kanade flow. Each measure of the flow is saved to
@@ -30,7 +30,7 @@ from OpenGL.raw.GL.VERSION.GL_1_1 import glGetTexImage as raw_get_tex_image  # n
 
 from modules.log_config import setup_logging, install_excepthooks  # noqa: E402
 from modules.gl import Fbo, Style  # noqa: E402
-from modules.flow import FlowUtil, LucasKanadeFlow  # noqa: E402
+from modules.flow import FlowUtil, LucasKanadeFlow3D  # noqa: E402
 from apps.deep_flow.main import DeepFlowMain  # noqa: E402
 
 LOOP_TIMEOUT: float = 60.0      # seconds a loop may take before the capture gives up
@@ -40,7 +40,7 @@ def main() -> int:
     assert __doc__ is not None
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('recording', help='the recording folder name under the app\'s recordings')
-    parser.add_argument('--out', type=Path, default=Path('temp/depth_track'))
+    parser.add_argument('--out', type=Path, default=Path('temp/depth_velocity'))
     args = parser.parse_args()
     out_dir: Path = args.out / args.recording
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -66,7 +66,7 @@ def main() -> int:
         glBindTexture(GL_TEXTURE_2D, 0)
         return array
 
-    update = LucasKanadeFlow.update
+    update = LucasKanadeFlow3D.update
 
     def saved(self, depth, delta_time, view_span, depth_step) -> None:
         if starting.is_set():                     # on the render thread: the loop starts here
@@ -84,7 +84,7 @@ def main() -> int:
                               width=w, height=h, settings=self.settings.to_dict()))
         update(self, depth, delta_time, view_span, depth_step)
 
-    LucasKanadeFlow.update = saved
+    LucasKanadeFlow3D.update = saved
     app = DeepFlowMain(simulation=True, interface=False)
     loops = threading.Semaphore(0)
     assert app.player is not None, 'deep_flow made no player: the recording needs -sim'

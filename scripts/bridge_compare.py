@@ -2,8 +2,8 @@
 
     python scripts/bridge_compare.py FRAMES --side NAME=KIND[:PATH=VALUE,...] [--side ...] [--flow PATH=VALUE ...]
 
-FRAMES is what depth_track_capture saved from one loop of a recording. No app and no camera: a hidden window
-gives the GL context, one `LucasKanadeFlow` measures the saved frames with the settings they were saved with
+FRAMES is what depth_velocity_capture saved from one loop of a recording. No app and no camera: a hidden window
+gives the GL context, one `LucasKanadeFlow3D` measures the saved frames with the settings they were saved with
 (`--flow` overrides one by its panel path), and every side's bridge takes its velocity. KIND is `trail` (the
 VelocityTrailBridge), `kinetic` (the KineticBridge) or `event` (the VelocityEventBridge: its start and stop);
 PATH=VALUE sets one of its settings by its panel path
@@ -46,9 +46,9 @@ from OpenGL.GL import glFinish
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from modules.gl import Texture  # noqa: E402
-from modules.flow import (KineticBridge, KineticBridgeSettings, LucasKanadeFlow, LucasKanadeFlowSettings,  # noqa: E402
+from modules.flow import (KineticBridge, KineticBridgeSettings, LucasKanadeFlow3D, LucasKanadeFlow3DSettings,  # noqa: E402
                           VelocityEventBridge, VelocityEventBridgeSettings, VelocityTrailBridge, VelocityTrailBridgeSettings)
-from depth_track_compare import Frames, context, overrides, read_back, recorded_settings, setting_owner, upload  # noqa: E402
+from depth_velocity_compare import Frames, context, overrides, read_back, recorded_settings, setting_owner, upload  # noqa: E402
 
 SETTLE: float = 1.5         # s of the still part left out of its noise
 STEADY_AFTER: float = 0.3   # s of a half left out of its steady mean
@@ -232,12 +232,12 @@ def main() -> int:
     width, height = frames.width, frames.height
     context(False, 64, 64)
 
-    flow_settings = LucasKanadeFlowSettings()
+    flow_settings = LucasKanadeFlow3DSettings()
     flow_settings.update_from_dict(recorded_settings(frames.calls[0]['settings']))
     for path, value in overrides(args.flow).items():
         owner, name = setting_owner(flow_settings, path)
         setattr(owner, name, value)
-    flow = LucasKanadeFlow(flow_settings)
+    flow = LucasKanadeFlow3D(flow_settings)
     flow.allocate(width, height)
     sides = [Side(spec, width, height) for spec in args.side]
     print(frames.describe())
