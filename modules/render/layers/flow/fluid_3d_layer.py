@@ -8,7 +8,6 @@ RGB-coloured — no post-composite colorisation step is needed.
 
 # Standard library imports
 from __future__ import annotations
-from enum import IntEnum, auto
 
 # Third-party imports
 from OpenGL.GL import GL_VIEWPORT, glGetIntegerv
@@ -21,35 +20,18 @@ from modules.board import HasFrames
 from modules.pose import Frame, Similarity, MotionGate, AngleMotion, Points2D, PointLandmark
 
 from modules.settings import Field, BaseSettings, Group
-from modules.flow import Fluid2D, Fluid3D, FluidSettings
+from modules.flow import Fluid3D, FluidSettings
 
 from modules.utils import HotReloadMethods
 
 from .motion_3d_layer import Motion3DLayer
 from ...color_settings import ColorSettings
 
-class FluidSimEngine(IntEnum):
-    """Simulation engine selection.
-
-    FLUID_2D: 2D Navier-Stokes (Fluid2D) — the hd_trio reference look, no depth
-    FLUID_3D: 3D volumetric Navier-Stokes (Fluid3D)
-    """
-    FLUID_2D = 0
-    FLUID_3D = auto()
-
-
-# Map enum -> class for engine creation
-_ENGINE_CLASSES: dict[FluidSimEngine, type] = {
-    FluidSimEngine.FLUID_2D: Fluid2D,
-    FluidSimEngine.FLUID_3D: Fluid3D,
-}
-
 
 class Fluid3DLayerSettings(BaseSettings):
     """Configuration for Fluid3DLayer (3D fluid simulation)."""
     stage: Field[int] =                     Field(0, description="Pipeline stage for pose data")
     max_players: Field[int] =               Field(3, min=1, max=8, access=Field.INIT)
-    sim_engine: Field[FluidSimEngine] =     Field(FluidSimEngine.FLUID_3D)
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
     scale_by_motion: Field[bool] =          Field(True, description="Scale velocity and density by the player's motion; off is full strength")
 
@@ -100,11 +82,7 @@ class Fluid3DLayer(LayerBase):
         self.settings: Fluid3DLayerSettings = settings or Fluid3DLayerSettings()
         self._color_settings: ColorSettings = color_settings
 
-        # Simulation engine (swappable at runtime)
-        self._fluid: Fluid2D | Fluid3D = self._create_engine()
-        self._alloc_width: int = 0
-        self._alloc_height: int = 0
-        self._swap_engine_pending: bool = False
+        self._fluid: Fluid3D = Fluid3D(self.settings.fluid)
 
         # Legend for the debug depth view (hue = layer)
         self._legend_text: Text = Text()
@@ -113,31 +91,7 @@ class Fluid3DLayer(LayerBase):
         self._eye_x: float = 0.0
         self._eye_y: float = 0.0
 
-        # Defer engine swap to GL thread (callbacks fire from websocket thread)
-        self.settings.bind(Fluid3DLayerSettings.sim_engine, lambda _: self._request_swap_engine())
-
         self._hot_reload = HotReloadMethods(self.__class__, True, True)
-
-    def _create_engine(self) -> Fluid2D | Fluid3D:
-        """Instantiate the selected simulation engine with the shared settings."""
-        cls = _ENGINE_CLASSES[self.settings.sim_engine]
-        return cls(self.settings.fluid)
-
-    def _request_swap_engine(self) -> None:
-        """Request engine swap (deferred to next update on GL thread)."""
-        self._swap_engine_pending = True
-
-    def _swap_engine(self) -> None:
-        """Swap simulation engine at runtime, preserving allocation state.
-
-        Must run on the GL thread (called from update).
-        """
-        was_allocated = self._alloc_width > 0
-        if was_allocated:
-            self._fluid.deallocate()
-        self._fluid = self._create_engine()
-        if was_allocated:
-            self._fluid.allocate(self._alloc_width, self._alloc_height)
 
     # ========== Output Access ==========
 
@@ -161,8 +115,6 @@ class Fluid3DLayer(LayerBase):
             height: Processing height
             internal_format: Ignored (formats determined by Fluid3D)
         """
-        self._alloc_width = width
-        self._alloc_height = height
         self._fluid.allocate(width, height)
         self._legend_text.allocate(font_size=18)
 
@@ -179,11 +131,6 @@ class Fluid3DLayer(LayerBase):
 
     def update(self) -> None:
         """Update 3D fluid simulation with inputs from all flow layers."""
-        # Handle deferred engine swap (must run on GL thread)
-        if self._swap_engine_pending:
-            self._swap_engine_pending = False
-            self._swap_engine()
-
         # Get motion data from pose
         pose: Frame | None = self._board.get_frame(self.settings.stage, self._cam_id)
         similarities: np.ndarray = (
@@ -220,30 +167,22 @@ class Fluid3DLayer(LayerBase):
             # and the kinetic bridge's push of a starting motion, each with its measured w if there is depth
             velocity: Texture = flow_layer.smooth_velocity
             onset: Texture | None = flow_layer.onset_velocity
-            if isinstance(self._fluid, Fluid3D):
-                depth: bool = flow_layer.depth_enabled     # z in each texture's blue channel
-                self._fluid.add_velocity(velocity, vel_strength, velocity if depth else None, 2)
-                if onset is not None:
-                    self._fluid.add_velocity(onset, vel_strength, onset if depth else None, 2)
-            else:
-                self._fluid.add_velocity(velocity, vel_strength)
-                if onset is not None:
-                    self._fluid.add_velocity(onset, vel_strength)
+            depth: bool = flow_layer.depth_enabled     # z in each texture's blue channel
+            self._fluid.add_velocity(velocity, vel_strength, velocity if depth else None, 2)
+            if onset is not None:
+                self._fluid.add_velocity(onset, vel_strength, onset if depth else None, 2)
 
             # The kinetic bridge's curl for the vorticity force
             spin: Texture | None = flow_layer.spin
-            if spin is not None and isinstance(self._fluid, Fluid3D):
+            if spin is not None:
                 self._fluid.set_spin(spin, flow_layer.settings.flow_bridge.kinetic.onset.spin * vel_strength)
 
-            # Add density to per-camera channel (R=cam0, G=cam1, B=cam2, A=cam3)
-            channel: int = cam_id % 4
-            # self._fluid.add_density_channel(flow_layer.magnitude, channel, den_strength)
             self._fluid.add_density(flow_layer.density, den_strength)
 
             # Add temperature from each flow layer
             self._fluid.add_temperature(flow_layer.temperature, 1.0)
 
-        # Head-coupled parallax eye (3D engine only)
+        # Head-coupled parallax eye
         self._update_eye(pose)
 
         # Update 3D fluid simulation (handles its own reallocation internally)
@@ -258,8 +197,6 @@ class Fluid3DLayer(LayerBase):
         mean, the nose when they are missing, easing back to centre when both
         are. Offsets are ±1 across the frame (vertical at half range).
         """
-        if not isinstance(self._fluid, Fluid3D):
-            return
         target_x, target_y = 0.0, 0.0
         if pose is not None and Points2D in pose:
             pts = pose[Points2D].values

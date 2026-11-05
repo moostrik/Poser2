@@ -494,7 +494,6 @@
     },
     "fluid": {
       "max_players": 1,
-      "sim_engine": "FLUID_2D",
       "blend_mode": "ADD",
       "scale_by_motion": true,
       "fluid": {
