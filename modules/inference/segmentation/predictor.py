@@ -1,3 +1,4 @@
+import math
 from threading import Lock
 from typing import TYPE_CHECKING, TypeAlias
 
@@ -146,6 +147,7 @@ class Predictor:
                 result_frames[track_id] = Image(
                     mask=mask,
                     foreground=foreground,
+                    timestamp=poses[track_id].timestamp if track_id in poses else math.nan,
                 )
 
         # Broadcast to callbacks

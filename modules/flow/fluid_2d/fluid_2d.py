@@ -704,20 +704,6 @@ class Fluid2D:
             return
         FlowUtil.add_region(self._density_fbo, texture, x, y, w, h, strength)
 
-    def add_density_channel(self, texture: Texture, channel: int, strength: float = 1.0) -> None:
-        """Add single-channel texture to one of the density channels. Applies settingsdensity.gain and delta_time."""
-        if not self._allocated:
-            return
-        dt = self._dt
-        effective = strength * self.settings.density.gain * dt
-        FlowUtil.add_channel(self._density_fbo, texture, channel, effective)
-
-    def add_density_channel_region(self, texture: Texture, channel: int, x: float, y: float, w: float, h: float, strength: float = 1.0) -> None:
-        """Add density to a specific channel at a specific region."""
-        if not self._allocated:
-            return
-        FlowUtil.add_channel_region(self._density_fbo, texture, channel, x, y, w, h, strength)
-
     # ----- Temperature -----
     def set_temperature(self, texture: Texture, strength: float = 1.0) -> None:
         """Set temperature field."""

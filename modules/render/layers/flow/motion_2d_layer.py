@@ -1,250 +1,64 @@
-"""Flow Layer - the 2D optical flow (no depth) and the velocity/density/temperature bridges."""
+"""The 2D motion layer: the gradient flow, x/y from the image, as on main."""
 
 # Standard library imports
 from enum import IntEnum, auto
 
 # Local application imports
-from modules.gl import Texture, Style, Blit
-from ..layer_base import LayerBase
-from modules.board import HasFrames
-from modules.pose import Frame, AngleMotion
-
-from ..source import MaskSourceLayer
-
-from modules.settings import Field, BaseSettings, Group
-from modules.flow import GradientFlow, GradientFlowSettings, bridge_2d, Visualizer, VisualizationFieldSettings
-
+from modules.flow import GradientFlow, GradientFlowSettings
+from modules.settings import Field, Group
 from modules.utils import HotReloadMethods
+from .motion_layer import MotionLayer, MotionLayerSettings, MotionInput, MotionOutput
 
 
 class Motion2DDrawMode(IntEnum):
     """Draw modes for Motion2DLayer.
 
-    Inputs:
-        OPTICAL_INPUT - Luminance frames fed to optical flow
-
-    Outputs:
-        OPTICAL_OUTPUT - Raw optical flow velocity (RG32F)
-        SMOOTH_VELOCITY_OUTPUT - Smoothed velocity (RG32F)
-        DENSITY_BRIDGE_OUTPUT - Colored density (RGBA32F)
-        TEMPERATURE_BRIDGE_OUTPUT - Temperature field (R32F)
+    IMAGE - The luminance the flow measures on
+    VELOCITY - The flow's velocity (RG)
     """
-    OPTICAL_INPUT = 0
-    OPTICAL_OUTPUT = auto()
-    SMOOTH_VELOCITY_INPUT = auto()
-    SMOOTH_VELOCITY_OUTPUT = auto()
-    SMOOTH_VELOCITY_MAGNITUDE = auto()
-    DENSITY_BRIDGE_INPUT_COLOR = auto()
-    DENSITY_BRIDGE_INPUT_VELOCITY = auto()
-    DENSITY_BRIDGE_OUTPUT = auto()
-    TEMPERATURE_BRIDGE_INPUT_COLOR = auto()
-    TEMPERATURE_BRIDGE_INPUT_MASK = auto()
-    TEMPERATURE_BRIDGE_OUTPUT = auto()
+    IMAGE = 0
+    VELOCITY = auto()
 
 
-class Motion2DLayerSettings(BaseSettings):
-    """Configuration for Motion2DLayer (optical flow + bridges)."""
-    stage: Field[int] =                     Field(0, description="Pipeline stage for pose data")
-    fps: Field[float] =                     Field(60.0, min=1.0, max=240.0)
-    draw_mode: Field[Motion2DDrawMode] =        Field(Motion2DDrawMode.DENSITY_BRIDGE_INPUT_COLOR)
-    blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD)
-    width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
-    height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
+class Motion2DLayerSettings(MotionLayerSettings):
+    """Configuration for Motion2DLayer."""
+    draw_mode: Field[Motion2DDrawMode] =    Field(Motion2DDrawMode.VELOCITY)
 
-    visualization      = Group(VisualizationFieldSettings)
-    optical_flow       = Group(GradientFlowSettings)
-    velocity_trail     = Group(bridge_2d.SmoothTrailSettings)
-    density_bridge     = Group(bridge_2d.DensityBridgeSettings)
-    temperature_bridge = Group(bridge_2d.TemperatureBridgeSettings)
+    gradient = Group(GradientFlowSettings)
 
 
-class Motion2DLayer(LayerBase):
-    """Flow processing layer with optical flow and bridges.
+class Motion2DLayer(MotionLayer):
+    """The 2D motion layer: `GradientFlow` on the input's image. Its velocity is per frame, not per
+    second, and it reads no mask, until the 2D flow moves to the Lucas–Kanade solve."""
 
-    Computes optical flow and prepares velocity/density/temperature for fluid simulation:
-    1. GradientFlow: Computes motion from source frames
-    2. VelocitySmoothTrail: Smooths velocity temporally (2–4 are the 2D bridge, bridge_2d)
-    3. DensityBridge: Combines RGB density with velocity info
-    4. TemperatureBridge: Generates temperature field
-
-    Output textures for Fluid2DLayer:
-        - velocity: Smoothed velocity (RG16F)
-        - density: Colored density (RGBA16F)
-        - temperature: Temperature field (R16F)
-
-    Usage:
-        flow = Motion2DLayer(cam_id, board, mask, motion, colors, settings)
-        flow.update()
-        # Access outputs for fluid simulation:
-        fluid.add_velocity(flow.velocity)
-        fluid.add_density(flow.density)
-        fluid.add_temperature(flow.temperature)
-    """
-
-    def __init__(self, cam_id: int, board: HasFrames, mask_source: MaskSourceLayer, flow_input: Texture, density_input: Texture, settings: Motion2DLayerSettings | None = None) -> None:
-        """Initialize flow layer.
-
-        Args:
-            cam_id: Camera ID
-            board: Board for pose data
-            mask_source: Mask source layer for optical flow update
-            mask: Mask texture for optical flow input
-            settings: Layer configuration
-        """
-        self._cam_id: int = cam_id
-        self._board: HasFrames = board
-        self._mask_source: MaskSourceLayer = mask_source
-        self._flow_input: Texture = flow_input
-        self._density_input: Texture = density_input
-        self.settings: Motion2DLayerSettings = settings or Motion2DLayerSettings()
-
-        self._optical_flow: GradientFlow = GradientFlow(self.settings.optical_flow)
-        self._velocity_trail: bridge_2d.VelocitySmoothTrail = bridge_2d.VelocitySmoothTrail(self.settings.velocity_trail)
-        self._velocity_magnitude: bridge_2d.VelocityMagnitude = bridge_2d.VelocityMagnitude()
-        self._density_bridge: bridge_2d.DensityBridge = bridge_2d.DensityBridge(self.settings.density_bridge)
-        self._temperature_bridge: bridge_2d.TemperatureBridge = bridge_2d.TemperatureBridge(self.settings.temperature_bridge)
-
-        self._visualizer: Visualizer = Visualizer(self.settings.visualization)
+    def __init__(self, settings: Motion2DLayerSettings) -> None:
+        super().__init__(settings)
+        self.settings: Motion2DLayerSettings = settings
+        self._flow: GradientFlow = GradientFlow(settings.gradient)
 
         hot_reload = HotReloadMethods(self.__class__, True, True)
 
-    # ========== Output Access ==========
-
     @property
-    def texture(self) -> Texture:
-        """Visualization output texture."""
-        return self._visualizer.texture
+    def output(self) -> MotionOutput:
+        return MotionOutput(self._flow.velocity)
 
-    @property
-    def velocity(self) -> Texture:
-        """Smoothed velocity output (RG16F) for fluid simulation."""
-        return self._velocity_trail.velocity
+    # ========== The flow ==========
 
-    @property
-    def density(self) -> Texture:
-        """Colored density output (RGBA16F) for fluid simulation."""
-        return self._density_bridge.density
+    def _allocate_stages(self, width: int, height: int, output_width: int, output_height: int) -> None:
+        self._flow.allocate(width, height)
 
-    @property
-    def magnitude(self) -> Texture:
-        """Velocity magnitude output (RR16F) for fluid simulation."""
-        return self._velocity_magnitude.magnitude
+    def _deallocate_stages(self) -> None:
+        self._flow.deallocate()
 
-    @property
-    def temperature(self) -> Texture:
-        """Temperature output (R16F) for fluid simulation."""
-        return self._temperature_bridge.temperature
+    def _reset_stages(self) -> None:
+        self._flow.reset()
 
-    # ========== Input Setters ==========
+    def _measure(self, input: MotionInput, interval: float) -> None:
+        self._flow.set_input(input.image)
+        self._flow.update()
 
-    def set_flow_input(self, texture: Texture) -> None:
-        self._flow_input = texture
-
-    def set_density_input(self, texture: Texture) -> None:
-        self._density_input = texture
-
-    # ========== Lifecycle Methods ==========
-
-    def allocate(self, width: int, height: int, internal_format: int | None = None) -> None:
-        """Allocate all processing stages.
-
-        Args:
-            width: Processing width
-            height: Processing height
-            internal_format: Ignored (formats determined by each stage)
-        """
-        sim_width = self.settings.width
-        sim_height = self.settings.height
-
-        self._optical_flow.allocate(sim_width, sim_height)
-        self._velocity_trail.allocate(sim_width, sim_height, width, height)
-        self._velocity_magnitude.allocate(sim_width, sim_height)
-        self._density_bridge.allocate(width, height)
-        self._temperature_bridge.allocate(sim_width, sim_height)
-
-        self._visualizer.allocate(width, height)
-
-    def deallocate(self) -> None:
-        """Deallocate all resources."""
-        self._optical_flow.deallocate()
-        self._velocity_trail.deallocate()
-        self._velocity_magnitude.deallocate()
-        self._density_bridge.deallocate()
-        self._temperature_bridge.deallocate()
-        self._visualizer.deallocate()
-
-    def reset(self) -> None:
-        """Reset all processing stages."""
-        self._optical_flow.reset()
-        self._velocity_trail.reset()
-        self._density_bridge.reset()
-
-    # ========== Processing ==========
-
-    def update(self) -> None:
-        """Update optical flow and bridges."""
-        # Get motion data from pose
-        pose: Frame | None = self._board.get_frame(self.settings.stage, self._cam_id)
-        motion = pose[AngleMotion].value if pose is not None and AngleMotion in pose else 0.0
-
-        Style.push_style()
-        Style.set_blend_mode(Style.BlendMode.DISABLED)
-
-        if self._mask_source.dirty:
-            # pass
-            # Stage 1: Optical flow
-            self._optical_flow.set_input(self._flow_input)
-            self._optical_flow.update()
-
-        # Stage 2: Bridges
-        self._velocity_trail.set_velocity(self._optical_flow.velocity)
-        self._velocity_trail.update()
-
-        self._velocity_magnitude.set_input(self._velocity_trail.velocity)
-        self._velocity_magnitude.update()
-
-        # self._density_bridge.set_color(self._flow_input)
-        self._density_bridge.set_color(self._density_input)
-        # self._density_bridge.update(motion)
-        self._density_bridge.set_velocity(self._velocity_trail.velocity)
-        # self._density_bridge.set_velocity(self._mask_source.texture)
-        self._density_bridge.update()
-
-        self._temperature_bridge.set_color(self._density_input)
-        self._temperature_bridge.set_mask(self._velocity_magnitude.magnitude)
-        self._temperature_bridge.update()
-
-
-        Style.set_blend_mode(Style.BlendMode.ALPHA)
-
-        self._visualizer.process(self._get_draw_texture())
-        Style.pop_style()
-
-    # ========== Rendering ==========
-
-    def draw(self) -> None:
-        """Draw with configured blend mode."""
-        Style.push_style()
-        Style.set_blend_mode(self.settings.blend_mode)
-        if self.texture.allocated:
-            Blit.use(self.texture)
-        Style.pop_style()
-
-    # ========== Texture Selection ==========
-
-    def _get_draw_texture(self) -> Texture:
-        """Get texture to draw based on draw_mode."""
-        textures = {
-            Motion2DDrawMode.OPTICAL_INPUT: self._optical_flow.color_input,
-            Motion2DDrawMode.OPTICAL_OUTPUT: self._optical_flow.velocity,
-            Motion2DDrawMode.SMOOTH_VELOCITY_INPUT: self._velocity_trail.velocity_input,
-            Motion2DDrawMode.SMOOTH_VELOCITY_OUTPUT: self._velocity_trail.velocity,
-            Motion2DDrawMode.SMOOTH_VELOCITY_MAGNITUDE: self._velocity_magnitude.magnitude,
-            Motion2DDrawMode.DENSITY_BRIDGE_INPUT_COLOR: self._density_bridge.color_input,
-            Motion2DDrawMode.DENSITY_BRIDGE_INPUT_VELOCITY: self._density_bridge.velocity_input,
-            Motion2DDrawMode.DENSITY_BRIDGE_OUTPUT: self._density_bridge.density,
-            Motion2DDrawMode.TEMPERATURE_BRIDGE_INPUT_COLOR: self._temperature_bridge.color_input,
-            Motion2DDrawMode.TEMPERATURE_BRIDGE_INPUT_MASK: self._temperature_bridge.mask_input,
-            Motion2DDrawMode.TEMPERATURE_BRIDGE_OUTPUT: self._temperature_bridge.temperature,
-        }
-        return textures.get(self.settings.draw_mode, self._density_input)
+    def _visualize(self, input: MotionInput) -> None:
+        if self.settings.draw_mode == Motion2DDrawMode.IMAGE:
+            self._visualizer.process(self._flow.color_input)
+        else:
+            self._visualizer.process(self._flow.velocity)

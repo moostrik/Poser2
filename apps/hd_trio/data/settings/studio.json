@@ -524,8 +524,7 @@
       }
     },
     "motion": {
-      "fps": 60.0,
-      "draw_mode": "SMOOTH_VELOCITY_OUTPUT",
+      "draw_mode": "VELOCITY",
       "blend_mode": "ADD",
       "width": 512,
       "height": 288,
@@ -536,29 +535,39 @@
         "element_length": 2.0,
         "element_width": 1.0
       },
-      "optical_flow": {
+      "gradient": {
         "offset": 3,
         "threshold": 0.0,
         "strength_x": 3.3,
         "strength_y": 3.3,
         "boost": 0.0
+      }
+    },
+    "bridge": {
+      "draw_mode": "VELOCITY",
+      "blend_mode": "ADD",
+      "visualization": {
+        "toggle_scalar": false,
+        "scale": 1.0,
+        "spacing": 20.0,
+        "element_length": 2.0,
+        "element_width": 1.0
       },
-      "velocity_trail": {
+      "trail": {
         "scale": 1.54,
         "trail_weight": 0.9,
         "blur_radius": 8.0,
         "blur_steps": 4
       },
-      "density_bridge": {
+      "density": {
         "saturation": 1.2,
         "brightness": 2.0
       },
-      "temperature_bridge": {
+      "temperature": {
         "scale": 0.5
       }
     },
     "fluid": {
-      "max_players": 3,
       "draw_mode": "DENSITY",
       "blend_mode": "ADD",
       "fluid": {

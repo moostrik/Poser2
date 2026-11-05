@@ -16,6 +16,7 @@ from .flow import     MotionInput, MotionOutput, MotionLayer, MotionLayerSetting
                       Injection, FluidInput, FluidLayer, FluidLayerSettings, \
                       Motion2DLayer, Motion2DLayerSettings, Motion2DDrawMode, \
                       Motion3DLayer, Motion3DLayerSettings, Motion3DDrawMode, \
+                      Bridge2DLayer, Bridge2DLayerSettings, Bridge2DDrawMode, \
                       Bridge3DLayer, Bridge3DLayerSettings, Bridge3DDrawMode, BridgeMethod, \
                       Fluid2DLayer, Fluid2DLayerSettings, Fluid2DDrawMode, \
                       Fluid3DLayer, Fluid3DLayerSettings

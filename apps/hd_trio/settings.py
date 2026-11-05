@@ -117,6 +117,7 @@ class Layers(IntEnum):
     # composition layers
     color_mask =    auto()
     motion =        auto()
+    bridge =        auto()
     fluid =         auto()
     composite =     auto()
 
@@ -384,8 +385,9 @@ class RenderSettings(BaseSettings):
     preview: Group[PreviewGroup]              = Group(PreviewGroup)
     center : Group[CenterGroup]               = Group(CenterGroup, share=[similarity_scale])
     intro_sequence: Group[IntroSequenceSettings] = Group(IntroSequenceSettings)
-    motion : Group[layers.Motion2DLayerSettings] = Group(layers.Motion2DLayerSettings, share=[stage])
-    fluid  : Group[layers.Fluid2DLayerSettings]  = Group(layers.Fluid2DLayerSettings, share=[stage, similarity_scale])
+    motion : Group[layers.Motion2DLayerSettings] = Group(layers.Motion2DLayerSettings)
+    bridge : Group[layers.Bridge2DLayerSettings] = Group(layers.Bridge2DLayerSettings)
+    fluid  : Group[layers.Fluid2DLayerSettings]  = Group(layers.Fluid2DLayerSettings)
     colors : Group[ColorSettings]             = Group(ColorSettings)
     window : Group[WindowSettings]            = Group(WindowSettings)
 

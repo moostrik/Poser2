@@ -3,13 +3,15 @@
 from collections.abc import Sequence
 from typing import cast
 
+import numpy as np
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId
 from modules.board import HasFrames
 from modules.camera import RigCameraSettings, CameraCheckSettings
+from modules.pose import Frame, Similarity, AngleMotion
 from modules.render import ColorSettings, layers as ls, make_subdivision, SubdivisionRow, Subdivision
-from modules.utils import Rect, Point2f, HotReloadMethods
+from modules.utils import Rect, Point2f, Color, HotReloadMethods
 
 from .render_board import RenderBoard
 from .settings import Layers, RenderSettings, ShowStage, Stage, IntroSequenceSettings
@@ -32,6 +34,7 @@ UPDATE_LAYERS: list[Layers] = [
 
     Layers.color_mask,
     Layers.motion,
+    Layers.bridge,
     Layers.fluid,
     # Layers.composite, -> updated via stage system
 ]
@@ -43,9 +46,14 @@ INTERFACE_LAYERS: list[Layers] = [
 
 LARGE_LAYERS: list[Layers] = [
     Layers.motion,
+    Layers.bridge,
     Layers.fluid,
     Layers.composite,
 ]
+
+MIN_TICK: float = 1.0 / 240.0   # s: a tick measured shorter is a clock step, not a frame
+FADE_TIME_STILL: float = 18.0   # s: the density's fade while the player stands still
+FADE_TIME_RANGE: float = 14.0   # s: how much faster it fades at full motion
 
 
 class HDTrioRender(RenderBase):
@@ -77,11 +85,11 @@ class HDTrioRender(RenderBase):
         self._intro_color_proxy = FixedColorProxy(settings.intro_sequence)
         self._intro_geometries: dict[int, ls.CenterGeometry] = {}
 
-        flows: dict[int, ls.Motion2DLayer] = {}
+        self._mask_sources: dict[int, ls.MaskSourceLayer] = {}      # each camera's mask, with the capture time of its frame
         cmt: dict[int, Texture] = {}
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.board)
-            cam_mask =      self.L[Layers.cam_mask][i] =    ls.MaskSourceLayer(     i, self.board)
+            cam_mask =      self.L[Layers.cam_mask][i] =    self._mask_sources[i] = ls.MaskSourceLayer(i, self.board)
             cam_foreground = self.L[Layers.cam_foreground][i] = ls.ForegroundSourceLayer(i, self.board)
             cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.board)
 
@@ -100,8 +108,9 @@ class HDTrioRender(RenderBase):
             self.L[Layers.intro_pose][i] =                   ls.CenterPoseLayer(     i, intro_geometry,                             settings.intro_sequence.pose, cast(ColorSettings, self._intro_color_proxy))
 
             ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,      center_foreground.texture, cmt, settings.center.color,  settings.colors)
-            flows[i] =      self.L[Layers.motion][i] =        ls.Motion2DLayer(           i, self.board,      cam_mask,  center_mask.texture, center_foreground.texture, settings.motion)
-            fluid =         self.L[Layers.fluid][i] =       ls.Fluid2DLayer(          i, self.board,      flows,                      settings.fluid,             settings.colors)
+            self.L[Layers.motion][i] =                      ls.Motion2DLayer(       settings.motion)
+            self.L[Layers.bridge][i] =                      ls.Bridge2DLayer(       settings.bridge)
+            fluid =         self.L[Layers.fluid][i] =       ls.Fluid2DLayer(        settings.fluid)
 
             lut =           self.L[Layers.composite][i] =   ls.CompositeLayer(                          [fluid, ms_mask],           settings.layer.composite)
 
@@ -122,9 +131,10 @@ class HDTrioRender(RenderBase):
         ]
         self.subdivision: Subdivision = make_subdivision(self.subdivision_rows, settings.window.width, settings.window.height, False)
 
-        # The render rate of each tick feeds the fluid's time step
+        # The length of each tick, the flow's dt
         self._last_tick: float = 0.0
-        self.add_update_callback(self._measure_fps)
+        self._dt: float = 1.0 / 60.0
+        self.add_update_callback(self._measure_tick)
 
         # hot reloader
         self.hot_reloader = HotReloadMethods(self.__class__, True, True)
@@ -171,10 +181,44 @@ class HDTrioRender(RenderBase):
             for layer in cam_dict.values():
                 layer.deallocate()
 
-    def _measure_fps(self, now: float) -> None:
+    def _measure_tick(self, now: float) -> None:
         if self._last_tick > 0.0 and now > self._last_tick:
-            self.settings.fluid.fluid.fps = min(240.0, 1.0 / (now - self._last_tick))
+            self._dt = max(now - self._last_tick, MIN_TICK)
         self._last_tick = now
+
+    # ========== The flow's wiring ==========
+
+    def _wire_flow(self) -> None:
+        """Build each stage's input: a motion input per camera on its centered mask, with the capture
+        time of the frame the mask was made from; a bridge input with the camera's track color; a fluid
+        input per screen with one injection per camera's bridge, the own camera's at the player's
+        motion, another's at the cross-camera similarity times `similarity_scale`."""
+        dt: float = self._dt
+        colors: list[Color] = self.settings.colors.track_colors
+        bridges: dict[int, ls.Bridge2DLayer] = {i: cast(ls.Bridge2DLayer, layer) for i, layer in self.L[Layers.bridge].items()}
+
+        for i, _motion in self.L[Layers.motion].items():
+            motion = cast(ls.Motion2DLayer, _motion)
+            if i not in bridges:
+                continue
+            motion.set_input(ls.MotionInput(self.L[Layers.center_mask][i].texture, self._mask_sources[i].timestamp, dt))
+            color: Color = colors[i % len(colors)]
+            bridges[i].set_input(ls.BridgeInput(motion.output.velocity, dt, color=(color.r, color.g, color.b)))
+
+        for i, _fluid in self.L[Layers.fluid].items():
+            fluid = cast(ls.Fluid2DLayer, _fluid)
+            pose: Frame | None = self.board.get_frame(self.settings.stage, i)
+            motion_value: float = float(pose[AngleMotion].value) if pose is not None and AngleMotion in pose else 0.0
+            similarities: np.ndarray = (np.nan_to_num(pose[Similarity].values) if pose is not None and Similarity in pose
+                                        else np.zeros(self.max_players)) * self.settings.similarity_scale
+            # More motion, a faster fade
+            self.settings.fluid.fluid.density.fade_time = FADE_TIME_STILL - motion_value ** 2 * FADE_TIME_RANGE
+            injections: list[ls.Injection] = []
+            for j, bridge in bridges.items():
+                output: ls.BridgeOutput = bridge.output
+                weight: float = motion_value if j == i else (float(similarities[j]) if j < len(similarities) else 0.0)
+                injections.append(ls.Injection(output.velocity, output.density, output.temperature, weight=weight))
+            fluid.set_input(ls.FluidInput(dt, injections))
 
     def update(self) -> None:
         self._notify_update()
@@ -195,6 +239,8 @@ class HDTrioRender(RenderBase):
             for s in self._active_stages:
                 s.enter()
             self._prev_stage = stage
+
+        self._wire_flow()
 
         # Layer updates
         Style.reset_state()
