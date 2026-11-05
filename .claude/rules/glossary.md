@@ -20,6 +20,7 @@ Each bullet names the term to use and, after "not", the synonyms it replaces. A 
 - Exponential moving average: `Ema`; not `EMA`
 - A time something is smoothed over (ms): `smooth` (the depth velocity's `smooth`, `catch_up` and `xy_smooth`); not `time`
 - The z of the 3D flow: `depth_velocity` (`DepthVelocity`, `DepthVelocitySettings`); not `depth_track`. `depth` is the camera's depth
+- A swap buffer's other buffer, the previous one: `back` (`SwapFbo.back`, `SwapTexture3D.back`, `SwapTexture2DArray.back`); not `back_texture`. A texture object is passed as itself, never as a `.texture` of it; a layer's `texture` is the layer's output
 - American spelling: `center`, `visualization`, `color`; not `centre`, `visualisation`, `colour`
 
 ## Render
