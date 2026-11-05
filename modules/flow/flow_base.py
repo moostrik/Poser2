@@ -3,11 +3,10 @@
 Ported from ofxFlowTools ftFlow.h/cpp
 """
 
-from abc import ABC, abstractmethod
+from abc import ABC
 
-from modules.gl import SwapFbo, Texture, Blit
+from modules.gl import SwapFbo, Texture
 from .flow_util import FlowUtil
-from modules.utils import Rect
 
 
 class FlowBase(ABC):
@@ -33,9 +32,6 @@ class FlowBase(ABC):
         # Subclasses must set these in __init__
         self._input_internal_format: int = 0
         self._output_internal_format: int = 0
-
-        # Auto-detecting visualization (lazy initialized)
-        self._visualization_field = None
 
     @property
     def _input(self) -> Texture:
@@ -77,16 +73,10 @@ class FlowBase(ABC):
 
         self._allocated = True
 
-        # Allocate visualization if already created
-        if self._visualization_field is not None:
-            self._visualization_field.allocate(out_w, out_h)
-
     def deallocate(self) -> None:
         """Release all FBO resources."""
         self._input_fbo.deallocate()
         self._output_fbo.deallocate()
-        if self._visualization_field is not None:
-            self._visualization_field.deallocate()
         self._allocated = False
 
     # def _set(self, texture: Texture, strength: float = 1.0) -> None:
@@ -105,27 +95,4 @@ class FlowBase(ABC):
         """Clear input and output buffers to zero."""
         FlowUtil.zero(self._input_fbo)
         FlowUtil.zero(self._output_fbo)
-
-    # CONVENIENCE DRAW METHODS
-    def draw(self) -> None:
-        """Draw output buffer with auto-visualization."""
-        self.draw_output()
-
-    def draw_input(self) -> None:
-        """Draw input buffer with auto-visualization."""
-        self._draw_with_visualization_field(self._input_fbo)
-
-    def draw_output(self) -> None:
-        """Draw output buffer with auto-visualization (velocity=field, RGB=direct)."""
-        self._draw_with_visualization_field(self._output_fbo)
-
-    def _draw_with_visualization_field(self, texture: Texture) -> None:
-        """Protected: Draw texture using auto-detecting Visualizer (lazy init)."""
-        # Lazy init visualization field
-        if self._visualization_field is None:
-            from .visualization.visualizer import Visualizer
-            self._visualization_field = Visualizer()
-            if self._allocated:
-                self._visualization_field.allocate(self._output_fbo.width, self._output_fbo.height)
-        Blit.use(self._visualization_field.texture)  # Draw visualization background if needed
 
