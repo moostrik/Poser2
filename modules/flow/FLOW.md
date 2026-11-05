@@ -134,7 +134,9 @@ The render runs on the display's vsync (`WindowManager._render_loop`, `swap_inte
 camera runs at 50 fps, the mains rate **(site fact)**, against a 60 Hz display. The board holds
 one latest capture per camera (`CaptureStoreMixin.set_capture`), which `CaptureImageLayer.update`
 takes once per tick. At these rates every frame gets a tick of its own and none is lost; a frame
-waits for the next vsync, up to one 60 Hz tick, before it is measured.
+waits for the next vsync, up to one 60 Hz tick, before it is measured. That wait is a limit of
+the design: every stage runs on the render tick, so measuring on arrival, on a thread and GL
+context of its own, would move the wait to the bridge, and the screen still shows at vsync.
 
 ### The layers
 
@@ -206,10 +208,9 @@ The shader loader finds a shader's source by its `.py` module name beside it
 - The inputs and outputs are the contract and the base classes hold the two kinds to one shape;
   there are no `Protocol`s for the boundaries. Shared code lives in the base, never in a shared
   concrete class.
-- The optical flow classes are GL but no `LayerBase`, so that the motion stage can later run on a
-  thread of its own, driven by the camera, with the render thread reading its textures; a
-  `LayerBase` ties the measurement to the render tick. Until then it runs in the motion layer, on
-  the render thread, as all GL does.
+- The optical flow classes are GL but no `LayerBase`: the motion layer holds one, and the
+  comparison scripts run one on saved frames with no render loop
+  (`scripts/depth_velocity_compare.py`).
 - The image, the mask and the depth come pushed in the inputs: a GL texture lives on the render
   thread and is not board data. The layers read nothing from the board; the app's wiring pass
   reads the pose frames there for the weights and the eye.
@@ -239,10 +240,6 @@ The shader loader finds a shader's source by its `.py` module name beside it
 
 ## Open
 
-- The wait for vsync. A frame is measured at the first render tick after it arrives, up to one
-  60 Hz tick later. Measuring on arrival means the motion stage on its own thread, driven by the
-  camera, with its own GL context: the one GL outside the render thread. To measure the
-  capture-to-measure latency and any dropped frames from the stamps first, at the real rates.
 - `LayerBase.dirty` defaults to `True`. A layer that does not answer the question claims a new
   frame every tick. No default, so a layer either says it or cannot be asked: a small change of
   its own.
@@ -251,8 +248,6 @@ The shader loader finds a shader's source by its `.py` module name beside it
   velocity's z always. The design takes z as w, with no blend; `push`, `squeeze` and `depth_mix`
   go with it. deep_flow's preset runs `push` 0.5 and `depth_mix` 0, so its w is the synthesized
   one; removing them changes the show and is a change of its own.
-- A 2D bridge after a 3D motion, or the reverse, is expressible: a `BridgeInput` holds a velocity
-  texture, and a 2D bridge reads its x and y. Nothing needs a mixed pair.
 - hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
   the pose's motion, a settings field written per tick. A per-tick value on the fluid layer, as the
   eye is, would take it off the settings.
