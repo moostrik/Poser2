@@ -11,6 +11,7 @@ draw its output's `textures`."""
 
 from abc import abstractmethod
 from dataclasses import dataclass
+from typing import Annotated
 
 from OpenGL.GL import GL_RGBA16F
 
@@ -18,6 +19,7 @@ from modules.gl import Fbo, Texture, Style
 from modules.settings import Field
 from ...shaders import DensityColor
 from .stage_layer import StageLayer, StageLayerSettings, StageOutput
+from .port import TextureKind
 
 
 @dataclass
@@ -26,11 +28,11 @@ class BridgeInput:
     motion output; `dt` the render tick's; `image`, or None, the picture whose RGB colors the
     density; `color` an RGB tint on it, white by default, the color alone without an image; `mask`
     the player's mask on the view, or None, which gates the image."""
-    velocity: Texture
+    velocity: Annotated[Texture, TextureKind.VELOCITY]
     dt: float
-    image: Texture | None = None
+    image: Annotated[Texture | None, TextureKind.IMAGE] = None
     color: tuple[float, float, float] = (1.0, 1.0, 1.0)
-    mask: Texture | None = None
+    mask: Annotated[Texture | None, TextureKind.SCALAR] = None
 
 
 @dataclass
@@ -38,11 +40,11 @@ class BridgeOutput(StageOutput):
     """The bridge stage's textures, what the fluid injects: `velocity`; `density`, in 2D the amount
     alone, in 3D RGBA, the amount times the color, with the amount as alpha; `temperature`; `onset`,
     a second velocity, or None; `spin`, a curl at its `spin` setting, or None."""
-    velocity: Texture
-    density: Texture
-    temperature: Texture
-    onset: Texture | None = None
-    spin: Texture | None = None
+    velocity: Annotated[Texture, TextureKind.VELOCITY]
+    density: Annotated[Texture, TextureKind.IMAGE]
+    temperature: Annotated[Texture, TextureKind.SCALAR]
+    onset: Annotated[Texture | None, TextureKind.VELOCITY] = None
+    spin: Annotated[Texture | None, TextureKind.SCALAR] = None
 
 
 class BridgeLayerSettings(StageLayerSettings):

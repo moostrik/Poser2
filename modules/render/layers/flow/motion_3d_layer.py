@@ -7,7 +7,6 @@ import logging
 from modules.flow import LucasKanadeFlow3D, LucasKanadeFlow3DSettings, DepthView
 from modules.utils import HotReloadMethods
 from .motion_layer import MotionLayer, MotionLayerSettings, MotionInput, MotionOutput
-from .port import Port, TextureKind
 
 logger = logging.getLogger(__name__)
 
@@ -30,16 +29,7 @@ class Motion3DLayer(MotionLayer):
 
     @property
     def output(self) -> MotionOutput:
-        textures: dict[str, Port] = {}
-        input: MotionInput | None = self._input
-        if input is not None:
-            textures['image'] = Port(input.image, TextureKind.IMAGE)
-            if input.depth is not None:
-                textures['depth'] = Port(input.depth.texture, TextureKind.SCALAR)
-            if input.mask is not None:
-                textures['mask'] = Port(input.mask, TextureKind.SCALAR)
-        textures['velocity'] = Port(self._flow.velocity, TextureKind.VELOCITY)
-        return MotionOutput(self._flow.velocity, textures=textures)
+        return MotionOutput(self._flow.velocity)
 
     # ========== The flow ==========
 

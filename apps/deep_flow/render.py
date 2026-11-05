@@ -308,14 +308,14 @@ class DeepFlowRender(RenderBase):
         for i, _motion in self.L[Layers.motion].items():
             if i not in bridges or i not in self.L[Layers.fluid]:
                 continue
-            textures: dict[ls.FlowStage, dict[str, ls.Port]] = {
-                ls.FlowStage.MOTION: cast(ls.Motion3DLayer, _motion).output.textures,
-                ls.FlowStage.BRIDGE: bridges[i].output.textures,
-                ls.FlowStage.FLUID: cast(ls.Fluid3DLayer, self.L[Layers.fluid][i]).output.textures,
+            ports: dict[ls.FlowStage, dict[str, ls.Port]] = {
+                ls.FlowStage.MOTION: cast(ls.Motion3DLayer, _motion).ports,
+                ls.FlowStage.BRIDGE: bridges[i].ports,
+                ls.FlowStage.FLUID: cast(ls.Fluid3DLayer, self.L[Layers.fluid][i]).ports,
             }
             for key in (Layers.monitor_a, Layers.monitor_b):
                 if i in self.L[key]:
-                    cast(ls.MonitorLayer, self.L[key][i]).set_input(ls.MonitorInput(textures))
+                    cast(ls.MonitorLayer, self.L[key][i]).set_input(ls.MonitorInput(ports))
 
     def _weight(self, pose: Frame | None, own_cam: int, cam_id: int) -> float:
         """The share of camera `cam_id`'s bridge in camera `own_cam`'s fluid: its player's motion for the

@@ -11,10 +11,12 @@ the monitors draw its output's `textures`."""
 
 from abc import abstractmethod
 from dataclasses import dataclass, field
+from typing import Annotated
 
 from modules.gl import Texture, Style, Blit
 from modules.settings import Field
 from .stage_layer import StageLayer, StageLayerSettings, StageOutput
+from .port import TextureKind
 
 
 @dataclass
@@ -44,7 +46,7 @@ class FluidInput:
 @dataclass
 class FluidOutput(StageOutput):
     """The fluid stage's textures: `density`, the show."""
-    density: Texture
+    density: Annotated[Texture, TextureKind.IMAGE]
 
 
 class FluidLayerSettings(StageLayerSettings):

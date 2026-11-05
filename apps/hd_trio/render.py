@@ -238,14 +238,14 @@ class HDTrioRender(RenderBase):
         for i, _motion in self.L[Layers.motion].items():
             if i not in bridges or i not in self.L[Layers.fluid]:
                 continue
-            textures: dict[ls.FlowStage, dict[str, ls.Port]] = {
-                ls.FlowStage.MOTION: cast(ls.Motion2DLayer, _motion).output.textures,
-                ls.FlowStage.BRIDGE: bridges[i].output.textures,
-                ls.FlowStage.FLUID: cast(ls.Fluid2DLayer, self.L[Layers.fluid][i]).output.textures,
+            ports: dict[ls.FlowStage, dict[str, ls.Port]] = {
+                ls.FlowStage.MOTION: cast(ls.Motion2DLayer, _motion).ports,
+                ls.FlowStage.BRIDGE: bridges[i].ports,
+                ls.FlowStage.FLUID: cast(ls.Fluid2DLayer, self.L[Layers.fluid][i]).ports,
             }
             for key in (Layers.monitor_a, Layers.monitor_b):
                 if i in self.L[key]:
-                    cast(ls.MonitorLayer, self.L[key][i]).set_input(ls.MonitorInput(textures))
+                    cast(ls.MonitorLayer, self.L[key][i]).set_input(ls.MonitorInput(ports))
 
     def update(self) -> None:
         self._notify_update()

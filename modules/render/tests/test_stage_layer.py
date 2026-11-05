@@ -2,8 +2,10 @@
 
 import unittest
 from dataclasses import dataclass
+from typing import Annotated
 
-from modules.render.layers import StageLayer, StageLayerSettings, StageOutput
+from modules.gl import Texture
+from modules.render.layers import Port, StageLayer, StageLayerSettings, StageOutput, TextureKind, ports_of
 
 
 @dataclass
@@ -47,9 +49,39 @@ class StageLayerTest(unittest.TestCase):
         stage.update()
         self.assertEqual(stage.calls, ['update'])
 
-    def test_an_output_takes_its_ports_by_keyword_after_its_own_fields(self) -> None:
-        output = _Output(3, textures={})
-        self.assertEqual((output.value, output.textures), (3, {}))
+    def test_an_output_takes_its_diagnostics_by_keyword_after_its_own_fields(self) -> None:
+        output = _Output(3, diagnostics={})
+        self.assertEqual((output.value, output.diagnostics), (3, {}))
+
+
+@dataclass
+class _Input:
+    image: Annotated[Texture, TextureKind.IMAGE]
+    dt: float
+    mask: Annotated[Texture | None, TextureKind.SCALAR] = None
+
+
+@dataclass
+class _KindOutput(StageOutput):
+    velocity: Annotated[Texture, TextureKind.VELOCITY]
+    onset: Annotated[Texture | None, TextureKind.VELOCITY] = None
+
+
+class PortsTest(unittest.TestCase):
+    """A field that declares its kind is a port; one left None is none; a diagnostic comes after."""
+
+    def test_an_input_gives_its_set_fields_with_their_kinds(self) -> None:
+        image = Texture()
+        ports = ports_of(_Input(image, 0.016), 'input_')
+        self.assertEqual(list(ports), ['input_image'])
+        self.assertIs(ports['input_image'].texture, image)
+        self.assertEqual(ports['input_image'].kind, TextureKind.IMAGE)
+
+    def test_an_output_gives_its_fields_then_its_diagnostics(self) -> None:
+        velocity, inner = Texture(), Texture()
+        output = _KindOutput(velocity, diagnostics={'inner': Port(inner, TextureKind.SCALAR)})
+        self.assertEqual(list(output.ports), ['velocity', 'inner'])
+        self.assertEqual(output.ports['velocity'].kind, TextureKind.VELOCITY)
 
 
 if __name__ == '__main__':

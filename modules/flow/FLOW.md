@@ -36,7 +36,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 | depth velocity       | the z of the 3D flow: the depth change along the x/y displacement, in view widths per second          | `DepthVelocity`, `DepthVelocitySettings`, group `depth_velocity`   |
 | 2D flow, 3D flow     | a system: a motion layer and a bridge layer per camera, a fluid layer per show output                 | `Motion2DLayer` + `Bridge2DLayer` + `Fluid2DLayer`; `…3D…`         |
 | 2D camera, 3D camera | an image and a mask; those and a depth image on the same view                                         | `MotionInput` without / with `depth`                               |
-| port                 | a stage's named texture with its kind: image, velocity, scalar, depth scalar; every output lists its ports as `textures` | `Port`, `TextureKind`                                 |
+| port                 | a stage's named texture with its kind: image, velocity, scalar, depth scalar; read from the kinds its input and output fields declare, plus its diagnostics | `Port`, `TextureKind`, `ports_of`                       |
 | monitor              | a layer that shows one port of one stage, picked on the panel, drawn only while it is shown           | `MonitorLayer`, `monitor_a`, `monitor_b`                           |
 
 "bridge" is ofxFlowTools' word (`ftVelocityBridge`, `ftDensityBridge`, `ftTemperatureBridge`);
@@ -68,10 +68,14 @@ textures and numbers, never an output; the fluid's input holds its injections as
 `Injection`, each values. The app's wiring pass builds each input new every tick, copying into
 it what the stage reads from the output of the stage before and from the camera layers, and sets
 it on the layer before the render loop. The output holds the stage's textures, allocated once,
-and the layer hands it out as `output`; an output is a stage's only way out. Every output also
-carries `textures`, the stage's ports, what it computed and the inputs it drew from, each a
-texture with its kind; the monitors' input is built from them. The layers hold no reference to
-each other, and no input knows an output's type. A field is named with the same noun for the
+and the layer hands it out as `output`; an output is a stage's only way out, and the next stage
+reads its fields by name. A texture field declares its kind on the field
+(`velocity: Annotated[Texture, TextureKind.VELOCITY]`), in inputs and outputs alike, and a stage's
+`ports`, what the monitors show, are read from those declarations (`ports_of`): the output's
+fields, then the input's as `input_<field>`, each texture written once. An output's
+`diagnostics` add the stage's insides a monitor can show and nothing downstream reads (the 3D
+bridge's kinetic trails, the 2D fluid's pressure). A layer's `texture` stays what it draws, read by
+the composite. The layers hold no reference to each other, and no input knows an output's type. A field is named with the same noun for the
 same kind of thing, in every input.
 
 A texture field holds the `Fbo`, `SwapFbo` or `Tensor` object itself; a swap is its current
@@ -84,10 +88,10 @@ an output, or they would be the tick before's.
 
 | Stage  | Input `@dataclass`, built by the app each tick                                                                                      | Output `@dataclass`, the stage's textures                                                                |
 |--------|-------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
-| motion | `MotionInput`: `image`, the picture the velocity is measured on by its brightness; `timestamp`, the capture time of the camera frame `image` holds, the frame's identity; `dt`, the render tick's; `depth`, a `DepthView` or `None`; `mask`, or `None` | `MotionOutput`: `velocity` (x, y, z), gated by `mask` with the 3D flow's `use_mask`; z is 0 without depth; `textures` |
-| bridge | `BridgeInput`: `velocity`, from the motion output; `dt`; `image`, or `None`, the picture whose RGB colors the density; `color`, an RGB tint on it, white by default; `mask`, or `None`, which gates the image | `BridgeOutput`: `velocity`; `density`, what the fluid injects: in 2D the amount alone, the trail's speed (R); in 3D RGBA, the amount (the kinetic emission or the speed) times `color`, times the image's RGB where there is one, with the amount as alpha; `temperature`; `onset` or `None`; `spin`, the curl at its `spin` setting, or `None`; `textures` |
-| fluid  | `FluidInput`: `dt`, and `injections`, a list of `Injection`: `velocity`, `density`, `temperature`, `onset`, `spin`, from one bridge output, with `weight`, 0 to 1, the injection's share of the fluid's velocity, density and temperature, as a layer's weight in the light renderer's mix, and `color`, the color the 2D fluid gives the injection's density at its output; the app builds one injection per bridge it wants in that fluid | `FluidOutput`: `density`, the show, which the composite draws as the layer's `texture`; `textures` |
-| monitor | `MonitorInput`: `textures`, every stage's ports keyed by stage; the monitor picks by its own `stage` and `texture` | none: it draws                                                                                           |
+| motion | `MotionInput`: `image`, the picture the velocity is measured on by its brightness; `timestamp`, the capture time of the camera frame `image` holds, the frame's identity; `dt`, the render tick's; `depth`, a `DepthView` or `None`; `mask`, or `None` | `MotionOutput`: `velocity` (x, y, z), gated by `mask` with the 3D flow's `use_mask`; z is 0 without depth |
+| bridge | `BridgeInput`: `velocity`, from the motion output; `dt`; `image`, or `None`, the picture whose RGB colors the density; `color`, an RGB tint on it, white by default; `mask`, or `None`, which gates the image | `BridgeOutput`: `velocity`; `density`, what the fluid injects: in 2D the amount alone, the trail's speed (R); in 3D RGBA, the amount (the kinetic emission or the speed) times `color`, times the image's RGB where there is one, with the amount as alpha; `temperature`; `onset` or `None`; `spin`, the curl at its `spin` setting, or `None` |
+| fluid  | `FluidInput`: `dt`, and `injections`, a list of `Injection`: `velocity`, `density`, `temperature`, `onset`, `spin`, from one bridge output, with `weight`, 0 to 1, the injection's share of the fluid's velocity, density and temperature, as a layer's weight in the light renderer's mix, and `color`, the color the 2D fluid gives the injection's density at its output; the app builds one injection per bridge it wants in that fluid | `FluidOutput`: `density`, the show, which the composite draws as the layer's `texture` |
+| monitor | `MonitorInput`: `ports`, every stage's ports keyed by stage; the monitor picks by its own `stage` and `texture` | none: it draws                                                                                           |
 
 The motion layer measures once per camera frame: when `timestamp` differs from the one it last
 measured; a source without stamps (`None`) measures every tick. A gap wider than a frame period
@@ -136,7 +140,7 @@ waits for the next vsync, up to one 60 Hz tick, before it is measured.
 
 | Class                                       | Role                                                                                                                                                                                  |
 |---------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `StageLayer[I, O]` (ABC)                    | `set_input(I)` before the render loop; `output: O`, a `StageOutput`, whose `textures` (keyword only) are the stage's ports; `reset()`, from rest; `update()` takes a reset the panel's `reset` button asked for, on the render thread, then runs `_update()`. Unbinds the button in `deallocate()` |
+| `StageLayer[I, O]` (ABC)                    | `set_input(I)` before the render loop; `output: O`, a `StageOutput`, whose `diagnostics` (keyword only) add to the ports its fields declare; `ports`, the output's then the input's; `reset()`, from rest; `update()` takes a reset the panel's `reset` button asked for, on the render thread, then runs `_update()`. Unbinds the button in `deallocate()` |
 | `MotionLayer` (ABC)                         | `StageLayer[MotionInput, MotionOutput]`; `_update()` as the template method: `_measure` on a new frame. Holds the allocate and resize pattern; the flow runs at `settings.width` by `settings.height`. Draws nothing |
 | `Motion2DLayer`, `Motion3DLayer`            | the subclasses, each on its optical flow (`GradientFlow`; `LucasKanadeFlow3D`). The 2D flow's velocity is per frame, not per second, and it reads no mask, until the 2D flow moves to the Lucas–Kanade solve |
 | `BridgeLayer` (ABC)                         | `StageLayer[BridgeInput, BridgeOutput]`; `_update()`: the density's color (`DensityColor`: the image, or white, times the tint, gated by the mask), `_bridge` the input's velocity into velocity, density and temperature. The bridges' filters run at the velocity's size and their outputs at `settings.width` by `settings.height`; the layer follows both. Draws nothing |
@@ -158,7 +162,7 @@ cross-camera similarity times `similarity_scale`; deep_flow picks the layers on
 its panel, live, one `Layers` field per picture (`motion_image`, `bridge_image`, `mask`) in its
 `inputs` group with `scale_by_motion` (`apps/deep_flow/settings.py`), reads the fields each tick,
 and steers the eye toward the tracked head. Both apps give each camera two monitors, `monitor_a`
-and `monitor_b`, each handed every stage's `textures`; they go into the panel's select lists like
+and `monitor_b`, each handed every stage's `ports`; they go into the panel's select lists like
 any layer, and two show A beside B.
 
 ## Packages

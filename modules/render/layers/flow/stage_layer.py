@@ -1,9 +1,10 @@
 """A stage of a flow system: what the motion, the bridge and the fluid layer are.
 
 A stage takes an input the app builds each tick (`set_input`), hands out an output (`output`), and
-starts from rest on `reset`, which its panel's reset button asks for. Every output carries
-`textures`, the stage's ports, which is all the monitors read. Inputs share no base: each stage reads
-its own fields, and nothing takes any stage's input."""
+starts from rest on `reset`, which its panel's reset button asks for. The next stage reads the
+output's fields by name. The monitors read the stage's `ports`: every input and output field that
+declares its kind, written once on the field, and the `diagnostics` a stage adds of its insides.
+Inputs share no base: each stage reads its own fields, and nothing takes any stage's input."""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -11,14 +12,19 @@ from threading import Event
 
 from modules.settings import Field, BaseSettings, Widget
 from ..layer_base import LayerBase
-from .port import Port
+from .port import Port, ports_of
 
 
 @dataclass
 class StageOutput:
-    """What every stage output carries: `textures`, the stage's ports for the monitors, what it
-    computed and the inputs it drew from."""
-    textures: dict[str, Port] = field(default_factory=dict, kw_only=True)
+    """What every stage output carries beside its fields: `diagnostics`, the stage's insides a
+    monitor can show, which no stage downstream reads."""
+    diagnostics: dict[str, Port] = field(default_factory=dict, kw_only=True)
+
+    @property
+    def ports(self) -> dict[str, Port]:
+        """The fields that declare a kind, then the diagnostics."""
+        return {**ports_of(self), **self.diagnostics}
 
 
 class StageLayerSettings(BaseSettings):
@@ -47,8 +53,14 @@ class StageLayer[I, O: StageOutput](LayerBase, ABC):
     @property
     @abstractmethod
     def output(self) -> O:
-        """The stage's output, its textures allocated once; what the next stage's and the monitors' inputs are built from."""
+        """The stage's output, its textures allocated once; what the next stage's input is built from."""
         ...
+
+    @property
+    def ports(self) -> dict[str, Port]:
+        """What the monitors show of the stage: its output's ports, then its input's, named `input_<field>`."""
+        inputs: dict[str, Port] = ports_of(self._input, 'input_') if self._input is not None else {}
+        return {**self.output.ports, **inputs}
 
     @abstractmethod
     def reset(self) -> None:

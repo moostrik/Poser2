@@ -58,7 +58,7 @@ class MonitorLayerSettings(BaseSettings):
 @dataclass
 class MonitorInput:
     """Every stage's ports, built by the app each tick; the monitor picks by its settings."""
-    textures: dict[FlowStage, dict[str, Port]] = field(default_factory=dict)
+    ports: dict[FlowStage, dict[str, Port]] = field(default_factory=dict)
 
 
 class MonitorLayer(LayerBase):
@@ -114,7 +114,7 @@ class MonitorLayer(LayerBase):
     # ========== Processing ==========
 
     def _ports(self) -> dict[str, Port]:
-        return self._input.textures.get(self.settings.stage, {}) if self._input is not None else {}
+        return self._input.ports.get(self.settings.stage, {}) if self._input is not None else {}
 
     def _pick(self) -> Port | None:
         """The port the settings name, else the stage's first."""

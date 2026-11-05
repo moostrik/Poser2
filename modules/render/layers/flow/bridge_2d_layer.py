@@ -34,13 +34,9 @@ class Bridge2DLayer(BridgeLayer):
     @property
     def output(self) -> BridgeOutput:
         """The density is the amount alone, the smoothed velocity's speed (R); the 2D fluid colors it at its output."""
-        return BridgeOutput(self._trail.velocity, self._velocity_magnitude.magnitude, self._temperature_bridge.temperature, textures={
-            'velocity_input': Port(self._trail.velocity_input, TextureKind.VELOCITY),
-            'velocity': Port(self._trail.velocity, TextureKind.VELOCITY),
-            'speed': Port(self._velocity_magnitude.magnitude, TextureKind.SCALAR),
+        return BridgeOutput(self._trail.velocity, self._velocity_magnitude.magnitude, self._temperature_bridge.temperature, diagnostics={
             'color': Port(self._color, TextureKind.IMAGE),
-            'density': Port(self._density_bridge.density, TextureKind.IMAGE),
-            'temperature': Port(self._temperature_bridge.temperature, TextureKind.SCALAR),
+            'density_bridge': Port(self._density_bridge.density, TextureKind.IMAGE),
         })
 
     # ========== Lifecycle ==========

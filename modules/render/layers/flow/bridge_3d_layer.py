@@ -67,15 +67,12 @@ class Bridge3DLayer(BridgeLayer):
     def output(self) -> BridgeOutput:
         kinetic: KineticBridgeSettings = self.settings.kinetic
         bridge: KineticBridge = self._kinetic_bridge
-        textures: dict[str, Port] = {
-            'velocity': Port(self._velocity, TextureKind.VELOCITY),
+        diagnostics: dict[str, Port] = {
             'speed': Port(self._velocity_magnitude.magnitude, TextureKind.SCALAR),
             'color': Port(self._color, TextureKind.IMAGE),
-            'density': Port(self._density_bridge.density, TextureKind.IMAGE),
-            'temperature': Port(self._temperature_bridge.temperature, TextureKind.SCALAR),
         }
         if self._kinetic:
-            textures.update({
+            diagnostics.update({
                 'kinetic_fast': Port(bridge.fast, TextureKind.VELOCITY),
                 'kinetic_slow': Port(bridge.slow, TextureKind.VELOCITY),
                 'kinetic_acceleration': Port(bridge.acceleration, TextureKind.SCALAR),
@@ -91,7 +88,7 @@ class Bridge3DLayer(BridgeLayer):
             self._velocity, self._density_bridge.density, self._temperature_bridge.temperature,
             bridge.onset_velocity if self._kinetic and kinetic.onset.force > 0.0 else None,
             bridge.curl if self._kinetic and kinetic.onset.spin > 0.0 else None,
-            textures=textures,
+            diagnostics=diagnostics,
         )
 
     # ========== Lifecycle ==========

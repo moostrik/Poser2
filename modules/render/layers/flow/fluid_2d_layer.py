@@ -53,8 +53,7 @@ class Fluid2DLayer(FluidLayer):
     @property
     def output(self) -> FluidOutput:
         fluid: Fluid2D = self._fluid
-        return FluidOutput(self._colorized, textures={
-            'density': Port(self._colorized, TextureKind.IMAGE),
+        return FluidOutput(self._colorized, diagnostics={
             'density_channels': Port(fluid.density, TextureKind.IMAGE),
             'velocity': Port(fluid.velocity, TextureKind.VELOCITY),
             'pressure': Port(fluid.pressure, TextureKind.SCALAR),

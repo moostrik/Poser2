@@ -11,7 +11,7 @@ from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOf
                       TimeSeriesLayer, TimeSeriesLayerSettings, \
                       FeatureFrameLayer, FeatureWindowLayer, MotionTimeRenderer, MotionTimeRendererSettings, \
                       PoseLineLayer, PoseLineLayerSettings
-from .flow import     Port, TextureKind, StageLayer, StageLayerSettings, StageOutput, \
+from .flow import     Port, TextureKind, ports_of, StageLayer, StageLayerSettings, StageOutput, \
                       MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, \
                       BridgeInput, BridgeOutput, BridgeLayer, BridgeLayerSettings, \
                       Injection, FluidInput, FluidOutput, FluidLayer, FluidLayerSettings, \

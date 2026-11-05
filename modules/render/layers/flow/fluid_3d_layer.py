@@ -13,7 +13,6 @@ from modules.gl import Texture, Style, Text, Blit
 from modules.flow import Fluid3D, Fluid3DSettings
 from modules.utils import HotReloadMethods
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidOutput, Injection
-from .port import Port, TextureKind
 
 
 class Fluid3DLayerSettings(Fluid3DSettings, FluidLayerSettings):
@@ -40,7 +39,7 @@ class Fluid3DLayer(FluidLayer):
 
     @property
     def output(self) -> FluidOutput:
-        return FluidOutput(self._fluid.density, textures={'density': Port(self._fluid.density, TextureKind.IMAGE)})
+        return FluidOutput(self._fluid.density)
 
     def set_eye(self, x: float, y: float) -> None:
         """The parallax eye's offset (±1 across the frame, vertical at half range), read at the next composite."""

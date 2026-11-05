@@ -11,11 +11,13 @@ give (`frame_interval`). It draws nothing; the monitors draw its output's `textu
 from abc import abstractmethod
 from dataclasses import dataclass
 import math
+from typing import Annotated
 
 from modules.gl import Texture, Style
 from modules.flow import DepthView
 from modules.settings import Field
 from .stage_layer import StageLayer, StageLayerSettings, StageOutput
+from .port import TextureKind
 
 MAX_FRAME_INTERVAL: float = 0.5     # s: a longer gap between two captures is a pause or a loop, not a frame's
 FRAME_PERIOD_BAND: tuple[float, float] = (0.5, 2.0)    # a capture gap is held to this share of the frame interval
@@ -50,18 +52,18 @@ class MotionInput:
     holds, the frame's identity: the stage measures when it differs from the one it measured last
     (None: every tick); `dt` the render tick's; `depth` the camera's depth on the same view, or None;
     `mask` the player's mask on the view, or None."""
-    image: Texture
+    image: Annotated[Texture, TextureKind.IMAGE]
     timestamp: float | None
     dt: float
-    depth: DepthView | None = None
-    mask: Texture | None = None
+    depth: Annotated[DepthView | None, TextureKind.SCALAR] = None
+    mask: Annotated[Texture | None, TextureKind.SCALAR] = None
 
 
 @dataclass
 class MotionOutput(StageOutput):
     """The motion stage's textures: `velocity` (x, y, z) in view widths per second, gated by the mask
-    with the flow's `use_mask`, z 0 without depth; its ports are the velocity and what it measured on."""
-    velocity: Texture
+    with the flow's `use_mask`, z 0 without depth."""
+    velocity: Annotated[Texture, TextureKind.VELOCITY]
 
 
 class MotionLayerSettings(StageLayerSettings):
