@@ -45,7 +45,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from modules.gl import Texture  # noqa: E402
 from modules.flow import (LucasKanadeFlow3D, LucasKanadeFlow3DSettings,  # noqa: E402
-                          Impulse, VelocityImpulseBridge, VelocityImpulseBridgeSettings, VelocityTrailBridge, VelocityTrailBridgeSettings)
+                          Impulse, VelocityImpulseBridge, VelocityImpulseBridgeSettings, VelocityTrailBridge, VelocityTrailBridgeSettings,
+                          decay_weight)
 from depth_velocity_compare import Frames, context, overrides, read_back, recorded_settings, setting_owner, upload  # noqa: E402
 
 SETTLE: float = 1.5         # s of the still part left out of its noise
@@ -54,6 +55,7 @@ START_WINDOW: float = 0.4   # s after a move begins
 STOP_WINDOW: tuple[float, float] = (-0.1, 0.6)    # s around a move's end
 COAST_SHARE: float = 0.2
 MAX_LAG: int = 12           # frames
+EPSILON: float = 1e-4       # below this a speed is no motion, as in the bridge
 PRESET: Path = Path(__file__).resolve().parent.parent / 'apps' / 'deep_flow' / 'data' / 'settings' / 'settings.json'
 
 
@@ -101,8 +103,12 @@ class Side:
             self.changed[path] = set_path(self.settings, path, value)
         self.bridge.allocate(width, height)
         self.series: dict[str, Series] = {'velocity': Series(), 'z': Series(), 'amount': Series(),
-                                          **{impulse.name.lower(): Series() for impulse in Impulse}}
+                                          **{impulse.name.lower(): Series() for impulse in Impulse},
+                                          'stop_moving': Series(), 'wake_moving': Series()}
         self.milliseconds: list[float] = []
+        # A trial, here only: the stop's region over the flow's moving pixels, as the start's, its two trails per region
+        self._region_fast: np.ndarray | None = None
+        self._region_slow: np.ndarray | None = None
 
     def step(self, velocity: Texture, delta_time: float) -> None:
         glFinish()
@@ -112,10 +118,37 @@ class Side:
         glFinish()
         self.milliseconds.append((time.perf_counter() - began) * 1000.0)
 
-    def measure(self, flow: np.ndarray, moving: np.ndarray, ring: np.ndarray, core: np.ndarray, still: bool) -> None:
+    def _moving_stop_share(self, flow: np.ndarray, delta_time: float) -> np.ndarray:
+        """The trial stop share per pixel: the region's mean speed over the flow's moving pixels, through the fast and
+        the slow trail per region, as far as it falls (numpy; what a moving-pixel stop region would give)."""
+        assert isinstance(self.settings, VelocityImpulseBridgeSettings)
+        s, h, w = self.settings, flow.shape[0], flow.shape[1]
+        size: int = max(1, int(round(s.stop_region_size)))
+        rows, columns = -(-h // size), -(-w // size)
+        speed = np.zeros((rows * size, columns * size))
+        speed[:h, :w] = np.linalg.norm(flow, axis=-1)
+        blocks = speed.reshape(rows, size, columns, size)
+        count = (blocks > EPSILON).sum(axis=(1, 3))
+        mean = np.where(count > 0, blocks.sum(axis=(1, 3)) / np.maximum(count, 1), 0.0)
+        if self._region_fast is None or self._region_fast.shape != mean.shape:
+            self._region_fast, self._region_slow = np.zeros_like(mean), np.zeros_like(mean)
+        fast_weight, slow_weight = decay_weight(delta_time, s.fast_smooth * 1000.0), decay_weight(delta_time, s.slow_smooth * 1000.0)
+        self._region_fast = fast_weight * self._region_fast + (1.0 - fast_weight) * mean
+        self._region_slow = slow_weight * self._region_slow + (1.0 - slow_weight) * mean
+        share = np.clip((self._region_slow - self._region_fast) / np.maximum(self._region_slow, EPSILON), 0.0, 1.0)
+        share = 1.0 + (share - 1.0) * s.stop_region_weight
+        return np.repeat(np.repeat(share, size, axis=0), size, axis=1)[:h, :w]
+
+    def measure(self, flow: np.ndarray, moving: np.ndarray, ring: np.ndarray, core: np.ndarray, still: bool,
+                delta_time: float) -> None:
         if isinstance(self.bridge, VelocityImpulseBridge):
-            for impulse in Impulse:
-                self.series[impulse.name.lower()].add(read_back(self.bridge.impulse(impulse))[..., 0], moving, ring, core, still)
+            values = {impulse: read_back(self.bridge.impulse(impulse))[..., 0] for impulse in Impulse}
+            for impulse, value in values.items():
+                self.series[impulse.name.lower()].add(value, moving, ring, core, still)
+            fall = values[Impulse.STOP] + values[Impulse.WAKE]
+            share = self._moving_stop_share(flow, delta_time)
+            self.series['stop_moving'].add(fall * share, moving, ring, core, still)
+            self.series['wake_moving'].add(fall * (1.0 - share), moving, ring, core, still)
             return
         v = read_back(self.bridge.smooth_velocity)[..., :3]
         for name, magnitude in (('velocity', np.hypot(v[..., 0], v[..., 1])), ('z', np.abs(v[..., 2])),
@@ -188,7 +221,7 @@ def report(label: str, series: dict[str, Series], flow: dict[str, Series], frame
             ring = np.array(s.ring)
             smear = float(np.mean(ring[w['fast']])) / max(fast, 1e-9)
             line += (f' {lag_ms(body, np.array(flow["velocity"].body), dt):.0f} | {coast_s(body, frames, fast):.2f} | {smear:.2f} |')
-        elif name in ('amount', 'start', 'bow', 'stop', 'wake'):
+        elif name in ('amount', 'start', 'bow', 'stop', 'wake', 'stop_moving', 'wake_moving'):
             # A burst: s after a move's end until it is under 20% of that stop's peak; the ring 4-24 px outside the
             # mask over the body, in the stop windows
             ring = np.array(s.ring)
@@ -243,7 +276,7 @@ def main() -> int:
         flow_series['z'].add(np.abs(v[..., 2]), moving, ring, core, still)
         for side in sides:
             side.step(flow.velocity, c['delta_time'])
-            side.measure(v, moving, ring, core, still)
+            side.measure(v, moving, ring, core, still, c['delta_time'])
 
     dt = float(np.median([c['delta_time'] for c in frames.calls]))
     w = windows(frames)
@@ -252,7 +285,24 @@ def main() -> int:
     print('\n'.join(report('flow', flow_series, flow_series, frames, w, dt)))
     for side in sides:
         print('\n'.join(report(side.name, side.series, flow_series, frames, w, dt)), flush=True)
-    print('GPU ms per frame: ' + ', '.join(f'{side.name} {np.median(side.milliseconds):.2f}' for side in sides), flush=True)
+    for side in sides:
+        if side.kind != 'impulse':
+            continue
+        # In steady fast motion every rise and fall is a limb passing: the share its region kept as a start or stop
+        # is false; at the real starts and stops the region's share is the right one
+        names = ('start', 'bow', 'stop', 'wake', 'stop_moving', 'wake_moving')
+        mean = {name: float(np.mean(np.array(side.series[name].body)[w['fast']])) for name in names}
+        at_start = {name: events_max(np.array(side.series[name].body), frames, 'start') for name in names}
+        at_stop = {name: events_max(np.array(side.series[name].body), frames, 'stop') for name in names}
+
+        def share(values: dict[str, float], kept: str, rest: str) -> float:
+            return values[kept] / max(values[kept] + values[rest], 1e-9)
+        print(f'{side.name}: steady fast motion read as start {share(mean, "start", "bow"):.2f}, as stop {share(mean, "stop", "wake"):.2f} '
+              f'(moving-pixel stop region {share(mean, "stop_moving", "wake_moving"):.2f}); at real starts start '
+              f'{share(at_start, "start", "bow"):.2f}; at real stops stop {share(at_stop, "stop", "wake"):.2f} '
+              f'(moving-pixel stop region {share(at_stop, "stop_moving", "wake_moving"):.2f})', flush=True)
+    print('GPU ms per frame, mean / p95: ' + ', '.join(
+        f'{side.name} {np.mean(side.milliseconds[10:]):.2f} / {np.percentile(side.milliseconds[10:], 95):.2f}' for side in sides), flush=True)
     glfw.terminate()
     return 0
 

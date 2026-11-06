@@ -241,28 +241,62 @@ reaches the fluid yet.
 
 ### Measured
 
-`scripts/bridge_compare.py` on the standmoves recording (four moves, starts and stops), frames
-captured on 2026-11-05 with deep_flow's preset flow (levels 5, threshold 0.5), each bridge stepped
-once per flow frame. Per frame, the mean over the body's pixels that move in the loop; noise is the
-still part's p99 per pixel; stop ÷ fast is the stop window's peak over steady fast motion.
+`scripts/bridge_compare.py` on the standmoves recording (`20261103-215324`: four whole-arm moves
+from rest, with starts and stops, a player at 0.65–1.5 m), its frames as captured on 2026-11-05
+(`temp/depth_track_1105/`, 1449 frames, 25 fps, the stamps the replay's decode times), the flow run
+again on them with deep_flow's preset flow of 2026-11-06 (levels 4, same_surface and xy_smooth on,
+the depth velocity's `smooth` 50 ms unless named), each bridge at its preset values (trail: smooth
+1 s, attack 0.001 s, advect 1, blur 4 px × 4; impulse: 0.025 / 0.15 s, both region weights 1,
+regions 128 px), stepped once per flow frame. Per frame, the mean over the body's pixels that move
+in the loop; noise is the still part's p99 per pixel; slow and fast are the steady halves of the
+moves; stop ÷ fast is the stop window's peak over steady fast motion, start ÷ fast the start
+window's.
 
-| Reading                                             | Noise | Stop ÷ fast | Start ÷ fast | Coast or burst, s | Ring |
-|-----------------------------------------------------|-------|-------------|--------------|-------------------|------|
-| trail velocity (smooth 1 s, attack 0.001 s, advect 1, blur 4.43) | 0.018 | 0.69 | 1.16     | 0.87              | 0.19 |
-| trail velocity, advect 0                            | 0.270 | 1.07        | 0.84         | 1.84              | 0.40 |
-| trail velocity, blur 0                              | 0.017 | 0.68        | 1.09         | 0.84              | 0.16 |
-| stop, region weight 0                               | 0.025 | 1.18        | 0.40         | 0.47              | 0.33 |
-| stop, region weight 1                               | 0.009 | 1.64        | 0.48         | 0.38              | 0.35 |
-| stop, region weight 1, x/y only                     | 0.000 | 2.26        | 0.93         | 0.27              | 0.28 |
-| start, region weight 0                              | 0.104 | 0.12        | 1.46         |                   |      |
-| start, region weight 0, x/y only                    | 0.001 | 0.05        | 1.89         |                   |      |
+The depth velocity's `smooth`, with both bridges treating z like x/y:
 
-The impulse rows are measured before the step peak scaling; the ratios hold, the impulse's level is
-1 / 0.58 = 1.72 times higher now. The stop rows hold 0.1 s. Ring is the share 4–24 px outside the mask, in steady fast motion for the
-trail and in the stop windows for the impulses; x/y only is z left out of the impulses. Without
-its region, a start rises along the front of every moving limb, 0.125 in steady fast motion against
-0.18 at real starts. The start's region reading over moving pixels and the bow and wake are not
-measured on the harness yet.
+| `smooth` | Flow z noise | Flow z, fast | Trail z noise | Trail z, fast | Start noise | Stop ÷ fast | Start share at starts / steady |
+|----------|--------------|--------------|---------------|---------------|-------------|-------------|--------------------------------|
+| 50 ms    | 0.160        | 0.093        | 0.243         | 0.387         | 0.079       | 4.07        | 0.34 / 0.37                    |
+| 100 ms   | 0.012        | 0.079        | 0.066         | 0.329         | 0.000       | 4.24        | 0.38 / 0.36                    |
+| 200 ms   | 0.000        | 0.047        | 0.005         | 0.171         | 0.000       | 10.41       | 0.42 / 0.30                    |
+| 400 ms   | 0.000        | 0.020        | 0.000         | 0.057         | 0.000       | 10.88       | 0.48 / 0.24                    |
+
+The trail follows a rising speed at once, so it keeps z's upward noise for about `smooth`: it needs
+a calm z. At 100 ms the flow's z keeps 85% of its motion and loses 93% of its noise; at 200 ms its
+noise is gone and half its motion is left; at 400 ms little of either. The start's region only
+tells a start from a limb arriving once z is calm: its share at real starts against steady motion
+grows from equal at 50 ms to 0.42 against 0.30 at 200 ms.
+
+The stop's region, `smooth` 50 ms:
+
+| Stop reading                                   | Noise | Stop ÷ fast | Falls in steady motion read as stop | At real stops |
+|------------------------------------------------|-------|-------------|-------------------------------------|---------------|
+| region weight 0                                | 0.040 | 2.46        | 1.00                                | 1.00          |
+| region 64 px                                   | 0.019 | 3.57        | 0.44                                | 0.63          |
+| region 128 px (the preset)                     | 0.010 | 4.07        | 0.38                                | 0.62          |
+| region 256 px                                  | 0.008 | 4.31        | 0.36                                | 0.61          |
+| region 128 px over the flow's moving pixels    | 0.011 | 3.48        | 0.45                                | 0.63          |
+
+A region over the flow's moving pixels, as the start's, reads more of a leaving limb as a stop and
+the real stops the same, so the stop's region reads the trails' mean speed. Without the region the
+stop's noise is four times higher.
+
+| GPU, each bridge alone | Mean, ms | p95, ms |
+|------------------------|----------|---------|
+| the trail              | 1.55     | 2.13    |
+| the impulse bridge     | 1.88     | 2.38    |
+
+Advice, from these numbers on this clip:
+
+| Setting                       | Value  | Why |
+|-------------------------------|--------|-----|
+| the depth velocity's `smooth` | 200 ms | z calm for the trail's attack and the start's region, at +150 ms of z's lag; 100 ms for a livelier z at some noise |
+| `stop_region_size`            | 128–256 px | 256 a little cleaner (noise 0.008, 4.31×), 64 worse |
+| `stop_region_weight`          | 1      | without it the stop's noise is four times higher and its stops half as distinct |
+
+The clip moves whole arms from rest, so a limb arriving and a part speeding up come together: the
+start and bow split, `start_region_*`, `fast_smooth` and z's impulses toward the camera are not
+tested on it, and the trail's and impulse bridge's own settings are left as the preset.
 
 ## Packages
 
@@ -474,17 +508,16 @@ box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU
 ## Open
 
 - The 3D bridge's finish, in this order; each step its tests, then the app:
-  4. Measured on the harness, the frames captured again with the preset's flow: the GPU time of the
-     trail and the impulse bridge per configuration, each alone; the best value of every setting by
-     the one results table; the stop's region on a limb's back edge, built over moving pixels as the
-     start's only where more than about a tenth of it reads as stop; the numbers and the advice here.
   5. The mix in `Bridge3DLayer`: `velocity` the trail, `impulse` the start, bow, stop and wake
      velocities, `density` and `temperature` the trail's speed and the four, each source at a weight
      0 to 1, the trail 1 and the rest 0 by default. No gain in the bridge: its sources share one
      unit, the motion's gains balance the axes and the fluid's gains set the strength. The trail and
      the impulse stay two velocity outputs, as the fluid takes them two ways (below).
-  6. The 3D fluid's `input_x` and `input_y` go: the motion's `x_gain` and `y_gain` balance the axes.
-     For the fluid refactor, as the fluid's own settings.
+- For the fluid refactor: the 3D fluid's `input_x` and `input_y` go, as the motion's `x_gain` and
+  `y_gain` balance the axes.
+- `scripts/depth_velocity_capture.py` ran deep_flow at about 4 fps on 2026-11-06 (257 frames over
+  60 s, gaps to 0.46 s), against 25 fps the day before with the same work per frame: the app, not
+  the capture, is slower **(deduction)**; a profiler run would show where.
 - For the fluid refactor: no bridge gives a spin any more, so `Injection.spin`, `Fluid3D`'s spin
   input (`set_spin`, `vorticity_force_3d`'s `spin`) and `Fluid3DLayer`'s use of it have no source.
 - Whether the density's reduced view should also feed the fluid's own composite at a lower

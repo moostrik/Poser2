@@ -73,7 +73,7 @@ def main() -> int:
             starting.clear()
             recording.set()
         if recording.is_set() and depth is not None:
-            luminance = self._frames.luminance
+            luminance = self.luminance
             w, h = luminance.width, luminance.height
             index = len(calls)
             mask = self._mask if self._mask is not None and self._mask.allocated else None
