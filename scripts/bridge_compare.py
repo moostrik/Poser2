@@ -5,16 +5,14 @@
 FRAMES is what depth_velocity_capture saved from one loop of a recording. No app and no camera: a hidden window
 gives the GL context, one `LucasKanadeFlow3D` measures the saved frames with the settings they were saved with
 (`--flow` overrides one by its panel path), and every side's bridge takes its velocity. KIND is `trail` (the
-VelocityTrailBridge), `kinetic` (the KineticBridge) or `event` (the VelocityEventBridge: its start and stop);
-PATH=VALUE sets one of its settings by its panel path
-(trails.fast_smooth, release.stop_gate, onset.force, smooth, ...), the rest as in deep_flow's preset. Each
-bridge steps once per flow frame, by the frame's saved interval, as the kinetic bridge does in the app.
+VelocityTrailBridge) or `event` (the VelocityEventBridge: its start, bow, stop and wake); PATH=VALUE sets one
+of its settings by its panel path (smooth, fast_smooth, stop_region_weight, ...), the rest as in deep_flow's
+preset. Each bridge steps once per flow frame, by the frame's saved interval.
 
-What a side gives the fluid, as Motion3DLayer hands it over:
-    velocity   its smooth_velocity, in image widths per second (the kinetic one divided by its scale_x)
-    amount     the density's alpha: the trail's |velocity| (VelocityMagnitude), the kinetic bridge's emission
-    onset      the kinetic bridge's onset_velocity, |xyz| (only with onset.force > 0)
-    stop       a trail's max(0, |velocity x/y| - |flow x/y|): how much motion just ended at each pixel
+What a side gives:
+    velocity   a trail's smooth_velocity, in image widths per second
+    amount     the density's alpha: the trail's |velocity| (VelocityMagnitude)
+    start, bow, stop, wake    an event bridge's events, in image widths per second
 
 For amount and stop, the last two columns are the burst (s after a move's end until under 20% of that stop's
 peak) and the ring's share in the stop windows (4–24 px outside the mask over the body).
@@ -46,7 +44,7 @@ from OpenGL.GL import glFinish
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from modules.gl import Texture  # noqa: E402
-from modules.flow import (KineticBridge, KineticBridgeSettings, LucasKanadeFlow3D, LucasKanadeFlow3DSettings,  # noqa: E402
+from modules.flow import (LucasKanadeFlow3D, LucasKanadeFlow3DSettings,  # noqa: E402
                           MotionEvent, VelocityEventBridge, VelocityEventBridgeSettings, VelocityTrailBridge, VelocityTrailBridgeSettings)
 from depth_velocity_compare import Frames, context, overrides, read_back, recorded_settings, setting_owner, upload  # noqa: E402
 
@@ -89,25 +87,21 @@ class Side:
         preset = json.loads(PRESET.read_text())['render']['bridge']
         self.changed: dict[str, object] = {}
         if kind == 'trail':
-            self.settings: VelocityTrailBridgeSettings | KineticBridgeSettings | VelocityEventBridgeSettings = VelocityTrailBridgeSettings()
+            self.settings: VelocityTrailBridgeSettings | VelocityEventBridgeSettings = VelocityTrailBridgeSettings()
             self.settings.update_from_dict(preset['trail'])
-            self.bridge: VelocityTrailBridge | KineticBridge | VelocityEventBridge = VelocityTrailBridge(self.settings)
-        elif kind == 'kinetic':
-            self.settings = KineticBridgeSettings()
-            self.settings.update_from_dict(preset['kinetic'])
-            self.bridge = KineticBridge(self.settings)
+            self.bridge: VelocityTrailBridge | VelocityEventBridge = VelocityTrailBridge(self.settings)
         elif kind == 'event':
             self.settings = VelocityEventBridgeSettings()
-            self.settings.update_from_dict(preset.get('velocity_event', {}))
+            self.settings.update_from_dict(preset.get('event', {}))
             self.bridge = VelocityEventBridge(self.settings)
         else:
-            raise SystemExit(f'unknown bridge {kind}: trail, kinetic or event')
+            raise SystemExit(f'unknown bridge {kind}: trail or event')
         for item in filter(None, items.split(',')):
             path, value = item.split('=', 1)
             self.changed[path] = set_path(self.settings, path, value)
         self.bridge.allocate(width, height)
-        self.series: dict[str, Series] = {'velocity': Series(), 'z': Series(), 'amount': Series(), 'onset': Series(), 'curl': Series(),
-                                          'reservoir': Series(), 'start': Series(), 'stop': Series()}
+        self.series: dict[str, Series] = {'velocity': Series(), 'z': Series(), 'amount': Series(),
+                                          **{event.name.lower(): Series() for event in MotionEvent}}
         self.milliseconds: list[float] = []
 
     def step(self, velocity: Texture, delta_time: float) -> None:
@@ -115,32 +109,17 @@ class Side:
         began = time.perf_counter()
         self.bridge.set_velocity(velocity)
         self.bridge.update(delta_time)
-        if isinstance(self.bridge, KineticBridge):
-            self.bridge.update_curl()
         glFinish()
         self.milliseconds.append((time.perf_counter() - began) * 1000.0)
 
     def measure(self, flow: np.ndarray, moving: np.ndarray, ring: np.ndarray, core: np.ndarray, still: bool) -> None:
         if isinstance(self.bridge, VelocityEventBridge):
-            for name, texture in (('start', self.bridge.event(MotionEvent.START)), ('stop', self.bridge.event(MotionEvent.STOP))):
-                self.series[name].add(read_back(texture)[..., 0], moving, ring, core, still)
+            for event in MotionEvent:
+                self.series[event.name.lower()].add(read_back(self.bridge.event(event))[..., 0], moving, ring, core, still)
             return
         v = read_back(self.bridge.smooth_velocity)[..., :3]
-        if isinstance(self.bridge, KineticBridge) and isinstance(self.settings, KineticBridgeSettings):
-            scale: float = max(abs(self.settings.scale_x), 1e-6)
-            v = v / scale
-            amount = read_back(self.bridge.emission)[..., 0]
-            onset = np.linalg.norm(read_back(self.bridge.onset_velocity)[..., :3], axis=-1) / scale
-            curl = np.abs(read_back(self.bridge.curl)[..., 0])
-            reservoir = read_back(self.bridge.reservoir)[..., 0]
-        else:
-            amount = np.linalg.norm(v, axis=-1)
-            onset = curl = reservoir = np.zeros(v.shape[:2], np.float32)
-        speed: np.ndarray = np.hypot(v[..., 0], v[..., 1])
-        stop = (np.maximum(speed - np.hypot(flow[..., 0], flow[..., 1]), 0.0) if self.kind == 'trail'
-                else np.zeros(v.shape[:2], np.float32))
-        for name, magnitude in (('velocity', speed), ('z', np.abs(v[..., 2])), ('amount', amount),
-                                ('onset', onset), ('curl', curl), ('reservoir', reservoir), ('stop', stop)):
+        for name, magnitude in (('velocity', np.hypot(v[..., 0], v[..., 1])), ('z', np.abs(v[..., 2])),
+                                ('amount', np.linalg.norm(v, axis=-1))):
             self.series[name].add(magnitude, moving, ring, core, still)
 
 
@@ -209,7 +188,7 @@ def report(label: str, series: dict[str, Series], flow: dict[str, Series], frame
             ring = np.array(s.ring)
             smear = float(np.mean(ring[w['fast']])) / max(fast, 1e-9)
             line += (f' {lag_ms(body, np.array(flow["velocity"].body), dt):.0f} | {coast_s(body, frames, fast):.2f} | {smear:.2f} |')
-        elif name in ('stop', 'amount'):
+        elif name in ('amount', 'start', 'bow', 'stop', 'wake'):
             # A burst: s after a move's end until it is under 20% of that stop's peak; the ring 4-24 px outside the
             # mask over the body, in the stop windows
             ring = np.array(s.ring)

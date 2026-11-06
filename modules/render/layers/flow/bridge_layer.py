@@ -39,12 +39,11 @@ class BridgeInput:
 class BridgeOutput(StageOutput):
     """The bridge stage's textures, what the fluid injects: `velocity`; `density`, in 2D the amount
     alone, in 3D RGBA, the amount times the color, with the amount as alpha; `temperature`; `onset`,
-    a second velocity, or None; `spin`, a curl at its `spin` setting, or None."""
+    a second velocity, or None."""
     velocity: Annotated[Texture, TextureKind.VELOCITY]
     density: Annotated[Texture, TextureKind.IMAGE]
     temperature: Annotated[Texture, TextureKind.SCALAR]
     onset: Annotated[Texture | None, TextureKind.VELOCITY] = None
-    spin: Annotated[Texture | None, TextureKind.SCALAR] = None
 
 
 class BridgeLayerSettings(StageLayerSettings):

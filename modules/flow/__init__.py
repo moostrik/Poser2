@@ -20,7 +20,7 @@ from .motion import DepthView, DepthVelocity, DepthVelocitySettings, catch_up_sh
 # Bridges: the 3D bridge by name, the 2D bridge as `bridge_2d` (bridge_2d.DensityBridge, ...)
 from . import bridge_2d
 from .bridge_3d import  DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
-                        BlurPosition, KineticBridge, KineticBridgeSettings, decay_weight, project, stop_gate, hold_release, drop, fill_reservoir, advect, \
+                        decay_weight, direction, advect, \
                         VelocityTrailBridge, VelocityTrailBridgeSettings, velocity_trail, \
                         VelocityEventBridge, VelocityEventBridgeSettings, MotionEvent, velocity_event, step_peak, moving_mean, start_region_share, stop_region_share, event_velocity, \
                         TemperatureBridge, TemperatureBridgeSettings

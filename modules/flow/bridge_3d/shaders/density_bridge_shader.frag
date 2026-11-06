@@ -2,7 +2,7 @@
 
 // Density Bridge Shader
 // Ported from ofxFlowTools ftDensityBridgeShader.h
-// Combines RGB density with an amount (the speed, or the kinetic bridge's emission) as alpha
+// Combines RGB density with an amount (the trail's speed) as alpha
 
 uniform sampler2D tex0;  // Density RGB input
 uniform sampler2D tex1;  // Amount R

@@ -25,7 +25,7 @@ uniform float lod;              // A fall: mip level of a region
 in vec2 texCoord;
 out vec4 fragColor;
 
-const float EPSILON = 1e-4;     // EPSILON in kinetics: below this a speed is no motion
+const float EPSILON = 1e-4;     // EPSILON in trails: below this a speed is no motion
 
 void main() {
     vec3 fast = texture(tex0, texCoord).xyz;

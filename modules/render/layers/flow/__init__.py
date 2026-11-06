@@ -5,7 +5,7 @@ from .fluid_layer import        Injection, FluidInput, FluidOutput, FluidLayer, 
 from .motion_2d_layer import    Motion2DLayer, Motion2DLayerSettings
 from .motion_3d_layer import    Motion3DLayer, Motion3DLayerSettings
 from .bridge_2d_layer import    Bridge2DLayer, Bridge2DLayerSettings
-from .bridge_3d_layer import    Bridge3DLayer, Bridge3DLayerSettings, BridgeMethod
+from .bridge_3d_layer import    Bridge3DLayer, Bridge3DLayerSettings
 from .fluid_2d_layer import     Fluid2DLayer, Fluid2DLayerSettings
 from .fluid_3d_layer import     Fluid3DLayer, Fluid3DLayerSettings
 from .monitor_layer import      MonitorLayer, MonitorLayerSettings, MonitorInput, MonitorView, FlowStage, Channel

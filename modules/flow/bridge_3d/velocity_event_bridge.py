@@ -50,8 +50,8 @@ from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil, Port, TextureKind
 from ..shaders import Trail
-from .kinetics import EPSILON, decay_weight, direction
-from .shaders import MotionEvent, KineticOnset, KineticPatch, VelocityEvent, VelocityEventRegion, VelocityEventRegionMean
+from .trails import EPSILON, decay_weight, direction
+from .shaders import MotionEvent, VelocityEvent, VelocityEventDirection, VelocityEventRegion, VelocityEventRegionMean, VelocityEventRegionSpeed
 
 logger = logging.getLogger(__name__)
 
@@ -122,9 +122,9 @@ class VelocityEventBridge(FlowBase):
         self._trail_shader: Trail = Trail()
         self._moving_shader: VelocityEventRegion = VelocityEventRegion()
         self._moving_mean_shader: VelocityEventRegionMean = VelocityEventRegionMean()
-        self._region_speed_shader: KineticPatch = KineticPatch()   # the trails' speeds, whose mips are a region's means
+        self._region_speed_shader: VelocityEventRegionSpeed = VelocityEventRegionSpeed()
         self._event_shader: VelocityEvent = VelocityEvent()
-        self._direction_shader: KineticOnset = KineticOnset()     # unit of a trail times an amount
+        self._direction_shader: VelocityEventDirection = VelocityEventDirection()
 
     @property
     def velocity_input(self) -> Texture:
@@ -284,7 +284,7 @@ class VelocityEventBridge(FlowBase):
 
             velocity: Fbo = self._velocities[event]
             velocity.begin()
-            self._direction_shader.use(self.fast if rise else self.slow, amount, 1.0)
+            self._direction_shader.use(self.fast if rise else self.slow, amount)
             velocity.end()
 
     @staticmethod
@@ -340,7 +340,7 @@ def stop_region_share(fast: np.ndarray, slow: np.ndarray, region_weight: float) 
 
 
 def event_velocity(trail: np.ndarray, event: np.ndarray) -> np.ndarray:
-    """The event (...) along the trail's direction (..., 3). Mirrors kinetic_onset.frag at strength 1."""
+    """The event (...) along the trail's direction (..., 3). Mirrors velocity_event_direction.frag."""
     length: np.ndarray = np.linalg.norm(trail, axis=-1, keepdims=True)
     unit: np.ndarray = np.divide(trail, length, out=np.zeros_like(trail), where=length > EPSILON)
     return unit * np.maximum(0.0, event)[..., None]

@@ -12,7 +12,7 @@ uniform sampler2D tex0;     // The flow's velocity RGB
 in vec2 texCoord;
 out vec4 fragColor;
 
-const float EPSILON = 1e-4;     // EPSILON in kinetics: below this a speed is no motion
+const float EPSILON = 1e-4;     // EPSILON in trails: below this a speed is no motion
 
 void main() {
     vec3 velocity = texture(tex0, texCoord).xyz;

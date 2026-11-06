@@ -333,8 +333,8 @@ class DeepFlowRender(RenderBase):
             injections: list[ls.Injection] = []
             for j, bridge in bridges.items():
                 output: ls.BridgeOutput = bridge.output
-                injections.append(ls.Injection(output.velocity, output.density, output.temperature, output.onset, output.spin,
-                                               self._weight(pose, i, j)))
+                injections.append(ls.Injection(output.velocity, output.density, output.temperature, output.onset,
+                                               weight=self._weight(pose, i, j)))
             fluid.set_input(ls.FluidInput(dt, injections))
             fluid.set_eye(*self._eye(i, pose, dt))
 

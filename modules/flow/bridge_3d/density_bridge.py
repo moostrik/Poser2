@@ -1,7 +1,6 @@
 """Density Bridge.
 
-Combines RGB density with an amount, its alpha, for fluid simulation: the speed on the trail
-bridge, the emission on the kinetic bridge.
+Combines RGB density with an amount, its alpha, for fluid simulation: the trail's speed.
 
 Ported from ofxFlowTools ftDensityBridgeFlow.h
 """

@@ -1,7 +1,7 @@
 #version 460 core
 
-// Kinetic Patch Shader
-// The speeds of the two trails, whose mip levels are the mean speed of a patch
+// Velocity Event Region Speed Shader
+// The speeds of the two trails, whose mip levels are a region's mean speeds: what a fall reads
 
 uniform sampler2D tex0;  // Fast trail RGB
 uniform sampler2D tex1;  // Slow trail RGB

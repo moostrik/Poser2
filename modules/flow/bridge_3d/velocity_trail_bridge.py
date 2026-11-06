@@ -21,8 +21,8 @@ from modules.gl import SwapFbo, Texture
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil, TextureKind
 from ..shaders import GaussianBlur
-from .kinetics import decay_weight
-from .shaders import KineticAdvect, VelocityTrail
+from .trails import decay_weight
+from .shaders import TrailAdvect, VelocityTrail
 
 
 class VelocityTrailBridgeSettings(BaseSettings):
@@ -59,7 +59,7 @@ class VelocityTrailBridge(FlowBase):
         self.settings: VelocityTrailBridgeSettings = settings or VelocityTrailBridgeSettings()
 
         # Shaders
-        self._advect_shader: KineticAdvect = KineticAdvect()
+        self._advect_shader: TrailAdvect = TrailAdvect()
         self._trail_shader: VelocityTrail = VelocityTrail()
         self._blur_shader: GaussianBlur = GaussianBlur()
 
