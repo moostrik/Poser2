@@ -13,4 +13,5 @@ from .cube_slices import CubeSlices
 from .cube_edges import CubeEdges
 from .glyph_arrows import GlyphArrows
 from .glyph_dots import GlyphDots
+from .volume_fog import VolumeFogShader
 from .histogram_count_volume import HistogramCountVolume

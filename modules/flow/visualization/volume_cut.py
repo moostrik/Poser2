@@ -14,9 +14,10 @@ from .shaders import VolumeCutShader
 
 
 class Cut(IntEnum):
-    """How a volume is laid out: in 3D as stacked layers (`VolumeCube`), or flat, one layer or the
-    projection seen from the front, the top or the side."""
+    """How a volume is laid out: in 3D as stacked layers (`VolumeCube`) or as a continuous fog
+    (`VolumeFog`), or flat, one layer or the projection seen from the front, the top or the side."""
     CUBE = 0
+    FOG = auto()
     SLICE = auto()
     FRONT = auto()
     TOP = auto()
@@ -25,7 +26,7 @@ class Cut(IntEnum):
     @property
     def flat(self) -> bool:
         """Whether it draws the volume into a 2D texture."""
-        return self != Cut.CUBE
+        return self not in (Cut.CUBE, Cut.FOG)
 
 
 def cut_size(cut: Cut, width: int, height: int, extent: float) -> tuple[int, int]:
@@ -66,7 +67,7 @@ class VolumeCut:
 
     def process(self, volume: Texture3D, cut: Cut, position: float, kind: TextureKind, extent: float) -> Texture:
         """Draw the flat cut of `volume` at `position` (0 front, 1 back, for a slice); returns its texture."""
-        assert cut.flat, "the cube is VolumeCube's"
+        assert cut.flat, "the cube and the fog are VolumeCube's and VolumeFog's"
         size: tuple[int, int] = cut_size(cut, volume.width, volume.height, extent)
         if not self._fbo.allocated or (self._fbo.width, self._fbo.height) != size:
             self._fbo.deallocate()

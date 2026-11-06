@@ -462,6 +462,60 @@ def step_4(results: Results) -> None:
     check_3d_glyphs(results)
 
 
+# ── step 5: the fog ───────────────────────────────────────────────────────
+
+def fog_monitor(values: np.ndarray, kind: TextureKind, view: MonitorView, extent: float = 0.5) -> Monitor:
+    monitor = Monitor(Port(volume_of(values), kind, extent), view)
+    monitor.settings.advanced.cut = Cut.FOG
+    monitor.settings.advanced.legend = False
+    return monitor
+
+
+def check_fog(results: Results) -> None:
+    d, h, w = 8, 48, 64
+    layered = np.zeros((d, h, w, 4), np.float32)
+    layered[:2, ..., 0] = 1.0                    # the front red
+    layered[-2:, ..., 2] = 1.0                   # the back blue
+    monitor = fog_monitor(layered, TextureKind.IMAGE, MonitorView.IMAGE)
+    for yaw_drag, name in ((0.0, 'front'), (-1.0, 'back')):
+        monitor.layer.reset_view()
+        monitor.layer.drag(yaw_drag, 0.0, MouseButton.LEFT)
+        monitor.tick(PANEL)
+        pixels = monitor.picture()
+        red, blue = (float(pixels[PANEL[1] // 2, PANEL[0] // 2, c]) for c in (0, 2))
+        results.check(f'the fog from the {name} shows its near side over its far side', (red > blue) == (name == 'front'),
+                      f'red {red:.0f}, blue {blue:.0f}')
+        results.save(f'5_fog_layers_{name}', pixels)
+
+    empty = fog_monitor(np.zeros((d, h, w, 4), np.float32), TextureKind.SCALAR, MonitorView.COLORMAP)
+    empty.tick(PANEL)
+    middle = empty.picture()[PANEL[1] // 2, PANEL[0] // 2]
+    results.check('an empty volume draws no fog, only the edges', int(middle[3]) == 0, f'alpha {middle[3]}')
+
+    sphere = known_volume(w, h, d)
+    sphere[..., 0] = sphere[..., 1]
+    fog = fog_monitor(sphere, TextureKind.SCALAR, MonitorView.COLORMAP)
+    fog.settings.advanced.channel = Channel.X
+    fog.layer.drag(0.15, 0.1, MouseButton.LEFT)
+    fog.tick(PANEL)
+    pixels = fog.picture()
+    alpha = pixels[..., 3].astype(np.float32)
+    ys, xs = np.nonzero(alpha > 0.3 * alpha.max())
+    centered = len(xs) > 0 and abs(float(xs.mean()) - PANEL[0] / 2) < PANEL[0] * 0.1 and abs(float(ys.mean()) - PANEL[1] / 2) < PANEL[1] * 0.1
+    results.check("a sphere's fog is densest at the box's middle", centered, f'{len(xs)} pixels')
+    results.save('5_fog_sphere', pixels)
+
+    big = fog_monitor(known_volume(448, 800, 16), TextureKind.SCALAR, MonitorView.COLORMAP, 0.14)
+    big.tick(PANEL)
+    ms = gpu_ms(lambda: big.tick(PANEL), 10)
+    print(f'     the fog    {ms:6.2f} ms of a 448 x 800 x 16 volume at {PANEL[0]} x {PANEL[1]}')
+
+
+def step_5(results: Results) -> None:
+    print('step 5: the fog')
+    check_fog(results)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--no-png', action='store_true', help='skip the pictures')
@@ -472,6 +526,7 @@ def main() -> int:
     step_1b(results)
     step_3(results)
     step_4(results)
+    step_5(results)
     glFinish()
     glfw.destroy_window(window)
     glfw.terminate()
