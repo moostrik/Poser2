@@ -31,7 +31,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 942,
+        "iso": 955,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -563,7 +563,7 @@
     },
     "monitor_a": {
       "stage": "BRIDGE",
-      "texture": "event.bow_velocity",
+      "texture": "output.velocity",
       "view": "AUTO",
       "advanced": {
         "channel": "ALL",
@@ -576,7 +576,7 @@
     },
     "monitor_b": {
       "stage": "BRIDGE",
-      "texture": "event.wake_velocity",
+      "texture": "event.start_velocity",
       "view": "GLYPHS",
       "advanced": {
         "channel": "ALL",

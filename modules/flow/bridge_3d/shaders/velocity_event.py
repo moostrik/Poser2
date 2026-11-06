@@ -31,7 +31,7 @@ class MotionEvent(IntEnum):
 class VelocityEvent(Shader):
     """Writes max(event * its region's share or the rest, previous * decay) to the red channel."""
 
-    def use(self, fast: Texture, slow: Texture, previous: Texture, event: MotionEvent, decay: float,
+    def use(self, fast: Texture, slow: Texture, previous: Texture, event: MotionEvent, scale: float, decay: float,
             region_fast: Texture, region_slow: Texture, region_weight: float, lod: float) -> None:
         """Hold one event.
 
@@ -40,6 +40,7 @@ class VelocityEvent(Shader):
             slow: RGB slow trail
             previous: Previous held event
             event: START, BOW, STOP or WAKE
+            scale: 1 / the trails' step peak, so a sudden start or stop of speed v reads v; 0 = no events
             decay: What remains of the held event this update
             region_fast: A rise: the region's mean moving velocity, fast trail (RGB, a texel per region); a fall:
                 the region speeds, fast in R and slow in G, with mipmaps
@@ -61,6 +62,7 @@ class VelocityEvent(Shader):
             glUniform1i(self.get_uniform_loc(f"tex{unit}"), unit)
         glUniform1f(self.get_uniform_loc("sign"), event.sign)
         glUniform1f(self.get_uniform_loc("edge"), 1.0 if event.edge else 0.0)
+        glUniform1f(self.get_uniform_loc("scale"), scale)
         glUniform1f(self.get_uniform_loc("decay"), decay)
         glUniform1f(self.get_uniform_loc("region_weight"), region_weight)
         glUniform1f(self.get_uniform_loc("lod"), lod)

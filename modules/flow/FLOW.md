@@ -199,7 +199,11 @@ body is part of the look **(site fact)**.
 ### The events
 
 The difference of the fast and the slow trail along the motion's direction rises where a move
-starts and falls where it stops; it lasts about `slow_smooth`, as the slow trail catches up. A
+starts and falls where it stops; it lasts about `slow_smooth`, as the slow trail catches up. It is
+divided by the trails' step peak (`step_peak`, 0.58 at 25 and 150 ms), so a limb at speed v that
+starts or stops at once reads v: the events are in the motion's own strength, image widths per
+second, and a gradual start or stop reads less, by how much of its speed changes within the
+trails' times. A
 pixel cannot tell a move starting from a limb arriving at it, nor a move stopping from a limb
 leaving it: its speed rises or falls either way. The region around it can, so the region splits
 each pixel's rise and fall in two, by the region weight (`start_region_weight`,
@@ -247,7 +251,8 @@ still part's p99 per pixel; stop ÷ fast is the stop window's peak over steady f
 | start, region weight 0                              | 0.104 | 0.12        | 1.46         |                   |      |
 | start, region weight 0, x/y only                    | 0.001 | 0.05        | 1.89         |                   |      |
 
-The stop rows hold 0.1 s. Ring is the share 4–24 px outside the mask, in steady fast motion for the
+The event rows are measured before the step peak scaling; the ratios hold, the event's level is
+1 / 0.58 = 1.72 times higher now. The stop rows hold 0.1 s. Ring is the share 4–24 px outside the mask, in steady fast motion for the
 trail and in the stop windows for the events; x/y only is z left out of the events. Without
 its region, a start rises along the front of every moving limb, 0.125 in steady fast motion against
 0.18 at real starts. The start's region reading over moving pixels and the bow and wake are not

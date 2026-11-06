@@ -2,7 +2,8 @@
 
 // Velocity Event Shader
 // One event of the motion, peak-held: fast - slow along the motion's direction, its rise (sign +1) or
-// its fall (sign -1). Its region splits it in two by the region weight (0 = all of it is the region's):
+// its fall (sign -1), over the two trails' step peak (`scale`), so a limb at speed v that starts or stops
+// at once reads v. Its region splits it in two by the region weight (0 = all of it is the region's):
 // the share its region changes the same way is the start or the stop, the rest (`edge` 1) the bow or the
 // wake, a limb arriving at or leaving a pixel, which changes that pixel and not its region.
 // A rise reads the region's mean velocity over its moving pixels, smoothed per region by the fast and
@@ -18,6 +19,7 @@ uniform sampler2D tex3;         // A rise: the region's mean moving velocity, fa
 uniform sampler2D tex4;         // A rise: the region's mean moving velocity, slow trail RGB; a fall: unread
 uniform float sign;             // +1 start or bow, -1 stop or wake
 uniform float edge;             // 0 the region's share (start, stop), 1 the rest (bow, wake)
+uniform float scale;            // 1 / the trails' step peak; 0 = no events
 uniform float decay;            // What remains of the held event this update
 uniform float region_weight;    // 0 = every pixel's event counts, 1 = as far as its region changes the same way
 uniform float lod;              // A fall: mip level of a region
@@ -37,7 +39,7 @@ void main() {
     float slow_length = length(slow);
     vec3 unit = fast_length > EPSILON ? fast / fast_length : slow_length > EPSILON ? slow / slow_length : vec3(0.0);
 
-    float event = max(0.0, sign * dot(fast - slow, unit));
+    float event = max(0.0, sign * dot(fast - slow, unit)) * scale;
     float share = 1.0;
     if (region_weight > 0.0) {
         float change;

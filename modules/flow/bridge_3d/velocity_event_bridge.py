@@ -2,7 +2,10 @@
 
 Next to the velocity trail, which is the motion's push, this reads the motion's events: where a move
 starts and where it stops. Two short trails on the flow's velocity, fast and slow, unit-gain Emas; their
-difference along the motion's direction rises where a move starts and falls where it stops.
+difference along the motion's direction rises where a move starts and falls where it stops. The
+difference is divided by its step peak (`step_peak`): a limb at speed v that starts or stops at once
+reads v, so the events are in the motion's own strength, image widths per second; a gradual start or
+stop reads less, by how much of the speed changes within the trails' times.
 
 A pixel cannot tell a move starting from a limb arriving at it, nor a move stopping from a limb leaving
 it: its speed rises or falls either way. The region around it (`start_region_size`, `stop_region_size`)
@@ -37,6 +40,7 @@ Out come, in image widths per second like the flow:
 Steps every tick on its dt, as the other bridges do.
 """
 
+import logging
 import math
 
 import numpy as np
@@ -49,7 +53,21 @@ from ..shaders import Trail
 from .kinetics import EPSILON, decay_weight, direction
 from .shaders import MotionEvent, KineticOnset, KineticPatch, VelocityEvent, VelocityEventRegion, VelocityEventRegionMean
 
+logger = logging.getLogger(__name__)
+
 START_FLOOR: float = 0.01   # widths/s: a pixel slower than this does not move, a region slower has no speedup; START_FLOOR in velocity_event.frag
+
+
+def step_peak(fast_smooth: float, slow_smooth: float) -> float:
+    """The largest difference of a slow and a fast Ema (time constants in s) after a unit step: where
+    the slow one still holds what the fast one let go. 1 with an instant fast trail, 0 when the slow
+    trail is not slower. Continuous, as `decay_weight` is."""
+    if slow_smooth <= fast_smooth:
+        return 0.0
+    if fast_smooth <= 0.0:
+        return 1.0
+    t: float = fast_smooth * slow_smooth / (slow_smooth - fast_smooth) * math.log(slow_smooth / fast_smooth)
+    return math.exp(-t / slow_smooth) - math.exp(-t / fast_smooth)
 
 
 class VelocityEventBridgeSettings(BaseSettings):
@@ -105,6 +123,7 @@ class VelocityEventBridge(FlowBase):
         self._held: dict[MotionEvent, SwapFbo] = {event: SwapFbo() for event in MotionEvent}
         self._velocities: dict[MotionEvent, Fbo] = {event: Fbo() for event in MotionEvent}
         self._size: tuple[int, int] = (0, 0)
+        self._warned_peak: bool = False     # slow_smooth not slower than fast_smooth was logged
 
         self._trail_shader: Trail = Trail()
         self._moving_shader: VelocityEventRegion = VelocityEventRegion()
@@ -251,6 +270,14 @@ class VelocityEventBridge(FlowBase):
             self._region_speed_fbo.end()
             self._mipmap(self._region_speed_fbo)
 
+        peak: float = step_peak(s.fast_smooth, s.slow_smooth)
+        if peak <= 0.0 and not self._warned_peak:
+            self._warned_peak = True
+            logger.warning("VelocityEventBridge: slow_smooth (%.3f s) is not slower than fast_smooth (%.3f s), so there are no events",
+                           s.slow_smooth, s.fast_smooth)
+        self._warned_peak = self._warned_peak and peak <= 0.0
+        scale: float = 1.0 / peak if peak > 0.0 else 0.0
+
         holds: dict[MotionEvent, float] = {MotionEvent.START: s.start_hold, MotionEvent.BOW: s.bow_hold,
                                            MotionEvent.STOP: s.stop_hold, MotionEvent.WAKE: s.wake_hold}
         for event in MotionEvent:
@@ -261,7 +288,7 @@ class VelocityEventBridge(FlowBase):
             held: SwapFbo = self._held[event]
             held.swap()
             held.begin()
-            self._event_shader.use(self.fast, self.slow, held.back, event, decay_weight(delta_time, holds[event] * 1000.0),
+            self._event_shader.use(self.fast, self.slow, held.back, event, scale, decay_weight(delta_time, holds[event] * 1000.0),
                                    region_fast, region_slow, region_weight, stop_lod)
             held.end()
 
@@ -288,13 +315,13 @@ class VelocityEventBridge(FlowBase):
 # ── numpy reference ─────────────────────────────────────────────────────
 
 def velocity_event(fast: np.ndarray, slow: np.ndarray, held: np.ndarray, sign: float, decay: float,
-                   share: np.ndarray | float = 1.0, edge: bool = False) -> np.ndarray:
-    """One held event (..., ) from the trails (..., 3): max(sign * (fast - slow) along the motion, 0) times the share
-    its region shares (a start or a stop), or with `edge` times the rest (a bow or a wake); or what remains of the
-    last one when that is more. Mirrors velocity_event.frag."""
+                   share: np.ndarray | float = 1.0, edge: bool = False, scale: float = 1.0) -> np.ndarray:
+    """One held event (..., ) from the trails (..., 3): max(sign * (fast - slow) along the motion, 0) times `scale`
+    (1 / `step_peak`), times the share its region shares (a start or a stop), or with `edge` times the rest (a bow
+    or a wake); or what remains of the last one when that is more. Mirrors velocity_event.frag."""
     unit: np.ndarray = direction(fast, slow)
     part: np.ndarray | float = 1.0 - share if edge else share
-    event: np.ndarray = np.maximum(0.0, sign * np.sum((fast - slow) * unit, axis=-1)) * part
+    event: np.ndarray = np.maximum(0.0, sign * np.sum((fast - slow) * unit, axis=-1)) * scale * part
     return np.maximum(event, held * decay)
 
 
