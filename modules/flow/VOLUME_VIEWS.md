@@ -57,16 +57,17 @@ A temporary plan, deleted when its last step is in; what it builds is then state
   | `IMAGE`    | the picture                | stacked slices, each drawn as the picture                    |
   | `COLORMAP` | colormap on mid grey       | stacked slices, each drawn as the colormap                   |
   | `GLYPHS`   | arrows, or dots for a scalar | 3D arrows, or 3D dots for a scalar, on a coarse grid       |
-  | `FOG`      | (none)                     | the scalar ray-marched as a colormap fog                     |
   | `STRIP`    | mean per channel over time | the same over the whole volume: its front mean projection, the volume's mean |
   | `HISTOGRAM`| counts of the samples      | counts of a 3D grid of samples, 64 × 64 × the layers         |
 
-  `GLYPHS` replaces `ARROWS`, renamed in the step that builds it. A volume in any picture view
-  can instead be drawn flat, with one more choice, `cut`:
+  `GLYPHS` replaces `ARROWS`, renamed in the step that builds it. `view` says how values get
+  their colors; how a volume is laid out in space is one more choice, `cut`, which every picture
+  view takes:
 
   | `cut`   | Means                                                                     |
   |---------|---------------------------------------------------------------------------|
-  | `CUBE`  | the 3D view (default for a volume)                                        |
+  | `CUBE`  | the 3D view, the volume as stacked slices (default for a volume)          |
+  | `FOG`   | the same cube drawn continuously, a ray through the box per pixel: with `IMAGE` the density's own colors as a cloud, close to the show's composite, with `COLORMAP` the signed values as a cloud; `GLYPHS` take it as `CUBE` |
   | `SLICE` | the volume at the slice position, its nearest layer                       |
   | `FRONT`, `TOP`, `SIDE` | the projection along z, y or x: the max for an image port, the mean for a velocity or a scalar, whose signs would cancel in a max; drawn in the box's proportions (the top is width × z extent, the side z extent × height), so the depth looks as deep as it is, as in the cube |
 
@@ -161,9 +162,10 @@ Each step ends with its tests and a commit; the user runs the app.
      pointing at the camera would be a dot, and z, the depth movement, is what the cube is for);
      a dot as a point sprite (`GL_PROGRAM_POINT_SIZE`); both drawn with the depth test. New:
      instanced drawing and the arrow mesh in `modules/gl` or beside the shader.
-5. **Fog.**
-   - `volume_fog.frag`: a ray through the box per pixel, the colormap's color and the value's
-     size as opacity, from the camera's inverse matrix; at the size the monitor is drawn at.
+5. **The fog cut.**
+   - `volume_fog.frag`: a ray through the box per pixel from the camera's inverse matrix, each
+     sample colored as the view colors it (the image's color, or the colormap's) and its amount as
+     opacity; at the size the monitor is drawn at. `cut` gains `FOG`.
 6. **Close.** `FLOW.md`'s monitor section states the views as built, its Open item goes, and
    this file is deleted.
 
