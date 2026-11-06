@@ -31,7 +31,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 955,
+        "iso": 1093,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -427,7 +427,7 @@
         "edge": 0.1,
         "window": "SEVEN",
         "tolerance": 0.2,
-        "smooth": 50.0,
+        "smooth": 100.0,
         "xy_smooth": true,
         "catch_up": 8.0,
         "dead_zone": 0.02,
@@ -437,59 +437,43 @@
     "bridge": {
       "width": 448,
       "height": 800,
-      "method": "VELOCITY_TRAIL",
       "trail": {
         "advect": 1.0,
-        "attack": 0.001,
-        "smooth": 1.0,
+        "attack": 1.0,
+        "smooth": 1000.0,
         "blur_radius": 4.0,
         "blur_steps": 4
       },
-      "event": {
-        "fast_smooth": 0.03,
-        "slow_smooth": 0.25,
-        "start_hold": 0.0,
-        "bow_hold": 0.0,
-        "stop_hold": 0.0,
-        "wake_hold": 0.0,
+      "impulse": {
+        "fast_smooth": 30.0,
+        "slow_smooth": 250.0,
         "start_region_weight": 1.0,
         "stop_region_weight": 1.0,
         "start_region_size": 128.0,
-        "stop_region_size": 128.0
+        "stop_region_size": 256.0
       },
-      "kinetic": {
-        "scale_x": 1.0,
-        "scale_y": 1.0,
-        "scale_z": 1.0,
-        "trails": {
-          "fast_smooth": 25.0,
-          "slow_smooth": 150.0,
-          "advect": 0.0,
-          "blur_position": "BEFORE",
-          "blur_radius": 2.0,
-          "blur_steps": 2
-        },
-        "release": {
-          "stop_gate": 0.0,
-          "stop_tile": 128.0,
-          "hold": 0.0,
-          "emission_gain": 20.0,
-          "drop_velocity": 1.0
-        },
-        "onset": {
-          "force": 0.5,
-          "spin": 0.0
-        },
-        "reservoir": {
-          "enabled": false,
-          "leak": 4.0
-        }
+      "velocity": {
+        "trail": 1.0,
+        "start": 0.0,
+        "bow": 0.0,
+        "stop": 0.0,
+        "wake": 0.0
       },
       "density": {
+        "trail": 1.0,
+        "start": 0.0,
+        "bow": 0.0,
+        "stop": 0.0,
+        "wake": 0.0,
         "saturation": 1.0,
         "brightness": 1.0
       },
       "temperature": {
+        "trail": 1.0,
+        "start": 0.0,
+        "bow": 0.0,
+        "stop": 0.0,
+        "wake": 0.0,
         "scale": 0.5
       }
     },
@@ -576,7 +560,7 @@
     },
     "monitor_b": {
       "stage": "BRIDGE",
-      "texture": "event.start_velocity",
+      "texture": "impulse.start_velocity",
       "view": "GLYPHS",
       "advanced": {
         "channel": "ALL",

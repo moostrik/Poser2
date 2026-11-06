@@ -158,7 +158,7 @@ context of its own, would move the wait to the bridge, and the screen still show
 | `FluidLayer` (ABC)                          | `StageLayer[FluidInput, FluidOutput]`; `_update()`: `_inject` each injection's velocity, density and temperature at its weight, `_step(dt)`; `texture`, the show. Knows injections, not cameras; reads no poses. The stage's reset is the fluid's only one |
 | `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's. `Fluid3DLayer` injects RGBA density, the impulse (added as the velocity is) and a spin where one is given, the velocity's z as the volume's w (its sign turned: w points away from the viewer), and takes the parallax eye the app steers by `set_eye(x, y)` |
 | `MonitorLayer`                              | `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's port names (`names`, the options of `texture`); `draw()` renders the port once per tick, however many panels show it, by its kind or by `view`, and nothing while not shown; its views and settings are in [The monitor](#the-monitor). Not a stage, since it has no output and no `reset` |
-| `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass, each a `StageLayerSettings`: `reset`, then `width` and `height`, the stage's working size, first on every stage's panel. The motion's is the size its flow runs at, the bridge's the size it writes its outputs at (its filters follow the velocity's size), the fluid's its simulation grid (its density is at the size the app allocates). On the fluid layer `blend_mode`. A layer whose stage runs one component is that component's settings too (`Motion2DLayerSettings` is a `GradientFlowSettings`, `Motion3DLayerSettings` a `LucasKanadeFlow3DSettings`, the fluid layers' a `Fluid2DSettings` and a `Fluid3DSettings`), so the component's fields and groups sit on the stage's panel; the bridge layers, running several bridges, hold each as a group (`trail`, `impulse`, `impulse_mix`, `density_mix`, `temperature_mix`, `density`, `temperature`). No `draw_mode`, `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take `dt` from their input |
+| `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass, each a `StageLayerSettings`: `reset`, then `width` and `height`, the stage's working size, first on every stage's panel. The motion's is the size its flow runs at, the bridge's the size it writes its outputs at (its filters follow the velocity's size), the fluid's its simulation grid (its density is at the size the app allocates). On the fluid layer `blend_mode`. A layer whose stage runs one component is that component's settings too (`Motion2DLayerSettings` is a `GradientFlowSettings`, `Motion3DLayerSettings` a `LucasKanadeFlow3DSettings`, the fluid layers' a `Fluid2DSettings` and a `Fluid3DSettings`), so the component's fields and groups sit on the stage's panel; the bridge layers, running several bridges, hold each as a group (`trail`, `impulse`, then the outputs with their mix, `velocity`, `density`, `temperature`). No `draw_mode`, `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take `dt` from their input |
 
 The apps' render is a layer graph of `LayerBase` layers updated by one loop calling `update()`
 on each (`apps/deep_flow/render.py`, `apps/hd_trio/render.py`), with a wiring pass before it
@@ -241,20 +241,24 @@ impulse bridge runs while the mix takes an impulse or a monitor shows one of its
 ### The mix
 
 What the fluid takes is a mix of the two bridges, each source at a share, 0 to 1, as the light
-renderer mixes its layers (`Bridge3DLayer`, `WeightedSum`):
+renderer mixes its layers (`Bridge3DLayer`, `WeightedSum`). Each output's panel group holds its
+five shares as knobs on the first row (`MixSettings`: `trail`, `start`, `bow`, `stop`, `wake`),
+and the density's and the temperature's own settings on the second (`DensityMixSettings`,
+`TemperatureMixSettings`):
 
-| Output        | Sources                                              | Panel group       | Default        |
-|---------------|------------------------------------------------------|-------------------|----------------|
-| `velocity`    | the trail                                            |                   |                |
-| `impulse`     | the start, bow, stop and wake velocities             | `impulse_mix`     | all 0: `None`  |
-| `density`     | the trail's speed, the start, bow, stop and wake      | `density_mix`     | the trail 1    |
-| `temperature` | the same, as the temperature's mask                  | `temperature_mix` | the trail 1    |
+| Output        | Sources                                           | Second row             | Panel group   | Default       |
+|---------------|---------------------------------------------------|------------------------|---------------|---------------|
+| `velocity`    | the trail                                         |                        | `velocity`    | the trail 1   |
+| `impulse`     | the start, bow, stop and wake velocities          |                        | `velocity`    | all 0: `None` |
+| `density`     | the trail's speed, the start, bow, stop and wake  | saturation, brightness | `density`     | the trail 1   |
+| `temperature` | the same, as the temperature's mask               | scale                  | `temperature` | the trail 1   |
 
 The sources share one unit, image widths per second, so the mix has no gain: the motion's gains
 balance the axes and the fluid's gains set the strength; a weight is a share. The trail and the
-impulse stay two velocities, since a fluid may take a velocity and a velocity change two ways
-([Open](#open)); the 3D fluid adds both as the velocity is added today. The density's and the
-temperature's amounts are the mix's ports (`mix.density`, `mix.temperature`, `mix.impulse`).
+impulse are mixed in one group and stay two velocity outputs, since a fluid may take a velocity
+and a velocity change two ways ([Open](#open)); the 3D fluid adds both as the velocity is added
+today, so mixing them in one group is mixing them in the fluid. The mix's ports are
+`mix.velocity`, `mix.impulse`, `mix.density` and `mix.temperature`.
 
 ### Measured
 
@@ -263,7 +267,7 @@ from rest, with starts and stops, a player at 0.65–1.5 m), its frames as captu
 (`temp/depth_track_1105/`, 1449 frames, 25 fps, the stamps the replay's decode times), the flow run
 again on them with deep_flow's preset flow of 2026-11-06 (levels 4, same_surface and xy_smooth on,
 the depth velocity's `smooth` 50 ms unless named), each bridge at its preset values (trail: smooth
-1 s, attack 0.001 s, advect 1, blur 4 px × 4; impulse: 0.025 / 0.15 s, both region weights 1,
+1000 ms, attack 1 ms, advect 1, blur 4 px × 4; impulse: 25 / 150 ms, both region weights 1,
 regions 128 px), stepped once per flow frame. Per frame, the mean over the body's pixels that move
 in the loop; noise is the still part's p99 per pixel; slow and fast are the steady halves of the
 moves; stop ÷ fast is the stop window's peak over steady fast motion, start ÷ fast the start

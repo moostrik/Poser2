@@ -176,10 +176,10 @@ class VelocityImpulseTest(unittest.TestCase):
             np.testing.assert_allclose(velocity_impulse(moving, moving, sign), [0.0])
 
     def test_the_step_peak(self) -> None:
-        self.assertEqual(step_peak(0.0, 0.15), 1.0)
-        self.assertAlmostEqual(step_peak(0.025, 0.15), 0.582, places=3)
-        self.assertEqual(step_peak(0.15, 0.15), 0.0)
-        self.assertEqual(step_peak(0.2, 0.15), 0.0)
+        self.assertEqual(step_peak(0.0, 150.0), 1.0)
+        self.assertAlmostEqual(step_peak(25.0, 150.0), 0.582, places=3)
+        self.assertEqual(step_peak(150.0, 150.0), 0.0)
+        self.assertEqual(step_peak(200.0, 150.0), 0.0)
 
     def test_a_sudden_stop_at_speed_v_reads_v(self) -> None:
         # The two trails stepped at 240 Hz through a stop from 0.4 widths/s to rest; the scaled fall's peak is the speed
@@ -188,7 +188,7 @@ class VelocityImpulseTest(unittest.TestCase):
         fast_weight, slow_weight = decay_weight(dt, 25.0), decay_weight(dt, 150.0)
         for _ in range(240):
             fast, slow = fast_weight * fast, slow_weight * slow
-            peak = max(peak, float(velocity_impulse(fast, slow, -1.0, scale=1.0 / step_peak(0.025, 0.15))[0]))
+            peak = max(peak, float(velocity_impulse(fast, slow, -1.0, scale=1.0 / step_peak(25.0, 150.0))[0]))
         self.assertAlmostEqual(peak, 0.4, delta=0.01)
 
     def test_the_region_scales_a_stop(self) -> None:

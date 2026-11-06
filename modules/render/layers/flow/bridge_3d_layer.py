@@ -18,47 +18,45 @@ from modules.settings import BaseSettings, Field, Group, Widget
 from .bridge_layer import BridgeLayer, BridgeLayerSettings, BridgeInput, BridgeOutput
 
 
-class ImpulseMixSettings(BaseSettings):
-    """What the fluid's impulse is made of: each impulse's velocity at its share, 0 to 1."""
+class MixSettings(BaseSettings):
+    """What an output is made of: the trail and each impulse at its share, 0 to 1, as knobs on the first row."""
+    trail = Field(1.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the trail")
     start = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the start: a part of the body speeding up")
     bow = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the bow: a limb arriving")
     stop = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the stop: a part of the body slowing down")
     wake = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the wake: a limb leaving")
 
 
-class AmountMixSettings(BaseSettings):
-    """What an amount is made of: the trail's speed and each impulse at its share, 0 to 1."""
-    trail = Field(1.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the trail's speed")
-    start = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the start")
-    bow = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the bow")
-    stop = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the stop")
-    wake = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the wake")
+class DensityMixSettings(DensityBridgeSettings, MixSettings):
+    """The density: its amount's mix, the trail's speed and the impulses, then its color."""
+
+
+class TemperatureMixSettings(TemperatureBridgeSettings, MixSettings):
+    """The temperature: its mask's mix, the trail's speed and the impulses, then its scale."""
 
 
 IMPULSES: tuple[tuple[str, Impulse], ...] = (('start', Impulse.START), ('bow', Impulse.BOW), ('stop', Impulse.STOP), ('wake', Impulse.WAKE))
 
 
 class Bridge3DLayerSettings(BridgeLayerSettings):
-    """Configuration for Bridge3DLayer: each bridge's group, and the mix of what the fluid takes."""
-    trail           = Group(VelocityTrailBridgeSettings)
-    impulse         = Group(VelocityImpulseBridgeSettings)
-    impulse_mix     = Group(ImpulseMixSettings)
-    density_mix     = Group(AmountMixSettings)
-    temperature_mix = Group(AmountMixSettings)
-    density         = Group(DensityBridgeSettings)
-    temperature     = Group(TemperatureBridgeSettings)
+    """Configuration for Bridge3DLayer: each bridge's group, then each output's, with its mix."""
+    trail       = Group(VelocityTrailBridgeSettings)
+    impulse     = Group(VelocityImpulseBridgeSettings)
+    velocity    = Group(MixSettings)
+    density     = Group(DensityMixSettings)
+    temperature = Group(TemperatureMixSettings)
 
 
 class Bridge3DLayer(BridgeLayer):
     """The 3D bridge layer. The velocity trail and, beside it, the velocity impulse bridge read the motion;
-    the mix makes what the fluid takes from them, each source at a share, 0 to 1, as the light renderer
-    mixes its layers. The sources share one unit, image widths per second, so the mix has no gain: the
-    motion's gains balance the axes and the fluid's set the strength.
-        velocity      the trail
-        impulse       the start, bow, stop and wake velocities (`impulse_mix`); None while all are 0
-        density       its amount, the trail's speed and the four impulses (`density_mix`), colored by the
-                      density bridge with the density's color
-        temperature   its mask, the same sources (`temperature_mix`)
+    each output's group mixes what the fluid takes from them, each source at a share, 0 to 1, as the light
+    renderer mixes its layers. The sources share one unit, image widths per second, so the mix has no gain:
+    the motion's gains balance the axes and the fluid's set the strength.
+        velocity      the trail at its share, and the impulse: the start, bow, stop and wake velocities
+                      at theirs, None while all are 0 (`velocity`)
+        density       its amount, the trail's speed and the four impulses, colored by the density bridge
+                      with the density's color (`density`)
+        temperature   its mask, the same sources (`temperature`)
     The defaults are the trail alone. The trail and the impulse stay two velocities, as a fluid may take
     them two ways (FLOW.md's Open).
 
@@ -73,6 +71,7 @@ class Bridge3DLayer(BridgeLayer):
         self._impulse_shown: bool = False       # a monitor read one of its ports since the last update
         self._impulse_running: bool = False     # it ran the tick before
         self._velocity_magnitude: VelocityMagnitude = VelocityMagnitude()
+        self._velocity_mix: Fbo = Fbo()         # the fluid's velocity, the trail at its share, xyz
         self._impulse_mix: Fbo = Fbo()          # the fluid's impulse, xyz
         self._density_amount: Fbo = Fbo()       # the density's amount
         self._temperature_amount: Fbo = Fbo()   # the temperature's mask
@@ -84,12 +83,13 @@ class Bridge3DLayer(BridgeLayer):
     @property
     def output(self) -> BridgeOutput:
         impulse: Texture | None = self._impulse_mix if self._impulse_mixed() else None
-        return BridgeOutput(self._trail_bridge.smooth_velocity, self._density_bridge.density,
+        return BridgeOutput(self._velocity_mix, self._density_bridge.density,
                             self._temperature_bridge.temperature, impulse)
 
     def _bridges(self) -> dict[str, HasPorts]:
         """The trail, the impulse bridge, the speed, the mix, then the density and the temperature."""
-        mix: Ports = Ports({'impulse': Port(self._impulse_mix, TextureKind.VELOCITY),
+        mix: Ports = Ports({'velocity': Port(self._velocity_mix, TextureKind.VELOCITY),
+                            'impulse': Port(self._impulse_mix, TextureKind.VELOCITY),
                             'density': Port(self._density_amount, TextureKind.SCALAR),
                             'temperature': Port(self._temperature_amount, TextureKind.SCALAR)})
         return {'trail': self._trail_bridge, 'impulse': self._impulse_ports(), 'speed': self._velocity_magnitude,
@@ -105,12 +105,12 @@ class Bridge3DLayer(BridgeLayer):
 
     def _impulse_mixed(self) -> bool:
         """Whether the fluid's impulse has a share above 0."""
-        mix: ImpulseMixSettings = self.settings.impulse_mix
+        mix: MixSettings = self.settings.velocity
         return any(getattr(mix, name) > 0.0 for name, _ in IMPULSES)
 
     def _impulses_used(self) -> bool:
         """Whether any output takes an impulse."""
-        amounts: tuple[AmountMixSettings, ...] = (self.settings.density_mix, self.settings.temperature_mix)
+        amounts: tuple[MixSettings, ...] = (self.settings.density, self.settings.temperature)
         return self._impulse_mixed() or any(getattr(mix, name) > 0.0 for mix in amounts for name, _ in IMPULSES)
 
     # ========== Lifecycle ==========
@@ -128,6 +128,7 @@ class Bridge3DLayer(BridgeLayer):
         self._trail_bridge.allocate(width, height, output_width, output_height)
         self._impulse_bridge.allocate(width, height)
         self._velocity_magnitude.allocate(width, height)
+        self._velocity_mix.allocate(width, height, GL_RGBA16F)
         self._impulse_mix.allocate(width, height, GL_RGBA16F)
         self._density_amount.allocate(width, height, GL_R32F)
         self._temperature_amount.allocate(width, height, GL_R32F)
@@ -138,6 +139,7 @@ class Bridge3DLayer(BridgeLayer):
         self._trail_bridge.deallocate()
         self._impulse_bridge.deallocate()
         self._velocity_magnitude.deallocate()
+        self._velocity_mix.deallocate()
         self._impulse_mix.deallocate()
         self._density_amount.deallocate()
         self._temperature_amount.deallocate()
@@ -162,11 +164,12 @@ class Bridge3DLayer(BridgeLayer):
         self._velocity_magnitude.update()
 
         bridge: VelocityImpulseBridge = self._impulse_bridge
+        velocity: MixSettings = self.settings.velocity
+        self._mix(self._velocity_mix, [(self._trail_bridge.smooth_velocity, velocity.trail)])
         if self._impulse_mixed():
-            mix: ImpulseMixSettings = self.settings.impulse_mix
-            self._mix(self._impulse_mix, [(bridge.impulse_velocity(impulse), getattr(mix, name)) for name, impulse in IMPULSES])
-        for amount, mix_settings in ((self._density_amount, self.settings.density_mix),
-                                     (self._temperature_amount, self.settings.temperature_mix)):
+            self._mix(self._impulse_mix, [(bridge.impulse_velocity(impulse), getattr(velocity, name)) for name, impulse in IMPULSES])
+        for amount, mix_settings in ((self._density_amount, self.settings.density),
+                                     (self._temperature_amount, self.settings.temperature)):
             self._mix(amount, [(self._velocity_magnitude.magnitude, mix_settings.trail),
                                *[(bridge.impulse(impulse), getattr(mix_settings, name)) for name, impulse in IMPULSES]])
 

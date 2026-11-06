@@ -15,7 +15,7 @@ from ..shaders.hsv import HSV
 
 class DensityBridgeSettings(BaseSettings):
     """Configuration for density bridge."""
-    saturation = Field(1.2, min=0.0, max=5.0, description="Color saturation boost")
+    saturation = Field(1.2, min=0.0, max=5.0, newline=True, description="Color saturation boost")
     brightness = Field(1.0, min=0.0, max=2.0, description="Brightness/value adjustment")
 
 

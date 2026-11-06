@@ -438,48 +438,18 @@
     "bridge": {
       "width": 448,
       "height": 800,
-      "method": "VELOCITY_TRAIL",
       "trail": {
         "advect": 1.0,
-        "attack": 0.001,
-        "smooth": 1.0,
+        "attack": 1.0,
+        "smooth": 1000.0,
         "blur_radius": 4.0,
         "blur_steps": 4
       },
-      "event": {
-        "fast_smooth": 0.025,
-        "slow_smooth": 0.15,
-        "stop_hold": 0.1,
+      "impulse": {
+        "fast_smooth": 25.0,
+        "slow_smooth": 150.0,
         "stop_region_weight": 1.0,
         "stop_region_size": 128.0
-      },
-      "kinetic": {
-        "scale_x": 1.0,
-        "scale_y": 1.0,
-        "scale_z": 1.0,
-        "trails": {
-          "fast_smooth": 25.0,
-          "slow_smooth": 150.0,
-          "advect": 0.0,
-          "blur_position": "BEFORE",
-          "blur_radius": 2.0,
-          "blur_steps": 2
-        },
-        "release": {
-          "stop_gate": 0.0,
-          "stop_tile": 128.0,
-          "hold": 100.0,
-          "emission_gain": 1.0,
-          "drop_velocity": 1.0
-        },
-        "onset": {
-          "force": 0.5,
-          "spin": 0.0
-        },
-        "reservoir": {
-          "enabled": false,
-          "leak": 4.0
-        }
       },
       "density": {
         "saturation": 1.0,

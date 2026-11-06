@@ -71,8 +71,8 @@ def step_peak(fast_smooth: float, slow_smooth: float) -> float:
 
 class VelocityImpulseBridgeSettings(BaseSettings):
     """Configuration for the velocity impulse bridge: its two trails and the start and stop regions."""
-    fast_smooth = Field(0.025, min=0.0, max=0.5, step=0.005, description="Fast trail smoothing time, s; 0 = the flow itself")
-    slow_smooth = Field(0.15, min=0.0, max=1.0, step=0.005, description="Slow trail smoothing time, s: what a change is read against")
+    fast_smooth = Field(25.0, min=0.0, max=500.0, step=1.0, description="Fast trail smoothing time, ms; 0 = the flow itself")
+    slow_smooth = Field(150.0, min=0.0, max=1000.0, step=1.0, description="Slow trail smoothing time, ms: what a change is read against")
     start_region_weight = Field(1.0, min=0.0, max=1.0, step=0.05, newline=True, description="How much the region around a start must speed up too, the rest the bow; 0 = all start")
     stop_region_weight = Field(1.0, min=0.0, max=1.0, step=0.05, description="How much the region around a stop must slow down too, the rest the wake; 0 = all stop")
     start_region_size = Field(128.0, min=8.0, max=1024.0, step=8.0, newline=True, description="Size of the region around a start, pixels of the bridge")
@@ -239,8 +239,8 @@ class VelocityImpulseBridge(FlowBase):
         if not self._allocated:
             return
         s: VelocityImpulseBridgeSettings = self.settings
-        fast_weight: float = decay_weight(delta_time, s.fast_smooth * 1000.0)
-        slow_weight: float = decay_weight(delta_time, s.slow_smooth * 1000.0)
+        fast_weight: float = decay_weight(delta_time, s.fast_smooth)
+        slow_weight: float = decay_weight(delta_time, s.slow_smooth)
 
         self._advance_trail(self._fast_fbo, self._input, fast_weight)
         self._advance_trail(self._slow_fbo, self._input, slow_weight)
@@ -268,7 +268,7 @@ class VelocityImpulseBridge(FlowBase):
         peak: float = step_peak(s.fast_smooth, s.slow_smooth)
         if peak <= 0.0 and not self._warned_peak:
             self._warned_peak = True
-            logger.warning("VelocityImpulseBridge: slow_smooth (%.3f s) is not slower than fast_smooth (%.3f s), so there are no impulses",
+            logger.warning("VelocityImpulseBridge: slow_smooth (%.0f ms) is not slower than fast_smooth (%.0f ms), so there are no impulses",
                            s.slow_smooth, s.fast_smooth)
         self._warned_peak = self._warned_peak and peak <= 0.0
         scale: float = 1.0 / peak if peak > 0.0 else 0.0

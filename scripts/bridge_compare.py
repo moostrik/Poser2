@@ -132,7 +132,7 @@ class Side:
         mean = np.where(count > 0, blocks.sum(axis=(1, 3)) / np.maximum(count, 1), 0.0)
         if self._region_fast is None or self._region_fast.shape != mean.shape:
             self._region_fast, self._region_slow = np.zeros_like(mean), np.zeros_like(mean)
-        fast_weight, slow_weight = decay_weight(delta_time, s.fast_smooth * 1000.0), decay_weight(delta_time, s.slow_smooth * 1000.0)
+        fast_weight, slow_weight = decay_weight(delta_time, s.fast_smooth), decay_weight(delta_time, s.slow_smooth)
         self._region_fast = fast_weight * self._region_fast + (1.0 - fast_weight) * mean
         self._region_slow = slow_weight * self._region_slow + (1.0 - slow_weight) * mean
         share = np.clip((self._region_slow - self._region_fast) / np.maximum(self._region_slow, EPSILON), 0.0, 1.0)
