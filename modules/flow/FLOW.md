@@ -541,6 +541,17 @@ box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU
 
 - For the fluid refactor: the 3D fluid's `input_x` and `input_y` go, as the motion's `x_gain` and
   `y_gain` balance the axes.
+- For the fluid refactor: a burst of false velocity slows the 3D fluid to 2 to 4 fps. With
+  `WARM_UP_TIME` 0, the exposure ramp at startup reads as x/y motion; with the fluid updated the
+  frame rate drops to 2 to 4 fps, without it it stays up **(site fact)**. Nothing in the fluid
+  loops by the velocity, so the cost is in its reads: the advection traces each texel back by
+  velocity × dt, noise points neighbouring texels apart, and the density's advection over 2160 ×
+  3840 × 16 RGBA16F, about 1 GB, then misses the texture cache on every read **(deduction, not
+  measured)**. Ordinary motion moves neighbours alike and reads together. `dampen_threshold`
+  (5 widths per second over `dampen_time`, 0.5 s) is too slow to stop it. The fix: measure the
+  step's GPU time on a still velocity and on a burst, then cap the trace at a few cells per step
+  in the advection, which bounds the scatter whatever comes in and which real motion stays under
+  at 60 fps. Until then the motion's 5 s warm-up keeps the startup burst out.
 - `scripts/depth_velocity_capture.py` ran deep_flow at about 4 fps on 2026-11-06 (257 frames over
   60 s, gaps to 0.46 s), against 25 fps the day before with the same work per frame: the app, not
   the capture, is slower **(deduction)**; a profiler run would show where.
