@@ -18,7 +18,7 @@ class Gradient3D(ComputeShader):
 
     def use(self, velocity: Texture3D, pressure: Texture3D, obstacle: Texture3D,
             result_out: Texture3D,
-            grid_scale: float, aspect: float,
+            cell: float,
             has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True)) -> None:
         """Subtract pressure gradient: v_new = v_old - grad(p).
 
@@ -27,8 +27,7 @@ class Gradient3D(ComputeShader):
             pressure: 3D pressure field (R16F)
             obstacle: 3D obstacle mask (R8)
             result_out: Output corrected velocity (RGBA16F)
-            grid_scale: Grid scaling factor
-            aspect: Width/height ratio
+            cell: The cubic cell's size in widths
             has_obstacles: Whether obstacle logic is active
             closed: Per axis, whether the domain's walls are closed (solid) or open
         """
@@ -43,9 +42,8 @@ class Gradient3D(ComputeShader):
 
         self.bind_image_3d_write(0, result_out, GL_RGBA16F)
 
-        dx = grid_scale
-        dy = grid_scale * aspect
-        dz = grid_scale                   # cubic cells
+        dx = cell                         # cubic cells, in widths
+        dy = dz = cell
         glUniform3f(self.get_uniform_loc("uHalfRdxInv"), 0.5 / dx, 0.5 / dy, 0.5 / dz)
         glUniform3i(self.get_uniform_loc("uSize"),
                     result_out.width, result_out.height, result_out.depth)

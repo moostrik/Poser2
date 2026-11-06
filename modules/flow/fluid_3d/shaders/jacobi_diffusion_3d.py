@@ -27,7 +27,7 @@ class JacobiDiffusion3D(ComputeShader):
 
     def use(self, velocity_in: Texture3D, velocity_out: Texture3D,
             obstacle: Texture3D,
-            grid_scale: float, aspect: float,
+            cell: float,
             viscosity_dt: float,
             iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH,
             has_obstacles: bool = True) -> None:
@@ -37,8 +37,7 @@ class JacobiDiffusion3D(ComputeShader):
             velocity_in: Input velocity volume (RGBA16F)
             velocity_out: Output velocity volume (RGBA16F)
             obstacle: 3D obstacle mask (R8)
-            grid_scale: Grid scaling factor
-            aspect: Width/height ratio
+            cell: The cubic cell's size in widths
             viscosity_dt: Viscosity * delta_time
             iterations: Iterations per dispatch
             has_obstacles: Whether obstacle logic is active
@@ -46,9 +45,8 @@ class JacobiDiffusion3D(ComputeShader):
         if not self.allocated or not self.shader_program:
             return
 
-        dx = grid_scale
-        dy = grid_scale * aspect
-        dz = grid_scale                   # cubic cells
+        dx = cell                         # cubic cells, in widths
+        dy = dz = cell
 
         alpha_x = 1.0 / (dx * dx)
         alpha_y = 1.0 / (dy * dy)
@@ -75,7 +73,7 @@ class JacobiDiffusion3D(ComputeShader):
 
     def solve(self, velocity_a: Texture3D, velocity_b: Texture3D,
               obstacle: Texture3D,
-              grid_scale: float, aspect: float,
+              cell: float,
               viscosity_dt: float,
               total_iterations: int = 20,
               iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH,
@@ -94,7 +92,7 @@ class JacobiDiffusion3D(ComputeShader):
             iters = min(iterations_per_dispatch,
                         total_iterations - i * iterations_per_dispatch)
             self.use(src, dst, obstacle,
-                     grid_scale, aspect, viscosity_dt, iters,
+                     cell, viscosity_dt, iters,
                      has_obstacles)
             src, dst = dst, src
 

@@ -36,7 +36,7 @@ class Advect3D(ComputeShader):
             result_write: Destination to write to (front buffer)
             velocity: 3D velocity field
             obstacle: 3D obstacle mask
-            aspect: Width/height ratio
+            aspect: Width over height: a width of y crosses this share of the uv
             z_extent: Slab thickness in sim-width units (uRdx.z = 1/z_extent)
             timestep: dt * speed
             dissipation: Decay multiplier
@@ -59,7 +59,7 @@ class Advect3D(ComputeShader):
 
         # Uniforms
         glUniform1f(self.get_uniform_loc("uTimestep"), timestep)
-        rdx_y = 1.0 / aspect if aspect > 0.0 else 1.0
+        rdx_y = aspect          # a width per second of y crosses width / height of the uv
         rdx_z = 1.0 / z_extent if z_extent > 0.0 else 1.0
         glUniform3f(self.get_uniform_loc("uRdx"), 1.0, rdx_y, rdx_z)
         glUniform1f(self.get_uniform_loc("uDissipation"), dissipation)

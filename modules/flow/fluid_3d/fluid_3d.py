@@ -32,7 +32,7 @@ slab at `volume.injection_layer`.
 import math
 
 import numpy as np
-from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_R16F, GL_R8, GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
+from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_R16F, GL_R32F, GL_R8, GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
 
 from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
@@ -130,7 +130,7 @@ class Fluid3D:
         self._output_height: int = 0
         self._depth: int = 0              # layers, every field's
         self._aspect: float = 1.0
-        self._grid_scale: float = 1.0     # the simulation's cell in output texels
+        self._cell: float = 1.0           # the cubic cell's size in widths: 1 / the grid's width
 
         self._dt: float = REFERENCE_STEP
         self._time_step: TimeStep = TimeStep()
@@ -254,9 +254,13 @@ class Fluid3D:
         self._simulation_width = self._align32(self.settings.width)
         self._simulation_height = self._align32(self.settings.height)
         self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
-        self._grid_scale = self._simulation_width / self._output_width if self._output_width > 0 else 1.0
+        self._cell = 1.0 / max(1, self._simulation_width)
         self._depth = self.settings.volume.layers
         self._z_extent = self._depth / max(1, self._simulation_width)
+
+    def _spread(self) -> float:
+        """The injection's gaussian sigma as a share of the slab's depth, from `injection_spread` in widths."""
+        return max(self.settings.volume.injection_spread / max(self._z_extent, 1e-6), 0.001)
 
     @property
     def _carrier(self) -> DensityCarrier:
@@ -280,7 +284,7 @@ class Fluid3D:
         # Primary simulation fields
         self._velocity.allocate(sim_w, sim_h, d, GL_RGBA16F)
         self._temperature.allocate(sim_w, sim_h, d, GL_R16F)
-        self._pressure.allocate(sim_w, sim_h, d, GL_R16F)
+        self._pressure.allocate(sim_w, sim_h, d, GL_R32F)     # a cell in widths makes it small, past half floats
         self._obstacle.allocate(sim_w, sim_h, d, GL_R8)
         if self._has_obstacles:
             self._inject_binary_shader.use(self._obstacle_source, self._obstacle, mode=1)
@@ -416,14 +420,14 @@ class Fluid3D:
         if self.settings.velocity.viscosity <= 0.0:
             return
 
-        viscosity_dt = self.settings.velocity.viscosity * (self._grid_scale ** 2) * self._dt
+        viscosity_dt = self.settings.velocity.viscosity * self._dt       # widths² per second × s
         iterations = viscosity_iterations(self.settings.velocity.viscosity_iter, self._dt)
 
         result = self._jacobi_diffusion_shader.solve(
             self._velocity,
             self._velocity.back,
             self._obstacle,
-            self._grid_scale, self._aspect,
+            self._cell,
             viscosity_dt,
             total_iterations=iterations,
             iterations_per_dispatch=5,
@@ -438,15 +442,15 @@ class Fluid3D:
         if self.settings.velocity.vorticity <= 0.0 or self.settings.velocity.vorticity_radius <= 0.0:
             return
 
-        vorticity_radius = self.settings.velocity.vorticity_radius * self._grid_scale
-        vorticity_force = self.settings.velocity.vorticity * self._dt
+        vorticity_radius = self.settings.velocity.vorticity_radius        # cells
+        vorticity_force = self.settings.velocity.vorticity * self._cell * self._dt     # epsilon h (N x omega), Fedkiw 2001
 
         # a. Compute curl
         self._vorticity_curl_shader.use(
             self._velocity,
             self._obstacle,
             self._curl_vol,
-            self._grid_scale, self._aspect,
+            self._cell,
             vorticity_radius,
             has_obstacles=self._has_obstacles
         )
@@ -457,7 +461,7 @@ class Fluid3D:
             self._curl_vol,
             self._obstacle,
             self._vorticity_force_vol,
-            self._grid_scale, self._aspect,
+            self._cell,
             vorticity_force,
             has_obstacles=self._has_obstacles,
         )
@@ -487,8 +491,8 @@ class Fluid3D:
         if temp.buoyancy == 0.0 and temp.sink == 0.0:
             return
 
-        sigma = self._dt * self._grid_scale * temp.buoyancy
-        kappa = self._dt * self._grid_scale * temp.sink
+        sigma = self._dt * temp.buoyancy
+        kappa = self._dt * temp.sink
         gravity = (temp.gravity_x, temp.gravity_y, temp.gravity_z)
 
         weight: Texture3D | None = self._carrier.weight
@@ -516,7 +520,7 @@ class Fluid3D:
             self._velocity,
             self._obstacle,
             self._divergence_vol,
-            self._grid_scale, self._aspect,
+            self._cell,
             has_obstacles=self._has_obstacles, closed=closed
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
@@ -529,7 +533,7 @@ class Fluid3D:
             self._pressure.back,
             self._divergence_vol,
             self._obstacle,
-            self._grid_scale, self._aspect,
+            self._cell,
             total_iterations=iterations,
             iterations_per_dispatch=5,
             has_obstacles=self._has_obstacles, closed=closed
@@ -545,7 +549,7 @@ class Fluid3D:
             self._pressure,
             self._obstacle,
             self._velocity,
-            self._grid_scale, self._aspect,
+            self._cell,
             has_obstacles=self._has_obstacles, closed=closed
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
@@ -657,7 +661,7 @@ class Fluid3D:
         self._boundary_velocity_shader.use(
             texture, self._velocity,
             self.settings.volume.injection_layer,
-            self.settings.volume.injection_spread,
+            self._spread(),
             boundary.gain, drag_share(self._dt, boundary.drag_time), weight, DRAG_FLOOR,
         )
         glMemoryBarrier(_BARRIER_IMAGE)
@@ -670,7 +674,7 @@ class Fluid3D:
         self._body_force_acceleration_shader.use(
             texture, self._velocity,
             self.settings.volume.injection_layer,
-            self.settings.volume.injection_spread,
+            self._spread(),
             weight * self.settings.body_force.gain * self._dt,
         )
         glMemoryBarrier(_BARRIER_IMAGE)
@@ -689,7 +693,7 @@ class Fluid3D:
         if not self._allocated:
             return
         volume = self.settings.volume
-        self._carrier.add(texture, gain, self._dt, volume.injection_layer, volume.injection_spread)
+        self._carrier.add(texture, gain, self._dt, volume.injection_layer, self._spread())
 
     def add_boundary_temperature(self, texture: Texture, weight: float = 1.0) -> None:
         """The boundary's temperature (widths/s, signed by the color) × temperature.boundary_gain × dt into the slab."""
@@ -706,7 +710,7 @@ class Fluid3D:
         self._inject_shader.use(
             texture, volume,
             self.settings.volume.injection_layer,
-            self.settings.volume.injection_spread,
+            self._spread(),
             gain * self._dt,
             internal_format=internal_format
         )

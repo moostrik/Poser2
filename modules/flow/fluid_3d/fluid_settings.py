@@ -67,9 +67,9 @@ class VelocitySettings(BaseSettings):
     fade_time: Field[float]         = Field(60.0,   min=0.1,    max=60.0,   color="deep-blue",      description="Seconds until velocity fades to ~1%; 60 = water keeps its momentum")
     dampen_threshold: Field[float]  = Field(50.0,   min=0.1,    max=50.0,   color="cyan",           description="Speed above which velocity is dampened (widths/s); a guard far above any body")
     dampen_time: Field[float]       = Field(2.0,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")
-    vorticity: Field[float]         = Field(0.64,   min=0.0,    max=60.0,   color="purple",         description="Vortex confinement strength (adds turbulence)")
-    vorticity_radius: Field[float]  = Field(3.0,    min=1.0,    max=30.0,   color="deep-purple",    description="Curl sampling radius in texels")
-    viscosity: Field[float]         = Field(0.0,    min=0.0,    max=100.0,  color="indigo",         description="Fluid thickness/resistance to flow; 0 = water at this scale")
+    vorticity: Field[float]         = Field(0.3,    min=0.0,    max=5.0,    color="purple",         description="Vortex confinement's epsilon, its force epsilon × cell × (N × curl) (Fedkiw 2001)")
+    vorticity_radius: Field[float]  = Field(1.0,    min=1.0,    max=8.0,    color="deep-purple",    description="Curl sampling radius in cells; 1 = the neighbors")
+    viscosity: Field[float]         = Field(0.0,    min=0.0,    max=0.01,   step=0.0001, color="indigo", description="Kinematic viscosity (widths² per second); 0 = water at this scale")
     viscosity_iter: Field[int]      = Field(20,     min=1,      max=60,     color="orange",         description="Viscosity solver iterations at 60 fps; fewer at a higher rate, never more")
 
 
@@ -89,8 +89,8 @@ class TemperatureSettings(BaseSettings):
     boundary_gain: Field[float]     = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The boundary's temperature times this is added × dt, signed by the color")
     body_force_gain: Field[float]   = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's temperature times this is added × dt, signed by the color")
     fade_time: Field[float]         = Field(3.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until temperature fades to ~1%")
-    buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Thermal buoyancy coefficient: hot (fresh) density rises against gravity")
-    sink: Field[float]              = Field(0.0,    min=0.0,    max=20.0,   color="red",            description="Weight of the density: it sinks along gravity; 0 = as heavy as the water")
+    buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Lift per unit of temperature above ambient (widths/s²) against gravity; 0 = none")
+    sink: Field[float]              = Field(0.0,    min=0.0,    max=20.0,   color="red",            description="Weight per unit of density (widths/s²) along gravity; 0 = as heavy as the water")
     gravity_x: Field[float]         = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction X")
     gravity_y: Field[float]         = Field(1.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction Y; 1 = down the screen")
     gravity_z: Field[float]         = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction Z; 1 = away from viewer")
@@ -108,7 +108,7 @@ class VolumeSettings(BaseSettings):
     """The volume: the grid's z layers, where the body sits in it, and the composite's look."""
     layers: Field[int]              = Field(64,   min=1,    max=128,    description="z layers; the cells are cubic, so the slab is layers / width deep")
     injection_layer: Field[float]   = Field(0.5,  min=0.0,  max=1.0,    description="Normalized depth of the injection's center, where the body sits")
-    injection_spread: Field[float]  = Field(0.1,  min=0.001, max=0.5,   description="Gaussian sigma of the injection's depth spread")
+    injection_spread: Field[float]  = Field(0.024, min=0.001, max=0.2,  step=0.001, description="Gaussian sigma of the injection's depth (widths); 0.024 keeps 3 sigma inside the 0.14 slab")
     emission: Field[float]          = Field(1.0,  min=0.0,  max=8.0,    color="amber",          description="Brightness gain per unit density")
     absorption: Field[float]        = Field(4.0,  min=0.01, max=50.0,   color="deep-orange",    description="Occlusion: extinction per unit density (near density covers far density)")
     glow: Field[float]              = Field(0.25, min=0.0,  max=1.0,    color="yellow",         description="Additive glow mix: 1 = additive (depth invisible)")

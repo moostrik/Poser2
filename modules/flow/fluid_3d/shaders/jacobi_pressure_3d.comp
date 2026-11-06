@@ -24,8 +24,8 @@ layout(binding = 0) uniform sampler3D uDivergence;  // Velocity divergence (R16F
 layout(binding = 1) uniform sampler3D uObstacle;     // Obstacle mask (R8)
 
 // Pressure images (read/write)
-layout(r16f, binding = 0) uniform image3D uPressureIn;
-layout(r16f, binding = 1) uniform image3D uPressureOut;
+layout(r32f, binding = 0) uniform image3D uPressureIn;
+layout(r32f, binding = 1) uniform image3D uPressureOut;
 
 // Parameters
 uniform vec3  uAlpha;       // (1/dx², 1/dy², 1/dz²) — Laplacian weights

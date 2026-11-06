@@ -26,7 +26,7 @@ class ParticleAdvect(ComputeShader):
         particles.bind_base(0)
         self.bind_texture_3d(0, velocity, "uVelocity")
         glUniform1f(self.get_uniform_loc("uTimestep"), timestep)
-        glUniform3f(self.get_uniform_loc("uRdx"), 1.0, 1.0 / aspect if aspect > 0.0 else 1.0,
+        glUniform3f(self.get_uniform_loc("uRdx"), 1.0, aspect,
                     1.0 / z_extent if z_extent > 0.0 else 1.0)
         glUniform1f(self.get_uniform_loc("uDt"), dt)
         glUniform1f(self.get_uniform_loc("uDissipation"), dissipation)

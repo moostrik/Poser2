@@ -137,7 +137,8 @@ class ParticleDensity(DensityCarrier):
         """The mass a texel of amount 1 gives each of its particles at the boundary's density gain: a blob of
         this mass has `radius`, so the gain changes how much ink there is, not how big a drop is."""
         volume = self.settings.volume
-        return (slab_sum(volume.injection_layer, volume.injection_spread, self._layers) * self.settings.density.boundary_gain
+        spread: float = max(volume.injection_spread / max(self._z_extent, 1e-6), 0.001)     # widths, as a share of the slab
+        return (slab_sum(volume.injection_layer, spread, self._layers) * self.settings.density.boundary_gain
                 / max(self.settings.particles.rate, 1e-6))
 
     def add(self, texture: Texture, gain: float, dt: float, layer: float, spread: float) -> None:

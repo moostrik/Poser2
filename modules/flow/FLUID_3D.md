@@ -44,7 +44,7 @@ The step's GPU time, measured in a hidden window on a swirl at the preset's pass
 path, with the z lerp across coarse layers and the scattered reads of a big volume.
 
 What the layer injects before the step (`Fluid3DLayer._inject`), each at the injection's `weight`,
-into the gaussian slab at `injection_layer` 0.54, `injection_spread` 0.1:
+into the gaussian slab at `injection_layer` 0.5, `injection_spread` 0.024 widths:
 
 | Input                          | The fluid                                                            | Shader                       |
 |--------------------------------|----------------------------------------------------------------------|------------------------------|
@@ -275,21 +275,34 @@ scale), `pressure.iterations` 40 (GPU Gems' 40 to 80 for a Jacobi solve), the de
 60 s and `evaporation` 0, `temperature.sink` 0 and `ambient` 0 (the density as heavy as the water,
 no buoyancy), gravity down the screen, every wall closed; the dampen a guard at 50 widths/s; the
 bridge's mix the boundary's trail alone and its lowpass's `smooth` its default 160 ms, since the
-coast is the fluid's now. Kept as tuned: the composite's look (`emission`, `absorption`, `glow`,
-`tint`, `fog`) and the confinement (`vorticity` 0.64, `vorticity_radius` 3), whose units are open
-([Open](#open-the-confinements-units)).
+coast is the fluid's now; the confinement Fedkiw's ε 0.3 over the neighbors (`vorticity_radius` 1);
+in z, `injection_layer` 0.5 and `injection_spread` 0.024 widths, three sigma inside the 0.14-width
+slab, since the slab is thinner than a body (about 0.3 widths at the camera's crop, from its
+`view_span` of 0.76 m, **(deduction)**). Kept as tuned: the composite's look (`emission`,
+`absorption`, `glow`, `tint`, `fog`).
 
-Measured with these on standmoves through the harness: the water 0.91 of the body's speed in the
-fast halves, its peak 0.75 of the body's, the step 12.5 ms with the harness (mean; p95 15.4).
+Measured with these on standmoves through the harness: the water 0.89 of the body's speed in the
+fast halves, its peak 0.76 of the body's, the step 11.5 ms with the harness (mean; p95 12.8).
 
-## Open: the confinement's units
+### One unit
 
-The confinement's force is ε × dt × (N × ω) with ω from differences over `vorticity_radius` × the
-grid's cell in output pixels (`_grid_scale`, 448 / 2160), so its strength and its reach follow the
-output's allocation, not the grid: at 2160 wide about 4.8 times the textbook's ε h (N × ω) (Fedkiw
-2001, h the cell), and a radius of 3 reads over 0.6 of a cell **(deduction, from the code)**. The fix
-is one unit, the cell in widths, through the curl and the force; the preset's 0.64 then changes
-meaning, so it waits for his word.
+Every length in the fluid is in image widths, the motion's and the bridge's unit, and every time in
+seconds: the cell h = 1 / the grid's width (the cells are cubic). The solvers' differences are over h
+(the divergence, the gradient, the pressure's and the viscosity's Jacobi solves, the curl); the
+confinement's force is ε × h × (N × ω) (Fedkiw 2001) with the curl over `vorticity_radius` cells;
+the buoyancy is an acceleration, widths/s² per unit of density or temperature; the viscosity a
+kinematic viscosity in widths²/s; `injection_spread` a thickness in widths. The advection moves a
+texel by v × dt in uv as (1, width / height, 1 / slab depth) × v, x, y and z each a width per width.
+The pressure is 32-bit: in these units it is small, past the half float's precision.
+
+The output's allocation is not in it. Before, the cell was the grid's width over the output's (448 /
+2160), so the confinement, the buoyancy and the viscosity followed the output's size, and y moved
+(height / width)², 3.2 times, too far. Measured in a hidden window:
+
+| Check                                                      | Before          | After          |
+|------------------------------------------------------------|-----------------|----------------|
+| 0.02 widths/s along y for 1 s: the density moved           | 0.064 widths    | 0.020          |
+| a swirl with confinement, the same at a 1080 and a 2160 wide output: the largest velocity difference | 0.50 widths/s | 0.000 |
 
 ## Tuning
 

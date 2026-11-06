@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import math
 
-from OpenGL.GL import GL_R16F, GL_READ_ONLY, GL_WRITE_ONLY, glUniform1f, glUniform1i, glUniform3f, glUniform3i, glUseProgram
+from OpenGL.GL import GL_R32F, GL_READ_ONLY, GL_WRITE_ONLY, glUniform1f, glUniform1i, glUniform3f, glUniform3i, glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
 
@@ -27,7 +27,7 @@ class JacobiPressure3D(ComputeShader):
 
     def use(self, pressure_in: Texture3D, pressure_out: Texture3D,
             divergence: Texture3D, obstacle: Texture3D,
-            grid_scale: float, aspect: float,
+            cell: float,
             iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH,
             has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True)) -> None:
         """Run multiple 3D Jacobi pressure iterations.
@@ -37,17 +37,15 @@ class JacobiPressure3D(ComputeShader):
             pressure_out: Output pressure volume (R16F) — write via image
             divergence: Velocity divergence volume (R16F) — read via sampler
             obstacle: 3D obstacle mask (R8) — read via sampler
-            grid_scale: Grid scaling factor
-            aspect: Width/height ratio
+            cell: The cubic cell's size in widths
             iterations: Number of iterations per dispatch
             has_obstacles: Whether obstacle logic is active
         """
         if not self.allocated or not self.shader_program:
             return
 
-        dx = grid_scale
-        dy = grid_scale * aspect
-        dz = grid_scale                   # cubic cells
+        dx = cell                         # cubic cells, in widths
+        dy = dz = cell
 
         alpha_x = 1.0 / (dx * dx)
         alpha_y = 1.0 / (dy * dy)
@@ -61,8 +59,8 @@ class JacobiPressure3D(ComputeShader):
         self.bind_texture_3d(1, obstacle, "uObstacle")
 
         # Images
-        self.bind_image_3d(0, pressure_in, GL_READ_ONLY, GL_R16F)
-        self.bind_image_3d(1, pressure_out, GL_WRITE_ONLY, GL_R16F)
+        self.bind_image_3d(0, pressure_in, GL_READ_ONLY, GL_R32F)
+        self.bind_image_3d(1, pressure_out, GL_WRITE_ONLY, GL_R32F)
 
         # Uniforms
         glUniform3f(self.get_uniform_loc("uAlpha"), alpha_x, alpha_y, alpha_z)
@@ -77,7 +75,7 @@ class JacobiPressure3D(ComputeShader):
 
     def solve(self, pressure_a: Texture3D, pressure_b: Texture3D,
               divergence: Texture3D, obstacle: Texture3D,
-              grid_scale: float, aspect: float,
+              cell: float,
               total_iterations: int = 40,
               iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH,
               has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True)) -> Texture3D:
@@ -87,7 +85,7 @@ class JacobiPressure3D(ComputeShader):
             pressure_a, pressure_b: Ping-pong pressure buffers
             divergence: Velocity divergence volume
             obstacle: 3D obstacle mask
-            grid_scale, aspect: Grid parameters
+            cell: The cubic cell's size in widths
             total_iterations: Total Jacobi iterations
             iterations_per_dispatch: Iterations per compute dispatch
             has_obstacles: Whether obstacle logic is active
@@ -104,7 +102,7 @@ class JacobiPressure3D(ComputeShader):
             iters = min(iterations_per_dispatch,
                         total_iterations - i * iterations_per_dispatch)
             self.use(src, dst, divergence, obstacle,
-                     grid_scale, aspect, iters,
+                     cell, iters,
                      has_obstacles, closed)
             src, dst = dst, src
 

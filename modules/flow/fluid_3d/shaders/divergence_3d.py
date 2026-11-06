@@ -18,7 +18,7 @@ class Divergence3D(ComputeShader):
 
     def use(self, velocity: Texture3D, obstacle: Texture3D,
             divergence_out: Texture3D,
-            grid_scale: float, aspect: float,
+            cell: float,
             has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True)) -> None:
         """Compute divergence of 3D velocity field.
 
@@ -26,8 +26,7 @@ class Divergence3D(ComputeShader):
             velocity: 3D velocity field (RGBA16F)
             obstacle: 3D obstacle mask (R8)
             divergence_out: Output divergence volume (R16F)
-            grid_scale: Grid scaling factor
-            aspect: Width/height ratio
+            cell: The cubic cell's size in widths
             has_obstacles: Whether obstacle logic is active
             closed: Per axis, whether the domain's walls are closed (solid) or open
         """
@@ -44,9 +43,8 @@ class Divergence3D(ComputeShader):
         self.bind_image_3d_write(0, divergence_out, GL_R16F)
 
         # Aspect-corrected grid scales; the cells are cubic, so dz = dx
-        dx = grid_scale
-        dy = grid_scale * aspect
-        dz = grid_scale
+        dx = cell                         # cubic cells, in widths
+        dy = dz = cell
         glUniform3f(self.get_uniform_loc("uHalfRdxInv"), 0.5 / dx, 0.5 / dy, 0.5 / dz)
         glUniform3i(self.get_uniform_loc("uSize"),
                     divergence_out.width, divergence_out.height, divergence_out.depth)
