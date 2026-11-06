@@ -171,14 +171,14 @@ any layer, and two show A beside B.
 
 | Package                         | Holds                                                                                                                                                      |
 |---------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `modules/flow/motion/`          | `GradientFlow`; `LucasKanadeFlow`, the x/y solve with `LucasKanadeFlowSettings`; `LucasKanadeFlow3D`, composing it with `DepthVelocity`, with `LucasKanadeFlow3DSettings` (`use_mask`, the gains, `solve`, `depth_velocity`); `DepthVelocitySettings`; `DepthView` |
+| `modules/flow/motion/`          | `GradientFlow`; `LucasKanadeFlow`, the x/y solve with `LucasKanadeFlowSettings`; `LucasKanadeFlow3D`, composing it with `DepthVelocity`, with `LucasKanadeFlow3DSettings` (`use_mask`, the gains, `xy`, `z`); `DepthVelocitySettings`; `DepthView` |
 | `modules/flow/bridge_2d/`       | the 2D bridge                                                                                                                                              |
 | `modules/flow/bridge_3d/`       | the 3D bridge                                                                                                                                              |
 | `modules/flow/fluid_2d/`        | `Fluid2D`, `Fluid2DSettings` with its own `VelocitySettings`, `DensitySettings`, `TemperatureSettings`, `PressureSettings`; `shaders/`                     |
 | `modules/flow/fluid_3d/`        | `Fluid3D`, `Fluid3DSettings` with its own groups and `VolumeSettings`; `shaders/`                                                                          |
 | `modules/flow/shaders/`         | the shared fragment shaders, `AddBoolean` among them                                                                                                       |
 | `modules/flow/time_step.py`, `modules/flow/boundary_mode.py` | shared                                                                                                                        |
-| `modules/flow/visualization/`   | the monitors' drawing: `Visualizer` (image, colormap, arrows and histogram into one FBO), `Strip`, `AxisOverlay` with `log_axis.py`, `ALL_CHANNELS`               |
+| `modules/flow/visualization/`   | the monitors' drawing: `Visualizer` (image, colormap, arrows and histogram into one FBO), `Strip`, `Legend` with `log_axis.py`, `ALL_CHANNELS`               |
 | `modules/render/layers/flow/`   | `port.py` (`Port`, `TextureKind`); `motion_layer.py` (`MotionInput`, `MotionOutput`, `MotionLayer`, `frame_interval`), `motion_2d_layer.py`, `motion_3d_layer.py`; `bridge_layer.py` (`BridgeInput`, `BridgeOutput`, `BridgeLayer`), `bridge_2d_layer.py`, `bridge_3d_layer.py`; `fluid_layer.py` (`Injection`, `FluidInput`, `FluidOutput`, `FluidLayer`), `fluid_2d_layer.py`, `fluid_3d_layer.py`; `monitor_layer.py` (`MonitorInput`, `MonitorLayer`, `MonitorLayerSettings`, `MonitorAdvancedSettings`, `FlowStage`, `MonitorView`, `Channel`, `ArrowSpacing`) |
 
 Neither `fluid_2d` nor `fluid_3d` imports the other. The settings group of each fluid is `fluid`.
@@ -285,17 +285,17 @@ kinds of `TextureKind`.
   mean amount spans decades between a still player and a fast move, so a linear lane clips the one
   or loses the other. `scale` slides the window; a bar a third taller is ten times the amount.
 - With `legend` on, the strip and the histogram show their log axis over the plot
-  (`AxisOverlay`): the lane names, a 2 px grey line at each round decade labeled with what it reads
+  (`Legend`): the lane names, a 2 px grey line at each round decade labeled with what it reads
   (the strip's mean amount, 0.001, 0.01, 0.1, 1; the histogram's share of the samples, 0.01%,
   0.1%, 1%, 10%), and the histogram's 0 and its ±1/`scale` limits. `COLORMAP` shows a color key
-  instead: a bar per channel shown (x, y, z on `ALL`) from −1/`scale` through 0 to +1/`scale` in
-  its colors. The legend is drawn into its own FBO only when the view, `channel` or `scale`
+  instead, in the top left: a small bar per channel shown (x, y, z on `ALL`) from −1/`scale`
+  through 0 to +1/`scale` in its colors, since the map is read channel by channel. The legend is drawn into its own FBO only when the view, `channel` or `scale`
   changes and blitted every draw, since `Text` builds and uploads each string's glyphs per draw;
   the lines and labels come from `log_axis.py`, tested without GL in
   `modules/flow/tests/test_log_axis.py`.
 - `Visualizer` draws into one FBO: `ChannelView` (image and colormap, the channel and the view as
   uniforms), `VelocityArrowField`, and `HistogramCount` with `HistogramDraw`; `Strip` keeps its
-  own, and `AxisOverlay` its `LogGrid` and `ColormapKey`.
+  own, and `Legend` its `LogGrid` and `ColormapKey`.
   `scripts/depth_velocity_compare.py` draws through the same `Visualizer`.
 - There is no hue-by-direction map: it is 2D only, on black, with z unread, where `COLORMAP` on
   `ALL` shows direction as a mix of red and green around grey, and z in blue.

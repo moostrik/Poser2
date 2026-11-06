@@ -1,23 +1,23 @@
 """Lucas–Kanade Flow 3D: the x/y solve (`LucasKanadeFlow`) and the depth velocity (`DepthVelocity`)
 composed into one 3D velocity.
 
-The displacement (uv per frame) stays inside: `solve.threshold` (px per frame) comes off its length,
+The displacement (uv per frame) stays inside: `xy.threshold` (px per frame) comes off its length,
 as below it is the solve's jitter, not motion. z comes from its own `DepthVelocity`: a depth track carried
 along the displacement, so a surface sliding sideways over a slope reads no motion toward the camera,
-corrected each frame by the mean over `depth_velocity.window` depth samples and smoothed over
-`depth_velocity.smooth`; `depth_velocity.threshold` comes off it. The depth change comes in view
+corrected each frame by the mean over `z.window` depth samples and smoothed over
+`z.smooth`; `z.threshold` comes off it. The depth change comes in view
 widths per frame like the displacement, so all three become view widths per second the same way. Out
 comes one 3D velocity in image widths per second times `x_gain`, `y_gain` and `z_gain` (1 = true speed,
 0 = that axis off, negative = inverted). With `use_mask`, the velocity is multiplied by the mask.
 
-z lags its motion by the time it is smoothed over. With `depth_velocity.xy_smooth`, x/y goes through the
-same filter over `depth_velocity.smooth` before its threshold, carried along the displacement as z is, so
+z lags its motion by the time it is smoothed over. With `z.xy_smooth`, x/y goes through the
+same filter over `z.smooth` before its threshold, carried along the displacement as z is, so
 both lag alike. A displacement is a step of position, so the filter is the same one: with a steady frame
 interval and a full z window, x/y answers a change of speed exactly as z does. The tracks are
-carried by the displacement as solved, before `solve.threshold`: a slide too slow for the output
+carried by the displacement as solved, before `xy.threshold`: a slide too slow for the output
 still moves the tracks with it, or on a slope it would read as z.
 
-The settings in flow pixels go with the flow's resolution: the solve's, and `depth_velocity.threshold`.
+The settings in flow pixels go with the flow's resolution: the solve's, and `z.threshold`.
 Those in metres and milliseconds do not.
 
 `filter_displacement` and `displacement_velocity` below are the numpy references of the shaders.
@@ -40,14 +40,14 @@ FALLBACK_DELTA_TIME: float = 1.0 / 30.0     # s: the interval taken in its place
 
 
 class LucasKanadeFlow3DSettings(BaseSettings):
-    """Configuration for the 3D Lucas–Kanade flow: the mask and the axes, its x/y solve and its depth velocity."""
+    """Configuration for the 3D Lucas–Kanade flow: the mask and the axes, its x/y solve in `xy` and its depth velocity in `z`."""
     use_mask:       Field[bool]  = Field(True, newline=True, width=48, description="Only the player moves the fluid (off: whole image)")
     x_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, image widths per second")
     y_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, image widths per second")
     z_gain:         Field[float] = Field(1.0, min=-10.0, max=10.0, step=0.05, widget=Widget.knob, description="1 = true speed, on the x/y scale")
 
-    solve          = Group(LucasKanadeFlowSettings)
-    depth_velocity = Group(DepthVelocitySettings)
+    xy             = Group(LucasKanadeFlowSettings)
+    z              = Group(DepthVelocitySettings)
 
 
 class LucasKanadeFlow3D:
@@ -55,7 +55,7 @@ class LucasKanadeFlow3D:
 
     def __init__(self, settings: LucasKanadeFlow3DSettings) -> None:
         self.settings: LucasKanadeFlow3DSettings = settings
-        self._flow: LucasKanadeFlow = LucasKanadeFlow(settings.solve)
+        self._flow: LucasKanadeFlow = LucasKanadeFlow(settings.xy)
         self._depth_velocity: DepthVelocity = DepthVelocity()
         self._mask: Texture | None = None
 
@@ -131,8 +131,8 @@ class LucasKanadeFlow3D:
             FlowUtil.zero(self._velocity)
             return
         s: LucasKanadeFlow3DSettings = self.settings
-        xy_s: LucasKanadeFlowSettings = s.solve
-        z_s: DepthVelocitySettings = s.depth_velocity
+        xy_s: LucasKanadeFlowSettings = s.xy
+        z_s: DepthVelocitySettings = s.z
 
         self._flow.update(depth, z_s.tolerance)
         solved: Texture = self._flow.solved
@@ -174,7 +174,7 @@ class LucasKanadeFlow3D:
 # ── numpy reference ─────────────────────────────────────────────────────
 
 def filter_displacement(displacement: np.ndarray, state: np.ndarray, carry: np.ndarray, alpha: float) -> np.ndarray:
-    """The filter x/y goes through with depth_velocity.xy_smooth, one frame on (H, W, 4): the filtered
+    """The filter x/y goes through with z.xy_smooth, one frame on (H, W, 4): the filtered
     displacement (x, y, pixels per frame) and the position error (x, y, pixels). Mirrors
     displacement_filter.frag.
 

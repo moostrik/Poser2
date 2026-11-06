@@ -416,14 +416,14 @@
       "x_gain": 1.0,
       "y_gain": 1.0,
       "z_gain": 1.0,
-      "solve": {
+      "xy": {
         "levels": 4,
         "window": "SEVEN",
         "damping": 0.03,
         "same_surface": true,
         "threshold": 0.5
       },
-      "depth_velocity": {
+      "z": {
         "edge": 0.1,
         "window": "SEVEN",
         "tolerance": 0.2,

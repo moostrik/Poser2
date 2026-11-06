@@ -1,8 +1,8 @@
 #version 460 core
 
 // Colormap Key Shader
-// The colormap's key: in a box, one bar per channel shown, each running from -1 at its
-// left through 0 (mid grey) to 1 at its right, in the color the colormap gives that channel
+// The colormap's key: in a box, one bar per channel shown, each running from -1 at its left
+// through 0 (mid grey) to 1 at its right, in the color the colormap gives that channel
 
 uniform vec4 box;           // x0, y0, x1, y1 in pixels from the bottom left
 uniform int channel;        // 0 to 3 for one bar, 4 for x, y, z

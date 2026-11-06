@@ -5,7 +5,7 @@
 FRAMES is what depth_velocity_capture saved from one loop of a recording (temp/depth_velocity/RECORDING).
 No app and no camera: a window gives the GL context, and two `LucasKanadeFlow3D`, A and B, measure the
 saved frames with the settings they were recorded with; `--a` and `--b` override any of them by its
-path in the panel (solve.levels, solve.threshold, depth_velocity.catch_up, z, ...). The window plays the loop at its
+path in the panel (xy.levels, xy.threshold, z.catch_up, z_gain, ...). The window plays the loop at its
 recorded rate, again and again, A on the left, B on the right:
 
     1  z of the track, red toward the camera, green away     space  pause
@@ -51,13 +51,13 @@ WARM_UP: float = 1.0          # s at the start the flows settle in, measured in 
 SHORTEST_PAUSE: float = 1.0   # s of stillness that end a move
 RENAMED: dict[str, str] = {'z_time': 'z_smooth', 'z_catch_up_time': 'z_catch_up', 'xy_follow_z_time': 'xy_smooth', 'xy_follow_z': 'xy_smooth', 'xy_regularizer': 'xy_damping',
                            'strength_x': 'x_gain', 'strength_y': 'y_gain', 'strength_z': 'z_gain',
-                           'lucas_kanade': 'solve', 'depth_track': 'depth_velocity'}   # in frames saved before
+                           'lucas_kanade': 'xy', 'depth_track': 'z', 'solve': 'xy', 'depth_velocity': 'z'}   # in frames saved before
 SWITCHED: dict[str, str] = {'x': 'x_gain', 'y': 'y_gain', 'z': 'z_gain'}   # in frames saved with axis switches: off is a gain of 0
-GROUPED: dict[str, str] = {'xy_levels': 'solve.levels', 'xy_window': 'solve.window', 'xy_damping': 'solve.damping',
-                           'xy_same_surface': 'solve.same_surface', 'xy_threshold': 'solve.threshold',
-                           'z_edge': 'depth_velocity.edge', 'z_window': 'depth_velocity.window', 'z_tolerance': 'depth_velocity.tolerance',
-                           'z_smooth': 'depth_velocity.smooth', 'xy_smooth': 'depth_velocity.xy_smooth',
-                           'z_catch_up': 'depth_velocity.catch_up', 'z_dead_zone': 'depth_velocity.dead_zone', 'z_threshold': 'depth_velocity.threshold'}   # in frames saved flat, before the groups
+GROUPED: dict[str, str] = {'xy_levels': 'xy.levels', 'xy_window': 'xy.window', 'xy_damping': 'xy.damping',
+                           'xy_same_surface': 'xy.same_surface', 'xy_threshold': 'xy.threshold',
+                           'z_edge': 'z.edge', 'z_window': 'z.window', 'z_tolerance': 'z.tolerance',
+                           'z_smooth': 'z.smooth', 'xy_smooth': 'z.xy_smooth',
+                           'z_catch_up': 'z.catch_up', 'z_dead_zone': 'z.dead_zone', 'z_threshold': 'z.threshold'}   # in frames saved flat, before the groups
 MOVED: float = 0.05          # luminance change of a pixel that moves
 MOVED_FRAMES: int = 5         # frames it changes that much in, over the loop
 VIEWS: dict[int, str] = {1: 'z of the track', 2: 'z after the threshold', 3: 'depth', 4: 'velocity colormap', 5: 'velocity arrows'}
@@ -118,7 +118,7 @@ def recorded_settings(recorded: dict) -> dict:
     result: dict = {}
     for key, value in recorded.items():
         key = RENAMED.get(key, key)
-        if key in SWITCHED:
+        if key in SWITCHED and isinstance(value, bool):     # the old axis switches; a "z" group is a dict
             key, value = SWITCHED[key], 1.0 if value else 0.0
         *groups, name = GROUPED.get(key, key).split('.')
         target: dict = result
@@ -129,7 +129,7 @@ def recorded_settings(recorded: dict) -> dict:
 
 
 def setting_owner(settings: LucasKanadeFlow3DSettings, path: str) -> tuple[object, str]:
-    """The settings object that holds the setting at `path` (solve.levels) and its name there."""
+    """The settings object that holds the setting at `path` (xy.levels) and its name there."""
     *groups, name = path.split('.')
     owner: object = settings
     for group in groups:
@@ -383,7 +383,7 @@ def verify(frames: Frames, changed: dict[str, object], frames_to_check: int) -> 
     context(False, 64, 64)
     w, h = frames.width, frames.height
     side = Side('A', frames.calls[0]['settings'], changed, w, h, False)
-    xy, z = side.settings.solve, side.settings.depth_velocity
+    xy, z = side.settings.xy, side.settings.z
     luminance, depth_texture, mask_texture = Texture(), Texture(), Texture()
     state, catch_up, previous = np.zeros((h, w, 4)), np.zeros((h, w, 2)), None
     last = min(frames_to_check, len(frames)) - 1

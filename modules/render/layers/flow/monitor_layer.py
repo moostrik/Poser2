@@ -4,8 +4,8 @@ it is shown.
 `MonitorInput` is what the app hands it each tick: every stage's ports. The monitor picks the stage
 and the texture by its own settings, and draws their channels, all or one, by the port's kind or by
 the view asked: as an image, as a colormap centered on grey, as arrows, as a strip of the channels'
-amounts over time, or as a histogram of their values, the last two under their log axis
-(`AxisOverlay`). It renders in `draw`, once per tick however many panels show it, and nothing in
+amounts over time, or as a histogram of their values, the last two under their log axis, the colormap under its key
+(`Legend`). It renders in `draw`, once per tick however many panels show it, and nothing in
 `update`."""
 
 from dataclasses import dataclass, field
@@ -14,7 +14,7 @@ from enum import IntEnum, auto
 from OpenGL.GL import GL_VIEWPORT, glGetIntegerv, glViewport
 
 from modules.gl import Texture, Style, Blit
-from modules.flow import Visualizer, HISTOGRAM_TOTAL, Strip, ALL_CHANNELS, AxisOverlay, Axis
+from modules.flow import Visualizer, HISTOGRAM_TOTAL, Strip, ALL_CHANNELS, Legend, LegendKind
 from modules.settings import Field, BaseSettings, Group, Widget
 from ..layer_base import LayerBase
 from .port import Port, TextureKind
@@ -102,11 +102,12 @@ class MonitorLayer(LayerBase):
         self._input: MonitorInput | None = None
         self._visualizer: Visualizer = Visualizer()
         self._strip: Strip = Strip()
-        self._axis_overlay: AxisOverlay = AxisOverlay()
-        self._axis: Axis | None = None          # the plot drawn last that has a legend
+        self._legend: Legend = Legend()
+        self._legend_kind: LegendKind | None = None     # the legend of the plot drawn last, if it has one
         self._rendered: bool = False            # this tick's port is drawn into the visualizer or the strip
         self._strip_of: tuple[FlowStage, str, Channel] | None = None    # what the strip plots; anything else restarts it
         self._port: Port | None = None          # the port rendered last
+        self._view: MonitorView = MonitorView.AUTO   # the view rendered last, AUTO resolved; draw shows what render drew
 
     def set_input(self, input: MonitorInput) -> None:
         """Every stage's ports, for the next draw."""
@@ -115,7 +116,7 @@ class MonitorLayer(LayerBase):
     @property
     def texture(self) -> Texture:
         """The port as drawn last: the strip or the visualizer's output."""
-        if self.settings.view == MonitorView.STRIP:
+        if self._view == MonitorView.STRIP:
             return self._strip.texture
         return self._visualizer.texture
 
@@ -124,12 +125,12 @@ class MonitorLayer(LayerBase):
     def allocate(self, width: int, height: int, internal_format: int | None = None) -> None:
         self._visualizer.allocate(width, height)
         self._strip.allocate()
-        self._axis_overlay.allocate()
+        self._legend.allocate()
 
     def deallocate(self) -> None:
         self._visualizer.deallocate()
         self._strip.deallocate()
-        self._axis_overlay.deallocate()
+        self._legend.deallocate()
 
     # ========== Processing ==========
 
@@ -154,7 +155,7 @@ class MonitorLayer(LayerBase):
     def _render(self) -> None:
         port: Port | None = self._pick()
         self._port = port
-        self._axis = None
+        self._legend_kind = None
         view: MonitorView = self.settings.view
         if view != MonitorView.STRIP:
             self._strip_of = None               # the strip starts over when it is shown again
@@ -165,25 +166,26 @@ class MonitorLayer(LayerBase):
         scale: float = settings.advanced.scale
         if view == MonitorView.AUTO:
             view = _AUTO_VIEWS[port.kind]
+        self._view = view
         if view == MonitorView.STRIP:
             shown: tuple[FlowStage, str, Channel] = (self.settings.stage, self.settings.texture, channel)
             if shown != self._strip_of:
                 self._strip.reset()
                 self._strip_of = shown
             self._strip.update(port.texture, scale, int(channel))
-            self._axis = Axis.STRIP
+            self._legend_kind = LegendKind.STRIP
         elif view == MonitorView.IMAGE:
             self._visualizer.process_image(port.texture, scale, int(channel))
         elif view == MonitorView.COLORMAP:
             self._visualizer.process_colormap(port.texture, scale, int(channel))
-            self._axis = Axis.COLORMAP
+            self._legend_kind = LegendKind.COLORMAP
         elif view == MonitorView.HISTOGRAM:
             self._visualizer.process_histogram(port.texture, scale, int(channel))
-            self._axis = Axis.HISTOGRAM
+            self._legend_kind = LegendKind.HISTOGRAM
         else:
             self._visualizer.process_arrows(port.texture, scale, float(settings.advanced.arrow_spacing.value))
-        if self._axis is not None and settings.advanced.legend:
-            self._axis_overlay.update(self._axis, int(channel), scale, HISTOGRAM_TOTAL)
+        if self._legend_kind is not None and settings.advanced.legend:
+            self._legend.update(self._legend_kind, int(channel), scale, HISTOGRAM_TOTAL)
 
     # ========== Rendering ==========
 
@@ -203,7 +205,7 @@ class MonitorLayer(LayerBase):
         Style.set_blend_mode(self.settings.advanced.blend_mode)
         if self.texture.allocated:
             Blit.use(self.texture)
-        if self._axis is not None and self.settings.advanced.legend and self._axis_overlay.texture.allocated:
+        if self._legend_kind is not None and self.settings.advanced.legend and self._legend.texture.allocated:
             Style.set_blend_mode(Style.BlendMode.ALPHA)
-            Blit.use(self._axis_overlay.texture)
+            Blit.use(self._legend.texture)
         Style.pop_style()
