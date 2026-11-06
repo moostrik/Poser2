@@ -82,18 +82,22 @@ A temporary plan, deleted when its last step is in; what it builds is then state
   left button turns yaw and pitch, the right button zooms the distance (a vertical drag), and
   scroll selects the layer, in every view alike: on a flat slice it is the slice shown, in the
   cube it is the layer drawn brighter and pulled out of the stack: a gap opens on both sides of
-  it, fading over the next layers, so it shows whole from any angle, an exploded stack. A and B
-  get the same mouse, so they stay at one angle, one distance and one layer. Nothing else in the
+  it, fading over the next layers, so it shows whole from any angle, an exploded stack. A scroll
+  step is one layer of the density, the show's `layers`, for every monitor, and a volume with
+  fewer layers shows its nearest; a drag across the window's width turns 180°. A and B get the
+  same mouse, so they stay at one angle, one distance and one position. Nothing else in the
   main window takes the mouse.
-- **Transparent slices in order.** The stacked slices blend from the far side to the near one:
-  each draw tests the sign of the camera's direction along z and walks the layers that way, so
-  the order flips exactly when the view turns past the side.
+- **Transparent slices in order, in one draw.** The stacked slices are one instanced draw of a
+  quad, one instance per layer, blended from the far side to the near one: a uniform with the
+  sign of the camera's direction along z makes instance i draw layer i or the last minus i, so
+  the order flips exactly when the view turns past the side, with no loop over the layers.
 
 ## Steps
 
 Each step ends with its tests and a commit; the user runs the app.
 
-1. **The monitor's size, volume ports, flat cuts and the summaries.**
+1a. **The monitor at its drawn size.** Fixes today's 4k rendering of every monitor, before any
+   volume work.
    - The monitor: the visualizer, the strip's plot height and the legend allocate at the
      viewport's size in `draw()` and follow a change: the largest viewport of the previous tick,
      since the first draw of a tick cannot see the second's, and a re-render at once when a
@@ -102,13 +106,19 @@ Each step ends with its tests and a commit; the user runs the app.
      legend's text is drawn at a fixed pixel size into its viewport-sized FBO.
    - The summaries' read grid: the texture's size, capped at 128 × 228 for the strip and
      256 × 256 for the histogram, its total the samples read.
-   - `modules/flow/port.py`: `Port.texture` is a `Texture | Texture3D`; `Port.volume` says which.
-     `Port.prepare`, a callable or None, is what a view calls before it reads the port.
+   - Tests: GL-free, the size followed (the previous tick's largest, a larger one at once).
+1b. **Volume ports, flat cuts and the summaries over a volume.**
+   - `modules/flow/port.py`: `Port.texture` is a `Texture | Texture3D`; `Port.volume` says which;
+     `ports_of` takes a 3D texture as a field's value too. `Port.prepare`, a callable or None, is
+     what a view calls before it reads the port.
    - `Fluid3D.ports` adds `velocity`, `density`, `temperature`, `pressure`, `divergence`,
      `vorticity`, `vorticity_force`, `buoyancy`, `obstacle`. The density's port is a `Texture3D`
      of the simulation's width and height and the density's `layers`, its `prepare`
      `Fluid3D._reduce_density`: a compute shader (`fluid_3d/shaders/reduce_density.comp`, the mean
-     of each block of texels), run once per step at the first call, marked stale by the step.
+     of each block of texels), run at the first call after a step, marked stale by the step, and
+     never when no view asks. Where the density is no larger than the simulation, the pass is a
+     plain copy into the 3D texture, which every view needs for its one sampler type. The fluid
+     allocates, reallocates and frees that texture with its simulation fields.
    - `modules/flow/visualization`: `VolumeCut`, one shader for a slice and the three projections
      (`volume_cut.frag`, `sampler3D`, the slice at w, the projections walking each texel of their
      axis), into an FBO of the cut's size; the monitor's views then read that FBO.
