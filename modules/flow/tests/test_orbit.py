@@ -24,9 +24,13 @@ class OrbitTest(unittest.TestCase):
             orbit.turn(dx, dy)
             np.testing.assert_allclose(clip(orbit, (0.0, 0.0, 0.0), self.BOX)[:2], (0.0, 0.0), atol=1e-9)
 
-    def test_the_front_view_frames_the_box_inside_the_picture(self) -> None:
-        corner = clip(Orbit(), (0.5, self.BOX[1] / 2, self.BOX[2] / 2), self.BOX)
-        self.assertTrue(all(abs(c) <= 1.0 for c in corner[:2]))
+    def test_the_box_fits_a_narrow_view_from_any_angle(self) -> None:
+        box = box_size(64, 48, 0.5)                     # wider than the 9:16 view it is drawn in
+        orbit = Orbit()
+        for dx, dy in ((0.0, 0.0), (0.2, 0.12), (0.3, 0.3), (-0.6, -0.2)):
+            orbit.turn(dx, dy)
+            for corner in ((sx * 0.5, sy * box[1] / 2, sz * box[2] / 2) for sx in (-1, 1) for sy in (-1, 1) for sz in (-1, 1)):
+                self.assertTrue(all(abs(c) <= 1.0 for c in clip(orbit, corner, box)[:2]))
 
     def test_a_drag_right_turns_the_box_right(self) -> None:
         orbit = Orbit()

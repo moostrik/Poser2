@@ -15,7 +15,7 @@ from enum import IntEnum, auto
 from OpenGL.GL import GL_VIEWPORT, glGetIntegerv, glViewport
 
 from modules.gl import Texture, Texture3D, Style, Blit, MouseButton, fit
-from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind, VolumeCut, Cut, Orbit
+from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind, VolumeCut, VolumeCube, Cut, Orbit
 from modules.settings import Field, BaseSettings, Group, Widget
 from ..layer_base import LayerBase
 
@@ -64,7 +64,7 @@ class ArrowSpacing(IntEnum):
 class MonitorAdvancedSettings(BaseSettings):
     """How the monitor draws: the channels, the scale, the arrows' spacing, the legend and the blend."""
     channel: Field[Channel] =       Field(Channel.ALL, width=16, description="The channels drawn")
-    cut: Field[Cut] =               Field(Cut.SLICE, width=24, description="How a volume is laid out: one layer, or seen from the front, the top or the side")
+    cut: Field[Cut] =               Field(Cut.CUBE, width=24, description="How a volume is laid out: in 3D, one layer, or seen from the front, the top or the side")
     scale: Field[float] =           Field(1.0, min=0.01, max=100.0, widget=Widget.log_slider, description="Multiplier on the values")
     arrow_spacing: Field[ArrowSpacing] = Field(ArrowSpacing.SPACING_32, width=24, description="Distance between arrows (pixels)")
     legend: Field[bool] =           Field(True, description="The strip's and histogram's log axis, the colormap's key")
@@ -114,6 +114,8 @@ class MonitorLayer(LayerBase):
         self._rendered_size: tuple[int, int] = (0, 0)   # the size this tick's port was rendered at
         self._strip_stepped: bool = False           # the strip got this tick's column
         self._volume_cut: VolumeCut = VolumeCut()   # a volume laid out flat for the 2D views
+        self._volume_cube: VolumeCube = VolumeCube()    # a volume in 3D, for the picture views
+        self._cube_shown: bool = False              # what it rendered last is the cube
         self._slice: float = 0.5                    # the slice's place through a volume, 0 front to 1 back
         self._layers: int = 0                       # the layers a scroll steps through, the show's density's
         self._orbit: Orbit = Orbit()                # the 3D views' camera; the mouse turns it, a middle click resets it
@@ -158,9 +160,11 @@ class MonitorLayer(LayerBase):
 
     @property
     def texture(self) -> Texture:
-        """The port as drawn last: the strip or the visualizer's output."""
+        """The port as drawn last: the strip, a volume's cube, or the visualizer's output."""
         if self._view == MonitorView.STRIP:
             return self._strip.texture
+        if self._cube_shown:
+            return self._volume_cube.texture
         return self._visualizer.texture
 
     # ========== Lifecycle ==========
@@ -171,10 +175,12 @@ class MonitorLayer(LayerBase):
         self._strip.allocate()
         self._legend.allocate()
         self._volume_cut.allocate()
+        self._volume_cube.allocate()
         self._allocated = True
 
     def deallocate(self) -> None:
         self._volume_cut.deallocate()
+        self._volume_cube.deallocate()
         self._visualizer.deallocate()
         self._strip.deallocate()
         self._legend.deallocate()
@@ -184,6 +190,7 @@ class MonitorLayer(LayerBase):
         self._visualizer.resize(width, height)
         self._strip.resize(height)
         self._legend.resize(width, height)
+        self._volume_cube.resize(width, height)
 
     # ========== Processing ==========
 
@@ -224,6 +231,14 @@ class MonitorLayer(LayerBase):
             view = _AUTO_VIEWS[port.kind]
         self._view = view
         self._aspect = None
+        self._cube_shown = False
+        if port.volume and settings.advanced.cut == Cut.CUBE and view in (MonitorView.IMAGE, MonitorView.COLORMAP):
+            self._render_cube(port, view == MonitorView.COLORMAP, scale, int(channel))
+            if view == MonitorView.COLORMAP:
+                self._legend_kind = LegendKind.COLORMAP
+                if settings.advanced.legend:
+                    self._legend.update(self._legend_kind, int(channel), scale, self._visualizer.histogram_total)
+            return
         texture: Texture = self._flat(port, view)
         if view == MonitorView.STRIP:
             shown: tuple[FlowStage, str, Channel] = (self.settings.stage, self.settings.texture, channel)
@@ -245,6 +260,15 @@ class MonitorLayer(LayerBase):
         else:
             self._visualizer.process_arrows(texture, scale, float(settings.advanced.arrow_spacing.value))
 
+    def _render_cube(self, port: Port, colormap: bool, scale: float, channel: int) -> None:
+        """A volume's layers stacked in its box, from the orbit camera, the slice's layer pulled out."""
+        if port.prepare is not None:
+            port.prepare()
+        volume = port.texture
+        assert isinstance(volume, Texture3D)
+        self._volume_cube.process(volume, self._orbit, self._slice, port.extent, scale, channel, colormap)
+        self._cube_shown = True
+
     def _flat(self, port: Port, view: MonitorView) -> Texture:
         """The 2D texture a view draws: the port's own, or a volume's flat cut. A volume is brought up
         to date first (`Port.prepare`); the strip reads its front mean, the volume's mean, and the
@@ -259,6 +283,8 @@ class MonitorLayer(LayerBase):
         if view == MonitorView.HISTOGRAM:
             return self._volume_cut.texture         # not drawn: the histogram counts the volume
         cut: Cut = Cut.FRONT if view == MonitorView.STRIP else self.settings.advanced.cut
+        if not cut.flat:
+            cut = Cut.SLICE                         # a view with no cube of its own draws the slice
         flat: Texture = self._volume_cut.process(volume, cut, self._slice, port.kind, port.extent)
         if view != MonitorView.STRIP:
             self._aspect = flat.width / max(flat.height, 1)

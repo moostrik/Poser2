@@ -9,4 +9,6 @@ from .strip_roll import StripRoll
 from .strip_summary import StripSummary
 from .velocity_arrow_field import VelocityArrowField
 from .volume_cut import VolumeCutShader
+from .cube_slices import CubeSlices
+from .cube_edges import CubeEdges
 from .histogram_count_volume import HistogramCountVolume

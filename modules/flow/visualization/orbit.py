@@ -42,10 +42,12 @@ class Orbit:
         """A drag of `dy` (a share of the window's height, down positive): up comes closer."""
         self.zoom = min(max(self.zoom * math.exp(dy * ZOOM_RATE), ZOOM_LIMITS[0]), ZOOM_LIMITS[1])
 
-    def eye(self, box: tuple[float, float, float]) -> np.ndarray:
-        """Where the camera is: on a sphere around the center, far enough to frame the box at zoom 1."""
+    def eye(self, box: tuple[float, float, float], aspect: float = 1.0) -> np.ndarray:
+        """Where the camera is: on a sphere around the center, far enough that the box fits a view
+        `aspect` wide from any angle at zoom 1, by the narrower of its two fields of view."""
         radius: float = 0.5 * math.sqrt(sum(s * s for s in box))
-        distance: float = self.zoom * radius / math.sin(FOV / 2.0)
+        across: float = 2.0 * math.atan(math.tan(FOV / 2.0) * max(aspect, 1e-6))
+        distance: float = self.zoom * radius / math.sin(min(FOV, across) / 2.0)
         yaw, pitch = math.radians(self.yaw), math.radians(self.pitch)
         return np.array([math.cos(pitch) * math.sin(yaw), math.sin(pitch), math.cos(pitch) * math.cos(yaw)]) * distance
 
@@ -55,7 +57,7 @@ class Orbit:
 
     def view_projection(self, box: tuple[float, float, float], aspect: float) -> np.ndarray:
         """The matrix from the box's space to clip space (4 × 4, row-major) for a view `aspect` wide."""
-        eye: np.ndarray = self.eye(box)
+        eye: np.ndarray = self.eye(box, aspect)
         return perspective(FOV, aspect, 0.05, float(np.linalg.norm(eye)) * 4.0) @ look_at(eye, np.zeros(3), np.array([0.0, 1.0, 0.0]))
 
 

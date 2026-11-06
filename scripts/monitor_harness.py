@@ -28,7 +28,7 @@ from OpenGL.GL import (GL_ARRAY_BUFFER, GL_FALSE, GL_FLOAT, GL_FRAMEBUFFER, GL_Q
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from modules.flow import Cut, OnDemand, Port, TextureKind, VolumeCut, cut_size  # noqa: E402
 from modules.flow.fluid_3d.shaders import ReduceDensity  # noqa: E402  (a harness reaches inside, as the compare scripts do)
-from modules.gl import Fbo, Style, SwapTexture2DArray, Texture, Texture3D  # noqa: E402
+from modules.gl import Fbo, MouseButton, Style, SwapTexture2DArray, Texture, Texture3D  # noqa: E402
 from modules.render.layers import FlowStage, MonitorInput, MonitorLayer, MonitorLayerSettings, MonitorView  # noqa: E402
 
 OUT: str = os.path.join('temp', 'monitor_harness')
@@ -339,6 +339,54 @@ def step_1b(results: Results) -> None:
     check_cut_times(results)
 
 
+# ── step 3: the cube, stacked slices ──────────────────────────────────────
+
+def check_cube_order(results: Results) -> None:
+    """The near layers cover the far ones from both sides: the front's red from the front, the back's blue from behind."""
+    values = np.zeros((4, 32, 32, 4), np.float32)
+    values[0, ..., 0] = 1.0                      # the front layer red
+    values[3, ..., 2] = 1.0                      # the back layer blue
+    port = Port(volume_of(values), TextureKind.IMAGE, 0.5)
+    monitor = Monitor(port, MonitorView.IMAGE)
+    monitor.settings.advanced.cut = Cut.CUBE
+    for yaw_drag, name in ((0.0, 'front'), (-1.0, 'back')):
+        monitor.layer.reset_view()
+        monitor.layer.drag(yaw_drag, 0.0, MouseButton.LEFT)
+        monitor.tick(PANEL)
+        pixels = monitor.picture()
+        red, blue = (float(pixels[PANEL[1] // 2, PANEL[0] // 2, c]) for c in (0, 2))
+        near_red: bool = name == 'front'
+        results.check(f'the cube from the {name} shows its near layer', (red > blue) == near_red, f'red {red:.0f}, blue {blue:.0f}')
+
+
+def check_cube_pictures(results: Results, values: np.ndarray) -> None:
+    d, h, w = values.shape[:3]
+    port = Port(volume_of(values), TextureKind.SCALAR, 0.5)
+    monitor = Monitor(port, MonitorView.COLORMAP)
+    monitor.settings.advanced.cut = Cut.CUBE
+    for name, drags in (('front', []), ('turned', [(0.2, 0.12)]), ('top', [(0.0, 0.48)]), ('side', [(-0.5, 0.0)])):
+        monitor.layer.reset_view()
+        for dx, dy in drags:
+            monitor.layer.drag(dx, dy, MouseButton.LEFT)
+        monitor.layer.scroll(1, d)
+        monitor.tick(PANEL)
+        results.save(f'3_cube_{name}', monitor.picture())
+    results.check('the cube renders at the drawn size', (monitor.layer.texture.width, monitor.layer.texture.height) == PANEL)
+
+    big = Port(volume_of(np.zeros((16, 800, 448, 4), np.float32)), TextureKind.SCALAR, 0.14)
+    timed = Monitor(big, MonitorView.COLORMAP)
+    timed.settings.advanced.cut = Cut.CUBE
+    timed.tick(PANEL)
+    ms = gpu_ms(lambda: timed.tick(PANEL))
+    print(f'     the cube   {ms:6.2f} ms of a 448 x 800 x 16 volume at {PANEL[0]} x {PANEL[1]}')
+
+
+def step_3(results: Results) -> None:
+    print('step 3: the cube, stacked slices')
+    check_cube_order(results)
+    check_cube_pictures(results, known_volume(64, 48, 8))
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--no-png', action='store_true', help='skip the pictures')
@@ -347,6 +395,7 @@ def main() -> int:
     results = Results(not args.no_png)
     step_1a(results)
     step_1b(results)
+    step_3(results)
     glFinish()
     glfw.destroy_window(window)
     glfw.terminate()
