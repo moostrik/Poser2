@@ -522,6 +522,7 @@
       "fixed_fps": 60.0,
       "fps_smoothing": 1.0,
       "speed": 1.0,
+      "advection": "MACCORMACK",
       "boundary": {
         "gain": 1.0,
         "drag_time": 50.0
@@ -545,7 +546,7 @@
         "fade_time": 60.0,
         "dampen_threshold": 50.0,
         "dampen_time": 2.0,
-        "vorticity": 0.3,
+        "vorticity": 1.69,
         "vorticity_radius": 1.0,
         "viscosity": 0.0,
         "viscosity_iter": 20
@@ -553,10 +554,24 @@
       "density": {
         "boundary_gain": 1.0,
         "body_force_gain": 1.0,
+        "carrier": "PARTICLES",
         "size": 1,
         "fade_time": 60.0,
         "evaporation": 0.0,
         "wall": "CLOSED"
+      },
+      "particles": {
+        "count": 100000,
+        "rate": 0.1,
+        "ring_fade": 0.1,
+        "draw": "STREAKS",
+        "overlap": "OCCLUDED",
+        "slices": 16,
+        "size": 3.12,
+        "streak": 1.0,
+        "radius": 24.0,
+        "spread": 2.0,
+        "smooth": 3
       },
       "temperature": {
         "boundary_gain": 1.0,
@@ -684,7 +699,7 @@
     },
     "window": {
       "title": "Poser",
-      "v_sync": true,
+      "v_sync": false,
       "monitor": "M0",
       "x": 1708,
       "y": 31,
