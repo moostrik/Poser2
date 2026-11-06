@@ -21,7 +21,7 @@ from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 
 @dataclass
 class Injection:
-    """One bridge output as one fluid takes it: `velocity`, `density`, `temperature` and `impulse`
+    """One bridge output as one fluid takes it: `velocity`, `density`, `temperature` and `acceleration`
     from the bridge output, `spin`, which no bridge gives, at `weight`, 0 to 1, the injection's share of the fluid's
     velocity, density and temperature, as a layer's weight in a mix. The app sets the weight from
     whatever it reads; the fluid never knows why. `color` is the color the 2D fluid gives the
@@ -30,7 +30,7 @@ class Injection:
     velocity: Texture
     density: Texture
     temperature: Texture
-    impulse: Texture | None = None
+    acceleration: Texture | None = None
     spin: Texture | None = None
     weight: float = 1.0
     color: tuple[float, float, float] = (1.0, 1.0, 1.0)

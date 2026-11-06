@@ -5,7 +5,7 @@
 FRAMES is what depth_velocity_capture saved from one loop of a recording. No app and no camera: a hidden window
 gives the GL context, one `LucasKanadeFlow3D` measures the saved frames with the settings they were saved with
 (`--flow` overrides one by its panel path), and every side's bridge takes its velocity. KIND is `trail` (the
-VelocityTrailBridge) or `impulse` (the VelocityImpulseBridge: its start, bow, stop and wake); PATH=VALUE sets one
+VelocityTrailBridge) or `change` (the VelocityChangeBridge: its start, bow, stop and wake); PATH=VALUE sets one
 of its settings by its panel path (smooth, fast_smooth, stop_region_weight, ...), the rest as in deep_flow's
 preset. Each bridge steps once per flow frame, by the frame's saved interval.
 
@@ -15,16 +15,16 @@ What a side gives:
     start, bow, stop, wake    an event bridge's events, in image widths per second
 
 For amount and stop, the last two columns are the burst (s after a move's end until under 20% of that stop's
-peak) and the ring's share in the stop windows (4–24 px outside the mask over the body).
+peak) and the ring's share in the stop windows (4–24 px outside the mask over the player).
 
-Measured on the body (the mask, 12 px and more inside) where it moves in the loop, per frame as a mean, then:
+Measured on the player (the mask, 12 px and more inside) where it moves in the loop, per frame as a mean, then:
     noise      the still part's p99 per pixel (its first 1.5 s left out, the trails' start)
     slow/fast  the mean in each move's slow and fast half, steady (its first 0.3 s left out)
     start      the highest mean in each move's first 0.4 s
     stop       the highest mean from 0.1 s before a move's end to 0.6 s after
     lag        the delay (ms) that best lines the side's velocity up with the flow's own, over the loop
     coast      s after a move's end until the side's velocity is below 20% of its fast half
-    smear      the fast halves' mean |velocity| 4–24 px outside the mask over the one on the body
+    smear      the fast halves' mean |velocity| 4–24 px outside the mask over the one on the player
     GPU        the bridge's time per frame
 """
 
@@ -45,7 +45,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from modules.gl import Texture  # noqa: E402
 from modules.flow import (LucasKanadeFlow3D, LucasKanadeFlow3DSettings,  # noqa: E402
-                          Impulse, VelocityImpulseBridge, VelocityImpulseBridgeSettings, VelocityTrailBridge, VelocityTrailBridgeSettings,
+                          Change, VelocityChangeBridge, VelocityChangeBridgeSettings, VelocityTrailBridge, VelocityTrailBridgeSettings,
                           decay_weight)
 from depth_velocity_compare import Frames, context, overrides, read_back, recorded_settings, setting_owner, upload  # noqa: E402
 
@@ -69,13 +69,13 @@ def set_path(settings: object, path: str, value: str) -> object:
 
 @dataclass
 class Series:
-    """One measure of one side, per frame: its mean on the moving body, outside the mask, and the still pixels."""
-    body: list[float] = field(default_factory=list)
+    """One measure of one side, per frame: its mean on the moving player, outside the mask, and the still pixels."""
+    player: list[float] = field(default_factory=list)
     ring: list[float] = field(default_factory=list)
     still: list[np.ndarray] = field(default_factory=list)
 
     def add(self, magnitude: np.ndarray, moving: np.ndarray, ring: np.ndarray, core: np.ndarray, still: bool) -> None:
-        self.body.append(float(np.mean(magnitude[moving])) if moving.any() else 0.0)
+        self.player.append(float(np.mean(magnitude[moving])) if moving.any() else 0.0)
         self.ring.append(float(np.mean(magnitude[ring])) if ring.any() else 0.0)
         if still:
             self.still.append(magnitude[core])
@@ -89,21 +89,21 @@ class Side:
         preset = json.loads(PRESET.read_text())['render']['bridge']
         self.changed: dict[str, object] = {}
         if kind == 'trail':
-            self.settings: VelocityTrailBridgeSettings | VelocityImpulseBridgeSettings = VelocityTrailBridgeSettings()
-            self.settings.update_from_dict(preset['trail'])
-            self.bridge: VelocityTrailBridge | VelocityImpulseBridge = VelocityTrailBridge(self.settings)
-        elif kind == 'impulse':
-            self.settings = VelocityImpulseBridgeSettings()
-            self.settings.update_from_dict(preset.get('impulse', {}))
-            self.bridge = VelocityImpulseBridge(self.settings)
+            self.settings: VelocityTrailBridgeSettings | VelocityChangeBridgeSettings = VelocityTrailBridgeSettings()
+            self.settings.update_from_dict(preset['readings']['trail'])
+            self.bridge: VelocityTrailBridge | VelocityChangeBridge = VelocityTrailBridge(self.settings)
+        elif kind == 'change':
+            self.settings = VelocityChangeBridgeSettings()
+            self.settings.update_from_dict(preset['readings']['change'])
+            self.bridge = VelocityChangeBridge(self.settings)
         else:
-            raise SystemExit(f'unknown bridge {kind}: trail or impulse')
+            raise SystemExit(f'unknown bridge {kind}: trail or change')
         for item in filter(None, items.split(',')):
             path, value = item.split('=', 1)
             self.changed[path] = set_path(self.settings, path, value)
         self.bridge.allocate(width, height)
         self.series: dict[str, Series] = {'velocity': Series(), 'z': Series(), 'amount': Series(),
-                                          **{impulse.name.lower(): Series() for impulse in Impulse},
+                                          **{change.name.lower(): Series() for change in Change},
                                           'stop_moving': Series(), 'wake_moving': Series()}
         self.milliseconds: list[float] = []
         # A trial, here only: the stop's region over the flow's moving pixels, as the start's, its two trails per region
@@ -121,7 +121,7 @@ class Side:
     def _moving_stop_share(self, flow: np.ndarray, delta_time: float) -> np.ndarray:
         """The trial stop share per pixel: the region's mean speed over the flow's moving pixels, through the fast and
         the slow trail per region, as far as it falls (numpy; what a moving-pixel stop region would give)."""
-        assert isinstance(self.settings, VelocityImpulseBridgeSettings)
+        assert isinstance(self.settings, VelocityChangeBridgeSettings)
         s, h, w = self.settings, flow.shape[0], flow.shape[1]
         size: int = max(1, int(round(s.stop_region_size)))
         rows, columns = -(-h // size), -(-w // size)
@@ -141,11 +141,11 @@ class Side:
 
     def measure(self, flow: np.ndarray, moving: np.ndarray, ring: np.ndarray, core: np.ndarray, still: bool,
                 delta_time: float) -> None:
-        if isinstance(self.bridge, VelocityImpulseBridge):
-            values = {impulse: read_back(self.bridge.impulse(impulse))[..., 0] for impulse in Impulse}
-            for impulse, value in values.items():
-                self.series[impulse.name.lower()].add(value, moving, ring, core, still)
-            fall = values[Impulse.STOP] + values[Impulse.WAKE]
+        if isinstance(self.bridge, VelocityChangeBridge):
+            values = {change: read_back(self.bridge.change(change))[..., 0] for change in Change}
+            for change, value in values.items():
+                self.series[change.name.lower()].add(value, moving, ring, core, still)
+            fall = values[Change.STOP] + values[Change.WAKE]
             share = self._moving_stop_share(flow, delta_time)
             self.series['stop_moving'].add(fall * share, moving, ring, core, still)
             self.series['wake_moving'].add(fall * (1.0 - share), moving, ring, core, still)
@@ -208,25 +208,25 @@ def burst_s(series: np.ndarray, frames: Frames) -> float:
 def report(label: str, series: dict[str, Series], flow: dict[str, Series], frames: Frames, w: dict[str, np.ndarray], dt: float) -> list[str]:
     lines = []
     for name, s in series.items():
-        body = np.array(s.body)
-        if not body.any():
+        player = np.array(s.player)
+        if not player.any():
             continue
         noise = float(np.percentile(np.concatenate(s.still), 99)) if s.still else 0.0
-        slow, fast = float(np.mean(body[w['slow']])), float(np.mean(body[w['fast']]))
-        start, stop = events_max(body, frames, 'start'), events_max(body, frames, 'stop')
+        slow, fast = float(np.mean(player[w['slow']])), float(np.mean(player[w['fast']]))
+        start, stop = events_max(player, frames, 'start'), events_max(player, frames, 'stop')
         over_noise: str = f'{fast / noise:.1f}' if noise > 1e-4 else 'no noise'
         line = (f'| {label} | {name} | {noise:.3f} | {slow:.3f} | {fast:.3f} | {fast / max(slow, 1e-9):.2f} | {over_noise} '
                 f'| {start:.3f} | {stop:.3f} | {stop / max(fast, 1e-9):.2f} | {start / max(fast, 1e-9):.2f} |')
         if name == 'velocity':
             ring = np.array(s.ring)
             smear = float(np.mean(ring[w['fast']])) / max(fast, 1e-9)
-            line += (f' {lag_ms(body, np.array(flow["velocity"].body), dt):.0f} | {coast_s(body, frames, fast):.2f} | {smear:.2f} |')
+            line += (f' {lag_ms(player, np.array(flow["velocity"].player), dt):.0f} | {coast_s(player, frames, fast):.2f} | {smear:.2f} |')
         elif name in ('amount', 'start', 'bow', 'stop', 'wake', 'stop_moving', 'wake_moving'):
             # A burst: s after a move's end until it is under 20% of that stop's peak; the ring 4-24 px outside the
-            # mask over the body, in the stop windows
+            # mask over the player, in the stop windows
             ring = np.array(s.ring)
-            ring_share = float(np.mean(ring[w['stop']])) / max(float(np.mean(body[w['stop']])), 1e-9)
-            line += f' | {burst_s(body, frames):.2f} | {ring_share:.2f} |'
+            ring_share = float(np.mean(ring[w['stop']])) / max(float(np.mean(player[w['stop']])), 1e-9)
+            line += f' | {burst_s(player, frames):.2f} | {ring_share:.2f} |'
         else:
             line += ' | | |'
         lines.append(line)
@@ -286,14 +286,14 @@ def main() -> int:
     for side in sides:
         print('\n'.join(report(side.name, side.series, flow_series, frames, w, dt)), flush=True)
     for side in sides:
-        if side.kind != 'impulse':
+        if side.kind != 'change':
             continue
         # In steady fast motion every rise and fall is a limb passing: the share its region kept as a start or stop
         # is false; at the real starts and stops the region's share is the right one
         names = ('start', 'bow', 'stop', 'wake', 'stop_moving', 'wake_moving')
-        mean = {name: float(np.mean(np.array(side.series[name].body)[w['fast']])) for name in names}
-        at_start = {name: events_max(np.array(side.series[name].body), frames, 'start') for name in names}
-        at_stop = {name: events_max(np.array(side.series[name].body), frames, 'stop') for name in names}
+        mean = {name: float(np.mean(np.array(side.series[name].player)[w['fast']])) for name in names}
+        at_start = {name: events_max(np.array(side.series[name].player), frames, 'start') for name in names}
+        at_stop = {name: events_max(np.array(side.series[name].player), frames, 'stop') for name in names}
 
         def share(values: dict[str, float], kept: str, rest: str) -> float:
             return values[kept] / max(values[kept] + values[rest], 1e-9)

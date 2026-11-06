@@ -1,11 +1,11 @@
 #version 460 core
 
-// Velocity Impulse Direction Shader
-// An impulse as a velocity: its amount along a trail's 3D direction. The numpy reference is
-// velocity_impulse_bridge.impulse_velocity
+// Velocity Change Direction Shader
+// A change as a velocity: its amount along a trail's 3D direction. The numpy reference is
+// velocity_change_bridge.change_velocity
 
 uniform sampler2D tex0;  // Trail RGB: the direction
-uniform sampler2D tex1;  // Impulse R: the amount
+uniform sampler2D tex1;  // Change R: the amount
 
 in vec2 texCoord;
 out vec4 fragColor;

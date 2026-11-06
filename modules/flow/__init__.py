@@ -22,7 +22,7 @@ from . import bridge_2d
 from .bridge_3d import  DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
                         decay_weight, direction, advect, \
                         VelocityTrailBridge, VelocityTrailBridgeSettings, velocity_trail, \
-                        VelocityImpulseBridge, VelocityImpulseBridgeSettings, Impulse, WeightedSum, velocity_impulse, step_peak, moving_mean, start_region_share, stop_region_share, impulse_velocity, \
+                        VelocityChangeBridge, VelocityChangeBridgeSettings, Change, WeightedSum, velocity_change, step_peak, moving_mean, start_region_share, stop_region_share, change_velocity, \
                         TemperatureBridge, TemperatureBridgeSettings
 
 # Visualization

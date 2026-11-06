@@ -20,7 +20,7 @@ class Fluid3DLayerSettings(Fluid3DSettings, FluidLayerSettings):
 
 
 class Fluid3DLayer(FluidLayer):
-    """The 3D fluid layer: each injection's velocity, its z as w, its impulse and spin, density and
+    """The 3D fluid layer: each injection's velocity, its z as w, its acceleration and spin, density and
     temperature into the volume at its weight; one step per tick; the composited density as the texture."""
 
     def __init__(self, settings: Fluid3DLayerSettings) -> None:
@@ -63,10 +63,10 @@ class Fluid3DLayer(FluidLayer):
 
     def _inject(self, injection: Injection) -> None:
         fluid: Fluid3D = self._fluid
-        # The velocity's z (blue) is the w; the impulse likewise, added as the velocity is (FLOW.md's Open)
+        # The velocity's z (blue) is the w; the acceleration likewise, added as the velocity is (FLOW.md's Open)
         fluid.add_velocity(injection.velocity, injection.weight)
-        if injection.impulse is not None:
-            fluid.add_velocity(injection.impulse, injection.weight)
+        if injection.acceleration is not None:
+            fluid.add_velocity(injection.acceleration, injection.weight)
         if injection.spin is not None:
             fluid.set_spin(injection.spin, injection.weight)
         fluid.add_density(injection.density, injection.weight)

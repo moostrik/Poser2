@@ -53,7 +53,7 @@ BANNED: list[tuple[str, str]] = [
     ('hwaccel, not hwdecode', r'hwdecode'),
     ('add/remove_<kind>_callback, not register/unregister_callback', r'^register_callback$|^unregister_callback$'),
     ('glyphs, not arrows (the monitor view)', r'arrow_spacing|ArrowSpacing|VelocityArrowField|process_arrows'),
-    ('impulse, not event (the 3D bridge)', r'VelocityEvent|MotionEvent'),
+    ('change, not impulse or event (the 3D bridge)', r'[Ii]mpulse|IMPULSE|VelocityEvent|MotionEvent'),
 ]
 
 # the glossary's app sections: banned in that app's code and presets

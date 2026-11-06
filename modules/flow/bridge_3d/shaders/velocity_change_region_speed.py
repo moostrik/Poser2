@@ -1,4 +1,4 @@
-"""Velocity Impulse Region Speed shader.
+"""Velocity Change Region Speed shader.
 
 Writes the speeds of the two trails, for a fall's region means.
 """
@@ -7,7 +7,7 @@ from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, 
 from modules.gl import Shader, draw_quad, Texture
 
 
-class VelocityImpulseRegionSpeed(Shader):
+class VelocityChangeRegionSpeed(Shader):
     """Writes (fast speed, slow speed) to RG."""
 
     def use(self, fast: Texture, slow: Texture) -> None:

@@ -437,44 +437,55 @@
     "bridge": {
       "width": 448,
       "height": 800,
-      "trail": {
-        "advect": 1.0,
-        "attack": 1.0,
-        "smooth": 1000.0,
-        "blur_radius": 4.0,
-        "blur_steps": 4
+      "readings": {
+        "trail": {
+          "advect": 1.0,
+          "attack": 1.0,
+          "smooth": 1000.0,
+          "blur_radius": 4.0,
+          "blur_steps": 4
+        },
+        "change": {
+          "fast_smooth": 30.0,
+          "slow_smooth": 250.0,
+          "start_region_weight": 1.0,
+          "stop_region_weight": 1.0,
+          "start_region_size": 128.0,
+          "stop_region_size": 256.0
+        }
       },
-      "impulse": {
-        "fast_smooth": 30.0,
-        "slow_smooth": 250.0,
-        "start_region_weight": 1.0,
-        "stop_region_weight": 1.0,
-        "start_region_size": 128.0,
-        "stop_region_size": 256.0
-      },
-      "velocity": {
-        "trail": 1.0,
-        "start": 0.0,
-        "bow": 0.0,
-        "stop": 0.0,
-        "wake": 0.0
-      },
-      "density": {
-        "trail": 1.0,
-        "start": 0.0,
-        "bow": 0.0,
-        "stop": 0.0,
-        "wake": 0.0,
-        "saturation": 1.0,
-        "brightness": 1.0
-      },
-      "temperature": {
-        "trail": 1.0,
-        "start": 0.0,
-        "bow": 0.0,
-        "stop": 0.0,
-        "wake": 0.0,
-        "scale": 0.5
+      "outputs": {
+        "velocity": {
+          "trail": 1.0,
+          "start": 0.0,
+          "bow": 0.0,
+          "stop": 0.0,
+          "wake": 0.0
+        },
+        "acceleration": {
+          "trail": 0.0,
+          "start": 0.0,
+          "bow": 0.0,
+          "stop": 0.0,
+          "wake": 0.0
+        },
+        "density": {
+          "trail": 1.0,
+          "start": 0.0,
+          "bow": 0.0,
+          "stop": 0.0,
+          "wake": 0.0,
+          "saturation": 1.0,
+          "brightness": 1.0
+        },
+        "temperature": {
+          "trail": 1.0,
+          "start": 0.0,
+          "bow": 0.0,
+          "stop": 0.0,
+          "wake": 0.0,
+          "scale": 0.5
+        }
       }
     },
     "fluid": {
@@ -560,7 +571,7 @@
     },
     "monitor_b": {
       "stage": "BRIDGE",
-      "texture": "impulse.start_velocity",
+      "texture": "change.start_velocity",
       "view": "GLYPHS",
       "advanced": {
         "channel": "ALL",

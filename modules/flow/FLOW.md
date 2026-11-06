@@ -29,7 +29,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 | flow                 | the domain: everything from the camera's motion to the fluid                                          | `modules/flow`                                                     |
 | motion               | the stage that measures a velocity field from two images: the optical flow                            | `motion/`, `GradientFlow`, `LucasKanadeFlow`, `LucasKanadeFlow3D`  |
 | bridge               | the stage that turns the measured velocity into what the fluid injects: a velocity to add, density with its color, temperature, and in 3D a second velocity | `bridge_2d/`, `bridge_3d/`                 |
-| impulse              | a velocity change, Δv in widths per second, where a move starts or stops, read by the 3D bridge beside its trail: start, bow, stop, wake | `VelocityImpulseBridge`, `Impulse`, group `impulse` |
+| change               | a velocity change, Δv in widths per second, where a move starts or stops, read by the 3D bridge beside its trail: start, bow, stop, wake | `VelocityChangeBridge`, `Change`, group `change` |
 | region               | the pixels around one, which tell a part of the body changing speed from a limb arriving or leaving | `start_region_size`, `stop_region_size`, `*_region_weight`         |
 | injection            | one bridge output as one fluid takes it, at its weight                                                | `Injection`                                                        |
 | fluid                | the Navier–Stokes simulation; its density is the show                                                  | `fluid_2d/`, `fluid_3d/`, `Fluid2D`, `Fluid3D`                     |
@@ -78,7 +78,7 @@ and every component that owns textures names them once with their kinds in its `
 components once (`_components`), by their settings group, and its `ports`, what the monitors
 show, is one list with the data running bottom to top, the prefix its group: `output.*` on top,
 each component's from the last the stage runs to the first (`z.track`, `xy.solve`,
-`impulse.fast`, `trail.output`), `input.*` at the bottom. A texture not allocated is left out, so a part the stage does not run gives none.
+`change.fast`, `trail.output`), `input.*` at the bottom. A texture not allocated is left out, so a part the stage does not run gives none.
 Not by reflection over attributes: it would find
 the FBOs, not their kinds, and a swap's back buffer would be a port too. A layer's `texture` stays
 what it draws, read by the composite. The layers hold no reference to each other, and no input knows an output's type. A field is named with the same noun for the
@@ -95,8 +95,8 @@ an output, or they would be the tick before's.
 | Stage  | Input `@dataclass`, built by the app each tick                                                                                      | Output `@dataclass`, the stage's textures                                                                |
 |--------|-------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
 | motion | `MotionInput`: `image`, the picture the velocity is measured on by its brightness; `timestamp`, the capture time of the camera frame `image` holds, the frame's identity; `dt`, the render tick's; `depth`, a `DepthView` or `None`; `mask`, or `None` | `MotionOutput`: `velocity` (x, y, z), gated by `mask` with the 3D flow's `use_mask`; z is 0 without depth |
-| bridge | `BridgeInput`: `velocity`, from the motion output; `dt`; `image`, or `None`, the picture whose RGB colors the density; `color`, an RGB tint on it, white by default; `mask`, or `None`, which gates the image | `BridgeOutput`: `velocity`; `density`, what the fluid injects: in 2D the amount alone, the trail's speed (R); in 3D RGBA, the amount (the mix's, [The mix](#the-mix)) times `color`, times the image's RGB where there is one, with the amount as alpha; `temperature`; `impulse`, a second velocity, the velocity changes where moves start and stop, or `None` |
-| fluid  | `FluidInput`: `dt`, and `injections`, a list of `Injection`: `velocity`, `density`, `temperature`, `impulse` from one bridge output, and `spin`, which no bridge gives, with `weight`, 0 to 1, the injection's share of the fluid's velocity, density and temperature, as a layer's weight in the light renderer's mix, and `color`, the color the 2D fluid gives the injection's density at its output; the app builds one injection per bridge it wants in that fluid | `FluidOutput`: `density`, the show, which the composite draws as the layer's `texture` |
+| bridge | `BridgeInput`: `velocity`, from the motion output; `dt`; `image`, or `None`, the picture whose RGB colors the density; `color`, an RGB tint on it, white by default; `mask`, or `None`, which gates the image | `BridgeOutput`: `velocity`; `density`, what the fluid injects: in 2D the amount alone, the trail's speed (R); in 3D RGBA, the amount (the mix's, [The mix](#the-mix)) times `color`, times the image's RGB where there is one, with the amount as alpha; `temperature`; `acceleration`, a second velocity the fluid takes as an acceleration, or `None` |
+| fluid  | `FluidInput`: `dt`, and `injections`, a list of `Injection`: `velocity`, `density`, `temperature`, `acceleration` from one bridge output, and `spin`, which no bridge gives, with `weight`, 0 to 1, the injection's share of the fluid's velocity, density and temperature, as a layer's weight in the light renderer's mix, and `color`, the color the 2D fluid gives the injection's density at its output; the app builds one injection per bridge it wants in that fluid | `FluidOutput`: `density`, the show, which the composite draws as the layer's `texture` |
 | monitor | `MonitorInput`: `ports`, every stage's ports keyed by stage; the monitor picks by its own `stage` and `texture` | none: it draws                                                                                           |
 
 The motion layer measures once per camera frame: when `timestamp` differs from the one it last
@@ -157,11 +157,11 @@ context of its own, would move the wait to the bridge, and the screen still show
 | `MotionLayer` (ABC)                         | `StageLayer[MotionInput, MotionOutput]`; `_update()` as the template method: `_measure` on a new frame. Holds the allocate and resize pattern; the flow runs at `settings.width` by `settings.height`. Draws nothing |
 | `Motion2DLayer`, `Motion3DLayer`            | the subclasses, each on its optical flow (`GradientFlow`; `LucasKanadeFlow3D`). The 2D flow's velocity is per frame, not per second, and it reads no mask, until the 2D flow moves to the Lucas–Kanade solve |
 | `BridgeLayer` (ABC)                         | `StageLayer[BridgeInput, BridgeOutput]`; `_update()`: the density's color (`DensityColor`: the image, or white, times the tint, gated by the mask), `_bridge` the input's velocity into velocity, density and temperature. The bridges' filters run at the velocity's size and their outputs at `settings.width` by `settings.height`; the layer follows both. Draws nothing |
-| `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, the velocity trail and beside it the velocity impulse bridge, [The impulses](#the-impulses), and their mix, [The mix](#the-mix)) |
+| `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, the velocity trail and beside it the velocity change bridge, [The changes](#the-changes), and their mix, [The mix](#the-mix)) |
 | `FluidLayer` (ABC)                          | `StageLayer[FluidInput, FluidOutput]`; `_update()`: `_inject` each injection's velocity, density and temperature at its weight, `_step(dt)`; `texture`, the show. Knows injections, not cameras; reads no poses. The stage's reset is the fluid's only one |
-| `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's. `Fluid3DLayer` injects RGBA density, the impulse (added as the velocity is) and a spin where one is given, the velocity's z as the volume's w (its sign turned: w points away from the viewer), and takes the parallax eye the app steers by `set_eye(x, y)` |
+| `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's. `Fluid3DLayer` injects RGBA density, the acceleration (added as the velocity is) and a spin where one is given, the velocity's z as the volume's w (its sign turned: w points away from the viewer), and takes the parallax eye the app steers by `set_eye(x, y)` |
 | `MonitorLayer`                              | `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's port names (`names`, the options of `texture`); `draw()` renders the port once per tick, however many panels show it, by its kind or by `view`, and nothing while not shown; its views and settings are in [MONITOR.md](MONITOR.md). Not a stage, since it has no output and no `reset` |
-| `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass, each a `StageLayerSettings`: `reset`, then `width` and `height`, the stage's working size, first on every stage's panel. The motion's is the size its flow runs at, the bridge's the size it writes its outputs at (its filters follow the velocity's size), the fluid's its simulation grid (its density is at the size the app allocates). On the fluid layer `blend_mode`. A layer whose stage runs one component is that component's settings too (`Motion2DLayerSettings` is a `GradientFlowSettings`, `Motion3DLayerSettings` a `LucasKanadeFlow3DSettings`, the fluid layers' a `Fluid2DSettings` and a `Fluid3DSettings`), so the component's fields and groups sit on the stage's panel; the bridge layers, running several bridges, hold each as a group (`trail`, `impulse`, then the outputs with their mix, `velocity`, `density`, `temperature`). No `draw_mode`, `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take `dt` from their input |
+| `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass, each a `StageLayerSettings`: `reset`, then `width` and `height`, the stage's working size, first on every stage's panel. The motion's is the size its flow runs at, the bridge's the size it writes its outputs at (its filters follow the velocity's size), the fluid's its simulation grid (its density is at the size the app allocates). On the fluid layer `blend_mode`. A layer whose stage runs one component is that component's settings too (`Motion2DLayerSettings` is a `GradientFlowSettings`, `Motion3DLayerSettings` a `LucasKanadeFlow3DSettings`, the fluid layers' a `Fluid2DSettings` and a `Fluid3DSettings`), so the component's fields and groups sit on the stage's panel; the bridge layers, running several bridges, hold them in two subpanels (the 3D bridge's `readings`, `trail` and `change`, and `outputs`, `velocity`, `acceleration`, `density`, `temperature`, each with its mix). No `draw_mode`, `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take `dt` from their input |
 
 The apps' render is a layer graph of `LayerBase` layers updated by one loop calling `update()`
 on each (`apps/deep_flow/render.py`, `apps/hd_trio/render.py`), with a wiring pass before it
@@ -180,15 +180,17 @@ any layer, and two show A beside B.
 
 ## The 3D bridge
 
-The bridge reads two things from a movement: the motion itself, a push in its direction that is
-stronger for fast than for slow and coasts after a stop; and its impulses, the velocity changes
-where a move starts and where it stops. The motion wants a long, soft reading, the impulses a
-short, sharp one, so they are two bridges side by side on the same velocity (`bridge_3d/`):
+The bridge reads two things from a movement: the motion itself, a velocity in its direction that
+is stronger for fast than for slow and coasts after a stop; and its changes, the velocity changes
+where a move starts and where it stops. The motion wants a long, soft reading, the changes a
+short, sharp one, so they are two bridges side by side on the same velocity (`bridge_3d/`), the
+readings; the outputs mix them into what the fluid takes ([The mix](#the-mix)). The panel shows
+them as two subpanels, `readings` and `outputs`:
 
-| Bridge                  | Reads                                                         | Gives                                                          | Panel group |
-|-------------------------|---------------------------------------------------------------|----------------------------------------------------------------|-------------|
-| `VelocityTrailBridge`   | the flow's velocity through one trail: advect, attack/smooth, blur | `smooth_velocity`, the push; its speed is the density amount  | `trail`     |
-| `VelocityImpulseBridge` | the flow's velocity through a fast and a slow trail, and their regions | `start`, `bow`, `stop`, `wake`, each also as `<impulse>_velocity` | `impulse`   |
+| Bridge                 | Reads                                                                  | Gives                                                              | Panel group       |
+|------------------------|------------------------------------------------------------------------|--------------------------------------------------------------------|-------------------|
+| `VelocityTrailBridge`  | the flow's velocity through one trail: advect, attack/smooth, blur     | `smooth_velocity`, the trail; its speed is the density amount      | `readings.trail`  |
+| `VelocityChangeBridge` | the flow's velocity through a fast and a slow trail, and their regions | `start`, `bow`, `stop`, `wake`, each also as `<change>_velocity`   | `readings.change` |
 
 The fluid makes its own swirl from what it is given, so the bridge gives no curl of its own.
 
@@ -203,20 +205,19 @@ trail with its own motion before each step, so the average follows a moving limb
 fixed pixel. `blur_radius` and `blur_steps` spread it in space; the ring it leaves around the
 body is part of the look **(site fact)**.
 
-### The impulses
+### The changes
 
 The difference of the fast and the slow trail along the motion's direction rises where a move
 starts and falls where it stops; it lasts about `slow_smooth`, as the slow trail catches up. It is
 divided by the trails' step peak (`step_peak`, 0.58 at 25 and 150 ms), so a limb at speed v that
-starts or stops at once reads v: the impulses are in the motion's own strength, image widths per
-second, a velocity change Δv, an impulse in the physics sense (a change of momentum per unit of
-mass), and a gradual start or stop reads less, by how much of its speed changes within the trails'
-times. A pixel cannot tell a move starting from a limb arriving at it, nor a move stopping from a limb
+starts or stops at once reads v: the changes are in the motion's own unit, image widths per
+second, a velocity change Δv, and a gradual start or stop reads less, by how much of its speed
+changes within the trails' times. A pixel cannot tell a move starting from a limb arriving at it, nor a move stopping from a limb
 leaving it: its speed rises or falls either way. The region around it can, so the region splits
 each pixel's rise and fall in two, by the region weight (`start_region_weight`,
 `stop_region_weight`; 0 gives all of it to the start and the stop):
 
-| Impulse | Is                                              | Along                 |
+| Change | Is                                               | Along                 |
 |--------|--------------------------------------------------|-----------------------|
 | start  | the share of a rise its region shares: a part of the body speeding up | the fast trail's direction |
 | bow    | the rest of the rise: a limb arriving, the wave in front of it        | the fast trail's direction |
@@ -235,33 +236,32 @@ Start + bow is a pixel's whole rise, stop + wake its whole fall. What a region s
   limb keeps, where a mean velocity would shrink and read as a stop. The trails lag at the pixels
   a limb leaves, so a leaving limb lowers it too: part of a wake reads as a stop.
 
-The impulses read x, y and z alike. The bridge filters in time only: noise within a frame is the
-motion's to filter, and the trail's blur is a look. An impulse takes no hold: it lasts about
+The changes read x, y and z alike. The bridge filters in time only: noise within a frame is the
+motion's to filter, and the trail's blur is a look. A change takes no hold: it lasts about
 `slow_smooth` by itself, and what a stop injects is the speed it ended, as a hold would lift steady
-motion as much as the stops. No blur and no advect: the impulses stay sharp. The
-impulse bridge runs while the mix takes an impulse or a monitor shows one of its ports.
+motion as much as the stops. No blur and no advect: the changes stay sharp. The change bridge
+runs while an output takes a change or a monitor shows one of its ports.
 
 ### The mix
 
-What the fluid takes is a mix of the two bridges, each source at a share, 0 to 1, as the light
-renderer mixes its layers (`Bridge3DLayer`, `WeightedSum`). Each output's panel group holds its
-five shares as knobs on the first row (`MixSettings`: `trail`, `start`, `bow`, `stop`, `wake`),
-and the density's and the temperature's own settings on the second (`DensityMixSettings`,
-`TemperatureMixSettings`):
+What the fluid takes is a mix of the two readings, each output named after the quantity it is and
+each source at a share, 0 to 1, as the light renderer mixes its layers (`Bridge3DLayer`,
+`WeightedSum`). Each output's group in `outputs` holds the five shares as knobs on the first row
+(`MixSettings`: `trail`, `start`, `bow`, `stop`, `wake`), and the density's and the temperature's
+own settings on the second (`DensityMixSettings`, `TemperatureMixSettings`):
 
-| Output        | Sources                                           | Second row             | Panel group   | Default       |
-|---------------|---------------------------------------------------|------------------------|---------------|---------------|
-| `velocity`    | the trail                                         |                        | `velocity`    | the trail 1   |
-| `impulse`     | the start, bow, stop and wake velocities          |                        | `velocity`    | all 0: `None` |
-| `density`     | the trail's speed, the start, bow, stop and wake  | saturation, brightness | `density`     | the trail 1   |
-| `temperature` | the same, as the temperature's mask               | scale                  | `temperature` | the trail 1   |
+| Output         | Sources                                                        | Second row             | Default       |
+|----------------|----------------------------------------------------------------|------------------------|---------------|
+| `velocity`     | the trail's velocity, the start, bow, stop and wake velocities |                        | the trail 1   |
+| `acceleration` | the same                                                       |                        | all 0: `None` |
+| `density`      | the trail's speed, the start, bow, stop and wake               | saturation, brightness | the trail 1   |
+| `temperature`  | the same, as the temperature's mask                            | scale                  | the trail 1   |
 
 The sources share one unit, image widths per second, so the mix has no gain: the motion's gains
-balance the axes and the fluid's gains set the strength; a weight is a share. The trail and the
-impulse are mixed in one group and stay two velocity outputs, since a fluid may take a velocity
-and a velocity change two ways ([Open](#open)); the 3D fluid adds both as the velocity is added
-today, so mixing them in one group is mixing them in the fluid. The mix's ports are
-`mix.velocity`, `mix.impulse`, `mix.density` and `mix.temperature`.
+balance the axes and the fluid's gains set the strength; a weight is a share. The velocity and the
+acceleration are two outputs, since a fluid takes a velocity and an acceleration two ways
+([Open](#open)); the 3D fluid adds both as the velocity is added today. The mix's ports are
+`mix.velocity`, `mix.acceleration`, `mix.density` and `mix.temperature`.
 
 ### Measured
 
@@ -270,7 +270,7 @@ from rest, with starts and stops, a player at 0.65–1.5 m), its frames as captu
 (`temp/depth_track_1105/`, 1449 frames, 25 fps, the stamps the replay's decode times), the flow run
 again on them with deep_flow's preset flow of 2026-11-06 (levels 4, same_surface and xy_smooth on,
 the depth velocity's `smooth` 50 ms unless named), each bridge at its preset values (trail: smooth
-1000 ms, attack 1 ms, advect 1, blur 4 px × 4; impulse: 25 / 150 ms, both region weights 1,
+1000 ms, attack 1 ms, advect 1, blur 4 px × 4; change: 25 / 150 ms, both region weights 1,
 regions 128 px), stepped once per flow frame. Per frame, the mean over the body's pixels that move
 in the loop; noise is the still part's p99 per pixel; slow and fast are the steady halves of the
 moves; stop ÷ fast is the stop window's peak over steady fast motion, start ÷ fast the start
@@ -308,7 +308,7 @@ stop's noise is four times higher.
 | GPU, each bridge alone | Mean, ms | p95, ms |
 |------------------------|----------|---------|
 | the trail              | 1.55     | 2.13    |
-| the impulse bridge     | 1.88     | 2.38    |
+| the change bridge      | 1.88     | 2.38    |
 
 Advice, from these numbers on this clip:
 
@@ -319,8 +319,8 @@ Advice, from these numbers on this clip:
 | `stop_region_weight`          | 1      | without it the stop's noise is four times higher and its stops half as distinct |
 
 The clip moves whole arms from rest, so a limb arriving and a part speeding up come together: the
-start and bow split, `start_region_*`, `fast_smooth` and z's impulses toward the camera are not
-tested on it, and the trail's and impulse bridge's own settings are left as the preset.
+start and bow split, `start_region_*`, `fast_smooth` and z's changes toward the camera are not
+tested on it, and the trail's and change bridge's own settings are left as the preset.
 
 ## Packages
 
@@ -426,35 +426,23 @@ The shader loader finds a shader's source by its `.py` module name beside it
   Fluids adds a source; but the bridge's velocity is a velocity, in view widths per second like
   the fluid's, so it is taken as an acceleration, `velocity.gain` acts as a rate, and the fluid
   stays near 0.05 to 0.1 of the motion's speed **(deduction)**, a monitor needing a scale of 20 to
-  30 to show it. In Navier–Stokes the external force term is an acceleration per unit mass, as
-  gravity and buoyancy enter. The rule, by what each input is:
-
-  | Input is           | The fluid                                                            | From the bridge                  |
-  |--------------------|----------------------------------------------------------------------|----------------------------------|
-  | a body's velocity  | takes it where the body is, a moving boundary: set, or pulled toward it at a share from a time constant, never past it | the trail's push   |
-  | an impulse, Δv     | adds it once in total, without dt                                    | the start, bow, stop and wake    |
-  | an acceleration    | adds it times dt                                                     | buoyancy, the spin's vorticity force |
-  | a source           | adds it times dt, an amount per second                               | density, temperature             |
-
-  The moving boundary is the physical model of a body in a fluid: the fluid touching it moves with
-  it, and coasts on its own inertia once it stops. An impulse is added once: it lasts about
-  `slow_smooth` over many ticks, so added directly each tick it counts once per tick, and a
-  velocity added without dt every tick runs away while a limb keeps moving, 60 times its speed in
-  a second; spread over its ticks, its rate (the change over its duration) times dt adds about its
-  Δv in all **(deduction)**. A toggle between the force (as now) and these keeps today's look
-  comparable.
+  30 to show it. In Navier–Stokes an outside term is an acceleration per unit mass, as gravity and
+  buoyancy enter. The bridge gives the two quantities apart, `velocity` and `acceleration`; how
+  the fluid takes each, the velocity as a velocity and the acceleration times dt, is the fluid
+  refactor's. A change lasts about `slow_smooth` over many ticks, so a velocity change added
+  without dt every tick would count once per tick, 60 times its Δv in a second **(deduction)**.
 - hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
   the pose's motion, a settings field written per tick. A per-tick value on the fluid layer, as the
   eye is, would take it off the settings.
 - Unused channels written 0 in the whole flow module. The 3D motion's and the 3D bridge's
   velocities write 0 in their unused w (`compose_velocity.frag`, `velocity_trail.frag`,
-  `velocity_impulse_direction.frag`), so a monitor shows w as
+  `velocity_change_direction.frag`), so a monitor shows w as
   nothing rather than a full strip lane and a histogram spike at 1 × `scale`. The rest of
   `modules/flow` still writes 1.0 into unused channels, an alpha left from when the monitors
   blitted textures as they are: among others `gradient_flow_shader.frag`,
-  `lucas_kanade_shader.frag`, `displacement_threshold.frag`, the impulse scalars and
+  `lucas_kanade_shader.frag`, `displacement_threshold.frag`, the change scalars and
   `magnitude_shader.frag`. It matters only where the target texture has that channel (an R16F
   target drops it). Each wants its readers checked first, as the velocities' were: there the
-  trails, the impulse shaders, `VelocityMagnitude` and `inject_flow_3d.comp` read xyz only,
+  trails, the change shaders, `VelocityMagnitude` and `inject_flow_3d.comp` read xyz only,
   `trail_advect.frag` carries the vec4 along unread, and `Fluid3D.set_velocity` has no caller.
   The visualization's own shaders keep alpha 1, since they draw for the screen.
