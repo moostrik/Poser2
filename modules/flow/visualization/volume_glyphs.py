@@ -8,7 +8,7 @@ from OpenGL.GL import GL_DEPTH_BUFFER_BIT, GL_DEPTH_TEST, GL_LESS, GL_RGBA8, glC
 
 from modules.gl import Fbo, Style, Texture, Texture3D
 from .orbit import FOV, Orbit, box_size
-from .shaders import CubeEdges, GlyphArrows, GlyphDots
+from .shaders import CubeAxes, CubeEdges, GlyphArrows, GlyphDots
 
 GRID_LIMIT: int = 96        # grid points across at most
 
@@ -27,6 +27,7 @@ class VolumeGlyphs:
         self._arrows: GlyphArrows = GlyphArrows()
         self._dots: GlyphDots = GlyphDots()
         self._edges: CubeEdges = CubeEdges()
+        self._axes: CubeAxes = CubeAxes()
 
     @property
     def texture(self) -> Texture:
@@ -36,12 +37,14 @@ class VolumeGlyphs:
         self._arrows.allocate()
         self._dots.allocate()
         self._edges.allocate()
+        self._axes.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._arrows.deallocate()
         self._dots.deallocate()
         self._edges.deallocate()
+        self._axes.deallocate()
 
     def resize(self, width: int, height: int) -> None:
         if self._fbo.allocated and (self._fbo.width, self._fbo.height) == (width, height):
@@ -73,6 +76,8 @@ class VolumeGlyphs:
             self._arrows.use(volume, matrix, box, grid, scale)
         self._edges.reload()
         self._edges.use(matrix, box)
+        self._axes.reload()
+        self._axes.use(matrix, box)
         glDisable(GL_DEPTH_TEST)
         Style.pop_style()
         self._fbo.end()

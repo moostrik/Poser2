@@ -22,12 +22,12 @@ from . import bridge_2d
 from .bridge_3d import  DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
                         BlurPosition, KineticBridge, KineticBridgeSettings, decay_weight, project, stop_gate, hold_release, drop, fill_reservoir, advect, \
                         VelocityTrailBridge, VelocityTrailBridgeSettings, velocity_trail, \
-                        VelocityEventBridge, VelocityEventBridgeSettings, velocity_event, event_velocity, \
+                        VelocityEventBridge, VelocityEventBridgeSettings, velocity_event, event_gate, event_velocity, \
                         TemperatureBridge, TemperatureBridgeSettings
 
 # Visualization
 from .visualization import Visualizer, histogram_grid, histogram_volume_grid, Strip, ALL_CHANNELS, summary_grid, Legend, LegendKind, DrawnSize, \
-                           VolumeCut, VolumeCube, VolumeGlyphs, VolumeFog, glyph_grid, Cut, cut_size, projects_max, Orbit, box_size
+                           VolumeCut, VolumeCube, VolumeGlyphs, VolumeFog, glyph_grid, Cut, cut_size, projects_max, Orbit, box_size, axis_labels
 
 # Shared by the 2D and 3D fluid
 from .time_step import TimeStep, TimeStepMode, hold_tick

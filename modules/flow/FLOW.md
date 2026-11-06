@@ -152,7 +152,7 @@ context of its own, would move the wait to the bridge, and the screen still show
 | `MotionLayer` (ABC)                         | `StageLayer[MotionInput, MotionOutput]`; `_update()` as the template method: `_measure` on a new frame. Holds the allocate and resize pattern; the flow runs at `settings.width` by `settings.height`. Draws nothing |
 | `Motion2DLayer`, `Motion3DLayer`            | the subclasses, each on its optical flow (`GradientFlow`; `LucasKanadeFlow3D`). The 2D flow's velocity is per frame, not per second, and it reads no mask, until the 2D flow moves to the Lucas–Kanade solve |
 | `BridgeLayer` (ABC)                         | `StageLayer[BridgeInput, BridgeOutput]`; `_update()`: the density's color (`DensityColor`: the image, or white, times the tint, gated by the mask), `_bridge` the input's velocity into velocity, density and temperature. The bridges' filters run at the velocity's size and their outputs at `settings.width` by `settings.height`; the layer follows both. Draws nothing |
-| `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, with `method` picking the trail or the kinetic bridge, whose curl is scaled by `onset.spin`; beside the trail the velocity event bridge, its start and stop, run while a monitor shows one of its ports, through their `prepare`, and not yet in the output) |
+| `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, with `method` picking the trail or the kinetic bridge, whose curl is scaled by `onset.spin`; beside the trail the velocity event bridge, its start and stop, each gated by its patch speeding up (its mean x/y velocity) or slowing down (its mean speed), run while a monitor shows one of its ports, through their `prepare`, and not yet in the output) |
 | `FluidLayer` (ABC)                          | `StageLayer[FluidInput, FluidOutput]`; `_update()`: `_inject` each injection's velocity, density and temperature at its weight, `_step(dt)`; `texture`, the show. Knows injections, not cameras; reads no poses. The stage's reset is the fluid's only one |
 | `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's. `Fluid3DLayer` injects RGBA density, onset and spin, the velocity's z as the volume's w (its sign turned: w points away from the viewer), and takes the parallax eye the app steers by `set_eye(x, y)` |
 | `MonitorLayer`                              | `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's port names (`names`, the options of `texture`); `draw()` renders the port once per tick, however many panels show it, by its kind or by `view`, and nothing while not shown; its views and settings are in [The monitor](#the-monitor). Not a stage, since it has no output and no `reset` |
@@ -301,7 +301,9 @@ kinds of `TextureKind`.
 - The strip's height is logarithmic over three decades, `(log10(mean × scale) + 3) / 3`: a frame's
   mean amount spans decades between a still player and a fast move, so a linear lane clips the one
   or loses the other. `scale` slides the window; a bar a third taller is ten times the amount.
-- With `legend` on, the strip and the histogram show their log axis over the plot
+- With `legend` on, every view has a title at the top center, the stage and the port shown
+  (`motion / output.velocity`, a slash since the font atlas holds ASCII), and the colormap's key
+  sits under it. The strip and the histogram show their log axis over the plot
   (`Legend`): the lane names, a 2 px grey line at each round decade labeled with what it reads
   (the strip's mean amount, 0.001, 0.01, 0.1, 1; the histogram's share of the samples, 0.01%,
   0.1%, 1%, 10%), and the histogram's 0 and its ±1/`scale` limits. `COLORMAP` shows a color key
@@ -339,7 +341,7 @@ box, so the density's `layers` and the simulation's `sim_layers` need not match.
 
   | `cut`    | Means                                                                       |
   |----------|-----------------------------------------------------------------------------|
-  | `CUBE`   | the layers stacked in the box, one instanced draw from the far side to the near one, partly transparent; the selected layer opaque and pulled out, a gap on both sides fading over the next layers; the box's edges |
+  | `CUBE`   | the layers stacked in the box, one instanced draw from the far side to the near one, partly transparent; the selected layer opaque and pulled out, a gap on both sides fading over the next layers; the box's edges and axes |
   | `FOG`    | the volume drawn continuously, a ray per pixel marched front to back, each sample colored as `IMAGE` or `COLORMAP` colors it and its amount its opacity; the box's edges |
   | `SLICE`  | the selected layer                                                          |
   | `FRONT`, `TOP`, `SIDE` | the projection along z, y or x: the max for an image port, the mean for a velocity or a scalar, whose signs would cancel in a max; in the box's proportions, the top width × depth with the front at the bottom, the side depth × height with the front on the right |
@@ -347,7 +349,11 @@ box, so the density's `layers` and the simulation's `sim_layers` need not match.
 - `IMAGE` and `COLORMAP` draw the cube or the fog; `GLYPHS` draws in 3D on either: lit arrows of
   a small mesh per grid point, so one pointing at the camera still shows, or a scalar's dots as
   point sprites, both with the depth test (`Fbo(depth=True)`), at most 96 across (`glyph_grid`).
-  The stacked layers take no depth test, since they blend far to near. The strip reads a volume's
+  The stacked layers take no depth test, since they blend far to near. Every 3D view draws the box's
+  edges and, from its first corner (x 0, y 0, the front layer), its axes 3 px wide in the
+  colormap's colors at 1 (`CubeAxes`): x red along the width, y green up, z blue into the depth.
+  With `legend` on, each axis's letter sits past its end (`axis_labels`, the legend redrawn when
+  the camera moves). The strip reads a volume's
   front mean, the volume's mean; the histogram counts a grid through every layer, at most
   128 × 128 across (`histogram_volume_grid`). A view with no 3D draw of its own on a 3D cut takes
   the slice.

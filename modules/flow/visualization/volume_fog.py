@@ -7,7 +7,7 @@ from OpenGL.GL import GL_RGBA8
 
 from modules.gl import Fbo, Style, Texture, Texture3D
 from .orbit import Orbit, box_size
-from .shaders import CubeEdges, VolumeFogShader
+from .shaders import CubeAxes, CubeEdges, VolumeFogShader
 
 STEPS: int = 96             # samples along a ray through the whole box
 DENSITY: float = 6.0        # opacity per box width at an amount of 1
@@ -20,6 +20,7 @@ class VolumeFog:
         self._fbo: Fbo = Fbo()
         self._fog: VolumeFogShader = VolumeFogShader()
         self._edges: CubeEdges = CubeEdges()
+        self._axes: CubeAxes = CubeAxes()
 
     @property
     def texture(self) -> Texture:
@@ -28,11 +29,13 @@ class VolumeFog:
     def allocate(self) -> None:
         self._fog.allocate()
         self._edges.allocate()
+        self._axes.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._fog.deallocate()
         self._edges.deallocate()
+        self._axes.deallocate()
 
     def resize(self, width: int, height: int) -> None:
         if self._fbo.allocated and (self._fbo.width, self._fbo.height) == (width, height):
@@ -55,6 +58,8 @@ class VolumeFog:
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         self._edges.reload()
         self._edges.use(matrix, box)
+        self._axes.reload()
+        self._axes.use(matrix, box)
         Style.pop_style()
         self._fbo.end()
         return self._fbo

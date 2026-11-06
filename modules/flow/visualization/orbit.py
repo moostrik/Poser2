@@ -61,6 +61,28 @@ class Orbit:
         return perspective(FOV, aspect, 0.05, float(np.linalg.norm(eye)) * 4.0) @ look_at(eye, np.zeros(3), np.array([0.0, 1.0, 0.0]))
 
 
+AXIS_CORNER: tuple[float, float, float] = (-0.5, -0.5, 0.5)     # x 0, y 0, the front layer, in shares of the box
+AXIS_ENDS: tuple[tuple[str, tuple[float, float, float]], ...] = (
+    ('x', (0.5, -0.5, 0.5)), ('y', (-0.5, 0.5, 0.5)), ('z', (-0.5, -0.5, -0.5)))
+LABEL_REACH: float = 1.1    # a letter sits past its axis's end, by a share of the axis
+
+
+def axis_labels(view_projection: np.ndarray, box: tuple[float, float, float], width: int, height: int) -> list[tuple[str, float, float]]:
+    """Each axis's letter and where it goes in a view `width` × `height`: in pixels from the top left,
+    just past the end of the box's edge along that axis from its first corner; none behind the camera."""
+    size: np.ndarray = np.asarray(box)
+    corner: np.ndarray = np.asarray(AXIS_CORNER) * size
+    labels: list[tuple[str, float, float]] = []
+    for name, end in AXIS_ENDS:
+        tip: np.ndarray = corner + (np.asarray(end) * size - corner) * LABEL_REACH
+        clip: np.ndarray = view_projection @ np.append(tip, 1.0)
+        if clip[3] <= 1e-6:
+            continue
+        x, y = clip[0] / clip[3], clip[1] / clip[3]
+        labels.append((name, (x + 1.0) * 0.5 * width, (1.0 - y) * 0.5 * height))
+    return labels
+
+
 def look_at(eye: np.ndarray, target: np.ndarray, up: np.ndarray) -> np.ndarray:
     """The view matrix of a camera at `eye` looking at `target` (row-major)."""
     forward: np.ndarray = target - eye

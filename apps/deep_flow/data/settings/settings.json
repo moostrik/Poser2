@@ -7,7 +7,7 @@
     "keyframe_interval": 50,
     "color": true,
     "resolution": "P720",
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "fov": 80.0,
     "split_seconds": 60,
@@ -31,8 +31,8 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 3216,
-        "auto_exposure": false,
+        "iso": 394,
+        "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
         "auto_iso_limit": 16585,
@@ -446,6 +446,14 @@
         "blur_radius": 4.0,
         "blur_steps": 4
       },
+      "event": {
+        "fast_smooth": 0.025,
+        "slow_smooth": 0.15,
+        "z_weight": 1.0,
+        "hold": 0.1,
+        "stop_gate": 1.0,
+        "stop_tile": 128.0
+      },
       "kinetic": {
         "scale_x": 1.0,
         "scale_y": 1.0,
@@ -492,7 +500,7 @@
       "fps_smoothing": 1.0,
       "speed": 0.4,
       "volume": {
-        "layers": 32,
+        "layers": 24,
         "sim_layers": 16,
         "spacing": 4.0,
         "emission": 1.16,
@@ -556,7 +564,7 @@
       "view": "AUTO",
       "advanced": {
         "channel": "ALL",
-        "cut": "CUBE",
+        "cut": "FOG",
         "scale": 1.0,
         "glyph_spacing": "SPACING_16",
         "legend": true,
@@ -565,8 +573,8 @@
     },
     "monitor_b": {
       "stage": "FLUID",
-      "texture": "density",
-      "view": "GLYPHS",
+      "texture": "velocity",
+      "view": "COLORMAP",
       "advanced": {
         "channel": "ALL",
         "cut": "FOG",
@@ -661,10 +669,10 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M0",
-      "x": 1708,
+      "x": 2561,
       "y": 31,
-      "width": 851,
-      "height": 1360,
+      "width": 1278,
+      "height": 2080,
       "secondary_list": [
         "M1"
       ],

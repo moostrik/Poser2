@@ -37,7 +37,7 @@ class Legend:
         self._text: Text = Text()
         self._grid: LogGrid = LogGrid()
         self._key: ColormapKey = ColormapKey()
-        self._drawn: tuple[LegendKind, int, float, int] | None = None     # what the FBO shows
+        self._drawn: tuple[LegendKind | None, int, float, int, tuple[tuple[str, int, int], ...], str] | None = None   # what the FBO shows
 
     @property
     def texture(self) -> Texture:
@@ -66,10 +66,13 @@ class Legend:
         self._key.deallocate()
         self._drawn = None
 
-    def update(self, kind: LegendKind, channel: int, scale: float, samples: int) -> None:
+    def update(self, kind: LegendKind | None, channel: int, scale: float, samples: int,
+               axes: list[tuple[str, float, float]] | None = None, title: str = '') -> None:
         """Draw the legend for this plot, unless it shows it already; `samples` is the histogram's
-        total of samples counted."""
-        shown: tuple[LegendKind, int, float, int] = (kind, channel, scale, samples)
+        total of samples counted. `axes` are a 3D view's axis letters, each with its place in pixels
+        from the top left (`axis_labels`); `title` goes at the top center, what is shown."""
+        letters: tuple[tuple[str, int, int], ...] = tuple((name, round(x), round(y)) for name, x, y in axes or [])
+        shown = (kind, channel, scale, samples, letters, title)
         if shown == self._drawn or not self._fbo.allocated:
             return
         self._drawn = shown
@@ -79,11 +82,32 @@ class Legend:
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)     # the shapes' alpha stored as is, for the blit to apply once
         if kind == LegendKind.COLORMAP:
-            self._draw_key(channel, scale)
-        else:
+            self._draw_key(channel, scale, self._title_height(title))
+        elif kind is not None:
             self._draw_axis(kind, channel, scale, samples)
+        self._draw_letters(letters)
+        self._draw_title(title)
         Style.pop_style()
         self._fbo.end()
+
+    def _draw_title(self, title: str) -> None:
+        """The title at the top center."""
+        if not title or not self._text.allocated:
+            return
+        w, h = self._fbo.width, self._fbo.height
+        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        text_w: int = self._text.measure_text(title)[0]
+        self._text.draw_box_text((w - text_w) / 2, MARGIN, title, TEXT, BOX, w, h)
+
+    def _draw_letters(self, letters: tuple[tuple[str, int, int], ...]) -> None:
+        """Each axis's letter centered on its place."""
+        if not letters or not self._text.allocated:
+            return
+        w, h = self._fbo.width, self._fbo.height
+        Style.set_blend_mode(Style.BlendMode.ALPHA)
+        for name, x, y in letters:
+            text_w, text_h = self._text.measure_text(name)
+            self._text.draw_box_text(x - text_w / 2, y - text_h / 2, name, TEXT, BOX, w, h)
 
     def _draw_axis(self, kind: LegendKind, channel: int, scale: float, samples: int) -> None:
         """The lane names, a line at each decade with its label, and the histogram's 0 and limits."""
@@ -111,15 +135,21 @@ class Legend:
         if kind == LegendKind.HISTOGRAM:
             self._draw_limits(scale, MARGIN, w - MARGIN, h - MARGIN)
 
-    def _draw_key(self, channel: int, scale: float) -> None:
-        """In the top left, a color bar per channel shown with its name, and -1, 0 and 1 after
-        `scale` under them."""
+    def _title_height(self, title: str) -> float:
+        """The pixels the title takes at the top, with its margin; 0 without one."""
+        if not title or not self._text.allocated:
+            return 0.0
+        return float(self._text.measure_text(title)[1] + MARGIN)
+
+    def _draw_key(self, channel: int, scale: float, below: float = 0.0) -> None:
+        """In the top left, `below` pixels down, a color bar per channel shown with its name, and
+        -1, 0 and 1 after `scale` under them."""
         w, h = self._fbo.width, self._fbo.height
         names: tuple[str, ...] = LANES[:3] if channel == ALL_CHANNELS else (LANES[channel],)
         bars: int = len(names)
         x0: float = MARGIN + KEY_NAME
         x1: float = x0 + KEY_WIDTH
-        top: float = h - MARGIN - 4                                 # from the bottom, room for the name boxes' padding
+        top: float = h - MARGIN - 4 - below                         # from the bottom, room for the name boxes' padding
         bottom: float = top - bars * KEY_BAR - (bars - 1) * KEY_GAP
         self._key.reload()
         self._key.use((x0, bottom, x1, top), channel, KEY_BAR, KEY_GAP)

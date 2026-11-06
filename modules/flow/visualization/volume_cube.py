@@ -7,7 +7,7 @@ from OpenGL.GL import GL_RGBA8
 
 from modules.gl import Fbo, Style, Texture, Texture3D
 from .orbit import Orbit, box_size
-from .shaders import CubeEdges, CubeSlices
+from .shaders import CubeAxes, CubeEdges, CubeSlices
 
 GAP: float = 3.0            # layer spacings on each side of the selected layer
 OPACITY: float = 0.3        # the other layers'
@@ -20,6 +20,7 @@ class VolumeCube:
         self._fbo: Fbo = Fbo()
         self._slices: CubeSlices = CubeSlices()
         self._edges: CubeEdges = CubeEdges()
+        self._axes: CubeAxes = CubeAxes()
 
     @property
     def texture(self) -> Texture:
@@ -28,11 +29,13 @@ class VolumeCube:
     def allocate(self) -> None:
         self._slices.allocate()
         self._edges.allocate()
+        self._axes.allocate()
 
     def deallocate(self) -> None:
         self._fbo.deallocate()
         self._slices.deallocate()
         self._edges.deallocate()
+        self._axes.deallocate()
 
     def resize(self, width: int, height: int) -> None:
         if self._fbo.allocated and (self._fbo.width, self._fbo.height) == (width, height):
@@ -56,6 +59,8 @@ class VolumeCube:
         self._slices.use(volume, matrix, box, orbit.front_on_near_side(), selected, GAP, scale, channel, colormap, OPACITY)
         self._edges.reload()
         self._edges.use(matrix, box)
+        self._axes.reload()
+        self._axes.use(matrix, box)
         Style.pop_style()
         self._fbo.end()
         return self._fbo

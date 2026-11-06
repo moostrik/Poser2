@@ -15,7 +15,7 @@ from enum import IntEnum, auto
 from OpenGL.GL import GL_VIEWPORT, glGetIntegerv, glViewport
 
 from modules.gl import Texture, Texture3D, Style, Blit, MouseButton, fit
-from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind, VolumeCut, VolumeCube, VolumeGlyphs, VolumeFog, Cut, Orbit
+from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind, VolumeCut, VolumeCube, VolumeGlyphs, VolumeFog, Cut, Orbit, box_size, axis_labels
 from modules.settings import Field, BaseSettings, Group, Widget
 from ..layer_base import LayerBase
 
@@ -121,6 +121,7 @@ class MonitorLayer(LayerBase):
         self._volume_glyphs: VolumeGlyphs = VolumeGlyphs()  # a volume in 3D, for the glyphs
         self._volume_fog: VolumeFog = VolumeFog()   # a volume in 3D as a fog, for the image and colormap views
         self._shown_3d: Texture | None = None       # what it rendered last, when it is one of the 3D views
+        self._axes: list[tuple[str, float, float]] = []     # a 3D view's axis letters and their places, for the legend
         self._slice: float = 0.5                    # the slice's place through a volume, 0 front to 1 back
         self._layers: int = 0                       # the layers a scroll steps through, the show's density's
         self._orbit: Orbit = Orbit()                # the 3D views' camera; the mouse turns it, a middle click resets it
@@ -245,12 +246,13 @@ class MonitorLayer(LayerBase):
         self._view = view
         self._aspect = None
         self._shown_3d = None
+        self._axes = []
         if port.volume and not settings.advanced.cut.flat and view in (MonitorView.IMAGE, MonitorView.COLORMAP, MonitorView.GLYPHS):
             self._render_3d(port, view, scale, int(channel))
             if view != MonitorView.IMAGE:
                 self._legend_kind = LegendKind.COLORMAP
-                if settings.advanced.legend:
-                    self._legend.update(self._legend_kind, int(channel), scale, self._visualizer.histogram_total)
+            if settings.advanced.legend:
+                self._legend.update(self._legend_kind, int(channel), scale, self._visualizer.histogram_total, self._axes, self._title(port))
             return
         texture: Texture = self._flat(port, view)
         self._visualizer.resize(*self._fitted())
@@ -274,8 +276,13 @@ class MonitorLayer(LayerBase):
         else:
             self._visualizer.process_glyphs(texture, scale, float(settings.advanced.glyph_spacing.value),
                                             port.kind != TextureKind.VELOCITY, int(channel))
-        if self._legend_kind is not None and settings.advanced.legend:
-            self._legend.update(self._legend_kind, int(channel), scale, self._visualizer.histogram_total)
+        if settings.advanced.legend:
+            self._legend.update(self._legend_kind, int(channel), scale, self._visualizer.histogram_total, title=self._title(port))
+
+    def _title(self, port: Port) -> str:
+        """What is shown: the stage and the port's name, the one picked when the settings name none."""
+        name: str = next((key for key, value in self._ports().items() if value is port), self.settings.texture)
+        return f"{self.settings.stage.name.lower()} / {name}"
 
     def _fitted(self) -> tuple[int, int]:
         """The size the visualizer draws at: the drawn size, or for a cut the part of it the cut
@@ -292,6 +299,9 @@ class MonitorLayer(LayerBase):
         dots of a scalar."""
         volume = port.texture
         assert isinstance(volume, Texture3D)
+        width, height = self._rendered_size
+        box: tuple[float, float, float] = box_size(volume.width, volume.height, BOX_DEPTH)
+        self._axes = axis_labels(self._orbit.view_projection(box, width / max(height, 1)), box, width, height)
         if view == MonitorView.GLYPHS:
             spacing: float = float(self.settings.advanced.glyph_spacing.value)
             self._shown_3d = self._volume_glyphs.process(volume, self._orbit, BOX_DEPTH, spacing, scale,
@@ -351,7 +361,7 @@ class MonitorLayer(LayerBase):
                 glViewport(int(viewport[0]), int(viewport[1]), int(viewport[2]), int(viewport[3]))
             else:
                 Blit.use(self.texture)
-        if self._legend_kind is not None and self.settings.advanced.legend and self._legend.texture.allocated:
+        if self.settings.advanced.legend and self._legend.texture.allocated:
             Style.set_blend_mode(Style.BlendMode.ALPHA)
             Blit.use(self._legend.texture)
         Style.pop_style()

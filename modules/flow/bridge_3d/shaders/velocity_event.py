@@ -26,8 +26,8 @@ class VelocityEvent(Shader):
             previous: Previous held event
             event: START or STOP
             decay: What remains of the held event this update
-            patches: Fast speed in red and slow speed in green, with mipmaps
-            strength: Gate strength, 0 = every event counts
+            patches: With mipmaps; for a start fast x/y in RG and slow x/y in BA, for a stop fast speed in R and slow speed in G
+            strength: Gate strength, 0 = every event counts; a start counts as far as its patch speeds up, a stop as far as it slows down
             lod: Mip level of a patch
         """
         if not self.allocated or not self.shader_program:

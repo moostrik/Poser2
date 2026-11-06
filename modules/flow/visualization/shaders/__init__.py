@@ -11,6 +11,7 @@ from .glyph_field import GlyphField
 from .volume_cut import VolumeCutShader
 from .cube_slices import CubeSlices
 from .cube_edges import CubeEdges
+from .cube_axes import CubeAxes
 from .glyph_arrows import GlyphArrows
 from .glyph_dots import GlyphDots
 from .volume_fog import VolumeFogShader

@@ -6,7 +6,7 @@ import unittest
 
 import numpy as np
 
-from modules.flow import Orbit, box_size
+from modules.flow import Orbit, axis_labels, box_size
 
 
 def clip(orbit: Orbit, point: tuple[float, float, float], box: tuple[float, float, float]) -> np.ndarray:
@@ -57,6 +57,20 @@ class OrbitTest(unittest.TestCase):
         orbit.turn(-1.0, 0.0)                                           # 180° round
         self.assertFalse(orbit.front_on_near_side())
         self.assertTrue(math.isclose(abs(orbit.yaw), 180.0))
+
+
+class AxisLabelsTest(unittest.TestCase):
+    def test_from_the_front_x_goes_right_y_up_and_z_into_the_box(self) -> None:
+        box = box_size(448, 800, 1.0)
+        width, height = 540, 960
+        labels = {name: (x, y) for name, x, y in axis_labels(Orbit().view_projection(box, width / height), box, width, height)}
+        self.assertEqual(set(labels), {'x', 'y', 'z'})
+        (xx, xy), (yx, yy), (zx, zy) = labels['x'], labels['y'], labels['z']
+        self.assertGreater(xx, width / 2)           # x ends right of the middle, at the bottom
+        self.assertGreater(xy, height / 2)
+        self.assertLess(yy, height / 2)             # y ends above the middle, at the left
+        self.assertLess(yx, width / 2)
+        self.assertTrue(yx < zx < xx and yy < zy < xy)  # z runs back, toward the middle
 
 
 if __name__ == '__main__':
