@@ -6,10 +6,12 @@
  * v_new = v_old - ∇p
  * ∇p = (∂p/∂x, ∂p/∂y, ∂p/∂z) using central differences.
  *
- * Boundary conditions:
- *   - Pressure uses CLAMP_TO_EDGE → Neumann (∂p/∂n ≈ 0) at walls
- *   - Interior obstacles: Neumann via pCenter substitution
- *   - No-penetration: velocity cannot flow into obstacle faces
+ * Boundary conditions, by a ghost pressure beyond the domain's last cell:
+ *   - A closed wall: the ghost is pCenter (Neumann, ∂p/∂n = 0), and the velocity cannot flow into
+ *     the wall (no penetration), as into an obstacle's face
+ *   - An open wall: the ghost is 0 (Dirichlet), the pressure escapes
+ *   - Interior obstacles: Neumann via pCenter substitution, no penetration
+ * The same ghosts as the divergence's and the Jacobi solve's, so the three agree on one wall.
  */
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
@@ -26,6 +28,7 @@ layout(rgba16f, binding = 0) writeonly uniform image3D uResult;
 uniform vec3  uHalfRdxInv;    // (0.5/dx, 0.5/dy, 0.5/dz)
 uniform ivec3 uSize;
 uniform bool  uHasObstacles;   // Skip obstacle logic when no obstacles present
+uniform ivec3 uClosed;         // Per axis, 1 where the domain's walls are closed (solid), 0 where open
 
 void main() {
     ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
@@ -64,6 +67,15 @@ void main() {
     float pB = texture(uPressure, st - vec3(0.0, texel.y, 0.0)).r;
     float pF = texture(uPressure, st + vec3(0.0, 0.0, texel.z)).r;
     float pK = texture(uPressure, st - vec3(0.0, 0.0, texel.z)).r;
+
+    // The domain's walls: the ghost beyond the last cell, closed (Neumann) or open (0)
+    vec3 ghost = mix(vec3(0.0), vec3(pC), vec3(uClosed));
+    if (gid.x == uSize.x - 1) { pR = ghost.x; oR = float(uClosed.x); }
+    if (gid.x == 0)           { pL = ghost.x; oL = float(uClosed.x); }
+    if (gid.y == uSize.y - 1) { pT = ghost.y; oT = float(uClosed.y); }
+    if (gid.y == 0)           { pB = ghost.y; oB = float(uClosed.y); }
+    if (gid.z == uSize.z - 1) { pF = ghost.z; oF = float(uClosed.z); }
+    if (gid.z == 0)           { pK = ghost.z; oK = float(uClosed.z); }
 
     // Neumann BCs for interior obstacles: use pCenter if neighbor is obstacle
     pR = mix(pR, pC, step(0.5, oR));

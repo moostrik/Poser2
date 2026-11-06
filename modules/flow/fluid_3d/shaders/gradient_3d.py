@@ -19,7 +19,7 @@ class Gradient3D(ComputeShader):
     def use(self, velocity: Texture3D, pressure: Texture3D, obstacle: Texture3D,
             result_out: Texture3D,
             grid_scale: float, aspect: float,
-            has_obstacles: bool = True) -> None:
+            has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True)) -> None:
         """Subtract pressure gradient: v_new = v_old - grad(p).
 
         Args:
@@ -30,6 +30,7 @@ class Gradient3D(ComputeShader):
             grid_scale: Grid scaling factor
             aspect: Width/height ratio
             has_obstacles: Whether obstacle logic is active
+            closed: Per axis, whether the domain's walls are closed (solid) or open
         """
         if not self.allocated or not self.shader_program:
             return
@@ -49,5 +50,6 @@ class Gradient3D(ComputeShader):
         glUniform3i(self.get_uniform_loc("uSize"),
                     result_out.width, result_out.height, result_out.depth)
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
+        glUniform3i(self.get_uniform_loc("uClosed"), *(int(c) for c in closed))
 
         self.dispatch(result_out.width, result_out.height, result_out.depth)

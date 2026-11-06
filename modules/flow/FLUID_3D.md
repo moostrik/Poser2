@@ -15,12 +15,12 @@ A step (`Fluid3D.update`), in order, at the preset (`apps/deep_flow/data/setting
 | Pass        | What                                                                                  | On                    | Depends on the input |
 |-------------|---------------------------------------------------------------------------------------|-----------------------|----------------------|
 | dampen_vel  | drag on the speed above `dampen_threshold` (50 widths/s) over `dampen_time` (2 s)     | velocity 448×800×64   | no                   |
-| advect_vel  | semi-Lagrangian self-advection, `self_advection` 1, fade 6 s                          | velocity              | the trace distance   |
+| advect_vel  | semi-Lagrangian self-advection, `self_advection` 1, fade 60 s                         | velocity              | the trace distance   |
 | viscosity   | Jacobi diffusion, off (`viscosity` 0)                                                 | velocity              | no                   |
 | vorticity   | curl, confinement force × dt, added to the velocity                                   | velocity, curl, force | no                   |
 | advect_temp | off (`buoyancy` 0 clears the temperature)                                             | temperature           | the trace distance   |
 | buoyancy    | gravity × (sink × density − buoyancy × ΔT) × dt; gravity is 0 in the preset           | force                 | no                   |
-| incompress  | divergence, 20 Jacobi iterations, gradient subtraction                                | pressure, velocity    | no                   |
+| incompress  | divergence, 40 Jacobi iterations, gradient subtraction, on the walls ([The walls](#the-walls)) | pressure, velocity | no              |
 | advect_den  | semi-Lagrangian advection, one trilinear read per texel, the evaporation subtracted   | density 448×800×64    | the trace distance   |
 | composite   | front-to-back march, one step per layer                                               | output 2160×3840      | no                   |
 
@@ -148,6 +148,32 @@ exactly once at any frame rate, with no history and no number from the bridge in
 motion's `smooth` on z is one more linear filter in the chain, so the areas hold for z too; the
 heights read z low by `smooth` against `fast_smooth`.
 
+### The walls
+
+The domain is a box with solid walls, as the textbook's (Bridson): beyond a closed wall the water
+cannot pass, v·n = 0, and the pressure has no gradient across it, ∂p/∂n = 0. The projection's three
+passes take the walls the same way, by a ghost beyond the last cell (`uClosed`, per axis): the
+divergence a ghost velocity whose normal component is the last cell's turned, so the flux through the
+wall's face is 0; the Jacobi solve and the gradient the last cell's pressure as the ghost; and the
+gradient keeps the velocity from pointing into the wall, as into an obstacle's face. An open wall
+takes the last cell's velocity as the ghost and 0 as the pressure: the water leaves. x and y are
+closed or open by `pressure.wall`, z by `volume.wall`.
+
+Before, the walls were the texture's: the velocity read 0 beyond the border and the pressure its
+edge, while the obstacle code that keeps water out of a face ran only with an obstacle set. The
+divergence then saw a face at the wall the gradient could not empty, so water pushed into a wall
+stayed and was squeezed along it. Measured in a hidden window at the preset's grid, a body 50 px
+from the right wall at 1 width/s, held 5 s, its band 300 px tall, at 25 fps:
+
+| The body                 | The water's highest speed, before | after |
+|--------------------------|-----------------------------------|-------|
+| pushing into the wall    | 2.34 widths/s, in the wall's cells | 0.93 |
+| sliding along the wall   | 3.96, in the corner               | 1.07  |
+
+Confinement off changed neither (2.34 and 4.11 before), so the confinement was not the cause. With
+the walls right, the water stays at the body's speed or under, the confinement adding a few
+percent, MacCormack too (0.90 and 1.23).
+
 ### The guard
 
 The dampen, at the step's first pass, stays as it is: `dampen_threshold` and `dampen_time`. With
@@ -243,8 +269,27 @@ as a tuning:
 | `volume.injection_layer`, `volume.injection_spread`                              | 0.5, 0.1        | the body mid-volume                     |
 | `wall` (every field, the volume)                                                 | closed          | as his settings                         |
 
-The field's own settings (`fade_time`, `dampen_*`, `vorticity*`, `viscosity*`, the composite's)
-keep their defaults; they are looks, not meanings.
+The fields' physics take the textbook's water, with no artificial decay or thickness, and the preset
+holds them: the velocity's `fade_time` 60 s (it keeps its momentum), `viscosity` 0 (water at this
+scale), `pressure.iterations` 40 (GPU Gems' 40 to 80 for a Jacobi solve), the density's `fade_time`
+60 s and `evaporation` 0, `temperature.sink` 0 and `ambient` 0 (the density as heavy as the water,
+no buoyancy), gravity down the screen, every wall closed; the dampen a guard at 50 widths/s; the
+bridge's mix the boundary's trail alone and its lowpass's `smooth` its default 160 ms, since the
+coast is the fluid's now. Kept as tuned: the composite's look (`emission`, `absorption`, `glow`,
+`tint`, `fog`) and the confinement (`vorticity` 0.64, `vorticity_radius` 3), whose units are open
+([Open](#open-the-confinements-units)).
+
+Measured with these on standmoves through the harness: the water 0.91 of the body's speed in the
+fast halves, its peak 0.75 of the body's, the step 12.5 ms with the harness (mean; p95 15.4).
+
+## Open: the confinement's units
+
+The confinement's force is ε × dt × (N × ω) with ω from differences over `vorticity_radius` × the
+grid's cell in output pixels (`_grid_scale`, 448 / 2160), so its strength and its reach follow the
+output's allocation, not the grid: at 2160 wide about 4.8 times the textbook's ε h (N × ω) (Fedkiw
+2001, h the cell), and a radius of 3 reads over 0.6 of a cell **(deduction, from the code)**. The fix
+is one unit, the cell in widths, through the curl and the force; the preset's 0.64 then changes
+meaning, so it waits for his word.
 
 ## Tuning
 
@@ -257,7 +302,7 @@ with the body force's density; the burst's fps; the wall.
 
 FLOW.md's item: with `WARM_UP_TIME` 0 the exposure ramp reads as x/y motion over the whole image,
 and the fluid's frame rate drops to 2 to 4 fps **(site fact)**. Nothing in the fluid loops by the
-velocity: every pass runs a fixed number of dispatches, the pressure solve its 20 iterations, the
+velocity: every pass runs a fixed number of dispatches, the pressure solve its 40 iterations, the
 composite its 64 steps. What is data-dependent is where the advections read: a texel's backward
 trace lands velocity × dt × `speed` away, and noise points neighbors apart **(deduction, not
 measured)**. The shape takes the density from 1.6 GB to 0.18 GB a buffer, and the drag bounds the
@@ -266,19 +311,6 @@ them. The check: one run with `WARM_UP_TIME` 0 (locally, not committed). Only if
 still drops, a `GpuTimer` per pass, in the `GPU fluid` series, at rest, during the burst and
 during a fast arm move; the pass that grows on the burst and not on the arm is the one, and a hard
 top speed ([The guard](#the-guard)) the first thing to try.
-
-## Open: the velocity explodes at a wall
-
-Seen on 2026-11-06 **(site fact)**, before the shape and the drag: when the body crosses a wall of
-the volume the fluid's velocity sometimes explodes, while the bridge's `boundary_velocity` on the
-monitor stays calm, so the cause is the fluid's. Not checked **(deduction)**: the velocity is 0 at
-the walls (`GL_CLAMP_TO_BORDER`), so a push into the cells right at a wall leaves a strong
-divergence there; if the pressure solve's 20 iterations do not cancel it, it grows step after
-step, and the vorticity confinement may amplify it at the wall. His walls are all closed **(site
-fact)**: the velocity's wrap is `GL_CLAMP_TO_BORDER` 0, the other fields' `GL_CLAMP_TO_EDGE`, a
-zero gradient, which the Jacobi solve reads the same way (`loadPressure` at clamped coordinates).
-Whether it remains with the drag is his check on the app. If it does, the places to look are the
-divergence and the pressure at the wall on the monitors and the confinement near the border.
 
 ## Next
 

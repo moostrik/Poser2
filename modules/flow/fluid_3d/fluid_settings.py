@@ -64,13 +64,13 @@ class BodyForceSettings(BaseSettings):
 class VelocitySettings(BaseSettings):
     """Velocity field parameters."""
     self_advection: Field[float]    = Field(1.0,    min=0.0,    max=1.0,    color="blue-grey",      description="How far the velocity carries itself per step; 1 = the full step, the physics")
-    fade_time: Field[float]         = Field(30.0,   min=0.1,    max=60.0,   color="deep-blue",      description="Seconds until velocity fades to ~1%")
-    dampen_threshold: Field[float]  = Field(5.0,    min=0.1,    max=50.0,   color="cyan",           description="Magnitude above which velocity is dampened")
-    dampen_time: Field[float]       = Field(0.5,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")
-    vorticity: Field[float]         = Field(5.17,   min=0.0,    max=60.0,   color="purple",         description="Vortex confinement strength (adds turbulence)")
-    vorticity_radius: Field[float]  = Field(2.82,   min=1.0,    max=30.0,   color="deep-purple",    description="Curl sampling radius in texels")
-    viscosity: Field[float]         = Field(6.62,   min=0.0,    max=100.0,  color="indigo",         description="Fluid thickness/resistance to flow")
-    viscosity_iter: Field[int]      = Field(40,     min=1,      max=60,     color="orange",         description="Viscosity solver iterations at 60 fps; fewer at a higher rate, never more")
+    fade_time: Field[float]         = Field(60.0,   min=0.1,    max=60.0,   color="deep-blue",      description="Seconds until velocity fades to ~1%; 60 = water keeps its momentum")
+    dampen_threshold: Field[float]  = Field(50.0,   min=0.1,    max=50.0,   color="cyan",           description="Speed above which velocity is dampened (widths/s); a guard far above any body")
+    dampen_time: Field[float]       = Field(2.0,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")
+    vorticity: Field[float]         = Field(0.64,   min=0.0,    max=60.0,   color="purple",         description="Vortex confinement strength (adds turbulence)")
+    vorticity_radius: Field[float]  = Field(3.0,    min=1.0,    max=30.0,   color="deep-purple",    description="Curl sampling radius in texels")
+    viscosity: Field[float]         = Field(0.0,    min=0.0,    max=100.0,  color="indigo",         description="Fluid thickness/resistance to flow; 0 = water at this scale")
+    viscosity_iter: Field[int]      = Field(20,     min=1,      max=60,     color="orange",         description="Viscosity solver iterations at 60 fps; fewer at a higher rate, never more")
 
 
 class DensitySettings(BaseSettings):
@@ -79,9 +79,9 @@ class DensitySettings(BaseSettings):
     body_force_gain: Field[float]   = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's density times this is added × dt; 1 = one unit per width/s of Δv")
     carrier: Field[Carrier]         = Field(Carrier.GRID,                                           description="What carries the density: the grid's volume or particles")
     size: Field[int]                = Field(1,      min=1,      max=4,                              description="The density grid's x and y size as a multiple of the simulation's; 1 = one grid")
-    fade_time: Field[float]         = Field(4.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%")
+    fade_time: Field[float]         = Field(60.0,   min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%; 60 = ink stays")
     evaporation: Field[float]       = Field(0.0,    min=0.0,    max=2.0,    color="grey",           description="Density removed per second; clears low-level haze (0 = off)")
-    wall: Field[WallMode]           = Field(WallMode.OPEN,                                          description="Open: density absorbed at the walls. Closed: density reflects")
+    wall: Field[WallMode]           = Field(WallMode.CLOSED,                                        description="Open: density absorbed at the walls. Closed: density reflects")
 
 
 class TemperatureSettings(BaseSettings):
@@ -90,18 +90,18 @@ class TemperatureSettings(BaseSettings):
     body_force_gain: Field[float]   = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's temperature times this is added × dt, signed by the color")
     fade_time: Field[float]         = Field(3.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until temperature fades to ~1%")
     buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Thermal buoyancy coefficient: hot (fresh) density rises against gravity")
-    sink: Field[float]              = Field(4.0,    min=0.0,    max=20.0,   color="red",            description="Weight of the density: it sinks along gravity")
+    sink: Field[float]              = Field(0.0,    min=0.0,    max=20.0,   color="red",            description="Weight of the density: it sinks along gravity; 0 = as heavy as the water")
     gravity_x: Field[float]         = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction X")
     gravity_y: Field[float]         = Field(1.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction Y; 1 = down the screen")
     gravity_z: Field[float]         = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction Z; 1 = away from viewer")
-    ambient: Field[float]           = Field(0.2,    min=0.0,    max=1.0,    color="brown",          description="Reference temperature (buoyancy = 0 at this temp)")
+    ambient: Field[float]           = Field(0.0,    min=0.0,    max=1.0,    color="brown",          description="Reference temperature (buoyancy = 0 at this temp)")
     wall: Field[WallMode]           = Field(WallMode.CLOSED,                                        description="Closed: insulated walls (reflects). Open: cold walls (0 at the walls)")
 
 
 class PressureSettings(BaseSettings):
     """Pressure field parameters."""
     iterations: Field[int]          = Field(40,     min=1,      max=60,     color="orange",         description="Pressure solver iterations per step")
-    wall: Field[WallMode]           = Field(WallMode.OPEN,                                          description="Open: pressure escapes at the walls (less sticky). Closed: pressure reflects")
+    wall: Field[WallMode]           = Field(WallMode.CLOSED,                                        description="The x and y walls. Closed: solid, the water cannot pass. Open: pressure escapes")
 
 
 class VolumeSettings(BaseSettings):
@@ -114,7 +114,7 @@ class VolumeSettings(BaseSettings):
     glow: Field[float]              = Field(0.25, min=0.0,  max=1.0,    color="yellow",         description="Additive glow mix: 1 = additive (depth invisible)")
     tint: Field[float]              = Field(0.5,  min=0.0,  max=1.0,    color="light-blue",     description="Far density shifts toward water color (red absorbed first)")
     fog: Field[float]               = Field(0.5,  min=0.0,  max=4.0,    color="blue-grey",      description="Water extinction over the full depth; dims far layers")
-    wall: Field[WallMode]           = Field(WallMode.CLOSED,                                        description="The z walls. Closed: front and back reflect. Open: they absorb")
+    wall: Field[WallMode]           = Field(WallMode.CLOSED,                                        description="The z walls. Closed: solid, front and back reflect. Open: they absorb")
 
 
 class Fluid3DSettings(BaseSettings):

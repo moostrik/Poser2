@@ -12,7 +12,8 @@
  * data through shared memory across iterations, eliminating per-iteration
  * global reads for interior Z pairs.
  *
- * Boundary: pressure uses CLAMP_TO_EDGE → Neumann at domain walls.
+ * The domain's walls, as the divergence and the gradient take them: beyond a closed wall the
+ * ghost pressure is the last cell's (Neumann), beyond an open one 0 (Dirichlet).
  * Interior obstacles: Neumann via pCenter substitution.
  */
 
@@ -32,6 +33,7 @@ uniform float uBeta;        // 1 / (2*αx + 2*αy + 2*αz)
 uniform int   uIterations;  // Iterations per dispatch
 uniform ivec3 uSize;          // Volume dimensions
 uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
+uniform ivec3 uClosed;        // Per axis, 1 where the domain's walls are closed (solid), 0 where open
 
 // Shared memory: 2 working Z layers + 2 Z halo layers, each with 18×18 XY halo.
 // Index: [z_slot][y+1][x+1]
@@ -43,6 +45,10 @@ uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
 shared float s_pressure[4][18][18];
 
 float loadPressure(ivec3 coord) {
+    // Beyond an open wall the pressure is 0; beyond a closed one, the last cell's
+    if ((uClosed.x == 0 && (coord.x < 0 || coord.x >= uSize.x)) ||
+        (uClosed.y == 0 && (coord.y < 0 || coord.y >= uSize.y)) ||
+        (uClosed.z == 0 && (coord.z < 0 || coord.z >= uSize.z))) return 0.0;
     coord = clamp(coord, ivec3(0), uSize - 1);
     return imageLoad(uPressureIn, coord).r;
 }
@@ -123,9 +129,15 @@ void main() {
             float pF = s_pressure[sz + 1][sid.y][sid.x];
             float pK = s_pressure[sz - 1][sid.y][sid.x];
 
-            // Domain boundary: clamp to center (Neumann)
-            if (gz + 1 >= uSize.z) pF = pC;
-            if (gz - 1 < 0)        pK = pC;
+            // The domain's walls: the cell's own pressure beyond a closed one (Neumann), this iteration's,
+            // not the halo's loaded at the dispatch; 0 beyond an open one
+            vec3 ghost = mix(vec3(0.0), vec3(pC), vec3(uClosed));
+            if (gid.x + 1 >= uSize.x) pR = ghost.x;
+            if (gid.x - 1 < 0)        pL = ghost.x;
+            if (gid.y + 1 >= uSize.y) pT = ghost.y;
+            if (gid.y - 1 < 0)        pB = ghost.y;
+            if (gz + 1 >= uSize.z)    pF = ghost.z;
+            if (gz - 1 < 0)           pK = ghost.z;
 
             // Neumann BCs for interior obstacles
             if (uHasObstacles) {

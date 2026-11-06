@@ -19,7 +19,7 @@ class Divergence3D(ComputeShader):
     def use(self, velocity: Texture3D, obstacle: Texture3D,
             divergence_out: Texture3D,
             grid_scale: float, aspect: float,
-            has_obstacles: bool = True) -> None:
+            has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True)) -> None:
         """Compute divergence of 3D velocity field.
 
         Args:
@@ -29,6 +29,7 @@ class Divergence3D(ComputeShader):
             grid_scale: Grid scaling factor
             aspect: Width/height ratio
             has_obstacles: Whether obstacle logic is active
+            closed: Per axis, whether the domain's walls are closed (solid) or open
         """
         if not self.allocated or not self.shader_program:
             return
@@ -50,5 +51,6 @@ class Divergence3D(ComputeShader):
         glUniform3i(self.get_uniform_loc("uSize"),
                     divergence_out.width, divergence_out.height, divergence_out.depth)
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
+        glUniform3i(self.get_uniform_loc("uClosed"), *(int(c) for c in closed))
 
         self.dispatch(divergence_out.width, divergence_out.height, divergence_out.depth)

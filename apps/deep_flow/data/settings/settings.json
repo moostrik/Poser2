@@ -442,7 +442,7 @@
         "lowpass": {
           "advect": 1.0,
           "attack": 1.0,
-          "smooth": 1000.0,
+          "smooth": 160.0,
           "blur_radius": 4.0,
           "blur_steps": 4
         },
@@ -531,7 +531,7 @@
       },
       "volume": {
         "layers": 64,
-        "injection_layer": 0.54,
+        "injection_layer": 0.5,
         "injection_spread": 0.1,
         "emission": 1.16,
         "absorption": 2.86,
@@ -542,20 +542,20 @@
       },
       "velocity": {
         "self_advection": 1.0,
-        "fade_time": 6.04,
+        "fade_time": 60.0,
         "dampen_threshold": 50.0,
         "dampen_time": 2.0,
         "vorticity": 0.64,
         "vorticity_radius": 3.0,
         "viscosity": 0.0,
-        "viscosity_iter": 15
+        "viscosity_iter": 20
       },
       "density": {
-        "boundary_gain": 9.43,
+        "boundary_gain": 1.0,
         "body_force_gain": 1.0,
         "size": 1,
         "fade_time": 60.0,
-        "evaporation": 0.04,
+        "evaporation": 0.0,
         "wall": "CLOSED"
       },
       "temperature": {
@@ -563,15 +563,15 @@
         "body_force_gain": 1.0,
         "fade_time": 12.0,
         "buoyancy": 0.0,
-        "sink": 4.0,
+        "sink": 0.0,
         "gravity_x": 0.0,
-        "gravity_y": 0.0,
+        "gravity_y": 1.0,
         "gravity_z": 0.0,
         "ambient": 0.0,
         "wall": "CLOSED"
       },
       "pressure": {
-        "iterations": 20,
+        "iterations": 40,
         "wall": "CLOSED"
       }
     },

@@ -506,14 +506,18 @@ class Fluid3D:
         self._add_force_to_velocity(self._buoyancy_force_vol)
 
     def _enforce_incompressibility(self) -> None:
-        """Pressure projection (divergence → Jacobi solve → gradient subtraction)."""
+        """Pressure projection (divergence → Jacobi solve → gradient subtraction), the three passes on one set
+        of walls: x and y closed or open by `pressure.wall`, z by `volume.wall`."""
+        closed: tuple[bool, bool, bool] = (self.settings.pressure.wall == WallMode.CLOSED,
+                                           self.settings.pressure.wall == WallMode.CLOSED,
+                                           self.settings.volume.wall == WallMode.CLOSED)
         # a. Compute divergence
         self._divergence_shader.use(
             self._velocity,
             self._obstacle,
             self._divergence_vol,
             self._grid_scale, self._aspect,
-            has_obstacles=self._has_obstacles
+            has_obstacles=self._has_obstacles, closed=closed
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
@@ -528,7 +532,7 @@ class Fluid3D:
             self._grid_scale, self._aspect,
             total_iterations=iterations,
             iterations_per_dispatch=5,
-            has_obstacles=self._has_obstacles
+            has_obstacles=self._has_obstacles, closed=closed
         )
         if result is not self._pressure:
             self._pressure.swap()
@@ -542,7 +546,7 @@ class Fluid3D:
             self._obstacle,
             self._velocity,
             self._grid_scale, self._aspect,
-            has_obstacles=self._has_obstacles
+            has_obstacles=self._has_obstacles, closed=closed
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 

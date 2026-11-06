@@ -5,8 +5,10 @@
  *
  * div(v) = ∂u/∂x + ∂v/∂y + ∂w/∂z  using central differences.
  *
- * Boundary conditions:
- *   - Velocity uses CLAMP_TO_BORDER(0) → out-of-bounds = zero velocity
+ * Boundary conditions, by a ghost value beyond the domain's last cell:
+ *   - A closed wall: the ghost's normal component is -vCenter's, so the velocity through the wall's
+ *     face, their mean, is 0 (v·n = 0, the solid wall)
+ *   - An open wall: the ghost is vCenter (zero gradient), the fluid leaves freely
  *   - Interior obstacles: no-slip via -vCenter substitution
  */
 
@@ -23,6 +25,7 @@ layout(r16f, binding = 0) writeonly uniform image3D uDivergence;
 uniform vec3  uHalfRdxInv;   // (0.5/dx, 0.5/dy, 0.5/dz) — aspect & depth corrected
 uniform ivec3 uSize;          // Volume dimensions
 uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
+uniform ivec3 uClosed;        // Per axis, 1 where the domain's walls are closed (solid), 0 where open
 
 void main() {
     ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
@@ -50,6 +53,15 @@ void main() {
     vec3 vB = texture(uVelocity, st - vec3(0.0, texel.y, 0.0)).xyz;
     vec3 vF = texture(uVelocity, st + vec3(0.0, 0.0, texel.z)).xyz;  // Front (+z)
     vec3 vK = texture(uVelocity, st - vec3(0.0, 0.0, texel.z)).xyz;  // Back  (-z)
+
+    // The domain's walls: the ghost beyond the last cell, closed or open
+    vec3 ghost = mix(vC, -vC, vec3(uClosed));
+    if (gid.x == uSize.x - 1) vR.x = ghost.x;
+    if (gid.x == 0)           vL.x = ghost.x;
+    if (gid.y == uSize.y - 1) vT.y = ghost.y;
+    if (gid.y == 0)           vB.y = ghost.y;
+    if (gid.z == uSize.z - 1) vF.z = ghost.z;
+    if (gid.z == 0)           vK.z = ghost.z;
 
     // No-slip boundary: if neighbor is interior obstacle, use -vCenter
     if (uHasObstacles) {
