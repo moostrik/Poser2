@@ -463,8 +463,9 @@ The shader loader finds a shader's source by its `.py` module name beside it
   the fluid's, so it is taken as an acceleration, `velocity.gain` acts as a rate, and the fluid
   stays near 0.05 to 0.1 of the motion's speed **(deduction)**, a monitor needing a scale of 20 to
   30 to show it. In Navier–Stokes an outside term is an acceleration per unit mass, as gravity and
-  buoyancy enter. The bridge gives the two quantities apart, `velocity` and `acceleration`; how
-  the fluid takes each, the velocity as a velocity and the acceleration times dt, is the fluid
+  buoyancy enter. The bridge gives the two apart, the boundary (`boundary_velocity`) and the body
+  force (`body_force_acceleration`, [The mix](#the-mix)); how the fluid takes each, the boundary's
+  velocity as a velocity to drag toward and the body force's acceleration times dt, is the fluid
   refactor's. A change lasts about `slow_smooth` over many ticks, so a velocity change added
   without dt every tick would count once per tick, 60 times its Δv in a second **(deduction)**.
 - hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
