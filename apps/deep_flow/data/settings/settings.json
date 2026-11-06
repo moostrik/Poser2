@@ -7,7 +7,7 @@
     "keyframe_interval": 50,
     "color": true,
     "resolution": "P720",
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "fov": 80.0,
     "split_seconds": 60,
@@ -77,7 +77,7 @@
         "DEPTH"
       ],
       "apply_warp": false,
-      "folder": "20261103-184710_stillslowfast",
+      "folder": "20261103-215324_standmoves",
       "sim_passthrough": false,
       "replay": true
     },
@@ -522,6 +522,13 @@
       "fixed_fps": 60.0,
       "fps_smoothing": 1.0,
       "speed": 1.0,
+      "boundary": {
+        "gain": 1.0,
+        "drag_time": 50.0
+      },
+      "body_force": {
+        "gain": 1.0
+      },
       "volume": {
         "layers": 64,
         "injection_layer": 0.54,
@@ -545,11 +552,15 @@
       },
       "density": {
         "boundary_gain": 9.43,
+        "body_force_gain": 1.0,
+        "size": 1,
         "fade_time": 60.0,
         "evaporation": 0.04,
         "wall": "CLOSED"
       },
       "temperature": {
+        "boundary_gain": 1.0,
+        "body_force_gain": 1.0,
         "fade_time": 12.0,
         "buoyancy": 0.0,
         "sink": 4.0,
@@ -566,7 +577,7 @@
     },
     "monitor_a": {
       "stage": "BRIDGE",
-      "texture": "output.velocity",
+      "texture": "body_force.acceleration",
       "view": "AUTO",
       "advanced": {
         "channel": "ALL",
@@ -675,10 +686,10 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M0",
-      "x": 2561,
+      "x": 1708,
       "y": 31,
-      "width": 1278,
-      "height": 2080,
+      "width": 851,
+      "height": 1360,
       "secondary_list": [
         "M1"
       ],

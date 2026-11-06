@@ -1,0 +1,74 @@
+#version 460 core
+
+/*
+ * MacCormack3D - the MacCormack correction of a semi-Lagrangian advection (Selle et al. 2008).
+ *
+ * The predictor (uForward) is the semi-Lagrangian step of the source, traced back along the
+ * velocity. Traced forward again from each cell, the predictor gives back the source up to the
+ * step's error; half of that error is added back:
+ *
+ *     phi = forward(x) + 0.5 * (source(x) - forward(x + dt * v(x)))
+ *
+ * and clamped to the source's eight texels around the backward trace, so the correction never
+ * makes a value the step could not have read (no overshoot, no ringing). Then the dissipation and
+ * the evaporation, as the plain step applies them. The velocity and the obstacle are sampled by
+ * uv, so the field may sit on a finer grid than they do.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler3D uVelocity;  // Velocity field (RGBA16F: xyz = u,v,w)
+layout(binding = 1) uniform sampler3D uSource;    // The field before the step
+layout(binding = 2) uniform sampler3D uForward;   // The semi-Lagrangian predictor
+layout(binding = 3) uniform sampler3D uObstacle;  // Obstacle mask (R8)
+
+layout(rgba16f, binding = 0) writeonly uniform image3D uResult;
+
+uniform float uTimestep;      // dt * speed
+uniform vec3  uRdx;           // (1.0, 1.0/aspect, 1.0/z_extent)
+uniform float uDissipation;   // Exponential decay multiplier
+uniform float uEvaporation;   // Subtracted this step; 0 for a signed field
+uniform ivec3 uSize;          // Volume dimensions
+uniform bool  uHasObstacles;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
+    vec4 forward = texelFetch(uForward, gid, 0);
+
+    if (uHasObstacles && texture(uObstacle, st).r > 0.5) {
+        imageStore(uResult, gid, texelFetch(uSource, gid, 0));
+        return;
+    }
+
+    vec3 step = uTimestep * uRdx * texture(uVelocity, st).xyz;
+    vec3 st_back = st - step;
+    vec4 back = texture(uForward, st + step);
+    vec4 result = forward + 0.5 * (texelFetch(uSource, gid, 0) - back);
+
+    // A trace that reads past a wall read the wall's value, which no texel holds: there the
+    // correction has no source to be limited by, and kept it grows the velocity at the walls step
+    // after step, so the predictor stands
+    ivec3 base = ivec3(floor(st_back * vec3(uSize) - 0.5));
+    if (any(lessThan(base, ivec3(0))) || any(greaterThan(base + 1, uSize - 1))) {
+        result = forward;
+    } else {
+        // The limiter: the source's eight texels the backward trace read between
+        vec4 lo = vec4(1e30);
+        vec4 hi = vec4(-1e30);
+        for (int k = 0; k < 8; k++) {
+            vec4 value = texelFetch(uSource, base + ivec3(k & 1, (k >> 1) & 1, (k >> 2) & 1), 0);
+            lo = min(lo, value);
+            hi = max(hi, value);
+        }
+        result = clamp(result, lo, hi);
+    }
+
+    result *= uDissipation;
+    if (uEvaporation > 0.0) {
+        result = max(result - vec4(uEvaporation), vec4(0.0));
+    }
+    imageStore(uResult, gid, result);
+}

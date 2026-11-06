@@ -280,14 +280,141 @@ zero gradient, which the Jacobi solve reads the same way (`loadPressure` at clam
 Whether it remains with the drag is his check on the app. If it does, the places to look are the
 divergence and the pressure at the wall on the monitors and the confinement near the border.
 
+## Next
+
+Three steps, discussed one by one before any is built; each gets its decisions here as they are
+made.
+
+| Step | What                                                                                     | Judge on                                              |
+|------|------------------------------------------------------------------------------------------|-------------------------------------------------------|
+| 6    | Built, [MacCormack](#maccormack) | a drop's ring keeps turning; a thin thread stays thin; the step's GPU time |
+| 7    | The particle carrier: the density as particles advected through the velocity grid (the roadmap's phase C), after the B1 split, the velocity solver apart from the density carrier | a drop reads as a drop next to the grid's; 4K without sparkle at 60 fps |
+| 8    | A better 4K upscale, parked ([Step 8](#step-8-the-4k-upscale-parked)) | the edges at 2160 × 3840 |
+
+### MacCormack
+
+`advection` carries the velocity, the density and the temperature: `SEMI_LAGRANGIAN`, the default,
+or `MACCORMACK` (Selle 2008, `maccormack_3d.comp`). The semi-Lagrangian step writes a predictor into
+a scratch volume per field (allocated at its first MacCormack step); traced forward again, it gives
+back the source up to the step's error, half of which is added back, clamped to the source's eight
+texels around the backward trace. Where that trace reads past a wall the predictor stands: the
+wall's value is in no texel, and the correction kept there grew the velocity at the walls step
+after step, to eight times its speed in a second at the preset's grid (measured, before the guard).
+
+Measured in a hidden window at 448 × 800 × 64, a swirl dragged in and left, then a square of
+density carried for 2 s, no confinement, no viscosity; and on stillslowfast through the harness at
+the preset:
+
+| Measure                                        | Semi-Lagrangian | MacCormack |
+|------------------------------------------------|-----------------|------------|
+| the swirl's mean speed after 2 s, of its start | 0.52            | 0.62       |
+| the density's edge, its 99.5% gradient over its max, per texel | 0.071 | 0.140 |
+| the step, GPU ms, hidden window                | 5.7             | 6.7        |
+| stillslowfast: water / body, fast              | 0.55            | 0.60       |
+| stillslowfast: peak / body                     | 0.74            | 0.82       |
+| stillslowfast: the step with the harness, ms   | 9.5             | 11.0       |
+
+### Step 7: the particles
+
+Decided: the grid density stays beside the particles, one setting picks the carrier; the first
+look is the particles alone, the weight (the splat back into the grid for the buoyancy) after;
+drawn as points or as streaks, one setting; the count a setting, sized by the memory the old 4K
+density took (3.2 GB holds 100 M particles at 32 bytes), 32 M to start; the oldest fade out
+before the ring overwrites them; overlap first, ink a bit opaque, additive as the other option.
+
+Everything stays on the GPU: the CPU dispatches and draws a fixed count, never reads a particle
+back. The design **(deduction, to measure)**:
+
+| Part     | How                                                                                       | Why                                                        |
+|----------|-------------------------------------------------------------------------------------------|------------------------------------------------------------|
+| storage  | one SSBO, 32 bytes a particle: position and age (vec4), the previous position (vec3), color RGBA8 packed in a uint; 32 M is 1 GB, 100 M 3.2 GB | each particle updates itself in place, so no swap pair     |
+| emission | a compute pass over the bridge's density at the bridge's size: each texel's count, amount × rate × dt, rounded by a hash so a small amount still spawns; an atomic head (`atomicAdd`) gives the slots, modulo the count | a ring buffer: no free list, no compaction, no count read back |
+| the ring's fade | a particle's place in the ring, (head − slot) mod N over N, is how near it is to being overwritten; its alpha falls to 0 over the ring's last share (`ring_fade`, 0.1), so the oldest fade out at whatever rate the body emits; the age's own fade by `density.fade_time` on top | no particle vanishes in a frame, whatever the emission |
+| advection | a compute pass, 256 a group, RK2 (midpoint) through the velocity's `sampler3D`, the same uv metric as `advect_3d` (`uRdx`, `speed`); the walls clamp | two trilinear fetches a particle, the hardware's; the grid sets the motion |
+| drawing  | no copy: a vertex shader pulls the SSBO by `gl_VertexID`; points `glDrawArrays(GL_POINTS, 0, N)`, streaks `GL_LINES` with 2 N vertices, the previous and the current position; a dead or unborn particle leaves the clip space | the rasterizer splats millions faster than atomics in compute, and draws lines, which compute would not |
+| overlap (`OCCLUDED`, the default) | the particles drawn additively into depth slices, a `GL_TEXTURE_2D_ARRAY` at the output's size, a layered draw (`gl_Layer` from the particle's z): 16 slices at 2160 × 3840 RGBA16F, 1 GB, the color and the optical depth; then a front-to-back march through the slices, Beer–Lambert, `absorption`, `tint`, `fog` as the grid's composite | near ink covers far ink between slices, exact for emission and absorption inside one; a bucket sort by depth, no particle sorted |
+| overlap (`ADDITIVE`) | the same draw into one RGBA16F target, each particle's fog and tint by its z; one pass: exp(−τ) and the emission | order-independent, one target; the depth only as fog |
+| weight (later) | the particles splatted into an `r32ui` grid by fixed-point `imageAtomicAdd`, converted to the density volume the buoyancy reads | `imageAtomicAdd` needs integers |
+| weight (later) | the particles splatted into an `r32ui` grid by fixed-point `imageAtomicAdd`, converted to the density volume the buoyancy reads | `imageAtomicAdd` needs integers |
+
+Two more ways to draw the same particles, decided as options: blobby, where each particle carries
+a smooth kernel and the kernels' sum melts near particles into one shape (Blinn's blobby objects,
+metaballs). Far fewer particles, each covering many pixels: the cost moves from the count to the
+kernel.
+
+| `draw`    | What                                                                                     | Count, a start |
+|-----------|------------------------------------------------------------------------------------------|----------------|
+| `POINTS`  | one pixel a particle, into the slices or additive, above                                 | 32 M           |
+| `STREAKS` | a line from the previous to the current position                                         | 32 M           |
+| `BLOBS`   | the soft melt: each particle a gaussian sprite of `radius` pixels, its sum the density, marched through the slices as `POINTS` is; ink clouds whose drops merge | 1 M |
+| `SURFACE` | the liquid: screen-space fluid rendering (van der Laan 2009); each particle a sphere sprite of `radius`, its nearest depth into a depth target and its thickness summed into another; the depth smoothed by a filter that keeps its edges (a bilateral or narrow-range filter); the normals from the smoothed depth; then the ink's color through its thickness (Beer–Lambert, `absorption`, `tint`), a Fresnel edge, a specular and the background refracted by the normal; drops and threads with a sharp edge that merge and pinch off | 1 M |
+
+Each particle carries a mass, the density it took at its birth; its kernel sums to its mass, so
+the ink is kept whatever the size. A blob's or a sphere's radius follows the mass,
+`radius × (mass / reference)^(1/3)`, the cube root since the mass fills a volume: a strong drop a
+big blob, a trace a small one. As it ages a blob widens and its peak falls by the same mass, as a
+drop of ink spreads in water (`spread`, the diffusion: σ² grows by 2 × `spread` × dt). The
+widening is refined: a small default, and a blob grows to at most twice its birth radius, so it
+softens over its life and never bloats. A point's
+and a streak's alpha is its mass.
+
+| Part      | How                                                                                     |
+|-----------|-----------------------------------------------------------------------------------------|
+| emission  | each tick, at the bridge's size, the boundary's density (the brush, per width of travel) and the body force's (the pipette, per Δv), each at its gain: a texel spawns `rate × amount × dt` particles, rounded by a hash so faint ink still spawns now and then; each takes an even share of the texel's amount as its mass, the density's color, a random place in the texel and a z drawn from the injection slab's gaussian; no velocity of its own, the grid carries it and the drag gave the grid the body's |
+| one knob  | a high `rate` many light particles, the points' and the streaks' look; a low `rate` few heavy ones, the blobs'; the mass and the size follow |
+| duration  | three things end a particle, the first that comes: `density.fade_time`, the mass's exponential decay, as the grid density's; `evaporation`, subtracted, which takes faint ones to 0; the ring, once more are alive than `count`, the oldest fading over `ring_fade` before they are overwritten |
+| the budget | in a steady state about `rate` × the emission × the lifetime are alive; while that stays under `count` the fade decides how long ink lasts and the ring is only the cap; the panel shows the seconds the ring takes to wrap, one counter read asynchronously, no particle |
+
+`BLOBS` is the slice target with a bigger, softer point; `SURFACE` is its own pass, a depth and a
+thickness target at the output's size, a filter of a few passes and one shading pass. Both depend
+on `radius` against the particles' spacing: too small and the blobs fall apart into dots, too big
+and the shape goes soft **(deduction)**.
+
+The settings, a `particles` group: `count` (`Field.INIT`, 32 M), `rate` (particles per unit of
+density per second), `ring_fade` (the ring's last share the oldest fade over), `draw`
+(`ParticleDraw.POINTS`, `STREAKS`, `BLOBS` or `SURFACE`), `radius` (a blob's or a sphere's pixels at the reference mass), `spread` (a blob's widening with
+age),
+`smooth` (the surface's filter passes), `size` (a point's pixels), `streak` (a streak's length as a
+share of its step), `overlap` (`Overlap.OCCLUDED` or `ADDITIVE`), `slices` (`Field.INIT`, 16).
+The cost grows with the count by the advection's reads and the draw's fill, not by the memory
+**(deduction)**: an estimate at 32 M, 2 to 4 ms for the advection, 4 to 8 ms for the points into
+16 slices at 4K, the streaks by their length; measured before the count goes higher. Judge on: a
+drop reads as a drop next to the grid's; a thread stays one particle wide at 2160 × 3840; near ink
+covers far ink; the step's GPU time.
+
+### Step 8: the 4K upscale, parked
+
+Parked after steps 6 and 7. What was found:
+
+- Many layers at 4K is what killed the old shape, and a cubic volume at 4K cannot be had: 64 cells
+  deep at 448 wide is 64 × 4.8 ≈ 307 layers at 2160 wide, about 20 GB. So the detail at 4K does
+  not come from a volume.
+- A tricubic read in today's composite is 8 hardware reads a step instead of 1, 64 steps over
+  2160 × 3840 pixels, about 4 G reads a frame, 5 to 10 ms **(deduction)**.
+- The direction: depth in 3D at the grid, detail in 2D at 4K. The march at the grid's 448 × 800
+  (0.36 M pixels instead of 8.3 M, about 20 times cheaper **(deduction)**), one edge-aware upscale
+  of the flat result, and one 4K detail layer advected by the grid's velocity seen from the front
+  with a curl noise where the water moves (Kim 2008 in 2D), multiplying the upscaled image so
+  detail shows where ink is. The particles stay the other way to 4K in depth.
+- The options, cheapest first: tricubic reads; a finer `density.size` with MacCormack; detail below
+  the grid (the curl noise); an edge curve, a look rather than detail.
+
+The grid's depth, open: 64 layers is 0.14 widths, so the body's z motion meets a wall within a few
+cells, likely part of the wall's explosions **(deduction)**. Half the width deep, measured in a
+hidden window, the step with its composite at 4K:
+
+| Grid             | Depth, widths | Cells | Step, GPU ms |
+|------------------|---------------|-------|--------------|
+| 448 × 800 × 64   | 0.14          | 23 M  | 6.8          |
+| 448 × 800 × 224  | 0.50          | 80 M  | 22.5         |
+| 320 × 576 × 160  | 0.50          | 29 M  | 9.4          |
+| 256 × 448 × 128  | 0.50          | 15 M  | 5.1          |
+
+A coarser grid across buys the depth: the detail it gives up in x and y is what the 4K layer and
+the particles bring back, the trade the ink roadmap made at 128 × 224 × 96. Only settings
+(`width`, `height`, `layers`; `layers`' maximum to 256).
+
 ## Later
 
-- The 4K density by the particle carrier, beside `density.size`; judged on the same clips at the
-  output's size once the fluid is right.
-- The advection's order: MacCormack beside semi-Lagrangian for the velocity (the roadmap's B2);
-  measured on how long a drop's ring keeps turning.
-- The particle carrier (the roadmap's phase C), once the grid's drops read right; it needs the
-  roadmap's B1 split first, the velocity solver apart from the density carrier, which is one
-  field's move now that the density is a `Texture3D` on the grid.
 - The 2D fluid modeled after this one: the drag, the two systems, the one grid.
 - hd_trio's `density.fade_time` written per tick from the pose's motion: the 2D fluid's, not here.

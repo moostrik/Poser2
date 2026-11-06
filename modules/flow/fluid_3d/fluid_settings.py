@@ -1,10 +1,18 @@
 """The 3D fluid's settings: one group per field (velocity, density, temperature, pressure) and
 the volume, with the field's name as the group's, so the field names carry no prefix."""
 
+from enum import IntEnum
+
 from modules.settings import Field, BaseSettings, Group
 
 from ..wall_mode import WallMode
 from ..time_step import TimeStepMode
+
+
+class Advection(IntEnum):
+    """How the velocity, the density and the temperature are carried each step."""
+    SEMI_LAGRANGIAN = 0     # trace back and read, trilinear: stable, blurs a little every step
+    MACCORMACK = 1          # the same, corrected by half its error traced forward, clamped (Selle 2008)
 
 
 class BoundarySettings(BaseSettings):
@@ -92,6 +100,7 @@ class Fluid3DSettings(BaseSettings):
     fixed_fps: Field[float]         = Field(60.0,   min=1.0,    max=240.0,              description="Steps per second in fixed mode (fps)")
     fps_smoothing: Field[float]     = Field(1.0,    min=0.0,    max=10.0,               description="Smoothing of the measured rate in measured mode (s); 0 follows each frame")
     speed: Field[float]             = Field(1.0,    min=0.0,    max=5.0,    description="Base fluid transport rate")
+    advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,              description="How the fields are carried: MacCormack keeps swirls and edges, at about twice the reads")
 
     # ---- The inputs, then the field groups ----
     boundary: Group[BoundarySettings]       = Group(BoundarySettings)

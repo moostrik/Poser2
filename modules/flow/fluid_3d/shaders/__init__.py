@@ -1,6 +1,7 @@
 """3D fluid simulation compute shaders. Every field is a GL_TEXTURE_3D on one grid."""
 
 from .advect_3d import Advect3D
+from .maccormack_3d import MacCormack3D
 from .divergence_3d import Divergence3D
 from .gradient_3d import Gradient3D
 from .jacobi_pressure_3d import JacobiPressure3D
