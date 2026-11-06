@@ -475,8 +475,7 @@ box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU
      moves where the motion gives it a velocity; the start's division keeps a numerical floor only.
   2. The kinetic bridge goes, with all that serves only it: its shaders, `KineticStrip`, `method`,
      `BridgeOutput.onset`'s kinetic source and `spin`, the 3D fluid's spin input, the presets'
-     `kinetic` keys. Its parts are taken over or measured not to work (the reservoir); the fluid
-     makes its own swirl, and the motion's curl is mostly the same edges **(deduction)**.
+     `kinetic` keys. Its parts are taken over or measured not to work (the reservoir).
   3. The event bridge is `ImpulseBridge`, group `impulse`: its values are a velocity change, Δv, in
      widths per second, an impulse in the physics sense.
   4. Measured on the harness, the frames captured again with the preset's flow: the GPU time of the
@@ -488,10 +487,7 @@ box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU
      0 to 1, the trail 1 and the rest 0 by default. No gain in the bridge: its sources share one
      unit, the motion's gains balance the axes and the fluid's gains set the strength. The trail and
      the impulse stay two velocity outputs, as the fluid takes them two ways (below).
-  6. The 3D fluid's `input_x` and `input_y` go: the motion's `x_gain` and `y_gain` balance the axes.
-- A turn, the change across the motion (a limb changing direction), from the same two trails; waits
-  for a recording with a turning limb to measure it on.
-- Whether the density's reduced view should also feed the fluid's own composite at a lower
+  6. The 3D fluid's `input_x` and `input_y` go: the motion's `x_gain` and `y_gain` balance the axes.- Whether the density's reduced view should also feed the fluid's own composite at a lower
   quality setting.
 - How a fluid takes what the bridge gives, the base of the fluid refactor. Both fluids add the
   injected velocity times dt (`Fluid2D.add_velocity`, `Fluid3D.add_velocity`), as Stam's Stable
