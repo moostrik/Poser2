@@ -27,7 +27,7 @@ from .bridge_3d import  DensityBridge, DensityBridgeSettings, Magnitude, Velocit
 
 # Visualization
 from .visualization import Visualizer, histogram_grid, histogram_volume_grid, Strip, ALL_CHANNELS, summary_grid, Legend, LegendKind, DrawnSize, \
-                           VolumeCut, Cut, cut_size, projects_max
+                           VolumeCut, Cut, cut_size, projects_max, Orbit, box_size
 
 # Shared by the 2D and 3D fluid
 from .time_step import TimeStep, TimeStepMode, hold_tick

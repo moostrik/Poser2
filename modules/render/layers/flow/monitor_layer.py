@@ -14,8 +14,8 @@ from enum import IntEnum, auto
 
 from OpenGL.GL import GL_VIEWPORT, glGetIntegerv, glViewport
 
-from modules.gl import Texture, Texture3D, Style, Blit, fit
-from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind, VolumeCut, Cut
+from modules.gl import Texture, Texture3D, Style, Blit, MouseButton, fit
+from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind, VolumeCut, Cut, Orbit
 from modules.settings import Field, BaseSettings, Group, Widget
 from ..layer_base import LayerBase
 
@@ -77,6 +77,7 @@ class MonitorLayerSettings(BaseSettings):
     names: Field[list[str]] =       Field([""], access=Field.READ, visible=False, description="The stage's textures")
     texture: Field[str] =           Field("output.velocity", widget=Widget.text_select, options=names, description="The texture shown")
     view: Field[MonitorView] =      Field(MonitorView.AUTO, description="By its kind, as an image, as a colormap centered on grey, as arrows, as a strip over time, or as a histogram")
+    camera: Field[str] =            Field("", access=Field.READ, description="A volume's view: the angle and zoom (left and right drag), the layer (scroll); middle click resets")
 
     advanced = Group(MonitorAdvancedSettings)
 
@@ -114,12 +115,46 @@ class MonitorLayer(LayerBase):
         self._strip_stepped: bool = False           # the strip got this tick's column
         self._volume_cut: VolumeCut = VolumeCut()   # a volume laid out flat for the 2D views
         self._slice: float = 0.5                    # the slice's place through a volume, 0 front to 1 back
+        self._layers: int = 0                       # the layers a scroll steps through, the show's density's
+        self._orbit: Orbit = Orbit()                # the 3D views' camera; the mouse turns it, a middle click resets it
         self._aspect: float | None = None           # the shape of what it rendered, kept when drawn; None fills the panel
         self._allocated: bool = False
 
     def set_input(self, input: MonitorInput) -> None:
         """Every stage's ports, for the next draw."""
         self._input = input
+
+    # ========== The mouse ==========
+
+    def drag(self, dx: float, dy: float, button: MouseButton) -> None:
+        """A drag of `dx`, `dy` (shares of the window, y down): the left button turns the 3D view,
+        the right zooms it. Render thread, from the window's callbacks."""
+        if button == MouseButton.LEFT:
+            self._orbit.turn(dx, dy)
+        elif button == MouseButton.RIGHT:
+            self._orbit.dolly(dy)
+        self._show_camera()
+
+    def scroll(self, steps: float, layers: int) -> None:
+        """A turn of the wheel: the slice one of `layers` further back per step away from the user,
+        `layers` the show's density's, the same for every monitor, so they stay on one place."""
+        if layers <= 0:
+            return
+        self._layers = layers
+        layer: int = min(max(int(self._slice * layers) + round(steps), 0), layers - 1)
+        self._slice = (layer + 0.5) / layers
+        self._show_camera()
+
+    def reset_view(self) -> None:
+        """The front view, framed, at the middle layer."""
+        self._orbit.reset()
+        self._slice = 0.5
+        self._show_camera()
+
+    def _show_camera(self) -> None:
+        orbit: Orbit = self._orbit
+        layer: str = f", layer {int(self._slice * self._layers) + 1} of {self._layers}" if self._layers else ""
+        self.settings.camera = f"yaw {orbit.yaw:.0f}°, pitch {orbit.pitch:.0f}°, zoom {orbit.zoom:.2f}{layer}"
 
     @property
     def texture(self) -> Texture:

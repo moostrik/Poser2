@@ -6,7 +6,7 @@ from typing import cast
 import numpy as np
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId
+from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId, MouseButton
 from modules.flow import DepthView, Port, hold_tick
 from modules.pose import Frame, Similarity, AngleMotion, Points2D, PointLandmark
 from modules.render import layers as ls, shaders, make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
@@ -170,6 +170,14 @@ class DeepFlowRender(RenderBase):
         # The border around each layer in the main window
         self._border: shaders.DrawRectangleOutline = shaders.DrawRectangleOutline()
 
+        # The mouse in the main window drives the monitors' volume views: a drag that starts anywhere goes to
+        # every monitor, so A and B keep one angle and one layer (nothing else in the main window takes it)
+        self._drag: tuple[MouseButton, float, float] | None = None     # the button held and where the cursor was
+        self._dragged: bool = False
+        self.window_manager.add_mouse_button_callback(self._on_mouse_button)
+        self.window_manager.add_mouse_move_callback(self._on_mouse_move)
+        self.window_manager.add_mouse_scroll_callback(self._on_mouse_scroll)
+
     def _make_layout(self) -> Subdivision:
         width, height = self._window_size
         aspect_ratios: list[float] = self._panel_aspect_ratios
@@ -227,6 +235,34 @@ class DeepFlowRender(RenderBase):
         if self._last_tick > 0.0:
             self._dt, self._tick_mean = hold_tick(now - self._last_tick, self._tick_mean)
         self._last_tick = now
+
+    # ========== The mouse: the monitors' volume views ==========
+
+    def _monitors(self) -> list[ls.MonitorLayer]:
+        return [cast(ls.MonitorLayer, layer) for key in (Layers.monitor_a, Layers.monitor_b) for layer in self.L[key].values()]
+
+    def _on_mouse_button(self, x: float, y: float, button: MouseButton, pressed: bool) -> None:
+        """A press starts a drag; a middle click that did not move resets the views."""
+        if pressed:
+            self._drag, self._dragged = (button, x, y), False
+            return
+        if self._drag is not None and self._drag[0] == MouseButton.MIDDLE and not self._dragged:
+            for monitor in self._monitors():
+                monitor.reset_view()
+        self._drag = None
+
+    def _on_mouse_move(self, x: float, y: float) -> None:
+        if self._drag is None:
+            return
+        button, last_x, last_y = self._drag
+        for monitor in self._monitors():
+            monitor.drag(x - last_x, y - last_y, button)
+        self._drag, self._dragged = (button, x, y), True
+
+    def _on_mouse_scroll(self, steps: float) -> None:
+        """A layer per step for every monitor, the show's density's layers."""
+        for monitor in self._monitors():
+            monitor.scroll(steps, self.settings.fluid.volume.layers)
 
     def reset_fluid(self) -> None:
         """Clear the optical flow, the bridges and the fluid volume at the next update; any thread."""

@@ -110,6 +110,7 @@ class WindowManager():
         self._exit_callbacks: list[Callable[[], None]] = []
         self._mouse_move_callbacks: list[Callable[[float, float], None]] = []
         self._mouse_button_callbacks: list[Callable[[float, float, MouseButton, bool], None]] = []
+        self._mouse_scroll_callbacks: list[Callable[[float], None]] = []
         self._key_callbacks: list[Callable] = []
 
         # Secondary windows sharing the main context: logical_id → window
@@ -238,6 +239,7 @@ class WindowManager():
         glfw.set_key_callback(self._main_window, self._notify_key_callback)
         glfw.set_cursor_pos_callback(self._main_window, self._notify_cursor_pos_callback)
         glfw.set_mouse_button_callback(self._main_window, self._notify_mouse_button_callback)
+        glfw.set_scroll_callback(self._main_window, self._notify_scroll_callback)
 
         logger.info("Setting up secondary monitors: %s", self.settings.secondary_list)
 
@@ -624,6 +626,12 @@ class WindowManager():
         for c in cbs:
             c(x, y, mb, pressed)
 
+    def _notify_scroll_callback(self, window, xoffset, yoffset) -> None:
+        with self._callback_lock:
+            cbs = list(self._mouse_scroll_callbacks)
+        for c in cbs:
+            c(float(yoffset))
+
     def _notify_exit_callbacks(self) -> None:
         with self._callback_lock:
             cbs = list(self._exit_callbacks)
@@ -643,6 +651,12 @@ class WindowManager():
             if callback not in self._mouse_button_callbacks:
                 self._mouse_button_callbacks.append(callback)
 
+    def add_mouse_scroll_callback(self, callback: Callable[[float], None]) -> None:
+        """`callback(steps)` for each turn of the wheel over the main window, positive away from the user."""
+        with self._callback_lock:
+            if callback not in self._mouse_scroll_callbacks:
+                self._mouse_scroll_callbacks.append(callback)
+
     def add_keyboard_callback(self, callback: Callable[[int, int, int], None]) -> None:
         with self._callback_lock:
             if callback not in self._key_callbacks:
@@ -657,6 +671,7 @@ class WindowManager():
         with self._callback_lock:
             self._mouse_move_callbacks.clear()
             self._mouse_button_callbacks.clear()
+            self._mouse_scroll_callbacks.clear()
             self._key_callbacks.clear()
             # exit_callbacks are intentionally preserved — they must fire on both natural and programmatic stop
 
