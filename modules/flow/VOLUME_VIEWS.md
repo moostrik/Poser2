@@ -9,10 +9,17 @@ A temporary plan, deleted when its last step is in; what it builds is then state
   (`SwapTexture3D`, the simulation's width × height × `sim_layers`), `_divergence_vol`,
   `_curl_vol`, `_vorticity_force_vol`, `_buoyancy_force_vol`, `_simulation_obstacle`
   (`Texture3D`), and `_density` (`SwapTexture2DArray` at the output size, 2160 × 3840 × `layers`
-  of RGBA16F, about 1 GB). `Fluid3D.ports` lists only the 2D obstacle.
+  of RGBA16F, about 1 GB). `layers` and `sim_layers` are separate settings (`VolumeSettings`).
+  `Fluid3D.ports` lists only the 2D obstacle.
 - `Port.texture` is a 2D `Texture`. The monitor's views (`MonitorView`: `IMAGE`, `COLORMAP`,
   `ARROWS`, `HISTOGRAM`, `STRIP`) all read a 2D texture through `Visualizer` and `Strip`, and draw
   with full-screen quads (`channel_view`, `velocity_arrow_field`, `histogram_*`, `strip_*`).
+- The monitor renders at the size the app allocates its layer, 2160 × 3840 in both apps
+  (`MonitorLayer.allocate` hands it to the visualizer), to be blitted into a panel about 1000
+  pixels high.
+- The strip and the histogram sample a fixed grid, whatever the texture's size: the strip a
+  128 × 228 summary, averaged by its mipmaps to one mean per channel; the histogram 256 × 256
+  samples into 256 bins per channel.
 - Nothing in the render uses a depth buffer (`Fbo` has no depth attachment) or instanced drawing.
 - The window manager reports mouse moves and buttons on the render thread
   (`add_mouse_move_callback`, `add_mouse_button_callback`, 0 to 1 across the window); nothing
@@ -20,10 +27,19 @@ A temporary plan, deleted when its last step is in; what it builds is then state
 
 ## The design
 
-- **Volume ports.** A port's texture may be a volume. Every view reads a volume at the
-  simulation size: the density is averaged down to the simulation's width, height and
-  `sim_layers`, once per tick and only while a monitor shows it, so no view shimmers or reads
-  the whole gigabyte. The other volumes are at that size already.
+- **The monitor's own size.** Like a stage, the monitor has `width` and `height`, 1080 × 1920
+  by default, first on its panel after `reset`, and reallocates when they change; the panel's
+  blit scales it to fit as now. No view draws at the output's 4k.
+- **Volume ports.** A port's texture may be a volume, always a 3D texture (`sampler3D`), so each
+  view is one shader. The density, stored as a 2D array at the output size, is averaged down into
+  a 3D texture of the simulation's width and height and its own `layers`, so no view shimmers or
+  reads the whole gigabyte. The fluid owns that reduction: it marks the reduced density stale at
+  every step, and the first view that asks for it this tick (`Port.prepare`) reduces it, so two
+  monitors showing it cost one reduction and none shows it costs nothing.
+- **A volume is addressed by position, not by layer.** Every view samples a volume at (u, v, w)
+  from 0 to 1 through the box, so each volume brings its own layer count: the density's `layers`
+  and the simulation's `sim_layers` need not match, and a density dot and a velocity arrow at one
+  grid point sample the same place.
 - **Picture views draw a volume as a cube**, summaries read all of it:
 
   | View       | 2D texture (as now)        | Volume                                                       |
@@ -32,8 +48,8 @@ A temporary plan, deleted when its last step is in; what it builds is then state
   | `COLORMAP` | colormap on mid grey       | stacked slices, each drawn as the colormap                   |
   | `GLYPHS`   | arrows, or dots for a scalar | 3D arrows, or 3D dots for a scalar, on a coarse grid       |
   | `FOG`      | (none)                     | the scalar ray-marched as a colormap fog                     |
-  | `STRIP`    | mean per channel over time | the same over all the voxels                                 |
-  | `HISTOGRAM`| counts of the samples      | counts of all the voxels                                     |
+  | `STRIP`    | mean per channel over time | the same over the whole volume: its front mean projection, the volume's mean |
+  | `HISTOGRAM`| counts of the samples      | counts of a 3D grid of samples, 64 × 64 × the layers         |
 
   `GLYPHS` replaces `ARROWS`, renamed in the step that builds it. A volume in any picture view
   can instead be drawn flat, with one more choice, `cut`:
@@ -41,70 +57,81 @@ A temporary plan, deleted when its last step is in; what it builds is then state
   | `cut`   | Means                                                                     |
   |---------|---------------------------------------------------------------------------|
   | `CUBE`  | the 3D view (default for a volume)                                        |
-  | `SLICE` | the layer at `layer`, 0 to 1 through the volume                           |
+  | `SLICE` | the volume at the slice position, its nearest layer                       |
   | `FRONT`, `TOP`, `SIDE` | the projection along z, y or x: the max for an image port, the mean for a velocity or a scalar, whose signs would cancel in a max |
 
   A flat cut is a 2D texture, so every 2D view draws it as it is; from the top, the glyphs of x
-  and z show the depth movement. `cut` and `layer` are not read for a 2D port.
-- **The orbit camera.** The 3D views share one camera on each monitor, around the volume's
-  center: `orbit.yaw`, `orbit.pitch` (degrees), `orbit.distance` (box sizes), `orbit.spin` (a
-  turn on its own, degrees per second, 0 off). The volume is a box of the fluid's width,
-  height and z extent (`Fluid3D._z_extent`), so a layer gap looks as deep as it is.
+  and z show the depth movement. `cut` is not read for a 2D port.
+- **The camera and the slice are the monitor's state, not settings.** Yaw, pitch and distance of
+  the orbit camera around the volume's center, and the slice position (0 to 1), live in the
+  monitor; the mouse changes them and the monitor's `reset` sets them back to the front view at
+  the middle layer. No setting is written per tick. A read-only readout on the panel shows the
+  angle and the slice. The volume is a box of the fluid's width, height and z extent
+  (`Fluid3D._z_extent`), so a layer gap looks as deep as it is.
 - **The mouse.** A drag that starts anywhere in the main window goes to every monitor: on a
-  cube it turns yaw and pitch, on a slice it moves `layer`; scroll zooms `distance` or steps one
-  layer. The mouse writes the monitor's settings, so the panel shows the same values; A and B
-  follow one drag. Nothing else in the main window takes the mouse.
+  cube it turns yaw and pitch, on a slice it moves the slice position; scroll zooms the distance
+  or steps one layer. A and B get the same drags, so they stay at one angle and one slice.
+  Nothing else in the main window takes the mouse.
+- **Transparent slices in order.** The stacked slices blend from the far side to the near one:
+  each draw tests the sign of the camera's direction along z and walks the layers that way, so
+  the order flips exactly when the view turns past the side.
 
 ## Steps
 
 Each step ends with its tests and a commit; the user runs the app.
 
-1. **Volume ports and flat cuts.**
-   - `modules/flow/port.py`: `Port.texture` is a `Texture | Texture3D | Texture2DArray`;
-     `Port.volume` says which. `Port.prepare`, a callable or None, is what a view calls before it
-     reads the port, at most once per tick.
+1. **The monitor's size, volume ports, flat cuts and the summaries.**
+   - The monitor: `width` and `height` in its settings, after `reset`; the visualizer, the strip
+     and the legend allocate at that size and follow a change; the presets get no value unless
+     they differ from 1080 × 1920.
+   - `modules/flow/port.py`: `Port.texture` is a `Texture | Texture3D`; `Port.volume` says which.
+     `Port.prepare`, a callable or None, is what a view calls before it reads the port.
    - `Fluid3D.ports` adds `velocity`, `density`, `temperature`, `pressure`, `divergence`,
      `vorticity`, `vorticity_force`, `buoyancy`, `obstacle`. The density's port is a `Texture3D`
-     at the simulation size with `prepare` set to `Fluid3D._reduce_density`, a new compute shader
-     (`fluid_3d/shaders/reduce_density.comp`, the mean of each block of texels and layers).
-   - `modules/flow/visualization`: `VolumeCut`, one shader for a slice and the three
-     projections (`volume_cut.frag`, a `sampler3D` or a `sampler2DArray` by a uniform), into an
-     FBO of the cut's size; the monitor's views then read that FBO. `Strip` and the histogram
-     count read a volume through its `FRONT` mean, which is the volume's mean **(deduction:
-     exact for the strip; the histogram then counts the projection, not the voxels, until step 5)**.
-   - The monitor: `advanced.cut` and `advanced.layer`; `cut` defaults to `SLICE` until step 3
-     builds the cube.
-   - Tests: GL-free, the port's `volume` and `prepare` called once per tick, the projection
-     rule by kind.
-2. **The mouse and the orbit settings.**
+     of the simulation's width and height and the density's `layers`, its `prepare`
+     `Fluid3D._reduce_density`: a compute shader (`fluid_3d/shaders/reduce_density.comp`, the mean
+     of each block of texels), run once per step at the first call, marked stale by the step.
+   - `modules/flow/visualization`: `VolumeCut`, one shader for a slice and the three projections
+     (`volume_cut.frag`, `sampler3D`, the slice at w, the projections walking each texel of their
+     axis), into an FBO of the cut's size; the monitor's views then read that FBO.
+   - The summaries: the strip reads a volume through its front mean projection;
+     `histogram_count.comp` gets the 3D grid (64 × 64 × the layers, its total the full height).
+   - The monitor: `advanced.cut`, defaulting to `SLICE` until step 3 builds the cube; the slice
+     at the middle, moved by the mouse from step 2.
+   - Tests: GL-free, the port's `volume`, the reduction run once per step however many calls,
+     the projection rule by kind, the histogram total for a volume.
+2. **The mouse and the camera.**
    - `WindowManager.add_mouse_scroll_callback`, beside the move and button ones.
-   - `modules/flow/visualization/orbit.py`: `OrbitSettings` (`yaw`, `pitch`, `distance`,
-     `spin`) and the view and projection matrices in numpy, no GL.
-   - `MonitorLayer.drag(dx, dy)` and `scroll(steps)`, writing its settings; each app registers
-     the window's mouse callbacks once and hands a drag that started with a button down, and
-     each scroll, to its monitors.
-   - Tests: GL-free, the matrices (the center maps to the middle, yaw turns about y), a drag
-     and a scroll writing the settings and clamping pitch and `layer`.
+   - `modules/flow/visualization/orbit.py`: `Orbit`, yaw, pitch and distance with their limits,
+     and the view and projection matrices in numpy, no GL.
+   - `MonitorLayer.drag(dx, dy)` and `scroll(steps)` changing its orbit and slice position;
+     `reset` sets them back; a read-only readout shows them. Each app registers the window's
+     mouse callbacks once and hands a drag that started with a button down, and each scroll, to
+     its monitors.
+   - Tests: GL-free, the matrices (the center maps to the middle, yaw turns about y), a drag and
+     a scroll clamping pitch, distance and the slice, reset back to the front view.
 3. **The 3D view: stacked slices.**
    - `modules/gl`: an `Fbo` with a depth attachment, on request (`Fbo(depth=True)`), for this
      step and the next.
    - `modules/flow/visualization`: `VolumeCube` draws every layer as a quad at its depth, with
-     the camera's matrices, back to front, each through the channel view's image or colormap,
-     partly transparent, the layer at `layer` brighter, and the box's edges for orientation.
-     New: a vertex shader with a `mat4` (`cube_slice.vert`, `.frag`).
+     the camera's matrices, from the far side to the near one by the sign of the camera's
+     direction along z, each through the channel view's image or colormap, partly transparent,
+     the slice's layer brighter, and the box's edges for orientation. New: a vertex shader with
+     a `mat4` (`cube_slice.vert`, `.frag`).
    - The monitor: `cut` defaults to `CUBE` for a volume.
+   - Tests: GL-free, the layer order flipping with the side the camera is on.
 4. **Glyphs.**
    - `ARROWS` becomes `GLYPHS` (`MonitorView`, the `AUTO` map, both apps' presets, `FLOW.md`).
    - Flat: `glyph_field.frag` replaces `velocity_arrow_field.frag`: an arrow for a velocity as
-     now, a dot for a scalar (the colormap's color, its size the value).
-   - 3D: instanced glyphs on a grid of about 16 × 9 × the layers, the volume sampled in the
-     vertex shader; an arrow as a camera-facing ribbon (core GL draws no wide lines), a dot as a
-     point sprite (`GL_PROGRAM_POINT_SIZE`), drawn with the depth test. New: instanced drawing
-     and a glyph mesh in `modules/gl` or beside the shader.
-5. **Fog, and the summaries over all voxels.**
+     now, a dot for a scalar (the colormap's color, its size the value, small values small or
+     transparent).
+   - 3D: instanced glyphs on a grid of about 16 × 9 × the layers, the volume sampled at (u, v, w)
+     in the vertex shader; an arrow as a camera-facing ribbon (core GL draws no wide lines), a
+     dot as a point sprite (`GL_PROGRAM_POINT_SIZE`), drawn with the depth test. New: instanced
+     drawing and a glyph mesh in `modules/gl` or beside the shader.
+5. **Fog.**
    - `volume_fog.frag`: a ray through the box per pixel, the colormap's color and the value's
-     size as opacity, from the camera's inverse matrix.
-   - `histogram_count.comp` counts a volume's voxels directly; the strip keeps the mean.
+     size as opacity, from the camera's inverse matrix; at the monitor's own size, not 4k.
 6. **Close.** `FLOW.md`'s monitor section states the views as built, its Open item goes, and
    this file is deleted.
 
