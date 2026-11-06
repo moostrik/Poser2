@@ -162,7 +162,7 @@ context of its own, would move the wait to the bridge, and the screen still show
 | `BridgeLayer` (ABC)                         | `StageLayer[BridgeInput, BridgeOutput]`; `_update()`: the density's color (`DensityColor`: the image, or white, times the tint, gated by the mask), `_bridge` the input's velocity into velocity, density and temperature. The bridges' filters run at the velocity's size and their outputs at `settings.width` by `settings.height`; the layer follows both. Draws nothing |
 | `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, the velocity lowpass and beside it the velocity bandpass, [The changes](#the-changes), and the boundary's and the body force's mixes, [The mix](#the-mix)) |
 | `FluidLayer` (ABC)                          | `StageLayer[FluidInput, FluidOutput]`; `_update()`: `_inject` each injection's velocity, density and temperature at its weight, `_step(dt)`; `texture`, the show. Knows injections, not cameras; reads no poses. The stage's reset is the fluid's only one |
-| `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's. `Fluid3DLayer` injects both systems' RGBA density, the body force's acceleration (added as the boundary's velocity is), the velocity's z as the volume's w (its sign turned: w points away from the viewer) |
+| `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's. `Fluid3DLayer` drags the fluid toward the boundary's velocity, adds the body force's acceleration × dt and injects both systems' RGBA density and temperature, each velocity's z as the volume's w (its sign turned: w points away from the viewer); how the fluid takes each is in [FLUID_3D.md](FLUID_3D.md) |
 | `MonitorLayer`                              | `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's port names (`names`, the options of `texture`); `draw()` renders the port once per tick, however many panels show it, by its kind or by `view`, and nothing while not shown; its views and settings are in [MONITOR.md](MONITOR.md). Not a stage, since it has no output and no `reset` |
 | `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass, each a `StageLayerSettings`: `reset`, then `width` and `height`, the stage's working size, first on every stage's panel. The motion's is the size its flow runs at, the bridge's the size it writes its outputs at (its filters follow the velocity's size), the fluid's its simulation grid (its density is at the size the app allocates). On the fluid layer `blend_mode`. A layer whose stage runs one component is that component's settings too (`Motion2DLayerSettings` is a `GradientFlowSettings`, `Motion3DLayerSettings` a `LucasKanadeFlow3DSettings`, the fluid layers' a `Fluid2DSettings` and a `Fluid3DSettings`), so the component's fields and groups sit on the stage's panel; the bridge layers, running several bridges, hold them in groups (the 3D bridge's three subpanels: `readings`, `lowpass` and `bandpass`; `boundary`, `velocity`, `density`, `temperature`; `body_force`, `acceleration`, `density`, `temperature`, each with its mix). No `draw_mode`, `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take `dt` from their input |
 
@@ -427,8 +427,9 @@ The shader loader finds a shader's source by its `.py` module name beside it
 - An outside source gates an input through its weight: every injection carries `weight`, 1 by
   default, and the app sets it from whatever it reads (hd_trio: the pose's motion and the
   cross-camera similarity). The fluid never knows why.
-- A multiplier on an input is a `gain` (the fluids' `velocity.gain`, `density.gain`,
-  `temperature.gain`); a 0 to 1 share in a mix is a `weight`; the density's sinking along gravity
+- A multiplier on an input is a `gain` (the 2D fluid's `velocity.gain`, `density.gain`,
+  `temperature.gain`; the 3D fluid's `boundary.gain` and `body_force.gain`, and its density's and
+  temperature's `boundary_gain` and `body_force_gain`); a 0 to 1 share in a mix is a `weight`; the density's sinking along gravity
   in the buoyancy is `temperature.sink`, which both fluids read (`Fluid2D._apply_buoyancy`).
 - `modules/render/tests/test_flow_systems.py` loads each app preset into its system's stage
   settings and fails on an unknown key, and fails on a field of the flow's settings that no code
@@ -451,17 +452,13 @@ The shader loader finds a shader's source by its `.py` module name beside it
   the step's GPU time on a still velocity and on a burst, then cap the trace at a few cells per
   step in the advection, which bounds the scatter whatever comes in and which real motion stays
   under at 60 fps.
-- How a fluid takes what the bridge gives, the base of the fluid refactor. Both fluids add the
-  injected velocity times dt (`Fluid2D.add_velocity`, `Fluid3D.add_velocity`), as Stam's Stable
-  Fluids adds a source; but the bridge's velocity is a velocity, in view widths per second like
-  the fluid's, so it is taken as an acceleration, `velocity.gain` acts as a rate, and the fluid
-  stays near 0.05 to 0.1 of the motion's speed **(deduction)**, a monitor needing a scale of 20 to
-  30 to show it. In Navier–Stokes an outside term is an acceleration per unit mass, as gravity and
-  buoyancy enter. The bridge gives the two apart, the boundary (`boundary_velocity`) and the body
-  force (`body_force_acceleration`, [The mix](#the-mix)); how the fluid takes each, the boundary's
-  velocity as a velocity to drag toward and the body force's acceleration times dt, is the fluid
-  refactor's. A change lasts about `slow_smooth` over many ticks, so a velocity change added
-  without dt every tick would count once per tick, 60 times its Δv in a second **(deduction)**.
+- How the 2D fluid takes what the bridge gives: it adds the injected velocity times dt
+  (`Fluid2D.add_velocity`), as Stam's Stable Fluids adds a source; but the bridge's velocity is a
+  velocity, in view widths per second like the fluid's, so it is taken as an acceleration,
+  `velocity.gain` acts as a rate, and the fluid stays near 0.05 to 0.1 of the motion's speed
+  **(deduction)**, a monitor needing a scale of 20 to 30 to show it. The 3D fluid takes the
+  boundary's velocity by a drag and the body force's acceleration times dt
+  ([FLUID_3D.md](FLUID_3D.md)); the 2D fluid is to follow it.
 - hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
   the pose's motion, a settings field written per tick. A per-tick value on the fluid layer would
   take it off the settings.

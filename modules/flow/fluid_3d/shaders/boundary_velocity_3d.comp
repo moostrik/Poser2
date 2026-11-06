@@ -1,0 +1,57 @@
+#version 460 core
+
+/*
+ * BoundaryVelocity3D - the boundary: the fluid's velocity is dragged toward the body's where the
+ * body is, in the gaussian birth slab, never past it.
+ *
+ *     v <- v + (v_body * gain - v) * pull,    pull = share * g * weight * slab
+ *
+ * share is 1 - exp(-dt / drag_time) (0 ms sets the velocity), g says where the body is, the body's
+ * speed above a floor, min(|v_body| / floor, 1), so a dead trail drags nothing toward 0; weight is
+ * the injection's; slab the gaussian, exp(-0.5 * ((z_norm - target) / spread)²). Every factor is
+ * at most 1, so the fluid is at most as fast as the body times gain, whatever the frame rate.
+ *
+ * The input holds the body's velocity, x and y on the image plane and z toward the camera. The
+ * volume's w points away from the viewer (+W moves fluid toward higher layer indices; layer 0 is
+ * the front face), so w is -z.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+// The body's velocity (RGBA16F: x, y, z toward the camera; widths/s)
+layout(binding = 0) uniform sampler2D uInput;
+
+// The velocity volume (read-write; u,v,w = .xyz)
+layout(rgba16f, binding = 0) uniform image3D uVolume;
+
+// Parameters
+uniform float uTargetLayer;  // Normalized depth [0, 1] — center of the slab
+uniform float uSpread;       // Gaussian sigma in normalized depth units
+uniform float uGain;         // The body's velocity times this is the target
+uniform float uShare;        // 1 - exp(-dt / drag_time)
+uniform float uWeight;       // The injection's weight, 0 to 1
+uniform float uFloor;        // widths/s: the body's speed below which it drags nothing
+uniform ivec3 uSize;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    // Gaussian weight along depth
+    float z_norm = (float(gid.z) + 0.5) / float(uSize.z);
+    float target_z = (0.5 + uTargetLayer * (float(uSize.z) - 1.0)) / float(uSize.z);
+    float dz = (z_norm - target_z) / max(uSpread, 0.001);
+    float slab = exp(-0.5 * dz * dz);
+    if (slab < 0.001) return;
+
+    vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
+    vec3 body = texture(uInput, uv).xyz;
+    float g = min(length(body) / max(uFloor, 1e-6), 1.0);
+    float pull = uShare * g * uWeight * slab;
+    if (pull <= 0.0) return;
+
+    vec3 target = vec3(body.xy, -body.z) * uGain;
+    vec4 current = imageLoad(uVolume, gid);
+    current.xyz += (target - current.xyz) * pull;
+    imageStore(uVolume, gid, current);
+}

@@ -9,7 +9,8 @@ from .vorticity_curl_3d import VorticityCurl3D
 from .vorticity_force_3d import VorticityForce3D
 from .buoyancy_3d import Buoyancy3D
 from .inject_3d import Inject3D
-from .inject_flow_3d import InjectFlow3D
+from .boundary_velocity_3d import BoundaryVelocity3D
+from .body_force_acceleration_3d import BodyForceAcceleration3D
 from .dampen_3d import Dampen3D
 from .add_3d import Add3D
 from .inject_binary_3d import InjectBinary3D

@@ -1,4 +1,4 @@
 """3D volumetric fluid simulation."""
 
-from .fluid_3d import Fluid3D
-from .fluid_settings import Fluid3DSettings, VolumeSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings
+from .fluid_3d import Fluid3D, DRAG_FLOOR, drag_share, drag_gate, drag_velocity_step
+from .fluid_settings import Fluid3DSettings, BoundarySettings, BodyForceSettings, VolumeSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings

@@ -20,12 +20,22 @@ The walls are per-field wrap modes (no explicit border obstacles):
     Velocity:          GL_CLAMP_TO_BORDER(0,0,0,0)  -> no-slip / Dirichlet
     Density, pressure, temperature: by their `wall`; the z walls by the volume's
     Obstacle:          GL_CLAMP_TO_BORDER(1,0,0,0)   -> OOB = obstacle
+
+The inputs are the bridge's two systems: the boundary, the body in the water, whose velocity the
+water is dragged toward where the body is (`drag_velocity`, never past it); and the body force, an
+acceleration added × dt (`add_acceleration`). The densities and the temperatures are sources, added
+× dt, each side at its own gain (`add_boundary_density`, `add_body_force_density`,
+`add_boundary_temperature`, `add_body_force_temperature`). Every input goes into the gaussian birth
+slab at `volume.injection_layer`.
 """
+import math
+
+import numpy as np
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_R16F, GL_R8, GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
 
 from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
-from .fluid_settings import Fluid3DSettings, VolumeSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings
+from .fluid_settings import Fluid3DSettings, VolumeSettings, DensitySettings, TemperatureSettings, PressureSettings, VelocitySettings
 from ..shaders import AddBoolean
 from ..flow_util import FlowUtil
 from ..port import Port, TextureKind
@@ -34,7 +44,7 @@ from .shaders import (
     Advect3D, Divergence3D, Gradient3D,
     JacobiPressure3D, JacobiDiffusion3D,
     VorticityCurl3D, VorticityForce3D, Buoyancy3D,
-    Inject3D, InjectFlow3D,
+    Inject3D, BoundaryVelocity3D, BodyForceAcceleration3D,
     Dampen3D, Composite3D, Add3D,
     InjectBinary3D
 )
@@ -48,8 +58,35 @@ _WALL_GL: dict = {
     WallMode.CLOSED: (GL_CLAMP_TO_EDGE,   (0.0, 0.0, 0.0, 0.0)),
 }
 
+DRAG_FLOOR: float = 0.02    # widths/s: the body's speed below which it drags nothing, so a dead trail pulls nothing toward 0
+
 import logging
 logger = logging.getLogger(__name__)
+
+
+# ── the drag's arithmetic, the shader's in numpy ─────────────────────────
+
+def drag_share(delta_time: float, drag_time: float) -> float:
+    """The share of the gap to the body's velocity the water closes in one step of `delta_time` (s):
+    1 − exp(−dt / drag_time), `drag_time` in ms; 0 ms sets the velocity at once."""
+    if drag_time <= 0.0:
+        return 1.0
+    return 1.0 - math.exp(-delta_time * 1000.0 / drag_time)
+
+
+def drag_gate(speed: np.ndarray) -> np.ndarray:
+    """Where the body is: its speed (widths/s) over the floor, at most 1."""
+    return np.minimum(speed / DRAG_FLOOR, 1.0)
+
+
+def drag_velocity_step(velocity: np.ndarray, boundary: np.ndarray, gain: float, share: float, weight: float = 1.0,
+                       slab: float = 1.0) -> np.ndarray:
+    """One drag step on (..., 3) velocities, in the volume's frame: v + (boundary × gain − v) × pull, with
+    pull = share × gate × weight × slab, `boundary` the body's velocity. Mirrors boundary_velocity_3d.comp,
+    without its w = −z."""
+    gate: np.ndarray = drag_gate(np.linalg.norm(boundary, axis=-1, keepdims=True))
+    pull: np.ndarray = share * gate * weight * slab
+    return velocity + (boundary * gain - velocity) * pull
 
 
 # ---------------------------------------------------------------------------
@@ -138,7 +175,8 @@ class Fluid3D:
         self._vorticity_force_shader: VorticityForce3D = VorticityForce3D()
         self._buoyancy_shader: Buoyancy3D = Buoyancy3D()
         self._inject_shader: Inject3D = Inject3D()
-        self._inject_flow_shader: InjectFlow3D = InjectFlow3D()
+        self._boundary_velocity_shader: BoundaryVelocity3D = BoundaryVelocity3D()
+        self._body_force_acceleration_shader: BodyForceAcceleration3D = BodyForceAcceleration3D()
         self._dampen_shader: Dampen3D = Dampen3D()
         self._composite_shader: Composite3D = Composite3D()
         self._add_shader: Add3D = Add3D()
@@ -188,7 +226,8 @@ class Fluid3D:
         self._vorticity_force_shader.allocate()
         self._buoyancy_shader.allocate()
         self._inject_shader.allocate()
-        self._inject_flow_shader.allocate()
+        self._boundary_velocity_shader.allocate()
+        self._body_force_acceleration_shader.allocate()
         self._dampen_shader.allocate()
         self._composite_shader.allocate()
         self._add_shader.allocate()
@@ -261,7 +300,8 @@ class Fluid3D:
         self._vorticity_force_shader.deallocate()
         self._buoyancy_shader.deallocate()
         self._inject_shader.deallocate()
-        self._inject_flow_shader.deallocate()
+        self._boundary_velocity_shader.deallocate()
+        self._body_force_acceleration_shader.deallocate()
         self._dampen_shader.deallocate()
         self._composite_shader.deallocate()
         self._add_shader.deallocate()
@@ -281,7 +321,8 @@ class Fluid3D:
         self._vorticity_force_shader.reload()
         self._buoyancy_shader.reload()
         self._inject_shader.reload()
-        self._inject_flow_shader.reload()
+        self._boundary_velocity_shader.reload()
+        self._body_force_acceleration_shader.reload()
         self._dampen_shader.reload()
         self._composite_shader.reload()
         self._add_shader.reload()
@@ -612,44 +653,62 @@ class Fluid3D:
 
     # ========== Input Methods (2D -> 3D injection) ==========
 
-    def add_velocity(self, texture: Texture, strength: float = 1.0) -> None:
-        """Inject the 3D velocity (x, y on the image plane, z toward the camera) into the gaussian
-        birth slab, gained by velocity.gain. The volume's w is -z: +W moves fluid away from the
-        viewer (layer 0 is the front face). Without depth, z is 0, and so is w.
+    def drag_velocity(self, texture: Texture, weight: float = 1.0) -> None:
+        """The boundary: drag the velocity in the gaussian birth slab toward the body's velocity (x, y on
+        the image plane, z toward the camera; widths/s) × boundary.gain, over boundary.drag_time, where
+        the body moves (its speed above DRAG_FLOOR), never past it. The volume's w is -z: +W moves fluid
+        away from the viewer (layer 0 is the front face). Without depth, z is 0, and so is w.
         """
         if not self._allocated:
             return
-        self._inject_flow_shader.use(
+        boundary = self.settings.boundary
+        self._boundary_velocity_shader.use(
             texture, self._velocity,
             self.settings.volume.injection_layer,
             self.settings.volume.injection_spread,
-            strength * self.settings.velocity.gain * self._dt,
+            boundary.gain, drag_share(self._dt, boundary.drag_time), weight, DRAG_FLOOR,
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
-    def add_density(self, texture: Texture, strength: float = 1.0) -> None:
-        """Inject 2D density texture into the density volume. Applies settings.density.gain and delta_time."""
+    def add_acceleration(self, texture: Texture, weight: float = 1.0) -> None:
+        """The body force: add the acceleration (x, y on the image plane, z toward the camera; widths/s²)
+        × body_force.gain × dt into the gaussian birth slab; w is -z, as the boundary's."""
         if not self._allocated:
             return
-        self._inject_shader.use(
-            texture, self._density,
+        self._body_force_acceleration_shader.use(
+            texture, self._velocity,
             self.settings.volume.injection_layer,
             self.settings.volume.injection_spread,
-            strength * self.settings.density.gain * self._dt,
-            internal_format=GL_RGBA16F
+            weight * self.settings.body_force.gain * self._dt,
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
-    def add_temperature(self, texture: Texture, strength: float = 1.0) -> None:
-        """Inject 2D temperature texture into 3D temperature volume. Applies settings.temperature.gain and delta_time."""
+    def add_boundary_density(self, texture: Texture, weight: float = 1.0) -> None:
+        """The boundary's density (RGBA, widths/s times the color) × density.boundary_gain × dt into the slab."""
+        self._add_source(texture, self._density, weight * self.settings.density.boundary_gain, GL_RGBA16F)
+
+    def add_body_force_density(self, texture: Texture, weight: float = 1.0) -> None:
+        """The body force's density (RGBA, widths/s² times the color) × density.body_force_gain × dt into the slab."""
+        self._add_source(texture, self._density, weight * self.settings.density.body_force_gain, GL_RGBA16F)
+
+    def add_boundary_temperature(self, texture: Texture, weight: float = 1.0) -> None:
+        """The boundary's temperature (widths/s, signed by the color) × temperature.boundary_gain × dt into the slab."""
+        self._add_source(texture, self._temperature, weight * self.settings.temperature.boundary_gain, GL_R16F)
+
+    def add_body_force_temperature(self, texture: Texture, weight: float = 1.0) -> None:
+        """The body force's temperature (widths/s², signed by the color) × temperature.body_force_gain × dt into the slab."""
+        self._add_source(texture, self._temperature, weight * self.settings.temperature.body_force_gain, GL_R16F)
+
+    def _add_source(self, texture: Texture, volume: SwapTexture3D, gain: float, internal_format: int) -> None:
+        """A source: `texture` × gain × dt added into the volume's gaussian birth slab."""
         if not self._allocated:
             return
         self._inject_shader.use(
-            texture, self._temperature,
+            texture, volume,
             self.settings.volume.injection_layer,
             self.settings.volume.injection_spread,
-            strength * self.settings.temperature.gain * self._dt,
-            internal_format=GL_R16F
+            gain * self._dt,
+            internal_format=internal_format
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 

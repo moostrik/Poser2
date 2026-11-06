@@ -521,7 +521,7 @@
       "time_step": "MEASURED",
       "fixed_fps": 60.0,
       "fps_smoothing": 1.0,
-      "speed": 0.4,
+      "speed": 1.0,
       "volume": {
         "layers": 64,
         "injection_layer": 0.54,
@@ -534,8 +534,7 @@
         "wall": "CLOSED"
       },
       "velocity": {
-        "gain": 10.0,
-        "self_advection": 0.51,
+        "self_advection": 1.0,
         "fade_time": 6.04,
         "dampen_threshold": 50.0,
         "dampen_time": 2.0,
@@ -545,13 +544,12 @@
         "viscosity_iter": 15
       },
       "density": {
-        "gain": 9.43,
+        "boundary_gain": 9.43,
         "fade_time": 60.0,
         "evaporation": 0.04,
         "wall": "CLOSED"
       },
       "temperature": {
-        "gain": 1.0,
         "fade_time": 12.0,
         "buoyancy": 0.0,
         "sink": 4.0,

@@ -16,8 +16,9 @@ class Fluid3DLayerSettings(Fluid3DSettings, FluidLayerSettings):
 
 
 class Fluid3DLayer(FluidLayer):
-    """The 3D fluid layer: each injection's boundary and body force, their z as w, density and temperature
-    into the volume at its weight; one step per tick; the composited density as the texture."""
+    """The 3D fluid layer: each injection's boundary velocity dragged toward and body force acceleration added,
+    their z as w, its densities and temperatures into the volume at its weight; one step per tick; the
+    composited density as the texture."""
 
     def __init__(self, settings: Fluid3DLayerSettings) -> None:
         super().__init__(settings)
@@ -52,17 +53,17 @@ class Fluid3DLayer(FluidLayer):
 
     def _inject(self, injection: Injection) -> None:
         fluid: Fluid3D = self._fluid
-        # The velocity's z (blue) is the w; the body force likewise, added as the boundary is, until the fluid
-        # takes each its own way (FLOW.md's Open)
-        fluid.add_velocity(injection.boundary_velocity, injection.weight)
+        # The boundary's velocity is dragged toward, the body force's acceleration added × dt; the z (blue) of
+        # each is the w
+        fluid.drag_velocity(injection.boundary_velocity, injection.weight)
         if injection.body_force_acceleration is not None:
-            fluid.add_velocity(injection.body_force_acceleration, injection.weight)
-        fluid.add_density(injection.boundary_density, injection.weight)
+            fluid.add_acceleration(injection.body_force_acceleration, injection.weight)
+        fluid.add_boundary_density(injection.boundary_density, injection.weight)
         if injection.body_force_density is not None:
-            fluid.add_density(injection.body_force_density, injection.weight)
-        fluid.add_temperature(injection.boundary_temperature, injection.weight)
+            fluid.add_body_force_density(injection.body_force_density, injection.weight)
+        fluid.add_boundary_temperature(injection.boundary_temperature, injection.weight)
         if injection.body_force_temperature is not None:
-            fluid.add_temperature(injection.body_force_temperature, injection.weight)
+            fluid.add_body_force_temperature(injection.body_force_temperature, injection.weight)
 
     def _step(self, dt: float) -> None:
         self._fluid.update(dt)

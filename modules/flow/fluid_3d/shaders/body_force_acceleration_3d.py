@@ -1,4 +1,4 @@
-"""InjectFlow3D - Inject the 3D velocity (x, y on the image plane, z toward the camera) into the velocity volume."""
+"""BodyForceAcceleration3D - the body force: an acceleration added × dt into the velocity volume's birth slab."""
 from __future__ import annotations
 
 from OpenGL.GL import GL_RGBA16F, GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform3i, glUseProgram
@@ -6,13 +6,10 @@ from OpenGL.GL import GL_RGBA16F, GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, g
 from modules.gl import Texture, Texture3D, ComputeShader
 
 
-class InjectFlow3D(ComputeShader):
-    """Inject the 3D velocity texture into the 3D velocity volume as one vec3 input.
-
-    x and y are the image plane's; the volume's w is the velocity's -z, since z points toward the
-    camera and +W away from the viewer. All three are written into the gaussian birth slab and
-    treated identically from then on.
-    """
+class BodyForceAcceleration3D(ComputeShader):
+    """Add an acceleration × dt into the velocity volume's gaussian birth slab. x and y are the image
+    plane's; the volume's w is the acceleration's −z, since z points toward the camera and +W away
+    from the viewer."""
 
     WORKGROUP_SIZE_X = 16
     WORKGROUP_SIZE_Y = 16
@@ -21,16 +18,16 @@ class InjectFlow3D(ComputeShader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, velocity: Texture, volume: Texture3D, target_layer: float, spread: float,
+    def use(self, acceleration: Texture, volume: Texture3D, target_layer: float, spread: float,
             strength: float) -> None:
-        """Inject the velocity into the velocity volume.
+        """Add the acceleration into the volume.
 
         Args:
-            velocity: 3D velocity texture (RGBA16F: x, y, z toward the camera; normalized-width units)
+            acceleration: The acceleration (RGBA16F: x, y, z toward the camera; widths/s²)
             volume: 3D velocity volume (read-write; u,v,w = .xyz)
-            target_layer: Normalized depth [0, 1] — center of injection
+            target_layer: Normalized depth [0, 1] — center of the slab
             spread: Gaussian sigma in normalized depth units
-            strength: Gain on the velocity (strength * gain * dt)
+            strength: weight × gain × dt
         """
         if not self.allocated or not self.shader_program:
             return
@@ -38,7 +35,7 @@ class InjectFlow3D(ComputeShader):
         glUseProgram(self.shader_program)
 
         glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, velocity.tex_id)
+        glBindTexture(GL_TEXTURE_2D, acceleration.tex_id)
         glUniform1i(self.get_uniform_loc("uInput"), 0)
 
         self.bind_image_3d_readwrite(0, volume, GL_RGBA16F)

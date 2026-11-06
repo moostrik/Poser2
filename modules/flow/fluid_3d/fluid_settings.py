@@ -7,10 +7,20 @@ from ..wall_mode import WallMode
 from ..time_step import TimeStepMode
 
 
+class BoundarySettings(BaseSettings):
+    """The boundary: the body in the water, whose velocity the water is dragged toward."""
+    gain: Field[float]              = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's velocity times this is what the water is dragged toward; 1 = as fast as the body")
+    drag_time: Field[float]         = Field(50.0,   min=0.0,    max=1000.0, step=1.0, color="cyan", description="Time the water takes to close the gap to the body's velocity (ms); 0 = at once")
+
+
+class BodyForceSettings(BaseSettings):
+    """The body force: the Navier–Stokes force term, an acceleration added × dt."""
+    gain: Field[float]              = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The acceleration times this is added × dt; 1 = its Δv added once")
+
+
 class VelocitySettings(BaseSettings):
     """Velocity field parameters."""
-    gain: Field[float]              = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="Multiplier applied to the measured (x, y, z) velocity input")
-    self_advection: Field[float]    = Field(0.01,   min=0.0,    max=1.0,    color="blue-grey",      description="How much velocity advects itself. Keep low for stability.")
+    self_advection: Field[float]    = Field(1.0,    min=0.0,    max=1.0,    color="blue-grey",      description="How far the velocity carries itself per step; 1 = the full step, the physics")
     fade_time: Field[float]         = Field(30.0,   min=0.1,    max=60.0,   color="deep-blue",      description="Seconds until velocity fades to ~1%")
     dampen_threshold: Field[float]  = Field(5.0,    min=0.1,    max=50.0,   color="cyan",           description="Magnitude above which velocity is dampened")
     dampen_time: Field[float]       = Field(0.5,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")
@@ -22,7 +32,8 @@ class VelocitySettings(BaseSettings):
 
 class DensitySettings(BaseSettings):
     """Density field parameters."""
-    gain: Field[float]              = Field(1.0,    min=0.0,    max=10.0,    color="teal",          description="Multiplier applied to all density inputs")
+    boundary_gain: Field[float]     = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The boundary's density times this is added × dt; 1 = one unit per width of travel")
+    body_force_gain: Field[float]   = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's density times this is added × dt; 1 = one unit per width/s of Δv")
     size: Field[int]                = Field(1,      min=1,      max=4,                              description="The density grid's x and y size as a multiple of the simulation's; 1 = one grid")
     fade_time: Field[float]         = Field(4.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%")
     evaporation: Field[float]       = Field(0.0,    min=0.0,    max=2.0,    color="grey",           description="Density removed per second; clears low-level haze (0 = off)")
@@ -31,7 +42,8 @@ class DensitySettings(BaseSettings):
 
 class TemperatureSettings(BaseSettings):
     """Temperature field parameters."""
-    gain: Field[float]              = Field(0.0,    min=0.0,    max=2.0,    color="teal",           description="Multiplier applied to all temperature inputs")
+    boundary_gain: Field[float]     = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The boundary's temperature times this is added × dt, signed by the color")
+    body_force_gain: Field[float]   = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's temperature times this is added × dt, signed by the color")
     fade_time: Field[float]         = Field(3.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until temperature fades to ~1%")
     buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Thermal buoyancy coefficient: hot (fresh) density rises against gravity")
     sink: Field[float]              = Field(4.0,    min=0.0,    max=20.0,   color="red",            description="Weight of the density: it sinks along gravity")
@@ -81,7 +93,9 @@ class Fluid3DSettings(BaseSettings):
     fps_smoothing: Field[float]     = Field(1.0,    min=0.0,    max=10.0,               description="Smoothing of the measured rate in measured mode (s); 0 follows each frame")
     speed: Field[float]             = Field(1.0,    min=0.0,    max=5.0,    description="Base fluid transport rate")
 
-    # ---- Field groups ----
+    # ---- The inputs, then the field groups ----
+    boundary: Group[BoundarySettings]       = Group(BoundarySettings)
+    body_force: Group[BodyForceSettings]    = Group(BodyForceSettings)
     volume: Group[VolumeSettings]           = Group(VolumeSettings)
     velocity: Group[VelocitySettings]       = Group(VelocitySettings)
     density: Group[DensitySettings]         = Group(DensitySettings)
