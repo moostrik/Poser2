@@ -7,7 +7,7 @@ from modules.gl import Texture, Texture3D, ComputeShader
 
 
 class Inject3D(ComputeShader):
-    """Inject 2D texture into 3D volume with gaussian depth spread."""
+    """Add a 2D texture into a 3D volume with gaussian depth spread."""
 
     WORKGROUP_SIZE_X = 16
     WORKGROUP_SIZE_Y = 16
@@ -18,16 +18,15 @@ class Inject3D(ComputeShader):
 
     def use(self, input_2d: Texture, volume: Texture3D,
             target_layer: float, spread: float, strength: float = 1.0,
-            mode: int = 0, internal_format: int = GL_RGBA16F) -> None:
-        """Inject 2D input into 3D volume.
+            internal_format: int = GL_RGBA16F) -> None:
+        """Add the 2D input into the 3D volume.
 
         Args:
             input_2d: 2D source texture
-            volume: 3D destination volume (read-write for additive mode)
+            volume: 3D destination volume (read-write)
             target_layer: Normalized depth [0, 1] — center of injection
             spread: Gaussian sigma in normalized depth units
             strength: Injection strength multiplier
-            mode: 0 = additive, 1 = set (replace)
             internal_format: Image format for volume binding
         """
         if not self.allocated or not self.shader_program:
@@ -47,7 +46,6 @@ class Inject3D(ComputeShader):
         glUniform1f(self.get_uniform_loc("uTargetLayer"), target_layer)
         glUniform1f(self.get_uniform_loc("uSpread"), spread)
         glUniform1f(self.get_uniform_loc("uStrength"), strength)
-        glUniform1i(self.get_uniform_loc("uMode"), mode)
         glUniform3i(self.get_uniform_loc("uSize"),
                     volume.width, volume.height, volume.depth)
 

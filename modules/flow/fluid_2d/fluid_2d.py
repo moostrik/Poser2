@@ -26,7 +26,7 @@ from modules.gl import Texture, SwapFbo, Fbo, Profiler
 from .. import FlowUtil, Port, TextureKind
 from ..time_step import REFERENCE_STEP, TimeStep, viscosity_iterations
 from ..shaders import AddBoolean
-from ..boundary_mode import BoundaryMode
+from ..wall_mode import WallMode
 from .fluid_settings import Fluid2DSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings
 from .shaders import (
     Advect, Divergence, Gradient,
@@ -34,9 +34,9 @@ from .shaders import (
     VorticityCurl, VorticityForce, Buoyancy
 )
 
-_BOUNDARY_GL: dict = {
-    BoundaryMode.OPEN:   (GL_CLAMP_TO_BORDER, (0.0, 0.0, 0.0, 0.0)),
-    BoundaryMode.CLOSED: (GL_CLAMP_TO_EDGE,   (0.0, 0.0, 0.0, 0.0)),
+_WALL_GL: dict = {
+    WallMode.OPEN:   (GL_CLAMP_TO_BORDER, (0.0, 0.0, 0.0, 0.0)),
+    WallMode.CLOSED: (GL_CLAMP_TO_EDGE,   (0.0, 0.0, 0.0, 0.0)),
 }
 
 
@@ -84,10 +84,10 @@ class Fluid2D:
         self._allocated: bool = False
 
         self._reallocate_pending: bool = False
-        self._boundary_dirty: bool = False
+        self._wall_dirty: bool = False
 
         # ---- Simulation fields (SwapFbo for ping-pong) ----
-        # Velocity always uses Dirichlet (v=0 at walls); others configurable via _apply_boundary_modes().
+        # Velocity always uses Dirichlet (v=0 at walls); others configurable via _apply_wall_modes().
         self._velocity_fbo: SwapFbo = SwapFbo(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         self._density_fbo: SwapFbo = SwapFbo()
         self._temperature_fbo: SwapFbo = SwapFbo()
@@ -133,10 +133,10 @@ class Fluid2D:
         self.settings.bind(Fluid2DSettings.width, lambda _: self._request_reallocate())
         self.settings.bind(Fluid2DSettings.height, lambda _: self._request_reallocate())
         self.settings.bind(Fluid2DSettings.profile, lambda v: setattr(self._profiler, 'enabled', v))
-        mark_boundary = lambda _: setattr(self, '_boundary_dirty', True)
-        self.settings.density.bind(DensitySettings.boundary, mark_boundary)
-        self.settings.temperature.bind(TemperatureSettings.boundary, mark_boundary)
-        self.settings.pressure.bind(PressureSettings.boundary, mark_boundary)
+        mark_wall = lambda _: setattr(self, '_wall_dirty', True)
+        self.settings.density.bind(DensitySettings.wall, mark_wall)
+        self.settings.temperature.bind(TemperatureSettings.wall, mark_wall)
+        self.settings.pressure.bind(PressureSettings.wall, mark_wall)
 
     # ========== Allocation ==========
 
@@ -199,7 +199,7 @@ class Fluid2D:
         self._vorticity_force_fbo.allocate(sim_w, sim_h, GL_RG16F)
         self._buoyancy_fbo.allocate(sim_w, sim_h, GL_RG16F)
 
-        self._apply_boundary_modes()
+        self._apply_wall_modes()
 
     def deallocate(self) -> None:
         """Release all GPU resources."""
@@ -567,11 +567,11 @@ class Fluid2D:
 
     # ========== Deferred ==========
 
-    def _apply_boundary_modes(self) -> None:
-        """Apply current boundary mode settings to all field FBOs (GL thread only)."""
-        self._density_fbo.set_wrap(*_BOUNDARY_GL[self.settings.density.boundary])
-        self._temperature_fbo.set_wrap(*_BOUNDARY_GL[self.settings.temperature.boundary])
-        self._pressure_fbo.set_wrap(*_BOUNDARY_GL[self.settings.pressure.boundary])
+    def _apply_wall_modes(self) -> None:
+        """Apply the wall settings to all field FBOs (GL thread only)."""
+        self._density_fbo.set_wrap(*_WALL_GL[self.settings.density.wall])
+        self._temperature_fbo.set_wrap(*_WALL_GL[self.settings.temperature.wall])
+        self._pressure_fbo.set_wrap(*_WALL_GL[self.settings.pressure.wall])
 
     def _handle_deferred_actions(self) -> None:
         """Process reset and reallocation requests queued from the UI thread."""
@@ -582,9 +582,9 @@ class Fluid2D:
             if self._simulation_width != old_w or self._simulation_height != old_h:
                 self._allocate_simulation_fields()
 
-        if self._boundary_dirty:
-            self._boundary_dirty = False
-            self._apply_boundary_modes()
+        if self._wall_dirty:
+            self._wall_dirty = False
+            self._apply_wall_modes()
 
     def _request_reallocate(self) -> None:
         """Thread-safe reallocation request — deferred to next update() on the GL thread."""

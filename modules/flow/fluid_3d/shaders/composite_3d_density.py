@@ -27,7 +27,7 @@ class Composite3DDensity(ComputeShader):
         Args:
             density: Density volume as Texture2DArray (RGBA16F)
             output_2d: 2D output texture (RGBA16F)
-            emission: Ink brightness gain
+            emission: Density brightness gain
             gamma: Density response exponent (>1 hides thin haze, pops dense cores)
             absorption: Extinction per unit density
             tint: 0..1 mix toward per-channel water extinction (red dies first)

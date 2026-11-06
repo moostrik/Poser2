@@ -518,7 +518,6 @@
       "width": 448,
       "height": 800,
       "blend_mode": "ADD",
-      "profile": false,
       "time_step": "MEASURED",
       "fixed_fps": 60.0,
       "fps_smoothing": 1.0,
@@ -541,12 +540,10 @@
         "debug_layers": false,
         "injection_layer": 0.54,
         "injection_spread": 0.1,
-        "boundary": "CLOSED"
+        "wall": "CLOSED"
       },
       "velocity": {
         "gain": 10.0,
-        "input_x": 1.0,
-        "input_y": 1.0,
         "self_advection": 0.51,
         "fade_time": 6.04,
         "dampen_threshold": 50.0,
@@ -558,14 +555,12 @@
       },
       "density": {
         "gain": 9.43,
-        "speed_offset": 0.0,
         "fade_time": 60.0,
         "evaporation": 0.04,
-        "boundary": "CLOSED"
+        "wall": "CLOSED"
       },
       "temperature": {
         "gain": 1.0,
-        "speed_offset": 0.0,
         "fade_time": 12.0,
         "buoyancy": 0.0,
         "sink": 4.0,
@@ -573,13 +568,11 @@
         "gravity_y": 0.0,
         "gravity_z": 0.0,
         "ambient": 0.0,
-        "boundary": "CLOSED"
+        "wall": "CLOSED"
       },
       "pressure": {
-        "speed": 0.66,
-        "fade_time": 3.45,
         "iterations": 20,
-        "boundary": "CLOSED"
+        "wall": "CLOSED"
       }
     },
     "monitor_a": {

@@ -5,12 +5,12 @@
  * GL_TEXTURE_2D_ARRAY density volume into a 2D image, with depth cues.
  *
  * Per ray step (front -> back, manual Z-lerp between layers):
- *   occlusion    per-channel Beer-Lambert extinction; near ink covers far ink
+ *   occlusion    per-channel Beer-Lambert extinction; near density covers far density
  *   glow         the unoccluded additive sum is accumulated alongside and
  *                mixed in: uGlow = 1 reproduces the legacy additive composite
  *   parallax     per-layer UV shift from a virtual eye; layers shear with depth
  *   perspective  per-layer shrink toward the vanishing point
- *   tint + fog   far ink shifts toward water colour and fades
+ *   tint + fog   far density shifts toward water color and fades
  *   depth blur   optional jittered taps, radius growing with depth
  *
  * uDebugDepth: dominant layer as hue (red = back, violet = front).
@@ -26,7 +26,7 @@ layout(rgba16f, binding = 0) writeonly uniform image2D uOutput;
 
 uniform int   uDepth;        // Number of physical depth layers
 uniform ivec2 uOutputSize;   // 2D output dimensions
-uniform float uEmission;     // Ink brightness gain
+uniform float uEmission;     // Density brightness gain
 uniform float uGamma;        // Density response exponent: >1 hides haze, pops cores
 uniform float uAbsorption;   // Extinction per unit density
 uniform float uTint;         // 0..1 mix toward per-channel water extinction
@@ -103,7 +103,7 @@ void main() {
 
     if (uDebugDepth) {
         // Density-weighted mean depth as hue: red = back, violet = front.
-        // (A dominant-layer view is blind to ink traveling behind its own
+        // (A dominant-layer view is blind to density traveling behind its own
         // birth column; the mean shifts as soon as depth fills anywhere.)
         float sum_d = 0.0;
         float sum_dz = 0.0;

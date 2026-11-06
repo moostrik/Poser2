@@ -31,7 +31,7 @@ from .visualization import Visualizer, histogram_grid, histogram_volume_grid, St
 
 # Shared by the 2D and 3D fluid
 from .time_step import TimeStep, TimeStepMode, hold_tick, viscosity_iterations, MAX_STEP
-from .boundary_mode import BoundaryMode
+from .wall_mode import WallMode
 
 # 2D fluid simulation
 from .fluid_2d import Fluid2D, Fluid2DSettings

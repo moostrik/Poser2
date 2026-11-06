@@ -3,7 +3,7 @@ the field's name as the group's, so the field names carry no prefix."""
 
 from modules.settings import Field, BaseSettings, Group
 
-from ..boundary_mode import BoundaryMode
+from ..wall_mode import WallMode
 from ..time_step import TimeStepMode
 
 
@@ -27,7 +27,7 @@ class DensitySettings(BaseSettings):
     fade_time: Field[float]         = Field(4.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%")
     dampen_threshold: Field[float]  = Field(1.2,    min=0.1,    max=5.0,    color="cyan",           description="Magnitude above which density is dampened")
     dampen_time: Field[float]       = Field(0.5,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")
-    boundary: Field[BoundaryMode]   = Field(BoundaryMode.OPEN,                                      description="Open: density absorbed at edges. Closed: density reflects at edges")
+    wall: Field[WallMode]           = Field(WallMode.OPEN,                                          description="Open: density absorbed at the walls. Closed: density reflects")
 
 
 class TemperatureSettings(BaseSettings):
@@ -38,7 +38,7 @@ class TemperatureSettings(BaseSettings):
     buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Thermal buoyancy coefficient: hot (fresh) density rises against gravity")
     sink: Field[float]              = Field(4.0,    min=0.0,    max=20.0,   color="red",            description="Weight of the density: it sinks along gravity")
     ambient: Field[float]           = Field(0.2,    min=0.0,    max=1.0,    color="brown",          description="Reference temperature (buoyancy = 0 at this temp)")
-    boundary: Field[BoundaryMode]   = Field(BoundaryMode.CLOSED,                                    description="Closed: insulated walls (reflects). Open: cold walls (0 at edges)")
+    wall: Field[WallMode]           = Field(WallMode.CLOSED,                                        description="Closed: insulated walls (reflects). Open: cold walls (0 at the walls)")
 
 
 class PressureSettings(BaseSettings):
@@ -46,7 +46,7 @@ class PressureSettings(BaseSettings):
     speed: Field[float]             = Field(0.0,    min=0.0,    max=2.0,    color="blue-grey",      description="Pressure advection speed")
     fade_time: Field[float]         = Field(8.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until pressure fades to ~1%")
     iterations: Field[int]          = Field(40,     min=1,      max=60,     color="orange",         description="Pressure solver iterations per step")
-    boundary: Field[BoundaryMode]   = Field(BoundaryMode.OPEN,                                      description="Open: pressure escapes at edges (less sticky). Closed: pressure reflects")
+    wall: Field[WallMode]           = Field(WallMode.OPEN,                                          description="Open: pressure escapes at the walls (less sticky). Closed: pressure reflects")
 
 
 class Fluid2DSettings(BaseSettings):

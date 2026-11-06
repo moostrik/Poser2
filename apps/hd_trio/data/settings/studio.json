@@ -597,7 +597,7 @@
           "fade_time": 18.0,
           "dampen_threshold": 1.47,
           "dampen_time": 3.63,
-          "boundary": "OPEN"
+          "wall": "OPEN"
         },
         "temperature": {
           "gain":0.0,
@@ -606,13 +606,13 @@
           "buoyancy": 0.0,
           "sink": 0.0,
           "ambient": 0.2,
-          "boundary": "CLOSED"
+          "wall": "CLOSED"
         },
         "pressure": {
           "speed": 0.0,
           "fade_time": 8.0,
           "iterations": 40,
-          "boundary": "OPEN"
+          "wall": "OPEN"
         }
     },
     "colors": {

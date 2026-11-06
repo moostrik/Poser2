@@ -3,15 +3,13 @@ the volume, with the field's name as the group's, so the field names carry no pr
 
 from modules.settings import Field, BaseSettings, Group
 
-from ..boundary_mode import BoundaryMode
+from ..wall_mode import WallMode
 from ..time_step import TimeStepMode
 
 
 class VelocitySettings(BaseSettings):
     """Velocity field parameters."""
     gain: Field[float]              = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="Multiplier applied to the measured (x, y, z) velocity input")
-    input_x: Field[float]           = Field(1.0,    min=-2.0,   max=2.0,    step=0.05, color="teal",    description="x against y on top of gain; negative inverts")
-    input_y: Field[float]           = Field(1.0,    min=-2.0,   max=2.0,    step=0.05, color="teal",    description="y against x on top of gain; negative inverts")
     self_advection: Field[float]    = Field(0.01,   min=0.0,    max=1.0,    color="blue-grey",      description="How much velocity advects itself. Keep low for stability.")
     fade_time: Field[float]         = Field(30.0,   min=0.1,    max=60.0,   color="deep-blue",      description="Seconds until velocity fades to ~1%")
     dampen_threshold: Field[float]  = Field(5.0,    min=0.1,    max=50.0,   color="cyan",           description="Magnitude above which velocity is dampened")
@@ -25,16 +23,14 @@ class VelocitySettings(BaseSettings):
 class DensitySettings(BaseSettings):
     """Density field parameters."""
     gain: Field[float]              = Field(1.0,    min=0.0,    max=10.0,    color="teal",          description="Multiplier applied to all density inputs")
-    speed_offset: Field[float]      = Field(0.0,    min=-5.0,   max=5.0,    color="blue-grey",      description="Added to base speed for density only. 0 = physically coupled.")
     fade_time: Field[float]         = Field(4.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%")
     evaporation: Field[float]       = Field(0.0,    min=0.0,    max=2.0,    color="grey",           description="Density removed per second; clears low-level haze (0 = off)")
-    boundary: Field[BoundaryMode]   = Field(BoundaryMode.OPEN,                                      description="Open: density absorbed at edges. Closed: density reflects at edges")
+    wall: Field[WallMode]           = Field(WallMode.OPEN,                                          description="Open: density absorbed at the walls. Closed: density reflects")
 
 
 class TemperatureSettings(BaseSettings):
     """Temperature field parameters."""
     gain: Field[float]              = Field(0.0,    min=0.0,    max=2.0,    color="teal",           description="Multiplier applied to all temperature inputs")
-    speed_offset: Field[float]      = Field(0.0,    min=-5.0,   max=5.0,    color="blue-grey",      description="Added to base speed for temperature only. 0 = physically coupled.")
     fade_time: Field[float]         = Field(3.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until temperature fades to ~1%")
     buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Thermal buoyancy coefficient: hot (fresh) density rises against gravity")
     sink: Field[float]              = Field(4.0,    min=0.0,    max=20.0,   color="red",            description="Weight of the density: it sinks along gravity")
@@ -42,15 +38,13 @@ class TemperatureSettings(BaseSettings):
     gravity_y: Field[float]         = Field(1.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction Y; 1 = down the screen")
     gravity_z: Field[float]         = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction Z; 1 = away from viewer")
     ambient: Field[float]           = Field(0.2,    min=0.0,    max=1.0,    color="brown",          description="Reference temperature (buoyancy = 0 at this temp)")
-    boundary: Field[BoundaryMode]   = Field(BoundaryMode.CLOSED,                                    description="Closed: insulated walls (reflects). Open: cold walls (0 at edges)")
+    wall: Field[WallMode]           = Field(WallMode.CLOSED,                                        description="Closed: insulated walls (reflects). Open: cold walls (0 at the walls)")
 
 
 class PressureSettings(BaseSettings):
     """Pressure field parameters."""
-    speed: Field[float]             = Field(0.0,    min=0.0,    max=2.0,    color="blue-grey",      description="Pressure advection speed")
-    fade_time: Field[float]         = Field(8.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until pressure fades to ~1%")
     iterations: Field[int]          = Field(40,     min=1,      max=60,     color="orange",         description="Pressure solver iterations per step")
-    boundary: Field[BoundaryMode]   = Field(BoundaryMode.OPEN,                                      description="Open: pressure escapes at edges (less sticky). Closed: pressure reflects")
+    wall: Field[WallMode]           = Field(WallMode.OPEN,                                          description="Open: pressure escapes at the walls (less sticky). Closed: pressure reflects")
 
 
 class VolumeSettings(BaseSettings):
@@ -72,24 +66,20 @@ class VolumeSettings(BaseSettings):
     debug_layers: Field[bool]       = Field(False,                                              description="Show the dominant z layer as hue (red = back, violet = front)")
     injection_layer: Field[float]   = Field(1.0,  min=0.0,  max=1.0,    description="Normalized depth for 2D->3D injection center")
     injection_spread: Field[float]  = Field(0.001, min=0.001, max=0.5,   description="Gaussian sigma for depth spread during injection")
-    boundary: Field[BoundaryMode]   = Field(BoundaryMode.CLOSED,                                    description="Z boundary. Closed: front/back reflect. Open: they absorb")
+    wall: Field[WallMode]           = Field(WallMode.CLOSED,                                        description="The z walls. Closed: front and back reflect. Open: they absorb")
 
 
 class Fluid3DSettings(BaseSettings):
     """The 3D fluid's configuration.
 
     Speed model:
-        One 'speed' parameter controls all passive scalar transport (density,
-        temperature, pressure). At speed=1.0, a velocity value of 1.0 moves
-        fluid across the full texture width in 1 second.
+        One 'speed' parameter controls the passive scalar transport (density and temperature).
+        At speed=1.0, a velocity value of 1.0 moves fluid across the full texture width in 1 second.
 
     Fade_time model:
         Exponential frame-rate-independent decay: multiplier = 0.01^(dt/fade_time).
         fade_time=3.0 means the field retains ~1% after 3 seconds.
     """
-
-    # ---- Profiling ----
-    profile: Field[bool] = Field(False, description="Enable per-pass GPU timing (uses glFinish; serializes pipeline)")
 
     # ---- Grid dimensions (multiples of 32) ----
     width: Field[int]               = Field(1024,   min=32,     max=4096,   step=32,    description="Simulation grid width")

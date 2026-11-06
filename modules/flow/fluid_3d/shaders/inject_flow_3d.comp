@@ -23,7 +23,7 @@ layout(rgba16f, binding = 0) uniform image3D uVolume;
 // Parameters
 uniform float uTargetLayer;  // Normalized depth [0, 1] — center of injection
 uniform float uSpread;       // Gaussian sigma in normalized depth units
-uniform vec3  uStrength;     // strength * gain * input_x, input_y, 1 * dt
+uniform float uStrength;     // strength * gain * dt
 uniform ivec3 uSize;
 
 void main() {

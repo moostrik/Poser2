@@ -27,7 +27,7 @@ class Buoyancy3DDensity(Buoyancy3D):
             obstacle: 3D obstacle mask (Texture3D — sampler3D)
             force_out: Output force volume (Texture3D — image3D)
             sigma: Thermal buoyancy coefficient
-            kappa: Density weight coefficient (dense ink sinks along gravity)
+            kappa: Density weight coefficient (dense density sinks along gravity)
             ambient_temperature: Reference temperature
             gravity: Gravity direction — (0,1,0) down-screen, (0,0,1) away from viewer
             has_obstacles: Whether obstacle logic is active

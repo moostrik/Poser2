@@ -5,9 +5,9 @@
  *                      as GL_TEXTURE_2D_ARRAY.
  *
  * F = uGravity * (κ·density - σ(T - T_ambient)):
- *   dense ink sinks along gravity; hot ink rises against it.
- * The weight term acts wherever ink exists (not gated by temperature),
- * so accumulated old ink settles even after it has cooled.
+ *   dense density sinks along gravity; hot density rises against it.
+ * The weight term acts wherever density is (not gated by temperature),
+ * so accumulated old density settles even after it has cooled.
  * Temperature and obstacle remain sampler3D (GL_TEXTURE_3D at sim scale).
  * Density is sampler2DArray with manual Z interpolation.
  */
@@ -69,7 +69,7 @@ void main() {
     float temperature = texture(uTemperature, st).r;
     float dtemp = temperature - uAmbientTemperature;
 
-    // Thermal lift where warm; ink weight wherever ink exists
+    // Thermal lift where warm; the density's weight wherever density is
     float lift = (abs(dtemp) > 0.0001) ? dtemp * uSigma : 0.0;
     vec4 d = sampleDensity(st);
     float density = max(d.r, max(d.g, d.b));
