@@ -224,22 +224,18 @@ class Bridge3DLayer(BridgeLayer):
         self._mix(self._boundary_velocity, self._velocities(), boundary.velocity)
         self._mix(self._boundary_density_amount, self._velocities(), boundary.density, lengths=True)
         self._mix(self._boundary_temperature_amount, self._velocities(), boundary.temperature, lengths=True)
-        self._color(self._boundary_density, self._boundary_temperature, self._boundary_density_amount,
-                    self._boundary_temperature_amount, color)
+        self._update_density(self._boundary_density, self._boundary_density_amount, color)
+        self._update_temperature(self._boundary_temperature, self._boundary_temperature_amount, color)
 
         side: BodyForceSettings = self.settings.body_force
         if self._mixed(side.acceleration):
             self._mix(self._body_force_acceleration, self._accelerations(), side.acceleration)
         if self._mixed(side.density):
             self._mix(self._body_force_density_amount, self._accelerations(), side.density, lengths=True)
-            self._body_force_density.set_color(color)
-            self._body_force_density.set_alpha(self._body_force_density_amount)
-            self._body_force_density.update()
+            self._update_density(self._body_force_density, self._body_force_density_amount, color)
         if self._mixed(side.temperature):
             self._mix(self._body_force_temperature_amount, self._accelerations(), side.temperature, lengths=True)
-            self._body_force_temperature.set_color(color)
-            self._body_force_temperature.set_mask(self._body_force_temperature_amount)
-            self._body_force_temperature.update()
+            self._update_temperature(self._body_force_temperature, self._body_force_temperature_amount, color)
         self._gpu_timer.end()
 
     def _velocities(self) -> dict[str, Texture]:
@@ -259,14 +255,17 @@ class Bridge3DLayer(BridgeLayer):
         target.end()
 
     @staticmethod
-    def _color(density: DensityBridge, temperature: TemperatureBridge, density_amount: Texture,
-               temperature_amount: Texture, color: Texture) -> None:
-        """A side's density and temperature from their amounts, with the color."""
+    def _update_density(density: DensityBridge, amount: Texture, color: Texture) -> None:
+        """A side's density from its amount, with the color."""
         density.set_color(color)
-        density.set_alpha(density_amount)
+        density.set_alpha(amount)
         density.update()
+
+    @staticmethod
+    def _update_temperature(temperature: TemperatureBridge, amount: Texture, color: Texture) -> None:
+        """A side's temperature from its amount, with the color."""
         temperature.set_color(color)
-        temperature.set_mask(temperature_amount)
+        temperature.set_mask(amount)
         temperature.update()
 
     def _update_bandpass(self, input: BridgeInput, run: bool, acceleration: bool) -> None:
