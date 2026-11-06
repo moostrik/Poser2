@@ -14,25 +14,25 @@ from modules.flow import (
     DensityBridge, DensityBridgeSettings,
     HasPorts, Port, Ports, TextureKind,
 )
-from modules.settings import BaseSettings, Field, Group
+from modules.settings import BaseSettings, Field, Group, Widget
 from .bridge_layer import BridgeLayer, BridgeLayerSettings, BridgeInput, BridgeOutput
 
 
 class ImpulseMixSettings(BaseSettings):
     """What the fluid's impulse is made of: each impulse's velocity at its share, 0 to 1."""
-    start = Field(0.0, min=0.0, max=1.0, step=0.05, description="Share of the start: a part of the body speeding up")
-    bow = Field(0.0, min=0.0, max=1.0, step=0.05, description="Share of the bow: a limb arriving")
-    stop = Field(0.0, min=0.0, max=1.0, step=0.05, description="Share of the stop: a part of the body slowing down")
-    wake = Field(0.0, min=0.0, max=1.0, step=0.05, description="Share of the wake: a limb leaving")
+    start = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the start: a part of the body speeding up")
+    bow = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the bow: a limb arriving")
+    stop = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the stop: a part of the body slowing down")
+    wake = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the wake: a limb leaving")
 
 
 class AmountMixSettings(BaseSettings):
     """What an amount is made of: the trail's speed and each impulse at its share, 0 to 1."""
-    trail = Field(1.0, min=0.0, max=1.0, step=0.05, description="Share of the trail's speed")
-    start = Field(0.0, min=0.0, max=1.0, step=0.05, description="Share of the start")
-    bow = Field(0.0, min=0.0, max=1.0, step=0.05, description="Share of the bow")
-    stop = Field(0.0, min=0.0, max=1.0, step=0.05, description="Share of the stop")
-    wake = Field(0.0, min=0.0, max=1.0, step=0.05, description="Share of the wake")
+    trail = Field(1.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the trail's speed")
+    start = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the start")
+    bow = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the bow")
+    stop = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the stop")
+    wake = Field(0.0, min=0.0, max=1.0, step=0.05, widget=Widget.knob, description="Share of the wake")
 
 
 IMPULSES: tuple[tuple[str, Impulse], ...] = (('start', Impulse.START), ('bow', Impulse.BOW), ('stop', Impulse.STOP), ('wake', Impulse.WAKE))
