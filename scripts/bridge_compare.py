@@ -47,7 +47,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from modules.gl import Texture  # noqa: E402
 from modules.flow import (KineticBridge, KineticBridgeSettings, LucasKanadeFlow3D, LucasKanadeFlow3DSettings,  # noqa: E402
-                          VelocityEventBridge, VelocityEventBridgeSettings, VelocityTrailBridge, VelocityTrailBridgeSettings)
+                          MotionEvent, VelocityEventBridge, VelocityEventBridgeSettings, VelocityTrailBridge, VelocityTrailBridgeSettings)
 from depth_velocity_compare import Frames, context, overrides, read_back, recorded_settings, setting_owner, upload  # noqa: E402
 
 SETTLE: float = 1.5         # s of the still part left out of its noise
@@ -122,7 +122,7 @@ class Side:
 
     def measure(self, flow: np.ndarray, moving: np.ndarray, ring: np.ndarray, core: np.ndarray, still: bool) -> None:
         if isinstance(self.bridge, VelocityEventBridge):
-            for name, texture in (('start', self.bridge.start), ('stop', self.bridge.stop)):
+            for name, texture in (('start', self.bridge.event(MotionEvent.START)), ('stop', self.bridge.event(MotionEvent.STOP))):
                 self.series[name].add(read_back(texture)[..., 0], moving, ring, core, still)
             return
         v = read_back(self.bridge.smooth_velocity)[..., :3]

@@ -450,8 +450,8 @@
         "fast_smooth": 0.025,
         "slow_smooth": 0.15,
         "stop_hold": 0.1,
-        "stop_gate": 1.0,
-        "stop_patch_size": 128.0
+        "stop_region_weight": 1.0,
+        "stop_region_size": 128.0
       },
       "kinetic": {
         "scale_x": 1.0,

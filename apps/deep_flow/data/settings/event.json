@@ -31,7 +31,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 670,
+        "iso": 942,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -448,9 +448,14 @@
       "event": {
         "fast_smooth": 0.03,
         "slow_smooth": 0.25,
-        "stop_hold": 0.2,
-        "stop_gate": 1.0,
-        "stop_patch_size": 128.0
+        "start_hold": 0.0,
+        "bow_hold": 0.0,
+        "stop_hold": 0.0,
+        "wake_hold": 0.0,
+        "start_region_weight": 1.0,
+        "stop_region_weight": 1.0,
+        "start_region_size": 128.0,
+        "stop_region_size": 128.0
       },
       "kinetic": {
         "scale_x": 1.0,
@@ -558,7 +563,7 @@
     },
     "monitor_a": {
       "stage": "BRIDGE",
-      "texture": "event.stop_velocity",
+      "texture": "event.bow_velocity",
       "view": "AUTO",
       "advanced": {
         "channel": "ALL",
@@ -571,7 +576,7 @@
     },
     "monitor_b": {
       "stage": "BRIDGE",
-      "texture": "event.start_velocity",
+      "texture": "event.wake_velocity",
       "view": "GLYPHS",
       "advanced": {
         "channel": "ALL",

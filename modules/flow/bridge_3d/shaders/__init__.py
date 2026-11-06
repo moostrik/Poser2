@@ -11,7 +11,7 @@ from .kinetic_projection import KineticProjection, Projection
 from .kinetic_reservoir import KineticReservoir
 from .kinetic_velocity import KineticVelocity
 from .scale_velocity import ScaleVelocity
-from .velocity_event import Event, VelocityEvent
+from .velocity_event import MotionEvent, VelocityEvent
 from .velocity_event_region import VelocityEventRegion
 from .velocity_event_region_mean import VelocityEventRegionMean
 from .velocity_trail import VelocityTrail

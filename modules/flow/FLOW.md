@@ -29,6 +29,8 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 | flow                 | the domain: everything from the camera's motion to the fluid                                          | `modules/flow`                                                     |
 | motion               | the stage that measures a velocity field from two images: the optical flow                            | `motion/`, `GradientFlow`, `LucasKanadeFlow`, `LucasKanadeFlow3D`  |
 | bridge               | the stage that turns the measured velocity into what the fluid injects: a velocity to add, density with its color, temperature, and in 3D onset and spin | `bridge_2d/`, `bridge_3d/`                 |
+| event                | where a move starts or stops, read by the 3D bridge beside its trail: start, bow, stop, wake          | `VelocityEventBridge`, `MotionEvent`, group `event`                |
+| region               | the pixels around one, which tell a part of the body changing speed from a limb arriving or leaving | `start_region_size`, `stop_region_size`, `*_region_weight`         |
 | injection            | one bridge output as one fluid takes it, at its weight                                                | `Injection`                                                        |
 | fluid                | the Navier–Stokes simulation; its density is the show                                                  | `fluid_2d/`, `fluid_3d/`, `Fluid2D`, `Fluid3D`                     |
 | volume               | the 3D fluid's z layers: their count, spacing and the composite's look                                | `VolumeSettings`, group `volume`                                   |
@@ -152,7 +154,7 @@ context of its own, would move the wait to the bridge, and the screen still show
 | `MotionLayer` (ABC)                         | `StageLayer[MotionInput, MotionOutput]`; `_update()` as the template method: `_measure` on a new frame. Holds the allocate and resize pattern; the flow runs at `settings.width` by `settings.height`. Draws nothing |
 | `Motion2DLayer`, `Motion3DLayer`            | the subclasses, each on its optical flow (`GradientFlow`; `LucasKanadeFlow3D`). The 2D flow's velocity is per frame, not per second, and it reads no mask, until the 2D flow moves to the Lucas–Kanade solve |
 | `BridgeLayer` (ABC)                         | `StageLayer[BridgeInput, BridgeOutput]`; `_update()`: the density's color (`DensityColor`: the image, or white, times the tint, gated by the mask), `_bridge` the input's velocity into velocity, density and temperature. The bridges' filters run at the velocity's size and their outputs at `settings.width` by `settings.height`; the layer follows both. Draws nothing |
-| `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, with `method` picking the trail or the kinetic bridge, whose curl is scaled by `onset.spin`; beside the trail the velocity event bridge, its start and stop on the flow's xyz, each held over its own hold and gated by its patch speeding up (its mean velocity over its moving pixels) or slowing down (its mean speed), run while a monitor shows one of its ports, through their `prepare`, and not yet in the output) |
+| `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, with `method` picking the trail or the kinetic bridge, whose curl is scaled by `onset.spin`; beside the trail the velocity event bridge, [The events](#the-events), run while a monitor shows one of its ports, through their `prepare`, and not yet in the output) |
 | `FluidLayer` (ABC)                          | `StageLayer[FluidInput, FluidOutput]`; `_update()`: `_inject` each injection's velocity, density and temperature at its weight, `_step(dt)`; `texture`, the show. Knows injections, not cameras; reads no poses. The stage's reset is the fluid's only one |
 | `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's. `Fluid3DLayer` injects RGBA density, onset and spin, the velocity's z as the volume's w (its sign turned: w points away from the viewer), and takes the parallax eye the app steers by `set_eye(x, y)` |
 | `MonitorLayer`                              | `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's port names (`names`, the options of `texture`); `draw()` renders the port once per tick, however many panels show it, by its kind or by `view`, and nothing while not shown; its views and settings are in [The monitor](#the-monitor). Not a stage, since it has no output and no `reset` |
@@ -172,6 +174,84 @@ its panel, live, one `Layers` field per picture (`motion_image`, `bridge_image`,
 and steers the eye toward the tracked head. Both apps give each camera two monitors, `monitor_a`
 and `monitor_b`, each handed every stage's `ports`; they go into the panel's select lists like
 any layer, and two show A beside B.
+
+## The 3D bridge
+
+The bridge reads two things from a movement: the motion itself, a push in its direction that is
+stronger for fast than for slow and coasts after a stop; and the events in it, where a move starts
+and where it stops. The motion wants a long, soft reading, the events a short, sharp one, so they
+are two bridges side by side on the same velocity (`bridge_3d/`):
+
+| Bridge                | Reads                                                         | Gives                                                          | Panel group |
+|-----------------------|---------------------------------------------------------------|----------------------------------------------------------------|-------------|
+| `VelocityTrailBridge` | the flow's velocity through one trail: advect, attack/smooth, blur | `smooth_velocity`, the push; its speed is the density amount  | `trail`     |
+| `VelocityEventBridge` | the flow's velocity through a fast and a slow trail, and their regions | `start`, `bow`, `stop`, `wake`, each also as `<event>_velocity` | `event`     |
+| `KineticBridge`       | two trails and their change, with release, onset and reservoir | the reference the event bridge was built from; `method` picks it instead of the trail | `kinetic` |
+
+### The velocity trail
+
+One unit-gain Ema per pixel: a rising x/y speed follows over `attack`, a falling one and all of z
+over `smooth`, so a flick reaches the fluid at full strength and a stop coasts. `advect` moves the
+trail with its own motion before each step, so the average follows a moving limb instead of a
+fixed pixel. `blur_radius` and `blur_steps` spread it in space; the ring it leaves around the
+body is part of the look **(site fact)**.
+
+### The events
+
+The difference of the fast and the slow trail along the motion's direction rises where a move
+starts and falls where it stops; it lasts about `slow_smooth`, as the slow trail catches up. A
+pixel cannot tell a move starting from a limb arriving at it, nor a move stopping from a limb
+leaving it: its speed rises or falls either way. The region around it can, so the region splits
+each pixel's rise and fall in two, by the region weight (`start_region_weight`,
+`stop_region_weight`; 0 gives all of it to the start and the stop):
+
+| Event  | Is                                               | Along                 |
+|--------|--------------------------------------------------|-----------------------|
+| start  | the share of a rise its region shares: a part of the body speeding up | the fast trail's direction |
+| bow    | the rest of the rise: a limb arriving, the wave in front of it        | the fast trail's direction |
+| stop   | the share of a fall its region shares: a part of the body slowing down | the slow trail's direction, the motion it ended |
+| wake   | the rest of the fall: a limb leaving, behind it                        | the slow trail's direction |
+
+Start + bow is a pixel's whole rise, stop + wake its whole fall. What a region shares:
+
+- A rise reads the region's mean velocity over its moving pixels (faster than `START_FLOOR`,
+  0.01 widths/s), taken from the flow and then smoothed per region by the fast and the slow trail.
+  A limb arriving adds moving pixels at its own speed and leaves that mean as it was; a limb
+  speeding up raises it; jitter on a still body cancels in it. Two other readings fail: over all
+  of a region's pixels an arriving limb raises the mean like a speedup, and taken of the two
+  trails the slow trail's lag at the pixels a limb arrives at does too.
+- A fall reads the region's mean speed of the two trails, which jitter never lowers and a turning
+  limb keeps, where a mean velocity would shrink and read as a stop. The trails lag at the pixels
+  a limb leaves, so a leaving limb lowers it too: part of a wake reads as a stop.
+
+The events read x, y and z alike; the regions keep z's noise out as they keep x/y's. Each event is
+peak-held over its own hold (`start_hold`, `bow_hold`, `stop_hold`, `wake_hold`). No blur and no
+advect: the events stay sharp. The event bridge runs while a monitor shows one of its ports
+(`Bridge3DLayer`); nothing it makes reaches the fluid yet.
+
+### Measured
+
+`scripts/bridge_compare.py` on the standmoves recording (four moves, starts and stops), frames
+captured on 2026-11-05 with deep_flow's preset flow (levels 5, threshold 0.5), each bridge stepped
+once per flow frame. Per frame, the mean over the body's pixels that move in the loop; noise is the
+still part's p99 per pixel; stop ÷ fast is the stop window's peak over steady fast motion.
+
+| Reading                                             | Noise | Stop ÷ fast | Start ÷ fast | Coast or burst, s | Ring |
+|-----------------------------------------------------|-------|-------------|--------------|-------------------|------|
+| trail velocity (smooth 1 s, attack 1 ms, advect 1, blur 4.43) | 0.018 | 0.69 | 1.16     | 0.87              | 0.19 |
+| trail velocity, advect 0                            | 0.270 | 1.07        | 0.84         | 1.84              | 0.40 |
+| trail velocity, blur 0                              | 0.017 | 0.68        | 1.09         | 0.84              | 0.16 |
+| stop, region weight 0                               | 0.025 | 1.18        | 0.40         | 0.47              | 0.33 |
+| stop, region weight 1                               | 0.009 | 1.64        | 0.48         | 0.38              | 0.35 |
+| stop, region weight 1, x/y only                     | 0.000 | 2.26        | 0.93         | 0.27              | 0.28 |
+| start, region weight 0                              | 0.104 | 0.12        | 1.46         |                   |      |
+| start, region weight 0, x/y only                    | 0.001 | 0.05        | 1.89         |                   |      |
+
+The stop rows hold 0.1 s. Ring is the share 4–24 px outside the mask, in steady fast motion for the
+trail and in the stop windows for the events; x/y only is z left out of the events. Without
+its region, a start rises along the front of every moving limb, 0.125 in steady fast motion against
+0.18 at real starts. The start's region reading over moving pixels and the bow and wake are not
+measured on the harness yet.
 
 ## Packages
 
@@ -382,6 +462,17 @@ box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU
 
 ## Open
 
+- The bridge's mix: what the fluid gets, per output (velocity, density, temperature), a weight for
+  each source (the trail, start, bow, stop, wake), the trail 1 and the rest 0 by default, as the
+  light renderer mixes its layers. The weight is the gain, so no gain per bridge; the flow's mask
+  already gates every source.
+- The events' holds. An event lasts about `slow_smooth` by itself, and the fluid keeps what it is
+  given; on the harness a hold lifted steady motion as much as the stops **(deduction from the
+  measured)**. Without them an event is the change alone, and its weight in the mix sets how much it
+  counts.
+- The stop's region over moving pixels, as the start's: a leaving limb would then read as wake only.
+  It changes the stop as it is.
+- The kinetic bridge goes once the event bridge and the mix do what it did.
 - Whether the density's reduced view should also feed the fluid's own composite at a lower
   quality setting.
 - How a fluid takes the injected velocity, a choice to toggle. Both fluids add it times dt
