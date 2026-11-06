@@ -535,8 +535,8 @@
       "stage": "BRIDGE",
       "texture": "velocity",
       "view": "AUTO",
-      "channel": "ALL",
       "advanced": {
+        "channel": "ALL",
         "scale": 1.0,
         "blend_mode": "ADD",
         "arrow_spacing": "SPACING_16"
@@ -546,8 +546,8 @@
       "stage": "FLUID",
       "texture": "density",
       "view": "AUTO",
-      "channel": "ALL",
       "advanced": {
+        "channel": "ALL",
         "scale": 1.0,
         "blend_mode": "ADD",
         "arrow_spacing": "SPACING_16"

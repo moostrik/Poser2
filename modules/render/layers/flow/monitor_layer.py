@@ -62,11 +62,12 @@ class ArrowSpacing(IntEnum):
 
 
 class MonitorAdvancedSettings(BaseSettings):
-    """How the monitor draws: the scale, the arrows' spacing, the legend and the blend."""
+    """How the monitor draws: the channels, the scale, the arrows' spacing, the legend and the blend."""
+    channel: Field[Channel] =       Field(Channel.ALL, width=16, description="The channels drawn")
     scale: Field[float] =           Field(1.0, min=0.01, max=100.0, widget=Widget.log_slider, description="Multiplier on the values")
     arrow_spacing: Field[ArrowSpacing] = Field(ArrowSpacing.SPACING_32, width=24, description="Distance between arrows (pixels)")
     legend: Field[bool] =           Field(True, description="The strip's and histogram's log axis, the colormap's key")
-    blend_mode: Field[Style.BlendMode] = Field(Style.BlendMode.ADD, width=36, description="How the monitor is drawn over the panel")
+    blend_mode: Field[Style.BlendMode] = Field(Style.BlendMode.ADD, width=32, description="How the monitor is drawn over the panel")
 
 
 class MonitorLayerSettings(BaseSettings):
@@ -75,7 +76,6 @@ class MonitorLayerSettings(BaseSettings):
     names: Field[list[str]] =       Field([""], access=Field.READ, visible=False, description="The stage's textures")
     texture: Field[str] =           Field("velocity", widget=Widget.text_select, options=names, description="The texture shown")
     view: Field[MonitorView] =      Field(MonitorView.AUTO, description="By its kind, as an image, as a colormap centered on grey, as arrows, as a strip over time, or as a histogram")
-    channel: Field[Channel] =       Field(Channel.ALL, description="The channels drawn")
 
     advanced = Group(MonitorAdvancedSettings)
 
@@ -162,7 +162,7 @@ class MonitorLayer(LayerBase):
         if port is None:
             return
         settings: MonitorLayerSettings = self.settings
-        channel: Channel = settings.channel
+        channel: Channel = settings.advanced.channel
         scale: float = settings.advanced.scale
         if view == MonitorView.AUTO:
             view = _AUTO_VIEWS[port.kind]

@@ -31,8 +31,8 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 3167,
-        "auto_exposure": true,
+        "iso": 3216,
+        "auto_exposure": false,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
         "auto_iso_limit": 16585,
@@ -43,8 +43,8 @@
           "width": 1.0,
           "height": 1.0
         },
-        "balance": 3962,
-        "auto_balance": true,
+        "balance": 3933,
+        "auto_balance": false,
         "auto_balance_lock": false,
         "brightness": 0,
         "contrast": 0,
@@ -553,24 +553,24 @@
       "stage": "MOTION",
       "texture": "velocity",
       "view": "AUTO",
-      "channel": "ALL",
       "advanced": {
-        "blend_mode": "ADD",
-        "legend": true,
+        "channel": "ALL",
         "scale": 1.0,
-        "arrow_spacing": "SPACING_64"
+        "arrow_spacing": "SPACING_64",
+        "legend": true,
+        "blend_mode": "ADD"
       }
     },
     "monitor_b": {
       "stage": "MOTION",
       "texture": "velocity",
       "view": "COLORMAP",
-      "channel": "ALL",
       "advanced": {
-        "blend_mode": "ADD",
-        "legend": true,
+        "channel": "ALL",
         "scale": 1.0,
-        "arrow_spacing": "SPACING_64"
+        "arrow_spacing": "SPACING_64",
+        "legend": true,
+        "blend_mode": "ADD"
       }
     },
     "time_series": {

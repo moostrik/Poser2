@@ -248,7 +248,7 @@ The monitor's panel group (`MonitorLayerSettings`) says what is drawn; its `adva
 | `stage`                  | `MOTION`, `BRIDGE`, `FLUID`                                 | the stage whose port is shown               |
 | `texture`                | the stage's port names                                      | the port shown                              |
 | `view`                   | `AUTO`, `IMAGE`, `COLORMAP`, `ARROWS`, `HISTOGRAM`, `STRIP` | how the channels are drawn                  |
-| `channel`                | `X`, `Y`, `Z`, `W`, `ALL` (default)                         | which of the texture's channels are drawn   |
+| `advanced.channel`       | `X`, `Y`, `Z`, `W`, `ALL` (default)                         | which of the texture's channels are drawn   |
 | `advanced.scale`         | 0.01 to 100, a log slider                                   | multiplier on the values, in every view     |
 | `advanced.arrow_spacing` | 4, 8, 16, 32, 64, 128 (`ArrowSpacing`)                      | distance between arrows (pixels)            |
 | `advanced.legend`        | on (default), off                                           | the log axis, or the colormap's key         |
