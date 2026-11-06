@@ -8,7 +8,7 @@ from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId, MouseButton
 from modules.flow import DepthView, Port, hold_tick
-from modules.pose import Frame, Similarity, AngleMotion, Points2D, PointLandmark
+from modules.pose import Frame, Similarity, AngleMotion
 from modules.render import layers as ls, shaders, make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f
 
@@ -60,7 +60,6 @@ LARGE_LAYERS: list[Layers] = [
 OUTPUT_WIDTH: int = 1080
 OUTPUT_HEIGHT: int = 1920
 
-EYE_EASE: float = 0.4           # s: the parallax eye's ease toward the tracked head, keeping keypoint jitter out
 BORDER: tuple[float, float, float, float] = (0.4, 0.4, 0.4, 1.0)    # the border around each layer in the main window, so a black layer shows
 BORDER_WIDTH: float = 2.0       # px
 
@@ -160,9 +159,6 @@ class DeepFlowRender(RenderBase):
         self._tick_mean: float | None = None
         self._dt: float = 1.0 / 60.0
         self.add_update_callback(self._measure_tick)
-
-        # The parallax eye per fluid, eased toward the tracked head
-        self._eyes: dict[int, tuple[float, float]] = {}
 
         # A reset asked for from another thread, applied at the next update on the GL thread
         self._reset_fluid: Event = Event()
@@ -337,7 +333,6 @@ class DeepFlowRender(RenderBase):
                                                output.body_force_acceleration, output.body_force_density,
                                                output.body_force_temperature, weight=self._weight(pose, i, j)))
             fluid.set_input(ls.FluidInput(dt, injections))
-            fluid.set_eye(*self._eye(i, pose, dt))
 
         for i, _motion in self.L[Layers.motion].items():
             if i not in bridges or i not in self.L[Layers.fluid]:
@@ -364,26 +359,6 @@ class DeepFlowRender(RenderBase):
             similarities: np.ndarray = np.nan_to_num(pose[Similarity].values)
             return float(similarities[cam_id]) if cam_id < len(similarities) else 0.0
         return 0.0
-
-    def _eye(self, cam_id: int, pose: Frame | None, dt: float) -> tuple[float, float]:
-        """The parallax eye of camera `cam_id`'s fluid, eased toward the tracked head: the eyes' mean,
-        the nose when they are missing, easing back to center when both are. Offsets are ±1 across
-        the frame (vertical at half range)."""
-        target_x, target_y = 0.0, 0.0
-        if pose is not None and Points2D in pose:
-            pts = pose[Points2D].values
-            head = pts[[PointLandmark.left_eye, PointLandmark.right_eye]].mean(axis=0)
-            if np.isnan(head).any():
-                head = pts[PointLandmark.nose]
-            if not np.isnan(head).any():
-                target_x = (float(head[0]) - 0.5) * 2.0
-                target_y = float(head[1]) - 0.5
-        x, y = self._eyes.get(cam_id, (0.0, 0.0))
-        k: float = 1.0 - 0.01 ** (dt / EYE_EASE)
-        x += (target_x - x) * k
-        y += (target_y - y) * k
-        self._eyes[cam_id] = (x, y)
-        return x, y
 
     # ========== Drawing ==========
 

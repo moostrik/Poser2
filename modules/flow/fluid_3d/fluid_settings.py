@@ -23,6 +23,7 @@ class VelocitySettings(BaseSettings):
 class DensitySettings(BaseSettings):
     """Density field parameters."""
     gain: Field[float]              = Field(1.0,    min=0.0,    max=10.0,    color="teal",          description="Multiplier applied to all density inputs")
+    size: Field[int]                = Field(1,      min=1,      max=4,                              description="The density grid's x and y size as a multiple of the simulation's; 1 = one grid")
     fade_time: Field[float]         = Field(4.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%")
     evaporation: Field[float]       = Field(0.0,    min=0.0,    max=2.0,    color="grey",           description="Density removed per second; clears low-level haze (0 = off)")
     wall: Field[WallMode]           = Field(WallMode.OPEN,                                          description="Open: density absorbed at the walls. Closed: density reflects")
@@ -48,24 +49,15 @@ class PressureSettings(BaseSettings):
 
 
 class VolumeSettings(BaseSettings):
-    """The volume: the 3D fluid's z layers and the composite's look."""
-    layers: Field[int]              = Field(4,    min=1,    max=64,     description="Density z layers (the stored density volume)")
-    sim_layers: Field[int]          = Field(4,    min=1,    max=128,    description="Velocity/pressure/temperature z layers (the sim grid)")
-    spacing: Field[float]           = Field(4.0,  min=1.0,  max=64.0,   description="Z layer spacing in sim texels (low = lively depth, high = flat)")
+    """The volume: the grid's z layers, where the body sits in it, and the composite's look."""
+    layers: Field[int]              = Field(64,   min=1,    max=128,    description="z layers; the cells are cubic, so the slab is layers / width deep")
+    injection_layer: Field[float]   = Field(0.5,  min=0.0,  max=1.0,    description="Normalized depth of the injection's center, where the body sits")
+    injection_spread: Field[float]  = Field(0.1,  min=0.001, max=0.5,   description="Gaussian sigma of the injection's depth spread")
     emission: Field[float]          = Field(1.0,  min=0.0,  max=8.0,    color="amber",          description="Brightness gain per unit density")
-    gamma: Field[float]             = Field(1.0,  min=0.5,  max=3.0,    color="orange",         description="Density response exponent: >1 hides thin haze, pops dense cores")
     absorption: Field[float]        = Field(4.0,  min=0.01, max=50.0,   color="deep-orange",    description="Occlusion: extinction per unit density (near density covers far density)")
-    glow: Field[float]              = Field(0.25, min=0.0,  max=1.0,    color="yellow",         description="Additive glow mix: 1 = legacy additive (depth invisible)")
+    glow: Field[float]              = Field(0.25, min=0.0,  max=1.0,    color="yellow",         description="Additive glow mix: 1 = additive (depth invisible)")
     tint: Field[float]              = Field(0.5,  min=0.0,  max=1.0,    color="light-blue",     description="Far density shifts toward water color (red absorbed first)")
     fog: Field[float]               = Field(0.5,  min=0.0,  max=4.0,    color="blue-grey",      description="Water extinction over the full depth; dims far layers")
-    parallax: Field[float]          = Field(0.02, min=0.0,  max=0.1,    color="purple",         description="Virtual eye offset in UV units; layers shear with depth")
-    perspective: Field[float]       = Field(0.15, min=0.0,  max=1.0,    color="deep-purple",    description="Per-layer shrink toward the vanishing point; 0 = flat")
-    drift_period: Field[float]      = Field(45.0, min=0.0,  max=180.0,  color="indigo",         description="Seconds per orbit of the drifting eye; 0 = static offset")
-    eye_tracking: Field[float]      = Field(0.0,  min=0.0,  max=1.0,    color="violet",         description="Parallax eye follows the tracked head; 0 = autonomous drift")
-    layer_blur: Field[float]        = Field(0.0,  min=0.0,  max=8.0,    color="brown",          description="Blur radius in texels at the back layer; 0 = off")
-    debug_layers: Field[bool]       = Field(False,                                              description="Show the dominant z layer as hue (red = back, violet = front)")
-    injection_layer: Field[float]   = Field(1.0,  min=0.0,  max=1.0,    description="Normalized depth for 2D->3D injection center")
-    injection_spread: Field[float]  = Field(0.001, min=0.001, max=0.5,   description="Gaussian sigma for depth spread during injection")
     wall: Field[WallMode]           = Field(WallMode.CLOSED,                                        description="The z walls. Closed: front and back reflect. Open: they absorb")
 
 

@@ -6,6 +6,8 @@
  * Backward-traces along the 3D velocity field and samples the source
  * using trilinear interpolation (sampler3D). Border colors provide
  * implicit boundary conditions — no explicit obstacle border needed.
+ * The velocity and the obstacle are sampled by uv, so the field may sit
+ * on a finer grid than they do.
  *
  * Velocity is stored as RGBA16F with xyz = (u, v, w).
  */
@@ -22,8 +24,10 @@ layout(rgba16f, binding = 0) writeonly uniform image3D uResult;
 
 // Parameters
 uniform float uTimestep;      // dt * speed
-uniform vec3  uRdx;           // (1.0, 1.0/aspect, 1.0/depth_scale) — aspect-corrected inverse grid
+uniform vec3  uRdx;           // (1.0, 1.0/aspect, 1.0/z_extent) — aspect-corrected inverse grid
 uniform float uDissipation;   // Exponential decay multiplier
+uniform float uEvaporation;   // Subtracted this step; unlike the multiplicative fade it reaches
+                              // zero, so low-level haze clears. 0 for a signed field
 uniform ivec3 uSize;          // Volume dimensions (width, height, depth)
 uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
 
@@ -58,6 +62,9 @@ void main() {
 
     // Sample source with trilinear interpolation and apply dissipation
     vec4 result = uDissipation * texture(uSource, st_back);
+    if (uEvaporation > 0.0) {
+        result = max(result - vec4(uEvaporation), vec4(0.0));
+    }
 
     imageStore(uResult, gid, result);
 }

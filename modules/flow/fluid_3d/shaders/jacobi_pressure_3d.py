@@ -27,7 +27,7 @@ class JacobiPressure3D(ComputeShader):
 
     def use(self, pressure_in: Texture3D, pressure_out: Texture3D,
             divergence: Texture3D, obstacle: Texture3D,
-            grid_scale: float, aspect: float, z_spacing: float,
+            grid_scale: float, aspect: float,
             iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH,
             has_obstacles: bool = True) -> None:
         """Run multiple 3D Jacobi pressure iterations.
@@ -39,7 +39,6 @@ class JacobiPressure3D(ComputeShader):
             obstacle: 3D obstacle mask (R8) — read via sampler
             grid_scale: Grid scaling factor
             aspect: Width/height ratio
-            z_spacing: Sim-grid Z cell size in sim texels (dz/dx)
             iterations: Number of iterations per dispatch
             has_obstacles: Whether obstacle logic is active
         """
@@ -48,7 +47,7 @@ class JacobiPressure3D(ComputeShader):
 
         dx = grid_scale
         dy = grid_scale * aspect
-        dz = grid_scale * z_spacing
+        dz = grid_scale                   # cubic cells
 
         alpha_x = 1.0 / (dx * dx)
         alpha_y = 1.0 / (dy * dy)
@@ -77,7 +76,7 @@ class JacobiPressure3D(ComputeShader):
 
     def solve(self, pressure_a: Texture3D, pressure_b: Texture3D,
               divergence: Texture3D, obstacle: Texture3D,
-              grid_scale: float, aspect: float, z_spacing: float,
+              grid_scale: float, aspect: float,
               total_iterations: int = 40,
               iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH,
               has_obstacles: bool = True) -> Texture3D:
@@ -87,7 +86,7 @@ class JacobiPressure3D(ComputeShader):
             pressure_a, pressure_b: Ping-pong pressure buffers
             divergence: Velocity divergence volume
             obstacle: 3D obstacle mask
-            grid_scale, aspect, z_spacing: Grid parameters
+            grid_scale, aspect: Grid parameters
             total_iterations: Total Jacobi iterations
             iterations_per_dispatch: Iterations per compute dispatch
             has_obstacles: Whether obstacle logic is active
@@ -104,7 +103,7 @@ class JacobiPressure3D(ComputeShader):
             iters = min(iterations_per_dispatch,
                         total_iterations - i * iterations_per_dispatch)
             self.use(src, dst, divergence, obstacle,
-                     grid_scale, aspect, z_spacing, iters,
+                     grid_scale, aspect, iters,
                      has_obstacles)
             src, dst = dst, src
 

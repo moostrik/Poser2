@@ -36,7 +36,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 | region               | the pixels around one, which tell a part of the body changing speed from a limb arriving or leaving | `start_region_size`, `stop_region_size`, `*_region_weight`         |
 | injection            | one bridge output as one fluid takes it, at its weight                                                | `Injection`                                                        |
 | fluid                | the Navier–Stokes simulation; its density is the show                                                  | `fluid_2d/`, `fluid_3d/`, `Fluid2D`, `Fluid3D`                     |
-| volume               | the 3D fluid's z layers: their count, spacing and the composite's look                                | `VolumeSettings`, group `volume`                                   |
+| volume               | the 3D fluid's z layers, where the body sits in them, and the composite's look                       | `VolumeSettings`, group `volume`                                   |
 | depth                | the camera's depth in metres, on the flow's view                                                      | `DepthView`                                                        |
 | depth velocity       | the z of the 3D flow: the depth change along the x/y displacement, in view widths per second          | `DepthVelocity`, `DepthVelocitySettings`, group `depth_velocity`   |
 | 2D flow, 3D flow     | a system: a motion layer and a bridge layer per camera, a fluid layer per show output                 | `Motion2DLayer` + `Bridge2DLayer` + `Fluid2DLayer`; `…3D…`         |
@@ -162,7 +162,7 @@ context of its own, would move the wait to the bridge, and the screen still show
 | `BridgeLayer` (ABC)                         | `StageLayer[BridgeInput, BridgeOutput]`; `_update()`: the density's color (`DensityColor`: the image, or white, times the tint, gated by the mask), `_bridge` the input's velocity into velocity, density and temperature. The bridges' filters run at the velocity's size and their outputs at `settings.width` by `settings.height`; the layer follows both. Draws nothing |
 | `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, the velocity lowpass and beside it the velocity bandpass, [The changes](#the-changes), and the boundary's and the body force's mixes, [The mix](#the-mix)) |
 | `FluidLayer` (ABC)                          | `StageLayer[FluidInput, FluidOutput]`; `_update()`: `_inject` each injection's velocity, density and temperature at its weight, `_step(dt)`; `texture`, the show. Knows injections, not cameras; reads no poses. The stage's reset is the fluid's only one |
-| `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's. `Fluid3DLayer` injects both systems' RGBA density, the body force's acceleration (added as the boundary's velocity is), the velocity's z as the volume's w (its sign turned: w points away from the viewer), and takes the parallax eye the app steers by `set_eye(x, y)` |
+| `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's. `Fluid3DLayer` injects both systems' RGBA density, the body force's acceleration (added as the boundary's velocity is), the velocity's z as the volume's w (its sign turned: w points away from the viewer) |
 | `MonitorLayer`                              | `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's port names (`names`, the options of `texture`); `draw()` renders the port once per tick, however many panels show it, by its kind or by `view`, and nothing while not shown; its views and settings are in [MONITOR.md](MONITOR.md). Not a stage, since it has no output and no `reset` |
 | `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass, each a `StageLayerSettings`: `reset`, then `width` and `height`, the stage's working size, first on every stage's panel. The motion's is the size its flow runs at, the bridge's the size it writes its outputs at (its filters follow the velocity's size), the fluid's its simulation grid (its density is at the size the app allocates). On the fluid layer `blend_mode`. A layer whose stage runs one component is that component's settings too (`Motion2DLayerSettings` is a `GradientFlowSettings`, `Motion3DLayerSettings` a `LucasKanadeFlow3DSettings`, the fluid layers' a `Fluid2DSettings` and a `Fluid3DSettings`), so the component's fields and groups sit on the stage's panel; the bridge layers, running several bridges, hold them in groups (the 3D bridge's three subpanels: `readings`, `lowpass` and `bandpass`; `boundary`, `velocity`, `density`, `temperature`; `body_force`, `acceleration`, `density`, `temperature`, each with its mix). No `draw_mode`, `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take `dt` from their input |
 
@@ -176,8 +176,8 @@ foreground as the picture behind its density and temperature, each injection the
 color, and weights the own camera's injection by the player's motion and another's by the
 cross-camera similarity times `similarity_scale`; deep_flow picks the layers on
 its panel, live, one `Layers` field per picture (`motion_image`, `bridge_image`, `mask`) in its
-`inputs` group with `scale_by_motion` (`apps/deep_flow/settings.py`), reads the fields each tick,
-and steers the eye toward the tracked head. Both apps give each camera two monitors, `monitor_a`
+`inputs` group with `scale_by_motion` (`apps/deep_flow/settings.py`) and reads the fields each
+tick. Both apps give each camera two monitors, `monitor_a`
 and `monitor_b`, each handed every stage's `ports`; they go into the panel's select lists like
 any layer, and two show A beside B.
 
@@ -405,7 +405,7 @@ The shader loader finds a shader's source by its `.py` module name beside it
   (`scripts/depth_velocity_compare.py`).
 - The image, the mask and the depth come pushed in the inputs: a GL texture lives on the render
   thread and is not board data. The layers read nothing from the board; the app's wiring pass
-  reads the pose frames there for the weights and the eye.
+  reads the pose frames there for the weights.
 - A layer has no change flag: a source layer's `timestamp`, the capture time of the frame it
   holds, says whether it holds a new one. `MotionInput.timestamp` tells the motion layer, and
   `DepthMaskLayer` reads its depth source's the same way.
@@ -451,8 +451,6 @@ The shader loader finds a shader's source by its `.py` module name beside it
   the step's GPU time on a still velocity and on a burst, then cap the trace at a few cells per
   step in the advection, which bounds the scatter whatever comes in and which real motion stays
   under at 60 fps.
-- Whether the density's reduced view should also feed the fluid's own composite at a lower
-  quality setting.
 - How a fluid takes what the bridge gives, the base of the fluid refactor. Both fluids add the
   injected velocity times dt (`Fluid2D.add_velocity`, `Fluid3D.add_velocity`), as Stam's Stable
   Fluids adds a source; but the bridge's velocity is a velocity, in view widths per second like
@@ -465,8 +463,8 @@ The shader loader finds a shader's source by its `.py` module name beside it
   refactor's. A change lasts about `slow_smooth` over many ticks, so a velocity change added
   without dt every tick would count once per tick, 60 times its Δv in a second **(deduction)**.
 - hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
-  the pose's motion, a settings field written per tick. A per-tick value on the fluid layer, as the
-  eye is, would take it off the settings.
+  the pose's motion, a settings field written per tick. A per-tick value on the fluid layer would
+  take it off the settings.
 - Unused channels written 0 in the whole flow module. The 3D motion's and the 3D bridge's
   velocities write 0 in their unused w (`compose_velocity.frag`, `velocity_trail.frag`,
   `velocity_bandpass_direction.frag`), so a monitor shows w as

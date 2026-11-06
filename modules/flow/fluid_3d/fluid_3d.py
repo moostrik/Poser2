@@ -1,8 +1,9 @@
 """Fluid3D - 3D Navier-Stokes fluid simulation on the GPU.
 
-Density is stored as GL_TEXTURE_2D_ARRAY at output resolution for optimal
-per-layer 2D tiling (RGBA16F, colour baked in at injection). Velocity,
-pressure, temperature, and obstacles are GL_TEXTURE_3D at simulation scale.
+Every field is a GL_TEXTURE_3D on one grid of cubic cells: the velocity (RGBA16F), the temperature
+and the pressure (R16F) and the obstacle (R8) at the simulation's size, `volume.layers` deep; the
+density (RGBA16F, its color baked in at injection) on the same grid, or on one `density.size` times
+finer in x and y, sampled by uv wherever a pass reads it against the simulation's fields.
 
 Pipeline:
     1. Dampen velocity (magnitude clamping)
@@ -12,33 +13,30 @@ Pipeline:
     5. Advect temperature
     6. Apply buoyancy force
     7. Enforce incompressibility (divergence -> Jacobi solve -> gradient subtraction)
-    8. Advect density (GL_TEXTURE_2D_ARRAY, manual Z-lerp)
-    9. Composite 3D density -> 2D output
+    8. Advect density
+    9. Composite the density -> 2D output
 
 The walls are per-field wrap modes (no explicit border obstacles):
-    Velocity/density:  GL_CLAMP_TO_BORDER(0,0,0,0)  -> no-slip / Dirichlet
-    Pressure/temp:     GL_CLAMP_TO_EDGE              -> zero-gradient / Neumann
+    Velocity:          GL_CLAMP_TO_BORDER(0,0,0,0)  -> no-slip / Dirichlet
+    Density, pressure, temperature: by their `wall`; the z walls by the volume's
     Obstacle:          GL_CLAMP_TO_BORDER(1,0,0,0)   -> OOB = obstacle
 """
-import math
-import time
-
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_R16F, GL_R8, GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
 
-from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, SwapTexture2DArray, GpuTimer
+from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
 from .fluid_settings import Fluid3DSettings, VolumeSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings
 from ..shaders import AddBoolean
 from ..flow_util import FlowUtil
-from ..port import OnDemand, Port, TextureKind
+from ..port import Port, TextureKind
 from ..time_step import REFERENCE_STEP, TimeStep, viscosity_iterations
 from .shaders import (
-    Advect3D, Advect3DDensity, Divergence3D, Gradient3D,
+    Advect3D, Divergence3D, Gradient3D,
     JacobiPressure3D, JacobiDiffusion3D,
-    VorticityCurl3D, VorticityForce3D, Buoyancy3DDensity,
-    Inject3D, Inject3DDensity, InjectFlow3D,
-    Dampen3D, Composite3DDensity, Add3D,
-    InjectBinary3D, ReduceDensity
+    VorticityCurl3D, VorticityForce3D, Buoyancy3D,
+    Inject3D, InjectFlow3D,
+    Dampen3D, Composite3D, Add3D,
+    InjectBinary3D
 )
 
 # Combined memory barrier bits (cast to int for Pylance compatibility)
@@ -59,19 +57,14 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 class Fluid3D:
-    """3D Navier-Stokes fluid simulation with GL_TEXTURE_2D_ARRAY density.
-
-    Density is stored as SwapTexture2DArray (GL_TEXTURE_2D_ARRAY) for
-    optimal per-layer 2D tiling at high resolutions. Density advection,
-    injection, buoyancy, and compositing use dedicated shaders with
-    sampler2DArray / image2DArray bindings.
+    """3D Navier-Stokes fluid simulation, every field a GL_TEXTURE_3D on one grid.
 
     Fields:
-        velocity:    SwapTexture3D      RGBA16F  (u, v, w, spare)
-        density:     SwapTexture2DArray RGBA16F  (r, g, b, a)
-        temperature: SwapTexture3D      R16F
-        pressure:    SwapTexture3D      R16F
-        obstacle:    Texture3D          R8
+        velocity:    SwapTexture3D  RGBA16F  (u, v, w, spare)
+        density:     SwapTexture3D  RGBA16F  (r, g, b, a), `density.size` times the grid in x and y
+        temperature: SwapTexture3D  R16F
+        pressure:    SwapTexture3D  R16F
+        obstacle:    Texture3D      R8
 
     Intermediate (single-buffer):
         divergence:       Texture3D R16F
@@ -80,7 +73,7 @@ class Fluid3D:
         buoyancy_force:   Texture3D RGBA16F  (Fx, Fy, Fz, 0)
 
     2D composited output:
-        _output_texture:  Texture RGBA16F    (composited from 3D density)
+        _output_texture:  Texture RGBA16F    (composited from the density)
 
     The fields leave through `ports`; `density` is the composited output.
     """
@@ -91,23 +84,21 @@ class Fluid3D:
         # ---- Simulation dimensions and state ---
         self._simulation_width: int = 0
         self._simulation_height: int = 0
-        self._density_width: int = 0
+        self._output_width: int = 0       # the composited output, the layer's allocation
+        self._output_height: int = 0
+        self._density_width: int = 0      # the simulation's size times density.size
         self._density_height: int = 0
-        self._depth: int = 0          # density layers
-        self._sim_depth: int = 0      # velocity/pressure/temperature layers
+        self._depth: int = 0              # layers, every field's
         self._aspect: float = 1.0
+        self._grid_scale: float = 1.0     # the simulation's cell in output texels
 
         self._dt: float = REFERENCE_STEP
         self._time_step: TimeStep = TimeStep()
 
-        # Z metric, recomputed per update from depth.spacing (one physical slab, two layer counts)
-        self._z_spacing: float = 1.0  # sim-grid dz in sim texels (solvers)
-        self._z_extent: float = 1.0   # slab thickness in width units (advection: uRdx.z = 1/z_extent)
+        # The slab's thickness in width units: cubic cells, so layers / width (advection: uRdx.z = 1/z_extent)
+        self._z_extent: float = 1.0
 
         self._has_obstacles: bool = False
-
-        # Tracked-head eye offset for the composite (set_eye, polled per frame)
-        self._eye_person: tuple[float, float] = (0.0, 0.0)
 
         self._allocated: bool = False
 
@@ -119,15 +110,12 @@ class Fluid3D:
         # ---- Volumetric fields (SwapTexture3D for ping-pong) ----
         # Velocity always uses Dirichlet (v=0 at walls); others configurable via _apply_wall_modes().
         self._velocity: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
-        # Density uses GL_TEXTURE_2D_ARRAY for optimal per-layer 2D tiling.
-        self._density: SwapTexture2DArray = SwapTexture2DArray()
+        self._density: SwapTexture3D = SwapTexture3D()
         self._temperature: SwapTexture3D = SwapTexture3D()
         self._pressure: SwapTexture3D = SwapTexture3D()
         # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds = obstacle
-        self._simulation_obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
-        # Density-resolution obstacle (for density advection when grid_scale < 1)
-        self._density_obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
-        # 2D obstacle source (authoritative, never affected by depth/sim_scale changes)
+        self._obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
+        # 2D obstacle source (authoritative, never affected by a reallocation)
         self._obstacle_source: SwapFbo = SwapFbo(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
 
         # ---- Intermediate volumes (single buffer, no ping-pong) ----
@@ -148,26 +136,18 @@ class Fluid3D:
         self._jacobi_diffusion_shader: JacobiDiffusion3D = JacobiDiffusion3D()
         self._vorticity_curl_shader: VorticityCurl3D = VorticityCurl3D()
         self._vorticity_force_shader: VorticityForce3D = VorticityForce3D()
+        self._buoyancy_shader: Buoyancy3D = Buoyancy3D()
         self._inject_shader: Inject3D = Inject3D()
         self._inject_flow_shader: InjectFlow3D = InjectFlow3D()
         self._dampen_shader: Dampen3D = Dampen3D()
-        # Density-specific shaders (GL_TEXTURE_2D_ARRAY bindings)
-        self._advect_density_shader: Advect3DDensity = Advect3DDensity()
-        self._buoyancy_density_shader: Buoyancy3DDensity = Buoyancy3DDensity()
-        self._inject_density_shader: Inject3DDensity = Inject3DDensity()
-        self._composite_density_shader: Composite3DDensity = Composite3DDensity()
-        # The density as the monitors read it: at the simulation's width and height, a 3D texture, refreshed
-        # once per step and only when a view asks (`_density_view_refresh`, the port's `prepare`)
-        self._density_view: Texture3D = Texture3D()
-        self._reduce_density_shader: ReduceDensity = ReduceDensity()
-        self._density_view_refresh: OnDemand = OnDemand(self._reduce_density)
+        self._composite_shader: Composite3D = Composite3D()
         self._add_shader: Add3D = Add3D()
         self._inject_binary_shader: InjectBinary3D = InjectBinary3D()
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
         # Bind settings actions
         self.settings.volume.bind(VolumeSettings.layers, lambda _: self._request_reallocate())
-        self.settings.volume.bind(VolumeSettings.sim_layers, lambda _: self._request_reallocate())
+        self.settings.density.bind(DensitySettings.size, lambda _: self._request_reallocate())
         self.settings.bind(Fluid3DSettings.width, lambda _: self._request_reallocate())
         self.settings.bind(Fluid3DSettings.height, lambda _: self._request_reallocate())
         mark_wall = lambda _: setattr(self, '_wall_dirty', True)
@@ -179,24 +159,24 @@ class Fluid3D:
     # ========== Allocation ==========
 
     def allocate(self, width: int, height: int) -> None:
-        """Allocate all 3D volumes and shaders.
+        """Allocate all volumes and shaders.
 
         Args:
-            width: Full output resolution width (XY)
-            height: Full output resolution height (XY)
+            width: The composited output's width, the layer's allocation
+            height: The composited output's height
         """
-        self._density_width = width
-        self._density_height = height
-        self._update_simulation_dimensions()
+        self._output_width = width
+        self._output_height = height
+        self._update_dimensions()
 
         self._allocate_simulation_fields()
-        self._allocate_density_fields()
+        self._allocate_density()
 
-        # 2D obstacle source (full output resolution, depth-independent)
-        self._obstacle_source.allocate(self._density_width, self._density_height, GL_R8)
+        # 2D obstacle source (output resolution, independent of the grid)
+        self._obstacle_source.allocate(self._output_width, self._output_height, GL_R8)
 
         # 2D composited output
-        self._output_texture.allocate(self._density_width, self._density_height, GL_RGBA16F)
+        self._output_texture.allocate(self._output_width, self._output_height, GL_RGBA16F)
 
         # Allocate shaders
         self._advect_shader.allocate()
@@ -206,39 +186,37 @@ class Fluid3D:
         self._jacobi_diffusion_shader.allocate()
         self._vorticity_curl_shader.allocate()
         self._vorticity_force_shader.allocate()
+        self._buoyancy_shader.allocate()
         self._inject_shader.allocate()
         self._inject_flow_shader.allocate()
         self._dampen_shader.allocate()
-        self._advect_density_shader.allocate()
-        self._buoyancy_density_shader.allocate()
-        self._inject_density_shader.allocate()
-        self._composite_density_shader.allocate()
-        self._reduce_density_shader.allocate()
+        self._composite_shader.allocate()
         self._add_shader.allocate()
         self._inject_binary_shader.allocate()
         self._add_boolean_shader.allocate()
 
         self._allocated = True
 
-    def _update_simulation_dimensions(self) -> None:
-        """Recompute simulation dimensions from current settings."""
+    def _update_dimensions(self) -> None:
+        """Recompute the grids' dimensions from the settings."""
         self._simulation_width = self._align32(self.settings.width)
         self._simulation_height = self._align32(self.settings.height)
         self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
-        self._grid_scale = self._simulation_width / self._density_width if self._density_width > 0 else 1.0
+        self._grid_scale = self._simulation_width / self._output_width if self._output_width > 0 else 1.0
         self._depth = self.settings.volume.layers
-        self._sim_depth = self.settings.volume.sim_layers
+        size: int = max(1, self.settings.density.size)
+        self._density_width = self._simulation_width * size
+        self._density_height = self._simulation_height * size
+        self._z_extent = self._depth / max(1, self._simulation_width)
 
-    def _allocate_density_fields(self) -> None:
-        """(Re)allocate density-resolution volumes (full output resolution × depth)."""
+    def _allocate_density(self) -> None:
+        """(Re)allocate the density, on the simulation's grid or `density.size` times finer in x and y."""
         self._density.allocate(self._density_width, self._density_height, self._depth, GL_RGBA16F)
-        self._density_obstacle.allocate(self._density_width, self._density_height, self._depth, GL_R8)
-        self._regenerate_obstacle_volumes()
-        self._allocate_density_view()
+        self._apply_wall_modes()
 
     def _allocate_simulation_fields(self) -> None:
-        """(Re)allocate simulation-resolution 3D volumes."""
-        d = self._sim_depth
+        """(Re)allocate the simulation's volumes."""
+        d = self._depth
         sim_w = self._simulation_width
         sim_h = self._simulation_height
 
@@ -246,8 +224,10 @@ class Fluid3D:
         self._velocity.allocate(sim_w, sim_h, d, GL_RGBA16F)
         self._temperature.allocate(sim_w, sim_h, d, GL_R16F)
         self._pressure.allocate(sim_w, sim_h, d, GL_R16F)
-        self._simulation_obstacle.allocate(sim_w, sim_h, d, GL_R8)
-        self._regenerate_obstacle_volumes()
+        self._obstacle.allocate(sim_w, sim_h, d, GL_R8)
+        if self._has_obstacles:
+            self._inject_binary_shader.use(self._obstacle_source, self._obstacle, mode=1)
+            glMemoryBarrier(_BARRIER_IMAGE)
 
         # Intermediate volumes
         self._divergence_vol.allocate(sim_w, sim_h, d, GL_R16F)
@@ -256,33 +236,6 @@ class Fluid3D:
         self._buoyancy_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
 
         self._apply_wall_modes()
-        self._allocate_density_view()
-
-    def _allocate_density_view(self) -> None:
-        """(Re)allocate the density as the monitors read it: the simulation's width and height, the
-        density's layers. Both allocations call it, since it follows both."""
-        if self._simulation_width <= 0 or self._depth <= 0:
-            return
-        size: tuple[int, int, int] = (self._simulation_width, self._simulation_height, self._depth)
-        view: Texture3D = self._density_view
-        if view.allocated and (view.width, view.height, view.depth) == size:
-            return
-        view.deallocate()
-        view.allocate(*size, GL_RGBA16F)
-        self._density_view_refresh.mark()
-
-    def _reduce_density(self) -> None:
-        """The density averaged down into `_density_view`; the port's `prepare`, run once per step at most."""
-        self._reduce_density_shader.use(self._density, self._density_view)
-        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
-
-    def _regenerate_obstacle_volumes(self) -> None:
-        """Project 2D obstacle source into both 3D obstacle volumes."""
-        if not self._has_obstacles:
-            return
-        self._inject_binary_shader.use(self._obstacle_source, self._simulation_obstacle, mode=1)
-        self._inject_binary_shader.use(self._obstacle_source, self._density_obstacle, mode=1)
-        glMemoryBarrier(_BARRIER_IMAGE)
 
     def deallocate(self) -> None:
         """Release all GPU resources."""
@@ -291,8 +244,7 @@ class Fluid3D:
         self._density.deallocate()
         self._temperature.deallocate()
         self._pressure.deallocate()
-        self._density_obstacle.deallocate()
-        self._simulation_obstacle.deallocate()
+        self._obstacle.deallocate()
         self._obstacle_source.deallocate()
         self._divergence_vol.deallocate()
         self._curl_vol.deallocate()
@@ -307,15 +259,11 @@ class Fluid3D:
         self._jacobi_diffusion_shader.deallocate()
         self._vorticity_curl_shader.deallocate()
         self._vorticity_force_shader.deallocate()
+        self._buoyancy_shader.deallocate()
         self._inject_shader.deallocate()
         self._inject_flow_shader.deallocate()
         self._dampen_shader.deallocate()
-        self._advect_density_shader.deallocate()
-        self._buoyancy_density_shader.deallocate()
-        self._inject_density_shader.deallocate()
-        self._composite_density_shader.deallocate()
-        self._reduce_density_shader.deallocate()
-        self._density_view.deallocate()
+        self._composite_shader.deallocate()
         self._add_shader.deallocate()
         self._inject_binary_shader.deallocate()
         self._add_boolean_shader.deallocate()
@@ -331,14 +279,11 @@ class Fluid3D:
         self._jacobi_diffusion_shader.reload()
         self._vorticity_curl_shader.reload()
         self._vorticity_force_shader.reload()
+        self._buoyancy_shader.reload()
         self._inject_shader.reload()
         self._inject_flow_shader.reload()
         self._dampen_shader.reload()
-        self._advect_density_shader.reload()
-        self._buoyancy_density_shader.reload()
-        self._inject_density_shader.reload()
-        self._composite_density_shader.reload()
-        self._reduce_density_shader.reload()
+        self._composite_shader.reload()
         self._add_shader.reload()
         self._inject_binary_shader.reload()
 
@@ -364,11 +309,6 @@ class Fluid3D:
         # Per-frame state
         self._step_time(dt)
 
-        # Z metric from live settings: solvers see sim-grid cell size, advection sees slab thickness
-        spacing = max(1.0, self.settings.volume.spacing)
-        self._z_spacing = spacing
-        self._z_extent = (self._sim_depth * spacing) / max(1, self._simulation_width)
-
         self._gpu_timer.begin()
 
         # Dampen velocity (clean input for all steps)
@@ -387,7 +327,6 @@ class Fluid3D:
         self._composite_output()
 
         self._gpu_timer.end()
-        self._density_view_refresh.mark()
 
     # ========== Pipeline Steps ==========
 
@@ -406,7 +345,7 @@ class Fluid3D:
             self._velocity.back,
             self._velocity,
             self._velocity.back,
-            self._simulation_obstacle,
+            self._obstacle,
             self._aspect, self._z_extent,
             advect_step, dissipation,
             internal_format=GL_RGBA16F,
@@ -425,8 +364,8 @@ class Fluid3D:
         result = self._jacobi_diffusion_shader.solve(
             self._velocity,
             self._velocity.back,
-            self._simulation_obstacle,
-            self._grid_scale, self._aspect, self._z_spacing,
+            self._obstacle,
+            self._grid_scale, self._aspect,
             viscosity_dt,
             total_iterations=iterations,
             iterations_per_dispatch=5,
@@ -447,9 +386,9 @@ class Fluid3D:
         # a. Compute curl
         self._vorticity_curl_shader.use(
             self._velocity,
-            self._simulation_obstacle,
+            self._obstacle,
             self._curl_vol,
-            self._grid_scale, self._aspect, self._z_spacing,
+            self._grid_scale, self._aspect,
             vorticity_radius,
             has_obstacles=self._has_obstacles
         )
@@ -458,9 +397,9 @@ class Fluid3D:
         # b. Compute confinement force
         self._vorticity_force_shader.use(
             self._curl_vol,
-            self._simulation_obstacle,
+            self._obstacle,
             self._vorticity_force_vol,
-            self._grid_scale, self._aspect, self._z_spacing,
+            self._grid_scale, self._aspect,
             vorticity_force,
             has_obstacles=self._has_obstacles,
         )
@@ -483,7 +422,7 @@ class Fluid3D:
             self._temperature.back,
             self._temperature,
             self._velocity,
-            self._simulation_obstacle,
+            self._obstacle,
             self._aspect, self._z_extent,
             advect_step, dissipation,
             internal_format=GL_R16F,
@@ -506,10 +445,10 @@ class Fluid3D:
         kappa = self._dt * self._grid_scale * temp.sink
         gravity = (temp.gravity_x, temp.gravity_y, temp.gravity_z)
 
-        self._buoyancy_density_shader.use(
+        self._buoyancy_shader.use(
             self._temperature,
             self._density,
-            self._simulation_obstacle,
+            self._obstacle,
             self._buoyancy_force_vol,
             sigma, kappa, temp.ambient,
             gravity=gravity,
@@ -524,9 +463,9 @@ class Fluid3D:
         # a. Compute divergence
         self._divergence_shader.use(
             self._velocity,
-            self._simulation_obstacle,
+            self._obstacle,
             self._divergence_vol,
-            self._grid_scale, self._aspect, self._z_spacing,
+            self._grid_scale, self._aspect,
             has_obstacles=self._has_obstacles
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
@@ -538,8 +477,8 @@ class Fluid3D:
             self._pressure,
             self._pressure.back,
             self._divergence_vol,
-            self._simulation_obstacle,
-            self._grid_scale, self._aspect, self._z_spacing,
+            self._obstacle,
+            self._grid_scale, self._aspect,
             total_iterations=iterations,
             iterations_per_dispatch=5,
             has_obstacles=self._has_obstacles
@@ -553,9 +492,9 @@ class Fluid3D:
         self._gradient_shader.use(
             self._velocity.back,
             self._pressure,
-            self._simulation_obstacle,
+            self._obstacle,
             self._velocity,
-            self._grid_scale, self._aspect, self._z_spacing,
+            self._grid_scale, self._aspect,
             has_obstacles=self._has_obstacles
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
@@ -566,16 +505,15 @@ class Fluid3D:
         dissipation = self._calculate_dissipation(self._dt, self.settings.density.fade_time)
 
         self._density.swap()
-        self._advect_density_shader.advect(
+        self._advect_shader.advect(
             self._density.back,
             self._density,
             self._velocity,
-            self._density_obstacle,
+            self._obstacle,
             self._aspect, self._z_extent,
             advect_step, dissipation,
             internal_format=GL_RGBA16F,
             has_obstacles=self._has_obstacles,
-            closed_z=self.settings.volume.wall == WallMode.CLOSED,
             evaporation=self.settings.density.evaporation * self._dt
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
@@ -603,36 +541,17 @@ class Fluid3D:
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
-    def set_eye(self, x: float, y: float) -> None:
-        """Store the tracked-head eye offset (±1 range), polled by the composite."""
-        self._eye_person = (x, y)
-
     def _composite_output(self) -> None:
-        """Composite 3D density → 2D output with depth cues (virtual eye)."""
+        """Composite the density → 2D output."""
         d = self.settings.volume
-        if d.drift_period > 0.0:
-            # Lissajous orbit — never visibly repeats, period in seconds
-            t = (2.0 * math.pi) * time.monotonic() / d.drift_period
-            drift = (d.parallax * math.sin(t), 0.6 * d.parallax * math.cos(t * 0.77))
-        else:
-            drift = (d.parallax, 0.0)
-        # Crossfade autonomous drift <-> head-coupled parallax
-        k = d.eye_tracking
-        eye = (drift[0] * (1.0 - k) + self._eye_person[0] * d.parallax * k,
-               drift[1] * (1.0 - k) + self._eye_person[1] * d.parallax * k)
-        self._composite_density_shader.use(
+        self._composite_shader.use(
             self._density,
             self._output_texture,
             emission=d.emission,
-            gamma=d.gamma,
             absorption=d.absorption,
             tint=d.tint,
             fog=d.fog,
             glow=d.glow,
-            eye=eye,
-            perspective=d.perspective,
-            depth_blur=d.layer_blur,
-            debug_depth=d.debug_layers,
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
@@ -644,23 +563,20 @@ class Fluid3D:
         self._temperature.set_wrap(*_WALL_GL[self.settings.temperature.wall])
         self._pressure.set_wrap(*_WALL_GL[self.settings.pressure.wall])
         z_wrap, z_color = _WALL_GL[self.settings.volume.wall]
-        for vol in [self._velocity, self._temperature, self._pressure]:
+        for vol in [self._velocity, self._density, self._temperature, self._pressure]:
             vol.set_wrap_z(z_wrap, z_color)
 
     def _handle_deferred_actions(self) -> None:
         """Process reset and reallocation requests queued from the UI thread."""
         if self._reallocate_pending:
             self._reallocate_pending = False
-            old_w, old_h = self._simulation_width, self._simulation_height
-            old_d, old_sd = self._depth, self._sim_depth
-            self._update_simulation_dimensions()
-            sim_changed = (self._simulation_width != old_w or self._simulation_height != old_h
-                           or self._sim_depth != old_sd)
-            depth_changed = self._depth != old_d
-            if sim_changed:
+            old_sim = (self._simulation_width, self._simulation_height, self._depth)
+            old_density = (self._density_width, self._density_height, self._depth)
+            self._update_dimensions()
+            if (self._simulation_width, self._simulation_height, self._depth) != old_sim:
                 self._allocate_simulation_fields()
-            if depth_changed:
-                self._allocate_density_fields()
+            if (self._density_width, self._density_height, self._depth) != old_density:
+                self._allocate_density()
 
         if self._wall_dirty:
             self._wall_dirty = False
@@ -712,10 +628,10 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def add_density(self, texture: Texture, strength: float = 1.0) -> None:
-        """Inject 2D density texture into 3D density volume. Applies settings.density.gain and delta_time."""
+        """Inject 2D density texture into the density volume. Applies settings.density.gain and delta_time."""
         if not self._allocated:
             return
-        self._inject_density_shader.use(
+        self._inject_shader.use(
             texture, self._density,
             self.settings.volume.injection_layer,
             self.settings.volume.injection_spread,
@@ -740,8 +656,7 @@ class Fluid3D:
     def set_obstacle(self, texture: Texture) -> None:
         """Replace obstacle volume with a 2D mask projected through all layers.
 
-        Stores the 2D mask as the authoritative source, then projects into
-        both sim-resolution and density-resolution 3D obstacle volumes.
+        Stores the 2D mask as the authoritative source, then projects it into the obstacle volume.
 
         Args:
             texture: 2D obstacle mask (any channel > 0.5 = obstacle)
@@ -754,16 +669,14 @@ class Fluid3D:
         self._obstacle_source.begin()
         self._add_boolean_shader.use(self._obstacle_source.back, texture)
         self._obstacle_source.end()
-        # Project to 3D volumes
-        self._inject_binary_shader.use(self._obstacle_source, self._simulation_obstacle, mode=1)
-        self._inject_binary_shader.use(self._obstacle_source, self._density_obstacle, mode=1)
+        self._inject_binary_shader.use(self._obstacle_source, self._obstacle, mode=1)
         glMemoryBarrier(_BARRIER_IMAGE)
         self._has_obstacles = True
 
     def add_obstacle(self, texture: Texture) -> None:
         """Add to obstacle volume (boolean OR with existing obstacles).
 
-        Updates the 2D source and both 3D obstacle volumes.
+        Updates the 2D source and the obstacle volume.
 
         Args:
             texture: 2D obstacle mask to add (any channel > 0.5 = obstacle)
@@ -775,9 +688,8 @@ class Fluid3D:
         self._obstacle_source.begin()
         self._add_boolean_shader.use(self._obstacle_source.back, texture)
         self._obstacle_source.end()
-        # Regenerate 3D volumes from updated source
-        self._inject_binary_shader.use(self._obstacle_source, self._simulation_obstacle, mode=1)
-        self._inject_binary_shader.use(self._obstacle_source, self._density_obstacle, mode=1)
+        # Regenerate the volume from the updated source
+        self._inject_binary_shader.use(self._obstacle_source, self._obstacle, mode=1)
         glMemoryBarrier(_BARRIER_IMAGE)
         self._has_obstacles = True
 
@@ -786,8 +698,7 @@ class Fluid3D:
         if not self._allocated:
             return
         FlowUtil.zero(self._obstacle_source)
-        self._simulation_obstacle.clear()
-        self._density_obstacle.clear()
+        self._obstacle.clear()
         glMemoryBarrier(_BARRIER_IMAGE)
         self._has_obstacles = False
 
@@ -801,14 +712,14 @@ class Fluid3D:
     @property
     def ports(self) -> dict[str, Port]:
         """Its fields in the order a step reaches them, each a volume in a box `_z_extent` deep, and the
-        2D obstacle as it comes. The density's port is its reduced view, refreshed when a view asks."""
+        2D obstacle as it comes."""
         extent: float = self._z_extent
 
         def volume(texture: Texture3D, kind: TextureKind) -> Port:
             return Port(texture, kind, extent)
 
         return {'obstacle_source': Port(self._obstacle_source, TextureKind.SCALAR),
-                'obstacle': volume(self._simulation_obstacle, TextureKind.SCALAR),
+                'obstacle': volume(self._obstacle, TextureKind.SCALAR),
                 'velocity': volume(self._velocity, TextureKind.VELOCITY),
                 'vorticity': volume(self._curl_vol, TextureKind.VELOCITY),
                 'vorticity_force': volume(self._vorticity_force_vol, TextureKind.VELOCITY),
@@ -816,4 +727,4 @@ class Fluid3D:
                 'buoyancy': volume(self._buoyancy_force_vol, TextureKind.VELOCITY),
                 'divergence': volume(self._divergence_vol, TextureKind.SCALAR),
                 'pressure': volume(self._pressure, TextureKind.SCALAR),
-                'density': Port(self._density_view, TextureKind.IMAGE, extent, self._density_view_refresh)}
+                'density': volume(self._density, TextureKind.IMAGE)}

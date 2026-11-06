@@ -89,17 +89,12 @@ A port's texture may be a volume, always a `Texture3D` (`Port.volume`), so each 
 shader. The 3D fluid lists its volumes as ports: `velocity`, `density`, `temperature`,
 `pressure`, `divergence`, `vorticity`, `vorticity_force`, `buoyancy`, `obstacle`, beside the 2D
 `obstacle_source`. Each carries its box's depth (`Port.extent`, `Fluid3D._z_extent`); the
-monitor draws the box as deep as it is wide (`BOX_DEPTH`), since the simulated slab, 16 layers at
-spacing 4 on a 448 wide grid, is 0.14 of its width and reads as flat. A flat cut renders at the
-part of the panel it fills in its proportions, so glyphs keep their spacing. Every view samples a volume at (u, v, w) from 0 to 1 through the
-box, so the density's `layers` and the simulation's `sim_layers` need not match.
+monitor draws the box as deep as it is wide (`BOX_DEPTH`), since the simulated slab, 64 cubic
+cells on a 448 wide grid, is 0.14 of its width and reads as flat. A flat cut renders at the
+part of the panel it fills in its proportions, so glyphs keep their spacing. Every view samples a
+volume at (u, v, w) from 0 to 1 through the box, so the density may sit on a finer grid than the
+simulation's (`density.size`) and is read as it is.
 
-- The density, a 2D array at the output size (2160 × 3840 × `layers` of RGBA16F), is averaged
-  down into a `Texture3D` of the simulation's width and height and its `layers`
-  (`reduce_density.comp`, the mean of each block), so no view shimmers or reads the whole
-  gigabyte. The fluid marks it stale every step (`OnDemand`) and the first view that asks this
-  tick (`Port.prepare`) reduces it: two monitors showing it cost one reduction, none costs
-  nothing.
 - `cut` lays a volume out. `CUBE` and `FOG` are 3D, on the orbit camera; the others are flat, a
   2D texture (`VolumeCut`) every 2D view draws as it draws any texture:
 
@@ -131,8 +126,7 @@ box, so the density's `layers` and the simulation's `sim_layers` need not match.
 
 `scripts/monitor_harness.py` checks the monitor without an app or a camera: a hidden GL window,
 known textures and volumes with values numpy computes (a cut against numpy's layer, max and mean,
-the reduction against the block mean, the cube's and the fog's near side from both sides of the
-box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU's timer queries:
+the cube's and the fog's near side from both sides of the box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU's timer queries:
 
 | Work                                   | At                                   | GPU (ms) |
 |----------------------------------------|--------------------------------------|----------|
@@ -140,6 +134,5 @@ box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU
 | glyphs, flat                           | 540 × 960 / 2160 × 3840, spacing 32  | 0.18 / 2.4 |
 | histogram                              | 540 × 960 / 2160 × 3840              | 0.10 / 0.12 |
 | strip                                  | 540 × 960                            | 0.05     |
-| the density's reduction                | 2160 × 3840 × 16 to 448 × 800 × 16   | 1.1      |
 | slice, front, top, side                | a 448 × 800 × 16 volume              | 0.01, 0.08, 0.61, 0.36 |
 | cube, 3D arrows, fog                   | a 448 × 800 × 16 volume at 540 × 960 | 0.04, 0.05, 0.05 |

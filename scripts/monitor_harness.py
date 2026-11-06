@@ -19,16 +19,15 @@ from typing import Callable
 import cv2
 import glfw
 import numpy as np
-from OpenGL.GL import (GL_ARRAY_BUFFER, GL_FALSE, GL_FLOAT, GL_FRAMEBUFFER, GL_QUERY_RESULT, GL_RGBA, GL_RGBA16F, GL_RGBA32F,
-                       GL_STATIC_DRAW, GL_TEXTURE_2D, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_3D, GL_TIME_ELAPSED, glBeginQuery,
+from OpenGL.GL import (GL_ARRAY_BUFFER, GL_FALSE, GL_FLOAT, GL_FRAMEBUFFER, GL_QUERY_RESULT, GL_RGBA, GL_RGBA32F,
+                       GL_STATIC_DRAW, GL_TEXTURE_2D, GL_TEXTURE_3D, GL_TIME_ELAPSED, glBeginQuery,
                        glBindBuffer, glBindFramebuffer, glBindTexture, glBindVertexArray, glBufferData,
                        glEnableVertexAttribArray, glEndQuery, glFinish, glGenBuffers, glGenQueries, glGenVertexArrays,
                        glGetQueryObjectuiv, glTexImage2D, glTexSubImage3D, glVertexAttribPointer, glViewport)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from modules.flow import Cut, OnDemand, Port, TextureKind, VolumeCut, cut_size  # noqa: E402
-from modules.flow.fluid_3d.shaders import ReduceDensity  # noqa: E402  (a harness reaches inside, as the compare scripts do)
-from modules.gl import Fbo, MouseButton, Style, SwapTexture2DArray, Texture, Texture3D  # noqa: E402
+from modules.gl import Fbo, MouseButton, Style, Texture, Texture3D  # noqa: E402
 from modules.render.layers import Channel, FlowStage, MonitorInput, MonitorLayer, MonitorLayerSettings, MonitorView  # noqa: E402
 
 OUT: str = os.path.join('temp', 'monitor_harness')
@@ -262,38 +261,6 @@ def check_cuts(results: Results, values: np.ndarray) -> None:
     volume.deallocate()
 
 
-def check_reduction(results: Results) -> None:
-    """The density's reduction is the mean of each block, layer for layer."""
-    width, height, layers = 128, 96, 4
-    rng = np.random.default_rng(1)
-    density = rng.random((layers, height, width, 4), dtype=np.float32)
-    source = SwapTexture2DArray()
-    source.allocate(width, height, layers, GL_RGBA16F)
-    glBindTexture(GL_TEXTURE_2D_ARRAY, source.tex_id)
-    glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, width, height, layers, GL_RGBA, GL_FLOAT, density)
-    glBindTexture(GL_TEXTURE_2D_ARRAY, 0)
-    target = Texture3D()
-    target.allocate(width // 4, height // 4, layers, GL_RGBA16F)
-    shader = ReduceDensity()
-    shader.allocate()
-    shader.use(source, target)
-    glFinish()
-    got = target.read_to_numpy(flip=False)
-    assert got is not None
-    want = density.reshape(layers, height // 4, 4, width // 4, 4, 4).mean(axis=(2, 4))
-    results.check('the density reduces to the mean of each block', bool(np.allclose(got.astype(np.float32), want, atol=2e-3)))
-
-    big = SwapTexture2DArray()
-    big.allocate(*OUTPUT, 16, GL_RGBA16F)
-    small = Texture3D()
-    small.allocate(448, 800, 16, GL_RGBA16F)
-    ms = gpu_ms(lambda: shader.use(big, small), 10)
-    print(f'     the reduction  {ms:6.2f} ms from {OUTPUT[0]} x {OUTPUT[1]} x 16 to 448 x 800 x 16')
-    for texture in (source, target, big, small):
-        texture.deallocate()
-    shader.deallocate()
-
-
 def check_volume_monitor(results: Results, values: np.ndarray) -> None:
     """A volume in the monitor: one refresh a tick for two monitors, the cut's proportions, every layer counted."""
     d, h, w = values.shape[:3]
@@ -334,7 +301,6 @@ def step_1b(results: Results) -> None:
     print('step 1b: volume ports, flat cuts, summaries over a volume')
     values = known_volume(64, 48, 8)
     check_cuts(results, values)
-    check_reduction(results)
     check_volume_monitor(results, values)
     check_cut_times(results)
 

@@ -1,0 +1,68 @@
+#version 460 core
+
+/*
+ * Composite3D - Volumetric front-to-back composite of the RGBA density
+ * volume into a 2D image, one step per layer.
+ *
+ * Per ray step (front -> back, trilinear reads):
+ *   occlusion    per-channel Beer-Lambert extinction; near density covers far density
+ *   glow         the unoccluded additive sum is accumulated alongside and
+ *                mixed in: uGlow = 1 is the additive composite
+ *   tint + fog   far density shifts toward water color and fades
+ *
+ * Dispatched as a 2D compute (one thread per output pixel). The output may
+ * be larger than the volume: the volume is sampled by uv.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler3D uDensity;  // RGBA16F
+
+layout(rgba16f, binding = 0) writeonly uniform image2D uOutput;
+
+uniform int   uDepth;        // Number of layers, the march's steps
+uniform ivec2 uOutputSize;   // 2D output dimensions
+uniform float uEmission;     // Density brightness gain
+uniform float uAbsorption;   // Extinction per unit density
+uniform float uTint;         // 0..1 mix toward per-channel water extinction
+uniform float uFog;          // Medium extinction over the full depth
+uniform float uGlow;         // 0 = occluded volumetric, 1 = additive
+
+const vec3 WATER_CHAN = vec3(1.8, 1.0, 0.6);  // relative extinction: red dies first
+
+void main() {
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(gid, uOutputSize))) return;
+
+    vec2 uv = (vec2(gid) + 0.5) / vec2(uOutputSize);
+
+    int steps = max(uDepth, 1);
+    float inv_steps = 1.0 / float(steps);
+
+    vec3 chan  = mix(vec3(1.0), WATER_CHAN, uTint);
+    vec3 sigma = uAbsorption * chan;
+    vec3 fog_s = (uFog / float(steps)) * chan;
+
+    vec3 T   = vec3(1.0);  // transmittance
+    vec3 vol = vec3(0.0);  // occluded accumulation
+    vec3 add = vec3(0.0);  // unoccluded additive sum
+
+    for (int i = 0; i < steps; i++) {
+        float z_norm = (float(i) + 0.5) * inv_steps;
+        vec4 s = texture(uDensity, vec3(uv, z_norm));
+
+        vec3 e = uEmission * max(s.rgb, vec3(0.0));
+        vol += T * e;
+        add += e;
+
+        float d = max(s.r, max(s.g, s.b));
+        T *= exp(-(sigma * d + fog_s));
+
+        // Fully occluded and no additive term left to accumulate
+        if (uGlow <= 0.0 && all(lessThan(T, vec3(0.004)))) break;
+    }
+
+    vec3 rgb = mix(vol, add, uGlow);
+    float alpha = 1.0 - dot(T, vec3(0.299, 0.587, 0.114));
+    imageStore(uOutput, gid, vec4(rgb, alpha));
+}

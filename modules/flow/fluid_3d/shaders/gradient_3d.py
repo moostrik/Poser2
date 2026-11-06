@@ -18,7 +18,7 @@ class Gradient3D(ComputeShader):
 
     def use(self, velocity: Texture3D, pressure: Texture3D, obstacle: Texture3D,
             result_out: Texture3D,
-            grid_scale: float, aspect: float, z_spacing: float,
+            grid_scale: float, aspect: float,
             has_obstacles: bool = True) -> None:
         """Subtract pressure gradient: v_new = v_old - grad(p).
 
@@ -29,7 +29,6 @@ class Gradient3D(ComputeShader):
             result_out: Output corrected velocity (RGBA16F)
             grid_scale: Grid scaling factor
             aspect: Width/height ratio
-            z_spacing: Sim-grid Z cell size in sim texels (dz/dx)
             has_obstacles: Whether obstacle logic is active
         """
         if not self.allocated or not self.shader_program:
@@ -45,7 +44,7 @@ class Gradient3D(ComputeShader):
 
         dx = grid_scale
         dy = grid_scale * aspect
-        dz = grid_scale * z_spacing
+        dz = grid_scale                   # cubic cells
         glUniform3f(self.get_uniform_loc("uHalfRdxInv"), 0.5 / dx, 0.5 / dy, 0.5 / dz)
         glUniform3i(self.get_uniform_loc("uSize"),
                     result_out.width, result_out.height, result_out.depth)

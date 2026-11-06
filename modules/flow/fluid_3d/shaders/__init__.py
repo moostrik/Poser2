@@ -1,8 +1,4 @@
-"""3D fluid simulation compute shaders.
-
-Simulation fields are GL_TEXTURE_3D; density is GL_TEXTURE_2D_ARRAY
-(optimal per-layer 2D tiling) with dedicated density shaders.
-"""
+"""3D fluid simulation compute shaders. Every field is a GL_TEXTURE_3D on one grid."""
 
 from .advect_3d import Advect3D
 from .divergence_3d import Divergence3D
@@ -17,10 +13,4 @@ from .inject_flow_3d import InjectFlow3D
 from .dampen_3d import Dampen3D
 from .add_3d import Add3D
 from .inject_binary_3d import InjectBinary3D
-
-# Density-specific shaders (GL_TEXTURE_2D_ARRAY bindings)
-from .advect_3d_density import Advect3DDensity
-from .buoyancy_3d_density import Buoyancy3DDensity
-from .inject_3d_density import Inject3DDensity
-from .composite_3d_density import Composite3DDensity
-from .reduce_density import ReduceDensity
+from .composite_3d import Composite3D
