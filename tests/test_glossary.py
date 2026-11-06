@@ -52,6 +52,7 @@ BANNED: list[tuple[str, str]] = [
     ('ip, not ip_address', r'ip_address(?:es|_)|_ip_address'),
     ('hwaccel, not hwdecode', r'hwdecode'),
     ('add/remove_<kind>_callback, not register/unregister_callback', r'^register_callback$|^unregister_callback$'),
+    ('glyphs, not arrows (the monitor view)', r'arrow_spacing|ArrowSpacing|VelocityArrowField|process_arrows'),
 ]
 
 # the glossary's app sections: banned in that app's code and presets

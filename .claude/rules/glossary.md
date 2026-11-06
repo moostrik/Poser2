@@ -22,6 +22,8 @@ Each bullet names the term to use and, after "not", the synonyms it replaces. A 
 - The z of the 3D flow: `depth_velocity` (`DepthVelocity`, `DepthVelocitySettings`); not `depth_track`. `depth` is the camera's depth
 - A swap buffer's other buffer, the previous one: `back` (`SwapFbo.back`, `SwapTexture3D.back`, `SwapTexture2DArray.back`); not `back_texture`. A texture object is passed as itself, never as a `.texture` of it; a layer's `texture` is the layer's output
 - American spelling: `center`, `visualization`, `color`; not `centre`, `visualisation`, `colour`
+- A monitor's view of a field as marks on a grid, arrows for a velocity and dots for a scalar: `glyphs` (`MonitorView.GLYPHS`, `glyph_spacing`, `GlyphField`); not `ARROWS` as the view's name, `arrow_spacing`, `ArrowSpacing`, `VelocityArrowField`
+- How a monitor lays out a volume (`CUBE`, `FOG`, `SLICE`, `FRONT`, `TOP`, `SIDE`): `cut` (`Cut`, `advanced.cut`, `VolumeCut`); not `slice_mode`, `projection`
 
 ## Render
 
