@@ -1,11 +1,11 @@
 """Velocity Event shader.
 
-Peak-holds one event of the motion, a start or a stop, from the fast and slow trails.
+One event of the motion, a start, bow, stop or wake, from the fast and slow trails.
 """
 
 from enum import IntEnum
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -29,19 +29,17 @@ class MotionEvent(IntEnum):
 
 
 class VelocityEvent(Shader):
-    """Writes max(event * its region's share or the rest, previous * decay) to the red channel."""
+    """Writes the event times its region's share or the rest to the red channel."""
 
-    def use(self, fast: Texture, slow: Texture, previous: Texture, event: MotionEvent, scale: float, decay: float,
+    def use(self, fast: Texture, slow: Texture, event: MotionEvent, scale: float,
             region_fast: Texture, region_slow: Texture, region_weight: float, lod: float) -> None:
-        """Hold one event.
+        """Write one event.
 
         Args:
             fast: RGB fast trail
             slow: RGB slow trail
-            previous: Previous held event
             event: START, BOW, STOP or WAKE
             scale: 1 / the trails' step peak, so a sudden start or stop of speed v reads v; 0 = no events
-            decay: What remains of the held event this update
             region_fast: A rise: the region's mean moving velocity, fast trail (RGB, a texel per region); a fall:
                 the region speeds, fast in R and slow in G, with mipmaps
             region_slow: A rise: the region's mean moving velocity, slow trail; a fall: unread
@@ -51,19 +49,18 @@ class VelocityEvent(Shader):
         """
         if not self.allocated or not self.shader_program:
             return
-        if not fast.allocated or not slow.allocated or not previous.allocated:
+        if not fast.allocated or not slow.allocated:
             return
 
         glUseProgram(self.shader_program)
 
-        for unit, texture in enumerate((fast, slow, previous, region_fast, region_slow)):
-            glActiveTexture((GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4)[unit])
+        for unit, texture in enumerate((fast, slow, region_fast, region_slow)):
+            glActiveTexture((GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3)[unit])
             glBindTexture(GL_TEXTURE_2D, texture.tex_id)
             glUniform1i(self.get_uniform_loc(f"tex{unit}"), unit)
         glUniform1f(self.get_uniform_loc("sign"), event.sign)
         glUniform1f(self.get_uniform_loc("edge"), 1.0 if event.edge else 0.0)
         glUniform1f(self.get_uniform_loc("scale"), scale)
-        glUniform1f(self.get_uniform_loc("decay"), decay)
         glUniform1f(self.get_uniform_loc("region_weight"), region_weight)
         glUniform1f(self.get_uniform_loc("lod"), lod)
 

@@ -218,8 +218,8 @@ each pixel's rise and fall in two, by the region weight (`start_region_weight`,
 
 Start + bow is a pixel's whole rise, stop + wake its whole fall. What a region shares:
 
-- A rise reads the region's mean velocity over its moving pixels (faster than `START_FLOOR`,
-  0.01 widths/s), taken from the flow and then smoothed per region by the fast and the slow trail.
+- A rise reads the region's mean velocity over its moving pixels (those the motion gives a
+  velocity), taken from the flow and then smoothed per region by the fast and the slow trail.
   A limb arriving adds moving pixels at its own speed and leaves that mean as it was; a limb
   speeding up raises it; jitter on a still body cancels in it. Two other readings fail: over all
   of a region's pixels an arriving limb raises the mean like a speedup, and taken of the two
@@ -228,9 +228,10 @@ Start + bow is a pixel's whole rise, stop + wake its whole fall. What a region s
   limb keeps, where a mean velocity would shrink and read as a stop. The trails lag at the pixels
   a limb leaves, so a leaving limb lowers it too: part of a wake reads as a stop.
 
-The events read x, y and z alike; the regions keep z's noise out as they keep x/y's. Each event is
-peak-held over its own hold (`start_hold`, `bow_hold`, `stop_hold`, `wake_hold`). No blur and no
-advect: the events stay sharp. The event bridge runs while a monitor shows one of its ports
+The events read x, y and z alike. The bridge filters in time only: noise within a frame is the
+motion's to filter, and the trail's blur is a look. An event takes no hold: it lasts about
+`slow_smooth` by itself, and what a stop injects is the speed it ended; a hold lifted steady motion
+as much as the stops on the harness (below). No blur and no advect: the events stay sharp. The event bridge runs while a monitor shows one of its ports
 (`Bridge3DLayer`); nothing it makes reaches the fluid yet.
 
 ### Measured
@@ -468,11 +469,6 @@ box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU
 ## Open
 
 - The 3D bridge's finish, in this order; each step its tests, then the app:
-  1. The events take no hold and no floor. An event lasts about `slow_smooth` by itself, the fluid
-     keeps what it is given, and on the harness a hold lifted steady motion as much as the stops
-     **(deduction from the measured)**. `START_FLOOR` is a one-frame noise gate, and noise within a
-     frame is the motion's to filter: the bridge filters in time, and its blur is a look. A pixel
-     moves where the motion gives it a velocity; the start's division keeps a numerical floor only.
   2. The kinetic bridge goes, with all that serves only it: its shaders, `KineticStrip`, `method`,
      `BridgeOutput.onset`'s kinetic source and `spin`, the 3D fluid's spin input, the presets'
      `kinetic` keys. Its parts are taken over or measured not to work (the reservoir).

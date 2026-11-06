@@ -157,24 +157,19 @@ class VelocityEventTest(unittest.TestCase):
 
     def test_a_speeding_up_motion_is_a_start_not_a_stop(self) -> None:
         fast, slow = np.array([[1.0, 0.0, 0.0]]), np.array([[0.25, 0.0, 0.0]])
-        np.testing.assert_allclose(velocity_event(fast, slow, np.zeros(1), 1.0, 0.0), [0.75])
-        np.testing.assert_allclose(velocity_event(fast, slow, np.zeros(1), -1.0, 0.0), [0.0])
+        np.testing.assert_allclose(velocity_event(fast, slow, 1.0), [0.75])
+        np.testing.assert_allclose(velocity_event(fast, slow, -1.0), [0.0])
 
     def test_a_slowing_motion_is_a_stop_along_the_motion_it_ended(self) -> None:
         fast, slow = self.STILL, np.array([[0.0, 0.5, 0.0]])
-        stop = velocity_event(fast, slow, np.zeros(1), -1.0, 0.0)
+        stop = velocity_event(fast, slow, -1.0)
         np.testing.assert_allclose(stop, [0.5])
         np.testing.assert_allclose(event_velocity(slow, stop), [[0.0, 0.5, 0.0]])
 
     def test_a_steady_motion_has_no_event(self) -> None:
         moving = np.array([[0.3, -0.4, 0.0]])
         for sign in (1.0, -1.0):
-            np.testing.assert_allclose(velocity_event(moving, moving, np.zeros(1), sign, 0.0), [0.0])
-
-    def test_a_held_event_decays_and_a_larger_one_takes_over(self) -> None:
-        np.testing.assert_allclose(velocity_event(self.STILL, self.STILL, np.array([1.0]), -1.0, 0.5), [0.5])
-        fast, slow = self.STILL, np.array([[2.0, 0.0, 0.0]])
-        np.testing.assert_allclose(velocity_event(fast, slow, np.array([1.0]), -1.0, 0.5), [2.0])
+            np.testing.assert_allclose(velocity_event(moving, moving, sign), [0.0])
 
     def test_the_step_peak(self) -> None:
         self.assertEqual(step_peak(0.0, 0.15), 1.0)
@@ -189,24 +184,24 @@ class VelocityEventTest(unittest.TestCase):
         fast_weight, slow_weight = decay_weight(dt, 25.0), decay_weight(dt, 150.0)
         for _ in range(240):
             fast, slow = fast_weight * fast, slow_weight * slow
-            peak = max(peak, float(velocity_event(fast, slow, np.zeros(1), -1.0, 0.0, scale=1.0 / step_peak(0.025, 0.15))[0]))
+            peak = max(peak, float(velocity_event(fast, slow, -1.0, scale=1.0 / step_peak(0.025, 0.15))[0]))
         self.assertAlmostEqual(peak, 0.4, delta=0.01)
 
     def test_the_region_scales_a_stop(self) -> None:
-        np.testing.assert_allclose(velocity_event(self.STILL, np.array([[1.0, 0.0, 0.0]]), np.zeros(1), -1.0, 0.0, 0.25), [0.25])
+        np.testing.assert_allclose(velocity_event(self.STILL, np.array([[1.0, 0.0, 0.0]]), -1.0, 0.25), [0.25])
 
     def test_the_region_and_the_edge_split_the_whole_event(self) -> None:
         fast, slow = np.array([[1.0, 0.0, 0.0]]), np.array([[0.25, 0.0, 0.0]])
-        start = velocity_event(fast, slow, np.zeros(1), 1.0, 0.0, 0.4)
-        bow = velocity_event(fast, slow, np.zeros(1), 1.0, 0.0, 0.4, edge=True)
-        np.testing.assert_allclose(start + bow, velocity_event(fast, slow, np.zeros(1), 1.0, 0.0))
+        start = velocity_event(fast, slow, 1.0, 0.4)
+        bow = velocity_event(fast, slow, 1.0, 0.4, edge=True)
+        np.testing.assert_allclose(start + bow, velocity_event(fast, slow, 1.0))
 
     def test_region_weight_0_is_all_start_and_stop_no_bow_or_wake(self) -> None:
         fast, slow = np.array([[1.0, 0.0, 0.0]]), np.array([[0.25, 0.0, 0.0]])
         share = start_region_share(np.array([0.3, 0.0, 0.0]), np.array([0.3, 0.0, 0.0]), 0.0)
-        np.testing.assert_allclose(velocity_event(fast, slow, np.zeros(1), 1.0, 0.0, share, edge=True), [0.0])
+        np.testing.assert_allclose(velocity_event(fast, slow, 1.0, share, edge=True), [0.0])
         share = stop_region_share(self.region((0.3, 0.0, 0.0)), self.region((0.3, 0.0, 0.0)), 0.0)
-        np.testing.assert_allclose(velocity_event(slow, fast, np.zeros(1), -1.0, 0.0, share, edge=True), [0.0])
+        np.testing.assert_allclose(velocity_event(slow, fast, -1.0, share, edge=True), [0.0])
 
     @staticmethod
     def region(*xyz: tuple[float, float, float]) -> np.ndarray:
