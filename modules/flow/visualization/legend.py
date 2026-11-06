@@ -10,7 +10,7 @@ from OpenGL.GL import GL_RGBA8
 from modules.gl import Fbo, Style, Text, Texture
 from .log_axis import histogram_lines, strip_lines, value_limit, AxisLine
 from .shaders import LogGrid, ColormapKey
-from .strip import ALL_CHANNELS, LANES, STRIP_HEIGHT, STRIP_WIDTH
+from .strip import ALL_CHANNELS, LANES
 
 TEXT: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)
 BOX: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.6)
@@ -29,8 +29,8 @@ class LegendKind(IntEnum):
 
 
 class Legend:
-    """Lane names, log lines and their labels, or the color key, on transparent at the strip's size.
-    Render thread only."""
+    """Lane names, log lines and their labels, or the color key, on transparent at the size `resize`
+    sets, the size the view is drawn at, so its text keeps its pixel size. Render thread only."""
 
     def __init__(self) -> None:
         self._fbo: Fbo = Fbo()
@@ -43,8 +43,17 @@ class Legend:
     def texture(self) -> Texture:
         return self._fbo
 
+    def resize(self, width: int, height: int) -> None:
+        """Draw at `width` × `height` from now on; a change redraws it."""
+        if self._fbo.allocated and (self._fbo.width, self._fbo.height) == (width, height):
+            return
+        if self._fbo.allocated:
+            self._fbo.deallocate()
+        self._fbo.allocate(width, height, GL_RGBA8)
+        self._drawn = None
+
     def allocate(self) -> None:
-        self._fbo.allocate(STRIP_WIDTH, STRIP_HEIGHT, GL_RGBA8)
+        """The text and the shaders; the FBO comes with the first `resize`."""
         self._text.allocate(font_size=18)
         self._grid.allocate()
         self._key.allocate()
@@ -81,7 +90,7 @@ class Legend:
         names: tuple[str, ...] = LANES if channel == ALL_CHANNELS else (LANES[channel],)
         lanes: int = len(names)
         lines: list[AxisLine] = strip_lines(scale) if kind == LegendKind.STRIP else histogram_lines(samples)
-        w, h = STRIP_WIDTH, STRIP_HEIGHT
+        w, h = self._fbo.width, self._fbo.height
 
         self._grid.reload()
         self._grid.use(lanes, [line.fraction for line in lines], kind == LegendKind.HISTOGRAM)
@@ -105,7 +114,7 @@ class Legend:
     def _draw_key(self, channel: int, scale: float) -> None:
         """In the top left, a color bar per channel shown with its name, and -1, 0 and 1 after
         `scale` under them."""
-        w, h = STRIP_WIDTH, STRIP_HEIGHT
+        w, h = self._fbo.width, self._fbo.height
         names: tuple[str, ...] = LANES[:3] if channel == ALL_CHANNELS else (LANES[channel],)
         bars: int = len(names)
         x0: float = MARGIN + KEY_NAME
@@ -125,7 +134,7 @@ class Legend:
 
     def _draw_limits(self, scale: float, left: float, right: float, bottom: float) -> None:
         """-1, 0 and 1 after `scale`, at the left, the middle and the right, ending at `bottom` (from the top)."""
-        w, h = STRIP_WIDTH, STRIP_HEIGHT
+        w, h = self._fbo.width, self._fbo.height
         limit: str = value_limit(scale)
         for label, anchor in (('-' + limit, 0.0), ('0', 0.5), (limit, 1.0)):
             text_w, text_h = self._text.measure_text(label)

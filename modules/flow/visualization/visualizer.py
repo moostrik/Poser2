@@ -14,12 +14,17 @@ from .strip import ALL_CHANNELS
 
 ARROW_WIDTH: float = 1.0 / 20.0     # the arrows' line width, a share of their spacing
 HISTOGRAM_BINS: int = 256
-HISTOGRAM_SAMPLES: int = 256        # per side: a fixed cost at any texture size
-HISTOGRAM_TOTAL: int = HISTOGRAM_SAMPLES * HISTOGRAM_SAMPLES     # samples counted, a bin's count at full height
+HISTOGRAM_SAMPLES: int = 512        # samples per side at most: the texture's own grid up to this, a fixed cost above
+
+
+def histogram_grid(width: int, height: int) -> tuple[int, int]:
+    """The grid of samples the histogram reads a texture of `width` × `height` on: its own, capped."""
+    return (max(1, min(width, HISTOGRAM_SAMPLES)), max(1, min(height, HISTOGRAM_SAMPLES)))
 
 
 class Visualizer:
-    """Draws one texture per call into its FBO, `texture`; render thread only."""
+    """Draws one texture per call into its FBO, `texture`, at the size `resize` sets, the size the
+    view is drawn at; render thread only."""
 
     def __init__(self) -> None:
         self._fbo: Fbo = Fbo()
@@ -28,6 +33,7 @@ class Visualizer:
         self._histogram: Texture = Texture(GL_NEAREST)  # the bins, one row per channel; an integer texture must not filter
         self._histogram_count: HistogramCount = HistogramCount()
         self._histogram_draw: HistogramDraw = HistogramDraw()
+        self._histogram_total: int = 1                  # the samples counted last, a bin's count at full height
         self._zero: np.ndarray = np.zeros(1, dtype=np.uint32)
 
     @property
@@ -35,8 +41,21 @@ class Visualizer:
         """The texture as drawn last (RGBA8)."""
         return self._fbo
 
-    def allocate(self, width: int, height: int) -> None:
+    @property
+    def histogram_total(self) -> int:
+        """The samples the last histogram counted, a bin's count at full height."""
+        return self._histogram_total
+
+    def resize(self, width: int, height: int) -> None:
+        """Draw at `width` × `height` from now on; reallocates only when it changes."""
+        if self._fbo.allocated and (self._fbo.width, self._fbo.height) == (width, height):
+            return
+        if self._fbo.allocated:
+            self._fbo.deallocate()
         self._fbo.allocate(width, height, GL_RGBA8)
+
+    def allocate(self) -> None:
+        """The shaders and the histogram's bins; the FBO comes with the first `resize`."""
         self._histogram.allocate(HISTOGRAM_BINS, 4, GL_R32UI)
         self._channel_view.allocate()
         self._arrows.allocate()
@@ -75,15 +94,17 @@ class Visualizer:
     def process_histogram(self, texture: Texture, scale: float, channel: int = ALL_CHANNELS) -> None:
         """How many of the texture's values fall where from -1 to 1 after `scale`, 0 in the middle,
         the height the log of the count: four lanes, or one channel's lane. Counted on the GPU over
-        a fixed grid of samples."""
+        the texture's own grid of samples, capped at `HISTOGRAM_SAMPLES` per side."""
         if not self._fbo.allocated or not texture.allocated or not self._histogram.allocated:
             return
+        grid: tuple[int, int] = histogram_grid(texture.width, texture.height)
+        self._histogram_total = grid[0] * grid[1]
         glClearTexImage(self._histogram.tex_id, 0, GL_RED_INTEGER, GL_UNSIGNED_INT, self._zero)
         self._histogram_count.reload()
-        self._histogram_count.use(texture, self._histogram, scale, HISTOGRAM_SAMPLES)
+        self._histogram_count.use(texture, self._histogram, scale, grid)
         self._fbo.begin()
         self._histogram_draw.reload()
-        self._histogram_draw.use(self._histogram, channel, HISTOGRAM_TOTAL)
+        self._histogram_draw.use(self._histogram, channel, self._histogram_total)
         self._fbo.end()
 
     def _process_channels(self, texture: Texture, scale: float, channel: int, colormap: bool) -> None:

@@ -26,7 +26,7 @@ from .bridge_3d import  DensityBridge, DensityBridgeSettings, Magnitude, Velocit
                         TemperatureBridge, TemperatureBridgeSettings
 
 # Visualization
-from .visualization import Visualizer, HISTOGRAM_TOTAL, Strip, ALL_CHANNELS, Legend, LegendKind
+from .visualization import Visualizer, histogram_grid, Strip, ALL_CHANNELS, summary_grid, Legend, LegendKind, DrawnSize
 
 # Shared by the 2D and 3D fluid
 from .time_step import TimeStep, TimeStepMode, hold_tick

@@ -1,24 +1,24 @@
 #version 460 core
 
 // Histogram Count Shader
-// Counts a texture's four channels into bins, on a fixed grid of samples: one invocation per
-// sample, one atomic add per channel. The bins run from -1 to 1 after `scale`; a value outside
-// lands in the end bin
+// Counts a texture's four channels into bins, on a grid of samples: one invocation per sample,
+// one atomic add per channel. The bins run from -1 to 1 after `scale`; a value outside lands in
+// the end bin
 
 layout(local_size_x = 16, local_size_y = 16) in;
 
 uniform sampler2D tex0;     // The texture counted
 uniform float scale;        // Multiplier on the values
-uniform int samples;        // Samples per side of the grid
+uniform ivec2 samples;      // The grid of samples, across and down
 
 layout(r32ui, binding = 0) uniform uimage2D histogram;     // bins wide, one row per channel
 
 void main() {
     ivec2 id = ivec2(gl_GlobalInvocationID.xy);
-    if (any(greaterThanEqual(id, ivec2(samples)))) return;
+    if (any(greaterThanEqual(id, samples))) return;
 
     int bins = imageSize(histogram).x;
-    vec2 uv = (vec2(id) + 0.5) / float(samples);
+    vec2 uv = (vec2(id) + 0.5) / vec2(samples);
     vec4 value = textureLod(tex0, uv, 0.0) * scale;
     for (int channel = 0; channel < 4; channel++) {
         int bin = clamp(int(floor((value[channel] * 0.5 + 0.5) * float(bins))), 0, bins - 1);

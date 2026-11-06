@@ -9,14 +9,18 @@ from .shaders import StripRoll, StripSummary
 
 LANES: tuple[str, ...] = ('x', 'y', 'z', 'w')      # top to bottom
 ALL_CHANNELS: int = 4           # the channel that stands for all four
-STRIP_WIDTH: int = 540          # columns: 9 s at 60 ticks per second
-STRIP_HEIGHT: int = 960
-SUMMARY_WIDTH: int = 128        # enough samples for a mean of fields with thin edges
-SUMMARY_HEIGHT: int = 228
+STRIP_WIDTH: int = 540          # columns: 9 s at 60 ticks per second; the height is the size it is drawn at
+SUMMARY_LIMIT: int = 512        # the summary reads the texture at its own size up to this per side
+
+
+def summary_grid(width: int, height: int) -> tuple[int, int]:
+    """The grid the strip's summary reads a texture of `width` × `height` on: its own, capped."""
+    return (max(1, min(width, SUMMARY_LIMIT)), max(1, min(height, SUMMARY_LIMIT)))
 
 
 class Strip:
-    """Rolling plot of a texture's channels; advance it once per tick with the texture to plot."""
+    """Rolling plot of a texture's channels; advance it once per tick with the texture to plot. Its
+    columns are its history, its height the one `resize` sets."""
 
     def __init__(self) -> None:
         self._summary_fbo: Fbo = Fbo()
@@ -30,14 +34,7 @@ class Strip:
         return self._strip_fbo
 
     def allocate(self) -> None:
-        self._summary_fbo.allocate(SUMMARY_WIDTH, SUMMARY_HEIGHT, GL_RGBA16F)
-        glBindTexture(GL_TEXTURE_2D, self._summary_fbo.tex_id)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
-        glGenerateMipmap(GL_TEXTURE_2D)
-        glBindTexture(GL_TEXTURE_2D, 0)
-        self._strip_fbo.allocate(STRIP_WIDTH, STRIP_HEIGHT, GL_RGBA8)
-        FlowUtil.zero(self._strip_fbo)
+        """The shaders; the plot comes with the first `resize`, the summary with the first texture."""
         self._summary_shader.allocate()
         self._roll_shader.allocate()
 
@@ -47,12 +44,39 @@ class Strip:
         self._summary_shader.deallocate()
         self._roll_shader.deallocate()
 
-    def reset(self) -> None:
+    def resize(self, height: int) -> None:
+        """Plot at `height` from now on; a change starts the plot over."""
+        if self._strip_fbo.allocated and self._strip_fbo.height == height:
+            return
+        if self._strip_fbo.allocated:
+            self._strip_fbo.deallocate()
+        self._strip_fbo.allocate(STRIP_WIDTH, height, GL_RGBA8)
         FlowUtil.zero(self._strip_fbo)
+
+    def reset(self) -> None:
+        if self._strip_fbo.allocated:
+            FlowUtil.zero(self._strip_fbo)
+
+    def _follow_summary(self, texture: Texture) -> None:
+        """The summary at the texture's own grid, capped; mipmapped, so its top level is the mean."""
+        grid: tuple[int, int] = summary_grid(texture.width, texture.height)
+        if self._summary_fbo.allocated and (self._summary_fbo.width, self._summary_fbo.height) == grid:
+            return
+        if self._summary_fbo.allocated:
+            self._summary_fbo.deallocate()
+        self._summary_fbo.allocate(*grid, GL_RGBA16F)
+        glBindTexture(GL_TEXTURE_2D, self._summary_fbo.tex_id)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+        glGenerateMipmap(GL_TEXTURE_2D)
+        glBindTexture(GL_TEXTURE_2D, 0)
 
     def update(self, texture: Texture, scale: float, channel: int = ALL_CHANNELS) -> None:
         """Add one column: the mean amount of each of `texture`'s channels, times `scale`, in four lanes,
         or of `channel` (0 to 3) alone at full height."""
+        if not self._strip_fbo.allocated or not texture.allocated:
+            return
+        self._follow_summary(texture)
         self._summary_fbo.begin()
         self._summary_shader.use(texture)
         self._summary_fbo.end()

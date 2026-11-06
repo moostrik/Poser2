@@ -6,7 +6,8 @@ and the texture by its own settings, and draws their channels, all or one, by th
 the view asked: as an image, as a colormap centered on grey, as arrows, as a strip of the channels'
 amounts over time, or as a histogram of their values, the last two under their log axis, the colormap under its key
 (`Legend`). It renders in `draw`, once per tick however many panels show it, and nothing in
-`update`."""
+`update`, at the size it is drawn at (`DrawnSize`): the viewport the app fits it into, not the
+size the app allocates the layer at."""
 
 from dataclasses import dataclass, field
 from enum import IntEnum, auto
@@ -14,7 +15,7 @@ from enum import IntEnum, auto
 from OpenGL.GL import GL_VIEWPORT, glGetIntegerv, glViewport
 
 from modules.gl import Texture, Style, Blit
-from modules.flow import Visualizer, HISTOGRAM_TOTAL, Strip, ALL_CHANNELS, Legend, LegendKind, Port, TextureKind
+from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind
 from modules.settings import Field, BaseSettings, Group, Widget
 from ..layer_base import LayerBase
 
@@ -107,6 +108,10 @@ class MonitorLayer(LayerBase):
         self._strip_of: tuple[FlowStage, str, Channel] | None = None    # what the strip plots; anything else restarts it
         self._port: Port | None = None          # the port rendered last
         self._view: MonitorView = MonitorView.AUTO   # the view rendered last, AUTO resolved; draw shows what render drew
+        self._drawn_size: DrawnSize = DrawnSize()   # the size it renders at, from the viewports it is drawn into
+        self._rendered_size: tuple[int, int] = (0, 0)   # the size this tick's port was rendered at
+        self._strip_stepped: bool = False           # the strip got this tick's column
+        self._allocated: bool = False
 
     def set_input(self, input: MonitorInput) -> None:
         """Every stage's ports, for the next draw."""
@@ -122,14 +127,22 @@ class MonitorLayer(LayerBase):
     # ========== Lifecycle ==========
 
     def allocate(self, width: int, height: int, internal_format: int | None = None) -> None:
-        self._visualizer.allocate(width, height)
+        """The shaders; the size the app gives is not the monitor's: it renders at the size it is drawn at."""
+        self._visualizer.allocate()
         self._strip.allocate()
         self._legend.allocate()
+        self._allocated = True
 
     def deallocate(self) -> None:
         self._visualizer.deallocate()
         self._strip.deallocate()
         self._legend.deallocate()
+        self._allocated = False
+
+    def _resize(self, width: int, height: int) -> None:
+        self._visualizer.resize(width, height)
+        self._strip.resize(height)
+        self._legend.resize(width, height)
 
     # ========== Processing ==========
 
@@ -148,6 +161,8 @@ class MonitorLayer(LayerBase):
     def update(self) -> None:
         """Keep the panel's list of the stage's textures; the port is rendered at the first draw."""
         self._rendered = False
+        self._strip_stepped = False
+        self._drawn_size.tick()
         names: list[str] = list(self._ports()) or [""]
         if names != self.settings.names:
             self.settings.names = names
@@ -172,7 +187,9 @@ class MonitorLayer(LayerBase):
             if shown != self._strip_of:
                 self._strip.reset()
                 self._strip_of = shown
-            self._strip.update(port.texture, scale, int(channel))
+            if not self._strip_stepped:         # one column per tick, also when a larger draw renders again
+                self._strip.update(port.texture, scale, int(channel))
+                self._strip_stepped = True
             self._legend_kind = LegendKind.STRIP
         elif view == MonitorView.IMAGE:
             self._visualizer.process_image(port.texture, scale, int(channel))
@@ -185,14 +202,19 @@ class MonitorLayer(LayerBase):
         else:
             self._visualizer.process_arrows(port.texture, scale, float(settings.advanced.arrow_spacing.value))
         if self._legend_kind is not None and settings.advanced.legend:
-            self._legend.update(self._legend_kind, int(channel), scale, HISTOGRAM_TOTAL)
+            self._legend.update(self._legend_kind, int(channel), scale, self._visualizer.histogram_total)
 
     # ========== Rendering ==========
 
     def draw(self) -> None:
-        if not self._rendered:
+        if not self._allocated:
+            return
+        viewport = glGetIntegerv(GL_VIEWPORT)
+        size: tuple[int, int] = self._drawn_size.see(int(viewport[2]), int(viewport[3]))
+        if not self._rendered or size != self._rendered_size:
             # Rendering into the port's FBOs sets the viewport to their size; the panel's comes back after
-            viewport = glGetIntegerv(GL_VIEWPORT)
+            self._resize(*size)
+            self._rendered_size = size
             Style.push_style()
             Style.set_blend_mode(Style.BlendMode.DISABLED)
             self._render()

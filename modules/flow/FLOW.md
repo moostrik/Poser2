@@ -280,9 +280,17 @@ kinds of `TextureKind`.
   repeats x in y and z (its grey swizzle, `modules/gl/texture.py`), a two-channel one has z 0, and
   a missing w is 1.
 - The histogram's height is the log of a bin's count against the log of the samples, since most of
-  a flow is still and its zero bin would flatten every other. It counts 256 bins on a fixed grid of
-  256 × 256 samples on the GPU (`HistogramCount`, atomic adds), so its cost does not grow with the
-  texture and nothing is read back.
+  a flow is still and its zero bin would flatten every other. It counts 256 bins on the GPU
+  (`HistogramCount`, atomic adds) over the texture's own grid, capped at 512 × 512 samples
+  (`histogram_grid`), so the 512 × 288 flow is counted whole, a 4k texture costs no more than the
+  cap, and nothing is read back. The strip's mean reads the texture the same way (`summary_grid`).
+- The monitor renders at the size it is drawn at (`DrawnSize`): the viewport the app fits it into,
+  the largest of the tick before, grown at once when a larger draw turns up, so a smaller layout
+  takes over a tick later. No setting: the size the app allocates a layer at (4k) is not the
+  monitor's. Its legend draws at that size too, so its text keeps its pixel size and its lines sit
+  on the bars; the strip's 540 columns are its history, 9 s at 60 ticks, and its height follows.
+  The harness (`scripts/monitor_harness.py`) measured the arrows at 0.56 ms at 540 × 960 against
+  7.9 ms at 2160 × 3840, the other views well under 0.2 ms.
 - One `scale` serves every view, since each monitor has its own view and its own scale. z takes
   `scale` like x and y, since the motion's `z_gain` already balances it.
 - The strip's height is logarithmic over three decades, `(log10(mean × scale) + 3) / 3`: a frame's
