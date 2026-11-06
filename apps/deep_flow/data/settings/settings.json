@@ -31,7 +31,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 394,
+        "iso": 2126,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -449,7 +449,9 @@
         "bandpass": {
           "fast_smooth": 25.0,
           "slow_smooth": 150.0,
+          "start_region_weight": 1.0,
           "stop_region_weight": 1.0,
+          "start_region_size": 128.0,
           "stop_region_size": 128.0
         }
       },
@@ -577,11 +579,11 @@
         "speed": 0.66,
         "fade_time": 3.45,
         "iterations": 20,
-        "boundary": "OPEN"
+        "boundary": "CLOSED"
       }
     },
     "monitor_a": {
-      "stage": "MOTION",
+      "stage": "BRIDGE",
       "texture": "output.velocity",
       "view": "AUTO",
       "advanced": {
