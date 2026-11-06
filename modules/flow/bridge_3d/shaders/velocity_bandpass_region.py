@@ -7,7 +7,7 @@ from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture
 from modules.gl import Shader, draw_quad, Texture
 
 
-class VelocityChangeRegion(Shader):
+class VelocityBandpassRegion(Shader):
     """Writes (velocity * moving, moving) to RGBA."""
 
     def use(self, velocity: Texture) -> None:

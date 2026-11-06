@@ -54,6 +54,13 @@ BANNED: list[tuple[str, str]] = [
     ('add/remove_<kind>_callback, not register/unregister_callback', r'^register_callback$|^unregister_callback$'),
     ('glyphs, not arrows (the monitor view)', r'arrow_spacing|ArrowSpacing|VelocityArrowField|process_arrows'),
     ('change, not impulse or event (the 3D bridge)', r'[Ii]mpulse|IMPULSE|VelocityEvent|MotionEvent'),
+    ('lowpass and bandpass, not the trail and change bridges', r'VelocityTrailBridge|VelocityChangeBridge'),
+]
+
+# the glossary's Flow section: banned in the flow's code only, where the words are the fluid's
+FLOW_ROOTS: tuple[Path, ...] = (ROOT / 'modules' / 'flow', ROOT / 'modules' / 'render' / 'layers' / 'flow')
+FLOW_BANNED: list[tuple[str, str]] = [
+    ('the quantity or boundary, not body alone (the flow)', r'^body$|^bodies$'),
 ]
 
 # the glossary's app sections: banned in that app's code and presets
@@ -76,8 +83,14 @@ def app_of(path: Path) -> str | None:
     return parts[1] if len(parts) > 1 and parts[0] == 'apps' else None
 
 
+def in_flow(path: Path) -> bool:
+    """Whether a file is the flow's code."""
+    return any(path.is_relative_to(root) for root in FLOW_ROOTS)
+
+
 def patterns_for(path: Path) -> list[tuple[str, re.Pattern[str]]]:
-    return [(concept, re.compile(regex)) for concept, regex in BANNED + APP_BANNED.get(app_of(path) or '', [])]
+    scoped: list[tuple[str, str]] = APP_BANNED.get(app_of(path) or '', []) + (FLOW_BANNED if in_flow(path) else [])
+    return [(concept, re.compile(regex)) for concept, regex in BANNED + scoped]
 
 
 def source_files() -> list[Path]:

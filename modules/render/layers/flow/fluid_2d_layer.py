@@ -83,11 +83,11 @@ class Fluid2DLayer(FluidLayer):
 
     def _inject(self, injection: Injection) -> None:
         fluid: Fluid2D = self._fluid
-        fluid.add_velocity(injection.velocity, injection.weight)
+        fluid.add_velocity(injection.boundary_velocity, injection.weight)
         channel: int = self._channel
         if channel < CHANNELS:
-            fluid.add_density_channel(injection.density, channel, injection.weight)
-        fluid.add_temperature(injection.temperature, injection.weight)
+            fluid.add_density_channel(injection.boundary_density, channel, injection.weight)
+        fluid.add_temperature(injection.boundary_temperature, injection.weight)
         self._channel = channel + 1
 
     def _step(self, dt: float) -> None:

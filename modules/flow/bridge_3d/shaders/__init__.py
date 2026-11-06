@@ -2,11 +2,11 @@
 
 from .density_bridge_shader import DensityBridgeShader
 from .trail_advect import TrailAdvect
-from .velocity_change import Change, VelocityChange
-from .velocity_change_direction import VelocityChangeDirection
-from .velocity_change_region import VelocityChangeRegion
-from .velocity_change_region_mean import VelocityChangeRegionMean
-from .velocity_change_region_speed import VelocityChangeRegionSpeed
+from .velocity_bandpass_change import Change, VelocityBandpassChange
+from .velocity_bandpass_direction import VelocityBandpassDirection
+from .velocity_bandpass_region import VelocityBandpassRegion
+from .velocity_bandpass_region_mean import VelocityBandpassRegionMean
+from .velocity_bandpass_region_speed import VelocityBandpassRegionSpeed
 from .velocity_trail import VelocityTrail
 from .weighted_sum import WeightedSum
 from .temperature_bridge_shader import TemperatureBridgeShader

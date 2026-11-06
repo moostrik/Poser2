@@ -10,7 +10,7 @@
 // the slow trail: a limb arriving keeps that mean, a limb speeding up raises it, and jitter on a still
 // region cancels in it. A fall reads the region's mean speed, which jitter never lowers and a turning
 // limb keeps.
-// The numpy references are velocity_change_bridge.velocity_change, start_region_share and stop_region_share
+// The numpy references are velocity_bandpass.velocity_change, start_region_share and stop_region_share
 
 uniform sampler2D tex0;         // Fast trail RGB
 uniform sampler2D tex1;         // Slow trail RGB

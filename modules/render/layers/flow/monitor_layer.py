@@ -75,7 +75,7 @@ class MonitorLayerSettings(BaseSettings):
     """Configuration for MonitorLayer: what it shows, and in `advanced` how."""
     stage: Field[FlowStage] =       Field(FlowStage.BRIDGE, description="The stage whose texture is shown")
     names: Field[list[str]] =       Field([""], access=Field.READ, visible=False, description="The stage's textures")
-    texture: Field[str] =           Field("output.velocity", widget=Widget.text_select, options=names, description="The texture shown")
+    texture: Field[str] =           Field("output.boundary_velocity", widget=Widget.text_select, options=names, description="The texture shown")
     view: Field[MonitorView] =      Field(MonitorView.AUTO, description="By its kind, as an image, as a colormap centered on grey, as glyphs (arrows, or dots for a scalar), as a strip over time, or as a histogram")
 
     advanced = Group(MonitorAdvancedSettings)

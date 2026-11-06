@@ -7,7 +7,7 @@ from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, 
 from modules.gl import Shader, draw_quad, Texture
 
 
-class VelocityChangeDirection(Shader):
+class VelocityBandpassDirection(Shader):
     """Writes the change along the trail's direction to RGB."""
 
     def use(self, trail: Texture, change: Texture) -> None:

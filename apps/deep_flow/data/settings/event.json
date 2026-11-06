@@ -438,14 +438,14 @@
       "width": 448,
       "height": 800,
       "readings": {
-        "trail": {
+        "lowpass": {
           "advect": 1.0,
           "attack": 1.0,
           "smooth": 1000.0,
           "blur_radius": 4.0,
           "blur_steps": 4
         },
-        "change": {
+        "bandpass": {
           "fast_smooth": 30.0,
           "slow_smooth": 250.0,
           "start_region_weight": 1.0,
@@ -454,16 +454,10 @@
           "stop_region_size": 256.0
         }
       },
-      "outputs": {
+      "boundary": {
         "velocity": {
           "trail": 1.0,
-          "start": 0.0,
-          "bow": 0.0,
-          "stop": 0.0,
-          "wake": 0.0
-        },
-        "acceleration": {
-          "trail": 0.0,
+          "change": 0.0,
           "start": 0.0,
           "bow": 0.0,
           "stop": 0.0,
@@ -471,6 +465,7 @@
         },
         "density": {
           "trail": 1.0,
+          "change": 0.0,
           "start": 0.0,
           "bow": 0.0,
           "stop": 0.0,
@@ -480,6 +475,36 @@
         },
         "temperature": {
           "trail": 1.0,
+          "change": 0.0,
+          "start": 0.0,
+          "bow": 0.0,
+          "stop": 0.0,
+          "wake": 0.0,
+          "scale": 0.5
+        }
+      },
+      "body_force": {
+        "acceleration": {
+          "trail": 0.0,
+          "change": 0.0,
+          "start": 0.0,
+          "bow": 0.0,
+          "stop": 0.0,
+          "wake": 0.0
+        },
+        "density": {
+          "trail": 0.0,
+          "change": 0.0,
+          "start": 0.0,
+          "bow": 0.0,
+          "stop": 0.0,
+          "wake": 0.0,
+          "saturation": 1.0,
+          "brightness": 1.0
+        },
+        "temperature": {
+          "trail": 0.0,
+          "change": 0.0,
           "start": 0.0,
           "bow": 0.0,
           "stop": 0.0,
@@ -558,7 +583,7 @@
     },
     "monitor_a": {
       "stage": "BRIDGE",
-      "texture": "output.velocity",
+      "texture": "output.boundary_velocity",
       "view": "AUTO",
       "advanced": {
         "channel": "ALL",
@@ -571,7 +596,7 @@
     },
     "monitor_b": {
       "stage": "BRIDGE",
-      "texture": "change.start_velocity",
+      "texture": "bandpass.start",
       "view": "GLYPHS",
       "advanced": {
         "channel": "ALL",

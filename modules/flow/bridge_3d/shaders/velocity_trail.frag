@@ -1,9 +1,9 @@
 #version 460 core
 
 // Velocity Trail Shader
-// One unit-gain Ema step of the velocity trail bridge: weight * previous + (1 - weight) * input. x, y and z
+// One unit-gain Ema step of the velocity lowpass's trail: weight * previous + (1 - weight) * input. x, y and z
 // alike take the attack weight where the 3D speed rises above the trail's, else the release weight; z's
-// noise is the motion's to filter. The numpy reference is velocity_trail_bridge.velocity_trail
+// noise is the motion's to filter. The numpy reference is velocity_lowpass.velocity_trail
 
 uniform sampler2D tex0;     // Previous trail RGB
 uniform sampler2D tex1;     // Velocity RGB

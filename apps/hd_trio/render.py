@@ -214,7 +214,7 @@ class HDTrioRender(RenderBase):
                 output: ls.BridgeOutput = bridge.output
                 weight: float = motion_value if j == i else (float(similarities[j]) if j < len(similarities) else 0.0)
                 color: Color = colors[j % len(colors)]
-                injections.append(ls.Injection(output.velocity, output.density, output.temperature, weight=weight, color=(color.r, color.g, color.b)))
+                injections.append(ls.Injection(output.boundary_velocity, output.boundary_density, output.boundary_temperature, weight=weight, color=(color.r, color.g, color.b)))
             fluid.set_input(ls.FluidInput(dt, injections))
 
         for i, _motion in self.L[Layers.motion].items():

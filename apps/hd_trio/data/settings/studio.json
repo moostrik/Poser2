@@ -534,7 +534,7 @@
     },
     "monitor_a": {
       "stage": "BRIDGE",
-      "texture": "output.velocity",
+      "texture": "output.boundary_velocity",
       "view": "AUTO",
       "advanced": {
         "channel": "ALL",

@@ -215,7 +215,7 @@ class VelocityChangeTest(unittest.TestCase):
     @staticmethod
     def start_shares(frames: list[np.ndarray], dt: float = 1.0 / 60.0) -> list[float]:
         """The share of a rise its region shares, per frame of the region's pixels: its mean moving velocity
-        through the fast (25 ms) and the slow (150 ms) trail, as VelocityChangeBridge smooths it."""
+        through the fast (25 ms) and the slow (150 ms) trail, as VelocityBandpass smooths it."""
         fast, slow, shares = np.zeros(3), np.zeros(3), []
         for pixels in frames:
             mean = moving_mean(pixels)

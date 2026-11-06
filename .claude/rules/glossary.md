@@ -20,11 +20,17 @@ Each bullet names the term to use and, after "not", the synonyms it replaces. A 
 - Exponential moving average: `Ema`; not `EMA`
 - A time something is smoothed over (ms): `smooth` (the depth velocity's `smooth`, `catch_up` and `xy_smooth`); not `time`
 - The z of the 3D flow: `depth_velocity` (`DepthVelocity`, `DepthVelocitySettings`); not `depth_track`. `depth` is the camera's depth
-- A velocity change the 3D bridge reads where a move starts or stops, Δv in widths per second: `change` (`VelocityChangeBridge`, `Change`, group `change`); its four parts `start`, `bow` (a limb arriving), `stop`, `wake` (a limb leaving); not `impulse`, `event`, `MotionEvent`
-- The 3D bridge's outputs, each named after the quantity it is: `velocity`, `acceleration`, `density`, `temperature`; not `impulse`
-- The pixels around one, which tell a part of the body changing speed from a limb arriving or leaving: `region` (`start_region_size`, `start_region_weight`, `stop_region_*`); not `patch`, `tile`, `gate`
 - A swap buffer's other buffer, the previous one: `back` (`SwapFbo.back`, `SwapTexture3D.back`, `SwapTexture2DArray.back`); not `back_texture`. A texture object is passed as itself, never as a `.texture` of it; a layer's `texture` is the layer's output
 - American spelling: `center`, `visualization`, `color`; not `centre`, `visualisation`, `colour`
+
+## Flow
+
+- What a bridge filter makes from the motion, in widths/s as a velocity and in widths/s² as an acceleration: a "reading"; not "signal", "band", "component", "event"
+- The six readings: `trail` (the motion, held and smoothed), `change` (the whole change of speed, Δv, signed), and its four parts `start`, `bow` (a limb arriving), `stop`, `wake` (a limb leaving)
+- The bridge's filters, named by what they do: `lowpass` (`VelocityLowpass`, gives the trail) and `bandpass` (`VelocityBandpass`, `Change`, gives the change and its parts); not `VelocityTrailBridge`, `VelocityChangeBridge`, `impulse`, `MotionEvent`
+- The pixels around one, which tell a part of the body changing speed from a limb arriving or leaving: `region` (`start_region_size`, `start_region_weight`, `stop_region_*`); not `patch`, `tile`, `gate`
+- The two systems a fluid takes the bridge in: `boundary`, the body in the water, what the water is dragged toward (`boundary_velocity`, `boundary_density`, `boundary_temperature`); `body_force`, the Navier–Stokes force term, what is added × dt (`body_force_acceleration`, `body_force_density`, `body_force_temperature`); `wall`, the domain's edge
+- "impulse", "body", "force", "delta" and "drag" name nothing on their own; a name says the quantity (`velocity`, `acceleration`) or the textbook term (`body_force`, `drag_time`)
 
 ## Render
 

@@ -7,7 +7,7 @@ from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, 
 from modules.gl import Shader, draw_quad, Texture
 
 
-class VelocityChangeRegionSpeed(Shader):
+class VelocityBandpassRegionSpeed(Shader):
     """Writes (fast speed, slow speed) to RG."""
 
     def use(self, fast: Texture, slow: Texture) -> None:

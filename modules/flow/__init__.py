@@ -21,8 +21,8 @@ from .motion import DepthView, DepthVelocity, DepthVelocitySettings, catch_up_sh
 from . import bridge_2d
 from .bridge_3d import  DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
                         decay_weight, direction, advect, \
-                        VelocityTrailBridge, VelocityTrailBridgeSettings, velocity_trail, \
-                        VelocityChangeBridge, VelocityChangeBridgeSettings, Change, WeightedSum, velocity_change, step_peak, moving_mean, start_region_share, stop_region_share, change_velocity, \
+                        VelocityLowpass, VelocityLowpassSettings, velocity_trail, trail_acceleration, \
+                        VelocityBandpass, VelocityBandpassSettings, Change, WeightedSum, velocity_change, step_peak, moving_mean, start_region_share, stop_region_share, change_velocity, band_width, change_acceleration_scale, whole_change, \
                         TemperatureBridge, TemperatureBridgeSettings
 
 # Visualization

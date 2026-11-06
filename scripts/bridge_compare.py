@@ -4,15 +4,15 @@
 
 FRAMES is what depth_velocity_capture saved from one loop of a recording. No app and no camera: a hidden window
 gives the GL context, one `LucasKanadeFlow3D` measures the saved frames with the settings they were saved with
-(`--flow` overrides one by its panel path), and every side's bridge takes its velocity. KIND is `trail` (the
-VelocityTrailBridge) or `change` (the VelocityChangeBridge: its start, bow, stop and wake); PATH=VALUE sets one
+(`--flow` overrides one by its panel path), and every side's bridge takes its velocity. KIND is `lowpass` (the
+VelocityLowpass: its trail) or `bandpass` (the VelocityBandpass: its start, bow, stop and wake); PATH=VALUE sets one
 of its settings by its panel path (smooth, fast_smooth, stop_region_weight, ...), the rest as in deep_flow's
 preset. Each bridge steps once per flow frame, by the frame's saved interval.
 
 What a side gives:
-    velocity   a trail's smooth_velocity, in image widths per second
+    velocity   the lowpass's trail, in image widths per second
     amount     the density's alpha: the trail's |velocity| (VelocityMagnitude)
-    start, bow, stop, wake    an event bridge's events, in image widths per second
+    start, bow, stop, wake    the bandpass's parts, in image widths per second
 
 For amount and stop, the last two columns are the burst (s after a move's end until under 20% of that stop's
 peak) and the ring's share in the stop windows (4–24 px outside the mask over the player).
@@ -45,7 +45,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from modules.gl import Texture  # noqa: E402
 from modules.flow import (LucasKanadeFlow3D, LucasKanadeFlow3DSettings,  # noqa: E402
-                          Change, VelocityChangeBridge, VelocityChangeBridgeSettings, VelocityTrailBridge, VelocityTrailBridgeSettings,
+                          Change, VelocityBandpass, VelocityBandpassSettings, VelocityLowpass, VelocityLowpassSettings,
                           decay_weight)
 from depth_velocity_compare import Frames, context, overrides, read_back, recorded_settings, setting_owner, upload  # noqa: E402
 
@@ -88,16 +88,16 @@ class Side:
         self.kind = kind
         preset = json.loads(PRESET.read_text())['render']['bridge']
         self.changed: dict[str, object] = {}
-        if kind == 'trail':
-            self.settings: VelocityTrailBridgeSettings | VelocityChangeBridgeSettings = VelocityTrailBridgeSettings()
-            self.settings.update_from_dict(preset['readings']['trail'])
-            self.bridge: VelocityTrailBridge | VelocityChangeBridge = VelocityTrailBridge(self.settings)
-        elif kind == 'change':
-            self.settings = VelocityChangeBridgeSettings()
-            self.settings.update_from_dict(preset['readings']['change'])
-            self.bridge = VelocityChangeBridge(self.settings)
+        if kind == 'lowpass':
+            self.settings: VelocityLowpassSettings | VelocityBandpassSettings = VelocityLowpassSettings()
+            self.settings.update_from_dict(preset['readings']['lowpass'])
+            self.bridge: VelocityLowpass | VelocityBandpass = VelocityLowpass(self.settings)
+        elif kind == 'bandpass':
+            self.settings = VelocityBandpassSettings()
+            self.settings.update_from_dict(preset['readings']['bandpass'])
+            self.bridge = VelocityBandpass(self.settings)
         else:
-            raise SystemExit(f'unknown bridge {kind}: trail or change')
+            raise SystemExit(f'unknown filter {kind}: lowpass or bandpass')
         for item in filter(None, items.split(',')):
             path, value = item.split('=', 1)
             self.changed[path] = set_path(self.settings, path, value)
@@ -121,7 +121,7 @@ class Side:
     def _moving_stop_share(self, flow: np.ndarray, delta_time: float) -> np.ndarray:
         """The trial stop share per pixel: the region's mean speed over the flow's moving pixels, through the fast and
         the slow trail per region, as far as it falls (numpy; what a moving-pixel stop region would give)."""
-        assert isinstance(self.settings, VelocityChangeBridgeSettings)
+        assert isinstance(self.settings, VelocityBandpassSettings)
         s, h, w = self.settings, flow.shape[0], flow.shape[1]
         size: int = max(1, int(round(s.stop_region_size)))
         rows, columns = -(-h // size), -(-w // size)
@@ -141,8 +141,8 @@ class Side:
 
     def measure(self, flow: np.ndarray, moving: np.ndarray, ring: np.ndarray, core: np.ndarray, still: bool,
                 delta_time: float) -> None:
-        if isinstance(self.bridge, VelocityChangeBridge):
-            values = {change: read_back(self.bridge.change(change))[..., 0] for change in Change}
+        if isinstance(self.bridge, VelocityBandpass):
+            values = {change: read_back(self.bridge.speed(change))[..., 0] for change in Change}
             for change, value in values.items():
                 self.series[change.name.lower()].add(value, moving, ring, core, still)
             fall = values[Change.STOP] + values[Change.WAKE]
@@ -150,7 +150,7 @@ class Side:
             self.series['stop_moving'].add(fall * share, moving, ring, core, still)
             self.series['wake_moving'].add(fall * (1.0 - share), moving, ring, core, still)
             return
-        v = read_back(self.bridge.smooth_velocity)[..., :3]
+        v = read_back(self.bridge.trail)[..., :3]
         for name, magnitude in (('velocity', np.hypot(v[..., 0], v[..., 1])), ('z', np.abs(v[..., 2])),
                                 ('amount', np.linalg.norm(v, axis=-1))):
             self.series[name].add(magnitude, moving, ring, core, still)
@@ -286,7 +286,7 @@ def main() -> int:
     for side in sides:
         print('\n'.join(report(side.name, side.series, flow_series, frames, w, dt)), flush=True)
     for side in sides:
-        if side.kind != 'change':
+        if side.kind != 'bandpass':
             continue
         # In steady fast motion every rise and fall is a limb passing: the share its region kept as a start or stop
         # is false; at the real starts and stops the region's share is the right one

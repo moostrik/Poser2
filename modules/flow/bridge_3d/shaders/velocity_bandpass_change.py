@@ -28,7 +28,7 @@ class Change(IntEnum):
         return self in (Change.BOW, Change.WAKE)
 
 
-class VelocityChange(Shader):
+class VelocityBandpassChange(Shader):
     """Writes the change times its region's share or the rest to the red channel."""
 
     def use(self, fast: Texture, slow: Texture, change: Change, scale: float,

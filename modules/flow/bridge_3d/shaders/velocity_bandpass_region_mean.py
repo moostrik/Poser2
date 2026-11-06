@@ -7,7 +7,7 @@ from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture
 from modules.gl import Shader, draw_quad, Texture
 
 
-class VelocityChangeRegionMean(Shader):
+class VelocityBandpassRegionMean(Shader):
     """Writes the region's sums over its moving share to RGB."""
 
     def use(self, regions: Texture, lod: float) -> None:

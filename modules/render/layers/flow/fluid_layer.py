@@ -21,16 +21,19 @@ from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 
 @dataclass
 class Injection:
-    """One bridge output as one fluid takes it: `velocity`, `density`, `temperature` and `acceleration`
-    from the bridge output, `spin`, which no bridge gives, at `weight`, 0 to 1, the injection's share of the fluid's
-    velocity, density and temperature, as a layer's weight in a mix. The app sets the weight from
-    whatever it reads; the fluid never knows why. `color` is the color the 2D fluid gives the
-    injection's density at its output, where the 2D density is an amount; the 3D fluid's density
-    arrives colored and ignores it."""
-    velocity: Texture
-    density: Texture
-    temperature: Texture
-    acceleration: Texture | None = None
+    """One bridge output as one fluid takes it: the boundary's `boundary_velocity`, `boundary_density`,
+    `boundary_temperature` and the body force's `body_force_acceleration`, `body_force_density`,
+    `body_force_temperature` from the bridge output, `spin`, which no bridge gives, at `weight`, 0 to 1, the
+    injection's share of the fluid's velocity, density and temperature, as a layer's weight in a mix. The app
+    sets the weight from whatever it reads; the fluid never knows why. `color` is the color the 2D fluid gives
+    the injection's density at its output, where the 2D density is an amount; the 3D fluid's density arrives
+    colored and ignores it."""
+    boundary_velocity: Texture
+    boundary_density: Texture
+    boundary_temperature: Texture
+    body_force_acceleration: Texture | None = None
+    body_force_density: Texture | None = None
+    body_force_temperature: Texture | None = None
     spin: Texture | None = None
     weight: float = 1.0
     color: tuple[float, float, float] = (1.0, 1.0, 1.0)
