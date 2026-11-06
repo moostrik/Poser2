@@ -6,7 +6,9 @@ from it, so an input built before the render loop names the object the stage bef
 
 `MotionLayer` is the shape the 2D and the 3D motion layer share: it measures once per camera frame,
 when the input's `timestamp` differs from the one it measured last, over the interval the stamps
-give (`frame_interval`). It draws nothing; the monitors draw its output's `textures`."""
+give (`frame_interval`). For its first WARM_UP_TIME seconds it stays at rest, as the camera's
+exposure settles and the flow would read the brightening as motion. It draws nothing; the monitors
+draw its output's `textures`."""
 
 from abc import abstractmethod
 from dataclasses import dataclass
@@ -18,30 +20,28 @@ from modules.flow import DepthView, TextureKind
 from modules.settings import Field
 from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 
-MAX_FRAME_INTERVAL: float = 0.5     # s: a longer gap between two captures is a pause or a loop, not a frame's
-FRAME_PERIOD_BAND: tuple[float, float] = (0.5, 2.0)    # a capture gap is held to this share of the frame interval
-FRAME_PERIOD_WEIGHT: float = 0.05   # weight of a new gap on the frame interval's Ema
+WARM_UP_TIME: float = 5.0           # s after start the motion stays at rest, while the camera's exposure settles
+MAX_FRAME_INTERVAL: float = 0.5    # s: a longer gap between two captures is a pause or a loop, not a frame's
+FRAME_INTERVAL_BAND: tuple[float, float] = (0.5, 2.0)  # a capture gap is held to this share of the expected frame interval
 
 
-def frame_interval(timestamp: float | None, last: float | None, period: float | None, ticks: float,
-                   time_step: float) -> tuple[float, float | None]:
-    """The interval (s) a flow frame divides its motion by, and the frame period one frame on: the
-    gap between the capture times `last` and `timestamp`, held to FRAME_PERIOD_BAND of `period` (an
-    Ema of the gaps); a gap that is not a frame's (none, not finite, 0 or less, a pause or a loop)
-    takes `period`, else `ticks` (the time counted in ticks), else `time_step`. Never 0, negative or
-    not finite."""
-    if period is not None and not (math.isfinite(period) and period > 0.0):
-        period = None
+def frame_interval(timestamp: float | None, last: float | None, fps: float, ticks: float, time_step: float) -> float:
+    """The interval (s) a flow frame divides its motion by: the gap between the capture times `last`
+    and `timestamp`, held to FRAME_INTERVAL_BAND of the expected frame interval, 1 / `fps`, the
+    camera's set frame rate; a gap that is not a frame's (none, not finite, 0 or less, a pause or a
+    loop) takes the expected interval. Without a frame rate (not finite, 0 or less) the gap is taken
+    as it is, and one that is not a frame's takes `ticks` (the time counted in ticks), else
+    `time_step`. Never 0, negative or not finite."""
+    expected: float | None = 1.0 / fps if math.isfinite(fps) and fps > 0.0 else None
     gap: float = timestamp - last if timestamp is not None and last is not None else math.nan
     if not (math.isfinite(gap) and 0.0 < gap < MAX_FRAME_INTERVAL):
-        if period is not None:
-            return period, period
-        return (ticks if math.isfinite(ticks) and ticks > 0.0 else time_step), None
-    if period is None:
-        return gap, gap
-    low, high = FRAME_PERIOD_BAND
-    gap = min(max(gap, low * period), high * period)
-    return gap, period + FRAME_PERIOD_WEIGHT * (gap - period)
+        if expected is not None:
+            return expected
+        return ticks if math.isfinite(ticks) and ticks > 0.0 else time_step
+    if expected is None:
+        return gap
+    low, high = FRAME_INTERVAL_BAND
+    return min(max(gap, low * expected), high * expected)
 
 
 @dataclass
@@ -69,6 +69,7 @@ class MotionLayerSettings(StageLayerSettings):
     """What the 2D and the 3D motion layer share; each adds its optical flow's group."""
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
+    fps: Field[float] =                     Field(30.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate the capture gaps are held around")
 
 
 class MotionLayer(StageLayer[MotionInput, MotionOutput]):
@@ -80,9 +81,9 @@ class MotionLayer(StageLayer[MotionInput, MotionOutput]):
         super().__init__(settings)
         self.settings: MotionLayerSettings = settings
         self._timestamp: float | None = None        # the capture time of the frame measured last
-        self._frame_period: float | None = None     # the frame interval, an Ema of the capture gaps (s)
         self._ticks: float = 0.0                    # time counted in ticks since the last measurement (s)
         self._flow_size: tuple[int, int] = (0, 0)   # the size the flow runs at; follows settings.width/height
+        self._warm_up: float = 0.0                  # render time since the first input (s), up to WARM_UP_TIME
 
     # ========== Lifecycle ==========
 
@@ -97,7 +98,6 @@ class MotionLayer(StageLayer[MotionInput, MotionOutput]):
         """Start the flow from rest: the next frame is a first frame."""
         self._reset_stages()
         self._timestamp = None
-        self._frame_period = None
         self._ticks = 0.0
 
     def _allocate_flow(self) -> None:
@@ -138,11 +138,17 @@ class MotionLayer(StageLayer[MotionInput, MotionOutput]):
             return
         self._follow_flow_size()
 
+        # the camera's exposure settles over its first seconds, which the flow reads as motion: at rest until then
+        if self._warm_up < WARM_UP_TIME:
+            self._warm_up += input.dt if math.isfinite(input.dt) and input.dt > 0.0 else 0.0
+            self.reset()
+            return
+
         self._ticks += input.dt
         if input.timestamp is None or input.timestamp != self._timestamp:
             Style.push_style()
             Style.set_blend_mode(Style.BlendMode.DISABLED)
-            interval, self._frame_period = frame_interval(input.timestamp, self._timestamp, self._frame_period, self._ticks, input.dt)
+            interval: float = frame_interval(input.timestamp, self._timestamp, self.settings.fps, self._ticks, input.dt)
             if input.timestamp is not None and math.isfinite(input.timestamp):
                 self._timestamp = input.timestamp
             self._measure(input, interval)

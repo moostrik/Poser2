@@ -102,8 +102,10 @@ an output, or they would be the tick before's.
 | monitor | `MonitorInput`: `ports`, every stage's ports keyed by stage; the monitor picks by its own `stage` and `texture` | none: it draws                                                                                           |
 
 The motion layer measures once per camera frame: when `timestamp` differs from the one it last
-measured; a source without stamps (`None`) measures every tick. A gap wider than a frame period
-is a dropped frame. A camera frame has no other identity: `CameraFrame` and `Capture` carry a
+measured; a source without stamps (`None`) measures every tick. A gap wider than the expected
+frame interval is a dropped frame. For its first 5 s after start the motion layer stays at rest
+(`WARM_UP_TIME`): the camera's exposure settles then, and the Lucas–Kanade solve reads the
+brightening as motion, x/y at full reach over the whole image **(site fact)**. A camera frame has no other identity: `CameraFrame` and `Capture` carry a
 timestamp and no sequence number, because the device's sequence numbers skip on the depth while
 every frame arrives (`modules/camera/oak4/OAK4.md`). A source layer keeps the capture time of the
 frame it holds (`CaptureImageLayer`, `DepthSourceLayer`, `MaskSourceLayer` and
@@ -120,11 +122,14 @@ view it takes at construction, and the `depth_step` from the sample size and its
 `CenterDepthLayer.depth_view` puts them together.
 
 Two clocks. The motion layer measures between two camera frames, so its interval comes from
-`timestamp` (`frame_interval`, `motion_layer.py`, with `dt` as the fallback for a source without
-stamps). The bridge and the fluid run per render frame, so they step on `dt`, the tick's measured
-length, which the app holds to at most twice the mean tick (`hold_tick`, `time_step.py`): a stall
-counts as one long frame and the rest is dropped, as a capture gap is held to twice the frame
-period. The fluid's `TimeStep` smooths it over `fps_smoothing`; a raw per-frame dt looks jittery
+`timestamp` (`frame_interval`, `motion_layer.py`), held to half to twice the expected frame
+interval, 1 / the camera's set frame rate (the motion settings' `fps`, shared from the app's
+`input_fps`). The range is fixed, not learned from the gaps, so a burst of frames a few ms apart
+while the camera comes up to speed is held once and does not carry into the frames after it; `dt`
+is the fallback for a source without stamps or frame rate. The bridge and the fluid run per render
+frame, so they step on `dt`, the tick's measured length, which the app holds to at most twice the
+mean tick (`hold_tick`, `time_step.py`): a stall counts as one long frame and the rest is dropped,
+as a capture gap is held to twice the expected frame interval. The fluid's `TimeStep` smooths it over `fps_smoothing`; a raw per-frame dt looks jittery
 in the sim **(site fact)**.
 
 A tick without a new camera frame measures nothing: the motion output holds what the last pair

@@ -274,13 +274,14 @@ class CenterGroup(BaseSettings):
 
 class RenderSettings(BaseSettings):
     stage  : Field[Stage]                        = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")
+    input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
     layer  : Group[LayerGroup]                   = Group(LayerGroup)
     data   : Group[DataGroup]                    = Group(DataGroup)
     preview: Group[PreviewGroup]                 = Group(PreviewGroup)
     center : Group[CenterGroup]                  = Group(CenterGroup)
     depth  : Group[layers.DepthSourceLayerSettings] = Group(layers.DepthSourceLayerSettings)
     inputs : Group[FlowInputSettings]            = Group(FlowInputSettings)
-    motion : Group[layers.Motion3DLayerSettings] = Group(layers.Motion3DLayerSettings)
+    motion : Group[layers.Motion3DLayerSettings] = Group(layers.Motion3DLayerSettings, share=[input_fps.as_('fps')])
     bridge : Group[layers.Bridge3DLayerSettings] = Group(layers.Bridge3DLayerSettings)
     fluid  : Group[layers.Fluid3DLayerSettings]  = Group(layers.Fluid3DLayerSettings)
     monitor_a: Group[layers.MonitorLayerSettings] = Group(layers.MonitorLayerSettings)
@@ -302,6 +303,6 @@ class Settings(BaseSettings):
 
     camera: Group[Oak4Group]      = Group(Oak4Group, share=[num_cams, input_fps.as_('fps')])
     pose  : Group[PoseGroup]      = Group(PoseGroup, share=[max_players, input_fps.as_('frequency')])
-    render: Group[RenderSettings] = Group(RenderSettings)
+    render: Group[RenderSettings] = Group(RenderSettings, share=[input_fps])
     inout : Group[InOutGroup]     = Group(InOutGroup)
     panel : Group[PanelSettings]  = Group(PanelSettings)
