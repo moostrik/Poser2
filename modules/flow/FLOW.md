@@ -302,6 +302,19 @@ kinds of `TextureKind`.
 
 ## Open
 
+- Every component's textures as ports. Only a stage's fields and the diagnostics a stage lists by
+  hand reach the monitors; the trails, the depth velocity, the Lucas–Kanade levels and the
+  fluids' fields do not. Next: each component that owns textures declares them once, a `ports`
+  property naming its FBOs with their kinds, and the stage base composes its `diagnostics` from
+  its components' ports, each name prefixed with the component's (`trail.input`,
+  `kinetic.fast`, `depth_velocity.track`), so no stage writes a list. `Port` and `TextureKind`
+  move into `modules/flow`, where the components live. Not by reflection over attributes: it
+  finds the FBOs, not their kinds, and a swap's back buffer would be a port too. The 3D fluid's
+  volumes stay out until the item after.
+- A view for the 3D fluid's volumes. Its velocity, density, temperature and pressure are
+  `Texture3D`s or `SwapTexture2DArray`s; the monitor shows 2D textures. After the item above:
+  a slice of the volume at a layer picked on the panel, drawn through the same channel views, so
+  the volumes become ports like the rest.
 - hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
   the pose's motion, a settings field written per tick. A per-tick value on the fluid layer, as the
   eye is, would take it off the settings.
