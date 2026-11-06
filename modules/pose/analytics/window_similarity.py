@@ -15,7 +15,7 @@ from modules.settings import BaseSettings, Field, Group
 from ..frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
 from ..features import Angles, AngleMotion, AngleVelocity, AggregationMethod, NormalizedScalarFeature, Similarity, LeaderScore
 from .joint_select import JointSelectSettings, joint_mask
-from modules.utils import PerformanceTimer, HotReloadMethods
+from modules.utils import PerformanceTimer
 
 import logging
 logger = logging.getLogger(__name__)
@@ -131,9 +131,6 @@ class WindowSimilarity:
         self._callbacks: list[Callable[[SimilarityResult], None]] = []      # run in registration order
 
         self.Timer: PerformanceTimer = PerformanceTimer(name="similarity  ", sample_count=200, report_interval=100, color="red", omit_init=0)
-
-        self._hot_reloader = HotReloadMethods(self.__class__, True, True)
-
 
     def start(self) -> None:
         """Start the similarity processing thread."""

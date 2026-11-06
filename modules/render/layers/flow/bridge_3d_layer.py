@@ -14,7 +14,6 @@ from modules.flow import (
     DensityBridge, DensityBridgeSettings,
 )
 from modules.settings import Field, Group
-from modules.utils import HotReloadMethods
 from .bridge_layer import BridgeLayer, BridgeLayerSettings, BridgeInput, BridgeOutput
 from .port import Port, TextureKind
 
@@ -51,8 +50,6 @@ class Bridge3DLayer(BridgeLayer):
         self._density_bridge: DensityBridge = DensityBridge(settings.density)
         self._temperature_bridge: TemperatureBridge = TemperatureBridge(settings.temperature)
         self._gpu_timer: GpuTimer = GpuTimer("GPU bridge")
-
-        hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def _kinetic(self) -> bool:

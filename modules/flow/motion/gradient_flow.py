@@ -11,8 +11,6 @@ from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil
 from .shaders import Luminance, GradientFlowShader
 
-from modules.utils import HotReloadMethods
-
 
 class GradientFlowSettings(BaseSettings):
     offset = Field(3, min=1, max=10, newline=True, description="Gradient sample offset in pixels")
@@ -46,8 +44,6 @@ class GradientFlow(FlowBase):
         # Shaders
         self._gradient_flow_shader: GradientFlowShader = GradientFlowShader()
         self._luminance_shader: Luminance = Luminance()
-
-        # hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def velocity(self) -> Texture:

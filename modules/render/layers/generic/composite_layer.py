@@ -10,8 +10,6 @@ from modules.gl import Fbo, Texture, Style, shaders
 from ..layer_base import LayerBase
 from modules.settings import Field, BaseSettings, Widget, Group
 
-from modules.utils import HotReloadMethods
-
 logger = logging.getLogger(__name__)
 
 
@@ -77,8 +75,6 @@ class CompositeLayer(LayerBase):
 
         # Blit shader for passthrough when no LUT
         self._blit: shaders.Blit = shaders.Blit()
-
-        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
         # Scan LUTs now and whenever folder changes or rescan is pressed
         self._scan_luts()

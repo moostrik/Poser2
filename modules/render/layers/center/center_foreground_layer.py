@@ -9,8 +9,6 @@ from modules.gl import Fbo, SwapFbo, Texture, Style, shaders
 from ...color_settings import ColorSettings
 
 
-from modules.utils import HotReloadMethods
-
 class CenterForegroundLayerSettings(BaseSettings):
     """Configuration for CenterForegroundLayer foreground rendering."""
     blend_factor:   Field[float] = Field(0.2, min=0.0, max=1.0, description="Foreground temporal blending")
@@ -67,8 +65,6 @@ class CenterForegroundLayer(LayerBase):
         self._sharpen_shader = shaders.Sharpen()
         self._mask_shader = MaskApply()
         self._premultiply_shader = MaskMultiply()
-
-        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:

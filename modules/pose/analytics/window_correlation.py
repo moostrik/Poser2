@@ -14,7 +14,7 @@ from modules.settings import BaseSettings, Field
 from ..frame import FeatureWindow, FeatureWindowDict, FrameWindowDict
 from ..features import Angles, AngleMotion, AggregationMethod, NormalizedScalarFeature, Similarity, LeaderScore
 from .window_similarity import SimilarityResult
-from modules.utils import PerformanceTimer, HotReloadMethods
+from modules.utils import PerformanceTimer
 
 import logging
 logger = logging.getLogger(__name__)
@@ -78,8 +78,6 @@ class WindowCorrelation:
         self._callbacks: list[Callable[[SimilarityResult], None]] = []      # run in registration order
 
         self.Timer: PerformanceTimer = PerformanceTimer(name="correlation ", sample_count=200, report_interval=100, color="cyan", omit_init=0)
-
-        self._hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def start(self) -> None:
         """Start the correlation processing thread."""

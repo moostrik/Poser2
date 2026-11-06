@@ -10,7 +10,7 @@ from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, Mon
 from modules.flow import DepthView, hold_tick
 from modules.pose import Frame, Similarity, AngleMotion, Points2D, PointLandmark
 from modules.render import layers as ls, shaders, make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
-from modules.utils import Rect, Point2f, HotReloadMethods
+from modules.utils import Rect, Point2f
 
 from modules.board import HasFrames
 
@@ -169,9 +169,6 @@ class DeepFlowRender(RenderBase):
 
         # The border around each layer in the main window
         self._border: shaders.DrawRectangleOutline = shaders.DrawRectangleOutline()
-
-        # hot reloader
-        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def _make_layout(self) -> Subdivision:
         width, height = self._window_size

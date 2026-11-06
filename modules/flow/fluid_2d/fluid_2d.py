@@ -34,8 +34,6 @@ from .shaders import (
     VorticityCurl, VorticityForce, Buoyancy
 )
 
-from modules.utils import HotReloadMethods
-
 _BOUNDARY_GL: dict = {
     BoundaryMode.OPEN:   (GL_CLAMP_TO_BORDER, (0.0, 0.0, 0.0, 0.0)),
     BoundaryMode.CLOSED: (GL_CLAMP_TO_EDGE,   (0.0, 0.0, 0.0, 0.0)),
@@ -140,8 +138,6 @@ class Fluid2D:
         self.settings.density.bind(DensitySettings.boundary, mark_boundary)
         self.settings.temperature.bind(TemperatureSettings.boundary, mark_boundary)
         self.settings.pressure.bind(PressureSettings.boundary, mark_boundary)
-
-        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     # ========== Allocation ==========
 

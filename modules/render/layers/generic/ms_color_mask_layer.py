@@ -16,8 +16,6 @@ from modules.settings import Field, BaseSettings
 
 from ...shaders import MSColorMask, AddDodgeBlend, Tint
 
-from modules.utils import HotReloadMethods
-
 from ...color_settings import ColorSettings
 
 
@@ -60,8 +58,6 @@ class MSColorMaskLayer(LayerBase):
         self._tint: Tint = Tint()
         self._add_dodge: AddDodgeBlend = AddDodgeBlend()
         self._shader: MSColorMask = MSColorMask()
-
-        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     # ========== Output Access ==========
 

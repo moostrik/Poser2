@@ -14,7 +14,6 @@ from OpenGL.GL import GL_RGBA16F
 # Local application imports
 from modules.gl import Fbo, Texture
 from modules.flow import Fluid2D, Fluid2DSettings
-from modules.utils import HotReloadMethods
 from ...shaders import DensityColorize
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidInput, FluidOutput, Injection
 from .port import Port, TextureKind
@@ -43,8 +42,6 @@ class Fluid2DLayer(FluidLayer):
         self._colorize_shader: DensityColorize = DensityColorize()
         self._channel: int = 0      # the channel the next injection's amount goes into
         self._warned_channels: bool = False
-
-        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:

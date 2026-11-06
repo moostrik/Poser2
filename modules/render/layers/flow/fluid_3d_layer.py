@@ -11,7 +11,6 @@ from OpenGL.GL import GL_VIEWPORT, glGetIntegerv
 # Local application imports
 from modules.gl import Texture, Style, Text, Blit
 from modules.flow import Fluid3D, Fluid3DSettings
-from modules.utils import HotReloadMethods
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidOutput, Injection
 
 
@@ -29,8 +28,6 @@ class Fluid3DLayer(FluidLayer):
         self.settings: Fluid3DLayerSettings = settings
         self._fluid: Fluid3D = Fluid3D(settings)
         self._legend_text: Text = Text()     # legend for the debug layers view (hue = layer)
-
-        self._hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def texture(self) -> Texture:

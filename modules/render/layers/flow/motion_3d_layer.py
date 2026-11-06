@@ -5,7 +5,6 @@ import logging
 
 # Local application imports
 from modules.flow import LucasKanadeFlow3D, LucasKanadeFlow3DSettings, DepthView
-from modules.utils import HotReloadMethods
 from .motion_layer import MotionLayer, MotionLayerSettings, MotionInput, MotionOutput
 
 logger = logging.getLogger(__name__)
@@ -24,8 +23,6 @@ class Motion3DLayer(MotionLayer):
         self._cam_id: int = cam_id
         self._flow: LucasKanadeFlow3D = LucasKanadeFlow3D(settings)
         self._warned_view_span: bool = False
-
-        hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def output(self) -> MotionOutput:

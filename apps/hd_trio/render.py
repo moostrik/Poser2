@@ -12,11 +12,10 @@ from modules.camera import RigCameraSettings, CameraCheckSettings
 from modules.flow import hold_tick
 from modules.pose import Frame, Similarity, AngleMotion
 from modules.render import ColorSettings, layers as ls, shaders, make_subdivision, SubdivisionRow, Subdivision
-from modules.utils import Rect, Point2f, Color, HotReloadMethods
+from modules.utils import Rect, Point2f, Color
 
 from .render_board import RenderBoard
 from .settings import Layers, RenderSettings, ShowStage, Stage, IntroSequenceSettings
-from . import render_stages
 from .render_stages import STAGES, StageLayer
 from .intro_sequence import IntroSequencePlayer, SequenceDataProxy, FixedColorProxy
 from pathlib import Path
@@ -147,25 +146,8 @@ class HDTrioRender(RenderBase):
         # The border around each panel in the main window
         self._border: shaders.DrawRectangleOutline = shaders.DrawRectangleOutline()
 
-        # hot reloader
-        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
-        self.stage_reloader = HotReloadMethods(StageLayer, True, True)
-        self.stage_reloader.add_file_changed_callback(self._rebuild_stages)
-
         self._prev_stage: ShowStage | None = None
         self._active_stages: list[StageLayer] = []
-
-    def _rebuild_stages(self) -> None:
-        """Re-instantiate stage objects after hot-reload of stages.py."""
-        self._stages = {
-            stage: [
-                cls(i, self.board, self.settings, {layer: cam_dict[i] for layer, cam_dict in self.L.items() if i in cam_dict})
-                for i in range(self.num_cams)
-            ]
-            for stage, cls in render_stages.STAGES.items()
-        }
-        self._prev_stage = None
-        self._active_stages = []
 
     def on_main_window_resize(self, width: int, height: int) -> None:
         self.subdivision = make_subdivision(self.subdivision_rows, width, height, True)

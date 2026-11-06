@@ -9,7 +9,6 @@ from OpenGL.GL import GL_BLEND, GL_ONE, GL_ONE_MINUS_SRC_ALPHA, GL_SRC_ALPHA, gl
 from modules.board import HasObservations, HasTracklets
 from modules.gl import Blit, Fbo, Texture, clear_color
 from modules.tracker import PanoramicTrackerSettings, Tracklet, row_model
-from modules.utils import HotReloadMethods
 
 from ..layer_base import LayerBase
 from ...color_settings import ColorSettings
@@ -90,8 +89,6 @@ class Compositor(LayerBase):
             (Part.marks,  self._marks),
             (Part.labels, self._labels),
         ]
-
-        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     # -- geometry ------------------------------------------------------------
 

@@ -1,6 +1,4 @@
 # Local application imports
-from modules.utils import HotReloadMethods
-
 from ...shaders import DrawColoredRectangle
 from ..layer_base import LayerBase
 from .marks import Mark
@@ -43,8 +41,6 @@ class MarkRenderer(LayerBase):
         self._marks: list[Mark] = []
         self._width: int = 1
         self._height: int = 1
-
-        self.hot_reloader = HotReloadMethods(self.__class__, True, True)
 
     def set_marks(self, marks: list[Mark]) -> None:
         self._marks = marks

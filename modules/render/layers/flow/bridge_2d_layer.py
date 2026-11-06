@@ -4,7 +4,6 @@
 from modules.gl import Texture
 from modules.flow import bridge_2d
 from modules.settings import Group
-from modules.utils import HotReloadMethods
 from .bridge_layer import BridgeLayer, BridgeLayerSettings, BridgeInput, BridgeOutput
 from .port import Port, TextureKind
 
@@ -28,8 +27,6 @@ class Bridge2DLayer(BridgeLayer):
         self._velocity_magnitude: bridge_2d.VelocityMagnitude = bridge_2d.VelocityMagnitude()
         self._density_bridge: bridge_2d.DensityBridge = bridge_2d.DensityBridge(settings.density)
         self._temperature_bridge: bridge_2d.TemperatureBridge = bridge_2d.TemperatureBridge(settings.temperature)
-
-        hot_reload = HotReloadMethods(self.__class__, True, True)
 
     @property
     def output(self) -> BridgeOutput:
