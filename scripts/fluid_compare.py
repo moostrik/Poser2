@@ -13,7 +13,8 @@ frames' summed interval (the flow still measures every frame), a frame-rate chec
 Measured per frame on the moving player (the mask, 12 px and more inside, where it moves in the loop):
     body       the boundary velocity's |xy| mean, widths/s: what the water is dragged toward
     water      the fluid velocity's |xy| mean on the injection layer's slice, widths/s
-    density    the density's mean (the max of r, g, b) over the whole slice, in density units
+    density    the density's mean (the max of r, g, b) over the whole slice, in density units; 0 for the
+               particles, which keep no density volume
 
 Then per side:
     noise      the still part's p99 of the water per pixel (its first 1.5 s left out)
@@ -116,6 +117,9 @@ class Side:
         self.series['body'].add(np.hypot(body[..., 0], body[..., 1]), *_fit(moving, core, body.shape[:2]), still)
         water = self._slice('velocity')
         self.series['water'].add(np.hypot(water[..., 0], water[..., 1]), *_fit(moving, core, water.shape[:2]), still)
+        if 'density' not in self.fluid.ports:       # the particles keep no density volume
+            self.series['density'].player.append(0.0)
+            return
         density = self._slice('density')
         amount = np.max(density[..., :3], axis=-1)
         everywhere = np.ones(amount.shape, bool)

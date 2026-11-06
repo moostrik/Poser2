@@ -288,7 +288,7 @@ made.
 | Step | What                                                                                     | Judge on                                              |
 |------|------------------------------------------------------------------------------------------|-------------------------------------------------------|
 | 6    | Built, [MacCormack](#maccormack) | a drop's ring keeps turning; a thin thread stays thin; the step's GPU time |
-| 7    | The particle carrier: the density as particles advected through the velocity grid (the roadmap's phase C), after the B1 split, the velocity solver apart from the density carrier | a drop reads as a drop next to the grid's; 4K without sparkle at 60 fps |
+| 7    | Built, [the particles](#step-7-the-particles); the weight (the splat back for the buoyancy) to come | a drop reads as a drop next to the grid's; 4K without sparkle at 60 fps |
 | 8    | A better 4K upscale, parked ([Step 8](#step-8-the-4k-upscale-parked)) | the edges at 2160 × 3840 |
 
 ### MacCormack
@@ -315,6 +315,31 @@ the preset:
 | stillslowfast: the step with the harness, ms   | 9.5             | 11.0       |
 
 ### Step 7: the particles
+
+Built: the solver owns the velocity, the pressure and the temperature; the density is its carrier's
+(`DensityCarrier`, `density_carrier.py`), `density.carrier` picking `GRID` (`GridDensity`, the default)
+or `PARTICLES` (`ParticleDensity`), the one picked allocated. The field advection, semi-Lagrangian or
+MacCormack, is one part both use (`FieldAdvection`). The particles' group is `particles`; the buoyancy
+reads no weight from them yet, so with particles the density does not sink. Where a sprite would cover
+the frame its birth radius stops at twice `radius`, and the reference mass carries the boundary's
+density gain, so the gain sets how much ink there is, not how big a drop is.
+
+Measured in a hidden window, the output at 2160 × 3840, the grid 448 × 800 × 64, the step with the
+carrier's draw; with the ring full, and on stillslowfast through the harness at the preset (`rate` 2
+for the blobby looks):
+
+| `draw`, `overlap`    | Particles | Ring full, GPU ms | stillslowfast, ms mean / p95 |
+|----------------------|-----------|-------------------|------------------------------|
+| the grid             |           | 6.6               | 7.7 / 8.4                    |
+| `POINTS`, occluded   | 32 M      | 21.3              | 16.3 / 24.7                  |
+| `POINTS`, additive   | 32 M      | 12.7              |                              |
+| `STREAKS`, occluded  | 32 M      | 39.5              | 13.8 / 24.5                  |
+| `BLOBS`, occluded    | 1 M       | 26.9              | 17.9 / 43.0                  |
+| `SURFACE`            | 1 M       | 31.9              | 20.1 / 54.1                  |
+
+The cost is the draw's fill at 4K: the count for points and streaks, the radius for blobs and the
+surface. `count`, `radius`, `slices` and the additive overlap are the knobs; the 60 fps budget
+(16.7 ms) holds for points at a few million and blobs at a smaller radius **(deduction)**.
 
 Decided: the grid density stays beside the particles, one setting picks the carrier; the first
 look is the particles alone, the weight (the splat back into the grid for the buoyancy) after;

@@ -18,6 +18,7 @@ class BlendMode(Enum):
     ADD = (GL_SRC_ALPHA, GL_ONE)  # Additive blending (brightens)
     MULTIPLY = (GL_DST_COLOR, GL_ZERO)  # Multiply blending (darkens)
     SCREEN = (GL_ONE, GL_ONE_MINUS_SRC_COLOR)  # Screen blending (lightens)
+    SUM = (GL_ONE, GL_ONE)  # Plain sum of every channel, alpha included (accumulation targets)
     DISABLED = (GL_ONE, GL_ZERO)  # No blending (replaces destination)
 
     @property

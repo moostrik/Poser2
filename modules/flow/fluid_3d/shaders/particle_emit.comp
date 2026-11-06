@@ -1,0 +1,81 @@
+#version 460 core
+
+/*
+ * ParticleEmit - new particles from a density source, into the ring.
+ *
+ * Per texel of the source (RGBA: the amount times the color, the amount as alpha): its expected
+ * count this step is rate × dt × g, g = min(amount / floor, 1), rounded by a hash so faint ink still
+ * spawns now and then; each new particle takes amount × gain × dt × slab / expected as its mass, so
+ * the texel's mass is the grid's in expectation (slab: the gaussian's sum over the grid's layers)
+ * and a strong drop makes heavy particles. Its color is the source's, its place a random point in
+ * the texel, its z drawn from the injection's gaussian. The slots come from an atomic head, modulo
+ * the count: a ring, the oldest overwritten.
+ *
+ * A particle: position (xyz in the volume's uv, w = packHalf2x16(mass, age)), previous (xyz,
+ * w = packUnorm4x8(color)).
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+struct Particle { vec4 position; vec4 previous; };
+layout(std430, binding = 0) buffer Particles { Particle particles[]; };
+layout(std430, binding = 1) buffer Ring { uint head; };
+
+layout(binding = 0) uniform sampler2D uSource;
+
+uniform float uGain;        // the source's gain × the injection's weight
+uniform float uDt;          // s
+uniform float uRate;        // particles per texel per second where ink is
+uniform float uFloor;       // the amount below which a texel spawns fewer
+uniform float uSlab;        // the gaussian's sum over the grid's layers
+uniform float uLayer;       // the slab's center in the volume's z, 0 to 1, as the grid's layers place it
+uniform float uSpread;      // its sigma
+uniform uint  uCount;       // the ring's size
+uniform uint  uSeed;        // the frame
+
+const int MAX_PER_TEXEL = 16;
+
+uint hash(uint x) {
+    x ^= x >> 16; x *= 0x7feb352du;
+    x ^= x >> 15; x *= 0x846ca68bu;
+    x ^= x >> 16;
+    return x;
+}
+
+float random(inout uint state) {
+    state = hash(state);
+    return float(state) / 4294967295.0;
+}
+
+void main() {
+    ivec2 size = textureSize(uSource, 0);
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(gid, size))) return;
+
+    vec4 source = texelFetch(uSource, gid, 0);
+    float amount = source.a;
+    if (amount <= 0.0) return;
+
+    uint state = hash(uint(gid.x) * 73856093u ^ uint(gid.y) * 19349663u ^ uSeed * 83492791u);
+    float expected = uRate * uDt * min(amount / max(uFloor, 1e-6), 1.0);
+    int n = int(floor(expected)) + (random(state) < fract(expected) ? 1 : 0);
+    n = min(n, MAX_PER_TEXEL);
+    if (n <= 0) return;
+
+    float mass = amount * uGain * uDt * uSlab / max(expected, 1e-6);
+    vec3 color = clamp(source.rgb / amount, 0.0, 1.0);
+    float packed_color = uintBitsToFloat(packUnorm4x8(vec4(color, 1.0)));
+    float packed_mass = uintBitsToFloat(packHalf2x16(vec2(mass, 0.0)));
+
+    uint start = atomicAdd(head, uint(n));
+    for (int i = 0; i < n; i++) {
+        uint slot = (start + uint(i)) % uCount;
+        vec2 uv = (vec2(gid) + vec2(random(state), random(state))) / vec2(size);
+        // a gaussian z by Box-Muller
+        float r = sqrt(-2.0 * log(max(random(state), 1e-7)));
+        float z = clamp(uLayer + uSpread * r * cos(6.2831853 * random(state)), 0.0, 1.0);
+        vec3 position = vec3(uv, z);
+        particles[slot].position = vec4(position, packed_mass);
+        particles[slot].previous = vec4(position, packed_color);
+    }
+}

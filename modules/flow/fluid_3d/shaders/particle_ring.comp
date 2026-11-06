@@ -1,0 +1,16 @@
+#version 460 core
+
+/*
+ * ParticleRing - the ring's head back into [0, count), after a step's emission, so the head never
+ * wraps the uint and a slot's place in the ring, (head - 1 - slot) mod count, stays exact.
+ */
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+layout(std430, binding = 1) buffer Ring { uint head; };
+
+uniform uint uCount;
+
+void main() {
+    head = head % uCount;
+}

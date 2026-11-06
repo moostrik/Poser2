@@ -15,6 +15,41 @@ class Advection(IntEnum):
     MACCORMACK = 1          # the same, corrected by half its error traced forward, clamped (Selle 2008)
 
 
+class Carrier(IntEnum):
+    """What carries the density: the grid's volume, or particles moved through the grid's velocity."""
+    GRID = 0
+    PARTICLES = 1
+
+
+class ParticleDraw(IntEnum):
+    """How the particles are drawn."""
+    POINTS = 0              # one pixel a particle
+    STREAKS = 1             # a line from the previous to the current position
+    BLOBS = 2               # a gaussian a particle, the sum a soft melt
+    SURFACE = 3             # spheres melted into one surface, shaded (screen-space fluid rendering)
+
+
+class Overlap(IntEnum):
+    """How the particles cover each other, for points, streaks and blobs."""
+    OCCLUDED = 0            # depth slices marched front to back: near ink covers far ink
+    ADDITIVE = 1            # one sum, the depth as fog per particle
+
+
+class ParticleSettings(BaseSettings):
+    """The particle carrier: the ring, the emission, the look."""
+    count: Field[int]               = Field(32_000_000, min=100_000, max=100_000_000, step=100_000,      description="Particles in the ring, the most alive at once; 32 bytes each")
+    rate: Field[float]              = Field(20.0,   min=0.1,    max=200.0,                              description="Particles per texel per second where ink is (fewer: heavier, bigger blobs)")
+    ring_fade: Field[float]         = Field(0.1,    min=0.01,   max=1.0,                                description="The ring's last share the oldest fade over before they are overwritten")
+    draw: Field[ParticleDraw]       = Field(ParticleDraw.POINTS,                                        description="Points, streaks, blobs or a surface")
+    overlap: Field[Overlap]         = Field(Overlap.OCCLUDED,                                           description="Occluded: near ink covers far ink. Additive: one sum")
+    slices: Field[int]              = Field(16,     min=2,      max=32,                                 description="Depth slices of the occluded look, at the output's size")
+    size: Field[float]              = Field(1.0,    min=1.0,    max=8.0,                                description="A point's size in pixels")
+    streak: Field[float]            = Field(1.0,    min=0.0,    max=4.0,                                description="A streak's length as a share of its step")
+    radius: Field[float]            = Field(24.0,   min=0.5,    max=128.0,                              description="A blob's or a sphere's radius in output pixels at the reference mass")
+    spread: Field[float]            = Field(2.0,    min=0.0,    max=50.0,                               description="A blob's widening with age (pixels² per second), at most twice its radius")
+    smooth: Field[int]              = Field(3,      min=0,      max=8,                                  description="The surface's smoothing passes")
+
+
 class BoundarySettings(BaseSettings):
     """The boundary: the body in the water, whose velocity the water is dragged toward."""
     gain: Field[float]              = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's velocity times this is what the water is dragged toward; 1 = as fast as the body")
@@ -42,6 +77,7 @@ class DensitySettings(BaseSettings):
     """Density field parameters."""
     boundary_gain: Field[float]     = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The boundary's density times this is added × dt; 1 = one unit per width of travel")
     body_force_gain: Field[float]   = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's density times this is added × dt; 1 = one unit per width/s of Δv")
+    carrier: Field[Carrier]         = Field(Carrier.GRID,                                           description="What carries the density: the grid's volume or particles")
     size: Field[int]                = Field(1,      min=1,      max=4,                              description="The density grid's x and y size as a multiple of the simulation's; 1 = one grid")
     fade_time: Field[float]         = Field(4.0,    min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%")
     evaporation: Field[float]       = Field(0.0,    min=0.0,    max=2.0,    color="grey",           description="Density removed per second; clears low-level haze (0 = off)")
@@ -108,5 +144,6 @@ class Fluid3DSettings(BaseSettings):
     volume: Group[VolumeSettings]           = Group(VolumeSettings)
     velocity: Group[VelocitySettings]       = Group(VelocitySettings)
     density: Group[DensitySettings]         = Group(DensitySettings)
+    particles: Group[ParticleSettings]      = Group(ParticleSettings)
     temperature: Group[TemperatureSettings] = Group(TemperatureSettings)
     pressure: Group[PressureSettings]       = Group(PressureSettings)

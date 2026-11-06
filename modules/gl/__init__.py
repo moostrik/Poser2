@@ -9,8 +9,9 @@ from .utils import Blit, clear_color, FpsCounter, fit
 # TEXTURE CLASSES
 from .texture import Texture
 from .texture_3d import Texture3D, SwapTexture3D
-from .texture_2d_array import Texture2DArray, SwapTexture2DArray
+from .texture_2d_array import Texture2DArray, SwapTexture2DArray, LayeredFbo
 from .fbo import Fbo, SwapFbo
+from .storage_buffer import StorageBuffer
 from .image import Image
 from .tensor import Tensor
 

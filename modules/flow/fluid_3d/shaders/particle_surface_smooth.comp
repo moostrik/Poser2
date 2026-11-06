@@ -1,0 +1,41 @@
+#version 460 core
+
+/*
+ * ParticleSurfaceSmooth - one direction of a separable bilateral filter on the spheres' depth:
+ * neighbors along uDirection weighted by distance and by how near their depth is, so the spheres
+ * melt into one surface while a drop's edge against the empty water (depth 1) stays an edge. A
+ * pass is a horizontal and a vertical run.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler2D uDepth;   // R32F, 1 = empty
+layout(r32f, binding = 0) writeonly uniform image2D uResult;
+
+uniform ivec2 uSize;
+uniform ivec2 uDirection;     // (1, 0) or (0, 1)
+uniform int   uRadius;        // pixels
+uniform float uSpatial;       // the distance's sigma, pixels
+uniform float uRange;         // the depth difference's sigma, the volume's z
+
+void main() {
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(gid, uSize))) return;
+    float center = texelFetch(uDepth, gid, 0).r;
+    if (center >= 1.0) {
+        imageStore(uResult, gid, vec4(1.0));
+        return;
+    }
+    float sum = 0.0;
+    float weight = 0.0;
+    for (int k = -uRadius; k <= uRadius; k++) {
+        ivec2 p = clamp(gid + uDirection * k, ivec2(0), uSize - 1);
+        float depth = texelFetch(uDepth, p, 0).r;
+        if (depth >= 1.0) continue;
+        float dz = (depth - center) / uRange;
+        float w = exp(-float(k * k) / (2.0 * uSpatial * uSpatial) - 0.5 * dz * dz);
+        sum += depth * w;
+        weight += w;
+    }
+    imageStore(uResult, gid, vec4(sum / max(weight, 1e-6)));
+}

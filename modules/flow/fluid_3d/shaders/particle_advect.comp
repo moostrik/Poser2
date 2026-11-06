@@ -1,0 +1,49 @@
+#version 460 core
+
+/*
+ * ParticleAdvect - each particle one step along the velocity, RK2 (midpoint), the trilinear
+ * reads the hardware's, the uv metric the grid advection's; its mass faded and evaporated, its
+ * age grown. A closed wall stops it at the wall, an open one takes it: its mass goes to 0.
+ */
+
+layout(local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+struct Particle { vec4 position; vec4 previous; };
+layout(std430, binding = 0) buffer Particles { Particle particles[]; };
+
+layout(binding = 0) uniform sampler3D uVelocity;
+
+uniform float uTimestep;      // dt × speed
+uniform vec3  uRdx;           // (1, 1/aspect, 1/z_extent)
+uniform float uDt;            // s
+uniform float uDissipation;   // the fade's multiplier this step
+uniform float uEvaporation;   // mass subtracted this step
+uniform bool  uClosedXY;      // the density's walls
+uniform bool  uClosedZ;       // the volume's z walls
+uniform uint  uCount;
+
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+    if (index >= uCount) return;
+
+    vec4 position = particles[index].position;
+    vec2 mass_age = unpackHalf2x16(floatBitsToUint(position.w));
+    if (mass_age.x <= 0.0) return;
+
+    vec3 p = position.xyz;
+    vec3 v1 = texture(uVelocity, p).xyz;
+    vec3 middle = p + 0.5 * uTimestep * uRdx * v1;
+    vec3 v2 = texture(uVelocity, middle).xyz;
+    vec3 moved = p + uTimestep * uRdx * v2;
+
+    float mass = mass_age.x * uDissipation - uEvaporation;
+    bool outside_xy = any(lessThan(moved.xy, vec2(0.0))) || any(greaterThan(moved.xy, vec2(1.0)));
+    bool outside_z = moved.z < 0.0 || moved.z > 1.0;
+    if ((outside_xy && !uClosedXY) || (outside_z && !uClosedZ)) {
+        mass = 0.0;
+    }
+    moved = clamp(moved, vec3(0.0), vec3(1.0));
+
+    particles[index].previous.xyz = p;
+    particles[index].position = vec4(moved, uintBitsToFloat(packHalf2x16(vec2(max(mass, 0.0), mass_age.y + uDt))));
+}
