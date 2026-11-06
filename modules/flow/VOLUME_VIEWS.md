@@ -93,9 +93,25 @@ A temporary plan, deleted when its last step is in; what it builds is then state
   sign of the camera's direction along z makes instance i draw layer i or the last minus i, so
   the order flips exactly when the view turns past the side, with no loop over the layers.
 
+## Checking the work
+
+`scripts/monitor_harness.py`, like `scripts/depth_velocity_compare.py`: a hidden GL window, no
+app and no camera, grown with each step. Before each run, no app of the user's may be running
+(it holds the GPU and the ports). Per step it does three things:
+
+1. **Exact checks on known volumes.** Synthetic 3D textures with values numpy computes (a ramp
+   along z, a sphere, a swirl as a velocity), each cut and view rendered into an FBO and read
+   back: a slice equals the volume's layer, a projection numpy's max or mean, the reduced density
+   the block mean, and the cube's front pixels show the near layer from both sides of the box,
+   which proves the draw order flips.
+2. **Pictures, looked at before handing over.** A PNG of each view at a few camera angles (cube,
+   fog, glyphs), read and judged before the step is reported.
+3. **GPU time.** A `GpuTimer` around each view at a panel's size and around the density
+   reduction at the real 2160 × 3840 × 16, which replaces the estimates above with measurements.
+
 ## Steps
 
-Each step ends with its tests and a commit; the user runs the app.
+Each step ends with its tests, its harness run and a commit; the user runs the app.
 
 1a. **The monitor at its drawn size.** Fixes today's 4k rendering of every monitor, before any
    volume work.
@@ -108,6 +124,8 @@ Each step ends with its tests and a commit; the user runs the app.
    - The summaries' read grid: the texture's size, capped at 128 × 228 for the strip and
      256 × 256 for the histogram, its total the samples read.
    - Tests: GL-free, the size followed (the previous tick's largest, a larger one at once).
+   - The harness: its window and its first checks, a monitor drawn at two viewport sizes, the
+     legend's text the same pixel size in both, and each view's GPU time at a panel's size.
 1b. **Volume ports, flat cuts and the summaries over a volume.**
    - `modules/flow/port.py`: `Port.texture` is a `Texture | Texture3D`; `Port.volume` says which;
      `ports_of` takes a 3D texture as a field's value too. `Port.prepare`, a callable or None, is
