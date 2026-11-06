@@ -306,10 +306,24 @@ kinds of `TextureKind`.
 
 ## Open
 
-- A view for the 3D fluid's volumes. Its velocity, density, temperature and pressure are
+- Views of the 3D fluid's volumes. Its velocity, density, temperature and pressure are
   `Texture3D`s or `SwapTexture2DArray`s; the monitor shows 2D textures, so the 3D fluid lists only
-  its obstacle. Next: a slice of the volume at a layer picked on the panel, drawn through the same
-  channel views, so the volumes become ports like the rest.
+  its obstacle. Three views, built in this order:
+  1. Slices and projections, 2D. Each volume gives 2D ports: a slice at a layer picked on the
+     panel, and its projection along each axis (front, top, side; the mean or the max through the
+     volume). The monitor draws them with the views it has (colormap, image, arrows, strip); from
+     the top, the arrows of x and z show the depth movement. One small shader, no new drawing
+     path, and the volumes become ports like the rest.
+  2. The rotatable arrow grid for the velocity. Instanced arrows on a coarse grid, about
+     16 × 9 × the layers, each its 3D direction and length, colored by w or by speed, drawn with
+     depth test from an orbit camera. New drawing: instanced geometry and a perspective camera,
+     which the render does not have yet.
+  3. A rotatable view of the scalars. Density, temperature, pressure and divergence ray-marched
+     through the volume as a colormap fog from the same orbit camera, one fragment shader like the
+     show's own composite.
+
+  The two rotatable views share one orbit camera on the monitor (yaw, pitch, distance, or a slow
+  auto-rotate), so monitor A and B compare a scalar and the velocity from the same angle.
 - hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
   the pose's motion, a settings field written per tick. A per-tick value on the fluid layer, as the
   eye is, would take it off the settings.
