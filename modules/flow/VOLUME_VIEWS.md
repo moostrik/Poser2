@@ -27,9 +27,13 @@ A temporary plan, deleted when its last step is in; what it builds is then state
 
 ## The design
 
-- **The monitor's own size.** Like a stage, the monitor has `width` and `height`, 1080 × 1920
-  by default, first on its panel after `reset`, and reallocates when they change; the panel's
-  blit scales it to fit as now. No view draws at the output's 4k.
+- **The monitor renders at the size it is drawn at.** It reads the viewport in `draw()`, the
+  rect the app fits it into, and renders there in the same call, so it renders at that size and
+  reallocates when it changes (a window resize, a layout change). In a panel about 1000 pixels
+  high it renders 1000 high; in the output on a 4k screen, 4k; shown at two sizes in one tick,
+  at the larger, the smaller scaled down. No setting: a fixed number is wrong as soon as the
+  window or the layout changes. The strip and the histogram keep their fixed grids; they plot
+  data, not pixels.
 - **Volume ports.** A port's texture may be a volume, always a 3D texture (`sampler3D`), so each
   view is one shader. The density, stored as a 2D array at the output size, is averaged down into
   a 3D texture of the simulation's width and height and its own `layers`, so no view shimmers or
@@ -81,9 +85,9 @@ A temporary plan, deleted when its last step is in; what it builds is then state
 Each step ends with its tests and a commit; the user runs the app.
 
 1. **The monitor's size, volume ports, flat cuts and the summaries.**
-   - The monitor: `width` and `height` in its settings, after `reset`; the visualizer, the strip
-     and the legend allocate at that size and follow a change; the presets get no value unless
-     they differ from 1080 × 1920.
+   - The monitor: the visualizer and the legend allocate at the viewport's size in `draw()` and
+     follow a change (the largest viewport of the tick when it is drawn twice); `allocate` no
+     longer sizes them from the layer's 4k.
    - `modules/flow/port.py`: `Port.texture` is a `Texture | Texture3D`; `Port.volume` says which.
      `Port.prepare`, a callable or None, is what a view calls before it reads the port.
    - `Fluid3D.ports` adds `velocity`, `density`, `temperature`, `pressure`, `divergence`,
@@ -131,7 +135,7 @@ Each step ends with its tests and a commit; the user runs the app.
      drawing and a glyph mesh in `modules/gl` or beside the shader.
 5. **Fog.**
    - `volume_fog.frag`: a ray through the box per pixel, the colormap's color and the value's
-     size as opacity, from the camera's inverse matrix; at the monitor's own size, not 4k.
+     size as opacity, from the camera's inverse matrix; at the size the monitor is drawn at.
 6. **Close.** `FLOW.md`'s monitor section states the views as built, its Open item goes, and
    this file is deleted.
 
