@@ -4,7 +4,7 @@
 import logging
 
 # Local application imports
-from modules.flow import LucasKanadeFlow3D, LucasKanadeFlow3DSettings, DepthView
+from modules.flow import LucasKanadeFlow3D, LucasKanadeFlow3DSettings, DepthView, HasPorts
 from .motion_layer import MotionLayer, MotionLayerSettings, MotionInput, MotionOutput
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,9 @@ class Motion3DLayer(MotionLayer):
     @property
     def output(self) -> MotionOutput:
         return MotionOutput(self._flow.velocity)
+
+    def _components(self) -> dict[str, HasPorts]:
+        return {'': self._flow}     # its own parts carry their groups' names, xy and z
 
     # ========== The flow ==========
 

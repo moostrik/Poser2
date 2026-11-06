@@ -534,7 +534,7 @@
     },
     "monitor_a": {
       "stage": "BRIDGE",
-      "texture": "velocity",
+      "texture": "output.velocity",
       "view": "AUTO",
       "advanced": {
         "channel": "ALL",
@@ -545,7 +545,7 @@
     },
     "monitor_b": {
       "stage": "FLUID",
-      "texture": "density",
+      "texture": "output.density",
       "view": "AUTO",
       "advanced": {
         "channel": "ALL",

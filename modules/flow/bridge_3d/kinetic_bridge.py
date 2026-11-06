@@ -10,7 +10,7 @@ from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R16F, GL_R32F, GL_R
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import Field, BaseSettings, Group
-from .. import FlowBase, FlowUtil
+from .. import FlowBase, FlowUtil, Port, TextureKind
 from ..shaders import Trail, GaussianBlur
 from .kinetics import decay_weight
 from .shaders import KineticAdvect, KineticCurl, KineticEmission, KineticHold, KineticOnset, KineticPatch, KineticProjection, KineticReservoir, KineticVelocity, Projection, ScaleVelocity
@@ -97,6 +97,8 @@ class KineticBridge(FlowBase):
 
         self._input_internal_format = GL_RGBA16F
         self._output_internal_format = GL_RGBA16F
+        self._input_kind = TextureKind.VELOCITY
+        self._output_kind = TextureKind.VELOCITY
 
         self._fast_fbo: SwapFbo = SwapFbo()
         self._slow_fbo: SwapFbo = SwapFbo()
@@ -182,6 +184,20 @@ class KineticBridge(FlowBase):
     def curl(self) -> Texture:
         """2D curl of the fast trail (R16F)."""
         return self._curl_fbo
+
+    @property
+    def ports(self) -> dict[str, Port]:
+        return {**super().ports,
+                'fast': Port(self._fast_fbo, TextureKind.VELOCITY),
+                'slow': Port(self._slow_fbo, TextureKind.VELOCITY),
+                'acceleration': Port(self._acceleration_fbo, TextureKind.SCALAR),
+                'depth_acceleration': Port(self._depth_acceleration_fbo, TextureKind.SCALAR),
+                'turn': Port(self._turn_fbo, TextureKind.SCALAR),
+                'held_release': Port(self._held_release_fbo, TextureKind.SCALAR),
+                'reservoir': Port(self._reservoir_fbo, TextureKind.SCALAR),
+                'emission': Port(self._emission_fbo, TextureKind.SCALAR),
+                'onset_velocity': Port(self._onset_fbo, TextureKind.VELOCITY),
+                'curl': Port(self._curl_fbo, TextureKind.SCALAR)}
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate all fields at the bridge resolution.

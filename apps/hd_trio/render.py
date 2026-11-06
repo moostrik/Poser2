@@ -9,7 +9,7 @@ from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 from modules.gl import RenderBase, Shader, Style, clear_color, Texture, MonitorId
 from modules.board import HasFrames
 from modules.camera import RigCameraSettings, CameraCheckSettings
-from modules.flow import hold_tick
+from modules.flow import Port, hold_tick
 from modules.pose import Frame, Similarity, AngleMotion
 from modules.render import ColorSettings, layers as ls, shaders, make_subdivision, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f, Color
@@ -220,7 +220,7 @@ class HDTrioRender(RenderBase):
         for i, _motion in self.L[Layers.motion].items():
             if i not in bridges or i not in self.L[Layers.fluid]:
                 continue
-            ports: dict[ls.FlowStage, dict[str, ls.Port]] = {
+            ports: dict[ls.FlowStage, dict[str, Port]] = {
                 ls.FlowStage.MOTION: cast(ls.Motion2DLayer, _motion).ports,
                 ls.FlowStage.BRIDGE: bridges[i].ports,
                 ls.FlowStage.FLUID: cast(ls.Fluid2DLayer, self.L[Layers.fluid][i]).ports,

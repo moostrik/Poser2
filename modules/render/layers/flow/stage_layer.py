@@ -2,29 +2,29 @@
 
 A stage takes an input the app builds each tick (`set_input`), hands out an output (`output`), and
 starts from rest on `reset`, which its panel's reset button asks for. The next stage reads the
-output's fields by name. The monitors read the stage's `ports`: every input and output field that
-declares its kind, written once on the field, and the `diagnostics` a stage adds of its insides.
+output's fields by name. The monitors read the stage's `ports`, one list in the order the data runs:
+the input's fields as `input.<field>`, each component's textures under its settings group's name
+(`trail.smooth`, `xy.solve`), then the output's fields as `output.<field>`. Each texture is
+written once: a dataclass field declares its kind, a component names its own in its `ports`.
 Inputs share no base: each stage reads its own fields, and nothing takes any stage's input."""
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from threading import Event
 
+from modules.flow import HasPorts, Port, ports_of, prefixed
 from modules.settings import Field, BaseSettings, Widget
 from ..layer_base import LayerBase
-from .port import Port, ports_of
 
 
 @dataclass
 class StageOutput:
-    """What every stage output carries beside its fields: `diagnostics`, the stage's insides a
-    monitor can show, which no stage downstream reads."""
-    diagnostics: dict[str, Port] = field(default_factory=dict, kw_only=True)
+    """The base of every stage output: its fields that declare a kind are its ports."""
 
     @property
     def ports(self) -> dict[str, Port]:
-        """The fields that declare a kind, then the diagnostics."""
-        return {**ports_of(self), **self.diagnostics}
+        """The fields that declare a kind, by name."""
+        return ports_of(self)
 
 
 class StageLayerSettings(BaseSettings):
@@ -58,9 +58,20 @@ class StageLayer[I, O: StageOutput](LayerBase, ABC):
 
     @property
     def ports(self) -> dict[str, Port]:
-        """What the monitors show of the stage: its output's ports, then its input's, named `input_<field>`."""
-        inputs: dict[str, Port] = ports_of(self._input, 'input_') if self._input is not None else {}
-        return {**self.output.ports, **inputs}
+        """What the monitors show of the stage, in the order the data runs: `input.*`, each
+        component's under its name, `output.*`. A texture not allocated is left out, so a part the
+        stage does not run gives none."""
+        inputs: dict[str, Port] = ports_of(self._input) if self._input is not None else {}
+        parts: dict[str, Port] = {}
+        for name, component in self._components().items():
+            parts.update(prefixed(name, component.ports))
+        ports: dict[str, Port] = {**prefixed('input', inputs), **parts, **prefixed('output', self.output.ports)}
+        return {name: port for name, port in ports.items() if port.texture.allocated}
+
+    def _components(self) -> dict[str, HasPorts]:
+        """The parts that own textures, by their settings group's name ('' for none), in the order
+        the stage runs them. A stage with parts lists them here once."""
+        return {}
 
     @abstractmethod
     def reset(self) -> None:

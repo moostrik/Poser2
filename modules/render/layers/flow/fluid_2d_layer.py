@@ -13,10 +13,9 @@ from OpenGL.GL import GL_RGBA16F
 
 # Local application imports
 from modules.gl import Fbo, Texture
-from modules.flow import Fluid2D, Fluid2DSettings
+from modules.flow import Fluid2D, Fluid2DSettings, HasPorts
 from ...shaders import DensityColorize
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidInput, FluidOutput, Injection
-from .port import Port, TextureKind
 
 logger = logging.getLogger(__name__)
 
@@ -49,17 +48,10 @@ class Fluid2DLayer(FluidLayer):
 
     @property
     def output(self) -> FluidOutput:
-        fluid: Fluid2D = self._fluid
-        return FluidOutput(self._colorized, diagnostics={
-            'density_channels': Port(fluid.density, TextureKind.IMAGE),
-            'velocity': Port(fluid.velocity, TextureKind.VELOCITY),
-            'pressure': Port(fluid.pressure, TextureKind.SCALAR),
-            'temperature': Port(fluid.temperature, TextureKind.SCALAR),
-            'divergence': Port(fluid.divergence, TextureKind.SCALAR),
-            'vorticity': Port(fluid.vorticity_curl, TextureKind.SCALAR),
-            'buoyancy': Port(fluid.buoyancy, TextureKind.VELOCITY),
-            'obstacle': Port(fluid.obstacle, TextureKind.SCALAR),
-        })
+        return FluidOutput(self._colorized)
+
+    def _components(self) -> dict[str, HasPorts]:
+        return {'': self._fluid}    # its fields carry their groups' names: velocity, density, temperature, pressure
 
     # ========== Lifecycle ==========
 

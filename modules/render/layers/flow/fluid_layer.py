@@ -14,9 +14,9 @@ from dataclasses import dataclass, field
 from typing import Annotated
 
 from modules.gl import Texture, Style, Blit
+from modules.flow import TextureKind
 from modules.settings import Field
 from .stage_layer import StageLayer, StageLayerSettings, StageOutput
-from .port import TextureKind
 
 
 @dataclass

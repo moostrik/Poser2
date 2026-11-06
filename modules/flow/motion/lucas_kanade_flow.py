@@ -26,6 +26,7 @@ from OpenGL.GL import GL_RG32F
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import BaseSettings, Field
+from ..port import Port, TextureKind
 from .luminance_frames import LuminanceFrames
 from .patch import Patch
 from .shaders import DisplacementThreshold, LucasKanadeShader
@@ -78,6 +79,16 @@ class LucasKanadeFlow:
     def displacement(self) -> Texture:
         """The displacement (RG32F, uv per frame) with `threshold` taken off its length."""
         return self._displacement
+
+    @property
+    def ports(self) -> dict[str, Port]:
+        """The luminance it measures on, the pyramid levels it solves coarse to fine, the solve and the displacement."""
+        used: int = min(self.settings.levels, MAX_LEVELS) - 1      # the levels above the full-size solve
+        levels: dict[str, Port] = {f'level_{level}': Port(self._levels[level - 1], TextureKind.VELOCITY)
+                                   for level in range(used, 0, -1)}
+        return {'luminance': Port(self._frames.luminance, TextureKind.IMAGE), **levels,
+                'solve': Port(self._solve, TextureKind.VELOCITY),
+                'displacement': Port(self._displacement, TextureKind.VELOCITY)}
 
     def allocate(self, width: int, height: int) -> None:
         self._frames.allocate(width, height)

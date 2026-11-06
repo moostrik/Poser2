@@ -9,7 +9,7 @@ from OpenGL.GL import GL_R32F, GL_RGBA16F
 
 from modules.gl import Texture, SwapFbo
 from modules.settings import Field, BaseSettings
-from .. import FlowBase, FlowUtil
+from .. import FlowBase, FlowUtil, Port, TextureKind
 from .shaders import DensityBridgeShader
 from ..shaders.hsv import HSV
 
@@ -39,6 +39,8 @@ class DensityBridge(FlowBase):
         # Define internal formats
         self._input_internal_format = GL_RGBA16F   # RGB density input
         self._output_internal_format = GL_RGBA16F  # RGBA density output
+        self._input_kind = TextureKind.IMAGE
+        self._output_kind = TextureKind.IMAGE
 
         self._alpha_fbo: SwapFbo = SwapFbo()
 
@@ -60,6 +62,10 @@ class DensityBridge(FlowBase):
     def alpha_input(self) -> Texture:
         """The amount the alpha is made from."""
         return self._alpha_fbo
+
+    @property
+    def ports(self) -> dict[str, Port]:
+        return {**super().ports, 'alpha': Port(self._alpha_fbo, TextureKind.SCALAR)}
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate density bridge FBOs.

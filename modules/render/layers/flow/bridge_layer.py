@@ -16,10 +16,10 @@ from typing import Annotated
 from OpenGL.GL import GL_RGBA16F
 
 from modules.gl import Fbo, Texture, Style
+from modules.flow import HasPorts, Port, Ports, TextureKind
 from modules.settings import Field
 from ...shaders import DensityColor
 from .stage_layer import StageLayer, StageLayerSettings, StageOutput
-from .port import TextureKind
 
 
 @dataclass
@@ -113,6 +113,14 @@ class BridgeLayer(StageLayer[BridgeInput, BridgeOutput]):
     @abstractmethod
     def _bridge(self, input: BridgeInput, color: Texture) -> None:
         """Run the bridges on `input.velocity`, stepping `input.dt`; `color` is the density's color."""
+
+    @abstractmethod
+    def _bridges(self) -> dict[str, HasPorts]:
+        """The bridges it runs, by their settings group's name, in the order it runs them."""
+
+    def _components(self) -> dict[str, HasPorts]:
+        """The density's color, made first, then the bridges."""
+        return {'': Ports({'color': Port(self._color, TextureKind.IMAGE)}), **self._bridges()}
 
     # ========== Processing ==========
 

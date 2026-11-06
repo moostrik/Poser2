@@ -14,10 +14,9 @@ import math
 from typing import Annotated
 
 from modules.gl import Texture, Style
-from modules.flow import DepthView
+from modules.flow import DepthView, TextureKind
 from modules.settings import Field
 from .stage_layer import StageLayer, StageLayerSettings, StageOutput
-from .port import TextureKind
 
 MAX_FRAME_INTERVAL: float = 0.5     # s: a longer gap between two captures is a pause or a loop, not a frame's
 FRAME_PERIOD_BAND: tuple[float, float] = (0.5, 2.0)    # a capture gap is held to this share of the frame interval

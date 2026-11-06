@@ -551,7 +551,7 @@
     },
     "monitor_a": {
       "stage": "MOTION",
-      "texture": "velocity",
+      "texture": "output.velocity",
       "view": "AUTO",
       "advanced": {
         "channel": "ALL",
@@ -563,7 +563,7 @@
     },
     "monitor_b": {
       "stage": "MOTION",
-      "texture": "velocity",
+      "texture": "output.velocity",
       "view": "COLORMAP",
       "advanced": {
         "channel": "ALL",

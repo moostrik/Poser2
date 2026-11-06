@@ -14,10 +14,9 @@ from enum import IntEnum, auto
 from OpenGL.GL import GL_VIEWPORT, glGetIntegerv, glViewport
 
 from modules.gl import Texture, Style, Blit
-from modules.flow import Visualizer, HISTOGRAM_TOTAL, Strip, ALL_CHANNELS, Legend, LegendKind
+from modules.flow import Visualizer, HISTOGRAM_TOTAL, Strip, ALL_CHANNELS, Legend, LegendKind, Port, TextureKind
 from modules.settings import Field, BaseSettings, Group, Widget
 from ..layer_base import LayerBase
-from .port import Port, TextureKind
 
 
 class FlowStage(IntEnum):
@@ -74,7 +73,7 @@ class MonitorLayerSettings(BaseSettings):
     """Configuration for MonitorLayer: what it shows, and in `advanced` how."""
     stage: Field[FlowStage] =       Field(FlowStage.BRIDGE, description="The stage whose texture is shown")
     names: Field[list[str]] =       Field([""], access=Field.READ, visible=False, description="The stage's textures")
-    texture: Field[str] =           Field("velocity", widget=Widget.text_select, options=names, description="The texture shown")
+    texture: Field[str] =           Field("output.velocity", widget=Widget.text_select, options=names, description="The texture shown")
     view: Field[MonitorView] =      Field(MonitorView.AUTO, description="By its kind, as an image, as a colormap centered on grey, as arrows, as a strip over time, or as a histogram")
 
     advanced = Group(MonitorAdvancedSettings)
@@ -138,11 +137,12 @@ class MonitorLayer(LayerBase):
         return self._input.ports.get(self.settings.stage, {}) if self._input is not None else {}
 
     def _pick(self) -> Port | None:
-        """The port the settings name, else the stage's first."""
+        """The port the settings name, else the stage's first output, else its first port."""
         ports: dict[str, Port] = self._ports()
         port: Port | None = ports.get(self.settings.texture)
         if port is None and ports:
-            port = next(iter(ports.values()))
+            outputs: list[Port] = [p for name, p in ports.items() if name.startswith('output.')]
+            port = outputs[0] if outputs else next(iter(ports.values()))
         return port if port is not None and port.texture.allocated else None
 
     def update(self) -> None:

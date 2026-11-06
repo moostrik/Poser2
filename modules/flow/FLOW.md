@@ -36,7 +36,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 | depth velocity       | the z of the 3D flow: the depth change along the x/y displacement, in view widths per second          | `DepthVelocity`, `DepthVelocitySettings`, group `depth_velocity`   |
 | 2D flow, 3D flow     | a system: a motion layer and a bridge layer per camera, a fluid layer per show output                 | `Motion2DLayer` + `Bridge2DLayer` + `Fluid2DLayer`; `…3D…`         |
 | 2D camera, 3D camera | an image and a mask; those and a depth image on the same view                                         | `MotionInput` without / with `depth`                               |
-| port                 | a stage's named texture with its kind: image, velocity, scalar; read from the kinds its input and output fields declare, plus its diagnostics | `Port`, `TextureKind`, `ports_of`                       |
+| port                 | a stage's named texture with its kind: image, velocity, scalar; its input and output fields declare theirs, every component its own | `Port`, `TextureKind`, `HasPorts`, `ports_of`, in `modules/flow` |
 | monitor              | a layer that shows one port of one stage, picked on the panel, drawn only while it is shown           | `MonitorLayer`, `monitor_a`, `monitor_b`                           |
 
 "bridge" is ofxFlowTools' word (`ftVelocityBridge`, `ftDensityBridge`, `ftTemperatureBridge`);
@@ -70,12 +70,16 @@ it what the stage reads from the output of the stage before and from the camera 
 it on the layer before the render loop. The output holds the stage's textures, allocated once,
 and the layer hands it out as `output`; an output is a stage's only way out, and the next stage
 reads its fields by name. A texture field declares its kind on the field
-(`velocity: Annotated[Texture, TextureKind.VELOCITY]`), in inputs and outputs alike, and a stage's
-`ports`, what the monitors show, are read from those declarations (`ports_of`): the output's
-fields, then the input's as `input_<field>`, each texture written once. An output's
-`diagnostics` add the stage's insides a monitor can show and nothing downstream reads (the 3D
-bridge's kinetic trails, the 2D fluid's pressure). A layer's `texture` stays what it draws, read by
-the composite. The layers hold no reference to each other, and no input knows an output's type. A field is named with the same noun for the
+(`velocity: Annotated[Texture, TextureKind.VELOCITY]`), in inputs and outputs alike (`ports_of`),
+and every component that owns textures names them once with their kinds in its `ports`
+(`HasPorts`): `FlowBase` its `input` and `output`, a subclass its others. A stage names its
+components once (`_components`), by their settings group, and its `ports`, what the monitors
+show, is one list in the order the data runs, the prefix its group: `input.*`, each component's
+in the order the stage runs them (`trail.output`, `kinetic.fast`, `xy.solve`, `z.track`), then
+`output.*`. A texture not allocated is left out, so a part the stage does not run gives none;
+the 3D bridge lists only its method's bridge. Not by reflection over attributes: it would find
+the FBOs, not their kinds, and a swap's back buffer would be a port too. A layer's `texture` stays
+what it draws, read by the composite. The layers hold no reference to each other, and no input knows an output's type. A field is named with the same noun for the
 same kind of thing, in every input.
 
 A texture field holds the `Fbo`, `SwapFbo` or `Tensor` object itself; a swap is its current
@@ -142,7 +146,7 @@ context of its own, would move the wait to the bridge, and the screen still show
 
 | Class                                       | Role                                                                                                                                                                                  |
 |---------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `StageLayer[I, O]` (ABC)                    | `set_input(I)` before the render loop; `output: O`, a `StageOutput`, whose `diagnostics` (keyword only) add to the ports its fields declare; `ports`, the output's then the input's; `reset()`, from rest; `update()` takes a reset the panel's `reset` button asked for, on the render thread, then runs `_update()`. Unbinds the button in `deallocate()` |
+| `StageLayer[I, O]` (ABC)                    | `set_input(I)` before the render loop; `output: O`, a `StageOutput`, whose fields with a kind are its ports; `_components()`, the parts by group name; `ports`, input, parts, output; `reset()`, from rest; `update()` takes a reset the panel's `reset` button asked for, on the render thread, then runs `_update()`. Unbinds the button in `deallocate()` |
 | `MotionLayer` (ABC)                         | `StageLayer[MotionInput, MotionOutput]`; `_update()` as the template method: `_measure` on a new frame. Holds the allocate and resize pattern; the flow runs at `settings.width` by `settings.height`. Draws nothing |
 | `Motion2DLayer`, `Motion3DLayer`            | the subclasses, each on its optical flow (`GradientFlow`; `LucasKanadeFlow3D`). The 2D flow's velocity is per frame, not per second, and it reads no mask, until the 2D flow moves to the Lucas–Kanade solve |
 | `BridgeLayer` (ABC)                         | `StageLayer[BridgeInput, BridgeOutput]`; `_update()`: the density's color (`DensityColor`: the image, or white, times the tint, gated by the mask), `_bridge` the input's velocity into velocity, density and temperature. The bridges' filters run at the velocity's size and their outputs at `settings.width` by `settings.height`; the layer follows both. Draws nothing |
@@ -246,7 +250,7 @@ The monitor's panel group (`MonitorLayerSettings`) says what is drawn; its `adva
 | Setting                  | Values                                                      | Means                                       |
 |--------------------------|-------------------------------------------------------------|---------------------------------------------|
 | `stage`                  | `MOTION`, `BRIDGE`, `FLUID`                                 | the stage whose port is shown               |
-| `texture`                | the stage's port names                                      | the port shown                              |
+| `texture`                | the stage's port names                                      | the port shown; a name the stage no longer has shows its first output |
 | `view`                   | `AUTO`, `IMAGE`, `COLORMAP`, `ARROWS`, `HISTOGRAM`, `STRIP` | how the channels are drawn                  |
 | `advanced.channel`       | `X`, `Y`, `Z`, `W`, `ALL` (default)                         | which of the texture's channels are drawn   |
 | `advanced.scale`         | 0.01 to 100, a log slider                                   | multiplier on the values, in every view     |
@@ -302,19 +306,10 @@ kinds of `TextureKind`.
 
 ## Open
 
-- Every component's textures as ports. Only a stage's fields and the diagnostics a stage lists by
-  hand reach the monitors; the trails, the depth velocity, the Lucas–Kanade levels and the
-  fluids' fields do not. Next: each component that owns textures declares them once, a `ports`
-  property naming its FBOs with their kinds, and the stage base composes its `diagnostics` from
-  its components' ports, each name prefixed with the component's (`trail.input`,
-  `kinetic.fast`, `depth_velocity.track`), so no stage writes a list. `Port` and `TextureKind`
-  move into `modules/flow`, where the components live. Not by reflection over attributes: it
-  finds the FBOs, not their kinds, and a swap's back buffer would be a port too. The 3D fluid's
-  volumes stay out until the item after.
 - A view for the 3D fluid's volumes. Its velocity, density, temperature and pressure are
-  `Texture3D`s or `SwapTexture2DArray`s; the monitor shows 2D textures. After the item above:
-  a slice of the volume at a layer picked on the panel, drawn through the same channel views, so
-  the volumes become ports like the rest.
+  `Texture3D`s or `SwapTexture2DArray`s; the monitor shows 2D textures, so the 3D fluid lists only
+  its obstacle. Next: a slice of the volume at a layer picked on the panel, drawn through the same
+  channel views, so the volumes become ports like the rest.
 - hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
   the pose's motion, a settings field written per tick. A per-tick value on the fluid layer, as the
   eye is, would take it off the settings.

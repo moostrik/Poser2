@@ -31,6 +31,7 @@ from ..boundary_mode import BoundaryMode
 from .fluid_settings import Fluid3DSettings, VolumeSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings
 from ..shaders import AddBoolean
 from ..flow_util import FlowUtil
+from ..port import Port, TextureKind
 from ..time_step import TimeStep
 from .shaders import (
     Advect3D, Advect3DDensity, Divergence3D, Gradient3D,
@@ -994,6 +995,11 @@ class Fluid3D:
     def density(self) -> Texture:
         """2D composited density output for downstream render layers."""
         return self._output_texture
+
+    @property
+    def ports(self) -> dict[str, Port]:
+        """Its 2D textures: the obstacle as it comes. The volumes are 3D, which no monitor shows yet."""
+        return {'obstacle': Port(self._obstacle_source, TextureKind.SCALAR)}
 
     @property
     def velocity(self) -> Texture3D:

@@ -19,7 +19,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_RGBA16F
 
 from modules.gl import SwapFbo, Texture
 from modules.settings import Field, BaseSettings
-from .. import FlowBase, FlowUtil
+from .. import FlowBase, FlowUtil, TextureKind
 from ..shaders import GaussianBlur
 from .kinetics import decay_weight
 from .shaders import KineticAdvect, VelocityTrail
@@ -53,6 +53,8 @@ class VelocityTrailBridge(FlowBase):
 
         self._input_internal_format = GL_RGBA16F
         self._output_internal_format = GL_RGBA16F
+        self._input_kind = TextureKind.VELOCITY
+        self._output_kind = TextureKind.VELOCITY
 
         self.settings: VelocityTrailBridgeSettings = settings or VelocityTrailBridgeSettings()
 

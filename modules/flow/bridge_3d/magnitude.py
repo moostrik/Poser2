@@ -8,7 +8,7 @@ Ported from ofxFlowTools ftVelocityMaskFlow.h
 from OpenGL.GL import GL_R32F, GL_RGBA16F
 
 from modules.gl import Texture
-from .. import FlowBase, FlowUtil
+from .. import FlowBase, FlowUtil, TextureKind
 from ..shaders import MagnitudeShader
 
 
@@ -31,6 +31,8 @@ class Magnitude(FlowBase):
         # Define internal formats (input configurable, output always R32F)
         self._input_internal_format = input_format
         self._output_internal_format = GL_R32F   # Scalar magnitude output
+        self._input_kind = TextureKind.VELOCITY
+        self._output_kind = TextureKind.SCALAR
 
         # Shader
         self._magnitude_shader: MagnitudeShader = MagnitudeShader()

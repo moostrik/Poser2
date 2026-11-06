@@ -1,16 +1,16 @@
-"""A stage's ports: its named textures with their kinds, what a monitor shows.
+"""Ports: named textures with their kinds, what a monitor shows.
 
 An input or output dataclass declares a field's kind on the field itself,
-`velocity: Annotated[Texture, TextureKind.VELOCITY]`, and `ports_of` reads the ports from it, so a
-stage writes each of its textures once."""
+`velocity: Annotated[Texture, TextureKind.VELOCITY]`, and `ports_of` reads the ports from it. A
+component that owns textures declares them once in its `ports` (`HasPorts`), and a stage joins its
+components' ports under their names (`prefixed`), so each texture is written once."""
 
 from dataclasses import dataclass, fields
 from enum import IntEnum, auto
 from functools import cache
-from typing import get_type_hints
+from typing import Protocol, get_type_hints
 
 from modules.gl import Texture
-from modules.flow import DepthView
 
 
 class TextureKind(IntEnum):
@@ -23,10 +23,29 @@ class TextureKind(IntEnum):
 
 @dataclass
 class Port:
-    """A named texture of a stage, with its kind. `texture` is the `Fbo`, `SwapFbo` or `Tensor` object
-    itself, never a buffer taken from it."""
+    """A named texture with its kind. `texture` is the `Fbo`, `SwapFbo` or `Tensor` object itself,
+    never a buffer taken from it."""
     texture: Texture
     kind: TextureKind
+
+
+class HasPorts(Protocol):
+    """A component that owns textures and names them, each with its kind."""
+    @property
+    def ports(self) -> dict[str, Port]: ...
+
+
+@dataclass
+class Ports:
+    """Textures a stage owns itself, beside its components', as one more part."""
+    ports: dict[str, Port]
+
+
+def prefixed(prefix: str, ports: dict[str, Port]) -> dict[str, Port]:
+    """`ports` named `<prefix>.<name>`; an empty prefix leaves the names as they are."""
+    if not prefix:
+        return dict(ports)
+    return {f'{prefix}.{name}': port for name, port in ports.items()}
 
 
 @cache
@@ -41,14 +60,14 @@ def _kinds(cls: type) -> tuple[tuple[str, TextureKind], ...]:
     return tuple(declared)
 
 
-def ports_of(values: object, prefix: str = '') -> dict[str, Port]:
+def ports_of(values: object) -> dict[str, Port]:
     """The ports the dataclass `values` declares: each field with a kind whose value is set, by its
-    name after `prefix`; a `DepthView` is its depth texture."""
+    name; a value that is no texture is a view holding one as `texture` (a `DepthView`)."""
     ports: dict[str, Port] = {}
     for name, kind in _kinds(type(values)):
         value = getattr(values, name)
-        if isinstance(value, DepthView):
+        if value is not None and not isinstance(value, Texture):
             value = value.texture
         if value is not None:
-            ports[prefix + name] = Port(value, kind)
+            ports[name] = Port(value, kind)
     return ports

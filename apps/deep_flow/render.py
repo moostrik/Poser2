@@ -7,7 +7,7 @@ import numpy as np
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId
-from modules.flow import DepthView, hold_tick
+from modules.flow import DepthView, Port, hold_tick
 from modules.pose import Frame, Similarity, AngleMotion, Points2D, PointLandmark
 from modules.render import layers as ls, shaders, make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
 from modules.utils import Rect, Point2f
@@ -305,7 +305,7 @@ class DeepFlowRender(RenderBase):
         for i, _motion in self.L[Layers.motion].items():
             if i not in bridges or i not in self.L[Layers.fluid]:
                 continue
-            ports: dict[ls.FlowStage, dict[str, ls.Port]] = {
+            ports: dict[ls.FlowStage, dict[str, Port]] = {
                 ls.FlowStage.MOTION: cast(ls.Motion3DLayer, _motion).ports,
                 ls.FlowStage.BRIDGE: bridges[i].ports,
                 ls.FlowStage.FLUID: cast(ls.Fluid3DLayer, self.L[Layers.fluid][i]).ports,

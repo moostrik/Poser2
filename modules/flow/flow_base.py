@@ -7,6 +7,7 @@ from abc import ABC
 
 from modules.gl import SwapFbo, Texture
 from .flow_util import FlowUtil
+from .port import Port, TextureKind
 
 
 class FlowBase(ABC):
@@ -15,10 +16,12 @@ class FlowBase(ABC):
     Provides input_fbo and output_fbo (SwapFbo) for ping-pong rendering.
 
     Derived classes must:
-    1. Set _input_internal_format and _output_internal_format in __init__()
+    1. Set _input_internal_format and _output_internal_format in __init__(), and the kinds
+       _input_kind and _output_kind the monitors draw them by
     2. Implement update(delta_time) to process input_fbo → output_fbo
     3. Expose domain-specific public APIs (e.g., set_velocity(), .velocity property)
     4. Never expose _input, _output, _set(), or _add() directly
+    5. Name the other textures they own in `ports`, after the base's `input` and `output`
 
     Protected methods (_set, _add) and properties (_input, _output) are for
     internal use only. Derived classes wrap these with semantic names.
@@ -32,6 +35,14 @@ class FlowBase(ABC):
         # Subclasses must set these in __init__
         self._input_internal_format: int = 0
         self._output_internal_format: int = 0
+        self._input_kind: TextureKind | None = None
+        self._output_kind: TextureKind | None = None
+
+    @property
+    def ports(self) -> dict[str, Port]:
+        """The textures it owns with their kinds: `input` and `output`; a subclass adds its others."""
+        assert self._input_kind is not None and self._output_kind is not None
+        return {'input': Port(self._input_fbo, self._input_kind), 'output': Port(self._output_fbo, self._output_kind)}
 
     @property
     def _input(self) -> Texture:
@@ -61,6 +72,8 @@ class FlowBase(ABC):
         """
         if self._input_internal_format == 0 or self._output_internal_format == 0:
             raise RuntimeError(f"{self.__class__.__name__} must set input_internal_format and output_internal_format in __init__")
+        if self._input_kind is None or self._output_kind is None:
+            raise RuntimeError(f"{self.__class__.__name__} must set _input_kind and _output_kind in __init__")
 
         out_w = output_width if output_width is not None else width
         out_h = output_height if output_height is not None else height

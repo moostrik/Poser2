@@ -48,7 +48,7 @@ from OpenGL.GL import GL_R16F, GL_R32F, GL_RG32F, GL_RGBA32F
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import BaseSettings, Field
-from .. import FlowBase, FlowUtil
+from .. import FlowBase, FlowUtil, Port, TextureKind
 from .patch import Patch
 from .shaders import DepthStepFilter, DepthThreshold, DepthVelocityShader
 
@@ -90,6 +90,8 @@ class DepthVelocity(FlowBase):
 
         self._input_internal_format = GL_R32F
         self._output_internal_format = GL_R16F
+        self._input_kind = TextureKind.SCALAR
+        self._output_kind = TextureKind.SCALAR
 
         self._step_filter_shader: DepthStepFilter = DepthStepFilter()
         self._velocity_shader: DepthVelocityShader = DepthVelocityShader()
@@ -109,6 +111,13 @@ class DepthVelocity(FlowBase):
         """The track (RGBA32F): z before the threshold in red (view widths per frame), its disparity
         (1/m) in green, the disparity's rate (1/m per second) in blue and the dead zone's anchor (m) in alpha."""
         return self._track
+
+    @property
+    def ports(self) -> dict[str, Port]:
+        """`input` is the depth with its edges taken off, `raw` as it came."""
+        return {'raw': Port(self._raw, TextureKind.SCALAR), **super().ports,
+                'track': Port(self._track, TextureKind.SCALAR),
+                'catch_up': Port(self._catch_up, TextureKind.SCALAR)}
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         super().allocate(width, height, output_width, output_height)

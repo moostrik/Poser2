@@ -2,10 +2,9 @@
 
 # Local application imports
 from modules.gl import Texture
-from modules.flow import bridge_2d
+from modules.flow import bridge_2d, HasPorts
 from modules.settings import Group
 from .bridge_layer import BridgeLayer, BridgeLayerSettings, BridgeInput, BridgeOutput
-from .port import Port, TextureKind
 
 
 class Bridge2DLayerSettings(BridgeLayerSettings):
@@ -31,10 +30,11 @@ class Bridge2DLayer(BridgeLayer):
     @property
     def output(self) -> BridgeOutput:
         """The density is the amount alone, the smoothed velocity's speed (R); the 2D fluid colors it at its output."""
-        return BridgeOutput(self._trail.velocity, self._velocity_magnitude.magnitude, self._temperature_bridge.temperature, diagnostics={
-            'color': Port(self._color, TextureKind.IMAGE),
-            'density_bridge': Port(self._density_bridge.density, TextureKind.IMAGE),
-        })
+        return BridgeOutput(self._trail.velocity, self._velocity_magnitude.magnitude, self._temperature_bridge.temperature)
+
+    def _bridges(self) -> dict[str, HasPorts]:
+        return {'trail': self._trail, 'speed': self._velocity_magnitude, 'density': self._density_bridge,
+                'temperature': self._temperature_bridge}
 
     # ========== Lifecycle ==========
 

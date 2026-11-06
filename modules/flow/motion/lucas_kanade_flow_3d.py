@@ -30,7 +30,7 @@ from OpenGL.GL import GL_RG32F, GL_RGBA16F, GL_RGBA32F
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import BaseSettings, Field, Group, Widget
-from .. import FlowUtil
+from .. import FlowUtil, Port, TextureKind, prefixed
 from .depth_velocity import DepthVelocity, DepthVelocitySettings, track_weights
 from .lucas_kanade_flow import LucasKanadeFlow, LucasKanadeFlowSettings, _bilinear
 from .shaders import ComposeVelocity, DisplacementFilter, DisplacementThreshold
@@ -81,6 +81,15 @@ class LucasKanadeFlow3D:
     def depth_velocity(self) -> DepthVelocity:
         """Its z, before `z_gain` and the mask."""
         return self._depth_velocity
+
+    @property
+    def ports(self) -> dict[str, Port]:
+        """Its two parts under their settings groups: the x/y solve with its smoothing, and the z.
+        The composed velocity is the motion stage's output."""
+        return {**prefixed('xy', {**self._flow.ports,
+                                  'filtered': Port(self._filtered, TextureKind.VELOCITY),
+                                  'followed': Port(self._followed, TextureKind.VELOCITY)}),
+                **prefixed('z', self._depth_velocity.ports)}
 
     def allocate(self, width: int, height: int) -> None:
         self._flow.allocate(width, height)

@@ -1,9 +1,8 @@
 """The 2D motion layer: the gradient flow, x/y from the image, as on main."""
 
 # Local application imports
-from modules.flow import GradientFlow, GradientFlowSettings
+from modules.flow import GradientFlow, GradientFlowSettings, HasPorts
 from .motion_layer import MotionLayer, MotionLayerSettings, MotionInput, MotionOutput
-from .port import Port, TextureKind
 
 
 class Motion2DLayerSettings(GradientFlowSettings, MotionLayerSettings):
@@ -21,9 +20,10 @@ class Motion2DLayer(MotionLayer):
 
     @property
     def output(self) -> MotionOutput:
-        return MotionOutput(self._flow.velocity, diagnostics={
-            'luminance': Port(self._flow.color_input, TextureKind.IMAGE),
-        })
+        return MotionOutput(self._flow.velocity)
+
+    def _components(self) -> dict[str, HasPorts]:
+        return {'gradient': self._flow}
 
     # ========== The flow ==========
 

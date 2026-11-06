@@ -10,7 +10,7 @@ from OpenGL.GL import GL_VIEWPORT, glGetIntegerv
 
 # Local application imports
 from modules.gl import Texture, Style, Text, Blit
-from modules.flow import Fluid3D, Fluid3DSettings
+from modules.flow import Fluid3D, Fluid3DSettings, HasPorts
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidOutput, Injection
 
 
@@ -37,6 +37,9 @@ class Fluid3DLayer(FluidLayer):
     @property
     def output(self) -> FluidOutput:
         return FluidOutput(self._fluid.density)
+
+    def _components(self) -> dict[str, HasPorts]:
+        return {'': self._fluid}
 
     def set_eye(self, x: float, y: float) -> None:
         """The parallax eye's offset (±1 across the frame, vertical at half range), read at the next composite."""

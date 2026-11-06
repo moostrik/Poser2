@@ -8,7 +8,7 @@ from OpenGL.GL import GL_RG16F, GL_RGBA16F
 
 from modules.gl import Texture
 from modules.settings import Field, BaseSettings
-from .. import FlowBase, FlowUtil
+from .. import FlowBase, FlowUtil, TextureKind
 from ..shaders import Trail, GaussianBlur
 
 
@@ -43,6 +43,8 @@ class SmoothTrail(FlowBase):
         # Define formats
         self._input_internal_format = format
         self._output_internal_format = format
+        self._input_kind = TextureKind.VELOCITY
+        self._output_kind = TextureKind.VELOCITY
 
         self.settings: SmoothTrailSettings = settings or SmoothTrailSettings()
 

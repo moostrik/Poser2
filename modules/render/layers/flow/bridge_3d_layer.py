@@ -12,10 +12,10 @@ from modules.flow import (
     VelocityMagnitude,
     TemperatureBridge, TemperatureBridgeSettings,
     DensityBridge, DensityBridgeSettings,
+    HasPorts,
 )
 from modules.settings import Field, Group
 from .bridge_layer import BridgeLayer, BridgeLayerSettings, BridgeInput, BridgeOutput
-from .port import Port, TextureKind
 
 
 class BridgeMethod(IntEnum):
@@ -64,29 +64,16 @@ class Bridge3DLayer(BridgeLayer):
     def output(self) -> BridgeOutput:
         kinetic: KineticBridgeSettings = self.settings.kinetic
         bridge: KineticBridge = self._kinetic_bridge
-        diagnostics: dict[str, Port] = {
-            'speed': Port(self._velocity_magnitude.magnitude, TextureKind.SCALAR),
-            'color': Port(self._color, TextureKind.IMAGE),
-        }
-        if self._kinetic:
-            diagnostics.update({
-                'kinetic_fast': Port(bridge.fast, TextureKind.VELOCITY),
-                'kinetic_slow': Port(bridge.slow, TextureKind.VELOCITY),
-                'kinetic_acceleration': Port(bridge.acceleration, TextureKind.SCALAR),
-                'kinetic_depth_acceleration': Port(bridge.depth_acceleration, TextureKind.SCALAR),
-                'kinetic_turn': Port(bridge.turn, TextureKind.SCALAR),
-                'kinetic_held_release': Port(bridge.held_release, TextureKind.SCALAR),
-                'kinetic_reservoir': Port(bridge.reservoir, TextureKind.SCALAR),
-                'kinetic_emission': Port(bridge.emission, TextureKind.SCALAR),
-                'kinetic_onset_velocity': Port(bridge.onset_velocity, TextureKind.VELOCITY),
-                'kinetic_curl': Port(bridge.curl, TextureKind.SCALAR),
-            })
         return BridgeOutput(
             self._velocity, self._density_bridge.density, self._temperature_bridge.temperature,
             bridge.onset_velocity if self._kinetic and kinetic.onset.force > 0.0 else None,
             bridge.curl if self._kinetic and kinetic.onset.spin > 0.0 else None,
-            diagnostics=diagnostics,
         )
+
+    def _bridges(self) -> dict[str, HasPorts]:
+        """The method's bridge only, then the speed, the density and the temperature."""
+        velocity: dict[str, HasPorts] = {'kinetic': self._kinetic_bridge} if self._kinetic else {'trail': self._trail_bridge}
+        return {**velocity, 'speed': self._velocity_magnitude, 'density': self._density_bridge, 'temperature': self._temperature_bridge}
 
     # ========== Lifecycle ==========
 

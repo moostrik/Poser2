@@ -8,7 +8,7 @@ from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R8, GL_RED, GL_RG16
 from modules.gl import Fbo, Texture, Blit
 
 from modules.settings import Field, BaseSettings
-from .. import FlowBase, FlowUtil
+from .. import FlowBase, FlowUtil, TextureKind
 from .shaders import Luminance, GradientFlowShader
 
 
@@ -32,6 +32,8 @@ class GradientFlow(FlowBase):
         # Define internal formats
         self._input_internal_format = GL_R8      # Luminance input (current/previous frames)
         self._output_internal_format = GL_RG16F  # Velocity output
+        self._input_kind = TextureKind.IMAGE
+        self._output_kind = TextureKind.VELOCITY
 
         # Configuration with change notification
         self.settings: GradientFlowSettings = settings or GradientFlowSettings()

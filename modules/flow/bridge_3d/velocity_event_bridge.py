@@ -22,7 +22,7 @@ from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R16F, GL_RG16F, GL_
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import Field, BaseSettings
-from .. import FlowBase, FlowUtil
+from .. import FlowBase, FlowUtil, Port, TextureKind
 from ..shaders import Trail
 from .kinetics import EPSILON, decay_weight, direction
 from .shaders import Event, KineticOnset, KineticPatch, ScaleVelocity, VelocityEvent
@@ -58,6 +58,8 @@ class VelocityEventBridge(FlowBase):
 
         self._input_internal_format = GL_RGBA16F
         self._output_internal_format = GL_RGBA16F
+        self._input_kind = TextureKind.VELOCITY
+        self._output_kind = TextureKind.VELOCITY
 
         self.settings: VelocityEventBridgeSettings = settings or VelocityEventBridgeSettings()
 
@@ -109,6 +111,16 @@ class VelocityEventBridge(FlowBase):
     def stop_velocity(self) -> Texture:
         """The stop along the slow trail's direction, the motion it ended (RGBA16F, xyz)."""
         return self._stop_velocity_fbo
+
+    @property
+    def ports(self) -> dict[str, Port]:
+        return {**super().ports,
+                'fast': Port(self._fast_fbo, TextureKind.VELOCITY),
+                'slow': Port(self._slow_fbo, TextureKind.VELOCITY),
+                'start': Port(self._start_fbo, TextureKind.SCALAR),
+                'stop': Port(self._stop_fbo, TextureKind.SCALAR),
+                'start_velocity': Port(self._start_velocity_fbo, TextureKind.VELOCITY),
+                'stop_velocity': Port(self._stop_velocity_fbo, TextureKind.VELOCITY)}
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate all fields at the bridge resolution."""

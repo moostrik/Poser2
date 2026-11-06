@@ -23,7 +23,7 @@ Boundary conditions via per-field wrap modes:
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_R16F, GL_R8, GL_RG16F, GL_RGBA16F
 
 from modules.gl import Texture, SwapFbo, Fbo, Profiler
-from .. import FlowUtil
+from .. import FlowUtil, Port, TextureKind
 from ..time_step import TimeStep
 from ..shaders import AddBoolean
 from ..boundary_mode import BoundaryMode
@@ -852,6 +852,19 @@ class Fluid2D:
     def obstacle(self) -> Texture:
         """R8 obstacle mask."""
         return self._density_obstacle_fbo
+
+    @property
+    def ports(self) -> dict[str, Port]:
+        """Its fields, each in the order a step reaches it."""
+        return {'obstacle': Port(self._density_obstacle_fbo, TextureKind.SCALAR),
+                'velocity': Port(self._velocity_fbo, TextureKind.VELOCITY),
+                'vorticity': Port(self._vorticity_curl_fbo, TextureKind.SCALAR),
+                'vorticity_force': Port(self._vorticity_force_fbo, TextureKind.VELOCITY),
+                'buoyancy': Port(self._buoyancy_fbo, TextureKind.VELOCITY),
+                'divergence': Port(self._divergence_fbo, TextureKind.SCALAR),
+                'pressure': Port(self._pressure_fbo, TextureKind.SCALAR),
+                'temperature': Port(self._temperature_fbo, TextureKind.SCALAR),
+                'density': Port(self._density_fbo, TextureKind.IMAGE)}
 
     @property
     def sim_width(self) -> int:
