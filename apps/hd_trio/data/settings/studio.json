@@ -540,7 +540,7 @@
         "channel": "ALL",
         "scale": 1.0,
         "blend_mode": "ADD",
-        "arrow_spacing": "SPACING_16"
+        "glyph_spacing": "SPACING_16"
       }
     },
     "monitor_b": {
@@ -551,7 +551,7 @@
         "channel": "ALL",
         "scale": 1.0,
         "blend_mode": "ADD",
-        "arrow_spacing": "SPACING_16"
+        "glyph_spacing": "SPACING_16"
       }
     },
     "bridge": {

@@ -556,7 +556,7 @@
       "advanced": {
         "channel": "ALL",
         "scale": 1.0,
-        "arrow_spacing": "SPACING_64",
+        "glyph_spacing": "SPACING_64",
         "legend": true,
         "blend_mode": "ADD"
       }
@@ -568,7 +568,7 @@
       "advanced": {
         "channel": "ALL",
         "scale": 1.0,
-        "arrow_spacing": "SPACING_64",
+        "glyph_spacing": "SPACING_64",
         "legend": true,
         "blend_mode": "ADD"
       }

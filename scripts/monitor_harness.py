@@ -29,7 +29,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from modules.flow import Cut, OnDemand, Port, TextureKind, VolumeCut, cut_size  # noqa: E402
 from modules.flow.fluid_3d.shaders import ReduceDensity  # noqa: E402  (a harness reaches inside, as the compare scripts do)
 from modules.gl import Fbo, MouseButton, Style, SwapTexture2DArray, Texture, Texture3D  # noqa: E402
-from modules.render.layers import FlowStage, MonitorInput, MonitorLayer, MonitorLayerSettings, MonitorView  # noqa: E402
+from modules.render.layers import Channel, FlowStage, MonitorInput, MonitorLayer, MonitorLayerSettings, MonitorView  # noqa: E402
 
 OUT: str = os.path.join('temp', 'monitor_harness')
 PANEL: tuple[int, int] = (540, 960)         # a panel's size, about what a main-window panel gives
@@ -138,7 +138,7 @@ class Results:
 
 # ── step 1a: the monitor at its drawn size ──────────────────────────────
 
-VIEWS: tuple[MonitorView, ...] = (MonitorView.IMAGE, MonitorView.COLORMAP, MonitorView.ARROWS,
+VIEWS: tuple[MonitorView, ...] = (MonitorView.IMAGE, MonitorView.COLORMAP, MonitorView.GLYPHS,
                                   MonitorView.HISTOGRAM, MonitorView.STRIP)
 
 
@@ -387,6 +387,81 @@ def step_3(results: Results) -> None:
     check_cube_pictures(results, known_volume(64, 48, 8))
 
 
+# ── step 4: glyphs ────────────────────────────────────────────────────────
+
+def drawn(pixels: np.ndarray) -> np.ndarray:
+    """The pixels something was drawn into (alpha above zero)."""
+    return pixels[pixels[..., 3] > 0]
+
+
+def check_flat_dots(results: Results) -> None:
+    """A scalar's dot in its cell: the colormap's color at its center."""
+    values = np.zeros((288, 512, 4), np.float32)
+    values[..., 0] = 0.8
+    monitor = Monitor(Port(texture_of(values), TextureKind.SCALAR), MonitorView.GLYPHS)
+    monitor.settings.advanced.channel = Channel.X
+    monitor.settings.advanced.legend = False
+    monitor.tick(PANEL)
+    pixels = monitor.picture()
+    spacing: int = int(monitor.settings.advanced.glyph_spacing.value)
+    center = pixels[spacing // 2, spacing // 2, :3].astype(np.float32) / 255.0      # the first cell's middle, from the top left
+    results.check("a scalar's dot has the colormap's color", bool(np.allclose(center, (0.9, 0.5, 0.5), atol=0.03)),
+                  f'{np.round(center, 2)}')
+    results.save('4_dots_flat', pixels)
+
+
+def glyph_monitor(values: np.ndarray, kind: TextureKind, extent: float = 0.5) -> Monitor:
+    monitor = Monitor(Port(volume_of(values), kind, extent), MonitorView.GLYPHS)
+    monitor.settings.advanced.cut = Cut.CUBE
+    monitor.settings.advanced.legend = False
+    return monitor
+
+
+def check_3d_glyphs(results: Results) -> None:
+    d, h, w = 8, 48, 64
+    toward = np.zeros((d, h, w, 4), np.float32)
+    toward[..., 2] = 1.0                                     # every arrow toward the camera of the front view
+    monitor = glyph_monitor(toward, TextureKind.VELOCITY)
+    monitor.tick(PANEL)
+    pixels = drawn(monitor.picture())
+    blue = len(pixels) > 0 and float(pixels[:, 2].mean()) > float(pixels[:, 0].mean())
+    results.check('an arrow pointing at the camera still shows, in its direction color', blue, f'{len(pixels)} pixels')
+    results.save('4_arrows_toward', monitor.picture())
+
+    swirl_volume = np.repeat(swirl(w, h)[None], d, axis=0)
+    swirl_volume[..., 2] = np.linspace(-1.0, 1.0, d)[:, None, None]      # z from the back to the front
+    monitor = glyph_monitor(swirl_volume, TextureKind.VELOCITY)
+    for name, drags in (('front', []), ('turned', [(0.2, 0.15)])):
+        monitor.layer.reset_view()
+        for dx, dy in drags:
+            monitor.layer.drag(dx, dy, MouseButton.LEFT)
+        monitor.tick(PANEL)
+        results.save(f'4_arrows_{name}', monitor.picture())
+
+    sphere = known_volume(w, h, d)
+    sphere[..., 0] = sphere[..., 1]                          # the dots' size is x: the sphere
+    dots = glyph_monitor(sphere, TextureKind.SCALAR)
+    dots.layer.drag(0.15, 0.1, MouseButton.LEFT)
+    dots.tick(PANEL)
+    results.check('a scalar volume draws its dots', len(drawn(dots.picture())) > 0)
+    results.save('4_dots_turned', dots.picture())
+    empty = glyph_monitor(np.zeros((d, h, w, 4), np.float32), TextureKind.SCALAR)
+    empty.tick(PANEL)
+    edges = drawn(empty.picture())
+    results.check('values too small to see draw no dots, only the edges', len(edges) > 0 and bool(np.all(np.abs(edges[:, 0].astype(int) - edges[:, 1].astype(int)) < 4)))
+
+    big = glyph_monitor(np.repeat(np.repeat(np.repeat(swirl(448, 800)[None], 16, axis=0), 1, axis=1), 1, axis=2), TextureKind.VELOCITY, 0.14)
+    big.tick(PANEL)
+    ms = gpu_ms(lambda: big.tick(PANEL), 10)
+    print(f'     3D arrows  {ms:6.2f} ms of a 448 x 800 x 16 volume at {PANEL[0]} x {PANEL[1]}, spacing 32')
+
+
+def step_4(results: Results) -> None:
+    print('step 4: glyphs')
+    check_flat_dots(results)
+    check_3d_glyphs(results)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--no-png', action='store_true', help='skip the pictures')
@@ -396,6 +471,7 @@ def main() -> int:
     step_1a(results)
     step_1b(results)
     step_3(results)
+    step_4(results)
     glFinish()
     glfw.destroy_window(window)
     glfw.terminate()

@@ -3,7 +3,7 @@ it is shown.
 
 `MonitorInput` is what the app hands it each tick: every stage's ports. The monitor picks the stage
 and the texture by its own settings, and draws their channels, all or one, by the port's kind or by
-the view asked: as an image, as a colormap centered on grey, as arrows, as a strip of the channels'
+the view asked: as an image, as a colormap centered on grey, as glyphs, as a strip of the channels'
 amounts over time, or as a histogram of their values, the last two under their log axis, the colormap under its key
 (`Legend`). It renders in `draw`, once per tick however many panels show it, and nothing in
 `update`, at the size it is drawn at (`DrawnSize`): the viewport the app fits it into, not the
@@ -15,7 +15,7 @@ from enum import IntEnum, auto
 from OpenGL.GL import GL_VIEWPORT, glGetIntegerv, glViewport
 
 from modules.gl import Texture, Texture3D, Style, Blit, MouseButton, fit
-from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind, VolumeCut, VolumeCube, Cut, Orbit
+from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind, VolumeCut, VolumeCube, VolumeGlyphs, Cut, Orbit
 from modules.settings import Field, BaseSettings, Group, Widget
 from ..layer_base import LayerBase
 
@@ -32,7 +32,7 @@ class MonitorView(IntEnum):
     AUTO = 0
     IMAGE = auto()
     COLORMAP = auto()
-    ARROWS = auto()
+    GLYPHS = auto()
     HISTOGRAM = auto()
     STRIP = auto()
 
@@ -46,8 +46,8 @@ class Channel(IntEnum):
     ALL = ALL_CHANNELS
 
 
-class ArrowSpacing(IntEnum):
-    """The distance between arrows, in pixels, in steps that double."""
+class GlyphSpacing(IntEnum):
+    """The distance between glyphs, in pixels, in steps that double."""
     SPACING_4 = 4
     SPACING_8 = 8
     SPACING_16 = 16
@@ -62,11 +62,11 @@ class ArrowSpacing(IntEnum):
 
 
 class MonitorAdvancedSettings(BaseSettings):
-    """How the monitor draws: the channels, the scale, the arrows' spacing, the legend and the blend."""
+    """How the monitor draws: the channels, the scale, the glyphs' spacing, the legend and the blend."""
     channel: Field[Channel] =       Field(Channel.ALL, width=16, description="The channels drawn")
     cut: Field[Cut] =               Field(Cut.CUBE, width=24, description="How a volume is laid out: in 3D, one layer, or seen from the front, the top or the side")
     scale: Field[float] =           Field(1.0, min=0.01, max=100.0, widget=Widget.log_slider, description="Multiplier on the values")
-    arrow_spacing: Field[ArrowSpacing] = Field(ArrowSpacing.SPACING_32, width=24, description="Distance between arrows (pixels)")
+    glyph_spacing: Field[GlyphSpacing] = Field(GlyphSpacing.SPACING_32, width=24, description="Distance between glyphs (pixels)")
     legend: Field[bool] =           Field(True, description="The strip's and histogram's log axis, the colormap's key")
     blend_mode: Field[Style.BlendMode] = Field(Style.BlendMode.ADD, width=32, description="How the monitor is drawn over the panel")
 
@@ -76,7 +76,7 @@ class MonitorLayerSettings(BaseSettings):
     stage: Field[FlowStage] =       Field(FlowStage.BRIDGE, description="The stage whose texture is shown")
     names: Field[list[str]] =       Field([""], access=Field.READ, visible=False, description="The stage's textures")
     texture: Field[str] =           Field("output.velocity", widget=Widget.text_select, options=names, description="The texture shown")
-    view: Field[MonitorView] =      Field(MonitorView.AUTO, description="By its kind, as an image, as a colormap centered on grey, as arrows, as a strip over time, or as a histogram")
+    view: Field[MonitorView] =      Field(MonitorView.AUTO, description="By its kind, as an image, as a colormap centered on grey, as glyphs (arrows, or dots for a scalar), as a strip over time, or as a histogram")
     camera: Field[str] =            Field("", access=Field.READ, description="A volume's view: the angle and zoom (left and right drag), the layer (scroll); middle click resets")
 
     advanced = Group(MonitorAdvancedSettings)
@@ -90,7 +90,7 @@ class MonitorInput:
 
 _AUTO_VIEWS: dict[TextureKind, MonitorView] = {
     TextureKind.IMAGE: MonitorView.IMAGE,
-    TextureKind.VELOCITY: MonitorView.ARROWS,
+    TextureKind.VELOCITY: MonitorView.GLYPHS,
     TextureKind.SCALAR: MonitorView.COLORMAP,
 }
 
@@ -114,8 +114,9 @@ class MonitorLayer(LayerBase):
         self._rendered_size: tuple[int, int] = (0, 0)   # the size this tick's port was rendered at
         self._strip_stepped: bool = False           # the strip got this tick's column
         self._volume_cut: VolumeCut = VolumeCut()   # a volume laid out flat for the 2D views
-        self._volume_cube: VolumeCube = VolumeCube()    # a volume in 3D, for the picture views
-        self._cube_shown: bool = False              # what it rendered last is the cube
+        self._volume_cube: VolumeCube = VolumeCube()    # a volume in 3D, for the image and colormap views
+        self._volume_glyphs: VolumeGlyphs = VolumeGlyphs()  # a volume in 3D, for the glyphs
+        self._shown_3d: Texture | None = None       # what it rendered last, when it is one of the 3D views
         self._slice: float = 0.5                    # the slice's place through a volume, 0 front to 1 back
         self._layers: int = 0                       # the layers a scroll steps through, the show's density's
         self._orbit: Orbit = Orbit()                # the 3D views' camera; the mouse turns it, a middle click resets it
@@ -163,8 +164,8 @@ class MonitorLayer(LayerBase):
         """The port as drawn last: the strip, a volume's cube, or the visualizer's output."""
         if self._view == MonitorView.STRIP:
             return self._strip.texture
-        if self._cube_shown:
-            return self._volume_cube.texture
+        if self._shown_3d is not None:
+            return self._shown_3d
         return self._visualizer.texture
 
     # ========== Lifecycle ==========
@@ -176,11 +177,13 @@ class MonitorLayer(LayerBase):
         self._legend.allocate()
         self._volume_cut.allocate()
         self._volume_cube.allocate()
+        self._volume_glyphs.allocate()
         self._allocated = True
 
     def deallocate(self) -> None:
         self._volume_cut.deallocate()
         self._volume_cube.deallocate()
+        self._volume_glyphs.deallocate()
         self._visualizer.deallocate()
         self._strip.deallocate()
         self._legend.deallocate()
@@ -191,6 +194,7 @@ class MonitorLayer(LayerBase):
         self._strip.resize(height)
         self._legend.resize(width, height)
         self._volume_cube.resize(width, height)
+        self._volume_glyphs.resize(width, height)
 
     # ========== Processing ==========
 
@@ -231,10 +235,10 @@ class MonitorLayer(LayerBase):
             view = _AUTO_VIEWS[port.kind]
         self._view = view
         self._aspect = None
-        self._cube_shown = False
-        if port.volume and settings.advanced.cut == Cut.CUBE and view in (MonitorView.IMAGE, MonitorView.COLORMAP):
-            self._render_cube(port, view == MonitorView.COLORMAP, scale, int(channel))
-            if view == MonitorView.COLORMAP:
+        self._shown_3d = None
+        if port.volume and settings.advanced.cut == Cut.CUBE and view in (MonitorView.IMAGE, MonitorView.COLORMAP, MonitorView.GLYPHS):
+            self._render_3d(port, view, scale, int(channel))
+            if view != MonitorView.IMAGE:
                 self._legend_kind = LegendKind.COLORMAP
                 if settings.advanced.legend:
                     self._legend.update(self._legend_kind, int(channel), scale, self._visualizer.histogram_total)
@@ -258,16 +262,23 @@ class MonitorLayer(LayerBase):
             self._visualizer.process_histogram(port.texture if port.volume else texture, scale, int(channel))
             self._legend_kind = LegendKind.HISTOGRAM
         else:
-            self._visualizer.process_arrows(texture, scale, float(settings.advanced.arrow_spacing.value))
+            self._visualizer.process_glyphs(texture, scale, float(settings.advanced.glyph_spacing.value),
+                                            port.kind != TextureKind.VELOCITY, int(channel))
 
-    def _render_cube(self, port: Port, colormap: bool, scale: float, channel: int) -> None:
-        """A volume's layers stacked in its box, from the orbit camera, the slice's layer pulled out."""
+    def _render_3d(self, port: Port, view: MonitorView, scale: float, channel: int) -> None:
+        """A volume in its box from the orbit camera: for the image and the colormap its layers stacked,
+        the slice's layer pulled out; for the glyphs arrows of a velocity or dots of a scalar."""
         if port.prepare is not None:
             port.prepare()
         volume = port.texture
         assert isinstance(volume, Texture3D)
-        self._volume_cube.process(volume, self._orbit, self._slice, port.extent, scale, channel, colormap)
-        self._cube_shown = True
+        if view == MonitorView.GLYPHS:
+            spacing: float = float(self.settings.advanced.glyph_spacing.value)
+            self._shown_3d = self._volume_glyphs.process(volume, self._orbit, port.extent, spacing, scale,
+                                                         port.kind != TextureKind.VELOCITY, channel)
+        else:
+            self._shown_3d = self._volume_cube.process(volume, self._orbit, self._slice, port.extent, scale, channel,
+                                                       view == MonitorView.COLORMAP)
 
     def _flat(self, port: Port, view: MonitorView) -> Texture:
         """The 2D texture a view draws: the port's own, or a volume's flat cut. A volume is brought up

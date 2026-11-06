@@ -1,5 +1,5 @@
 """The visualizer: draws a texture's channels into its own FBO, as an image, as a colormap centered on grey,
-as arrows or as a histogram. A channel is 0 to 3 for x, y, z, w, or `ALL_CHANNELS`; a channel the
+as glyphs (arrows for a velocity, dots for a scalar) or as a histogram. A channel is 0 to 3 for x, y, z, w, or `ALL_CHANNELS`; a channel the
 texture does not have reads as sampled: a one-channel texture repeats x in y and z (its grey
 swizzle), and a missing w is 1."""
 
@@ -9,7 +9,7 @@ from OpenGL.GL import GL_NEAREST, GL_R32UI, GL_RED_INTEGER, GL_RGBA8, GL_UNSIGNE
 from modules.gl import Fbo, Texture, Texture3D
 
 from .. import FlowUtil
-from .shaders import ChannelView, HistogramCount, HistogramCountVolume, HistogramDraw, VelocityArrowField
+from .shaders import ChannelView, GlyphField, HistogramCount, HistogramCountVolume, HistogramDraw
 from .strip import ALL_CHANNELS
 
 ARROW_WIDTH: float = 1.0 / 20.0     # the arrows' line width, a share of their spacing
@@ -35,7 +35,7 @@ class Visualizer:
     def __init__(self) -> None:
         self._fbo: Fbo = Fbo()
         self._channel_view: ChannelView = ChannelView()
-        self._arrows: VelocityArrowField = VelocityArrowField()
+        self._glyphs: GlyphField = GlyphField()
         self._histogram: Texture = Texture(GL_NEAREST)  # the bins, one row per channel; an integer texture must not filter
         self._histogram_count: HistogramCount = HistogramCount()
         self._histogram_count_volume: HistogramCountVolume = HistogramCountVolume()
@@ -65,7 +65,7 @@ class Visualizer:
         """The shaders and the histogram's bins; the FBO comes with the first `resize`."""
         self._histogram.allocate(HISTOGRAM_BINS, 4, GL_R32UI)
         self._channel_view.allocate()
-        self._arrows.allocate()
+        self._glyphs.allocate()
         self._histogram_count.allocate()
         self._histogram_count_volume.allocate()
         self._histogram_draw.allocate()
@@ -74,7 +74,7 @@ class Visualizer:
         self._fbo.deallocate()
         self._histogram.deallocate()
         self._channel_view.deallocate()
-        self._arrows.deallocate()
+        self._glyphs.deallocate()
         self._histogram_count.deallocate()
         self._histogram_count_volume.deallocate()
         self._histogram_draw.deallocate()
@@ -88,16 +88,19 @@ class Visualizer:
         channel in its own color, w as grey."""
         self._process_channels(texture, scale, channel, True)
 
-    def process_arrows(self, texture: Texture, scale: float, spacing: float) -> None:
-        """The arrow of x and y, with a ring for z when the texture has it, `spacing` apart (pixels):
-        at speed 1 an arrow reaches one spacing, and at most two; its lines are spacing / 20 wide."""
+    def process_glyphs(self, texture: Texture, scale: float, spacing: float, dots: bool = False,
+                       channel: int = ALL_CHANNELS) -> None:
+        """Glyphs `spacing` apart (pixels). A velocity's arrow of x and y, with a ring for z when the
+        texture has it: at speed 1 it reaches one spacing, and at most two; its lines are spacing / 20
+        wide. With `dots`, a scalar's dot in each cell, in the colormap's color, its radius the value's
+        size, half a spacing at 1."""
         if not self._fbo.allocated or not texture.allocated:
             return
         xyz: bool = FlowUtil.get_num_channels(texture.internal_format) >= 3
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._fbo.begin()
-        self._arrows.reload()
-        self._arrows.use(texture, scale, spacing, spacing * ARROW_WIDTH, xyz)
+        self._glyphs.reload()
+        self._glyphs.use(texture, scale, spacing, spacing * ARROW_WIDTH, xyz, dots, channel)
         self._fbo.end()
 
     def process_histogram(self, texture: Texture | Texture3D, scale: float, channel: int = ALL_CHANNELS) -> None:

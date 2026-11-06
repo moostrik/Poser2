@@ -1,4 +1,8 @@
-from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_COLOR_ATTACHMENT0, GL_COLOR_BUFFER_BIT, GL_FRAMEBUFFER, GL_LINEAR, GL_TEXTURE_2D, glBindFramebuffer, glClear, glClearColor, glFramebufferTexture2D, glGenFramebuffers, glViewport
+from OpenGL.GL import (Constant, GL_CLAMP_TO_EDGE, GL_COLOR_ATTACHMENT0, GL_COLOR_BUFFER_BIT, GL_DEPTH_ATTACHMENT,
+                       GL_DEPTH_BUFFER_BIT, GL_DEPTH_COMPONENT24, GL_FRAMEBUFFER, GL_LINEAR, GL_RENDERBUFFER, GL_TEXTURE_2D,
+                       glBindFramebuffer, glBindRenderbuffer, glClear, glClearColor, glDeleteRenderbuffers,
+                       glFramebufferRenderbuffer, glFramebufferTexture2D, glGenFramebuffers, glGenRenderbuffers,
+                       glRenderbufferStorage, glViewport)
 from .texture import Texture
 
 _current_viewport: tuple[int, int, int, int] = (0, 0, 0, 0)
@@ -7,9 +11,13 @@ class Fbo(Texture):
     def __init__(self,
                  interpolation: int = GL_LINEAR,
                  wrap: int = GL_CLAMP_TO_EDGE,
-                 border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0)) -> None:
+                 border_color: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 1.0),
+                 depth: bool = False) -> None:
+        """`depth`: a depth buffer beside the color, for a draw with the depth test."""
         super().__init__(interpolation, wrap, border_color)
         self.fbo_id = 0
+        self._depth: bool = depth
+        self._depth_id: int = 0
 
 
     def allocate(self, width: int, height: int, internal_format) -> None:
@@ -21,12 +29,24 @@ class Fbo(Texture):
         glBindFramebuffer(GL_FRAMEBUFFER, self.fbo_id)
         self.bind()
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, self.tex_id, 0)
+        if self._depth:
+            self._depth_id = glGenRenderbuffers(1)
+            glBindRenderbuffer(GL_RENDERBUFFER, self._depth_id)
+            glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height)
+            glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, self._depth_id)
+            glBindRenderbuffer(GL_RENDERBUFFER, 0)
 
         glClearColor(0.0, 0.0, 0.0, 0.0)
-        glClear(GL_COLOR_BUFFER_BIT)
+        glClear(GL_COLOR_BUFFER_BIT | (GL_DEPTH_BUFFER_BIT if self._depth else 0))
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         self.unbind()
+
+    def deallocate(self) -> None:
+        if self._depth_id:
+            glDeleteRenderbuffers(1, [self._depth_id])
+            self._depth_id = 0
+        super().deallocate()
 
     def begin(self)  -> None:
         """Begin rendering to FBO. Uses top-left origin (see COORDINATE_SYSTEM.md)."""

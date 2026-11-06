@@ -1,14 +1,18 @@
 #version 460 core
 
-// Velocity Arrow Field Visualization
-// Procedural arrows without geometry shaders. A 2D velocity is a white arrow. A 3D velocity (xyz) is
-// the same white arrow for x/y with a ring around the grid point for z, red toward the camera and
-// green away, and shows with no x/y. Sizes are on the cell, the grid spacing: at a speed
-// of 1 the arrow's tip reaches 1 cell and the ring's radius is 1/pi cell, so a ring draws as much
-// line as an arrow of the same value; faster, both roll off toward 2 cells
+// Glyph Field
+// Procedural glyphs on a grid, without geometry shaders: an arrow for a velocity, a dot for a scalar.
+// A 2D velocity is a white arrow. A 3D velocity (xyz) is the same white arrow for x/y with a ring
+// around the grid point for z, red toward the camera and green away, and shows with no x/y. Sizes
+// are on the cell, the grid spacing: at a speed of 1 the arrow's tip reaches 1 cell and the ring's
+// radius is 1/pi cell, so a ring draws as much line as an arrow of the same value; faster, both roll
+// off toward 2 cells. A scalar is a dot in each cell, its color the colormap's (centered on grey),
+// its radius the value's size, half a cell at 1, small values small
 
 uniform sampler2D tex0;
 uniform bool xyz;                   // A 3D velocity: z in the blue channel
+uniform bool dots;                  // A scalar: dots, not arrows
+uniform int channel;                // The dots' channel, 0 to 3; 4 for all, x's size and xyz's colors
 uniform float scale;
 uniform float grid_spacing;         // in pixels
 uniform float arrow_thickness;
@@ -76,9 +80,26 @@ float coverage(float dist) {
     return 1.0 - smoothstep(-edge_width, edge_width, dist);
 }
 
+const vec3 AXES[4] = vec3[](vec3(1.0, 0.0, 0.0), vec3(0.0, 1.0, 0.0), vec3(0.0, 0.0, 1.0), vec3(1.0));
+
+// A dot in this pixel's cell: its colormap color, its radius the value's size (a cell holds one dot)
+vec4 dot_glyph(vec2 pixel) {
+    vec2 grid_pos = floor(pixel / grid_spacing) * grid_spacing + grid_spacing * 0.5;
+    vec4 value = texture(tex0, grid_pos / resolution) * scale;
+    float amount = channel == 4 ? value.x : value[channel];
+    vec3 color = 0.5 + 0.5 * (channel == 4 ? value.xyz : AXES[channel] * amount);
+    float radius = 0.5 * grid_spacing * tanh(abs(amount));
+    float alpha = coverage(length(pixel - grid_pos) - radius);
+    return vec4(clamp(color, 0.0, 1.0) * alpha, alpha);
+}
+
 void main() {
     // Current pixel in screen space
     vec2 pixel = gl_FragCoord.xy;
+    if (dots) {
+        fragColor = dot_glyph(pixel);
+        return;
+    }
     float cell = grid_spacing;
 
     float arrow_dist = 1e10;

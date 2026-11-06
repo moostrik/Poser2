@@ -7,8 +7,10 @@ from .log_grid import LogGrid
 from .colormap_key import ColormapKey
 from .strip_roll import StripRoll
 from .strip_summary import StripSummary
-from .velocity_arrow_field import VelocityArrowField
+from .glyph_field import GlyphField
 from .volume_cut import VolumeCutShader
 from .cube_slices import CubeSlices
 from .cube_edges import CubeEdges
+from .glyph_arrows import GlyphArrows
+from .glyph_dots import GlyphDots
 from .histogram_count_volume import HistogramCountVolume

@@ -347,7 +347,8 @@ class Side:
         self.flow.allocate(width, height)
         self.visualizer = Visualizer() if show else None
         if self.visualizer is not None:
-            self.visualizer.allocate(width, height)
+            self.visualizer.allocate()
+            self.visualizer.resize(width, height)
         self.measures = Measures()
 
     def step(self, frames: Frames, k: int, luminance: Texture, depth: Texture, mask: Texture) -> None:
@@ -367,7 +368,7 @@ class Side:
         if self.visualizer is None:
             return None
         if view == 5:
-            self.visualizer.process_arrows(self.flow.velocity, scale, 20.0)
+            self.visualizer.process_glyphs(self.flow.velocity, scale, 20.0)
         elif view == 4:
             self.visualizer.process_colormap(self.flow.velocity, scale)
         elif view == 3:
