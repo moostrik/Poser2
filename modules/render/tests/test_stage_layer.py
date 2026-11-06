@@ -60,7 +60,7 @@ class _Input:
 @dataclass
 class _KindOutput(StageOutput):
     velocity: Annotated[Texture, TextureKind.VELOCITY]
-    onset: Annotated[Texture | None, TextureKind.VELOCITY] = None
+    impulse: Annotated[Texture | None, TextureKind.VELOCITY] = None
 
 
 def _allocated() -> Texture:

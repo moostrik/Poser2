@@ -97,8 +97,8 @@ an output, or they would be the tick before's.
 | Stage  | Input `@dataclass`, built by the app each tick                                                                                      | Output `@dataclass`, the stage's textures                                                                |
 |--------|-------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
 | motion | `MotionInput`: `image`, the picture the velocity is measured on by its brightness; `timestamp`, the capture time of the camera frame `image` holds, the frame's identity; `dt`, the render tick's; `depth`, a `DepthView` or `None`; `mask`, or `None` | `MotionOutput`: `velocity` (x, y, z), gated by `mask` with the 3D flow's `use_mask`; z is 0 without depth |
-| bridge | `BridgeInput`: `velocity`, from the motion output; `dt`; `image`, or `None`, the picture whose RGB colors the density; `color`, an RGB tint on it, white by default; `mask`, or `None`, which gates the image | `BridgeOutput`: `velocity`; `density`, what the fluid injects: in 2D the amount alone, the trail's speed (R); in 3D RGBA, the amount (the trail's speed) times `color`, times the image's RGB where there is one, with the amount as alpha; `temperature`; `onset`, a second velocity, or `None` |
-| fluid  | `FluidInput`: `dt`, and `injections`, a list of `Injection`: `velocity`, `density`, `temperature`, `onset` from one bridge output, and `spin`, which no bridge gives, with `weight`, 0 to 1, the injection's share of the fluid's velocity, density and temperature, as a layer's weight in the light renderer's mix, and `color`, the color the 2D fluid gives the injection's density at its output; the app builds one injection per bridge it wants in that fluid | `FluidOutput`: `density`, the show, which the composite draws as the layer's `texture` |
+| bridge | `BridgeInput`: `velocity`, from the motion output; `dt`; `image`, or `None`, the picture whose RGB colors the density; `color`, an RGB tint on it, white by default; `mask`, or `None`, which gates the image | `BridgeOutput`: `velocity`; `density`, what the fluid injects: in 2D the amount alone, the trail's speed (R); in 3D RGBA, the amount (the mix's, [The mix](#the-mix)) times `color`, times the image's RGB where there is one, with the amount as alpha; `temperature`; `impulse`, a second velocity, the velocity changes where moves start and stop, or `None` |
+| fluid  | `FluidInput`: `dt`, and `injections`, a list of `Injection`: `velocity`, `density`, `temperature`, `impulse` from one bridge output, and `spin`, which no bridge gives, with `weight`, 0 to 1, the injection's share of the fluid's velocity, density and temperature, as a layer's weight in the light renderer's mix, and `color`, the color the 2D fluid gives the injection's density at its output; the app builds one injection per bridge it wants in that fluid | `FluidOutput`: `density`, the show, which the composite draws as the layer's `texture` |
 | monitor | `MonitorInput`: `ports`, every stage's ports keyed by stage; the monitor picks by its own `stage` and `texture` | none: it draws                                                                                           |
 
 The motion layer measures once per camera frame: when `timestamp` differs from the one it last
@@ -154,11 +154,11 @@ context of its own, would move the wait to the bridge, and the screen still show
 | `MotionLayer` (ABC)                         | `StageLayer[MotionInput, MotionOutput]`; `_update()` as the template method: `_measure` on a new frame. Holds the allocate and resize pattern; the flow runs at `settings.width` by `settings.height`. Draws nothing |
 | `Motion2DLayer`, `Motion3DLayer`            | the subclasses, each on its optical flow (`GradientFlow`; `LucasKanadeFlow3D`). The 2D flow's velocity is per frame, not per second, and it reads no mask, until the 2D flow moves to the Lucas–Kanade solve |
 | `BridgeLayer` (ABC)                         | `StageLayer[BridgeInput, BridgeOutput]`; `_update()`: the density's color (`DensityColor`: the image, or white, times the tint, gated by the mask), `_bridge` the input's velocity into velocity, density and temperature. The bridges' filters run at the velocity's size and their outputs at `settings.width` by `settings.height`; the layer follows both. Draws nothing |
-| `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, the velocity trail and beside it the velocity impulse bridge, [The impulses](#the-impulses), run while a monitor shows one of its ports, through their `prepare`, and not yet in the output) |
+| `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, the velocity trail and beside it the velocity impulse bridge, [The impulses](#the-impulses), and their mix, [The mix](#the-mix)) |
 | `FluidLayer` (ABC)                          | `StageLayer[FluidInput, FluidOutput]`; `_update()`: `_inject` each injection's velocity, density and temperature at its weight, `_step(dt)`; `texture`, the show. Knows injections, not cameras; reads no poses. The stage's reset is the fluid's only one |
-| `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's. `Fluid3DLayer` injects RGBA density, the onset and a spin where one is given, the velocity's z as the volume's w (its sign turned: w points away from the viewer), and takes the parallax eye the app steers by `set_eye(x, y)` |
+| `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's. `Fluid3DLayer` injects RGBA density, the impulse (added as the velocity is) and a spin where one is given, the velocity's z as the volume's w (its sign turned: w points away from the viewer), and takes the parallax eye the app steers by `set_eye(x, y)` |
 | `MonitorLayer`                              | `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's port names (`names`, the options of `texture`); `draw()` renders the port once per tick, however many panels show it, by its kind or by `view`, and nothing while not shown; its views and settings are in [The monitor](#the-monitor). Not a stage, since it has no output and no `reset` |
-| `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass, each a `StageLayerSettings`: `reset`, then `width` and `height`, the stage's working size, first on every stage's panel. The motion's is the size its flow runs at, the bridge's the size it writes its outputs at (its filters follow the velocity's size), the fluid's its simulation grid (its density is at the size the app allocates). On the fluid layer `blend_mode`. A layer whose stage runs one component is that component's settings too (`Motion2DLayerSettings` is a `GradientFlowSettings`, `Motion3DLayerSettings` a `LucasKanadeFlow3DSettings`, the fluid layers' a `Fluid2DSettings` and a `Fluid3DSettings`), so the component's fields and groups sit on the stage's panel; the bridge layers, running several bridges, hold each as a group (`trail`, `impulse`, `density`, `temperature`). No `draw_mode`, `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take `dt` from their input |
+| `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass, each a `StageLayerSettings`: `reset`, then `width` and `height`, the stage's working size, first on every stage's panel. The motion's is the size its flow runs at, the bridge's the size it writes its outputs at (its filters follow the velocity's size), the fluid's its simulation grid (its density is at the size the app allocates). On the fluid layer `blend_mode`. A layer whose stage runs one component is that component's settings too (`Motion2DLayerSettings` is a `GradientFlowSettings`, `Motion3DLayerSettings` a `LucasKanadeFlow3DSettings`, the fluid layers' a `Fluid2DSettings` and a `Fluid3DSettings`), so the component's fields and groups sit on the stage's panel; the bridge layers, running several bridges, hold each as a group (`trail`, `impulse`, `impulse_mix`, `density_mix`, `temperature_mix`, `density`, `temperature`). No `draw_mode`, `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take `dt` from their input |
 
 The apps' render is a layer graph of `LayerBase` layers updated by one loop calling `update()`
 on each (`apps/deep_flow/render.py`, `apps/hd_trio/render.py`), with a wiring pass before it
@@ -236,8 +236,25 @@ The impulses read x, y and z alike. The bridge filters in time only: noise withi
 motion's to filter, and the trail's blur is a look. An impulse takes no hold: it lasts about
 `slow_smooth` by itself, and what a stop injects is the speed it ended; a hold lifted steady motion
 as much as the stops on the harness (below). No blur and no advect: the impulses stay sharp. The
-impulse bridge runs while a monitor shows one of its ports (`Bridge3DLayer`); nothing it makes
-reaches the fluid yet.
+impulse bridge runs while the mix takes an impulse or a monitor shows one of its ports.
+
+### The mix
+
+What the fluid takes is a mix of the two bridges, each source at a share, 0 to 1, as the light
+renderer mixes its layers (`Bridge3DLayer`, `WeightedSum`):
+
+| Output        | Sources                                              | Panel group       | Default        |
+|---------------|------------------------------------------------------|-------------------|----------------|
+| `velocity`    | the trail                                            |                   |                |
+| `impulse`     | the start, bow, stop and wake velocities             | `impulse_mix`     | all 0: `None`  |
+| `density`     | the trail's speed, the start, bow, stop and wake      | `density_mix`     | the trail 1    |
+| `temperature` | the same, as the temperature's mask                  | `temperature_mix` | the trail 1    |
+
+The sources share one unit, image widths per second, so the mix has no gain: the motion's gains
+balance the axes and the fluid's gains set the strength; a weight is a share. The trail and the
+impulse stay two velocities, since a fluid may take a velocity and a velocity change two ways
+([Open](#open)); the 3D fluid adds both as the velocity is added today. The density's and the
+temperature's amounts are the mix's ports (`mix.density`, `mix.temperature`, `mix.impulse`).
 
 ### Measured
 
@@ -507,12 +524,6 @@ box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU
 
 ## Open
 
-- The 3D bridge's finish, in this order; each step its tests, then the app:
-  5. The mix in `Bridge3DLayer`: `velocity` the trail, `impulse` the start, bow, stop and wake
-     velocities, `density` and `temperature` the trail's speed and the four, each source at a weight
-     0 to 1, the trail 1 and the rest 0 by default. No gain in the bridge: its sources share one
-     unit, the motion's gains balance the axes and the fluid's gains set the strength. The trail and
-     the impulse stay two velocity outputs, as the fluid takes them two ways (below).
 - For the fluid refactor: the 3D fluid's `input_x` and `input_y` go, as the motion's `x_gain` and
   `y_gain` balance the axes.
 - `scripts/depth_velocity_capture.py` ran deep_flow at about 4 fps on 2026-11-06 (257 frames over

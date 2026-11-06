@@ -8,4 +8,5 @@ from .velocity_impulse_region import VelocityImpulseRegion
 from .velocity_impulse_region_mean import VelocityImpulseRegionMean
 from .velocity_impulse_region_speed import VelocityImpulseRegionSpeed
 from .velocity_trail import VelocityTrail
+from .weighted_sum import WeightedSum
 from .temperature_bridge_shader import TemperatureBridgeShader
