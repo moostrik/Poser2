@@ -8,10 +8,10 @@ Before each step the trail moves with the motion it holds (`advect`): each pixel
 where its own x/y says it came from, so the average follows a moving limb instead of a fixed pixel,
 and a fast move is not cut off by a smoothing time longer than it takes to cross.
 
-The smoothing is one unit-gain Ema per pixel. Where the x/y speed rises it follows over `attack`, else over
-`smooth`, so a flick reaches the fluid at full strength and a stop still coasts. z follows over `smooth`
-alone, so a one-frame spike is averaged instead of passed on. The blur runs `blur_steps` passes per tick
-inside the Ema's loop, so its spread grows with the trail's memory.
+The smoothing is one unit-gain Ema per pixel. Where the 3D speed rises it follows over `attack`, else over
+`smooth`, so a flick reaches the fluid at full strength and a stop still coasts. x, y and z alike: z's noise
+is the motion's to filter (its depth velocity's `smooth`). The blur runs `blur_steps` passes per tick inside
+the Ema's loop, so its spread grows with the trail's memory.
 """
 
 import numpy as np
@@ -28,8 +28,8 @@ from .shaders import TrailAdvect, VelocityTrail
 class VelocityTrailBridgeSettings(BaseSettings):
     """Configuration for the velocity trail bridge."""
     advect = Field(0.0, min=0.0, max=1.0, step=0.05, description="How far the trail moves with its motion before each step; 0 = at a fixed pixel")
-    attack = Field(0.0, min=0.0, max=0.5, step=0.001, description="Smoothing time of a rising x/y speed, s; 0 = as smooth (lower: quicker flicks)")
-    smooth = Field(0.16, min=0.0, max=3.0, step=0.01, description="Smoothing time, s; the fall of x/y and all of z; 0 = none (higher: longer coast)")
+    attack = Field(0.0, min=0.0, max=0.5, step=0.001, description="Smoothing time of a rising speed, s; 0 = as smooth (lower: quicker flicks)")
+    smooth = Field(0.16, min=0.0, max=3.0, step=0.01, description="Smoothing time of a falling speed, s; 0 = none (higher: longer coast)")
     blur_radius = Field(0.0, min=0.0, max=10.0, newline=True, description="Gaussian blur radius in pixels; 0 = off")
     blur_steps = Field(1, min=1, max=8, description="Gaussian blur passes per tick (more: wider spread)")
 
@@ -140,10 +140,8 @@ class VelocityTrailBridge(FlowBase):
 # ── numpy reference ─────────────────────────────────────────────────────
 
 def velocity_trail(previous: np.ndarray, velocity: np.ndarray, attack: float, release: float) -> np.ndarray:
-    """One step of the trail (..., 3): x/y by `attack` where its speed rises above the trail's, else by
-    `release`; z by `release`. Mirrors velocity_trail.frag."""
-    rising: np.ndarray = np.linalg.norm(velocity[..., :2], axis=-1, keepdims=True) > np.linalg.norm(previous[..., :2], axis=-1, keepdims=True)
-    weight_xy: np.ndarray = np.where(rising, attack, release)
-    xy: np.ndarray = weight_xy * previous[..., :2] + (1.0 - weight_xy) * velocity[..., :2]
-    z: np.ndarray = release * previous[..., 2:3] + (1.0 - release) * velocity[..., 2:3]
-    return np.concatenate((xy, z), axis=-1)
+    """One step of the trail (..., 3): by `attack` where the 3D speed rises above the trail's, else by `release`.
+    Mirrors velocity_trail.frag."""
+    rising: np.ndarray = np.linalg.norm(velocity, axis=-1, keepdims=True) > np.linalg.norm(previous, axis=-1, keepdims=True)
+    weight: np.ndarray = np.where(rising, attack, release)
+    return weight * previous + (1.0 - weight) * velocity

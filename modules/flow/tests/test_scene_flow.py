@@ -143,9 +143,13 @@ class DisplacementVelocityTest(unittest.TestCase):
 
 
 class VelocityTrailTest(unittest.TestCase):
-    def test_a_rising_xy_follows_the_attack(self) -> None:
+    def test_a_rising_speed_follows_the_attack_on_every_axis(self) -> None:
         stepped = velocity_trail(np.zeros((1, 3)), np.array([[1.0, 0.0, 1.0]]), 0.1, 0.9)
-        np.testing.assert_allclose(stepped, [[0.9, 0.0, 0.1]])
+        np.testing.assert_allclose(stepped, [[0.9, 0.0, 0.9]])
+
+    def test_a_rise_toward_the_camera_alone_follows_the_attack(self) -> None:
+        stepped = velocity_trail(np.zeros((1, 3)), np.array([[0.0, 0.0, 1.0]]), 0.1, 0.9)
+        np.testing.assert_allclose(stepped, [[0.0, 0.0, 0.9]])
 
     def test_a_falling_xy_follows_the_release(self) -> None:
         stepped = velocity_trail(np.array([[1.0, 0.0, 0.0]]), np.zeros((1, 3)), 0.1, 0.9)

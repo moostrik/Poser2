@@ -191,8 +191,11 @@ The fluid makes its own swirl from what it is given, so the bridge gives no curl
 
 ### The velocity trail
 
-One unit-gain Ema per pixel: a rising x/y speed follows over `attack`, a falling one and all of z
-over `smooth`, so a flick reaches the fluid at full strength and a stop coasts. `advect` moves the
+One unit-gain Ema per pixel: a rising 3D speed follows over `attack`, a falling one over `smooth`,
+so a flick reaches the fluid at full strength and a stop coasts. Both bridges treat x, y and z
+alike: z is a little noisier than x/y, and its one time constant is the motion's (the depth
+velocity's `smooth`), which every reader of z then shares, as a z time per bridge would add the
+same lag in more places. `advect` moves the
 trail with its own motion before each step, so the average follows a moving limb instead of a
 fixed pixel. `blur_radius` and `blur_steps` spread it in space; the ring it leaves around the
 body is part of the look **(site fact)**.
