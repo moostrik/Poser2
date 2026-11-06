@@ -12,6 +12,7 @@ from .kinetic_reservoir import KineticReservoir
 from .kinetic_velocity import KineticVelocity
 from .scale_velocity import ScaleVelocity
 from .velocity_event import Event, VelocityEvent
-from .velocity_event_patch import VelocityEventPatch
+from .velocity_event_region import VelocityEventRegion
+from .velocity_event_region_mean import VelocityEventRegionMean
 from .velocity_trail import VelocityTrail
 from .temperature_bridge_shader import TemperatureBridgeShader

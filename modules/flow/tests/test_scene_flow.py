@@ -5,7 +5,8 @@ import unittest
 
 import numpy as np
 
-from modules.flow import displacement_velocity, filter_displacement, lucas_kanade, threshold_displacement, track_depth, track_weights, velocity_trail, velocity_event, event_gate, event_velocity
+from modules.flow import displacement_velocity, filter_displacement, lucas_kanade, threshold_displacement, track_depth, track_weights, velocity_trail, velocity_event, moving_mean, event_start_gate, event_stop_gate, event_velocity, \
+                         decay_weight
 
 SIZE: int = 64
 
@@ -179,40 +180,60 @@ class VelocityEventTest(unittest.TestCase):
         np.testing.assert_allclose(velocity_event(self.STILL, np.array([[1.0, 0.0, 0.0]]), np.zeros(1), -1.0, 0.0, 0.25), [0.25])
 
     @staticmethod
-    def patch(*xy: tuple[float, float]) -> np.ndarray:
-        """A patch's pixels (N, 3) with these x/y velocities and no z."""
-        return np.array([[x, y, 0.0] for x, y in xy])
+    def patch(*xyz: tuple[float, float, float]) -> np.ndarray:
+        """A patch's pixels (N, 3) with these velocities."""
+        return np.array(xyz, dtype=float)
 
-    def test_a_start_counts_as_far_as_its_patch_speeds_up(self) -> None:
-        self.assertAlmostEqual(event_gate(self.patch((1.0, 0.0), (1.0, 0.0)), self.patch((0.5, 0.0), (0.5, 0.0)), 1.0, 1.0), 0.5)
-        self.assertAlmostEqual(event_gate(self.patch((0.5, 0.0)), self.patch((1.0, 0.0)), 1.0, 1.0), 0.0)
+    @staticmethod
+    def start_gates(frames: list[np.ndarray], dt: float = 1.0 / 60.0) -> list[float]:
+        """The start gate per frame of a patch's pixels: its mean moving velocity through the fast (25 ms) and
+        the slow (150 ms) trail, as VelocityEventBridge smooths it."""
+        fast, slow, gates = np.zeros(3), np.zeros(3), []
+        for pixels in frames:
+            mean = moving_mean(pixels)
+            fast_weight, slow_weight = decay_weight(dt, 25.0), decay_weight(dt, 150.0)
+            fast = fast_weight * fast + (1.0 - fast_weight) * mean
+            slow = slow_weight * slow + (1.0 - slow_weight) * mean
+            gates.append(event_start_gate(fast, slow, 1.0))
+        return gates
 
     def test_jitter_on_a_still_patch_is_no_start(self) -> None:
-        # The fast trail keeps more of the jitter than the slow one: in speeds the patch reads as speeding up
-        fast = self.patch((0.2, 0.0), (-0.2, 0.0), (0.0, 0.2), (0.0, -0.2))
-        slow = self.patch((0.05, 0.0), (-0.05, 0.0), (0.0, 0.05), (0.0, -0.05))
-        self.assertAlmostEqual(event_gate(fast, slow, 1.0, 1.0), 0.0)
+        # Every pixel moves, in every direction and in z: its mean is still nothing
+        jitter = self.patch((0.2, 0.0, 0.0), (-0.2, 0.0, 0.0), (0.0, 0.2, 0.3), (0.0, -0.2, -0.3))
+        frames = [jitter if k % 2 else -jitter for k in range(30)]
+        self.assertAlmostEqual(max(self.start_gates(frames)), 0.0)
 
-    def test_a_steady_motion_with_jitter_is_no_start(self) -> None:
-        fast = self.patch((0.5, 0.1), (0.5, -0.1))
-        slow = self.patch((0.5, 0.02), (0.5, -0.02))
-        self.assertAlmostEqual(event_gate(fast, slow, 1.0, 1.0), 0.0)
+    def test_a_limb_arriving_in_a_patch_at_its_speed_is_no_start(self) -> None:
+        v = (0.3, 0.0, 0.1)
+        frames = [self.patch(v, *[(0.0, 0.0, 0.0)] * 7)] * 60                                  # in the patch, settled
+        frames += [self.patch(*[v] * k, *[(0.0, 0.0, 0.0)] * (8 - k)) for k in range(2, 9)]     # more of it arrives
+        self.assertLess(max(self.start_gates(frames)[60:]), 0.01)     # what the slow trail has left of settling
+
+    def test_a_patch_speeding_up_is_a_start(self) -> None:
+        frames = [self.patch(*[(0.1, 0.0, 0.0)] * 8)] * 60
+        frames += [self.patch(*[(0.1 + 0.05 * k, 0.0, 0.0)] * 8) for k in range(1, 8)]
+        self.assertGreater(max(self.start_gates(frames)[60:]), 0.3)
+
+    def test_a_start_from_rest_is_a_start(self) -> None:
+        frames = [self.patch(*[(0.0, 0.0, 0.0)] * 8)] * 30 + [self.patch(*[(0.0, 0.0, 0.3)] * 8)] * 5
+        self.assertGreater(max(self.start_gates(frames)[30:]), 0.5)
 
     def test_a_stop_counts_as_far_as_its_patch_slows_down(self) -> None:
-        self.assertAlmostEqual(event_gate(self.patch((0.5, 0.0)), self.patch((1.0, 0.0)), -1.0, 1.0), 0.5)
-        self.assertAlmostEqual(event_gate(self.patch((1.0, 0.0)), self.patch((0.5, 0.0)), -1.0, 1.0), 0.0)
+        self.assertAlmostEqual(event_stop_gate(self.patch((0.5, 0.0, 0.0)), self.patch((1.0, 0.0, 0.0)), 1.0), 0.5)
+        self.assertAlmostEqual(event_stop_gate(self.patch((1.0, 0.0, 0.0)), self.patch((0.5, 0.0, 0.0)), 1.0), 0.0)
 
     def test_a_turning_patch_is_no_stop(self) -> None:
         # Its mean velocity shrinks as the directions spread; its mean speed does not
-        fast = self.patch((0.0, 1.0), (1.0, 0.0))
-        slow = self.patch((1.0, 0.0), (1.0, 0.0))
-        self.assertAlmostEqual(event_gate(fast, slow, -1.0, 1.0), 0.0)
+        fast = self.patch((0.0, 1.0, 0.0), (1.0, 0.0, 0.0))
+        slow = self.patch((1.0, 0.0, 0.0), (1.0, 0.0, 0.0))
+        self.assertAlmostEqual(event_stop_gate(fast, slow, 1.0), 0.0)
 
     def test_a_steady_patch_lets_no_event_through_and_strength_0_lets_all(self) -> None:
-        steady = self.patch((0.7, 0.0))
-        for sign in (1.0, -1.0):
-            self.assertAlmostEqual(event_gate(steady, steady, sign, 1.0), 0.0)
-            self.assertAlmostEqual(event_gate(steady, steady, sign, 0.0), 1.0)
+        steady = self.patch((0.7, 0.0, 0.0))
+        self.assertAlmostEqual(event_stop_gate(steady, steady, 1.0), 0.0)
+        self.assertAlmostEqual(event_stop_gate(steady, steady, 0.0), 1.0)
+        self.assertAlmostEqual(event_start_gate(steady[0], steady[0], 1.0), 0.0)
+        self.assertAlmostEqual(event_start_gate(steady[0], steady[0], 0.0), 1.0)
 
 
 if __name__ == '__main__':

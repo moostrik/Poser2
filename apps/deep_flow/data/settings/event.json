@@ -448,10 +448,9 @@
       "event": {
         "fast_smooth": 0.03,
         "slow_smooth": 0.25,
-        "z_weight": 1.0,
-        "hold": 0.2,
+        "stop_hold": 0.2,
         "stop_gate": 1.0,
-        "stop_tile": 128.0
+        "stop_patch_size": 128.0
       },
       "kinetic": {
         "scale_x": 1.0,

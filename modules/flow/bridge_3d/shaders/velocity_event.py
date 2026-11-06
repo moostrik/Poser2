@@ -5,7 +5,7 @@ Peak-holds one event of the motion, a start or a stop, from the fast and slow tr
 
 from enum import IntEnum
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
@@ -15,9 +15,10 @@ class Event(IntEnum):
 
 
 class VelocityEvent(Shader):
-    """Writes max(event * gate, previous * decay) to the red channel."""
+    """Writes max(event * region, previous * decay) to the red channel."""
 
-    def use(self, fast: Texture, slow: Texture, previous: Texture, event: Event, decay: float, patches: Texture, strength: float, lod: float) -> None:
+    def use(self, fast: Texture, slow: Texture, previous: Texture, event: Event, decay: float,
+            region_fast: Texture, region_slow: Texture, region_weight: float, lod: float) -> None:
         """Hold one event.
 
         Args:
@@ -26,9 +27,11 @@ class VelocityEvent(Shader):
             previous: Previous held event
             event: START or STOP
             decay: What remains of the held event this update
-            patches: With mipmaps; for a start fast x/y in RG and slow x/y in BA, for a stop fast speed in R and slow speed in G
-            strength: Gate strength, 0 = every event counts; a start counts as far as its patch speeds up, a stop as far as it slows down
-            lod: Mip level of a patch
+            region_fast: Start: the region's mean moving velocity, fast trail (RGB, a texel per region); stop: the
+                region speeds, fast in R and slow in G, with mipmaps
+            region_slow: Start: the region's mean moving velocity, slow trail; stop: unread
+            region_weight: 0 = every pixel's event counts; 1 = a start as far as its region speeds up, a stop as far as it slows down
+            lod: Stop: mip level of a region
         """
         if not self.allocated or not self.shader_program:
             return
@@ -37,22 +40,13 @@ class VelocityEvent(Shader):
 
         glUseProgram(self.shader_program)
 
-        glActiveTexture(GL_TEXTURE0)
-        glBindTexture(GL_TEXTURE_2D, fast.tex_id)
-        glActiveTexture(GL_TEXTURE1)
-        glBindTexture(GL_TEXTURE_2D, slow.tex_id)
-        glActiveTexture(GL_TEXTURE2)
-        glBindTexture(GL_TEXTURE_2D, previous.tex_id)
-        glActiveTexture(GL_TEXTURE3)
-        glBindTexture(GL_TEXTURE_2D, patches.tex_id)
-
-        glUniform1i(self.get_uniform_loc("tex0"), 0)
-        glUniform1i(self.get_uniform_loc("tex1"), 1)
-        glUniform1i(self.get_uniform_loc("tex2"), 2)
-        glUniform1i(self.get_uniform_loc("tex3"), 3)
+        for unit, texture in enumerate((fast, slow, previous, region_fast, region_slow)):
+            glActiveTexture((GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE4)[unit])
+            glBindTexture(GL_TEXTURE_2D, texture.tex_id)
+            glUniform1i(self.get_uniform_loc(f"tex{unit}"), unit)
         glUniform1f(self.get_uniform_loc("sign"), float(event))
         glUniform1f(self.get_uniform_loc("decay"), decay)
-        glUniform1f(self.get_uniform_loc("strength"), strength)
+        glUniform1f(self.get_uniform_loc("region_weight"), region_weight)
         glUniform1f(self.get_uniform_loc("lod"), lod)
 
         draw_quad()
