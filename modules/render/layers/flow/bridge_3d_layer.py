@@ -8,11 +8,12 @@ from enum import IntEnum, auto
 from modules.gl import GpuTimer, Texture
 from modules.flow import (
     VelocityTrailBridge, VelocityTrailBridgeSettings,
+    VelocityEventBridge, VelocityEventBridgeSettings,
     KineticBridge, KineticBridgeSettings,
     VelocityMagnitude,
     TemperatureBridge, TemperatureBridgeSettings,
     DensityBridge, DensityBridgeSettings,
-    HasPorts,
+    HasPorts, Port, Ports,
 )
 from modules.settings import Field, Group
 from .bridge_layer import BridgeLayer, BridgeLayerSettings, BridgeInput, BridgeOutput
@@ -29,6 +30,7 @@ class Bridge3DLayerSettings(BridgeLayerSettings):
     method: Field[BridgeMethod] =           Field(BridgeMethod.VELOCITY_TRAIL, newline=True, description="How the bridge makes the fluid's velocity and the density's amount: one trail, or two trails reading the change of the motion")
 
     trail       = Group(VelocityTrailBridgeSettings)
+    event       = Group(VelocityEventBridgeSettings)
     kinetic     = Group(KineticBridgeSettings)
     density     = Group(DensityBridgeSettings)
     temperature = Group(TemperatureBridgeSettings)
@@ -39,12 +41,19 @@ class Bridge3DLayer(BridgeLayer):
     fluid's velocity and the density's amount; the density bridge colors the amount with the density's
     color, the temperature bridge reads the color where there is speed. The kinetic bridge's fields
     are ports while it runs: its two trails, the acceleration along the motion and its z, the turn
-    across it, the held release, the reservoir, the emission, the onset velocity and the curl."""
+    across it, the held release, the reservoir, the emission, the onset velocity and the curl.
+
+    Next to the trail, the velocity event bridge reads where a move starts and stops (`event.*`). It
+    runs while a monitor shows one of its ports, from rest when it starts: a port's `prepare` says it
+    is shown, and the next tick runs it. Nothing it makes reaches the fluid yet."""
 
     def __init__(self, settings: Bridge3DLayerSettings) -> None:
         super().__init__(settings)
         self.settings: Bridge3DLayerSettings = settings
         self._trail_bridge: VelocityTrailBridge = VelocityTrailBridge(settings.trail)
+        self._event_bridge: VelocityEventBridge = VelocityEventBridge(settings.event)
+        self._event_shown: bool = False     # a monitor read one of its ports since the last update
+        self._event_running: bool = False   # it ran the tick before
         self._kinetic_bridge: KineticBridge = KineticBridge(settings.kinetic)
         self._velocity_magnitude: VelocityMagnitude = VelocityMagnitude()
         self._density_bridge: DensityBridge = DensityBridge(settings.density)
@@ -71,9 +80,18 @@ class Bridge3DLayer(BridgeLayer):
         )
 
     def _bridges(self) -> dict[str, HasPorts]:
-        """The method's bridge only, then the speed, the density and the temperature."""
-        velocity: dict[str, HasPorts] = {'kinetic': self._kinetic_bridge} if self._kinetic else {'trail': self._trail_bridge}
+        """The method's bridge only, with the trail the event bridge, then the speed, the density and the temperature."""
+        velocity: dict[str, HasPorts] = {'kinetic': self._kinetic_bridge} if self._kinetic else \
+            {'trail': self._trail_bridge, 'event': self._event_ports()}
         return {**velocity, 'speed': self._velocity_magnitude, 'density': self._density_bridge, 'temperature': self._temperature_bridge}
+
+    def _event_ports(self) -> Ports:
+        """The event bridge's ports, each telling it that it is shown when a view reads it."""
+        return Ports({name: Port(port.texture, port.kind, port.extent, self._show_event)
+                      for name, port in self._event_bridge.ports.items()})
+
+    def _show_event(self) -> None:
+        self._event_shown = True
 
     # ========== Lifecycle ==========
 
@@ -83,6 +101,7 @@ class Bridge3DLayer(BridgeLayer):
 
     def _allocate_stages(self, width: int, height: int, output_width: int, output_height: int) -> None:
         self._trail_bridge.allocate(width, height, output_width, output_height)
+        self._event_bridge.allocate(width, height)
         self._kinetic_bridge.allocate(width, height)
         self._velocity_magnitude.allocate(width, height)
         self._temperature_bridge.allocate(width, height)
@@ -90,6 +109,7 @@ class Bridge3DLayer(BridgeLayer):
 
     def _deallocate_stages(self) -> None:
         self._trail_bridge.deallocate()
+        self._event_bridge.deallocate()
         self._kinetic_bridge.deallocate()
         self._velocity_magnitude.deallocate()
         self._temperature_bridge.deallocate()
@@ -97,6 +117,7 @@ class Bridge3DLayer(BridgeLayer):
 
     def _reset_stages(self) -> None:
         self._trail_bridge.reset()
+        self._event_bridge.reset()
         self._kinetic_bridge.reset()
         self._density_bridge.reset()
 
@@ -115,6 +136,8 @@ class Bridge3DLayer(BridgeLayer):
         else:
             self._trail_bridge.set_velocity(input.velocity)
             self._trail_bridge.update(input.dt)
+        self._update_event(input, not kinetic and self._event_shown)
+        self._event_shown = False
 
         self._velocity_magnitude.set_input(self._velocity)
         self._velocity_magnitude.update()
@@ -129,3 +152,13 @@ class Bridge3DLayer(BridgeLayer):
         self._temperature_bridge.set_mask(self._velocity_magnitude.magnitude)
         self._temperature_bridge.update()
         self._gpu_timer.end()
+
+    def _update_event(self, input: BridgeInput, run: bool) -> None:
+        """Step the event bridge while it is `run`, from rest when it starts again."""
+        if run:
+            bridge: VelocityEventBridge = self._event_bridge
+            if not self._event_running:
+                bridge.reset()
+            bridge.set_velocity(input.velocity)
+            bridge.update(input.dt)
+        self._event_running = run

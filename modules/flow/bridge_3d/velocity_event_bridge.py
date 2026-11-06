@@ -12,7 +12,7 @@ Out come, in image widths per second like the flow:
                                     fast trail's direction, a stop along the slow one's, the motion it ended
 
 z goes in times `z_weight`, so a move toward or away from the camera can start and stop as well, as far as
-its noise allows. Steps once per new optical flow frame, by its interval.
+its noise allows. Steps every tick on its dt, as the other bridges do.
 """
 
 import math
@@ -34,7 +34,7 @@ class VelocityEventBridgeSettings(BaseSettings):
     slow_smooth = Field(0.15, min=0.0, max=1.0, step=0.005, description="Slow trail smoothing time, s: what a change is read against")
     z_weight = Field(1.0, min=0.0, max=1.0, step=0.05, description="z in the events; 0 = x/y only")
     hold = Field(0.1, min=0.0, max=1.0, step=0.01, newline=True, description="Decay of a held start or stop, s; 0 = no hold")
-    stop_gate = Field(0.0, min=0.0, max=1.0, step=0.05, description="How far a stop must be a slowdown of its patch; 0 lets all through")
+    stop_gate = Field(1.0, min=0.0, max=1.0, step=0.05, description="How far a stop must be a slowdown of its patch; 0 lets all through")
     stop_tile = Field(128.0, min=8.0, max=1024.0, step=8.0, description="Size of a stop gate patch, pixels of the bridge")
 
 
@@ -172,10 +172,10 @@ class VelocityEventBridge(FlowBase):
         self._input_fbo.end()
 
     def update(self, delta_time: float = 1.0 / 60.0) -> None:
-        """Advance on a new optical flow frame.
+        """Advance the trails and the held events by `delta_time`.
 
         Args:
-            delta_time: Seconds since the previous optical flow frame
+            delta_time: Seconds since the previous update
         """
         if not self._allocated:
             return

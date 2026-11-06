@@ -27,7 +27,8 @@ class Port:
     itself, never a buffer taken from it. A volume (`volume`) is always a 3D texture, so a view reads
     it with one sampler type; `extent` is its depth as a share of its width, the box a view draws it
     in, so a layer gap looks as deep as it is. `prepare`, when set, is what a view calls before it
-    reads the texture: its owner brings it up to date there, once however many views ask."""
+    reads the texture: its owner brings it up to date there, once however many views ask, or learns
+    that it is shown."""
     texture: Texture | Texture3D
     kind: TextureKind
     extent: float = 0.0

@@ -235,6 +235,8 @@ class MonitorLayer(LayerBase):
             self._strip_of = None               # the strip starts over when it is shown again
         if port is None:
             return
+        if port.prepare is not None:
+            port.prepare()                      # its owner brings it up to date, or learns it is shown
         settings: MonitorLayerSettings = self.settings
         channel: Channel = settings.advanced.channel
         scale: float = settings.advanced.scale
@@ -288,8 +290,6 @@ class MonitorLayer(LayerBase):
         """A volume in its box from the orbit camera: for the image and the colormap its layers stacked,
         the slice's layer pulled out, or its fog; for the glyphs, in either cut, arrows of a velocity or
         dots of a scalar."""
-        if port.prepare is not None:
-            port.prepare()
         volume = port.texture
         assert isinstance(volume, Texture3D)
         if view == MonitorView.GLYPHS:
@@ -304,14 +304,12 @@ class MonitorLayer(LayerBase):
                                                        view == MonitorView.COLORMAP)
 
     def _flat(self, port: Port, view: MonitorView) -> Texture:
-        """The 2D texture a view draws: the port's own, or a volume's flat cut. A volume is brought up
-        to date first (`Port.prepare`); the strip reads its front mean, the volume's mean, and the
-        histogram counts the volume itself. A cut keeps the box's proportions when drawn."""
+        """The 2D texture a view draws: the port's own, or a volume's flat cut. The strip reads a
+        volume's front mean, the volume's mean, and the histogram counts the volume itself. A cut keeps
+        the box's proportions when drawn."""
         if not port.volume:
             assert isinstance(port.texture, Texture)
             return port.texture
-        if port.prepare is not None:
-            port.prepare()
         volume = port.texture
         assert isinstance(volume, Texture3D)
         if view == MonitorView.HISTOGRAM:
