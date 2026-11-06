@@ -314,16 +314,21 @@ kinds of `TextureKind`.
      volume). The monitor draws them with the views it has (colormap, image, arrows, strip); from
      the top, the arrows of x and z show the depth movement. One small shader, no new drawing
      path, and the volumes become ports like the rest.
-  2. The rotatable arrow grid for the velocity. Instanced arrows on a coarse grid, about
-     16 × 9 × the layers, each its 3D direction and length, colored by w or by speed, drawn with
-     depth test from an orbit camera. New drawing: instanced geometry and a perspective camera,
-     which the render does not have yet.
-  3. A rotatable view of the scalars. Density, temperature, pressure and divergence ray-marched
-     through the volume as a colormap fog from the same orbit camera, one fragment shader like the
-     show's own composite.
+  2. Glyphs: marks on a grid, by the port's kind, an arrow for a velocity (its direction and
+     length, colored by w or by speed) and a dot for a scalar (colored by the colormap, sized by
+     its value, small values small or transparent so the inside stays visible). The `GLYPHS` view
+     replaces `ARROWS`, renamed when it is built so the panel name changes once: flat on a 2D
+     texture, where today's arrows are its velocity case and a scalar gets a dot field, and
+     rotatable on a volume, on a coarse grid of about 16 × 9 × the layers drawn with depth test
+     from an orbit camera. Arrows and dots share the grid spacing, so a scalar and the velocity
+     line up point for point in monitor A and B. New drawing: instanced geometry and a
+     perspective camera, which the render does not have yet.
+  3. Fog for the scalars. Density, temperature, pressure and divergence ray-marched through the
+     volume as a colormap fog, one fragment shader like the show's own composite; beside the dots
+     it shows a thin sheet inside a dense volume.
 
-  The two rotatable views share one orbit camera on the monitor (yaw, pitch, distance, or a slow
-  auto-rotate), so monitor A and B compare a scalar and the velocity from the same angle.
+  The rotatable views share one orbit camera on the monitor (yaw, pitch, distance, or a slow
+  auto-rotate), so monitor A and B compare from the same angle.
 - hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
   the pose's motion, a settings field written per tick. A per-tick value on the fluid layer, as the
   eye is, would take it off the settings.
