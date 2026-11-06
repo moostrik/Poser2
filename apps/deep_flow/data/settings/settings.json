@@ -7,7 +7,7 @@
     "keyframe_interval": 50,
     "color": true,
     "resolution": "P720",
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "fov": 80.0,
     "split_seconds": 60,
@@ -77,7 +77,7 @@
         "DEPTH"
       ],
       "apply_warp": false,
-      "folder": "20261103-215324_standmoves",
+      "folder": "20261103-184710_stillslowfast",
       "sim_passthrough": false,
       "replay": true
     },
@@ -272,7 +272,8 @@
     "layer": {
       "select": {
         "left": [
-          "monitor_a"
+          "monitor_a",
+          "fluid"
         ],
         "right": [
           "monitor_b"
@@ -491,7 +492,7 @@
       "fps_smoothing": 1.0,
       "speed": 0.4,
       "volume": {
-        "layers": 16,
+        "layers": 32,
         "sim_layers": 16,
         "spacing": 4.0,
         "emission": 1.16,
@@ -506,28 +507,28 @@
         "eye_tracking": 0.8,
         "layer_blur": 0.25,
         "debug_layers": false,
-        "injection_layer": 0.0,
-        "injection_spread": 0.06,
+        "injection_layer": 0.54,
+        "injection_spread": 0.1,
         "boundary": "CLOSED"
       },
       "velocity": {
-        "gain": 1.0,
+        "gain": 10.0,
         "input_x": 1.0,
         "input_y": 1.0,
-        "self_advection": 0.2,
-        "fade_time": 12.0,
-        "dampen_threshold": 10.0,
+        "self_advection": 0.51,
+        "fade_time": 6.04,
+        "dampen_threshold": 50.0,
         "dampen_time": 2.0,
-        "vorticity": 1.2,
+        "vorticity": 0.64,
         "vorticity_radius": 3.0,
-        "viscosity": 50.0,
+        "viscosity": 0.0,
         "viscosity_iter": 15
       },
       "density": {
-        "gain": 1.0,
+        "gain": 9.43,
         "speed_offset": 0.0,
         "fade_time": 60.0,
-        "evaporation": 0.05,
+        "evaporation": 0.04,
         "boundary": "CLOSED"
       },
       "temperature": {
@@ -555,20 +556,22 @@
       "view": "AUTO",
       "advanced": {
         "channel": "ALL",
+        "cut": "CUBE",
         "scale": 1.0,
-        "glyph_spacing": "SPACING_64",
+        "glyph_spacing": "SPACING_16",
         "legend": true,
         "blend_mode": "ADD"
       }
     },
     "monitor_b": {
-      "stage": "MOTION",
-      "texture": "output.velocity",
-      "view": "COLORMAP",
+      "stage": "FLUID",
+      "texture": "density",
+      "view": "GLYPHS",
       "advanced": {
         "channel": "ALL",
+        "cut": "FOG",
         "scale": 1.0,
-        "glyph_spacing": "SPACING_64",
+        "glyph_spacing": "SPACING_32",
         "legend": true,
         "blend_mode": "ADD"
       }
@@ -658,10 +661,10 @@
       "title": "Poser",
       "v_sync": true,
       "monitor": "M0",
-      "x": 2400,
+      "x": 1708,
       "y": 31,
-      "width": 1429,
-      "height": 2080,
+      "width": 851,
+      "height": 1360,
       "secondary_list": [
         "M1"
       ],

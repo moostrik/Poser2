@@ -88,6 +88,9 @@ class MonitorInput:
     ports: dict[FlowStage, dict[str, Port]] = field(default_factory=dict)
 
 
+BOX_DEPTH: float = 1.0      # a volume's box is drawn as deep as it is wide, for now, not at its port's extent
+
+
 _AUTO_VIEWS: dict[TextureKind, MonitorView] = {
     TextureKind.IMAGE: MonitorView.IMAGE,
     TextureKind.VELOCITY: MonitorView.GLYPHS,
@@ -193,7 +196,7 @@ class MonitorLayer(LayerBase):
         self._allocated = False
 
     def _resize(self, width: int, height: int) -> None:
-        self._visualizer.resize(width, height)
+        """Everything but the visualizer, which `_render` sizes to what it draws."""
         self._strip.resize(height)
         self._legend.resize(width, height)
         self._volume_cube.resize(width, height)
@@ -248,6 +251,7 @@ class MonitorLayer(LayerBase):
                     self._legend.update(self._legend_kind, int(channel), scale, self._visualizer.histogram_total)
             return
         texture: Texture = self._flat(port, view)
+        self._visualizer.resize(*self._fitted())
         if view == MonitorView.STRIP:
             shown: tuple[FlowStage, str, Channel] = (self.settings.stage, self.settings.texture, channel)
             if shown != self._strip_of:
@@ -271,6 +275,15 @@ class MonitorLayer(LayerBase):
         if self._legend_kind is not None and settings.advanced.legend:
             self._legend.update(self._legend_kind, int(channel), scale, self._visualizer.histogram_total)
 
+    def _fitted(self) -> tuple[int, int]:
+        """The size the visualizer draws at: the drawn size, or for a cut the part of it the cut
+        fills in its proportions, so glyphs keep their spacing in the panel's pixels."""
+        width, height = self._rendered_size
+        if self._aspect is None:
+            return (width, height)
+        w, h = fit(self._aspect, 1.0, width, height)[2:]
+        return (max(1, round(w)), max(1, round(h)))
+
     def _render_3d(self, port: Port, view: MonitorView, scale: float, channel: int) -> None:
         """A volume in its box from the orbit camera: for the image and the colormap its layers stacked,
         the slice's layer pulled out, or its fog; for the glyphs, in either cut, arrows of a velocity or
@@ -281,13 +294,13 @@ class MonitorLayer(LayerBase):
         assert isinstance(volume, Texture3D)
         if view == MonitorView.GLYPHS:
             spacing: float = float(self.settings.advanced.glyph_spacing.value)
-            self._shown_3d = self._volume_glyphs.process(volume, self._orbit, port.extent, spacing, scale,
+            self._shown_3d = self._volume_glyphs.process(volume, self._orbit, BOX_DEPTH, spacing, scale,
                                                          port.kind != TextureKind.VELOCITY, channel)
         elif self.settings.advanced.cut == Cut.FOG:
-            self._shown_3d = self._volume_fog.process(volume, self._orbit, port.extent, scale, channel,
+            self._shown_3d = self._volume_fog.process(volume, self._orbit, BOX_DEPTH, scale, channel,
                                                       view == MonitorView.COLORMAP)
         else:
-            self._shown_3d = self._volume_cube.process(volume, self._orbit, self._slice, port.extent, scale, channel,
+            self._shown_3d = self._volume_cube.process(volume, self._orbit, self._slice, BOX_DEPTH, scale, channel,
                                                        view == MonitorView.COLORMAP)
 
     def _flat(self, port: Port, view: MonitorView) -> Texture:
@@ -306,7 +319,7 @@ class MonitorLayer(LayerBase):
         cut: Cut = Cut.FRONT if view == MonitorView.STRIP else self.settings.advanced.cut
         if not cut.flat:
             cut = Cut.SLICE                         # a view with no cube of its own draws the slice
-        flat: Texture = self._volume_cut.process(volume, cut, self._slice, port.kind, port.extent)
+        flat: Texture = self._volume_cut.process(volume, cut, self._slice, port.kind, BOX_DEPTH)
         if view != MonitorView.STRIP:
             self._aspect = flat.width / max(flat.height, 1)
         return flat

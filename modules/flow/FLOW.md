@@ -322,8 +322,10 @@ kinds of `TextureKind`.
 A port's texture may be a volume, always a `Texture3D` (`Port.volume`), so each view is one
 shader. The 3D fluid lists its volumes as ports: `velocity`, `density`, `temperature`,
 `pressure`, `divergence`, `vorticity`, `vorticity_force`, `buoyancy`, `obstacle`, beside the 2D
-`obstacle_source`. Each carries its box's depth (`Port.extent`, `Fluid3D._z_extent`), so a
-layer gap looks as deep as it is. Every view samples a volume at (u, v, w) from 0 to 1 through the
+`obstacle_source`. Each carries its box's depth (`Port.extent`, `Fluid3D._z_extent`); the
+monitor draws the box as deep as it is wide (`BOX_DEPTH`), since the simulated slab, 16 layers at
+spacing 4 on a 448 wide grid, is 0.14 of its width and reads as flat. A flat cut renders at the
+part of the panel it fills in its proportions, so glyphs keep their spacing. Every view samples a volume at (u, v, w) from 0 to 1 through the
 box, so the density's `layers` and the simulation's `sim_layers` need not match.
 
 - The density, a 2D array at the output size (2160 × 3840 × `layers` of RGBA16F), is averaged
@@ -376,6 +378,14 @@ box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU
 
 - Whether the density's reduced view should also feed the fluid's own composite at a lower
   quality setting.
+- How a fluid takes the injected velocity, a choice to toggle. Both fluids add it times dt
+  (`Fluid2D.add_velocity`, `Fluid3D.add_velocity`), a force, as Stam's Stable Fluids adds a
+  source; but the bridge's velocity is a velocity, in view widths per second like the fluid's, so
+  `velocity.gain` acts as a rate and the fluid stays near 0.05 to 0.1 of the motion's speed
+  **(deduction)**, a monitor needing a scale of 20 to 30 to show it. The modes: a force (as now);
+  an impulse, the velocity added as it is, as interactive demos add a drag; a pull toward the
+  injected velocity at a share set by a time constant, which reaches the motion's speed where the
+  motion lasts and does not overshoot.
 - hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
   the pose's motion, a settings field written per tick. A per-tick value on the fluid layer, as the
   eye is, would take it off the settings.
