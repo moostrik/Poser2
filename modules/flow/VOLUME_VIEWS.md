@@ -32,8 +32,14 @@ A temporary plan, deleted when its last step is in; what it builds is then state
   reallocates when it changes (a window resize, a layout change). In a panel about 1000 pixels
   high it renders 1000 high; in the output on a 4k screen, 4k; shown at two sizes in one tick,
   at the larger, the smaller scaled down. No setting: a fixed number is wrong as soon as the
-  window or the layout changes. The strip and the histogram keep their fixed grids; they plot
-  data, not pixels.
+  window or the layout changes. The same holds for what it draws over a view: the strip's plot
+  (its 540 columns stay, its history of 9 s at 60 ticks, its height follows) and the legend (lane
+  names, log lines, limits, the colormap's key), whose text keeps a fixed pixel size so it stays
+  sharp and the same in any panel, and whose lines sit on the bars because they share the size.
+  The legend still redraws only when its content changes; a size change is one more reason.
+- **The summaries read the texture's own grid, capped.** The strip's summary and the histogram's
+  samples follow the texture's size up to today's 128 × 228 and 256 × 256, so the 512 × 288
+  flow is read whole and only the 4k textures are sampled, at a fixed cost.
 - **Volume ports.** A port's texture may be a volume, always a 3D texture (`sampler3D`), so each
   view is one shader. The density, stored as a 2D array at the output size, is averaged down into
   a 3D texture of the simulation's width and height and its own `layers`, so no view shimmers or
@@ -85,9 +91,12 @@ A temporary plan, deleted when its last step is in; what it builds is then state
 Each step ends with its tests and a commit; the user runs the app.
 
 1. **The monitor's size, volume ports, flat cuts and the summaries.**
-   - The monitor: the visualizer and the legend allocate at the viewport's size in `draw()` and
-     follow a change (the largest viewport of the tick when it is drawn twice); `allocate` no
-     longer sizes them from the layer's 4k.
+   - The monitor: the visualizer, the strip's plot height and the legend allocate at the
+     viewport's size in `draw()` and follow a change (the largest viewport of the tick when it is
+     drawn twice); `allocate` no longer sizes them from the layer's 4k. `STRIP_HEIGHT` goes; the
+     legend's text is drawn at a fixed pixel size into its viewport-sized FBO.
+   - The summaries' read grid: the texture's size, capped at 128 × 228 for the strip and
+     256 × 256 for the histogram, its total the samples read.
    - `modules/flow/port.py`: `Port.texture` is a `Texture | Texture3D`; `Port.volume` says which.
      `Port.prepare`, a callable or None, is what a view calls before it reads the port.
    - `Fluid3D.ports` adds `velocity`, `density`, `temperature`, `pressure`, `divergence`,
