@@ -28,7 +28,7 @@ from .shaders import KineticAdvect, VelocityTrail
 class VelocityTrailBridgeSettings(BaseSettings):
     """Configuration for the velocity trail bridge."""
     advect = Field(0.0, min=0.0, max=1.0, step=0.05, description="How far the trail moves with its motion before each step; 0 = at a fixed pixel")
-    attack = Field(0.0, min=0.0, max=500.0, step=1.0, description="Smoothing time of a rising x/y speed, ms; 0 = as smooth (lower: quicker flicks)")
+    attack = Field(0.0, min=0.0, max=0.5, step=0.001, description="Smoothing time of a rising x/y speed, s; 0 = as smooth (lower: quicker flicks)")
     smooth = Field(0.16, min=0.0, max=3.0, step=0.01, description="Smoothing time, s; the fall of x/y and all of z; 0 = none (higher: longer coast)")
     blur_radius = Field(0.0, min=0.0, max=10.0, newline=True, description="Gaussian blur radius in pixels; 0 = off")
     blur_steps = Field(1, min=1, max=8, description="Gaussian blur passes per tick (more: wider spread)")
@@ -121,7 +121,7 @@ class VelocityTrailBridge(FlowBase):
 
         # Stage 2: Temporal smoothing, one unit-gain Ema step per pixel: weight * previous + (1 - weight) * input
         release: float = decay_weight(delta_time, s.smooth * 1000.0)
-        attack: float = decay_weight(delta_time, s.attack) if s.attack > 0.0 else release
+        attack: float = decay_weight(delta_time, s.attack * 1000.0) if s.attack > 0.0 else release
         self._output_fbo.swap()
         self._output_fbo.begin()
         self._trail_shader.use(self._output_fbo.back, self._input_fbo, attack, release)

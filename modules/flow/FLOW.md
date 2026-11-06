@@ -242,7 +242,7 @@ still part's p99 per pixel; stop ÷ fast is the stop window's peak over steady f
 
 | Reading                                             | Noise | Stop ÷ fast | Start ÷ fast | Coast or burst, s | Ring |
 |-----------------------------------------------------|-------|-------------|--------------|-------------------|------|
-| trail velocity (smooth 1 s, attack 1 ms, advect 1, blur 4.43) | 0.018 | 0.69 | 1.16     | 0.87              | 0.19 |
+| trail velocity (smooth 1 s, attack 0.001 s, advect 1, blur 4.43) | 0.018 | 0.69 | 1.16     | 0.87              | 0.19 |
 | trail velocity, advect 0                            | 0.270 | 1.07        | 0.84         | 1.84              | 0.40 |
 | trail velocity, blur 0                              | 0.017 | 0.68        | 1.09         | 0.84              | 0.16 |
 | stop, region weight 0                               | 0.025 | 1.18        | 0.40         | 0.47              | 0.33 |
@@ -467,27 +467,54 @@ box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU
 
 ## Open
 
-- The bridge's mix: what the fluid gets, per output (velocity, density, temperature), a weight for
-  each source (the trail, start, bow, stop, wake), the trail 1 and the rest 0 by default, as the
-  light renderer mixes its layers. The weight is the gain, so no gain per bridge; the flow's mask
-  already gates every source.
-- The events' holds. An event lasts about `slow_smooth` by itself, and the fluid keeps what it is
-  given; on the harness a hold lifted steady motion as much as the stops **(deduction from the
-  measured)**. Without them an event is the change alone, and its weight in the mix sets how much it
-  counts.
-- The stop's region over moving pixels, as the start's: a leaving limb would then read as wake only.
-  It changes the stop as it is.
-- The kinetic bridge goes once the event bridge and the mix do what it did.
+- The 3D bridge's finish, in this order; each step its tests, then the app:
+  1. The events take no hold and no floor. An event lasts about `slow_smooth` by itself, the fluid
+     keeps what it is given, and on the harness a hold lifted steady motion as much as the stops
+     **(deduction from the measured)**. `START_FLOOR` is a one-frame noise gate, and noise within a
+     frame is the motion's to filter: the bridge filters in time, and its blur is a look. A pixel
+     moves where the motion gives it a velocity; the start's division keeps a numerical floor only.
+  2. The kinetic bridge goes, with all that serves only it: its shaders, `KineticStrip`, `method`,
+     `BridgeOutput.onset`'s kinetic source and `spin`, the 3D fluid's spin input, the presets'
+     `kinetic` keys. Its parts are taken over or measured not to work (the reservoir); the fluid
+     makes its own swirl, and the motion's curl is mostly the same edges **(deduction)**.
+  3. The event bridge is `ImpulseBridge`, group `impulse`: its values are a velocity change, Δv, in
+     widths per second, an impulse in the physics sense.
+  4. Measured on the harness, the frames captured again with the preset's flow: the GPU time of the
+     trail and the impulse bridge per configuration, each alone; the best value of every setting by
+     the one results table; the stop's region on a limb's back edge, built over moving pixels as the
+     start's only where more than about a tenth of it reads as stop; the numbers and the advice here.
+  5. The mix in `Bridge3DLayer`: `velocity` the trail, `impulse` the start, bow, stop and wake
+     velocities, `density` and `temperature` the trail's speed and the four, each source at a weight
+     0 to 1, the trail 1 and the rest 0 by default. No gain in the bridge: its sources share one
+     unit, the motion's gains balance the axes and the fluid's gains set the strength. The trail and
+     the impulse stay two velocity outputs, as the fluid takes them two ways (below).
+  6. The 3D fluid's `input_x` and `input_y` go: the motion's `x_gain` and `y_gain` balance the axes.
+- A turn, the change across the motion (a limb changing direction), from the same two trails; waits
+  for a recording with a turning limb to measure it on.
 - Whether the density's reduced view should also feed the fluid's own composite at a lower
   quality setting.
-- How a fluid takes the injected velocity, a choice to toggle. Both fluids add it times dt
-  (`Fluid2D.add_velocity`, `Fluid3D.add_velocity`), a force, as Stam's Stable Fluids adds a
-  source; but the bridge's velocity is a velocity, in view widths per second like the fluid's, so
-  `velocity.gain` acts as a rate and the fluid stays near 0.05 to 0.1 of the motion's speed
-  **(deduction)**, a monitor needing a scale of 20 to 30 to show it. The modes: a force (as now);
-  an impulse, the velocity added as it is, as interactive demos add a drag; a pull toward the
-  injected velocity at a share set by a time constant, which reaches the motion's speed where the
-  motion lasts and does not overshoot.
+- How a fluid takes what the bridge gives, the base of the fluid refactor. Both fluids add the
+  injected velocity times dt (`Fluid2D.add_velocity`, `Fluid3D.add_velocity`), as Stam's Stable
+  Fluids adds a source; but the bridge's velocity is a velocity, in view widths per second like
+  the fluid's, so it is taken as an acceleration, `velocity.gain` acts as a rate, and the fluid
+  stays near 0.05 to 0.1 of the motion's speed **(deduction)**, a monitor needing a scale of 20 to
+  30 to show it. In Navier–Stokes the external force term is an acceleration per unit mass, as
+  gravity and buoyancy enter. The rule, by what each input is:
+
+  | Input is           | The fluid                                                            | From the bridge                  |
+  |--------------------|----------------------------------------------------------------------|----------------------------------|
+  | a body's velocity  | takes it where the body is, a moving boundary: set, or pulled toward it at a share from a time constant, never past it | the trail's push   |
+  | an impulse, Δv     | adds it once in total, without dt                                    | the start, bow, stop and wake    |
+  | an acceleration    | adds it times dt                                                     | buoyancy, the spin's vorticity force |
+  | a source           | adds it times dt, an amount per second                               | density, temperature             |
+
+  The moving boundary is the physical model of a body in a fluid: the fluid touching it moves with
+  it, and coasts on its own inertia once it stops. An impulse is added once: an event lasts about
+  `slow_smooth` over many ticks, so added directly each tick it counts once per tick, and a
+  velocity added without dt every tick runs away while a limb keeps moving, 60 times its speed in
+  a second; spread over its ticks, its rate (the change over its duration) times dt adds about its
+  Δv in all **(deduction)**. A toggle between the force (as now) and these keeps today's look
+  comparable.
 - hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
   the pose's motion, a settings field written per tick. A per-tick value on the fluid layer, as the
   eye is, would take it off the settings.

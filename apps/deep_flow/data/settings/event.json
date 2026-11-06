@@ -440,7 +440,7 @@
       "method": "VELOCITY_TRAIL",
       "trail": {
         "advect": 1.0,
-        "attack": 1.0,
+        "attack": 0.001,
         "smooth": 1.0,
         "blur_radius": 4.0,
         "blur_steps": 4
