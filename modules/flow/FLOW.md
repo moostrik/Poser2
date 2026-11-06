@@ -74,9 +74,9 @@ reads its fields by name. A texture field declares its kind on the field
 and every component that owns textures names them once with their kinds in its `ports`
 (`HasPorts`): `FlowBase` its `input` and `output`, a subclass its others. A stage names its
 components once (`_components`), by their settings group, and its `ports`, what the monitors
-show, is one list in the order the data runs, the prefix its group: `input.*`, each component's
-in the order the stage runs them (`trail.output`, `kinetic.fast`, `xy.solve`, `z.track`), then
-`output.*`. A texture not allocated is left out, so a part the stage does not run gives none;
+show, is one list with the data running bottom to top, the prefix its group: `output.*` on top,
+each component's from the last the stage runs to the first (`z.track`, `xy.solve`,
+`kinetic.fast`, `trail.output`), `input.*` at the bottom. A texture not allocated is left out, so a part the stage does not run gives none;
 the 3D bridge lists only its method's bridge. Not by reflection over attributes: it would find
 the FBOs, not their kinds, and a swap's back buffer would be a port too. A layer's `texture` stays
 what it draws, read by the composite. The layers hold no reference to each other, and no input knows an output's type. A field is named with the same noun for the

@@ -91,8 +91,8 @@ class _PartStage(StageLayer[_Input, _KindOutput]):
 
 
 class PortsTest(unittest.TestCase):
-    """A field that declares its kind is a port; one left None is none; a stage lists its input,
-    its parts and its output in the order the data runs, and leaves out what is not allocated."""
+    """A field that declares its kind is a port; one left None is none; a stage lists its output,
+    its parts and its input with the data running bottom to top, and leaves out what is not allocated."""
 
     def test_a_dataclass_gives_its_set_fields_with_their_kinds(self) -> None:
         image = Texture()
@@ -101,10 +101,10 @@ class PortsTest(unittest.TestCase):
         self.assertIs(ports['image'].texture, image)
         self.assertEqual(ports['image'].kind, TextureKind.IMAGE)
 
-    def test_a_stage_lists_input_parts_output_in_order_without_unallocated(self) -> None:
+    def test_a_stage_lists_output_parts_input_top_down_without_unallocated(self) -> None:
         stage = _PartStage()
         stage.set_input(_Input(_allocated(), 0.016))
-        self.assertEqual(list(stage.ports), ['input.image', 'trail.smooth', 'color', 'output.velocity'])
+        self.assertEqual(list(stage.ports), ['output.velocity', 'color', 'trail.smooth', 'input.image'])
         self.assertEqual(stage.ports['output.velocity'].kind, TextureKind.VELOCITY)
 
     def test_prefixed_names_a_part_and_leaves_no_prefix_alone(self) -> None:
