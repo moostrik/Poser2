@@ -1,4 +1,4 @@
-"""Velocity Event Region shader.
+"""Velocity Impulse Region shader.
 
 Writes the flow's velocity where a pixel moves and whether it moves, for a rise's region means.
 """
@@ -7,7 +7,7 @@ from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture
 from modules.gl import Shader, draw_quad, Texture
 
 
-class VelocityEventRegion(Shader):
+class VelocityImpulseRegion(Shader):
     """Writes (velocity * moving, moving) to RGBA."""
 
     def use(self, velocity: Texture) -> None:

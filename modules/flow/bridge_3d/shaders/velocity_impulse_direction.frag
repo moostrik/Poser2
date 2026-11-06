@@ -1,11 +1,11 @@
 #version 460 core
 
-// Velocity Event Direction Shader
-// An event as a velocity: its amount along a trail's 3D direction. The numpy reference is
-// velocity_event_bridge.event_velocity
+// Velocity Impulse Direction Shader
+// An impulse as a velocity: its amount along a trail's 3D direction. The numpy reference is
+// velocity_impulse_bridge.impulse_velocity
 
 uniform sampler2D tex0;  // Trail RGB: the direction
-uniform sampler2D tex1;  // Event R: the amount
+uniform sampler2D tex1;  // Impulse R: the amount
 
 in vec2 texCoord;
 out vec4 fragColor;

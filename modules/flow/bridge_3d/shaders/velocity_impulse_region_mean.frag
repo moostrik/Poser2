@@ -1,6 +1,6 @@
 #version 460 core
 
-// Velocity Event Region Mean Shader
+// Velocity Impulse Region Mean Shader
 // A region's mean velocity over its moving pixels: the region texture's sums at the region's mip level
 // over its moving share; 0 where nothing in the region moves
 

@@ -1,6 +1,6 @@
 #version 460 core
 
-// Velocity Event Region Speed Shader
+// Velocity Impulse Region Speed Shader
 // The speeds of the two trails, whose mip levels are a region's mean speeds: what a fall reads
 
 uniform sampler2D tex0;  // Fast trail RGB

@@ -29,7 +29,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 | flow                 | the domain: everything from the camera's motion to the fluid                                          | `modules/flow`                                                     |
 | motion               | the stage that measures a velocity field from two images: the optical flow                            | `motion/`, `GradientFlow`, `LucasKanadeFlow`, `LucasKanadeFlow3D`  |
 | bridge               | the stage that turns the measured velocity into what the fluid injects: a velocity to add, density with its color, temperature, and in 3D a second velocity | `bridge_2d/`, `bridge_3d/`                 |
-| event                | where a move starts or stops, read by the 3D bridge beside its trail: start, bow, stop, wake          | `VelocityEventBridge`, `MotionEvent`, group `event`                |
+| impulse              | a velocity change, Δv in widths per second, where a move starts or stops, read by the 3D bridge beside its trail: start, bow, stop, wake | `VelocityImpulseBridge`, `Impulse`, group `impulse` |
 | region               | the pixels around one, which tell a part of the body changing speed from a limb arriving or leaving | `start_region_size`, `stop_region_size`, `*_region_weight`         |
 | injection            | one bridge output as one fluid takes it, at its weight                                                | `Injection`                                                        |
 | fluid                | the Navier–Stokes simulation; its density is the show                                                  | `fluid_2d/`, `fluid_3d/`, `Fluid2D`, `Fluid3D`                     |
@@ -80,7 +80,7 @@ and every component that owns textures names them once with their kinds in its `
 components once (`_components`), by their settings group, and its `ports`, what the monitors
 show, is one list with the data running bottom to top, the prefix its group: `output.*` on top,
 each component's from the last the stage runs to the first (`z.track`, `xy.solve`,
-`event.fast`, `trail.output`), `input.*` at the bottom. A texture not allocated is left out, so a part the stage does not run gives none.
+`impulse.fast`, `trail.output`), `input.*` at the bottom. A texture not allocated is left out, so a part the stage does not run gives none.
 Not by reflection over attributes: it would find
 the FBOs, not their kinds, and a swap's back buffer would be a port too. A layer's `texture` stays
 what it draws, read by the composite. The layers hold no reference to each other, and no input knows an output's type. A field is named with the same noun for the
@@ -154,11 +154,11 @@ context of its own, would move the wait to the bridge, and the screen still show
 | `MotionLayer` (ABC)                         | `StageLayer[MotionInput, MotionOutput]`; `_update()` as the template method: `_measure` on a new frame. Holds the allocate and resize pattern; the flow runs at `settings.width` by `settings.height`. Draws nothing |
 | `Motion2DLayer`, `Motion3DLayer`            | the subclasses, each on its optical flow (`GradientFlow`; `LucasKanadeFlow3D`). The 2D flow's velocity is per frame, not per second, and it reads no mask, until the 2D flow moves to the Lucas–Kanade solve |
 | `BridgeLayer` (ABC)                         | `StageLayer[BridgeInput, BridgeOutput]`; `_update()`: the density's color (`DensityColor`: the image, or white, times the tint, gated by the mask), `_bridge` the input's velocity into velocity, density and temperature. The bridges' filters run at the velocity's size and their outputs at `settings.width` by `settings.height`; the layer follows both. Draws nothing |
-| `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, the velocity trail and beside it the velocity event bridge, [The events](#the-events), run while a monitor shows one of its ports, through their `prepare`, and not yet in the output) |
+| `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, the velocity trail and beside it the velocity impulse bridge, [The impulses](#the-impulses), run while a monitor shows one of its ports, through their `prepare`, and not yet in the output) |
 | `FluidLayer` (ABC)                          | `StageLayer[FluidInput, FluidOutput]`; `_update()`: `_inject` each injection's velocity, density and temperature at its weight, `_step(dt)`; `texture`, the show. Knows injections, not cameras; reads no poses. The stage's reset is the fluid's only one |
 | `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's. `Fluid3DLayer` injects RGBA density, the onset and a spin where one is given, the velocity's z as the volume's w (its sign turned: w points away from the viewer), and takes the parallax eye the app steers by `set_eye(x, y)` |
 | `MonitorLayer`                              | `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's port names (`names`, the options of `texture`); `draw()` renders the port once per tick, however many panels show it, by its kind or by `view`, and nothing while not shown; its views and settings are in [The monitor](#the-monitor). Not a stage, since it has no output and no `reset` |
-| `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass, each a `StageLayerSettings`: `reset`, then `width` and `height`, the stage's working size, first on every stage's panel. The motion's is the size its flow runs at, the bridge's the size it writes its outputs at (its filters follow the velocity's size), the fluid's its simulation grid (its density is at the size the app allocates). On the fluid layer `blend_mode`. A layer whose stage runs one component is that component's settings too (`Motion2DLayerSettings` is a `GradientFlowSettings`, `Motion3DLayerSettings` a `LucasKanadeFlow3DSettings`, the fluid layers' a `Fluid2DSettings` and a `Fluid3DSettings`), so the component's fields and groups sit on the stage's panel; the bridge layers, running several bridges, hold each as a group (`trail`, `event`, `density`, `temperature`). No `draw_mode`, `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take `dt` from their input |
+| `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass, each a `StageLayerSettings`: `reset`, then `width` and `height`, the stage's working size, first on every stage's panel. The motion's is the size its flow runs at, the bridge's the size it writes its outputs at (its filters follow the velocity's size), the fluid's its simulation grid (its density is at the size the app allocates). On the fluid layer `blend_mode`. A layer whose stage runs one component is that component's settings too (`Motion2DLayerSettings` is a `GradientFlowSettings`, `Motion3DLayerSettings` a `LucasKanadeFlow3DSettings`, the fluid layers' a `Fluid2DSettings` and a `Fluid3DSettings`), so the component's fields and groups sit on the stage's panel; the bridge layers, running several bridges, hold each as a group (`trail`, `impulse`, `density`, `temperature`). No `draw_mode`, `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take `dt` from their input |
 
 The apps' render is a layer graph of `LayerBase` layers updated by one loop calling `update()`
 on each (`apps/deep_flow/render.py`, `apps/hd_trio/render.py`), with a wiring pass before it
@@ -178,14 +178,14 @@ any layer, and two show A beside B.
 ## The 3D bridge
 
 The bridge reads two things from a movement: the motion itself, a push in its direction that is
-stronger for fast than for slow and coasts after a stop; and the events in it, where a move starts
-and where it stops. The motion wants a long, soft reading, the events a short, sharp one, so they
-are two bridges side by side on the same velocity (`bridge_3d/`):
+stronger for fast than for slow and coasts after a stop; and its impulses, the velocity changes
+where a move starts and where it stops. The motion wants a long, soft reading, the impulses a
+short, sharp one, so they are two bridges side by side on the same velocity (`bridge_3d/`):
 
-| Bridge                | Reads                                                         | Gives                                                          | Panel group |
-|-----------------------|---------------------------------------------------------------|----------------------------------------------------------------|-------------|
-| `VelocityTrailBridge` | the flow's velocity through one trail: advect, attack/smooth, blur | `smooth_velocity`, the push; its speed is the density amount  | `trail`     |
-| `VelocityEventBridge` | the flow's velocity through a fast and a slow trail, and their regions | `start`, `bow`, `stop`, `wake`, each also as `<event>_velocity` | `event`     |
+| Bridge                  | Reads                                                         | Gives                                                          | Panel group |
+|-------------------------|---------------------------------------------------------------|----------------------------------------------------------------|-------------|
+| `VelocityTrailBridge`   | the flow's velocity through one trail: advect, attack/smooth, blur | `smooth_velocity`, the push; its speed is the density amount  | `trail`     |
+| `VelocityImpulseBridge` | the flow's velocity through a fast and a slow trail, and their regions | `start`, `bow`, `stop`, `wake`, each also as `<impulse>_velocity` | `impulse`   |
 
 The fluid makes its own swirl from what it is given, so the bridge gives no curl of its own.
 
@@ -197,20 +197,20 @@ trail with its own motion before each step, so the average follows a moving limb
 fixed pixel. `blur_radius` and `blur_steps` spread it in space; the ring it leaves around the
 body is part of the look **(site fact)**.
 
-### The events
+### The impulses
 
 The difference of the fast and the slow trail along the motion's direction rises where a move
 starts and falls where it stops; it lasts about `slow_smooth`, as the slow trail catches up. It is
 divided by the trails' step peak (`step_peak`, 0.58 at 25 and 150 ms), so a limb at speed v that
-starts or stops at once reads v: the events are in the motion's own strength, image widths per
-second, and a gradual start or stop reads less, by how much of its speed changes within the
-trails' times. A
-pixel cannot tell a move starting from a limb arriving at it, nor a move stopping from a limb
+starts or stops at once reads v: the impulses are in the motion's own strength, image widths per
+second, a velocity change Δv, an impulse in the physics sense (a change of momentum per unit of
+mass), and a gradual start or stop reads less, by how much of its speed changes within the trails'
+times. A pixel cannot tell a move starting from a limb arriving at it, nor a move stopping from a limb
 leaving it: its speed rises or falls either way. The region around it can, so the region splits
 each pixel's rise and fall in two, by the region weight (`start_region_weight`,
 `stop_region_weight`; 0 gives all of it to the start and the stop):
 
-| Event  | Is                                               | Along                 |
+| Impulse | Is                                              | Along                 |
 |--------|--------------------------------------------------|-----------------------|
 | start  | the share of a rise its region shares: a part of the body speeding up | the fast trail's direction |
 | bow    | the rest of the rise: a limb arriving, the wave in front of it        | the fast trail's direction |
@@ -229,11 +229,12 @@ Start + bow is a pixel's whole rise, stop + wake its whole fall. What a region s
   limb keeps, where a mean velocity would shrink and read as a stop. The trails lag at the pixels
   a limb leaves, so a leaving limb lowers it too: part of a wake reads as a stop.
 
-The events read x, y and z alike. The bridge filters in time only: noise within a frame is the
-motion's to filter, and the trail's blur is a look. An event takes no hold: it lasts about
+The impulses read x, y and z alike. The bridge filters in time only: noise within a frame is the
+motion's to filter, and the trail's blur is a look. An impulse takes no hold: it lasts about
 `slow_smooth` by itself, and what a stop injects is the speed it ended; a hold lifted steady motion
-as much as the stops on the harness (below). No blur and no advect: the events stay sharp. The event bridge runs while a monitor shows one of its ports
-(`Bridge3DLayer`); nothing it makes reaches the fluid yet.
+as much as the stops on the harness (below). No blur and no advect: the impulses stay sharp. The
+impulse bridge runs while a monitor shows one of its ports (`Bridge3DLayer`); nothing it makes
+reaches the fluid yet.
 
 ### Measured
 
@@ -253,9 +254,9 @@ still part's p99 per pixel; stop ÷ fast is the stop window's peak over steady f
 | start, region weight 0                              | 0.104 | 0.12        | 1.46         |                   |      |
 | start, region weight 0, x/y only                    | 0.001 | 0.05        | 1.89         |                   |      |
 
-The event rows are measured before the step peak scaling; the ratios hold, the event's level is
+The impulse rows are measured before the step peak scaling; the ratios hold, the impulse's level is
 1 / 0.58 = 1.72 times higher now. The stop rows hold 0.1 s. Ring is the share 4–24 px outside the mask, in steady fast motion for the
-trail and in the stop windows for the events; x/y only is z left out of the events. Without
+trail and in the stop windows for the impulses; x/y only is z left out of the impulses. Without
 its region, a start rises along the front of every moving limb, 0.125 in steady fast motion against
 0.18 at real starts. The start's region reading over moving pixels and the bow and wake are not
 measured on the harness yet.
@@ -470,8 +471,6 @@ box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU
 ## Open
 
 - The 3D bridge's finish, in this order; each step its tests, then the app:
-  3. The event bridge is `ImpulseBridge`, group `impulse`: its values are a velocity change, Δv, in
-     widths per second, an impulse in the physics sense.
   4. Measured on the harness, the frames captured again with the preset's flow: the GPU time of the
      trail and the impulse bridge per configuration, each alone; the best value of every setting by
      the one results table; the stop's region on a limb's back edge, built over moving pixels as the
@@ -503,7 +502,7 @@ box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU
   | a source           | adds it times dt, an amount per second                               | density, temperature             |
 
   The moving boundary is the physical model of a body in a fluid: the fluid touching it moves with
-  it, and coasts on its own inertia once it stops. An impulse is added once: an event lasts about
+  it, and coasts on its own inertia once it stops. An impulse is added once: it lasts about
   `slow_smooth` over many ticks, so added directly each tick it counts once per tick, and a
   velocity added without dt every tick runs away while a limb keeps moving, 60 times its speed in
   a second; spread over its ticks, its rate (the change over its duration) times dt adds about its
@@ -514,13 +513,13 @@ box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU
   eye is, would take it off the settings.
 - Unused channels written 0 in the whole flow module. The 3D motion's and the 3D bridge's
   velocities write 0 in their unused w (`compose_velocity.frag`, `velocity_trail.frag`,
-  `velocity_event_direction.frag`), so a monitor shows w as
+  `velocity_impulse_direction.frag`), so a monitor shows w as
   nothing rather than a full strip lane and a histogram spike at 1 × `scale`. The rest of
   `modules/flow` still writes 1.0 into unused channels, an alpha left from when the monitors
   blitted textures as they are: among others `gradient_flow_shader.frag`,
-  `lucas_kanade_shader.frag`, `displacement_threshold.frag`, the event scalars and
+  `lucas_kanade_shader.frag`, `displacement_threshold.frag`, the impulse scalars and
   `magnitude_shader.frag`. It matters only where the target texture has that channel (an R16F
   target drops it). Each wants its readers checked first, as the velocities' were: there the
-  trails, the event shaders, `VelocityMagnitude` and `inject_flow_3d.comp` read xyz only,
+  trails, the impulse shaders, `VelocityMagnitude` and `inject_flow_3d.comp` read xyz only,
   `trail_advect.frag` carries the vec4 along unread, and `Fluid3D.set_velocity` has no caller.
   The visualization's own shaders keep alpha 1, since they draw for the screen.

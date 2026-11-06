@@ -1,6 +1,6 @@
 #version 460 core
 
-// Velocity Event Region Shader
+// Velocity Impulse Region Shader
 // The flow's velocity where a pixel moves, and whether it moves: (velocity * moving, moving). A pixel
 // moves where the motion gives it a velocity; the motion filters the noise within a frame. The mip
 // levels of this are a region's sums over its moving pixels and its moving share, so a rise can read

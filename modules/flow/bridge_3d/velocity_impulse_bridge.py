@@ -1,11 +1,12 @@
-"""Velocity Event Bridge.
+"""Velocity Impulse Bridge.
 
-Next to the velocity trail, which is the motion's push, this reads the motion's events: where a move
-starts and where it stops. Two short trails on the flow's velocity, fast and slow, unit-gain Emas; their
-difference along the motion's direction rises where a move starts and falls where it stops. The
-difference is divided by its step peak (`step_peak`): a limb at speed v that starts or stops at once
-reads v, so the events are in the motion's own strength, image widths per second; a gradual start or
-stop reads less, by how much of the speed changes within the trails' times.
+Next to the velocity trail, which is the motion's push, this reads the motion's impulses: its velocity
+changes, Δv, where a move starts and where it stops. Two short trails on the flow's velocity, fast and slow,
+unit-gain Emas; their difference along the motion's direction rises where a move starts and falls where it
+stops. The difference is divided by its step peak (`step_peak`): a limb at speed v that starts or stops at
+once reads v, so the impulses are in the motion's own strength, image widths per second, an impulse in the
+physics sense (a change of momentum, per unit of mass); a gradual start or stop reads less, by how much of
+the speed changes within the trails' times.
 
 A pixel cannot tell a move starting from a limb arriving at it, nor a move stopping from a limb leaving
 it: its speed rises or falls either way. The region around it (`start_region_size`, `stop_region_size`)
@@ -15,7 +16,7 @@ can, so the region splits each pixel's rise and fall in two, by its region weigh
     bow     the rest: a limb arriving, the wave in front of a moving limb
     stop    the share of a fall its region shares: a part of the body slowing down
     wake    the rest: a limb leaving, the wake behind it
-Start + bow is the pixel's whole rise, stop + wake its whole fall. An event lasts about `slow_smooth`, as
+Start + bow is the pixel's whole rise, stop + wake its whole fall. An impulse lasts about `slow_smooth`, as
 the slow trail catches up; it takes no hold, so what a stop injects is the speed it ended.
 
 What a region shares:
@@ -28,12 +29,12 @@ What a region shares:
             turning limb keeps it, where a mean velocity would shrink and read as a stop. The trails lag at the
             pixels a limb leaves, so a leaving limb lowers it too, and part of a wake reads as a stop
 
-The events read the flow's x, y and z alike. They filter in time only: noise within a frame is the
-motion's to filter. No blur and no advect: the events stay sharp.
+The impulses read the flow's x, y and z alike. They filter in time only: noise within a frame is the
+motion's to filter. No blur and no advect: the impulses stay sharp.
 
 Out come, in image widths per second like the flow:
-    start, bow, stop, wake          the events (R16F)
-    <event>_velocity                the motion's direction times its event (RGBA16F, xyz): a start and a bow along
+    start, bow, stop, wake          the impulses (R16F)
+    <impulse>_velocity              the motion's direction times its impulse (RGBA16F, xyz): a start and a bow along
                                     the fast trail's direction, a stop and a wake along the slow one's, the motion
                                     it ended
 
@@ -51,7 +52,7 @@ from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil, Port, TextureKind
 from ..shaders import Trail
 from .trails import EPSILON, decay_weight, direction
-from .shaders import MotionEvent, VelocityEvent, VelocityEventDirection, VelocityEventRegion, VelocityEventRegionMean, VelocityEventRegionSpeed
+from .shaders import Impulse, VelocityImpulse, VelocityImpulseDirection, VelocityImpulseRegion, VelocityImpulseRegionMean, VelocityImpulseRegionSpeed
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +69,8 @@ def step_peak(fast_smooth: float, slow_smooth: float) -> float:
     return math.exp(-t / slow_smooth) - math.exp(-t / fast_smooth)
 
 
-class VelocityEventBridgeSettings(BaseSettings):
-    """Configuration for the velocity event bridge: its two trails and the start and stop regions."""
+class VelocityImpulseBridgeSettings(BaseSettings):
+    """Configuration for the velocity impulse bridge: its two trails and the start and stop regions."""
     fast_smooth = Field(0.025, min=0.0, max=0.5, step=0.005, description="Fast trail smoothing time, s; 0 = the flow itself")
     slow_smooth = Field(0.15, min=0.0, max=1.0, step=0.005, description="Slow trail smoothing time, s: what a change is read against")
     start_region_weight = Field(1.0, min=0.0, max=1.0, step=0.05, newline=True, description="How much the region around a start must speed up too, the rest the bow; 0 = all start")
@@ -78,7 +79,7 @@ class VelocityEventBridgeSettings(BaseSettings):
     stop_region_size = Field(128.0, min=8.0, max=1024.0, step=8.0, description="Size of the region around a stop, pixels of the bridge")
 
 
-class VelocityEventBridge(FlowBase):
+class VelocityImpulseBridge(FlowBase):
     """Two short trails on the flow and the starts and stops of their difference.
 
     Pipeline:
@@ -97,7 +98,7 @@ class VelocityEventBridge(FlowBase):
         - output_fbo: unused (the trail bridges' form); the outputs are their own FBOs
     """
 
-    def __init__(self, settings: VelocityEventBridgeSettings | None = None) -> None:
+    def __init__(self, settings: VelocityImpulseBridgeSettings | None = None) -> None:
         super().__init__()
 
         self._input_internal_format = GL_RGBA16F
@@ -105,7 +106,7 @@ class VelocityEventBridge(FlowBase):
         self._input_kind = TextureKind.VELOCITY
         self._output_kind = TextureKind.VELOCITY
 
-        self.settings: VelocityEventBridgeSettings = settings or VelocityEventBridgeSettings()
+        self.settings: VelocityImpulseBridgeSettings = settings or VelocityImpulseBridgeSettings()
 
         self._fast_fbo: SwapFbo = SwapFbo()
         self._slow_fbo: SwapFbo = SwapFbo()
@@ -114,17 +115,17 @@ class VelocityEventBridge(FlowBase):
         self._region_fast_fbo: SwapFbo = SwapFbo()      # that mean, through the fast trail
         self._region_slow_fbo: SwapFbo = SwapFbo()      # and through the slow trail
         self._region_speed_fbo: Fbo = Fbo()             # the stop's: fast speed, slow speed
-        self._events: dict[MotionEvent, Fbo] = {event: Fbo() for event in MotionEvent}
-        self._velocities: dict[MotionEvent, Fbo] = {event: Fbo() for event in MotionEvent}
+        self._impulses: dict[Impulse, Fbo] = {impulse: Fbo() for impulse in Impulse}
+        self._velocities: dict[Impulse, Fbo] = {impulse: Fbo() for impulse in Impulse}
         self._size: tuple[int, int] = (0, 0)
         self._warned_peak: bool = False     # slow_smooth not slower than fast_smooth was logged
 
         self._trail_shader: Trail = Trail()
-        self._moving_shader: VelocityEventRegion = VelocityEventRegion()
-        self._moving_mean_shader: VelocityEventRegionMean = VelocityEventRegionMean()
-        self._region_speed_shader: VelocityEventRegionSpeed = VelocityEventRegionSpeed()
-        self._event_shader: VelocityEvent = VelocityEvent()
-        self._direction_shader: VelocityEventDirection = VelocityEventDirection()
+        self._moving_shader: VelocityImpulseRegion = VelocityImpulseRegion()
+        self._moving_mean_shader: VelocityImpulseRegionMean = VelocityImpulseRegionMean()
+        self._region_speed_shader: VelocityImpulseRegionSpeed = VelocityImpulseRegionSpeed()
+        self._impulse_shader: VelocityImpulse = VelocityImpulse()
+        self._direction_shader: VelocityImpulseDirection = VelocityImpulseDirection()
 
     @property
     def velocity_input(self) -> Texture:
@@ -141,24 +142,24 @@ class VelocityEventBridge(FlowBase):
         """Slow trail (RGBA16F, xyz)."""
         return self._slow_fbo
 
-    def event(self, event: MotionEvent) -> Texture:
-        """The event (R16F), image widths per second."""
-        return self._events[event]
+    def impulse(self, impulse: Impulse) -> Texture:
+        """The impulse (R16F), image widths per second."""
+        return self._impulses[impulse]
 
-    def event_velocity(self, event: MotionEvent) -> Texture:
-        """The event along its direction (RGBA16F, xyz): a start or a bow along the fast trail's, a stop or a
+    def impulse_velocity(self, impulse: Impulse) -> Texture:
+        """The impulse along its direction (RGBA16F, xyz): a start or a bow along the fast trail's, a stop or a
         wake along the slow trail's, the motion it ended."""
-        return self._velocities[event]
+        return self._velocities[impulse]
 
     @property
     def ports(self) -> dict[str, Port]:
         ports: dict[str, Port] = {**super().ports,
                                   'fast': Port(self._fast_fbo, TextureKind.VELOCITY),
                                   'slow': Port(self._slow_fbo, TextureKind.VELOCITY)}
-        for event in MotionEvent:
-            name: str = event.name.lower()
-            ports[name] = Port(self._events[event], TextureKind.SCALAR)
-            ports[f'{name}_velocity'] = Port(self._velocities[event], TextureKind.VELOCITY)
+        for impulse in Impulse:
+            name: str = impulse.name.lower()
+            ports[name] = Port(self._impulses[impulse], TextureKind.SCALAR)
+            ports[f'{name}_velocity'] = Port(self._velocities[impulse], TextureKind.VELOCITY)
         return ports
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
@@ -174,9 +175,9 @@ class VelocityEventBridge(FlowBase):
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
             glGenerateMipmap(GL_TEXTURE_2D)
             glBindTexture(GL_TEXTURE_2D, 0)
-        for event in MotionEvent:
-            self._events[event].allocate(width, height, GL_R16F)
-            self._velocities[event].allocate(width, height, GL_RGBA16F)
+        for impulse in Impulse:
+            self._impulses[impulse].allocate(width, height, GL_R16F)
+            self._velocities[impulse].allocate(width, height, GL_RGBA16F)
         self._follow_start_region_size()
         self.reset()
 
@@ -184,27 +185,27 @@ class VelocityEventBridge(FlowBase):
         self._moving_shader.allocate()
         self._moving_mean_shader.allocate()
         self._region_speed_shader.allocate()
-        self._event_shader.allocate()
+        self._impulse_shader.allocate()
         self._direction_shader.allocate()
 
     def deallocate(self) -> None:
         """Release all resources."""
         super().deallocate()
         for fbo in (self._fast_fbo, self._slow_fbo, self._moving_fbo, self._moving_mean_fbo, self._region_fast_fbo,
-                    self._region_slow_fbo, self._region_speed_fbo, *self._events.values(), *self._velocities.values()):
+                    self._region_slow_fbo, self._region_speed_fbo, *self._impulses.values(), *self._velocities.values()):
             fbo.deallocate()
         self._size = (0, 0)
         self._trail_shader.deallocate()
         self._moving_shader.deallocate()
         self._moving_mean_shader.deallocate()
         self._region_speed_shader.deallocate()
-        self._event_shader.deallocate()
+        self._impulse_shader.deallocate()
         self._direction_shader.deallocate()
 
     def reset(self) -> None:
         """Reset all fields to zero."""
         super().reset()
-        for fbo in (self._fast_fbo, self._slow_fbo, self._region_fast_fbo, self._region_slow_fbo, *self._events.values(),
+        for fbo in (self._fast_fbo, self._slow_fbo, self._region_fast_fbo, self._region_slow_fbo, *self._impulses.values(),
                     *self._velocities.values()):
             FlowUtil.zero(fbo)
 
@@ -230,14 +231,14 @@ class VelocityEventBridge(FlowBase):
         FlowUtil.blit(self._input_fbo, velocity)
 
     def update(self, delta_time: float = 1.0 / 60.0) -> None:
-        """Advance the trails by `delta_time` and read the events.
+        """Advance the trails by `delta_time` and read the impulses.
 
         Args:
             delta_time: Seconds since the previous update
         """
         if not self._allocated:
             return
-        s: VelocityEventBridgeSettings = self.settings
+        s: VelocityImpulseBridgeSettings = self.settings
         fast_weight: float = decay_weight(delta_time, s.fast_smooth * 1000.0)
         slow_weight: float = decay_weight(delta_time, s.slow_smooth * 1000.0)
 
@@ -267,22 +268,22 @@ class VelocityEventBridge(FlowBase):
         peak: float = step_peak(s.fast_smooth, s.slow_smooth)
         if peak <= 0.0 and not self._warned_peak:
             self._warned_peak = True
-            logger.warning("VelocityEventBridge: slow_smooth (%.3f s) is not slower than fast_smooth (%.3f s), so there are no events",
+            logger.warning("VelocityImpulseBridge: slow_smooth (%.3f s) is not slower than fast_smooth (%.3f s), so there are no impulses",
                            s.slow_smooth, s.fast_smooth)
         self._warned_peak = self._warned_peak and peak <= 0.0
         scale: float = 1.0 / peak if peak > 0.0 else 0.0
 
-        for event in MotionEvent:
-            rise: bool = event.sign > 0.0
+        for impulse in Impulse:
+            rise: bool = impulse.sign > 0.0
             region_weight: float = s.start_region_weight if rise else s.stop_region_weight
             region_fast: Texture = self._region_fast_fbo if rise else self._region_speed_fbo
             region_slow: Texture = self._region_slow_fbo if rise else self._region_speed_fbo
-            amount: Fbo = self._events[event]
+            amount: Fbo = self._impulses[impulse]
             amount.begin()
-            self._event_shader.use(self.fast, self.slow, event, scale, region_fast, region_slow, region_weight, stop_lod)
+            self._impulse_shader.use(self.fast, self.slow, impulse, scale, region_fast, region_slow, region_weight, stop_lod)
             amount.end()
 
-            velocity: Fbo = self._velocities[event]
+            velocity: Fbo = self._velocities[impulse]
             velocity.begin()
             self._direction_shader.use(self.fast if rise else self.slow, amount)
             velocity.end()
@@ -304,11 +305,11 @@ class VelocityEventBridge(FlowBase):
 
 # ── numpy reference ─────────────────────────────────────────────────────
 
-def velocity_event(fast: np.ndarray, slow: np.ndarray, sign: float, share: np.ndarray | float = 1.0,
-                   edge: bool = False, scale: float = 1.0) -> np.ndarray:
-    """One event (..., ) from the trails (..., 3): max(sign * (fast - slow) along the motion, 0) times `scale`
+def velocity_impulse(fast: np.ndarray, slow: np.ndarray, sign: float, share: np.ndarray | float = 1.0,
+                     edge: bool = False, scale: float = 1.0) -> np.ndarray:
+    """One impulse (..., ) from the trails (..., 3): max(sign * (fast - slow) along the motion, 0) times `scale`
     (1 / `step_peak`), times the share its region shares (a start or a stop), or with `edge` times the rest (a bow
-    or a wake). Mirrors velocity_event.frag."""
+    or a wake). Mirrors velocity_impulse.frag."""
     unit: np.ndarray = direction(fast, slow)
     part: np.ndarray | float = 1.0 - share if edge else share
     return np.maximum(0.0, sign * np.sum((fast - slow) * unit, axis=-1)) * scale * part
@@ -316,7 +317,7 @@ def velocity_event(fast: np.ndarray, slow: np.ndarray, sign: float, share: np.nd
 
 def moving_mean(velocity: np.ndarray) -> np.ndarray:
     """A region's mean velocity (3,) over its moving pixels, those of its pixels (N, 3) the motion gives a velocity;
-    0 where none moves. Mirrors velocity_event_region.frag and velocity_event_region_mean.frag."""
+    0 where none moves. Mirrors velocity_impulse_region.frag and velocity_impulse_region_mean.frag."""
     moving: np.ndarray = np.linalg.norm(velocity, axis=-1) > EPSILON
     return np.mean(velocity[moving], axis=0) if moving.any() else np.zeros(3)
 
@@ -324,7 +325,7 @@ def moving_mean(velocity: np.ndarray) -> np.ndarray:
 def start_region_share(region_fast: np.ndarray, region_slow: np.ndarray, region_weight: float) -> float:
     """How much of a start counts, 0..1, from its region's mean moving velocity through the fast and the slow trail
     (`moving_mean` of each frame, smoothed): as far as it grows; region weight 0 lets all count. Mirrors
-    velocity_event.frag."""
+    velocity_impulse.frag."""
     fast: float = float(np.linalg.norm(region_fast))
     change: float = (fast - float(np.linalg.norm(region_slow))) / max(fast, EPSILON)
     return 1.0 + (min(max(change, 0.0), 1.0) - 1.0) * region_weight
@@ -332,15 +333,15 @@ def start_region_share(region_fast: np.ndarray, region_slow: np.ndarray, region_
 
 def stop_region_share(fast: np.ndarray, slow: np.ndarray, region_weight: float) -> float:
     """How much of a stop counts, 0..1, from the trails over its region's pixels (N, 3): as far as their mean speed
-    falls; region weight 0 lets all count. Mirrors velocity_event.frag."""
+    falls; region weight 0 lets all count. Mirrors velocity_impulse.frag."""
     fast_speed: float = float(np.mean(np.linalg.norm(fast, axis=-1)))
     slow_speed: float = float(np.mean(np.linalg.norm(slow, axis=-1)))
     change: float = (slow_speed - fast_speed) / max(slow_speed, EPSILON)
     return 1.0 + (min(max(change, 0.0), 1.0) - 1.0) * region_weight
 
 
-def event_velocity(trail: np.ndarray, event: np.ndarray) -> np.ndarray:
-    """The event (...) along the trail's direction (..., 3). Mirrors velocity_event_direction.frag."""
+def impulse_velocity(trail: np.ndarray, impulse: np.ndarray) -> np.ndarray:
+    """The impulse (...) along the trail's direction (..., 3). Mirrors velocity_impulse_direction.frag."""
     length: np.ndarray = np.linalg.norm(trail, axis=-1, keepdims=True)
     unit: np.ndarray = np.divide(trail, length, out=np.zeros_like(trail), where=length > EPSILON)
-    return unit * np.maximum(0.0, event)[..., None]
+    return unit * np.maximum(0.0, impulse)[..., None]

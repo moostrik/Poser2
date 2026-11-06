@@ -5,7 +5,7 @@
 FRAMES is what depth_velocity_capture saved from one loop of a recording. No app and no camera: a hidden window
 gives the GL context, one `LucasKanadeFlow3D` measures the saved frames with the settings they were saved with
 (`--flow` overrides one by its panel path), and every side's bridge takes its velocity. KIND is `trail` (the
-VelocityTrailBridge) or `event` (the VelocityEventBridge: its start, bow, stop and wake); PATH=VALUE sets one
+VelocityTrailBridge) or `impulse` (the VelocityImpulseBridge: its start, bow, stop and wake); PATH=VALUE sets one
 of its settings by its panel path (smooth, fast_smooth, stop_region_weight, ...), the rest as in deep_flow's
 preset. Each bridge steps once per flow frame, by the frame's saved interval.
 
@@ -45,7 +45,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from modules.gl import Texture  # noqa: E402
 from modules.flow import (LucasKanadeFlow3D, LucasKanadeFlow3DSettings,  # noqa: E402
-                          MotionEvent, VelocityEventBridge, VelocityEventBridgeSettings, VelocityTrailBridge, VelocityTrailBridgeSettings)
+                          Impulse, VelocityImpulseBridge, VelocityImpulseBridgeSettings, VelocityTrailBridge, VelocityTrailBridgeSettings)
 from depth_velocity_compare import Frames, context, overrides, read_back, recorded_settings, setting_owner, upload  # noqa: E402
 
 SETTLE: float = 1.5         # s of the still part left out of its noise
@@ -87,21 +87,21 @@ class Side:
         preset = json.loads(PRESET.read_text())['render']['bridge']
         self.changed: dict[str, object] = {}
         if kind == 'trail':
-            self.settings: VelocityTrailBridgeSettings | VelocityEventBridgeSettings = VelocityTrailBridgeSettings()
+            self.settings: VelocityTrailBridgeSettings | VelocityImpulseBridgeSettings = VelocityTrailBridgeSettings()
             self.settings.update_from_dict(preset['trail'])
-            self.bridge: VelocityTrailBridge | VelocityEventBridge = VelocityTrailBridge(self.settings)
-        elif kind == 'event':
-            self.settings = VelocityEventBridgeSettings()
-            self.settings.update_from_dict(preset.get('event', {}))
-            self.bridge = VelocityEventBridge(self.settings)
+            self.bridge: VelocityTrailBridge | VelocityImpulseBridge = VelocityTrailBridge(self.settings)
+        elif kind == 'impulse':
+            self.settings = VelocityImpulseBridgeSettings()
+            self.settings.update_from_dict(preset.get('impulse', {}))
+            self.bridge = VelocityImpulseBridge(self.settings)
         else:
-            raise SystemExit(f'unknown bridge {kind}: trail or event')
+            raise SystemExit(f'unknown bridge {kind}: trail or impulse')
         for item in filter(None, items.split(',')):
             path, value = item.split('=', 1)
             self.changed[path] = set_path(self.settings, path, value)
         self.bridge.allocate(width, height)
         self.series: dict[str, Series] = {'velocity': Series(), 'z': Series(), 'amount': Series(),
-                                          **{event.name.lower(): Series() for event in MotionEvent}}
+                                          **{impulse.name.lower(): Series() for impulse in Impulse}}
         self.milliseconds: list[float] = []
 
     def step(self, velocity: Texture, delta_time: float) -> None:
@@ -113,9 +113,9 @@ class Side:
         self.milliseconds.append((time.perf_counter() - began) * 1000.0)
 
     def measure(self, flow: np.ndarray, moving: np.ndarray, ring: np.ndarray, core: np.ndarray, still: bool) -> None:
-        if isinstance(self.bridge, VelocityEventBridge):
-            for event in MotionEvent:
-                self.series[event.name.lower()].add(read_back(self.bridge.event(event))[..., 0], moving, ring, core, still)
+        if isinstance(self.bridge, VelocityImpulseBridge):
+            for impulse in Impulse:
+                self.series[impulse.name.lower()].add(read_back(self.bridge.impulse(impulse))[..., 0], moving, ring, core, still)
             return
         v = read_back(self.bridge.smooth_velocity)[..., :3]
         for name, magnitude in (('velocity', np.hypot(v[..., 0], v[..., 1])), ('z', np.abs(v[..., 2])),
