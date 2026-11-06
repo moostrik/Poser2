@@ -39,9 +39,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 | 2D flow, 3D flow     | a system: a motion layer and a bridge layer per camera, a fluid layer per show output                 | `Motion2DLayer` + `Bridge2DLayer` + `Fluid2DLayer`; `…3D…`         |
 | 2D camera, 3D camera | an image and a mask; those and a depth image on the same view                                         | `MotionInput` without / with `depth`                               |
 | port                 | a stage's named texture with its kind: image, velocity, scalar; its input and output fields declare theirs, every component its own | `Port`, `TextureKind`, `HasPorts`, `ports_of`, in `modules/flow` |
-| monitor              | a layer that shows one port of one stage, picked on the panel, drawn only while it is shown           | `MonitorLayer`, `monitor_a`, `monitor_b`                           |
-| glyphs               | a monitor's view of a field as marks on a grid: arrows for a velocity, dots for a scalar             | `MonitorView.GLYPHS`, `glyph_spacing`, `GlyphField`, `VolumeGlyphs` |
-| cut                  | how a monitor lays out a volume: in 3D as stacked layers or a fog, or flat, one layer or a projection | `Cut`, `advanced.cut`, `VolumeCut`                                 |
+| monitor              | a layer that shows one port of one stage, picked on the panel, drawn only while it is shown; its views in [MONITOR.md](MONITOR.md) | `MonitorLayer`, `monitor_a`, `monitor_b`              |
 
 "bridge" is ofxFlowTools' word (`ftVelocityBridge`, `ftDensityBridge`, `ftTemperatureBridge`);
 it says where the stage sits, and the glossary defines what it does.
@@ -103,7 +101,7 @@ an output, or they would be the tick before's.
 
 The motion layer measures once per camera frame: when `timestamp` differs from the one it last
 measured; a source without stamps (`None`) measures every tick. A gap wider than the expected
-frame interval is a dropped frame. For its first 5 s after start the motion layer stays at rest
+frame interval is a dropped frame. For its first 3 s after start the motion layer stays at rest
 (`WARM_UP_TIME`): the camera's exposure settles then, and the Lucas–Kanade solve reads the
 brightening as motion, x/y at full reach over the whole image **(site fact)**. A camera frame has no other identity: `CameraFrame` and `Capture` carry a
 timestamp and no sequence number, because the device's sequence numbers skip on the depth while
@@ -162,7 +160,7 @@ context of its own, would move the wait to the bridge, and the screen still show
 | `Bridge2DLayer`, `Bridge3DLayer`            | the subclasses, each on its bridges (`bridge_2d`; `bridge_3d`, the velocity trail and beside it the velocity impulse bridge, [The impulses](#the-impulses), and their mix, [The mix](#the-mix)) |
 | `FluidLayer` (ABC)                          | `StageLayer[FluidInput, FluidOutput]`; `_update()`: `_inject` each injection's velocity, density and temperature at its weight, `_step(dt)`; `texture`, the show. Knows injections, not cameras; reads no poses. The stage's reset is the fluid's only one |
 | `Fluid2DLayer`, `Fluid3DLayer`              | the subclasses, each on its own fluid. `Fluid2DLayer` keeps its injections apart: injection i's amount goes into channel i of the density, four at most, and the output colors each channel with its injection's color (`DensityColorize`), the brightness capped at white and the opacity the strongest channel's. `Fluid3DLayer` injects RGBA density, the impulse (added as the velocity is) and a spin where one is given, the velocity's z as the volume's w (its sign turned: w points away from the viewer), and takes the parallax eye the app steers by `set_eye(x, y)` |
-| `MonitorLayer`                              | `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's port names (`names`, the options of `texture`); `draw()` renders the port once per tick, however many panels show it, by its kind or by `view`, and nothing while not shown; its views and settings are in [The monitor](#the-monitor). Not a stage, since it has no output and no `reset` |
+| `MonitorLayer`                              | `set_input(MonitorInput)`; `update()` keeps the panel's list of the chosen stage's port names (`names`, the options of `texture`); `draw()` renders the port once per tick, however many panels show it, by its kind or by `view`, and nothing while not shown; its views and settings are in [MONITOR.md](MONITOR.md). Not a stage, since it has no output and no `reset` |
 | `MotionLayerSettings`, `BridgeLayerSettings`, `FluidLayerSettings` | base settings the 2D and 3D settings subclass, each a `StageLayerSettings`: `reset`, then `width` and `height`, the stage's working size, first on every stage's panel. The motion's is the size its flow runs at, the bridge's the size it writes its outputs at (its filters follow the velocity's size), the fluid's its simulation grid (its density is at the size the app allocates). On the fluid layer `blend_mode`. A layer whose stage runs one component is that component's settings too (`Motion2DLayerSettings` is a `GradientFlowSettings`, `Motion3DLayerSettings` a `LucasKanadeFlow3DSettings`, the fluid layers' a `Fluid2DSettings` and a `Fluid3DSettings`), so the component's fields and groups sit on the stage's panel; the bridge layers, running several bridges, hold each as a group (`trail`, `impulse`, then the outputs with their mix, `velocity`, `density`, `temperature`). No `draw_mode`, `visualization`, `stage`, `max_players` or `fps`: the stages draw nothing, read no poses and take `dt` from their input |
 
 The apps' render is a layer graph of `LayerBase` layers updated by one loop calling `update()`
@@ -239,8 +237,8 @@ Start + bow is a pixel's whole rise, stop + wake its whole fall. What a region s
 
 The impulses read x, y and z alike. The bridge filters in time only: noise within a frame is the
 motion's to filter, and the trail's blur is a look. An impulse takes no hold: it lasts about
-`slow_smooth` by itself, and what a stop injects is the speed it ended; a hold lifted steady motion
-as much as the stops on the harness (below). No blur and no advect: the impulses stay sharp. The
+`slow_smooth` by itself, and what a stop injects is the speed it ended, as a hold would lift steady
+motion as much as the stops. No blur and no advect: the impulses stay sharp. The
 impulse bridge runs while the mix takes an impulse or a monitor shows one of its ports.
 
 ### The mix
@@ -402,141 +400,6 @@ The shader loader finds a shader's source by its `.py` module name beside it
 - `modules/render/tests/test_stage_layer.py` checks, without GL, that a reset button asks and the
   stage's next update resets once before it runs, and asks nothing after `deallocate`.
 
-## The monitor
-
-The monitor's panel group (`MonitorLayerSettings`) says what is drawn; its `advanced` group
-(`MonitorAdvancedSettings`) says how. Neither has row breaks of its own; the panel wraps them.
-
-| Setting                  | Values                                                      | Means                                       |
-|--------------------------|-------------------------------------------------------------|---------------------------------------------|
-| `stage`                  | `MOTION`, `BRIDGE`, `FLUID`                                 | the stage whose port is shown               |
-| `texture`                | the stage's port names                                      | the port shown; a name the stage no longer has shows its first output |
-| `view`                   | `AUTO`, `IMAGE`, `COLORMAP`, `GLYPHS`, `HISTOGRAM`, `STRIP` | how the channels are drawn                  |
-| `camera`                 | read only                                                   | a volume's view: yaw, pitch, zoom, the layer |
-| `advanced.channel`       | `X`, `Y`, `Z`, `W`, `ALL` (default)                         | which of the texture's channels are drawn   |
-| `advanced.cut`           | `CUBE` (default), `FOG`, `SLICE`, `FRONT`, `TOP`, `SIDE`    | how a volume is laid out; not read for a 2D port |
-| `advanced.scale`         | 0.01 to 100, a log slider                                   | multiplier on the values, in every view     |
-| `advanced.glyph_spacing` | 4, 8, 16, 32, 64, 128 (`GlyphSpacing`)                      | distance between glyphs (pixels)            |
-| `advanced.legend`        | on (default), off                                           | the log axis, or the colormap's key         |
-| `advanced.blend_mode`    | a `Style.BlendMode`                                         | how the monitor is drawn over the panel     |
-
-An arrow reaches one spacing at speed 1 and at most two (the shader rolls its length off toward
-2), and its lines are spacing / 20 wide (`ARROW_WIDTH`), so the arrows keep their proportions at
-every spacing. A scalar's dot is the colormap's color of its value, its radius half a spacing
-times `tanh` of its amount, so small values draw small dots.
-
-The strip starts over when `stage`, `texture` or `channel` changes, or when `view` turns to
-`STRIP`, so it never shows another texture's history and needs no reset button.
-
-| View     | `ALL`                                                              | one channel                                   |
-|----------|--------------------------------------------------------------------|-----------------------------------------------|
-| `IMAGE`  | the texture as stored, times `scale`                               | that channel as grey, times `scale`           |
-| `COLORMAP` | x, y, z as red, green, blue around mid grey: grey is 0             | `ALL` with the other channels 0: x from grey toward red above 0 and toward cyan below, y green, z blue; w, which has no color in `ALL`, as grey |
-| `GLYPHS` | a velocity's arrow of x and y, with the ring for z on a 3- or 4-channel texture (channel not read); a scalar's dot of x | a scalar's dot of that channel |
-| `STRIP`  | four lanes, x, y, z, w: the frame-wide mean of each channel's amount (its absolute value; a signed mean cancels left against right), on a log axis | one lane, full height |
-| `HISTOGRAM` | four lanes, x, y, z, w: how many values fall where from −1 to 1 after `scale`, 0 in the middle, outside in the end bins | one lane, full height |
-
-`AUTO` is `IMAGE` for an image port, `GLYPHS` for a velocity, `COLORMAP` for a scalar, the three
-kinds of `TextureKind`.
-
-- A channel the texture does not have reads as sampled in every view: a one-channel texture
-  repeats x in y and z (its grey swizzle, `modules/gl/texture.py`), a two-channel one has z 0, and
-  a missing w is 1.
-- The histogram's height is the log of a bin's count against the log of the samples, since most of
-  a flow is still and its zero bin would flatten every other. It counts 256 bins on the GPU
-  (`HistogramCount`, atomic adds) over the texture's own grid, capped at 512 × 512 samples
-  (`histogram_grid`), so the 512 × 288 flow is counted whole, a 4k texture costs no more than the
-  cap, and nothing is read back. The strip's mean reads the texture the same way (`summary_grid`).
-- The monitor renders at the size it is drawn at (`DrawnSize`): the viewport the app fits it into,
-  the largest of the tick before, grown at once when a larger draw turns up, so a smaller layout
-  takes over a tick later. No setting: the size the app allocates a layer at (4k) is not the
-  monitor's. Its legend draws at that size too, so its text keeps its pixel size and its lines sit
-  on the bars; the strip's 540 columns are its history, 9 s at 60 ticks, and its height follows.
-  The GPU times are in [Volumes](#volumes).
-- One `scale` serves every view, since each monitor has its own view and its own scale. z takes
-  `scale` like x and y, since the motion's `z_gain` already balances it.
-- The strip's height is logarithmic over three decades, `(log10(mean × scale) + 3) / 3`: a frame's
-  mean amount spans decades between a still player and a fast move, so a linear lane clips the one
-  or loses the other. `scale` slides the window; a bar a third taller is ten times the amount.
-- With `legend` on, every view has a title at the top center, the stage and the port shown
-  (`motion / output.velocity`, a slash since the font atlas holds ASCII), and the colormap's key
-  sits under it. The strip and the histogram show their log axis over the plot
-  (`Legend`): the lane names, a 2 px grey line at each round decade labeled with what it reads
-  (the strip's mean amount, 0.001, 0.01, 0.1, 1; the histogram's share of the samples, 0.01%,
-  0.1%, 1%, 10%), and the histogram's 0 and its ±1/`scale` limits. `COLORMAP` shows a color key
-  instead, in the top left: a small bar per channel shown (x, y, z on `ALL`) from −1/`scale`
-  through 0 to +1/`scale` in its colors, since the map is read channel by channel. The legend is drawn into its own FBO only when the view, `channel` or `scale`
-  changes and blitted every draw, since `Text` builds and uploads each string's glyphs per draw;
-  the lines and labels come from `log_axis.py`, tested without GL in
-  `modules/flow/tests/test_log_axis.py`.
-- `Visualizer` draws into one FBO: `ChannelView` (image and colormap, the channel and the view as
-  uniforms), `GlyphField`, and `HistogramCount` with `HistogramDraw`; `Strip` keeps its
-  own, and `Legend` its `LogGrid` and `ColormapKey`.
-  `scripts/depth_velocity_compare.py` draws through the same `Visualizer`.
-- There is no hue-by-direction map: it is 2D only, on black, with z unread, where `COLORMAP` on
-  `ALL` shows direction as a mix of red and green around grey, and z in blue.
-
-### Volumes
-
-A port's texture may be a volume, always a `Texture3D` (`Port.volume`), so each view is one
-shader. The 3D fluid lists its volumes as ports: `velocity`, `density`, `temperature`,
-`pressure`, `divergence`, `vorticity`, `vorticity_force`, `buoyancy`, `obstacle`, beside the 2D
-`obstacle_source`. Each carries its box's depth (`Port.extent`, `Fluid3D._z_extent`); the
-monitor draws the box as deep as it is wide (`BOX_DEPTH`), since the simulated slab, 16 layers at
-spacing 4 on a 448 wide grid, is 0.14 of its width and reads as flat. A flat cut renders at the
-part of the panel it fills in its proportions, so glyphs keep their spacing. Every view samples a volume at (u, v, w) from 0 to 1 through the
-box, so the density's `layers` and the simulation's `sim_layers` need not match.
-
-- The density, a 2D array at the output size (2160 × 3840 × `layers` of RGBA16F), is averaged
-  down into a `Texture3D` of the simulation's width and height and its `layers`
-  (`reduce_density.comp`, the mean of each block), so no view shimmers or reads the whole
-  gigabyte. The fluid marks it stale every step (`OnDemand`) and the first view that asks this
-  tick (`Port.prepare`) reduces it: two monitors showing it cost one reduction, none costs
-  nothing.
-- `cut` lays a volume out. `CUBE` and `FOG` are 3D, on the orbit camera; the others are flat, a
-  2D texture (`VolumeCut`) every 2D view draws as it draws any texture:
-
-  | `cut`    | Means                                                                       |
-  |----------|-----------------------------------------------------------------------------|
-  | `CUBE`   | the layers stacked in the box, one instanced draw from the far side to the near one, partly transparent; the selected layer opaque and pulled out, a gap on both sides fading over the next layers; the box's edges and axes |
-  | `FOG`    | the volume drawn continuously, a ray per pixel marched front to back, each sample colored as `IMAGE` or `COLORMAP` colors it and its amount its opacity; the box's edges |
-  | `SLICE`  | the selected layer                                                          |
-  | `FRONT`, `TOP`, `SIDE` | the projection along z, y or x: the max for an image port, the mean for a velocity or a scalar, whose signs would cancel in a max; in the box's proportions, the top width × depth with the front at the bottom, the side depth × height with the front on the right |
-
-- `IMAGE` and `COLORMAP` draw the cube or the fog; `GLYPHS` draws in 3D on either: lit arrows of
-  a small mesh per grid point, so one pointing at the camera still shows, or a scalar's dots as
-  point sprites, both with the depth test (`Fbo(depth=True)`), at most 96 across (`glyph_grid`).
-  The stacked layers take no depth test, since they blend far to near. Every 3D view draws the box's
-  edges and, from its first corner (x 0, y 0, the front layer), its axes 3 px wide in the
-  colormap's colors at 1 (`CubeAxes`): x red along the width, y green up, z blue into the depth.
-  With `legend` on, each axis's letter sits past its end (`axis_labels`, the legend redrawn when
-  the camera moves). The strip reads a volume's
-  front mean, the volume's mean; the histogram counts a grid through every layer, at most
-  128 × 128 across (`histogram_volume_grid`). A view with no 3D draw of its own on a 3D cut takes
-  the slice.
-- The camera and the selected layer are the monitor's state, not settings, and `camera` shows
-  them. In deep_flow a drag that starts anywhere in the main window goes to every monitor, so
-  A and B stay on one view: the left button turns (a drag across the window 180°), the right
-  zooms, scroll steps one of the show's density `layers` (away from the user is further back,
-  a volume with fewer layers showing its nearest), a middle click without a move resets to the
-  front view at the middle layer. `Orbit` frames the box by the narrower field of view, so it
-  fits a 9:16 panel.
-
-`scripts/monitor_harness.py` checks the monitor without an app or a camera: a hidden GL window,
-known textures and volumes with values numpy computes (a cut against numpy's layer, max and mean,
-the reduction against the block mean, the cube's and the fog's near side from both sides of the
-box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU's timer queries:
-
-| Work                                   | At                                   | GPU (ms) |
-|----------------------------------------|--------------------------------------|----------|
-| image, colormap                        | 540 × 960 / 2160 × 3840              | 0.01 / 0.03 |
-| glyphs, flat                           | 540 × 960 / 2160 × 3840, spacing 32  | 0.18 / 2.4 |
-| histogram                              | 540 × 960 / 2160 × 3840              | 0.10 / 0.12 |
-| strip                                  | 540 × 960                            | 0.05     |
-| the density's reduction                | 2160 × 3840 × 16 to 448 × 800 × 16   | 1.1      |
-| slice, front, top, side                | a 448 × 800 × 16 volume              | 0.01, 0.08, 0.61, 0.36 |
-| cube, 3D arrows, fog                   | a 448 × 800 × 16 volume at 540 × 960 | 0.04, 0.05, 0.05 |
-
 ## Open
 
 - For the fluid refactor: the 3D fluid's `input_x` and `input_y` go, as the motion's `x_gain` and
@@ -545,16 +408,15 @@ box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU
   `WARM_UP_TIME` 0, the exposure ramp at startup reads as x/y motion; with the fluid updated the
   frame rate drops to 2 to 4 fps, without it it stays up **(site fact)**. Nothing in the fluid
   loops by the velocity, so the cost is in its reads: the advection traces each texel back by
-  velocity × dt, noise points neighbouring texels apart, and the density's advection over 2160 ×
+  velocity × dt, noise points neighboring texels apart, and the density's advection over 2160 ×
   3840 × 16 RGBA16F, about 1 GB, then misses the texture cache on every read **(deduction, not
-  measured)**. Ordinary motion moves neighbours alike and reads together. `dampen_threshold`
-  (5 widths per second over `dampen_time`, 0.5 s) is too slow to stop it. The fix: measure the
-  step's GPU time on a still velocity and on a burst, then cap the trace at a few cells per step
-  in the advection, which bounds the scatter whatever comes in and which real motion stays under
-  at 60 fps. Until then the motion's 5 s warm-up keeps the startup burst out.
-- `scripts/depth_velocity_capture.py` ran deep_flow at about 4 fps on 2026-11-06 (257 frames over
-  60 s, gaps to 0.46 s), against 25 fps the day before with the same work per frame: the app, not
-  the capture, is slower **(deduction)**; a profiler run would show where.
+  measured)**. Ordinary motion moves neighbors alike and reads together. `dampen_threshold`
+  (5 widths per second over `dampen_time`, 0.5 s) is too slow to stop it. The motion's
+  warm-up keeps the startup burst out (`WARM_UP_TIME`); a capture run at 4 fps rather than 25
+  (`scripts/depth_velocity_capture.py`) was this burst **(site fact)**. What remains is the fluid's side: measure
+  the step's GPU time on a still velocity and on a burst, then cap the trace at a few cells per
+  step in the advection, which bounds the scatter whatever comes in and which real motion stays
+  under at 60 fps.
 - For the fluid refactor: no bridge gives a spin any more, so `Injection.spin`, `Fluid3D`'s spin
   input (`set_spin`, `vorticity_force_3d`'s `spin`) and `Fluid3DLayer`'s use of it have no source.
 - Whether the density's reduced view should also feed the fluid's own composite at a lower

@@ -51,14 +51,16 @@ The flow's velocity is in image widths per second times its gains.
 | edge      | 0.1 m        | 0.05–0.3 (0.01) | A   | halves the edge spikes                 |
 | window    | 7×7          | 1×1–9×9         | A   | the most samples averaged              |
 | tolerance | 0.2 m        | 0.05–0.5 (0.01) | B   | keeps a push's z                       |
-| smooth    | 50 ms        | 0–200 (1)       | A   | at 0 the still z noise is 15× higher   |
+| smooth    | 50 ms        | 0–500 (1)       | A   | at 0 the still z noise is 15× higher   |
 | xy_smooth | off          | on/off          | B   | x/y without extra lag                  |
 | catch_up  | 8 ms         | 0–50 (1)        | B   | fast z 75% → 96%, same still noise     |
 | dead_zone | 0.02 m       | 0–0.05 (0.001)  | A   | takes the depth's wander               |
 | threshold | 1.0 px/frame | 0–5 (0.05)      | A   | with the dead zone, still z noise is 0 |
 
 - tolerance at 0.05: a push loses 77% of its z, and the track restarts 6× as often while moving.
-- smooth: lower lags less; keep it as low as looks right.
+- smooth: lower lags less; keep it as low as looks right. The bridges read z as they read x/y, so
+  this is z's one time constant; what it does to them, and the 200 ms advised for them, is in
+  [FLOW.md's Measured](../FLOW.md#measured).
 
 ## Constraints
 
