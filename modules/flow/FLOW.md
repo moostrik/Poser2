@@ -308,27 +308,42 @@ kinds of `TextureKind`.
 
 - Views of the 3D fluid's volumes. Its velocity, density, temperature and pressure are
   `Texture3D`s or `SwapTexture2DArray`s; the monitor shows 2D textures, so the 3D fluid lists only
-  its obstacle. Three views, built in this order:
+  its obstacle. Every view reads a volume at the simulation size: the density, kept at the output
+  size (2160 × 3840 × 16 layers of RGBA16F, about 1 GB), is averaged down once per tick, only
+  while a monitor shows it, into an array of the simulation's width, height and layers, so a
+  view neither shimmers (sampling a 4k layer at panel size without mipmaps) nor reads the whole
+  gigabyte scattered. The other volumes are at the simulation size already. The views, built in
+  this order:
   1. Slices and projections, 2D. Each volume gives 2D ports: a slice at a layer picked on the
-     panel, and its projection along each axis (front, top, side; the mean or the max through the
-     volume). The monitor draws them with the views it has (colormap, image, arrows, strip); from
-     the top, the arrows of x and z show the depth movement. One small shader, no new drawing
-     path, and the volumes become ports like the rest.
-  2. Glyphs: marks on a grid, by the port's kind, an arrow for a velocity (its direction and
+     panel, and its projection along each axis (front, top, side; the max for density and
+     temperature, the mean for velocity and pressure, whose signs would cancel in a max). The
+     monitor draws them with the views it has (colormap, image, arrows, strip); from the top,
+     the arrows of x and z show the depth movement. One small shader, no new drawing path, and
+     the volumes become ports like the rest.
+  2. The 3D view, stacked slices: every layer a quad at its depth, each drawn with its flat view
+     (colormap, image), partly transparent so the layers show through each other, the active
+     one brighter. The cheapest 3D: quads and a perspective camera, no instancing.
+  3. Glyphs: marks on a grid, by the port's kind, an arrow for a velocity (its direction and
      length, colored by w or by speed) and a dot for a scalar (colored by the colormap, sized by
      its value, small values small or transparent so the inside stays visible). The `GLYPHS` view
      replaces `ARROWS`, renamed when it is built so the panel name changes once: flat on a 2D
      texture, where today's arrows are its velocity case and a scalar gets a dot field, and
      rotatable on a volume, on a coarse grid of about 16 × 9 × the layers drawn with depth test
      from an orbit camera. Arrows and dots share the grid spacing, so a scalar and the velocity
-     line up point for point in monitor A and B. New drawing: instanced geometry and a
-     perspective camera, which the render does not have yet.
-  3. Fog for the scalars. Density, temperature, pressure and divergence ray-marched through the
+     line up point for point in monitor A and B. New drawing: instanced geometry, on the 3D
+     view's camera.
+  4. Fog for the scalars. Density, temperature, pressure and divergence ray-marched through the
      volume as a colormap fog, one fragment shader like the show's own composite; beside the dots
      it shows a thin sheet inside a dense volume.
 
-  The rotatable views share one orbit camera on the monitor (yaw, pitch, distance, or a slow
-  auto-rotate), so monitor A and B compare from the same angle.
+  The 3D views share one orbit camera on the monitor (`yaw`, `pitch`, `distance`, and `spin`, a
+  slow turn on its own), around the volume's center, the volume a box of the fluid's width,
+  height and z extent so a layer gap looks as deep as it is. The mouse drives them: a drag that
+  starts anywhere in the main window goes to every monitor (nothing else there takes the mouse),
+  turning yaw and pitch on a 3D view and moving the slice through the volume on a slice, and
+  scroll zooms the distance or steps a layer; the window manager gets a scroll callback beside
+  its move and button ones. The mouse writes the monitor's settings, so the panel shows the same
+  values, and A and B follow one drag, at one angle or one layer.
 - hd_trio's density fade from motion. Its wiring pass writes `density.fade_time` every tick from
   the pose's motion, a settings field written per tick. A per-tick value on the fluid layer, as the
   eye is, would take it off the settings.
