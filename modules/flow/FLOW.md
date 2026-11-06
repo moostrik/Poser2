@@ -378,6 +378,12 @@ The shader loader finds a shader's source by its `.py` module name beside it
 - The time step has one transport: the app hands the tick's `dt` in the inputs, and the fluid's
   `TimeStep` smooths it over `fps_smoothing`, or steps fixed at `fixed_fps`. No `fps` or
   `step_fps` field: runtime data stays off the settings.
+- A slow frame never gives the fluid more work. Its step is at most 1/20 s (`MAX_STEP`), so a
+  slower frame runs the fluid slower than real time and nothing moves further in one step; the
+  pressure solve takes its `iterations` at any step, since the grid sets what it needs; the
+  viscosity takes its `viscosity_iter` at a 60 fps step and fewer at a shorter one, never more
+  (`viscosity_iterations`). Iterations that grew with the step kept a dropped frame rate down: at
+  4 fps, 15 times the work per frame **(deduction)**.
 - The stages draw nothing; the monitors draw, only while shown, once per tick. A port's kind says
   how it is drawn when nothing else is asked; the monitor's `view` overrides it.
 - The 2D bridge keeps three classes the 3D bridge also has (`DensityBridge`, `TemperatureBridge`,

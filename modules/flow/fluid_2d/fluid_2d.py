@@ -24,7 +24,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_R16F, GL_R8, GL_R
 
 from modules.gl import Texture, SwapFbo, Fbo, Profiler
 from .. import FlowUtil, Port, TextureKind
-from ..time_step import TimeStep
+from ..time_step import REFERENCE_STEP, TimeStep, viscosity_iterations
 from ..shaders import AddBoolean
 from ..boundary_mode import BoundaryMode
 from .fluid_settings import Fluid2DSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings
@@ -76,8 +76,7 @@ class Fluid2D:
         self._density_height: int = 0
         self._aspect: float = 1.0
 
-        self._reference_dt: float = 1.0 / 60.0  # iteration scaling baseline (60fps)
-        self._dt: float = self._reference_dt
+        self._dt: float = REFERENCE_STEP
         self._time_step: TimeStep = TimeStep()
 
         self._has_obstacles: bool = False
@@ -342,7 +341,7 @@ class Fluid2D:
             return
 
         viscosity_dt = self.settings.velocity.viscosity * (self._grid_scale ** 2) * self._dt
-        iterations = self._scale_iterations(self.settings.velocity.viscosity_iter)
+        iterations = viscosity_iterations(self.settings.velocity.viscosity_iter, self._dt)
 
         if self._use_compute_diffusion:
             current: Texture = self._velocity_fbo
@@ -488,7 +487,7 @@ class Fluid2D:
         self._divergence_fbo.end()
 
         # b. Solve Poisson equation for pressure
-        iterations = self._scale_iterations(self.settings.pressure.iterations)
+        iterations = self.settings.pressure.iterations     # the grid sets what it needs, not the step
 
         if self._use_compute_pressure:
             current = self._pressure_fbo
@@ -601,15 +600,6 @@ class Fluid2D:
     def _step_time(self, dt: float) -> None:
         s = self.settings
         self._dt = self._time_step.update(s.time_step, dt, s.fixed_fps, s.fps_smoothing)
-
-    def _scale_iterations(self, base_iterations: int) -> int:
-        """Scale solver iterations proportionally to dt.
-
-        GUI iteration count represents quality at 60fps. At other frame rates,
-        iterations scale to approximate consistent solver convergence.
-        """
-        ratio = self._dt / self._reference_dt
-        return max(1, int(base_iterations * ratio + 0.5))
 
     @staticmethod
     def _align32(v: int) -> int:

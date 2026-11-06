@@ -1,4 +1,5 @@
-"""The fluid's time step: the measured render rate smoothed by an Ema, or a fixed rate."""
+"""The fluid's time step: the measured render rate smoothed by an Ema, or a fixed rate, at most
+MAX_STEP; and the viscosity solve's iterations for a step."""
 
 import math
 from enum import IntEnum
@@ -10,6 +11,8 @@ class TimeStepMode(IntEnum):
 
 
 MIN_TICK: float = 1.0 / 240.0   # s: a tick measured shorter is a clock step, not a frame
+MAX_STEP: float = 1.0 / 20.0    # s: the longest step the fluid takes; a slower frame runs it slower than real time
+REFERENCE_STEP: float = 1.0 / 60.0  # s: the step a solver's iteration setting is for
 TICK_BAND: float = 2.0          # a tick is held to this share of the mean tick: a stall counts as one long frame
 TICK_WEIGHT: float = 0.05       # weight of a tick on the mean tick's Ema
 
@@ -30,6 +33,13 @@ def hold_tick(dt: float, mean: float | None) -> tuple[float, float]:
     return dt, mean + TICK_WEIGHT * (dt - mean)
 
 
+def viscosity_iterations(iterations: int, dt: float) -> int:
+    """The viscosity solve's iterations for a step of `dt`: the setting's at a 60 fps step, fewer for a
+    shorter one, which diffuses less, never more for a longer one, since a slow frame given more work
+    renders slower still."""
+    return max(1, round(iterations * min(dt / REFERENCE_STEP, 1.0)))
+
+
 class TimeStep:
     """dt per tick. Plain arithmetic, no clock: the caller hands in the tick's dt it measured."""
 
@@ -42,11 +52,12 @@ class TimeStep:
 
     def update(self, mode: TimeStepMode, dt: float, fixed_fps: float, smoothing: float) -> float:
         """Advance one tick and return its dt: `dt`, the tick's measured length (s), through the Ema,
-        or a fixed step. `smoothing` is the Ema's time constant in seconds; 0 follows each tick."""
+        or a fixed step, at most MAX_STEP. `smoothing` is the Ema's time constant in seconds; 0
+        follows each tick."""
         if mode == TimeStepMode.FIXED:
-            self._dt = 1.0 / max(1.0, fixed_fps)
+            self._dt = min(1.0 / max(1.0, fixed_fps), MAX_STEP)
             return self._dt
-        raw: float = max(dt, 0.0)
+        raw: float = min(max(dt, 0.0), MAX_STEP)
         if smoothing <= 0.0:
             self._dt = raw
         else:

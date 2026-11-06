@@ -3,7 +3,7 @@
 import math
 import unittest
 
-from modules.flow import TimeStep, TimeStepMode, hold_tick
+from modules.flow import MAX_STEP, TimeStep, TimeStepMode, hold_tick, viscosity_iterations
 
 
 class TimeStepTest(unittest.TestCase):
@@ -28,6 +28,18 @@ class TimeStepTest(unittest.TestCase):
             dt = step.update(TimeStepMode.MEASURED, 1 / 30, 60.0, 1.0)
         self.assertAlmostEqual(dt, 1 / 30, delta=0.001)
 
+
+
+class SlowFrameTest(unittest.TestCase):
+    def test_a_slow_frame_steps_at_most_the_longest_step(self) -> None:
+        self.assertEqual(TimeStep().update(TimeStepMode.MEASURED, 0.25, 60.0, 0.0), MAX_STEP)
+        self.assertEqual(TimeStep().update(TimeStepMode.FIXED, 0.0, 4.0, 0.0), MAX_STEP)
+
+    def test_viscosity_takes_fewer_iterations_on_a_short_step_and_never_more(self) -> None:
+        self.assertEqual(viscosity_iterations(40, 1.0 / 60.0), 40)
+        self.assertEqual(viscosity_iterations(40, 1.0 / 120.0), 20)
+        self.assertEqual(viscosity_iterations(40, 0.25), 40)
+        self.assertEqual(viscosity_iterations(40, 0.0), 1)
 
 
 class HoldTickTest(unittest.TestCase):

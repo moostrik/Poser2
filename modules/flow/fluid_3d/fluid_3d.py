@@ -32,7 +32,7 @@ from .fluid_settings import Fluid3DSettings, VolumeSettings, VelocitySettings, D
 from ..shaders import AddBoolean
 from ..flow_util import FlowUtil
 from ..port import OnDemand, Port, TextureKind
-from ..time_step import TimeStep
+from ..time_step import REFERENCE_STEP, TimeStep, viscosity_iterations
 from .shaders import (
     Advect3D, Advect3DDensity, Divergence3D, Gradient3D,
     JacobiPressure3D, JacobiDiffusion3D,
@@ -96,8 +96,7 @@ class Fluid3D:
         self._sim_depth: int = 0      # velocity/pressure/temperature layers
         self._aspect: float = 1.0
 
-        self._reference_dt: float = 1.0 / 60.0  # iteration scaling baseline (60fps)
-        self._dt: float = self._reference_dt
+        self._dt: float = REFERENCE_STEP
         self._time_step: TimeStep = TimeStep()
 
         # Z metric, recomputed per update from depth.spacing (one physical slab, two layer counts)
@@ -468,7 +467,7 @@ class Fluid3D:
             return
 
         viscosity_dt = self.settings.velocity.viscosity * (self._grid_scale ** 2) * self._dt
-        iterations = self._scale_iterations(self.settings.velocity.viscosity_iter)
+        iterations = viscosity_iterations(self.settings.velocity.viscosity_iter, self._dt)
 
         result = self._jacobi_diffusion_shader.solve(
             self._velocity,
@@ -610,7 +609,7 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
         # b. Solve Poisson equation for pressure
-        iterations = self._scale_iterations(self.settings.pressure.iterations)
+        iterations = self.settings.pressure.iterations     # the grid sets what it needs, not the step
 
         result = self._jacobi_pressure_shader.solve(
             self._pressure,
@@ -760,15 +759,6 @@ class Fluid3D:
     def _step_time(self, dt: float) -> None:
         s = self.settings
         self._dt = self._time_step.update(s.time_step, dt, s.fixed_fps, s.fps_smoothing)
-
-    def _scale_iterations(self, base_iterations: int) -> int:
-        """Scale solver iterations proportionally to dt.
-
-        GUI iteration count represents quality at 60fps. At other frame rates,
-        iterations scale to approximate consistent solver convergence.
-        """
-        ratio = self._dt / self._reference_dt
-        return max(1, int(base_iterations * ratio + 0.5))
 
     @staticmethod
     def _align32(v: int) -> int:

@@ -30,7 +30,7 @@ from .visualization import Visualizer, histogram_grid, histogram_volume_grid, St
                            VolumeCut, VolumeCube, VolumeGlyphs, VolumeFog, glyph_grid, Cut, cut_size, projects_max, Orbit, box_size, axis_labels
 
 # Shared by the 2D and 3D fluid
-from .time_step import TimeStep, TimeStepMode, hold_tick
+from .time_step import TimeStep, TimeStepMode, hold_tick, viscosity_iterations, MAX_STEP
 from .boundary_mode import BoundaryMode
 
 # 2D fluid simulation
