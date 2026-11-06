@@ -1,5 +1,5 @@
 """The monitor's mouse: a scroll steps one of the show's layers and stays inside the volume; a drag
-turns its camera; a reset brings the front view at the middle layer back."""
+turns its orbit; a reset brings the front view at the middle layer back."""
 
 import unittest
 
@@ -25,7 +25,6 @@ class MonitorMouseTest(unittest.TestCase):
         monitor.scroll(3, 16)
         monitor.reset_view()
         self.assertEqual((monitor._orbit.yaw, monitor._orbit.pitch, monitor._orbit.zoom, monitor._slice), (0.0, 0.0, 1.0, 0.5))
-        self.assertIn('layer 9 of 16', monitor.settings.camera)
 
 
 if __name__ == '__main__':

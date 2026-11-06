@@ -20,7 +20,6 @@ The monitor's panel group (`MonitorLayerSettings`) says what is drawn; its `adva
 | `stage`                  | `MOTION`, `BRIDGE`, `FLUID`                                 | the stage whose port is shown               |
 | `texture`                | the stage's port names                                      | the port shown; a name the stage no longer has shows its first output |
 | `view`                   | `AUTO`, `IMAGE`, `COLORMAP`, `GLYPHS`, `HISTOGRAM`, `STRIP` | how the channels are drawn                  |
-| `camera`                 | read only                                                   | a volume's view: yaw, pitch, zoom, the layer |
 | `advanced.channel`       | `X`, `Y`, `Z`, `W`, `ALL` (default)                         | which of the texture's channels are drawn   |
 | `advanced.cut`           | `CUBE` (default), `FOG`, `SLICE`, `FRONT`, `TOP`, `SIDE`    | how a volume is laid out; not read for a 2D port |
 | `advanced.scale`         | 0.01 to 100, a log slider                                   | multiplier on the values, in every view     |
@@ -122,8 +121,8 @@ box, so the density's `layers` and the simulation's `sim_layers` need not match.
   front mean, the volume's mean; the histogram counts a grid through every layer, at most
   128 × 128 across (`histogram_volume_grid`). A view with no 3D draw of its own on a 3D cut takes
   the slice.
-- The camera and the selected layer are the monitor's state, not settings, and `camera` shows
-  them. In deep_flow a drag that starts anywhere in the main window goes to every monitor, so
+- The orbit and the selected layer are the monitor's state, not settings, and the panel shows
+  neither. In deep_flow a drag that starts anywhere in the main window goes to every monitor, so
   A and B stay on one view: the left button turns (a drag across the window 180°), the right
   zooms, scroll steps one of the show's density `layers` (away from the user is further back,
   a volume with fewer layers showing its nearest), a middle click without a move resets to the
