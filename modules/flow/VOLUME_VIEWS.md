@@ -68,7 +68,7 @@ A temporary plan, deleted when its last step is in; what it builds is then state
   |---------|---------------------------------------------------------------------------|
   | `CUBE`  | the 3D view (default for a volume)                                        |
   | `SLICE` | the volume at the slice position, its nearest layer                       |
-  | `FRONT`, `TOP`, `SIDE` | the projection along z, y or x: the max for an image port, the mean for a velocity or a scalar, whose signs would cancel in a max |
+  | `FRONT`, `TOP`, `SIDE` | the projection along z, y or x: the max for an image port, the mean for a velocity or a scalar, whose signs would cancel in a max; drawn in the box's proportions (the top is width × z extent, the side z extent × height), so the depth looks as deep as it is, as in the cube |
 
   A flat cut is a 2D texture, so every 2D view draws it as it is; from the top, the glyphs of x
   and z show the depth movement. `cut` is not read for a 2D port.
@@ -92,8 +92,10 @@ Each step ends with its tests and a commit; the user runs the app.
 
 1. **The monitor's size, volume ports, flat cuts and the summaries.**
    - The monitor: the visualizer, the strip's plot height and the legend allocate at the
-     viewport's size in `draw()` and follow a change (the largest viewport of the tick when it is
-     drawn twice); `allocate` no longer sizes them from the layer's 4k. `STRIP_HEIGHT` goes; the
+     viewport's size in `draw()` and follow a change: the largest viewport of the previous tick,
+     since the first draw of a tick cannot see the second's, and a re-render at once when a
+     larger one turns up, so a layout change lags one tick and nothing else; `allocate` no longer
+     sizes them from the layer's 4k. `STRIP_HEIGHT` goes; the
      legend's text is drawn at a fixed pixel size into its viewport-sized FBO.
    - The summaries' read grid: the texture's size, capped at 128 × 228 for the strip and
      256 × 256 for the histogram, its total the samples read.
@@ -123,9 +125,8 @@ Each step ends with its tests and a commit; the user runs the app.
      its monitors.
    - Tests: GL-free, the matrices (the center maps to the middle, yaw turns about y), a drag and
      a scroll clamping pitch, distance and the slice, reset back to the front view.
-3. **The 3D view: stacked slices.**
-   - `modules/gl`: an `Fbo` with a depth attachment, on request (`Fbo(depth=True)`), for this
-     step and the next.
+3. **The 3D view: stacked slices.** No depth buffer: the slices blend from far to near, which a
+   depth test would break; only the glyphs need one.
    - `modules/flow/visualization`: `VolumeCube` draws every layer as a quad at its depth, with
      the camera's matrices, from the far side to the near one by the sign of the camera's
      direction along z, each through the channel view's image or colormap, partly transparent,
@@ -138,10 +139,13 @@ Each step ends with its tests and a commit; the user runs the app.
    - Flat: `glyph_field.frag` replaces `velocity_arrow_field.frag`: an arrow for a velocity as
      now, a dot for a scalar (the colormap's color, its size the value, small values small or
      transparent).
+   - `modules/gl`: an `Fbo` with a depth attachment, on request (`Fbo(depth=True)`).
    - 3D: instanced glyphs on a grid of about 16 × 9 × the layers, the volume sampled at (u, v, w)
-     in the vertex shader; an arrow as a camera-facing ribbon (core GL draws no wide lines), a
-     dot as a point sprite (`GL_PROGRAM_POINT_SIZE`), drawn with the depth test. New: instanced
-     drawing and a glyph mesh in `modules/gl` or beside the shader.
+     in the vertex shader; an arrow as a small mesh, a shaft and a head of about 30 triangles
+     with simple lighting, so its direction reads from any angle (a camera-facing flat arrow
+     pointing at the camera would be a dot, and z, the depth movement, is what the cube is for);
+     a dot as a point sprite (`GL_PROGRAM_POINT_SIZE`); both drawn with the depth test. New:
+     instanced drawing and the arrow mesh in `modules/gl` or beside the shader.
 5. **Fog.**
    - `volume_fog.frag`: a ray through the box per pixel, the colormap's color and the value's
      size as opacity, from the camera's inverse matrix; at the size the monitor is drawn at.
