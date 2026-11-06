@@ -78,10 +78,13 @@ A temporary plan, deleted when its last step is in; what it builds is then state
   the middle layer. No setting is written per tick. A read-only readout on the panel shows the
   angle and the slice. The volume is a box of the fluid's width, height and z extent
   (`Fluid3D._z_extent`), so a layer gap looks as deep as it is.
-- **The mouse.** A drag that starts anywhere in the main window goes to every monitor: on a
-  cube it turns yaw and pitch, on a slice it moves the slice position; scroll zooms the distance
-  or steps one layer. A and B get the same drags, so they stay at one angle and one slice.
-  Nothing else in the main window takes the mouse.
+- **The mouse.** A drag that starts anywhere in the main window goes to every monitor. The
+  left button turns yaw and pitch, the right button zooms the distance (a vertical drag), and
+  scroll selects the layer, in every view alike: on a flat slice it is the slice shown, in the
+  cube it is the layer drawn brighter and pulled out of the stack: a gap opens on both sides of
+  it, fading over the next layers, so it shows whole from any angle, an exploded stack. A and B
+  get the same mouse, so they stay at one angle, one distance and one layer. Nothing else in the
+  main window takes the mouse.
 - **Transparent slices in order.** The stacked slices blend from the far side to the near one:
   each draw tests the sign of the camera's direction along z and walks the layers that way, so
   the order flips exactly when the view turns past the side.
@@ -119,18 +122,20 @@ Each step ends with its tests and a commit; the user runs the app.
    - `WindowManager.add_mouse_scroll_callback`, beside the move and button ones.
    - `modules/flow/visualization/orbit.py`: `Orbit`, yaw, pitch and distance with their limits,
      and the view and projection matrices in numpy, no GL.
-   - `MonitorLayer.drag(dx, dy)` and `scroll(steps)` changing its orbit and slice position;
-     `reset` sets them back; a read-only readout shows them. Each app registers the window's
-     mouse callbacks once and hands a drag that started with a button down, and each scroll, to
-     its monitors.
-   - Tests: GL-free, the matrices (the center maps to the middle, yaw turns about y), a drag and
-     a scroll clamping pitch, distance and the slice, reset back to the front view.
+   - `MonitorLayer.drag(dx, dy, button)` and `scroll(steps)`: the left button the orbit's yaw
+     and pitch, the right its distance, scroll the layer; `reset` sets them back; a read-only
+     readout shows them. Each app registers the window's mouse callbacks once and hands a drag
+     that started with a button down, with its button, and each scroll, to its monitors.
+   - Tests: GL-free, the matrices (the center maps to the middle, yaw turns about y), each
+     button's drag and a scroll clamping pitch, distance and the layer, reset back to the front
+     view.
 3. **The 3D view: stacked slices.** No depth buffer: the slices blend from far to near, which a
    depth test would break; only the glyphs need one.
    - `modules/flow/visualization`: `VolumeCube` draws every layer as a quad at its depth, with
      the camera's matrices, from the far side to the near one by the sign of the camera's
      direction along z, each through the channel view's image or colormap, partly transparent,
-     the slice's layer brighter, and the box's edges for orientation. New: a vertex shader with
+     the selected layer brighter and pulled out of the stack (a gap on both sides of it, fading
+     over the next layers), and the box's edges for orientation. New: a vertex shader with
      a `mat4` (`cube_slice.vert`, `.frag`).
    - The monitor: `cut` defaults to `CUBE` for a volume.
    - Tests: GL-free, the layer order flipping with the side the camera is on.
