@@ -8,9 +8,9 @@ components' ports under their names (`prefixed`), so each texture is written onc
 from dataclasses import dataclass, fields
 from enum import IntEnum, auto
 from functools import cache
-from typing import Protocol, get_type_hints
+from typing import Callable, Protocol, get_type_hints
 
-from modules.gl import Texture
+from modules.gl import Texture, Texture3D
 
 
 class TextureKind(IntEnum):
@@ -23,10 +23,38 @@ class TextureKind(IntEnum):
 
 @dataclass
 class Port:
-    """A named texture with its kind. `texture` is the `Fbo`, `SwapFbo` or `Tensor` object itself,
-    never a buffer taken from it."""
-    texture: Texture
+    """A named texture with its kind. `texture` is the `Fbo`, `SwapFbo`, `Tensor` or 3D texture object
+    itself, never a buffer taken from it. A volume (`volume`) is always a 3D texture, so a view reads
+    it with one sampler type; `extent` is its depth as a share of its width, the box a view draws it
+    in, so a layer gap looks as deep as it is. `prepare`, when set, is what a view calls before it
+    reads the texture: its owner brings it up to date there, once however many views ask."""
+    texture: Texture | Texture3D
     kind: TextureKind
+    extent: float = 0.0
+    prepare: Callable[[], None] | None = None
+
+    @property
+    def volume(self) -> bool:
+        """Whether the texture is a volume, a 3D texture."""
+        return isinstance(self.texture, Texture3D)
+
+
+class OnDemand:
+    """Work done at most once between two `mark`s, and only when asked (`__call__`): a view's
+    `Port.prepare` for a texture its owner refreshes only while something reads it."""
+
+    def __init__(self, work: Callable[[], None]) -> None:
+        self._work: Callable[[], None] = work
+        self._stale: bool = True
+
+    def mark(self) -> None:
+        """What the work reads has changed: the next call does it again."""
+        self._stale = True
+
+    def __call__(self) -> None:
+        if self._stale:
+            self._stale = False
+            self._work()
 
 
 class HasPorts(Protocol):
@@ -66,7 +94,7 @@ def ports_of(values: object) -> dict[str, Port]:
     ports: dict[str, Port] = {}
     for name, kind in _kinds(type(values)):
         value = getattr(values, name)
-        if value is not None and not isinstance(value, Texture):
+        if value is not None and not isinstance(value, (Texture, Texture3D)):
             value = value.texture
         if value is not None:
             ports[name] = Port(value, kind)

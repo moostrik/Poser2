@@ -6,7 +6,7 @@ subpackages (e.g. ``from modules.flow import Fluid2D``, never
 """
 
 # Ports: named textures with their kinds, what the monitors show
-from .port import Port, Ports, TextureKind, HasPorts, prefixed, ports_of
+from .port import Port, Ports, TextureKind, HasPorts, OnDemand, prefixed, ports_of
 
 # Base classes
 from .flow_base import FlowBase
@@ -26,7 +26,8 @@ from .bridge_3d import  DensityBridge, DensityBridgeSettings, Magnitude, Velocit
                         TemperatureBridge, TemperatureBridgeSettings
 
 # Visualization
-from .visualization import Visualizer, histogram_grid, Strip, ALL_CHANNELS, summary_grid, Legend, LegendKind, DrawnSize
+from .visualization import Visualizer, histogram_grid, histogram_volume_grid, Strip, ALL_CHANNELS, summary_grid, Legend, LegendKind, DrawnSize, \
+                           VolumeCut, Cut, cut_size, projects_max
 
 # Shared by the 2D and 3D fluid
 from .time_step import TimeStep, TimeStepMode, hold_tick

@@ -25,3 +25,4 @@ from .buoyancy_3d_density import Buoyancy3DDensity
 from .inject_3d_density import Inject3DDensity
 from .inject_channel_3d_density import InjectChannel3DDensity
 from .composite_3d_density import Composite3DDensity
+from .reduce_density import ReduceDensity

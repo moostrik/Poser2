@@ -1,0 +1,26 @@
+#version 460 core
+
+// Histogram Count Volume Shader
+// Counts a volume's four channels into bins, on a 3D grid of samples through all its depth: one
+// invocation per sample, one atomic add per channel, the bins as `histogram_count.comp` has them
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+uniform sampler3D tex0;     // The volume counted
+uniform float scale;        // Multiplier on the values
+uniform ivec3 samples;      // The grid of samples, across, down and deep
+
+layout(r32ui, binding = 0) uniform uimage2D histogram;     // bins wide, one row per channel
+
+void main() {
+    ivec3 id = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    if (any(greaterThanEqual(id, samples))) return;
+
+    int bins = imageSize(histogram).x;
+    vec3 uvw = (vec3(id) + 0.5) / vec3(samples);
+    vec4 value = textureLod(tex0, uvw, 0.0) * scale;
+    for (int channel = 0; channel < 4; channel++) {
+        int bin = clamp(int(floor((value[channel] * 0.5 + 0.5) * float(bins))), 0, bins - 1);
+        imageAtomicAdd(histogram, ivec2(bin, channel), 1u);
+    }
+}

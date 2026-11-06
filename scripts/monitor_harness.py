@@ -19,15 +19,16 @@ from typing import Callable
 import cv2
 import glfw
 import numpy as np
-from OpenGL.GL import (GL_ARRAY_BUFFER, GL_FALSE, GL_FLOAT, GL_FRAMEBUFFER, GL_QUERY_RESULT, GL_RGBA, GL_RGBA32F,
-                       GL_STATIC_DRAW, GL_TEXTURE_2D, GL_TIME_ELAPSED, glBeginQuery, glBindBuffer,
-                       glBindFramebuffer, glBindTexture, glBindVertexArray, glBufferData, glEnableVertexAttribArray,
-                       glEndQuery, glFinish, glGenBuffers, glGenQueries, glGenVertexArrays, glGetQueryObjectuiv,
-                       glTexImage2D, glVertexAttribPointer, glViewport)
+from OpenGL.GL import (GL_ARRAY_BUFFER, GL_FALSE, GL_FLOAT, GL_FRAMEBUFFER, GL_QUERY_RESULT, GL_RGBA, GL_RGBA16F, GL_RGBA32F,
+                       GL_STATIC_DRAW, GL_TEXTURE_2D, GL_TEXTURE_2D_ARRAY, GL_TEXTURE_3D, GL_TIME_ELAPSED, glBeginQuery,
+                       glBindBuffer, glBindFramebuffer, glBindTexture, glBindVertexArray, glBufferData,
+                       glEnableVertexAttribArray, glEndQuery, glFinish, glGenBuffers, glGenQueries, glGenVertexArrays,
+                       glGetQueryObjectuiv, glTexImage2D, glTexSubImage3D, glVertexAttribPointer, glViewport)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from modules.flow import Port, TextureKind  # noqa: E402
-from modules.gl import Fbo, Style, Texture  # noqa: E402
+from modules.flow import Cut, OnDemand, Port, TextureKind, VolumeCut, cut_size  # noqa: E402
+from modules.flow.fluid_3d.shaders import ReduceDensity  # noqa: E402  (a harness reaches inside, as the compare scripts do)
+from modules.gl import Fbo, Style, SwapTexture2DArray, Texture, Texture3D  # noqa: E402
 from modules.render.layers import FlowStage, MonitorInput, MonitorLayer, MonitorLayerSettings, MonitorView  # noqa: E402
 
 OUT: str = os.path.join('temp', 'monitor_harness')
@@ -199,6 +200,145 @@ def step_1a(results: Results) -> None:
     check_views(results, port)
 
 
+# ── step 1b: volume ports, flat cuts, summaries over a volume ──────────
+
+def volume_of(values: np.ndarray) -> Texture3D:
+    """An RGBA32F volume holding `values` (D, H, W, 4): layer 0 the front, row 0 the bottom."""
+    volume = Texture3D()
+    d, h, w = values.shape[:3]
+    volume.allocate(w, h, d, GL_RGBA32F)
+    glBindTexture(GL_TEXTURE_3D, volume.tex_id)
+    glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, w, h, d, GL_RGBA, GL_FLOAT, np.ascontiguousarray(values, dtype=np.float32))
+    glBindTexture(GL_TEXTURE_3D, 0)
+    return volume
+
+
+def known_volume(width: int, height: int, depth: int) -> np.ndarray:
+    """x: the layer from 0 at the front to 1 at the back; y: a sphere in the middle; z: a ramp across
+    from -1 to 1; w: a ramp down from 0 at the bottom to 1 at the top."""
+    z, y, x = np.mgrid[0:depth, 0:height, 0:width].astype(np.float32)
+    u, v, w = (x + 0.5) / width, (y + 0.5) / height, (z + 0.5) / depth
+    values = np.zeros((depth, height, width, 4), np.float32)
+    values[..., 0] = z / max(depth - 1, 1)
+    values[..., 1] = ((u - 0.5) ** 2 + (v - 0.5) ** 2 + (w - 0.5) ** 2 < 0.09).astype(np.float32)
+    values[..., 2] = u * 2.0 - 1.0
+    values[..., 3] = v
+    return values
+
+
+def read_float(texture: Texture) -> np.ndarray:
+    """A float texture's RGBA (H, W, 4), row 0 at the bottom as GL has it."""
+    pixels = texture.read_to_numpy(flip=False)
+    assert pixels is not None
+    return pixels.astype(np.float32)
+
+
+def check_cuts(results: Results, values: np.ndarray) -> None:
+    d, h, w = values.shape[:3]
+    volume = volume_of(values)
+    cut = VolumeCut()
+    cut.allocate()
+    extent: float = d / w                        # the top and the side are then a texel per layer
+
+    layer: int = 5
+    got = read_float(cut.process(volume, Cut.SLICE, (layer + 0.5) / d, TextureKind.SCALAR, extent))
+    results.check('a slice is its layer', bool(np.allclose(got, values[layer], atol=1e-3)))
+    got = read_float(cut.process(volume, Cut.FRONT, 0.5, TextureKind.SCALAR, extent))
+    results.check('the front mean is the mean through the layers', bool(np.allclose(got, values.mean(axis=0), atol=1e-3)))
+    got = read_float(cut.process(volume, Cut.FRONT, 0.5, TextureKind.IMAGE, extent))
+    results.check('an image projects its max', bool(np.allclose(got, values.max(axis=0), atol=1e-3)))
+    got = read_float(cut.process(volume, Cut.TOP, 0.5, TextureKind.SCALAR, extent))
+    results.check('the top is the mean down, the front at the bottom', got.shape[:2] == (d, w)
+                  and bool(np.allclose(got, values.mean(axis=1), atol=1e-3)), f'{got.shape[1]} x {got.shape[0]}')
+    got = read_float(cut.process(volume, Cut.SIDE, 0.5, TextureKind.SCALAR, extent))
+    want = values.mean(axis=2).transpose(1, 0, 2)[:, ::-1]          # (H, D) with the front on the right
+    results.check('the side is the mean across, the front on the right', got.shape[:2] == (h, d)
+                  and bool(np.allclose(got, want, atol=1e-3)), f'{got.shape[1]} x {got.shape[0]}')
+    got = read_float(cut.process(volume, Cut.TOP, 0.5, TextureKind.VELOCITY, extent))
+    mean = values.mean(axis=1)
+    want = np.stack([mean[..., 0], -mean[..., 2], mean[..., 1], mean[..., 3]], axis=-1)
+    results.check("a velocity's top shows x and away from the viewer", bool(np.allclose(got, want, atol=1e-3)))
+    cut.deallocate()
+    volume.deallocate()
+
+
+def check_reduction(results: Results) -> None:
+    """The density's reduction is the mean of each block, layer for layer."""
+    width, height, layers = 128, 96, 4
+    rng = np.random.default_rng(1)
+    density = rng.random((layers, height, width, 4), dtype=np.float32)
+    source = SwapTexture2DArray()
+    source.allocate(width, height, layers, GL_RGBA16F)
+    glBindTexture(GL_TEXTURE_2D_ARRAY, source.tex_id)
+    glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, 0, width, height, layers, GL_RGBA, GL_FLOAT, density)
+    glBindTexture(GL_TEXTURE_2D_ARRAY, 0)
+    target = Texture3D()
+    target.allocate(width // 4, height // 4, layers, GL_RGBA16F)
+    shader = ReduceDensity()
+    shader.allocate()
+    shader.use(source, target)
+    glFinish()
+    got = target.read_to_numpy(flip=False)
+    assert got is not None
+    want = density.reshape(layers, height // 4, 4, width // 4, 4, 4).mean(axis=(2, 4))
+    results.check('the density reduces to the mean of each block', bool(np.allclose(got.astype(np.float32), want, atol=2e-3)))
+
+    big = SwapTexture2DArray()
+    big.allocate(*OUTPUT, 16, GL_RGBA16F)
+    small = Texture3D()
+    small.allocate(448, 800, 16, GL_RGBA16F)
+    ms = gpu_ms(lambda: shader.use(big, small), 10)
+    print(f'     the reduction  {ms:6.2f} ms from {OUTPUT[0]} x {OUTPUT[1]} x 16 to 448 x 800 x 16')
+    for texture in (source, target, big, small):
+        texture.deallocate()
+    shader.deallocate()
+
+
+def check_volume_monitor(results: Results, values: np.ndarray) -> None:
+    """A volume in the monitor: one refresh a tick for two monitors, the cut's proportions, every layer counted."""
+    d, h, w = values.shape[:3]
+    volume = volume_of(values)
+    refreshes: list[int] = []
+    refresh = OnDemand(lambda: refreshes.append(1))
+    port = Port(volume, TextureKind.SCALAR, d / w, refresh)
+    a, b = Monitor(port, MonitorView.COLORMAP), Monitor(port, MonitorView.HISTOGRAM)
+    for _ in range(3):
+        refresh.mark()
+        a.tick(PANEL)
+        b.tick(PANEL)
+    results.check('two monitors on a volume refresh it once a tick', len(refreshes) == 3, f'{len(refreshes)} in 3 ticks')
+    results.check('the histogram counts every layer', b.layer._visualizer.histogram_total == w * h * d,
+                  f'{b.layer._visualizer.histogram_total}')
+    for cut in (Cut.SLICE, Cut.FRONT, Cut.TOP, Cut.SIDE):
+        a.settings.advanced.cut = cut
+        a.tick(PANEL)
+        results.save(f'1b_{cut.name.lower()}', a.picture())
+        size = cut_size(cut, w, h, d / w)
+        results.check(f'{cut.name.lower()}: drawn in its proportions', a.layer._aspect is not None
+                      and abs(a.layer._aspect - size[0] / size[1]) < 1e-6)
+    volume.deallocate()
+
+
+def check_cut_times(results: Results) -> None:
+    volume = volume_of(np.zeros((16, 800, 448, 4), np.float32))
+    cut = VolumeCut()
+    cut.allocate()
+    for mode in (Cut.SLICE, Cut.FRONT, Cut.TOP, Cut.SIDE):
+        ms = gpu_ms(lambda mode=mode: cut.process(volume, mode, 0.5, TextureKind.SCALAR, 0.14), 10)
+        print(f'     {mode.name.lower():<9} {ms:6.2f} ms of a 448 x 800 x 16 volume')
+    cut.deallocate()
+    volume.deallocate()
+
+
+def step_1b(results: Results) -> None:
+    print('step 1b: volume ports, flat cuts, summaries over a volume')
+    values = known_volume(64, 48, 8)
+    check_cuts(results, values)
+    check_reduction(results)
+    check_volume_monitor(results, values)
+    check_cut_times(results)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--no-png', action='store_true', help='skip the pictures')
@@ -206,6 +346,7 @@ def main() -> int:
     window = context()
     results = Results(not args.no_png)
     step_1a(results)
+    step_1b(results)
     glFinish()
     glfw.destroy_window(window)
     glfw.terminate()

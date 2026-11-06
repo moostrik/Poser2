@@ -14,8 +14,8 @@ from enum import IntEnum, auto
 
 from OpenGL.GL import GL_VIEWPORT, glGetIntegerv, glViewport
 
-from modules.gl import Texture, Style, Blit
-from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind
+from modules.gl import Texture, Texture3D, Style, Blit, fit
+from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind, VolumeCut, Cut
 from modules.settings import Field, BaseSettings, Group, Widget
 from ..layer_base import LayerBase
 
@@ -64,6 +64,7 @@ class ArrowSpacing(IntEnum):
 class MonitorAdvancedSettings(BaseSettings):
     """How the monitor draws: the channels, the scale, the arrows' spacing, the legend and the blend."""
     channel: Field[Channel] =       Field(Channel.ALL, width=16, description="The channels drawn")
+    cut: Field[Cut] =               Field(Cut.SLICE, width=24, description="How a volume is laid out: one layer, or seen from the front, the top or the side")
     scale: Field[float] =           Field(1.0, min=0.01, max=100.0, widget=Widget.log_slider, description="Multiplier on the values")
     arrow_spacing: Field[ArrowSpacing] = Field(ArrowSpacing.SPACING_32, width=24, description="Distance between arrows (pixels)")
     legend: Field[bool] =           Field(True, description="The strip's and histogram's log axis, the colormap's key")
@@ -111,6 +112,9 @@ class MonitorLayer(LayerBase):
         self._drawn_size: DrawnSize = DrawnSize()   # the size it renders at, from the viewports it is drawn into
         self._rendered_size: tuple[int, int] = (0, 0)   # the size this tick's port was rendered at
         self._strip_stepped: bool = False           # the strip got this tick's column
+        self._volume_cut: VolumeCut = VolumeCut()   # a volume laid out flat for the 2D views
+        self._slice: float = 0.5                    # the slice's place through a volume, 0 front to 1 back
+        self._aspect: float | None = None           # the shape of what it rendered, kept when drawn; None fills the panel
         self._allocated: bool = False
 
     def set_input(self, input: MonitorInput) -> None:
@@ -131,9 +135,11 @@ class MonitorLayer(LayerBase):
         self._visualizer.allocate()
         self._strip.allocate()
         self._legend.allocate()
+        self._volume_cut.allocate()
         self._allocated = True
 
     def deallocate(self) -> None:
+        self._volume_cut.deallocate()
         self._visualizer.deallocate()
         self._strip.deallocate()
         self._legend.deallocate()
@@ -182,25 +188,46 @@ class MonitorLayer(LayerBase):
         if view == MonitorView.AUTO:
             view = _AUTO_VIEWS[port.kind]
         self._view = view
+        self._aspect = None
+        texture: Texture = self._flat(port, view)
         if view == MonitorView.STRIP:
             shown: tuple[FlowStage, str, Channel] = (self.settings.stage, self.settings.texture, channel)
             if shown != self._strip_of:
                 self._strip.reset()
                 self._strip_of = shown
             if not self._strip_stepped:         # one column per tick, also when a larger draw renders again
-                self._strip.update(port.texture, scale, int(channel))
+                self._strip.update(texture, scale, int(channel))
                 self._strip_stepped = True
             self._legend_kind = LegendKind.STRIP
         elif view == MonitorView.IMAGE:
-            self._visualizer.process_image(port.texture, scale, int(channel))
+            self._visualizer.process_image(texture, scale, int(channel))
         elif view == MonitorView.COLORMAP:
-            self._visualizer.process_colormap(port.texture, scale, int(channel))
+            self._visualizer.process_colormap(texture, scale, int(channel))
             self._legend_kind = LegendKind.COLORMAP
         elif view == MonitorView.HISTOGRAM:
-            self._visualizer.process_histogram(port.texture, scale, int(channel))
+            self._visualizer.process_histogram(port.texture if port.volume else texture, scale, int(channel))
             self._legend_kind = LegendKind.HISTOGRAM
         else:
-            self._visualizer.process_arrows(port.texture, scale, float(settings.advanced.arrow_spacing.value))
+            self._visualizer.process_arrows(texture, scale, float(settings.advanced.arrow_spacing.value))
+
+    def _flat(self, port: Port, view: MonitorView) -> Texture:
+        """The 2D texture a view draws: the port's own, or a volume's flat cut. A volume is brought up
+        to date first (`Port.prepare`); the strip reads its front mean, the volume's mean, and the
+        histogram counts the volume itself. A cut keeps the box's proportions when drawn."""
+        if not port.volume:
+            assert isinstance(port.texture, Texture)
+            return port.texture
+        if port.prepare is not None:
+            port.prepare()
+        volume = port.texture
+        assert isinstance(volume, Texture3D)
+        if view == MonitorView.HISTOGRAM:
+            return self._volume_cut.texture         # not drawn: the histogram counts the volume
+        cut: Cut = Cut.FRONT if view == MonitorView.STRIP else self.settings.advanced.cut
+        flat: Texture = self._volume_cut.process(volume, cut, self._slice, port.kind, port.extent)
+        if view != MonitorView.STRIP:
+            self._aspect = flat.width / max(flat.height, 1)
+        return flat
         if self._legend_kind is not None and settings.advanced.legend:
             self._legend.update(self._legend_kind, int(channel), scale, self._visualizer.histogram_total)
 
@@ -226,7 +253,13 @@ class MonitorLayer(LayerBase):
         Style.push_style()
         Style.set_blend_mode(self.settings.advanced.blend_mode)
         if self.texture.allocated:
-            Blit.use(self.texture)
+            if self._aspect is not None:        # a volume's cut, in the box's proportions inside the panel
+                x, y, w, h = fit(self._aspect, 1.0, int(viewport[2]), int(viewport[3]))
+                glViewport(int(viewport[0] + x), int(viewport[1] + y), int(w), int(h))
+                Blit.use(self.texture)
+                glViewport(int(viewport[0]), int(viewport[1]), int(viewport[2]), int(viewport[3]))
+            else:
+                Blit.use(self.texture)
         if self._legend_kind is not None and self.settings.advanced.legend and self._legend.texture.allocated:
             Style.set_blend_mode(Style.BlendMode.ALPHA)
             Blit.use(self._legend.texture)

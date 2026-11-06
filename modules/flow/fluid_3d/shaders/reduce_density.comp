@@ -1,0 +1,29 @@
+#version 460 core
+
+/*
+ * ReduceDensity - the density, a 2D array at the output size, averaged down into a 3D texture at
+ * the simulation's width and height, layer for layer: each target texel the mean of the block of
+ * source texels it covers. A target no smaller than the source copies it texel for texel.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler2DArray uSource;            // the density (RGBA16F)
+layout(rgba16f, binding = 0) uniform writeonly image3D uTarget;  // the reduced density
+uniform ivec3 uSize;                                           // the target's size
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    ivec2 source = textureSize(uSource, 0).xy;
+    ivec2 lo = gid.xy * source / uSize.xy;
+    ivec2 hi = max((gid.xy + 1) * source / uSize.xy, lo + 1);
+    vec4 sum = vec4(0.0);
+    for (int y = lo.y; y < hi.y; y++) {
+        for (int x = lo.x; x < hi.x; x++) {
+            sum += texelFetch(uSource, ivec3(x, y, gid.z), 0);
+        }
+    }
+    imageStore(uTarget, gid, sum / float((hi.x - lo.x) * (hi.y - lo.y)));
+}

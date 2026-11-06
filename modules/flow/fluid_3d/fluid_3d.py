@@ -31,7 +31,7 @@ from ..boundary_mode import BoundaryMode
 from .fluid_settings import Fluid3DSettings, VolumeSettings, VelocitySettings, DensitySettings, TemperatureSettings, PressureSettings
 from ..shaders import AddBoolean
 from ..flow_util import FlowUtil
-from ..port import Port, TextureKind
+from ..port import OnDemand, Port, TextureKind
 from ..time_step import TimeStep
 from .shaders import (
     Advect3D, Advect3DDensity, Divergence3D, Gradient3D,
@@ -39,7 +39,7 @@ from .shaders import (
     VorticityCurl3D, VorticityForce3D, Buoyancy3DDensity,
     Inject3D, Inject3DDensity, InjectChannel3DDensity, InjectFlow3D,
     Dampen3D, Composite3DDensity, Add3D,
-    InjectBinary3D
+    InjectBinary3D, ReduceDensity
 )
 
 # Combined memory barrier bits (cast to int for Pylance compatibility)
@@ -168,6 +168,11 @@ class Fluid3D:
         self._inject_density_shader: Inject3DDensity = Inject3DDensity()
         self._inject_density_channel_shader: InjectChannel3DDensity = InjectChannel3DDensity()
         self._composite_density_shader: Composite3DDensity = Composite3DDensity()
+        # The density as the monitors read it: at the simulation's width and height, a 3D texture, refreshed
+        # once per step and only when a view asks (`_density_view_refresh`, the port's `prepare`)
+        self._density_view: Texture3D = Texture3D()
+        self._reduce_density_shader: ReduceDensity = ReduceDensity()
+        self._density_view_refresh: OnDemand = OnDemand(self._reduce_density)
         self._add_shader: Add3D = Add3D()
         self._inject_binary_shader: InjectBinary3D = InjectBinary3D()
         self._add_boolean_shader: AddBoolean = AddBoolean()
@@ -222,6 +227,7 @@ class Fluid3D:
         self._inject_density_shader.allocate()
         self._inject_density_channel_shader.allocate()
         self._composite_density_shader.allocate()
+        self._reduce_density_shader.allocate()
         self._add_shader.allocate()
         self._inject_binary_shader.allocate()
         self._add_boolean_shader.allocate()
@@ -242,6 +248,7 @@ class Fluid3D:
         self._density.allocate(self._density_width, self._density_height, self._depth, GL_RGBA16F)
         self._density_obstacle.allocate(self._density_width, self._density_height, self._depth, GL_R8)
         self._regenerate_obstacle_volumes()
+        self._allocate_density_view()
 
     def _allocate_simulation_fields(self) -> None:
         """(Re)allocate simulation-resolution 3D volumes."""
@@ -263,6 +270,25 @@ class Fluid3D:
         self._buoyancy_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
 
         self._apply_boundary_modes()
+        self._allocate_density_view()
+
+    def _allocate_density_view(self) -> None:
+        """(Re)allocate the density as the monitors read it: the simulation's width and height, the
+        density's layers. Both allocations call it, since it follows both."""
+        if self._simulation_width <= 0 or self._depth <= 0:
+            return
+        size: tuple[int, int, int] = (self._simulation_width, self._simulation_height, self._depth)
+        view: Texture3D = self._density_view
+        if view.allocated and (view.width, view.height, view.depth) == size:
+            return
+        view.deallocate()
+        view.allocate(*size, GL_RGBA16F)
+        self._density_view_refresh.mark()
+
+    def _reduce_density(self) -> None:
+        """The density averaged down into `_density_view`; the port's `prepare`, run once per step at most."""
+        self._reduce_density_shader.use(self._density, self._density_view)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _regenerate_obstacle_volumes(self) -> None:
         """Project 2D obstacle source into both 3D obstacle volumes."""
@@ -303,6 +329,8 @@ class Fluid3D:
         self._inject_density_shader.deallocate()
         self._inject_density_channel_shader.deallocate()
         self._composite_density_shader.deallocate()
+        self._reduce_density_shader.deallocate()
+        self._density_view.deallocate()
         self._add_shader.deallocate()
         self._inject_binary_shader.deallocate()
         self._add_boolean_shader.deallocate()
@@ -326,6 +354,7 @@ class Fluid3D:
         self._inject_density_shader.reload()
         self._inject_density_channel_shader.reload()
         self._composite_density_shader.reload()
+        self._reduce_density_shader.reload()
         self._add_shader.reload()
         self._inject_binary_shader.reload()
 
@@ -404,6 +433,7 @@ class Fluid3D:
         self._profiler.end("composite")
 
         self._gpu_timer.end()
+        self._density_view_refresh.mark()
 
         self._profiler.report()
 
@@ -998,8 +1028,23 @@ class Fluid3D:
 
     @property
     def ports(self) -> dict[str, Port]:
-        """Its 2D textures: the obstacle as it comes. The volumes are 3D, which no monitor shows yet."""
-        return {'obstacle': Port(self._obstacle_source, TextureKind.SCALAR)}
+        """Its fields in the order a step reaches them, each a volume in a box `_z_extent` deep, and the
+        2D obstacle as it comes. The density's port is its reduced view, refreshed when a view asks."""
+        extent: float = self._z_extent
+
+        def volume(texture: Texture3D, kind: TextureKind) -> Port:
+            return Port(texture, kind, extent)
+
+        return {'obstacle_source': Port(self._obstacle_source, TextureKind.SCALAR),
+                'obstacle': volume(self._simulation_obstacle, TextureKind.SCALAR),
+                'velocity': volume(self._velocity, TextureKind.VELOCITY),
+                'vorticity': volume(self._curl_vol, TextureKind.VELOCITY),
+                'vorticity_force': volume(self._vorticity_force_vol, TextureKind.VELOCITY),
+                'temperature': volume(self._temperature, TextureKind.SCALAR),
+                'buoyancy': volume(self._buoyancy_force_vol, TextureKind.VELOCITY),
+                'divergence': volume(self._divergence_vol, TextureKind.SCALAR),
+                'pressure': volume(self._pressure, TextureKind.SCALAR),
+                'density': Port(self._density_view, TextureKind.IMAGE, extent, self._density_view_refresh)}
 
     @property
     def velocity(self) -> Texture3D:
