@@ -116,8 +116,7 @@ class PressureSettings(BaseSettings):
 
 
 class VolumeSettings(BaseSettings):
-    """The volume: the grid's z layers, where the body sits in it, and the composite's look."""
-    layers: Field[int]              = Field(128,  min=1,    max=256,    description="z layers; the cells are cubic, so the slab is layers / width deep")
+    """The volume: where the body sits in the grid's depth, and the composite's look."""
     injection_layer: Field[float]   = Field(0.5,  min=0.0,  max=1.0,    description="Normalized depth of the injection's center, where the body sits")
     injection_spread: Field[float]  = Field(0.075, min=0.001, max=0.2,  step=0.001, description="Gaussian sigma of the injection's depth (widths); 0.075 = a body 0.3 widths thick")
     emission: Field[float]          = Field(1.0,  min=0.0,  max=8.0,    color="amber",          description="Brightness gain per unit density")
@@ -143,6 +142,7 @@ class Fluid3DSettings(BaseSettings):
     # ---- Grid dimensions (multiples of 32) ----
     width: Field[int]               = Field(256,    min=32,     max=4096,   step=32,    description="Simulation grid width")
     height: Field[int]              = Field(448,    min=32,     max=4096,   step=32,    description="Simulation grid height")
+    layers: Field[int]              = Field(128,    min=1,      max=256,                description="Simulation grid layers in z; the cells are cubic, so the box is layers / width deep")
     time_step: Field[TimeStepMode]  = Field(TimeStepMode.MEASURED,                  description="Step by the measured render rate, or by a fixed rate")
     fixed_fps: Field[float]         = Field(60.0,   min=1.0,    max=240.0,              description="Steps per second in fixed mode (fps)")
     fps_smoothing: Field[float]     = Field(1.0,    min=0.0,    max=10.0,               description="Smoothing of the measured rate in measured mode (s); 0 follows each frame")

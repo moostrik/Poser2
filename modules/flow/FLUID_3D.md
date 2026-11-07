@@ -24,7 +24,7 @@ A step (`Fluid3D.update`), in order, at the preset (`apps/deep_flow/data/setting
 | composite   | front-to-back march, one step per layer                                               | output 2160×3840      | no                   |
 
 Every field is a `GL_TEXTURE_3D` on one grid of cubic cells at the stage's size, 256 × 448 by
-`volume.layers` 128: the velocity RGBA16F, the temperature R16F and the pressure R32F, the density
+`layers` 128: the velocity RGBA16F, the temperature R16F and the pressure R32F, the density
 RGBA16F with its color baked in, each a swap pair, the obstacle R8. The simulation's cell is 1/256
 width in x, y and z, so the slab is 128 / 256 = 0.5 widths deep (`_z_extent`). The grid is the one
 that holds 60 fps in deep_flow with the pose on the same GPU ([TIMING.md](TIMING.md#the-grid)). The density is on the same
@@ -297,7 +297,7 @@ as a tuning:
 | `density.boundary_gain`, `density.body_force_gain`, `temperature.boundary_gain`, `temperature.body_force_gain` | 1 | one unit per width, per Δv |
 | `speed`                                                                          | 1               | the density moves with the water        |
 | `velocity.self_advection`                                                        | 1               | the velocity carries itself the full step |
-| `width`, `height`, `volume.layers`                                               | 256, 448, 128   | half a width deep, within 60 fps        |
+| `width`, `height`, `layers`                                                      | 256, 448, 128   | half a width deep, within 60 fps        |
 | `density.size`                                                                   | 1               | the density on the simulation's grid    |
 | `volume.injection_layer`, `volume.injection_spread`                              | 0.5, 0.075      | the body mid-volume, 0.3 widths thick   |
 | `wall` (every field, the volume)                                                 | closed          | as his settings                         |

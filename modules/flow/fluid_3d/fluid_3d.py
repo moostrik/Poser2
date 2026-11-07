@@ -1,7 +1,7 @@
 """Fluid3D - 3D Navier-Stokes fluid simulation on the GPU.
 
 Every field is a GL_TEXTURE_3D on one grid of cubic cells: the velocity (RGBA16F), the temperature
-and the pressure (R16F) and the obstacle (R8) at the simulation's size, `volume.layers` deep. The
+and the pressure (R16F) and the obstacle (R8) at the simulation's size, `layers` deep. The
 density is its carrier's (`density.carrier`): the grid's (`GridDensity`, RGBA16F, its color baked in at
 injection, on the same grid or `density.size` times finer in x and y, sampled by uv wherever a pass reads
 it against the simulation's fields) or particles' (`ParticleDensity`), moved through the same velocity.
@@ -197,7 +197,7 @@ class Fluid3D:
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
         # Bind settings actions
-        self.settings.volume.bind(VolumeSettings.layers, lambda _: self._request_reallocate())
+        self.settings.bind(Fluid3DSettings.layers, lambda _: self._request_reallocate())
         reallocate_carrier = lambda _: setattr(self, '_carrier_pending', True)
         for field in (DensitySettings.size, DensitySettings.carrier):
             self.settings.density.bind(field, reallocate_carrier)
@@ -259,7 +259,7 @@ class Fluid3D:
         self._simulation_height = self._align32(self.settings.height)
         self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
         self._cell = 1.0 / max(1, self._simulation_width)
-        self._depth = self.settings.volume.layers
+        self._depth = self.settings.layers
         self._z_extent = self._depth / max(1, self._simulation_width)
 
     def _spread(self) -> float:

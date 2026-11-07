@@ -35,6 +35,11 @@ class StageLayerSettings(BaseSettings):
     height: Field[int] =    Field(288, min=32, max=4096, step=32, description="Working height")
 
 
+class Stage3DLayerSettings(StageLayerSettings):
+    """A stage whose working size has a depth: its z layers right after its width and height."""
+    layers: Field[int] =    Field(16, min=1, max=256, description="Working layers in z")
+
+
 class StageLayer[I, O: StageOutput](LayerBase, ABC):
     """A stage's layer: `set_input` before the render loop, `output` its output, `reset` from rest.
     `update` resets first when the panel asked for it, on the render thread, then runs the stage

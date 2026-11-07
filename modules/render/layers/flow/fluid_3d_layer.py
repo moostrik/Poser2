@@ -8,11 +8,12 @@ The density volume holds the colored density (RGBA16F GL_TEXTURE_3D on the simul
 from modules.gl import GpuTimer, Texture
 from modules.flow import Fluid3D, Fluid3DSettings, HasPorts
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidOutput, Injection
+from .stage_layer import Stage3DLayerSettings
 
 
-class Fluid3DLayerSettings(Fluid3DSettings, FluidLayerSettings):
+class Fluid3DLayerSettings(Fluid3DSettings, FluidLayerSettings, Stage3DLayerSettings):
     """Configuration for Fluid3DLayer: the stage's settings and its fluid's own, one panel, the stage's
-    first; the stage's width and height are the fluid's simulation grid."""
+    first; the stage's width, height and layers are the fluid's simulation grid."""
 
 
 class Fluid3DLayer(FluidLayer):

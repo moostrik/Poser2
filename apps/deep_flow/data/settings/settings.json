@@ -517,6 +517,7 @@
     "fluid": {
       "width": 256,
       "height": 448,
+      "layers": 128,
       "blend_mode": "ADD",
       "time_step": "MEASURED",
       "fixed_fps": 60.0,
@@ -531,7 +532,6 @@
         "gain": 1.0
       },
       "volume": {
-        "layers": 128,
         "injection_layer": 0.5,
         "injection_spread": 0.075,
         "emission": 1.16,
