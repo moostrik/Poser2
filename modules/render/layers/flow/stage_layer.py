@@ -37,7 +37,7 @@ class StageLayerSettings(BaseSettings):
 
 class Stage3DLayerSettings(StageLayerSettings):
     """A stage whose working size has a depth: its z layers right after its width and height."""
-    layers: Field[int] =    Field(16, min=1, max=256, description="Working layers in z")
+    layers: Field[int] =    Field(16, min=4, max=256, step=4, description="Working layers in z")
 
 
 class StageLayer[I, O: StageOutput](LayerBase, ABC):

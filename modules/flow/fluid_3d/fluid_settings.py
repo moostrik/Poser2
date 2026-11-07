@@ -142,7 +142,7 @@ class Fluid3DSettings(BaseSettings):
     # ---- Grid dimensions (multiples of 32) ----
     width: Field[int]               = Field(256,    min=32,     max=4096,   step=32,    description="Simulation grid width")
     height: Field[int]              = Field(448,    min=32,     max=4096,   step=32,    description="Simulation grid height")
-    layers: Field[int]              = Field(128,    min=1,      max=256,                description="Simulation grid layers in z; the cells are cubic, so the box is layers / width deep")
+    layers: Field[int]              = Field(128,    min=4,      max=256,    step=4,     description="Simulation grid layers in z; the cells are cubic, so the box is layers / width deep")
     time_step: Field[TimeStepMode]  = Field(TimeStepMode.MEASURED,                  description="Step by the measured render rate, or by a fixed rate")
     fixed_fps: Field[float]         = Field(60.0,   min=1.0,    max=240.0,              description="Steps per second in fixed mode (fps)")
     fps_smoothing: Field[float]     = Field(1.0,    min=0.0,    max=10.0,               description="Smoothing of the measured rate in measured mode (s); 0 follows each frame")
