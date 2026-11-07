@@ -557,6 +557,15 @@ Each item commits on its own when it is in, and writes its measured row into TIM
 | 13 | the narrow-range filter and the narrow band                | 0.3 to 1 ms                     | the band a replacement; the filter an option if the surface differs |
 | 14 | the Morton sort                                            | under 0.5 ms at 2 M             | replacement; the ring's fade must then go by the particle's age, not its slot |
 
+The sparse grid (8), as a plan, not built. The volumes stay dense: 24 GB holds them, so GVDB's atlas, which
+saves memory, buys nothing here; what a sparse grid saves is the passes' work. Each step a pass marks the
+8 × 8 × 8 bricks whose velocity or density is above a floor, grown by one brick, into a list with an
+atomic counter; every pass but the pressure then runs `glDispatchComputeIndirect` over the list, one
+workgroup a brick, and a brick off the list keeps its values. The multigrid's coarse levels stay whole,
+an eighth and less of the work. Its gain is the share of bricks off the list, and item 2 measured the
+density in most 8³ blocks on the recording; so first one cheap pass counts the active share on standmoves
+and stillslowfast, and the grid is built only if it is under half.
+
 Beside 5 and 6, the memory a step: the bytes read and written per cell by every pass, counted from
 the shaders before and after, since the passes are bandwidth-bound and the three force and curl
 volumes (24 bytes a cell) exist only between passes. A winning solver becomes the preset's

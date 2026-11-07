@@ -33,6 +33,8 @@ flat out float vPointSize;
 
 const vec3 WATER_CHAN = vec3(1.8, 1.0, 0.6);
 
+const float CUT = 2.5;          // a blob is drawn out to this many sigma, 95.6% of its gaussian
+
 void main() {
     uint index = uMode == 1 ? uint(gl_VertexID) >> 1 : uint(gl_VertexID);
     Particle particle = particles[index];
@@ -66,7 +68,7 @@ void main() {
         float sigma0 = 0.5 * uRadius * min(pow(max(birth / max(uReferenceMass, 1e-9), 0.0), 1.0 / 3.0), 2.0);
         float sigma = min(sqrt(sigma0 * sigma0 + 2.0 * uSpread * mass_age.y), 2.0 * sigma0);
         vSigma = max(sigma, 0.5);
-        point = min(ceil(6.0 * vSigma), uMaxPointSize);
+        point = min(ceil(2.0 * CUT * vSigma), uMaxPointSize);     // the gaussian to CUT sigma, the rest of it not drawn
     }
 
     if (uSlices == 1) {

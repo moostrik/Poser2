@@ -241,6 +241,8 @@ against the code before.
 | 7 | `pressure.solver` `MULTIGRID`, 1 cycle, an option and the preset's | pressure | 4.07 | 2.56 | 4.12   | 0.05  | yes    | the water 1.36 of the body, was 0.90; the coast 0.10 s, was 0.94 | option, the preset's |
 |   |                                 | the step             | 9.31   | 7.77   | 9.41         | 0.10  | yes    |                             |             |
 |   |                                 | the frame            | 12.23  | 10.24  | 12.17        | 0.06  | yes    |                             |             |
+| 9 | the blobs drawn to 2.5 sigma, the gaussian scaled by its share inside | particles draw, 100 k blobs | 1.64, 2.15 | 0.96, 0.96 | 1.40, 1.38 | 0.24, 0.77 | not by the rule; below all four befores | 0.1 to 0.5 of 255 in the mean, 2% of pixels over 4 at the blobs' edges | replacement |
+|   |                                 | the harness's step   | 16.08  | 12.97  |              |       | yes    |                             |             |
 
 Item 2 was slower in both forms, one thread a block (3.84 ms) and one workgroup a block (3.49): on the
 recording the density fills most blocks, so the skip saves little and its pass and branch cost more. The
@@ -266,6 +268,11 @@ has to go round it, faster (1.23 and 1.36 of the body against Jacobi's 0.90), an
 body (the coast 0.10 s against 0.94). Jacobi's 40 iterations leave a residual of 0.37 of the divergence, so
 part of the push was compression the next steps relaxed. The solve's accuracy, the time each takes and why
 SOR is no faster are in [FLUID_3D.md](FLUID_3D.md#the-pressure).
+
+Item 9 misses the rule in the app, where the pose's load moved the befores by 0.24 and 0.77 ms over two
+sets of runs, but the change came in under all four befores both times (0.96 ms), and the harness, with no
+pose on the GPU, gives the step 16.1 → 13.0 ms (p95 29 → 21): the fill is 25 σ² a blob where it was 36.
+Kept as a replacement on that, and marked here as the exception.
 
 ### What sets the p95
 
