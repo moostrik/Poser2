@@ -596,7 +596,7 @@
       "view": "AUTO",
       "advanced": {
         "channel": "ALL",
-        "cut": "FOG",
+        "cut": "FRONT",
         "scale": 1.0,
         "glyph_spacing": "SPACING_16",
         "legend": true,
@@ -609,7 +609,7 @@
       "view": "COLORMAP",
       "advanced": {
         "channel": "ALL",
-        "cut": "FOG",
+        "cut": "FRONT",
         "scale": 1.0,
         "glyph_spacing": "SPACING_32",
         "legend": true,

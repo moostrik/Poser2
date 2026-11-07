@@ -184,49 +184,47 @@ back to back.
 
 ## Faster
 
-What would make each stage faster, ordered by the time it is expected to give back at the baseline,
-256 × 448 × 128 with MacCormack, the step 12.2 ms with the pose on. An estimate is
-**(deduction)** unless its source measured it; the sources' numbers are on their own scenes.
+The technical changes that would make the fluid and the particles faster, ordered by the time each is
+expected to give back at the baseline: 256 × 448 × 128 with MacCormack, the step 12.2 ms, the output
+at 2160 × 3840 and every stage as it is. Nothing here turns a feature off or lowers a resolution. An
+estimate is **(deduction)** unless its source measured it; a source's numbers are on its own scene.
 
 ### The fluid
 
 | # | Change                                                                                                                          | Its share now                     | Expected back           | Source |
 |---|---------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|-------------------------|--------|
-| 1 | The pose's share of the GPU: the person detection at a lower rate (it runs 35 to 50 times a second; the tracker needs it when a track is lost), or the models on a smaller input | 6.6 ms of the step at 448 × 800 × 64 ([The pose's share](#the-poses-share)) | 3 to 6 ms | measured here: the step 14.9 → 8.2 ms with the pose off |
-| 2 | The pressure by multigrid: a V-cycle smoothed by red-black Gauss–Seidel, warm-started as now, or as the preconditioner of a conjugate gradient (MGPCG) | 4.8 ms, 40 Jacobi iterations     | 2.5 to 3.5 ms           | a V-cycle about the cost of 10 Jacobi iterations at far more convergence (gist); 3 × the accuracy of Jacobi in the same time on the GPU (Glimberg 2009); convergence independent of the grid (McAdams 2010) |
-| 3 | The pressure on a coarser grid: the projection at half the resolution per axis, the velocity's fine detail kept (coarse grid projection) | the same 4.8 ms                   | 3 to 4 ms; the alternative to 2 | Lentine, Zheng, Fedkiw 2010; 2 to 30 × on the projection (Kashefi and Staples) |
-| 4 | The composite at the grid's 256 × 448 instead of 2160 × 3840, then an edge-aware upscale: step 8's direction ([FLUID_3D.md](FLUID_3D.md#step-8-the-4k-upscale-parked)) | 2.4 ms, 128 steps over 8.3 M pixels | 1.5 to 2 ms           | 70 × fewer pixels marched |
-| 5 | The composite's early exit: it stops only at `glow` 0, and the preset has 0.1, so every ray marches all 128 layers; the glow's sum kept to where the ray is not yet opaque, or empty space skipped by a coarse occupancy grid | the same 2.4 ms                   | 0.5 to 1.5 ms, by how much is empty or opaque | min-max octrees and occupancy grids in volume renderers |
-| 6 | Red-black Gauss–Seidel with over-relaxation (SOR) in place of Jacobi, the cheap form of 2: one solve, two colors a sweep | 4.8 ms                            | 1.5 to 2.5 ms, the same residual in about half the sweeps | red-black ordering keeps most of Gauss–Seidel's lead on Jacobi in parallel (Pyroclast; Astaroth) |
-| 7 | Passes fused, each field read once: the dampen into the velocity's advection, the curl and the confinement force in one pass with the curl in shared memory, the divergence into the first Jacobi dispatch | dampen 0.4, vorticity 1.7, divergence in the pressure | 1 to 1.5 ms | the stencils are bandwidth-bound; kernel fusion and blocking (Intel 3.5D blocking, Aalto) |
-| 8 | The temperature cleared once when `buoyancy` goes to 0, not every step, and its injection skipped while it is 0, as the preset has it: nothing reads it | 0.4 ms, both buffers cleared a step | 0.4 to 0.5 ms | the code: `Fluid3D._advect_temperature` |
-| 9 | MacCormack on the velocity only, the density semi-Lagrangian, or the particles carrying the density | MacCormack's +0.7 velocity, +0.85 density | 0.85 ms | measured here: the grid's step 12.2 → 11.0 ms semi-Lagrangian |
-| 10 | A sparse grid, bricks of 8³ or 16³ cells, only those with motion or density stepped (GVDB, EmberGen 2) | every pass                       | from 0 with water everywhere to half the step with the body alone; the velocity fades over 60 s, so the water fills the box | Wu et al. 2018; JangaFX |
+| 1 | The pressure by multigrid: a V-cycle, restriction to 128 × 224 × 64 and down, smoothed by red-black Gauss–Seidel, warm-started from the last step's pressure as now; or that cycle as the preconditioner of a conjugate gradient (MGPCG) | 4.8 ms, 40 Jacobi iterations | 2.5 to 3.5 ms | one V-cycle converges like about a thousand Jacobi iterations at the cost of about ten (gist); 3 × the accuracy of Jacobi in the same time on the GPU (Glimberg 2009); convergence independent of the grid's size (McAdams 2010) |
+| 2 | The pressure by red-black Gauss–Seidel with over-relaxation (SOR) in place of Jacobi: the cheap form of 1, one solve, two colors a sweep, each color from the other's fresh values | the same 4.8 ms | 1.5 to 2.5 ms, the same residual in about half the sweeps | red-black ordering keeps most of Gauss–Seidel's lead on Jacobi in parallel (Pyroclast; Astaroth); Jacobi converges slowly (FLIP on GPU) |
+| 3 | The composite's early exit, which never fires: it stops only at `glow` 0, and the preset's 0.1 keeps every ray marching all 128 layers for the additive sum; instead the additive sum stopped with the transmittance where it is under the output's precision, and empty space skipped by a coarse occupancy volume (the density's max over 8 × 8 × 8 cells), the ray stepping a block at a time where it is empty | 2.4 ms, 128 steps over 8.3 M pixels | 0.5 to 1.5 ms, by how much of the box is empty or already opaque | min-max octrees and occupancy grids in volume renderers |
+| 4 | Passes fused, each field read once: the dampen into the velocity's advection; the curl and the confinement force in one pass with the curl in shared memory; the divergence into the first Jacobi dispatch; the body force's and the boundary's injections in one pass | dampen 0.4, vorticity 1.7, inject 0.8, the divergence in the pressure | 1 to 1.5 ms | the stencils are bandwidth-bound; kernel fusion and blocking (Intel 3.5D blocking, Aalto) |
+| 5 | The temperature cleared once when `buoyancy` goes to 0, not both buffers every step, and its injection skipped while it is 0; nothing reads it then | 0.4 ms | 0.4 to 0.5 ms | the code: `Fluid3D._advect_temperature` |
+| 6 | The 3D stencil passes on 3D workgroups: the advections, the curl, the divergence and the gradient run 16 × 16 × 1, one layer a group, so a group's z neighbors come from another group's reads; 8 × 8 × 4 groups keep the three neighbors in the cache | the advections 1.5, vorticity 1.7, the gradient and the divergence in the pressure | 0.3 to 0.6 ms | 3D blocking of stencils (Intel 3.5D blocking) |
+| 7 | MacCormack in one dispatch: the forward trace, the error and the clamp in the predictor's pass, the predictor kept in registers, so each field is written once and read once instead of twice | +0.7 ms on the velocity, +0.85 on the density | 0.4 to 0.6 ms | the step's three passes read each field three times |
+| 8 | A sparse grid: bricks of 8³ or 16³ cells, only those with velocity or density stepped (GVDB, EmberGen 2) | every pass | with the body alone in the box, up to half the step; the velocity fades over 60 s and the walls are closed, so the water fills the box over time and the gain goes to 0; the density's passes keep it | Wu et al. 2018; JangaFX |
 
 ### The particles
 
 | # | Change                                                                                                     | Its share now                                        | Expected back                     | Source |
 |---|------------------------------------------------------------------------------------------------------------|------------------------------------------------------|-----------------------------------|--------|
-| 1 | The draw at half the output, 1080 × 1920, then upsampled: a quarter of the fill for blobs, spheres and wide points | the draw: 2.7 ms at 2 M points, 1.8 at 100 k blobs, p95 to 30 ms at 500 k | half to three quarters of the draw | the cost is fill, measured above |
-| 2 | Points rasterized in compute: each into its slice by fixed-point `atomicAdd` into a storage buffer, not the blend unit; for an opaque look one 64-bit `atomicMin` of depth and color a pixel | the points' draw, 10 ms at 8 M occluded            | 2 to 5 × on the points' draw      | Schütz 2019: 5 to 10 × faster than `GL_POINTS` at 1-pixel points, less above 2 pixels |
-| 3 | Weighted blended order-independent transparency in place of the 16 slices: two targets, no layered draw, no march, near ink approximately over far | the slices' write and clear (16 × 2160 × 3840 RGBA16F) and the march, 0.4 ms | the march, and a third to half of the draw | McGuire and Bavoil 2013 |
-| 4 | The blobs' and the spheres' growth capped lower than twice `radius`, or `radius` smaller | the blobs' p95, 9 ms of draw at 100 k, 30 at 500 k | most of the p95 | measured above: the mean 1.3 against the p95 9 |
-| 5 | The surface's filter as a narrow-range filter, or the narrow band: only the particles at the liquid's surface drawn and filtered | the surface's march, 0.8 ms, and its draw              | 0.3 to 1 ms; 2.4 × on the surface pass (narrow band over narrow range) | Truong and Yuksel 2018; Oliveira and Paiva 2022 |
-| 6 | The ring sorted by Morton order of the cell now and then, so a group's particles read the same velocity texels | the advection, 0.2 ms a million                      | under 0.5 ms at the baseline; 1.5 to 2 × at 8 M and more | a 3.2 × gain from sorting in a molecular-dynamics benchmark (NVIDIA forum) |
+| 1 | Points and streaks rasterized in compute, not through the vertex and blend units: each particle adds its value by fixed-point `atomicAdd` into its slice of a storage buffer; a streak as a Bresenham line of the same adds | the points' draw, 2.7 ms at 2 M, 10 at 8 M; the streaks' 1.5 at 1 M | 2 to 5 × on the draw | Schütz 2019: 5 to 10 × faster than `GL_POINTS` at 1-pixel points, less above 2 pixels; `compute_rasterizer` |
+| 2 | Weighted blended order-independent transparency in place of the 16 depth slices: two targets at the output, no layered draw, no 1 GB of slices cleared and marched a frame, near ink over far by a depth weight | the slices' clear and march, 0.4 ms, and the layered draw | the march, the clear and a third to half of the draw | McGuire and Bavoil 2013 |
+| 3 | The blobs' and the spheres' sprites cut at 2 sigma instead of their full quad: a gaussian beyond 2 sigma holds 5% of its mass; and the growth capped under twice `radius`, since a sprite twice as wide fills four times the pixels | the blobs' p95, 9 ms of draw at 100 k, 30 at 500 k | half the fill; most of the p95 | measured above: the mean 1.3 against the p95 9 |
+| 4 | The surface's filter as a narrow-range filter, which keeps the edges with fewer passes, and the narrow band: only the particles at the liquid's surface drawn into the depth and thickness | the surface's march, 0.8 ms, and its draw | 0.3 to 1 ms; 2.4 × on the surface pass | Truong and Yuksel 2018; Oliveira and Paiva 2022 |
+| 5 | The draw by the alive count: `glDrawArraysIndirect` with the count the emission's head gives, so the vertex shader runs for the particles there are, not for every slot of the ring | the vertex shader over `count` slots a frame | up to the ring's empty share; 0 once it wraps | the code: the draw over `count` |
+| 6 | The ring sorted by the Morton order of the particles' cells now and then (a bitonic sort in compute), so a group's particles read the same velocity texels | the advection, 0.2 ms a million                      | under 0.5 ms at the baseline; 1.5 to 2 × at 8 M and more | a 3.2 × gain from sorting in a molecular-dynamics benchmark (NVIDIA forum); Morton-sorted SPH |
 
-### Outside the fluid
+### What sets the p95
 
-| Change | Its share now | Expected back | Source |
-|--------|---------------|---------------|--------|
-| `Render update`'s spikes: a py-spy profile of the CPU side of the render during a particle run, the p95 20 to 29 ms against a mean of 8 to 11 | the frame's p95 | the p95 to the mean, about 15 ms | measured here |
+Not the fluid: `Render update`, the CPU side of the render, spikes to a p95 of 20 to 29 ms in the
+particle runs against 9 to 10 in the grid's, with a mean of 8 to 11. A py-spy profile of a particle
+run finds the call; the p95 then falls to the mean, about 15 ms.
 
 Sources: [McAdams, Sifakis, Teran 2010](https://pages.cs.wisc.edu/~sifakis/project_pages/mgpcg.html);
 [Glimberg et al. 2009](https://diglib.eg.org/items/22d6a58b-5efa-4cc9-b204-24bbbe2b4108/full);
 [a multigrid against Jacobi write-up](https://gist.github.com/61315/55f11aba9ba77c76aeb8f004e58f650f);
-[Lentine, Zheng, Fedkiw 2010](https://history.siggraph.org/?p=105932);
-[Kashefi and Staples, coarse grid projection](https://ar5iv.labs.arxiv.org/html/1212.0922);
 [Pyroclast, red-black Gauss–Seidel](https://arxiv.org/pdf/2603.14040);
 [Astaroth, Poisson solvers](https://arxiv.org/pdf/2605.03563);
+[FLIP on CPU and GPU](https://arxiv.org/pdf/2404.01931);
 [3.5D blocking, Intel 2010](https://ieeexplore.ieee.org/document/5645463/keywords);
 [compressible flow on GPUs, Aalto](https://ar5iv.arxiv.org/html/1707.08900);
 [Wu et al. 2018, sparse volumes](https://people.csail.mit.edu/kuiwu/gvdb_sim.html);
@@ -242,7 +240,7 @@ Sources: [McAdams, Sifakis, Teran 2010](https://pages.cs.wisc.edu/~sifakis/proje
 ## Open
 
 - The blobs' and the surface's p95: a sprite that grows to twice `radius` on a strong drop fills
-  four times the pixels. A smaller `radius`, or the cap at less than twice, is the knob, judged on
-  the look.
+  four times the pixels. The cut at 2 sigma and the lower cap ([The particles](#the-particles-1), 3)
+  are the fix, judged on the look.
 - The run-to-run spread of the pose's load, 1 to 1.5 ms of the step between two runs of one
   configuration: the person detection's rate is not fixed.
