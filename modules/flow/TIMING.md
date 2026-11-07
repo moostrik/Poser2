@@ -248,6 +248,9 @@ against the code before.
 | 11 | `overlap` `WEIGHTED`, weighted blended order-independent transparency, an option | particles draw, 2 M points | 2.98 | 1.32 | 2.68 | 0.30 | yes | 0.25 of 255 in the mean against `OCCLUDED` | option |
 |   |                                 | particles march      | 0.40   | 0.21   | 0.41         | 0.01  | yes    |                             |             |
 |   |                                 | the step             | 8.77   | 6.41   | 8.47         | 0.30  | yes    |                             |             |
+| 12 | one-pixel points rasterized in compute, a half-float vector atomic add into the slices | particles draw, 2 M points | 2.70 | 3.14 | 2.73 | 0.03 | no: slower | 0.1 to 0.5 of 255 in the mean | dropped |
+| 13 | the surface's filter, a run of 256 pixels read once into shared memory | particles march, 100 k spheres | 0.70 | 0.89 | 0.70 | 0.00 | no: slower | 0.1 to 1.1 of 255 in the mean | dropped |
+| 14 | the ring sorted by Morton order |                     |        |        |              |       |        |                             | not built   |
 
 Item 2 was slower in both forms, one thread a block (3.84 ms) and one workgroup a block (3.49): on the
 recording the density fills most blocks, so the skip saves little and its pass and branch cost more. The
@@ -283,6 +286,19 @@ Item 11 draws into three 4K targets in one pass where `OCCLUDED` draws into 16 l
 (1 GB) and marches them: the draw halves and the march halves. Its order is a weight by depth, not the
 slices', so where ink is thick and near ink should hide far ink it differs; on the recording's thin ink it
 is 0.25 of 255 from the slices. An option, the preset keeps `OCCLUDED`.
+
+Item 12 was slower: the draw's time is not the rasterizer's setup of 2 M points but the 16 slices' clear
+and the sum into them, which the atomics make no cheaper; the streaks were not tried after it. `WEIGHTED`
+(item 11) is what removes the slices.
+
+Item 13 was slower in its cheap form, the texture's cache already serving the filter's reads; the
+narrow-range filter and the narrow band were not built: the surface's whole filter and shade take 0.7 ms
+at its budget of 100 k, so the most either could give back is a fraction of that, and the narrow-range
+filter is a different look, a choice for the eye.
+
+Item 14 was not built: the advection it would speed takes 0.33 ms at 2 M points and 0.05 at the blobs'
+and the surface's 100 k, under what a GPU sort of 2 M keys costs itself, and a sorted ring needs the fade
+by each particle's age, not its slot.
 
 ### What sets the p95
 

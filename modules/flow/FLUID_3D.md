@@ -376,7 +376,7 @@ made.
 | 6    | Built, [MacCormack](#maccormack) | a drop's ring keeps turning; a thin thread stays thin; the step's GPU time |
 | 7    | Built, [the particles](#step-7-the-particles); the weight (the splat back for the buoyancy) to come | a drop reads as a drop next to the grid's; 4K without sparkle at 60 fps |
 | 8    | A better 4K upscale, parked ([Step 8](#step-8-the-4k-upscale-parked)) | the edges at 2160 × 3840 |
-| 9    | Faster, one change at a time ([Step 9](#step-9-faster)), to be reviewed | the pass's GPU time, the physics and the picture the same |
+| 9    | Faster, one change at a time ([Step 9](#step-9-faster)), done | the pass's GPU time, the physics and the picture the same |
 
 ### MacCormack
 
@@ -571,6 +571,10 @@ Beside 5 and 6, the memory a step: the bytes read and written per cell by every 
 the shaders before and after, since the passes are bandwidth-bound and the three force and curl
 volumes (24 bytes a cell) exist only between passes. A winning solver becomes the preset's
 `pressure.solver` too. Each kept item is one commit, none pushed.
+
+What each came to, measured, is [TIMING.md's Measured](TIMING.md#measured): kept as replacements 1, 3, 5,
+9 and 10; options 6 (`SOR`), 7 (`MULTIGRID`, the preset's) and 11 (`WEIGHTED`); dropped 2, 12 and 13,
+slower; not built 4 and 14, for the reasons there; 8 a plan.
 
 The panel gains at most three options from it: `pressure.solver`, `overlap`'s `WEIGHTED`, and the
 surface's filter if it comes. Everything else is the same picture faster, and leaves no trace but
