@@ -155,6 +155,7 @@ class Fluid3DSettings(BaseSettings):
     time_step: Field[TimeStepMode]  = Field(TimeStepMode.MEASURED,                  description="Step by the measured render rate, or by a fixed rate")
     fixed_fps: Field[float]         = Field(60.0,   min=1.0,    max=240.0,              description="Steps per second in fixed mode (fps)")
     fps_smoothing: Field[float]     = Field(1.0,    min=0.0,    max=10.0,               description="Smoothing of the measured rate in measured mode (s); 0 follows each frame")
+    time_scale: Field[float]        = Field(1.0,    min=0.05,   max=2.0,    step=0.05,  description="The fluid's time as a share of real time; 0.5 = everything at half speed, 1 = real time")
     speed: Field[float]             = Field(1.0,    min=0.0,    max=5.0,    description="Base fluid transport rate")
     advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,              description="How the fields are carried: MacCormack keeps swirls and edges, at about twice the reads")
 

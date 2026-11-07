@@ -643,7 +643,9 @@ class Fluid3D:
 
     def _step_time(self, dt: float) -> None:
         s = self.settings
-        self._dt = self._time_step.update(s.time_step, dt, s.fixed_fps, s.fps_smoothing)
+        # the fluid's own time: every pass steps by it, the injections' sources and the drag included, so at
+        # time_scale 0.5 the whole fluid runs at half speed and keeps its shapes
+        self._dt = self._time_step.update(s.time_step, dt, s.fixed_fps, s.fps_smoothing) * s.time_scale
 
     @staticmethod
     def _align32(v: int) -> int:
