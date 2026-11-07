@@ -1,0 +1,29 @@
+#version 460 core
+
+/*
+ * InjectAmount3D - a 2D source's amount (its alpha) into a one-channel volume, in the gaussian slab around
+ * uTargetLayer, as Inject3D adds the whole RGBA. The source is read by uv, so the volume may be finer.
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(binding = 0) uniform sampler2D uInput;      // RGBA: the amount times the color, the amount as alpha
+layout(r16f, binding = 0) uniform image3D uVolume;
+
+uniform float uTargetLayer;  // normalized depth [0, 1] of the slab's center
+uniform float uSpread;       // the gaussian's sigma in normalized depth
+uniform float uStrength;
+uniform ivec3 uSize;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(gid, uSize))) return;
+    float z_norm = (float(gid.z) + 0.5) / float(uSize.z);
+    float target = (0.5 + uTargetLayer * (float(uSize.z) - 1.0)) / float(uSize.z);
+    float dz = (z_norm - target) / max(uSpread, 0.001);
+    float weight = exp(-0.5 * dz * dz) * uStrength;
+    if (weight < 0.001) return;
+    vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
+    float amount = texture(uInput, uv).a * weight;
+    imageStore(uVolume, gid, vec4(imageLoad(uVolume, gid).r + amount, 0.0, 0.0, 0.0));
+}

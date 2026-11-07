@@ -1,5 +1,5 @@
-"""The density on the grid: an RGBA16F `GL_TEXTURE_3D`, the simulation's size or `density.size` times finer
-in x and y, carried by the fluid's advection and marched front to back into the output (`Composite3D`)."""
+"""The density on the grid: an RGBA16F `GL_TEXTURE_3D` on the simulation's grid, carried by the fluid's advection
+and marched front to back into the output (`Composite3D`)."""
 
 from OpenGL.GL import GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, glMemoryBarrier
 
@@ -14,7 +14,7 @@ _BARRIER_IMAGE: int = int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 
 
 class GridDensity(DensityCarrier):
-    """The grid carrier: the density a volume on the simulation's grid, `density.size` times finer in x and y."""
+    """The grid carrier: the density a volume on the simulation's grid."""
 
     def __init__(self, settings: Fluid3DSettings, advection: FieldAdvection) -> None:
         self.settings: Fluid3DSettings = settings
@@ -27,8 +27,7 @@ class GridDensity(DensityCarrier):
         self._composite_shader: Composite3D = Composite3D()
 
     def allocate(self, width: int, height: int, layers: int, output_width: int, output_height: int) -> None:
-        size: int = max(1, self.settings.density.size)
-        self._density.allocate(width * size, height * size, layers, GL_RGBA16F)
+        self._density.allocate(width, height, layers, GL_RGBA16F)
         self._z_extent = layers / max(1, width)
         self._inject_shader.allocate()
         self._composite_shader.allocate()

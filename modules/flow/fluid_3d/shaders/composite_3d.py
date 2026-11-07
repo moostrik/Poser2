@@ -11,7 +11,8 @@ class Composite3D(ComputeShader):
     the water's tint and fog. The output may be larger than the volume; the volume is sampled by uv."""
 
     def use(self, density: Texture3D, output_2d: Texture, *,
-            emission: float, absorption: float, tint: float, fog: float, glow: float) -> None:
+            emission: float, absorption: float, tint: float, fog: float, glow: float,
+            color: Texture3D | None = None) -> None:
         """Composite the density volume into the 2D output, one march step per layer.
 
         Args:
@@ -22,6 +23,7 @@ class Composite3D(ComputeShader):
             tint: 0..1 mix toward per-channel water extinction (red dies first)
             fog: Medium extinction over the full depth
             glow: 0 = occluded volumetric, 1 = additive
+            color: With it, `density` is the amount alone and its color is this volume's (color × amount, amount)
         """
         if not self.allocated or not self.shader_program:
             return
@@ -38,5 +40,8 @@ class Composite3D(ComputeShader):
         glUniform1f(self.get_uniform_loc("uTint"), tint)
         glUniform1f(self.get_uniform_loc("uFog"), fog)
         glUniform1f(self.get_uniform_loc("uGlow"), glow)
+        glUniform1i(self.get_uniform_loc("uSplit"), int(color is not None))
+        if color is not None:
+            self.bind_texture_3d(1, color, "uColor")
 
         self.dispatch(output_2d.width, output_2d.height)

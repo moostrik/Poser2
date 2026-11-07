@@ -3,12 +3,12 @@
 Every field is a GL_TEXTURE_3D on one grid of cubic cells: the velocity (RGBA16F), the temperature
 and the pressure (R16F) and the obstacle (R8) at the simulation's size, `layers` deep. The
 density is its carrier's (`density.carrier`): the grid's (`GridDensity`, RGBA16F, its color baked in at
-injection, on the same grid or `density.size` times finer in x and y, sampled by uv wherever a pass reads
+injection, on the same grid; `OutputDensity`, its amount at the output's x and y, sampled by uv wherever a pass reads
 it against the simulation's fields) or particles' (`ParticleDensity`), moved through the same velocity.
 
 Pipeline:
-    1. Dampen velocity (magnitude clamping)
-    2. Advect velocity (3D self-advection; every advection semi-Lagrangian or MacCormack, `advection`)
+    1. Advect velocity (3D self-advection, the dampen on its result; every advection semi-Lagrangian or MacCormack, `advection`)
+    2. (the dampen is the advection's)
     3. Apply viscosity (3D Jacobi diffusion solver)
     4. Confine vorticity (3D curl + confinement force)
     5. Advect temperature
@@ -43,6 +43,7 @@ from ..flow_util import FlowUtil
 from ..port import Port, TextureKind
 from ..time_step import REFERENCE_STEP, TimeStep, viscosity_iterations
 from .density_carrier import CarrierStep, DensityCarrier
+from .output_density import OutputDensity
 from .field_advection import FieldAdvection
 from .grid_density import GridDensity
 from .particle_density import ParticleDensity
@@ -139,6 +140,7 @@ class Fluid3D:
 
         # The slab's thickness in width units: cubic cells, so layers / width (advection: uRdx.z = 1/z_extent)
         self._z_extent: float = 1.0
+        self._depth_scale: float = 1.0      # the body's z to the box's: its depth over the smaller of its width and height
 
         self._has_obstacles: bool = False
 
@@ -164,6 +166,7 @@ class Fluid3D:
         self._advection: FieldAdvection = FieldAdvection()
         self._grid_density: GridDensity = GridDensity(self.settings, self._advection)
         self._particle_density: ParticleDensity = ParticleDensity(self.settings)
+        self._output_density: OutputDensity = OutputDensity(self.settings, self._advection)
         self._no_density: Texture3D = Texture3D()
         # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds = obstacle
         self._obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
@@ -199,7 +202,7 @@ class Fluid3D:
         # Bind settings actions
         self.settings.bind(Fluid3DSettings.layers, lambda _: self._request_reallocate())
         reallocate_carrier = lambda _: setattr(self, '_carrier_pending', True)
-        for field in (DensitySettings.size, DensitySettings.carrier):
+        for field in (DensitySettings.layers, DensitySettings.carrier):
             self.settings.density.bind(field, reallocate_carrier)
         for field in (ParticleSettings.count, ParticleSettings.slices):
             self.settings.particles.bind(field, reallocate_carrier)
@@ -261,6 +264,7 @@ class Fluid3D:
         self._cell = 1.0 / max(1, self._simulation_width)
         self._depth = self.settings.layers
         self._z_extent = self._depth / max(1, self._simulation_width)
+        self._depth_scale = self._depth / max(1, min(self._simulation_width, self._simulation_height))
 
     def _spread(self) -> float:
         """The injection's gaussian sigma as a share of the slab's depth, from `injection_spread` in widths."""
@@ -269,11 +273,14 @@ class Fluid3D:
     @property
     def _carrier(self) -> DensityCarrier:
         """The density's carrier, by `density.carrier`."""
-        return self._particle_density if self.settings.density.carrier == Carrier.PARTICLES else self._grid_density
+        carrier: Carrier = self.settings.density.carrier
+        if carrier == Carrier.PARTICLES:
+            return self._particle_density
+        return self._output_density if carrier == Carrier.OUTPUT else self._grid_density
 
     def _allocate_carrier(self) -> None:
         """(Re)allocate the carrier `density.carrier` names on the simulation's grid, the other one released."""
-        for carrier in (self._grid_density, self._particle_density):
+        for carrier in (self._grid_density, self._particle_density, self._output_density):
             carrier.deallocate()
         self._carrier.allocate(self._simulation_width, self._simulation_height, self._depth,
                                self._output_width, self._output_height)
@@ -308,7 +315,7 @@ class Fluid3D:
         for timer in self._pass_timers.values():
             timer.deallocate()
         self._velocity.deallocate()
-        for carrier in (self._grid_density, self._particle_density):
+        for carrier in (self._grid_density, self._particle_density, self._output_density):
             carrier.deallocate()
         self._no_density.deallocate()
         self._temperature.deallocate()
@@ -656,8 +663,10 @@ class Fluid3D:
     def drag_velocity(self, texture: Texture, weight: float = 1.0) -> None:
         """The boundary: drag the velocity in the gaussian birth slab toward the body's velocity (x, y on
         the image plane, z toward the camera; widths/s) × boundary.gain, over boundary.drag_time, where
-        the body moves (its speed above DRAG_FLOOR), never past it. The volume's w is -z: +W moves fluid
-        away from the viewer (layer 0 is the front face). Without depth, z is 0, and so is w.
+        the body moves (its speed above DRAG_FLOOR), never past it. The volume's w is -z × the depth scale:
+        the box's depth stands for as much real depth as the smaller of its width and height, so z is
+        scaled by its depth over that; +W moves fluid away from the viewer (layer 0 is the front face).
+        Without depth, z is 0, and so is w.
         """
         if not self._allocated:
             return
@@ -666,7 +675,7 @@ class Fluid3D:
             texture, self._velocity,
             self.settings.volume.injection_layer,
             self._spread(),
-            boundary.gain, drag_share(self._dt, boundary.drag_time), weight, DRAG_FLOOR,
+            boundary.gain, drag_share(self._dt, boundary.drag_time), weight, DRAG_FLOOR, self._depth_scale,
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
@@ -679,7 +688,7 @@ class Fluid3D:
             texture, self._velocity,
             self.settings.volume.injection_layer,
             self._spread(),
-            weight * self.settings.body_force.gain * self._dt,
+            weight * self.settings.body_force.gain * self._dt, self._depth_scale,
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 

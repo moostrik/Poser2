@@ -1,0 +1,29 @@
+#version 460 core
+
+/*
+ * VelocityAverage3D - the velocity averaged in z over the grid's layers each of uLayers coarser layers spans,
+ * on the grid's x and y: what an OUTPUT density layer moves with. A grid layer a layer boundary cuts is
+ * weighted by its share.
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(rgba16f, binding = 0) readonly uniform image3D uVelocity;
+layout(rgba16f, binding = 1) writeonly uniform image3D uAverage;
+
+uniform ivec3 uSize;      // the velocity's
+uniform int   uLayers;    // the average's layers
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(gid, ivec3(uSize.xy, uLayers)))) return;
+    float per = float(uSize.z) / float(uLayers);      // grid layers a layer spans
+    float low = float(gid.z) * per;
+    float high = low + per;
+    vec4 sum = vec4(0.0);
+    for (int z = int(floor(low)); z < int(ceil(high)) && z < uSize.z; z++) {
+        float share = min(high, float(z + 1)) - max(low, float(z));
+        sum += share * imageLoad(uVelocity, ivec3(gid.xy, z));
+    }
+    imageStore(uAverage, gid, sum / per);
+}

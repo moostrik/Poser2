@@ -544,8 +544,8 @@
       "velocity": {
         "self_advection": 1.0,
         "fade_time": 60.0,
-        "dampen_threshold": 50.0,
-        "dampen_time": 2.0,
+        "dampen_threshold": 3.0,
+        "dampen_time": 0.5,
         "vorticity": 1.69,
         "vorticity_radius": 1.0,
         "viscosity": 0.0,
@@ -555,7 +555,8 @@
         "boundary_gain": 1.0,
         "body_force_gain": 1.0,
         "carrier": "PARTICLES",
-        "size": 1,
+        "layers": 16,
+        "sample": "AVERAGE",
         "fade_time": 60.0,
         "evaporation": 0.0,
         "wall": "CLOSED"

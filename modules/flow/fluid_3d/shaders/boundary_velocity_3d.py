@@ -19,7 +19,7 @@ class BoundaryVelocity3D(ComputeShader):
         super().__init__()
 
     def use(self, velocity: Texture, volume: Texture3D, target_layer: float, spread: float,
-            gain: float, share: float, weight: float, floor: float) -> None:
+            gain: float, share: float, weight: float, floor: float, depth_scale: float = 1.0) -> None:
         """Drag the volume toward the body's velocity.
 
         Args:
@@ -31,6 +31,7 @@ class BoundaryVelocity3D(ComputeShader):
             share: 1 − exp(−dt / drag_time), the step's share of the gap
             weight: The injection's weight, 0 to 1
             floor: widths/s, the body's speed below which it drags nothing
+            depth_scale: The body's z times this is the water's: the box's depth over the smaller of its width and height
         """
         if not self.allocated or not self.shader_program:
             return
@@ -49,6 +50,7 @@ class BoundaryVelocity3D(ComputeShader):
         glUniform1f(self.get_uniform_loc("uShare"), share)
         glUniform1f(self.get_uniform_loc("uWeight"), weight)
         glUniform1f(self.get_uniform_loc("uFloor"), floor)
+        glUniform1f(self.get_uniform_loc("uDepthScale"), depth_scale)
         glUniform3i(self.get_uniform_loc("uSize"),
                     volume.width, volume.height, volume.depth)
 

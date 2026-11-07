@@ -23,9 +23,17 @@ class PressureSolver(IntEnum):
 
 
 class Carrier(IntEnum):
-    """What carries the density: the grid's volume, or particles moved through the grid's velocity."""
+    """What carries the density: the grid's volume, particles moved through the grid's velocity, or a volume at
+    the output's resolution."""
     GRID = 0
     PARTICLES = 1
+    OUTPUT = 2              # the amount at the output's x and y and density.layers, the color on the grid
+
+
+class DensitySample(IntEnum):
+    """Which velocity moves an OUTPUT density layer that spans several of the grid's layers."""
+    MIDDLE = 0              # the velocity at the layer's middle
+    AVERAGE = 1             # the velocity averaged over the grid's layers the layer spans
 
 
 class ParticleDraw(IntEnum):
@@ -73,8 +81,8 @@ class VelocitySettings(BaseSettings):
     """Velocity field parameters."""
     self_advection: Field[float]    = Field(1.0,    min=0.0,    max=1.0,    color="blue-grey",      description="How far the velocity carries itself per step; 1 = the full step, the physics")
     fade_time: Field[float]         = Field(60.0,   min=0.1,    max=60.0,   color="deep-blue",      description="Seconds until velocity fades to ~1%; 60 = water keeps its momentum")
-    dampen_threshold: Field[float]  = Field(50.0,   min=0.1,    max=50.0,   color="cyan",           description="Speed above which velocity is dampened (widths/s); a guard far above any body")
-    dampen_time: Field[float]       = Field(2.0,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")
+    dampen_threshold: Field[float]  = Field(3.0,    min=0.1,    max=50.0,   color="cyan",           description="Speed above which velocity is dampened (widths/s); a guard just above the fastest body")
+    dampen_time: Field[float]       = Field(0.5,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")
     vorticity: Field[float]         = Field(0.3,    min=0.0,    max=5.0,    color="purple",         description="Vortex confinement's epsilon, its force epsilon × cell × (N × curl) (Fedkiw 2001)")
     vorticity_radius: Field[float]  = Field(1.0,    min=1.0,    max=8.0,    color="deep-purple",    description="Curl sampling radius in cells; 1 = the neighbors")
     viscosity: Field[float]         = Field(0.0,    min=0.0,    max=0.01,   step=0.0001, color="indigo", description="Kinematic viscosity (widths² per second); 0 = water at this scale")
@@ -85,8 +93,9 @@ class DensitySettings(BaseSettings):
     """Density field parameters."""
     boundary_gain: Field[float]     = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The boundary's density times this is added × dt; 1 = one unit per width of travel")
     body_force_gain: Field[float]   = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's density times this is added × dt; 1 = one unit per width/s of Δv")
-    carrier: Field[Carrier]         = Field(Carrier.GRID,                                           description="What carries the density: the grid's volume or particles")
-    size: Field[int]                = Field(1,      min=1,      max=4,                              description="The density grid's x and y size as a multiple of the simulation's; 1 = one grid")
+    carrier: Field[Carrier]         = Field(Carrier.GRID,                                           description="What carries the density: the grid's volume, particles, or a volume at the output's resolution")
+    layers: Field[int]              = Field(16,     min=4,      max=256,    step=4,                 description="OUTPUT: the density's layers in z, over the grid's depth")
+    sample: Field[DensitySample]    = Field(DensitySample.AVERAGE,                                  description="OUTPUT: the velocity at a layer's middle, or averaged over the grid's layers it spans")
     fade_time: Field[float]         = Field(60.0,   min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%; 60 = ink stays")
     evaporation: Field[float]       = Field(0.0,    min=0.0,    max=2.0,    color="grey",           description="Density removed per second; clears low-level haze (0 = off)")
     wall: Field[WallMode]           = Field(WallMode.CLOSED,                                        description="Open: density absorbed at the walls. Closed: density reflects")

@@ -23,6 +23,7 @@ layout(rgba16f, binding = 0) uniform image3D uVolume;
 uniform float uTargetLayer;  // Normalized depth [0, 1] — center of the slab
 uniform float uSpread;       // Gaussian sigma in normalized depth units
 uniform float uStrength;     // weight * gain * dt
+uniform float uDepthScale;   // the body's z over the box's: its depth over the smaller of its width and height
 uniform ivec3 uSize;
 
 void main() {
@@ -39,7 +40,7 @@ void main() {
     vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
     vec3 acceleration = texture(uInput, uv).xyz;
 
-    vec3 add = vec3(acceleration.xy, -acceleration.z) * uStrength * slab;
+    vec3 add = vec3(acceleration.xy, -acceleration.z * uDepthScale) * uStrength * slab;
     if (dot(abs(add), vec3(1.0)) < 1e-7) return;
 
     vec4 current = imageLoad(uVolume, gid);

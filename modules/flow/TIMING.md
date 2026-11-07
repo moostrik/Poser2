@@ -352,6 +352,29 @@ Sources: [McAdams, Sifakis, Teran 2010](https://pages.cs.wisc.edu/~sifakis/proje
 [sorting particles by a space-filling curve](https://forums.developer.nvidia.com/t/fast-texture-fetching-an-algorithm-for-fast-texture-fetching/5489);
 [StarsX/Smoke3D, a compute-shader 3D smoke](https://github.com/StarsX/Smoke3D).
 
+## The density at the output's 4K
+
+Step 10's `OUTPUT` carrier ([FLUID_3D.md](FLUID_3D.md#step-10-the-densitys-detail)): the amount at 2160 × 3840 ×
+`density.layers`, the color on the fluid's grid, `density.sample` `AVERAGE`; the fluid at 448 × 800, the preset's
+other settings, the pose on, one 60 s run each after 10 s. Semi-Lagrangian, with the depth scale and the dampen
+at 3 widths/s:
+
+| Fluid layers | Density layers | The step     | pressure    | density     | composite   | The frame              |
+|--------------|----------------|--------------|-------------|-------------|-------------|------------------------|
+| 16           | 16             | 3.70 / 4.67  | 0.98 / 1.41 | 1.29 / 1.74 | 0.92 / 1.32 | 6.58 / 8.46, 152 fps   |
+| 16           | 8              | 2.69 / 3.53  | 0.96 / 1.40 | 0.78 / 1.17 | 0.48 / 0.78 | 5.51 / 7.86, 181 fps   |
+| 32           | 32             | 6.96 / 8.68  | 1.87 / 2.38 | 2.48 / 3.34 | 1.65 / 2.65 | 11.38 / 15.03, 88 fps  |
+| 32           | 16             | 5.74 / 7.43  | 2.25 / 3.24 | 1.61 / 2.43 | 0.80 / 1.21 | 9.05 / 11.49, 110 fps  |
+| 48           | 48             | 11.84 / 17.45 | 3.35 / 4.82 | 4.56 / 10.46 | 2.31 / 3.60 | 19.26 / 31.62, 52 fps |
+| 48           | 24             | 9.50 / 12.31 | 4.12 / 5.75 | 2.41 / 3.89 | 1.24 / 2.05 | 15.11 / 24.46, 66 fps  |
+| 64           | 64             | 14.60 / 18.22 | 4.63 / 6.25 | 5.29 / 7.83 | 2.81 / 3.39 | 20.90 / 25.78, 48 fps |
+| 64           | 32             | 11.60 / 12.97 | 5.25 / 6.49 | 2.95 / 4.20 | 1.42 / 1.75 | 15.99 / 18.31, 63 fps |
+
+Within 60 fps: up to 32 fluid layers with the density at 32, or 48 and 64 with the density at half. The density's
+4K × 16 costs 1.3 ms to carry and 0.9 to march, the old 16-layer look's 2 GB a step now under a quarter of it.
+MacCormack, timed before the depth scale while the water still burst, took 9.1 ms a frame at 16 and 16 and was
+over the budget from 32 fluid layers up; its cost is in [FLUID_3D.md's Later](FLUID_3D.md#later).
+
 ## Open
 
 - The blobs' and the surface's p95: a sprite that grows to twice `radius` on a strong drop fills

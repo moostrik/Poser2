@@ -14,7 +14,7 @@ A step (`Fluid3D.update`), in order, at the preset (`apps/deep_flow/data/setting
 
 | Pass        | What                                                                                  | On                    | Depends on the input |
 |-------------|---------------------------------------------------------------------------------------|-----------------------|----------------------|
-| advect_vel  | self-advection by `advection`, `self_advection` 1, fade 60 s; on its result the dampen, a drag on the speed above `dampen_threshold` (50 widths/s) over `dampen_time` (2 s) | velocity 256×448×128 | the trace distance |
+| advect_vel  | self-advection by `advection`, `self_advection` 1, fade 60 s; on its result the dampen, a drag on the speed above `dampen_threshold` (3 widths/s) over `dampen_time` (0.5 s) | velocity 256×448×128 | the trace distance |
 | viscosity   | Jacobi diffusion, off (`viscosity` 0)                                                 | velocity              | no                   |
 | vorticity   | the curl, then the confinement force × dt added to the velocity in the same pass       | velocity, curl        | no                   |
 | advect_temp | off: `buoyancy` 0 clears the temperature once, and nothing is injected into it  | temperature           | the trace distance   |
@@ -27,33 +27,33 @@ Every field is a `GL_TEXTURE_3D` on one grid of cubic cells at the stage's size,
 `layers` 128: the velocity RGBA16F, the temperature R16F and the pressure R32F, the density
 RGBA16F with its color baked in, each a swap pair, the obstacle R8. The simulation's cell is 1/256
 width in x, y and z, so the slab is 128 / 256 = 0.5 widths deep (`_z_extent`). The grid is the one
-that holds 60 fps in deep_flow with the pose on the same GPU ([TIMING.md](TIMING.md#the-grid)). The density is on the same
-grid, or `density.size` times finer in x and y (1, 2 or 4): every pass that reads the velocity or
-the obstacle against it samples by uv, so the shaders are the same (`advect_3d`, `inject_3d`,
-`buoyancy_3d`). The composite reads the volume at the output's 2160 × 3840 and upsamples it
-bilinearly. The monitors read every field as it is. The GPU is a 24 GB RTX 4090, so nothing pages.
-
-| `layers` | `density.size` | density, one buffer | step, GPU ms |
-|----------|----------------|---------------------|--------------|
-| 64       | 1              | 448 × 800 × 64, 0.18 GB | 6.6      |
-| 64       | 2              | 896 × 1600 × 64, 0.73 GB | 7.2     |
-| 24       | 4              | 1792 × 3200 × 24, 1.1 GB | 4.8     |
-
-The step's GPU time at 448 × 800, measured in a hidden window on a swirl at the preset's passes, the
-composite at 2160 × 3840; every pass's time in the app is in [TIMING.md](TIMING.md). `layers` is the knob if it is too much; `density.size` 4 is the 4K look on the same
-path, with the z lerp across coarse layers and the scattered reads of a big volume.
+that holds 60 fps in deep_flow with the pose on the same GPU ([TIMING.md](TIMING.md#the-grid)). The density is its carrier's
+(`density.carrier`): `GRID` on the same grid, `OUTPUT` its amount at the output's 2160 × 3840 and
+`density.layers` with its color on the grid ([Step 10](#step-10-the-densitys-detail)), or `PARTICLES`. Every pass
+that reads the velocity or the obstacle against the density samples by uv, so the shaders are the same
+(`advect_3d`, `inject_3d`, `buoyancy_3d`). The composite reads the volume at the output's 2160 × 3840. The monitors
+read every field as it is. The GPU is a 24 GB RTX 4090, so nothing pages. Every pass's time is in
+[TIMING.md](TIMING.md).
 
 What the layer injects before the step (`Fluid3DLayer._inject`), each at the injection's `weight`,
 into the gaussian slab at `injection_layer` 0.5, `injection_spread` 0.075 widths:
 
 | Input                          | The fluid                                                            | Shader                       |
 |--------------------------------|----------------------------------------------------------------------|------------------------------|
-| `boundary_velocity`            | dragged toward, [The drag](#the-drag), w = −z                        | `boundary_velocity_3d`       |
-| `body_force_acceleration`      | added × `body_force.gain` × dt, w = −z                               | `body_force_acceleration_3d` |
+| `boundary_velocity`            | dragged toward, [The drag](#the-drag), w = −z × the depth scale      | `boundary_velocity_3d`       |
+| `body_force_acceleration`      | added × `body_force.gain` × dt, w = −z × the depth scale              | `body_force_acceleration_3d` |
 | `boundary_density` (RGBA)      | added × `density.boundary_gain` × dt                                 | `inject_3d`                  |
 | `body_force_density` (RGBA)    | added × `density.body_force_gain` × dt                               | `inject_3d`                  |
 | `boundary_temperature`         | added × `temperature.boundary_gain` × dt                             | `inject_3d`                  |
 | `body_force_temperature`       | added × `temperature.body_force_gain` × dt                           | `inject_3d`                  |
+
+The depth scale is the box's depth over the smaller of its width and height (`layers` / 448 at 448 × 800,
+0.07 at 32 layers, 0.5 at 256 × 448 × 128): the box's depth stands for as much real depth as its width does, so
+a body moving toward the camera crosses the box's depth in the time the same speed crosses its width. At one
+scale with x and y, a near hand's real 2–3 m/s pushed water the box could not hold, and the projection turned
+it sideways: on standmoves at 448 × 800 × 32 the water reached 5.2 widths/s, scaled 1.7, no step above 2. The
+velocity's dampen is the guard just above the fastest body, 3 widths/s over 0.5 s; on stillslowfast it changes
+nothing.
 
 The velocity is in image widths per second, as the bridge's; the advection moves a texel by
 velocity × dt × `speed` (1) in uv, so 1 width/s crosses the width in 1 s.
@@ -298,7 +298,7 @@ as a tuning:
 | `speed`                                                                          | 1               | the density moves with the water        |
 | `velocity.self_advection`                                                        | 1               | the velocity carries itself the full step |
 | `width`, `height`, `layers`                                                      | 256, 448, 128   | half a width deep, within 60 fps        |
-| `density.size`                                                                   | 1               | the density on the simulation's grid    |
+| `density.carrier`                                                                | `GRID`          | the density on the simulation's grid    |
 | `volume.injection_layer`, `volume.injection_spread`                              | 0.5, 0.075      | the body mid-volume, 0.3 widths thick   |
 | `wall` (every field, the volume)                                                 | closed          | as his settings                         |
 
@@ -306,7 +306,7 @@ The fields' physics take the textbook's water, with no artificial decay or thick
 holds them: the velocity's `fade_time` 60 s (it keeps its momentum), `viscosity` 0 (water at this
 scale), `pressure.iterations` 40 (GPU Gems' 40 to 80 for a Jacobi solve), the density's `fade_time`
 60 s and `evaporation` 0, `temperature.sink` 0 and `ambient` 0 (the density as heavy as the water,
-no buoyancy), gravity down the screen, every wall closed; the dampen a guard at 50 widths/s; the
+no buoyancy), gravity down the screen, every wall closed; the dampen a guard just above the fastest body, 3 widths/s over 0.5 s; the
 bridge's mix the boundary's trail alone and its lowpass's `smooth` its default 160 ms, since the
 coast is the fluid's now; the confinement Fedkiw's ε 0.3 over the neighbors (`vorticity_radius` 1);
 in z, `injection_layer` 0.5 and `injection_spread` 0.075 widths, a body's thickness of about 0.3
@@ -358,6 +358,21 @@ still drops, a `GpuTimer` per pass, in the `GPU fluid` series, at rest, during t
 during a fast arm move; the pass that grows on the burst and not on the arm is the one, and a hard
 top speed ([The guard](#the-guard)) the first thing to try.
 
+## Open: the fluid becomes unstable sometimes
+
+Seen in the app **(site fact)**; not yet reproduced. On standmoves through the harness at 448 × 800 × 32 the
+step grew to 128 ms over the minute while the density filled the box to white, where stillslowfast at the
+same grid steps in 11 ms: a value growing out of range (a half float's infinity, a NaN) would fit both
+**(deduction)**. The check: the harness on standmoves with the velocity's and the density's largest value
+and any non-finite count per step, to find the step and the pass where it starts.
+
+## Open: the water looks too fast
+
+Seen in the app **(site fact)** after the depth scale: everything moves very fast. Measured, the water follows the
+body at 0.8–0.9 of its speed in fast moves, so it is the water's own motion **(deduction)**; the candidates are the
+preset's confinement (1.69, the textbook 0.3), the velocity's fade (60 s, viscosity 0) and MacCormack keeping the
+swirls. Parked for step 10.
+
 ## Open: the projection's floor
 
 The projection's divergence and gradient are central differences on the cell centers, and the solvers
@@ -368,7 +383,7 @@ solve's accuracy then reaches the velocity **(deduction)**. It changes every pas
 
 ## Next
 
-Four steps, discussed one by one before any is built; each gets its decisions here as they are
+Six steps, discussed one by one before any is built; each gets its decisions here as they are
 made.
 
 | Step | What                                                                                     | Judge on                                              |
@@ -377,6 +392,8 @@ made.
 | 7    | Built, [the particles](#step-7-the-particles); the weight (the splat back for the buoyancy) to come | a drop reads as a drop next to the grid's; 4K without sparkle at 60 fps |
 | 8    | A better 4K upscale, parked ([Step 8](#step-8-the-4k-upscale-parked)) | the edges at 2160 × 3840 |
 | 9    | Faster, one change at a time ([Step 9](#step-9-faster)), done | the pass's GPU time, the physics and the picture the same |
+| 10   | The density's detail: the amount at 4K × its own layers, the color on the grid ([Step 10](#step-10-the-densitys-detail)) | the old 16-layer 4K look, in the budget |
+| 11   | The 4K layers' look: depth from the coarse grid ([Step 11](#step-11-the-4k-layers-look)) | near density covering far as finely as the fluid; the depth reads |
 
 ### MacCormack
 
@@ -510,8 +527,9 @@ Parked after steps 6 and 7. What was found:
   of the flat result, and one 4K detail layer advected by the grid's velocity seen from the front
   with a curl noise where the water moves (Kim 2008 in 2D), multiplying the upscaled image so
   detail shows where ink is. The particles stay the other way to 4K in depth.
-- The options, cheapest first: tricubic reads; a finer `density.size` with MacCormack; detail below
-  the grid (the curl noise); an edge curve, a look rather than detail.
+- The options: the density finer than the grid, now [step 10](#step-10-the-densitys-detail); detail below the grid
+  (the curl noise); an edge curve, a look rather than detail. Tricubic reads are dropped: 5 to 10 ms for a
+  smoother upscale is not worth it.
 
 The grid's depth: 256 × 448 × 128, half a width deep, so the body's z motion has room before a wall.
 A coarser grid across buys the depth: the detail it gives up in x and y is what the 4K layer and
@@ -580,7 +598,54 @@ The panel gains at most three options from it: `pressure.solver`, `overlap`'s `W
 surface's filter if it comes. Everything else is the same picture faster, and leaves no trace but
 its row in TIMING.md.
 
+### Step 10: the density's detail
+
+The goal: at the 4K output the density is as fine as the pixels, thin threads and smooth gradients drawn
+out by the motion, never grainy; near density covers far; all of it at 60 fps with the pose running.
+
+The old look was a 2160 × 3840 × 16 density carried by a coarse velocity, the ofxFlowTools recipe in 3D;
+it cost 2 GB of reads and writes a step. This is that look with the color split off, as video splits its
+color (4:2:0): the eye resolves the brightness much finer than the color, and the color never has more
+detail than the bridge's 448 × 800 it comes from.
+
+| Part        | How                                                                                                  |
+|-------------|------------------------------------------------------------------------------------------------------|
+| two volumes | the `OUTPUT` carrier (`OutputDensity`): the color, the grid's RGBA volume (color × amount, the amount); the amount alone (R16F) at the output's 2160 × 3840 and `density.layers` in z, over the same box; at 16 layers 265 MB a buffer |
+| injection   | the bridge's density into both: the RGBA into the color, its amount into the detail's gaussian slab   |
+| a step      | both carried by the velocity, by `advection`; where the detail has fewer layers than the grid, one pass first averages the velocity over each detail layer's thickness and the detail moves with that; the fade and the evaporation as now |
+| composite   | the detail's layers marched at the output: the brightness and the opacity from the detail's amount, the color the color volume's rgb over its amount at the same place |
+| off         | at `size` 1 and the grid's layers the detail is not allocated: the density as today                 |
+| settings    | `density.carrier` `OUTPUT`, `density.layers` and `density.sample` (`MIDDLE` or `AVERAGE`, the velocity a layer spanning several of the grid's moves with); built, timed in [TIMING.md](TIMING.md#the-density-at-the-outputs-4k) |
+| turbulence  | the detail moved by the velocity upsampled plus synthesized turbulence below the grid (wavelet turbulence, Kim et al. 2008): band-limited noise at the detail's scale, its strength from the grid's own turbulence there, so small swirls appear where the water already churns and nowhere else; one setting, its strength, 0 the plain upsampled velocity |
+| storage     | 3D textures, as every field: the advection reads a traced point in one trilinear fetch, z included, and the driver tiles the texels in x, y and z; a texture array filters within a layer only, two fetches and a mix for z, and its layers are tiled apart, which suits drawing into layers (the particles' slices), not tracing through them |
+
+Measured: the step at 4K × 16, 32 and 64 layers, semi-Lagrangian and MacCormack, against the budget,
+in TIMING.md; judged by eye against the old look on standmoves. A second preset, `flat.json`, for this
+look with a velocity grid still to pick (448 × 800 × 64 or 128 × 224 × 16).
+
+### Step 11: the 4K layers' look
+
+How step 10's 4K layers are drawn, using the depth the coarse fluid already simulates (its 128 layers):
+
+| Part       | How |
+|------------|-----|
+| shadows    | the density lit from a direction (above or the side), each point darkened by the density between it and the light, measured through the coarse grid: a thread in front casts onto what is behind it |
+| occlusion  | what covers what measured through the coarse grid's layers, the 4K detail laid over it: the order in depth as fine as the fluid's, the detail 4K × `density.layers` |
+
 ## Later
+
+- A soft limit on the motion's z speed, parked: z as measured to a knee (about 1.5 m/s), compressed above it
+  toward a maximum (about 3 m/s), the speed gate (6 m/s) behind it; a curve per reading, no time filter. To be
+  checked against the spread of z speeds on standmoves and stillslowfast first.
+
+- MacCormack's cost at 4K: a 4K texel reads 41 texels a step against semi-Lagrangian's 16 (the predictor, the
+  velocity again, the forward trace, the cell, the limiter's eight), 3.7 ms for the 4K × 16 density. Two ways
+  down: MacCormack on the velocity and semi-Lagrangian on the 4K density, a setting; or the predictor reading
+  its eight texels itself and keeping their min and max for the limiter, about a fifth less **(deduction)**.
+
+- The density's detail carried by a flow map (BiMocq², Qu et al. 2019): the coordinates moved on the coarse
+  grid and the 4K density read through them, baked every half second; parked, its benefit to be shown first.
+- Vortex particles shed by the body for swirls below the grid (He et al. 2011; Weißmann and Pinkall 2009).
 
 - The 2D fluid modeled after this one: the drag, the two systems, the one grid.
 - hd_trio's `density.fade_time` written per tick from the pose's motion: the 2D fluid's, not here.

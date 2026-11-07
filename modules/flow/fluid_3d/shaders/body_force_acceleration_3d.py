@@ -19,7 +19,7 @@ class BodyForceAcceleration3D(ComputeShader):
         super().__init__()
 
     def use(self, acceleration: Texture, volume: Texture3D, target_layer: float, spread: float,
-            strength: float) -> None:
+            strength: float, depth_scale: float = 1.0) -> None:
         """Add the acceleration into the volume.
 
         Args:
@@ -28,6 +28,7 @@ class BodyForceAcceleration3D(ComputeShader):
             target_layer: Normalized depth [0, 1] — center of the slab
             spread: Gaussian sigma in normalized depth units
             strength: weight × gain × dt
+            depth_scale: The acceleration's z times this is the water's, as the boundary's
         """
         if not self.allocated or not self.shader_program:
             return
@@ -43,6 +44,7 @@ class BodyForceAcceleration3D(ComputeShader):
         glUniform1f(self.get_uniform_loc("uTargetLayer"), target_layer)
         glUniform1f(self.get_uniform_loc("uSpread"), spread)
         glUniform1f(self.get_uniform_loc("uStrength"), strength)
+        glUniform1f(self.get_uniform_loc("uDepthScale"), depth_scale)
         glUniform3i(self.get_uniform_loc("uSize"),
                     volume.width, volume.height, volume.depth)
 

@@ -31,6 +31,7 @@ uniform float uGain;         // The body's velocity times this is the target
 uniform float uShare;        // 1 - exp(-dt / drag_time)
 uniform float uWeight;       // The injection's weight, 0 to 1
 uniform float uFloor;        // widths/s: the body's speed below which it drags nothing
+uniform float uDepthScale;   // the body's z over the box's: its depth over the smaller of its width and height
 uniform ivec3 uSize;
 
 void main() {
@@ -50,7 +51,7 @@ void main() {
     float pull = uShare * g * uWeight * slab;
     if (pull <= 0.0) return;
 
-    vec3 target = vec3(body.xy, -body.z) * uGain;
+    vec3 target = vec3(body.xy, -body.z * uDepthScale) * uGain;
     vec4 current = imageLoad(uVolume, gid);
     current.xyz += (target - current.xyz) * pull;
     imageStore(uVolume, gid, current);

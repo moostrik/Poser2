@@ -11,12 +11,15 @@
  *   tint + fog   far density shifts toward water color and fades
  *
  * Dispatched as a 2D compute (one thread per output pixel). The output may
- * be larger than the volume: the volume is sampled by uv.
+ * be larger than the volume: the volume is sampled by uv. Split, the amount is
+ * one volume and its color another, coarser: the color is the color volume's
+ * color × amount over its amount, at the same place.
  */
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
-layout(binding = 0) uniform sampler3D uDensity;  // RGBA16F
+layout(binding = 0) uniform sampler3D uDensity;  // RGBA16F, or with uSplit the amount alone (R16F)
+layout(binding = 1) uniform sampler3D uColor;    // with uSplit: the color volume, color × amount and the amount
 
 layout(rgba16f, binding = 0) writeonly uniform image2D uOutput;
 
@@ -27,6 +30,7 @@ uniform float uAbsorption;   // Extinction per unit density
 uniform float uTint;         // 0..1 mix toward per-channel water extinction
 uniform float uFog;          // Medium extinction over the full depth
 uniform float uGlow;         // 0 = occluded volumetric, 1 = additive
+uniform bool  uSplit;        // the amount from uDensity, its color from uColor (the OUTPUT carrier)
 
 const vec3 WATER_CHAN = vec3(1.8, 1.0, 0.6);  // relative extinction: red dies first
 
@@ -50,6 +54,10 @@ void main() {
     for (int i = 0; i < steps; i++) {
         float z_norm = (float(i) + 0.5) * inv_steps;
         vec4 s = texture(uDensity, vec3(uv, z_norm));
+        if (uSplit) {
+            vec4 c = texture(uColor, vec3(uv, z_norm));
+            s = vec4(c.rgb / max(c.a, 1e-4) * s.r, s.r);
+        }
 
         vec3 e = uEmission * max(s.rgb, vec3(0.0));
         vol += T * e;
