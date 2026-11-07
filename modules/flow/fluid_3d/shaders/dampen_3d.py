@@ -9,9 +9,9 @@ from modules.gl import Texture3D, ComputeShader
 class Dampen3D(ComputeShader):
     """Dampen voxels above a magnitude threshold via exponential drag (in-place)."""
 
-    WORKGROUP_SIZE_X = 16
-    WORKGROUP_SIZE_Y = 16
-    WORKGROUP_SIZE_Z = 1
+    WORKGROUP_SIZE_X = 8
+    WORKGROUP_SIZE_Y = 8
+    WORKGROUP_SIZE_Z = 4
 
     def __init__(self) -> None:
         super().__init__()

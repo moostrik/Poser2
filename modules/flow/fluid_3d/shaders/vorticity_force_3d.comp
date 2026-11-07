@@ -9,7 +9,7 @@
  * In 3D, the confinement force is computed via cross product of N and ω.
  */
 
-layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick of cells, so z neighbors share the cache
 
 layout(binding = 0) uniform sampler3D uCurl;      // Curl vector field (RGBA16F: xyz)
 layout(binding = 1) uniform sampler3D uObstacle;   // Obstacle mask (R8)
@@ -22,7 +22,7 @@ uniform ivec3 uSize;
 uniform bool  uHasObstacles;   // Skip obstacle logic when no obstacles present
 
 void main() {
-    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
     if (any(greaterThanEqual(gid, uSize))) return;
 
     vec3 st = (vec3(gid) + 0.5) / vec3(uSize);

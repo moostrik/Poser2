@@ -10,9 +10,9 @@ class MacCormack3D(ComputeShader):
     """Correct a semi-Lagrangian predictor by half its error, traced forward again, clamped to the source's
     eight texels around the backward trace; then the dissipation and the evaporation."""
 
-    WORKGROUP_SIZE_X = 16
-    WORKGROUP_SIZE_Y = 16
-    WORKGROUP_SIZE_Z = 1
+    WORKGROUP_SIZE_X = 8
+    WORKGROUP_SIZE_Y = 8
+    WORKGROUP_SIZE_Z = 4
 
     def __init__(self) -> None:
         super().__init__()

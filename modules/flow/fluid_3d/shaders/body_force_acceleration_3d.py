@@ -11,9 +11,9 @@ class BodyForceAcceleration3D(ComputeShader):
     plane's; the volume's w is the acceleration's −z, since z points toward the camera and +W away
     from the viewer."""
 
-    WORKGROUP_SIZE_X = 16
-    WORKGROUP_SIZE_Y = 16
-    WORKGROUP_SIZE_Z = 1
+    WORKGROUP_SIZE_X = 8
+    WORKGROUP_SIZE_Y = 8
+    WORKGROUP_SIZE_Z = 4
 
     def __init__(self) -> None:
         super().__init__()

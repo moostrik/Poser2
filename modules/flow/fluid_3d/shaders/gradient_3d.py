@@ -9,9 +9,9 @@ from modules.gl import Texture3D, ComputeShader
 class Gradient3D(ComputeShader):
     """Subtract 3D pressure gradient from velocity (projection step)."""
 
-    WORKGROUP_SIZE_X = 16
-    WORKGROUP_SIZE_Y = 16
-    WORKGROUP_SIZE_Z = 1
+    WORKGROUP_SIZE_X = 8
+    WORKGROUP_SIZE_Y = 8
+    WORKGROUP_SIZE_Z = 4
 
     def __init__(self) -> None:
         super().__init__()

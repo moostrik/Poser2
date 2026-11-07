@@ -15,7 +15,7 @@
  * uv, so the field may sit on a finer grid than they do.
  */
 
-layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick of cells, so z neighbors share the cache
 
 layout(binding = 0) uniform sampler3D uVelocity;  // Velocity field (RGBA16F: xyz = u,v,w)
 layout(binding = 1) uniform sampler3D uSource;    // The field before the step

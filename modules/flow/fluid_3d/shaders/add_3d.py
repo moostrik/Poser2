@@ -14,9 +14,9 @@ class Add3D(ComputeShader):
     within a single dispatch).
     """
 
-    WORKGROUP_SIZE_X = 16
-    WORKGROUP_SIZE_Y = 16
-    WORKGROUP_SIZE_Z = 1
+    WORKGROUP_SIZE_X = 8
+    WORKGROUP_SIZE_Y = 8
+    WORKGROUP_SIZE_Z = 4
 
     def __init__(self) -> None:
         super().__init__()

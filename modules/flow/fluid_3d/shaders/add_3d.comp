@@ -9,7 +9,7 @@
  * No filtering needed — both volumes have identical dimensions.
  */
 
-layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick of cells, so z neighbors share the cache
 
 layout(rgba16f, binding = 0) uniform image3D uDst;     // Read-write: velocity or target field
 layout(rgba16f, binding = 1) readonly uniform image3D uSrc;  // Read-only: force to add

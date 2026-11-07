@@ -14,7 +14,7 @@
  * The same ghosts as the divergence's and the Jacobi solve's, so the three agree on one wall.
  */
 
-layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick of cells, so z neighbors share the cache
 
 // Input textures
 layout(binding = 0) uniform sampler3D uVelocity;   // Current velocity (RGBA16F)

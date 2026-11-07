@@ -16,7 +16,7 @@
  * the front face), so w is -z.
  */
 
-layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick of cells, so z neighbors share the cache
 
 // The body's velocity (RGBA16F: x, y, z toward the camera; widths/s)
 layout(binding = 0) uniform sampler2D uInput;
@@ -34,7 +34,7 @@ uniform float uFloor;        // widths/s: the body's speed below which it drags 
 uniform ivec3 uSize;
 
 void main() {
-    ivec3 gid = ivec3(gl_GlobalInvocationID.xy, gl_WorkGroupID.z);
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
     if (any(greaterThanEqual(gid, uSize))) return;
 
     // Gaussian weight along depth

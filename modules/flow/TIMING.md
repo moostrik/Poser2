@@ -225,6 +225,18 @@ against the code before.
 |---|---------------------------------|----------------------|--------|--------|--------------|-------|--------|-----------------------------|-------------|
 | 1 | the temperature cleared once    | advect temperature   | 0.32   | 0.00   | 0.30         | 0.02  | yes    | the same; 0 of 255 apart    | replacement |
 |   |                                 | inject               | 0.66   | 0.52   | 0.66         | 0.00  | yes    |                             |             |
+| 2 | the composite's empty blocks skipped, by a volume of each 8³ block's largest density | composite, with the occupancy pass | 2.46 | 3.49 | 2.45 | 0.01 | no | the same; 1 of 255 apart | dropped |
+| 3 | 8 × 8 × 4 workgroups on the 13 stencil passes | the step | 10.30 | 10.09 | 10.33 | 0.03 | yes | the same; 0 of 255 apart | replacement |
+|   |                                 | advect velocity      | 0.82   | 0.78   | 0.81         | 0.01  | yes    |                             |             |
+|   |                                 | vorticity            | 1.25   | 1.22   | 1.26         | 0.01  | yes    |                             |             |
+|   |                                 | inject               | 0.49   | 0.41   | 0.47         | 0.02  | yes    |                             |             |
+|   |                                 | dampen               | 0.36   | 0.34   | 0.35         | 0.01  | no     |                             |             |
+|   |                                 | density              | 1.11   | 1.15   | 1.15         | 0.04  | no     |                             |             |
+
+Item 2 was slower in both forms, one thread a block (3.84 ms) and one workgroup a block (3.49): on the
+recording the density fills most blocks, so the skip saves little and its pass and branch cost more. The
+early exit at opacity was not built: with `glow` above 0 the additive sum behind opaque density is part of
+the picture, so stopping there changes it.
 
 ### What sets the p95
 

@@ -9,9 +9,9 @@ from modules.gl import Texture3D, ComputeShader
 class Buoyancy3D(ComputeShader):
     """Compute the 3D buoyancy force: F = gravity * (κ·density − σ(T − T_ambient))."""
 
-    WORKGROUP_SIZE_X = 16
-    WORKGROUP_SIZE_Y = 16
-    WORKGROUP_SIZE_Z = 1
+    WORKGROUP_SIZE_X = 8
+    WORKGROUP_SIZE_Y = 8
+    WORKGROUP_SIZE_Z = 4
 
     def __init__(self) -> None:
         super().__init__()
