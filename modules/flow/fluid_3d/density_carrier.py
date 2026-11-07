@@ -26,6 +26,8 @@ class CarrierStep:
     dissipation: float      # the fade's multiplier this step
     evaporation: float      # subtracted this step
     advection: Advection
+    curl: Texture3D | None = None   # the velocity's curl (1/s), while the turbulence needs it
+    cell: float = 0.0               # the grid's cubic cell (widths)
 
 
 class DensityCarrier(ABC):

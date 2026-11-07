@@ -1,0 +1,59 @@
+#version 460 core
+
+/*
+ * TurbulentAdvect3D - the semi-Lagrangian step of the density at the output's resolution, moved by the grid's
+ * velocity plus synthesized turbulence below the grid (wavelet turbulence, Kim et al. 2008): a divergence-free
+ * noise tile read where the water started (two displacements half a cycle apart, cross-faded, so the reading
+ * never stretches too far), scaled by the grid's churn there, the curl's size × the cell, and uTurbulence.
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(binding = 0) uniform sampler3D uVelocity;      // widths/s, the grid's
+layout(binding = 1) uniform sampler3D uSource;        // the amount before
+layout(binding = 2) uniform sampler3D uObstacle;
+layout(binding = 3) uniform sampler3D uCurl;          // 1/s, the grid's
+layout(binding = 4) uniform sampler3D uNoise;         // the swirl tile, repeating, rms 1
+layout(binding = 5) uniform sampler3D uDisplacementA; // widths
+layout(binding = 6) uniform sampler3D uDisplacementB;
+
+layout(r16f, binding = 0) writeonly uniform image3D uResult;
+
+uniform float uTimestep;      // dt × speed
+uniform vec3  uRdx;           // the uv a width of each axis crosses
+uniform vec3  uExtent;        // the box in widths: 1, height over width, depth over width
+uniform float uDissipation;
+uniform float uEvaporation;
+uniform float uTurbulence;    // the swirls' strength, 0 the grid's velocity alone
+uniform float uCell;          // the grid's cell (widths)
+uniform float uTiles;         // noise tiles a width
+uniform vec2  uWeights;       // the two displacements' cross-fade
+uniform ivec3 uSize;
+uniform bool  uHasObstacles;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(gid, uSize))) return;
+    vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
+    if (uHasObstacles && texture(uObstacle, st).r > 0.5) {
+        imageStore(uResult, gid, texture(uSource, st));
+        return;
+    }
+    vec3 velocity = texture(uVelocity, st).xyz;
+    if (uTurbulence > 0.0) {
+        vec3 position = st * uExtent;
+        vec3 a = texture(uNoise, (position - texture(uDisplacementA, st).xyz) * uTiles).xyz;
+        vec3 b = texture(uNoise, (position - texture(uDisplacementB, st).xyz) * uTiles).xyz;
+        vec3 swirl = (uWeights.x * a + uWeights.y * b) / max(length(uWeights), 1e-6);
+        velocity += uTurbulence * length(texture(uCurl, st).xyz) * uCell * swirl;
+    }
+    vec3 st_back = st - uTimestep * uRdx * velocity;
+    if (uHasObstacles && texture(uObstacle, st_back).r > 0.5) {
+        st_back = st;
+    }
+    float result = uDissipation * texture(uSource, st_back).r;
+    if (uEvaporation > 0.0) {
+        result = max(result - uEvaporation, 0.0);
+    }
+    imageStore(uResult, gid, vec4(result, 0.0, 0.0, 0.0));
+}

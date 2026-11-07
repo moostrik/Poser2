@@ -456,8 +456,14 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _confine_vorticity(self) -> None:
-        """Vorticity confinement: the curl, then its force added to the velocity."""
-        if self.settings.velocity.vorticity <= 0.0 or self.settings.velocity.vorticity_radius <= 0.0:
+        """Vorticity confinement: the curl, then its force added to the velocity. The curl alone while only the
+        OUTPUT density's turbulence reads it."""
+        confining: bool = self.settings.velocity.vorticity > 0.0 and self.settings.velocity.vorticity_radius > 0.0
+        if not confining:
+            if self._needs_curl:
+                self._vorticity_curl_shader.use(self._velocity, self._obstacle, self._curl_vol, self._cell, 1.0,
+                                                has_obstacles=self._has_obstacles)
+                glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
             return
 
         vorticity_radius = self.settings.velocity.vorticity_radius        # cells
@@ -586,7 +592,14 @@ class Fluid3D:
             velocity=self._velocity, obstacle=self._obstacle, has_obstacles=self._has_obstacles,
             aspect=self._aspect, z_extent=self._z_extent, dt=self._dt, step=self._dt * self.settings.speed,
             dissipation=self._calculate_dissipation(self._dt, self.settings.density.fade_time),
-            evaporation=self.settings.density.evaporation * self._dt, advection=self.settings.advection))
+            evaporation=self.settings.density.evaporation * self._dt, advection=self.settings.advection,
+            curl=self._curl_vol if self._needs_curl else None, cell=self._cell))
+
+    @property
+    def _needs_curl(self) -> bool:
+        """Whether the OUTPUT density's turbulence reads the curl this step."""
+        density = self.settings.density
+        return density.carrier == Carrier.OUTPUT and density.turbulence > 0.0
 
     def _dampen_step(self) -> tuple[float, float]:
         """The velocity's dampen for this step, which its advection applies to the step's result: the threshold

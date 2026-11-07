@@ -16,6 +16,8 @@ from .buoyancy_3d import Buoyancy3D
 from .inject_3d import Inject3D
 from .inject_amount_3d import InjectAmount3D
 from .velocity_average_3d import VelocityAverage3D
+from .noise_coordinates_3d import NoiseCoordinates3D
+from .turbulent_advect_3d import TurbulentAdvect3D
 from .boundary_velocity_3d import BoundaryVelocity3D
 from .body_force_acceleration_3d import BodyForceAcceleration3D
 from .add_3d import Add3D

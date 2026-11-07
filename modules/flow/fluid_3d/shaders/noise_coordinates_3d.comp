@@ -1,0 +1,33 @@
+#version 460 core
+
+/*
+ * NoiseCoordinates3D - where the water at each cell started since the last reset, as a displacement (widths), so
+ * the turbulence's noise is read at the water's own place and its swirls travel with the flow. Carried as the
+ * fields are: the displacement traced back along the velocity, plus the velocity's step,
+ *     d(x) = d(x - v dt) + v dt,
+ * and with uReset 0 everywhere, a fresh start.
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(binding = 0) uniform sampler3D uVelocity;   // widths/s
+layout(binding = 1) uniform sampler3D uSource;     // the displacement before (widths)
+layout(rgba16f, binding = 0) writeonly uniform image3D uResult;
+
+uniform float uTimestep;   // dt × speed
+uniform vec3  uRdx;        // the uv a width of each axis crosses
+uniform bool  uReset;
+uniform ivec3 uSize;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(gid, uSize))) return;
+    if (uReset) {
+        imageStore(uResult, gid, vec4(0.0));
+        return;
+    }
+    vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
+    vec3 velocity = texture(uVelocity, st).xyz;
+    vec3 displacement = texture(uSource, st - uTimestep * uRdx * velocity).xyz + uTimestep * velocity;
+    imageStore(uResult, gid, vec4(displacement, 0.0));
+}
