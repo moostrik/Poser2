@@ -1,10 +1,13 @@
 """ParticleSprites - the particles drawn from their buffer as points, streaks or blobs into the depth slices."""
 from __future__ import annotations
 
-from OpenGL.GL import (GL_LINES, GL_POINTS, glDrawArrays, glUniform1f, glUniform1i, glUniform1ui, glUniform2f,
+import ctypes
+
+from OpenGL.GL import (GL_DRAW_INDIRECT_BUFFER, GL_LINES, GL_POINTS, glBindBuffer, glDrawArraysIndirect, glUniform1f, glUniform1i, glUniform1ui, glUniform2f,
                        glUseProgram)
 
 from modules.gl import Shader, StorageBuffer
+from .particle_ring import DRAW_OFFSET
 
 
 class ParticleSprites(Shader):
@@ -38,7 +41,6 @@ class ParticleSprites(Shader):
         glUniform1f(self.get_uniform_loc("uMaxPointSize"), max_point_size)
         glUniform1f(self.get_uniform_loc("uFog"), fog)
         glUniform1f(self.get_uniform_loc("uTint"), tint)
-        if mode == self.STREAKS:
-            glDrawArrays(GL_LINES, 0, 2 * count)
-        else:
-            glDrawArrays(GL_POINTS, 0, count)
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, ring.buffer_id)     # over the ring's filled slots
+        glDrawArraysIndirect(GL_LINES if mode == self.STREAKS else GL_POINTS, ctypes.c_void_p(DRAW_OFFSET))
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0)

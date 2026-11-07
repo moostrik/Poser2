@@ -22,7 +22,7 @@ from .composite_3d import Composite3D
 
 # The particle carrier
 from .particle_emit import ParticleEmit
-from .particle_ring import ParticleRing
+from .particle_ring import ParticleRing, RING_BYTES
 from .particle_advect import ParticleAdvect
 from .particle_sprites import ParticleSprites
 from .particle_composite import ParticleComposite

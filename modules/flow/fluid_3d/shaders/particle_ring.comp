@@ -1,16 +1,40 @@
 #version 460 core
 
 /*
- * ParticleRing - the ring's head back into [0, count), after a step's emission, so the head never
- * wraps the uint and a slot's place in the ring, (head - 1 - slot) mod count, stays exact.
+ * ParticleRing - after a step's emission: how many slots have ever been born (filled, at most count), the
+ * head back into [0, count) so it never wraps the uint and a slot's place in the ring, (head - 1 - slot)
+ * mod count, stays exact; and the indirect draw and dispatch over the filled slots, so the draws and the
+ * advection run for the particles there are, not for every slot of an unfilled ring.
  */
 
 layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
 
-layout(std430, binding = 1) buffer Ring { uint head; };
+layout(std430, binding = 1) buffer Ring {
+    uint head;
+    uint filled;
+    uint pad0;
+    uint pad1;
+    uint draw_count;        // a DrawArraysIndirectCommand, at byte 16
+    uint draw_instances;
+    uint draw_first;
+    uint draw_base;
+    uint groups_x;          // a DispatchIndirectCommand, at byte 32
+    uint groups_y;
+    uint groups_z;
+};
 
 uniform uint uCount;
+uniform uint uVertices;     // vertices a particle: 2 for streaks, 1 otherwise
+uniform uint uGroupSize;    // the advection's workgroup
 
 void main() {
+    filled = max(filled, min(head, uCount));
     head = head % uCount;
+    draw_count = filled * uVertices;
+    draw_instances = 1u;
+    draw_first = 0u;
+    draw_base = 0u;
+    groups_x = (filled + uGroupSize - 1u) / uGroupSize;
+    groups_y = 1u;
+    groups_z = 1u;
 }

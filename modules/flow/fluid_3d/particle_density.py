@@ -31,7 +31,7 @@ from ..port import Port
 from ..wall_mode import WallMode
 from .density_carrier import CarrierStep, DensityCarrier
 from .fluid_settings import Fluid3DSettings, Overlap, ParticleDraw
-from .shaders import (ParticleAdvect, ParticleComposite, ParticleEmit, ParticleRing, ParticleSprites, ParticleSurface,
+from .shaders import (RING_BYTES, ParticleAdvect, ParticleComposite, ParticleEmit, ParticleRing, ParticleSprites, ParticleSurface,
                       ParticleSurfaceShade, ParticleSurfaceSmooth)
 
 PARTICLE_BYTES: int = 32        # position and mass/age (vec4), previous position and color (vec4)
@@ -110,7 +110,7 @@ class ParticleDensity(DensityCarrier):
         self._z_extent = layers / max(1, width)
         self._scale = (output_width * output_height) / max(1, width * height)
         self._particles.allocate(self._count * PARTICLE_BYTES)
-        self._ring.allocate(16)
+        self._ring.allocate(RING_BYTES)
         for shader in self._shaders():
             shader.allocate()
         glEnable(GL_PROGRAM_POINT_SIZE)
@@ -164,8 +164,9 @@ class ParticleDensity(DensityCarrier):
         if not self.allocated:
             return
         self._advect_timer.begin()
-        self._ring_shader.use(self._ring, self._count)
-        self._advect_shader.use(self._particles, self._count, step.velocity, aspect=step.aspect, z_extent=step.z_extent,
+        vertices: int = 2 if self.settings.particles.draw == ParticleDraw.STREAKS else 1
+        self._ring_shader.use(self._ring, self._count, vertices, ParticleAdvect.WORKGROUP_SIZE_X)
+        self._advect_shader.use(self._particles, self._ring, self._count, step.velocity, aspect=step.aspect, z_extent=step.z_extent,
                                 timestep=step.step, dt=step.dt, dissipation=step.dissipation,
                                 evaporation=self.settings.density.evaporation * step.dt * self._reference_mass(),
                                 closed_xy=self.settings.density.wall == WallMode.CLOSED,

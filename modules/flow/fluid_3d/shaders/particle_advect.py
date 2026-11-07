@@ -1,11 +1,10 @@
 """ParticleAdvect - the particles one step along the velocity, RK2, faded and aged."""
 from __future__ import annotations
 
-import math
-
-from OpenGL.GL import glUniform1f, glUniform1i, glUniform1ui, glUniform3f, glUseProgram
+from OpenGL.GL import GL_DISPATCH_INDIRECT_BUFFER, glBindBuffer, glDispatchComputeIndirect, glUniform1f, glUniform1i, glUniform1ui, glUniform3f, glUseProgram
 
 from modules.gl import ComputeShader, StorageBuffer, Texture3D
+from .particle_ring import DISPATCH_OFFSET
 
 
 class ParticleAdvect(ComputeShader):
@@ -18,7 +17,7 @@ class ParticleAdvect(ComputeShader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, particles: StorageBuffer, count: int, velocity: Texture3D, *, aspect: float, z_extent: float,
+    def use(self, particles: StorageBuffer, ring: StorageBuffer, count: int, velocity: Texture3D, *, aspect: float, z_extent: float,
             timestep: float, dt: float, dissipation: float, evaporation: float, closed_xy: bool, closed_z: bool) -> None:
         if not self.allocated or not self.shader_program:
             return
@@ -34,5 +33,7 @@ class ParticleAdvect(ComputeShader):
         glUniform1i(self.get_uniform_loc("uClosedXY"), int(closed_xy))
         glUniform1i(self.get_uniform_loc("uClosedZ"), int(closed_z))
         glUniform1ui(self.get_uniform_loc("uCount"), count)
-        self.dispatch_groups(math.ceil(count / self.WORKGROUP_SIZE_X))
+        glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, ring.buffer_id)     # over the ring's filled slots
+        glDispatchComputeIndirect(DISPATCH_OFFSET)
+        glBindBuffer(GL_DISPATCH_INDIRECT_BUFFER, 0)
         self.barrier_buffer()

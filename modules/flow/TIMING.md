@@ -243,6 +243,8 @@ against the code before.
 |   |                                 | the frame            | 12.23  | 10.24  | 12.17        | 0.06  | yes    |                             |             |
 | 9 | the blobs drawn to 2.5 sigma, the gaussian scaled by its share inside | particles draw, 100 k blobs | 1.64, 2.15 | 0.96, 0.96 | 1.40, 1.38 | 0.24, 0.77 | not by the rule; below all four befores | 0.1 to 0.5 of 255 in the mean, 2% of pixels over 4 at the blobs' edges | replacement |
 |   |                                 | the harness's step   | 16.08  | 12.97  |              |       | yes    |                             |             |
+| 10 | the draw and the advection over the ring's filled slots, by indirect commands | particles draw, the preset's 1 M streaks at `rate` 0.1 | 1.33 | 1.12 | 1.41 | 0.08 | yes | the same; 0 of 255 apart | replacement |
+|   |                                 | particles draw, 2 M points at `rate` 20 | 2.75 | 2.54 | 2.55 | 0.20 | no: the ring is full |      |             |
 
 Item 2 was slower in both forms, one thread a block (3.84 ms) and one workgroup a block (3.49): on the
 recording the density fills most blocks, so the skip saves little and its pass and branch cost more. The

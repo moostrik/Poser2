@@ -1,9 +1,12 @@
 """ParticleSurface - the particles as sphere sprites into a depth, a thickness and a color target."""
 from __future__ import annotations
 
-from OpenGL.GL import GL_POINTS, glDrawArrays, glUniform1f, glUniform1ui, glUniform2f, glUseProgram
+import ctypes
+
+from OpenGL.GL import GL_DRAW_INDIRECT_BUFFER, GL_POINTS, glBindBuffer, glDrawArraysIndirect, glUniform1f, glUniform1ui, glUniform2f, glUseProgram
 
 from modules.gl import Shader, StorageBuffer
+from .particle_ring import DRAW_OFFSET
 
 
 class ParticleSurface(Shader):
@@ -27,4 +30,6 @@ class ParticleSurface(Shader):
         glUniform1f(self.get_uniform_loc("uSpread"), spread)
         glUniform1f(self.get_uniform_loc("uFadeTime"), fade_time)
         glUniform1f(self.get_uniform_loc("uMaxPointSize"), max_point_size)
-        glDrawArrays(GL_POINTS, 0, count)
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, ring.buffer_id)     # over the ring's filled slots
+        glDrawArraysIndirect(GL_POINTS, ctypes.c_void_p(DRAW_OFFSET))
+        glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0)
