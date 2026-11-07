@@ -367,10 +367,13 @@ at 3 widths/s:
 | 32           | 16             | 5.74 / 7.43  | 2.25 / 3.24 | 1.61 / 2.43 | 0.80 / 1.21 | 9.05 / 11.49, 110 fps  |
 | 48           | 48             | 11.84 / 17.45 | 3.35 / 4.82 | 4.56 / 10.46 | 2.31 / 3.60 | 19.26 / 31.62, 52 fps |
 | 48           | 24             | 9.50 / 12.31 | 4.12 / 5.75 | 2.41 / 3.89 | 1.24 / 2.05 | 15.11 / 24.46, 66 fps  |
+| 48           | 16             | 7.83 / 9.55  | 3.74 / 4.60 | 1.83 / 2.65 | 0.81 / 1.33 | 11.90 / 18.88, 84 fps  |
 | 64           | 64             | 14.60 / 18.22 | 4.63 / 6.25 | 5.29 / 7.83 | 2.81 / 3.39 | 20.90 / 25.78, 48 fps |
 | 64           | 32             | 11.60 / 12.97 | 5.25 / 6.49 | 2.95 / 4.20 | 1.42 / 1.75 | 15.99 / 18.31, 63 fps |
+| 64           | 16             | 9.77 / 11.22 | 5.05 / 6.46 | 1.90 / 2.70 | 0.93 / 1.86 | 13.74 / 16.92, 73 fps  |
 
-Within 60 fps: up to 32 fluid layers with the density at 32, or 48 and 64 with the density at half. The density's
+Within 60 fps: up to 32 fluid layers with the density at 32, 48 with it at 24 or 16, 64 at 32 or 16. From 48 fluid
+layers up the pressure solve is the largest pass (3.7–5.3 ms). The density's
 4K × 16 costs 1.3 ms to carry and 0.9 to march, the old 16-layer look's 2 GB a step now under a quarter of it.
 MacCormack, timed before the depth scale while the water still burst, took 9.1 ms a frame at 16 and 16 and was
 over the budget from 32 fluid layers up; its cost is in [FLUID_3D.md's Later](FLUID_3D.md#later).
