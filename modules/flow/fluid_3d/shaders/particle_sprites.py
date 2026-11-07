@@ -20,7 +20,7 @@ class ParticleSprites(Shader):
     def use(self, particles: StorageBuffer, ring: StorageBuffer, count: int, mode: int, *, slices: int,
             scale: float, ring_fade: float, output_size: tuple[int, int], size: float, streak: float,
             radius: float, reference_mass: float, spread: float, fade_time: float, max_point_size: float,
-            fog: float, tint: float) -> None:
+            fog: float, tint: float, weighted: bool = False, emission: float = 1.0, absorption: float = 1.0) -> None:
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
@@ -41,6 +41,9 @@ class ParticleSprites(Shader):
         glUniform1f(self.get_uniform_loc("uMaxPointSize"), max_point_size)
         glUniform1f(self.get_uniform_loc("uFog"), fog)
         glUniform1f(self.get_uniform_loc("uTint"), tint)
+        glUniform1i(self.get_uniform_loc("uWeighted"), int(weighted))
+        glUniform1f(self.get_uniform_loc("uEmission"), emission)
+        glUniform1f(self.get_uniform_loc("uAbsorption"), absorption)
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, ring.buffer_id)     # over the ring's filled slots
         glDrawArraysIndirect(GL_LINES if mode == self.STREAKS else GL_POINTS, ctypes.c_void_p(DRAW_OFFSET))
         glBindBuffer(GL_DRAW_INDIRECT_BUFFER, 0)

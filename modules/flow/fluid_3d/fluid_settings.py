@@ -40,6 +40,7 @@ class Overlap(IntEnum):
     """How the particles cover each other, for points, streaks and blobs."""
     OCCLUDED = 0            # depth slices marched front to back: near ink covers far ink
     ADDITIVE = 1            # one sum, the depth as fog per particle
+    WEIGHTED = 2            # weighted blended order-independent transparency: one pass, near ink over far by a depth weight (McGuire, Bavoil 2013)
 
 
 class ParticleSettings(BaseSettings):
@@ -48,7 +49,7 @@ class ParticleSettings(BaseSettings):
     rate: Field[float]              = Field(20.0,   min=0.01,   max=50.0,                               description="Particles per texel per second where ink is (fewer: heavier, bigger blobs)")
     ring_fade: Field[float]         = Field(0.1,    min=0.01,   max=1.0,                                description="The ring's last share the oldest fade over before they are overwritten")
     draw: Field[ParticleDraw]       = Field(ParticleDraw.POINTS,                                        description="Points, streaks, blobs or a surface")
-    overlap: Field[Overlap]         = Field(Overlap.OCCLUDED,                                           description="Occluded: near ink covers far ink. Additive: one sum")
+    overlap: Field[Overlap]         = Field(Overlap.OCCLUDED,                                           description="Occluded: near ink covers far ink. Additive: one sum. Weighted: near over far by a weight, one pass")
     slices: Field[int]              = Field(16,     min=2,      max=32,                                 description="Depth slices of the occluded look, at the output's size")
     size: Field[float]              = Field(1.0,    min=1.0,    max=8.0,                                description="A point's size in pixels")
     streak: Field[float]            = Field(1.0,    min=0.0,    max=4.0,                                description="A streak's length as a share of its step")

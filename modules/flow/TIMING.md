@@ -245,6 +245,9 @@ against the code before.
 |   |                                 | the harness's step   | 16.08  | 12.97  |              |       | yes    |                             |             |
 | 10 | the draw and the advection over the ring's filled slots, by indirect commands | particles draw, the preset's 1 M streaks at `rate` 0.1 | 1.33 | 1.12 | 1.41 | 0.08 | yes | the same; 0 of 255 apart | replacement |
 |   |                                 | particles draw, 2 M points at `rate` 20 | 2.75 | 2.54 | 2.55 | 0.20 | no: the ring is full |      |             |
+| 11 | `overlap` `WEIGHTED`, weighted blended order-independent transparency, an option | particles draw, 2 M points | 2.98 | 1.32 | 2.68 | 0.30 | yes | 0.25 of 255 in the mean against `OCCLUDED` | option |
+|   |                                 | particles march      | 0.40   | 0.21   | 0.41         | 0.01  | yes    |                             |             |
+|   |                                 | the step             | 8.77   | 6.41   | 8.47         | 0.30  | yes    |                             |             |
 
 Item 2 was slower in both forms, one thread a block (3.84 ms) and one workgroup a block (3.49): on the
 recording the density fills most blocks, so the skip saves little and its pass and branch cost more. The
@@ -275,6 +278,11 @@ Item 9 misses the rule in the app, where the pose's load moved the befores by 0.
 sets of runs, but the change came in under all four befores both times (0.96 ms), and the harness, with no
 pose on the GPU, gives the step 16.1 → 13.0 ms (p95 29 → 21): the fill is 25 σ² a blob where it was 36.
 Kept as a replacement on that, and marked here as the exception.
+
+Item 11 draws into three 4K targets in one pass where `OCCLUDED` draws into 16 layered slices, clears them
+(1 GB) and marches them: the draw halves and the march halves. Its order is a weight by depth, not the
+slices', so where ink is thick and near ink should hide far ink it differs; on the recording's thin ink it
+is 0.25 of 255 from the slices. An option, the preset keeps `OCCLUDED`.
 
 ### What sets the p95
 

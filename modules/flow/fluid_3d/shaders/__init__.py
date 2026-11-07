@@ -26,6 +26,7 @@ from .particle_ring import ParticleRing, RING_BYTES
 from .particle_advect import ParticleAdvect
 from .particle_sprites import ParticleSprites
 from .particle_composite import ParticleComposite
+from .particle_weighted import ParticleWeighted
 from .particle_surface import ParticleSurface
 from .particle_surface_smooth import ParticleSurfaceSmooth
 from .particle_surface_shade import ParticleSurfaceShade

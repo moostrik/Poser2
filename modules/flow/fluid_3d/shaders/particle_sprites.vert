@@ -30,6 +30,7 @@ uniform float uTint;            // the additive look's water tint by depth, per 
 flat out vec4 vColor;           // rgb × value, value
 flat out float vSigma;          // a blob's sigma in pixels
 flat out float vPointSize;
+flat out float vDepth;          // the particle's z, 0 at the front, for the weighted look
 
 const vec3 WATER_CHAN = vec3(1.8, 1.0, 0.6);
 
@@ -77,6 +78,7 @@ void main() {
     }
     vColor = vec4(color * value, value);
     vPointSize = point;
+    vDepth = particle.position.z;
     gl_PointSize = point;
     gl_Layer = uSlices == 1 ? 0 : min(int(particle.position.z * float(uSlices)), uSlices - 1);
     gl_Position = vec4(at.xy * 2.0 - 1.0, 0.0, 1.0);

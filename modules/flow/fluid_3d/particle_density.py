@@ -21,8 +21,8 @@ import math
 
 from OpenGL.GL import (GL_COLOR, GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_BUFFER_BIT,
                        GL_FRAMEBUFFER, GL_FUNC_ADD, GL_MIN, GL_POINT_SIZE_RANGE, GL_PROGRAM_POINT_SIZE, GL_R32F,
-                       GL_RGBA16F, GL_TEXTURE_2D, GL_TEXTURE_FETCH_BARRIER_BIT, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT,
-                       glBindFramebuffer, glBlendEquationi, glClear, glClearBufferfv, glClearColor,
+                       GL_ONE_MINUS_SRC_COLOR, GL_RGBA16F, GL_RGBA32F, GL_TEXTURE_2D, GL_ZERO, GL_TEXTURE_FETCH_BARRIER_BIT, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT,
+                       glBindFramebuffer, glBlendEquationi, glBlendFunci, glClear, glClearBufferfv, glClearColor,
                        glDeleteFramebuffers, glDrawBuffers, glEnable, glFramebufferTexture2D, glGenFramebuffers,
                        glGetFloatv, glMemoryBarrier, glViewport)
 
@@ -31,7 +31,7 @@ from ..port import Port
 from ..wall_mode import WallMode
 from .density_carrier import CarrierStep, DensityCarrier
 from .fluid_settings import Fluid3DSettings, Overlap, ParticleDraw
-from .shaders import (RING_BYTES, ParticleAdvect, ParticleComposite, ParticleEmit, ParticleRing, ParticleSprites, ParticleSurface,
+from .shaders import (RING_BYTES, ParticleAdvect, ParticleComposite, ParticleEmit, ParticleRing, ParticleSprites, ParticleSurface, ParticleWeighted,
                       ParticleSurfaceShade, ParticleSurfaceSmooth)
 
 PARTICLE_BYTES: int = 32        # position and mass/age (vec4), previous position and color (vec4)
@@ -82,6 +82,11 @@ class ParticleDensity(DensityCarrier):
         self._surface_thickness: Texture = Texture()
         self._surface_color: Texture = Texture()
         self._smoothed: tuple[Texture, Texture] = (Texture(), Texture())
+        # The weighted look's targets: the weighted emission and opacity, the revealage, the plain emission
+        self._weighted_fbo: int = 0
+        self._weighted_sum: Texture = Texture()
+        self._weighted_reveal: Texture = Texture()
+        self._weighted_additive: Texture = Texture()
         self._emit_shader: ParticleEmit = ParticleEmit()
         self._ring_shader: ParticleRing = ParticleRing()
         self._advect_shader: ParticleAdvect = ParticleAdvect()
@@ -90,6 +95,7 @@ class ParticleDensity(DensityCarrier):
         self._surface_shader: ParticleSurface = ParticleSurface()
         self._smooth_shader: ParticleSurfaceSmooth = ParticleSurfaceSmooth()
         self._shade_shader: ParticleSurfaceShade = ParticleSurfaceShade()
+        self._weighted_shader: ParticleWeighted = ParticleWeighted()
         # The passes' GPU timers, inside the fluid's density and composite timers
         self._emit_timer: GpuTimer = GpuTimer("GPU particles emit")
         self._advect_timer: GpuTimer = GpuTimer("GPU particles advect")
@@ -98,7 +104,7 @@ class ParticleDensity(DensityCarrier):
 
     def _shaders(self) -> tuple:
         return (self._emit_shader, self._ring_shader, self._advect_shader, self._sprites_shader, self._composite_shader,
-                self._surface_shader, self._smooth_shader, self._shade_shader)
+                self._surface_shader, self._smooth_shader, self._shade_shader, self._weighted_shader)
 
     # ========== Lifecycle ==========
 
@@ -121,6 +127,7 @@ class ParticleDensity(DensityCarrier):
         self._ring.deallocate()
         self._slices.deallocate()
         self._deallocate_surface()
+        self._deallocate_weighted()
         for shader in self._shaders():
             shader.deallocate()
         for timer in (self._emit_timer, self._advect_timer, self._draw_timer, self._march_timer):
@@ -180,6 +187,8 @@ class ParticleDensity(DensityCarrier):
             return
         if self.settings.particles.draw == ParticleDraw.SURFACE:
             self._composite_surface(output)
+        elif self.settings.particles.overlap == Overlap.WEIGHTED:
+            self._composite_weighted(output)
         else:
             self._composite_sprites(output)
 
@@ -216,6 +225,61 @@ class ParticleDensity(DensityCarrier):
                                    tint=volume.tint, fog=0.0 if additive else volume.fog, glow=volume.glow)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._march_timer.end()
+
+    def _composite_weighted(self, output: Texture) -> None:
+        """The sprites into the weighted look's three targets in one pass, then into the output."""
+        particles = self.settings.particles
+        volume = self.settings.volume
+        width, height = self._output
+        if not self._weighted_fbo or (self._weighted_sum.width, self._weighted_sum.height) != (width, height):
+            self._deallocate_weighted()
+            self._allocate_weighted()
+
+        self._draw_timer.begin()
+        glBindFramebuffer(GL_FRAMEBUFFER, self._weighted_fbo)
+        glViewport(0, 0, width, height)
+        glClearBufferfv(GL_COLOR, 0, (0.0, 0.0, 0.0, 0.0))
+        glClearBufferfv(GL_COLOR, 1, (1.0, 1.0, 1.0, 1.0))
+        glClearBufferfv(GL_COLOR, 2, (0.0, 0.0, 0.0, 0.0))
+        Style.push_style()
+        Style.set_blend_mode(Style.BlendMode.SUM)
+        glBlendFunci(1, GL_ZERO, GL_ONE_MINUS_SRC_COLOR)        # the revealage: × (1 - alpha) per channel
+        self._sprites_shader.use(self._particles, self._ring, self._count, _SPRITES[particles.draw], slices=1,
+                                 scale=self._scale, ring_fade=particles.ring_fade, output_size=self._output,
+                                 size=particles.size, streak=particles.streak, radius=particles.radius,
+                                 reference_mass=self._reference_mass(), spread=particles.spread,
+                                 fade_time=self.settings.density.fade_time, max_point_size=self._max_point_size,
+                                 fog=volume.fog, tint=volume.tint, weighted=True, emission=volume.emission,
+                                 absorption=volume.absorption)
+        Style.pop_style()
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        self._draw_timer.end()
+
+        self._march_timer.begin()
+        self._weighted_shader.use(self._weighted_sum, self._weighted_reveal, self._weighted_additive, output, volume.glow)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        self._march_timer.end()
+
+    def _allocate_weighted(self) -> None:
+        width, height = self._output
+        self._weighted_sum.allocate(width, height, GL_RGBA32F)      # the weight reaches 3000: past a half float's sum
+        self._weighted_reveal.allocate(width, height, GL_RGBA16F)
+        self._weighted_additive.allocate(width, height, GL_RGBA16F)
+        self._weighted_fbo = int(glGenFramebuffers(1))
+        glBindFramebuffer(GL_FRAMEBUFFER, self._weighted_fbo)
+        for attachment, texture in ((GL_COLOR_ATTACHMENT0, self._weighted_sum), (GL_COLOR_ATTACHMENT1, self._weighted_reveal),
+                                    (GL_COLOR_ATTACHMENT2, self._weighted_additive)):
+            glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, texture.tex_id, 0)
+        glDrawBuffers(3, [GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2])
+        glBindFramebuffer(GL_FRAMEBUFFER, 0)
+
+    def _deallocate_weighted(self) -> None:
+        if self._weighted_fbo:
+            glDeleteFramebuffers(1, [self._weighted_fbo])
+            self._weighted_fbo = 0
+        for texture in (self._weighted_sum, self._weighted_reveal, self._weighted_additive):
+            texture.deallocate()
 
     def _allocate_surface(self) -> None:
         width, height = self._output
