@@ -266,6 +266,20 @@ preset now (the multigrid, every kept change), three runs, before, now, before:
 | particles draw       | 1.63          | 1.48         | 2.57          |
 | the frame, `Render interval` | 11.80 / 17.95, 85 fps | 8.73 / 10.82, 115 fps | 12.88 / 17.53, 78 fps |
 
+Item 10 gives back nothing once the ring is full. Each look at its budget with every slot alive, `rate`
+20 and 50 (the ring full at both: 50 is no slower), the multigrid, three runs each:
+
+| Look, the ring full         | particles draw, ms mean, three runs | march     | the frame, ms    |
+|-----------------------------|--------------------------------------|-----------|------------------|
+| 2 M `POINTS`, occluded     | 2.79, 2.20, 2.67                     | 0.39–0.40 | 11.2–12.7        |
+| 1 M `STREAKS`, occluded    | 1.02, 3.59, 6.16; 3.02, 3.45, 1.84   | 0.35–0.40 | 9.6–14.9         |
+| 100 k `BLOBS`, occluded    | 0.98, 0.99, 1.33                     | 0.41–0.43 | 9.4–9.8          |
+| 100 k `SURFACE`            | 0.85, 0.88, 0.85                     | 0.70–0.74 | 9.6–9.7          |
+
+The streaks' draw is their length, the water's speed × the step, so it moves with the motion: from 1.0 to
+6.2 ms over six runs, one with a p95 of 45 ms. Since the multigrid the water runs faster round the body,
+and the streaks are longer with it **(deduction)**.
+
 Item 2 was slower in both forms, one thread a block (3.84 ms) and one workgroup a block (3.49): on the
 recording the density fills most blocks, so the skip saves little and its pass and branch cost more. The
 early exit at opacity was not built: with `glow` above 0 the additive sum behind opaque density is part of
