@@ -14,20 +14,21 @@ A step (`Fluid3D.update`), in order, at the preset (`apps/deep_flow/data/setting
 
 | Pass        | What                                                                                  | On                    | Depends on the input |
 |-------------|---------------------------------------------------------------------------------------|-----------------------|----------------------|
-| dampen_vel  | drag on the speed above `dampen_threshold` (50 widths/s) over `dampen_time` (2 s)     | velocity 448×800×64   | no                   |
+| dampen_vel  | drag on the speed above `dampen_threshold` (50 widths/s) over `dampen_time` (2 s)     | velocity 256×448×128  | no                   |
 | advect_vel  | semi-Lagrangian self-advection, `self_advection` 1, fade 60 s                         | velocity              | the trace distance   |
 | viscosity   | Jacobi diffusion, off (`viscosity` 0)                                                 | velocity              | no                   |
 | vorticity   | curl, confinement force × dt, added to the velocity                                   | velocity, curl, force | no                   |
 | advect_temp | off (`buoyancy` 0 clears the temperature)                                             | temperature           | the trace distance   |
 | buoyancy    | gravity × (sink × density − buoyancy × ΔT) × dt; gravity is 0 in the preset           | force                 | no                   |
 | incompress  | divergence, 40 Jacobi iterations, gradient subtraction, on the walls ([The walls](#the-walls)) | pressure, velocity | no              |
-| advect_den  | semi-Lagrangian advection, one trilinear read per texel, the evaporation subtracted   | density 448×800×64    | the trace distance   |
+| advect_den  | semi-Lagrangian advection, one trilinear read per texel, the evaporation subtracted   | density 256×448×128   | the trace distance   |
 | composite   | front-to-back march, one step per layer                                               | output 2160×3840      | no                   |
 
-Every field is a `GL_TEXTURE_3D` on one grid of cubic cells at the stage's size, 448 × 800 by
-`volume.layers` 64: the velocity RGBA16F, the temperature and the pressure R16F, the density RGBA16F
-with its color baked in, each a swap pair, the obstacle R8. The simulation's cell is 1/448 width in
-x, y and z, so the slab is 64 / 448 = 0.14 widths deep (`_z_extent`). The density is on the same
+Every field is a `GL_TEXTURE_3D` on one grid of cubic cells at the stage's size, 256 × 448 by
+`volume.layers` 128: the velocity RGBA16F, the temperature R16F and the pressure R32F, the density
+RGBA16F with its color baked in, each a swap pair, the obstacle R8. The simulation's cell is 1/256
+width in x, y and z, so the slab is 128 / 256 = 0.5 widths deep (`_z_extent`). The grid is the one
+that holds 60 fps in deep_flow with the pose on the same GPU ([TIMING.md](TIMING.md#the-grid)). The density is on the same
 grid, or `density.size` times finer in x and y (1, 2 or 4): every pass that reads the velocity or
 the obstacle against it samples by uv, so the shaders are the same (`advect_3d`, `inject_3d`,
 `buoyancy_3d`). The composite reads the volume at the output's 2160 × 3840 and upsamples it
@@ -39,12 +40,12 @@ bilinearly. The monitors read every field as it is. The GPU is a 24 GB RTX 4090,
 | 64       | 2              | 896 × 1600 × 64, 0.73 GB | 7.2     |
 | 24       | 4              | 1792 × 3200 × 24, 1.1 GB | 4.8     |
 
-The step's GPU time, measured in a hidden window on a swirl at the preset's passes, the composite at
-2160 × 3840. `layers` is the knob if it is too much; `density.size` 4 is the 4K look on the same
+The step's GPU time at 448 × 800, measured in a hidden window on a swirl at the preset's passes, the
+composite at 2160 × 3840; every pass's time in the app is in [TIMING.md](TIMING.md). `layers` is the knob if it is too much; `density.size` 4 is the 4K look on the same
 path, with the z lerp across coarse layers and the scattered reads of a big volume.
 
 What the layer injects before the step (`Fluid3DLayer._inject`), each at the injection's `weight`,
-into the gaussian slab at `injection_layer` 0.5, `injection_spread` 0.024 widths:
+into the gaussian slab at `injection_layer` 0.5, `injection_spread` 0.075 widths:
 
 | Input                          | The fluid                                                            | Shader                       |
 |--------------------------------|----------------------------------------------------------------------|------------------------------|
@@ -264,9 +265,9 @@ as a tuning:
 | `density.boundary_gain`, `density.body_force_gain`, `temperature.boundary_gain`, `temperature.body_force_gain` | 1 | one unit per width, per Δv |
 | `speed`                                                                          | 1               | the density moves with the water        |
 | `velocity.self_advection`                                                        | 1               | the velocity carries itself the full step |
-| `volume.layers`                                                                  | 64              | cubic cells over the slab               |
+| `width`, `height`, `volume.layers`                                               | 256, 448, 128   | half a width deep, within 60 fps        |
 | `density.size`                                                                   | 1               | the density on the simulation's grid    |
-| `volume.injection_layer`, `volume.injection_spread`                              | 0.5, 0.1        | the body mid-volume                     |
+| `volume.injection_layer`, `volume.injection_spread`                              | 0.5, 0.075      | the body mid-volume, 0.3 widths thick   |
 | `wall` (every field, the volume)                                                 | closed          | as his settings                         |
 
 The fields' physics take the textbook's water, with no artificial decay or thickness, and the preset
@@ -276,9 +277,9 @@ scale), `pressure.iterations` 40 (GPU Gems' 40 to 80 for a Jacobi solve), the de
 no buoyancy), gravity down the screen, every wall closed; the dampen a guard at 50 widths/s; the
 bridge's mix the boundary's trail alone and its lowpass's `smooth` its default 160 ms, since the
 coast is the fluid's now; the confinement Fedkiw's ε 0.3 over the neighbors (`vorticity_radius` 1);
-in z, `injection_layer` 0.5 and `injection_spread` 0.024 widths, three sigma inside the 0.14-width
-slab, since the slab is thinner than a body (about 0.3 widths at the camera's crop, from its
-`view_span` of 0.76 m, **(deduction)**). Kept as tuned: the composite's look (`emission`,
+in z, `injection_layer` 0.5 and `injection_spread` 0.075 widths, a body's thickness of about 0.3
+widths at the camera's crop (from its `view_span` of 0.76 m, **(deduction)**) as four sigma, three
+sigma inside the 0.5-width slab. Kept as tuned: the composite's look (`emission`,
 `absorption`, `glow`, `tint`, `fog`).
 
 Measured with these on standmoves through the harness: the water 0.89 of the body's speed in the
@@ -383,13 +384,14 @@ for the blobby looks):
 | `SURFACE`            | 1 M       | 31.9              | 20.1 / 54.1                  |
 
 The cost is the draw's fill at 4K: the count for points and streaks, the radius for blobs and the
-surface. `count`, `radius`, `slices` and the additive overlap are the knobs; the 60 fps budget
-(16.7 ms) holds for points at a few million and blobs at a smaller radius **(deduction)**.
+surface. `count`, `radius`, `slices` and the additive overlap are the knobs; the count each look
+fits in 60 fps, measured in the app, is in [TIMING.md](TIMING.md#the-budget): 2 M points, the
+default, 1 M streaks, 100 k blobs or spheres.
 
 Decided: the grid density stays beside the particles, one setting picks the carrier; the first
 look is the particles alone, the weight (the splat back into the grid for the buoyancy) after;
 drawn as points or as streaks, one setting; the count a setting, sized by the memory the old 4K
-density took (3.2 GB holds 100 M particles at 32 bytes), 32 M to start; the oldest fade out
+density took (3.2 GB holds 100 M particles at 32 bytes), its default by the 60 fps budget; the oldest fade out
 before the ring overwrites them; overlap first, ink a bit opaque, additive as the other option.
 
 Everything stays on the GPU: the CPU dispatches and draws a fixed count, never reads a particle
@@ -412,12 +414,12 @@ a smooth kernel and the kernels' sum melts near particles into one shape (Blinn'
 metaballs). Far fewer particles, each covering many pixels: the cost moves from the count to the
 kernel.
 
-| `draw`    | What                                                                                     | Count, a start |
+| `draw`    | What                                                                                     | Count, 60 fps  |
 |-----------|------------------------------------------------------------------------------------------|----------------|
-| `POINTS`  | one pixel a particle, into the slices or additive, above                                 | 32 M           |
-| `STREAKS` | a line from the previous to the current position                                         | 32 M           |
-| `BLOBS`   | the soft melt: each particle a gaussian sprite of `radius` pixels, its sum the density, marched through the slices as `POINTS` is; ink clouds whose drops merge | 1 M |
-| `SURFACE` | the liquid: screen-space fluid rendering (van der Laan 2009); each particle a sphere sprite of `radius`, its nearest depth into a depth target and its thickness summed into another; the depth smoothed by a filter that keeps its edges (a bilateral or narrow-range filter); the normals from the smoothed depth; then the ink's color through its thickness (Beer–Lambert, `absorption`, `tint`), a Fresnel edge, a specular and the background refracted by the normal; drops and threads with a sharp edge that merge and pinch off | 1 M |
+| `POINTS`  | one pixel a particle, into the slices or additive, above                                 | 2 M            |
+| `STREAKS` | a line from the previous to the current position                                         | 1 M            |
+| `BLOBS`   | the soft melt: each particle a gaussian sprite of `radius` pixels, its sum the density, marched through the slices as `POINTS` is; ink clouds whose drops merge | 100 k          |
+| `SURFACE` | the liquid: screen-space fluid rendering (van der Laan 2009); each particle a sphere sprite of `radius`, its nearest depth into a depth target and its thickness summed into another; the depth smoothed by a filter that keeps its edges (a bilateral or narrow-range filter); the normals from the smoothed depth; then the ink's color through its thickness (Beer–Lambert, `absorption`, `tint`), a Fresnel edge, a specular and the background refracted by the normal; drops and threads with a sharp edge that merge and pinch off | 100 k          |
 
 Each particle carries a mass, the density it took at its birth; its kernel sums to its mass, so
 the ink is kept whatever the size. A blob's or a sphere's radius follows the mass,
@@ -440,15 +442,15 @@ thickness target at the output's size, a filter of a few passes and one shading 
 on `radius` against the particles' spacing: too small and the blobs fall apart into dots, too big
 and the shape goes soft **(deduction)**.
 
-The settings, a `particles` group: `count` (`Field.INIT`, 32 M), `rate` (particles per unit of
+The settings, a `particles` group: `count` (`Field.INIT`, 2 M), `rate` (particles per unit of
 density per second), `ring_fade` (the ring's last share the oldest fade over), `draw`
 (`ParticleDraw.POINTS`, `STREAKS`, `BLOBS` or `SURFACE`), `radius` (a blob's or a sphere's pixels at the reference mass), `spread` (a blob's widening with
 age),
 `smooth` (the surface's filter passes), `size` (a point's pixels), `streak` (a streak's length as a
 share of its step), `overlap` (`Overlap.OCCLUDED` or `ADDITIVE`), `slices` (`Field.INIT`, 16).
-The cost grows with the count by the advection's reads and the draw's fill, not by the memory
-**(deduction)**: an estimate at 32 M, 2 to 4 ms for the advection, 4 to 8 ms for the points into
-16 slices at 4K, the streaks by their length; measured before the count goes higher. Judge on: a
+The cost grows with the count by the advection's reads and the draw's fill, not by the memory: the
+advection 0.2 ms a million, the draw faster than the count once many share a pixel
+([TIMING.md](TIMING.md#the-particles)). Judge on: a
 drop reads as a drop next to the grid's; a thread stays one particle wide at 2160 × 3840; near ink
 covers far ink; the step's GPU time.
 
@@ -460,29 +462,19 @@ Parked after steps 6 and 7. What was found:
   deep at 448 wide is 64 × 4.8 ≈ 307 layers at 2160 wide, about 20 GB. So the detail at 4K does
   not come from a volume.
 - A tricubic read in today's composite is 8 hardware reads a step instead of 1, 64 steps over
-  2160 × 3840 pixels, about 4 G reads a frame, 5 to 10 ms **(deduction)**.
-- The direction: depth in 3D at the grid, detail in 2D at 4K. The march at the grid's 448 × 800
-  (0.36 M pixels instead of 8.3 M, about 20 times cheaper **(deduction)**), one edge-aware upscale
+  2160 × 3840 pixels at 64 layers, about 4 G reads a frame, 5 to 10 ms **(deduction)**.
+- The direction: depth in 3D at the grid, detail in 2D at 4K. The march at the grid's 256 × 448
+  (0.11 M pixels instead of 8.3 M, about 70 times cheaper **(deduction)**), one edge-aware upscale
   of the flat result, and one 4K detail layer advected by the grid's velocity seen from the front
   with a curl noise where the water moves (Kim 2008 in 2D), multiplying the upscaled image so
   detail shows where ink is. The particles stay the other way to 4K in depth.
 - The options, cheapest first: tricubic reads; a finer `density.size` with MacCormack; detail below
   the grid (the curl noise); an edge curve, a look rather than detail.
 
-The grid's depth, open: 64 layers is 0.14 widths, so the body's z motion meets a wall within a few
-cells, likely part of the wall's explosions **(deduction)**. Half the width deep, measured in a
-hidden window, the step with its composite at 4K:
-
-| Grid             | Depth, widths | Cells | Step, GPU ms |
-|------------------|---------------|-------|--------------|
-| 448 × 800 × 64   | 0.14          | 23 M  | 6.8          |
-| 448 × 800 × 224  | 0.50          | 80 M  | 22.5         |
-| 320 × 576 × 160  | 0.50          | 29 M  | 9.4          |
-| 256 × 448 × 128  | 0.50          | 15 M  | 5.1          |
-
+The grid's depth: 256 × 448 × 128, half a width deep, so the body's z motion has room before a wall.
 A coarser grid across buys the depth: the detail it gives up in x and y is what the 4K layer and
-the particles bring back, the trade the ink roadmap made at 128 × 224 × 96. Only settings
-(`width`, `height`, `layers`; `layers`' maximum to 256).
+the particles bring back, the trade the ink roadmap made at 128 × 224 × 96. The deeper grids
+measured, and why this one, are in [TIMING.md](TIMING.md#the-grid).
 
 ## Later
 

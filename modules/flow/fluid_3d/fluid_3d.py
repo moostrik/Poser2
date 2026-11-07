@@ -63,6 +63,8 @@ _WALL_GL: dict = {
     WallMode.CLOSED: (GL_CLAMP_TO_EDGE,   (0.0, 0.0, 0.0, 0.0)),
 }
 
+FLUID_PASSES: tuple[str, ...] = ('dampen', 'advect velocity', 'viscosity', 'vorticity', 'advect temperature', 'buoyancy',
+                                 'pressure', 'density', 'composite')     # a step's passes, each a GPU timer
 DRAG_FLOOR: float = 0.02    # widths/s: the body's speed below which it drags nothing, so a dead trail pulls nothing toward 0
 
 import logging
@@ -147,6 +149,7 @@ class Fluid3D:
         self._wall_dirty: bool = False
 
         self._gpu_timer: GpuTimer = GpuTimer("GPU fluid")
+        self._pass_timers: dict[str, GpuTimer] = {name: GpuTimer(f"GPU fluid {name}") for name in FLUID_PASSES}
 
         # ---- Volumetric fields (SwapTexture3D for ping-pong) ----
         # Velocity always uses Dirichlet (v=0 at walls); others configurable via _apply_wall_modes().
@@ -301,6 +304,8 @@ class Fluid3D:
     def deallocate(self) -> None:
         """Release all GPU resources."""
         self._gpu_timer.deallocate()
+        for timer in self._pass_timers.values():
+            timer.deallocate()
         self._velocity.deallocate()
         for carrier in (self._grid_density, self._particle_density):
             carrier.deallocate()
@@ -379,20 +384,27 @@ class Fluid3D:
 
         # Dampen velocity (clean input for all steps)
         vel: VelocitySettings = self.settings.velocity
-        self._dampen(self._velocity, vel.dampen_threshold, vel.dampen_time, self._dt, include_alpha=False)
+        self._timed('dampen', lambda: self._dampen(self._velocity, vel.dampen_threshold, vel.dampen_time, self._dt,
+                                                   include_alpha=False))
 
-        # Simulation steps
-        self._advect_velocity()
-        self._apply_viscosity()
-        self._confine_vorticity()
-        self._advect_temperature()
-        self._apply_buoyancy()
-        self._enforce_incompressibility()
-        self._advect_density()
-        # Density dampen disabled — not meaningful for 3D and wastes a full-volume pass
-        self._composite_output()
+        # Simulation steps, each its own GPU timer inside the step's
+        self._timed('advect velocity', self._advect_velocity)
+        self._timed('viscosity', self._apply_viscosity)
+        self._timed('vorticity', self._confine_vorticity)
+        self._timed('advect temperature', self._advect_temperature)
+        self._timed('buoyancy', self._apply_buoyancy)
+        self._timed('pressure', self._enforce_incompressibility)
+        self._timed('density', self._advect_density)
+        self._timed('composite', self._composite_output)
 
         self._gpu_timer.end()
+
+    def _timed(self, name: str, work) -> None:
+        """`work` inside its pass's GPU timer, `GPU fluid <name>`."""
+        timer: GpuTimer = self._pass_timers[name]
+        timer.begin()
+        work()
+        timer.end()
 
     # ========== Pipeline Steps ==========
 

@@ -5,7 +5,9 @@ Two app-independent flow systems, each a pipeline of three stages, motion, bridg
 camera. Either system takes either kind of camera. An app picks a system and wires its cameras
 to it.
 
-"Code" is what the files show; **(deduction)** marks what is inferred from them.
+"Code" is what the files show; **(deduction)** marks what is inferred from them. The 3D fluid's
+design is in [FLUID_3D.md](FLUID_3D.md), and every stage's GPU time in deep_flow in
+[TIMING.md](TIMING.md).
 
 ## The two systems
 
@@ -37,6 +39,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 | injection            | one bridge output as one fluid takes it, at its weight                                                | `Injection`                                                        |
 | fluid                | the Navier–Stokes simulation; its density is the show                                                  | `fluid_2d/`, `fluid_3d/`, `Fluid2D`, `Fluid3D`                     |
 | volume               | the 3D fluid's z layers, where the body sits in them, and the composite's look                       | `VolumeSettings`, group `volume`                                   |
+| carrier              | what carries the 3D fluid's density through its velocity: the grid's volume, or particles           | `DensityCarrier`, `GridDensity`, `ParticleDensity`, `density.carrier` |
 | depth                | the camera's depth in metres, on the flow's view                                                      | `DepthView`                                                        |
 | depth velocity       | the z of the 3D flow: the depth change along the x/y displacement, in view widths per second          | `DepthVelocity`, `DepthVelocitySettings`, group `depth_velocity`   |
 | 2D flow, 3D flow     | a system: a motion layer and a bridge layer per camera, a fluid layer per show output                 | `Motion2DLayer` + `Bridge2DLayer` + `Fluid2DLayer`; `…3D…`         |
@@ -278,9 +281,8 @@ temperature are colored by a density and a temperature bridge per side, with the
 | `boundary`   | `velocity`, `density`, `temperature`     | velocities        | what the water is dragged toward; the density and the temperature as a brush, per width of travel |
 | `body_force` | `acceleration`, `density`, `temperature` | accelerations     | what is added × dt; the density and the temperature as a pipette, per Δv                          |
 
-The six outputs (`BridgeOutput`, `Injection`), and what the fluid does with each once the fluid
-refactor is in; today `Fluid3DLayer` adds the body force as it adds the boundary, the acceleration
-through `add_velocity`:
+The six outputs (`BridgeOutput`, `Injection`), and what the 3D fluid does with each
+([FLUID_3D.md](FLUID_3D.md)):
 
 | Output                    | Unit                       | The fluid                                                                       | Default       |
 |---------------------------|----------------------------|---------------------------------------------------------------------------------|---------------|
@@ -366,7 +368,7 @@ tested on it, and the lowpass's and the bandpass's own settings are left as the 
 | `modules/flow/bridge_2d/`       | the 2D bridge                                                                                                                                              |
 | `modules/flow/bridge_3d/`       | the 3D bridge                                                                                                                                              |
 | `modules/flow/fluid_2d/`        | `Fluid2D`, `Fluid2DSettings` with its own `VelocitySettings`, `DensitySettings`, `TemperatureSettings`, `PressureSettings`; `shaders/`                     |
-| `modules/flow/fluid_3d/`        | `Fluid3D`, `Fluid3DSettings` with its own groups and `VolumeSettings`; `shaders/`                                                                          |
+| `modules/flow/fluid_3d/`        | `Fluid3D`, `Fluid3DSettings` with its own groups, `VolumeSettings` and `ParticleSettings`; the density's carriers (`DensityCarrier`: `GridDensity`, `ParticleDensity`), `FieldAdvection`; `shaders/`; its document [FLUID_3D.md](FLUID_3D.md) |
 | `modules/flow/shaders/`         | the shared fragment shaders, `AddBoolean` among them                                                                                                       |
 | `modules/flow/time_step.py`, `modules/flow/wall_mode.py` | shared                                                                                                                            |
 | `modules/flow/port.py`          | `Port`, `Ports`, `TextureKind`, `HasPorts`, `OnDemand`, `prefixed`, `ports_of`                                                                             |
@@ -439,19 +441,10 @@ The shader loader finds a shader's source by its `.py` module name beside it
 
 ## Open
 
-- For the fluid refactor: a burst of false velocity slows the 3D fluid to 2 to 4 fps. With
-  `WARM_UP_TIME` 0, the exposure ramp at startup reads as x/y motion; with the fluid updated the
-  frame rate drops to 2 to 4 fps, without it it stays up **(site fact)**. Nothing in the fluid
-  loops by the velocity, so the cost is in its reads: the advection traces each texel back by
-  velocity × dt, noise points neighboring texels apart, and the density's advection over 2160 ×
-  3840 × 16 RGBA16F, about 1 GB, then misses the texture cache on every read **(deduction, not
-  measured)**. Ordinary motion moves neighbors alike and reads together. `dampen_threshold`
-  (5 widths per second over `dampen_time`, 0.5 s) is too slow to stop it. The motion's
-  warm-up keeps the startup burst out (`WARM_UP_TIME`); a capture run at 4 fps rather than 25
-  (`scripts/depth_velocity_capture.py`) was this burst **(site fact)**. What remains is the fluid's side: measure
-  the step's GPU time on a still velocity and on a burst, then cap the trace at a few cells per
-  step in the advection, which bounds the scatter whatever comes in and which real motion stays
-  under at 60 fps.
+- A burst of false velocity slowed the 3D fluid to 2 to 4 fps: with `WARM_UP_TIME` 0, the exposure
+  ramp at startup reads as x/y motion **(site fact)**; the motion's warm-up keeps it out. Whether
+  the fluid still slows on one, now that its density is 0.18 GB a buffer and the drag bounds the
+  speed a burst gives it, is [FLUID_3D.md](FLUID_3D.md)'s open check.
 - How the 2D fluid takes what the bridge gives: it adds the injected velocity times dt
   (`Fluid2D.add_velocity`), as Stam's Stable Fluids adds a source; but the bridge's velocity is a
   velocity, in view widths per second like the fluid's, so it is taken as an acceleration,
@@ -471,6 +464,7 @@ The shader loader finds a shader's source by its `.py` module name beside it
   `lucas_kanade_shader.frag`, `displacement_threshold.frag`, the change scalars and
   `magnitude_shader.frag`. It matters only where the target texture has that channel (an R16F
   target drops it). Each wants its readers checked first, as the velocities' were: there the
-  trails, the change shaders, `VelocityMagnitude` and `inject_flow_3d.comp` read xyz only,
-  `trail_advect.frag` carries the vec4 along unread, and `Fluid3D.set_velocity` has no caller.
+  trails, the change shaders, `VelocityMagnitude`, `boundary_velocity_3d.comp` and
+  `body_force_acceleration_3d.comp` read xyz only, and `trail_advect.frag` carries the vec4 along
+  unread.
   The visualization's own shaders keep alpha 1, since they draw for the screen.

@@ -4,6 +4,7 @@
 import logging
 
 # Local application imports
+from modules.gl import GpuTimer
 from modules.flow import LucasKanadeFlow3D, LucasKanadeFlow3DSettings, DepthView, HasPorts
 from .motion_layer import MotionLayer, MotionLayerSettings, MotionInput, MotionOutput
 
@@ -23,6 +24,7 @@ class Motion3DLayer(MotionLayer):
         self._cam_id: int = cam_id
         self._flow: LucasKanadeFlow3D = LucasKanadeFlow3D(settings)
         self._warned_view_span: bool = False
+        self._gpu_timer: GpuTimer = GpuTimer("GPU motion")     # a measure, on each new camera frame
 
     @property
     def output(self) -> MotionOutput:
@@ -38,6 +40,7 @@ class Motion3DLayer(MotionLayer):
 
     def _deallocate_stages(self) -> None:
         self._flow.deallocate()
+        self._gpu_timer.deallocate()
 
     def _reset_stages(self) -> None:
         self._flow.reset()
@@ -52,6 +55,8 @@ class Motion3DLayer(MotionLayer):
         if depth is not None and depth.view_span <= 0.0 and not self._warned_view_span:
             self._warned_view_span = True
             logger.warning("Motion3DLayer %d: depth is on but its view spans nothing, so z reads no motion", self._cam_id)
+        self._gpu_timer.begin()
         flow.update(depth.texture if depth is not None else None, interval,
                     depth.view_span if depth is not None else 0.0,
                     depth.depth_step if depth is not None else (0.0, 0.0))
+        self._gpu_timer.end()

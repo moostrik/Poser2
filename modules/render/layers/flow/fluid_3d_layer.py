@@ -5,7 +5,7 @@ The density volume holds the colored density (RGBA16F GL_TEXTURE_3D on the simul
 """
 
 # Local application imports
-from modules.gl import Texture
+from modules.gl import GpuTimer, Texture
 from modules.flow import Fluid3D, Fluid3DSettings, HasPorts
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidOutput, Injection
 
@@ -24,6 +24,7 @@ class Fluid3DLayer(FluidLayer):
         super().__init__(settings)
         self.settings: Fluid3DLayerSettings = settings
         self._fluid: Fluid3D = Fluid3D(settings)
+        self._inject_timer: GpuTimer = GpuTimer("GPU fluid inject")     # an injection's drag, force and sources
 
     @property
     def texture(self) -> Texture:
@@ -44,6 +45,7 @@ class Fluid3DLayer(FluidLayer):
 
     def deallocate(self) -> None:
         self._fluid.deallocate()
+        self._inject_timer.deallocate()
         super().deallocate()
 
     def reset(self) -> None:
@@ -53,6 +55,12 @@ class Fluid3DLayer(FluidLayer):
 
     def _inject(self, injection: Injection) -> None:
         fluid: Fluid3D = self._fluid
+        self._inject_timer.begin()
+        self._inject_into(fluid, injection)
+        self._inject_timer.end()
+
+    @staticmethod
+    def _inject_into(fluid: Fluid3D, injection: Injection) -> None:
         # The boundary's velocity is dragged toward, the body force's acceleration added × dt; the z (blue) of
         # each is the w
         fluid.drag_velocity(injection.boundary_velocity, injection.weight)

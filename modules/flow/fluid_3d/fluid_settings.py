@@ -37,7 +37,7 @@ class Overlap(IntEnum):
 
 class ParticleSettings(BaseSettings):
     """The particle carrier: the ring, the emission, the look."""
-    count: Field[int]               = Field(32_000_000, min=100_000, max=100_000_000, step=100_000,      description="Particles in the ring, the most alive at once; 32 bytes each")
+    count: Field[int]               = Field(2_000_000, min=100_000, max=100_000_000, step=100_000,      description="Particles in the ring, the most alive at once; 32 bytes each")
     rate: Field[float]              = Field(20.0,   min=0.1,    max=200.0,                              description="Particles per texel per second where ink is (fewer: heavier, bigger blobs)")
     ring_fade: Field[float]         = Field(0.1,    min=0.01,   max=1.0,                                description="The ring's last share the oldest fade over before they are overwritten")
     draw: Field[ParticleDraw]       = Field(ParticleDraw.POINTS,                                        description="Points, streaks, blobs or a surface")
@@ -106,9 +106,9 @@ class PressureSettings(BaseSettings):
 
 class VolumeSettings(BaseSettings):
     """The volume: the grid's z layers, where the body sits in it, and the composite's look."""
-    layers: Field[int]              = Field(64,   min=1,    max=128,    description="z layers; the cells are cubic, so the slab is layers / width deep")
+    layers: Field[int]              = Field(128,  min=1,    max=256,    description="z layers; the cells are cubic, so the slab is layers / width deep")
     injection_layer: Field[float]   = Field(0.5,  min=0.0,  max=1.0,    description="Normalized depth of the injection's center, where the body sits")
-    injection_spread: Field[float]  = Field(0.024, min=0.001, max=0.2,  step=0.001, description="Gaussian sigma of the injection's depth (widths); 0.024 keeps 3 sigma inside the 0.14 slab")
+    injection_spread: Field[float]  = Field(0.075, min=0.001, max=0.2,  step=0.001, description="Gaussian sigma of the injection's depth (widths); 0.075 = a body 0.3 widths thick")
     emission: Field[float]          = Field(1.0,  min=0.0,  max=8.0,    color="amber",          description="Brightness gain per unit density")
     absorption: Field[float]        = Field(4.0,  min=0.01, max=50.0,   color="deep-orange",    description="Occlusion: extinction per unit density (near density covers far density)")
     glow: Field[float]              = Field(0.25, min=0.0,  max=1.0,    color="yellow",         description="Additive glow mix: 1 = additive (depth invisible)")
@@ -130,8 +130,8 @@ class Fluid3DSettings(BaseSettings):
     """
 
     # ---- Grid dimensions (multiples of 32) ----
-    width: Field[int]               = Field(1024,   min=32,     max=4096,   step=32,    description="Simulation grid width")
-    height: Field[int]              = Field(576,    min=32,     max=4096,   step=32,    description="Simulation grid height")
+    width: Field[int]               = Field(256,    min=32,     max=4096,   step=32,    description="Simulation grid width")
+    height: Field[int]              = Field(448,    min=32,     max=4096,   step=32,    description="Simulation grid height")
     time_step: Field[TimeStepMode]  = Field(TimeStepMode.MEASURED,                  description="Step by the measured render rate, or by a fixed rate")
     fixed_fps: Field[float]         = Field(60.0,   min=1.0,    max=240.0,              description="Steps per second in fixed mode (fps)")
     fps_smoothing: Field[float]     = Field(1.0,    min=0.0,    max=10.0,               description="Smoothing of the measured rate in measured mode (s); 0 follows each frame")

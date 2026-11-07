@@ -26,7 +26,7 @@ from OpenGL.GL import (GL_COLOR, GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_
                        glDeleteFramebuffers, glDrawBuffers, glEnable, glFramebufferTexture2D, glGenFramebuffers,
                        glGetFloatv, glMemoryBarrier, glViewport)
 
-from modules.gl import LayeredFbo, StorageBuffer, Style, Texture, Texture3D
+from modules.gl import GpuTimer, LayeredFbo, StorageBuffer, Style, Texture, Texture3D
 from ..port import Port
 from ..wall_mode import WallMode
 from .density_carrier import CarrierStep, DensityCarrier
@@ -90,6 +90,11 @@ class ParticleDensity(DensityCarrier):
         self._surface_shader: ParticleSurface = ParticleSurface()
         self._smooth_shader: ParticleSurfaceSmooth = ParticleSurfaceSmooth()
         self._shade_shader: ParticleSurfaceShade = ParticleSurfaceShade()
+        # The passes' GPU timers, inside the fluid's density and composite timers
+        self._emit_timer: GpuTimer = GpuTimer("GPU particles emit")
+        self._advect_timer: GpuTimer = GpuTimer("GPU particles advect")
+        self._draw_timer: GpuTimer = GpuTimer("GPU particles draw")         # the sprites or the spheres into their targets
+        self._march_timer: GpuTimer = GpuTimer("GPU particles march")       # the slices' march, or the surface's filter and shade
 
     def _shaders(self) -> tuple:
         return (self._emit_shader, self._ring_shader, self._advect_shader, self._sprites_shader, self._composite_shader,
@@ -118,6 +123,8 @@ class ParticleDensity(DensityCarrier):
         self._deallocate_surface()
         for shader in self._shaders():
             shader.deallocate()
+        for timer in (self._emit_timer, self._advect_timer, self._draw_timer, self._march_timer):
+            timer.deallocate()
 
     @property
     def allocated(self) -> bool:
@@ -146,20 +153,24 @@ class ParticleDensity(DensityCarrier):
             return
         self._seed += 1
         self._scale = (self._output[0] * self._output[1]) / max(1, texture.width * texture.height)
+        self._emit_timer.begin()
         self._emit_shader.use(texture, self._particles, self._ring, self._count, gain=gain, dt=dt,
                               rate=self.settings.particles.rate, floor=AMOUNT_FLOOR,
                               slab=slab_sum(layer, spread, self._layers), layer=layer_center(layer, self._layers),
                               spread=spread, seed=self._seed)
+        self._emit_timer.end()
 
     def update(self, step: CarrierStep) -> None:
         if not self.allocated:
             return
+        self._advect_timer.begin()
         self._ring_shader.use(self._ring, self._count)
         self._advect_shader.use(self._particles, self._count, step.velocity, aspect=step.aspect, z_extent=step.z_extent,
                                 timestep=step.step, dt=step.dt, dissipation=step.dissipation,
                                 evaporation=self.settings.density.evaporation * step.dt * self._reference_mass(),
                                 closed_xy=self.settings.density.wall == WallMode.CLOSED,
                                 closed_z=self.settings.volume.wall == WallMode.CLOSED)
+        self._advect_timer.end()
 
     # ========== Drawing ==========
 
@@ -182,6 +193,7 @@ class ParticleDensity(DensityCarrier):
             target.deallocate()
             target.allocate(width, height, int(particles.slices), GL_RGBA16F)
 
+        self._draw_timer.begin()
         target.begin()
         glClearColor(0.0, 0.0, 0.0, 0.0)
         glClear(GL_COLOR_BUFFER_BIT)
@@ -196,10 +208,13 @@ class ParticleDensity(DensityCarrier):
         Style.pop_style()
         target.end()
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        self._draw_timer.end()
 
+        self._march_timer.begin()
         self._composite_shader.use(target, slices, output, emission=volume.emission, absorption=volume.absorption,
                                    tint=volume.tint, fog=0.0 if additive else volume.fog, glow=volume.glow)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        self._march_timer.end()
 
     def _allocate_surface(self) -> None:
         width, height = self._output
@@ -231,6 +246,7 @@ class ParticleDensity(DensityCarrier):
             self._deallocate_surface()
             self._allocate_surface()
 
+        self._draw_timer.begin()
         glBindFramebuffer(GL_FRAMEBUFFER, self._surface_fbo)
         glViewport(0, 0, width, height)
         glClearBufferfv(GL_COLOR, 0, (1.0, 1.0, 1.0, 1.0))
@@ -247,7 +263,9 @@ class ParticleDensity(DensityCarrier):
         Style.pop_style()
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        self._draw_timer.end()
 
+        self._march_timer.begin()
         # The filter reaches half a sphere's radius each way, a sphere's depth its range: neighbors melt, a
         # drop's edge against the empty water stays
         depth: Texture = self._surface_depth
@@ -262,6 +280,7 @@ class ParticleDensity(DensityCarrier):
                                depth_per_pixel=width * self._z_extent, emission=volume.emission,
                                absorption=volume.absorption, tint=volume.tint, fog=volume.fog)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        self._march_timer.end()
 
     # ========== Outputs ==========
 

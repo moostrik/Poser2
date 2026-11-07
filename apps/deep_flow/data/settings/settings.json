@@ -515,8 +515,8 @@
       }
     },
     "fluid": {
-      "width": 448,
-      "height": 800,
+      "width": 256,
+      "height": 448,
       "blend_mode": "ADD",
       "time_step": "MEASURED",
       "fixed_fps": 60.0,
@@ -531,9 +531,9 @@
         "gain": 1.0
       },
       "volume": {
-        "layers": 64,
+        "layers": 128,
         "injection_layer": 0.5,
-        "injection_spread": 0.024,
+        "injection_spread": 0.075,
         "emission": 1.16,
         "absorption": 2.86,
         "glow": 0.1,
@@ -561,7 +561,7 @@
         "wall": "CLOSED"
       },
       "particles": {
-        "count": 100000,
+        "count": 1000000,
         "rate": 0.1,
         "ring_fade": 0.1,
         "draw": "STREAKS",

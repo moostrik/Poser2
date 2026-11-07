@@ -119,6 +119,9 @@ class Bridge3DLayer(BridgeLayer):
         self._body_force_density: DensityBridge = DensityBridge(settings.body_force.density)
         self._body_force_temperature: TemperatureBridge = TemperatureBridge(settings.body_force.temperature)
         self._gpu_timer: GpuTimer = GpuTimer("GPU bridge")
+        self._lowpass_timer: GpuTimer = GpuTimer("GPU bridge lowpass")
+        self._bandpass_timer: GpuTimer = GpuTimer("GPU bridge bandpass")
+        self._mix_timer: GpuTimer = GpuTimer("GPU bridge mix")      # the outputs' mixes, the densities and temperatures
 
     @property
     def output(self) -> BridgeOutput:
@@ -176,7 +179,8 @@ class Bridge3DLayer(BridgeLayer):
     def deallocate(self) -> None:
         super().deallocate()
         self._mix_shader.deallocate()
-        self._gpu_timer.deallocate()
+        for timer in (self._gpu_timer, self._lowpass_timer, self._bandpass_timer, self._mix_timer):
+            timer.deallocate()
 
     def _mix_fbos(self) -> tuple[tuple[Fbo, int], ...]:
         return ((self._boundary_velocity, GL_RGBA16F), (self._boundary_density_amount, GL_R32F),
@@ -214,11 +218,16 @@ class Bridge3DLayer(BridgeLayer):
         body_force: tuple[MixSettings, ...] = self._body_force_mixes()
         mixes: tuple[MixSettings, ...] = (*self._boundary_mixes(), *body_force)
 
+        self._lowpass_timer.begin()
         self._lowpass.set_velocity(input.velocity)
         self._lowpass.update(input.dt, self._lowpass_shown or any(mix.trail > 0.0 for mix in body_force))
+        self._lowpass_timer.end()
+        self._bandpass_timer.begin()
         self._update_bandpass(input, self._bandpass_shown or any(self._mixed(mix, BANDPASS_READINGS) for mix in mixes),
                               self._bandpass_shown or any(self._mixed(mix, BANDPASS_READINGS) for mix in body_force))
+        self._bandpass_timer.end()
         self._lowpass_shown = self._bandpass_shown = False
+        self._mix_timer.begin()
 
         boundary: BoundarySettings = self.settings.boundary
         self._mix(self._boundary_velocity, self._velocities(), boundary.velocity)
@@ -236,6 +245,7 @@ class Bridge3DLayer(BridgeLayer):
         if self._mixed(side.temperature):
             self._mix(self._body_force_temperature_amount, self._accelerations(), side.temperature, lengths=True)
             self._update_temperature(self._body_force_temperature, self._body_force_temperature_amount, color)
+        self._mix_timer.end()
         self._gpu_timer.end()
 
     def _velocities(self) -> dict[str, Texture]:
