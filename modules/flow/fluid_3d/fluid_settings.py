@@ -37,16 +37,16 @@ class Overlap(IntEnum):
 
 class ParticleSettings(BaseSettings):
     """The particle carrier: the ring, the emission, the look."""
-    count: Field[int]               = Field(2_000_000, min=100_000, max=100_000_000, step=100_000,      description="Particles in the ring, the most alive at once; 32 bytes each")
-    rate: Field[float]              = Field(20.0,   min=0.1,    max=200.0,                              description="Particles per texel per second where ink is (fewer: heavier, bigger blobs)")
+    count: Field[int]               = Field(2_000_000, min=10_000, max=8_000_000, step=10_000,     description="Particles in the ring, the most alive at once; 32 bytes each")
+    rate: Field[float]              = Field(20.0,   min=0.01,   max=50.0,                               description="Particles per texel per second where ink is (fewer: heavier, bigger blobs)")
     ring_fade: Field[float]         = Field(0.1,    min=0.01,   max=1.0,                                description="The ring's last share the oldest fade over before they are overwritten")
     draw: Field[ParticleDraw]       = Field(ParticleDraw.POINTS,                                        description="Points, streaks, blobs or a surface")
     overlap: Field[Overlap]         = Field(Overlap.OCCLUDED,                                           description="Occluded: near ink covers far ink. Additive: one sum")
     slices: Field[int]              = Field(16,     min=2,      max=32,                                 description="Depth slices of the occluded look, at the output's size")
     size: Field[float]              = Field(1.0,    min=1.0,    max=8.0,                                description="A point's size in pixels")
     streak: Field[float]            = Field(1.0,    min=0.0,    max=4.0,                                description="A streak's length as a share of its step")
-    radius: Field[float]            = Field(24.0,   min=0.5,    max=128.0,                              description="A blob's or a sphere's radius in output pixels at the reference mass")
-    spread: Field[float]            = Field(2.0,    min=0.0,    max=50.0,                               description="A blob's widening with age (pixels² per second), at most twice its radius")
+    radius: Field[float]            = Field(24.0,   min=1.0,    max=48.0,                               description="A blob's or a sphere's radius in output pixels at the reference mass")
+    spread: Field[float]            = Field(2.0,    min=0.0,    max=10.0,                               description="A blob's widening with age (pixels² per second), at most twice its radius")
     smooth: Field[int]              = Field(3,      min=0,      max=8,                                  description="The surface's smoothing passes")
 
 
