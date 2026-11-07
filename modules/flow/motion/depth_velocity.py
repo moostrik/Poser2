@@ -18,6 +18,11 @@ where the displacement is unsure, at an edge, a track is never carried over from
 passing over the pixel, the track starts over with no rate. With `smooth` 0 and a full window it is
 the plain change between two frames.
 
+`tolerance` tells surfaces apart in space, within the window and against the carried track; it is no limit on
+speed: 0.2 m a frame is 5 m/s at 25 fps, and a fast hand's sloped edge sliding off a pixel steps its depth by
+less than that each frame while the track's rate adds up to 9–11 m/s, no motion of a body. With `max_speed`
+(m/s), a track whose depth would move faster than a body part does reads another surface and starts over.
+
 A surface's depth wanders by a few mm, and its steps are a mm; the track reads both as slow motion.
 With `dead_zone` (m), each pixel holds an anchor: while the track stays within the dead zone of it,
 z is 0; past it, z reads at its full speed and the anchor is dragged along behind, so a real motion
@@ -62,6 +67,7 @@ class DepthVelocitySettings(BaseSettings):
     xy_smooth:      Field[bool]  = Field(False, width=48, description="x/y smoothed over smooth, so both lag alike (on: less noise, more lag)")
     catch_up:       Field[float] = Field(8.0, min=0.0, max=50.0, step=1.0, description="Shorter smoothing during a fast push, in ms, 0 = off (lower: quicker pushes)")
     dead_zone:      Field[float] = Field(0.02, min=0.0, max=0.05, step=0.001, newline=True, description="Depth drift ignored before z counts as motion, in m (higher: less drift, slower start)")
+    max_speed:      Field[float] = Field(6.0, min=0.0, max=20.0, step=0.5, description="The fastest a body part moves in depth, m/s; a faster track reads another surface (0 = off)")
     threshold:      Field[float] = Field(1.0, min=0.0, max=5.0, step=0.05, description="z below this is noise, in px/frame (higher: less noise, less slow z)")
 
 
@@ -146,7 +152,7 @@ class DepthVelocity(FlowBase):
 
     def update_depth(self, depth: Texture, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
                      smooth: float, threshold: float, tolerance: float, dead_zone: float, catch_up_smooth: float, motion_floor: float,
-                     displacement: Texture | None = None, edge: float | None = None) -> None:
+                     displacement: Texture | None = None, edge: float | None = None, max_speed: float = 0.0) -> None:
         """Advance on a new flow frame: correct the track by the new depth, then take the noise floor off.
 
         Args:
@@ -164,6 +170,7 @@ class DepthVelocity(FlowBase):
             displacement: How far each pixel moved since then (uv); when given, the track is carried
                 along the motion (Lucas–Kanade flow)
             edge: Depth step within a 3×3 of depth samples that marks an edge, dropped (m); None takes `tolerance`
+            max_speed: The fastest a body part moves in depth (m/s), the speed gate; 0 is none
         """
         if not self._allocated:
             return
@@ -184,7 +191,7 @@ class DepthVelocity(FlowBase):
             target.begin()
             self._velocity_shader.use(self._input_fbo, self._track.back, self._catch_up.back, catch_up_pass,
                                       float(alpha), smooth, catch_up_smooth, float(alpha), motion_floor, max(delta_time, 1e-6), view_span,
-                                      step, window, tolerance, dead_zone, displacement)
+                                      step, window, tolerance, dead_zone, displacement, max_speed)
             target.end()
 
         self._output_fbo.begin()
@@ -259,7 +266,7 @@ def color_motion(displacement: np.ndarray, motion_floor: float) -> np.ndarray:
 
 def track_depth(depth: np.ndarray, state: np.ndarray, catch_up: np.ndarray, displacement: np.ndarray, delta_time: float, window: int,
                 step: tuple[float, float], tolerance: float, smooth: float, view_span: float, dead_zone: float,
-                catch_up_smooth: float, motion_floor: float) -> tuple[np.ndarray, np.ndarray]:
+                catch_up_smooth: float, motion_floor: float, max_speed: float = 0.0) -> tuple[np.ndarray, np.ndarray]:
     """The depth track one frame on (H, W, 4): z in view widths per frame, disparity (1/m), its rate
     (1/m per second) and its anchor (m); and its catch-up (H, W, 2): the Emas of its miss of the
     prediction, signed and its size (m). As the shader writes them, in its two runs; `catch_up` is
@@ -319,8 +326,17 @@ def track_depth(depth: np.ndarray, state: np.ndarray, catch_up: np.ndarray, disp
     else:
         alpha, beta = track_weights(delta_time, smooth, share)
     residual: np.ndarray = measurement - predicted
-    disparity: np.ndarray = np.where(follows, predicted + alpha * residual, measurement)
-    rate: np.ndarray = np.where(follows, carried_rate + beta * residual / dt, 0.0)
+    corrected: np.ndarray = predicted + alpha * residual
+    rate: np.ndarray = carried_rate + beta * residual / dt
+    # the speed gate: a track whose depth would move faster than a body part does reads another surface sliding
+    # over the pixel, not a motion: it starts over, its catch-up with it
+    if max_speed > 0.0:
+        too_fast: np.ndarray = follows & (np.abs(rate) / np.where(follows, corrected * corrected, 1.0) > max_speed)
+        follows = follows & ~too_fast
+        signed = np.where(too_fast, 0.0, signed)
+        size = np.where(too_fast, 0.0, size)
+    disparity: np.ndarray = np.where(follows, corrected, measurement)
+    rate = np.where(follows, rate, 0.0)
     z: np.ndarray = np.where(follows, rate * dt / (np.where(follows, disparity, 1.0) * max(view_span, 1e-9)), 0.0)
 
     # the dead zone: within `dead_zone` of its anchor the track reads no z; past it, z at its full

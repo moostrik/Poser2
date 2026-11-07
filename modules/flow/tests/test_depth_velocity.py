@@ -307,6 +307,35 @@ class CatchUpTest(unittest.TestCase):
         np.testing.assert_allclose(states[-1][1, 1, 1], 1.0 / 0.7)
 
 
+class SpeedGateTest(unittest.TestCase):
+    """With `max_speed`, a track whose depth would move faster than a body part does reads another surface sliding
+    over the pixel, and starts over; a real push under it is followed as before."""
+
+    @staticmethod
+    def follow(depths: list[np.ndarray], max_speed: float) -> list[np.ndarray]:
+        state, catch_up, states = np.zeros((SIZE, SIZE, 4)), np.zeros((SIZE, SIZE, 2)), []
+        for depth in depths:
+            state, catch_up = track_depth(depth, state, catch_up, CatchUpTest.MOVING, 0.02, 0, STEP, 0.2, 50.0, SPAN, 0.02,
+                                          12.5, 0.5, max_speed)
+            states.append(state)
+        return states
+
+    @staticmethod
+    def speed(state: np.ndarray) -> float:
+        return abs(float(state[1, 1, 2])) / float(state[1, 1, 1]) ** 2 if state[1, 1, 1] > 0 else 0.0
+
+    def test_a_sweep_too_fast_for_a_body_starts_over(self) -> None:
+        # a hand's sloped edge leaving the pixel: the depth steps 14 cm a frame at 50 fps, each within tolerance
+        depths = [uniform(0.4)] * 6 + [uniform(0.4 + 0.14 * k) for k in range(1, 5)]
+        self.assertGreater(max(self.speed(s) for s in self.follow(depths, 0.0)), 6.0)       # without it: 7 m/s and more
+        self.assertLessEqual(max(self.speed(s) for s in self.follow(depths, 6.0)), 6.0)
+
+    def test_a_push_to_6_m_s_is_followed_as_before(self) -> None:
+        for speed in (3.0, 4.0, 6.0):
+            for a, b in zip(self.follow(CatchUpTest.approach(speed), 6.0), self.follow(CatchUpTest.approach(speed), 0.0)):
+                np.testing.assert_array_equal(a, b)
+
+
 class StepFilterTest(unittest.TestCase):
     """Before the track, a sample whose 3×3 depth samples span two surfaces has no depth."""
 

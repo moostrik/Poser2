@@ -149,7 +149,7 @@ class LucasKanadeFlow3D:
         if depth is not None:
             self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, z_s.window, z_s.smooth,
                                               z_s.threshold, z_s.tolerance, z_s.dead_zone, z_s.catch_up, xy_s.threshold,
-                                              solved, z_s.edge)
+                                              solved, z_s.edge, z_s.max_speed)
 
         xy: Texture = self._flow.displacement
         if z_s.xy_smooth:

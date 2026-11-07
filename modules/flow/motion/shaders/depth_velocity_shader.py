@@ -14,7 +14,7 @@ class DepthVelocityShader(Shader):
 
     def use(self, depth: Texture, track: Texture, catch_up: Texture, catch_up_pass: bool, alpha: float, smooth: float, catch_up_smooth: float,
             ema: float, motion_floor: float, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
-            tolerance: float, dead_zone: float, displacement: Texture | None = None) -> None:
+            tolerance: float, dead_zone: float, displacement: Texture | None = None, max_speed: float = 0.0) -> None:
         """Correct the track by the new depth, or with `catch_up_pass` write this frame's catch-up.
 
         Args:
@@ -34,6 +34,7 @@ class DepthVelocityShader(Shader):
             tolerance: Depth further than this is another surface: not averaged in, the track starts over (m)
             dead_zone: Depth the track wanders within its anchor without z (m); 0 is none
             displacement: uv per frame; when given, the track is carried from where each pixel came from
+            max_speed: The fastest a body part moves in depth (m/s); a track past it starts over. 0 is none
         """
         if not self.allocated or not self.shader_program:
             return
@@ -72,5 +73,6 @@ class DepthVelocityShader(Shader):
         glUniform1f(self.get_uniform_loc("delta_time"), delta_time)
         glUniform1f(self.get_uniform_loc("view_span"), view_span)
         glUniform1f(self.get_uniform_loc("dead_zone"), dead_zone)
+        glUniform1f(self.get_uniform_loc("max_speed"), max_speed)
 
         draw_quad()

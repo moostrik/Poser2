@@ -38,6 +38,7 @@ uniform float motion_floor;         // Displacement the image must move by to ca
 uniform float delta_time;           // Seconds since the last depth
 uniform float view_span; // Metres one view width spans per metre of depth
 uniform float dead_zone; // Depth the track wanders within its anchor without z (m); 0 is none
+uniform float max_speed; // The fastest a body part moves in depth (m/s): a track past it reads another surface; 0 is none
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -126,14 +127,6 @@ void main() {
 
     bool follows = predicted > 0.0 && abs(miss) <= tolerance;
     vec2 emas = follows ? last + ema * (vec2(miss, abs(miss)) - last) : vec2(0.0);
-    if (catch_up_pass) {
-        fragColor = vec4(emas, 0.0, 1.0);
-        return;
-    }
-    if (!follows) {
-        fragColor = vec4(0.0, measurement, 0.0, 1.0 / measurement);
-        return;
-    }
     float full = alpha;
     if (catching) {
         float opened = catch_up_share(emas.x, emas.y) * float(warp && moving(size));
@@ -145,6 +138,21 @@ void main() {
     float residual = measurement - predicted;
     float disparity = predicted + a * residual;
     float rate = track.y + b * residual / delta_time;
+    // The speed gate: a track whose depth would move faster than a body part does is reading another surface
+    // sliding over the pixel (a fast hand's edge leaving it), not a motion: it starts over. The depth's speed
+    // is the disparity's rate over the disparity squared
+    if (follows && max_speed > 0.0 && abs(rate) / (disparity * disparity) > max_speed) {
+        follows = false;
+        emas = vec2(0.0);
+    }
+    if (catch_up_pass) {
+        fragColor = vec4(emas, 0.0, 1.0);
+        return;
+    }
+    if (!follows) {
+        fragColor = vec4(0.0, measurement, 0.0, 1.0 / measurement);
+        return;
+    }
     float z = rate * delta_time / (disparity * view_span);
 
     float tracked = 1.0 / disparity;
