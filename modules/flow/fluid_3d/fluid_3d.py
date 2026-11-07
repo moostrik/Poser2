@@ -155,6 +155,7 @@ class Fluid3D:
         # Velocity always uses Dirichlet (v=0 at walls); others configurable via _apply_wall_modes().
         self._velocity: SwapTexture3D = SwapTexture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         self._temperature: SwapTexture3D = SwapTexture3D()
+        self._temperature_clear: bool = False      # both buffers 0 since buoyancy went to 0
         self._pressure: SwapTexture3D = SwapTexture3D()
         # The MacCormack predictors, one per carried field, allocated at its first MacCormack step
         self._velocity_scratch: Texture3D = Texture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
@@ -367,6 +368,7 @@ class Fluid3D:
         self._velocity.clear_all()
         self._carrier.reset()
         self._temperature.clear_all()
+        self._temperature_clear = True
         self._pressure.clear_all()
 
     def update(self, dt: float) -> None:
@@ -485,8 +487,11 @@ class Fluid3D:
     def _advect_temperature(self) -> None:
         """Advect & dissipate the temperature scalar field."""
         if self.settings.temperature.buoyancy == 0.0:
-            self._temperature.clear_all()
+            if not self._temperature_clear:     # cleared once; nothing adds to it while buoyancy is 0
+                self._temperature.clear_all()
+                self._temperature_clear = True
             return
+        self._temperature_clear = False
 
         advect_step = self._dt * self.settings.speed
         dissipation = self._calculate_dissipation(self._dt, self.settings.temperature.fade_time)
@@ -709,10 +714,14 @@ class Fluid3D:
 
     def add_boundary_temperature(self, texture: Texture, weight: float = 1.0) -> None:
         """The boundary's temperature (widths/s, signed by the color) × temperature.boundary_gain × dt into the slab."""
+        if self.settings.temperature.buoyancy == 0.0:      # nothing reads it
+            return
         self._add_source(texture, self._temperature, weight * self.settings.temperature.boundary_gain, GL_R16F)
 
     def add_body_force_temperature(self, texture: Texture, weight: float = 1.0) -> None:
         """The body force's temperature (widths/s², signed by the color) × temperature.body_force_gain × dt into the slab."""
+        if self.settings.temperature.buoyancy == 0.0:      # nothing reads it
+            return
         self._add_source(texture, self._temperature, weight * self.settings.temperature.body_force_gain, GL_R16F)
 
     def _add_source(self, texture: Texture, volume: SwapTexture3D, gain: float, internal_format: int) -> None:

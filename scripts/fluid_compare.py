@@ -1,6 +1,6 @@
 """Play saved frames through the Lucas–Kanade flow, the 3D bridge and the 3D fluid, side by side, and measure the fluid.
 
-    python scripts/fluid_compare.py FRAMES [--side NAME[:PATH=VALUE,...]] ... [--every N] [--output W H]
+    python scripts/fluid_compare.py FRAMES [--side NAME[:PATH=VALUE,...]] ... [--every N] [--output W H] [--save DIR]
 
 FRAMES is what depth_velocity_capture saved from one loop of a recording. No app and no camera: a hidden window
 gives the GL context, one `LucasKanadeFlow3D` measures the saved frames with the settings they were saved with,
@@ -8,7 +8,9 @@ and every side is a `Bridge3DLayer` and a `Fluid3DLayer` on its velocity, with d
 `render.fluid`); PATH=VALUE sets one setting by its panel path under `bridge.` or `fluid.`
 (fluid.boundary.drag_time=50, bridge.readings.lowpass.smooth=300, fluid.boundary.gain=2). The bridge and the
 fluid step once per flow frame by the frame's saved interval; `--every N` steps them once per N frames with the
-frames' summed interval (the flow still measures every frame), a frame-rate check.
+frames' summed interval (the flow still measures every frame), a frame-rate check. `--save DIR` writes every side's
+composited output at four steps of the loop, a quarter apart, as 8-bit PNGs (DIR/<side>_<step>.png), for a picture
+compared across two runs.
 
 Measured per frame on the moving player (the mask, 12 px and more inside, where it moves in the loop):
     body       the boundary velocity's |xy| mean, widths/s: what the water is dragged toward
@@ -162,12 +164,20 @@ def per_width(side: Side, frames: Frames) -> float:
     return side.series['density'].player[-1] / max(travel, 1e-9)
 
 
+def save_output(side: Side, path: Path) -> None:
+    """The side's composited output as an 8-bit PNG, the color times its alpha, top row first."""
+    rgba = read_back(side.fluid.texture)
+    rgb = np.clip(rgba[..., :3], 0.0, 1.0)
+    cv2.imwrite(str(path), cv2.cvtColor((rgb * 255.0 + 0.5).astype(np.uint8), cv2.COLOR_RGB2BGR))
+
+
 def main() -> int:
     assert __doc__ is not None
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('frames', type=Path)
     parser.add_argument('--side', action='append', default=[], metavar='NAME[:PATH=VALUE,...]')
     parser.add_argument('--every', type=int, default=1, help='step the bridge and the fluid once per N frames')
+    parser.add_argument('--save', type=Path, default=None, help='write the outputs at four steps here')
     parser.add_argument('--output', type=int, nargs=2, default=(2160, 3840), metavar=('W', 'H'),
                         help="the fluid's output allocation, as deep_flow's large layers (default 2160 3840)")
     args = parser.parse_args()
@@ -186,6 +196,10 @@ def main() -> int:
 
     luminance, depth_texture, mask_texture = Texture(), Texture(), Texture()
     pending: float = 0.0
+    steps = len(frames) // args.every
+    saved = {max(1, steps * q // 4) for q in range(1, 5)}
+    if args.save is not None:
+        args.save.mkdir(parents=True, exist_ok=True)
     for k in range(len(frames)):
         lum, depth, mask = frames.load(k)
         upload(luminance, lum); upload(depth_texture, depth); upload(mask_texture, mask.astype(np.float32))
@@ -203,6 +217,9 @@ def main() -> int:
         for side in sides:
             side.step(flow.velocity, mask_texture, pending)
             side.measure(moving, core, still)
+            step = len(side.milliseconds)
+            if args.save is not None and step in saved:
+                save_output(side, args.save / f'{side.name}_{step}.png')
         pending = 0.0
 
     stepped = frames.t[args.every - 1::args.every][:len(sides[0].series['body'].player)]

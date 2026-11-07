@@ -18,7 +18,7 @@ A step (`Fluid3D.update`), in order, at the preset (`apps/deep_flow/data/setting
 | advect_vel  | semi-Lagrangian self-advection, `self_advection` 1, fade 60 s                         | velocity              | the trace distance   |
 | viscosity   | Jacobi diffusion, off (`viscosity` 0)                                                 | velocity              | no                   |
 | vorticity   | curl, confinement force × dt, added to the velocity                                   | velocity, curl, force | no                   |
-| advect_temp | off (`buoyancy` 0 clears the temperature)                                             | temperature           | the trace distance   |
+| advect_temp | off: `buoyancy` 0 clears the temperature once, and nothing is injected into it  | temperature           | the trace distance   |
 | buoyancy    | gravity × (sink × density − buoyancy × ΔT) × dt; gravity is 0 in the preset           | force                 | no                   |
 | incompress  | divergence, 40 Jacobi iterations, gradient subtraction, on the walls ([The walls](#the-walls)) | pressure, velocity | no              |
 | advect_den  | semi-Lagrangian advection, one trilinear read per texel, the evaporation subtracted   | density 256×448×128   | the trace distance   |
@@ -328,7 +328,7 @@ top speed ([The guard](#the-guard)) the first thing to try.
 
 ## Next
 
-Three steps, discussed one by one before any is built; each gets its decisions here as they are
+Four steps, discussed one by one before any is built; each gets its decisions here as they are
 made.
 
 | Step | What                                                                                     | Judge on                                              |
@@ -336,6 +336,7 @@ made.
 | 6    | Built, [MacCormack](#maccormack) | a drop's ring keeps turning; a thin thread stays thin; the step's GPU time |
 | 7    | Built, [the particles](#step-7-the-particles); the weight (the splat back for the buoyancy) to come | a drop reads as a drop next to the grid's; 4K without sparkle at 60 fps |
 | 8    | A better 4K upscale, parked ([Step 8](#step-8-the-4k-upscale-parked)) | the edges at 2160 × 3840 |
+| 9    | Faster, one change at a time ([Step 9](#step-9-faster)), to be reviewed | the pass's GPU time, the physics and the picture the same |
 
 ### MacCormack
 
@@ -475,6 +476,55 @@ The grid's depth: 256 × 448 × 128, half a width deep, so the body's z motion h
 A coarser grid across buys the depth: the detail it gives up in x and y is what the 4K layer and
 the particles bring back, the trade the ink roadmap made at 128 × 224 × 96. The deeper grids
 measured, and why this one, are in [TIMING.md](TIMING.md#the-grid).
+
+### Step 9: faster
+
+The changes of [TIMING.md's Faster](TIMING.md#faster), one at a time. Each is built behind its own
+switch, measured against the baseline, and then kept one of two ways or dropped:
+
+| Outcome                                               | Kept as                                                                   |
+|-------------------------------------------------------|---------------------------------------------------------------------------|
+| faster, and the same result                           | a replacement: the old path removed, no setting                           |
+| faster, and a different result (a solver, a look)     | an option on the panel, as `advection` is, the current way staying the default until he picks |
+| not faster                                            | dropped, its row kept in TIMING.md                                        |
+
+The test, the same for every item: three timing runs back to back, baseline, change, baseline
+(`-timing 60 -warmup 10`, the pose on, standmoves), the pass's own GPU timer the measure: the two
+baselines' difference is the noise, and the change counts as faster when it beats the pass it
+replaces by at least 2.5 times that; then
+`scripts/fluid_compare.py` on stillslowfast, A the baseline, B the change, its numbers and the
+composited output side by side (a `--save` to add). The same numbers and the same picture: a
+replacement. Different: an option, judged on the look in the app.
+
+The order puts the sure and cheap ones first, each an hour or two, then the solvers, each a day, then
+the structural one; the particles after the fluid, since their draw is already within the budget.
+Each item commits on its own when it is in, and writes its measured row into TIMING.md.
+
+| # | Change                                                      | Expected                        | Kept as, if faster                                         |
+|---|-------------------------------------------------------------|---------------------------------|------------------------------------------------------------|
+| 1 | the temperature cleared once, its injection skipped at 0    | 0.4 to 0.5 ms                   | replacement                                                |
+| 2 | the composite's early exit and the occupancy volume         | 0.5 to 1.5 ms                   | replacement                                                |
+| 3 | 3D workgroups for the stencil passes                        | 0.3 to 0.6 ms                   | replacement                                                |
+| 4 | MacCormack in one dispatch                                  | 0.4 to 0.6 ms                   | replacement                                                |
+| 5 | fused passes                                                | 1 to 1.5 ms                     | replacement                                                |
+| 6 | red-black SOR                                               | 1.5 to 2.5 ms                   | option, decided: `pressure.solver`, `JACOBI` (the default), `SOR`, whatever it measures |
+| 7 | multigrid, or MGPCG                                         | 2.5 to 3.5 ms                   | option, decided: the same option gains `MULTIGRID`          |
+| 8 | the sparse grid                                             | 0 to half the step              | its plan written, not built: it touches every pass         |
+| 9 | the sprites cut at 2 sigma                                  | half the blobs' fill            | replacement; the growth cap stays as it is, a look          |
+| 10 | the draw by the alive count                                | the ring's empty share          | replacement                                                |
+| 11 | weighted blended OIT                                       | the march, the clear, a third of the draw | option: `overlap` gains `WEIGHTED`                |
+| 12 | points and streaks rasterized in compute                   | 2 to 5 × on the draw            | replacement for points; streaks if the lines match         |
+| 13 | the narrow-range filter and the narrow band                | 0.3 to 1 ms                     | the band a replacement; the filter an option if the surface differs |
+| 14 | the Morton sort                                            | under 0.5 ms at 2 M             | replacement; the ring's fade must then go by the particle's age, not its slot |
+
+Beside 5 and 6, the memory a step: the bytes read and written per cell by every pass, counted from
+the shaders before and after, since the passes are bandwidth-bound and the three force and curl
+volumes (24 bytes a cell) exist only between passes. A winning solver becomes the preset's
+`pressure.solver` too. Each kept item is one commit, none pushed.
+
+The panel gains at most three options from it: `pressure.solver`, `overlap`'s `WEIGHTED`, and the
+surface's filter if it comes. Everything else is the same picture faster, and leaves no trace but
+its row in TIMING.md.
 
 ## Later
 

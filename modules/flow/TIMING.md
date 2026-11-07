@@ -213,6 +213,19 @@ estimate is **(deduction)** unless its source measured it; a source's numbers ar
 | 5 | The draw by the alive count: `glDrawArraysIndirect` with the count the emission's head gives, so the vertex shader runs for the particles there are, not for every slot of the ring | the vertex shader over `count` slots a frame | up to the ring's empty share; 0 once it wraps | the code: the draw over `count` |
 | 6 | The ring sorted by the Morton order of the particles' cells now and then (a bitonic sort in compute), so a group's particles read the same velocity texels | the advection, 0.2 ms a million                      | under 0.5 ms at the baseline; 1.5 to 2 × at 8 M and more | a 3.2 × gain from sorting in a molecular-dynamics benchmark (NVIDIA forum); Morton-sorted SPH |
 
+### Measured
+
+Each change against the code before it, three runs back to back (`trial_runs.py`, the preset with the
+density on the grid unless the row says otherwise): the pass before, with the change, before again. The
+noise is the two befores' difference; a change counts as faster when it beats both by 2.5 times that.
+The harness's check is `fluid_compare.py` on stillslowfast, its water numbers and four saved outputs
+against the code before.
+
+| # | Change                          | Pass, ms mean        | Before | Change | Before again | Noise | Faster | Harness and picture         | Kept as     |
+|---|---------------------------------|----------------------|--------|--------|--------------|-------|--------|-----------------------------|-------------|
+| 1 | the temperature cleared once    | advect temperature   | 0.32   | 0.00   | 0.30         | 0.02  | yes    | the same; 0 of 255 apart    | replacement |
+|   |                                 | inject               | 0.66   | 0.52   | 0.66         | 0.00  | yes    |                             |             |
+
 ### What sets the p95
 
 Not the fluid: `Render update`, the CPU side of the render, spikes to a p95 of 20 to 29 ms in the
