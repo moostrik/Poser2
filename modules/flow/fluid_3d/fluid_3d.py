@@ -36,7 +36,8 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_R16F,
 
 from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
-from .fluid_settings import Carrier, Fluid3DSettings, VolumeSettings, DensitySettings, TemperatureSettings, PressureSettings, VelocitySettings, ParticleSettings
+from .fluid_settings import Carrier, PressureSolver, Fluid3DSettings, VolumeSettings, DensitySettings, TemperatureSettings, PressureSettings, VelocitySettings, ParticleSettings
+from .multigrid_pressure import MultigridPressure
 from ..shaders import AddBoolean
 from ..flow_util import FlowUtil
 from ..port import Port, TextureKind
@@ -47,7 +48,7 @@ from .grid_density import GridDensity
 from .particle_density import ParticleDensity
 from .shaders import (
     Divergence3D, Gradient3D,
-    JacobiPressure3D, JacobiDiffusion3D,
+    JacobiPressure3D, SorPressure3D, JacobiDiffusion3D,
     VorticityCurl3D, VorticityForce3D, Buoyancy3D,
     Inject3D, BoundaryVelocity3D, BodyForceAcceleration3D,
     Add3D,
@@ -182,6 +183,8 @@ class Fluid3D:
         self._divergence_shader: Divergence3D = Divergence3D()
         self._gradient_shader: Gradient3D = Gradient3D()
         self._jacobi_pressure_shader: JacobiPressure3D = JacobiPressure3D()
+        self._sor_pressure_shader: SorPressure3D = SorPressure3D()
+        self._multigrid: MultigridPressure = MultigridPressure()
         self._jacobi_diffusion_shader: JacobiDiffusion3D = JacobiDiffusion3D()
         self._vorticity_curl_shader: VorticityCurl3D = VorticityCurl3D()
         self._vorticity_force_shader: VorticityForce3D = VorticityForce3D()
@@ -236,6 +239,7 @@ class Fluid3D:
         self._divergence_shader.allocate()
         self._gradient_shader.allocate()
         self._jacobi_pressure_shader.allocate()
+        self._sor_pressure_shader.allocate()
         self._jacobi_diffusion_shader.allocate()
         self._vorticity_curl_shader.allocate()
         self._vorticity_force_shader.allocate()
@@ -285,6 +289,7 @@ class Fluid3D:
         self._velocity.allocate(sim_w, sim_h, d, GL_RGBA16F)
         self._temperature.allocate(sim_w, sim_h, d, GL_R16F)
         self._pressure.allocate(sim_w, sim_h, d, GL_R32F)     # a cell in widths makes it small, past half floats
+        self._multigrid.allocate(sim_w, sim_h, d)
         self._obstacle.allocate(sim_w, sim_h, d, GL_R8)
         if self._has_obstacles:
             self._inject_binary_shader.use(self._obstacle_source, self._obstacle, mode=1)
@@ -321,6 +326,8 @@ class Fluid3D:
         self._divergence_shader.deallocate()
         self._gradient_shader.deallocate()
         self._jacobi_pressure_shader.deallocate()
+        self._sor_pressure_shader.deallocate()
+        self._multigrid.deallocate()
         self._jacobi_diffusion_shader.deallocate()
         self._vorticity_curl_shader.deallocate()
         self._vorticity_force_shader.deallocate()
@@ -341,6 +348,8 @@ class Fluid3D:
         self._divergence_shader.reload()
         self._gradient_shader.reload()
         self._jacobi_pressure_shader.reload()
+        self._sor_pressure_shader.reload()
+        self._multigrid.reload()
         self._jacobi_diffusion_shader.reload()
         self._vorticity_curl_shader.reload()
         self._vorticity_force_shader.reload()
@@ -527,21 +536,29 @@ class Fluid3D:
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-        # b. Solve Poisson equation for pressure
-        iterations = self.settings.pressure.iterations     # the grid sets what it needs, not the step
-
-        result = self._jacobi_pressure_shader.solve(
-            self._pressure,
-            self._pressure.back,
-            self._divergence_vol,
-            self._obstacle,
-            self._cell,
-            total_iterations=iterations,
-            iterations_per_dispatch=5,
-            has_obstacles=self._has_obstacles, closed=closed
-        )
-        if result is not self._pressure:
-            self._pressure.swap()
+        # b. Solve Poisson equation for pressure, by the solver picked
+        pressure: PressureSettings = self.settings.pressure
+        iterations = pressure.iterations     # the grid sets what it needs, not the step
+        if pressure.solver == PressureSolver.MULTIGRID:
+            self._multigrid.solve(self._pressure, self._divergence_vol, self._obstacle, self._cell, pressure.cycles,
+                                  has_obstacles=self._has_obstacles, closed=closed)
+        elif pressure.solver == PressureSolver.SOR:
+            self._sor_pressure_shader.solve(self._pressure, self._divergence_vol, self._obstacle, self._cell,
+                                            iterations, pressure.relaxation,
+                                            has_obstacles=self._has_obstacles, closed=closed)
+        else:
+            result = self._jacobi_pressure_shader.solve(
+                self._pressure,
+                self._pressure.back,
+                self._divergence_vol,
+                self._obstacle,
+                self._cell,
+                total_iterations=iterations,
+                iterations_per_dispatch=5,
+                has_obstacles=self._has_obstacles, closed=closed
+            )
+            if result is not self._pressure:
+                self._pressure.swap()
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
         # c. Subtract pressure gradient from velocity

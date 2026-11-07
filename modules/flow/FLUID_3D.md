@@ -19,7 +19,7 @@ A step (`Fluid3D.update`), in order, at the preset (`apps/deep_flow/data/setting
 | vorticity   | the curl, then the confinement force × dt added to the velocity in the same pass       | velocity, curl        | no                   |
 | advect_temp | off: `buoyancy` 0 clears the temperature once, and nothing is injected into it  | temperature           | the trace distance   |
 | buoyancy    | gravity × (sink × density − buoyancy × ΔT) × dt; gravity is 0 in the preset           | force                 | no                   |
-| incompress  | divergence, 40 Jacobi iterations, gradient subtraction, on the walls ([The walls](#the-walls)) | pressure, velocity | no              |
+| incompress  | divergence, the pressure by `pressure.solver` ([The pressure](#the-pressure)), gradient subtraction, on the walls ([The walls](#the-walls)) | pressure, velocity | no |
 | advect_den  | semi-Lagrangian advection, one trilinear read per texel, the evaporation subtracted   | density 256×448×128   | the trace distance   |
 | composite   | front-to-back march, one step per layer                                               | output 2160×3840      | no                   |
 
@@ -174,6 +174,39 @@ Confinement off changed neither (2.34 and 4.11 before), so the confinement was n
 the walls right, the water stays at the body's speed or under, the confinement adding a few
 percent, MacCormack too (0.90 and 1.23).
 
+### The pressure
+
+`pressure.solver` picks how the Poisson equation is solved each step, each warm from the last step's
+pressure, each on the walls as [The walls](#the-walls) states:
+
+| `solver`    | How                                                                                              | Its count                          |
+|-------------|--------------------------------------------------------------------------------------------------|------------------------------------|
+| `JACOBI`    | every cell from its neighbors' last values, five iterations a dispatch in shared memory (`jacobi_pressure_3d`) | `iterations`, 40 |
+| `SOR`       | red-black Gauss–Seidel over-relaxed by `relaxation`: each color from the other's newest values (`sor_pressure_3d`); 1.95 diverged, so its range stops at 1.85 | `iterations`, its sweeps |
+| `MULTIGRID` | V-cycles (`multigrid_pressure.py`): on each level two red-black Gauss–Seidel sweeps, the residual restricted to the level halved, its correction solved from 0 and added back trilinearly, two sweeps again; down to 8 × 14 × 4 at the default grid, 16 sweeps there; obstacles on the finest level only | `cycles`, 1 |
+
+Measured through the harness on stillslowfast, the step's time with `glFinish` around it, the solve's
+residual |div − L p| over |div| (the mean and the p99, at four quarters of the loop), and the projected
+velocity's divergence, central differences, a cell's share:
+
+| Solver            | Residual, mean | p99   | Divergence after | Step, ms |
+|-------------------|----------------|-------|------------------|----------|
+| Jacobi 40         | 0.372          | 2.92  | 0.0079           | 8.66     |
+| Jacobi 20         | 0.454          | 3.76  | 0.0090           | 7.20     |
+| SOR 10, 1.8       | 1.570          | 12.0  | 0.0074           | 8.94     |
+| SOR 20, 1.8       | 0.898          | 6.87  | 0.0078           | 12.33    |
+| multigrid, 1 cycle | 0.024         | 0.42  | 0.0078           | 7.89     |
+| multigrid, 2 cycles | 0.002        | 0.03  | 0.0077           | 10.68    |
+| multigrid, 4 cycles | 0.0001       | 0.0004 | 0.0073          | 16.24    |
+
+One V-cycle leaves a sixteenth of Jacobi's residual in less time; each further cycle divides it by
+about thirteen. SOR's sweeps cost 0.34 ms each, two dispatches from global memory, and over-relaxed it
+leaves the high frequencies, which the mean residual counts, worse than Jacobi does. The divergence after
+the projection hardly moves with any of them: the divergence and the gradient are central differences
+on one grid, whose Laplacian is not the 7-point one every solver solves, so even an exact solve leaves
+it ([Open](#open-the-projections-floor)). With the solve exact the water keeps more of its speed, 0.150
+widths/s in the mean against Jacobi's 0.134.
+
 ### The guard
 
 The dampen, at the step's first pass, stays as it is: `dampen_threshold` and `dampen_time`. With
@@ -324,6 +357,14 @@ them. The check: one run with `WARM_UP_TIME` 0 (locally, not committed). Only if
 still drops, a `GpuTimer` per pass, in the `GPU fluid` series, at rest, during the burst and
 during a fast arm move; the pass that grows on the burst and not on the arm is the one, and a hard
 top speed ([The guard](#the-guard)) the first thing to try.
+
+## Open: the projection's floor
+
+The projection's divergence and gradient are central differences on the cell centers, and the solvers
+solve the compact 7-point Laplacian; the two differ, so the velocity keeps a divergence of about 0.0075 of
+a cell whatever the solver ([The pressure](#the-pressure)). A staggered grid (the velocity on the cells'
+faces, Harlow and Welch's MAC grid) makes the divergence of the gradient the 7-point Laplacian, and the
+solve's accuracy then reaches the velocity **(deduction)**. It changes every pass that reads the velocity.
 
 ## Next
 

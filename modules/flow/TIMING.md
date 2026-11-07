@@ -215,7 +215,7 @@ estimate is **(deduction)** unless its source measured it; a source's numbers ar
 
 ### Measured
 
-Each change against the code before it, three runs back to back (`trial_runs.py`, the preset with the
+Each change of [step 9](FLUID_3D.md#step-9-faster), by its number there, against the code before it, three runs back to back (`trial_runs.py`, the preset with the
 density on the grid unless the row says otherwise): the pass before, with the change, before again. The
 noise is the two befores' difference; a change counts as faster when it beats both by 2.5 times that.
 The harness's check is `fluid_compare.py` on stillslowfast, its water numbers and four saved outputs
@@ -237,6 +237,10 @@ against the code before.
 | 5 | the confinement force added in its own pass; the dampen in the velocity's advection | the step | 9.93 | 9.42 | 10.02 | 0.09 | yes | the same, as a 0.006% change of `vorticity` | replacement |
 |   |                                 | vorticity            | 1.20   | 0.92   | 1.21         | 0.01  | yes    |                             |             |
 |   |                                 | dampen, then advect velocity | 0.33 + 0.78 | 0.81 | 0.33 + 0.78 | 0.00 | yes |                     |             |
+| 6 | `pressure.solver` `SOR`, 10 sweeps at 1.8, an option | the step, harness   | 8.74   | 8.85   |              |       | no     | the water 1.23 of the body, was 0.90 | option |
+| 7 | `pressure.solver` `MULTIGRID`, 1 cycle, an option and the preset's | pressure | 4.07 | 2.56 | 4.12   | 0.05  | yes    | the water 1.36 of the body, was 0.90; the coast 0.10 s, was 0.94 | option, the preset's |
+|   |                                 | the step             | 9.31   | 7.77   | 9.41         | 0.10  | yes    |                             |             |
+|   |                                 | the frame            | 12.23  | 10.24  | 12.17        | 0.06  | yes    |                             |             |
 
 Item 2 was slower in both forms, one thread a block (3.84 ms) and one workgroup a block (3.49): on the
 recording the density fills most blocks, so the skip saves little and its pass and branch cost more. The
@@ -256,6 +260,12 @@ rounding to these numbers within that spread. The memory a step, per cell: the c
 and read where it was 48, with the dampen's 16 gone (the force volume's write 8, the add's 24 and the dampen's
 16, against the fused pass's 16): 0.47 GB a step less at 256 × 448 × 128, and the force volume's 0.12 GB freed.
 The monitor loses the `vorticity_force` port with it.
+
+Items 6 and 7 change the physics: a better solve leaves the water less compressible, so the body's push
+has to go round it, faster (1.23 and 1.36 of the body against Jacobi's 0.90), and the water stops with the
+body (the coast 0.10 s against 0.94). Jacobi's 40 iterations leave a residual of 0.37 of the divergence, so
+part of the push was compression the next steps relaxed. The solve's accuracy, the time each takes and why
+SOR is no faster are in [FLUID_3D.md](FLUID_3D.md#the-pressure).
 
 ### What sets the p95
 

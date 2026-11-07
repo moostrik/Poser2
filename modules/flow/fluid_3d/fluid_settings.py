@@ -15,6 +15,13 @@ class Advection(IntEnum):
     MACCORMACK = 1          # the same, corrected by half its error traced forward, clamped (Selle 2008)
 
 
+class PressureSolver(IntEnum):
+    """How the pressure's Poisson equation is solved each step, warm from the last step's pressure."""
+    JACOBI = 0              # every cell from its neighbors' last values; five iterations a dispatch in shared memory
+    SOR = 1                 # red-black Gauss–Seidel, over-relaxed: each color from the other's newest values
+    MULTIGRID = 2           # V-cycles over the grid halved to a few cells, red-black Gauss–Seidel smoothing each level
+
+
 class Carrier(IntEnum):
     """What carries the density: the grid's volume, or particles moved through the grid's velocity."""
     GRID = 0
@@ -100,7 +107,10 @@ class TemperatureSettings(BaseSettings):
 
 class PressureSettings(BaseSettings):
     """Pressure field parameters."""
-    iterations: Field[int]          = Field(40,     min=1,      max=60,     color="orange",         description="Pressure solver iterations per step")
+    solver: Field[PressureSolver]   = Field(PressureSolver.JACOBI,                                  description="Jacobi, red-black SOR (Gauss–Seidel over-relaxed) or multigrid V-cycles")
+    iterations: Field[int]          = Field(40,     min=1,      max=60,     color="orange",         description="Pressure solver iterations per step; for SOR its red-black sweeps")
+    relaxation: Field[float]        = Field(1.8,    min=1.0,    max=1.85,   color="orange",         description="SOR's over-relaxation factor omega; 1 = Gauss–Seidel; 1.95 diverged")
+    cycles: Field[int]              = Field(1,      min=1,      max=8,      color="orange",         description="Multigrid V-cycles per step")
     wall: Field[WallMode]           = Field(WallMode.CLOSED,                                        description="The x and y walls. Closed: solid, the water cannot pass. Open: pressure escapes")
 
 

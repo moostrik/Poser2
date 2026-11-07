@@ -1,0 +1,21 @@
+#version 460 core
+
+/*
+ * Prolong3D - the coarser level's correction added to a level, read trilinearly at the fine cell's center,
+ * the coarse volume's edge held (CLAMP_TO_EDGE).
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(binding = 0) uniform sampler3D uCoarse;      // R32F, linear
+layout(r32f, binding = 0) uniform image3D uFine;
+
+uniform ivec3 uFineSize;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID);
+    if (any(greaterThanEqual(gid, uFineSize))) return;
+    vec3 uv = (vec3(gid) + 0.5) / vec3(uFineSize);
+    float correction = texture(uCoarse, uv).r;
+    imageStore(uFine, gid, vec4(imageLoad(uFine, gid).r + correction, 0.0, 0.0, 0.0));
+}

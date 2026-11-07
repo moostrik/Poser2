@@ -586,7 +586,10 @@
         "wall": "CLOSED"
       },
       "pressure": {
+        "solver": "MULTIGRID",
         "iterations": 40,
+        "relaxation": 1.8,
+        "cycles": 1,
         "wall": "CLOSED"
       }
     },

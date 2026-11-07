@@ -1,0 +1,28 @@
+#version 460 core
+
+/*
+ * Restrict3D - a volume onto the coarser level, each coarse cell the mean of the up to eight fine cells it
+ * covers (a fine size that is odd leaves the last coarse cell fewer).
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(r32f, binding = 0) readonly uniform image3D uFine;
+layout(r32f, binding = 1) writeonly uniform image3D uCoarse;
+
+uniform ivec3 uFineSize;
+uniform ivec3 uCoarseSize;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID);
+    if (any(greaterThanEqual(gid, uCoarseSize))) return;
+    float sum = 0.0;
+    float count = 0.0;
+    for (int k = 0; k < 8; k++) {
+        ivec3 fine = gid * 2 + ivec3(k & 1, (k >> 1) & 1, (k >> 2) & 1);
+        if (any(greaterThanEqual(fine, uFineSize))) continue;
+        sum += imageLoad(uFine, fine).r;
+        count += 1.0;
+    }
+    imageStore(uCoarse, gid, vec4(sum / max(count, 1.0), 0.0, 0.0, 0.0));
+}

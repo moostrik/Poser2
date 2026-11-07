@@ -1,0 +1,65 @@
+#version 460 core
+
+/*
+ * SorPressure3D - one color's half sweep of red-black Gauss-Seidel with over-relaxation (SOR) on the
+ * pressure's Poisson equation, in place.
+ *
+ * The cells are colored by (x + y + z) mod 2: a red cell's six neighbors are black, so each color's
+ * cells update in parallel from the other color's newest values, Gauss-Seidel's order kept. Then
+ *
+ *     p = (1 - omega) p + omega * beta * (ax (pL + pR) + ay (pB + pT) + az (pK + pF) - div)
+ *
+ * omega 1 is Gauss-Seidel; between 1 and 2 it over-relaxes, faster on the smooth part of the error.
+ * One thread a cell of the color: x is doubled and offset by the color's parity.
+ *
+ * The domain's walls as the Jacobi solve takes them: beyond a closed wall the ghost is the cell's own
+ * pressure (Neumann), beyond an open one 0 (Dirichlet); an obstacle's face is Neumann.
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(binding = 0) uniform sampler3D uDivergence;  // R16F
+layout(binding = 1) uniform sampler3D uObstacle;    // R8
+
+layout(r32f, binding = 0) uniform image3D uPressure;
+
+uniform vec3  uAlpha;        // (1/dx², 1/dy², 1/dz²)
+uniform float uBeta;         // 1 / (2 ax + 2 ay + 2 az)
+uniform float uOmega;        // the over-relaxation, 1 to 2
+uniform int   uColor;        // 0 red, 1 black
+uniform ivec3 uSize;
+uniform bool  uHasObstacles;
+uniform ivec3 uClosed;       // per axis, 1 where the domain's walls are closed
+
+bool isObstacle(ivec3 coord) {
+    return texture(uObstacle, (vec3(coord) + 0.5) / vec3(uSize)).r > 0.5;
+}
+
+float neighbor(ivec3 coord, float pC, int axis) {
+    if (coord[axis] < 0 || coord[axis] >= uSize[axis]) return uClosed[axis] == 1 ? pC : 0.0;
+    if (uHasObstacles && isObstacle(coord)) return pC;
+    return imageLoad(uPressure, coord).r;
+}
+
+void main() {
+    ivec3 id = ivec3(gl_GlobalInvocationID);
+    ivec3 gid = ivec3(id.x * 2 + ((id.y + id.z + uColor) & 1), id.y, id.z);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    if (uHasObstacles && isObstacle(gid)) {
+        imageStore(uPressure, gid, vec4(0.0));
+        return;
+    }
+
+    float pC = imageLoad(uPressure, gid).r;
+    float pL = neighbor(gid - ivec3(1, 0, 0), pC, 0);
+    float pR = neighbor(gid + ivec3(1, 0, 0), pC, 0);
+    float pB = neighbor(gid - ivec3(0, 1, 0), pC, 1);
+    float pT = neighbor(gid + ivec3(0, 1, 0), pC, 1);
+    float pK = neighbor(gid - ivec3(0, 0, 1), pC, 2);
+    float pF = neighbor(gid + ivec3(0, 0, 1), pC, 2);
+    float divergence = texture(uDivergence, (vec3(gid) + 0.5) / vec3(uSize)).r;
+
+    float gauss_seidel = uBeta * (uAlpha.x * (pL + pR) + uAlpha.y * (pB + pT) + uAlpha.z * (pK + pF) - divergence);
+    imageStore(uPressure, gid, vec4(mix(pC, gauss_seidel, uOmega), 0.0, 0.0, 0.0));
+}
