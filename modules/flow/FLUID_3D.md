@@ -14,10 +14,9 @@ A step (`Fluid3D.update`), in order, at the preset (`apps/deep_flow/data/setting
 
 | Pass        | What                                                                                  | On                    | Depends on the input |
 |-------------|---------------------------------------------------------------------------------------|-----------------------|----------------------|
-| dampen_vel  | drag on the speed above `dampen_threshold` (50 widths/s) over `dampen_time` (2 s)     | velocity 256×448×128  | no                   |
-| advect_vel  | semi-Lagrangian self-advection, `self_advection` 1, fade 60 s                         | velocity              | the trace distance   |
+| advect_vel  | self-advection by `advection`, `self_advection` 1, fade 60 s; on its result the dampen, a drag on the speed above `dampen_threshold` (50 widths/s) over `dampen_time` (2 s) | velocity 256×448×128 | the trace distance |
 | viscosity   | Jacobi diffusion, off (`viscosity` 0)                                                 | velocity              | no                   |
-| vorticity   | curl, confinement force × dt, added to the velocity                                   | velocity, curl, force | no                   |
+| vorticity   | the curl, then the confinement force × dt added to the velocity in the same pass       | velocity, curl        | no                   |
 | advect_temp | off: `buoyancy` 0 clears the temperature once, and nothing is injected into it  | temperature           | the trace distance   |
 | buoyancy    | gravity × (sink × density − buoyancy × ΔT) × dt; gravity is 0 in the preset           | force                 | no                   |
 | incompress  | divergence, 40 Jacobi iterations, gradient subtraction, on the walls ([The walls](#the-walls)) | pressure, velocity | no              |

@@ -233,10 +233,29 @@ against the code before.
 |   |                                 | dampen               | 0.36   | 0.34   | 0.35         | 0.01  | no     |                             |             |
 |   |                                 | density              | 1.11   | 1.15   | 1.15         | 0.04  | no     |                             |             |
 
+| 4 | MacCormack in one dispatch      |                      |        |        |              |       |        |                             | not built   |
+| 5 | the confinement force added in its own pass; the dampen in the velocity's advection | the step | 9.93 | 9.42 | 10.02 | 0.09 | yes | the same, as a 0.006% change of `vorticity` | replacement |
+|   |                                 | vorticity            | 1.20   | 0.92   | 1.21         | 0.01  | yes    |                             |             |
+|   |                                 | dampen, then advect velocity | 0.33 + 0.78 | 0.81 | 0.33 + 0.78 | 0.00 | yes |                     |             |
+
 Item 2 was slower in both forms, one thread a block (3.84 ms) and one workgroup a block (3.49): on the
 recording the density fills most blocks, so the skip saves little and its pass and branch cost more. The
 early exit at opacity was not built: with `glow` above 0 the additive sum behind opaque density is part of
 the picture, so stopping there changes it.
+
+Item 4 was not built: the correction reads the predictor at the forward-traced point, between other cells,
+so one dispatch would trace eight predictors a cell to get it, more than the scratch volume's write and read
+it saves.
+
+Item 5 changes the rounding, not the step: the force is added in float where the force volume held it as a
+half float. The fluid is chaotic on the recording, so any change at the rounding's size grows into a different
+picture: the code before against itself with `vorticity` 1.6901 for 1.69 differs as much (5 to 11 of 255 in
+the mean, half the pixels over 4) and its harness numbers as much (the water over the body 0.89 and 0.90, the
+stop 0.095 and 0.100). So the picture check holds a change to exactly the same arithmetic, and a change of
+rounding to these numbers within that spread. The memory a step, per cell: the confinement 32 bytes written
+and read where it was 48, with the dampen's 16 gone (the force volume's write 8, the add's 24 and the dampen's
+16, against the fused pass's 16): 0.47 GB a step less at 256 × 448 × 128, and the force volume's 0.12 GB freed.
+The monitor loses the `vorticity_force` port with it.
 
 ### What sets the p95
 

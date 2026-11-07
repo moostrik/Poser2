@@ -50,7 +50,7 @@ from .shaders import (
     JacobiPressure3D, JacobiDiffusion3D,
     VorticityCurl3D, VorticityForce3D, Buoyancy3D,
     Inject3D, BoundaryVelocity3D, BodyForceAcceleration3D,
-    Dampen3D, Add3D,
+    Add3D,
     InjectBinary3D
 )
 
@@ -63,7 +63,7 @@ _WALL_GL: dict = {
     WallMode.CLOSED: (GL_CLAMP_TO_EDGE,   (0.0, 0.0, 0.0, 0.0)),
 }
 
-FLUID_PASSES: tuple[str, ...] = ('dampen', 'advect velocity', 'viscosity', 'vorticity', 'advect temperature', 'buoyancy',
+FLUID_PASSES: tuple[str, ...] = ('advect velocity', 'viscosity', 'vorticity', 'advect temperature', 'buoyancy',
                                  'pressure', 'density', 'composite')     # a step's passes, each a GPU timer
 DRAG_FLOOR: float = 0.02    # widths/s: the body's speed below which it drags nothing, so a dead trail pulls nothing toward 0
 
@@ -107,13 +107,12 @@ class Fluid3D:
         velocity:    SwapTexture3D  RGBA16F  (u, v, w, spare)
         density:     the carrier's: GridDensity or ParticleDensity
         temperature: SwapTexture3D  R16F
-        pressure:    SwapTexture3D  R16F
+        pressure:    SwapTexture3D  R32F
         obstacle:    Texture3D      R8
 
     Intermediate (single-buffer):
         divergence:       Texture3D R16F
         curl:             Texture3D RGBA16F  (wx, wy, wz, 0)
-        vorticity_force:  Texture3D RGBA16F  (Fx, Fy, Fz, 0)
         buoyancy_force:   Texture3D RGBA16F  (Fx, Fy, Fz, 0)
 
     2D composited output:
@@ -174,7 +173,6 @@ class Fluid3D:
         self._divergence_vol: Texture3D = Texture3D()
         # Curl is sampled at neighbor offsets by VorticityForce3D — border must return zero
         self._curl_vol: Texture3D = Texture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
-        self._vorticity_force_vol: Texture3D = Texture3D()
         self._buoyancy_force_vol: Texture3D = Texture3D()
 
         # ---- 2D composited output (for downstream render layers) ----
@@ -191,7 +189,6 @@ class Fluid3D:
         self._inject_shader: Inject3D = Inject3D()
         self._boundary_velocity_shader: BoundaryVelocity3D = BoundaryVelocity3D()
         self._body_force_acceleration_shader: BodyForceAcceleration3D = BodyForceAcceleration3D()
-        self._dampen_shader: Dampen3D = Dampen3D()
         self._add_shader: Add3D = Add3D()
         self._inject_binary_shader: InjectBinary3D = InjectBinary3D()
         self._add_boolean_shader: AddBoolean = AddBoolean()
@@ -246,7 +243,6 @@ class Fluid3D:
         self._inject_shader.allocate()
         self._boundary_velocity_shader.allocate()
         self._body_force_acceleration_shader.allocate()
-        self._dampen_shader.allocate()
         self._add_shader.allocate()
         self._inject_binary_shader.allocate()
         self._add_boolean_shader.allocate()
@@ -297,7 +293,6 @@ class Fluid3D:
         # Intermediate volumes
         self._divergence_vol.allocate(sim_w, sim_h, d, GL_R16F)
         self._curl_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
-        self._vorticity_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
         self._buoyancy_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
 
         self._apply_wall_modes()
@@ -317,7 +312,6 @@ class Fluid3D:
         self._obstacle_source.deallocate()
         self._divergence_vol.deallocate()
         self._curl_vol.deallocate()
-        self._vorticity_force_vol.deallocate()
         self._buoyancy_force_vol.deallocate()
         self._output_texture.deallocate()
         for scratch in (self._velocity_scratch, self._temperature_scratch):
@@ -334,7 +328,6 @@ class Fluid3D:
         self._inject_shader.deallocate()
         self._boundary_velocity_shader.deallocate()
         self._body_force_acceleration_shader.deallocate()
-        self._dampen_shader.deallocate()
         self._add_shader.deallocate()
         self._inject_binary_shader.deallocate()
         self._add_boolean_shader.deallocate()
@@ -355,7 +348,6 @@ class Fluid3D:
         self._inject_shader.reload()
         self._boundary_velocity_shader.reload()
         self._body_force_acceleration_shader.reload()
-        self._dampen_shader.reload()
         self._add_shader.reload()
         self._inject_binary_shader.reload()
 
@@ -384,11 +376,6 @@ class Fluid3D:
 
         self._gpu_timer.begin()
 
-        # Dampen velocity (clean input for all steps)
-        vel: VelocitySettings = self.settings.velocity
-        self._timed('dampen', lambda: self._dampen(self._velocity, vel.dampen_threshold, vel.dampen_time, self._dt,
-                                                   include_alpha=False))
-
         # Simulation steps, each its own GPU timer inside the step's
         self._timed('advect velocity', self._advect_velocity)
         self._timed('viscosity', self._apply_viscosity)
@@ -416,18 +403,19 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def _advect_field(self, field: SwapTexture3D, scratch: Texture3D, velocity: Texture3D | None, step: float,
-                      dissipation: float, internal_format: int) -> None:
+                      dissipation: float, internal_format: int, dampen: tuple[float, float] = (0.0, 1.0)) -> None:
         """Carry `field` one step along the velocity (`velocity`, or the field's own previous buffer for the
         velocity's self-advection), by `settings.advection`."""
         if self._advection.carry(self.settings.advection, field, scratch, velocity, self._obstacle, self._aspect,
-                                 self._z_extent, step, dissipation, internal_format, self._has_obstacles):
+                                 self._z_extent, step, dissipation, internal_format, self._has_obstacles, dampen=dampen):
             self._apply_wall_modes()
 
     def _advect_velocity(self) -> None:
-        """Self-advect & dissipate velocity field."""
+        """Self-advect, dissipate and dampen the velocity field."""
         advect_step = self._dt * self.settings.velocity.self_advection
         dissipation = self._calculate_dissipation(self._dt, self.settings.velocity.fade_time)
-        self._advect_field(self._velocity, self._velocity_scratch, None, advect_step, dissipation, GL_RGBA16F)
+        self._advect_field(self._velocity, self._velocity_scratch, None, advect_step, dissipation, GL_RGBA16F,
+                           dampen=self._dampen_step())
 
     def _apply_viscosity(self) -> None:
         """Diffuse velocity via Jacobi viscosity solver."""
@@ -452,7 +440,7 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _confine_vorticity(self) -> None:
-        """Vorticity confinement (curl → force → add to velocity)."""
+        """Vorticity confinement: the curl, then its force added to the velocity."""
         if self.settings.velocity.vorticity <= 0.0 or self.settings.velocity.vorticity_radius <= 0.0:
             return
 
@@ -470,19 +458,16 @@ class Fluid3D:
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-        # b. Compute confinement force
+        # b. The confinement force, added to the velocity in the same pass
         self._vorticity_force_shader.use(
             self._curl_vol,
             self._obstacle,
-            self._vorticity_force_vol,
+            self._velocity,
             self._cell,
             vorticity_force,
             has_obstacles=self._has_obstacles,
         )
-        glMemoryBarrier(_BARRIER_IMAGE)
-
-        # c. Add force to velocity
-        self._add_force_to_velocity(self._vorticity_force_vol)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _advect_temperature(self) -> None:
         """Advect & dissipate the temperature scalar field."""
@@ -579,28 +564,13 @@ class Fluid3D:
             dissipation=self._calculate_dissipation(self._dt, self.settings.density.fade_time),
             evaporation=self.settings.density.evaporation * self._dt, advection=self.settings.advection))
 
-    def _dampen(self, volume: SwapTexture3D, threshold: float, dampen_time: float,
-               delta_time: float, include_alpha: bool,
-               internal_format: int = GL_RGBA16F) -> None:
-        """Exponential drag on magnitude excess above threshold.
-
-        Args:
-            volume: Volumetric field to dampen (in-place via compute shader)
-            threshold: Magnitude below which values are untouched
-            dampen_time: Seconds for excess to decay to ~1%. 0=off
-            delta_time: Frame delta time for frame-rate independence
-            include_alpha: True for density (RGBA magnitude), False for velocity (RGB)
-            internal_format: Image format for volume binding
-        """
-        if dampen_time <= 0.0:
-            return
-        factor = pow(0.01, delta_time / dampen_time)
-        self._dampen_shader.use(
-            volume, threshold, factor,
-            include_alpha=include_alpha,
-            internal_format=internal_format
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
+    def _dampen_step(self) -> tuple[float, float]:
+        """The velocity's dampen for this step, which its advection applies to the step's result: the threshold
+        (widths/s) and the share of the excess kept, pow(0.01, dt / dampen_time); (0, 1) is none."""
+        velocity: VelocitySettings = self.settings.velocity
+        if velocity.dampen_time <= 0.0:
+            return (0.0, 1.0)
+        return (velocity.dampen_threshold, pow(0.01, self._dt / velocity.dampen_time))
 
     def _composite_output(self) -> None:
         """The density into the 2D output, by its carrier."""
@@ -806,7 +776,6 @@ class Fluid3D:
                 'obstacle': volume(self._obstacle, TextureKind.SCALAR),
                 'velocity': volume(self._velocity, TextureKind.VELOCITY),
                 'vorticity': volume(self._curl_vol, TextureKind.VELOCITY),
-                'vorticity_force': volume(self._vorticity_force_vol, TextureKind.VELOCITY),
                 'temperature': volume(self._temperature, TextureKind.SCALAR),
                 'buoyancy': volume(self._buoyancy_force_vol, TextureKind.VELOCITY),
                 'divergence': volume(self._divergence_vol, TextureKind.SCALAR),

@@ -30,6 +30,8 @@ uniform float uDissipation;   // Exponential decay multiplier
 uniform float uEvaporation;   // Subtracted this step; 0 for a signed field
 uniform ivec3 uSize;          // Volume dimensions
 uniform bool  uHasObstacles;
+uniform float uDampenThreshold; // The velocity's speed above which its excess decays (widths/s)
+uniform float uDampenFactor;  // The excess's share kept this step; 1 = no dampen, every field but the velocity
 
 void main() {
     ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
@@ -69,6 +71,12 @@ void main() {
     result *= uDissipation;
     if (uEvaporation > 0.0) {
         result = max(result - vec4(uEvaporation), vec4(0.0));
+    }
+    if (uDampenFactor < 1.0) {      // the dampen, on the step's result
+        float speed = length(result.xyz);
+        if (speed > uDampenThreshold) {
+            result.xyz *= (uDampenThreshold + (speed - uDampenThreshold) * uDampenFactor) / speed;
+        }
     }
     imageStore(uResult, gid, result);
 }

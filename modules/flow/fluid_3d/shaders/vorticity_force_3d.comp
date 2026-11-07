@@ -1,9 +1,9 @@
 #version 460 core
 
 /*
- * VorticityForce3D - 3D vorticity confinement force.
+ * VorticityForce3D - 3D vorticity confinement force, added to the velocity in place.
  *
- * F = ε * (N × ω) * Δt
+ * v += ε h (N × ω) Δt
  * where N = ∇|ω| / |∇|ω||  (normalized gradient of curl magnitude)
  *
  * In 3D, the confinement force is computed via cross product of N and ω.
@@ -14,7 +14,7 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick 
 layout(binding = 0) uniform sampler3D uCurl;      // Curl vector field (RGBA16F: xyz)
 layout(binding = 1) uniform sampler3D uObstacle;   // Obstacle mask (R8)
 
-layout(rgba16f, binding = 0) writeonly uniform image3D uForce;
+layout(rgba16f, binding = 0) uniform image3D uVelocity;  // read and written at the cell alone
 
 uniform vec3  uHalfRdxInv;    // (0.5/dx, 0.5/dy, 0.5/dz)
 uniform float uTimestep;       // Vorticity strength * dt
@@ -30,10 +30,7 @@ void main() {
     // Obstacle check
     if (uHasObstacles) {
         float obstacle = texture(uObstacle, st).r;
-        if (obstacle > 0.5) {
-            imageStore(uForce, gid, vec4(0.0));
-            return;
-        }
+        if (obstacle > 0.5) return;
     }
 
     vec3 texel = 1.0 / vec3(uSize);
@@ -63,5 +60,5 @@ void main() {
     // Confinement force: F = ε * (N × ω) * dt  (standard Fedkiw formulation)
     vec3 force = uTimestep * cross(N, curlC);
 
-    imageStore(uForce, gid, vec4(force, 0.0));
+    imageStore(uVelocity, gid, imageLoad(uVelocity, gid) + vec4(force, 0.0));
 }

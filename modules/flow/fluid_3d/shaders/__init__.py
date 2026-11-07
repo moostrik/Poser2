@@ -12,7 +12,6 @@ from .buoyancy_3d import Buoyancy3D
 from .inject_3d import Inject3D
 from .boundary_velocity_3d import BoundaryVelocity3D
 from .body_force_acceleration_3d import BodyForceAcceleration3D
-from .dampen_3d import Dampen3D
 from .add_3d import Add3D
 from .inject_binary_3d import InjectBinary3D
 from .composite_3d import Composite3D

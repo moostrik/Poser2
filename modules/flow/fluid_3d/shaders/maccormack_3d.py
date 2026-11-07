@@ -20,7 +20,8 @@ class MacCormack3D(ComputeShader):
     def use(self, source: Texture3D, forward: Texture3D, result: Texture3D,
             velocity: Texture3D, obstacle: Texture3D,
             aspect: float, z_extent: float, timestep: float, dissipation: float,
-            internal_format: int = GL_RGBA16F, has_obstacles: bool = True, evaporation: float = 0.0) -> None:
+            internal_format: int = GL_RGBA16F, has_obstacles: bool = True, evaporation: float = 0.0,
+            dampen: tuple[float, float] = (0.0, 1.0)) -> None:
         """Write the corrected step into `result`.
 
         Args:
@@ -36,6 +37,7 @@ class MacCormack3D(ComputeShader):
             internal_format: Image format for output
             has_obstacles: Whether obstacle logic is active
             evaporation: Amount subtracted this step, for the density; 0 for a signed field
+            dampen: The velocity's dampen, its threshold (widths/s) and the excess's share kept; (0, 1) is none
         """
         if not self.allocated or not self.shader_program:
             return
@@ -54,6 +56,8 @@ class MacCormack3D(ComputeShader):
         glUniform3f(self.get_uniform_loc("uRdx"), 1.0, rdx_y, rdx_z)
         glUniform1f(self.get_uniform_loc("uDissipation"), dissipation)
         glUniform1f(self.get_uniform_loc("uEvaporation"), evaporation)
+        glUniform1f(self.get_uniform_loc("uDampenThreshold"), dampen[0])
+        glUniform1f(self.get_uniform_loc("uDampenFactor"), dampen[1])
         glUniform3i(self.get_uniform_loc("uSize"), result.width, result.height, result.depth)
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
 

@@ -31,10 +31,11 @@ class FieldAdvection:
 
     def carry(self, advection: Advection, field: SwapTexture3D, scratch: Texture3D, velocity: Texture3D | None,
               obstacle: Texture3D, aspect: float, z_extent: float, step: float, dissipation: float,
-              internal_format: int, has_obstacles: bool, evaporation: float = 0.0) -> bool:
+              internal_format: int, has_obstacles: bool, evaporation: float = 0.0,
+              dampen: tuple[float, float] = (0.0, 1.0)) -> bool:
         """Carry `field` one step along `velocity` (None: the field's own previous buffer, the velocity's
         self-advection). Semi-Lagrangian into the field; or its step into `scratch` as the predictor and the
-        MacCormack correction into the field. Returns whether `scratch` was (re)allocated, so its owner sets
+        MacCormack correction into the field; `dampen`, the velocity's, on the step's result. Returns whether `scratch` was (re)allocated, so its owner sets
         its walls."""
         field.swap()
         source: Texture3D = field.back
@@ -42,7 +43,7 @@ class FieldAdvection:
         if advection != Advection.MACCORMACK:
             self._advect_shader.advect(source, field, along, obstacle, aspect, z_extent, step, dissipation,
                                        internal_format=internal_format, has_obstacles=has_obstacles,
-                                       evaporation=evaporation)
+                                       evaporation=evaporation, dampen=dampen)
             glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
             return False
         allocated: bool = False
@@ -55,6 +56,6 @@ class FieldAdvection:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._maccormack_shader.use(source, scratch, field, along, obstacle, aspect, z_extent, step, dissipation,
                                     internal_format=internal_format, has_obstacles=has_obstacles,
-                                    evaporation=evaporation)
+                                    evaporation=evaporation, dampen=dampen)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         return allocated

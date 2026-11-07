@@ -87,7 +87,7 @@ kinds of `TextureKind`.
 
 A port's texture may be a volume, always a `Texture3D` (`Port.volume`), so each view is one
 shader. The 3D fluid lists its volumes as ports: `velocity`, `density`, `temperature`,
-`pressure`, `divergence`, `vorticity`, `vorticity_force`, `buoyancy`, `obstacle`, beside the 2D
+`pressure`, `divergence`, `vorticity`, `buoyancy`, `obstacle`, beside the 2D
 `obstacle_source`. Each carries its box's depth (`Port.extent`, `Fluid3D._z_extent`); the
 monitor draws the box as deep as it is wide (`BOX_DEPTH`), since the simulated slab, 64 cubic
 cells on a 448 wide grid, is 0.14 of its width and reads as flat. A flat cut renders at the
