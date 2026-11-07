@@ -252,6 +252,20 @@ against the code before.
 | 13 | the surface's filter, a run of 256 pixels read once into shared memory | particles march, 100 k spheres | 0.70 | 0.89 | 0.70 | 0.00 | no: slower | 0.1 to 1.1 of 255 in the mean | dropped |
 | 14 | the ring sorted by Morton order |                     |        |        |              |       |        |                             | not built   |
 
+The preset as it was before step 9 (`cac62f39`, Jacobi, the preset's 1 M streaks occluded) against the
+preset now (the multigrid, every kept change), three runs, before, now, before:
+
+| Timer                | Before        | Now          | Before again  |
+|----------------------|---------------|--------------|---------------|
+| `GPU fluid`, the step | 8.92 / 11.37 | 6.55 / 8.09  | 10.04 / 13.16 |
+| pressure             | 4.06          | 2.60         | 4.27          |
+| vorticity            | 1.25          | 0.98         | 1.24          |
+| dampen               | 0.36          | in advection | 0.34          |
+| advect temperature   | 0.25          | 0.00         | 0.23          |
+| inject               | 0.43          | 0.26         | 0.44          |
+| particles draw       | 1.63          | 1.48         | 2.57          |
+| the frame, `Render interval` | 11.80 / 17.95, 85 fps | 8.73 / 10.82, 115 fps | 12.88 / 17.53, 78 fps |
+
 Item 2 was slower in both forms, one thread a block (3.84 ms) and one workgroup a block (3.49): on the
 recording the density fills most blocks, so the skip saves little and its pass and branch cost more. The
 early exit at opacity was not built: with `glow` above 0 the additive sum behind opaque density is part of
