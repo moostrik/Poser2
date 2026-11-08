@@ -522,7 +522,7 @@
       "time_step": "MEASURED",
       "fixed_fps": 60.0,
       "fps_smoothing": 1.0,
-      "time_scale": 0.5,
+      "time_scale": 1.0,
       "speed": 1.0,
       "advection": "MACCORMACK",
       "boundary": {
@@ -544,7 +544,7 @@
       },
       "velocity": {
         "self_advection": 1.0,
-        "fade_time": 8.0,
+        "fade_time": 20.0,
         "dampen_threshold": 3.0,
         "dampen_time": 0.5,
         "vorticity": 0.3,

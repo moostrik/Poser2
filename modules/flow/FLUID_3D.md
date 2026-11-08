@@ -57,9 +57,8 @@ nothing.
 
 `time_scale` is the fluid's time as a share of real time: every pass steps by dt × it, the sources and the drag
 included, so at 0.5 the whole fluid runs at half speed and keeps its shapes. The preset is a calm composition: the
-water at 0.4 of the body's speed (`boundary.gain`), the confinement at the textbook 0.3, the velocity's fade 8 s
-with a viscosity of 0.0001 widths²/s, and half speed; on stillslowfast the water moves at 0.28 of the body in the
-fast moves, its peak 0.14 of the body's, and settles 0.27 s after a move. The viscosity costs 0.7 ms a step.
+water at 0.4 of the body's speed (`boundary.gain`), the confinement at the textbook 0.3, the velocity's fade 20 s
+with a viscosity of 0.0001 widths²/s, in real time (`time_scale` 1). The viscosity costs 0.7 ms a step.
 
 The velocity is in image widths per second, as the bridge's; the advection moves a texel by
 velocity × dt × `speed` (1) in uv, so 1 width/s crosses the width in 1 s.
