@@ -389,7 +389,7 @@ solve's accuracy then reaches the velocity **(deduction)**. It changes every pas
 
 ## Next
 
-Six steps, discussed one by one before any is built; each gets its decisions here as they are
+Seven steps, discussed one by one before any is built; each gets its decisions here as they are
 made.
 
 | Step | What                                                                                     | Judge on                                              |
@@ -400,6 +400,7 @@ made.
 | 9    | Faster, one change at a time ([Step 9](#step-9-faster)), done | the pass's GPU time, the physics and the picture the same |
 | 10   | The density's detail: the amount at 4K × its own layers, the color on the grid ([Step 10](#step-10-the-densitys-detail)) | the old 16-layer 4K look, in the budget |
 | 11   | The 4K layers' look: depth from the coarse grid ([Step 11](#step-11-the-4k-layers-look)) | near density covering far as finely as the fluid; the depth reads |
+| 12   | A staggered velocity, later ([Step 12](#step-12-a-staggered-velocity-later)) | the water exactly incompressible; the walls as now |
 
 ### MacCormack
 
@@ -637,6 +638,24 @@ How step 10's 4K layers are drawn, using the depth the coarse fluid already simu
 |------------|-----|
 | shadows    | the density lit from a direction (above or the side), each point darkened by the density between it and the light, measured through the coarse grid: a thread in front casts onto what is behind it |
 | occlusion  | what covers what measured through the coarse grid's layers, the 4K detail laid over it: the order in depth as fine as the fluid's, the detail 4K × `density.layers` |
+
+### Step 12: a staggered velocity, later
+
+The answer to [the projection's floor](#open-the-projections-floor): the velocity on the cells' faces (Harlow and
+Welch's MAC grid), so the divergence and the gradient are one-cell differences, the Laplacian the solvers solve,
+and an exact solve leaves the water exactly incompressible, with no pattern alternating cell by cell left behind.
+
+| Part      | How |
+|-----------|-----|
+| storage   | one RGBA16F volume at the cells' size: a texel's x, y, z the velocity on its left, bottom and front faces; the right, top and back faces on the domain's walls not stored, their value the walls' rule (0 closed, the neighbor's open), as the ghosts (`uClosed`) take them now, so the sizes stay multiples of 16 and 32 |
+| rewritten | the velocity's advection and its MacCormack, the divergence, the gradient, the viscosity, the confinement's force, the buoyancy's add, the drag and the body force, the walls in each |
+| new       | one pass a step averaging the faces to the cells' centers, so the density's carriers, the curl, the particles and the monitors read the velocity as now |
+| unchanged | the pressure solvers, the carriers, the bridge, the motion |
+| cost      | about +1 to 1.5 ms a step at 256 × 448 × 128, the velocity's advection reading two to three times as much **(deduction)** |
+| looks     | the density's brightness kept (no gathering or thinning by compression), less fine jitter for the confinement to spin up, swirls holding longer, pushes carrying further; subtle with the calm preset **(deduction)** |
+| re-check  | the walls (the explosion fixed by the ghosts), the drag's water against the body, the y metric and the resolution checks, through the harness |
+
+Sources: the face counts and the boundary faces zeroed ([oxiphysics MAC grid](https://docs.rs/oxiphysics-gpu/0.1.1/src/oxiphysics_gpu/gpu_fluid_euler.rs.html)); the walls folded into the operators on the GPU (Zaspel).
 
 ## Later
 
