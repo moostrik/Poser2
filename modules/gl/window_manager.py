@@ -54,6 +54,7 @@ class WindowSettings(BaseSettings):
     y: Field[int] =               Field(80)
     width: Field[int] =           Field(1920)
     height: Field[int] =          Field(1000)
+    default_placement: Field[bool] = Field(False, widget=Widget.button, description="Place the window on monitor 0 at 20, 0, 1280 × 720")
     secondary_list: Field[list[MonitorId]] = Field([MonitorId.M0], widget=Widget.order, newline=True)
     secondary_fullscreen: Field[bool] =       Field(True)
     fullscreen_mode: Field[FullscreenMode] = Field(FullscreenMode.WINDOWED)
@@ -70,6 +71,12 @@ class MouseButton(IntEnum):
 
 class WindowManager():
     _MIN_VISIBLE = 100  # px of window that must remain on-screen after a monitor switch
+    _MIN_VISIBLE_SHARE = 0.5  # share of the window that must be on the monitors at startup, else the default placement
+    # The default placement: monitor 0, relative to it
+    _DEFAULT_X = 20
+    _DEFAULT_Y = 0
+    _DEFAULT_WIDTH = 1280
+    _DEFAULT_HEIGHT = 720
 
     _GLFW_BUTTON_MAP: dict[int, MouseButton] = {
         glfw.MOUSE_BUTTON_LEFT:   MouseButton.LEFT,
@@ -133,6 +140,7 @@ class WindowManager():
         self._cb_size       = lambda _: self._deferred.put(lambda: self.set_size(s.width, s.height))
         self._cb_sec_fs     = lambda v: self._deferred.put(lambda: self.set_secondary_fullscreen(v))
         self._cb_mouse      = lambda _: self._deferred.put(self.apply_cursor)
+        self._cb_default    = lambda v: self._deferred.put(self.place_default) if v else None
         s.bind(WindowSettings.fullscreen_mode, self._cb_fm)
         s.bind(WindowSettings.monitor,    self._cb_monitor)
         s.bind(WindowSettings.x,         self._cb_xy)
@@ -141,6 +149,7 @@ class WindowManager():
         s.bind(WindowSettings.height,    self._cb_size)
         s.bind(WindowSettings.secondary_fullscreen, self._cb_sec_fs)
         s.bind(WindowSettings.fullscreen_mouse, self._cb_mouse)
+        s.bind(WindowSettings.default_placement, self._cb_default)
 
 
     @property
@@ -196,24 +205,27 @@ class WindowManager():
 
         self._ordered_monitor_ids = self._get_monitors_sorted_by_position()
 
+        # Place the window before creating it, so it is created at its size
+        s = self.settings
+        self._monitor = self._logical_monitor(s.monitor)
+        if self._monitor is None:
+            logger.warning("Monitor %s is not connected (%s monitors), placing the main window on monitor 0", s.monitor, len(self._ordered_monitor_ids))
+            self._monitor = self._logical_monitor(MonitorId.M0) or glfw.get_primary_monitor()
+            self._write_default_placement()
+        else:
+            mon_x, mon_y = glfw.get_monitor_pos(self._monitor)
+            share: float = self._visible_share(mon_x + s.x, mon_y + s.y, s.width, s.height)
+            if share < self._MIN_VISIBLE_SHARE:
+                logger.warning("Main window is %.0f%% on the monitors, placing it on monitor 0", share * 100)
+                self._monitor = self._logical_monitor(MonitorId.M0) or glfw.get_primary_monitor()
+                self._write_default_placement()
+
         # Create window
-        self._main_window = glfw.create_window(
-            self.settings.width, self.settings.height,
-            self.settings.title, None, None
-        )
+        self._main_window = glfw.create_window(s.width, s.height, s.title, None, None)
 
         if not self._main_window:
             glfw.terminate()
             raise RuntimeError("Failed to create GLFW window")
-
-        monitor_id = self.settings.monitor
-        monitors = glfw.get_monitors()
-
-        if self._ordered_monitor_ids and 0 <= monitor_id < len(self._ordered_monitor_ids):
-            self._monitor = monitors[self._ordered_monitor_ids[monitor_id]]
-        else:
-            logger.warning("%s ID: %s out of range for available monitors: %s, defaulting to primary monitor", type(self).__name__, monitor_id, len(monitors))
-            self._monitor = glfw.get_primary_monitor()
 
         posX, posY = glfw.get_monitor_pos(self._monitor)
         glfw.set_window_pos(self._main_window, posX + self.settings.x, posY + self.settings.y)
@@ -375,6 +387,7 @@ class WindowManager():
         s.unbind_all(self._cb_size)
         s.unbind_all(self._cb_sec_fs)
         s.unbind_all(self._cb_mouse)
+        s.unbind_all(self._cb_default)
 
         try:
             glfw.set_monitor_callback(None)  # pyright: ignore[reportArgumentType]
@@ -718,14 +731,10 @@ class WindowManager():
         """Move the main window to the given monitor (by sorted index)."""
         if not self._main_window:
             return
-        ordered_ids = self._ordered_monitor_ids
-        if monitor_id < 0 or monitor_id >= len(ordered_ids):
+        monitor = self._logical_monitor(monitor_id)
+        if monitor is None:
             return
-        real_id = ordered_ids[monitor_id]
-        monitors = glfw.get_monitors()
-        if real_id >= len(monitors):
-            return
-        self._monitor = monitors[real_id]
+        self._monitor = monitor
         if self._fullscreen_mode == FullscreenMode.WINDOWED_FULLSCREEN:
             video_mode = glfw.get_video_mode(self._monitor)
             posX, posY = glfw.get_monitor_pos(self._monitor)
@@ -758,6 +767,53 @@ class WindowManager():
         if not self._main_window: return
         if self._window_width == width and self._window_height == height: return
         glfw.set_window_size(self._main_window, width, height)
+
+    def place_default(self) -> None:
+        """Place the main window on monitor 0 at the default position and size, windowed."""
+        if not self._main_window: return
+        monitor = self._logical_monitor(MonitorId.M0) or glfw.get_primary_monitor()
+        self._monitor = monitor
+        self._write_default_placement()
+        if self.settings.fullscreen_mode != FullscreenMode.WINDOWED:
+            self.settings.fullscreen_mode = FullscreenMode.WINDOWED
+        if self._fullscreen_mode != FullscreenMode.WINDOWED:
+            self.set_fullscreen_mode(FullscreenMode.WINDOWED)  # restores the window at the settings' placement
+            return
+        mon_x, mon_y = glfw.get_monitor_pos(monitor)
+        glfw.set_window_size(self._main_window, self._DEFAULT_WIDTH, self._DEFAULT_HEIGHT)
+        glfw.set_window_pos(self._main_window, mon_x + self._DEFAULT_X, mon_y + self._DEFAULT_Y)
+
+    def _write_default_placement(self) -> None:
+        """Write the default placement into the settings: monitor 0, its position and size."""
+        s = self.settings
+        s.monitor = MonitorId.M0
+        s.x = self._DEFAULT_X
+        s.y = self._DEFAULT_Y
+        s.width = self._DEFAULT_WIDTH
+        s.height = self._DEFAULT_HEIGHT
+
+    def _logical_monitor(self, monitor_id: int) -> glfw._GLFWmonitorPointerT | None:
+        """The connected monitor at a logical slot (sorted index), or None when no monitor is there."""
+        if not 0 <= monitor_id < len(self._ordered_monitor_ids): return None
+        real_id: int = self._ordered_monitor_ids[monitor_id]
+        monitors: list[glfw._GLFWmonitorPointerT] = glfw.get_monitors()
+        return monitors[real_id] if real_id < len(monitors) else None
+
+    @staticmethod
+    def _visible_share(x: int, y: int, width: int, height: int) -> float:
+        """The share of a window (screen coordinates) that lies on the connected monitors."""
+        if width <= 0 or height <= 0: return 0.0
+        visible: int = 0
+        for m in glfw.get_monitors():
+            mode = glfw.get_video_mode(m)
+            if not mode:
+                continue  # a monitor that is being disconnected is still listed, without a video mode
+            mx, my = glfw.get_monitor_pos(m)
+            w: int = min(x + width, mx + mode.size.width) - max(x, mx)
+            h: int = min(y + height, my + mode.size.height) - max(y, my)
+            if w > 0 and h > 0:
+                visible += w * h
+        return visible / (width * height)
 
     def set_secondary_fullscreen(self, value: bool) -> None:
         """Set all secondary windows to fullscreen or windowed mode"""
