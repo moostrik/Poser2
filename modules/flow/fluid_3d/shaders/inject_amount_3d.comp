@@ -2,7 +2,9 @@
 
 /*
  * InjectAmount3D - a 2D source's amount (its alpha) into a one-channel volume, in the gaussian slab around
- * uTargetLayer, as Inject3D adds the whole RGBA. The source is read by uv, so the volume may be finer.
+ * uTargetLayer, as Inject3D adds the whole RGBA. The source is read by uv, so the volume may be finer: then
+ * uCubic enlarges it by a cubic B-spline, smooth through the source's texel corners, where a bilinear read keeps
+ * them as steps a source texel apart; four bilinear reads (Sigg and Hadwiger, GPU Gems 2).
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
@@ -13,7 +15,25 @@ layout(r16f, binding = 0) uniform image3D uVolume;
 uniform float uTargetLayer;  // normalized depth [0, 1] of the slab's center
 uniform float uSpread;       // the gaussian's sigma in normalized depth
 uniform float uStrength;
+uniform bool  uCubic;        // the source enlarged by a cubic B-spline, else bilinearly
 uniform ivec3 uSize;
+
+float bspline_alpha(vec2 uv) {
+    vec2 size = vec2(textureSize(uInput, 0));
+    vec2 position = uv * size - 0.5;
+    vec2 base = floor(position);
+    vec2 f = position - base;
+    vec2 w0 = (1.0 - f) * (1.0 - f) * (1.0 - f) / 6.0;
+    vec2 w1 = (4.0 - 6.0 * f * f + 3.0 * f * f * f) / 6.0;
+    vec2 w2 = (1.0 + 3.0 * f + 3.0 * f * f - 3.0 * f * f * f) / 6.0;
+    vec2 w3 = f * f * f / 6.0;
+    vec2 s0 = w0 + w1;
+    vec2 s1 = w2 + w3;
+    vec2 t0 = (base - 1.0 + w1 / s0 + 0.5) / size;
+    vec2 t1 = (base + 1.0 + w3 / s1 + 0.5) / size;
+    return s0.x * s0.y * texture(uInput, t0).a + s1.x * s0.y * texture(uInput, vec2(t1.x, t0.y)).a
+         + s0.x * s1.y * texture(uInput, vec2(t0.x, t1.y)).a + s1.x * s1.y * texture(uInput, t1).a;
+}
 
 void main() {
     ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
@@ -24,6 +44,6 @@ void main() {
     float weight = exp(-0.5 * dz * dz) * uStrength;
     if (weight < 0.001) return;
     vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
-    float amount = texture(uInput, uv).a * weight;
+    float amount = (uCubic ? bspline_alpha(uv) : texture(uInput, uv).a) * weight;
     imageStore(uVolume, gid, vec4(imageLoad(uVolume, gid).r + amount, 0.0, 0.0, 0.0));
 }

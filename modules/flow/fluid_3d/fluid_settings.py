@@ -96,6 +96,7 @@ class DensitySettings(BaseSettings):
     carrier: Field[Carrier]         = Field(Carrier.GRID,                                           description="What carries the density: the grid's volume, particles, or a volume at the output's resolution")
     layers: Field[int]              = Field(16,     min=4,      max=256,    step=4,                 description="OUTPUT: the density's layers in z, over the grid's depth")
     sample: Field[DensitySample]    = Field(DensitySample.AVERAGE,                                  description="OUTPUT: the velocity at a layer's middle, or averaged over the grid's layers it spans")
+    cubic: Field[bool]              = Field(True,                                                   description="OUTPUT: the bridge's density enlarged by a cubic B-spline, without its texels' steps; off: bilinear")
     turbulence: Field[float]        = Field(0.0,    min=0.0,    max=50.0,   step=0.5,              description="OUTPUT: swirls below the grid where the water churns, as its curl × cell; 0 = off")
     fade_time: Field[float]         = Field(60.0,   min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%; 60 = ink stays")
     evaporation: Field[float]       = Field(0.0,    min=0.0,    max=2.0,    color="grey",           description="Density removed per second; clears low-level haze (0 = off)")

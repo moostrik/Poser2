@@ -97,7 +97,7 @@ class OutputDensity(DensityCarrier):
         if not self.allocated:
             return
         self._color.add(texture, gain, dt, layer, spread)
-        self._inject_shader.use(texture, self._amount, layer, spread, gain * dt)
+        self._inject_shader.use(texture, self._amount, layer, spread, gain * dt, cubic=self.settings.density.cubic)
         glMemoryBarrier(_BARRIER)
 
     def update(self, step: CarrierStep) -> None:
