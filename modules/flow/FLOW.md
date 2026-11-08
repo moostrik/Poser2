@@ -38,7 +38,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 | region               | the pixels around one, which tell a part of the body changing speed from a limb arriving or leaving | `start_region_size`, `stop_region_size`, `*_region_weight`         |
 | injection            | one bridge output as one fluid takes it, at its weight                                                | `Injection`                                                        |
 | fluid                | the Navier–Stokes simulation; its density is the show                                                  | `fluid_2d/`, `fluid_3d/`, `Fluid2D`, `Fluid3D`                     |
-| volume               | the 3D fluid's z layers, where the body sits in them, and the composite's look                       | `VolumeSettings`, group `volume`                                   |
+| composite            | the 3D fluid's look: how its density volume is marched into the output                            | `CompositeSettings`, group `composite`                             |
 | carrier              | what carries the 3D fluid's density through its velocity: the simulation density always, the upscaled density and particles where enabled | `DensityCarrier`, `SimulationDensity`, `UpscaledDensity`, `ParticleDensity` |
 | depth                | the camera's depth in metres, on the flow's view                                                      | `DepthView`                                                        |
 | depth velocity       | the z of the 3D flow: the depth change along the x/y displacement, in view widths per second          | `DepthVelocity`, `DepthVelocitySettings`, group `depth_velocity`   |
@@ -286,7 +286,7 @@ The six outputs (`BridgeOutput`, `Injection`), and what the 3D fluid does with e
 
 | Output                    | Unit                       | The fluid                                                                       | Default       |
 |---------------------------|----------------------------|---------------------------------------------------------------------------------|---------------|
-| `boundary_velocity`       | widths/s                   | drags the water toward it where it is non-zero, over `drag_time`, never past it | the trail 1   |
+| `boundary_velocity`       | widths/s                   | drags the water toward it where it is non-zero, over `boundary_drag`, never past it | the trail 1   |
 | `boundary_density`        | widths/s, times the color  | adds it × dt into the slab: the brush, per width of travel                      | the trail 1   |
 | `boundary_temperature`    | widths/s, by the color     | adds it × dt into the slab                                                      | the trail 1   |
 | `body_force_acceleration` | widths/s²                  | adds it × dt: a Δv added once                                                   | all 0: `None` |
@@ -368,7 +368,7 @@ tested on it, and the lowpass's and the bandpass's own settings are left as the 
 | `modules/flow/bridge_2d/`       | the 2D bridge                                                                                                                                              |
 | `modules/flow/bridge_3d/`       | the 3D bridge                                                                                                                                              |
 | `modules/flow/fluid_2d/`        | `Fluid2D`, `Fluid2DSettings` with its own `VelocitySettings`, `DensitySettings`, `TemperatureSettings`, `PressureSettings`; `shaders/`                     |
-| `modules/flow/fluid_3d/`        | `Fluid3D`, `Fluid3DSettings` with its own groups, `VolumeSettings` and `ParticleSettings`; the density's carriers (`DensityCarrier`: `SimulationDensity`, `UpscaledDensity`, `ParticleDensity`), `FieldAdvection`; `shaders/`; its document [FLUID_3D.md](FLUID_3D.md) |
+| `modules/flow/fluid_3d/`        | `Fluid3D`, `Fluid3DSettings` with the box and one group per concern (`TimeSettings`, `CompositeSettings`, `ParticleSettings`, ...); the density's carriers (`DensityCarrier`: `SimulationDensity`, `UpscaledDensity`, `ParticleDensity`), `FieldAdvection`; `shaders/`; its document [FLUID_3D.md](FLUID_3D.md) |
 | `modules/flow/shaders/`         | the shared fragment shaders, `AddBoolean` among them                                                                                                       |
 | `modules/flow/time_step.py`, `modules/flow/wall_mode.py` | shared                                                                                                                            |
 | `modules/flow/port.py`          | `Port`, `Ports`, `TextureKind`, `HasPorts`, `OnDemand`, `prefixed`, `ports_of`                                                                             |
@@ -430,7 +430,7 @@ The shader loader finds a shader's source by its `.py` module name beside it
   default, and the app sets it from whatever it reads (hd_trio: the pose's motion and the
   cross-camera similarity). The fluid never knows why.
 - A multiplier on an input is a `gain` (the 2D fluid's `velocity.gain`, `density.gain`,
-  `temperature.gain`; the 3D fluid's `boundary.gain` and `body_force.gain`, and its density's and
+  `temperature.gain`; the 3D fluid's `velocity.boundary_gain` and `velocity.body_force_gain`, and its density's and
   temperature's `boundary_gain` and `body_force_gain`); a 0 to 1 share in a mix is a `weight`; the density's sinking along gravity
   in the buoyancy is `temperature.sink`, which both fluids read (`Fluid2D._apply_buoyancy`).
 - `modules/render/tests/test_flow_systems.py` loads each app preset into its system's stage

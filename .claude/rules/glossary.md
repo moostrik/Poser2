@@ -30,7 +30,7 @@ Each bullet names the term to use and, after "not", the synonyms it replaces. A 
 - The bridge's filters, named by what they do: `lowpass` (`VelocityLowpass`, gives the trail) and `bandpass` (`VelocityBandpass`, `Change`, gives the change and its parts); not `VelocityTrailBridge`, `VelocityChangeBridge`, `impulse`, `MotionEvent`
 - The pixels around one, which tell a part of the body changing speed from a limb arriving or leaving: `region` (`start_region_size`, `start_region_weight`, `stop_region_*`); not `patch`, `tile`, `gate`
 - The two systems a fluid takes the bridge in: `boundary`, the body in the water, what the water is dragged toward (`boundary_velocity`, `boundary_density`, `boundary_temperature`); `body_force`, the Navier–Stokes force term, what is added × dt (`body_force_acceleration`, `body_force_density`, `body_force_temperature`); `wall`, the domain's edge
-- "impulse", "body", "force", "delta" and "drag" name nothing on their own; a name says the quantity (`velocity`, `acceleration`) or the textbook term (`body_force`, `drag_time`)
+- "impulse", "body", "force", "delta" and "drag" name nothing on their own; a name says the quantity (`velocity`, `acceleration`) or the textbook term (`body_force`), or pairs with the system it belongs to (`boundary_drag`, the time the water takes to close in on the boundary)
 
 ## Render
 
@@ -54,6 +54,8 @@ Each bullet names the term to use and, after "not", the synonyms it replaces. A 
 - The camera count at an app's root: `num_cams`, separate from `max_players`
 - The gate on the group's similarity: "group sync" (`group_sync`, `GroupSync`, `GroupSyncGate`); not "full sync". The OSC address stays `/global/sync`
 - The flow stages in an app's settings and `Layers`: `motion`, `bridge`, `fluid`; not `flow`, `fluid3d`, `fluid_flow`
+- How far a field is carried along the water per step, 1 = with the water: `advection_scale` (on `velocity`, `density`, `temperature`); not `speed`, `self_advection`. `advection` is the method (semi-Lagrangian, MacCormack)
+- A field's inputs sit in its own group: `boundary_gain`, `body_force_gain`, and on `velocity` `boundary_drag`; the box holds one `wall` for every field and side, and the look is `composite`
 - The 3D fluid's grid size: `width`, `height`, `depth` (its cells in z); not `layers`. Outside a stage's size, `depth` is the camera's depth. The fluid's z look and injection: `volume` (`VolumeSettings`)
 - The 3D fluid's density carriers: the simulation density (in the simulation's cells, `SimulationDensity`, always on), the upscaled density (its amount at its own `width`, `height`, `depth`, `UpscaledDensity`, settings group `upscaled`) and the particles (`ParticleDensity`, group `particles`), each of the last two switched by `enabled`; not "grid density", "output density"
 

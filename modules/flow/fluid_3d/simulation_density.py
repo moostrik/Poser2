@@ -67,7 +67,7 @@ class SimulationDensity(DensityCarrier):
     def composite(self, output: Texture) -> None:
         if not self.allocated:
             return
-        volume = self.settings.volume
+        volume = self.settings.composite
         self._composite_shader.use(self._density, output, emission=volume.emission, absorption=volume.absorption,
                                    tint=volume.tint, fog=volume.fog, glow=volume.glow)
         glMemoryBarrier(_BARRIER_IMAGE)

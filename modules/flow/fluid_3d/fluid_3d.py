@@ -21,7 +21,7 @@ Pipeline:
 
 The walls are per-field wrap modes (no explicit border obstacles):
     Velocity:          GL_CLAMP_TO_BORDER(0,0,0,0)  -> no-slip / Dirichlet
-    Density, pressure, temperature: by their `wall`; the z walls by the volume's
+    Velocity z, density, pressure, temperature: by `wall`, every side alike
     Obstacle:          GL_CLAMP_TO_BORDER(1,0,0,0)   -> OOB = obstacle
 
 The inputs are the bridge's two systems: the boundary, the body in the water, whose velocity the
@@ -29,7 +29,7 @@ water is dragged toward where the body is (`drag_velocity`, never past it); and 
 acceleration added × dt (`add_acceleration`). The densities and the temperatures are sources, added
 × dt, each side at its own gain (`add_boundary_density`, `add_body_force_density`,
 `add_boundary_temperature`, `add_body_force_temperature`). Every input goes into the gaussian birth
-slab at `volume.injection_layer`.
+slab at `injection_layer`.
 """
 import math
 
@@ -38,7 +38,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_R16F,
 
 from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
-from .fluid_settings import PressureSolver, Fluid3DSettings, VolumeSettings, DensitySettings, TemperatureSettings, PressureSettings, VelocitySettings, ParticleSettings, UpscaledDensitySettings
+from .fluid_settings import PressureSolver, Fluid3DSettings, PressureSettings, VelocitySettings, ParticleSettings, UpscaledDensitySettings
 from .multigrid_pressure import MultigridPressure
 from ..shaders import AddBoolean
 from ..flow_util import FlowUtil
@@ -215,10 +215,7 @@ class Fluid3D:
         self.settings.bind(Fluid3DSettings.width, lambda _: self._request_reallocate())
         self.settings.bind(Fluid3DSettings.height, lambda _: self._request_reallocate())
         mark_wall = lambda _: setattr(self, '_wall_dirty', True)
-        self.settings.density.bind(DensitySettings.wall, mark_wall)
-        self.settings.temperature.bind(TemperatureSettings.wall, mark_wall)
-        self.settings.pressure.bind(PressureSettings.wall, mark_wall)
-        self.settings.volume.bind(VolumeSettings.wall, mark_wall)
+        self.settings.bind(Fluid3DSettings.wall, mark_wall)
 
     # ========== Allocation ==========
 
@@ -275,7 +272,7 @@ class Fluid3D:
 
     def _spread(self) -> float:
         """The injection's gaussian sigma as a share of the slab's depth, from `injection_spread` in widths."""
-        return max(self.settings.volume.injection_spread / max(self._z_extent, 1e-6), 0.001)
+        return max(self.settings.injection_spread / max(self._z_extent, 1e-6), 0.001)
 
     @property
     def _densities(self) -> list[DensityCarrier]:
@@ -446,7 +443,7 @@ class Fluid3D:
 
     def _advect_velocity(self) -> None:
         """Self-advect, dissipate and dampen the velocity field."""
-        advect_step = self._dt * self.settings.velocity.self_advection
+        advect_step = self._dt * self.settings.velocity.advection_scale
         dissipation = self._calculate_dissipation(self._dt, self.settings.velocity.fade_time)
         self._advect_field(self._velocity, self._velocity_scratch, None, advect_step, dissipation, GL_RGBA16F,
                            dampen=self._dampen_step())
@@ -518,7 +515,7 @@ class Fluid3D:
             return
         self._temperature_clear = False
 
-        advect_step = self._dt * self.settings.speed
+        advect_step = self._dt * self.settings.temperature.advection_scale
         dissipation = self._calculate_dissipation(self._dt, self.settings.temperature.fade_time)
         self._advect_field(self._temperature, self._temperature_scratch, self._velocity, advect_step, dissipation, GL_R16F)
 
@@ -553,10 +550,8 @@ class Fluid3D:
 
     def _enforce_incompressibility(self) -> None:
         """Pressure projection (divergence → Jacobi solve → gradient subtraction), the three passes on one set
-        of walls: x and y closed or open by `pressure.wall`, z by `volume.wall`."""
-        closed: tuple[bool, bool, bool] = (self.settings.pressure.wall == WallMode.CLOSED,
-                                           self.settings.pressure.wall == WallMode.CLOSED,
-                                           self.settings.volume.wall == WallMode.CLOSED)
+        of walls, closed or open by `wall`."""
+        closed: tuple[bool, bool, bool] = (self.settings.wall == WallMode.CLOSED,) * 3
         # a. Compute divergence
         self._divergence_shader.use(
             self._velocity,
@@ -608,7 +603,7 @@ class Fluid3D:
         """Move the density one step along the velocity, faded and evaporated, by each carrier running."""
         step = CarrierStep(
             velocity=self._velocity, obstacle=self._obstacle, has_obstacles=self._has_obstacles,
-            aspect=self._aspect, z_extent=self._z_extent, dt=self._dt, step=self._dt * self.settings.speed,
+            aspect=self._aspect, z_extent=self._z_extent, dt=self._dt, step=self._dt * self.settings.density.advection_scale,
             dissipation=self._calculate_dissipation(self._dt, self.settings.density.fade_time),
             evaporation=self.settings.density.evaporation * self._dt, advection=self.settings.advection,
             curl=self._curl_vol if self._needs_curl else None, cell=self._cell)
@@ -641,15 +636,14 @@ class Fluid3D:
     # ========== Deferred ==========
 
     def _apply_wall_modes(self) -> None:
-        """Apply the wall settings to all field volumes (GL thread only)."""
-        for temperature in (self._temperature, self._temperature_scratch):
-            temperature.set_wrap(*_WALL_GL[self.settings.temperature.wall])
-        self._pressure.set_wrap(*_WALL_GL[self.settings.pressure.wall])
-        z_wall = _WALL_GL[self.settings.volume.wall]
-        for vol in [self._velocity, self._temperature, self._pressure, self._velocity_scratch, self._temperature_scratch]:
-            vol.set_wrap_z(*z_wall)
+        """Apply `wall` to every field volume's sides, the velocity's x and y kept at 0 (GL thread only)."""
+        wall = _WALL_GL[self.settings.wall]
+        for volume in (self._temperature, self._temperature_scratch, self._pressure):
+            volume.set_wrap(*wall)
+        for volume in (self._velocity, self._temperature, self._pressure, self._velocity_scratch, self._temperature_scratch):
+            volume.set_wrap_z(*wall)
         for carrier in (self._simulation_density, self._upscaled_density, self._particle_density):
-            carrier.set_walls(_WALL_GL[self.settings.density.wall], z_wall)
+            carrier.set_walls(wall, wall)
 
     def _handle_deferred_actions(self) -> None:
         """Process reset and reallocation requests queued from the UI thread."""
@@ -684,7 +678,7 @@ class Fluid3D:
         s = self.settings
         # the fluid's own time: every pass steps by it, the injections' sources and the drag included, so at
         # time_scale 0.5 the whole fluid runs at half speed and keeps its shapes
-        self._dt = self._time_step.update(s.time_step, dt, s.fixed_fps, s.fps_smoothing) * s.time_scale
+        self._dt = self._time_step.update(s.time.time_step, dt, s.time.fixed_fps, s.time.fps_smoothing) * s.time.time_scale
 
     @staticmethod
     def _align32(v: int) -> int:
@@ -703,7 +697,7 @@ class Fluid3D:
 
     def drag_velocity(self, texture: Texture, weight: float = 1.0) -> None:
         """The boundary: drag the velocity in the gaussian birth slab toward the body's velocity (x, y on
-        the image plane, z toward the camera; widths/s) × boundary.gain, over boundary.drag_time, where
+        the image plane, z toward the camera; widths/s) × velocity.boundary_gain, over velocity.boundary_drag, where
         the body moves (its speed above DRAG_FLOOR), never past it. The volume's w is -z × the depth scale:
         the box's depth stands for as much real depth as the smaller of its width and height, so z is
         scaled by its depth over that; +W moves fluid away from the viewer (layer 0 is the front face).
@@ -711,25 +705,25 @@ class Fluid3D:
         """
         if not self._allocated:
             return
-        boundary = self.settings.boundary
+        velocity = self.settings.velocity
         self._boundary_velocity_shader.use(
             texture, self._velocity,
-            self.settings.volume.injection_layer,
+            self.settings.injection_layer,
             self._spread(),
-            boundary.gain, drag_share(self._dt, boundary.drag_time), weight, DRAG_FLOOR, self._depth_scale,
+            velocity.boundary_gain, drag_share(self._dt, velocity.boundary_drag), weight, DRAG_FLOOR, self._depth_scale,
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def add_acceleration(self, texture: Texture, weight: float = 1.0) -> None:
         """The body force: add the acceleration (x, y on the image plane, z toward the camera; widths/s²)
-        × body_force.gain × dt into the gaussian birth slab; w is -z, as the boundary's."""
+        × velocity.body_force_gain × dt into the gaussian birth slab; w is -z, as the boundary's."""
         if not self._allocated:
             return
         self._body_force_acceleration_shader.use(
             texture, self._velocity,
-            self.settings.volume.injection_layer,
+            self.settings.injection_layer,
             self._spread(),
-            weight * self.settings.body_force.gain * self._dt, self._depth_scale,
+            weight * self.settings.velocity.body_force_gain * self._dt, self._depth_scale,
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
@@ -746,9 +740,8 @@ class Fluid3D:
     def _add_density(self, texture: Texture, gain: float) -> None:
         if not self._allocated:
             return
-        volume = self.settings.volume
         for carrier in self._densities:
-            carrier.add(texture, gain, self._dt, volume.injection_layer, self._spread())
+            carrier.add(texture, gain, self._dt, self.settings.injection_layer, self._spread())
 
     def add_boundary_temperature(self, texture: Texture, weight: float = 1.0) -> None:
         """The boundary's temperature (widths/s, signed by the color) × temperature.boundary_gain × dt into the slab."""
@@ -768,7 +761,7 @@ class Fluid3D:
             return
         self._inject_shader.use(
             texture, volume,
-            self.settings.volume.injection_layer,
+            self.settings.injection_layer,
             self._spread(),
             gain * self._dt,
             internal_format=internal_format

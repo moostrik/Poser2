@@ -156,7 +156,7 @@ with the pose, on 256 × 448 × 128:
 ## The baseline
 
 The defaults (`modules/flow/fluid_3d/fluid_settings.py`): the grid `width` 256, `height` 448,
-`depth` 128, half a width deep; `volume.injection_spread` 0.075 widths, a body's
+`depth` 128, half a width deep; `injection_spread` 0.075 widths, a body's
 thickness; the particles' `count` 2 M, the points' budget, and their ranges to what fits:
 `count` 10 k to 8 M, `rate` 0.01 to 50, `radius` 1 to 48 pixels, `spread` 0 to 10. The preset
 takes the grid, the spread and, for its streaks, 1 M.

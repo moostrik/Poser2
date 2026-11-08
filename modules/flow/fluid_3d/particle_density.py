@@ -149,10 +149,10 @@ class ParticleDensity(DensityCarrier):
 
     def _reference_mass(self) -> float:
         """The mass a texel of amount 1 gives each of its particles at the boundary's density gain: a blob of
-        this mass has `radius`, so the gain changes how much ink there is, not how big a drop is."""
-        volume = self.settings.volume
-        spread: float = max(volume.injection_spread / max(self._z_extent, 1e-6), 0.001)     # widths, as a share of the slab
-        return (slab_sum(volume.injection_layer, spread, self._layers) * self.settings.density.boundary_gain
+        this mass has `radius`, so the gain changes how much density there is, not how big a drop is."""
+        settings = self.settings
+        spread: float = max(settings.injection_spread / max(self._z_extent, 1e-6), 0.001)     # widths, as a share of the slab
+        return (slab_sum(settings.injection_layer, spread, self._layers) * self.settings.density.boundary_gain
                 / max(self.settings.particles.rate, 1e-6))
 
     def add(self, texture: Texture, gain: float, dt: float, layer: float, spread: float) -> None:
@@ -176,8 +176,8 @@ class ParticleDensity(DensityCarrier):
         self._advect_shader.use(self._particles, self._ring, self._count, step.velocity, aspect=step.aspect, z_extent=step.z_extent,
                                 timestep=step.step, dt=step.dt, dissipation=step.dissipation,
                                 evaporation=self.settings.density.evaporation * step.dt * self._reference_mass(),
-                                closed_xy=self.settings.density.wall == WallMode.CLOSED,
-                                closed_z=self.settings.volume.wall == WallMode.CLOSED)
+                                closed_xy=self.settings.wall == WallMode.CLOSED,
+                                closed_z=self.settings.wall == WallMode.CLOSED)
         self._advect_timer.end()
 
     # ========== Drawing ==========
@@ -194,7 +194,7 @@ class ParticleDensity(DensityCarrier):
 
     def _composite_sprites(self, output: Texture) -> None:
         particles = self.settings.particles
-        volume = self.settings.volume
+        volume = self.settings.composite
         additive: bool = particles.overlap == Overlap.ADDITIVE
         slices: int = 1 if additive else int(particles.slices)
         target: LayeredFbo = self._slices
@@ -229,7 +229,7 @@ class ParticleDensity(DensityCarrier):
     def _composite_weighted(self, output: Texture) -> None:
         """The sprites into the weighted look's three targets in one pass, then into the output."""
         particles = self.settings.particles
-        volume = self.settings.volume
+        volume = self.settings.composite
         width, height = self._output
         if not self._weighted_fbo or (self._weighted_sum.width, self._weighted_sum.height) != (width, height):
             self._deallocate_weighted()
@@ -305,7 +305,7 @@ class ParticleDensity(DensityCarrier):
 
     def _composite_surface(self, output: Texture) -> None:
         particles = self.settings.particles
-        volume = self.settings.volume
+        volume = self.settings.composite
         width, height = self._output
         if not self._surface_fbo or (self._surface_depth.width, self._surface_depth.height) != (width, height):
             self._deallocate_surface()

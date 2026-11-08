@@ -31,7 +31,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 3410,
+        "iso": 4014,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -520,31 +520,21 @@
       "height": 800,
       "depth": 64,
       "blend_mode": "ADD",
-      "time_step": "MEASURED",
-      "fixed_fps": 60.0,
-      "fps_smoothing": 1.0,
-      "time_scale": 1.0,
-      "speed": 1.0,
+      "wall": "CLOSED",
+      "injection_layer": 0.5,
+      "injection_spread": 0.075,
       "advection": "SEMI_LAGRANGIAN",
-      "boundary": {
-        "gain": 1.0,
-        "drag_time": 500.0
-      },
-      "body_force": {
-        "gain": 1.0
-      },
-      "volume": {
-        "injection_layer": 0.5,
-        "injection_spread": 0.075,
-        "emission": 1.16,
-        "absorption": 2.86,
-        "glow": 0.1,
-        "tint": 0.3,
-        "fog": 0.1,
-        "wall": "CLOSED"
+      "time": {
+        "time_step": "MEASURED",
+        "fixed_fps": 60.0,
+        "fps_smoothing": 1.0,
+        "time_scale": 1.0
       },
       "velocity": {
-        "self_advection": 1.0,
+        "boundary_gain": 1.0,
+        "boundary_drag": 500.0,
+        "body_force_gain": 1.0,
+        "advection_scale": 1.0,
         "fade_time": 60.0,
         "dampen_threshold": 3.0,
         "dampen_time": 0.5,
@@ -556,28 +546,34 @@
       "density": {
         "boundary_gain": 1.0,
         "body_force_gain": 1.0,
+        "advection_scale": 1.0,
         "fade_time": 60.0,
-        "evaporation": 0.01,
-        "wall": "CLOSED"
+        "evaporation": 0.01
       },
       "temperature": {
         "boundary_gain": 1.0,
         "body_force_gain": 1.0,
+        "advection_scale": 1.0,
         "fade_time": 12.0,
         "buoyancy": 0.0,
         "sink": 0.0,
         "gravity_x": 0.0,
         "gravity_y": 1.0,
         "gravity_z": 0.0,
-        "ambient": 0.0,
-        "wall": "CLOSED"
+        "ambient": 0.0
       },
       "pressure": {
         "solver": "MULTIGRID",
         "iterations": 40,
         "relaxation": 1.8,
-        "cycles": 1,
-        "wall": "CLOSED"
+        "cycles": 1
+      },
+      "composite": {
+        "emission": 1.16,
+        "absorption": 2.86,
+        "glow": 0.1,
+        "tint": 0.3,
+        "fog": 0.1
       },
       "upscaled": {
         "enabled": true,
@@ -618,11 +614,11 @@
     },
     "monitor_b": {
       "stage": "FLUID",
-      "texture": "color",
+      "texture": "density",
       "view": "COLORMAP",
       "advanced": {
         "channel": "ALL",
-        "cut": "CUBE",
+        "cut": "FOG",
         "scale": 1.0,
         "glyph_spacing": "SPACING_32",
         "legend": true,

@@ -13,7 +13,7 @@ from .stage_layer import Stage3DLayerSettings
 
 class Fluid3DLayerSettings(Fluid3DSettings, FluidLayerSettings, Stage3DLayerSettings):
     """Configuration for Fluid3DLayer: the stage's settings and its fluid's own, one panel, the stage's
-    first; the stage's width, height and layers are the fluid's simulation grid."""
+    first; the stage's width, height and depth are the fluid's simulation grid."""
 
 
 class Fluid3DLayer(FluidLayer):
