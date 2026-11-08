@@ -2,7 +2,7 @@
 
 /*
  * VelocityAverage3D - the velocity averaged in z over the grid's layers each of uLayers coarser layers spans,
- * on the grid's x and y: what an OUTPUT density layer moves with. A grid layer a layer boundary cuts is
+ * on the grid's x and y: what an upscaled density layer moves with. A grid layer a layer boundary cuts is
  * weighted by its share.
  */
 

@@ -7,7 +7,7 @@
     "keyframe_interval": 50,
     "color": true,
     "resolution": "P720",
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "fov": 80.0,
     "split_seconds": 60,
@@ -31,7 +31,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 2126,
+        "iso": 3410,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -432,6 +432,7 @@
         "xy_smooth": true,
         "catch_up": 8.0,
         "dead_zone": 0.02,
+        "max_speed": 6.0,
         "threshold": 1.0
       }
     },
@@ -442,7 +443,7 @@
         "lowpass": {
           "advect": 1.0,
           "attack": 1.0,
-          "smooth": 160.0,
+          "smooth": 50.0,
           "blur_radius": 4.0,
           "blur_steps": 4
         },
@@ -515,19 +516,19 @@
       }
     },
     "fluid": {
-      "width": 256,
-      "height": 448,
-      "layers": 128,
+      "width": 448,
+      "height": 800,
+      "depth": 64,
       "blend_mode": "ADD",
       "time_step": "MEASURED",
       "fixed_fps": 60.0,
       "fps_smoothing": 1.0,
       "time_scale": 1.0,
       "speed": 1.0,
-      "advection": "MACCORMACK",
+      "advection": "SEMI_LAGRANGIAN",
       "boundary": {
-        "gain": 0.4,
-        "drag_time": 50.0
+        "gain": 1.0,
+        "drag_time": 500.0
       },
       "body_force": {
         "gain": 1.0
@@ -544,36 +545,20 @@
       },
       "velocity": {
         "self_advection": 1.0,
-        "fade_time": 20.0,
+        "fade_time": 60.0,
         "dampen_threshold": 3.0,
         "dampen_time": 0.5,
         "vorticity": 0.3,
         "vorticity_radius": 1.0,
-        "viscosity": 0.0001,
+        "viscosity": 0.0,
         "viscosity_iter": 20
       },
       "density": {
         "boundary_gain": 1.0,
         "body_force_gain": 1.0,
-        "carrier": "PARTICLES",
-        "layers": 16,
-        "sample": "AVERAGE",
         "fade_time": 60.0,
-        "evaporation": 0.0,
+        "evaporation": 0.01,
         "wall": "CLOSED"
-      },
-      "particles": {
-        "count": 1000000,
-        "rate": 0.1,
-        "ring_fade": 0.1,
-        "draw": "STREAKS",
-        "overlap": "OCCLUDED",
-        "slices": 16,
-        "size": 3.12,
-        "streak": 1.0,
-        "radius": 24.0,
-        "spread": 2.0,
-        "smooth": 3
       },
       "temperature": {
         "boundary_gain": 1.0,
@@ -593,6 +578,29 @@
         "relaxation": 1.8,
         "cycles": 1,
         "wall": "CLOSED"
+      },
+      "upscaled": {
+        "enabled": true,
+        "width": 2160,
+        "height": 3840,
+        "depth": 16,
+        "sample": "MIDDLE",
+        "cubic": true,
+        "turbulence": 0.0
+      },
+      "particles": {
+        "enabled": false,
+        "count": 1000000,
+        "rate": 0.1,
+        "ring_fade": 0.1,
+        "draw": "STREAKS",
+        "overlap": "OCCLUDED",
+        "slices": 16,
+        "size": 3.12,
+        "streak": 1.0,
+        "radius": 24.0,
+        "spread": 2.0,
+        "smooth": 3
       }
     },
     "monitor_a": {
@@ -610,11 +618,11 @@
     },
     "monitor_b": {
       "stage": "FLUID",
-      "texture": "velocity",
+      "texture": "color",
       "view": "COLORMAP",
       "advanced": {
         "channel": "ALL",
-        "cut": "FRONT",
+        "cut": "CUBE",
         "scale": 1.0,
         "glyph_spacing": "SPACING_32",
         "legend": true,
@@ -706,10 +714,10 @@
       "title": "Poser",
       "v_sync": false,
       "monitor": "M0",
-      "x": 1708,
+      "x": 2561,
       "y": 31,
-      "width": 851,
-      "height": 1360,
+      "width": 1278,
+      "height": 2080,
       "secondary_list": [
         "M1"
       ],

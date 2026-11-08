@@ -22,16 +22,8 @@ class PressureSolver(IntEnum):
     MULTIGRID = 2           # V-cycles over the grid halved to a few cells, red-black Gauss–Seidel smoothing each level
 
 
-class Carrier(IntEnum):
-    """What carries the density: the grid's volume, particles moved through the grid's velocity, or a volume at
-    the output's resolution."""
-    GRID = 0
-    PARTICLES = 1
-    OUTPUT = 2              # the amount at the output's x and y and density.layers, the color on the grid
-
-
 class DensitySample(IntEnum):
-    """Which velocity moves an OUTPUT density layer that spans several of the grid's layers."""
+    """Which velocity moves an upscaled density layer that spans several of the simulation's layers."""
     MIDDLE = 0              # the velocity at the layer's middle
     AVERAGE = 1             # the velocity averaged over the grid's layers the layer spans
 
@@ -46,18 +38,19 @@ class ParticleDraw(IntEnum):
 
 class Overlap(IntEnum):
     """How the particles cover each other, for points, streaks and blobs."""
-    OCCLUDED = 0            # depth slices marched front to back: near ink covers far ink
+    OCCLUDED = 0            # depth slices marched front to back: near density covers far density
     ADDITIVE = 1            # one sum, the depth as fog per particle
-    WEIGHTED = 2            # weighted blended order-independent transparency: one pass, near ink over far by a depth weight (McGuire, Bavoil 2013)
+    WEIGHTED = 2            # weighted blended order-independent transparency: one pass, near density over far by a depth weight (McGuire, Bavoil 2013)
 
 
 class ParticleSettings(BaseSettings):
-    """The particle carrier: the ring, the emission, the look."""
-    count: Field[int]               = Field(2_000_000, min=10_000, max=8_000_000, step=10_000,     description="Particles in the ring, the most alive at once; 32 bytes each")
-    rate: Field[float]              = Field(20.0,   min=0.01,   max=50.0,                               description="Particles per texel per second where ink is (fewer: heavier, bigger blobs)")
+    """The particles: the ring, the emission, the look; drawn over the volume."""
+    enabled: Field[bool]            = Field(False,                                                      description="Particles carried by the water, drawn over the volume")
+    count: Field[int]              = Field(2_000_000, min=10_000, max=8_000_000, step=10_000,     description="Particles in the ring, the most alive at once; 32 bytes each")
+    rate: Field[float]              = Field(20.0,   min=0.01,   max=50.0,                               description="Particles per texel per second where density is (fewer: heavier, bigger blobs)")
     ring_fade: Field[float]         = Field(0.1,    min=0.01,   max=1.0,                                description="The ring's last share the oldest fade over before they are overwritten")
     draw: Field[ParticleDraw]       = Field(ParticleDraw.POINTS,                                        description="Points, streaks, blobs or a surface")
-    overlap: Field[Overlap]         = Field(Overlap.OCCLUDED,                                           description="Occluded: near ink covers far ink. Additive: one sum. Weighted: near over far by a weight, one pass")
+    overlap: Field[Overlap]         = Field(Overlap.OCCLUDED,                                           description="Occluded: near density covers far density. Additive: one sum. Weighted: near over far by a weight, one pass")
     slices: Field[int]              = Field(16,     min=2,      max=32,                                 description="Depth slices of the occluded look, at the output's size")
     size: Field[float]              = Field(1.0,    min=1.0,    max=8.0,                                description="A point's size in pixels")
     streak: Field[float]            = Field(1.0,    min=0.0,    max=4.0,                                description="A streak's length as a share of its step")
@@ -93,14 +86,20 @@ class DensitySettings(BaseSettings):
     """Density field parameters."""
     boundary_gain: Field[float]     = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The boundary's density times this is added × dt; 1 = one unit per width of travel")
     body_force_gain: Field[float]   = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's density times this is added × dt; 1 = one unit per width/s of Δv")
-    carrier: Field[Carrier]         = Field(Carrier.GRID,                                           description="What carries the density: the grid's volume, particles, or a volume at the output's resolution")
-    layers: Field[int]              = Field(16,     min=4,      max=256,    step=4,                 description="OUTPUT: the density's layers in z, over the grid's depth")
-    sample: Field[DensitySample]    = Field(DensitySample.AVERAGE,                                  description="OUTPUT: the velocity at a layer's middle, or averaged over the grid's layers it spans")
-    cubic: Field[bool]              = Field(True,                                                   description="OUTPUT: the bridge's density enlarged by a cubic B-spline, without its texels' steps; off: bilinear")
-    turbulence: Field[float]        = Field(0.0,    min=0.0,    max=50.0,   step=0.5,              description="OUTPUT: swirls below the grid where the water churns, as its curl × cell; 0 = off")
-    fade_time: Field[float]         = Field(60.0,   min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%; 60 = ink stays")
+    fade_time: Field[float]         = Field(60.0,   min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%; 60 = density stays")
     evaporation: Field[float]       = Field(0.0,    min=0.0,    max=2.0,    color="grey",           description="Density removed per second; clears low-level haze (0 = off)")
     wall: Field[WallMode]           = Field(WallMode.CLOSED,                                        description="Open: density absorbed at the walls. Closed: density reflects")
+
+
+class UpscaledDensitySettings(BaseSettings):
+    """The upscaled density: its size, how its layers move, how the bridge's density is enlarged, the swirls."""
+    enabled: Field[bool]            = Field(False,                                                  description="The volume drawn from the upscaled amount instead of the simulation's cells")
+    width: Field[int]               = Field(2160,   min=32,     max=4096,   step=8,                 description="The amount's width; the output's is 2160")
+    height: Field[int]              = Field(3840,   min=32,     max=4096,   step=8,                 description="The amount's height; the output's is 3840")
+    depth: Field[int]               = Field(16,     min=4,      max=256,    step=4,                 description="The amount's depth in z, over the simulation's depth")
+    sample: Field[DensitySample]    = Field(DensitySample.AVERAGE,                                  description="The velocity at a layer's middle, or averaged over the simulation's layers it spans")
+    cubic: Field[bool]              = Field(True,                                                   description="The bridge's density enlarged by a cubic B-spline, without its texels' steps; off: bilinear")
+    turbulence: Field[float]        = Field(0.0,    min=0.0,    max=50.0,   step=0.5,              description="Swirls below the simulation's cells where the water churns, as its curl × cell; 0 = off")
 
 
 class TemperatureSettings(BaseSettings):
@@ -153,7 +152,7 @@ class Fluid3DSettings(BaseSettings):
     # ---- Grid dimensions (multiples of 32) ----
     width: Field[int]               = Field(256,    min=32,     max=4096,   step=32,    description="Simulation grid width")
     height: Field[int]              = Field(448,    min=32,     max=4096,   step=32,    description="Simulation grid height")
-    layers: Field[int]              = Field(128,    min=4,      max=256,    step=4,     description="Simulation grid layers in z; the cells are cubic, so the box is layers / width deep")
+    depth: Field[int]               = Field(128,    min=4,      max=256,    step=4,     description="Simulation grid depth in z; the cells are cubic, so the box is depth / width deep")
     time_step: Field[TimeStepMode]  = Field(TimeStepMode.MEASURED,                  description="Step by the measured render rate, or by a fixed rate")
     fixed_fps: Field[float]         = Field(60.0,   min=1.0,    max=240.0,              description="Steps per second in fixed mode (fps)")
     fps_smoothing: Field[float]     = Field(1.0,    min=0.0,    max=10.0,               description="Smoothing of the measured rate in measured mode (s); 0 follows each frame")
@@ -167,6 +166,7 @@ class Fluid3DSettings(BaseSettings):
     volume: Group[VolumeSettings]           = Group(VolumeSettings)
     velocity: Group[VelocitySettings]       = Group(VelocitySettings)
     density: Group[DensitySettings]         = Group(DensitySettings)
-    particles: Group[ParticleSettings]      = Group(ParticleSettings)
     temperature: Group[TemperatureSettings] = Group(TemperatureSettings)
     pressure: Group[PressureSettings]       = Group(PressureSettings)
+    upscaled: Group[UpscaledDensitySettings] = Group(UpscaledDensitySettings)
+    particles: Group[ParticleSettings]      = Group(ParticleSettings)

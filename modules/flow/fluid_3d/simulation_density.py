@@ -1,4 +1,4 @@
-"""The density on the grid: an RGBA16F `GL_TEXTURE_3D` on the simulation's grid, carried by the fluid's advection
+"""The density in the simulation's cells: an RGBA16F `GL_TEXTURE_3D` on the simulation's grid, carried by the fluid's advection
 and marched front to back into the output (`Composite3D`)."""
 
 from OpenGL.GL import GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, glMemoryBarrier
@@ -13,8 +13,8 @@ from .shaders import Inject3D, Composite3D
 _BARRIER_IMAGE: int = int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 
 
-class GridDensity(DensityCarrier):
-    """The grid carrier: the density a volume on the simulation's grid."""
+class SimulationDensity(DensityCarrier):
+    """The SIMULATION carrier: the density a volume on the simulation's grid."""
 
     def __init__(self, settings: Fluid3DSettings, advection: FieldAdvection) -> None:
         self.settings: Fluid3DSettings = settings

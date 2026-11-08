@@ -30,7 +30,7 @@ uniform float uAbsorption;   // Extinction per unit density
 uniform float uTint;         // 0..1 mix toward per-channel water extinction
 uniform float uFog;          // Medium extinction over the full depth
 uniform float uGlow;         // 0 = occluded volumetric, 1 = additive
-uniform bool  uSplit;        // the amount from uDensity, its color from uColor (the OUTPUT carrier)
+uniform bool  uSplit;        // the amount from uDensity, its color from uColor (the upscaled density)
 
 const vec3 WATER_CHAN = vec3(1.8, 1.0, 0.6);  // relative extinction: red dies first
 

@@ -85,7 +85,7 @@ MacCormack, the density on the grid, `pressure.iterations` 40:
 | 320 × 576 × 160  | 0.50          | 29 M   | 8.17 / 9.78  | 2.46 / 2.94 | 20.40 / 29.24 | 23.09 / 32.53, 43 fps |
 | 256 × 448 × 128  | 0.50          | 15 M   | 4.40 / 5.91  | 2.44 / 3.53 | 10.68 / 12.09 | 13.29 / 18.50, 75 fps |
 
-The depth is `layers` / `width`, the cells being cubic. 256 × 448 × 128 is the one grid that holds
+The box's depth is `depth` / `width`, the cells being cubic. 256 × 448 × 128 is the one grid that holds
 60 fps, and it is half a width deep where the preset's is 0.14.
 
 ### The pose's share
@@ -103,7 +103,7 @@ inference a cycle **(deduction)**. The budget is the app's, so every other table
 
 ## The particles
 
-`density.carrier` `PARTICLES`: the density's advection is the particles' (`GPU particles advect`, in
+`particles.enabled`: the density's advection is the particles' (`GPU particles advect`, in
 `GPU fluid density`), and the composite their draw and march (`GPU particles draw`,
 `GPU particles march`, in `GPU fluid composite`). The emission is `GPU particles emit`, under 0.2 ms
 in every run. `rate` 20 and the other particle settings at their defaults; the ring full.
@@ -156,7 +156,7 @@ with the pose, on 256 × 448 × 128:
 ## The baseline
 
 The defaults (`modules/flow/fluid_3d/fluid_settings.py`): the grid `width` 256, `height` 448,
-`layers` 128, half a width deep; `volume.injection_spread` 0.075 widths, a body's
+`depth` 128, half a width deep; `volume.injection_spread` 0.075 widths, a body's
 thickness; the particles' `count` 2 M, the points' budget, and their ranges to what fits:
 `count` 10 k to 8 M, `rate` 0.01 to 50, `radius` 1 to 48 pixels, `spread` 0 to 10. The preset
 takes the grid, the spread and, for its streaks, 1 M.
@@ -354,8 +354,8 @@ Sources: [McAdams, Sifakis, Teran 2010](https://pages.cs.wisc.edu/~sifakis/proje
 
 ## The density at the output's 4K
 
-Step 10's `OUTPUT` carrier ([FLUID_3D.md](FLUID_3D.md#step-10-the-densitys-detail)): the amount at 2160 × 3840 ×
-`density.layers`, the color on the fluid's grid, `density.sample` `AVERAGE`; the fluid at 448 × 800, the preset's
+Step 10's upscaled density ([FLUID_3D.md](FLUID_3D.md#step-10-the-densitys-detail)): the amount at 2160 × 3840 ×
+`upscaled.depth`, the color on the fluid's grid, `upscaled.sample` `AVERAGE`; the fluid at 448 × 800, the preset's
 other settings, the pose on, one 60 s run each after 10 s. Semi-Lagrangian, with the depth scale and the dampen
 at 3 widths/s:
 

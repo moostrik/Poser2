@@ -258,7 +258,7 @@ class DeepFlowRender(RenderBase):
     def _on_mouse_scroll(self, steps: float) -> None:
         """A layer per step for every monitor, the show's density's layers."""
         for monitor in self._monitors():
-            monitor.scroll(steps, self.settings.fluid.layers)
+            monitor.scroll(steps, self.settings.fluid.depth)
 
     def reset_fluid(self) -> None:
         """Clear the optical flow, the bridges and the fluid volume at the next update; any thread."""

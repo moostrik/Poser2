@@ -54,7 +54,8 @@ Each bullet names the term to use and, after "not", the synonyms it replaces. A 
 - The camera count at an app's root: `num_cams`, separate from `max_players`
 - The gate on the group's similarity: "group sync" (`group_sync`, `GroupSync`, `GroupSyncGate`); not "full sync". The OSC address stays `/global/sync`
 - The flow stages in an app's settings and `Layers`: `motion`, `bridge`, `fluid`; not `flow`, `fluid3d`, `fluid_flow`
-- The 3D fluid's z layers: `volume` (`VolumeSettings`); not `depth`, which is the camera's depth
+- The 3D fluid's grid size: `width`, `height`, `depth` (its cells in z); not `layers`. Outside a stage's size, `depth` is the camera's depth. The fluid's z look and injection: `volume` (`VolumeSettings`)
+- The 3D fluid's density carriers: the simulation density (in the simulation's cells, `SimulationDensity`, always on), the upscaled density (its amount at its own `width`, `height`, `depth`, `UpscaledDensity`, settings group `upscaled`) and the particles (`ParticleDensity`, group `particles`), each of the last two switched by `enabled`; not "grid density", "output density"
 
 ## smile
 

@@ -23,6 +23,7 @@ from .body_force_acceleration_3d import BodyForceAcceleration3D
 from .add_3d import Add3D
 from .inject_binary_3d import InjectBinary3D
 from .composite_3d import Composite3D
+from .composite_over import CompositeOver
 
 # The particle carrier
 from .particle_emit import ParticleEmit

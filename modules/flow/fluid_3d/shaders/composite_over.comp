@@ -1,0 +1,22 @@
+#version 460 core
+
+/*
+ * CompositeOver - one premultiplied image over the output (Porter and Duff 1984): the output keeps what the
+ * image's alpha leaves, the image's color added. The particles over the volume.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler2D uOver;         // RGBA16F, premultiplied: color, coverage
+
+layout(rgba16f, binding = 0) uniform image2D uOutput;
+
+uniform ivec2 uOutputSize;
+
+void main() {
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(gid, uOutputSize))) return;
+    vec4 over = texelFetch(uOver, gid, 0);
+    vec4 under = imageLoad(uOutput, gid);
+    imageStore(uOutput, gid, over + (1.0 - over.a) * under);
+}

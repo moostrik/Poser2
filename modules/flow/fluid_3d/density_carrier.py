@@ -1,4 +1,4 @@
-"""What carries the 3D fluid's density: the grid (`GridDensity`) or particles (`ParticleDensity`).
+"""What carries the 3D fluid's density: the simulation's cells (`SimulationDensity`), a volume upscaled past them (`UpscaledDensity`) and particles (`ParticleDensity`); the first always, the others where enabled.
 
 The fluid's solver owns the velocity, the pressure and the temperature; the carrier owns the density.
 Each step the fluid hands it its sources (`add`), moves it along the solver's velocity (`update`) and

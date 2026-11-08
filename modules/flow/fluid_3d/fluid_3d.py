@@ -1,10 +1,12 @@
 """Fluid3D - 3D Navier-Stokes fluid simulation on the GPU.
 
 Every field is a GL_TEXTURE_3D on one grid of cubic cells: the velocity (RGBA16F), the temperature
-and the pressure (R16F) and the obstacle (R8) at the simulation's size, `layers` deep. The
-density is its carrier's (`density.carrier`): the grid's (`GridDensity`, RGBA16F, its color baked in at
-injection, on the same grid; `OutputDensity`, its amount at the output's x and y, sampled by uv wherever a pass reads
-it against the simulation's fields) or particles' (`ParticleDensity`), moved through the same velocity.
+and the pressure (R16F) and the obstacle (R8) at the simulation's size, `depth` deep. The
+density is carried by the simulation density always (`SimulationDensity`, RGBA16F, its color baked in at
+injection, on the same grid), and where enabled by the upscaled density (`UpscaledDensity`, its amount at
+`upscaled`'s size, sampled by uv wherever a pass reads it against the simulation's fields, its color the
+simulation density's) and the particles (`ParticleDensity`), all moved through the same velocity. The volume
+drawn is the upscaled one where enabled, else the simulation's; the particles are laid over it.
 
 Pipeline:
     1. Advect velocity (3D self-advection, the dampen on its result; every advection semi-Lagrangian or MacCormack, `advection`)
@@ -36,23 +38,23 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_R16F,
 
 from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
-from .fluid_settings import Carrier, PressureSolver, Fluid3DSettings, VolumeSettings, DensitySettings, TemperatureSettings, PressureSettings, VelocitySettings, ParticleSettings
+from .fluid_settings import PressureSolver, Fluid3DSettings, VolumeSettings, DensitySettings, TemperatureSettings, PressureSettings, VelocitySettings, ParticleSettings, UpscaledDensitySettings
 from .multigrid_pressure import MultigridPressure
 from ..shaders import AddBoolean
 from ..flow_util import FlowUtil
 from ..port import Port, TextureKind
 from ..time_step import REFERENCE_STEP, TimeStep, viscosity_iterations
 from .density_carrier import CarrierStep, DensityCarrier
-from .output_density import OutputDensity
+from .upscaled_density import UpscaledDensity
 from .field_advection import FieldAdvection
-from .grid_density import GridDensity
+from .simulation_density import SimulationDensity
 from .particle_density import ParticleDensity
 from .shaders import (
     Divergence3D, Gradient3D,
     JacobiPressure3D, SorPressure3D, JacobiDiffusion3D,
     VorticityCurl3D, VorticityForce3D, Buoyancy3D,
     Inject3D, BoundaryVelocity3D, BodyForceAcceleration3D,
-    Add3D,
+    Add3D, CompositeOver,
     InjectBinary3D
 )
 
@@ -107,7 +109,7 @@ class Fluid3D:
 
     Fields:
         velocity:    SwapTexture3D  RGBA16F  (u, v, w, spare)
-        density:     the carrier's: GridDensity or ParticleDensity
+        density:     SimulationDensity, with UpscaledDensity and ParticleDensity where enabled
         temperature: SwapTexture3D  R16F
         pressure:    SwapTexture3D  R32F
         obstacle:    Texture3D      R8
@@ -147,7 +149,7 @@ class Fluid3D:
         self._allocated: bool = False
 
         self._reallocate_pending: bool = False
-        self._carrier_pending: bool = False
+        self._densities_pending: bool = False
         self._wall_dirty: bool = False
 
         self._gpu_timer: GpuTimer = GpuTimer("GPU fluid")
@@ -162,11 +164,14 @@ class Fluid3D:
         # The MacCormack predictors, one per carried field, allocated at its first MacCormack step
         self._velocity_scratch: Texture3D = Texture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         self._temperature_scratch: Texture3D = Texture3D()
-        # The density's carriers, the one `density.carrier` names allocated; the buoyancy's density while it gives none
+        # The density's carriers: the simulation density always, the upscaled and the particles by their `enabled`;
+        # the particles drawn into their own image, then over the volume
         self._advection: FieldAdvection = FieldAdvection()
-        self._grid_density: GridDensity = GridDensity(self.settings, self._advection)
+        self._simulation_density: SimulationDensity = SimulationDensity(self.settings, self._advection)
         self._particle_density: ParticleDensity = ParticleDensity(self.settings)
-        self._output_density: OutputDensity = OutputDensity(self.settings, self._advection)
+        self._upscaled_density: UpscaledDensity = UpscaledDensity(self.settings, self._advection, self._simulation_density)
+        self._particle_texture: Texture = Texture()
+        self._over_shader: CompositeOver = CompositeOver()
         self._no_density: Texture3D = Texture3D()
         # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds = obstacle
         self._obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
@@ -200,12 +205,13 @@ class Fluid3D:
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
         # Bind settings actions
-        self.settings.bind(Fluid3DSettings.layers, lambda _: self._request_reallocate())
-        reallocate_carrier = lambda _: setattr(self, '_carrier_pending', True)
-        for field in (DensitySettings.layers, DensitySettings.carrier):
-            self.settings.density.bind(field, reallocate_carrier)
-        for field in (ParticleSettings.count, ParticleSettings.slices):
-            self.settings.particles.bind(field, reallocate_carrier)
+        self.settings.bind(Fluid3DSettings.depth, lambda _: self._request_reallocate())
+        reallocate_densities = lambda _: setattr(self, '_densities_pending', True)
+        for field in (UpscaledDensitySettings.enabled, UpscaledDensitySettings.width, UpscaledDensitySettings.height,
+                      UpscaledDensitySettings.depth):
+            self.settings.upscaled.bind(field, reallocate_densities)
+        for field in (ParticleSettings.enabled, ParticleSettings.count, ParticleSettings.slices):
+            self.settings.particles.bind(field, reallocate_densities)
         self.settings.bind(Fluid3DSettings.width, lambda _: self._request_reallocate())
         self.settings.bind(Fluid3DSettings.height, lambda _: self._request_reallocate())
         mark_wall = lambda _: setattr(self, '_wall_dirty', True)
@@ -230,7 +236,7 @@ class Fluid3D:
         self._advection.allocate()
         self._no_density.allocate(1, 1, 1, GL_RGBA16F)
         self._allocate_simulation_fields()
-        self._allocate_carrier()
+        self._allocate_densities()
 
         # 2D obstacle source (output resolution, independent of the grid)
         self._obstacle_source.allocate(self._output_width, self._output_height, GL_R8)
@@ -253,6 +259,7 @@ class Fluid3D:
         self._add_shader.allocate()
         self._inject_binary_shader.allocate()
         self._add_boolean_shader.allocate()
+        self._over_shader.allocate()
 
         self._allocated = True
 
@@ -262,7 +269,7 @@ class Fluid3D:
         self._simulation_height = self._align32(self.settings.height)
         self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
         self._cell = 1.0 / max(1, self._simulation_width)
-        self._depth = self.settings.layers
+        self._depth = self.settings.depth
         self._z_extent = self._depth / max(1, self._simulation_width)
         self._depth_scale = self._depth / max(1, min(self._simulation_width, self._simulation_height))
 
@@ -271,19 +278,25 @@ class Fluid3D:
         return max(self.settings.volume.injection_spread / max(self._z_extent, 1e-6), 0.001)
 
     @property
-    def _carrier(self) -> DensityCarrier:
-        """The density's carrier, by `density.carrier`."""
-        carrier: Carrier = self.settings.density.carrier
-        if carrier == Carrier.PARTICLES:
-            return self._particle_density
-        return self._output_density if carrier == Carrier.OUTPUT else self._grid_density
+    def _densities(self) -> list[DensityCarrier]:
+        """The carriers running: the simulation density, then the upscaled and the particles where enabled."""
+        densities: list[DensityCarrier] = [self._simulation_density]
+        if self.settings.upscaled.enabled:
+            densities.append(self._upscaled_density)
+        if self.settings.particles.enabled:
+            densities.append(self._particle_density)
+        return densities
 
-    def _allocate_carrier(self) -> None:
-        """(Re)allocate the carrier `density.carrier` names on the simulation's grid, the other one released."""
-        for carrier in (self._grid_density, self._particle_density, self._output_density):
+    def _allocate_densities(self) -> None:
+        """(Re)allocate the carriers running on the simulation's grid, the others released."""
+        for carrier in (self._simulation_density, self._upscaled_density, self._particle_density):
             carrier.deallocate()
-        self._carrier.allocate(self._simulation_width, self._simulation_height, self._depth,
-                               self._output_width, self._output_height)
+        self._particle_texture.deallocate()
+        for carrier in self._densities:
+            carrier.allocate(self._simulation_width, self._simulation_height, self._depth,
+                             self._output_width, self._output_height)
+        if self.settings.particles.enabled:
+            self._particle_texture.allocate(self._output_width, self._output_height, GL_RGBA16F)
         self._apply_wall_modes()
 
     def _allocate_simulation_fields(self) -> None:
@@ -315,8 +328,9 @@ class Fluid3D:
         for timer in self._pass_timers.values():
             timer.deallocate()
         self._velocity.deallocate()
-        for carrier in (self._grid_density, self._particle_density, self._output_density):
+        for carrier in (self._simulation_density, self._particle_density, self._upscaled_density):
             carrier.deallocate()
+        self._particle_texture.deallocate()
         self._no_density.deallocate()
         self._temperature.deallocate()
         self._pressure.deallocate()
@@ -345,13 +359,16 @@ class Fluid3D:
         self._add_shader.deallocate()
         self._inject_binary_shader.deallocate()
         self._add_boolean_shader.deallocate()
+        self._over_shader.deallocate()
 
         self._allocated = False
 
     def _reload_shaders(self) -> None:
         """Hot-reload all shaders."""
         self._advection.reload()
-        self._carrier.reload()
+        for carrier in self._densities:
+            carrier.reload()
+        self._over_shader.reload()
         self._divergence_shader.reload()
         self._gradient_shader.reload()
         self._jacobi_pressure_shader.reload()
@@ -374,7 +391,8 @@ class Fluid3D:
         if not self._allocated:
             return
         self._velocity.clear_all()
-        self._carrier.reset()
+        for carrier in self._densities:
+            carrier.reset()
         self._temperature.clear_all()
         self._temperature_clear = True
         self._pressure.clear_all()
@@ -457,7 +475,7 @@ class Fluid3D:
 
     def _confine_vorticity(self) -> None:
         """Vorticity confinement: the curl, then its force added to the velocity. The curl alone while only the
-        OUTPUT density's turbulence reads it."""
+        upscaled density's turbulence reads it."""
         confining: bool = self.settings.velocity.vorticity > 0.0 and self.settings.velocity.vorticity_radius > 0.0
         if not confining:
             if self._needs_curl:
@@ -519,7 +537,7 @@ class Fluid3D:
         kappa = self._dt * temp.sink
         gravity = (temp.gravity_x, temp.gravity_y, temp.gravity_z)
 
-        weight: Texture3D | None = self._carrier.weight
+        weight: Texture3D | None = self._simulation_density.weight
         self._buoyancy_shader.use(
             self._temperature,
             weight if weight is not None else self._no_density,
@@ -587,19 +605,20 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _advect_density(self) -> None:
-        """Move the density one step along the velocity, faded and evaporated, by its carrier."""
-        self._carrier.update(CarrierStep(
+        """Move the density one step along the velocity, faded and evaporated, by each carrier running."""
+        step = CarrierStep(
             velocity=self._velocity, obstacle=self._obstacle, has_obstacles=self._has_obstacles,
             aspect=self._aspect, z_extent=self._z_extent, dt=self._dt, step=self._dt * self.settings.speed,
             dissipation=self._calculate_dissipation(self._dt, self.settings.density.fade_time),
             evaporation=self.settings.density.evaporation * self._dt, advection=self.settings.advection,
-            curl=self._curl_vol if self._needs_curl else None, cell=self._cell))
+            curl=self._curl_vol if self._needs_curl else None, cell=self._cell)
+        for carrier in self._densities:
+            carrier.update(step)
 
     @property
     def _needs_curl(self) -> bool:
-        """Whether the OUTPUT density's turbulence reads the curl this step."""
-        density = self.settings.density
-        return density.carrier == Carrier.OUTPUT and density.turbulence > 0.0
+        """Whether the upscaled density's turbulence reads the curl this step."""
+        return self.settings.upscaled.enabled and self.settings.upscaled.turbulence > 0.0
 
     def _dampen_step(self) -> tuple[float, float]:
         """The velocity's dampen for this step, which its advection applies to the step's result: the threshold
@@ -610,8 +629,14 @@ class Fluid3D:
         return (velocity.dampen_threshold, pow(0.01, self._dt / velocity.dampen_time))
 
     def _composite_output(self) -> None:
-        """The density into the 2D output, by its carrier."""
-        self._carrier.composite(self._output_texture)
+        """The volume into the 2D output, the upscaled amount's where enabled, else the simulation's; the particles
+        drawn into their own image and laid over it."""
+        volume: DensityCarrier = self._upscaled_density if self.settings.upscaled.enabled else self._simulation_density
+        volume.composite(self._output_texture)
+        if self.settings.particles.enabled and self._particle_texture.allocated:
+            self._particle_density.composite(self._particle_texture)
+            self._over_shader.use(self._particle_texture, self._output_texture)
+            glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     # ========== Deferred ==========
 
@@ -623,7 +648,8 @@ class Fluid3D:
         z_wall = _WALL_GL[self.settings.volume.wall]
         for vol in [self._velocity, self._temperature, self._pressure, self._velocity_scratch, self._temperature_scratch]:
             vol.set_wrap_z(*z_wall)
-        self._carrier.set_walls(_WALL_GL[self.settings.density.wall], z_wall)
+        for carrier in (self._simulation_density, self._upscaled_density, self._particle_density):
+            carrier.set_walls(_WALL_GL[self.settings.density.wall], z_wall)
 
     def _handle_deferred_actions(self) -> None:
         """Process reset and reallocation requests queued from the UI thread."""
@@ -633,11 +659,11 @@ class Fluid3D:
             self._update_dimensions()
             if (self._simulation_width, self._simulation_height, self._depth) != old_sim:
                 self._allocate_simulation_fields()
-                self._carrier_pending = True
+                self._densities_pending = True
 
-        if self._carrier_pending:
-            self._carrier_pending = False
-            self._allocate_carrier()
+        if self._densities_pending:
+            self._densities_pending = False
+            self._allocate_densities()
 
         if self._wall_dirty:
             self._wall_dirty = False
@@ -721,7 +747,8 @@ class Fluid3D:
         if not self._allocated:
             return
         volume = self.settings.volume
-        self._carrier.add(texture, gain, self._dt, volume.injection_layer, self._spread())
+        for carrier in self._densities:
+            carrier.add(texture, gain, self._dt, volume.injection_layer, self._spread())
 
     def add_boundary_temperature(self, texture: Texture, weight: float = 1.0) -> None:
         """The boundary's temperature (widths/s, signed by the color) × temperature.boundary_gain × dt into the slab."""
@@ -807,7 +834,7 @@ class Fluid3D:
     @property
     def ports(self) -> dict[str, Port]:
         """Its fields in the order a step reaches them, each a volume in a box `_z_extent` deep, the 2D
-        obstacle as it comes, and the carrier's (the grid's density; none for the particles)."""
+        obstacle as it comes, and the running carriers' (the simulation's `density`, the `upscaled_density`)."""
         extent: float = self._z_extent
 
         def volume(texture: Texture3D, kind: TextureKind) -> Port:
@@ -821,4 +848,4 @@ class Fluid3D:
                 'buoyancy': volume(self._buoyancy_force_vol, TextureKind.VELOCITY),
                 'divergence': volume(self._divergence_vol, TextureKind.SCALAR),
                 'pressure': volume(self._pressure, TextureKind.SCALAR),
-                **self._carrier.ports}
+                **{name: port for carrier in self._densities for name, port in carrier.ports.items()}}

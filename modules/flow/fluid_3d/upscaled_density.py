@@ -1,10 +1,11 @@
-"""The density at the output's resolution: its amount a one-channel `GL_TEXTURE_3D` at the output's x and y and
-`density.layers` in z, over the grid's depth, its color the grid carrier's volume on the simulation's grid.
+"""The density upscaled past the simulation: its amount a one-channel `GL_TEXTURE_3D` of `upscaled.width` ×
+`upscaled.height` × `upscaled.depth` over the simulation's box, its color the simulation density's, which the
+fluid keeps on its own cells and this borrows.
 
 The color never holds more detail than the bridge's density it comes from, so it stays on the grid; the amount,
 moved by the grid's velocity read between its cells, is stretched into threads finer than a cell and keeps them
 from step to step. A density layer that spans several of the grid's layers moves with the velocity at its middle
-or averaged over them (`density.sample`). The composite marches the amount's layers, the color the color
+or averaged over them (`upscaled.sample`). The composite marches the amount's layers, the color the color
 volume's color × amount over its amount at the same place."""
 
 import numpy as np
@@ -16,7 +17,7 @@ from ..port import Port, TextureKind
 from .density_carrier import CarrierStep, DensityCarrier
 from .field_advection import FieldAdvection
 from .fluid_settings import DensitySample, Fluid3DSettings
-from .grid_density import GridDensity
+from .simulation_density import SimulationDensity
 from .shaders import Composite3D, InjectAmount3D, NoiseCoordinates3D, TurbulentAdvect3D, VelocityAverage3D
 from .swirl_noise import swirl_noise
 
@@ -28,13 +29,13 @@ NOISE_CELLS: float = 8.0        # the grid's cells a tile spans: the swirls' wav
 NOISE_CYCLE: float = 1.0        # s of the fluid's time between two resets of one displacement
 
 
-class OutputDensity(DensityCarrier):
-    """The OUTPUT carrier: the amount at the output's resolution × `density.layers`, the color on the grid."""
+class UpscaledDensity(DensityCarrier):
+    """The upscaled density: the amount at `upscaled`'s size, the color the simulation density's."""
 
-    def __init__(self, settings: Fluid3DSettings, advection: FieldAdvection) -> None:
+    def __init__(self, settings: Fluid3DSettings, advection: FieldAdvection, color: SimulationDensity) -> None:
         self.settings: Fluid3DSettings = settings
         self._advection: FieldAdvection = advection
-        self._color: GridDensity = GridDensity(settings, advection)     # color × amount and the amount, on the grid
+        self._color: SimulationDensity = color      # color × amount and the amount, the fluid's, moved by it
         self._amount: SwapTexture3D = SwapTexture3D()
         self._scratch: Texture3D = Texture3D()      # the MacCormack predictor
         self._average: Texture3D = Texture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
@@ -51,9 +52,9 @@ class OutputDensity(DensityCarrier):
         self._clock: float = 0.0
 
     def allocate(self, width: int, height: int, layers: int, output_width: int, output_height: int) -> None:
-        density_layers: int = int(self.settings.density.layers)
-        self._color.allocate(width, height, layers, output_width, output_height)
-        self._amount.allocate(output_width, output_height, density_layers, GL_R16F)
+        upscaled = self.settings.upscaled
+        density_layers: int = int(upscaled.depth)
+        self._amount.allocate(int(upscaled.width), int(upscaled.height), density_layers, GL_R16F)
         self._z_extent = layers / max(1, width)
         if layers > density_layers:
             self._average.allocate(width, height, density_layers, GL_RGBA16F)
@@ -72,7 +73,6 @@ class OutputDensity(DensityCarrier):
         self._apply_walls()
 
     def deallocate(self) -> None:
-        self._color.deallocate()
         for volume in (self._amount, self._scratch, self._average, self._noise, *self._displacements):
             volume.deallocate()
         for shader in (self._inject_shader, self._average_shader, self._composite_shader, self._coordinates_shader,
@@ -84,32 +84,28 @@ class OutputDensity(DensityCarrier):
         return self._amount.allocated
 
     def reload(self) -> None:
-        self._color.reload()
         for shader in (self._inject_shader, self._average_shader, self._composite_shader, self._coordinates_shader,
                        self._turbulent_shader):
             shader.reload()
 
     def reset(self) -> None:
-        self._color.reset()
         self._amount.clear_all()
 
     def add(self, texture: Texture, gain: float, dt: float, layer: float, spread: float) -> None:
         if not self.allocated:
             return
-        self._color.add(texture, gain, dt, layer, spread)
-        self._inject_shader.use(texture, self._amount, layer, spread, gain * dt, cubic=self.settings.density.cubic)
+        self._inject_shader.use(texture, self._amount, layer, spread, gain * dt, cubic=self.settings.upscaled.cubic)
         glMemoryBarrier(_BARRIER)
 
     def update(self, step: CarrierStep) -> None:
         if not self.allocated:
             return
-        self._color.update(step)
         velocity: Texture3D = step.velocity
-        if self._average.allocated and self.settings.density.sample == DensitySample.AVERAGE:
+        if self._average.allocated and self.settings.upscaled.sample == DensitySample.AVERAGE:
             self._average_shader.use(step.velocity, self._average)
             glMemoryBarrier(_BARRIER)
             velocity = self._average
-        turbulence: float = float(self.settings.density.turbulence)
+        turbulence: float = float(self.settings.upscaled.turbulence)
         if turbulence > 0.0 and step.curl is not None:
             self._turbulent_step(step, velocity, turbulence)
         elif self._advection.carry(step.advection, self._amount, self._scratch, velocity, step.obstacle,
@@ -152,15 +148,14 @@ class OutputDensity(DensityCarrier):
 
     @property
     def weight(self) -> Texture3D | None:
-        return self._color.weight
+        return None         # the buoyancy weighs the simulation density
 
     @property
     def ports(self) -> dict[str, Port]:
-        return {'density': Port(self._amount, TextureKind.SCALAR, self._z_extent)} if self.allocated else {}
+        return {'upscaled_density': Port(self._amount, TextureKind.SCALAR, self._z_extent)} if self.allocated else {}
 
     def set_walls(self, xy: tuple[int, tuple[float, float, float, float]], z: tuple[int, tuple[float, float, float, float]]) -> None:
         self._walls = (xy, z)
-        self._color.set_walls(xy, z)
         self._apply_walls()
 
     def _apply_walls(self) -> None:
