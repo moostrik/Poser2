@@ -1,0 +1,67 @@
+#version 460 core
+
+/*
+ * CoarsePressure3D - the multigrid's coarsest level solved in one dispatch: its red-black Gauss-Seidel sweeps
+ * (SorPressure3D's at omega 1, no obstacles) run in shared memory by one workgroup, a barrier between the
+ * colors, instead of a dispatch a color. The coarsest level is a few thousand cells, too few to fill the GPU, so
+ * a dispatch each half sweep was its latency and little else. The arithmetic and its order are the same.
+ */
+
+layout(local_size_x = 1024) in;
+
+layout(binding = 0) uniform sampler3D uDivergence;   // the level's right-hand side (R32F)
+layout(r32f, binding = 0) uniform image3D uPressure;
+
+uniform float uAlpha;        // 1 / h²
+uniform float uBeta;         // 1 / (6 alpha)
+uniform int   uSweeps;
+uniform ivec3 uSize;
+uniform ivec3 uClosed;
+
+#include "walls.glsl"
+
+const int MAX_CELLS = 4096;  // CoarsePressure3D.MAX_CELLS
+shared float s_pressure[MAX_CELLS];
+shared float s_divergence[MAX_CELLS];
+
+int index_of(ivec3 c) {
+    return (c.z * uSize.y + c.y) * uSize.x + c.x;
+}
+
+ivec3 cell_of(int i) {
+    return ivec3(i % uSize.x, (i / uSize.x) % uSize.y, i / (uSize.x * uSize.y));
+}
+
+float neighbor(ivec3 c, float pC, int axis) {
+    if (c[axis] < 0 || c[axis] >= uSize[axis]) return wall_pressure(pC, axis);     // walls.glsl
+    return s_pressure[index_of(c)];
+}
+
+void main() {
+    int count = uSize.x * uSize.y * uSize.z;
+    int thread = int(gl_LocalInvocationIndex);
+    for (int i = thread; i < count; i += 1024) {
+        ivec3 c = cell_of(i);
+        s_pressure[i] = imageLoad(uPressure, c).r;
+        s_divergence[i] = texture(uDivergence, (vec3(c) + 0.5) / vec3(uSize)).r;
+    }
+    barrier();
+    for (int sweep = 0; sweep < uSweeps; sweep++) {
+        for (int color = 0; color < 2; color++) {
+            for (int i = thread; i < count; i += 1024) {
+                ivec3 c = cell_of(i);
+                if (((c.x + c.y + c.z) & 1) != color) continue;
+                float pC = s_pressure[i];
+                float gauss_seidel = uBeta * (uAlpha * (neighbor(c - ivec3(1, 0, 0), pC, 0) + neighbor(c + ivec3(1, 0, 0), pC, 0))
+                                            + uAlpha * (neighbor(c - ivec3(0, 1, 0), pC, 1) + neighbor(c + ivec3(0, 1, 0), pC, 1))
+                                            + uAlpha * (neighbor(c - ivec3(0, 0, 1), pC, 2) + neighbor(c + ivec3(0, 0, 1), pC, 2))
+                                            - s_divergence[i]);
+                s_pressure[i] = mix(pC, gauss_seidel, 1.0);
+            }
+            barrier();
+        }
+    }
+    for (int i = thread; i < count; i += 1024) {
+        imageStore(uPressure, cell_of(i), vec4(s_pressure[i], 0.0, 0.0, 0.0));
+    }
+}

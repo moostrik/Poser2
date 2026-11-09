@@ -1,0 +1,57 @@
+#version 460 core
+
+/*
+ * ResidualRestrict3D - the multigrid's residual restricted to the next coarser level in one pass: each coarse
+ * cell the mean of its up to eight fine cells' residuals, div - L p, each worked out where it is read, so the
+ * fine residual is never written and read back. The residual and the mean are PressureResidual3D's and
+ * Restrict3D's, in the same order.
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(binding = 0) uniform sampler3D uDivergence;  // the fine level's right-hand side
+layout(binding = 1) uniform sampler3D uObstacle;    // R8
+layout(r32f, binding = 0) readonly uniform image3D uPressure;
+layout(r32f, binding = 1) writeonly uniform image3D uCoarse;
+
+uniform float uAlpha;        // 1 / h², the fine level's
+uniform ivec3 uSize;         // the fine level's cells
+uniform ivec3 uCoarseSize;
+uniform bool  uHasObstacles;
+uniform ivec3 uClosed;
+
+#include "walls.glsl"
+
+bool isObstacle(ivec3 coord) {
+    return texture(uObstacle, (vec3(coord) + 0.5) / vec3(uSize)).r > 0.5;
+}
+
+float neighbor(ivec3 coord, float pC, int axis) {
+    if (coord[axis] < 0 || coord[axis] >= uSize[axis]) return wall_pressure(pC, axis);     // walls.glsl
+    if (uHasObstacles && isObstacle(coord)) return pC;
+    return imageLoad(uPressure, coord).r;
+}
+
+float residual(ivec3 gid) {
+    if (uHasObstacles && isObstacle(gid)) return 0.0;
+    float pC = imageLoad(uPressure, gid).r;
+    float sum = neighbor(gid - ivec3(1, 0, 0), pC, 0) + neighbor(gid + ivec3(1, 0, 0), pC, 0)
+              + neighbor(gid - ivec3(0, 1, 0), pC, 1) + neighbor(gid + ivec3(0, 1, 0), pC, 1)
+              + neighbor(gid - ivec3(0, 0, 1), pC, 2) + neighbor(gid + ivec3(0, 0, 1), pC, 2);
+    float divergence = texture(uDivergence, (vec3(gid) + 0.5) / vec3(uSize)).r;
+    return divergence - uAlpha * (sum - 6.0 * pC);
+}
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID);
+    if (any(greaterThanEqual(gid, uCoarseSize))) return;
+    float sum = 0.0;
+    float count = 0.0;
+    for (int k = 0; k < 8; k++) {
+        ivec3 fine = gid * 2 + ivec3(k & 1, (k >> 1) & 1, (k >> 2) & 1);
+        if (any(greaterThanEqual(fine, uSize))) continue;
+        sum += residual(fine);
+        count += 1.0;
+    }
+    imageStore(uCoarse, gid, vec4(sum / max(count, 1.0), 0.0, 0.0, 0.0));
+}

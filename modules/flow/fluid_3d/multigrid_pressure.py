@@ -4,7 +4,7 @@ Gauss–Seidel smoothing each level, warm from the last step's pressure (McAdams
 from OpenGL.GL import GL_R32F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
 
 from modules.gl import Texture3D
-from .shaders import SorPressure3D, PressureResidual3D, Restrict3D, Prolong3D
+from .shaders import SorPressure3D, ResidualRestrict3D, CoarsePressure3D, Prolong3D
 
 _BARRIER: int = int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 
@@ -20,22 +20,18 @@ class MultigridPressure:
 
     def __init__(self) -> None:
         self._smoother: SorPressure3D = SorPressure3D()
-        self._residual_shader: PressureResidual3D = PressureResidual3D()
-        self._restrict_shader: Restrict3D = Restrict3D()
+        self._residual_restrict_shader: ResidualRestrict3D = ResidualRestrict3D()     # the residual, restricted in one pass
+        self._coarse_shader: CoarsePressure3D = CoarsePressure3D()     # the coarsest level's sweeps in one dispatch
         self._prolong_shader: Prolong3D = Prolong3D()
-        self._residuals: list[Texture3D] = []       # each level's residual but the coarsest's
         self._corrections: list[Texture3D] = []     # each coarser level's correction
         self._sources: list[Texture3D] = []         # each coarser level's right-hand side, the finer residual restricted
 
     def allocate(self, width: int, height: int, depth: int) -> None:
         self.deallocate()
-        for shader in (self._smoother, self._residual_shader, self._restrict_shader, self._prolong_shader):
+        for shader in (self._smoother, self._residual_restrict_shader, self._coarse_shader, self._prolong_shader):
             shader.allocate()
         size = (width, height, depth)
         while min(-(-axis // 2) for axis in size) >= SMALLEST:
-            residual = Texture3D()
-            residual.allocate(*size, GL_R32F)
-            self._residuals.append(residual)
             size = tuple(-(-axis // 2) for axis in size)
             correction, source = Texture3D(), Texture3D()
             correction.allocate(*size, GL_R32F)
@@ -44,14 +40,14 @@ class MultigridPressure:
             self._sources.append(source)
 
     def deallocate(self) -> None:
-        for volume in self._residuals + self._corrections + self._sources:
+        for volume in self._corrections + self._sources:
             volume.deallocate()
-        self._residuals, self._corrections, self._sources = [], [], []
-        for shader in (self._smoother, self._residual_shader, self._restrict_shader, self._prolong_shader):
+        self._corrections, self._sources = [], []
+        for shader in (self._smoother, self._residual_restrict_shader, self._coarse_shader, self._prolong_shader):
             shader.deallocate()
 
     def reload(self) -> None:
-        for shader in (self._smoother, self._residual_shader, self._restrict_shader, self._prolong_shader):
+        for shader in (self._smoother, self._residual_restrict_shader, self._coarse_shader, self._prolong_shader):
             shader.reload()
 
     @property
@@ -68,16 +64,16 @@ class MultigridPressure:
     def _cycle(self, level: int, x: Texture3D, b: Texture3D, obstacle: Texture3D, cell: float, has_obstacles: bool,
                closed: tuple[bool, bool, bool]) -> None:
         if level == len(self._corrections):
-            self._smoother.solve(x, b, obstacle, cell, COARSEST_SWEEPS, 1.0, False, closed)
+            if self._coarse_shader.fits(x):
+                self._coarse_shader.solve(x, b, cell, COARSEST_SWEEPS, closed)
+            else:
+                self._smoother.solve(x, b, obstacle, cell, COARSEST_SWEEPS, 1.0, False, closed)
             glMemoryBarrier(_BARRIER)
             return
         self._smoother.solve(x, b, obstacle, cell, SMOOTHING, 1.0, has_obstacles, closed)
         glMemoryBarrier(_BARRIER)
-        residual = self._residuals[level]
-        self._residual_shader.use(x, b, obstacle, residual, cell, has_obstacles, closed)
-        glMemoryBarrier(_BARRIER)
         correction, source = self._corrections[level], self._sources[level]
-        self._restrict_shader.use(residual, source)
+        self._residual_restrict_shader.use(x, b, obstacle, source, cell, has_obstacles, closed)
         correction.clear()
         glMemoryBarrier(_BARRIER)
         self._cycle(level + 1, correction, source, obstacle, cell * 2.0, False, closed)

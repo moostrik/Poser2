@@ -6,9 +6,9 @@ from .divergence_3d import Divergence3D
 from .gradient_3d import Gradient3D
 from .jacobi_pressure_3d import JacobiPressure3D
 from .sor_pressure_3d import SorPressure3D
-from .pressure_residual_3d import PressureResidual3D
-from .restrict_3d import Restrict3D
 from .prolong_3d import Prolong3D
+from .residual_restrict_3d import ResidualRestrict3D
+from .coarse_pressure_3d import CoarsePressure3D
 from .vorticity_curl_3d import VorticityCurl3D
 from .vorticity_force_3d import VorticityForce3D
 from .buoyancy_3d import Buoyancy3D

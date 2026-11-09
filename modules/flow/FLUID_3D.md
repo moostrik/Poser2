@@ -225,11 +225,11 @@ stays at the body's speed or under, the confinement adding a few percent, MacCor
 `pressure.solver` picks how the Poisson equation is solved each step, each warm from the last step's
 pressure, each on the walls as [The walls](#the-walls) states:
 
-| `solver`    | How                                                                                                                                                                                                                                                                                                      | Its count                |
-|-------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------|
-| `JACOBI`    | every cell from its neighbors' last values, five iterations a dispatch in shared memory (`jacobi_pressure_3d`)                                                                                                                                                                                           | `iterations`, 40         |
-| `SOR`       | red-black Gauss–Seidel over-relaxed by `relaxation`: each color from the other's newest values (`sor_pressure_3d`); 1.95 diverged, so its range stops at 1.85                                                                                                                                            | `iterations`, its sweeps |
-| `MULTIGRID` | V-cycles (`multigrid_pressure.py`): on each level two red-black Gauss–Seidel sweeps, the residual restricted to the level halved, its correction solved from 0 and added back trilinearly, two sweeps again; down to 8 × 14 × 4 at the default grid, 16 sweeps there; obstacles on the finest level only | `cycles`, 1              |
+| `solver`    | How                                                                                                                                                                                                                                                                                                                      | Its count                |
+|-------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------|
+| `JACOBI`    | every cell from its neighbors' last values, five iterations a dispatch in shared memory (`jacobi_pressure_3d`)                                                                                                                                                                                                           | `iterations`, 40         |
+| `SOR`       | red-black Gauss–Seidel over-relaxed by `relaxation`: each color from the other's newest values (`sor_pressure_3d`); 1.95 diverged, so its range stops at 1.85                                                                                                                                                            | `iterations`, its sweeps |
+| `MULTIGRID` | V-cycles (`multigrid_pressure.py`): on each level two red-black Gauss–Seidel sweeps, the residual restricted to the level halved, its correction solved from 0 and added back trilinearly, two sweeps again; down to 8 × 14 × 4 at the default grid, 16 sweeps there in one dispatch; obstacles on the finest level only | `cycles`, 1              |
 
 Measured through the harness on stillslowfast, the step's time with `glFinish` around it, the solve's
 residual |div − L p| over |div| (the mean and the p99, at four quarters of the loop), and the projected
@@ -244,6 +244,13 @@ velocity's divergence, central differences, a cell's share:
 | multigrid, 1 cycle  | 0.024          | 0.42   | 0.0078           | 7.89     |
 | multigrid, 2 cycles | 0.002          | 0.03   | 0.0077           | 10.68    |
 | multigrid, 4 cycles | 0.0001         | 0.0004 | 0.0073           | 16.24    |
+
+The residual is worked out where the restriction reads it (`ResidualRestrict3D`), never written at the fine
+level, and the coarsest level's sweeps run in shared memory in one dispatch (`CoarsePressure3D`, up to 4096
+cells): a level of a few thousand cells cannot fill the GPU, so its 32 half-sweep dispatches were their
+latency. At the preset (288 × 512 × 64) a cycle alone 0.98 → 0.77 ms, the pressure in the app 1.61 →
+1.44 ms; the fused residual is the same to the bit, the coarse solve the same to a float's last bit (the
+compiler orders its multiply-adds its own way).
 
 One V-cycle leaves a sixteenth of Jacobi's residual in less time; each further cycle divides it by
 about thirteen. SOR's sweeps cost 0.34 ms each, two dispatches from global memory, and over-relaxed it

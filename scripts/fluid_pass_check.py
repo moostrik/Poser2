@@ -14,6 +14,9 @@ maccormack_check: `--set velocity.vorticity=1`.
 """
 
 import ctypes
+
+import OpenGL
+OpenGL.ERROR_CHECKING = False  # as launcher.py runs the app; a glGetError per call otherwise makes the CPU the bottleneck
 import sys
 from argparse import ArgumentParser
 from pathlib import Path
