@@ -415,7 +415,7 @@
       "use_mask": true,
       "x_gain": 1.0,
       "y_gain": 1.0,
-      "z_gain": 1.0,
+      "z_gain": 0.0,
       "xy": {
         "levels": 4,
         "window": "SEVEN",
@@ -471,7 +471,7 @@
           "bow": 0.0,
           "stop": 1.0,
           "wake": 0.0,
-          "saturation": 1.0,
+          "saturation": 1.18,
           "brightness": 1.0
         },
         "temperature": {
@@ -526,12 +526,12 @@
       },
       "input": {
         "layer": 0.5,
-        "spread": 0.01,
-        "depth_span": 0.3,
+        "spread": 0.07,
+        "depth_span": 1.35,
         "boundary": {
           "velocity_drag": 500.0,
           "velocity_gain": 2.57,
-          "density_drag": 200.0,
+          "density_drag": 0.0,
           "density_gain": 1.0,
           "temperature_drag": 200.0,
           "temperature_gain": 1.0
@@ -554,7 +554,7 @@
         "viscosity_iter": 20
       },
       "density": {
-        "advection_scale": 1.0,
+        "advection_scale": 0.0,
         "fade_time": 0.0,
         "evaporation_time": 300.0
       },

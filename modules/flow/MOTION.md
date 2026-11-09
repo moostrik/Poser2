@@ -1,9 +1,44 @@
-# Lucas–Kanade flow settings
+# The motion
 
-The settings of `LucasKanadeFlow3D` (`lucas_kanade_flow_3d.py`), in panel order, with their defaults and
-the reason for each. How the flow works is in the module docstrings of `lucas_kanade_flow_3d.py`,
-`lucas_kanade_flow.py` (the x/y solve) and `depth_velocity.py` (z).
+Every quantity and setting here is in a meaningful unit ([FLOW.md](FLOW.md#the-2d-and-3d-flow-systems)).
 
+The motion stage measures a velocity field from two camera frames, the optical flow: x and y on the
+image plane by a Lucas–Kanade solve, and in the 3D flow z toward the camera by the depth velocity.
+How the stages fit together is in [FLOW.md](FLOW.md); what is open, the motion's included, in
+[FLOW.md's Open](FLOW.md#open). "Code" is what the files show; **(deduction)** marks what is inferred
+from them, **(site fact)** what the operator saw.
+
+How the flow works is in the module docstrings of `motion/lucas_kanade_flow_3d.py`,
+`motion/lucas_kanade_flow.py` (the x/y solve) and `motion/depth_velocity.py` (z); the layer is
+`MotionLayer` (`modules/render/layers/flow/motion_layer.py`) with `Motion3DLayer` and `Motion2DLayer`.
+
+## When it measures
+
+The motion layer measures once per camera frame: when `timestamp` differs from the one it last
+measured; a source without stamps (`None`) measures every tick. A gap wider than the expected
+frame interval is a dropped frame. For its first 3 s after start the motion layer stays at rest
+(`WARM_UP_TIME`): the camera's exposure settles then, and the Lucas–Kanade solve reads the
+brightening as motion, x/y at full reach over the whole image **(site fact)**. A camera frame has
+no other identity: `CameraFrame` and `Capture` carry a timestamp and no sequence number, because the
+device's sequence numbers skip on the depth while every frame arrives (`modules/camera/oak4/OAK4.md`).
+A source layer keeps the capture time of the frame it holds (`CaptureImageLayer`, `DepthSourceLayer`,
+`MaskSourceLayer` and `ForegroundSourceLayer` from `segmentation.Image.timestamp`, `DepthMaskLayer`
+from its depth), and a view (`CenterCamLayer`, `CenterMaskLayer`, `CenterForegroundLayer`,
+`CenterDepthLayer`) takes its source layer and forwards the stamp of the frame it drew, so the app
+reads it off the layer it takes the texture from (`HasCaptureTime`,
+`modules/render/layers/layer_base.py`). The interval a measurement divides by is in
+[FLOW.md's two clocks](FLOW.md#inputs-and-outputs).
+
+`DepthView(texture, view_span, depth_step)` (`modules/flow/motion/depth_view.py`) is the depth on
+the flow's view: the texture, the metres one view width spans per metre of depth, and the uv
+between two depth samples. The 3D camera's layers make it: `DepthSourceLayer` the texture and its
+`sample_size`, `CenterGeometry` the `view_span` from its crop and the camera's horizontal field of
+view it takes at construction, and the `depth_step` from the sample size and its crop;
+`CenterDepthLayer.depth_view` puts them together.
+
+## The settings
+
+The settings of `LucasKanadeFlow3D`, in panel order, with their defaults and the reason for each.
 The defaults are the best measured for deep_flow, in this order of importance:
 
 - A: least z noise
@@ -15,7 +50,7 @@ Every number is measured with `scripts/depth_velocity_compare.py` on the GPU, un
 OAK4, and two recordings at 0.65–1.5 m: `stillslowfast` (still, then an arm slow and fast) and
 `standmoves` (arm sweeps, pushes toward the camera). The whole flow takes 2.0 ms per frame.
 
-## lucas_kanade
+### lucas_kanade
 
 | Setting                | Default | Range     | For | Why                                         |
 |------------------------|---------|-----------|-----|---------------------------------------------|
@@ -24,7 +59,7 @@ OAK4, and two recordings at 0.65–1.5 m: `stillslowfast` (still, then an arm sl
 
 The flow's velocity is in image widths per second times its gains.
 
-## solve (x/y)
+### solve (x/y)
 
 | Setting      | Default | Range (step)        | For | Why                                    |
 |--------------|---------|---------------------|-----|----------------------------------------|
@@ -41,10 +76,10 @@ The flow's velocity is in image widths per second times its gains.
 - window: 7×7 smears more than 5×5, but B ranks above C.
 - same_surface works only where a no-depth band separates the hand from what is behind it, as with a
   hand held far out. Where a limb is about 20 cm before the body, Neural Depth ramps over about 30 px
-  instead of stepping, and the patch's samples stay within the tolerance; see [Open](#open). It costs
-  +0.05 ms.
+  instead of stepping, and the patch's samples stay within the tolerance; see
+  [FLOW.md's Open](FLOW.md#open). It costs +0.05 ms.
 
-## depth_velocity (z)
+### depth_velocity (z)
 
 | Setting   | Default      | Range (step)    | For | Why                                    |
 |-----------|--------------|-----------------|-----|----------------------------------------|
@@ -60,7 +95,10 @@ The flow's velocity is in image widths per second times its gains.
 - tolerance at 0.05: a push loses 77% of its z, and the track restarts 6× as often while moving.
 - smooth: lower lags less; keep it as low as looks right. The bridges read z as they read x/y, so
   this is z's one time constant; what it does to them, and the 200 ms advised for them, is in
-  [FLOW.md's Measured](../FLOW.md#measured).
+  [BRIDGE.md's Measured](BRIDGE.md#measured).
+- xy_smooth puts x/y through the depth velocity's alpha–beta filter, carried along the motion, with
+  z's `smooth`. It is the only x/y state kept from frame to frame: the solve starts each frame from
+  no motion. The motion's reset clears it.
 
 ## Constraints
 
@@ -76,13 +114,6 @@ The flow's velocity is in image widths per second times its gains.
   window a fraction of a texel off its neighbor's, and where a window is badly conditioned the solve
   flips from pixel to pixel in rows and columns: streaks from 4 levels up. A median between levels
   also removes them, at +0.35 ms or more, so there is none.
+- The exposure is the camera's to settle, not the solve's: the solve matches no brightness between
+  frames, and the warm-up keeps the start's ramp out.
 
-## Open
-
-- A limb moving sideways before the body reads false z at its edges: the leading edge carries 43% of a
-  sweep's z, the trailing edge 12%. The cause is the depth's ramp at the limb's edge. The camera's
-  temporal filter is off and its confidence does not sharpen the ramp. Accepted for now; the cue not
-  yet tried is a forward-splat count of the x/y motion (0 = uncovered, above 1 = covered).
-- Range: edge, tolerance and dead_zone are in metres and tuned at 0.65–1.5 m. Stereo noise grows with
-  the square of the distance, so at 2–3.5 m they may need to be in disparity **(deduction)**. This
-  needs a recording at that distance.

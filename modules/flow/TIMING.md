@@ -215,7 +215,7 @@ estimate is **(deduction)** unless its source measured it; a source's numbers ar
 
 ### Measured
 
-Each change of [step 9](FLUID_3D.md#step-9-faster), by its number there, against the code before it, three runs back to back (`trial_runs.py`, the preset with the
+Each change of [Faster](FLUID_3D.md#faster), by its number there, against the code before it, three runs back to back (`trial_runs.py`, the preset with the
 density on the grid unless the row says otherwise): the pass before, with the change, before again. The
 noise is the two befores' difference; a change counts as faster when it beats both by 2.5 times that.
 The harness's check is `fluid_compare.py` on stillslowfast, its water numbers and four saved outputs
@@ -354,7 +354,7 @@ Sources: [McAdams, Sifakis, Teran 2010](https://pages.cs.wisc.edu/~sifakis/proje
 
 ## The density at the output's 4K
 
-Step 10's upscaled density ([FLUID_3D.md](FLUID_3D.md#step-10-the-densitys-detail)): the amount at 2160 × 3840 ×
+The upscaled density ([FLUID_3D.md](FLUID_3D.md#the-densitys-detail)): the amount at 2160 × 3840 ×
 `upscaled.depth`, the color on the fluid's grid, `upscaled.sample` `AVERAGE`; the fluid at 448 × 800, the preset's
 other settings, the pose on, one 60 s run each after 10 s. Semi-Lagrangian, with the depth scale and the dampen
 at 3 widths/s:
@@ -376,7 +376,7 @@ Within 60 fps: up to 32 fluid layers with the density at 32, 48 with it at 24 or
 layers up the pressure solve is the largest pass (3.7–5.3 ms). The density's
 4K × 16 costs 1.3 ms to carry and 0.9 to march, the old 16-layer look's 2 GB a step now under a quarter of it.
 MacCormack, timed before the depth scale while the water still burst, took 9.1 ms a frame at 16 and 16 and was
-over the budget from 32 fluid layers up; its cost is in [FLUID_3D.md's Later](FLUID_3D.md#later).
+over the budget from 32 fluid layers up; its cost is in [FLUID_3D.md's Parked](FLUID_3D.md#parked).
 
 ## Open
 
