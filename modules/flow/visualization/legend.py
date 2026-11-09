@@ -66,13 +66,14 @@ class Legend:
         self._key.deallocate()
         self._drawn = None
 
-    def update(self, kind: LegendKind | None, channel: int, scale: float, samples: int,
+    def update(self, kind: LegendKind | None, channel: int, channels: int, scale: float, samples: int,
                axes: list[tuple[str, float, float]] | None = None, title: str = '') -> None:
-        """Draw the legend for this plot, unless it shows it already; `samples` is the histogram's
-        total of samples counted. `axes` are a 3D view's axis letters, each with its place in pixels
-        from the top left (`axis_labels`); `title` goes at the top center, what is shown."""
+        """Draw the legend for this plot, unless it shows it already; `channels` are those the texture
+        holds, x first, `samples` the histogram's total of samples counted. `axes` are a 3D view's axis
+        letters, each with its place in pixels from the top left (`axis_labels`); `title` goes at the top
+        center, what is shown."""
         letters: tuple[tuple[str, int, int], ...] = tuple((name, round(x), round(y)) for name, x, y in axes or [])
-        shown = (kind, channel, scale, samples, letters, title)
+        shown = (kind, channel, channels, scale, samples, letters, title)
         if shown == self._drawn or not self._fbo.allocated:
             return
         self._drawn = shown
@@ -82,9 +83,9 @@ class Legend:
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)     # the shapes' alpha stored as is, for the blit to apply once
         if kind == LegendKind.COLORMAP:
-            self._draw_key(channel, scale, self._title_height(title))
+            self._draw_key(channel, channels, scale, self._title_height(title))
         elif kind is not None:
-            self._draw_axis(kind, channel, scale, samples)
+            self._draw_axis(kind, channel, channels, scale, samples)
         self._draw_letters(letters)
         self._draw_title(title)
         Style.pop_style()
@@ -109,9 +110,9 @@ class Legend:
             text_w, text_h = self._text.measure_text(name)
             self._text.draw_box_text(x - text_w / 2, y - text_h / 2, name, TEXT, BOX, w, h)
 
-    def _draw_axis(self, kind: LegendKind, channel: int, scale: float, samples: int) -> None:
+    def _draw_axis(self, kind: LegendKind, channel: int, channels: int, scale: float, samples: int) -> None:
         """The lane names, a line at each decade with its label, and the histogram's 0 and limits."""
-        names: tuple[str, ...] = LANES if channel == ALL_CHANNELS else (LANES[channel],)
+        names: tuple[str, ...] = LANES[:channels] if channel == ALL_CHANNELS else (LANES[channel],)
         lanes: int = len(names)
         lines: list[AxisLine] = strip_lines(scale) if kind == LegendKind.STRIP else histogram_lines(samples)
         w, h = self._fbo.width, self._fbo.height
@@ -141,18 +142,18 @@ class Legend:
             return 0.0
         return float(self._text.measure_text(title)[1] + MARGIN)
 
-    def _draw_key(self, channel: int, scale: float, below: float = 0.0) -> None:
+    def _draw_key(self, channel: int, channels: int, scale: float, below: float = 0.0) -> None:
         """In the top left, `below` pixels down, a color bar per channel shown with its name, and
         -1, 0 and 1 after `scale` under them."""
         w, h = self._fbo.width, self._fbo.height
-        names: tuple[str, ...] = LANES[:3] if channel == ALL_CHANNELS else (LANES[channel],)
+        names: tuple[str, ...] = LANES[:min(channels, 3)] if channel == ALL_CHANNELS else (LANES[channel],)
         bars: int = len(names)
         x0: float = MARGIN + KEY_NAME
         x1: float = x0 + KEY_WIDTH
         top: float = h - MARGIN - 4 - below                         # from the bottom, room for the name boxes' padding
         bottom: float = top - bars * KEY_BAR - (bars - 1) * KEY_GAP
         self._key.reload()
-        self._key.use((x0, bottom, x1, top), channel, KEY_BAR, KEY_GAP)
+        self._key.use((x0, bottom, x1, top), channel, channels, KEY_BAR, KEY_GAP)
         if not self._text.allocated:
             return
         Style.set_blend_mode(Style.BlendMode.ALPHA)

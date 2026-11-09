@@ -46,13 +46,19 @@ The strip starts over when `stage`, `texture` or `channel` changes, or when `vie
 | `COLORMAP` | by the port's kind: a velocity by its direction, 0.5 + 0.5 × the unit vector, as bright as its size capped at 1, black at 0; an image as stored; a scalar's x, y, z as red, green, blue around mid grey, grey 0 | a velocity's channel by its sign along its axis; a scalar's with the other channels 0: x from grey toward red above 0 and toward cyan below, y green, z blue; w as grey |
 | `GLYPHS` | a velocity's arrow of x and y, with the ring for z on a 3- or 4-channel texture (channel not read); an acceleration's push, a filled arrowhead; a scalar's dot of x, and so any one-channel texture's, which has no direction | a scalar's dot of that channel |
 | `IMAGE`  | the raw values as stored, times `scale`, for debugging             | that channel as grey, times `scale`           |
-| `HISTOGRAM` | four lanes, x, y, z, w: how many values fall where from −1 to 1 after `scale`, 0 in the middle, outside in the end bins | one lane, full height |
-| `STRIP`  | four lanes, x, y, z, w: the frame-wide mean of each channel's amount (its absolute value; a signed mean cancels left against right), on a log axis | one lane, full height |
+| `HISTOGRAM` | a lane for each channel the port holds, x on top: how many values fall where from −1 to 1 after `scale`, 0 in the middle, outside in the end bins | one lane, full height |
+| `STRIP`  | a lane for each channel the port holds, x on top: the frame-wide mean of each channel's amount (its absolute value; a signed mean cancels left against right), on a log axis | one lane, full height |
 
-- A channel the texture does not have reads as sampled in every view: a one-channel texture
-  repeats x in y and z (its grey swizzle, `modules/gl/texture.py`), a two-channel one has z 0, and
-  a missing w is 1. So a one-channel texture would draw arrows along the diagonal; the glyphs draw
-  it as dots, whatever its port's kind.
+- A port says the channels that hold its values, x first (`Port.channels`): a vector's components,
+  at most x, y and z, since a 3D vector sits in RGBA with w unused; a scalar's and an image's every
+  channel of its format; or `held` where the format holds more than the values (the light, RGB in
+  RGBA; the 3D Lucas–Kanade filter, its displacement in RG beside its position error). The lanes,
+  the colormap's key and its legend's names are those channels; a channel the port does not hold
+  draws nothing. A shader writes 0 in a channel nothing reads.
+- In the other views a channel the texture does not have reads as sampled: a one-channel texture
+  repeats x in y and z (its grey swizzle, `modules/gl/texture.py`), a two-channel one has z 0. So a
+  one-channel texture would draw arrows along the diagonal; the glyphs draw it as dots, whatever its
+  port's kind.
 - An acceleration (widths/s²) is drawn in every view as the velocity it adds in one reference step,
   times `REFERENCE_STEP` (1/60 s), as the fluid adds a body force × dt: a quick hand's 30 widths/s²
   reads 0.5, in the range of the velocities, so one `scale` reads both. Its title says "per step".

@@ -68,5 +68,5 @@ void main() {
     if (any(isnan(delta)) || any(isinf(delta))) delta = vec2(0.0);
     float reach = float(window + 1);
     delta = clamp(delta, vec2(-reach), vec2(reach));
-    fragColor = vec4(d + delta * texel, 0.0, 1.0);
+    fragColor = vec4(d + delta * texel, 0.0, 0.0);
 }

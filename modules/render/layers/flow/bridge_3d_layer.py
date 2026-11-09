@@ -139,7 +139,7 @@ class Bridge3DLayer(BridgeLayer):
         boundary: Ports = Ports({'velocity': Port(self._boundary_velocity, TextureKind.VELOCITY),
                                  'density_amount': Port(self._boundary_density_amount, TextureKind.SCALAR),
                                  'temperature_amount': Port(self._boundary_temperature_amount, TextureKind.SCALAR)})
-        body_force: Ports = Ports({'acceleration': Port(self._body_force_acceleration, TextureKind.VELOCITY),
+        body_force: Ports = Ports({'acceleration': Port(self._body_force_acceleration, TextureKind.ACCELERATION),
                                    'density_amount': Port(self._body_force_density_amount, TextureKind.SCALAR),
                                    'temperature_amount': Port(self._body_force_temperature_amount, TextureKind.SCALAR)})
         return {'lowpass': self._shown_ports(self._lowpass.ports, self._show_lowpass),

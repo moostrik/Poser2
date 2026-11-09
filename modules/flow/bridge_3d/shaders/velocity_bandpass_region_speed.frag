@@ -10,5 +10,5 @@ in vec2 texCoord;
 out vec4 fragColor;
 
 void main() {
-    fragColor = vec4(length(texture(tex0, texCoord).xyz), length(texture(tex1, texCoord).xyz), 0.0, 1.0);
+    fragColor = vec4(length(texture(tex0, texCoord).xyz), length(texture(tex1, texCoord).xyz), 0.0, 0.0);
 }

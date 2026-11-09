@@ -77,5 +77,5 @@ void main() {
     flow = (length(flow) > TINY) ? (flow / length(flow)) * magnitude : vec2(0.0);
     flow = clamp(flow, vec2(-1.0), vec2(1.0));
 
-    fragColor = vec4(flow, 0.0, 1.0);
+    fragColor = vec4(flow, 0.0, 0.0);
 }

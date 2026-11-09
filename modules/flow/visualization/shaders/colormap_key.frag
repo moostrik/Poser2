@@ -5,7 +5,8 @@
 // through 0 (mid grey) to 1 at its right, in the color the colormap gives that channel
 
 uniform vec4 box;           // x0, y0, x1, y1 in pixels from the bottom left
-uniform int channel;        // 0 to 3 for one bar, 4 for x, y, z
+uniform int channel;        // 0 to 3 for one bar, 4 for each of x, y, z the texture holds
+uniform int channels;       // The channels the texture holds, x first, 1 to 4
 uniform float bar_height;   // in pixels
 uniform float bar_gap;      // in pixels, between the bars
 
@@ -19,7 +20,7 @@ void main() {
     fragColor = vec4(0.0);
     if (p.x < box.x || p.x > box.z || p.y < box.y || p.y > box.w) return;
 
-    int bars = channel == ALL ? 3 : 1;
+    int bars = channel == ALL ? min(channels, 3) : 1;
     float from_top = box.w - p.y;
     int bar = int(from_top / (bar_height + bar_gap));
     if (bar >= bars || from_top - float(bar) * (bar_height + bar_gap) > bar_height) return;

@@ -14,5 +14,5 @@ const float EPSILON = 1e-4;
 
 void main() {
     vec4 sums = textureLod(tex0, texCoord, lod);
-    fragColor = vec4(sums.a > EPSILON ? sums.rgb / sums.a : vec3(0.0), 1.0);
+    fragColor = vec4(sums.a > EPSILON ? sums.rgb / sums.a : vec3(0.0), 0.0);     // w unused
 }

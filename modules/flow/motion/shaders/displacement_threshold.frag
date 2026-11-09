@@ -16,5 +16,5 @@ void main() {
     vec2 uv = texture(displacement, texCoord).xy;
     float pixels = length(uv * size);
     float kept = max(pixels - threshold, 0.0);
-    fragColor = vec4(pixels > 1e-6 ? uv * (kept / pixels) : vec2(0.0), 0.0, 1.0);
+    fragColor = vec4(pixels > 1e-6 ? uv * (kept / pixels) : vec2(0.0), 0.0, 0.0);
 }

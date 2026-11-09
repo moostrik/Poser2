@@ -157,7 +157,7 @@ void step_track() {
         emas = vec2(0.0);
     }
     if (catch_up_pass) {
-        fragColor = vec4(emas, 0.0, 1.0);
+        fragColor = vec4(emas, 0.0, 0.0);
         return;
     }
     if (!follows) {

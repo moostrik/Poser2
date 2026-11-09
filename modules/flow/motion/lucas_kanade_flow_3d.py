@@ -94,7 +94,7 @@ class LucasKanadeFlow3D:
         """Its two parts under their settings groups: the x/y solve with its smoothing, and the z.
         The composed velocity is the motion stage's output."""
         return {**prefixed('xy', {**self._flow.ports,
-                                  'filtered': Port(self._filtered, TextureKind.VELOCITY),
+                                  'filtered': Port(self._filtered, TextureKind.VELOCITY, held=2),     # BA the position error, state
                                   'followed': Port(self._followed, TextureKind.VELOCITY)}),
                 **prefixed('z', self._depth_velocity.ports)}
 

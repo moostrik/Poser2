@@ -242,6 +242,10 @@ class MonitorLayer(LayerBase):
             port.prepare()                      # its owner brings it up to date, or learns it is shown
         settings: MonitorLayerSettings = self.settings
         channel: Channel = settings.advanced.channel
+        channels: int = port.channels
+        if channel != Channel.ALL and channel >= channels:
+            self._port = None                   # a channel the port does not hold: nothing to draw
+            return
         scale: float = settings.advanced.scale
         if port.kind == TextureKind.ACCELERATION:
             scale *= REFERENCE_STEP             # the velocity it adds in a step, in a velocity's units
@@ -254,7 +258,7 @@ class MonitorLayer(LayerBase):
             if view != MonitorView.IMAGE and not by_kind:
                 self._legend_kind = LegendKind.COLORMAP
             if settings.advanced.legend:
-                self._legend.update(self._legend_kind, int(channel), scale, self._visualizer.histogram_total, self._axes, self._title(port))
+                self._legend.update(self._legend_kind, int(channel), channels, scale, self._visualizer.histogram_total, self._axes, self._title(port))
             return
         texture: Texture = self._flat(port, view)
         self._visualizer.resize(*self._rendered_size)
@@ -264,7 +268,7 @@ class MonitorLayer(LayerBase):
                 self._strip.reset()
                 self._strip_of = shown
             if not self._strip_stepped:         # one column per tick, also when a larger draw renders again
-                self._strip.update(texture, scale, int(channel))
+                self._strip.update(texture, scale, int(channel), channels)
                 self._strip_stepped = True
             self._legend_kind = LegendKind.STRIP
         elif view == MonitorView.IMAGE or by_kind:
@@ -273,13 +277,13 @@ class MonitorLayer(LayerBase):
             self._visualizer.process_colormap(texture, scale, int(channel), port.kind.vector)
             self._legend_kind = LegendKind.COLORMAP
         elif view == MonitorView.HISTOGRAM:
-            self._visualizer.process_histogram(port.texture if port.volume else texture, scale, int(channel))
+            self._visualizer.process_histogram(port.texture if port.volume else texture, scale, int(channel), channels)
             self._legend_kind = LegendKind.HISTOGRAM
         else:
             self._visualizer.process_glyphs(texture, scale, float(settings.advanced.glyph_spacing.value),
                                             not port.kind.vector, int(channel), port.kind == TextureKind.ACCELERATION)
         if settings.advanced.legend:
-            self._legend.update(self._legend_kind, int(channel), scale, self._visualizer.histogram_total, title=self._title(port))
+            self._legend.update(self._legend_kind, int(channel), channels, scale, self._visualizer.histogram_total, title=self._title(port))
 
     def _title(self, port: Port) -> str:
         """What is shown: the stage and the port's name, the one picked when the settings name none; an

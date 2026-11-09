@@ -11,5 +11,5 @@ out vec4 fragColor;
 
 void main() {
     float value = texture(tex0, texCoord).r;
-    fragColor = vec4(sign(value) * max(abs(value) - threshold, 0.0), 0.0, 0.0, 1.0);
+    fragColor = vec4(sign(value) * max(abs(value) - threshold, 0.0), 0.0, 0.0, 0.0);
 }

@@ -12,6 +12,8 @@ from typing import Callable, Protocol, get_type_hints
 
 from modules.gl import Texture, Texture3D
 
+from .flow_util import FlowUtil
+
 
 class TextureKind(IntEnum):
     """What a texture holds, which says how a monitor draws it: an image as the picture it is; a velocity
@@ -40,11 +42,22 @@ class Port:
     kind: TextureKind
     extent: float = 0.0
     prepare: Callable[[], None] | None = None
+    held: int = 0           # the channels holding its values, x first; 0 from its kind and format (`channels`)
 
     @property
     def volume(self) -> bool:
         """Whether the texture is a volume, a 3D texture."""
         return isinstance(self.texture, Texture3D)
+
+    @property
+    def channels(self) -> int:
+        """The channels that hold its values, x first, the ones a monitor draws: `held` where set (an RGB
+        image in RGBA), else a vector's components, at most x, y and z (a 3D vector sits in RGBA, w
+        unused), else every channel of its format."""
+        if self.held > 0:
+            return self.held
+        stored: int = FlowUtil.get_num_channels(self.texture.internal_format)
+        return min(stored, 3) if self.kind.vector else stored
 
 
 class OnDemand:

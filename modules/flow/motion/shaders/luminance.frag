@@ -11,5 +11,5 @@ void main() {
     // Standard luminance weights (ITU-R BT.709)
     float luminance = dot(color.rgb, vec3(0.2126, 0.7152, 0.0722)) * color.a;
 
-    fragColor = vec4(luminance, 0.0, 0.0, 1.0);
+    fragColor = vec4(luminance, 0.0, 0.0, 0.0);
 }

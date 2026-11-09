@@ -1,5 +1,5 @@
 """The strip: a texture's channels over time, a rolling plot of the frame-wide mean amount (absolute
-value) of x, y, z and w, or of one of them, one column per tick, on a log axis of three decades. It stays on the GPU, so the render thread never waits on a read."""
+value) of each channel it holds, or of one of them, one column per tick, on a log axis of three decades. It stays on the GPU, so the render thread never waits on a read."""
 
 from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_RGBA16F, GL_RGBA8, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
 
@@ -8,7 +8,7 @@ from .. import FlowUtil
 from .shaders import StripRoll, StripSummary
 
 LANES: tuple[str, ...] = ('x', 'y', 'z', 'w')      # top to bottom
-ALL_CHANNELS: int = 4           # the channel that stands for all four
+ALL_CHANNELS: int = 4           # the channel that stands for all the texture holds
 STRIP_WIDTH: int = 540          # columns: 9 s at 60 ticks per second; the height is the size it is drawn at
 SUMMARY_LIMIT: int = 512        # the summary reads the texture at its own size up to this per side
 
@@ -71,9 +71,9 @@ class Strip:
         glGenerateMipmap(GL_TEXTURE_2D)
         glBindTexture(GL_TEXTURE_2D, 0)
 
-    def update(self, texture: Texture, scale: float, channel: int = ALL_CHANNELS) -> None:
-        """Add one column: the mean amount of each of `texture`'s channels, times `scale`, in four lanes,
-        or of `channel` (0 to 3) alone at full height."""
+    def update(self, texture: Texture, scale: float, channel: int, channels: int) -> None:
+        """Add one column: the mean amount of each of the `channels` `texture` holds, times `scale`, a lane
+        each, or of `channel` (0 to 3) alone at full height."""
         if not self._strip_fbo.allocated or not texture.allocated:
             return
         self._follow_summary(texture)
@@ -86,5 +86,5 @@ class Strip:
 
         self._strip_fbo.swap()
         self._strip_fbo.begin()
-        self._roll_shader.use(self._strip_fbo.back, self._summary_fbo, scale, channel)
+        self._roll_shader.use(self._strip_fbo.back, self._summary_fbo, scale, channel, channels)
         self._strip_fbo.end()

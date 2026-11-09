@@ -50,5 +50,5 @@ void main() {
         share = mix(1.0, clamp(change, 0.0, 1.0), region_weight);
     }
     change *= edge > 0.5 ? 1.0 - share : share;
-    fragColor = vec4(change, 0.0, 0.0, 1.0);
+    fragColor = vec4(change, 0.0, 0.0, 0.0);
 }

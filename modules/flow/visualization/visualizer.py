@@ -1,7 +1,7 @@
 """The visualizer: draws a texture's channels into its own FBO, as an image, as a colormap centered on grey,
-as glyphs (arrows for a velocity, dots for a scalar) or as a histogram. A channel is 0 to 3 for x, y, z, w, or `ALL_CHANNELS`; a channel the
+as glyphs (arrows for a velocity, dots for a scalar) or as a histogram. A channel is 0 to 3 for x, y, z, w, or `ALL_CHANNELS`, those the port holds; a channel the
 texture does not have reads as sampled: a one-channel texture repeats x in y and z (its grey
-swizzle), and a missing w is 1."""
+swizzle), a two-channel one z 0."""
 
 import numpy as np
 from OpenGL.GL import GL_NEAREST, GL_R32UI, GL_RED_INTEGER, GL_RGBA8, GL_UNSIGNED_INT, glClearTexImage
@@ -105,9 +105,9 @@ class Visualizer:
         self._glyphs.use(texture, scale, spacing, spacing * ARROW_WIDTH, channels >= 3, dots or channels == 1, channel, push)
         self._fbo.end()
 
-    def process_histogram(self, texture: Texture | Texture3D, scale: float, channel: int = ALL_CHANNELS) -> None:
+    def process_histogram(self, texture: Texture | Texture3D, scale: float, channel: int, channels: int) -> None:
         """How many of the texture's values fall where from -1 to 1 after `scale`, 0 in the middle,
-        the height the log of the count: four lanes, or one channel's lane. Counted on the GPU over
+        the height the log of the count: a lane for each of the `channels` it holds, or one channel's lane. Counted on the GPU over
         the texture's own grid of samples, capped at `HISTOGRAM_SAMPLES` per side; a volume through
         all its layers, capped at `HISTOGRAM_VOLUME_SAMPLES` across."""
         if not self._fbo.allocated or not texture.allocated or not self._histogram.allocated:
@@ -125,7 +125,7 @@ class Visualizer:
             self._histogram_count.use(texture, self._histogram, scale, grid)
         self._fbo.begin()
         self._histogram_draw.reload()
-        self._histogram_draw.use(self._histogram, channel, self._histogram_total)
+        self._histogram_draw.use(self._histogram, channel, channels, self._histogram_total)
         self._fbo.end()
 
     def _process_channels(self, texture: Texture, scale: float, channel: int, colormap: bool, vector: bool = False) -> None:

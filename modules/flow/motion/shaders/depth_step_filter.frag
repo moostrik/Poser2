@@ -32,5 +32,5 @@ void main() {
         }
     }
     bool edge = far > 0.0 && far - near > tolerance;
-    fragColor = vec4(edge ? 0.0 : depth_at(texCoord), 0.0, 0.0, 1.0);
+    fragColor = vec4(edge ? 0.0 : depth_at(texCoord), 0.0, 0.0, 0.0);
 }

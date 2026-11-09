@@ -958,5 +958,5 @@ class Fluid3D:
                 'buoyancy': volume(self._buoyancy_force_vol, TextureKind.ACCELERATION),
                 'divergence': volume(self._divergence_vol, TextureKind.SCALAR),
                 'pressure': volume(self._pressure, TextureKind.SCALAR),
-                **({'light': volume(self._light_shown, TextureKind.IMAGE)} if self._light_shown.allocated else {}),
+                **({'light': Port(self._light_shown, TextureKind.IMAGE, extent, held=3)} if self._light_shown.allocated else {}),
                 **{name: port for carrier in self._densities for name, port in carrier.ports.items()}}

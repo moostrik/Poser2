@@ -32,5 +32,5 @@ void main() {
     if (uAxis == 2) {
         sum = mix(texelFetch(uDirect, gid, 0).rgb, sum, uScattering);
     }
-    imageStore(uResult, gid, vec4(sum, 1.0));
+    imageStore(uResult, gid, vec4(sum, 0.0));     // w unused
 }

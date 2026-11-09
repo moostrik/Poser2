@@ -2,11 +2,12 @@
 
 // Histogram Draw Shader
 // Draws the bins: x from -1 at the left through 0 in the middle to 1 at the right, the height the
-// log of the count against the log of the samples. Four lanes, x on top, or one channel's lane at
-// full height
+// log of the count against the log of the samples. A lane for each channel the texture holds, x on
+// top, or one channel's lane at full height
 
 uniform usampler2D tex0;    // The bins, one row per channel
-uniform int channel;        // 0 to 3 for one channel, 4 for all four
+uniform int channel;        // 0 to 3 for one channel, 4 for all the texture holds
+uniform int channels;       // The channels the texture holds, x first, 1 to 4
 uniform float total;        // Samples counted, the count at full height
 
 in vec2 texCoord;
@@ -26,7 +27,7 @@ void main() {
     vec2 p = texCoord;
     vec3 color = vec3(0.0);
 
-    int lanes = channel == ALL ? 4 : 1;
+    int lanes = channel == ALL ? channels : 1;
     float position = p.y * float(lanes);
     int lane_channel = channel == ALL ? lanes - 1 - int(position) : channel;   // the first lane on top
     float height = fract(position);

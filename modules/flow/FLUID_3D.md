@@ -72,14 +72,7 @@ advection destroyed added back, never energy created) with a gain above 1 for th
 - **Partial slip**: built, `slip_time` beside `wall`, 0 free-slip (the default) ([The walls](#the-walls)).
   Measured stable; how it looks is to judge at the app.
 
-### 4. The water looks too fast
-
-Seen in the app **(site fact)** after the depth scale: everything moves very fast. Measured, the
-water follows the body at 0.8–0.9 of its speed in fast moves, so it is the water's own motion
-**(deduction)**; the candidates are the preset's confinement (1.69, the textbook 0.3), the
-velocity's fade (60 s, viscosity 0) and MacCormack keeping the swirls.
-
-### 5. The projection's floor
+### 4. The projection's floor
 
 The projection's divergence and gradient are central differences on the cell centers, and the
 solvers solve the compact 7-point Laplacian; the two differ, so the velocity keeps a divergence of
@@ -88,19 +81,13 @@ grid makes the divergence of the gradient the 7-point Laplacian, and the solve's
 reaches the velocity **(deduction)**. It changes every pass that reads the velocity; its design is
 [The staggered velocity](#the-staggered-velocity).
 
-### 6. Unused channels written 0
+### 5. Unused channels
 
-The 3D motion's and the 3D bridge's velocities write 0 in their unused w (`compose_velocity.frag`,
-`velocity_trail.frag`, `velocity_bandpass_direction.frag`), so a monitor shows w as nothing rather
-than a full strip lane and a histogram spike at 1 × `scale`. The rest of `modules/flow` still
-writes 1.0 into unused channels, an alpha left from when the monitors blitted textures as they
-are: among others `gradient_flow_shader.frag`, `lucas_kanade_shader.frag`,
-`displacement_threshold.frag`, the change scalars and `magnitude_shader.frag`. It matters only
-where the target texture has that channel (an R16F target drops it). Each wants its readers checked
-first, as the velocities' were: there the trails, the change shaders, `VelocityMagnitude`,
-`boundary_velocity_3d.comp` and `body_force_acceleration_3d.comp` read xyz only, and
-`trail_advect.frag` carries the vec4 along unread. The visualization's own shaders keep alpha 1,
-since they draw for the screen.
+Built ([MONITOR.md](MONITOR.md)): a port says the channels that hold its values and the monitor draws
+only those; every flow shader writes 0 in a channel nothing reads, its readers checked (where the
+target holds that channel: the light's w, the start region's mean's w; elsewhere the format drops it).
+No texture holds fewer channels than its format beyond a 3D vector's w, which an image store and a
+render target need (RGB is neither).
 
 ## The fluid
 
@@ -305,7 +292,7 @@ about thirteen. SOR's sweeps cost 0.34 ms each, two dispatches from global memor
 leaves the high frequencies, which the mean residual counts, worse than Jacobi does. The divergence after
 the projection hardly moves with any of them: the divergence and the gradient are central differences
 on one grid, whose Laplacian is not the 7-point one every solver solves, so even an exact solve leaves
-it ([Plan](#5-the-projections-floor)). With the solve exact the water keeps more of its speed, 0.150
+it ([Plan](#4-the-projections-floor)). With the solve exact the water keeps more of its speed, 0.150
 widths/s in the mean against Jacobi's 0.134.
 
 ### The guard
@@ -716,7 +703,7 @@ its row in TIMING.md.
 
 ## The staggered velocity
 
-Not built; the answer to [the projection's floor](#5-the-projections-floor): the velocity on the cells' faces (Harlow and
+Not built; the answer to [the projection's floor](#4-the-projections-floor): the velocity on the cells' faces (Harlow and
 Welch's MAC grid), so the divergence and the gradient are one-cell differences, the Laplacian the solvers solve,
 and an exact solve leaves the water exactly incompressible, with no pattern alternating cell by cell left behind.
 
