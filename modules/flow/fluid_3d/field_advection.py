@@ -34,8 +34,8 @@ class FieldAdvection:
               obstacle: Texture3D, aspect: float, z_extent: float, step: float, dissipation: float,
               internal_format: int, has_obstacles: bool, evaporation: float = 0.0,
               measure: int = 0, guard: GuardSlot | None = None,
-              closed: tuple[bool, bool, bool] = (True, True, True)) -> bool:
-        """Carry `field` one step along `velocity`. Semi-Lagrangian into the field; or its step into `scratch` as
+              closed: tuple[bool, bool, bool] = (True, True, True), faces: Texture3D | None = None) -> bool:
+        """Carry `field` one step along `velocity`, or along `faces` (`FaceVelocity`) for a field on the simulation's grid. Semi-Lagrangian into the field; or its step into `scratch` as
         the predictor and the MacCormack correction into the field; on the step's result `guard` (a non-finite
         value 0 and counted). Returns whether `scratch` was (re)allocated, so its owner sets its walls."""
         field.swap()
@@ -43,7 +43,7 @@ class FieldAdvection:
         if advection != Advection.MACCORMACK:
             self._advect_shader.advect(source, field, velocity, obstacle, aspect, z_extent, step, dissipation,
                                        internal_format=internal_format, has_obstacles=has_obstacles,
-                                       evaporation=evaporation, measure=measure, guard=guard, closed=closed)
+                                       evaporation=evaporation, measure=measure, guard=guard, closed=closed, faces=faces)
             glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
             return False
         allocated: bool = False
@@ -52,10 +52,10 @@ class FieldAdvection:
             scratch.allocate(field.width, field.height, field.depth, internal_format)
             allocated = True
         self._advect_shader.advect(source, scratch, velocity, obstacle, aspect, z_extent, step, 1.0,
-                                   internal_format=internal_format, has_obstacles=has_obstacles)
+                                   internal_format=internal_format, has_obstacles=has_obstacles, closed=closed, faces=faces)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._maccormack_shader.use(source, scratch, field, velocity, obstacle, aspect, z_extent, step, dissipation,
                                     internal_format=internal_format, has_obstacles=has_obstacles,
-                                    evaporation=evaporation, measure=measure, guard=guard, closed=closed)
+                                    evaporation=evaporation, measure=measure, guard=guard, closed=closed, faces=faces)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         return allocated

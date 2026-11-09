@@ -29,7 +29,7 @@ class Advect3D(ComputeShader):
                internal_format: int = GL_RGBA16F,
                has_obstacles: bool = True, evaporation: float = 0.0, measure: int = 0,
             guard: GuardSlot | None = None,
-            closed: tuple[bool, bool, bool] = (True, True, True)) -> None:
+            closed: tuple[bool, bool, bool] = (True, True, True), faces: Texture3D | None = None) -> None:
         """Advect from source_read into result_write (separate read/write buffers).
 
         Use this for ping-pong: read from back buffer, write to front buffer.
@@ -49,6 +49,8 @@ class Advect3D(ComputeShader):
             measure: How the size is read: 0 a premultiplied density's alpha, 1 a vector's length, 2 |r|
             guard: The field's slot in its stage's FiniteGuard: a non-finite value 0 and counted; None no guard
             closed: Per axis, whether the box's walls are closed (walls.glsl)
+            faces: The velocity's faces (`FaceVelocity`), read instead of `velocity` for a field on the
+                simulation's grid; None reads `velocity`
         """
         if not self.allocated or not self.shader_program:
             return
@@ -72,6 +74,10 @@ class Advect3D(ComputeShader):
         glUniform1f(self.get_uniform_loc("uEvaporation"), evaporation)
         glUniform1i(self.get_uniform_loc("uMeasure"), measure)
         glUniform3i(self.get_uniform_loc("uClosed"), *(int(c) for c in closed))
+        glUniform1i(self.get_uniform_loc("uFromFaces"), int(faces is not None))
+        if faces is not None:
+            self.bind_texture_3d(4, faces, "uFaces")
+            glUniform3i(self.get_uniform_loc("uCells"), faces.width - 1, faces.height - 1, faces.depth - 1)
         if guard is not None:
             guard.use(self.get_uniform_loc("uGuardSlot"))
         else:

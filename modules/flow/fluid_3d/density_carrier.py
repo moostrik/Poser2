@@ -31,6 +31,7 @@ class CarrierStep:
     curl: Texture3D | None = None   # the velocity's curl (1/s), while the turbulence needs it
     cell: float = 0.0               # the grid's cubic cell (widths)
     guard: GuardSlot | None = None  # the density's slot in the fluid's FiniteGuard
+    faces: Texture3D | None = None  # the velocity on its faces, which a carrier on the simulation's grid moves by
 
 
 class DensityCarrier(ABC):

@@ -33,8 +33,11 @@ uniform ivec3 uSize;          // Volume dimensions (width, height, depth)
 uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
 uniform int   uGuardSlot;     // The field's slot in the stage's FiniteGuard; -1 no guard
 uniform ivec3 uClosed;        // Per axis, 1 where the domain's walls are closed
+uniform bool  uFromFaces;     // the velocity read from its faces (faces.glsl, a field on the simulation's grid), else uVelocity
+uniform ivec3 uCells;         // the simulation's cells, with uFromFaces
 
 #include "walls.glsl"
+#include "faces.glsl"
 
 // The stage's non-finite counts (FiniteGuard, GUARD_BINDING)
 layout(std430, binding = 7) buffer FiniteGuard { uint uNonFinite[]; };
@@ -88,7 +91,7 @@ void main() {
     }
 
     // Backward trace along 3D velocity
-    vec3 velocity = texture(uVelocity, st).xyz;
+    vec3 velocity = uFromFaces ? velocity_at(st * vec3(uCells)) : texture(uVelocity, st).xyz;
     vec3 st_back = st - uTimestep * uRdx * velocity;
 
     // If backtrace lands inside an obstacle, fall back to current position

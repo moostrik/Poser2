@@ -502,7 +502,7 @@ class Fluid3D:
         if self._advection.carry(self.settings.advection, field, scratch, velocity, self._obstacle, self._aspect,
                                  self._z_extent, step, dissipation, internal_format, self._has_obstacles,
                                  evaporation=evaporation, measure=measure,
-                                 guard=self._guard_slot(guard), closed=self._closed):
+                                 guard=self._guard_slot(guard), closed=self._closed, faces=self._faces.volume):
             self._apply_wall_modes()
 
     @property
@@ -678,7 +678,8 @@ class Fluid3D:
             aspect=self._aspect, z_extent=self._z_extent, dt=self._dt, step=self._dt * self.settings.density.advection_scale,
             dissipation=self._calculate_dissipation(self._dt, self.settings.density.fade_time),
             evaporation=self._evaporation(self._dt, self.settings.density.evaporation_time), advection=self.settings.advection,
-            curl=self._curl_vol if self._needs_curl else None, cell=self._cell, guard=self._guard_slot('density'))
+            curl=self._curl_vol if self._needs_curl else None, cell=self._cell, guard=self._guard_slot('density'),
+            faces=self._faces.volume)
         for carrier in self._densities:
             carrier.update(step)
 
@@ -962,6 +963,7 @@ class Fluid3D:
         return {'obstacle_source': Port(self._obstacle_source, TextureKind.SCALAR),
                 'obstacle': volume(self._obstacle, TextureKind.SCALAR),
                 'velocity': volume(self._velocity, TextureKind.VELOCITY),
+                'velocity_faces': volume(self._faces.volume, TextureKind.VELOCITY),
                 'vorticity': volume(self._curl_vol, TextureKind.VELOCITY),
                 'temperature': volume(self._temperature, TextureKind.SCALAR),
                 'buoyancy': volume(self._buoyancy_force_vol, TextureKind.ACCELERATION),
