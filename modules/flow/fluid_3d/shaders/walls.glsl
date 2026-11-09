@@ -35,14 +35,3 @@ vec3 wall_velocity(vec3 v, int axis) {
     return v;
 }
 
-// The velocity of `cell`, slowed along each closed wall it lies against by the share the wall keeps a step
-vec3 slip_along_walls(vec3 v, ivec3 cell, ivec3 size) {
-    for (int axis = 0; axis < 3; axis++) {
-        if (uClosed[axis] == 1 && (cell[axis] == 0 || cell[axis] == size[axis] - 1)) {
-            float normal = v[axis];
-            v *= uWallKeep;
-            v[axis] = normal;
-        }
-    }
-    return v;
-}

@@ -1,0 +1,27 @@
+#version 460 core
+
+/*
+ * FacesToCenters3D - the velocity at the cells' centers, each component the mean of its cell's two faces
+ * (faces.glsl): the RGBA16F volume the passes still on the centers, the particles, the upscaled density and
+ * the monitors read. w 0, unused.
+ */
+
+#pragma optionNV(unroll all)
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(binding = 2) uniform sampler3D uObstacle;
+layout(rgba16f, binding = 0) writeonly uniform image3D uCenters;
+
+uniform ivec3 uCells;
+uniform ivec3 uClosed;
+uniform bool  uHasObstacles;
+
+#include "walls.glsl"
+#include "faces.glsl"
+
+void main() {
+    ivec3 i = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(i, uCells))) return;
+    imageStore(uCenters, i, vec4(cell_velocity(i), 0.0));
+}

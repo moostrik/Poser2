@@ -1,0 +1,103 @@
+#version 460 core
+
+/*
+ * ViscosityFaces3D - the viscosity on the cells' faces: Jacobi iterations of the implicit diffusion
+ * (I - νΔt∇²) v_new = v_old, each component's 7-point Laplacian over its own faces (faces.glsl).
+ *
+ *   v^(k+1) = β (α Σ six neighbors + γ v_old),  γ = 1 / (ν Δt),  β = 1 / (6α + γ)
+ *
+ * One invocation an index, its three faces at once; a 16 × 16 × 2 tile with a one-index halo in shared
+ * memory, iterated there. A face held at 0 (a closed wall's, an obstacle's) stays 0 and is read as 0. A
+ * neighbor beyond a wall: across its own axis there is none past the wall's face, so the face itself (zero
+ * gradient); along a closed wall the ghost carries (2k - 1) of the face (walls.glsl's slip), an open one the
+ * face itself.
+ */
+
+#pragma optionNV(unroll all)
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 2) in;
+
+layout(binding = 2) uniform sampler3D uObstacle;
+
+uniform ivec3 uCells;
+uniform ivec3 uClosed;
+uniform bool  uHasObstacles;
+uniform float uAlpha;         // 1 / h²
+uniform float uGamma;         // 1 / (ν Δt)
+uniform float uBeta;          // 1 / (6 α + γ)
+uniform int   uIterations;
+
+#include "walls.glsl"
+#include "faces.glsl"
+
+shared vec4 s_faces[4][18][18];     // [z slot][y + 1][x + 1]: slot 0 the z halo below, 1 and 2 the pair, 3 above
+
+vec4 load(ivec3 i) {
+    return vec4(face_fetch(0, i), face_fetch(1, i), face_fetch(2, i), 0.0);
+}
+
+// How component `c`'s face `i` reads its neighbor at `n`: `stored` × its value there plus `own` × the face's own
+// (the ghost beyond a wall), each 0 or 1 but the slip's (2k - 1); a held neighbor reads 0
+vec2 neighbor_weights(int c, ivec3 n) {
+    for (int axis = 0; axis < 3; axis++) {
+        int count = axis == c ? uCells[axis] + 1 : uCells[axis];
+        if (n[axis] < 0 || n[axis] >= count) {
+            if (axis == c || uClosed[axis] == 0) return vec2(0.0, 1.0);
+            return vec2(0.0, 2.0 * uWallKeep - 1.0);
+        }
+    }
+    return vec2(held_face(c, n) ? 0.0 : 1.0, 0.0);
+}
+
+void main() {
+    int lz = int(gl_LocalInvocationID.z);
+    int gz = int(gl_WorkGroupID.z) * 2 + lz;
+    ivec3 i = ivec3(gl_GlobalInvocationID.xy, gz);
+    ivec2 lid = ivec2(gl_LocalInvocationID.xy);
+    ivec2 sid = lid + 1;
+    int sz = lz + 1;
+    ivec2 tile = ivec2(gl_WorkGroupID.xy) * 16;
+    int zBase = int(gl_WorkGroupID.z) * 2;
+
+    bool inside = all(lessThanEqual(i, uCells));
+    vec4 v_old = inside ? load(i) : vec4(0.0);
+    s_faces[sz][sid.y][sid.x] = v_old;
+    if (lid.y == 0)  s_faces[sz][0][sid.x]  = load(ivec3(tile + ivec2(lid.x, -1), gz));
+    if (lid.y == 15) s_faces[sz][17][sid.x] = load(ivec3(tile + ivec2(lid.x, 16), gz));
+    if (lid.x == 0)  s_faces[sz][sid.y][0]  = load(ivec3(tile + ivec2(-1, lid.y), gz));
+    if (lid.x == 15) s_faces[sz][sid.y][17] = load(ivec3(tile + ivec2(16, lid.y), gz));
+    if (lz == 0) s_faces[0][sid.y][sid.x] = load(ivec3(i.xy, zBase - 1));
+    if (lz == 1) s_faces[3][sid.y][sid.x] = load(ivec3(i.xy, zBase + 2));
+    barrier();
+
+    // The walls' and the obstacles' weights, fixed through the iterations: per direction the stored neighbor's
+    // weight for x, y and z, and summed over the six the face's own; a held or missing face stays 0
+    const ivec3 DIRECTIONS[6] = ivec3[](ivec3(1, 0, 0), ivec3(-1, 0, 0), ivec3(0, 1, 0), ivec3(0, -1, 0), ivec3(0, 0, 1), ivec3(0, 0, -1));
+    vec3 stored[6];
+    vec3 own = vec3(0.0);
+    vec3 live = vec3(0.0);
+    for (int d = 0; d < 6; d++) stored[d] = vec3(0.0);
+    for (int c = 0; c < 3; c++) {
+        if (!inside || !is_face(c, i) || held_face(c, i)) continue;
+        live[c] = 1.0;
+        for (int d = 0; d < 6; d++) {
+            vec2 w = neighbor_weights(c, i + DIRECTIONS[d]);
+            stored[d][c] = w.x;
+            own[c] += w.y;
+        }
+    }
+
+    vec3 current = v_old.xyz * live;
+    for (int iteration = 0; iteration < uIterations; iteration++) {
+        vec3 sum = stored[0] * s_faces[sz][sid.y][sid.x + 1].xyz + stored[1] * s_faces[sz][sid.y][sid.x - 1].xyz
+                 + stored[2] * s_faces[sz][sid.y + 1][sid.x].xyz + stored[3] * s_faces[sz][sid.y - 1][sid.x].xyz
+                 + stored[4] * s_faces[sz + 1][sid.y][sid.x].xyz + stored[5] * s_faces[sz - 1][sid.y][sid.x].xyz
+                 + own * current;
+        vec3 next = live * (uBeta * (uAlpha * sum + uGamma * v_old.xyz));
+        barrier();
+        s_faces[sz][sid.y][sid.x] = vec4(next, 0.0);
+        current = next;
+        barrier();
+    }
+    if (inside) store_faces(i, current);
+}

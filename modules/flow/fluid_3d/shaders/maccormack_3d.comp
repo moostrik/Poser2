@@ -32,7 +32,6 @@ uniform float uEvaporation;   // Subtracted this step; 0 for a signed field
 uniform int   uMeasure;       // how the evaporation reads a field's size: 0 its alpha, 1 its vector's length, 2 |r|
 uniform ivec3 uSize;          // Volume dimensions
 uniform bool  uHasObstacles;
-uniform float uMaxSpeed;      // The velocity's top speed (widths/s), bent softly toward from half; 0 no limit
 uniform int   uGuardSlot;     // The field's slot in the stage's FiniteGuard; -1 no guard
 uniform ivec3 uClosed;        // Per axis, 1 where the domain's walls are closed
 
@@ -67,17 +66,6 @@ vec4 guard(vec4 value) {
     if (uGuardSlot < 0 || !non_finite(value)) return value;
     atomicAdd(uNonFinite[uGuardSlot], 1u);
     return vec4(0.0);
-}
-
-// The top speed: untouched up to half of it, above bent smoothly toward it (tanh), the direction kept
-vec4 limit_speed(vec4 value) {
-    if (uMaxSpeed <= 0.0) return value;
-    float speed = length(value.xyz);
-    float knee = 0.5 * uMaxSpeed;
-    if (speed <= knee) return value;
-    float span = uMaxSpeed - knee;
-    value.xyz *= (knee + span * tanh((speed - knee) / span)) / speed;
-    return value;
 }
 
 void main() {
@@ -125,7 +113,6 @@ void main() {
     if (uEvaporation > 0.0) {
         result = evaporate(result);
     }
-    result = limit_speed(guard(result));     // the velocity's: a non-finite value 0, then its top speed
-    result.xyz = slip_along_walls(result.xyz, gid, uSize);     // uWallKeep 1 for every other field
+    result = guard(result);
     imageStore(uResult, gid, result);
 }

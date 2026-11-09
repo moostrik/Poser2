@@ -37,10 +37,11 @@ import math
 import numpy as np
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_R16F, GL_R32F, GL_R8, GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
 
-from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
+from modules.gl import ComputeShader, SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
-from .fluid_settings import Light, PressureSolver, Fluid3DSettings, PressureSettings, ParticleSettings, UpscaledDensitySettings
+from .fluid_settings import Advection, Light, PressureSolver, Fluid3DSettings, PressureSettings, ParticleSettings, UpscaledDensitySettings
 from .multigrid_pressure import MultigridPressure
+from .face_velocity import FaceVelocity
 from ..shaders import AddBoolean
 from ..flow_util import FlowUtil
 from ..port import Port, TextureKind
@@ -51,9 +52,10 @@ from .upscaled_density import UpscaledDensity
 from .field_advection import FieldAdvection
 from .simulation_density import SimulationDensity
 from .particle_density import ParticleDensity
-from .shaders import (
+from .shaders import (AdvectFaces3D, FacesToCenters3D, CentersToFaces3D, ViscosityFaces3D, SEMI_LAGRANGIAN, PREDICTOR, CORRECTION,
+                      
     Divergence3D, Gradient3D,
-    JacobiPressure3D, SorPressure3D, JacobiDiffusion3D,
+    JacobiPressure3D, SorPressure3D,
     VorticityCurl3D, VorticityForce3D, Buoyancy3D,
     Inject3D, BoundaryVelocity3D, BodyForceAcceleration3D,
     Add3D, CompositeOver, Knee,
@@ -72,8 +74,8 @@ _WALL_GL: dict = {
     WallMode.CLOSED: (GL_CLAMP_TO_EDGE,   (0.0, 0.0, 0.0, 0.0)),
 }
 
-FLUID_PASSES: tuple[str, ...] = ('advect velocity', 'viscosity', 'vorticity', 'advect temperature', 'buoyancy',
-                                 'pressure', 'density', 'composite')     # a step's passes, each a GPU timer
+FLUID_PASSES: tuple[str, ...] = ('centers to faces', 'advect velocity', 'viscosity', 'faces to centers', 'vorticity',
+                                 'advect temperature', 'buoyancy', 'pressure', 'density', 'composite')     # a step's passes, each a GPU timer
 DRAG_FLOOR: float = 0.02    # widths/s: the body's speed below which it drags nothing, so a dead trail pulls nothing toward 0
 
 import logging
@@ -180,7 +182,6 @@ class Fluid3D:
         self._temperature_clear: bool = False      # both buffers 0 since buoyancy went to 0
         self._pressure: SwapTexture3D = SwapTexture3D()
         # The MacCormack predictors, one per carried field, allocated at its first MacCormack step
-        self._velocity_scratch: Texture3D = Texture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         self._temperature_scratch: Texture3D = Texture3D()
         # The density's carriers: the simulation density always, the upscaled and the particles by their `enabled`;
         # the particles drawn into their own image, then over the volume
@@ -222,7 +223,13 @@ class Fluid3D:
         self._jacobi_pressure_shader: JacobiPressure3D = JacobiPressure3D()
         self._sor_pressure_shader: SorPressure3D = SorPressure3D()
         self._multigrid: MultigridPressure = MultigridPressure()
-        self._jacobi_diffusion_shader: JacobiDiffusion3D = JacobiDiffusion3D()
+        # The velocity on the cells' faces (FaceVelocity), carried and diffused there; the centers' volume its mean per cell
+        self._faces: FaceVelocity = FaceVelocity(swap=True)
+        self._faces_scratch: FaceVelocity = FaceVelocity(swap=False)      # MacCormack's predictor, at its first MacCormack step
+        self._advect_faces_shader: AdvectFaces3D = AdvectFaces3D()
+        self._viscosity_faces_shader: ViscosityFaces3D = ViscosityFaces3D()
+        self._faces_to_centers_shader: FacesToCenters3D = FacesToCenters3D()
+        self._centers_to_faces_shader: CentersToFaces3D = CentersToFaces3D()
         self._vorticity_curl_shader: VorticityCurl3D = VorticityCurl3D()
         self._vorticity_force_shader: VorticityForce3D = VorticityForce3D()
         self._buoyancy_shader: Buoyancy3D = Buoyancy3D()
@@ -276,7 +283,8 @@ class Fluid3D:
         self._gradient_shader.allocate()
         self._jacobi_pressure_shader.allocate()
         self._sor_pressure_shader.allocate()
-        self._jacobi_diffusion_shader.allocate()
+        for face_shader in self._face_shaders:
+            face_shader.allocate()
         self._vorticity_curl_shader.allocate()
         self._vorticity_force_shader.allocate()
         self._buoyancy_shader.allocate()
@@ -343,6 +351,9 @@ class Fluid3D:
 
         # Primary simulation fields
         self._velocity.allocate(sim_w, sim_h, d, GL_RGBA16F)
+        for faces in (self._faces, self._faces_scratch):
+            faces.deallocate()
+        self._faces.allocate(sim_w, sim_h, d)
         self._temperature.allocate(sim_w, sim_h, d, GL_R16F)
         self._pressure.allocate(sim_w, sim_h, d, GL_R32F)     # a cell in widths makes it small, past half floats
         self._multigrid.allocate(sim_w, sim_h, d)
@@ -364,6 +375,8 @@ class Fluid3D:
         for timer in self._pass_timers.values():
             timer.deallocate()
         self._velocity.deallocate()
+        self._faces.deallocate()
+        self._faces_scratch.deallocate()
         for carrier in (self._simulation_density, self._particle_density, self._upscaled_density):
             carrier.deallocate()
         self._particle_texture.deallocate()
@@ -376,7 +389,7 @@ class Fluid3D:
         self._curl_vol.deallocate()
         self._buoyancy_force_vol.deallocate()
         self._output_texture.deallocate()
-        for scratch in (self._velocity_scratch, self._temperature_scratch):
+        for scratch in (self._temperature_scratch,):
             scratch.deallocate()
 
         self._advection.deallocate()
@@ -386,7 +399,8 @@ class Fluid3D:
         self._jacobi_pressure_shader.deallocate()
         self._sor_pressure_shader.deallocate()
         self._multigrid.deallocate()
-        self._jacobi_diffusion_shader.deallocate()
+        for face_shader in self._face_shaders:
+            face_shader.deallocate()
         self._vorticity_curl_shader.deallocate()
         self._vorticity_force_shader.deallocate()
         self._buoyancy_shader.deallocate()
@@ -419,7 +433,8 @@ class Fluid3D:
         self._jacobi_pressure_shader.reload()
         self._sor_pressure_shader.reload()
         self._multigrid.reload()
-        self._jacobi_diffusion_shader.reload()
+        for face_shader in self._face_shaders:
+            face_shader.reload()
         self._vorticity_curl_shader.reload()
         self._vorticity_force_shader.reload()
         self._buoyancy_shader.reload()
@@ -436,6 +451,7 @@ class Fluid3D:
         if not self._allocated:
             return
         self._velocity.clear_all()
+        self._faces.clear()
         for carrier in self._densities:
             carrier.reset()
         self._temperature.clear_all()
@@ -456,8 +472,10 @@ class Fluid3D:
         self._gpu_timer.begin()
 
         # Simulation steps, each its own GPU timer inside the step's
+        self._timed('centers to faces', self._centers_to_faces)
         self._timed('advect velocity', self._advect_velocity)
         self._timed('viscosity', self._apply_viscosity)
+        self._timed('faces to centers', self._faces_to_centers)
         self._timed('vorticity', self._confine_vorticity)
         self._timed('advect temperature', self._advect_temperature)
         self._timed('buoyancy', self._apply_buoyancy)
@@ -482,49 +500,68 @@ class Fluid3D:
         self._add_shader.use(self._velocity, force, strength)
         glMemoryBarrier(_BARRIER_IMAGE)
 
-    def _advect_field(self, field: SwapTexture3D, scratch: Texture3D, velocity: Texture3D | None, step: float,
-                      dissipation: float, internal_format: int, max_speed: float = 0.0,
-                      evaporation: float = 0.0, measure: int = 0, guard: str = '', wall_keep: float = 1.0) -> None:
-        """Carry `field` one step along the velocity (`velocity`, or the field's own previous buffer for the
-        velocity's self-advection), by `settings.advection`; its size taken down by `evaporation`, read by
-        `measure` (0 a density's alpha, 1 a vector's length, 2 |r|); `guard` the field's name in the guard,
-        `max_speed` the velocity's top speed."""
+    def _advect_field(self, field: SwapTexture3D, scratch: Texture3D, velocity: Texture3D, step: float,
+                      dissipation: float, internal_format: int,
+                      evaporation: float = 0.0, measure: int = 0, guard: str = '') -> None:
+        """Carry `field` one step along `velocity` by `settings.advection`; its size taken down by `evaporation`,
+        read by `measure` (0 a density's alpha, 1 a vector's length, 2 |r|); `guard` the field's name in the guard."""
         if self._advection.carry(self.settings.advection, field, scratch, velocity, self._obstacle, self._aspect,
                                  self._z_extent, step, dissipation, internal_format, self._has_obstacles,
-                                 evaporation=evaporation, max_speed=max_speed, measure=measure,
-                                 guard=self._guard_slot(guard), closed=self._closed, wall_keep=wall_keep):
+                                 evaporation=evaporation, measure=measure,
+                                 guard=self._guard_slot(guard), closed=self._closed):
             self._apply_wall_modes()
 
+    @property
+    def _cells(self) -> tuple[int, int, int]:
+        return (self._simulation_width, self._simulation_height, self._depth)
+
+    def _centers_to_faces(self) -> None:
+        """The scaffold while passes still write the centers: the centers put on the faces, each the mean of its two
+        cells."""
+        self._centers_to_faces_shader.use(self._velocity, self._faces.volume, self._obstacle, self._closed,
+                                          self._has_obstacles)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+
+    def _faces_to_centers(self) -> None:
+        """The centers' volume: each component the mean of its cell's two faces."""
+        self._faces_to_centers_shader.use(self._faces.volume, self._velocity, self._obstacle, self._closed,
+                                          self._has_obstacles)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+
     def _advect_velocity(self) -> None:
-        """Self-advect and dissipate the velocity field, its non-finite values 0, its speed under `max_speed`."""
-        advect_step = self._dt * self.settings.velocity.advection_scale
-        dissipation = self._calculate_dissipation(self._dt, self.settings.velocity.fade_time)
-        self._advect_field(self._velocity, self._velocity_scratch, None, advect_step, dissipation, GL_RGBA16F,
-                           max_speed=self.settings.velocity.max_speed,
-                           evaporation=self._evaporation(self._dt, self.settings.velocity.evaporation_time), measure=1,
-                           guard='velocity', wall_keep=self._wall_keep)
+        """The faces carried one step along themselves by `advection`: each traced back on its own; on the result the
+        fade, the evaporation, the guard, the top speed and the slip."""
+        velocity = self.settings.velocity
+        step = self._dt * velocity.advection_scale
+        common = dict(obstacle=self._obstacle, cells=self._cells, step=step,
+                      closed=self._closed, has_obstacles=self._has_obstacles)
+        finish = dict(dissipation=self._calculate_dissipation(self._dt, velocity.fade_time),
+                      evaporation=self._evaporation(self._dt, velocity.evaporation_time), max_speed=velocity.max_speed,
+                      guard=self._guard_slot('velocity'), wall_keep=self._wall_keep)
+        self._faces.swap()
+        source = self._faces.back
+        if self.settings.advection != Advection.MACCORMACK:
+            self._advect_faces_shader.use(SEMI_LAGRANGIAN, source, self._faces.volume, **common, **finish)
+        else:
+            if not self._faces_scratch.allocated:
+                self._faces_scratch.allocate(*self._cells)
+            self._advect_faces_shader.use(PREDICTOR, source, self._faces_scratch.volume, **common)
+            glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+            self._advect_faces_shader.use(CORRECTION, source, self._faces.volume, **common, **finish,
+                                          predictor=self._faces_scratch.volume)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _apply_viscosity(self) -> None:
-        """Diffuse velocity via Jacobi viscosity solver."""
+        """The viscosity on the faces: Jacobi iterations of the implicit diffusion, `viscosity_iter` at 60 fps."""
         if self.settings.velocity.viscosity <= 0.0:
             return
-
         viscosity_dt = self.settings.velocity.viscosity * self._dt       # widths² per second × s
-        iterations = viscosity_iterations(self.settings.velocity.viscosity_iter, self._dt)
-
-        result = self._jacobi_diffusion_shader.solve(
-            self._velocity,
-            self._velocity.back,
-            self._obstacle,
-            self._cell,
-            viscosity_dt,
-            total_iterations=iterations,
-            iterations_per_dispatch=5,
-            has_obstacles=self._has_obstacles
-        )
-        if result is not self._velocity:
-            self._velocity.swap()
-        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        for iterations in self._viscosity_faces_shader.dispatches(viscosity_iterations(self.settings.velocity.viscosity_iter, self._dt)):
+            self._faces.swap()
+            self._viscosity_faces_shader.use(self._faces.back, self._faces.volume, self._obstacle,
+                                             self._cells, self._cell, viscosity_dt, iterations, self._closed,
+                                             self._wall_keep, self._has_obstacles)
+            glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _confine_vorticity(self) -> None:
         """Vorticity confinement: the curl, then its force added to the velocity. The curl alone while only the
@@ -681,6 +718,11 @@ class Fluid3D:
         return (self.settings.wall == WallMode.CLOSED,) * 3
 
     @property
+    def _face_shaders(self) -> tuple[ComputeShader, ...]:
+        return (self._advect_faces_shader, self._viscosity_faces_shader, self._faces_to_centers_shader,
+                self._centers_to_faces_shader)
+
+    @property
     def _wall_keep(self) -> float:
         """The velocity's share along a closed wall kept this step: 0.01 over `slip_time` seconds, 1 at 0 (free-slip)."""
         return self._calculate_dissipation(self._dt, self.settings.slip_time)
@@ -748,7 +790,7 @@ class Fluid3D:
         wall = _WALL_GL[self.settings.wall]
         for volume in (self._temperature, self._temperature_scratch, self._pressure):
             volume.set_wrap(*wall)
-        for volume in (self._velocity, self._temperature, self._pressure, self._velocity_scratch, self._temperature_scratch):
+        for volume in (self._velocity, self._temperature, self._pressure, self._temperature_scratch):
             volume.set_wrap_z(*wall)
         for carrier in (self._simulation_density, self._upscaled_density, self._particle_density):
             carrier.set_walls(wall, wall)

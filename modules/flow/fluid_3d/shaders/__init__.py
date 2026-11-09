@@ -9,7 +9,6 @@ from .sor_pressure_3d import SorPressure3D
 from .pressure_residual_3d import PressureResidual3D
 from .restrict_3d import Restrict3D
 from .prolong_3d import Prolong3D
-from .jacobi_diffusion_3d import JacobiDiffusion3D
 from .vorticity_curl_3d import VorticityCurl3D
 from .vorticity_force_3d import VorticityForce3D
 from .buoyancy_3d import Buoyancy3D
@@ -38,3 +37,9 @@ from .particle_weighted import ParticleWeighted
 from .particle_surface import ParticleSurface
 from .particle_surface_smooth import ParticleSurfaceSmooth
 from .particle_surface_shade import ParticleSurfaceShade
+
+# The velocity on the faces
+from .advect_faces_3d import AdvectFaces3D, SEMI_LAGRANGIAN, PREDICTOR, CORRECTION
+from .faces_to_centers_3d import FacesToCenters3D
+from .centers_to_faces_3d import CentersToFaces3D
+from .viscosity_faces_3d import ViscosityFaces3D

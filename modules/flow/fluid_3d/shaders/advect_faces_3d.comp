@@ -1,0 +1,139 @@
+#version 460 core
+
+/*
+ * AdvectFaces3D - the velocity on the cells' faces carried one step along itself (Bridson, ch. 3).
+ *
+ * One invocation an index: its cell's three faces, each where the index holds one (faces.glsl). Each face is
+ * traced back on its own from the velocity at its place, each component read from its own faces, and its
+ * component read where the trace lands from its own volume. Three modes:
+ *
+ *   0  semi-Lagrangian: the step, with the dissipation, the evaporation, the guard, the top speed and the slip
+ *   1  the MacCormack predictor: the plain step alone, into the scratch faces
+ *   2  the MacCormack correction (Selle et al. 2008): the predictor (uPred) traced forward again gives back
+ *      the source up to the step's error, half of which is added back, bounded by the source's eight faces
+ *      around the backward trace, else the predictor stands; then as mode 0
+ *
+ * A face on a closed wall or with an obstacle's cell on either side is 0 and stays 0. Along a closed wall the
+ * velocity is braked by uWallKeep (the slip); the evaporation and the top speed read the face's full vector,
+ * its other two components from the faces before the step.
+ */
+
+#pragma optionNV(unroll all)
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(binding = 2) uniform sampler3D uObstacle;  // R8 at the cells
+layout(binding = 8) uniform sampler3D uPred;      // mode 2: the predictor's faces
+
+uniform int   uMode;          // 0 semi-Lagrangian, 1 the MacCormack predictor, 2 its correction
+uniform ivec3 uCells;         // the cell counts
+uniform float uCellsPerWidth; // cells a width (cubic cells): a velocity in widths/s × it × dt is cells
+uniform float uTimestep;      // dt * advection_scale
+uniform float uDissipation;   // the fade's multiplier this step
+uniform float uEvaporation;   // widths/s taken off the speed this step
+uniform float uMaxSpeed;      // the top speed (widths/s), bent softly toward from half; 0 no limit
+uniform int   uGuardSlot;     // the velocity's slot in the stage's FiniteGuard; -1 no guard
+uniform ivec3 uClosed;        // per axis, 1 where the walls are closed
+uniform bool  uHasObstacles;
+
+#include "walls.glsl"
+#include "faces.glsl"
+
+layout(std430, binding = 7) buffer FiniteGuard { uint uNonFinite[]; };
+
+bool non_finite(float value) {
+    return (floatBitsToUint(value) & 0x7F800000u) == 0x7F800000u;
+}
+
+float guard(float value) {
+    if (uGuardSlot < 0 || !non_finite(value)) return value;
+    atomicAdd(uNonFinite[uGuardSlot], 1u);
+    return 0.0;
+}
+
+float sample_pred(int c, vec3 p) {
+    vec3 t = p;
+    t[c] += 0.5;
+    t = clamp(t, vec3(0.5), vec3(face_count(c)) - 0.5);
+    return texture(uPred, t / vec3(uCells + 1))[c];
+}
+
+float fetch_pred(int c, ivec3 i) {
+    return texelFetch(uPred, i, 0)[c];
+}
+
+// The speed's limit on component `c`, the face's full vector `v`: the factor its length is scaled by
+float speed_factor(vec3 v) {
+    float speed = length(v);
+    float factor = 1.0;
+    if (uEvaporation > 0.0 && speed > 0.0) {
+        factor = max(speed - uEvaporation, 0.0) / speed;
+        speed *= factor;
+    }
+    if (uMaxSpeed > 0.0) {
+        float knee = 0.5 * uMaxSpeed;
+        if (speed > knee) {
+            float span = uMaxSpeed - knee;
+            factor *= (knee + span * tanh((speed - knee) / span)) / speed;
+        }
+    }
+    return factor;
+}
+
+// Component `c`'s face `i` after the step
+float advect(int c, ivec3 i) {
+    if (held_face(c, i)) return 0.0;
+    float own = face_fetch(c, i);
+    if (uGuardSlot >= 0 && uMode != 1 && non_finite(own)) {
+        atomicAdd(uNonFinite[uGuardSlot], 1u);
+        return 0.0;
+    }
+    vec3 p = face_position(c, i);
+    vec3 v = velocity_at(p);
+    vec3 step = uTimestep * uCellsPerWidth * v;
+    vec3 back = p - step;
+    float result;
+    if (uMode == 2) {
+        float forward = fetch_pred(c, i);
+        result = forward + 0.5 * (own - sample_pred(c, p + step));
+        // the bounds: the source's eight faces of this component around the backward trace
+        vec3 t = back;
+        t[c] += 0.5;
+        ivec3 base = ivec3(floor(t - 0.5));
+        ivec3 count = face_count(c);
+        if (any(lessThan(base, ivec3(0))) || any(greaterThan(base + 1, count - 1))) {
+            result = forward;                       // past a wall: no source to bound it, the predictor stands
+        } else {
+            float lo = 1e30;
+            float hi = -1e30;
+            for (int k = 0; k < 8; k++) {
+                float value = face_fetch(c, base + ivec3(k & 1, (k >> 1) & 1, (k >> 2) & 1));
+                lo = min(lo, value);
+                hi = max(hi, value);
+            }
+            result = (lo > hi || result < lo || result > hi) ? forward : result;
+        }
+    } else {
+        result = face_at(c, back);
+    }
+    if (uMode == 1) return result;              // the predictor: the plain step alone
+    result = guard(result * uDissipation);
+    v[c] = result;
+    result *= speed_factor(v);
+    for (int axis = 0; axis < 3; axis++) {      // the slip: braked along each closed wall it lies against
+        if (axis != c && uClosed[axis] == 1 && (i[axis] == 0 || i[axis] == uCells[axis] - 1)) {
+            result *= uWallKeep;
+        }
+    }
+    return result;
+}
+
+void main() {
+    ivec3 i = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThan(i, uCells))) return;
+    vec3 v = vec3(0.0);
+    for (int c = 0; c < 3; c++) {
+        if (is_face(c, i)) v[c] = advect(c, i);
+    }
+    store_faces(i, v);
+}
