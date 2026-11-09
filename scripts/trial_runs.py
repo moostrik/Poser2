@@ -30,7 +30,12 @@ def changed(preset: dict, changes: list[str]) -> dict:
         for part in parts[1:-1]:
             node = node[part]
         current = node[parts[-1]]
-        node[parts[-1]] = type(current)(value) if not isinstance(current, bool) else value in ('1', 'true', 'True')
+        if isinstance(current, (list, dict)):
+            node[parts[-1]] = json.loads(value)         # a list or a group as JSON: [] or ["M1"]
+        elif isinstance(current, bool):
+            node[parts[-1]] = value in ('1', 'true', 'True')
+        else:
+            node[parts[-1]] = type(current)(value)
     return preset
 
 
