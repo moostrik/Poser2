@@ -379,6 +379,22 @@ read 8 ways. The field advection measured about 3.5% faster at 8 × 4 × 8 (the 
 depth 64 the finest smoothing is 7% slower at 8 × 8 × 8; a grid of 144 or deeper wants the pressure's shaders
 measured again.
 
+## The motion and the bridge
+
+Each pass alone on the stillslowfast frames (`motion_bridge_pass_check.py`, 448 × 800, 4 levels, window 3), two
+runs each:
+
+| Change                                                               | Before   | After    | The result                        |
+|----------------------------------------------------------------------|----------|----------|-----------------------------------|
+| the x/y solve: the current frame and the depth a 16 × 16 tile shares | 0.277 ms | 0.136 ms | read at the texels' exact centers |
+| the depth velocity: the track and its catch-up in one pass           | 0.058    | 0.042    | the same to the bit               |
+
+The motion whole 0.35 → 0.20 ms. The solve read each pixel's 7 × 7 window from the texture again, ten reads a
+sample; the fragment shader read at the rasterizer's interpolated coordinates, a little off the texel centers,
+so one solve differs on 30% of its values by up to 3e-4 uv, and with exact centers on both by 8e-5, the floats'
+last bits the solve amplifies. Not kept: the bandpass's four parts in one pass (0.140 → 0.117 ms), and the
+lowpass's advect fused into its trail, at most 0.005 ms of its 0.076 (its blur, 4 steps of 2 passes, is 0.064).
+
 ## The density at the output's 4K
 
 The upscaled density ([FLUID_3D.md](FLUID_3D.md#the-densitys-detail)): the amount at 2160 × 3840 ×

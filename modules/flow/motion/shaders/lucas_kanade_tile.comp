@@ -1,0 +1,101 @@
+#version 460 core
+
+// Lucas–Kanade, one mip level: refines the displacement so far (uv per frame) by the shift that carries the
+// previous frame, warped by it, onto the current one, solved over a (2·window+1)² window of this level's texels.
+// Run from the coarsest level to the finest, each into a target of its level's size, so every window sits on
+// the level's texel centers; `estimate` is the coarser level's solve, read linear (uv, so it needs no
+// scaling); the coarsest has none (`has_estimate` off) and starts from no motion. With `same_surface`, a sample
+// counts only where its depth is within `tolerance` of the centre's (so the background does not drag a
+// silhouette along, at every level), and `damping` scales with the share kept. The numpy reference is
+// lucas_kanade_flow.lucas_kanade.
+// A 16 × 16 tile of the level's texels a workgroup: the current frame's luminance and the depth around the tile
+// are read once into shared memory, and every window sample reads them there, at the texels' exact centers.
+// The previous frame is read where the estimate warps it, which differs pixel by pixel, so it stays a texture
+// read.
+
+#pragma optionNV(unroll all)
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+layout(binding = 0) uniform sampler2D previous;     // luminance, mipmapped
+layout(binding = 1) uniform sampler2D current;      // luminance, mipmapped
+layout(binding = 2) uniform sampler2D estimate;     // displacement so far, uv per frame (RG), with has_estimate
+layout(binding = 3) uniform sampler2D depth;        // metres (R), 0 where there is none, with same_surface
+layout(rg32f, binding = 0) writeonly uniform image2D uOut;
+
+uniform bool has_estimate;
+uniform int level;
+uniform int window;
+uniform float damping;
+uniform bool same_surface;
+uniform float tolerance;        // m
+
+const int MAX_WINDOW = 4;                       // Patch.NINE, the largest window
+const int HALO = MAX_WINDOW + 1;                // the window and the gradient's one texel beyond it
+const int TILE = 16 + 2 * HALO;
+shared float s_current[TILE][TILE];
+shared float s_depth[TILE][TILE];
+
+void main() {
+    ivec2 size = textureSize(current, level);
+    ivec2 depth_size = textureSize(depth, 0);
+    ivec2 origin = ivec2(gl_WorkGroupID.xy) * 16 - HALO;
+    for (int k = int(gl_LocalInvocationIndex); k < TILE * TILE; k += 256) {
+        ivec2 t = ivec2(k % TILE, k / TILE);
+        ivec2 texel_index = origin + t;
+        s_current[t.y][t.x] = texelFetch(current, clamp(texel_index, ivec2(0), size - 1), level).r;
+        if (same_surface) {
+            vec2 p = (vec2(texel_index) + 0.5) / vec2(size);
+            s_depth[t.y][t.x] = texelFetch(depth, clamp(ivec2(floor(p * vec2(depth_size))), ivec2(0), depth_size - 1), 0).r;
+        }
+    }
+    barrier();
+
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(gid, size))) return;
+    ivec2 c = ivec2(gl_LocalInvocationID.xy) + HALO;
+    vec2 texCoord = (vec2(gid) + 0.5) / vec2(size);
+    vec2 d = has_estimate ? texture(estimate, texCoord).xy : vec2(0.0);
+    float lod = float(level);
+    vec2 texel = 1.0 / vec2(size);
+    vec2 dx = vec2(texel.x, 0.0);
+    vec2 dy = vec2(0.0, texel.y);
+    float center = same_surface ? s_depth[c.y][c.x] : 0.0;
+
+    float sxx = 0.0, sxy = 0.0, syy = 0.0, sxt = 0.0, syt = 0.0;
+    float total = 0.0;
+    float count = 0.0;
+    for (int j = -window; j <= window; j++) {
+        for (int i = -window; i <= window; i++) {
+            ivec2 t = c + ivec2(i, j);
+            vec2 p = texCoord + vec2(i, j) * texel;
+            float w = 1.0;
+            if (center > 0.0) {
+                float sample_depth = s_depth[t.y][t.x];
+                w *= (sample_depth > 0.0 && abs(sample_depth - center) <= tolerance) ? 1.0 : 0.0;
+            }
+            total += w;
+            count += 1.0;
+            vec2 q = p - d;
+            float gx = 0.25 * (s_current[t.y][t.x + 1] - s_current[t.y][t.x - 1]
+                             + textureLod(previous, q + dx, lod).r - textureLod(previous, q - dx, lod).r);
+            float gy = 0.25 * (s_current[t.y + 1][t.x] - s_current[t.y - 1][t.x]
+                             + textureLod(previous, q + dy, lod).r - textureLod(previous, q - dy, lod).r);
+            float gt = s_current[t.y][t.x] - textureLod(previous, q, lod).r;
+            sxx += w * gx * gx;
+            sxy += w * gx * gy;
+            syy += w * gy * gy;
+            sxt += w * gx * gt;
+            syt += w * gy * gt;
+        }
+    }
+    float kept_damping = damping * total / count;
+    sxx += kept_damping;
+    syy += kept_damping;
+    float det = sxx * syy - sxy * sxy;
+    vec2 delta = abs(det) > 1e-12 ? -vec2(syy * sxt - sxy * syt, sxx * syt - sxy * sxt) / det : vec2(0.0);
+    if (any(isnan(delta)) || any(isinf(delta))) delta = vec2(0.0);
+    float reach = float(window + 1);
+    delta = clamp(delta, vec2(-reach), vec2(reach));
+    imageStore(uOut, gid, vec4(d + delta * texel, 0.0, 0.0));
+}

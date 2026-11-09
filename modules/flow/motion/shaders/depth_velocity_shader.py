@@ -4,7 +4,7 @@ One frame of the depth track: the motion toward the camera in view widths per fr
 disparity carried along the motion and corrected by the mean over a window of depth samples.
 """
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+from OpenGL.GL import GL_FALSE, GL_RG32F, GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE_2D, GL_WRITE_ONLY, glActiveTexture, glBindImageTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
 
 from modules.gl import Shader, draw_quad, Texture
 from ...finite_guard import GuardSlot
@@ -12,19 +12,19 @@ from ...finite_guard import GuardSlot
 
 class DepthVelocityShader(Shader):
     """Writes the track: z (view widths per frame), disparity (1/m), its rate (1/m per second) and its
-    anchor (m); or with `catch_up_pass`, the catch-up: the Emas of the miss of the prediction, signed and its size (m)."""
+    anchor (m); and beside it the catch-up: the Emas of the miss of the prediction, signed and its size (m)."""
 
-    def use(self, depth: Texture, track: Texture, catch_up: Texture, catch_up_pass: bool, alpha: float, smooth: float, catch_up_smooth: float,
+    def use(self, depth: Texture, track: Texture, catch_up: Texture, catch_up_out: Texture, alpha: float, smooth: float, catch_up_smooth: float,
             ema: float, motion_floor: float, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
             tolerance: float, dead_zone: float, displacement: Texture | None = None, max_speed: float = 0.0,
             guard: GuardSlot | None = None) -> None:
-        """Correct the track by the new depth, or with `catch_up_pass` write this frame's catch-up.
+        """Correct the track by the new depth into the bound target, and write this frame's catch-up into `catch_up_out`.
 
         Args:
             depth: Depth now (m)
             track: The track the frame before
             catch_up: The catch-up the frame before
-            catch_up_pass: Write the catch-up instead of the track
+            catch_up_out: This frame's catch-up (RG32F), written beside the track
             alpha: Weight of a full window's measurement on the disparity (1 takes it whole)
             smooth: Time the track follows over (ms); 0 takes the measurement whole
             catch_up_smooth: Time it follows over while catching up (ms); 0 is never
@@ -65,7 +65,7 @@ class DepthVelocityShader(Shader):
         glUniform1i(self.get_uniform_loc("displacement"), 2)
         glUniform1i(self.get_uniform_loc("tex2"), 3)
         glUniform1i(self.get_uniform_loc("warp"), int(warp))
-        glUniform1i(self.get_uniform_loc("catch_up_pass"), int(catch_up_pass))
+        glBindImageTexture(0, catch_up_out.tex_id, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RG32F)
         glUniform2f(self.get_uniform_loc("depth_step"), *depth_step)
         glUniform1i(self.get_uniform_loc("window"), window)
         glUniform1f(self.get_uniform_loc("tolerance"), tolerance)

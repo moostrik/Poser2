@@ -49,7 +49,7 @@ a band a depth sample wide reads no z; the player's mask cuts there anyway.
 import math
 
 import numpy as np
-from OpenGL.GL import GL_R16F, GL_R32F, GL_RG32F, GL_RGBA32F
+from OpenGL.GL import GL_R16F, GL_R32F, GL_RG32F, GL_RGBA32F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import BaseSettings, Field
@@ -187,15 +187,15 @@ class DepthVelocity(FlowBase):
         self._step_filter_shader.use(self._raw, step, tolerance if edge is None else edge)
         self._input_fbo.end()
 
-        # both runs read the track and the catch-up of the frame before: first the track, then the catch-up
+        # one pass reads the track and the catch-up of the frame before, and writes both
         self._track.swap()
         self._catch_up.swap()
-        for target, catch_up_pass in ((self._track, False), (self._catch_up, True)):
-            target.begin()
-            self._velocity_shader.use(self._input_fbo, self._track.back, self._catch_up.back, catch_up_pass,
-                                      float(alpha), smooth, catch_up_smooth, float(alpha), motion_floor, max(delta_time, 1e-6), view_span,
-                                      step, window, tolerance, dead_zone, displacement, max_speed, guard)
-            target.end()
+        self._track.begin()
+        self._velocity_shader.use(self._input_fbo, self._track.back, self._catch_up.back, self._catch_up,
+                                  float(alpha), smooth, catch_up_smooth, float(alpha), motion_floor, max(delta_time, 1e-6), view_span,
+                                  step, window, tolerance, dead_zone, displacement, max_speed, guard)
+        self._track.end()
+        glMemoryBarrier(int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT))
 
         self._output_fbo.begin()
         self._threshold_shader.use(self._track, threshold / max(width, 1))     # px as view widths

@@ -17,8 +17,8 @@
 // Catching up, with `catch_up_smoothing` above 0: Emas of the miss of the prediction, signed and its size;
 // where the miss keeps one way (the signed mean as large as the size, over twice the dead zone) and the
 // image moves (the 3×3 displacement past `motion_floor`), the time the track follows over blends from
-// `smoothing` toward `catch_up_smoothing`; and the carry takes each texel's depth a frame on by its rate. Run
-// twice on the same inputs: with `catch_up_pass` it writes this frame's Emas, without it the track.
+// `smoothing` toward `catch_up_smoothing`; and the carry takes each texel's depth a frame on by its rate. One
+// pass writes both: the track into its target, this frame's Emas into uCatchUp.
 // The numpy reference is depth_velocity.track_depth
 
 uniform sampler2D tex0;  // Depth now R (m)
@@ -26,7 +26,7 @@ uniform sampler2D tex1;  // The track the frame before: z, disparity (1/m), rate
 uniform sampler2D tex2;  // The catch-up the frame before: Emas of the miss, signed and its size (m)
 uniform sampler2D displacement;     // uv per frame (RG), with warp
 uniform bool warp;
-uniform bool catch_up_pass;         // Write the catch-up instead of the track
+layout(rg32f, binding = 0) writeonly uniform image2D uCatchUp;     // this frame's catch-up, written beside the track
 uniform vec2 depth_step; // uv between two depth samples
 uniform int window;      // Radius in depth samples
 uniform float tolerance; // Depth further than this is another surface (m)
@@ -105,10 +105,16 @@ bool moving(vec2 size) {
     return largest > motion_floor;
 }
 
-// One frame of the track or its catch-up into fragColor
+// This frame's catch-up, guarded as the track is
+void store_catch_up(vec2 emas) {
+    imageStore(uCatchUp, ivec2(gl_FragCoord.xy), guard(vec4(emas, 0.0, 0.0)));
+}
+
+// One frame of the track into fragColor, its catch-up into uCatchUp
 void step_track() {
     float center = depth_at(texCoord);
     if (center <= 0.0 || view_span <= 0.0) {
+        store_catch_up(vec2(0.0));
         fragColor = vec4(0.0);
         return;
     }
@@ -156,10 +162,7 @@ void step_track() {
         follows = false;
         emas = vec2(0.0);
     }
-    if (catch_up_pass) {
-        fragColor = vec4(emas, 0.0, 0.0);
-        return;
-    }
+    store_catch_up(emas);
     if (!follows) {
         fragColor = vec4(0.0, measurement, 0.0, 1.0 / measurement);
         return;

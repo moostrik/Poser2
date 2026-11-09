@@ -22,14 +22,14 @@ fewer for the same motion), `window` and `threshold`.
 """
 
 import numpy as np
-from OpenGL.GL import GL_RG32F
+from OpenGL.GL import GL_RG32F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import BaseSettings, Field
 from ..port import Port, TextureKind
 from .luminance_frames import LuminanceFrames
 from .patch import Patch
-from .shaders import DisplacementThreshold, LucasKanadeShader
+from .shaders import DisplacementThreshold, LucasKanadeTile
 
 MAX_LEVELS: int = 9     # the most pyramid levels a solve has an Fbo for
 
@@ -52,7 +52,7 @@ class LucasKanadeFlow:
         self._solve: SwapFbo = SwapFbo()            # the displacement as solved, at full size: level 0
         self._levels: list[SwapFbo] = [SwapFbo() for _ in range(1, MAX_LEVELS)]    # levels 1 and up, each at its own size
         self._displacement: Fbo = Fbo()             # with the noise floor taken off
-        self._shader: LucasKanadeShader = LucasKanadeShader()
+        self._tile_shader: LucasKanadeTile = LucasKanadeTile()     # the solve, its window's current frame and depth shared
         self._threshold_shader: DisplacementThreshold = DisplacementThreshold()
 
     @property
@@ -96,7 +96,7 @@ class LucasKanadeFlow:
         for level, fbo in enumerate(self._levels, start=1):
             fbo.allocate(max(width >> level, 1), max(height >> level, 1), GL_RG32F)     # the size of the frames' mip level
         self._displacement.allocate(width, height, GL_RG32F)
-        self._shader.allocate()
+        self._tile_shader.allocate()
         self._threshold_shader.allocate()
         self.reset()
 
@@ -106,7 +106,7 @@ class LucasKanadeFlow:
         for fbo in self._levels:
             fbo.deallocate()
         self._displacement.deallocate()
-        self._shader.deallocate()
+        self._tile_shader.deallocate()
         self._threshold_shader.deallocate()
 
     def reset(self) -> None:
@@ -143,9 +143,8 @@ class LucasKanadeFlow:
         for level in reversed(range(min(s.levels, MAX_LEVELS))):
             target: SwapFbo = solve if level == 0 else self._levels[level - 1]
             target.swap()
-            target.begin()
-            self._shader.use(previous, current, estimate, level, s.window, s.damping, depth, tolerance)     # the coarsest from no motion
-            target.end()
+            self._tile_shader.use(target, previous, current, estimate, level, s.window, s.damping, depth, tolerance)     # the coarsest from no motion
+            glMemoryBarrier(int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT))
             estimate = target
 
 
