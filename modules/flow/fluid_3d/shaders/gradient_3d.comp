@@ -1,109 +1,43 @@
 #version 460 core
 
 /*
- * Gradient3D - Subtract 3D pressure gradient from velocity.
+ * Gradient3D - the pressure's gradient subtracted from the velocity on the cells' faces (faces.glsl): each
+ * face less its two cells' pressure difference over h,
  *
- * v_new = v_old - ∇p
- * ∇p = (∂p/∂x, ∂p/∂y, ∂p/∂z) using central differences.
+ *   u(i) -= (p(i) - p(i - 1)) / h
  *
- * Boundary conditions, by a ghost pressure beyond the domain's last cell:
- *   - A closed wall: the ghost is pCenter (Neumann, ∂p/∂n = 0), and the velocity cannot flow into
- *     the wall (no penetration), as into an obstacle's face
- *   - An open wall: the ghost is 0 (Dirichlet), the pressure escapes
- *   - Interior obstacles: Neumann via pCenter substitution, no penetration
- * The same ghosts as the divergence's and the Jacobi solve's, so the three agree on one wall.
+ * A face on a closed wall or an obstacle's stays 0. On an open wall the cell beyond is the ghost, -p
+ * (walls.glsl), so the pressure is 0 on the wall's face and the face is set by it: the water leaves.
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick of cells, so z neighbors share the cache
 
-// Input textures
-layout(binding = 0) uniform sampler3D uVelocity;   // Current velocity (RGBA16F)
-layout(binding = 1) uniform sampler3D uPressure;    // Pressure field (R16F)
-layout(binding = 2) uniform sampler3D uObstacle;    // Obstacle mask (R8)
+layout(binding = 0) uniform sampler3D uPressure;   // R32F at the cells
+layout(binding = 2) uniform sampler3D uObstacle;   // R8 at the cells
 
-// Output image
-layout(rgba16f, binding = 0) writeonly uniform image3D uResult;
-
-// Parameters
-uniform vec3  uHalfRdxInv;    // (0.5/dx, 0.5/dy, 0.5/dz)
-uniform ivec3 uSize;
-uniform bool  uHasObstacles;   // Skip obstacle logic when no obstacles present
-uniform ivec3 uClosed;         // Per axis, 1 where the domain's walls are closed (solid), 0 where open
+uniform float uRdxInv;        // 1 / h
+uniform ivec3 uCells;
+uniform ivec3 uClosed;
+uniform bool  uHasObstacles;
 
 #include "walls.glsl"
+#include "faces.glsl"
 
 void main() {
-    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
-    if (any(greaterThanEqual(gid, uSize))) return;
-
-    vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
-    vec3 texel = 1.0 / vec3(uSize);
-
-    // Obstacle neighbor flags (default 0.0 = no obstacle)
-    float oR = 0.0, oL = 0.0, oT = 0.0, oB = 0.0, oF = 0.0, oK = 0.0;
-
-    if (uHasObstacles) {
-        // Center obstacle check
-        float obstacle = texture(uObstacle, st).r;
-        if (obstacle > 0.5) {
-            imageStore(uResult, gid, vec4(0.0));
-            return;
-        }
-
-        // Read neighbor obstacle status
-        oR = texture(uObstacle, st + vec3(texel.x, 0.0, 0.0)).r;
-        oL = texture(uObstacle, st - vec3(texel.x, 0.0, 0.0)).r;
-        oT = texture(uObstacle, st + vec3(0.0, texel.y, 0.0)).r;
-        oB = texture(uObstacle, st - vec3(0.0, texel.y, 0.0)).r;
-        oF = texture(uObstacle, st + vec3(0.0, 0.0, texel.z)).r;
-        oK = texture(uObstacle, st - vec3(0.0, 0.0, texel.z)).r;
+    ivec3 i = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThan(i, uCells))) return;
+    vec3 v = vec3(0.0);
+    for (int c = 0; c < 3; c++) {
+        if (!is_face(c, i) || held_face(c, i)) continue;
+        ivec3 left = i;
+        left[c] -= 1;
+        bool right_beyond = i[c] == uCells[c];      // the face on the far wall: its right cell the ghost
+        bool left_beyond = i[c] == 0;               // on the near wall: its left cell the ghost
+        float p_right = right_beyond ? 0.0 : texelFetch(uPressure, i, 0).r;
+        float p_left = left_beyond ? 0.0 : texelFetch(uPressure, left, 0).r;
+        if (right_beyond) p_right = wall_pressure(p_left, c);
+        if (left_beyond) p_left = wall_pressure(p_right, c);
+        v[c] = face_fetch(c, i) - (p_right - p_left) * uRdxInv;
     }
-
-    // Center pressure
-    float pC = texture(uPressure, st).r;
-
-    // Sample pressure at 6 neighbors
-    float pR = texture(uPressure, st + vec3(texel.x, 0.0, 0.0)).r;
-    float pL = texture(uPressure, st - vec3(texel.x, 0.0, 0.0)).r;
-    float pT = texture(uPressure, st + vec3(0.0, texel.y, 0.0)).r;
-    float pB = texture(uPressure, st - vec3(0.0, texel.y, 0.0)).r;
-    float pF = texture(uPressure, st + vec3(0.0, 0.0, texel.z)).r;
-    float pK = texture(uPressure, st - vec3(0.0, 0.0, texel.z)).r;
-
-    // The domain's walls: the ghost beyond the last cell (walls.glsl)
-    if (gid.x == uSize.x - 1) { pR = wall_pressure(pC, 0); oR = float(uClosed.x); }
-    if (gid.x == 0)           { pL = wall_pressure(pC, 0); oL = float(uClosed.x); }
-    if (gid.y == uSize.y - 1) { pT = wall_pressure(pC, 1); oT = float(uClosed.y); }
-    if (gid.y == 0)           { pB = wall_pressure(pC, 1); oB = float(uClosed.y); }
-    if (gid.z == uSize.z - 1) { pF = wall_pressure(pC, 2); oF = float(uClosed.z); }
-    if (gid.z == 0)           { pK = wall_pressure(pC, 2); oK = float(uClosed.z); }
-
-    // Neumann BCs for interior obstacles: use pCenter if neighbor is obstacle
-    pR = mix(pR, pC, step(0.5, oR));
-    pL = mix(pL, pC, step(0.5, oL));
-    pT = mix(pT, pC, step(0.5, oT));
-    pB = mix(pB, pC, step(0.5, oB));
-    pF = mix(pF, pC, step(0.5, oF));
-    pK = mix(pK, pC, step(0.5, oK));
-
-    // Compute gradient
-    vec3 grad = vec3(
-        uHalfRdxInv.x * (pR - pL),
-        uHalfRdxInv.y * (pT - pB),
-        uHalfRdxInv.z * (pF - pK)
-    );
-
-    // Subtract gradient from velocity
-    vec3 vOld = texture(uVelocity, st).xyz;
-    vec3 vNew = vOld - grad;
-
-    // No-penetration: zero velocity component pointing into obstacle neighbors
-    if (oR > 0.5) vNew.x = min(vNew.x, 0.0);
-    if (oL > 0.5) vNew.x = max(vNew.x, 0.0);
-    if (oT > 0.5) vNew.y = min(vNew.y, 0.0);
-    if (oB > 0.5) vNew.y = max(vNew.y, 0.0);
-    if (oF > 0.5) vNew.z = min(vNew.z, 0.0);
-    if (oK > 0.5) vNew.z = max(vNew.z, 0.0);
-
-    imageStore(uResult, gid, vec4(vNew, 0.0));
+    store_faces(i, v);
 }

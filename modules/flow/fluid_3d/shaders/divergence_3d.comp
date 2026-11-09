@@ -1,90 +1,37 @@
 #version 460 core
 
 /*
- * Divergence3D - Compute divergence of 3D velocity field.
+ * Divergence3D - the divergence of the velocity on the cells' faces (faces.glsl): per cell, its six faces'
+ * one-cell differences,
  *
- * div(v) = ∂u/∂x + ∂v/∂y + ∂w/∂z  using central differences.
+ *   div = (u(i+1) - u(i) + v(j+1) - v(j) + w(k+1) - w(k)) / h
  *
- * Boundary conditions, by a ghost value beyond the domain's last cell:
- *   - A closed wall: the ghost's normal component is -vCenter's, so the velocity through the wall's
- *     face, their mean, is 0 (v·n = 0, the solid wall)
- *   - An open wall: the ghost is vCenter (zero gradient), the fluid leaves freely
- *   - Interior obstacles: no-slip via -vCenter substitution
+ * whose divergence of the gradient is the 7-point Laplacian the solvers solve. A face on a closed wall or an
+ * obstacle's is 0, as stored: nothing flows through it. An obstacle's cell has no divergence.
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick of cells, so z neighbors share the cache
 
-// Input textures
-layout(binding = 0) uniform sampler3D uVelocity;   // Velocity field (RGBA16F: xyz = u,v,w)
-layout(binding = 1) uniform sampler3D uObstacle;    // Obstacle mask (R8)
-
-// Output image
+layout(binding = 2) uniform sampler3D uObstacle;   // R8 at the cells
 layout(r16f, binding = 0) writeonly uniform image3D uDivergence;
 
-// Parameters
-uniform vec3  uHalfRdxInv;   // (0.5/dx, 0.5/dy, 0.5/dz) — aspect & depth corrected
-uniform ivec3 uSize;          // Volume dimensions
-uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
-uniform ivec3 uClosed;        // Per axis, 1 where the domain's walls are closed (solid), 0 where open
+uniform float uRdxInv;        // 1 / h, the cubic cell in widths
+uniform ivec3 uCells;
+uniform ivec3 uClosed;
+uniform bool  uHasObstacles;
 
 #include "walls.glsl"
+#include "faces.glsl"
 
 void main() {
-    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
-    if (any(greaterThanEqual(gid, uSize))) return;
-
-    vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
-    vec3 texel = 1.0 / vec3(uSize);
-
-    // Obstacle check
-    if (uHasObstacles) {
-        float obstacle = texture(uObstacle, st).r;
-        if (obstacle > 0.5) {
-            imageStore(uDivergence, gid, vec4(0.0));
-            return;
-        }
+    ivec3 i = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(i, uCells))) return;
+    if (solid_cell(i)) {
+        imageStore(uDivergence, i, vec4(0.0));
+        return;
     }
-
-    // Center velocity
-    vec3 vC = texture(uVelocity, st).xyz;
-
-    // Sample 6 neighbors
-    vec3 vR = texture(uVelocity, st + vec3(texel.x, 0.0, 0.0)).xyz;
-    vec3 vL = texture(uVelocity, st - vec3(texel.x, 0.0, 0.0)).xyz;
-    vec3 vT = texture(uVelocity, st + vec3(0.0, texel.y, 0.0)).xyz;
-    vec3 vB = texture(uVelocity, st - vec3(0.0, texel.y, 0.0)).xyz;
-    vec3 vF = texture(uVelocity, st + vec3(0.0, 0.0, texel.z)).xyz;  // Front (+z)
-    vec3 vK = texture(uVelocity, st - vec3(0.0, 0.0, texel.z)).xyz;  // Back  (-z)
-
-    // The domain's walls: the ghost beyond the last cell (walls.glsl)
-    if (gid.x == uSize.x - 1) vR = wall_velocity(vC, 0);
-    if (gid.x == 0)           vL = wall_velocity(vC, 0);
-    if (gid.y == uSize.y - 1) vT = wall_velocity(vC, 1);
-    if (gid.y == 0)           vB = wall_velocity(vC, 1);
-    if (gid.z == uSize.z - 1) vF = wall_velocity(vC, 2);
-    if (gid.z == 0)           vK = wall_velocity(vC, 2);
-
-    // No-slip boundary: if neighbor is interior obstacle, use -vCenter
-    if (uHasObstacles) {
-        float oR = texture(uObstacle, st + vec3(texel.x, 0.0, 0.0)).r;
-        float oL = texture(uObstacle, st - vec3(texel.x, 0.0, 0.0)).r;
-        float oT = texture(uObstacle, st + vec3(0.0, texel.y, 0.0)).r;
-        float oB = texture(uObstacle, st - vec3(0.0, texel.y, 0.0)).r;
-        float oF = texture(uObstacle, st + vec3(0.0, 0.0, texel.z)).r;
-        float oK = texture(uObstacle, st - vec3(0.0, 0.0, texel.z)).r;
-
-        vR = mix(vR, -vC, step(0.5, oR));
-        vL = mix(vL, -vC, step(0.5, oL));
-        vT = mix(vT, -vC, step(0.5, oT));
-        vB = mix(vB, -vC, step(0.5, oB));
-        vF = mix(vF, -vC, step(0.5, oF));
-        vK = mix(vK, -vC, step(0.5, oK));
-    }
-
-    // Divergence: ∂u/∂x + ∂v/∂y + ∂w/∂z
-    float div = uHalfRdxInv.x * (vR.x - vL.x)
-              + uHalfRdxInv.y * (vT.y - vB.y)
-              + uHalfRdxInv.z * (vF.z - vK.z);
-
-    imageStore(uDivergence, gid, vec4(div, 0.0, 0.0, 0.0));
+    float div = face_fetch(0, i + ivec3(1, 0, 0)) - face_fetch(0, i)
+              + face_fetch(1, i + ivec3(0, 1, 0)) - face_fetch(1, i)
+              + face_fetch(2, i + ivec3(0, 0, 1)) - face_fetch(2, i);
+    imageStore(uDivergence, i, vec4(div * uRdxInv, 0.0, 0.0, 0.0));
 }

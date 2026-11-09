@@ -9,7 +9,7 @@ its edge) and a cube of fully dyed density beside its center, no fade, no evapor
 `--seconds`. Each second it prints, per advection, the swirl kept (the mean speed over its start), the density's
 total and peak (the compression: water squeezed or stretched gathers or thins it), its edge (the 99.5% gradient
 over the max, per texel) and the floor: the share of a cell's flux its faces leave unbalanced after the
-projection, mean over the cells inside, by the grid's own stencil.
+projection, mean over the cells inside, by the grid's own stencil (the faces' where the fluid has them).
 
 Settings can be changed by path: `--set velocity.vorticity=0.3`.
 
@@ -153,6 +153,21 @@ def floor(v: np.ndarray) -> float:
     return float(net[moving].sum() / max(float(total[moving].sum()), 1e-12))
 
 
+def face_floor(faces: np.ndarray) -> float:
+    """The floor on the staggered grid: `faces` (depth + 1, height + 1, width + 1, 4), a texel's x, y, z the faces
+    on its cell's left, bottom and front; per cell its six faces' imbalance over their summed size."""
+    f = faces.astype(np.float32)
+    x0, x1 = f[:-1, :-1, :-1, 0], f[:-1, :-1, 1:, 0]
+    y0, y1 = f[:-1, :-1, :-1, 1], f[:-1, 1:, :-1, 1]
+    z0, z1 = f[:-1, :-1, :-1, 2], f[1:, :-1, :-1, 2]
+    net = np.abs(x1 - x0 + y1 - y0 + z1 - z0)
+    total = np.abs(x0) + np.abs(x1) + np.abs(y0) + np.abs(y1) + np.abs(z0) + np.abs(z1)
+    inner = (slice(1, -1),) * 3
+    net, total = net[inner], total[inner]
+    moving = total > 1e-3 * float(total.max())
+    return float(net[moving].sum() / max(float(total[moving].sum()), 1e-12))
+
+
 def edge(alpha: np.ndarray) -> float:
     """The density's edge: the 90% of its gradient's size per texel over its max, among the texels it dyes
     (above 1% of its max), 0.5 for a cube's sharp step."""
@@ -184,8 +199,9 @@ def run_swirl(advection: Advection, seconds: float, overrides: list[str]) -> lis
             v = v.astype(np.float32)
             alpha = a[..., 3].astype(np.float32)
             speed = float(np.linalg.norm(v[..., :3], axis=-1).mean())
-            rows.append((i / FPS, speed / start_speed, float(alpha.sum()), float(alpha.max()), edge(alpha),
-                         floor(v) if i else float('nan')))
+            faces = fluid._faces.volume.read_to_numpy() if hasattr(fluid, '_faces') else None
+            unbalanced = (face_floor(faces) if faces is not None else floor(v)) if i else float('nan')
+            rows.append((i / FPS, speed / start_speed, float(alpha.sum()), float(alpha.max()), edge(alpha), unbalanced))
         fluid.update(1.0 / FPS)
     fluid.deallocate()
     return rows

@@ -74,8 +74,9 @@ _WALL_GL: dict = {
     WallMode.CLOSED: (GL_CLAMP_TO_EDGE,   (0.0, 0.0, 0.0, 0.0)),
 }
 
-FLUID_PASSES: tuple[str, ...] = ('centers to faces', 'advect velocity', 'viscosity', 'faces to centers', 'vorticity',
-                                 'advect temperature', 'buoyancy', 'pressure', 'density', 'composite')     # a step's passes, each a GPU timer
+FLUID_PASSES: tuple[str, ...] = ('scaffold to faces', 'advect velocity', 'viscosity', 'scaffold to centers', 'vorticity',
+                                 'advect temperature', 'buoyancy', 'scaffold to faces 2', 'pressure', 'faces to centers',
+                                 'density', 'composite')     # a step's passes, each a GPU timer
 DRAG_FLOOR: float = 0.02    # widths/s: the body's speed below which it drags nothing, so a dead trail pulls nothing toward 0
 
 import logging
@@ -472,14 +473,16 @@ class Fluid3D:
         self._gpu_timer.begin()
 
         # Simulation steps, each its own GPU timer inside the step's
-        self._timed('centers to faces', self._centers_to_faces)
+        self._timed('scaffold to faces', self._centers_to_faces)
         self._timed('advect velocity', self._advect_velocity)
         self._timed('viscosity', self._apply_viscosity)
-        self._timed('faces to centers', self._faces_to_centers)
+        self._timed('scaffold to centers', self._faces_to_centers)
         self._timed('vorticity', self._confine_vorticity)
         self._timed('advect temperature', self._advect_temperature)
         self._timed('buoyancy', self._apply_buoyancy)
+        self._timed('scaffold to faces 2', self._centers_to_faces)
         self._timed('pressure', self._enforce_incompressibility)
+        self._timed('faces to centers', self._faces_to_centers)
         self._timed('density', self._advect_density)
         self._timed('composite', self._composite_output)
 
@@ -650,14 +653,9 @@ class Fluid3D:
         """Pressure projection (divergence → Jacobi solve → gradient subtraction), the three passes on one set
         of walls, closed or open by `wall`."""
         closed: tuple[bool, bool, bool] = self._closed
-        # a. Compute divergence
-        self._divergence_shader.use(
-            self._velocity,
-            self._obstacle,
-            self._divergence_vol,
-            self._cell,
-            has_obstacles=self._has_obstacles, closed=closed
-        )
+        # a. The divergence, per cell from its six faces
+        self._divergence_shader.use(self._faces.volume, self._obstacle, self._divergence_vol,
+                                    self._cell, has_obstacles=self._has_obstacles, closed=closed)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
         # b. Solve Poisson equation for pressure, by the solver picked
@@ -685,16 +683,10 @@ class Fluid3D:
                 self._pressure.swap()
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-        # c. Subtract pressure gradient from velocity
-        self._velocity.swap()
-        self._gradient_shader.use(
-            self._velocity.back,
-            self._pressure,
-            self._obstacle,
-            self._velocity,
-            self._cell,
-            has_obstacles=self._has_obstacles, closed=closed
-        )
+        # c. The pressure's gradient subtracted from the faces
+        self._faces.swap()
+        self._gradient_shader.use(self._faces.back, self._pressure, self._obstacle, self._faces.volume,
+                                  self._cell, has_obstacles=self._has_obstacles, closed=closed)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _advect_density(self) -> None:

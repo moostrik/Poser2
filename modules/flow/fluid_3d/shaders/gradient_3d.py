@@ -1,53 +1,38 @@
-"""Gradient3D - Subtract 3D pressure gradient from velocity."""
+"""Gradient3D - the pressure's gradient subtracted from the velocity on the cells' faces."""
 from __future__ import annotations
 
-from OpenGL.GL import GL_RGBA16F, glUniform1i, glUniform3f, glUniform3i, glUseProgram
+from OpenGL.GL import glUniform1f, glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
+from .face_binding import bind_faces, bind_face_writes
 
 
 class Gradient3D(ComputeShader):
-    """Subtract 3D pressure gradient from velocity (projection step)."""
+    """Each face less its two cells' pressure difference over h (the projection's last pass)."""
 
     WORKGROUP_SIZE_X = 8
     WORKGROUP_SIZE_Y = 8
     WORKGROUP_SIZE_Z = 4
 
-    def __init__(self) -> None:
-        super().__init__()
-
-    def use(self, velocity: Texture3D, pressure: Texture3D, obstacle: Texture3D,
-            result_out: Texture3D,
-            cell: float,
-            has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True)) -> None:
-        """Subtract pressure gradient: v_new = v_old - grad(p).
+    def use(self, source: Texture3D, pressure: Texture3D, obstacle: Texture3D, result: Texture3D,
+            cell: float, has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True)) -> None:
+        """v_new = v_old - grad(p) on the faces.
 
         Args:
-            velocity: Current 3D velocity field (RGBA16F)
-            pressure: 3D pressure field (R16F)
-            obstacle: 3D obstacle mask (R8)
-            result_out: Output corrected velocity (RGBA16F)
+            source: The faces before (`FaceVelocity`)
+            pressure: The pressure (R32F at the cells)
+            obstacle: The obstacle mask (R8 at the cells)
+            result: The faces written
             cell: The cubic cell's size in widths
             has_obstacles: Whether obstacle logic is active
-            closed: Per axis, whether the domain's walls are closed (solid) or open
+            closed: Per axis, whether the walls are closed
         """
         if not self.allocated or not self.shader_program:
             return
-
         glUseProgram(self.shader_program)
-
-        self.bind_texture_3d(0, velocity, "uVelocity")
-        self.bind_texture_3d(1, pressure, "uPressure")
-        self.bind_texture_3d(2, obstacle, "uObstacle")
-
-        self.bind_image_3d_write(0, result_out, GL_RGBA16F)
-
-        dx = cell                         # cubic cells, in widths
-        dy = dz = cell
-        glUniform3f(self.get_uniform_loc("uHalfRdxInv"), 0.5 / dx, 0.5 / dy, 0.5 / dz)
-        glUniform3i(self.get_uniform_loc("uSize"),
-                    result_out.width, result_out.height, result_out.depth)
-        glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
-        glUniform3i(self.get_uniform_loc("uClosed"), *(int(c) for c in closed))
-
-        self.dispatch(result_out.width, result_out.height, result_out.depth)
+        cells = (pressure.width, pressure.height, pressure.depth)
+        bind_faces(self, source, cells, closed, has_obstacles, obstacle)
+        bind_face_writes(self, result)
+        self.bind_texture_3d(0, pressure, "uPressure")
+        glUniform1f(self.get_uniform_loc("uRdxInv"), 1.0 / cell)
+        self.dispatch(cells[0] + 1, cells[1] + 1, cells[2] + 1)
