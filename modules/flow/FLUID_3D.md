@@ -69,11 +69,8 @@ advection destroyed added back, never energy created) with a gain above 1 for th
   unstable at the walls was the curl and the confinement reading a no-slip wall the projection does not
   have; the open walls' non-finite values were the multigrid putting an open wall's 0 in a different place
   on each level. Both measured gone.
-- **Partial slip, an option, next.** Navier slip models the layer along a wall a coarse grid cannot
-  resolve, so it suits our grid (no-slip would need that layer resolved): the water along a wall slows
-  over a time, seconds to 1%, 0 free-slip (the default). It changes only the tangential velocity in the
-  rule's ghost: the pressure's condition stays, so curl, confinement and pressure still agree. It makes a
-  wall curl in proportion to its braking, which the confinement amplifies.
+- **Partial slip**: built, `slip_time` beside `wall`, 0 free-slip (the default) ([The walls](#the-walls)).
+  Measured stable; how it looks is to judge at the app.
 
 ### 4. The water looks too fast
 
@@ -223,11 +220,28 @@ last mirrors it:
 
 | | closed | open |
 |---|---|---|
-| the velocity | its component through the wall turned, along it the same: the face carries nothing, no shear | the same: it leaves as it came |
+| the velocity | its component through the wall turned, along it (2k − 1) of it: the face carries nothing through, k along | the same: it leaves as it came |
 | the pressure | the same: no push across | its negative: 0 on the wall's face, on every multigrid level alike |
 | the curl's size, for the confinement | the same: no slope toward the wall | the same |
 
 The gradient also keeps the velocity from pointing into a closed wall, as into an obstacle's face.
+
+A closed wall slips (Navier slip): `slip_time`, the seconds the water along it takes to slow to 1%, 0
+free-slip. It models the layer along the wall a coarse grid cannot resolve, where no-slip would need that
+layer resolved. k = 0.01^(dt / `slip_time`) is the share of the velocity along the wall kept a step: the
+velocity's advection multiplies the tangential velocity of the cells against a closed wall by it, and the
+curl's ghost carries (2k − 1) of it, so the curl reads the shear the braking makes. Only the tangential
+velocity changes; the pressure's condition stays, so the projection, curl and confinement still agree.
+Measured as below, MacCormack, wall band → inside at 12 s:
+
+| Run                  | free-slip       | `slip_time` 2   | `slip_time` 0.5 |
+|----------------------|-----------------|-----------------|-----------------|
+| vorticity 1.93 (SL)  | 0.023 → 0.011   | 0.004 → 0.007   |                 |
+| vorticity 1.93 (MC)  | 0.018 → 0.010   | 0.011 → 0.010   |                 |
+| vorticity 5 (MC)     | 0.015 → 0.021   |                 | 0.008 → 0.021   |
+
+No run made a non-finite value. A slipping wall makes a curl in proportion to its braking, which the
+confinement amplifies; at vorticity 5 and `slip_time` 0.5 it stays bounded.
 
 The curl and the confinement once read the textures' border of 0 instead: a wall the water slid along
 read as a shear, a curl no wall has, and the confinement pushed along the wall and made it bigger the

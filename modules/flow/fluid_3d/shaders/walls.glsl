@@ -1,11 +1,15 @@
 // The box's walls: one rule for every pass that reads beyond the box's edge, included where it reads (`#include
 // "walls.glsl"`). Per axis a wall is closed or open (`WallMode`, uClosed 1 or 0):
-//   closed  solid and free-slip, the textbook's (Bridson): nothing passes through, the water slides along
+//   closed  solid: nothing passes through; the water slides along freely (free-slip, the textbook's,
+//           Bridson), or slowed over `slip_time` (Navier slip, the layer along the wall a coarse grid
+//           cannot resolve, modelled: uWallKeep, the share of the velocity along the wall kept a step)
 //   open    the water leaves: the pressure 0 on the wall's face, the velocity carried out unchanged
 // A value beyond the wall is a ghost cell's, mirrored from the cell inside: the projection, the curl and the
 // confinement read the same wall, so none of them sees one the others do not.
 //
 // Needs: uniform ivec3 uClosed;  (per axis, 1 closed)
+
+uniform float uWallKeep = 1.0;  // the share of the velocity along a closed wall kept a step; 1 free-slip
 
 // Whether `cell` lies beyond the box on `axis`
 bool beyond(ivec3 cell, ivec3 size, int axis) {
@@ -20,10 +24,25 @@ float wall_pressure(float p, int axis) {
 }
 
 // The velocity beyond the wall on `axis`, the cell inside moving `v`: closed, its component through the wall
-// turned, so the face between them carries nothing, and along the wall the same, so the water slides with no
-// shear (free-slip); open, the same (zero gradient), so it leaves as it came
+// turned, so the face between them carries nothing, and along the wall (2 keep - 1) of it, so the face moves
+// with the share the wall keeps: all of it free-slip (no shear), none with the water held; open, the same
+// (zero gradient), so it leaves as it came
 vec3 wall_velocity(vec3 v, int axis) {
     if (uClosed[axis] == 0) return v;
-    v[axis] = -v[axis];
+    float normal = -v[axis];
+    v *= 2.0 * uWallKeep - 1.0;
+    v[axis] = normal;
+    return v;
+}
+
+// The velocity of `cell`, slowed along each closed wall it lies against by the share the wall keeps a step
+vec3 slip_along_walls(vec3 v, ivec3 cell, ivec3 size) {
+    for (int axis = 0; axis < 3; axis++) {
+        if (uClosed[axis] == 1 && (cell[axis] == 0 || cell[axis] == size[axis] - 1)) {
+            float normal = v[axis];
+            v *= uWallKeep;
+            v[axis] = normal;
+        }
+    }
     return v;
 }

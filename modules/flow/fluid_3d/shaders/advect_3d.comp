@@ -33,6 +33,9 @@ uniform ivec3 uSize;          // Volume dimensions (width, height, depth)
 uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
 uniform float uMaxSpeed;      // The velocity's top speed (widths/s), bent softly toward from half; 0 no limit
 uniform int   uGuardSlot;     // The field's slot in the stage's FiniteGuard; -1 no guard
+uniform ivec3 uClosed;        // Per axis, 1 where the domain's walls are closed
+
+#include "walls.glsl"
 
 // The stage's non-finite counts (FiniteGuard, GUARD_BINDING)
 layout(std430, binding = 7) buffer FiniteGuard { uint uNonFinite[]; };
@@ -113,5 +116,6 @@ void main() {
     }
 
     result = limit_speed(guard(result));     // the velocity's: a non-finite value 0, then its top speed
+    result.xyz = slip_along_walls(result.xyz, gid, uSize);     // uWallKeep 1 for every other field
     imageStore(uResult, gid, result);
 }

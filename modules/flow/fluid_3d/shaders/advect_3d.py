@@ -28,7 +28,8 @@ class Advect3D(ComputeShader):
                aspect: float, z_extent: float, timestep: float, dissipation: float,
                internal_format: int = GL_RGBA16F,
                has_obstacles: bool = True, evaporation: float = 0.0, measure: int = 0,
-            max_speed: float = 0.0, guard: GuardSlot | None = None) -> None:
+            max_speed: float = 0.0, guard: GuardSlot | None = None,
+            closed: tuple[bool, bool, bool] = (True, True, True), wall_keep: float = 1.0) -> None:
         """Advect from source_read into result_write (separate read/write buffers).
 
         Use this for ping-pong: read from back buffer, write to front buffer.
@@ -48,6 +49,8 @@ class Advect3D(ComputeShader):
             measure: How the size is read: 0 a premultiplied density's alpha, 1 a vector's length, 2 |r|
             max_speed: The velocity's top speed (widths/s), bent softly toward from half; 0 no limit
             guard: The field's slot in its stage's FiniteGuard: a non-finite value 0 and counted; None no guard
+            closed: Per axis, whether the box's walls are closed (walls.glsl)
+            wall_keep: The velocity's share along a closed wall kept this step (slip_time's); 1 free-slip, every other field
         """
         if not self.allocated or not self.shader_program:
             return
@@ -71,6 +74,8 @@ class Advect3D(ComputeShader):
         glUniform1f(self.get_uniform_loc("uEvaporation"), evaporation)
         glUniform1i(self.get_uniform_loc("uMeasure"), measure)
         glUniform1f(self.get_uniform_loc("uMaxSpeed"), max_speed)
+        glUniform3i(self.get_uniform_loc("uClosed"), *(int(c) for c in closed))
+        glUniform1f(self.get_uniform_loc("uWallKeep"), wall_keep)
         if guard is not None:
             guard.use(self.get_uniform_loc("uGuardSlot"))
         else:

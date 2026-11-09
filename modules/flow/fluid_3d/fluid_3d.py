@@ -484,7 +484,7 @@ class Fluid3D:
 
     def _advect_field(self, field: SwapTexture3D, scratch: Texture3D, velocity: Texture3D | None, step: float,
                       dissipation: float, internal_format: int, max_speed: float = 0.0,
-                      evaporation: float = 0.0, measure: int = 0, guard: str = '') -> None:
+                      evaporation: float = 0.0, measure: int = 0, guard: str = '', wall_keep: float = 1.0) -> None:
         """Carry `field` one step along the velocity (`velocity`, or the field's own previous buffer for the
         velocity's self-advection), by `settings.advection`; its size taken down by `evaporation`, read by
         `measure` (0 a density's alpha, 1 a vector's length, 2 |r|); `guard` the field's name in the guard,
@@ -492,7 +492,7 @@ class Fluid3D:
         if self._advection.carry(self.settings.advection, field, scratch, velocity, self._obstacle, self._aspect,
                                  self._z_extent, step, dissipation, internal_format, self._has_obstacles,
                                  evaporation=evaporation, max_speed=max_speed, measure=measure,
-                                 guard=self._guard_slot(guard)):
+                                 guard=self._guard_slot(guard), closed=self._closed, wall_keep=wall_keep):
             self._apply_wall_modes()
 
     def _advect_velocity(self) -> None:
@@ -502,7 +502,7 @@ class Fluid3D:
         self._advect_field(self._velocity, self._velocity_scratch, None, advect_step, dissipation, GL_RGBA16F,
                            max_speed=self.settings.velocity.max_speed,
                            evaporation=self._evaporation(self._dt, self.settings.velocity.evaporation_time), measure=1,
-                           guard='velocity')
+                           guard='velocity', wall_keep=self._wall_keep)
 
     def _apply_viscosity(self) -> None:
         """Diffuse velocity via Jacobi viscosity solver."""
@@ -533,7 +533,7 @@ class Fluid3D:
         if not confining:
             if self._needs_curl:
                 self._vorticity_curl_shader.use(self._velocity, self._obstacle, self._curl_vol, self._cell, 1.0,
-                                                has_obstacles=self._has_obstacles, closed=self._closed)
+                                                has_obstacles=self._has_obstacles, closed=self._closed, wall_keep=self._wall_keep)
                 glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
             return
 
@@ -548,7 +548,8 @@ class Fluid3D:
             self._cell,
             vorticity_radius,
             has_obstacles=self._has_obstacles,
-            closed=self._closed
+            closed=self._closed,
+            wall_keep=self._wall_keep
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
@@ -678,6 +679,11 @@ class Fluid3D:
     def _closed(self) -> tuple[bool, bool, bool]:
         """Per axis, whether the box's walls are closed (`wall`), as every pass reading beyond the box takes them."""
         return (self.settings.wall == WallMode.CLOSED,) * 3
+
+    @property
+    def _wall_keep(self) -> float:
+        """The velocity's share along a closed wall kept this step: 0.01 over `slip_time` seconds, 1 at 0 (free-slip)."""
+        return self._calculate_dissipation(self._dt, self.settings.slip_time)
 
     @property
     def _needs_curl(self) -> bool:

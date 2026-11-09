@@ -19,7 +19,8 @@ class VorticityCurl3D(ComputeShader):
     def use(self, velocity: Texture3D, obstacle: Texture3D,
             curl_out: Texture3D,
             cell: float,
-            radius: float, has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True)) -> None:
+            radius: float, has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True),
+            wall_keep: float = 1.0) -> None:
         """Compute 3D velocity curl.
 
         Args:
@@ -30,6 +31,7 @@ class VorticityCurl3D(ComputeShader):
             radius: Curl sampling radius in texels
             has_obstacles: Whether obstacle logic is active
             closed: Per axis, whether the box's walls are closed (walls.glsl)
+            wall_keep: The velocity's share along a closed wall kept a step; 1 free-slip
         """
         if not self.allocated or not self.shader_program:
             return
@@ -53,5 +55,6 @@ class VorticityCurl3D(ComputeShader):
                     curl_out.width, curl_out.height, curl_out.depth)
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
         glUniform3i(self.get_uniform_loc("uClosed"), *(int(c) for c in closed))
+        glUniform1f(self.get_uniform_loc("uWallKeep"), wall_keep)
 
         self.dispatch(curl_out.width, curl_out.height, curl_out.depth)

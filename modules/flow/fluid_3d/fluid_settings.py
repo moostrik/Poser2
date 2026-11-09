@@ -180,7 +180,8 @@ class Fluid3DSettings(BaseSettings):
     # ---- The guard, how the fields are carried and walled, then the box (multiples of 32) ----
     guard: Field[bool]              = Field(True,                                       description="Set non-finite values to 0, count and log them; off once the fluid is stable")
     advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the fields are carried: MacCormack keeps swirls and edges, at about twice the reads")
-    wall: Field[WallMode]           = Field(WallMode.CLOSED,                            description="Every side of every field. Closed: solid, it reflects. Open: it absorbs")
+    wall: Field[WallMode]           = Field(WallMode.CLOSED,                            newline=True, description="Every side of every field. Closed: solid, the water slides along. Open: it leaves")
+    slip_time: Field[float]         = Field(0.0,    min=0.0,    max=60.0,   step=0.1,   description="Seconds the water along a closed wall takes to slow to 1%; 0 = free-slip")
     width: Field[int]               = Field(256,    min=32,     max=4096,   step=32,    newline=True, description="Simulation grid width")
     height: Field[int]              = Field(448,    min=32,     max=4096,   step=32,    description="Simulation grid height")
     depth: Field[int]               = Field(128,    min=4,      max=256,    step=4,     description="Simulation grid depth in z; the cells are cubic, so the box is depth / width deep")

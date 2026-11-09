@@ -33,18 +33,20 @@ class FieldAdvection:
     def carry(self, advection: Advection, field: SwapTexture3D, scratch: Texture3D, velocity: Texture3D | None,
               obstacle: Texture3D, aspect: float, z_extent: float, step: float, dissipation: float,
               internal_format: int, has_obstacles: bool, evaporation: float = 0.0,
-              max_speed: float = 0.0, measure: int = 0, guard: GuardSlot | None = None) -> bool:
+              max_speed: float = 0.0, measure: int = 0, guard: GuardSlot | None = None,
+              closed: tuple[bool, bool, bool] = (True, True, True), wall_keep: float = 1.0) -> bool:
         """Carry `field` one step along `velocity` (None: the field's own previous buffer, the velocity's
         self-advection). Semi-Lagrangian into the field; or its step into `scratch` as the predictor and the
         MacCormack correction into the field; on the step's result `guard` (a non-finite value 0 and counted) and
-        `max_speed`, the velocity's top speed. Returns whether `scratch` was (re)allocated, so its owner sets its walls."""
+        `max_speed`, the velocity's top speed, and `wall_keep`, its share along a closed wall kept. Returns whether `scratch` was (re)allocated, so its owner sets its walls."""
         field.swap()
         source: Texture3D = field.back
         along: Texture3D = velocity if velocity is not None else source
         if advection != Advection.MACCORMACK:
             self._advect_shader.advect(source, field, along, obstacle, aspect, z_extent, step, dissipation,
                                        internal_format=internal_format, has_obstacles=has_obstacles,
-                                       evaporation=evaporation, max_speed=max_speed, measure=measure, guard=guard)
+                                       evaporation=evaporation, max_speed=max_speed, measure=measure, guard=guard,
+                                       closed=closed, wall_keep=wall_keep)
             glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
             return False
         allocated: bool = False
@@ -57,6 +59,7 @@ class FieldAdvection:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._maccormack_shader.use(source, scratch, field, along, obstacle, aspect, z_extent, step, dissipation,
                                     internal_format=internal_format, has_obstacles=has_obstacles,
-                                    evaporation=evaporation, max_speed=max_speed, measure=measure, guard=guard)
+                                    evaporation=evaporation, max_speed=max_speed, measure=measure, guard=guard,
+                                    closed=closed, wall_keep=wall_keep)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         return allocated
