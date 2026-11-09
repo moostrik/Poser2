@@ -54,7 +54,7 @@ class WindowSettings(BaseSettings):
     y: Field[int] =               Field(80)
     width: Field[int] =           Field(1920)
     height: Field[int] =          Field(1000)
-    default_placement: Field[bool] = Field(False, widget=Widget.button, description="Place the window on monitor 0 at 20, 0, 1280 × 720")
+    default_placement: Field[bool] = Field(False, widget=Widget.button, description="Place the window on monitor 0 at 20, 40, 1280 × 720")
     secondary_list: Field[list[MonitorId]] = Field([MonitorId.M0], widget=Widget.order, newline=True)
     secondary_fullscreen: Field[bool] =       Field(True)
     fullscreen_mode: Field[FullscreenMode] = Field(FullscreenMode.WINDOWED)
@@ -74,7 +74,7 @@ class WindowManager():
     _MIN_VISIBLE_SHARE = 0.5  # share of the window that must be on the monitors at startup, else the default placement
     # The default placement: monitor 0, relative to it
     _DEFAULT_X = 20
-    _DEFAULT_Y = 0
+    _DEFAULT_Y = 40
     _DEFAULT_WIDTH = 1280
     _DEFAULT_HEIGHT = 720
 
