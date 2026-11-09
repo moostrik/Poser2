@@ -32,9 +32,10 @@ from .visualization import Visualizer, histogram_grid, histogram_volume_grid, St
 # Shared by the 2D and 3D fluid
 from .time_step import TimeStep, TimeStepMode, hold_tick, viscosity_iterations, MAX_STEP, REFERENCE_STEP
 from .wall_mode import WallMode
+from .finite_guard import FiniteGuard, FiniteGuardSettings, GuardSlot, guard_report
 
 # 2D fluid simulation
 from .fluid_2d import Fluid2D, Fluid2DSettings
 
 # 3D fluid simulation
-from .fluid_3d import Fluid3D, Fluid3DSettings, CompositeSettings, Advection, ParticleDraw, Overlap, DRAG_FLOOR, drag_share, drag_gate, drag_velocity_step, swirl_noise
+from .fluid_3d import Fluid3D, soft_limit, Fluid3DSettings, CompositeSettings, Advection, ParticleDraw, Overlap, DRAG_FLOOR, drag_share, drag_gate, drag_velocity_step, swirl_noise

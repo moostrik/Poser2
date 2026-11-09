@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 
 from modules.gl import Texture, Texture3D
+from ..finite_guard import GuardSlot
 from ..port import Port
 from .fluid_settings import Advection
 from .shaders import CompositeLight, InjectMode
@@ -29,6 +30,7 @@ class CarrierStep:
     advection: Advection
     curl: Texture3D | None = None   # the velocity's curl (1/s), while the turbulence needs it
     cell: float = 0.0               # the grid's cubic cell (widths)
+    guard: GuardSlot | None = None  # the density's slot in the fluid's FiniteGuard
 
 
 class DensityCarrier(ABC):

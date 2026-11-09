@@ -5,6 +5,7 @@ from enum import IntEnum
 
 from modules.settings import Field, BaseSettings, Group, Widget
 
+from ..finite_guard import FiniteGuardSettings
 from ..wall_mode import WallMode
 from ..time_step import TimeStepMode
 
@@ -106,9 +107,8 @@ class VelocitySettings(BaseSettings):
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=1.0,    color="blue-grey",      description="How far the velocity carries itself per step; 1 = with the water, the physics")
     fade_time: Field[float]         = Field(60.0,   min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the velocity fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds 1 width/s takes to brake to rest, a fixed amount at a time; 0 = off")
-    dampen_threshold: Field[float]  = Field(3.0,    min=0.1,    max=50.0,   color="cyan",           description="Speed above which velocity is dampened (widths/s); a guard just above the fastest body")
-    dampen_time: Field[float]       = Field(0.5,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")
-    vorticity: Field[float]         = Field(0.3,    min=0.0,    max=5.0,    color="purple",         description="Vortex confinement's epsilon, its force epsilon × cell × (N × curl) (Fedkiw 2001)")
+    max_speed: Field[float]         = Field(0.0,    min=0.0,    max=20.0,   step=0.1, color="cyan", description="The water's top speed (widths/s), bent softly toward from half; 0 = no limit, a failsafe")
+    vorticity: Field[float]         = Field(0.3,    min=0.0,    max=100.0,    color="purple",         description="Vortex confinement's epsilon, its force epsilon × cell × (N × curl) (Fedkiw 2001)")
     vorticity_radius: Field[float]  = Field(1.0,    min=1.0,    max=8.0,    color="deep-purple",    description="Curl sampling radius in cells; 1 = the neighbors")
     viscosity: Field[float]         = Field(0.0,    min=0.0,    max=0.01,   step=0.0001, color="indigo", description="Kinematic viscosity (widths² per second); 0 = water at this scale")
     viscosity_iter: Field[int]      = Field(20,     min=1,      max=60,     color="orange",         description="Viscosity solver iterations at 60 fps; fewer at a higher rate, never more")
@@ -192,6 +192,7 @@ class Fluid3DSettings(BaseSettings):
     density: Group[DensitySettings]         = Group(DensitySettings)
     temperature: Group[TemperatureSettings] = Group(TemperatureSettings)
     pressure: Group[PressureSettings]       = Group(PressureSettings)
+    guard: Group[FiniteGuardSettings]       = Group(FiniteGuardSettings)
     upscaled: Group[UpscaledDensitySettings] = Group(UpscaledDensitySettings)
     particles: Group[ParticleSettings]      = Group(ParticleSettings)
     composite: Group[CompositeSettings]     = Group(CompositeSettings)

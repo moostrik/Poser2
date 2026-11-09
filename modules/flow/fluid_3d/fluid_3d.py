@@ -9,8 +9,9 @@ simulation density's) and the particles (`ParticleDensity`), all moved through t
 drawn is the upscaled one where enabled, else the simulation's; the particles are laid over it.
 
 Pipeline:
-    1. Advect velocity (3D self-advection, the dampen on its result; every advection semi-Lagrangian or MacCormack, `advection`)
-    2. (the dampen is the advection's)
+    1. Advect velocity (3D self-advection, on its result the guard and `max_speed`; every advection semi-Lagrangian
+       or MacCormack, `advection`; each field's advection sets its non-finite values to 0 and counts them, `FiniteGuard`)
+    2. (the top speed is the advection's)
     3. Apply viscosity (3D Jacobi diffusion solver)
     4. Confine vorticity (3D curl + confinement force)
     5. Advect temperature
@@ -38,12 +39,13 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_R16F,
 
 from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
-from .fluid_settings import Light, PressureSolver, Fluid3DSettings, PressureSettings, VelocitySettings, ParticleSettings, UpscaledDensitySettings
+from .fluid_settings import Light, PressureSolver, Fluid3DSettings, PressureSettings, ParticleSettings, UpscaledDensitySettings
 from .multigrid_pressure import MultigridPressure
 from ..shaders import AddBoolean
 from ..flow_util import FlowUtil
 from ..port import Port, TextureKind
 from ..time_step import REFERENCE_STEP, TimeStep, viscosity_iterations
+from ..finite_guard import FiniteGuard, GuardSlot
 from .density_carrier import CarrierStep, DensityCarrier
 from .upscaled_density import UpscaledDensity
 from .field_advection import FieldAdvection
@@ -91,6 +93,19 @@ def drag_share(delta_time: float, drag_time: float) -> float:
 def drag_gate(speed: np.ndarray) -> np.ndarray:
     """Where the body is: its speed (widths/s) over the floor, at most 1."""
     return np.minimum(speed / DRAG_FLOOR, 1.0)
+
+
+def soft_limit(velocity: np.ndarray, max_speed: float) -> np.ndarray:
+    """The velocity's top speed, as the advection's `limit_speed`: (..., 3) widths/s untouched up to half of
+    `max_speed`, above it bent smoothly toward it by a tanh, its direction kept; 0 no limit."""
+    if max_speed <= 0.0:
+        return velocity
+    speed: np.ndarray = np.linalg.norm(velocity, axis=-1, keepdims=True)
+    knee: float = 0.5 * max_speed
+    span: float = max_speed - knee
+    bent: np.ndarray = knee + span * np.tanh((speed - knee) / span)
+    scale: np.ndarray = np.where(speed > knee, bent / np.maximum(speed, 1e-12), 1.0)
+    return velocity * scale
 
 
 def drag_velocity_step(velocity: np.ndarray, boundary: np.ndarray, gain: float, share: float, weight: float = 1.0,
@@ -170,6 +185,8 @@ class Fluid3D:
         # The density's carriers: the simulation density always, the upscaled and the particles by their `enabled`;
         # the particles drawn into their own image, then over the volume
         self._advection: FieldAdvection = FieldAdvection()
+        # The fields' non-finite values, set to 0 where each is advected, counted and reported
+        self._guard: FiniteGuard = FiniteGuard('fluid', ('velocity', 'density', 'temperature'))
         self._simulation_density: SimulationDensity = SimulationDensity(self.settings, self._advection)
         self._particle_density: ParticleDensity = ParticleDensity(self.settings)
         self._upscaled_density: UpscaledDensity = UpscaledDensity(self.settings, self._advection, self._simulation_density)
@@ -243,6 +260,7 @@ class Fluid3D:
         self._update_dimensions()
 
         self._advection.allocate()
+        self._guard.allocate()
         self._no_density.allocate(1, 1, 1, GL_RGBA16F)
         self._allocate_simulation_fields()
         self._allocate_densities()
@@ -362,6 +380,7 @@ class Fluid3D:
             scratch.deallocate()
 
         self._advection.deallocate()
+        self._guard.deallocate()
         self._divergence_shader.deallocate()
         self._gradient_shader.deallocate()
         self._jacobi_pressure_shader.deallocate()
@@ -447,6 +466,7 @@ class Fluid3D:
         self._timed('composite', self._composite_output)
 
         self._gpu_timer.end()
+        self._guard.update(dt)
 
     def _timed(self, name: str, work) -> None:
         """`work` inside its pass's GPU timer, `GPU fluid <name>`."""
@@ -463,23 +483,26 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def _advect_field(self, field: SwapTexture3D, scratch: Texture3D, velocity: Texture3D | None, step: float,
-                      dissipation: float, internal_format: int, dampen: tuple[float, float] = (0.0, 1.0),
-                      evaporation: float = 0.0, measure: int = 0) -> None:
+                      dissipation: float, internal_format: int, max_speed: float = 0.0,
+                      evaporation: float = 0.0, measure: int = 0, guard: str = '') -> None:
         """Carry `field` one step along the velocity (`velocity`, or the field's own previous buffer for the
         velocity's self-advection), by `settings.advection`; its size taken down by `evaporation`, read by
-        `measure` (0 a density's alpha, 1 a vector's length, 2 |r|)."""
+        `measure` (0 a density's alpha, 1 a vector's length, 2 |r|); `guard` the field's name in the guard,
+        `max_speed` the velocity's top speed."""
         if self._advection.carry(self.settings.advection, field, scratch, velocity, self._obstacle, self._aspect,
                                  self._z_extent, step, dissipation, internal_format, self._has_obstacles,
-                                 evaporation=evaporation, dampen=dampen, measure=measure):
+                                 evaporation=evaporation, max_speed=max_speed, measure=measure,
+                                 guard=self._guard_slot(guard)):
             self._apply_wall_modes()
 
     def _advect_velocity(self) -> None:
-        """Self-advect, dissipate and dampen the velocity field."""
+        """Self-advect and dissipate the velocity field, its non-finite values 0, its speed under `max_speed`."""
         advect_step = self._dt * self.settings.velocity.advection_scale
         dissipation = self._calculate_dissipation(self._dt, self.settings.velocity.fade_time)
         self._advect_field(self._velocity, self._velocity_scratch, None, advect_step, dissipation, GL_RGBA16F,
-                           dampen=self._dampen_step(),
-                           evaporation=self._evaporation(self._dt, self.settings.velocity.evaporation_time), measure=1)
+                           max_speed=self.settings.velocity.max_speed,
+                           evaporation=self._evaporation(self._dt, self.settings.velocity.evaporation_time), measure=1,
+                           guard='velocity')
 
     def _apply_viscosity(self) -> None:
         """Diffuse velocity via Jacobi viscosity solver."""
@@ -551,7 +574,8 @@ class Fluid3D:
         advect_step = self._dt * self.settings.temperature.advection_scale
         dissipation = self._calculate_dissipation(self._dt, self.settings.temperature.fade_time)
         self._advect_field(self._temperature, self._temperature_scratch, self._velocity, advect_step, dissipation, GL_R16F,
-                           evaporation=self._evaporation(self._dt, self.settings.temperature.evaporation_time), measure=2)
+                           evaporation=self._evaporation(self._dt, self.settings.temperature.evaporation_time), measure=2,
+                           guard='temperature')
 
     def _apply_buoyancy(self) -> None:
         """Apply buoyancy to velocity: the acceleration f = gravity * (κρ − σ(T − T_ambient)) (widths/s²),
@@ -641,22 +665,18 @@ class Fluid3D:
             aspect=self._aspect, z_extent=self._z_extent, dt=self._dt, step=self._dt * self.settings.density.advection_scale,
             dissipation=self._calculate_dissipation(self._dt, self.settings.density.fade_time),
             evaporation=self._evaporation(self._dt, self.settings.density.evaporation_time), advection=self.settings.advection,
-            curl=self._curl_vol if self._needs_curl else None, cell=self._cell)
+            curl=self._curl_vol if self._needs_curl else None, cell=self._cell, guard=self._guard_slot('density'))
         for carrier in self._densities:
             carrier.update(step)
+
+    def _guard_slot(self, field: str) -> GuardSlot | None:
+        """The field's slot in the fluid's guard, None while `guard.enabled` is off or no field is named."""
+        return self._guard.slot(field) if field and self.settings.guard.enabled else None
 
     @property
     def _needs_curl(self) -> bool:
         """Whether the upscaled density's turbulence reads the curl this step."""
         return self.settings.upscaled.enabled and self.settings.upscaled.turbulence > 0.0
-
-    def _dampen_step(self) -> tuple[float, float]:
-        """The velocity's dampen for this step, which its advection applies to the step's result: the threshold
-        (widths/s) and the share of the excess kept, pow(0.01, dt / dampen_time); (0, 1) is none."""
-        velocity: VelocitySettings = self.settings.velocity
-        if velocity.dampen_time <= 0.0:
-            return (0.0, 1.0)
-        return (velocity.dampen_threshold, pow(0.01, self._dt / velocity.dampen_time))
 
     def _composite_output(self) -> None:
         """The volume into the 2D output, the upscaled amount's where enabled, else the simulation's; the particles

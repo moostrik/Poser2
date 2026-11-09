@@ -4,6 +4,7 @@ from __future__ import annotations
 from OpenGL.GL import GL_RGBA16F, glUniform1f, glUniform1i, glUniform3f, glUniform3i, glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
+from ...finite_guard import GuardSlot
 
 
 class Advect3D(ComputeShader):
@@ -27,7 +28,7 @@ class Advect3D(ComputeShader):
                aspect: float, z_extent: float, timestep: float, dissipation: float,
                internal_format: int = GL_RGBA16F,
                has_obstacles: bool = True, evaporation: float = 0.0, measure: int = 0,
-            dampen: tuple[float, float] = (0.0, 1.0)) -> None:
+            max_speed: float = 0.0, guard: GuardSlot | None = None) -> None:
         """Advect from source_read into result_write (separate read/write buffers).
 
         Use this for ping-pong: read from back buffer, write to front buffer.
@@ -45,7 +46,8 @@ class Advect3D(ComputeShader):
             has_obstacles: Whether obstacle logic is active
             evaporation: The size taken off this step, every channel scaled with it
             measure: How the size is read: 0 a premultiplied density's alpha, 1 a vector's length, 2 |r|
-            dampen: The velocity's dampen, its threshold (widths/s) and the excess's share kept; (0, 1) is none
+            max_speed: The velocity's top speed (widths/s), bent softly toward from half; 0 no limit
+            guard: The field's slot in its stage's FiniteGuard: a non-finite value 0 and counted; None no guard
         """
         if not self.allocated or not self.shader_program:
             return
@@ -68,8 +70,11 @@ class Advect3D(ComputeShader):
         glUniform1f(self.get_uniform_loc("uDissipation"), dissipation)
         glUniform1f(self.get_uniform_loc("uEvaporation"), evaporation)
         glUniform1i(self.get_uniform_loc("uMeasure"), measure)
-        glUniform1f(self.get_uniform_loc("uDampenThreshold"), dampen[0])
-        glUniform1f(self.get_uniform_loc("uDampenFactor"), dampen[1])
+        glUniform1f(self.get_uniform_loc("uMaxSpeed"), max_speed)
+        if guard is not None:
+            guard.use(self.get_uniform_loc("uGuardSlot"))
+        else:
+            glUniform1i(self.get_uniform_loc("uGuardSlot"), -1)
         glUniform3i(self.get_uniform_loc("uSize"),
                     result_write.width, result_write.height, result_write.depth)
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))

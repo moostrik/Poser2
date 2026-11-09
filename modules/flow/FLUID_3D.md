@@ -32,22 +32,39 @@ A value runs out of range and stays there, in the motion and in the fluid:
   the box to white, where stillslowfast at the same grid steps in 11 ms: a value growing out of
   range (a half float's infinity, a NaN) would fit both **(deduction)**.
 
-The work: find the step and the pass where a value leaves its range (the harness on standmoves with
-each stage's and each pass's largest value and non-finite count per step), fix it there, then guard
-each stage's output so a bad value cannot pass on, and the warm-up is no longer needed. The guards
-to try: a hard top speed on the water ([The guard](#the-guard)), and a soft limit on the motion's z
-speed, z as measured to a knee (about 1.5 m/s), compressed above it toward a maximum (about 3 m/s),
+The work: each stage guards its output, so a bad value stops where it was made and the warning names
+the stage; then the cause is fixed there. `WARM_UP_TIME` is 0 while this runs, so the start's burst is
+the test.
+
+| Step | What                                                                                      | State |
+|------|-------------------------------------------------------------------------------------------|-------|
+| 1    | the fluid: the finite guard and `max_speed` in place of the dampen ([The guard](#the-guard)); vorticity's range to 100 for the test | built |
+| –    | a test for every step: open walls make non-finite values ([2](#2-open-walls-make-non-finite-values)) | |
+| 2    | the bridge: the finite guard where it writes its outputs, the mixes and the density and temperature bridges | |
+| 3    | the motion: the finite guard in the compose; an x/y speed gate, one `max_speed` in m/s for the 3D velocity, as z's | design to confirm |
+| 4    | the app, watching the warnings; the guards' timing once the fluid is stable, a row in [TIMING.md](TIMING.md) | |
+| 5    | the sticking itself, from `xy_smooth` off and on at the app                                 | |
+
+Besides the water's top speed ([The guard](#the-guard)), a guard to try on the motion: a soft limit on
+its z speed, z as measured to a knee (about 1.5 m/s), compressed above it toward a maximum (about 3 m/s),
 the speed gate (6 m/s) behind it; a curve per reading, no time filter, checked against the spread of
 z speeds on standmoves and stillslowfast first.
 
-### 2. The water looks too fast
+### 2. Open walls make non-finite values
+
+With `wall` open the fluid makes non-finite values **(site fact)**, while the vorticity stays stable. Not yet
+looked into. Until it is fixed it is a test for the guards: open the walls and the fluid's finite guard
+should zero the values and log `fluid: … non-finite … values` ([The guard](#the-guard)). An open wall takes
+the last cell's velocity as the ghost and 0 as the pressure ([The walls](#the-walls)), the place to start.
+
+### 3. The water looks too fast
 
 Seen in the app **(site fact)** after the depth scale: everything moves very fast. Measured, the
 water follows the body at 0.8–0.9 of its speed in fast moves, so it is the water's own motion
 **(deduction)**; the candidates are the preset's confinement (1.69, the textbook 0.3), the
 velocity's fade (60 s, viscosity 0) and MacCormack keeping the swirls.
 
-### 3. The projection's floor
+### 4. The projection's floor
 
 The projection's divergence and gradient are central differences on the cell centers, and the
 solvers solve the compact 7-point Laplacian; the two differ, so the velocity keeps a divergence of
@@ -56,7 +73,7 @@ grid makes the divergence of the gradient the 7-point Laplacian, and the solve's
 reaches the velocity **(deduction)**. It changes every pass that reads the velocity; its design is
 [The staggered velocity](#the-staggered-velocity).
 
-### 4. Unused channels written 0
+### 5. Unused channels written 0
 
 The 3D motion's and the 3D bridge's velocities write 0 in their unused w (`compose_velocity.frag`,
 `velocity_trail.frag`, `velocity_bandpass_direction.frag`), so a monitor shows w as nothing rather
@@ -76,7 +93,7 @@ A step (`Fluid3D.update`), in order, at the code's defaults:
 
 | Pass        | What                                                                                  | On                    | Depends on the input |
 |-------------|---------------------------------------------------------------------------------------|-----------------------|----------------------|
-| advect_vel  | self-advection by `advection`, `velocity.advection_scale` 1, fade 60 s; on its result the dampen, a drag on the speed above `dampen_threshold` (3 widths/s) over `dampen_time` (0.5 s) | velocity 256×448×128 | the trace distance |
+| advect_vel  | self-advection by `advection`, `velocity.advection_scale` 1, fade 60 s; on its result the guard ([The guard](#the-guard)) and the top speed `max_speed`, 0 off | velocity 256×448×128 | the trace distance |
 | viscosity   | Jacobi diffusion, off (`viscosity` 0)                                                 | velocity              | no                   |
 | vorticity   | the curl, then the confinement force × dt added to the velocity in the same pass       | velocity, curl        | no                   |
 | advect_temp | off: `buoyancy` 0 clears the temperature once, and nothing is injected into it  | temperature           | the trace distance   |
@@ -107,9 +124,7 @@ The depth scale is the box's depth over the smaller of its width and height (`de
 0.07 at 32 layers, 0.5 at 256 × 448 × 128): the box's depth stands for as much real depth as its width does, so
 a body moving toward the camera crosses the box's depth in the time the same speed crosses its width. At one
 scale with x and y, a near hand's real 2–3 m/s pushed water the box could not hold, and the projection turned
-it sideways: on standmoves at 448 × 800 × 32 the water reached 5.2 widths/s, scaled 1.7, no step above 2. The
-velocity's dampen is the guard just above the fastest body, 3 widths/s over 0.5 s; on stillslowfast it changes
-nothing.
+it sideways: on standmoves at 448 × 800 × 32 the water reached 5.2 widths/s, scaled 1.7, no step above 2.
 
 `time_scale` is the fluid's time as a share of real time: every pass steps by dt × it, the sources and the drag
 included, so at 0.5 the whole fluid runs at half speed and keeps its shapes. A viscosity costs 0.7 ms a step.
@@ -235,17 +250,35 @@ about thirteen. SOR's sweeps cost 0.34 ms each, two dispatches from global memor
 leaves the high frequencies, which the mean residual counts, worse than Jacobi does. The divergence after
 the projection hardly moves with any of them: the divergence and the gradient are central differences
 on one grid, whose Laplacian is not the 7-point one every solver solves, so even an exact solve leaves
-it ([Plan](#3-the-projections-floor)). With the solve exact the water keeps more of its speed, 0.150
+it ([Plan](#4-the-projections-floor)). With the solve exact the water keeps more of its speed, 0.150
 widths/s in the mean against Jacobi's 0.134.
 
 ### The guard
 
-The dampen, at the step's first pass, stays as it is: `dampen_threshold` and `dampen_time`. With
-the drag the injection cannot exceed the body's own speed, so what the dampen guards is the
-simulation's own growth from the vorticity force, and a soft decay above a threshold fits that. If the
-explosion check ([Plan](#1-the-explosions)) shows the water's
-speed running away, a hard top speed (`velocity.limit`, the dampen shader with its factor 0) comes
-back as its own change.
+Two guards on the advection of each field, at the step's first pass, so a bad value stops where it was made
+and is never hidden:
+
+| Guard     | What                                                                                                             | Setting |
+|-----------|------------------------------------------------------------------------------------------------------------------|---------|
+| finite    | a value whose exponent bits are all ones, an infinity or a NaN, becomes 0: a cell that held one before the step, or that the step made one; each counted per field into the stage's `FiniteGuard` (`finite_guard.py`), read once a second from the other of two buffers once a fence says the GPU is done, so nothing waits, and logged as a warning naming the stage, the field and the count; on the velocity, the density and the temperature | none, always on |
+| top speed | the velocity's speed untouched up to half of `max_speed`, above it bent smoothly toward it (tanh), the direction kept (`limit_speed`, `soft_limit` its numpy reference) | `velocity.max_speed`, widths/s, 0 off (the default), a failsafe, so a runaway shows until it is set |
+
+The bit test, not `isnan`: GLSL may assume no NaN exists and drop `isnan`. A NaN slips past every comparison
+(`speed > threshold` is false), so a threshold could not catch it, and it spreads to every value computed from
+it. An infinite velocity traces off the grid and reads the border's 0, so it is caught where it is held. Where all
+eight texels MacCormack's limiter reads are non-finite it has no bounds, and the predictor stands for the guard
+to take. With the drag the injection cannot exceed the body's own speed, so what the top speed guards is the
+simulation's own growth, from the vorticity force above all.
+
+Measured in a hidden window at 64 × 128 × 32, the velocity filled with each value and stepped, semi-Lagrangian
+and MacCormack alike:
+
+| Filled with              | After one step                         | Warning within 2 s                         |
+|--------------------------|----------------------------------------|--------------------------------------------|
+| infinity                 | 0 everywhere, the output finite        | 262144 non-finite velocity values, every cell once |
+| NaN                      | 0 everywhere, the output finite        | 262144, every cell once                    |
+| 50 widths/s, `max_speed` 0 | top speed 44.7 (the walls and the projection) | none                                |
+| 50 widths/s, `max_speed` 3 | top speed 2.73                         | none                                       |
 
 ### Names
 
@@ -256,7 +289,7 @@ module by what it does, everything else by its quantity.
 |---------------------------------------|---------------------------------------------------------------------------------------------------------|
 | the mixes' knobs                      | shares, 0 to 1, one per reading in each output, summed                                                  |
 | the fluid's input methods             | `drag_velocity`, `add_acceleration`, `add_boundary_density`, `add_body_force_density`, `add_boundary_temperature`, `add_body_force_temperature` |
-| the fluid's fields                    | `velocity` (its own settings: fade, evaporation, dampen, vorticity, viscosity, self-advection), `density`, `temperature`, `pressure` |
+| the fluid's fields                    | `velocity` (its own settings: fade, evaporation, top speed, vorticity, viscosity, self-advection), `density`, `temperature`, `pressure` |
 
 The readings, the filters, the two systems, the input groups and the wall are the glossary's
 ("Flow" and "Apps"). "Drag" is what the fluid does with `boundary.velocity`, seen as `velocity_drag`, not the name of a
@@ -330,7 +363,7 @@ The fields' physics take the textbook's water, with no artificial decay or thick
 the velocity's `fade_time` 60 s (it keeps its momentum), `viscosity` 0 (water at this
 scale), `pressure.iterations` 40 (GPU Gems' 40 to 80 for a Jacobi solve), the density's `fade_time`
 and `evaporation_time` 0 (off: it stays until the water carries it away), `temperature.sink` 0 and `ambient` 0 (the density as heavy as the water,
-no buoyancy), gravity down the screen, every wall closed; the dampen a guard just above the fastest body, 3 widths/s over 0.5 s; the
+no buoyancy), gravity down the screen, every wall closed; the top speed off, a failsafe; the
 bridge's mix the boundary's trail alone and its lowpass's `smooth` its default 160 ms, since the
 coast is the fluid's; the confinement Fedkiw's ε 0.3 over the neighbors (`vorticity_radius` 1);
 in z, `input.layer` 0.5 and `input.spread` 0.075 widths, a body's thickness of about 0.3
@@ -610,7 +643,7 @@ its row in TIMING.md.
 
 ## The staggered velocity
 
-Not built; the answer to [the projection's floor](#3-the-projections-floor): the velocity on the cells' faces (Harlow and
+Not built; the answer to [the projection's floor](#4-the-projections-floor): the velocity on the cells' faces (Harlow and
 Welch's MAC grid), so the divergence and the gradient are one-cell differences, the Laplacian the solvers solve,
 and an exact solve leaves the water exactly incompressible, with no pattern alternating cell by cell left behind.
 

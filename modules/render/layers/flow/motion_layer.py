@@ -20,7 +20,7 @@ from modules.flow import DepthView, TextureKind
 from modules.settings import Field
 from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 
-WARM_UP_TIME: float = 3.0           # s after start the motion stays at rest, while the camera's exposure settles
+WARM_UP_TIME: float = 0.0           # s after start the motion stays at rest, while the camera's exposure settles
 MAX_FRAME_INTERVAL: float = 0.5    # s: a longer gap between two captures is a pause or a loop, not a frame's
 FRAME_INTERVAL_BAND: tuple[float, float] = (0.5, 2.0)  # a capture gap is held to this share of the expected frame interval
 

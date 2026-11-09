@@ -31,7 +31,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 873,
+        "iso": 1304,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -526,12 +526,12 @@
       },
       "input": {
         "layer": 0.5,
-        "spread": 0.07,
-        "depth_span": 1.35,
+        "spread": 0.01,
+        "depth_span": 1.0,
         "boundary": {
           "velocity_drag": 500.0,
           "velocity_gain": 2.57,
-          "density_drag": 0.0,
+          "density_drag": 500.0,
           "density_gain": 1.0,
           "temperature_drag": 200.0,
           "temperature_gain": 1.0
@@ -544,19 +544,18 @@
       },
       "velocity": {
         "advection_scale": 1.0,
-        "fade_time": 0.0,
+        "fade_time": 120.0,
         "evaporation_time": 0.0,
-        "dampen_threshold": 50.0,
-        "dampen_time": 0.5,
+        "max_speed": 0.0,
         "vorticity": 0.0,
         "vorticity_radius": 1.0,
         "viscosity": 0.0,
         "viscosity_iter": 20
       },
       "density": {
-        "advection_scale": 0.0,
-        "fade_time": 0.0,
-        "evaporation_time": 300.0
+        "advection_scale": 1.0,
+        "fade_time": 20.0,
+        "evaporation_time": 0.0
       },
       "temperature": {
         "advection_scale": 1.0,
