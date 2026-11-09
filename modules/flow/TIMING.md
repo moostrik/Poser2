@@ -7,18 +7,18 @@ from the numbers.
 
 ## The configuration
 
-| What              | Here                                                                                       |
-|-------------------|--------------------------------------------------------------------------------------------|
-| GPU               | GeForce RTX 4090, 24 GB                                                                    |
-| Target            | 60 fps, 16.7 ms a frame                                                                    |
-| App               | deep_flow, `launcher.py -app deep_flow -sim -ni -timing 60 -warmup 10`                     |
-| Input             | the standmoves recording (`-sim`), one camera, 50 fps                                      |
-| Preset            | `apps/deep_flow/data/settings/settings.json`, one setting changed per run                  |
-| Pose              | on: the person detection and RTM pose on TensorRT, on the same GPU                         |
-| Segmentation      | off: `mask_source` `DEPTH`, the RVM model not run                                          |
-| Output            | the large layers at 2 × the output, 2160 × 3840; no upscale pass beyond that allocation    |
-| `v_sync`          | off, so the frame rate shows the headroom                                                  |
-| Warm-up, duration | 10 s running before the first sample, then 60 s                                           |
+| What              | Here                                                                                    |
+|-------------------|-----------------------------------------------------------------------------------------|
+| GPU               | GeForce RTX 4090, 24 GB                                                                 |
+| Target            | 60 fps, 16.7 ms a frame                                                                 |
+| App               | deep_flow, `launcher.py -app deep_flow -sim -ni -timing 60 -warmup 10`                  |
+| Input             | the standmoves recording (`-sim`), one camera, 50 fps                                   |
+| Preset            | `apps/deep_flow/data/settings/settings.json`, one setting changed per run               |
+| Pose              | on: the person detection and RTM pose on TensorRT, on the same GPU                      |
+| Segmentation      | off: `mask_source` `DEPTH`, the RVM model not run                                       |
+| Output            | the large layers at 2 × the output, 2160 × 3840; no upscale pass beyond that allocation |
+| `v_sync`          | off, so the frame rate shows the headroom                                               |
+| Warm-up, duration | 10 s running before the first sample, then 60 s                                         |
 
 Every number is a mean and a p95 in ms over the run. A GPU time is a `GpuTimer` (`modules/gl/gpu_timer.py`),
 two GL timestamps around a block, so blocks nest: `GPU fluid` holds its passes, `GPU bridge` its
@@ -32,24 +32,24 @@ two render ticks; its fps is 1000 over its mean.
 At the preset as saved, the grid 448 × 800 × 64, MacCormack, the density on the grid, and at the
 default this document sets, 256 × 448 × 128:
 
-| Stage                 | Timer                          | 448 × 800 × 64 | 256 × 448 × 128 |
-|-----------------------|--------------------------------|----------------|-----------------|
-| motion                | `GPU motion`                   | 0.40 / 0.63    | 0.43 / 0.65     |
-| bridge, lowpass       | `GPU bridge lowpass`           | 0.08 / 0.08    | 0.09 / 0.08     |
-| bridge, bandpass      | `GPU bridge bandpass`          | 0.39 / 0.71    |                 |
-| bridge, the mixes     | `GPU bridge mix`               | 0.07 / 0.06    | 0.07 / 0.06     |
-| fluid, inject         | `GPU fluid inject`             | 0.96 / 1.34    | 0.30 / 0.55     |
-| fluid, dampen         | `GPU fluid dampen`             | 0.52 / 0.83    | 0.35 / 0.60     |
-| fluid, advect velocity | `GPU fluid advect velocity`   | 1.90 / 5.79    | 0.86 / 1.21     |
-| fluid, viscosity      | `GPU fluid viscosity`          | 0              | 0               |
-| fluid, vorticity      | `GPU fluid vorticity`          | 2.00 / 2.64    | 1.28 / 1.59     |
-| fluid, advect temperature | `GPU fluid advect temperature` | 0.45 / 0.86 | 0.23 / 0.23    |
-| fluid, buoyancy       | `GPU fluid buoyancy`           | 0              | 0               |
-| fluid, pressure       | `GPU fluid pressure`           | 6.74 / 8.09    | 4.40 / 5.91     |
-| fluid, density        | `GPU fluid density`            | 2.04 / 5.29    | 1.10 / 1.76     |
-| fluid, composite      | `GPU fluid composite`          | 1.16 / 1.45    | 2.44 / 3.53     |
-| fluid, the step       | `GPU fluid`                    | 14.86 / 21.64  | 10.68 / 12.09   |
-| the frame             | `Render interval`              | 17.93 / 25.34, 56 fps | 13.29 / 18.50, 75 fps |
+| Stage                     | Timer                          | 448 × 800 × 64        | 256 × 448 × 128       |
+|---------------------------|--------------------------------|-----------------------|-----------------------|
+| motion                    | `GPU motion`                   | 0.40 / 0.63           | 0.43 / 0.65           |
+| bridge, lowpass           | `GPU bridge lowpass`           | 0.08 / 0.08           | 0.09 / 0.08           |
+| bridge, bandpass          | `GPU bridge bandpass`          | 0.39 / 0.71           |                       |
+| bridge, the mixes         | `GPU bridge mix`               | 0.07 / 0.06           | 0.07 / 0.06           |
+| fluid, inject             | `GPU fluid inject`             | 0.96 / 1.34           | 0.30 / 0.55           |
+| fluid, dampen             | `GPU fluid dampen`             | 0.52 / 0.83           | 0.35 / 0.60           |
+| fluid, advect velocity    | `GPU fluid advect velocity`    | 1.90 / 5.79           | 0.86 / 1.21           |
+| fluid, viscosity          | `GPU fluid viscosity`          | 0                     | 0                     |
+| fluid, vorticity          | `GPU fluid vorticity`          | 2.00 / 2.64           | 1.28 / 1.59           |
+| fluid, advect temperature | `GPU fluid advect temperature` | 0.45 / 0.86           | 0.23 / 0.23           |
+| fluid, buoyancy           | `GPU fluid buoyancy`           | 0                     | 0                     |
+| fluid, pressure           | `GPU fluid pressure`           | 6.74 / 8.09           | 4.40 / 5.91           |
+| fluid, density            | `GPU fluid density`            | 2.04 / 5.29           | 1.10 / 1.76           |
+| fluid, composite          | `GPU fluid composite`          | 1.16 / 1.45           | 2.44 / 3.53           |
+| fluid, the step           | `GPU fluid`                    | 14.86 / 21.64         | 10.68 / 12.09         |
+| the frame                 | `Render interval`              | 17.93 / 25.34, 56 fps | 13.29 / 18.50, 75 fps |
 
 The bandpass runs only while a mix takes one of its readings; the preset takes the trail alone, so
 its row is from a run with `body_force.acceleration` taking `change`, `start`, `bow`, `stop` and
@@ -65,10 +65,10 @@ every frame.
 
 At 448 × 800 × 64, the density on the grid:
 
-| `advection`        | advect velocity | density     | the step      | the frame     |
-|--------------------|-----------------|-------------|---------------|---------------|
-| `SEMI_LAGRANGIAN`  | 0.61 / 0.94     | 0.68 / 1.21 | 13.13 / 16.72 | 18.63 / 33.99 |
-| `MACCORMACK`       | 1.90 / 5.79     | 2.04 / 5.29 | 14.86 / 21.64 | 17.93 / 25.34 |
+| `advection`       | advect velocity | density     | the step      | the frame     |
+|-------------------|-----------------|-------------|---------------|---------------|
+| `SEMI_LAGRANGIAN` | 0.61 / 0.94     | 0.68 / 1.21 | 13.13 / 16.72 | 18.63 / 33.99 |
+| `MACCORMACK`      | 1.90 / 5.79     | 2.04 / 5.29 | 14.86 / 21.64 | 17.93 / 25.34 |
 
 MacCormack costs 1.3 ms on the velocity and 1.4 ms on the density, three reads of each field where
 the semi-Lagrangian step makes one. The semi-Lagrangian run's frame has CPU stalls in `Render update`
@@ -78,12 +78,12 @@ the semi-Lagrangian step makes one. The semi-Lagrangian run's frame has CPU stal
 
 MacCormack, the density on the grid, `pressure.iterations` 40:
 
-| Grid             | Depth, widths | Cells  | pressure     | composite   | the step      | the frame             |
-|------------------|---------------|--------|--------------|-------------|---------------|-----------------------|
-| 448 × 800 × 64   | 0.14          | 23 M   | 6.74 / 8.09  | 1.16 / 1.45 | 14.86 / 21.64 | 17.93 / 25.34, 56 fps |
-| 448 × 800 × 128  | 0.29          | 46 M   | 10.94 / 12.65 | 2.06 / 2.10 | 30.43 / 52.66 | 33.96 / 55.76, 29 fps |
-| 320 × 576 × 160  | 0.50          | 29 M   | 8.17 / 9.78  | 2.46 / 2.94 | 20.40 / 29.24 | 23.09 / 32.53, 43 fps |
-| 256 × 448 × 128  | 0.50          | 15 M   | 4.40 / 5.91  | 2.44 / 3.53 | 10.68 / 12.09 | 13.29 / 18.50, 75 fps |
+| Grid            | Depth, widths | Cells | pressure      | composite   | the step      | the frame             |
+|-----------------|---------------|-------|---------------|-------------|---------------|-----------------------|
+| 448 × 800 × 64  | 0.14          | 23 M  | 6.74 / 8.09   | 1.16 / 1.45 | 14.86 / 21.64 | 17.93 / 25.34, 56 fps |
+| 448 × 800 × 128 | 0.29          | 46 M  | 10.94 / 12.65 | 2.06 / 2.10 | 30.43 / 52.66 | 33.96 / 55.76, 29 fps |
+| 320 × 576 × 160 | 0.50          | 29 M  | 8.17 / 9.78   | 2.46 / 2.94 | 20.40 / 29.24 | 23.09 / 32.53, 43 fps |
+| 256 × 448 × 128 | 0.50          | 15 M  | 4.40 / 5.91   | 2.44 / 3.53 | 10.68 / 12.09 | 13.29 / 18.50, 75 fps |
 
 The box's depth is `depth` / `width`, the cells being cubic. 256 × 448 × 128 is the one grid that holds
 60 fps, and it is half a width deep where the preset's is 0.14.
@@ -92,10 +92,10 @@ The box's depth is `depth` / `width`, the cells being cubic. 256 × 448 × 128 i
 
 The same run, 448 × 800 × 64, with the pose on and off (`pose.pose.enabled`):
 
-| Pose | advect velocity | vorticity   | pressure    | density     | the step      | the frame              |
-|------|-----------------|-------------|-------------|-------------|---------------|------------------------|
-| on   | 1.90 / 5.79     | 2.00 / 2.64 | 6.74 / 8.09 | 2.04 / 5.29 | 14.86 / 21.64 | 17.93 / 25.34, 56 fps  |
-| off  | 0.56 / 0.82     | 0.62 / 0.62 | 4.95 / 5.51 | 0.42 / 0.42 | 8.21 / 8.98   | 9.81 / 10.68, 102 fps  |
+| Pose | advect velocity | vorticity   | pressure    | density     | the step      | the frame             |
+|------|-----------------|-------------|-------------|-------------|---------------|-----------------------|
+| on   | 1.90 / 5.79     | 2.00 / 2.64 | 6.74 / 8.09 | 2.04 / 5.29 | 14.86 / 21.64 | 17.93 / 25.34, 56 fps |
+| off  | 0.56 / 0.82     | 0.62 / 0.62 | 4.95 / 5.51 | 0.42 / 0.42 | 8.21 / 8.98   | 9.81 / 10.68, 102 fps |
 
 Without the pose the step takes 8.2 ms: the 6.6 ms between the two is the TensorRT kernels the GPU
 runs between the fluid's passes, the person detection's 34 ms and the RTM pose's 14 ms of CPU-side
@@ -110,28 +110,28 @@ in every run. `rate` 20 and the other particle settings at their defaults; the r
 
 At the field defaults, 32 M particles, on 448 × 800 × 64:
 
-| `draw`, `overlap`   | advect      | draw            | march       | the frame               |
-|---------------------|-------------|-----------------|-------------|-------------------------|
-| `POINTS`, occluded  | 4.01 / 5.80 | 20.51 / 38.21   | 0.42 / 0.57 | 41.12 / 62.57, 24 fps   |
-| `POINTS`, additive  | 4.31 / 6.49 | 5.15 / 6.65     | 0.08 / 0.11 | 24.47 / 29.25, 41 fps   |
-| `STREAKS`, occluded | 4.44 / 5.62 | 275.40 / 625.40 | 1.03 / 1.27 | 295.42 / 646.63, 3 fps  |
-| `BLOBS`, occluded   | 3.90 / 6.05 | 522.33 / 916.49 | 1.07 / 1.27 | 541.36 / 936.39, 2 fps  |
+| `draw`, `overlap`   | advect      | draw              | march       | the frame                |
+|---------------------|-------------|-------------------|-------------|--------------------------|
+| `POINTS`, occluded  | 4.01 / 5.80 | 20.51 / 38.21     | 0.42 / 0.57 | 41.12 / 62.57, 24 fps    |
+| `POINTS`, additive  | 4.31 / 6.49 | 5.15 / 6.65       | 0.08 / 0.11 | 24.47 / 29.25, 41 fps    |
+| `STREAKS`, occluded | 4.44 / 5.62 | 275.40 / 625.40   | 1.03 / 1.27 | 295.42 / 646.63, 3 fps   |
+| `BLOBS`, occluded   | 3.90 / 6.05 | 522.33 / 916.49   | 1.07 / 1.27 | 541.36 / 936.39, 2 fps   |
 | `SURFACE`           | 2.48 / 3.55 | 1092.27 / 1569.24 | 1.15 / 1.37 | 1111.00 / 1589.10, 1 fps |
 
 On 256 × 448 × 128, by count:
 
-| `draw`, `overlap`   | Count | advect      | draw        | march       | the frame              |
-|---------------------|-------|-------------|-------------|-------------|------------------------|
-| the grid's density  |       | 1.10 / 1.76 | 2.44 / 3.53 |             | 13.29 / 18.50, 75 fps  |
-| `POINTS`, occluded  | 8 M   | 1.37 / 2.15 | 9.97 / 13.46 | 0.46 / 0.67 | 21.27 / 25.36, 47 fps |
-| `POINTS`, occluded  | 2 M   | 0.28 / 0.52 | 1.07 / 2.26 | 0.41 / 0.91 | 11.20 / 17.65, 89 fps  |
-| `POINTS`, additive  | 16 M  | 3.09 / 4.66 | 2.91 / 4.05 | 0.13 / 0.25 | 15.59 / 18.34, 64 fps  |
-| `STREAKS`, occluded | 1 M   | 0.14 / 0.15 | 0.35 / 0.81 | 0.33 / 0.66 | 10.04 / 12.00, 100 fps |
-| `STREAKS`, occluded | 250 k | 0.07 / 0.20 | 0.53 / 1.94 | 0.28 / 0.46 | 10.23 / 17.81, 98 fps  |
-| `BLOBS`, occluded   | 500 k | 0.10 / 0.32 | 6.48 / 30.19 | 0.37 / 0.63 | 16.53 / 40.48, 60 fps |
-| `BLOBS`, occluded   | 100 k | 0.07 / 0.31 | 1.33 / 9.04 | 0.32 / 0.61 | 10.95 / 20.24, 91 fps  |
-| `SURFACE`           | 250 k | 0.07 / 0.09 | 4.27 / 27.05 | 0.89 / 1.59 | 14.79 / 38.38, 68 fps |
-| `SURFACE`           | 100 k | 0.04 / 0.04 | 0.84 / 2.52 | 0.69 / 1.36 | 10.95 / 15.62, 91 fps  |
+| `draw`, `overlap`   | Count | advect      | draw         | march       | the frame              |
+|---------------------|-------|-------------|--------------|-------------|------------------------|
+| the grid's density  |       | 1.10 / 1.76 | 2.44 / 3.53  |             | 13.29 / 18.50, 75 fps  |
+| `POINTS`, occluded  | 8 M   | 1.37 / 2.15 | 9.97 / 13.46 | 0.46 / 0.67 | 21.27 / 25.36, 47 fps  |
+| `POINTS`, occluded  | 2 M   | 0.28 / 0.52 | 1.07 / 2.26  | 0.41 / 0.91 | 11.20 / 17.65, 89 fps  |
+| `POINTS`, additive  | 16 M  | 3.09 / 4.66 | 2.91 / 4.05  | 0.13 / 0.25 | 15.59 / 18.34, 64 fps  |
+| `STREAKS`, occluded | 1 M   | 0.14 / 0.15 | 0.35 / 0.81  | 0.33 / 0.66 | 10.04 / 12.00, 100 fps |
+| `STREAKS`, occluded | 250 k | 0.07 / 0.20 | 0.53 / 1.94  | 0.28 / 0.46 | 10.23 / 17.81, 98 fps  |
+| `BLOBS`, occluded   | 500 k | 0.10 / 0.32 | 6.48 / 30.19 | 0.37 / 0.63 | 16.53 / 40.48, 60 fps  |
+| `BLOBS`, occluded   | 100 k | 0.07 / 0.31 | 1.33 / 9.04  | 0.32 / 0.61 | 10.95 / 20.24, 91 fps  |
+| `SURFACE`           | 250 k | 0.07 / 0.09 | 4.27 / 27.05 | 0.89 / 1.59 | 14.79 / 38.38, 68 fps  |
+| `SURFACE`           | 100 k | 0.04 / 0.04 | 0.84 / 2.52  | 0.69 / 1.36 | 10.95 / 15.62, 91 fps  |
 
 The draw is the cost, and it is the fill at 2160 × 3840, not the count alone: points and streaks
 grow faster than their count once many land on one pixel (8 M points 9 times the draw of 2 M), and
@@ -145,13 +145,13 @@ marches 128 layers at 4K where the particles' march takes 16 slices.
 One count holds for every look, since `count` is a `Field.INIT`; what each look fits in 16.7 ms
 with the pose, on 256 × 448 × 128:
 
-| `draw`, `overlap`   | Count within 60 fps | Measured at it                   |
-|---------------------|---------------------|----------------------------------|
-| `POINTS`, occluded  | 2 M                 | 11.20 / 17.65                    |
-| `POINTS`, additive  | 8 M **(deduction)** | 16 M at 15.59 / 18.34            |
-| `STREAKS`, occluded | 1 M                 | 10.04 / 12.00                    |
+| `draw`, `overlap`   | Count within 60 fps | Measured at it                    |
+|---------------------|---------------------|-----------------------------------|
+| `POINTS`, occluded  | 2 M                 | 11.20 / 17.65                     |
+| `POINTS`, additive  | 8 M **(deduction)** | 16 M at 15.59 / 18.34             |
+| `STREAKS`, occluded | 1 M                 | 10.04 / 12.00                     |
 | `BLOBS`, occluded   | 100 k               | 10.95 / 20.24, the p95 its spikes |
-| `SURFACE`           | 100 k               | 10.95 / 15.62                    |
+| `SURFACE`           | 100 k               | 10.95 / 15.62                     |
 
 ## The baseline
 
@@ -163,16 +163,16 @@ takes the grid, the spread and, for its streaks, 1 M.
 
 Each recommendation timed as set, the other particle settings at their defaults:
 
-| Run                          | advect velocity | density     | pressure    | composite   | the step      | `Render update` | the frame             |
-|------------------------------|-----------------|-------------|-------------|-------------|---------------|-----------------|-----------------------|
-| grid, `SEMI_LAGRANGIAN`      | 0.40 / 0.77     | 0.43 / 0.85 | 5.24 / 6.83 | 2.44 / 3.94 | 10.97 / 13.37 | 6.53 / 9.96     | 13.98 / 17.94, 72 fps |
-| grid, `MACCORMACK`           | 1.11 / 1.72     | 1.28 / 2.18 | 4.81 / 6.67 | 2.43 / 3.61 | 12.17 / 15.11 | 6.24 / 9.43     | 15.28 / 19.29, 65 fps |
-| grid, MacCormack, bandpass on | 1.10 / 1.68    | 1.14 / 1.92 | 4.59 / 6.46 | 2.40 / 3.70 | 11.58 / 14.87 | 8.98 / 23.95    | 16.02 / 26.47, 62 fps |
-| 2 M `POINTS`, occluded       | 1.12 / 1.65     | 0.34 / 0.68 | 4.59 / 6.33 | 3.05 / 5.16 | 11.24 / 14.35 | 10.95 / 28.72   | 16.11 / 31.35, 62 fps |
-| 8 M `POINTS`, additive       | 1.10 / 1.63     | 1.29 / 2.11 | 4.66 / 6.36 | 1.64 / 2.79 | 10.80 / 13.51 | 10.30 / 27.80   | 15.34 / 30.50, 65 fps |
-| 1 M `STREAKS`, occluded      | 1.12 / 1.66     | 0.18 / 0.21 | 4.61 / 6.42 | 1.87 / 3.44 | 10.02 / 12.74 | 10.01 / 25.37   | 14.36 / 28.40, 70 fps |
-| 100 k `BLOBS`, occluded      | 1.17 / 1.71     | 0.05 / 0.05 | 4.53 / 6.30 | 2.29 / 4.49 | 10.37 / 13.57 | 8.02 / 20.32    | 14.13 / 24.12, 71 fps |
-| 100 k `SURFACE`              | 1.16 / 1.76     | 0.05 / 0.05 | 4.89 / 6.86 | 1.70 / 3.78 | 10.18 / 13.32 | 10.06 / 25.06   | 14.55 / 27.85, 69 fps |
+| Run                           | advect velocity | density     | pressure    | composite   | the step      | `Render update` | the frame             |
+|-------------------------------|-----------------|-------------|-------------|-------------|---------------|-----------------|-----------------------|
+| grid, `SEMI_LAGRANGIAN`       | 0.40 / 0.77     | 0.43 / 0.85 | 5.24 / 6.83 | 2.44 / 3.94 | 10.97 / 13.37 | 6.53 / 9.96     | 13.98 / 17.94, 72 fps |
+| grid, `MACCORMACK`            | 1.11 / 1.72     | 1.28 / 2.18 | 4.81 / 6.67 | 2.43 / 3.61 | 12.17 / 15.11 | 6.24 / 9.43     | 15.28 / 19.29, 65 fps |
+| grid, MacCormack, bandpass on | 1.10 / 1.68     | 1.14 / 1.92 | 4.59 / 6.46 | 2.40 / 3.70 | 11.58 / 14.87 | 8.98 / 23.95    | 16.02 / 26.47, 62 fps |
+| 2 M `POINTS`, occluded        | 1.12 / 1.65     | 0.34 / 0.68 | 4.59 / 6.33 | 3.05 / 5.16 | 11.24 / 14.35 | 10.95 / 28.72   | 16.11 / 31.35, 62 fps |
+| 8 M `POINTS`, additive        | 1.10 / 1.63     | 1.29 / 2.11 | 4.66 / 6.36 | 1.64 / 2.79 | 10.80 / 13.51 | 10.30 / 27.80   | 15.34 / 30.50, 65 fps |
+| 1 M `STREAKS`, occluded       | 1.12 / 1.66     | 0.18 / 0.21 | 4.61 / 6.42 | 1.87 / 3.44 | 10.02 / 12.74 | 10.01 / 25.37   | 14.36 / 28.40, 70 fps |
+| 100 k `BLOBS`, occluded       | 1.17 / 1.71     | 0.05 / 0.05 | 4.53 / 6.30 | 2.29 / 4.49 | 10.37 / 13.57 | 8.02 / 20.32    | 14.13 / 24.12, 71 fps |
+| 100 k `SURFACE`               | 1.16 / 1.76     | 0.05 / 0.05 | 4.89 / 6.86 | 1.70 / 3.78 | 10.18 / 13.32 | 10.06 / 25.06   | 14.55 / 27.85, 69 fps |
 
 Every baseline holds 60 fps in the mean, 62 to 72 fps; none holds it at the p95. Two things set the
 p95, not the fluid. `Render update`, the CPU side of the render, spikes to a p95 of 20 to 29 ms
@@ -191,27 +191,27 @@ estimate is **(deduction)** unless its source measured it; a source's numbers ar
 
 ### The fluid
 
-| # | Change                                                                                                                          | Its share now                     | Expected back           | Source |
-|---|---------------------------------------------------------------------------------------------------------------------------------|-----------------------------------|-------------------------|--------|
-| 1 | The pressure by multigrid: a V-cycle, restriction to 128 × 224 × 64 and down, smoothed by red-black Gauss–Seidel, warm-started from the last step's pressure as now; or that cycle as the preconditioner of a conjugate gradient (MGPCG) | 4.8 ms, 40 Jacobi iterations | 2.5 to 3.5 ms | one V-cycle converges like about a thousand Jacobi iterations at the cost of about ten (gist); 3 × the accuracy of Jacobi in the same time on the GPU (Glimberg 2009); convergence independent of the grid's size (McAdams 2010) |
-| 2 | The pressure by red-black Gauss–Seidel with over-relaxation (SOR) in place of Jacobi: the cheap form of 1, one solve, two colors a sweep, each color from the other's fresh values | the same 4.8 ms | 1.5 to 2.5 ms, the same residual in about half the sweeps | red-black ordering keeps most of Gauss–Seidel's lead on Jacobi in parallel (Pyroclast; Astaroth); Jacobi converges slowly (FLIP on GPU) |
-| 3 | The composite's early exit, which never fires: it stops only at `glow` 0, and the preset's 0.1 keeps every ray marching all 128 layers for the additive sum; instead the additive sum stopped with the transmittance where it is under the output's precision, and empty space skipped by a coarse occupancy volume (the density's max over 8 × 8 × 8 cells), the ray stepping a block at a time where it is empty | 2.4 ms, 128 steps over 8.3 M pixels | 0.5 to 1.5 ms, by how much of the box is empty or already opaque | min-max octrees and occupancy grids in volume renderers |
-| 4 | Passes fused, each field read once: the dampen into the velocity's advection; the curl and the confinement force in one pass with the curl in shared memory; the divergence into the first Jacobi dispatch; the body force's and the boundary's injections in one pass | dampen 0.4, vorticity 1.7, inject 0.8, the divergence in the pressure | 1 to 1.5 ms | the stencils are bandwidth-bound; kernel fusion and blocking (Intel 3.5D blocking, Aalto) |
-| 5 | The temperature cleared once when `buoyancy` goes to 0, not both buffers every step, and its injection skipped while it is 0; nothing reads it then | 0.4 ms | 0.4 to 0.5 ms | the code: `Fluid3D._advect_temperature` |
-| 6 | The 3D stencil passes on 3D workgroups: the advections, the curl, the divergence and the gradient run 16 × 16 × 1, one layer a group, so a group's z neighbors come from another group's reads; 8 × 8 × 4 groups keep the three neighbors in the cache | the advections 1.5, vorticity 1.7, the gradient and the divergence in the pressure | 0.3 to 0.6 ms | 3D blocking of stencils (Intel 3.5D blocking) |
-| 7 | MacCormack in one dispatch: the forward trace, the error and the clamp in the predictor's pass, the predictor kept in registers, so each field is written once and read once instead of twice | +0.7 ms on the velocity, +0.85 on the density | 0.4 to 0.6 ms | the step's three passes read each field three times |
-| 8 | A sparse grid: bricks of 8³ or 16³ cells, only those with velocity or density stepped (GVDB, EmberGen 2) | every pass | with the body alone in the box, up to half the step; the velocity fades over 60 s and the walls are closed, so the water fills the box over time and the gain goes to 0; the density's passes keep it | Wu et al. 2018; JangaFX |
+| #   | Change                                                                                                                                                                                                                                                                                                                                                                                                             | Its share now                                                                      | Expected back                                                                                                                                                                                         | Source                                                                                                                                                                                                                           |
+|-----|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1   | The pressure by multigrid: a V-cycle, restriction to 128 × 224 × 64 and down, smoothed by red-black Gauss–Seidel, warm-started from the last step's pressure as now; or that cycle as the preconditioner of a conjugate gradient (MGPCG)                                                                                                                                                                           | 4.8 ms, 40 Jacobi iterations                                                       | 2.5 to 3.5 ms                                                                                                                                                                                         | one V-cycle converges like about a thousand Jacobi iterations at the cost of about ten (gist); 3 × the accuracy of Jacobi in the same time on the GPU (Glimberg 2009); convergence independent of the grid's size (McAdams 2010) |
+| 2   | The pressure by red-black Gauss–Seidel with over-relaxation (SOR) in place of Jacobi: the cheap form of 1, one solve, two colors a sweep, each color from the other's fresh values                                                                                                                                                                                                                                 | the same 4.8 ms                                                                    | 1.5 to 2.5 ms, the same residual in about half the sweeps                                                                                                                                             | red-black ordering keeps most of Gauss–Seidel's lead on Jacobi in parallel (Pyroclast; Astaroth); Jacobi converges slowly (FLIP on GPU)                                                                                          |
+| 3   | The composite's early exit, which never fires: it stops only at `glow` 0, and the preset's 0.1 keeps every ray marching all 128 layers for the additive sum; instead the additive sum stopped with the transmittance where it is under the output's precision, and empty space skipped by a coarse occupancy volume (the density's max over 8 × 8 × 8 cells), the ray stepping a block at a time where it is empty | 2.4 ms, 128 steps over 8.3 M pixels                                                | 0.5 to 1.5 ms, by how much of the box is empty or already opaque                                                                                                                                      | min-max octrees and occupancy grids in volume renderers                                                                                                                                                                          |
+| 4   | Passes fused, each field read once: the dampen into the velocity's advection; the curl and the confinement force in one pass with the curl in shared memory; the divergence into the first Jacobi dispatch; the body force's and the boundary's injections in one pass                                                                                                                                             | dampen 0.4, vorticity 1.7, inject 0.8, the divergence in the pressure              | 1 to 1.5 ms                                                                                                                                                                                           | the stencils are bandwidth-bound; kernel fusion and blocking (Intel 3.5D blocking, Aalto)                                                                                                                                        |
+| 5   | The temperature cleared once when `buoyancy` goes to 0, not both buffers every step, and its injection skipped while it is 0; nothing reads it then                                                                                                                                                                                                                                                                | 0.4 ms                                                                             | 0.4 to 0.5 ms                                                                                                                                                                                         | the code: `Fluid3D._advect_temperature`                                                                                                                                                                                          |
+| 6   | The 3D stencil passes on 3D workgroups: the advections, the curl, the divergence and the gradient run 16 × 16 × 1, one layer a group, so a group's z neighbors come from another group's reads; 8 × 8 × 4 groups keep the three neighbors in the cache                                                                                                                                                             | the advections 1.5, vorticity 1.7, the gradient and the divergence in the pressure | 0.3 to 0.6 ms                                                                                                                                                                                         | 3D blocking of stencils (Intel 3.5D blocking)                                                                                                                                                                                    |
+| 7   | MacCormack in one dispatch: the forward trace, the error and the clamp in the predictor's pass, the predictor kept in registers, so each field is written once and read once instead of twice                                                                                                                                                                                                                      | +0.7 ms on the velocity, +0.85 on the density                                      | 0.4 to 0.6 ms                                                                                                                                                                                         | the step's three passes read each field three times                                                                                                                                                                              |
+| 8   | A sparse grid: bricks of 8³ or 16³ cells, only those with velocity or density stepped (GVDB, EmberGen 2)                                                                                                                                                                                                                                                                                                           | every pass                                                                         | with the body alone in the box, up to half the step; the velocity fades over 60 s and the walls are closed, so the water fills the box over time and the gain goes to 0; the density's passes keep it | Wu et al. 2018; JangaFX                                                                                                                                                                                                          |
 
 ### The particles
 
-| # | Change                                                                                                     | Its share now                                        | Expected back                     | Source |
-|---|------------------------------------------------------------------------------------------------------------|------------------------------------------------------|-----------------------------------|--------|
-| 1 | Points and streaks rasterized in compute, not through the vertex and blend units: each particle adds its value by fixed-point `atomicAdd` into its slice of a storage buffer; a streak as a Bresenham line of the same adds | the points' draw, 2.7 ms at 2 M, 10 at 8 M; the streaks' 1.5 at 1 M | 2 to 5 × on the draw | Schütz 2019: 5 to 10 × faster than `GL_POINTS` at 1-pixel points, less above 2 pixels; `compute_rasterizer` |
-| 2 | Weighted blended order-independent transparency in place of the 16 depth slices: two targets at the output, no layered draw, no 1 GB of slices cleared and marched a frame, near ink over far by a depth weight | the slices' clear and march, 0.4 ms, and the layered draw | the march, the clear and a third to half of the draw | McGuire and Bavoil 2013 |
-| 3 | The blobs' and the spheres' sprites cut at 2 sigma instead of their full quad: a gaussian beyond 2 sigma holds 5% of its mass; and the growth capped under twice `radius`, since a sprite twice as wide fills four times the pixels | the blobs' p95, 9 ms of draw at 100 k, 30 at 500 k | half the fill; most of the p95 | measured above: the mean 1.3 against the p95 9 |
-| 4 | The surface's filter as a narrow-range filter, which keeps the edges with fewer passes, and the narrow band: only the particles at the liquid's surface drawn into the depth and thickness | the surface's march, 0.8 ms, and its draw | 0.3 to 1 ms; 2.4 × on the surface pass | Truong and Yuksel 2018; Oliveira and Paiva 2022 |
-| 5 | The draw by the alive count: `glDrawArraysIndirect` with the count the emission's head gives, so the vertex shader runs for the particles there are, not for every slot of the ring | the vertex shader over `count` slots a frame | up to the ring's empty share; 0 once it wraps | the code: the draw over `count` |
-| 6 | The ring sorted by the Morton order of the particles' cells now and then (a bitonic sort in compute), so a group's particles read the same velocity texels | the advection, 0.2 ms a million                      | under 0.5 ms at the baseline; 1.5 to 2 × at 8 M and more | a 3.2 × gain from sorting in a molecular-dynamics benchmark (NVIDIA forum); Morton-sorted SPH |
+| #   | Change                                                                                                                                                                                                                              | Its share now                                                       | Expected back                                            | Source                                                                                                      |
+|-----|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|----------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|
+| 1   | Points and streaks rasterized in compute, not through the vertex and blend units: each particle adds its value by fixed-point `atomicAdd` into its slice of a storage buffer; a streak as a Bresenham line of the same adds         | the points' draw, 2.7 ms at 2 M, 10 at 8 M; the streaks' 1.5 at 1 M | 2 to 5 × on the draw                                     | Schütz 2019: 5 to 10 × faster than `GL_POINTS` at 1-pixel points, less above 2 pixels; `compute_rasterizer` |
+| 2   | Weighted blended order-independent transparency in place of the 16 depth slices: two targets at the output, no layered draw, no 1 GB of slices cleared and marched a frame, near ink over far by a depth weight                     | the slices' clear and march, 0.4 ms, and the layered draw           | the march, the clear and a third to half of the draw     | McGuire and Bavoil 2013                                                                                     |
+| 3   | The blobs' and the spheres' sprites cut at 2 sigma instead of their full quad: a gaussian beyond 2 sigma holds 5% of its mass; and the growth capped under twice `radius`, since a sprite twice as wide fills four times the pixels | the blobs' p95, 9 ms of draw at 100 k, 30 at 500 k                  | half the fill; most of the p95                           | measured above: the mean 1.3 against the p95 9                                                              |
+| 4   | The surface's filter as a narrow-range filter, which keeps the edges with fewer passes, and the narrow band: only the particles at the liquid's surface drawn into the depth and thickness                                          | the surface's march, 0.8 ms, and its draw                           | 0.3 to 1 ms; 2.4 × on the surface pass                   | Truong and Yuksel 2018; Oliveira and Paiva 2022                                                             |
+| 5   | The draw by the alive count: `glDrawArraysIndirect` with the count the emission's head gives, so the vertex shader runs for the particles there are, not for every slot of the ring                                                 | the vertex shader over `count` slots a frame                        | up to the ring's empty share; 0 once it wraps            | the code: the draw over `count`                                                                             |
+| 6   | The ring sorted by the Morton order of the particles' cells now and then (a bitonic sort in compute), so a group's particles read the same velocity texels                                                                          | the advection, 0.2 ms a million                                     | under 0.5 ms at the baseline; 1.5 to 2 × at 8 M and more | a 3.2 × gain from sorting in a molecular-dynamics benchmark (NVIDIA forum); Morton-sorted SPH               |
 
 ### Measured
 
@@ -221,60 +221,60 @@ noise is the two befores' difference; a change counts as faster when it beats bo
 The harness's check is `fluid_compare.py` on stillslowfast, its water numbers and four saved outputs
 against the code before.
 
-| # | Change                          | Pass, ms mean        | Before | Change | Before again | Noise | Faster | Harness and picture         | Kept as     |
-|---|---------------------------------|----------------------|--------|--------|--------------|-------|--------|-----------------------------|-------------|
-| 1 | the temperature cleared once    | advect temperature   | 0.32   | 0.00   | 0.30         | 0.02  | yes    | the same; 0 of 255 apart    | replacement |
-|   |                                 | inject               | 0.66   | 0.52   | 0.66         | 0.00  | yes    |                             |             |
-| 2 | the composite's empty blocks skipped, by a volume of each 8³ block's largest density | composite, with the occupancy pass | 2.46 | 3.49 | 2.45 | 0.01 | no | the same; 1 of 255 apart | dropped |
-| 3 | 8 × 8 × 4 workgroups on the 13 stencil passes | the step | 10.30 | 10.09 | 10.33 | 0.03 | yes | the same; 0 of 255 apart | replacement |
-|   |                                 | advect velocity      | 0.82   | 0.78   | 0.81         | 0.01  | yes    |                             |             |
-|   |                                 | vorticity            | 1.25   | 1.22   | 1.26         | 0.01  | yes    |                             |             |
-|   |                                 | inject               | 0.49   | 0.41   | 0.47         | 0.02  | yes    |                             |             |
-|   |                                 | dampen               | 0.36   | 0.34   | 0.35         | 0.01  | no     |                             |             |
-|   |                                 | density              | 1.11   | 1.15   | 1.15         | 0.04  | no     |                             |             |
+| #   | Change                                                                               | Pass, ms mean                      | Before | Change | Before again | Noise | Faster | Harness and picture      | Kept as     |
+|-----|--------------------------------------------------------------------------------------|------------------------------------|--------|--------|--------------|-------|--------|--------------------------|-------------|
+| 1   | the temperature cleared once                                                         | advect temperature                 | 0.32   | 0.00   | 0.30         | 0.02  | yes    | the same; 0 of 255 apart | replacement |
+|     |                                                                                      | inject                             | 0.66   | 0.52   | 0.66         | 0.00  | yes    |                          |             |
+| 2   | the composite's empty blocks skipped, by a volume of each 8³ block's largest density | composite, with the occupancy pass | 2.46   | 3.49   | 2.45         | 0.01  | no     | the same; 1 of 255 apart | dropped     |
+| 3   | 8 × 8 × 4 workgroups on the 13 stencil passes                                        | the step                           | 10.30  | 10.09  | 10.33        | 0.03  | yes    | the same; 0 of 255 apart | replacement |
+|     |                                                                                      | advect velocity                    | 0.82   | 0.78   | 0.81         | 0.01  | yes    |                          |             |
+|     |                                                                                      | vorticity                          | 1.25   | 1.22   | 1.26         | 0.01  | yes    |                          |             |
+|     |                                                                                      | inject                             | 0.49   | 0.41   | 0.47         | 0.02  | yes    |                          |             |
+|     |                                                                                      | dampen                             | 0.36   | 0.34   | 0.35         | 0.01  | no     |                          |             |
+|     |                                                                                      | density                            | 1.11   | 1.15   | 1.15         | 0.04  | no     |                          |             |
 
-| 4 | MacCormack in one dispatch      |                      |        |        |              |       |        |                             | not built   |
-| 5 | the confinement force added in its own pass; the dampen in the velocity's advection | the step | 9.93 | 9.42 | 10.02 | 0.09 | yes | the same, as a 0.006% change of `vorticity` | replacement |
-|   |                                 | vorticity            | 1.20   | 0.92   | 1.21         | 0.01  | yes    |                             |             |
-|   |                                 | dampen, then advect velocity | 0.33 + 0.78 | 0.81 | 0.33 + 0.78 | 0.00 | yes |                     |             |
-| 6 | `pressure.solver` `SOR`, 10 sweeps at 1.8, an option | the step, harness   | 8.74   | 8.85   |              |       | no     | the water 1.23 of the body, was 0.90 | option |
-| 7 | `pressure.solver` `MULTIGRID`, 1 cycle, an option and the preset's | pressure | 4.07 | 2.56 | 4.12   | 0.05  | yes    | the water 1.36 of the body, was 0.90; the coast 0.10 s, was 0.94 | option, the preset's |
-|   |                                 | the step             | 9.31   | 7.77   | 9.41         | 0.10  | yes    |                             |             |
-|   |                                 | the frame            | 12.23  | 10.24  | 12.17        | 0.06  | yes    |                             |             |
-| 9 | the blobs drawn to 2.5 sigma, the gaussian scaled by its share inside | particles draw, 100 k blobs | 1.64, 2.15 | 0.96, 0.96 | 1.40, 1.38 | 0.24, 0.77 | not by the rule; below all four befores | 0.1 to 0.5 of 255 in the mean, 2% of pixels over 4 at the blobs' edges | replacement |
-|   |                                 | the harness's step   | 16.08  | 12.97  |              |       | yes    |                             |             |
-| 10 | the draw and the advection over the ring's filled slots, by indirect commands | particles draw, the preset's 1 M streaks at `rate` 0.1 | 1.33 | 1.12 | 1.41 | 0.08 | yes | the same; 0 of 255 apart | replacement |
-|   |                                 | particles draw, 2 M points at `rate` 20 | 2.75 | 2.54 | 2.55 | 0.20 | no: the ring is full |      |             |
-| 11 | `overlap` `WEIGHTED`, weighted blended order-independent transparency, an option | particles draw, 2 M points | 2.98 | 1.32 | 2.68 | 0.30 | yes | 0.25 of 255 in the mean against `OCCLUDED` | option |
-|   |                                 | particles march      | 0.40   | 0.21   | 0.41         | 0.01  | yes    |                             |             |
-|   |                                 | the step             | 8.77   | 6.41   | 8.47         | 0.30  | yes    |                             |             |
-| 12 | one-pixel points rasterized in compute, a half-float vector atomic add into the slices | particles draw, 2 M points | 2.70 | 3.14 | 2.73 | 0.03 | no: slower | 0.1 to 0.5 of 255 in the mean | dropped |
-| 13 | the surface's filter, a run of 256 pixels read once into shared memory | particles march, 100 k spheres | 0.70 | 0.89 | 0.70 | 0.00 | no: slower | 0.1 to 1.1 of 255 in the mean | dropped |
-| 14 | the ring sorted by Morton order |                     |        |        |              |       |        |                             | not built   |
+| 4   | MacCormack in one dispatch                                                             |                                                        |             |            |             |            |                                         |                                                                        | not built            |
+| 5   | the confinement force added in its own pass; the dampen in the velocity's advection    | the step                                               | 9.93        | 9.42       | 10.02       | 0.09       | yes                                     | the same, as a 0.006% change of `vorticity`                            | replacement          |
+|     |                                                                                        | vorticity                                              | 1.20        | 0.92       | 1.21        | 0.01       | yes                                     |                                                                        |                      |
+|     |                                                                                        | dampen, then advect velocity                           | 0.33 + 0.78 | 0.81       | 0.33 + 0.78 | 0.00       | yes                                     |                                                                        |                      |
+| 6   | `pressure.solver` `SOR`, 10 sweeps at 1.8, an option                                   | the step, harness                                      | 8.74        | 8.85       |             |            | no                                      | the water 1.23 of the body, was 0.90                                   | option               |
+| 7   | `pressure.solver` `MULTIGRID`, 1 cycle, an option and the preset's                     | pressure                                               | 4.07        | 2.56       | 4.12        | 0.05       | yes                                     | the water 1.36 of the body, was 0.90; the coast 0.10 s, was 0.94       | option, the preset's |
+|     |                                                                                        | the step                                               | 9.31        | 7.77       | 9.41        | 0.10       | yes                                     |                                                                        |                      |
+|     |                                                                                        | the frame                                              | 12.23       | 10.24      | 12.17       | 0.06       | yes                                     |                                                                        |                      |
+| 9   | the blobs drawn to 2.5 sigma, the gaussian scaled by its share inside                  | particles draw, 100 k blobs                            | 1.64, 2.15  | 0.96, 0.96 | 1.40, 1.38  | 0.24, 0.77 | not by the rule; below all four befores | 0.1 to 0.5 of 255 in the mean, 2% of pixels over 4 at the blobs' edges | replacement          |
+|     |                                                                                        | the harness's step                                     | 16.08       | 12.97      |             |            | yes                                     |                                                                        |                      |
+| 10  | the draw and the advection over the ring's filled slots, by indirect commands          | particles draw, the preset's 1 M streaks at `rate` 0.1 | 1.33        | 1.12       | 1.41        | 0.08       | yes                                     | the same; 0 of 255 apart                                               | replacement          |
+|     |                                                                                        | particles draw, 2 M points at `rate` 20                | 2.75        | 2.54       | 2.55        | 0.20       | no: the ring is full                    |                                                                        |                      |
+| 11  | `overlap` `WEIGHTED`, weighted blended order-independent transparency, an option       | particles draw, 2 M points                             | 2.98        | 1.32       | 2.68        | 0.30       | yes                                     | 0.25 of 255 in the mean against `OCCLUDED`                             | option               |
+|     |                                                                                        | particles march                                        | 0.40        | 0.21       | 0.41        | 0.01       | yes                                     |                                                                        |                      |
+|     |                                                                                        | the step                                               | 8.77        | 6.41       | 8.47        | 0.30       | yes                                     |                                                                        |                      |
+| 12  | one-pixel points rasterized in compute, a half-float vector atomic add into the slices | particles draw, 2 M points                             | 2.70        | 3.14       | 2.73        | 0.03       | no: slower                              | 0.1 to 0.5 of 255 in the mean                                          | dropped              |
+| 13  | the surface's filter, a run of 256 pixels read once into shared memory                 | particles march, 100 k spheres                         | 0.70        | 0.89       | 0.70        | 0.00       | no: slower                              | 0.1 to 1.1 of 255 in the mean                                          | dropped              |
+| 14  | the ring sorted by Morton order                                                        |                                                        |             |            |             |            |                                         |                                                                        | not built            |
 
 The preset as it was before step 9 (`cac62f39`, Jacobi, the preset's 1 M streaks occluded) against the
 preset now (the multigrid, every kept change), three runs, before, now, before:
 
-| Timer                | Before        | Now          | Before again  |
-|----------------------|---------------|--------------|---------------|
-| `GPU fluid`, the step | 8.92 / 11.37 | 6.55 / 8.09  | 10.04 / 13.16 |
-| pressure             | 4.06          | 2.60         | 4.27          |
-| vorticity            | 1.25          | 0.98         | 1.24          |
-| dampen               | 0.36          | in advection | 0.34          |
-| advect temperature   | 0.25          | 0.00         | 0.23          |
-| inject               | 0.43          | 0.26         | 0.44          |
-| particles draw       | 1.63          | 1.48         | 2.57          |
+| Timer                        | Before                | Now                   | Before again          |
+|------------------------------|-----------------------|-----------------------|-----------------------|
+| `GPU fluid`, the step        | 8.92 / 11.37          | 6.55 / 8.09           | 10.04 / 13.16         |
+| pressure                     | 4.06                  | 2.60                  | 4.27                  |
+| vorticity                    | 1.25                  | 0.98                  | 1.24                  |
+| dampen                       | 0.36                  | in advection          | 0.34                  |
+| advect temperature           | 0.25                  | 0.00                  | 0.23                  |
+| inject                       | 0.43                  | 0.26                  | 0.44                  |
+| particles draw               | 1.63                  | 1.48                  | 2.57                  |
 | the frame, `Render interval` | 11.80 / 17.95, 85 fps | 8.73 / 10.82, 115 fps | 12.88 / 17.53, 78 fps |
 
 Item 10 gives back nothing once the ring is full. Each look at its budget with every slot alive, `rate`
 20 and 50 (the ring full at both: 50 is no slower), the multigrid, three runs each:
 
-| Look, the ring full         | particles draw, ms mean, three runs | march     | the frame, ms    |
-|-----------------------------|--------------------------------------|-----------|------------------|
-| 2 M `POINTS`, occluded     | 2.79, 2.20, 2.67                     | 0.39–0.40 | 11.2–12.7        |
-| 1 M `STREAKS`, occluded    | 1.02, 3.59, 6.16; 3.02, 3.45, 1.84   | 0.35–0.40 | 9.6–14.9         |
-| 100 k `BLOBS`, occluded    | 0.98, 0.99, 1.33                     | 0.41–0.43 | 9.4–9.8          |
-| 100 k `SURFACE`            | 0.85, 0.88, 0.85                     | 0.70–0.74 | 9.6–9.7          |
+| Look, the ring full     | particles draw, ms mean, three runs | march     | the frame, ms |
+|-------------------------|-------------------------------------|-----------|---------------|
+| 2 M `POINTS`, occluded  | 2.79, 2.20, 2.67                    | 0.39–0.40 | 11.2–12.7     |
+| 1 M `STREAKS`, occluded | 1.02, 3.59, 6.16; 3.02, 3.45, 1.84  | 0.35–0.40 | 9.6–14.9      |
+| 100 k `BLOBS`, occluded | 0.98, 0.99, 1.33                    | 0.41–0.43 | 9.4–9.8       |
+| 100 k `SURFACE`         | 0.85, 0.88, 0.85                    | 0.70–0.74 | 9.6–9.7       |
 
 The streaks' draw is their length, the water's speed × the step, so it moves with the motion: from 1.0 to
 6.2 ms over six runs, one with a p95 of 45 ms. Since the multigrid the water runs faster round the body,
@@ -362,6 +362,23 @@ against 1.48, the faces averaged to the centers 0.16; with `viscosity` on at 20 
 restriction ([FLUID_3D.md](FLUID_3D.md#the-pressure)) the step is 4.40 ms, the pressure 1.44. Its layouts and the rest of its measures are in
 [FLUID_3D.md](FLUID_3D.md#measured).
 
+## Workgroup shapes
+
+Seven shapes swept over the fluid's 14 compute passes (`fluid_pass_check.py`, each pass alone), at the preset's
+288 × 512 × 64 and at depth 144 and 256. 8 × 8 × 4 is the best or tied for the stencil passes and the velocity's
+advection at depth 64. Two passes take others, at every depth:
+
+| Pass                                  | Shape     | Depth 64      | Depth 144     | Depth 256     |
+|---------------------------------------|-----------|---------------|---------------|---------------|
+| the density injections (each)         | 8 × 8 × 8 | 0.393 → 0.330 | 0.386 → 0.321 | 0.322 → 0.302 |
+| the field advection (density with 4K) | 8 × 4 × 8 | 0.991 → 0.955 | 1.149 → 1.116 | 1.390 → 1.354 |
+
+An injection's threads mostly read the bridge's image at their x, y and stop; a group 8 layers deep shares that
+read 8 ways. At depth 144 and 256 the stencils lean toward deeper groups too, the pressure 3.15 → 3.01 ms
+(8 × 8 × 8) and 4.98 → 4.75 (4 × 8 × 8), about twice a pass's spread between runs at those sizes, while at
+depth 64 the finest smoothing is 7% slower at 8 × 8 × 8; a grid of 144 or deeper wants the pressure's shaders
+measured again.
+
 ## The density at the output's 4K
 
 The upscaled density ([FLUID_3D.md](FLUID_3D.md#the-densitys-detail)): the amount at 2160 × 3840 ×
@@ -369,18 +386,18 @@ The upscaled density ([FLUID_3D.md](FLUID_3D.md#the-densitys-detail)): the amoun
 other settings, the pose on, one 60 s run each after 10 s. Semi-Lagrangian, with the depth scale and the dampen
 at 3 widths/s:
 
-| Fluid layers | Density layers | The step     | pressure    | density     | composite   | The frame              |
-|--------------|----------------|--------------|-------------|-------------|-------------|------------------------|
-| 16           | 16             | 3.70 / 4.67  | 0.98 / 1.41 | 1.29 / 1.74 | 0.92 / 1.32 | 6.58 / 8.46, 152 fps   |
-| 16           | 8              | 2.69 / 3.53  | 0.96 / 1.40 | 0.78 / 1.17 | 0.48 / 0.78 | 5.51 / 7.86, 181 fps   |
-| 32           | 32             | 6.96 / 8.68  | 1.87 / 2.38 | 2.48 / 3.34 | 1.65 / 2.65 | 11.38 / 15.03, 88 fps  |
-| 32           | 16             | 5.74 / 7.43  | 2.25 / 3.24 | 1.61 / 2.43 | 0.80 / 1.21 | 9.05 / 11.49, 110 fps  |
+| Fluid layers | Density layers | The step      | pressure    | density      | composite   | The frame             |
+|--------------|----------------|---------------|-------------|--------------|-------------|-----------------------|
+| 16           | 16             | 3.70 / 4.67   | 0.98 / 1.41 | 1.29 / 1.74  | 0.92 / 1.32 | 6.58 / 8.46, 152 fps  |
+| 16           | 8              | 2.69 / 3.53   | 0.96 / 1.40 | 0.78 / 1.17  | 0.48 / 0.78 | 5.51 / 7.86, 181 fps  |
+| 32           | 32             | 6.96 / 8.68   | 1.87 / 2.38 | 2.48 / 3.34  | 1.65 / 2.65 | 11.38 / 15.03, 88 fps |
+| 32           | 16             | 5.74 / 7.43   | 2.25 / 3.24 | 1.61 / 2.43  | 0.80 / 1.21 | 9.05 / 11.49, 110 fps |
 | 48           | 48             | 11.84 / 17.45 | 3.35 / 4.82 | 4.56 / 10.46 | 2.31 / 3.60 | 19.26 / 31.62, 52 fps |
-| 48           | 24             | 9.50 / 12.31 | 4.12 / 5.75 | 2.41 / 3.89 | 1.24 / 2.05 | 15.11 / 24.46, 66 fps  |
-| 48           | 16             | 7.83 / 9.55  | 3.74 / 4.60 | 1.83 / 2.65 | 0.81 / 1.33 | 11.90 / 18.88, 84 fps  |
-| 64           | 64             | 14.60 / 18.22 | 4.63 / 6.25 | 5.29 / 7.83 | 2.81 / 3.39 | 20.90 / 25.78, 48 fps |
-| 64           | 32             | 11.60 / 12.97 | 5.25 / 6.49 | 2.95 / 4.20 | 1.42 / 1.75 | 15.99 / 18.31, 63 fps |
-| 64           | 16             | 9.77 / 11.22 | 5.05 / 6.46 | 1.90 / 2.70 | 0.93 / 1.86 | 13.74 / 16.92, 73 fps  |
+| 48           | 24             | 9.50 / 12.31  | 4.12 / 5.75 | 2.41 / 3.89  | 1.24 / 2.05 | 15.11 / 24.46, 66 fps |
+| 48           | 16             | 7.83 / 9.55   | 3.74 / 4.60 | 1.83 / 2.65  | 0.81 / 1.33 | 11.90 / 18.88, 84 fps |
+| 64           | 64             | 14.60 / 18.22 | 4.63 / 6.25 | 5.29 / 7.83  | 2.81 / 3.39 | 20.90 / 25.78, 48 fps |
+| 64           | 32             | 11.60 / 12.97 | 5.25 / 6.49 | 2.95 / 4.20  | 1.42 / 1.75 | 15.99 / 18.31, 63 fps |
+| 64           | 16             | 9.77 / 11.22  | 5.05 / 6.46 | 1.90 / 2.70  | 0.93 / 1.86 | 13.74 / 16.92, 73 fps |
 
 Within 60 fps: up to 32 fluid layers with the density at 32, 48 with it at 24 or 16, 64 at 32 or 16. From 48 fluid
 layers up the pressure solve is the largest pass (3.7–5.3 ms). The density's
