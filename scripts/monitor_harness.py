@@ -19,14 +19,14 @@ from typing import Callable
 import cv2
 import glfw
 import numpy as np
-from OpenGL.GL import (GL_ARRAY_BUFFER, GL_FALSE, GL_FLOAT, GL_FRAMEBUFFER, GL_QUERY_RESULT, GL_RGBA, GL_RGBA32F,
+from OpenGL.GL import (GL_ARRAY_BUFFER, GL_FALSE, GL_FLOAT, GL_FRAMEBUFFER, GL_QUERY_RESULT, GL_R32F, GL_RED, GL_RGBA, GL_RGBA32F,
                        GL_STATIC_DRAW, GL_TEXTURE_2D, GL_TEXTURE_3D, GL_TIME_ELAPSED, glBeginQuery,
                        glBindBuffer, glBindFramebuffer, glBindTexture, glBindVertexArray, glBufferData,
                        glEnableVertexAttribArray, glEndQuery, glFinish, glGenBuffers, glGenQueries, glGenVertexArrays,
                        glGetQueryObjectuiv, glTexImage2D, glTexSubImage3D, glVertexAttribPointer, glViewport)
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from modules.flow import Cut, OnDemand, Port, TextureKind, VolumeCut, cut_size  # noqa: E402
+from modules.flow import REFERENCE_STEP, Cut, OnDemand, Port, TextureKind, VolumeCut  # noqa: E402
 from modules.gl import Fbo, MouseButton, Style, Texture, Texture3D  # noqa: E402
 from modules.render.layers import Channel, FlowStage, MonitorInput, MonitorLayer, MonitorLayerSettings, MonitorView  # noqa: E402
 
@@ -137,8 +137,7 @@ class Results:
 
 # ── step 1a: the monitor at its drawn size ──────────────────────────────
 
-VIEWS: tuple[MonitorView, ...] = (MonitorView.IMAGE, MonitorView.COLORMAP, MonitorView.GLYPHS,
-                                  MonitorView.HISTOGRAM, MonitorView.STRIP)
+VIEWS: tuple[MonitorView, ...] = tuple(MonitorView)
 
 
 def check_drawn_size(results: Results, port: Port) -> None:
@@ -154,7 +153,8 @@ def check_drawn_size(results: Results, port: Port) -> None:
 
 
 def check_colormap_values(results: Results, port: Port, values: np.ndarray) -> None:
-    """The colormap of the middle pixel is 0.5 + 0.5 × the value, as `channel_view.frag` draws it."""
+    """The colormap of a velocity's pixel is its direction's color, 0.5 + 0.5 × the unit vector, times its
+    size capped at 1, as `channel_view.frag` draws it."""
     monitor = Monitor(port, MonitorView.COLORMAP)
     monitor.settings.advanced.legend = False
     monitor.tick(PANEL)
@@ -162,8 +162,10 @@ def check_colormap_values(results: Results, port: Port, values: np.ndarray) -> N
     h, w = pixels.shape[:2]
     got = pixels[h // 4, w // 4, :3].astype(np.float32) / 255.0                 # a quarter in from the top left
     vh, vw = values.shape[:2]
-    want = np.clip(0.5 + 0.5 * values[vh - 1 - vh // 4, vw // 4, :3], 0.0, 1.0)   # the texture's row 0 is its bottom
-    results.check('the colormap draws the value around grey', bool(np.all(np.abs(got - want) < 0.02)),
+    v = values[vh - 1 - vh // 4, vw // 4, :3]                                   # the texture's row 0 is its bottom
+    size = float(np.linalg.norm(v))
+    want = np.clip((0.5 + 0.5 * v / max(size, 1e-9)) * min(size, 1.0), 0.0, 1.0)
+    results.check('the colormap draws a velocity by its direction, as bright as its size', bool(np.all(np.abs(got - want) < 0.02)),
                   f'got {np.round(got, 3)}, want {np.round(want, 3)}')
 
 
@@ -262,7 +264,7 @@ def check_cuts(results: Results, values: np.ndarray) -> None:
 
 
 def check_volume_monitor(results: Results, values: np.ndarray) -> None:
-    """A volume in the monitor: one refresh a tick for two monitors, the cut's proportions, every layer counted."""
+    """A volume in the monitor: one refresh a tick for two monitors, every layer counted."""
     d, h, w = values.shape[:3]
     volume = volume_of(values)
     refreshes: list[int] = []
@@ -276,13 +278,6 @@ def check_volume_monitor(results: Results, values: np.ndarray) -> None:
     results.check('two monitors on a volume refresh it once a tick', len(refreshes) == 3, f'{len(refreshes)} in 3 ticks')
     results.check('the histogram counts every layer', b.layer._visualizer.histogram_total == w * h * d,
                   f'{b.layer._visualizer.histogram_total}')
-    for cut in (Cut.SLICE, Cut.FRONT, Cut.TOP, Cut.SIDE):
-        a.settings.advanced.cut = cut
-        a.tick(PANEL)
-        results.save(f'1b_{cut.name.lower()}', a.picture())
-        size = cut_size(cut, w, h, d / w)
-        results.check(f'{cut.name.lower()}: drawn in its proportions', a.layer._aspect is not None
-                      and abs(a.layer._aspect - size[0] / size[1]) < 1e-6)
     volume.deallocate()
 
 
@@ -305,52 +300,95 @@ def step_1b(results: Results) -> None:
     check_cut_times(results)
 
 
-# ── step 3: the cube, stacked slices ──────────────────────────────────────
+# ── step 3: the cube ──────────────────────────────────────────────────────
+
+def cube_monitor(values: np.ndarray, kind: TextureKind, view: MonitorView, extent: float = 0.5) -> Monitor:
+    monitor = Monitor(Port(volume_of(values), kind, extent), view)
+    monitor.settings.advanced.legend = False
+    return monitor
+
+
+def middle(monitor: Monitor) -> np.ndarray:
+    return monitor.picture()[PANEL[1] // 2, PANEL[0] // 2].astype(np.float32)
+
 
 def check_cube_order(results: Results) -> None:
-    """The near layers cover the far ones from both sides: the front's red from the front, the back's blue from behind."""
-    values = np.zeros((4, 32, 32, 4), np.float32)
-    values[0, ..., 0] = 1.0                      # the front layer red
-    values[3, ..., 2] = 1.0                      # the back layer blue
-    port = Port(volume_of(values), TextureKind.IMAGE, 0.5)
-    monitor = Monitor(port, MonitorView.IMAGE)
-    monitor.settings.advanced.cut = Cut.CUBE
+    """The near side covers the far one from both sides: the front's red from the front, the back's blue from behind."""
+    d, h, w = 8, 48, 64
+    layered = np.zeros((d, h, w, 4), np.float32)
+    layered[:2, ..., 0] = 1.0                    # the front red
+    layered[-2:, ..., 2] = 1.0                   # the back blue
+    monitor = cube_monitor(layered, TextureKind.IMAGE, MonitorView.COLORMAP)
     for yaw_drag, name in ((0.0, 'front'), (-1.0, 'back')):
         monitor.layer.reset_view()
         monitor.layer.drag(yaw_drag, 0.0, MouseButton.LEFT)
         monitor.tick(PANEL)
-        pixels = monitor.picture()
-        red, blue = (float(pixels[PANEL[1] // 2, PANEL[0] // 2, c]) for c in (0, 2))
-        near_red: bool = name == 'front'
-        results.check(f'the cube from the {name} shows its near layer', (red > blue) == near_red, f'red {red:.0f}, blue {blue:.0f}')
+        red, blue = middle(monitor)[0], middle(monitor)[2]
+        results.check(f'the cube from the {name} shows its near side over its far side', (red > blue) == (name == 'front'),
+                      f'red {red:.0f}, blue {blue:.0f}')
+        results.save(f'3_cube_layers_{name}', monitor.picture())
+
+    monitor.layer.reset_view()
+    monitor.settings.advanced.slice = True
+    monitor.layer.scroll(d, d)                   # the back layer
+    monitor.tick(PANEL)
+    red, blue = middle(monitor)[0], middle(monitor)[2]
+    results.check('the slice on the back layer brings it forward of the dimmed front', blue > red, f'red {red:.0f}, blue {blue:.0f}')
+    results.save('3_cube_slice_back', monitor.picture())
 
 
-def check_cube_pictures(results: Results, values: np.ndarray) -> None:
-    d, h, w = values.shape[:3]
-    port = Port(volume_of(values), TextureKind.SCALAR, 0.5)
-    monitor = Monitor(port, MonitorView.COLORMAP)
-    monitor.settings.advanced.cut = Cut.CUBE
-    for name, drags in (('front', []), ('turned', [(0.2, 0.12)]), ('top', [(0.0, 0.48)]), ('side', [(-0.5, 0.0)])):
-        monitor.layer.reset_view()
-        for dx, dy in drags:
-            monitor.layer.drag(dx, dy, MouseButton.LEFT)
-        monitor.layer.scroll(1, d)
+def check_cube_colors(results: Results) -> None:
+    """A velocity by its direction alone: slow and fast +x both reddish, the empty volume clear."""
+    d, h, w = 8, 48, 64
+    for speed in (0.1, 1.0):
+        flow = np.zeros((d, h, w, 4), np.float32)
+        flow[..., 0] = speed
+        monitor = cube_monitor(flow, TextureKind.VELOCITY, MonitorView.COLORMAP)
+        monitor.settings.advanced.scale = 1.0 / speed        # full either way: the color alone is compared
         monitor.tick(PANEL)
-        results.save(f'3_cube_{name}', monitor.picture())
-    results.check('the cube renders at the drawn size', (monitor.layer.texture.width, monitor.layer.texture.height) == PANEL)
+        r, g, b, _ = middle(monitor)
+        results.check(f'a velocity of {speed} along +x is colored by its direction', r > g + 40 and abs(g - b) < 10,
+                      f'rgb {r:.0f} {g:.0f} {b:.0f}')
+    empty = cube_monitor(np.zeros((d, h, w, 4), np.float32), TextureKind.SCALAR, MonitorView.COLORMAP)
+    empty.tick(PANEL)
+    results.check('an empty volume draws nothing, only the edges', int(middle(empty)[3]) == 0, f'alpha {middle(empty)[3]}')
 
-    big = Port(volume_of(np.zeros((16, 800, 448, 4), np.float32)), TextureKind.SCALAR, 0.14)
-    timed = Monitor(big, MonitorView.COLORMAP)
-    timed.settings.advanced.cut = Cut.CUBE
-    timed.tick(PANEL)
-    ms = gpu_ms(lambda: timed.tick(PANEL))
-    print(f'     the cube   {ms:6.2f} ms of a 448 x 800 x 16 volume at {PANEL[0]} x {PANEL[1]}')
+
+def check_cube_sphere(results: Results) -> None:
+    d, h, w = 8, 48, 64
+    sphere = known_volume(w, h, d)
+    sphere[..., 0] = sphere[..., 1]
+    cube = cube_monitor(sphere, TextureKind.SCALAR, MonitorView.COLORMAP)
+    cube.settings.advanced.channel = Channel.X
+    cube.layer.drag(0.15, 0.1, MouseButton.LEFT)
+    cube.tick(PANEL)
+    pixels = cube.picture()
+    alpha = pixels[..., 3].astype(np.float32)
+    ys, xs = np.nonzero(alpha > 0.3 * alpha.max())
+    centered = len(xs) > 0 and abs(float(xs.mean()) - PANEL[0] / 2) < PANEL[0] * 0.1 and abs(float(ys.mean()) - PANEL[1] / 2) < PANEL[1] * 0.1
+    results.check("a sphere's cube is densest at the box's middle", centered, f'{len(xs)} pixels')
+    results.save('3_cube_sphere', pixels)
+    cube.settings.advanced.slice = True
+    cube.tick(PANEL)
+    results.save('3_cube_sphere_slice', cube.picture())
+    results.check('the cube renders at the drawn size', (cube.layer.texture.width, cube.layer.texture.height) == PANEL)
+
+
+def check_cube_times(results: Results) -> None:
+    big = cube_monitor(known_volume(448, 800, 16), TextureKind.SCALAR, MonitorView.COLORMAP, 0.14)
+    for slice_on in (False, True):
+        big.settings.advanced.slice = slice_on
+        big.tick(PANEL)
+        ms = gpu_ms(lambda: big.tick(PANEL), 10)
+        print(f'     the cube{" + slice" if slice_on else ""}  {ms:6.2f} ms of a 448 x 800 x 16 volume at {PANEL[0]} x {PANEL[1]}')
 
 
 def step_3(results: Results) -> None:
-    print('step 3: the cube, stacked slices')
+    print('step 3: the cube')
     check_cube_order(results)
-    check_cube_pictures(results, known_volume(64, 48, 8))
+    check_cube_colors(results)
+    check_cube_sphere(results)
+    check_cube_times(results)
 
 
 # ── step 4: glyphs ────────────────────────────────────────────────────────
@@ -375,10 +413,35 @@ def check_flat_dots(results: Results) -> None:
                   f'{np.round(center, 2)}')
     results.save('4_dots_flat', pixels)
 
+    one = Texture()                                         # a one-channel texture marked a velocity: dots, not diagonal arrows
+    one.allocate(512, 288, GL_R32F)
+    glBindTexture(GL_TEXTURE_2D, one.tex_id)
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R32F, 512, 288, 0, GL_RED, GL_FLOAT, np.full((288, 512), 0.8, np.float32))
+    glBindTexture(GL_TEXTURE_2D, 0)
+    monitor = Monitor(Port(one, TextureKind.VELOCITY), MonitorView.GLYPHS)
+    monitor.settings.advanced.legend = False
+    monitor.tick(PANEL)
+    pixels = monitor.picture()
+    center = pixels[spacing // 2, spacing // 2, :3].astype(np.float32) / 255.0
+    results.check('a one-channel texture draws dots, whatever its kind', bool(np.allclose(center, (0.9, 0.9, 0.9), atol=0.05)),
+                  f'{np.round(center, 2)}')
+    results.save('4_dots_one_channel', pixels)
+
+    push = np.zeros((288, 512, 4), np.float32)
+    push[..., 0] = 0.8 / REFERENCE_STEP                     # 0.8 widths/s per step along +x
+    arrows, pushes = (Monitor(Port(texture_of(push * (REFERENCE_STEP if kind == TextureKind.VELOCITY else 1.0)), kind), MonitorView.GLYPHS)
+                      for kind in (TextureKind.VELOCITY, TextureKind.ACCELERATION))
+    for monitor in (arrows, pushes):
+        monitor.settings.advanced.legend = False
+        monitor.tick(PANEL)
+    filled = len(drawn(pushes.picture())) > len(drawn(arrows.picture()))
+    results.check("an acceleration draws a filled push, the arrow's length per step", filled,
+                  f'{len(drawn(pushes.picture()))} against {len(drawn(arrows.picture()))} pixels')
+    results.save('4_pushes_flat', pushes.picture())
+
 
 def glyph_monitor(values: np.ndarray, kind: TextureKind, extent: float = 0.5) -> Monitor:
     monitor = Monitor(Port(volume_of(values), kind, extent), MonitorView.GLYPHS)
-    monitor.settings.advanced.cut = Cut.CUBE
     monitor.settings.advanced.legend = False
     return monitor
 
@@ -393,6 +456,15 @@ def check_3d_glyphs(results: Results) -> None:
     blue = len(pixels) > 0 and float(pixels[:, 2].mean()) > float(pixels[:, 0].mean())
     results.check('an arrow pointing at the camera still shows, in its direction color', blue, f'{len(pixels)} pixels')
     results.save('4_arrows_toward', monitor.picture())
+
+    faint = np.zeros((d, h, w, 4), np.float32)
+    faint[..., 0] = 0.02                                     # far below a tenth of full: a dot, still +x's color
+    monitor = glyph_monitor(faint, TextureKind.VELOCITY)
+    monitor.tick(PANEL)
+    pixels = drawn(monitor.picture())
+    reddish = len(pixels) > 0 and float(pixels[:, 0].mean()) > float(pixels[:, 1].mean()) + 20
+    results.check('a tiny force draws a dot in its direction color', reddish, f'{len(pixels)} pixels')
+    results.save('4_arrows_tiny', monitor.picture())
 
     swirl_volume = np.repeat(swirl(w, h)[None], d, axis=0)
     swirl_volume[..., 2] = np.linspace(-1.0, 1.0, d)[:, None, None]      # z from the back to the front
@@ -428,60 +500,6 @@ def step_4(results: Results) -> None:
     check_3d_glyphs(results)
 
 
-# ── step 5: the fog ───────────────────────────────────────────────────────
-
-def fog_monitor(values: np.ndarray, kind: TextureKind, view: MonitorView, extent: float = 0.5) -> Monitor:
-    monitor = Monitor(Port(volume_of(values), kind, extent), view)
-    monitor.settings.advanced.cut = Cut.FOG
-    monitor.settings.advanced.legend = False
-    return monitor
-
-
-def check_fog(results: Results) -> None:
-    d, h, w = 8, 48, 64
-    layered = np.zeros((d, h, w, 4), np.float32)
-    layered[:2, ..., 0] = 1.0                    # the front red
-    layered[-2:, ..., 2] = 1.0                   # the back blue
-    monitor = fog_monitor(layered, TextureKind.IMAGE, MonitorView.IMAGE)
-    for yaw_drag, name in ((0.0, 'front'), (-1.0, 'back')):
-        monitor.layer.reset_view()
-        monitor.layer.drag(yaw_drag, 0.0, MouseButton.LEFT)
-        monitor.tick(PANEL)
-        pixels = monitor.picture()
-        red, blue = (float(pixels[PANEL[1] // 2, PANEL[0] // 2, c]) for c in (0, 2))
-        results.check(f'the fog from the {name} shows its near side over its far side', (red > blue) == (name == 'front'),
-                      f'red {red:.0f}, blue {blue:.0f}')
-        results.save(f'5_fog_layers_{name}', pixels)
-
-    empty = fog_monitor(np.zeros((d, h, w, 4), np.float32), TextureKind.SCALAR, MonitorView.COLORMAP)
-    empty.tick(PANEL)
-    middle = empty.picture()[PANEL[1] // 2, PANEL[0] // 2]
-    results.check('an empty volume draws no fog, only the edges', int(middle[3]) == 0, f'alpha {middle[3]}')
-
-    sphere = known_volume(w, h, d)
-    sphere[..., 0] = sphere[..., 1]
-    fog = fog_monitor(sphere, TextureKind.SCALAR, MonitorView.COLORMAP)
-    fog.settings.advanced.channel = Channel.X
-    fog.layer.drag(0.15, 0.1, MouseButton.LEFT)
-    fog.tick(PANEL)
-    pixels = fog.picture()
-    alpha = pixels[..., 3].astype(np.float32)
-    ys, xs = np.nonzero(alpha > 0.3 * alpha.max())
-    centered = len(xs) > 0 and abs(float(xs.mean()) - PANEL[0] / 2) < PANEL[0] * 0.1 and abs(float(ys.mean()) - PANEL[1] / 2) < PANEL[1] * 0.1
-    results.check("a sphere's fog is densest at the box's middle", centered, f'{len(xs)} pixels')
-    results.save('5_fog_sphere', pixels)
-
-    big = fog_monitor(known_volume(448, 800, 16), TextureKind.SCALAR, MonitorView.COLORMAP, 0.14)
-    big.tick(PANEL)
-    ms = gpu_ms(lambda: big.tick(PANEL), 10)
-    print(f'     the fog    {ms:6.2f} ms of a 448 x 800 x 16 volume at {PANEL[0]} x {PANEL[1]}')
-
-
-def step_5(results: Results) -> None:
-    print('step 5: the fog')
-    check_fog(results)
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('--no-png', action='store_true', help='skip the pictures')
@@ -492,7 +510,6 @@ def main() -> int:
     step_1b(results)
     step_3(results)
     step_4(results)
-    step_5(results)
     glFinish()
     glfw.destroy_window(window)
     glfw.terminate()

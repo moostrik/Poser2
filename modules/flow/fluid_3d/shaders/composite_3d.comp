@@ -9,6 +9,8 @@
  *   glow         the unoccluded additive sum is accumulated alongside and
  *                mixed in: uGlow = 1 is the additive composite
  *   tint + fog   far density shifts toward water color and fades
+ *   light        with uLit, each sample's emission × mix(1, the light reaching it, uShadow), the light
+ *                grid's transmittance times the Henyey–Greenstein phase toward the viewer
  *
  * Dispatched as a 2D compute (one thread per output pixel). The output may
  * be larger than the volume: the volume is sampled by uv. Split, the amount is
@@ -20,19 +22,36 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 layout(binding = 0) uniform sampler3D uDensity;  // RGBA16F, or with uSplit the amount alone (R16F)
 layout(binding = 1) uniform sampler3D uColor;    // with uSplit: the color volume, color × amount and the amount
+layout(binding = 2) uniform sampler3D uLight;    // with uLit: the light reaching each place, RGB transmittance
 
 layout(rgba16f, binding = 0) writeonly uniform image2D uOutput;
 
 uniform int   uDepth;        // Number of layers, the march's steps
 uniform ivec2 uOutputSize;   // 2D output dimensions
-uniform float uEmission;     // Density brightness gain
-uniform float uAbsorption;   // Extinction per unit density
+uniform float uEmission;     // Brightness of an amount of 1 filling the whole depth, unoccluded
+uniform float uAbsorption;   // Extinction of an amount of 1 over the whole depth
 uniform float uTint;         // 0..1 mix toward per-channel water extinction
 uniform float uFog;          // Medium extinction over the full depth
 uniform float uGlow;         // 0 = occluded volumetric, 1 = additive
 uniform bool  uSplit;        // the amount from uDensity, its color from uColor (the upscaled density)
+uniform bool  uLit;          // the density lit by uLight
+uniform float uShadow;       // how dark the shadowed parts get, 0 to 1
+uniform float uAnisotropy;   // Henyey–Greenstein g, 0 even, toward 1 forward
+uniform bool  uPoint;        // a lamp at uVector's place, else a sun toward uVector
+uniform vec3  uVector;       // toward the sun, or the lamp's place, ±1 the box's sides
+uniform vec3  uBox;          // the box in widths: 1, height over width, depth over width
 
 const vec3 WATER_CHAN = vec3(1.8, 1.0, 0.6);  // relative extinction: red dies first
+
+// The share of light a sample sends toward the viewer (along -z), 1 for g = 0: Henyey–Greenstein,
+// its cosine between the light's travel and the way to the eye, which is the light's direction's z
+float phase(vec3 uvw) {
+    if (uAnisotropy <= 0.0) return 1.0;
+    vec3 to_light = uPoint ? (0.5 + 0.5 * uVector) * uBox - uvw * uBox : uVector;
+    float cosine = normalize(length(to_light) > 1e-6 ? to_light : vec3(0.0, -1.0, 0.0)).z;
+    float g = uAnisotropy;
+    return (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * cosine, 1.5);
+}
 
 void main() {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
@@ -44,8 +63,9 @@ void main() {
     float inv_steps = 1.0 / float(steps);
 
     vec3 chan  = mix(vec3(1.0), WATER_CHAN, uTint);
-    vec3 sigma = uAbsorption * chan;
+    vec3 sigma = (uAbsorption / float(steps)) * chan;     // per layer: the depth's over its layers
     vec3 fog_s = (uFog / float(steps)) * chan;
+    float emission = uEmission / float(steps);
 
     vec3 T   = vec3(1.0);  // transmittance
     vec3 vol = vec3(0.0);  // occluded accumulation
@@ -59,11 +79,15 @@ void main() {
             s = vec4(c.rgb / max(c.a, 1e-4) * s.r, s.r);
         }
 
-        vec3 e = uEmission * max(s.rgb, vec3(0.0));
+        vec3 e = emission * max(s.rgb, vec3(0.0));
+        if (uLit) {
+            vec3 uvw = vec3(uv, z_norm);
+            e *= mix(vec3(1.0), texture(uLight, uvw).rgb * phase(uvw), uShadow);
+        }
         vol += T * e;
         add += e;
 
-        float d = max(s.r, max(s.g, s.b));
+        float d = max(s.a, 0.0);          // the amount: the same amount covers the same, whatever its color
         T *= exp(-(sigma * d + fog_s));
 
         // Fully occluded and no additive term left to accumulate

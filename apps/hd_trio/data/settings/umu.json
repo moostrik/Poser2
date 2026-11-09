@@ -534,7 +534,7 @@
     "monitor_a": {
       "stage": "BRIDGE",
       "texture": "output.boundary_velocity",
-      "view": "AUTO",
+      "view": "GLYPHS",
       "advanced": {
         "channel": "ALL",
         "scale": 1.0,
@@ -545,7 +545,7 @@
     "monitor_b": {
       "stage": "FLUID",
       "texture": "output.density",
-      "view": "AUTO",
+      "view": "COLORMAP",
       "advanced": {
         "channel": "ALL",
         "scale": 1.0,

@@ -22,8 +22,11 @@ from .boundary_velocity_3d import BoundaryVelocity3D
 from .body_force_acceleration_3d import BodyForceAcceleration3D
 from .add_3d import Add3D
 from .inject_binary_3d import InjectBinary3D
-from .composite_3d import Composite3D
+from .composite_3d import Composite3D, CompositeLight
+from .light_volume_3d import LightVolume3D
+from .light_blur_3d import LightBlur3D
 from .composite_over import CompositeOver
+from .knee import Knee
 
 # The particle carrier
 from .particle_emit import ParticleEmit

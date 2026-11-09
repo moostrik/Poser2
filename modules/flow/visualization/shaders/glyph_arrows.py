@@ -16,8 +16,8 @@ class GlyphArrows(Shader):
     """Draws an arrow per grid point along the volume's velocity; the depth test is the caller's."""
 
     def use(self, volume: Texture3D, view_projection: np.ndarray, box: tuple[float, float, float],
-            grid: tuple[int, int, int], scale: float) -> None:
-        """Draw the arrows.
+            grid: tuple[int, int, int], scale: float, pixels_per_unit: float, push: bool = False) -> None:
+        """Draw the arrows, a tiny velocity's as a dot.
 
         Args:
             volume: The velocity (xyz)
@@ -25,6 +25,8 @@ class GlyphArrows(Shader):
             box: The box's size, its width 1
             grid: The grid points across, down and deep
             scale: Multiplier on the velocity
+            pixels_per_unit: Pixels a box unit spans at a clip w of 1, for the dot's least size
+            push: An acceleration: the cone alone, without the shaft
         """
         if not self.allocated or not self.shader_program or not volume.allocated:
             return
@@ -36,5 +38,7 @@ class GlyphArrows(Shader):
         glUniform3f(self.get_uniform_loc("box"), *box)
         glUniform3i(self.get_uniform_loc("grid"), *grid)
         glUniform1f(self.get_uniform_loc("scale"), scale)
+        glUniform1f(self.get_uniform_loc("pixels_per_unit"), pixels_per_unit)
+        glUniform1i(self.get_uniform_loc("push"), 1 if push else 0)
         glDrawArraysInstanced(GL_TRIANGLES, 0, VERTICES, grid[0] * grid[1] * grid[2])
         glBindTexture(GL_TEXTURE_3D, 0)

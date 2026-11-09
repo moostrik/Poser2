@@ -24,10 +24,10 @@ def box_size(width: int, height: int, extent: float) -> tuple[float, float, floa
 class Orbit:
     """Yaw and pitch (degrees) and zoom (1 frames the box) of a camera looking at the box's center."""
 
-    def __init__(self) -> None:
-        self.yaw: float = 0.0
-        self.pitch: float = 0.0
-        self.zoom: float = 1.0
+    def __init__(self, yaw: float = 0.0, pitch: float = 0.0, zoom: float = 1.0) -> None:
+        self.yaw: float = yaw
+        self.pitch: float = pitch
+        self.zoom: float = zoom
 
     def reset(self) -> None:
         """The front view, framed."""

@@ -6,7 +6,7 @@ FRAMES is what depth_velocity_capture saved from one loop of a recording. No app
 gives the GL context, one `LucasKanadeFlow3D` measures the saved frames with the settings they were saved with,
 and every side is a `Bridge3DLayer` and a `Fluid3DLayer` on its velocity, with deep_flow's preset (`render.bridge`,
 `render.fluid`); PATH=VALUE sets one setting by its panel path under `bridge.` or `fluid.`
-(fluid.velocity.boundary_drag=50, bridge.readings.lowpass.smooth=300, fluid.velocity.boundary_gain=2). The bridge and the
+(fluid.input.boundary.velocity_drag=50, bridge.readings.lowpass.smooth=300, fluid.input.boundary.velocity_gain=2). The bridge and the
 fluid step once per flow frame by the frame's saved interval; `--every N` steps them once per N frames with the
 frames' summed interval (the flow still measures every frame), a frame-rate check. `--save DIR` writes every side's
 composited output at four steps of the loop, a quarter apart, as 8-bit PNGs (DIR/<side>_<step>.png), for a picture
@@ -112,7 +112,7 @@ class Side:
         port = self.fluid.ports[name]
         volume = port.texture
         assert isinstance(volume, Texture3D)
-        return read_back(self.cut.process(volume, Cut.SLICE, self.fluid_settings.injection_layer, TextureKind.SCALAR, port.extent))
+        return read_back(self.cut.process(volume, Cut.SLICE, self.fluid_settings.input.layer, TextureKind.SCALAR, port.extent))
 
     def measure(self, moving: np.ndarray, core: np.ndarray, still: bool) -> None:
         body = read_back(self.bridge.output.boundary_velocity)

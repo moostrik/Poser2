@@ -28,8 +28,8 @@ class Buoyancy3D(ComputeShader):
             density: 3D density field (RGBA16F; its weight is the max of r, g, b)
             obstacle: 3D obstacle mask (R8)
             force_out: Output force volume (RGBA16F)
-            sigma: Thermal buoyancy coefficient (includes dt * scale)
-            kappa: Density weight coefficient (includes dt * scale)
+            sigma: Thermal buoyancy (widths/s² per unit of temperature)
+            kappa: Density weight (widths/s² per unit of density)
             ambient_temperature: Reference temperature
             gravity: Gravity direction — (0,1,0) down-screen, (0,0,1) away from viewer
             has_obstacles: Whether obstacle logic is active

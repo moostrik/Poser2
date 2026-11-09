@@ -8,7 +8,8 @@ marks what is inferred from them.
 | Term   | Means                                                                                                 | In code                                                             |
 |--------|-------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------|
 | glyphs | a monitor's view of a field as marks on a grid: arrows for a velocity, dots for a scalar              | `MonitorView.GLYPHS`, `glyph_spacing`, `GlyphField`, `VolumeGlyphs` |
-| cut    | how a monitor lays out a volume: in 3D as stacked layers or a fog, or flat, one layer or a projection | `Cut`, `advanced.cut`, `VolumeCut`                                  |
+| cube   | a monitor's view of a volume in 3D: the volume drawn continuously in its box, a ray per pixel         | `VolumeCube`, `VolumeCubeShader`, `CubeColor`                       |
+| slice  | the scrolled layer of the cube in focus, framed, the rest dimmed                                      | `advanced.slice`                                                    |
 
 ## Settings and views
 
@@ -19,10 +20,15 @@ The monitor's panel group (`MonitorLayerSettings`) says what is drawn; its `adva
 |--------------------------|-------------------------------------------------------------|---------------------------------------------|
 | `stage`                  | `MOTION`, `BRIDGE`, `FLUID`                                 | the stage whose port is shown               |
 | `texture`                | the stage's port names                                      | the port shown; a name the stage no longer has shows its first output |
-| `view`                   | `AUTO`, `IMAGE`, `COLORMAP`, `GLYPHS`, `HISTOGRAM`, `STRIP` | how the channels are drawn                  |
+| `view`                   | `COLORMAP` (default), `GLYPHS`, `IMAGE`, `HISTOGRAM`, `STRIP` | how the channels are drawn, the most used first |
 | `advanced.channel`       | `X`, `Y`, `Z`, `W`, `ALL` (default)                         | which of the texture's channels are drawn   |
-| `advanced.cut`           | `CUBE` (default), `FOG`, `SLICE`, `FRONT`, `TOP`, `SIDE`    | how a volume is laid out; not read for a 2D port |
-| `advanced.scale`         | 0.01 to 100, a log slider                                   | multiplier on the values, in every view     |
+| `advanced.scale`         | 0.01 to 100, a log slider                                   | multiplier on the values, in every view; in the cube 1 after it is full |
+| `advanced.opacity`       | 0.1 to 100, a log slider, 6 (default)                       | the cube: how much a full sample hides what is behind it, per box width |
+| `advanced.depth_fade`    | 0 (default) to 10                                           | the cube: dimming per box width behind the near side |
+| `advanced.slice`         | on, off (default)                                           | the cube: the scrolled layer framed and in focus, the rest dimmed |
+| `advanced.slice_position`| 0 (front) to 1 (back), 0.5 (default)                        | the slice's place; the wheel steps it a layer |
+| `advanced.slice_focus`   | 0 to 1, 0.5 (default)                                       | opacity moved from the rest to the slice: 0 none, 1 only the slice |
+| `advanced.orbit`         | `yaw`, `pitch` (degrees), `zoom` (1 frames the box)        | the 3D camera; the mouse turns and zooms it |
 | `advanced.glyph_spacing` | 4, 8, 16, 32, 64, 128 (`GlyphSpacing`)                      | distance between glyphs (pixels)            |
 | `advanced.legend`        | on (default), off                                           | the log axis, or the colormap's key         |
 | `advanced.blend_mode`    | a `Style.BlendMode`                                         | how the monitor is drawn over the panel     |
@@ -37,18 +43,19 @@ The strip starts over when `stage`, `texture` or `channel` changes, or when `vie
 
 | View     | `ALL`                                                              | one channel                                   |
 |----------|--------------------------------------------------------------------|-----------------------------------------------|
-| `IMAGE`  | the texture as stored, times `scale`                               | that channel as grey, times `scale`           |
-| `COLORMAP` | x, y, z as red, green, blue around mid grey: grey is 0             | `ALL` with the other channels 0: x from grey toward red above 0 and toward cyan below, y green, z blue; w, which has no color in `ALL`, as grey |
-| `GLYPHS` | a velocity's arrow of x and y, with the ring for z on a 3- or 4-channel texture (channel not read); a scalar's dot of x | a scalar's dot of that channel |
-| `STRIP`  | four lanes, x, y, z, w: the frame-wide mean of each channel's amount (its absolute value; a signed mean cancels left against right), on a log axis | one lane, full height |
+| `COLORMAP` | by the port's kind: a velocity by its direction, 0.5 + 0.5 × the unit vector, as bright as its size capped at 1, black at 0; an image as stored; a scalar's x, y, z as red, green, blue around mid grey, grey 0 | a velocity's channel by its sign along its axis; a scalar's with the other channels 0: x from grey toward red above 0 and toward cyan below, y green, z blue; w as grey |
+| `GLYPHS` | a velocity's arrow of x and y, with the ring for z on a 3- or 4-channel texture (channel not read); an acceleration's push, a filled arrowhead; a scalar's dot of x, and so any one-channel texture's, which has no direction | a scalar's dot of that channel |
+| `IMAGE`  | the raw values as stored, times `scale`, for debugging             | that channel as grey, times `scale`           |
 | `HISTOGRAM` | four lanes, x, y, z, w: how many values fall where from −1 to 1 after `scale`, 0 in the middle, outside in the end bins | one lane, full height |
-
-`AUTO` is `IMAGE` for an image port, `GLYPHS` for a velocity, `COLORMAP` for a scalar, the three
-kinds of `TextureKind`.
+| `STRIP`  | four lanes, x, y, z, w: the frame-wide mean of each channel's amount (its absolute value; a signed mean cancels left against right), on a log axis | one lane, full height |
 
 - A channel the texture does not have reads as sampled in every view: a one-channel texture
   repeats x in y and z (its grey swizzle, `modules/gl/texture.py`), a two-channel one has z 0, and
-  a missing w is 1.
+  a missing w is 1. So a one-channel texture would draw arrows along the diagonal; the glyphs draw
+  it as dots, whatever its port's kind.
+- An acceleration (widths/s²) is drawn in every view as the velocity it adds in one reference step,
+  times `REFERENCE_STEP` (1/60 s), as the fluid adds a body force × dt: a quick hand's 30 widths/s²
+  reads 0.5, in the range of the velocities, so one `scale` reads both. Its title says "per step".
 - The histogram's height is the log of a bin's count against the log of the samples, since most of
   a flow is still and its zero bin would flatten every other. It counts 256 bins on the GPU
   (`HistogramCount`, atomic adds) over the texture's own grid, capped at 512 × 512 samples
@@ -80,8 +87,9 @@ kinds of `TextureKind`.
   uniforms), `GlyphField`, and `HistogramCount` with `HistogramDraw`; `Strip` keeps its
   own, and `Legend` its `LogGrid` and `ColormapKey`.
   `scripts/depth_velocity_compare.py` draws through the same `Visualizer`.
-- There is no hue-by-direction map: it is 2D only, on black, with z unread, where `COLORMAP` on
-  `ALL` shows direction as a mix of red and green around grey, and z in blue.
+- A velocity's colors are those of the grey-centered map at its direction (+x reddish, +y greenish,
+  +z bluish), without the grey: slow and fast water going one way share a color, and where nothing
+  moves is black, so where a force is and which way it points read apart.
 
 ## Volumes
 
@@ -90,43 +98,51 @@ shader. The 3D fluid lists its volumes as ports: `velocity`, `density`, `tempera
 `pressure`, `divergence`, `vorticity`, `buoyancy`, `obstacle`, beside the 2D
 `obstacle_source`. Each carries its box's depth (`Port.extent`, `Fluid3D._z_extent`); the
 monitor draws the box as deep as it is wide (`BOX_DEPTH`), since the simulated slab, 64 cubic
-cells on a 448 wide grid, is 0.14 of its width and reads as flat. A flat cut renders at the
-part of the panel it fills in its proportions, so glyphs keep their spacing. Every view samples a
-volume at (u, v, w) from 0 to 1 through the box, so the density may sit on a finer grid than the
-simulation's (`density.size`) and is read as it is.
+cells on a 448 wide grid, is 0.14 of its width and reads as flat. Every view samples a volume at
+(u, v, w) from 0 to 1 through the box, so the upscaled density, finer than the simulation, is read
+as it is.
 
-- `cut` lays a volume out. `CUBE` and `FOG` are 3D, on the orbit camera; the others are flat, a
-  2D texture (`VolumeCut`) every 2D view draws as it draws any texture:
-
-  | `cut`    | Means                                                                       |
-  |----------|-----------------------------------------------------------------------------|
-  | `CUBE`   | the layers stacked in the box, one instanced draw from the far side to the near one, partly transparent; the selected layer opaque and pulled out, a gap on both sides fading over the next layers; the box's edges and axes |
-  | `FOG`    | the volume drawn continuously, a ray per pixel marched front to back, each sample colored as `IMAGE` or `COLORMAP` colors it and its amount its opacity; the box's edges |
-  | `SLICE`  | the selected layer                                                          |
-  | `FRONT`, `TOP`, `SIDE` | the projection along z, y or x: the max for an image port, the mean for a velocity or a scalar, whose signs would cancel in a max; in the box's proportions, the top width × depth with the front at the bottom, the side depth × height with the front on the right |
-
-- `IMAGE` and `COLORMAP` draw the cube or the fog; `GLYPHS` draws in 3D on either: lit arrows of
-  a small mesh per grid point, so one pointing at the camera still shows, or a scalar's dots as
-  point sprites, both with the depth test (`Fbo(depth=True)`), at most 96 across (`glyph_grid`).
-  The stacked layers take no depth test, since they blend far to near. Every 3D view draws the box's
-  edges and, from its first corner (x 0, y 0, the front layer), its axes 3 px wide in the
-  colormap's colors at 1 (`CubeAxes`): x red along the width, y green up, z blue into the depth.
-  With `legend` on, each axis's letter sits past its end (`axis_labels`, the legend redrawn when
-  the camera moves). The strip reads a volume's
-  front mean, the volume's mean; the histogram counts a grid through every layer, at most
-  128 × 128 across (`histogram_volume_grid`). A view with no 3D draw of its own on a 3D cut takes
-  the slice.
-- The orbit and the selected layer are the monitor's state, not settings, and the panel shows
-  neither. In deep_flow a drag that starts anywhere in the main window goes to every monitor, so
+- `COLORMAP` and `IMAGE` draw a volume as the cube (`VolumeCube`), on the orbit camera: a ray per
+  pixel marched front to back, 96 samples through the box, each sample colored by `CubeColor` (in
+  `COLORMAP` by the port's kind as the table above, in `IMAGE` as stored), its amount times `scale`
+  capped at 1, its opacity `opacity` per box width, the samples behind the near side dimmed by
+  `depth_fade`; the box's edges over it.
+- With `slice` on, a ray reads the layer at `slice_position` where it crosses it, and `slice_focus`
+  moves opacity from the rest to it: at 0 the slice is a sample as any other, the plain cube; at 1
+  its opacity is its amount, capped at 1, full where its value is, clear where it is empty, and the
+  rest has none; in between both by the same share, so the layer stands out while the rest still
+  shows where it is and which way it moves. The layer's frame is the box's edges flattened to its
+  depth, in white, with the other outlines.
+- `GLYPHS` draws in 3D: lit arrows of a small mesh per grid point, so one pointing at the camera
+  still shows, or a scalar's dots as point sprites, both with the depth test (`Fbo(depth=True)`),
+  at most 96 across (`glyph_grid`). An arrow's shape is its size and its color its direction, at
+  full brightness: one cell long at 1 after `scale`, rolling off toward two, its thickness growing
+  with its length up to full at one cell and its head never narrower than the dot; a force shorter
+  than the dot, a tenth of a cell across and at least 2 px, draws as the dot, lit, in its direction's
+  color, so weak forces still show which way. Nothing is cut off above 0. An acceleration draws the cone
+  alone, a push, without the shaft; a one-channel volume draws dots. Every 3D view draws the box's edges. Its axes are the
+  overlay's, the legend's, drawn only with `legend` on: from the box's first corner (x 0, y 0, the
+  front layer), 3 px wide in the colormap's colors at 1 (`CubeAxes`), x red along the width, y green
+  up, z blue into the depth, each axis's letter past its end (`axis_labels`, the legend redrawn when
+  the camera moves). So the views themselves hold only what they show, and the harness, which draws
+  without the legend, checks them alone.
+- The strip reads a volume's front mean (`VolumeCut`, the projection along z), the volume's mean;
+  the histogram counts a grid through every layer, at most 128 × 128 across
+  (`histogram_volume_grid`). `VolumeCut` also lays a volume flat for the scripts that read layers
+  back: one layer, or the projection along z, y or x, the max for an image port and the mean for a
+  velocity or a scalar, whose signs would cancel in a max.
+- The orbit is `advanced.orbit` (`yaw`, `pitch`, `zoom`) and the slice's place `slice_position`,
+  settings the mouse writes, so the panel shows and sets them and a preset keeps them. In deep_flow a drag that starts anywhere in the main window goes to every monitor, so
   A and B stay on one view: the left button turns (a drag across the window 180°), the right
-  zooms, scroll steps one of the show's density `layers` (away from the user is further back,
+  zooms, scroll steps one of the fluid's `depth` layers (away from the user is further back,
   a volume with fewer layers showing its nearest), a middle click without a move resets to the
   front view at the middle layer. `Orbit` frames the box by the narrower field of view, so it
   fits a 9:16 panel.
 
 `scripts/monitor_harness.py` checks the monitor without an app or a camera: a hidden GL window,
 known textures and volumes with values numpy computes (a cut against numpy's layer, max and mean,
-the cube's and the fog's near side from both sides of the box), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU's timer queries:
+the cube's near side from both sides of the box, a velocity's direction color, the slice brought
+forward), pictures in `temp/monitor_harness`, and the GPU times, measured on the GPU's timer queries:
 
 | Work                                   | At                                   | GPU (ms) |
 |----------------------------------------|--------------------------------------|----------|
@@ -134,5 +150,8 @@ the cube's and the fog's near side from both sides of the box), pictures in `tem
 | glyphs, flat                           | 540 × 960 / 2160 × 3840, spacing 32  | 0.18 / 2.4 |
 | histogram                              | 540 × 960 / 2160 × 3840              | 0.10 / 0.12 |
 | strip                                  | 540 × 960                            | 0.05     |
-| slice, front, top, side                | a 448 × 800 × 16 volume              | 0.01, 0.08, 0.61, 0.36 |
-| cube, 3D arrows, fog                   | a 448 × 800 × 16 volume at 540 × 960 | 0.04, 0.05, 0.05 |
+| a flat cut: slice, front, top, side    | a 448 × 800 × 16 volume              | 0.01, 0.08, 0.61, 0.36 |
+| 3D arrows, cube                        | a 448 × 800 × 16 volume at 540 × 960 | 0.05, 0.05 |
+
+The cube's time is the one measured before its colors by kind and its slice; the harness times both
+again, not yet run.

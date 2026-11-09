@@ -20,6 +20,12 @@ class BlendMode(Enum):
     SCREEN = (GL_ONE, GL_ONE_MINUS_SRC_COLOR)  # Screen blending (lightens)
     SUM = (GL_ONE, GL_ONE)  # Plain sum of every channel, alpha included (accumulation targets)
     DISABLED = (GL_ONE, GL_ZERO)  # No blending (replaces destination)
+    PREMULTIPLIED = (GL_ONE, GL_ONE_MINUS_SRC_ALPHA)  # Transparency of a color already times its alpha
+
+    @property
+    def premultiplied(self) -> 'BlendMode':
+        """The same blend for a color already times its alpha: its alpha not applied again."""
+        return {BlendMode.ALPHA: BlendMode.PREMULTIPLIED, BlendMode.ADD: BlendMode.SUM}.get(self, self)
 
     @property
     def src_factor(self) -> int:

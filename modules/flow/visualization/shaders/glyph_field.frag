@@ -1,7 +1,8 @@
 #version 460 core
 
 // Glyph Field
-// Procedural glyphs on a grid, without geometry shaders: an arrow for a velocity, a dot for a scalar.
+// Procedural glyphs on a grid, without geometry shaders: an arrow for a velocity, a filled arrowhead
+// (a push) for an acceleration, a dot for a scalar or any one-channel texture.
 // A 2D velocity is a white arrow. A 3D velocity (xyz) is the same white arrow for x/y with a ring
 // around the grid point for z, red toward the camera and green away, and shows with no x/y. Sizes
 // are on the cell, the grid spacing: at a speed of 1 the arrow's tip reaches 1 cell and the ring's
@@ -12,6 +13,7 @@
 uniform sampler2D tex0;
 uniform bool xyz;                   // A 3D velocity: z in the blue channel
 uniform bool dots;                  // A scalar: dots, not arrows
+uniform bool push;                  // An acceleration: filled arrowheads, not line arrows
 uniform int channel;                // The dots' channel, 0 to 3; 4 for all, x's size and xyz's colors
 uniform float scale;
 uniform float grid_spacing;         // in pixels
@@ -65,6 +67,30 @@ float arrow(vec2 p, vec2 velocity, float arrow_size, float thickness) {
 
     // Combine all parts
     return min(shaft, min(head1, head2));
+}
+
+// Distance to a filled triangle a, b, c (Inigo Quilez's sdTriangle), negative inside
+float triangle(vec2 p, vec2 a, vec2 b, vec2 c) {
+    vec2 e0 = b - a, e1 = c - b, e2 = a - c;
+    vec2 v0 = p - a, v1 = p - b, v2 = p - c;
+    vec2 pq0 = v0 - e0 * clamp(dot(v0, e0) / dot(e0, e0), 0.0, 1.0);
+    vec2 pq1 = v1 - e1 * clamp(dot(v1, e1) / dot(e1, e1), 0.0, 1.0);
+    vec2 pq2 = v2 - e2 * clamp(dot(v2, e2) / dot(e2, e2), 0.0, 1.0);
+    float s = sign(e0.x * e2.y - e0.y * e2.x);
+    vec2 d = min(min(vec2(dot(pq0, pq0), s * (v0.x * e0.y - v0.y * e0.x)),
+                     vec2(dot(pq1, pq1), s * (v1.x * e1.y - v1.y * e1.x))),
+                     vec2(dot(pq2, pq2), s * (v2.x * e2.y - v2.y * e2.x)));
+    return -sqrt(d.x) * sign(d.y);
+}
+
+// Distance to a push, an acceleration's glyph: a filled arrowhead from the grid point to its tip, as
+// long as the arrow would be, its base half as wide as it is long
+float push_glyph(vec2 p, vec2 acceleration, float size, float thickness) {
+    float len = length(acceleration);
+    if (len < 0.001) return 1e10;
+    vec2 dir = acceleration / len;
+    vec2 across = vec2(-dir.y, dir.x) * 0.25 * size * len;
+    return triangle(p, dir * size * len, across, -across) - thickness;
 }
 
 // Distance to a ring around the grid point, its radius |z| / pi on the arrow's scale
@@ -125,7 +151,8 @@ void main() {
             // Position relative to this grid center
             vec2 local_pos = pixel - grid_pos;
 
-            arrow_dist = min(arrow_dist, arrow(local_pos, velocity.xy, cell, arrow_thickness));
+            arrow_dist = min(arrow_dist, push ? push_glyph(local_pos, velocity.xy, cell, arrow_thickness)
+                                              : arrow(local_pos, velocity.xy, cell, arrow_thickness));
             if (xyz) {
                 float dist = ring(local_pos, velocity.z, cell, arrow_thickness);
                 if (dist < ring_dist) {

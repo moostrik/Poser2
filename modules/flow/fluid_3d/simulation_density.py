@@ -8,7 +8,7 @@ from ..port import Port, TextureKind
 from .density_carrier import CarrierStep, DensityCarrier
 from .field_advection import FieldAdvection
 from .fluid_settings import Fluid3DSettings
-from .shaders import Inject3D, Composite3D
+from .shaders import Inject3D, Composite3D, CompositeLight
 
 _BARRIER_IMAGE: int = int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 
@@ -64,12 +64,12 @@ class SimulationDensity(DensityCarrier):
                                  step.has_obstacles, evaporation=step.evaporation):
             self._apply_walls()
 
-    def composite(self, output: Texture) -> None:
+    def composite(self, output: Texture, light: CompositeLight | None = None) -> None:
         if not self.allocated:
             return
         volume = self.settings.composite
         self._composite_shader.use(self._density, output, emission=volume.emission, absorption=volume.absorption,
-                                   tint=volume.tint, fog=volume.fog, glow=volume.glow)
+                                   tint=volume.tint, fog=volume.fog, glow=volume.glow, light=light)
         glMemoryBarrier(_BARRIER_IMAGE)
 
     @property

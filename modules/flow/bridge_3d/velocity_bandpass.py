@@ -207,11 +207,11 @@ class VelocityBandpass(FlowBase):
                                   'fast': Port(self._fast_fbo, TextureKind.VELOCITY),
                                   'slow': Port(self._slow_fbo, TextureKind.VELOCITY),
                                   'change': Port(self._change_fbo, TextureKind.VELOCITY),
-                                  'change_acceleration': Port(self._change_acceleration_fbo, TextureKind.VELOCITY)}
+                                  'change_acceleration': Port(self._change_acceleration_fbo, TextureKind.ACCELERATION)}
         for change in Change:
             name: str = change.name.lower()
             ports[name] = Port(self._velocities[change], TextureKind.VELOCITY)
-            ports[f'{name}_acceleration'] = Port(self._accelerations[change], TextureKind.VELOCITY)
+            ports[f'{name}_acceleration'] = Port(self._accelerations[change], TextureKind.ACCELERATION)
             ports[f'{name}_speed'] = Port(self._speeds[change], TextureKind.SCALAR)
         return ports
 

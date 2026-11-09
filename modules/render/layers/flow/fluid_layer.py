@@ -15,7 +15,6 @@ from typing import Annotated
 
 from modules.gl import Texture, Style, Blit
 from modules.flow import TextureKind
-from modules.settings import Field
 from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 
 
@@ -51,8 +50,8 @@ class FluidOutput(StageOutput):
 
 
 class FluidLayerSettings(StageLayerSettings):
-    """What the 2D and the 3D fluid layer share; each adds its fluid's group."""
-    blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD, newline=True)
+    """What the 2D and the 3D fluid layer share; each adds its fluid's group, and its `blend_mode` where its
+    panel puts the drawing."""
 
 
 class FluidLayer(StageLayer[FluidInput, FluidOutput]):
@@ -93,9 +92,14 @@ class FluidLayer(StageLayer[FluidInput, FluidOutput]):
 
     # ========== Rendering ==========
 
+    @property
+    @abstractmethod
+    def blend_mode(self) -> Style.BlendMode:
+        """How the show is drawn over the layers drawn before it."""
+
     def draw(self) -> None:
         Style.push_style()
-        Style.set_blend_mode(self.settings.blend_mode)
+        Style.set_blend_mode(self.blend_mode)
         if self.texture.allocated:
             Blit.use(self.texture)
         Style.pop_style()

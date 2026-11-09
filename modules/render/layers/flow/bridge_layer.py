@@ -45,7 +45,7 @@ class BridgeOutput(StageOutput):
     boundary_velocity: Annotated[Texture, TextureKind.VELOCITY]
     boundary_density: Annotated[Texture, TextureKind.IMAGE]
     boundary_temperature: Annotated[Texture, TextureKind.SCALAR]
-    body_force_acceleration: Annotated[Texture | None, TextureKind.VELOCITY] = None
+    body_force_acceleration: Annotated[Texture | None, TextureKind.ACCELERATION] = None
     body_force_density: Annotated[Texture | None, TextureKind.IMAGE] = None
     body_force_temperature: Annotated[Texture | None, TextureKind.SCALAR] = None
 

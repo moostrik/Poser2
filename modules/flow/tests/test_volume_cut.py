@@ -43,9 +43,6 @@ class CutTest(unittest.TestCase):
         self.assertEqual(cut_size(Cut.TOP, 448, 800, 0.25), (448, 112))
         self.assertEqual(cut_size(Cut.SIDE, 448, 800, 0.25), (112, 800))
 
-    def test_the_cube_and_the_fog_are_3d_the_rest_flat(self) -> None:
-        self.assertEqual([cut for cut in Cut if not cut.flat], [Cut.CUBE, Cut.FOG])
-
     def test_only_an_image_projects_its_max(self) -> None:
         self.assertTrue(projects_max(TextureKind.IMAGE))
         self.assertFalse(projects_max(TextureKind.VELOCITY))

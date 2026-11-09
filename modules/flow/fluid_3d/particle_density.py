@@ -31,7 +31,7 @@ from ..port import Port
 from ..wall_mode import WallMode
 from .density_carrier import CarrierStep, DensityCarrier
 from .fluid_settings import Fluid3DSettings, Overlap, ParticleDraw
-from .shaders import (RING_BYTES, ParticleAdvect, ParticleComposite, ParticleEmit, ParticleRing, ParticleSprites, ParticleSurface, ParticleWeighted,
+from .shaders import (RING_BYTES, CompositeLight, ParticleAdvect, ParticleComposite, ParticleEmit, ParticleRing, ParticleSprites, ParticleSurface, ParticleWeighted,
                       ParticleSurfaceShade, ParticleSurfaceSmooth)
 
 PARTICLE_BYTES: int = 32        # position and mass/age (vec4), previous position and color (vec4)
@@ -151,8 +151,8 @@ class ParticleDensity(DensityCarrier):
         """The mass a texel of amount 1 gives each of its particles at the boundary's density gain: a blob of
         this mass has `radius`, so the gain changes how much density there is, not how big a drop is."""
         settings = self.settings
-        spread: float = max(settings.injection_spread / max(self._z_extent, 1e-6), 0.001)     # widths, as a share of the slab
-        return (slab_sum(settings.injection_layer, spread, self._layers) * self.settings.density.boundary_gain
+        spread: float = max(settings.input.spread / max(self._z_extent, 1e-6), 0.001)     # widths, as a share of the slab
+        return (slab_sum(settings.input.layer, spread, self._layers) * self.settings.input.boundary.density_gain
                 / max(self.settings.particles.rate, 1e-6))
 
     def add(self, texture: Texture, gain: float, dt: float, layer: float, spread: float) -> None:
@@ -182,7 +182,10 @@ class ParticleDensity(DensityCarrier):
 
     # ========== Drawing ==========
 
-    def composite(self, output: Texture) -> None:
+    def composite(self, output: Texture, light: CompositeLight | None = None) -> None:
+        """The particles into `output`; the light is not theirs yet, their look is a step of its own. The
+        composite's `emission` and `absorption` are over the whole depth, so a particle look takes them over
+        its `slices`."""
         if not self.allocated:
             return
         if self.settings.particles.draw == ParticleDraw.SURFACE:
@@ -221,7 +224,7 @@ class ParticleDensity(DensityCarrier):
         self._draw_timer.end()
 
         self._march_timer.begin()
-        self._composite_shader.use(target, slices, output, emission=volume.emission, absorption=volume.absorption,
+        self._composite_shader.use(target, slices, output, emission=volume.emission / self.settings.particles.slices, absorption=volume.absorption / self.settings.particles.slices,
                                    tint=volume.tint, fog=0.0 if additive else volume.fog, glow=volume.glow)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._march_timer.end()
@@ -249,8 +252,8 @@ class ParticleDensity(DensityCarrier):
                                  size=particles.size, streak=particles.streak, radius=particles.radius,
                                  reference_mass=self._reference_mass(), spread=particles.spread,
                                  fade_time=self.settings.density.fade_time, max_point_size=self._max_point_size,
-                                 fog=volume.fog, tint=volume.tint, weighted=True, emission=volume.emission,
-                                 absorption=volume.absorption)
+                                 fog=volume.fog, tint=volume.tint, weighted=True, emission=volume.emission / self.settings.particles.slices,
+                                 absorption=volume.absorption / self.settings.particles.slices)
         Style.pop_style()
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
@@ -342,8 +345,8 @@ class ParticleDensity(DensityCarrier):
             glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
             depth = target
         self._shade_shader.use(depth, self._surface_thickness, self._surface_color, output,
-                               depth_per_pixel=width * self._z_extent, emission=volume.emission,
-                               absorption=volume.absorption, tint=volume.tint, fog=volume.fog)
+                               depth_per_pixel=width * self._z_extent, emission=volume.emission / self.settings.particles.slices,
+                               absorption=volume.absorption / self.settings.particles.slices, tint=volume.tint, fog=volume.fog)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._march_timer.end()
 

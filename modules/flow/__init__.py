@@ -27,14 +27,14 @@ from .bridge_3d import  DensityBridge, DensityBridgeSettings, Magnitude, Velocit
 
 # Visualization
 from .visualization import Visualizer, histogram_grid, histogram_volume_grid, Strip, ALL_CHANNELS, summary_grid, Legend, LegendKind, DrawnSize, \
-                           VolumeCut, VolumeCube, VolumeGlyphs, VolumeFog, glyph_grid, Cut, cut_size, projects_max, Orbit, box_size, axis_labels
+                           VolumeCut, VolumeCube, CubeColor, VolumeGlyphs, glyph_grid, Cut, cut_size, projects_max, Orbit, PITCH_LIMIT, ZOOM_LIMITS, box_size, axis_labels
 
 # Shared by the 2D and 3D fluid
-from .time_step import TimeStep, TimeStepMode, hold_tick, viscosity_iterations, MAX_STEP
+from .time_step import TimeStep, TimeStepMode, hold_tick, viscosity_iterations, MAX_STEP, REFERENCE_STEP
 from .wall_mode import WallMode
 
 # 2D fluid simulation
 from .fluid_2d import Fluid2D, Fluid2DSettings
 
 # 3D fluid simulation
-from .fluid_3d import Fluid3D, Fluid3DSettings, Advection, ParticleDraw, Overlap, DRAG_FLOOR, drag_share, drag_gate, drag_velocity_step, swirl_noise
+from .fluid_3d import Fluid3D, Fluid3DSettings, CompositeSettings, Advection, ParticleDraw, Overlap, DRAG_FLOOR, drag_share, drag_gate, drag_velocity_step, swirl_noise

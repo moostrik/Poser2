@@ -3,7 +3,7 @@ pressure, composite, upscaled, particles), with the concern's name as the group'
 
 from enum import IntEnum
 
-from modules.settings import Field, BaseSettings, Group
+from modules.settings import Field, BaseSettings, Group, Widget
 
 from ..wall_mode import WallMode
 from ..time_step import TimeStepMode
@@ -20,6 +20,12 @@ class PressureSolver(IntEnum):
     JACOBI = 0              # every cell from its neighbors' last values; five iterations a dispatch in shared memory
     SOR = 1                 # red-black Gauss–Seidel, over-relaxed: each color from the other's newest values
     MULTIGRID = 2           # V-cycles over the grid halved to a few cells, red-black Gauss–Seidel smoothing each level
+
+
+class Light(IntEnum):
+    """The light on the density."""
+    DIRECTIONAL = 0         # a sun: one direction everywhere, parallel shadows
+    POINT = 1               # a lamp at one place: shadows fanning out from it
 
 
 class DensitySample(IntEnum):
@@ -67,11 +73,33 @@ class TimeSettings(BaseSettings):
     time_scale: Field[float]        = Field(1.0,    min=0.05,   max=2.0,    step=0.05,              description="The fluid's time as a share of real time; 0.5 = everything at half speed, 1 = real time")
 
 
+class BoundarySettings(BaseSettings):
+    """The boundary, the body in the water: the drag toward its velocity and the gains on its outputs."""
+    velocity_drag: Field[float]     = Field(50.0,   min=0.0,    max=1000.0, step=1.0, color="cyan", description="Time the water takes to close the gap to the body's velocity (ms); 0 = at once")
+    velocity_gain: Field[float]     = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's velocity times this is what the water is dragged toward; 1 = as fast as the body")
+    density_gain: Field[float]      = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The boundary's density times this is added × dt; 1 = one unit per width of travel")
+    temperature_gain: Field[float]  = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The boundary's temperature times this is added × dt, signed by the color")
+
+
+class BodyForceSettings(BaseSettings):
+    """The body force, the Navier–Stokes force term: the gains on its outputs, each added × dt."""
+    acceleration_gain: Field[float] = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's acceleration times this is added × dt; 1 = its Δv added once")
+    density_gain: Field[float]      = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's density times this is added × dt; 1 = one unit per width/s of Δv")
+    temperature_gain: Field[float]  = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's temperature times this is added × dt, signed by the color")
+
+
+class InputSettings(BaseSettings):
+    """The bridge's input: where the body sits in the box's depth, how deep the real space is that the box
+    stands for, and each system's gains."""
+    layer: Field[float]             = Field(0.5,    min=0.0,    max=1.0,                            description="Normalized depth of the injection's center, where the body sits")
+    spread: Field[float]            = Field(0.075,  min=0.001,  max=0.2,    step=0.001,             description="Gaussian sigma of the injection's depth (widths); 0.075 = a body 0.3 widths thick")
+    depth_span: Field[float]        = Field(1.0,    min=0.1,    max=10.0,                           description="The real depth the box's depth stands for, as a share of its smaller side; 2 = the body's z half as strong")
+    boundary: Group[BoundarySettings]       = Group(BoundarySettings)
+    body_force: Group[BodyForceSettings]    = Group(BodyForceSettings)
+
+
 class VelocitySettings(BaseSettings):
-    """The velocity: its two inputs, how it carries itself, fades, swirls and thickens."""
-    boundary_gain: Field[float]     = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's velocity times this is what the water is dragged toward; 1 = as fast as the body")
-    boundary_drag: Field[float]     = Field(50.0,   min=0.0,    max=1000.0, step=1.0, color="cyan", description="Time the water takes to close the gap to the body's velocity (ms); 0 = at once")
-    body_force_gain: Field[float]   = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's acceleration times this is added × dt; 1 = its Δv added once")
+    """The velocity: how it carries itself, fades, swirls and thickens."""
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=1.0,    color="blue-grey",      description="How far the velocity carries itself per step; 1 = with the water, the physics")
     fade_time: Field[float]         = Field(60.0,   min=0.1,    max=60.0,   color="deep-blue",      description="Seconds until velocity fades to ~1%; 60 = water keeps its momentum")
     dampen_threshold: Field[float]  = Field(3.0,    min=0.1,    max=50.0,   color="cyan",           description="Speed above which velocity is dampened (widths/s); a guard just above the fastest body")
@@ -83,9 +111,7 @@ class VelocitySettings(BaseSettings):
 
 
 class DensitySettings(BaseSettings):
-    """Density field parameters."""
-    boundary_gain: Field[float]     = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The boundary's density times this is added × dt; 1 = one unit per width of travel")
-    body_force_gain: Field[float]   = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's density times this is added × dt; 1 = one unit per width/s of Δv")
+    """The density: how it is carried, fades and evaporates."""
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the density is carried per step; 1 = with the water, above it runs ahead")
     fade_time: Field[float]         = Field(60.0,   min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%; 60 = density stays")
     evaporation: Field[float]       = Field(0.0,    min=0.0,    max=2.0,    color="grey",           description="Density removed per second; clears low-level haze (0 = off)")
@@ -103,9 +129,7 @@ class UpscaledDensitySettings(BaseSettings):
 
 
 class TemperatureSettings(BaseSettings):
-    """Temperature field parameters."""
-    boundary_gain: Field[float]     = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The boundary's temperature times this is added × dt, signed by the color")
-    body_force_gain: Field[float]   = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's temperature times this is added × dt, signed by the color")
+    """The temperature: how it is carried, fades, and lifts or sinks the water."""
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the temperature is carried per step; 1 = with the water, above it runs ahead")
     fade_time: Field[float]         = Field(3.0,   min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until temperature fades to ~1%")
     buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Lift per unit of temperature above ambient (widths/s²) against gravity; 0 = none")
@@ -126,11 +150,18 @@ class PressureSettings(BaseSettings):
 
 class CompositeSettings(BaseSettings):
     """The composite: how the density volume is marched front to back into the output."""
-    emission: Field[float]          = Field(1.0,  min=0.0,  max=8.0,    color="amber",          description="Brightness gain per unit density")
-    absorption: Field[float]        = Field(4.0,  min=0.01, max=50.0,   color="deep-orange",    description="Occlusion: extinction per unit density (near density covers far density)")
-    glow: Field[float]              = Field(0.25, min=0.0,  max=1.0,    color="yellow",         description="Additive glow mix: 1 = additive (depth invisible)")
+    emission: Field[float]          = Field(16.0, min=0.1,  max=100.0,  widget=Widget.log_slider, color="amber", description="Brightness of an amount of 1 filling the whole depth, nothing covering it")
+    absorption: Field[float]        = Field(1.0,  min=0.1,  max=100.0,  widget=Widget.log_slider, color="deep-orange", description="How much an amount of 1 over the whole depth covers: 1 lets a third through, 50 a skin")
+    glow: Field[float]              = Field(0.0,  min=0.0,  max=1.0,    color="yellow",         description="Additive glow mix: 1 = additive (depth invisible)")
     tint: Field[float]              = Field(0.5,  min=0.0,  max=1.0,    color="light-blue",     description="Far density shifts toward water color (red absorbed first)")
-    fog: Field[float]               = Field(0.5,  min=0.0,  max=4.0,    color="blue-grey",      description="Water extinction over the full depth; dims far layers")
+    fog: Field[float]               = Field(0.5,  min=0.0,  max=4.0,    color="blue-grey",      description="Water extinction over the full depth; dims far layers, and the light on its way in")
+    light: Field[Light]             = Field(Light.DIRECTIONAL,                                  description="A sun from one direction, or a lamp at one place")
+    light_x: Field[float]           = Field(0.0,  min=-1.0, max=1.0,    color="amber",          description="Toward the sun, or the lamp's place (±1 the box's sides); x right")
+    light_y: Field[float]           = Field(-1.0, min=-1.0, max=1.0,    color="amber",          description="y down the screen; -1 = from above")
+    light_z: Field[float]           = Field(-0.3, min=-1.0, max=1.0,    color="amber",          description="z away from the viewer; -1 = from the front")
+    shadow: Field[float]            = Field(0.0,  min=0.0,  max=1.0,    color="blue-grey",      description="How dark the density's shadowed parts get; 0 = no light, as unlit")
+    scattering: Field[float]        = Field(0.0,  min=0.0,  max=1.0,    color="light-blue",     description="Light bounced inside the density: soft shadows, thick parts glowing within; 0 = off")
+    anisotropy: Field[float]        = Field(0.0,  min=0.0,  max=0.9,    color="yellow",         description="Henyey–Greenstein g: 0 scatters evenly, higher forward, a silver lining against the light")
 
 
 class Fluid3DSettings(BaseSettings):
@@ -141,21 +172,20 @@ class Fluid3DSettings(BaseSettings):
         fade_time=3.0 means the field retains ~1% after 3 seconds.
     """
 
-    # ---- The box (multiples of 32), its walls, where the body sits in it, how fields are carried ----
-    width: Field[int]               = Field(256,    min=32,     max=4096,   step=32,    description="Simulation grid width")
+    # ---- How the fields are carried and walled, then the box (multiples of 32) ----
+    advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the fields are carried: MacCormack keeps swirls and edges, at about twice the reads")
+    wall: Field[WallMode]           = Field(WallMode.CLOSED,                            description="Every side of every field. Closed: solid, it reflects. Open: it absorbs")
+    width: Field[int]               = Field(256,    min=32,     max=4096,   step=32,    newline=True, description="Simulation grid width")
     height: Field[int]              = Field(448,    min=32,     max=4096,   step=32,    description="Simulation grid height")
     depth: Field[int]               = Field(128,    min=4,      max=256,    step=4,     description="Simulation grid depth in z; the cells are cubic, so the box is depth / width deep")
-    wall: Field[WallMode]           = Field(WallMode.CLOSED,                            description="Every side of every field. Closed: solid, it reflects. Open: it absorbs")
-    injection_layer: Field[float]   = Field(0.5,    min=0.0,    max=1.0,                description="Normalized depth of the injection's center, where the body sits")
-    injection_spread: Field[float]  = Field(0.075,  min=0.001,  max=0.2,    step=0.001, description="Gaussian sigma of the injection's depth (widths); 0.075 = a body 0.3 widths thick")
-    advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the fields are carried: MacCormack keeps swirls and edges, at about twice the reads")
 
     # ---- The groups ----
     time: Group[TimeSettings]               = Group(TimeSettings)
+    input: Group[InputSettings]             = Group(InputSettings)
     velocity: Group[VelocitySettings]       = Group(VelocitySettings)
     density: Group[DensitySettings]         = Group(DensitySettings)
     temperature: Group[TemperatureSettings] = Group(TemperatureSettings)
     pressure: Group[PressureSettings]       = Group(PressureSettings)
-    composite: Group[CompositeSettings]     = Group(CompositeSettings)
     upscaled: Group[UpscaledDensitySettings] = Group(UpscaledDensitySettings)
     particles: Group[ParticleSettings]      = Group(ParticleSettings)
+    composite: Group[CompositeSettings]     = Group(CompositeSettings)

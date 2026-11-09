@@ -91,7 +91,7 @@ class VelocityLowpass(FlowBase):
     def ports(self) -> dict[str, Port]:
         return {'input': Port(self._input_fbo, TextureKind.VELOCITY),
                 'trail': Port(self._output_fbo, TextureKind.VELOCITY),
-                'trail_acceleration': Port(self._acceleration_fbo, TextureKind.VELOCITY)}
+                'trail_acceleration': Port(self._acceleration_fbo, TextureKind.ACCELERATION)}
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate the trail.

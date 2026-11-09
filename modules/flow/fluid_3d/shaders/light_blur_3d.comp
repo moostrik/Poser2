@@ -1,0 +1,36 @@
+#version 460 core
+
+/*
+ * LightBlur3D - multiple scattering, cheaply: the light grid blurred one axis a pass (a 5-tap gaussian,
+ * the three passes one separable blur), and on the last pass mixed into the unblurred light by
+ * uScattering, so thick density glows from within and shadow edges soften.
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(binding = 0) uniform sampler3D uSource;      // the light, blurred along the axes before this one
+layout(binding = 1) uniform sampler3D uDirect;      // the unblurred light, for the last pass's mix
+
+layout(rgba16f, binding = 0) writeonly uniform image3D uResult;
+
+uniform ivec3 uSize;
+uniform int   uAxis;          // 0 x, 1 y, 2 z; the last mixes
+uniform float uScattering;    // the blurred light's share
+
+const float WEIGHTS[3] = float[](0.375, 0.25, 0.0625);   // 1 4 6 4 1 over 16
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(gid, uSize))) return;
+    ivec3 axis = ivec3(uAxis == 0, uAxis == 1, uAxis == 2);
+    vec3 sum = texelFetch(uSource, gid, 0).rgb * WEIGHTS[0];
+    for (int k = 1; k <= 2; k++) {
+        ivec3 a = clamp(gid - axis * k, ivec3(0), uSize - 1);
+        ivec3 b = clamp(gid + axis * k, ivec3(0), uSize - 1);
+        sum += (texelFetch(uSource, a, 0).rgb + texelFetch(uSource, b, 0).rgb) * WEIGHTS[k];
+    }
+    if (uAxis == 2) {
+        sum = mix(texelFetch(uDirect, gid, 0).rgb, sum, uScattering);
+    }
+    imageStore(uResult, gid, vec4(sum, 1.0));
+}

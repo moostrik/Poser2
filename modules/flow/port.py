@@ -14,11 +14,18 @@ from modules.gl import Texture, Texture3D
 
 
 class TextureKind(IntEnum):
-    """How a texture is drawn when nothing else is asked: an image as the picture it is, a velocity
-    as arrows (a 2D one in RG, a 3D one in RGB with z as a ring), a scalar as a colormap centered on mid grey."""
+    """What a texture holds, which says how a monitor draws it: an image as the picture it is; a velocity
+    (widths/s) and an acceleration (widths/s², shown as the velocity it adds in a reference step) by their
+    direction, as arrows and as pushes (a 2D one in RG, a 3D one in RGB); a scalar centered on mid grey."""
     IMAGE = 0
     VELOCITY = auto()
     SCALAR = auto()
+    ACCELERATION = auto()
+
+    @property
+    def vector(self) -> bool:
+        """Whether it is a vector, drawn by its direction."""
+        return self in (TextureKind.VELOCITY, TextureKind.ACCELERATION)
 
 
 @dataclass

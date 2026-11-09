@@ -1,0 +1,57 @@
+#version 460 core
+
+/*
+ * LightVolume3D - how much light reaches each cell of a coarse grid over the box: from each cell's center
+ * toward the light (a sun's direction, or a lamp's place), the density's amount summed along the way
+ * (single scattering's shadow ray), and the water's fog over the whole distance, both per channel by the
+ * tint, so light deep in the water turns bluish. Out comes the transmittance, RGB, 1 where nothing is
+ * in the way. Distances are in widths; the density is sampled by uvw.
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(binding = 0) uniform sampler3D uDensity;     // RGBA16F: color × amount, the amount as alpha
+
+layout(rgba16f, binding = 0) writeonly uniform image3D uLight;
+
+uniform ivec3 uSize;          // the light grid's cells
+uniform vec3  uBox;           // the box in widths: 1, height over width, depth over width
+uniform bool  uPoint;         // a lamp at uVector's place, else a sun toward uVector
+uniform vec3  uVector;        // toward the sun, or the lamp's place, ±1 the box's sides
+uniform vec3  uSigma;         // the density's extinction per width per unit of amount, per channel
+uniform vec3  uFog;           // the water's extinction per width, per channel
+uniform float uStep;          // the march's step in widths: one light cell
+
+const int MAX_STEPS = 256;
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(gid, uSize))) return;
+    vec3 p = (vec3(gid) + 0.5) / vec3(uSize) * uBox;        // the cell's center, widths
+
+    vec3 dir;
+    float distance;
+    if (uPoint) {
+        vec3 lamp = (0.5 + 0.5 * uVector) * uBox;
+        vec3 to = lamp - p;
+        distance = length(to);
+        dir = distance > 1e-6 ? to / distance : vec3(0.0, -1.0, 0.0);
+    } else {
+        dir = normalize(length(uVector) > 1e-6 ? uVector : vec3(0.0, -1.0, 0.0));
+        distance = 1e6;
+    }
+    // where the ray leaves the box (the slab test from inside)
+    vec3 inv = 1.0 / dir;
+    vec3 t_exit = max((vec3(0.0) - p) * inv, (uBox - p) * inv);
+    distance = min(distance, min(t_exit.x, min(t_exit.y, t_exit.z)));
+
+    float amount = 0.0;
+    int steps = min(int(ceil(distance / uStep)), MAX_STEPS);
+    float step = distance / float(max(steps, 1));
+    for (int i = 0; i < steps; i++) {
+        vec3 q = p + dir * (float(i) + 0.5) * step;
+        amount += texture(uDensity, q / uBox).a * step;
+    }
+    vec3 transmittance = exp(-(uSigma * amount + uFog * distance));
+    imageStore(uLight, gid, vec4(transmittance, 1.0));
+}

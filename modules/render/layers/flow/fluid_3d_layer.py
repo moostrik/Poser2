@@ -5,15 +5,22 @@ The density volume holds the colored density (RGBA16F GL_TEXTURE_3D on the simul
 """
 
 # Local application imports
-from modules.gl import GpuTimer, Texture
-from modules.flow import Fluid3D, Fluid3DSettings, HasPorts
+from modules.gl import GpuTimer, Style, Texture
+from modules.flow import CompositeSettings, Fluid3D, Fluid3DSettings, HasPorts
+from modules.settings import Field, Group
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidOutput, Injection
 from .stage_layer import Stage3DLayerSettings
+
+
+class Fluid3DCompositeSettings(CompositeSettings):
+    """The fluid's composite, and how the layer draws its picture over the layers before it."""
+    blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD, description="How the show is drawn over the layers before it")
 
 
 class Fluid3DLayerSettings(Fluid3DSettings, FluidLayerSettings, Stage3DLayerSettings):
     """Configuration for Fluid3DLayer: the stage's settings and its fluid's own, one panel, the stage's
     first; the stage's width, height and depth are the fluid's simulation grid."""
+    composite: Group[Fluid3DCompositeSettings] = Group(Fluid3DCompositeSettings)
 
 
 class Fluid3DLayer(FluidLayer):
@@ -26,6 +33,11 @@ class Fluid3DLayer(FluidLayer):
         self.settings: Fluid3DLayerSettings = settings
         self._fluid: Fluid3D = Fluid3D(settings)
         self._inject_timer: GpuTimer = GpuTimer("GPU fluid inject")     # an injection's drag, force and sources
+
+    @property
+    def blend_mode(self) -> Style.BlendMode:
+        """The panel's blend for a premultiplied picture: the composite's color is already times its coverage."""
+        return self.settings.composite.blend_mode.premultiplied
 
     @property
     def texture(self) -> Texture:

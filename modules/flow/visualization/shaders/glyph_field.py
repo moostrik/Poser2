@@ -19,7 +19,7 @@ class GlyphField(Shader):
     """
 
     def use(self, texture: Texture, scale: float = 1.0, spacing: float = 8.0, arrow_thickness: float = 0.8,
-            xyz: bool = False, dots: bool = False, channel: int = 4) -> None:
+            xyz: bool = False, dots: bool = False, channel: int = 4, push: bool = False) -> None:
         """Draw the glyphs into the target bound.
 
         Args:
@@ -30,6 +30,7 @@ class GlyphField(Shader):
             xyz: An arrow for a 3D velocity: the arrow with a ring for z
             dots: Dots for a scalar, not arrows
             channel: The dots' channel, 0 to 3, or 4 for all
+            push: Filled arrowheads for an acceleration, not line arrows
         """
         if not self.allocated or not self.shader_program or not texture.allocated:
             return
@@ -42,6 +43,7 @@ class GlyphField(Shader):
         glUniform1i(self.get_uniform_loc("tex0"), 0)
         glUniform1i(self.get_uniform_loc("xyz"), 1 if xyz else 0)
         glUniform1i(self.get_uniform_loc("dots"), 1 if dots else 0)
+        glUniform1i(self.get_uniform_loc("push"), 1 if push else 0)
         glUniform1i(self.get_uniform_loc("channel"), channel)
         glUniform1f(self.get_uniform_loc("scale"), scale)
         glUniform1f(self.get_uniform_loc("grid_spacing"), spacing)

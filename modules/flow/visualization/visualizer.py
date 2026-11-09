@@ -83,24 +83,26 @@ class Visualizer:
         """The texture as stored, times `scale`; one channel as grey."""
         self._process_channels(texture, scale, channel, False)
 
-    def process_colormap(self, texture: Texture, scale: float, channel: int = ALL_CHANNELS) -> None:
+    def process_colormap(self, texture: Texture, scale: float, channel: int = ALL_CHANNELS, vector: bool = False) -> None:
         """The texture around mid grey, grey 0, times `scale`: x, y, z as red, green, blue; one
-        channel in its own color, w as grey."""
-        self._process_channels(texture, scale, channel, True)
+        channel in its own color, w as grey. A `vector` is colored by its direction alone, its brightness its
+        size, capped at 1, black where it is 0."""
+        self._process_channels(texture, scale, channel, True, vector)
 
     def process_glyphs(self, texture: Texture, scale: float, spacing: float, dots: bool = False,
-                       channel: int = ALL_CHANNELS) -> None:
+                       channel: int = ALL_CHANNELS, push: bool = False) -> None:
         """Glyphs `spacing` apart (pixels). A velocity's arrow of x and y, with a ring for z when the
         texture has it: at speed 1 it reaches one spacing, and at most two; its lines are spacing / 20
-        wide. With `dots`, a scalar's dot in each cell, in the colormap's color, its radius the value's
-        size, half a spacing at 1."""
+        wide; with `push`, an acceleration's filled arrowhead instead. With `dots`, or on a one-channel
+        texture, which has no direction, a dot in each cell, in the colormap's color, its radius the
+        value's size, half a spacing at 1."""
         if not self._fbo.allocated or not texture.allocated:
             return
-        xyz: bool = FlowUtil.get_num_channels(texture.internal_format) >= 3
+        channels: int = FlowUtil.get_num_channels(texture.internal_format)
         self._fbo.clear(0.0, 0.0, 0.0, 0.0)
         self._fbo.begin()
         self._glyphs.reload()
-        self._glyphs.use(texture, scale, spacing, spacing * ARROW_WIDTH, xyz, dots, channel)
+        self._glyphs.use(texture, scale, spacing, spacing * ARROW_WIDTH, channels >= 3, dots or channels == 1, channel, push)
         self._fbo.end()
 
     def process_histogram(self, texture: Texture | Texture3D, scale: float, channel: int = ALL_CHANNELS) -> None:
@@ -126,10 +128,10 @@ class Visualizer:
         self._histogram_draw.use(self._histogram, channel, self._histogram_total)
         self._fbo.end()
 
-    def _process_channels(self, texture: Texture, scale: float, channel: int, colormap: bool) -> None:
+    def _process_channels(self, texture: Texture, scale: float, channel: int, colormap: bool, vector: bool = False) -> None:
         if not self._fbo.allocated or not texture.allocated:
             return
         self._fbo.begin()
         self._channel_view.reload()
-        self._channel_view.use(texture, scale, channel, colormap)
+        self._channel_view.use(texture, scale, channel, colormap, vector)
         self._fbo.end()

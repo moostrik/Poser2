@@ -29,7 +29,7 @@ water is dragged toward where the body is (`drag_velocity`, never past it); and 
 acceleration added × dt (`add_acceleration`). The densities and the temperatures are sources, added
 × dt, each side at its own gain (`add_boundary_density`, `add_body_force_density`,
 `add_boundary_temperature`, `add_body_force_temperature`). Every input goes into the gaussian birth
-slab at `injection_layer`.
+slab at `input.layer`.
 """
 import math
 
@@ -38,7 +38,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_R16F,
 
 from modules.gl import SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
-from .fluid_settings import PressureSolver, Fluid3DSettings, PressureSettings, VelocitySettings, ParticleSettings, UpscaledDensitySettings
+from .fluid_settings import Light, PressureSolver, Fluid3DSettings, PressureSettings, VelocitySettings, ParticleSettings, UpscaledDensitySettings
 from .multigrid_pressure import MultigridPressure
 from ..shaders import AddBoolean
 from ..flow_util import FlowUtil
@@ -54,9 +54,12 @@ from .shaders import (
     JacobiPressure3D, SorPressure3D, JacobiDiffusion3D,
     VorticityCurl3D, VorticityForce3D, Buoyancy3D,
     Inject3D, BoundaryVelocity3D, BodyForceAcceleration3D,
-    Add3D, CompositeOver,
+    Add3D, CompositeOver, Knee,
+    CompositeLight, LightVolume3D, LightBlur3D,
     InjectBinary3D
 )
+
+WATER_CHANNELS: tuple[float, float, float] = (1.8, 1.0, 0.6)    # the water's relative extinction, red first; composite_3d's
 
 # Combined memory barrier bits (cast to int for Pylance compatibility)
 _BARRIER_FETCH_AND_IMAGE: int = int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
@@ -172,6 +175,15 @@ class Fluid3D:
         self._upscaled_density: UpscaledDensity = UpscaledDensity(self.settings, self._advection, self._simulation_density)
         self._particle_texture: Texture = Texture()
         self._over_shader: CompositeOver = CompositeOver()
+        self._knee_shader: Knee = Knee()               # the output's highlights bent, not clipped
+        # The light: how much reaches each cell of a grid at a quarter of the simulation's size, and its blur
+        # for the scattering; allocated while `composite.shadow` is above 0
+        self._light: Texture3D = Texture3D(wrap=GL_CLAMP_TO_EDGE)
+        self._light_blur: tuple[Texture3D, Texture3D] = (Texture3D(wrap=GL_CLAMP_TO_EDGE), Texture3D(wrap=GL_CLAMP_TO_EDGE))
+        self._light_shader: LightVolume3D = LightVolume3D()
+        self._light_blur_shader: LightBlur3D = LightBlur3D()
+        self._light_override: tuple[float, float, float] | None = None     # set_light's, over the settings
+        self._light_shown: Texture3D = self._light      # the light the composite read last: direct, or scattered
         self._no_density: Texture3D = Texture3D()
         # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds = obstacle
         self._obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
@@ -257,6 +269,9 @@ class Fluid3D:
         self._inject_binary_shader.allocate()
         self._add_boolean_shader.allocate()
         self._over_shader.allocate()
+        self._knee_shader.allocate()
+        self._light_shader.allocate()
+        self._light_blur_shader.allocate()
 
         self._allocated = True
 
@@ -271,8 +286,14 @@ class Fluid3D:
         self._depth_scale = self._depth / max(1, min(self._simulation_width, self._simulation_height))
 
     def _spread(self) -> float:
-        """The injection's gaussian sigma as a share of the slab's depth, from `injection_spread` in widths."""
-        return max(self.settings.injection_spread / max(self._z_extent, 1e-6), 0.001)
+        """The injection's gaussian sigma as a share of the slab's depth, from `input.spread` in widths."""
+        return max(self.settings.input.spread / max(self._z_extent, 1e-6), 0.001)
+
+    @property
+    def _z_scale(self) -> float:
+        """The body's z to the box's: the box's depth over the real depth it stands for, `input.depth_span`
+        times the smaller of its width and height."""
+        return self._depth_scale / max(self.settings.input.depth_span, 1e-6)
 
     @property
     def _densities(self) -> list[DensityCarrier]:
@@ -357,6 +378,11 @@ class Fluid3D:
         self._inject_binary_shader.deallocate()
         self._add_boolean_shader.deallocate()
         self._over_shader.deallocate()
+        self._knee_shader.deallocate()
+        self._light_shader.deallocate()
+        self._light_blur_shader.deallocate()
+        for light in (self._light, *self._light_blur):
+            light.deallocate()
 
         self._allocated = False
 
@@ -366,6 +392,9 @@ class Fluid3D:
         for carrier in self._densities:
             carrier.reload()
         self._over_shader.reload()
+        self._knee_shader.reload()
+        self._light_shader.reload()
+        self._light_blur_shader.reload()
         self._divergence_shader.reload()
         self._gradient_shader.reload()
         self._jacobi_pressure_shader.reload()
@@ -520,7 +549,8 @@ class Fluid3D:
         self._advect_field(self._temperature, self._temperature_scratch, self._velocity, advect_step, dissipation, GL_R16F)
 
     def _apply_buoyancy(self) -> None:
-        """Apply buoyancy to velocity: F = gravity * (κρ − σ(T − T_ambient)).
+        """Apply buoyancy to velocity: the acceleration f = gravity * (κρ − σ(T − T_ambient)) (widths/s²),
+        kept as it is in `buoyancy`, added × dt like every body force (Fedkiw 2001).
 
         Dense density sinks along gravity; hot (fresh) density rises against it.
         The weight term acts wherever density is, so it stays active even
@@ -530,8 +560,8 @@ class Fluid3D:
         if temp.buoyancy == 0.0 and temp.sink == 0.0:
             return
 
-        sigma = self._dt * temp.buoyancy
-        kappa = self._dt * temp.sink
+        sigma = temp.buoyancy
+        kappa = temp.sink
         gravity = (temp.gravity_x, temp.gravity_y, temp.gravity_z)
 
         weight: Texture3D | None = self._simulation_density.weight
@@ -546,7 +576,7 @@ class Fluid3D:
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
-        self._add_force_to_velocity(self._buoyancy_force_vol)
+        self._add_force_to_velocity(self._buoyancy_force_vol, self._dt)
 
     def _enforce_incompressibility(self) -> None:
         """Pressure projection (divergence → Jacobi solve → gradient subtraction), the three passes on one set
@@ -625,13 +655,54 @@ class Fluid3D:
 
     def _composite_output(self) -> None:
         """The volume into the 2D output, the upscaled amount's where enabled, else the simulation's; the particles
-        drawn into their own image and laid over it."""
+        drawn into their own image and laid over it; then the highlights bent above the knee instead of clipped."""
         volume: DensityCarrier = self._upscaled_density if self.settings.upscaled.enabled else self._simulation_density
-        volume.composite(self._output_texture)
+        volume.composite(self._output_texture, self._lit())
         if self.settings.particles.enabled and self._particle_texture.allocated:
             self._particle_density.composite(self._particle_texture)
             self._over_shader.use(self._particle_texture, self._output_texture)
             glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        self._knee_shader.use(self._output_texture)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+
+    def _lit(self) -> CompositeLight | None:
+        """The light this step, from the simulation density: each light cell marched toward the light, then
+        with `scattering` blurred and mixed in; None while `shadow` is 0, the light released. `absorption` and
+        `fog` are over the box's depth, so per width they are over its depth in widths."""
+        composite = self.settings.composite
+        density: Texture3D | None = self._simulation_density.weight
+        if composite.shadow <= 0.0 or density is None:
+            for light in (self._light, *self._light_blur):
+                light.deallocate()
+            return None
+        size = (max(1, self._simulation_width // 4), max(1, self._simulation_height // 4), max(1, self._depth // 4))
+        for light in (self._light, *self._light_blur):
+            if not light.allocated or (light.width, light.height, light.depth) != size:
+                light.allocate(*size, GL_RGBA16F)
+        box = (1.0, 1.0 / self._aspect, self._z_extent)
+        chan = tuple(1.0 + (water - 1.0) * composite.tint for water in WATER_CHANNELS)
+        per_width = 1.0 / max(self._z_extent, 1e-6)
+        sigma = tuple(composite.absorption * per_width * c for c in chan)
+        fog = tuple(composite.fog * per_width * c for c in chan)
+        point: bool = composite.light == Light.POINT
+        vector = self._light_override or (composite.light_x, composite.light_y, composite.light_z)
+        self._light_shader.use(density, self._light, box=box, point=point, vector=vector, sigma=sigma, fog=fog)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        light: Texture3D = self._light
+        if composite.scattering > 0.0:
+            a, b = self._light_blur
+            for axis, source, result in ((0, self._light, a), (1, a, b), (2, b, a)):
+                self._light_blur_shader.use(source, self._light, result, axis, composite.scattering)
+                glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+            light = a
+        self._light_shown = light
+        return CompositeLight(light, composite.shadow, composite.anisotropy, point, vector, box)
+
+    def set_light(self, vector: tuple[float, float, float] | None) -> None:
+        """The light's direction toward the sun, or the lamp's place (±1 the box's sides; x right, y down the
+        screen, z away from the viewer), over the settings' until None: the app's hook for a light it derives,
+        from the pose or elsewhere."""
+        self._light_override = vector
 
     # ========== Deferred ==========
 
@@ -697,63 +768,63 @@ class Fluid3D:
 
     def drag_velocity(self, texture: Texture, weight: float = 1.0) -> None:
         """The boundary: drag the velocity in the gaussian birth slab toward the body's velocity (x, y on
-        the image plane, z toward the camera; widths/s) × velocity.boundary_gain, over velocity.boundary_drag, where
-        the body moves (its speed above DRAG_FLOOR), never past it. The volume's w is -z × the depth scale:
-        the box's depth stands for as much real depth as the smaller of its width and height, so z is
-        scaled by its depth over that; +W moves fluid away from the viewer (layer 0 is the front face).
+        the image plane, z toward the camera; widths/s) × input.boundary.velocity_gain, over input.boundary.velocity_drag, where
+        the body moves (its speed above DRAG_FLOOR), never past it. The volume's w is -z × `_z_scale`:
+        the box's depth stands for `input.depth_span` × the smaller of its width and height of real depth,
+        so z is scaled by its depth over that; +W moves fluid away from the viewer (layer 0 is the front face).
         Without depth, z is 0, and so is w.
         """
         if not self._allocated:
             return
-        velocity = self.settings.velocity
+        boundary = self.settings.input.boundary
         self._boundary_velocity_shader.use(
             texture, self._velocity,
-            self.settings.injection_layer,
+            self.settings.input.layer,
             self._spread(),
-            velocity.boundary_gain, drag_share(self._dt, velocity.boundary_drag), weight, DRAG_FLOOR, self._depth_scale,
+            boundary.velocity_gain, drag_share(self._dt, boundary.velocity_drag), weight, DRAG_FLOOR, self._z_scale,
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def add_acceleration(self, texture: Texture, weight: float = 1.0) -> None:
         """The body force: add the acceleration (x, y on the image plane, z toward the camera; widths/s²)
-        × velocity.body_force_gain × dt into the gaussian birth slab; w is -z, as the boundary's."""
+        × input.body_force.acceleration_gain × dt into the gaussian birth slab; w is -z, as the boundary's."""
         if not self._allocated:
             return
         self._body_force_acceleration_shader.use(
             texture, self._velocity,
-            self.settings.injection_layer,
+            self.settings.input.layer,
             self._spread(),
-            weight * self.settings.velocity.body_force_gain * self._dt, self._depth_scale,
+            weight * self.settings.input.body_force.acceleration_gain * self._dt, self._z_scale,
         )
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def add_boundary_density(self, texture: Texture, weight: float = 1.0) -> None:
-        """The boundary's density (RGBA, widths/s times the color) × density.boundary_gain × dt into the slab,
+        """The boundary's density (RGBA, widths/s times the color) × input.boundary.density_gain × dt into the slab,
         by the carrier."""
-        self._add_density(texture, weight * self.settings.density.boundary_gain)
+        self._add_density(texture, weight * self.settings.input.boundary.density_gain)
 
     def add_body_force_density(self, texture: Texture, weight: float = 1.0) -> None:
-        """The body force's density (RGBA, widths/s² times the color) × density.body_force_gain × dt into the slab,
+        """The body force's density (RGBA, widths/s² times the color) × input.body_force.density_gain × dt into the slab,
         by the carrier."""
-        self._add_density(texture, weight * self.settings.density.body_force_gain)
+        self._add_density(texture, weight * self.settings.input.body_force.density_gain)
 
     def _add_density(self, texture: Texture, gain: float) -> None:
         if not self._allocated:
             return
         for carrier in self._densities:
-            carrier.add(texture, gain, self._dt, self.settings.injection_layer, self._spread())
+            carrier.add(texture, gain, self._dt, self.settings.input.layer, self._spread())
 
     def add_boundary_temperature(self, texture: Texture, weight: float = 1.0) -> None:
-        """The boundary's temperature (widths/s, signed by the color) × temperature.boundary_gain × dt into the slab."""
+        """The boundary's temperature (widths/s, signed by the color) × input.boundary.temperature_gain × dt into the slab."""
         if self.settings.temperature.buoyancy == 0.0:      # nothing reads it
             return
-        self._add_source(texture, self._temperature, weight * self.settings.temperature.boundary_gain, GL_R16F)
+        self._add_source(texture, self._temperature, weight * self.settings.input.boundary.temperature_gain, GL_R16F)
 
     def add_body_force_temperature(self, texture: Texture, weight: float = 1.0) -> None:
-        """The body force's temperature (widths/s², signed by the color) × temperature.body_force_gain × dt into the slab."""
+        """The body force's temperature (widths/s², signed by the color) × input.body_force.temperature_gain × dt into the slab."""
         if self.settings.temperature.buoyancy == 0.0:      # nothing reads it
             return
-        self._add_source(texture, self._temperature, weight * self.settings.temperature.body_force_gain, GL_R16F)
+        self._add_source(texture, self._temperature, weight * self.settings.input.body_force.temperature_gain, GL_R16F)
 
     def _add_source(self, texture: Texture, volume: SwapTexture3D, gain: float, internal_format: int) -> None:
         """A source: `texture` × gain × dt added into the volume's gaussian birth slab."""
@@ -761,7 +832,7 @@ class Fluid3D:
             return
         self._inject_shader.use(
             texture, volume,
-            self.settings.injection_layer,
+            self.settings.input.layer,
             self._spread(),
             gain * self._dt,
             internal_format=internal_format
@@ -838,7 +909,8 @@ class Fluid3D:
                 'velocity': volume(self._velocity, TextureKind.VELOCITY),
                 'vorticity': volume(self._curl_vol, TextureKind.VELOCITY),
                 'temperature': volume(self._temperature, TextureKind.SCALAR),
-                'buoyancy': volume(self._buoyancy_force_vol, TextureKind.VELOCITY),
+                'buoyancy': volume(self._buoyancy_force_vol, TextureKind.ACCELERATION),
                 'divergence': volume(self._divergence_vol, TextureKind.SCALAR),
                 'pressure': volume(self._pressure, TextureKind.SCALAR),
+                **({'light': volume(self._light_shown, TextureKind.IMAGE)} if self._light_shown.allocated else {}),
                 **{name: port for carrier in self._densities for name, port in carrier.ports.items()}}

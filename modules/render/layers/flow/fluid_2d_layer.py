@@ -12,7 +12,8 @@ import logging
 from OpenGL.GL import GL_RGBA16F
 
 # Local application imports
-from modules.gl import Fbo, Texture
+from modules.gl import Fbo, Style, Texture
+from modules.settings import Field
 from modules.flow import Fluid2D, Fluid2DSettings, HasPorts
 from ...shaders import DensityColorize
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidInput, FluidOutput, Injection
@@ -25,6 +26,7 @@ CHANNELS: int = 4       # the density's channels, one injection each
 class Fluid2DLayerSettings(Fluid2DSettings, FluidLayerSettings):
     """Configuration for Fluid2DLayer: the stage's settings and its fluid's own, one panel, the stage's
     first; the stage's width and height are the fluid's simulation grid."""
+    blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD, newline=True, description="How the show is drawn over the layers before it")
 
 
 class Fluid2DLayer(FluidLayer):
@@ -41,6 +43,10 @@ class Fluid2DLayer(FluidLayer):
         self._colorize_shader: DensityColorize = DensityColorize()
         self._channel: int = 0      # the channel the next injection's amount goes into
         self._warned_channels: bool = False
+
+    @property
+    def blend_mode(self) -> Style.BlendMode:
+        return self.settings.blend_mode
 
     @property
     def texture(self) -> Texture:

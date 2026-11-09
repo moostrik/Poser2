@@ -44,7 +44,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 | depth velocity       | the z of the 3D flow: the depth change along the x/y displacement, in view widths per second          | `DepthVelocity`, `DepthVelocitySettings`, group `depth_velocity`   |
 | 2D flow, 3D flow     | a system: a motion layer and a bridge layer per camera, a fluid layer per show output                 | `Motion2DLayer` + `Bridge2DLayer` + `Fluid2DLayer`; `…3D…`         |
 | 2D camera, 3D camera | an image and a mask; those and a depth image on the same view                                         | `MotionInput` without / with `depth`                               |
-| port                 | a stage's named texture with its kind: image, velocity, scalar; its input and output fields declare theirs, every component its own | `Port`, `TextureKind`, `HasPorts`, `ports_of`, in `modules/flow` |
+| port                 | a stage's named texture with its kind: image, velocity, acceleration, scalar; its input and output fields declare theirs, every component its own | `Port`, `TextureKind`, `HasPorts`, `ports_of`, in `modules/flow` |
 | monitor              | a layer that shows one port of one stage, picked on the panel, drawn only while it is shown; its views in [MONITOR.md](MONITOR.md) | `MonitorLayer`, `monitor_a`, `monitor_b`              |
 
 "bridge" is ofxFlowTools' word (`ftVelocityBridge`, `ftDensityBridge`, `ftTemperatureBridge`);
@@ -286,7 +286,7 @@ The six outputs (`BridgeOutput`, `Injection`), and what the 3D fluid does with e
 
 | Output                    | Unit                       | The fluid                                                                       | Default       |
 |---------------------------|----------------------------|---------------------------------------------------------------------------------|---------------|
-| `boundary_velocity`       | widths/s                   | drags the water toward it where it is non-zero, over `boundary_drag`, never past it | the trail 1   |
+| `boundary_velocity`       | widths/s                   | drags the water toward it where it is non-zero, over `velocity_drag`, never past it | the trail 1   |
 | `boundary_density`        | widths/s, times the color  | adds it × dt into the slab: the brush, per width of travel                      | the trail 1   |
 | `boundary_temperature`    | widths/s, by the color     | adds it × dt into the slab                                                      | the trail 1   |
 | `body_force_acceleration` | widths/s²                  | adds it × dt: a Δv added once                                                   | all 0: `None` |
@@ -372,7 +372,7 @@ tested on it, and the lowpass's and the bandpass's own settings are left as the 
 | `modules/flow/shaders/`         | the shared fragment shaders, `AddBoolean` among them                                                                                                       |
 | `modules/flow/time_step.py`, `modules/flow/wall_mode.py` | shared                                                                                                                            |
 | `modules/flow/port.py`          | `Port`, `Ports`, `TextureKind`, `HasPorts`, `OnDemand`, `prefixed`, `ports_of`                                                                             |
-| `modules/flow/visualization/`   | the monitors' drawing: `Visualizer` (image, colormap, glyphs and histogram into one FBO), `Strip`, `Legend` with `log_axis.py`, `DrawnSize`, `ALL_CHANNELS`; a volume's `Cut`, `VolumeCut`, `VolumeCube`, `VolumeGlyphs`, `VolumeFog` and their `Orbit` |
+| `modules/flow/visualization/`   | the monitors' drawing: `Visualizer` (image, colormap, glyphs and histogram into one FBO), `Strip`, `Legend` with `log_axis.py`, `DrawnSize`, `ALL_CHANNELS`; a volume's `VolumeCube` with `CubeColor`, `VolumeGlyphs` and their `Orbit`, and `Cut`, `VolumeCut` for the strip and the scripts |
 | `modules/render/layers/flow/`   | `motion_layer.py` (`MotionInput`, `MotionOutput`, `MotionLayer`, `frame_interval`), `motion_2d_layer.py`, `motion_3d_layer.py`; `bridge_layer.py` (`BridgeInput`, `BridgeOutput`, `BridgeLayer`), `bridge_2d_layer.py`, `bridge_3d_layer.py`; `fluid_layer.py` (`Injection`, `FluidInput`, `FluidOutput`, `FluidLayer`), `fluid_2d_layer.py`, `fluid_3d_layer.py`; `monitor_layer.py` (`MonitorInput`, `MonitorLayer`, `MonitorLayerSettings`, `MonitorAdvancedSettings`, `FlowStage`, `MonitorView`, `Channel`, `GlyphSpacing`) |
 
 Neither `fluid_2d` nor `fluid_3d` imports the other. The settings group of each fluid is `fluid`.
@@ -430,8 +430,8 @@ The shader loader finds a shader's source by its `.py` module name beside it
   default, and the app sets it from whatever it reads (hd_trio: the pose's motion and the
   cross-camera similarity). The fluid never knows why.
 - A multiplier on an input is a `gain` (the 2D fluid's `velocity.gain`, `density.gain`,
-  `temperature.gain`; the 3D fluid's `velocity.boundary_gain` and `velocity.body_force_gain`, and its density's and
-  temperature's `boundary_gain` and `body_force_gain`); a 0 to 1 share in a mix is a `weight`; the density's sinking along gravity
+  `temperature.gain`; the 3D fluid's gains in `input.boundary` and `input.body_force`,
+  one per bridge output); a 0 to 1 share in a mix is a `weight`; the density's sinking along gravity
   in the buoyancy is `temperature.sink`, which both fluids read (`Fluid2D._apply_buoyancy`).
 - `modules/render/tests/test_flow_systems.py` loads each app preset into its system's stage
   settings and fails on an unknown key, and fails on a field of the flow's settings that no code
