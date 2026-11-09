@@ -16,93 +16,48 @@ fluid is `Fluid3D` (`fluid_3d/fluid_3d.py`), its layer `Fluid3DLayer`
 What is next for the fluid, in order; what is open elsewhere in the flow is
 [FLOW.md's Open](FLOW.md#open).
 
-### 1. The explosions
-
-A value runs out of range and stays there, in the motion and in the fluid:
-
-- The motion sticks: x and y stop following the body while z still does, until the motion's reset
-  **(site fact)**, on the current code and the one before it. The one x/y state kept from frame to frame is the x/y filter of
-  `z.xy_smooth` (`LucasKanadeFlow3D`), which the reset clears; the solve starts each frame from no
-  motion, and z has its own track **(deduction)**. The check at the app: when it sticks,
-  `xy_smooth` off and on clears that filter alone.
-- The fluid becomes unstable sometimes **(site fact)**; not yet reproduced. On standmoves through
-  the harness at 448 × 800 × 32 the step grew to 128 ms over the minute while the density filled
-  the box to white, where stillslowfast at the same grid steps in 11 ms: a value growing out of
-  range (a half float's infinity, a NaN) would fit both **(deduction)**.
-
-The work: each stage guards its output, so a bad value stops where it was made and the warning names
-the stage; then the cause is fixed there.
-
-| Step | What                                                                                      | State |
-|------|-------------------------------------------------------------------------------------------|-------|
-| 1    | the fluid: the finite guard and `max_speed` in place of the dampen ([The guard](#the-guard)); vorticity's range to 100 for the test | built |
-| –    | a test for every step: open walls make non-finite values ([2](#3-the-walls)) | |
-| 2    | the bridge: not needed. It makes no non-finite value itself (every division in its shaders is held above a small floor); one could only come in from the motion, which now guards its output. Its trails would hold one until a reset | not needed |
-| 3    | the motion: the finite guard on its output (`velocity`) and on its two memories, the x/y filter's (`displacement`) and z's (`depth_velocity`), in `MOTION.md` ([The guard](MOTION.md#the-guard)); no x/y speed gate: the burst's x/y, about 1.4 m/s at 1 m, is a speed a body can move | built |
-| 4    | the app, watching the warnings; the guards' timing once the fluid is stable, a row in [TIMING.md](TIMING.md) | |
-| 5    | the sticking itself: the LK solve's coarsest level started from a cleared buffer, and the clear sometimes left garbage at startup; it now starts from no motion in the shader, and clears to 0 pass no memory ([MOTION.md](MOTION.md#constraints)); 8 starts without a bad frame | built |
-| 6    | the first frame: a view is black before the camera delivers; the motion counts only frames with a capture time, so `WARM_UP_TIME` is gone ([MOTION.md](MOTION.md#when-it-measures)) | built |
-
-Besides the water's top speed ([The guard](#the-guard)), a guard to try on the motion: a soft limit on
-its z speed, z as measured to a knee (about 1.5 m/s), compressed above it toward a maximum (about 3 m/s),
-the speed gate (6 m/s) behind it; a curve per reading, no time filter, checked against the spread of
-z speeds on standmoves and stillslowfast first.
-
-### 2. MacCormack, stable
-
-Found and fixed ([The advection](#the-advection)): the limiter clamped the correction to its bounds,
-which kept energy, and with the confinement the water grew; it now reverts to the semi-Lagrangian step,
-keeps the detail and decays as that step does. Left, the confinement: by the textbook (Fedkiw, Stam
-and Jensen 2001) it adds energy on purpose, to put back the swirl the semi-Lagrangian step smears
-away, and stays stable only while the advection loses at least that much; above about 1 it grows the
-water in both advections (measured, the same table, with the walls' false curl included; with the
-wall rule both decay at 1.93, and at 5 MacCormack's inside holds, [The walls](#the-walls)). The look
-above the textbook epsilon, smoke curling out of the water, is wanted **(site fact)**: more swirl than
-the advection lost. So, after the walls: measure the high epsilon again with consistent walls; if it is
-stable, nothing more; if it still grows, either the confinement kept as the look and capped where its
-push would raise the water's energy, or IVOCK (Zhang, Bridson and Greif 2015, the vorticity the
-advection destroyed added back, never energy created) with a gain above 1 for the look, capped as well.
-
-### 3. The walls
-
-- **One wall rule, free-slip consistent, open fixed**: built ([The walls](#the-walls)). The vorticity
-  unstable at the walls was the curl and the confinement reading a no-slip wall the projection does not
-  have; the open walls' non-finite values were the multigrid putting an open wall's 0 in a different place
-  on each level. Both measured gone.
-- **Partial slip**: built, `slip_time` beside `wall`, 0 free-slip (the default) ([The walls](#the-walls)).
-  Measured stable; how it looks is to judge at the app.
-
-### 4. The projection's floor
+### 1. The projection's floor
 
 The projection's divergence and gradient are central differences on the cell centers, and the
 solvers solve the compact 7-point Laplacian; the two differ, so the velocity keeps a divergence of
-about 0.0075 of a cell whatever the solver ([The pressure](#the-pressure)). A staggered
-grid makes the divergence of the gradient the 7-point Laplacian, and the solve's accuracy then
-reaches the velocity **(deduction)**. It changes every pass that reads the velocity; its design is
+about 0.0075 of a cell whatever the solver ([The pressure](#the-pressure)). A staggered grid makes
+the divergence of the gradient the 7-point Laplacian, and the solve's accuracy then reaches the
+velocity **(deduction)**. It changes every pass that reads the velocity; its design is
 [The staggered velocity](#the-staggered-velocity).
 
-### 5. Unused channels
+### 2. High vorticity
 
-Built ([MONITOR.md](MONITOR.md)): a port says the channels that hold its values and the monitor draws
-only those; every flow shader writes 0 in a channel nothing reads, its readers checked (where the
-target holds that channel: the light's w, the start region's mean's w; elsewhere the format drops it).
-No texture holds fewer channels than its format beyond a 3D vector's w, which an image store and a
-render target need (RGB is neither).
+The confinement adds energy by design (Fedkiw, Stam and Jensen 2001), to put back the swirl the
+semi-Lagrangian step smears away, and stays stable only while the advection loses at least that
+much. With the walls' rule both advections decay at ε 1.93, and at ε 5 MacCormack's inside holds
+([The walls](#the-walls)). The look above the textbook ε, smoke curling out of the water, is wanted
+**(site fact)**. To check at the app: if the water still grows at a high ε, either the confinement
+kept as the look and capped where its push would raise the water's energy, or IVOCK (Zhang, Bridson
+and Greif 2015: the vorticity the advection destroyed added back, never energy created) with a gain
+above 1 for the look, capped as well.
+
+### 3. The guards at the app
+
+The fluid became unstable sometimes **(site fact)**, not reproduced in the harness. Each stage now
+guards its output ([The guard](#the-guard), [MOTION.md](MOTION.md#the-guard)), so the warning names
+the stage where a bad value is made, and the cause is fixed there. The bridge has no guard: it makes
+no non-finite value itself, every division in its shaders held above a small floor, and its input is
+the guarded motion. The guards' cost goes in [TIMING.md](TIMING.md) once the fluid is stable.
 
 ## The fluid
 
 A step (`Fluid3D.update`), in order, at the code's defaults:
 
-| Pass        | What                                                                                  | On                    | Depends on the input |
-|-------------|---------------------------------------------------------------------------------------|-----------------------|----------------------|
-| advect_vel  | self-advection by `advection`, `velocity.advection_scale` 1, fade 60 s; on its result the guard ([The guard](#the-guard)) and the top speed `max_speed`, 0 off | velocity 256×448×128 | the trace distance |
-| viscosity   | Jacobi diffusion, off (`viscosity` 0)                                                 | velocity              | no                   |
-| vorticity   | the curl, then the confinement force × dt added to the velocity in the same pass       | velocity, curl        | no                   |
-| advect_temp | off: `buoyancy` 0 clears the temperature once, and nothing is injected into it  | temperature           | the trace distance   |
-| buoyancy    | gravity × (sink × density − buoyancy × ΔT), kept as an acceleration, added × dt; gravity down the screen (`gravity_y` 1) | acceleration | no |
-| incompress  | divergence, the pressure by `pressure.solver` ([The pressure](#the-pressure)), gradient subtraction, on the walls ([The walls](#the-walls)) | pressure, velocity | no |
-| advect_den  | semi-Lagrangian advection, one trilinear read per texel, the evaporation taking the alpha down, the color with it | density 256×448×128   | the trace distance   |
-| composite   | front-to-back march, one step per layer                                               | output 2160×3840      | no                   |
+| Pass        | What                                                                                                                                                           | On                   | Depends on the input |
+|-------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------|----------------------|
+| advect_vel  | self-advection by `advection`, `velocity.advection_scale` 1, fade 60 s; on its result the guard ([The guard](#the-guard)) and the top speed `max_speed`, 0 off | velocity 256×448×128 | the trace distance   |
+| viscosity   | Jacobi diffusion, off (`viscosity` 0)                                                                                                                          | velocity             | no                   |
+| vorticity   | the curl, then the confinement force × dt added to the velocity in the same pass                                                                               | velocity, curl       | no                   |
+| advect_temp | off: `buoyancy` 0 clears the temperature once, and nothing is injected into it                                                                                 | temperature          | the trace distance   |
+| buoyancy    | gravity × (sink × density − buoyancy × ΔT), kept as an acceleration, added × dt; gravity down the screen (`gravity_y` 1)                                       | acceleration         | no                   |
+| incompress  | divergence, the pressure by `pressure.solver` ([The pressure](#the-pressure)), gradient subtraction, on the walls ([The walls](#the-walls))                    | pressure, velocity   | no                   |
+| advect_den  | semi-Lagrangian advection, one trilinear read per texel, the evaporation taking the alpha down, the color with it                                              | density 256×448×128  | the trace distance   |
+| composite   | front-to-back march, one step per layer                                                                                                                        | output 2160×3840     | no                   |
 
 Every field is a `GL_TEXTURE_3D` on one grid of cubic cells at the stage's size, 256 × 448 by
 `depth` 128: the velocity RGBA16F, the temperature R16F and the pressure R32F, the density
@@ -134,10 +89,11 @@ included, so at 0.5 the whole fluid runs at half speed and keeps its shapes. A v
 The velocity is in image widths per second, as the bridge's; the advection moves a texel by
 velocity × dt × `density.advection_scale` (1) in uv, so 1 width/s crosses the width in 1 s.
 
-The volume's settings: `input.layer` and `input.spread`, where the body sits in
-the volume; `emission`, `opacity`, `glow`, `tint` and `fog`, the composite's march; `wall`, the
-z walls. Obstacles stay supported (`set_obstacle`, `add_obstacle`, `clear_obstacles`, no caller
-today): one R8 volume on the simulation's grid, which every field's pass samples.
+The volume's settings: `input.layer` and `input.spread`, where the body sits in the volume;
+`emission`, `opacity`, `glow`, `tint` and `fog`, the composite's march; `wall` and `slip_time`, every
+side of the box ([The walls](#the-walls)). Obstacles stay supported (`set_obstacle`, `add_obstacle`,
+`clear_obstacles`, no caller today): one R8 volume on the simulation's grid, which every field's pass
+samples.
 
 ## The inputs
 
@@ -145,12 +101,12 @@ The rule, by what each input is. The trail is a velocity in the fluid's own unit
 would act as an acceleration and its gain as a rate. In Navier–Stokes the body force is an
 acceleration per unit mass; a body in the fluid is a boundary that moves.
 
-| Input is              | The fluid                                                                       | Here                                             |
-|-----------------------|---------------------------------------------------------------------------------|--------------------------------------------------|
-| a body's velocity     | is dragged toward it where the body is, over a time, never past it              | the bridge's `boundary.velocity`                 |
-| a velocity change, Δv | adds it once in total: as an acceleration, the pulse over its area, × dt        | the bandpass's readings as accelerations         |
-| an acceleration       | adds it × dt                                                                    | buoyancy, the vorticity force, `body_force.acceleration` |
-| a source              | adds it × dt, an amount per second                                              | the densities and the temperatures               |
+| Input is              | The fluid                                                                | Here                                                     |
+|-----------------------|--------------------------------------------------------------------------|----------------------------------------------------------|
+| a body's velocity     | is dragged toward it where the body is, over a time, never past it       | the bridge's `boundary.velocity`                         |
+| a velocity change, Δv | adds it once in total: as an acceleration, the pulse over its area, × dt | the bandpass's readings as accelerations                 |
+| an acceleration       | adds it × dt                                                             | buoyancy, the vorticity force, `body_force.acceleration` |
+| a source              | adds it × dt, an amount per second                                       | the densities and the temperatures                       |
 
 ### What the fluid takes
 
@@ -161,14 +117,14 @@ The outputs, in two subpanels, one per system, each a mix of the six readings; t
 say how the water follows each; the densities and the temperatures go in by `inject_3d`, `FILL` for
 the boundary, `RATE` for the body force:
 
-| Subpanel     | Output        | Unit                       | The fluid                                                                        | The fluid's setting        | 1 means                               |
-|--------------|---------------|----------------------------|----------------------------------------------------------------------------------|----------------------------|---------------------------------------|
-| `boundary`   | `velocity`    | widths/s                   | drags the water toward it where it is non-zero, over `velocity_drag`, never past it (`boundary_velocity_3d`, [The drag](#the-drag)) | `input.boundary.velocity_gain`            | the water as fast as the body         |
-| `boundary`   | `density`     | the dye: color × presence, 0 to 1 | fills the water toward it × `density_gain` (at most 1) in the slab, never past it, over `density_drag` | `input.boundary.density_gain`    | fully dyed at 1 width/s               |
-| `boundary`   | `temperature` | warmth, -1 to 1            | drags the water toward it × `temperature_gain` (at most ±1) in the slab where the body is, over `temperature_drag` | `input.boundary.temperature_gain` | fully warm or cold at 1 width/s |
-| `body_force` | `acceleration`| widths/s²                  | adds it × dt (`body_force_acceleration_3d`)                                      | `input.body_force.acceleration_gain`          | a Δv added once                       |
-| `body_force` | `density`     | a push's dye, presence 0 to 1 | adds it at a rate × dt into the slab, capped at fully dyed: the pipette       | `input.body_force.density_rate`  | fully dyed per second at a full push  |
-| `body_force` | `temperature` | a push's warmth, -1 to 1   | adds it at a rate × dt into the slab, capped at ±1                               | `input.body_force.temperature_rate` | full warmth per second at a full push |
+| Subpanel     | Output         | Unit                              | The fluid                                                                                                                           | The fluid's setting                  | 1 means                               |
+|--------------|----------------|-----------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------|---------------------------------------|
+| `boundary`   | `velocity`     | widths/s                          | drags the water toward it where it is non-zero, over `velocity_drag`, never past it (`boundary_velocity_3d`, [The drag](#the-drag)) | `input.boundary.velocity_gain`       | the water as fast as the body         |
+| `boundary`   | `density`      | the dye: color × presence, 0 to 1 | fills the water toward it × `density_gain` (at most 1) in the slab, never past it, over `density_drag`                              | `input.boundary.density_gain`        | fully dyed at 1 width/s               |
+| `boundary`   | `temperature`  | warmth, -1 to 1                   | drags the water toward it × `temperature_gain` (at most ±1) in the slab where the body is, over `temperature_drag`                  | `input.boundary.temperature_gain`    | fully warm or cold at 1 width/s       |
+| `body_force` | `acceleration` | widths/s²                         | adds it × dt (`body_force_acceleration_3d`)                                                                                         | `input.body_force.acceleration_gain` | a Δv added once                       |
+| `body_force` | `density`      | a push's dye, presence 0 to 1     | adds it at a rate × dt into the slab, capped at fully dyed: the pipette                                                             | `input.body_force.density_rate`      | fully dyed per second at a full push  |
+| `body_force` | `temperature`  | a push's warmth, -1 to 1          | adds it at a rate × dt into the slab, capped at ±1                                                                                  | `input.body_force.temperature_rate`  | full warmth per second at a full push |
 
 The two subpanels are the two systems every solver distinguishes: a moving boundary, whose values
 the water takes, and the body force, which adds to it. The boundary's density and temperature are
@@ -190,73 +146,78 @@ the frame rate: it leaves the fluid at most as fast as the body × `gain`; what 
 does with the velocity, the projection and the confinement, is its own. w = −z. The arithmetic is
 in numpy beside the fluid (`drag_share`, `drag_gate`, `drag_velocity_step`, `test_drag.py`).
 
-`density.advection_scale` and `temperature.advection_scale` are 1: the density moves with the water. `velocity.advection_scale` is 1: the velocity carries itself
-the full step, the physics; viscosity and the confinement are the calming knobs. The lowpass's
-`smooth` makes the trail coast after a stop; with the drag that is the body still dragging after it
-stopped, while the coast is the fluid's own inertia ([Measuring](#measuring) shows it at `smooth`
-300), so the drag wants a short `smooth`: its default is 160 ms.
+`density.advection_scale` and `temperature.advection_scale` are 1: the density moves with the water.
+`velocity.advection_scale` is 1: the velocity carries itself the full step, the physics; viscosity and
+the confinement are the calming knobs. The lowpass's `smooth` makes the trail coast after a stop; with
+the drag that is the body still dragging after it stopped, while the coast is the fluid's own inertia
+([Measuring](#measuring) shows it at `smooth` 300), so the drag wants a short `smooth`: its default is
+160 ms.
 
 ### The walls
 
 The domain is a box with solid walls, as the textbook's (Bridson): beyond a closed wall the water
-cannot pass, v·n = 0, it slides along freely (free-slip), and the pressure has no gradient across it,
-∂p/∂n = 0. One rule says what lies beyond the box, `walls.glsl`, included by every pass that reads
-there: the divergence, the gradient, the Jacobi and SOR solves, the multigrid's residual and
-prolongation, the curl and the confinement (`uClosed`, per axis, from `wall`). A ghost cell beyond the
-last mirrors it:
+cannot pass, v·n = 0, it slides along freely (free-slip), and the pressure has no gradient across
+it, ∂p/∂n = 0. One rule says what lies beyond the box, `walls.glsl`, included by every pass that
+reads there: the divergence, the gradient, the Jacobi and SOR solves, the multigrid's residual and
+prolongation, the curl and the confinement (`uClosed`, per axis, from `wall`). A ghost cell beyond
+the last mirrors it:
 
-| | closed | open |
-|---|---|---|
-| the velocity | its component through the wall turned, along it (2k − 1) of it: the face carries nothing through, k along | the same: it leaves as it came |
-| the pressure | the same: no push across | its negative: 0 on the wall's face, on every multigrid level alike |
-| the curl's size, for the confinement | the same: no slope toward the wall | the same |
+|                                      | closed                                           | open                                               |
+|--------------------------------------|--------------------------------------------------|----------------------------------------------------|
+| the velocity                         | through the wall turned; along it (2k − 1) of it | the same: it leaves as it came                     |
+| the pressure                         | the same: no push across                         | its negative: 0 on the wall's face, on every level |
+| the curl's size, for the confinement | the same: no slope toward the wall               | the same                                           |
 
-The gradient also keeps the velocity from pointing into a closed wall, as into an obstacle's face.
+So the face between the last cell and the ghost carries nothing through a closed wall and k of the
+velocity along it. The gradient also keeps the velocity from pointing into a closed wall, as into an
+obstacle's face.
 
-A closed wall slips (Navier slip): `slip_time`, the seconds the water along it takes to slow to 1%, 0
-free-slip. It models the layer along the wall a coarse grid cannot resolve, where no-slip would need that
-layer resolved. k = 0.01^(dt / `slip_time`) is the share of the velocity along the wall kept a step: the
-velocity's advection multiplies the tangential velocity of the cells against a closed wall by it, and the
-curl's ghost carries (2k − 1) of it, so the curl reads the shear the braking makes. Only the tangential
-velocity changes; the pressure's condition stays, so the projection, curl and confinement still agree.
-Measured as below, MacCormack, wall band → inside at 12 s:
+A closed wall slips (Navier slip): `slip_time`, the seconds the water along it takes to slow to 1%,
+0 free-slip (the default). It models the layer along the wall a coarse grid cannot resolve, where
+no-slip would need that layer resolved. k = 0.01^(dt / `slip_time`) is the share of the velocity
+along the wall kept a step: the velocity's advection multiplies the tangential velocity of the cells
+against a closed wall by it, and the curl's ghost carries (2k − 1) of it, so the curl reads the shear
+the braking makes. Only the tangential velocity changes; the pressure's condition stays, so the
+projection, the curl and the confinement still agree. A slipping wall makes a curl in proportion to
+its braking, which the confinement amplifies.
 
-| Run                  | free-slip       | `slip_time` 2   | `slip_time` 0.5 |
-|----------------------|-----------------|-----------------|-----------------|
-| vorticity 1.93 (SL)  | 0.023 → 0.011   | 0.004 → 0.007   |                 |
-| vorticity 1.93 (MC)  | 0.018 → 0.010   | 0.011 → 0.010   |                 |
-| vorticity 5 (MC)     | 0.015 → 0.021   |                 | 0.008 → 0.021   |
+Every pass reads the same ghosts, and none reads the texture's border instead:
 
-No run made a non-finite value. A slipping wall makes a curl in proportion to its braking, which the
-confinement amplifies; at vorticity 5 and `slip_time` 0.5 it stays bounded.
+- A curl or a confinement reading the border's 0 sees a wall the water slides along as a shear, a
+  curl no wall has, and the confinement's push along the wall makes it bigger the next step.
+- A divergence reading the border sees a face at the wall the gradient cannot empty, so water pushed
+  into a wall stays and is squeezed along it.
+- An open wall's pressure as a ghost of 0 puts that 0 half a cell further out on each multigrid
+  level, a different place on each, and the coarse correction spreads to the edge as at a closed
+  wall, so it diverges.
 
-The curl and the confinement once read the textures' border of 0 instead: a wall the water slid along
-read as a shear, a curl no wall has, and the confinement pushed along the wall and made it bigger the
-next step. The multigrid once put an open wall's 0 one ghost cell out, a different place on each level,
-and its coarse correction spread to the edge as at a closed wall, so it diverged. Measured with
-`scripts/maccormack_check.py` at deep_flow's preset (the multigrid), a disc swinging for 3 s, then
-still; the mean speed (widths/s) in the two cells next to the walls and inside them, at 4 s and 12 s:
+Measured with `scripts/maccormack_check.py` at deep_flow's preset (the multigrid, 256 × 448 × 128), a
+disc swinging for 3 s, then still; the mean speed (widths/s) in the two cells next to the walls and
+inside them, at 4 s and 12 s:
 
-| Run | wall band, before | inside, before | wall band, the rule | inside, the rule |
-|---|---|---|---|---|
-| closed, vorticity 1.93, semi-Lagrangian | 0.060 → 0.212 | 0.024 → 0.069 | 0.032 → 0.011 | 0.022 → 0.008 |
-| closed, vorticity 1.93, MacCormack | 0.049 → 0.227 | 0.025 → 0.061 | 0.031 → 0.009 | 0.025 → 0.007 |
-| closed, vorticity 5, MacCormack | | | 0.027 → 0.015 | 0.025 → 0.021 |
-| open, both advections | the half float's top within 1.5 s, then non-finite | | 0.004 → 0.002 (6 s) | 0.007 → 0.004 (6 s) |
+| Run                                     | wall band, the border | inside, the border | wall band, the ghosts | inside, the ghosts  |
+|-----------------------------------------|-----------------------|--------------------|-----------------------|---------------------|
+| closed, vorticity 1.93, semi-Lagrangian | 0.060 → 0.212         | 0.024 → 0.069      | 0.032 → 0.011         | 0.022 → 0.008       |
+| closed, vorticity 1.93, MacCormack      | 0.049 → 0.227         | 0.025 → 0.061      | 0.031 → 0.009         | 0.025 → 0.007       |
+| closed, vorticity 5, MacCormack         |                       |                    | 0.027 → 0.015         | 0.025 → 0.021       |
+| open, both advections                   | non-finite in 1.5 s   |                    | 0.004 → 0.002 (6 s)   | 0.007 → 0.004 (6 s) |
 
-Jacobi and SOR, closed and open, decay as well; the density's edge and the swirl MacCormack keeps are as
-before (0.172, 0.723).
+Jacobi and SOR, closed and open, decay as well. With the ghosts, the slip, MacCormack, the wall band
+and the inside at 12 s, no run non-finite:
 
-The walls must be the ghosts, not the texture's border. With the border as the wall (the velocity
-0 beyond it, the pressure its edge, the obstacle's face rule off), the divergence sees a face at the
-wall the gradient cannot empty, so water pushed into a wall stays and is squeezed along it. Measured
-in a hidden window at 448 × 800, a body 50 px from the right wall at 1 width/s, held 5 s, its band
-300 px tall, at 25 fps:
+| Run                 | free-slip     | `slip_time` 2 | `slip_time` 0.5 |
+|---------------------|---------------|---------------|-----------------|
+| vorticity 1.93 (SL) | 0.023 / 0.011 | 0.004 / 0.007 |                 |
+| vorticity 1.93 (MC) | 0.018 / 0.010 | 0.011 / 0.010 |                 |
+| vorticity 5 (MC)    | 0.015 / 0.021 |               | 0.008 / 0.021   |
 
-| The body                 | The water's highest speed, the border as wall | the ghosts |
-|--------------------------|-----------------------------------------------|------------|
-| pushing into the wall    | 2.34 widths/s, in the wall's cells            | 0.93       |
-| sliding along the wall   | 3.96, in the corner                           | 1.07       |
+Measured in a hidden window at 448 × 800, a body 50 px from the right wall at 1 width/s, held 5 s,
+its band 300 px tall, at 25 fps:
+
+| The body               | The water's highest speed, the border as wall | the ghosts |
+|------------------------|-----------------------------------------------|------------|
+| pushing into the wall  | 2.34 widths/s, in the wall's cells            | 0.93       |
+| sliding along the wall | 3.96, in the corner                           | 1.07       |
 
 The confinement is not the cause: off, the border gives 2.34 and 4.11. With the ghosts the water
 stays at the body's speed or under, the confinement adding a few percent, MacCormack too (0.90 and
@@ -267,32 +228,32 @@ stays at the body's speed or under, the confinement adding a few percent, MacCor
 `pressure.solver` picks how the Poisson equation is solved each step, each warm from the last step's
 pressure, each on the walls as [The walls](#the-walls) states:
 
-| `solver`    | How                                                                                              | Its count                          |
-|-------------|--------------------------------------------------------------------------------------------------|------------------------------------|
-| `JACOBI`    | every cell from its neighbors' last values, five iterations a dispatch in shared memory (`jacobi_pressure_3d`) | `iterations`, 40 |
-| `SOR`       | red-black Gauss–Seidel over-relaxed by `relaxation`: each color from the other's newest values (`sor_pressure_3d`); 1.95 diverged, so its range stops at 1.85 | `iterations`, its sweeps |
-| `MULTIGRID` | V-cycles (`multigrid_pressure.py`): on each level two red-black Gauss–Seidel sweeps, the residual restricted to the level halved, its correction solved from 0 and added back trilinearly, two sweeps again; down to 8 × 14 × 4 at the default grid, 16 sweeps there; obstacles on the finest level only | `cycles`, 1 |
+| `solver`    | How                                                                                                                                                                                                                                                                                                      | Its count                |
+|-------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------|
+| `JACOBI`    | every cell from its neighbors' last values, five iterations a dispatch in shared memory (`jacobi_pressure_3d`)                                                                                                                                                                                           | `iterations`, 40         |
+| `SOR`       | red-black Gauss–Seidel over-relaxed by `relaxation`: each color from the other's newest values (`sor_pressure_3d`); 1.95 diverged, so its range stops at 1.85                                                                                                                                            | `iterations`, its sweeps |
+| `MULTIGRID` | V-cycles (`multigrid_pressure.py`): on each level two red-black Gauss–Seidel sweeps, the residual restricted to the level halved, its correction solved from 0 and added back trilinearly, two sweeps again; down to 8 × 14 × 4 at the default grid, 16 sweeps there; obstacles on the finest level only | `cycles`, 1              |
 
 Measured through the harness on stillslowfast, the step's time with `glFinish` around it, the solve's
 residual |div − L p| over |div| (the mean and the p99, at four quarters of the loop), and the projected
 velocity's divergence, central differences, a cell's share:
 
-| Solver            | Residual, mean | p99   | Divergence after | Step, ms |
-|-------------------|----------------|-------|------------------|----------|
-| Jacobi 40         | 0.372          | 2.92  | 0.0079           | 8.66     |
-| Jacobi 20         | 0.454          | 3.76  | 0.0090           | 7.20     |
-| SOR 10, 1.8       | 1.570          | 12.0  | 0.0074           | 8.94     |
-| SOR 20, 1.8       | 0.898          | 6.87  | 0.0078           | 12.33    |
-| multigrid, 1 cycle | 0.024         | 0.42  | 0.0078           | 7.89     |
-| multigrid, 2 cycles | 0.002        | 0.03  | 0.0077           | 10.68    |
-| multigrid, 4 cycles | 0.0001       | 0.0004 | 0.0073          | 16.24    |
+| Solver              | Residual, mean | p99    | Divergence after | Step, ms |
+|---------------------|----------------|--------|------------------|----------|
+| Jacobi 40           | 0.372          | 2.92   | 0.0079           | 8.66     |
+| Jacobi 20           | 0.454          | 3.76   | 0.0090           | 7.20     |
+| SOR 10, 1.8         | 1.570          | 12.0   | 0.0074           | 8.94     |
+| SOR 20, 1.8         | 0.898          | 6.87   | 0.0078           | 12.33    |
+| multigrid, 1 cycle  | 0.024          | 0.42   | 0.0078           | 7.89     |
+| multigrid, 2 cycles | 0.002          | 0.03   | 0.0077           | 10.68    |
+| multigrid, 4 cycles | 0.0001         | 0.0004 | 0.0073           | 16.24    |
 
 One V-cycle leaves a sixteenth of Jacobi's residual in less time; each further cycle divides it by
 about thirteen. SOR's sweeps cost 0.34 ms each, two dispatches from global memory, and over-relaxed it
 leaves the high frequencies, which the mean residual counts, worse than Jacobi does. The divergence after
 the projection hardly moves with any of them: the divergence and the gradient are central differences
 on one grid, whose Laplacian is not the 7-point one every solver solves, so even an exact solve leaves
-it ([Plan](#4-the-projections-floor)). With the solve exact the water keeps more of its speed, 0.150
+it ([Plan](#1-the-projections-floor)). With the solve exact the water keeps more of its speed, 0.150
 widths/s in the mean against Jacobi's 0.134.
 
 ### The guard
@@ -300,10 +261,10 @@ widths/s in the mean against Jacobi's 0.134.
 Two guards on the advection of each field, at the step's first pass, so a bad value stops where it was made
 and is never hidden:
 
-| Guard     | What                                                                                                             | Setting |
-|-----------|------------------------------------------------------------------------------------------------------------------|---------|
-| finite    | a value whose exponent bits are all ones, an infinity or a NaN, becomes 0: a cell that held one before the step, or that the step made one; each counted per field into the stage's `FiniteGuard` (`finite_guard.py`), read once a second from the other of two buffers once a fence says the GPU is done, so nothing waits, and logged as a warning naming the stage, the field and the count; on the velocity, the density and the temperature | `guard`, beside `reset`, on by default; off once the fluid is stable |
-| top speed | the velocity's speed untouched up to half of `max_speed`, above it bent smoothly toward it (tanh), the direction kept (`limit_speed`, `soft_limit` its numpy reference) | `velocity.max_speed`, widths/s, 0 off (the default), a failsafe, so a runaway shows until it is set |
+| Guard     | What                                                                                                                                                                                                                                                                                                                                                                                                                                             | Setting                                                                                             |
+|-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
+| finite    | a value whose exponent bits are all ones, an infinity or a NaN, becomes 0: a cell that held one before the step, or that the step made one; each counted per field into the stage's `FiniteGuard` (`finite_guard.py`), read once a second from the other of two buffers once a fence says the GPU is done, so nothing waits, and logged as a warning naming the stage, the field and the count; on the velocity, the density and the temperature | `guard`, beside `reset`, on by default; off once the fluid is stable                                |
+| top speed | the velocity's speed untouched up to half of `max_speed`, above it bent smoothly toward it (tanh), the direction kept (`limit_speed`, `soft_limit` its numpy reference)                                                                                                                                                                                                                                                                          | `velocity.max_speed`, widths/s, 0 off (the default), a failsafe, so a runaway shows until it is set |
 
 The bit test, not `isnan`: GLSL may assume no NaN exists and drop `isnan`. A NaN slips past every comparison
 (`speed > threshold` is false), so a threshold could not catch it, and it spreads to every value computed from
@@ -315,23 +276,23 @@ simulation's own growth, from the vorticity force above all.
 Measured in a hidden window at 64 × 128 × 32, the velocity filled with each value and stepped, semi-Lagrangian
 and MacCormack alike:
 
-| Filled with              | After one step                         | Warning within 2 s                         |
-|--------------------------|----------------------------------------|--------------------------------------------|
-| infinity                 | 0 everywhere, the output finite        | 262144 non-finite velocity values, every cell once |
-| NaN                      | 0 everywhere, the output finite        | 262144, every cell once                    |
-| 50 widths/s, `max_speed` 0 | top speed 44.7 (the walls and the projection) | none                                |
-| 50 widths/s, `max_speed` 3 | top speed 2.73                         | none                                       |
+| Filled with                | After one step                                | Warning within 2 s                                 |
+|----------------------------|-----------------------------------------------|----------------------------------------------------|
+| infinity                   | 0 everywhere, the output finite               | 262144 non-finite velocity values, every cell once |
+| NaN                        | 0 everywhere, the output finite               | 262144, every cell once                            |
+| 50 widths/s, `max_speed` 0 | top speed 44.7 (the walls and the projection) | none                                               |
+| 50 widths/s, `max_speed` 3 | top speed 2.73                                | none                                               |
 
 ### Names
 
 The rule is `.claude/rules/flow.md`: the textbook word where one exists, a reading by what it is, a
 module by what it does, everything else by its quantity.
 
-| Kind                                  | Names                                                                                                   |
-|---------------------------------------|---------------------------------------------------------------------------------------------------------|
-| the mixes' knobs                      | shares, 0 to 1, one per reading in each output, summed                                                  |
-| the fluid's input methods             | `drag_velocity`, `add_acceleration`, `add_boundary_density`, `add_body_force_density`, `add_boundary_temperature`, `add_body_force_temperature` |
-| the fluid's fields                    | `velocity` (its own settings: fade, evaporation, top speed, vorticity, viscosity, self-advection), `density`, `temperature`, `pressure` |
+| Kind                      | Names                                                                                                                                           |
+|---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
+| the mixes' knobs          | shares, 0 to 1, one per reading in each output, summed                                                                                          |
+| the fluid's input methods | `drag_velocity`, `add_acceleration`, `add_boundary_density`, `add_body_force_density`, `add_boundary_temperature`, `add_body_force_temperature` |
+| the fluid's fields        | `velocity` (its own settings: fade, evaporation, top speed, vorticity, viscosity, self-advection), `density`, `temperature`, `pressure`         |
 
 The readings, the filters, the two systems, the input groups and the wall are the glossary's
 ("Flow" and "Apps"). "Drag" is what the fluid does with `boundary.velocity`, seen as `velocity_drag`, not the name of a
@@ -356,14 +317,14 @@ over the loop over the highest body, and the coast, s after a move's end until t
 20% of its fast mean; the body's coast beside it. The preset is `velocity_drag` 50 ms, `gain` 1,
 `smooth` 1000 ms:
 
-| Clip          | Side                 | Water / body, fast | Peak / body | Coast s, body / water | GPU ms, mean / p95 |
-|---------------|----------------------|--------------------|-------------|-----------------------|--------------------|
-| stillslowfast | preset               | 0.55               | 0.74        | 0.85 / 0.94           | 9.7 / 12.8         |
-| stillslowfast | `velocity_drag` 0        | 0.61               | 1.18        | 0.85 / 0.94           | 9.8 / 12.8         |
-| stillslowfast | `smooth` 300         | 0.56               | 0.66        | 0.23 / 0.94           | 9.7 / 12.6         |
-| stillslowfast | `gain` 2             | 0.86               | 1.41        | 0.85 / 0.94           | 9.7 / 12.8         |
-| standmoves    | preset               | 0.73               | 0.79        | 1.15 / 3.34           | 9.2 / 13.1         |
-| standmoves    | `velocity_drag` 0        | 0.78               | 0.93        | 1.15 / 2.68           | 9.3 / 13.2         |
+| Clip          | Side              | Water / body, fast | Peak / body | Coast s, body / water | GPU ms, mean / p95 |
+|---------------|-------------------|--------------------|-------------|-----------------------|--------------------|
+| stillslowfast | preset            | 0.55               | 0.74        | 0.85 / 0.94           | 9.7 / 12.8         |
+| stillslowfast | `velocity_drag` 0 | 0.61               | 1.18        | 0.85 / 0.94           | 9.8 / 12.8         |
+| stillslowfast | `smooth` 300      | 0.56               | 0.66        | 0.23 / 0.94           | 9.7 / 12.6         |
+| stillslowfast | `gain` 2          | 0.86               | 1.41        | 0.85 / 0.94           | 9.7 / 12.8         |
+| standmoves    | preset            | 0.73               | 0.79        | 1.15 / 3.34           | 9.2 / 13.1         |
+| standmoves    | `velocity_drag` 0 | 0.78               | 0.93        | 1.15 / 2.68           | 9.3 / 13.2         |
 
 The water stays under the body at `gain` 1 and under twice it at `gain` 2 in the mean; the peak
 over the loop passes 1 at `velocity_drag` 0 (1.18), which is the simulation's own doing after the
@@ -388,30 +349,30 @@ the fluid alone wants the bridge at the frames' rate and the fluid at every seco
 Every field gets the default its meaning says, so a fresh settings file reads as the design, not
 as a tuning:
 
-| Field                                                                            | Default         | Means                                   |
-|----------------------------------------------------------------------------------|-----------------|-----------------------------------------|
-| `input.boundary.velocity_gain`                                                                  | 1               | the water as fast as the body           |
-| `input.boundary.velocity_drag`                                                             | 50 ms           | how fast the water takes the body's speed |
-| `input.body_force.acceleration_gain`                                                                | 1               | a Δv added once                         |
+| Field                                                                                                                                      | Default         | Means                                                                                                                            |
+|--------------------------------------------------------------------------------------------------------------------------------------------|-----------------|----------------------------------------------------------------------------------------------------------------------------------|
+| `input.boundary.velocity_gain`                                                                                                             | 1               | the water as fast as the body                                                                                                    |
+| `input.boundary.velocity_drag`                                                                                                             | 50 ms           | how fast the water takes the body's speed                                                                                        |
+| `input.body_force.acceleration_gain`                                                                                                       | 1               | a Δv added once                                                                                                                  |
 | `input.boundary.density_drag`, `temperature_drag`; `density_gain`, `temperature_gain`; `input.body_force.density_rate`, `temperature_rate` | 200 ms; 1; 1 /s | the water takes the dye in a fifth of a second, fully dyed where the body moves at 1 width/s; a full push dyes fully in a second |
-| `density.advection_scale`, `temperature.advection_scale`                         | 1               | the density moves with the water        |
-| `velocity.advection_scale`                                                       | 1               | the velocity carries itself the full step |
-| `width`, `height`, `depth`                                                       | 256, 448, 128   | half a width deep, within 60 fps        |
-| `upscaled.enabled`, `particles.enabled`                                          | off, off        | the density on the simulation's grid    |
-| `input.layer`, `input.spread`                              | 0.5, 0.075      | the body mid-volume, 0.3 widths thick   |
-| `wall` (every field, the volume)                                                 | closed          | as his settings                         |
+| `density.advection_scale`, `temperature.advection_scale`                                                                                   | 1               | the density moves with the water                                                                                                 |
+| `velocity.advection_scale`                                                                                                                 | 1               | the velocity carries itself the full step                                                                                        |
+| `width`, `height`, `depth`                                                                                                                 | 256, 448, 128   | half a width deep, within 60 fps                                                                                                 |
+| `upscaled.enabled`, `particles.enabled`                                                                                                    | off, off        | the density on the simulation's grid                                                                                             |
+| `input.layer`, `input.spread`                                                                                                              | 0.5, 0.075      | the body mid-volume, 0.3 widths thick                                                                                            |
+| `wall` (every field, the volume)                                                                                                           | closed          | the operator's settings                                                                                                          |
 
-The fields' physics take the textbook's water, with no artificial decay or thickness, as defaults:
-the velocity's `fade_time` 60 s (it keeps its momentum), `viscosity` 0 (water at this
-scale), `pressure.iterations` 40 (GPU Gems' 40 to 80 for a Jacobi solve), the density's `fade_time`
-and `evaporation_time` 0 (off: it stays until the water carries it away), `temperature.sink` 0 and `ambient` 0 (the density as heavy as the water,
-no buoyancy), gravity down the screen, every wall closed; the top speed off, a failsafe; the
-bridge's mix the boundary's trail alone and its lowpass's `smooth` its default 160 ms, since the
-coast is the fluid's; the confinement Fedkiw's ε 0.3 over the neighbors (`vorticity_radius` 1);
-in z, `input.layer` 0.5 and `input.spread` 0.075 widths, a body's thickness of about 0.3
-widths at the camera's crop (from its `view_span` of 0.76 m, **(deduction)**) as four sigma, three
-sigma inside the 0.5-width slab. Kept as tuned: the composite's look (`emission`,
-`opacity`, `glow`, `tint`, `fog`).
+The fields' physics take the textbook's water, with no artificial decay or thickness, as defaults: the
+velocity's `fade_time` 60 s (it keeps its momentum), `viscosity` 0 (water at this scale),
+`pressure.iterations` 40 (GPU Gems' 40 to 80 for a Jacobi solve), the density's `fade_time` and
+`evaporation_time` 0 (off: it stays until the water carries it away), `temperature.sink` 0 and `ambient`
+0 (the density as heavy as the water, no buoyancy), gravity down the screen, every wall closed; the top
+speed off, a failsafe; the bridge's mix the boundary's trail alone and its lowpass's `smooth` its default
+160 ms, since the coast is the fluid's; the confinement Fedkiw's ε 0.3 over the neighbors
+(`vorticity_radius` 1); in z, `input.layer` 0.5 and `input.spread` 0.075 widths, a body's thickness of
+about 0.3 widths at the camera's crop (from its `view_span` of 0.76 m, **(deduction)**) as four sigma,
+three sigma inside the 0.5-width slab. Kept as tuned: the composite's look (`emission`, `opacity`,
+`glow`, `tint`, `fog`).
 
 Measured with these on standmoves through the harness: the water 0.89 of the body's speed in the
 fast halves, its peak 0.76 of the body's, the step 11.5 ms with the harness (mean; p95 12.8).
@@ -431,14 +392,14 @@ The output's allocation is not in it. A cell taken as the grid's width over the 
 2160) makes the confinement, the buoyancy and the viscosity follow the output's size, and moves y
 (height / width)², 3.2 times, too far. Measured in a hidden window:
 
-| Check                                                      | Cell by the output | One unit   |
-|------------------------------------------------------------|-----------------|----------------|
-| 0.02 widths/s along y for 1 s: the density moved           | 0.064 widths    | 0.020          |
-| a swirl with confinement, the same at a 1080 and a 2160 wide output: the largest velocity difference | 0.50 widths/s | 0.000 |
+| Check                                                                                                | Cell by the output | One unit |
+|------------------------------------------------------------------------------------------------------|--------------------|----------|
+| 0.02 widths/s along y for 1 s: the density moved                                                     | 0.064 widths       | 0.020    |
+| a swirl with confinement, the same at a 1080 and a 2160 wide output: the largest velocity difference | 0.50 widths/s      | 0.000    |
 
 ## Tuning
 
-What remains is the preset, saved by him on the clips: `depth`, the gains, `velocity_drag`, the
+What remains is the preset, saved by the operator on the clips: `depth`, the gains, `velocity_drag`, the
 lowpass's `smooth`, the mixes; judged on deep_flow with the standmoves and stillslowfast
 recordings. Judge on: slow against fast reads; a stop coasts; a flick leaves one drop at its end
 with the body force's density; the burst's fps; the wall.
@@ -450,35 +411,35 @@ or `MACCORMACK` (Selle 2008, `maccormack_3d.comp`). The semi-Lagrangian step wri
 a scratch volume per field (allocated at its first MacCormack step); traced forward again, it gives
 back the source up to the step's error, half of which is added back, bounded by the source's eight
 texels around the backward trace: where the correction leaves them, the predictor stands (Selle's
-revert), as it does where that trace reads past a wall: the
-wall's value is in no texel, and the correction kept there grew the velocity at the walls step
-after step, to eight times its speed in a second at the preset's grid (measured without the guard).
+revert), as it does where that trace reads past a wall: the wall's value is in no texel, and a
+correction kept there grows the velocity at the walls step after step, to eight times its speed in a
+second at the preset's grid (measured without the guard).
 
 Measured in a hidden window at 448 × 800 × 64, a swirl dragged in and left, then a square of
 density carried for 2 s, no confinement, no viscosity; and on stillslowfast through the harness at
 the preset:
 
-| Measure                                        | Semi-Lagrangian | MacCormack |
-|------------------------------------------------|-----------------|------------|
-| the swirl's mean speed after 2 s, of its start | 0.52            | 0.62       |
-| the density's edge, its 99.5% gradient over its max, per texel | 0.071 | 0.140 |
-| the step, GPU ms, hidden window                | 5.7             | 6.7        |
-| stillslowfast: water / body, fast              | 0.55            | 0.60       |
-| stillslowfast: peak / body                     | 0.74            | 0.82       |
-| stillslowfast: the step with the harness, ms   | 9.5             | 11.0       |
+| Measure                                                        | Semi-Lagrangian | MacCormack |
+|----------------------------------------------------------------|-----------------|------------|
+| the swirl's mean speed after 2 s, of its start                 | 0.52            | 0.62       |
+| the density's edge, its 99.5% gradient over its max, per texel | 0.071           | 0.140      |
+| the step, GPU ms, hidden window                                | 5.7             | 6.7        |
+| stillslowfast: water / body, fast                              | 0.55            | 0.60       |
+| stillslowfast: peak / body                                     | 0.74            | 0.82       |
+| stillslowfast: the step with the harness, ms                   | 9.5             | 11.0       |
 
 The revert, not a clamp to the bounds: a clamp keeps the corrected value at the bound, energy the
-step lost, and with the vorticity confinement adding more the water grew after the body stopped.
+step lost, and with the vorticity confinement adding more the water grows after the body stops.
 Measured with `scripts/maccormack_check.py` at deep_flow's preset (256 × 448 × 128), a disc swinging
 through the water for 3 s, the water's mean speed (widths/s) after the body stopped, 4 s and 20 s, and a
 square of density carried 2 s by a steady swirl at 128 × 224 × 32, no confinement:
 
-| | Semi-Lagrangian | MacCormack, clamp | MacCormack, revert |
-|---|---|---|---|
-| vorticity 0.3: mean speed at 4 s → 20 s | 0.0233 → 0.0082 | 0.0286 → 0.0285, not decaying | 0.0256 → 0.0080 |
-| vorticity 1.93: mean speed at 4 s → 20 s | 0.0271 → 0.0968 | 0.0303 → 0.2458 | 0.0268 → 0.0884 |
-| the density's edge (99.5% gradient over the max) | 0.099 | 0.173 | 0.172 |
-| the swirl's mean speed after 2 s, of its start | 0.703 | 0.742 | 0.723 |
+|                                                  | Semi-Lagrangian | MacCormack, clamp             | MacCormack, revert |
+|--------------------------------------------------|-----------------|-------------------------------|--------------------|
+| vorticity 0.3: mean speed at 4 s → 20 s          | 0.0233 → 0.0082 | 0.0286 → 0.0285, not decaying | 0.0256 → 0.0080    |
+| vorticity 1.93: mean speed at 4 s → 20 s         | 0.0271 → 0.0968 | 0.0303 → 0.2458               | 0.0268 → 0.0884    |
+| the density's edge (99.5% gradient over the max) | 0.099           | 0.173                         | 0.172              |
+| the swirl's mean speed after 2 s, of its start   | 0.703           | 0.742                         | 0.723              |
 
 The revert keeps MacCormack's detail and decays as the plain step does. Above about 1 the confinement
 grows the water in both advections, after the body stopped: the confinement adds energy every step,
@@ -503,14 +464,14 @@ Measured in a hidden window, the output at 2160 × 3840, the grid 448 × 800 × 
 carrier's draw; with the ring full, and on stillslowfast through the harness at the preset (`rate` 2
 for the blobby looks):
 
-| `draw`, `overlap`    | Particles | Ring full, GPU ms | stillslowfast, ms mean / p95 |
-|----------------------|-----------|-------------------|------------------------------|
-| the grid             |           | 6.6               | 7.7 / 8.4                    |
-| `POINTS`, occluded   | 32 M      | 21.3              | 16.3 / 24.7                  |
-| `POINTS`, additive   | 32 M      | 12.7              |                              |
-| `STREAKS`, occluded  | 32 M      | 39.5              | 13.8 / 24.5                  |
-| `BLOBS`, occluded    | 1 M       | 26.9              | 17.9 / 43.0                  |
-| `SURFACE`            | 1 M       | 31.9              | 20.1 / 54.1                  |
+| `draw`, `overlap`   | Particles | Ring full, GPU ms | stillslowfast, ms mean / p95 |
+|---------------------|-----------|-------------------|------------------------------|
+| the grid            |           | 6.6               | 7.7 / 8.4                    |
+| `POINTS`, occluded  | 32 M      | 21.3              | 16.3 / 24.7                  |
+| `POINTS`, additive  | 32 M      | 12.7              |                              |
+| `STREAKS`, occluded | 32 M      | 39.5              | 13.8 / 24.5                  |
+| `BLOBS`, occluded   | 1 M       | 26.9              | 17.9 / 43.0                  |
+| `SURFACE`           | 1 M       | 31.9              | 20.1 / 54.1                  |
 
 The cost is the draw's fill at 4K: the count for points and streaks, the radius for blobs and the
 surface. `count`, `radius`, `slices` and the additive overlap are the knobs; the count each look
@@ -525,28 +486,28 @@ before the ring overwrites them; overlap first, the dye a bit opaque, additive a
 Everything stays on the GPU: the CPU dispatches and draws a fixed count, never reads a particle
 back:
 
-| Part     | How                                                                                       | Why                                                        |
-|----------|-------------------------------------------------------------------------------------------|------------------------------------------------------------|
-| storage  | one SSBO, 32 bytes a particle: position and age (vec4), the previous position (vec3), color RGBA8 packed in a uint; 32 M is 1 GB, 100 M 3.2 GB | each particle updates itself in place, so no swap pair     |
-| emission | a compute pass over the bridge's density at the bridge's size: each texel's count, amount × rate × dt, rounded by a hash so a small amount still spawns; an atomic head (`atomicAdd`) gives the slots, modulo the count | a ring buffer: no free list, no compaction, no count read back |
-| the ring's fade | a particle's place in the ring, (head − slot) mod N over N, is how near it is to being overwritten; its alpha falls to 0 over the ring's last share (`ring_fade`, 0.1), so the oldest fade out at whatever rate the body emits; the age's own fade by `density.fade_time` on top | no particle vanishes in a frame, whatever the emission |
-| advection | a compute pass, 256 a group, RK2 (midpoint) through the velocity's `sampler3D`, the same uv metric as `advect_3d` (`uRdx`, `advection_scale`); the walls clamp | two trilinear fetches a particle, the hardware's; the grid sets the motion |
-| drawing  | no copy: a vertex shader pulls the SSBO by `gl_VertexID`; points `glDrawArrays(GL_POINTS, 0, N)`, streaks `GL_LINES` with 2 N vertices, the previous and the current position; a dead or unborn particle leaves the clip space | the rasterizer splats millions faster than atomics in compute, and draws lines, which compute would not |
+| Part                              | How                                                                                                                                                                                                                                                                                                                                          | Why                                                                                                                              |
+|-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
+| storage                           | one SSBO, 32 bytes a particle: position and age (vec4), the previous position (vec3), color RGBA8 packed in a uint; 32 M is 1 GB, 100 M 3.2 GB                                                                                                                                                                                               | each particle updates itself in place, so no swap pair                                                                           |
+| emission                          | a compute pass over the bridge's density at the bridge's size: each texel's count, amount × rate × dt, rounded by a hash so a small amount still spawns; an atomic head (`atomicAdd`) gives the slots, modulo the count                                                                                                                      | a ring buffer: no free list, no compaction, no count read back                                                                   |
+| the ring's fade                   | a particle's place in the ring, (head − slot) mod N over N, is how near it is to being overwritten; its alpha falls to 0 over the ring's last share (`ring_fade`, 0.1), so the oldest fade out at whatever rate the body emits; the age's own fade by `density.fade_time` on top                                                             | no particle vanishes in a frame, whatever the emission                                                                           |
+| advection                         | a compute pass, 256 a group, RK2 (midpoint) through the velocity's `sampler3D`, the same uv metric as `advect_3d` (`uRdx`, `advection_scale`); the walls clamp                                                                                                                                                                               | two trilinear fetches a particle, the hardware's; the grid sets the motion                                                       |
+| drawing                           | no copy: a vertex shader pulls the SSBO by `gl_VertexID`; points `glDrawArrays(GL_POINTS, 0, N)`, streaks `GL_LINES` with 2 N vertices, the previous and the current position; a dead or unborn particle leaves the clip space                                                                                                               | the rasterizer splats millions faster than atomics in compute, and draws lines, which compute would not                          |
 | overlap (`OCCLUDED`, the default) | the particles drawn additively into depth slices, a `GL_TEXTURE_2D_ARRAY` at the output's size, a layered draw (`gl_Layer` from the particle's z): 16 slices at 2160 × 3840 RGBA16F, 1 GB, the color and the optical depth; then a front-to-back march through the slices, Beer–Lambert, `absorption`, `tint`, `fog` as the grid's composite | near dye covers far dye between slices, exact for emission and absorption inside one; a bucket sort by depth, no particle sorted |
-| overlap (`ADDITIVE`) | the same draw into one RGBA16F target, each particle's fog and tint by its z; one pass: exp(−τ) and the emission | order-independent, one target; the depth only as fog |
-| overlap (`WEIGHTED`) | weighted blended order-independent transparency (McGuire and Bavoil 2013): one pass into three targets at the output's size, the emission and the opacity weighted by depth (RGBA32F), the revealage per channel (×(1 − α)), the plain emission for the glow; one pass then divides and mixes | one pass, no slices to clear or march; the order approximate, by a weight |
+| overlap (`ADDITIVE`)              | the same draw into one RGBA16F target, each particle's fog and tint by its z; one pass: exp(−τ) and the emission                                                                                                                                                                                                                             | order-independent, one target; the depth only as fog                                                                             |
+| overlap (`WEIGHTED`)              | weighted blended order-independent transparency (McGuire and Bavoil 2013): one pass into three targets at the output's size, the emission and the opacity weighted by depth (RGBA32F), the revealage per channel (×(1 − α)), the plain emission for the glow; one pass then divides and mixes                                                | one pass, no slices to clear or march; the order approximate, by a weight                                                        |
 
 Two more ways to draw the same particles, as options: blobby, where each particle carries
 a smooth kernel and the kernels' sum melts near particles into one shape (Blinn's blobby objects,
 metaballs). Far fewer particles, each covering many pixels: the cost moves from the count to the
 kernel.
 
-| `draw`    | What                                                                                     | Count, 60 fps  |
-|-----------|------------------------------------------------------------------------------------------|----------------|
-| `POINTS`  | one pixel a particle, into the slices or additive, above                                 | 2 M            |
-| `STREAKS` | a line from the previous to the current position                                         | 1 M            |
-| `BLOBS`   | the soft melt: each particle a gaussian sprite of `radius` pixels, its sum the density, marched through the slices as `POINTS` is; dye clouds whose drops merge | 100 k          |
-| `SURFACE` | the liquid: screen-space fluid rendering (van der Laan 2009); each particle a sphere sprite of `radius`, its nearest depth into a depth target and its thickness summed into another; the depth smoothed by a filter that keeps its edges (a bilateral or narrow-range filter); the normals from the smoothed depth; then the dye's color through its thickness (Beer–Lambert, `absorption`, `tint`), a Fresnel edge, a specular and the background refracted by the normal; drops and threads with a sharp edge that merge and pinch off | 100 k          |
+| `draw`    | What                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | Count, 60 fps |
+|-----------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------|
+| `POINTS`  | one pixel a particle, into the slices or additive, above                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | 2 M           |
+| `STREAKS` | a line from the previous to the current position                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | 1 M           |
+| `BLOBS`   | the soft melt: each particle a gaussian sprite of `radius` pixels, its sum the density, marched through the slices as `POINTS` is; dye clouds whose drops merge                                                                                                                                                                                                                                                                                                                                                                           | 100 k         |
+| `SURFACE` | the liquid: screen-space fluid rendering (van der Laan 2009); each particle a sphere sprite of `radius`, its nearest depth into a depth target and its thickness summed into another; the depth smoothed by a filter that keeps its edges (a bilateral or narrow-range filter); the normals from the smoothed depth; then the dye's color through its thickness (Beer–Lambert, `absorption`, `tint`), a Fresnel edge, a specular and the background refracted by the normal; drops and threads with a sharp edge that merge and pinch off | 100 k         |
 
 Each particle carries a mass, the density it took at its birth; its kernel sums to its mass, so
 the dye is kept whatever the size. A blob's or a sphere's radius follows the mass,
@@ -557,29 +518,27 @@ widening is refined: a small default, and a blob grows to at most twice its birt
 softens over its life and never bloats. A point's
 and a streak's alpha is its mass.
 
-| Part      | How                                                                                     |
-|-----------|-----------------------------------------------------------------------------------------|
-| emission  | each tick, at the bridge's size, the boundary's density and the body force's, each by its setting in `input`: a texel spawns `rate × amount × dt` particles, rounded by a hash so faint dye still spawns now and then; each takes an even share of the texel's amount as its mass, the density's color, a random place in the texel and a z drawn from the injection slab's gaussian; no velocity of its own, the grid carries it and the drag gave the grid the body's |
-| one knob  | a high `rate` many light particles, the points' and the streaks' look; a low `rate` few heavy ones, the blobs'; the mass and the size follow |
-| duration  | three things end a particle, the first that comes: `density.fade_time`, the mass's exponential decay, as the grid density's; `evaporation_time`, a fixed amount taken off, which takes faint ones to 0; the ring, once more are alive than `count`, the oldest fading over `ring_fade` before they are overwritten |
-| the budget | in a steady state about `rate` × the emission × the lifetime are alive; while that stays under `count` the fade decides how long dye lasts and the ring is only the cap; the panel shows the seconds the ring takes to wrap, one counter read asynchronously, no particle |
+| Part       | How                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+|------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| emission   | each tick, at the bridge's size, the boundary's density and the body force's, each by its setting in `input`: a texel spawns `rate × amount × dt` particles, rounded by a hash so faint dye still spawns now and then; each takes an even share of the texel's amount as its mass, the density's color, a random place in the texel and a z drawn from the injection slab's gaussian; no velocity of its own, the grid carries it and the drag gave the grid the body's |
+| one knob   | a high `rate` many light particles, the points' and the streaks' look; a low `rate` few heavy ones, the blobs'; the mass and the size follow                                                                                                                                                                                                                                                                                                                            |
+| duration   | three things end a particle, the first that comes: `density.fade_time`, the mass's exponential decay, as the grid density's; `evaporation_time`, a fixed amount taken off, which takes faint ones to 0; the ring, once more are alive than `count`, the oldest fading over `ring_fade` before they are overwritten                                                                                                                                                      |
+| the budget | in a steady state about `rate` × the emission × the lifetime are alive; while that stays under `count` the fade decides how long dye lasts and the ring is only the cap; the panel shows the seconds the ring takes to wrap, one counter read asynchronously, no particle                                                                                                                                                                                               |
 
 `BLOBS` is the slice target with a bigger, softer point; `SURFACE` is its own pass, a depth and a
 thickness target at the output's size, a filter of a few passes and one shading pass. Both depend
 on `radius` against the particles' spacing: too small and the blobs fall apart into dots, too big
 and the shape goes soft **(deduction)**.
 
-The settings, a `particles` group: `count` (`Field.INIT`, 2 M), `rate` (particles per unit of
-density per second), `ring_fade` (the ring's last share the oldest fade over), `draw`
-(`ParticleDraw.POINTS`, `STREAKS`, `BLOBS` or `SURFACE`), `radius` (a blob's or a sphere's pixels at the reference mass), `spread` (a blob's widening with
-age),
-`smooth` (the surface's filter passes), `size` (a point's pixels), `streak` (a streak's length as a
-share of its step), `overlap` (`Overlap.OCCLUDED` or `ADDITIVE`), `slices` (`Field.INIT`, 16).
-The cost grows with the count by the advection's reads and the draw's fill, not by the memory: the
-advection 0.2 ms a million, the draw faster than the count once many share a pixel
-([TIMING.md](TIMING.md#the-particles)). Judge on: a
-drop reads as a drop next to the grid's; a thread stays one particle wide at 2160 × 3840; near dye
-covers far dye; the step's GPU time.
+The settings, a `particles` group: `count` (`Field.INIT`, 2 M), `rate` (particles per unit of density per
+second), `ring_fade` (the ring's last share the oldest fade over), `draw` (`ParticleDraw.POINTS`,
+`STREAKS`, `BLOBS` or `SURFACE`), `radius` (a blob's or a sphere's pixels at the reference mass),
+`spread` (a blob's widening with age), `smooth` (the surface's filter passes), `size` (a point's pixels),
+`streak` (a streak's length as a share of its step), `overlap` (`Overlap.OCCLUDED` or `ADDITIVE`),
+`slices` (`Field.INIT`, 16). The cost grows with the count by the advection's reads and the draw's fill,
+not by the memory: the advection 0.2 ms a million, the draw faster than the count once many share a pixel
+([TIMING.md](TIMING.md#the-particles)). Judge on: a drop reads as a drop next to the grid's; a thread
+stays one particle wide at 2160 × 3840; near dye covers far dye; the step's GPU time.
 
 ### The density's detail
 
@@ -591,16 +550,16 @@ of reads and writes a step. The upscaled density is that look with the color spl
 color (4:2:0): the eye resolves the brightness much finer than the color, and the color never has more
 detail than the bridge's 448 × 800 it comes from.
 
-| Part        | How                                                                                                  |
-|-------------|------------------------------------------------------------------------------------------------------|
-| two volumes | the upscaled density (`UpscaledDensity`): the color, the simulation density's RGBA volume (color × amount, the amount); the amount alone (R16F) at `upscaled.width` × `upscaled.height` × `upscaled.depth` (2160 × 3840 × 16, the output's size), over the same box; at 16 layers 265 MB a buffer |
-| injection   | the bridge's density into both: the RGBA into the color, its amount into the detail's gaussian slab   |
-| a step      | both carried by the velocity, by `advection`; where the detail has fewer layers than the grid, one pass first averages the velocity over each detail layer's thickness and the detail moves with that; the fade and the evaporation as on the grid |
-| composite   | the detail's layers marched at the output: the brightness and the opacity from the detail's amount, the color the color volume's rgb over its amount at the same place |
-| off         | `upscaled.enabled` off: the detail is not allocated, the simulation density drawn                   |
-| settings    | `upscaled.enabled`, its size, and `upscaled.sample` (`MIDDLE` or `AVERAGE`, the velocity a layer spanning several of the grid's moves with); smaller than the output, the composite enlarges it by uv; on the monitor the amount is `upscaled_density`, the color `density`; timed in [TIMING.md](TIMING.md#the-density-at-the-outputs-4k) |
+| Part        | How                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+|-------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| two volumes | the upscaled density (`UpscaledDensity`): the color, the simulation density's RGBA volume (color × amount, the amount); the amount alone (R16F) at `upscaled.width` × `upscaled.height` × `upscaled.depth` (2160 × 3840 × 16, the output's size), over the same box; at 16 layers 265 MB a buffer                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| injection   | the bridge's density into both: the RGBA into the color, its amount into the detail's gaussian slab                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| a step      | both carried by the velocity, by `advection`; where the detail has fewer layers than the grid, one pass first averages the velocity over each detail layer's thickness and the detail moves with that; the fade and the evaporation as on the grid                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| composite   | the detail's layers marched at the output: the brightness and the opacity from the detail's amount, the color the color volume's rgb over its amount at the same place                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| off         | `upscaled.enabled` off: the detail is not allocated, the simulation density drawn                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| settings    | `upscaled.enabled`, its size, and `upscaled.sample` (`MIDDLE` or `AVERAGE`, the velocity a layer spanning several of the grid's moves with); smaller than the output, the composite enlarges it by uv; on the monitor the amount is `upscaled_density`, the color `density`; timed in [TIMING.md](TIMING.md#the-density-at-the-outputs-4k)                                                                                                                                                                                                                                                                                                                                                                                                       |
 | turbulence  | the 4K amount moved semi-Lagrangian by the grid's velocity plus swirls below the grid (wavelet turbulence, Kim et al. 2008): a periodic 64³ tile of divergence-free noise (`swirl_noise`, the curl of random vectors band-passed to 8–16 texels, the tile 8 grid cells, so the swirls are 1 to 2 cells), read where the water started (two displacements of the water on the grid, reset a second apart half a cycle from each other and cross-faded), scaled by the grid's curl × its cell and `upscaled.turbulence`; the curl computed for it when the confinement is off. On stillslowfast with the calm preset, 1 to 3 change the picture by under 0.2 of 255; 10 to 30 give visible fine frizz along the density's edges, where the curl is |
-| storage     | 3D textures, as every field: the advection reads a traced point in one trilinear fetch, z included, and the driver tiles the texels in x, y and z; a texture array filters within a layer only, two fetches and a mix for z, and its layers are tiled apart, which suits drawing into layers (the particles' slices), not tracing through them |
+| storage     | 3D textures, as every field: the advection reads a traced point in one trilinear fetch, z included, and the driver tiles the texels in x, y and z; a texture array filters within a layer only, two fetches and a mix for z, and its layers are tiled apart, which suits drawing into layers (the particles' slices), not tracing through them                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 Measured: the step at 4K × 16, 32 and 64 layers, semi-Lagrangian and MacCormack, against the budget,
 in TIMING.md; judged by eye against the RGBA 4K look on standmoves. A second preset, `flat.json`, for this
@@ -642,26 +601,26 @@ How the density is drawn, using the depth the coarse fluid already simulates (it
 is set on the view: `composite.emission` and `opacity` refer to fully dyed water filling the view, and the
 monitor's `scale` 1 shows a full value for the density and the temperature as for a velocity of 1 width/s.
 
-| Part       | How |
-|------------|-----|
-| shadows    | `LightVolume3D`, `Fluid3D._lit` (`LightVolume3D`, `Fluid3D._lit`): a light grid at a quarter of the simulation's size, each step, each cell's RGB transmittance toward the light: the simulation density's amount summed along the way at one light cell a step (at most 256), times the extinction `opacity` gives over the view, per width of the box's depth, and the water's `fog` over the whole distance, both per channel by `tint`, so deep light turns bluish and a lamp falls off; the composite's each sample's emission × mix(1, the light there, `shadow`); off and released at `shadow` 0; a step's GPU time with it on within the noise of one without it, under 0.5 ms, in a smoke run at 448 × 800 × 64 with the upscaled density (not yet in TIMING.md) |
-| the light  | `composite.light`, `DIRECTIONAL` (a sun: one direction, parallel shadows) or `POINT` (a lamp, shadows fanning out); `light_x`, `light_y`, `light_z` toward the sun or the lamp's place (±1 the box's sides; x right, y down the screen, z away from the viewer), first above and a little toward the front; `shadow` how dark the shadowed parts get. `Fluid3D.set_light` overrides the settings, the hook for a light the app derives from the pose (a lamp at the nose), the pose pipeline's value handed over; the monitor shows the light grid as the port `light`. |
-| scattering | `scattering`, the light grid blurred (`LightBlur3D`, a separable 5-tap gaussian) and mixed into the direct light, for thick parts glowing within and soft shadow edges; `anisotropy`, the Henyey–Greenstein g of each lit sample toward the viewer, 1 at g 0, a silver lining against a light from behind; both 0 off, at no cost |
-| opacity    | `view_march`: the look is set on the view, the same at any number of layers and any depth: `opacity`, 0 to 1, how much fully dyed water filling the view covers what is behind it (Beer–Lambert, its extinction −ln(1 − opacity), 1 drawn at 0.999), and `emission`, how bright that water is seen, 1 its own color, its covering of its own far side made up for; a sample covers by its amount, not its color's brightest channel; a particle look takes both over its `slices` |
-| occlusion  | what covers what measured through the coarse grid's layers, the upscaled density laid over it: the order in depth as fine as the fluid's, the detail at `upscaled.width` × `upscaled.height` × `upscaled.depth` |
-| highlights | `Knee`, one pass on the output after the particles: the composite's color through a knee, straight up to 0.8 and bent softly toward 1 above it, each channel on its own, so the image below 0.8 keeps its contrast, thick cores no longer clip flat and the brightest drift a little toward white, as film does; no setting, `composite.emission` keeps its meaning |
-| blend      | the composite writes its color premultiplied (times its coverage) and the coverage as alpha, so the fluid layer draws it with the premultiplied form of `composite.blend_mode` (`BlendMode.premultiplied`: `ADD` as `GL_ONE, GL_ONE`, `ALPHA` as `GL_ONE, GL_ONE_MINUS_SRC_ALPHA`), not multiplied by its alpha a second time |
+| Part       | How                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+|------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| shadows    | `LightVolume3D`, `Fluid3D._lit`: a light grid at a quarter of the simulation's size, each step, each cell's RGB transmittance toward the light: the simulation density's amount summed along the way at one light cell a step (at most 256), times the extinction `opacity` gives over the view, per width of the box's depth, and the water's `fog` over the whole distance, both per channel by `tint`, so deep light turns bluish and a lamp falls off; the composite's each sample's emission × mix(1, the light there, `shadow`); off and released at `shadow` 0; a step's GPU time with it on within the noise of one without it, under 0.5 ms, in a smoke run at 448 × 800 × 64 with the upscaled density (not yet in TIMING.md) |
+| the light  | `composite.light`, `DIRECTIONAL` (a sun: one direction, parallel shadows) or `POINT` (a lamp, shadows fanning out); `light_x`, `light_y`, `light_z` toward the sun or the lamp's place (±1 the box's sides; x right, y down the screen, z away from the viewer), first above and a little toward the front; `shadow` how dark the shadowed parts get. `Fluid3D.set_light` overrides the settings, the hook for a light the app derives from the pose (a lamp at the nose), the pose pipeline's value handed over; the monitor shows the light grid as the port `light`.                                                                                                                                                                 |
+| scattering | `scattering`, the light grid blurred (`LightBlur3D`, a separable 5-tap gaussian) and mixed into the direct light, for thick parts glowing within and soft shadow edges; `anisotropy`, the Henyey–Greenstein g of each lit sample toward the viewer, 1 at g 0, a silver lining against a light from behind; both 0 off, at no cost                                                                                                                                                                                                                                                                                                                                                                                                       |
+| opacity    | `view_march`: the look is set on the view, the same at any number of layers and any depth: `opacity`, 0 to 1, how much fully dyed water filling the view covers what is behind it (Beer–Lambert, its extinction −ln(1 − opacity), 1 drawn at 0.999), and `emission`, how bright that water is seen, 1 its own color, its covering of its own far side made up for; a sample covers by its amount, not its color's brightest channel; a particle look takes both over its `slices`                                                                                                                                                                                                                                                       |
+| occlusion  | what covers what measured through the coarse grid's layers, the upscaled density laid over it: the order in depth as fine as the fluid's, the detail at `upscaled.width` × `upscaled.height` × `upscaled.depth`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| highlights | `Knee`, one pass on the output after the particles: the composite's color through a knee, straight up to 0.8 and bent softly toward 1 above it, each channel on its own, so the image below 0.8 keeps its contrast, thick cores do not clip flat and the brightest drift a little toward white, as film does; no setting, `composite.emission` keeps its meaning                                                                                                                                                                                                                                                                                                                                                                        |
+| blend      | the composite writes its color premultiplied (times its coverage) and the coverage as alpha, so the fluid layer draws it with the premultiplied form of `composite.blend_mode` (`BlendMode.premultiplied`: `ADD` as `GL_ONE, GL_ONE`, `ALPHA` as `GL_ONE, GL_ONE_MINUS_SRC_ALPHA`), not multiplied by its alpha a second time                                                                                                                                                                                                                                                                                                                                                                                                           |
 
 ## Faster
 
 The changes of [TIMING.md's Faster](TIMING.md#faster), one at a time. Each is built behind its own
 switch, measured against the baseline, and then kept one of two ways or dropped:
 
-| Outcome                                               | Kept as                                                                   |
-|-------------------------------------------------------|---------------------------------------------------------------------------|
-| faster, and the same result                           | a replacement: the old path removed, no setting                           |
-| faster, and a different result (a solver, a look)     | an option on the panel, as `advection` is, the current way staying the default until he picks |
-| not faster                                            | dropped, its row kept in TIMING.md                                        |
+| Outcome                                           | Kept as                                                                                                 |
+|---------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| faster, and the same result                       | a replacement: the old path removed, no setting                                                         |
+| faster, and a different result (a solver, a look) | an option on the panel, as `advection` is, the current way staying the default until the operator picks |
+| not faster                                        | dropped, its row kept in TIMING.md                                                                      |
 
 The test, the same for every item: three timing runs back to back, baseline, change, baseline
 (`-timing 60 -warmup 10`, the pose on, standmoves), the pass's own GPU timer the measure: the two
@@ -671,27 +630,27 @@ replaces by at least 2.5 times that; then
 composited output side by side (a `--save` to add). The same numbers and the same picture: a
 replacement. Different: an option, judged on the look in the app.
 
-| # | Change                                                      | Expected                        | Kept as, if faster                                         |
-|---|-------------------------------------------------------------|---------------------------------|------------------------------------------------------------|
-| 1 | the temperature cleared once, its injection skipped at 0    | 0.4 to 0.5 ms                   | replacement                                                |
-| 2 | the composite's early exit and the occupancy volume         | 0.5 to 1.5 ms                   | replacement                                                |
-| 3 | 3D workgroups for the stencil passes                        | 0.3 to 0.6 ms                   | replacement                                                |
-| 4 | MacCormack in one dispatch                                  | 0.4 to 0.6 ms                   | replacement                                                |
-| 5 | fused passes                                                | 1 to 1.5 ms                     | replacement                                                |
-| 6 | red-black SOR                                               | 1.5 to 2.5 ms                   | option, decided: `pressure.solver`, `JACOBI` (the default), `SOR`, whatever it measures |
-| 7 | multigrid, or MGPCG                                         | 2.5 to 3.5 ms                   | option, decided: the same option gains `MULTIGRID`          |
-| 8 | the sparse grid                                             | 0 to half the step              | its plan written, not built: it touches every pass         |
-| 9 | the sprites cut at 2 sigma                                  | half the blobs' fill            | replacement; the growth cap stays as it is, a look          |
-| 10 | the draw by the alive count                                | the ring's empty share          | replacement                                                |
-| 11 | weighted blended OIT                                       | the march, the clear, a third of the draw | option: `overlap` gains `WEIGHTED`                |
-| 12 | points and streaks rasterized in compute                   | 2 to 5 × on the draw            | replacement for points; streaks if the lines match         |
-| 13 | the narrow-range filter and the narrow band                | 0.3 to 1 ms                     | the band a replacement; the filter an option if the surface differs |
-| 14 | the Morton sort                                            | under 0.5 ms at 2 M             | replacement; the ring's fade must then go by the particle's age, not its slot |
+| #   | Change                                                   | Expected                                  | Kept as, if faster                                                                      |
+|-----|----------------------------------------------------------|-------------------------------------------|-----------------------------------------------------------------------------------------|
+| 1   | the temperature cleared once, its injection skipped at 0 | 0.4 to 0.5 ms                             | replacement                                                                             |
+| 2   | the composite's early exit and the occupancy volume      | 0.5 to 1.5 ms                             | replacement                                                                             |
+| 3   | 3D workgroups for the stencil passes                     | 0.3 to 0.6 ms                             | replacement                                                                             |
+| 4   | MacCormack in one dispatch                               | 0.4 to 0.6 ms                             | replacement                                                                             |
+| 5   | fused passes                                             | 1 to 1.5 ms                               | replacement                                                                             |
+| 6   | red-black SOR                                            | 1.5 to 2.5 ms                             | option, decided: `pressure.solver`, `JACOBI` (the default), `SOR`, whatever it measures |
+| 7   | multigrid, or MGPCG                                      | 2.5 to 3.5 ms                             | option, decided: the same option gains `MULTIGRID`                                      |
+| 8   | the sparse grid                                          | 0 to half the step                        | its plan written, not built: it touches every pass                                      |
+| 9   | the sprites cut at 2 sigma                               | half the blobs' fill                      | replacement; the growth cap stays as it is, a look                                      |
+| 10  | the draw by the alive count                              | the ring's empty share                    | replacement                                                                             |
+| 11  | weighted blended OIT                                     | the march, the clear, a third of the draw | option: `overlap` gains `WEIGHTED`                                                      |
+| 12  | points and streaks rasterized in compute                 | 2 to 5 × on the draw                      | replacement for points; streaks if the lines match                                      |
+| 13  | the narrow-range filter and the narrow band              | 0.3 to 1 ms                               | the band a replacement; the filter an option if the surface differs                     |
+| 14  | the Morton sort                                          | under 0.5 ms at 2 M                       | replacement; the ring's fade must then go by the particle's age, not its slot           |
 
 Beside 5 and 6, the memory a step: the bytes read and written per cell by every pass, counted from
 the shaders before and after, since the passes are bandwidth-bound and the three force and curl
 volumes (24 bytes a cell) exist only between passes. A winning solver becomes the preset's
-`pressure.solver` too. Each kept item is one commit, none pushed.
+`pressure.solver` too.
 
 What each came to, measured, is [TIMING.md's Measured](TIMING.md#measured): kept as replacements 1, 3, 5,
 9 and 10; options 6 (`SOR`), 7 (`MULTIGRID`, the preset's) and 11 (`WEIGHTED`); dropped 2, 12 and 13,
@@ -703,27 +662,28 @@ its row in TIMING.md.
 
 ## The staggered velocity
 
-Not built; the answer to [the projection's floor](#4-the-projections-floor): the velocity on the cells' faces (Harlow and
-Welch's MAC grid), so the divergence and the gradient are one-cell differences, the Laplacian the solvers solve,
-and an exact solve leaves the water exactly incompressible, with no pattern alternating cell by cell left behind.
+Not built; the answer to [the projection's floor](#1-the-projections-floor): the velocity on the cells'
+faces (Harlow and Welch's MAC grid), so the divergence and the gradient are one-cell differences, the
+Laplacian the solvers solve, and an exact solve leaves the water exactly incompressible, with no pattern
+alternating cell by cell left behind.
 
-| Part      | How |
-|-----------|-----|
-| storage   | one RGBA16F volume at the cells' size: a texel's x, y, z the velocity on its left, bottom and front faces; the right, top and back faces on the domain's walls not stored, their value the walls' rule (0 closed, the neighbor's open), as the ghosts (`uClosed`) take them now, so the sizes stay multiples of 16 and 32 |
-| rewritten | the velocity's advection and its MacCormack, the divergence, the gradient, the viscosity, the confinement's force, the buoyancy's add, the drag and the body force, the walls in each |
-| new       | one pass a step averaging the faces to the cells' centers, so the density's carriers, the curl, the particles and the monitors read the velocity as now |
-| unchanged | the pressure solvers, the carriers, the bridge, the motion |
-| cost      | about +1 to 1.5 ms a step at 256 × 448 × 128, the velocity's advection reading two to three times as much **(deduction)** |
-| looks     | the density's brightness kept (no gathering or thinning by compression), less fine jitter for the confinement to spin up, swirls holding longer, pushes carrying further; subtle with the calm preset **(deduction)** |
-| re-check  | the walls (the explosion fixed by the ghosts), the drag's water against the body, the y metric and the resolution checks, through the harness |
+| Part      | How                                                                                                                                                                                                                                                                                                                   |
+|-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| storage   | one RGBA16F volume at the cells' size: a texel's x, y, z the velocity on its left, bottom and front faces; the right, top and back faces on the domain's walls not stored, their value the walls' rule (0 closed, the neighbor's open), as the ghosts (`uClosed`) take them, so the sizes stay multiples of 16 and 32 |
+| rewritten | the velocity's advection and its MacCormack, the divergence, the gradient, the viscosity, the confinement's force, the buoyancy's add, the drag and the body force, the walls in each                                                                                                                                 |
+| new       | one pass a step averaging the faces to the cells' centers, so the density's carriers, the curl, the particles and the monitors read the velocity as now                                                                                                                                                               |
+| unchanged | the pressure solvers, the carriers, the bridge, the motion                                                                                                                                                                                                                                                            |
+| cost      | about +1 to 1.5 ms a step at 256 × 448 × 128, the velocity's advection reading two to three times as much **(deduction)**                                                                                                                                                                                             |
+| looks     | the density's brightness kept (no gathering or thinning by compression), less fine jitter for the confinement to spin up, swirls holding longer, pushes carrying further; subtle with the calm preset **(deduction)**                                                                                                 |
+| re-check  | the walls' ghosts, the drag's water against the body, the y metric and the resolution checks, through the harness                                                                                                                                                                                                     |
 
-Sources: the face counts and the boundary faces zeroed ([oxiphysics MAC grid](https://docs.rs/oxiphysics-gpu/0.1.1/src/oxiphysics_gpu/gpu_fluid_euler.rs.html)); the walls folded into the operators on the GPU (Zaspel).
+Sources: the face counts and the boundary faces zeroed ([oxiphysics MAC
+grid](https://docs.rs/oxiphysics-gpu/0.1.1/src/oxiphysics_gpu/gpu_fluid_euler.rs.html)); the walls folded
+into the operators on the GPU (Zaspel).
 
 ## Parked
 
 Not worked on until asked for; each with what is known.
-
-- Not worked on until asked for; each with what is known.
 
 - The 4K upscale: depth in 3D at the grid and detail in 2D at 4K, a march at the grid's size, one
   edge-aware upscale of the flat result and a 4K detail layer advected by the grid's velocity; what
