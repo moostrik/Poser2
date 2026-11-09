@@ -16,26 +16,15 @@ fluid is `Fluid3D` (`fluid_3d/fluid_3d.py`), its layer `Fluid3DLayer`
 What is next for the fluid, in order; what is open elsewhere in the flow is
 [FLOW.md's Open](FLOW.md#open).
 
-### 1. The projection's floor
+### 1. Open walls on the faces
 
-The projection's divergence and gradient are central differences on the cell centers, and the
-solvers solve the compact 7-point Laplacian; the two differ, so the velocity keeps a divergence of
-about 0.0075 of a cell whatever the solver ([The pressure](#the-pressure)). A staggered grid makes
-the divergence of the gradient the 7-point Laplacian, and the solve's accuracy then reaches the
-velocity **(deduction)**. It changes every pass that reads the velocity; its design is
-[The staggered velocity](#the-staggered-velocity). A replacement, not an option: the centered velocity
-goes in the same change.
-
-| Step | What                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-|------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1    | the measures the tests need and lack, in `maccormack_check.py`: the divergence after the projection, the compression                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
-| 2    | the baseline: every test of [The staggered velocity](#the-staggered-velocity) on the code as it is, the look's frames saved                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
-| 3a   | the faces' storage, and on them the velocity's advection (with its guard, top speed and slip) and the viscosity, its Jacobi iterations the velocity's one repeated pass; the walls' faces in both; a pass after them averaging the faces to the centers, and one before the advection interpolating the centers to the faces, so every other pass reads the centers as now; built in both storages, three R16F volumes and one RGBA16F volume a face longer on every axis, timed in the app with the pose (`trial_runs.py`, each pass's own timer; the step's total includes the scaffold), `viscosity` above 0 at the preset's `viscosity_iter` 20 for the timing; the faster storage kept |
-| 3b   | the divergence and the gradient on the faces, with their walls; the scaffold's two passes move around the passes still on the centers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| 3c   | the curl, the confinement, the buoyancy, the drag and the body force on the faces; the scaffold gone, the average to the centers at the step's end; timed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| 3d   | the obstacles' face rule in every pass                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| 3e   | the density and the temperature advected by the faces; the face volumes as monitor ports beside the centers' `velocity`; timed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| 4    | the same tests, against the baseline; the rows in TIMING.md and this document; a commit after each step                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+With `wall` open the water on the faces grows: on the swing at ε 0 the mean speed rises from 0.002
+to 0.004 widths/s in the two seconds after the body stops, and at ε 1.93 to 0.84 within 6 s, where the
+centered velocity decayed (0.008 → 0.003). The divergence stays 0 at every cell, the boundary's
+included, so the projection holds; the growth sits at the open walls' cells and spreads in. The
+textbook outflow on a MAC grid (Bridson ch. 5) is the pressure 0 on the wall's face, as built; what the
+advection and the forces do with the wall's face and the faces along it is to check first. The preset's
+walls are closed, which the staggered velocity takes as tested ([The walls](#the-walls)).
 
 ### 2. High vorticity
 
@@ -60,19 +49,21 @@ the guarded motion. The guards' cost goes in [TIMING.md](TIMING.md) once the flu
 
 A step (`Fluid3D.update`), in order, at the code's defaults:
 
-| Pass        | What                                                                                                                                                           | On                   | Depends on the input |
-|-------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------|----------------------|
-| advect_vel  | self-advection by `advection`, `velocity.advection_scale` 1, fade 60 s; on its result the guard ([The guard](#the-guard)) and the top speed `max_speed`, 0 off | velocity 256×448×128 | the trace distance   |
-| viscosity   | Jacobi diffusion, off (`viscosity` 0)                                                                                                                          | velocity             | no                   |
-| vorticity   | the curl, then the confinement force × dt added to the velocity in the same pass                                                                               | velocity, curl       | no                   |
-| advect_temp | off: `buoyancy` 0 clears the temperature once, and nothing is injected into it                                                                                 | temperature          | the trace distance   |
-| buoyancy    | gravity × (sink × density − buoyancy × ΔT), kept as an acceleration, added × dt; gravity down the screen (`gravity_y` 1)                                       | acceleration         | no                   |
-| incompress  | divergence, the pressure by `pressure.solver` ([The pressure](#the-pressure)), gradient subtraction, on the walls ([The walls](#the-walls))                    | pressure, velocity   | no                   |
-| advect_den  | semi-Lagrangian advection, one trilinear read per texel, the evaporation taking the alpha down, the color with it                                              | density 256×448×128  | the trace distance   |
-| composite   | front-to-back march, one step per layer                                                                                                                        | output 2160×3840     | no                   |
+| Pass        | What                                                                                                                                                                                                                                                                    | On                  | Depends on the input |
+|-------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|----------------------|
+| advect_vel  | self-advection on the faces by `advection`, each face traced on its own ([The staggered velocity](#the-staggered-velocity)), `velocity.advection_scale` 1, fade 60 s; on its result the guard ([The guard](#the-guard)), the top speed `max_speed` (0 off) and the slip | velocity's faces    | the trace distance   |
+| viscosity   | Jacobi diffusion on the faces, off (`viscosity` 0)                                                                                                                                                                                                                      | velocity's faces    | no                   |
+| vorticity   | the curl at the cells from the faces, the confinement's force at the cells, each face given its two cells' mean                                                                                                                                                         | faces, curl         | no                   |
+| advect_temp | off: `buoyancy` 0 clears the temperature once, and nothing is injected into it                                                                                                                                                                                          | temperature         | the trace distance   |
+| buoyancy    | gravity × (sink × density − buoyancy × ΔT), kept as an acceleration at the cells, each face given its two cells' mean × dt; gravity down the screen (`gravity_y` 1)                                                                                                     | acceleration        | no                   |
+| incompress  | the divergence per cell from its six faces, the pressure by `pressure.solver` ([The pressure](#the-pressure)), the gradient per face from its two cells, on the walls ([The walls](#the-walls))                                                                         | pressure, faces     | no                   |
+| centers     | the faces averaged to the cells' centers, which the particles, the upscaled density and the monitors read                                                                                                                                                               | velocity            | no                   |
+| advect_den  | semi-Lagrangian advection, one trilinear read per texel, the evaporation taking the alpha down, the color with it                                                                                                                                                       | density 256×448×128 | the trace distance   |
+| composite   | front-to-back march, one step per layer                                                                                                                                                                                                                                 | output 2160×3840    | no                   |
 
 Every field is a `GL_TEXTURE_3D` on one grid of cubic cells at the stage's size, 256 × 448 by
-`depth` 128: the velocity RGBA16F, the temperature R16F and the pressure R32F, the density
+`depth` 128: the velocity on its faces RGBA16F a face longer on every axis and at the centers RGBA16F, the
+temperature R16F and the pressure R32F, the density
 RGBA16F with its color baked in, each a swap pair, the obstacle R8. The simulation's cell is 1/256
 width in x, y and z, so the slab is 128 / 256 = 0.5 widths deep (`_z_extent`). The grid is the one
 that holds 60 fps in deep_flow with the pose on the same GPU ([TIMING.md](TIMING.md#the-grid)). The density is carried
@@ -131,10 +122,10 @@ the boundary, `RATE` for the body force:
 
 | Subpanel     | Output         | Unit                              | The fluid                                                                                                                           | The fluid's setting                  | 1 means                               |
 |--------------|----------------|-----------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------|---------------------------------------|
-| `boundary`   | `velocity`     | widths/s                          | drags the water toward it where it is non-zero, over `velocity_drag`, never past it (`boundary_velocity_3d`, [The drag](#the-drag)) | `input.boundary.velocity_gain`       | the water as fast as the body         |
+| `boundary`   | `velocity`     | widths/s                          | drags the water toward it where it is non-zero, over `velocity_drag`, never past it (`add_to_faces_3d`, [The drag](#the-drag)) | `input.boundary.velocity_gain`       | the water as fast as the body         |
 | `boundary`   | `density`      | the dye: color × presence, 0 to 1 | fills the water toward it × `density_gain` (at most 1) in the slab, never past it, over `density_drag`                              | `input.boundary.density_gain`        | fully dyed at 1 width/s               |
 | `boundary`   | `temperature`  | warmth, -1 to 1                   | drags the water toward it × `temperature_gain` (at most ±1) in the slab where the body is, over `temperature_drag`                  | `input.boundary.temperature_gain`    | fully warm or cold at 1 width/s       |
-| `body_force` | `acceleration` | widths/s²                         | adds it × dt (`body_force_acceleration_3d`)                                                                                         | `input.body_force.acceleration_gain` | a Δv added once                       |
+| `body_force` | `acceleration` | widths/s²                         | adds it × dt (`add_to_faces_3d`)                                                                                                 | `input.body_force.acceleration_gain` | a Δv added once                       |
 | `body_force` | `density`      | a push's dye, presence 0 to 1     | adds it at a rate × dt into the slab, capped at fully dyed: the pipette                                                             | `input.body_force.density_rate`      | fully dyed per second at a full push  |
 | `body_force` | `temperature`  | a push's warmth, -1 to 1          | adds it at a rate × dt into the slab, capped at ±1                                                                                  | `input.body_force.temperature_rate`  | full warmth per second at a full push |
 
@@ -148,7 +139,7 @@ force's are added at a rate, capped at fully dyed and ±1.
 A body moving through water drags the water toward its own speed: the force is the difference,
 `a = (v_body × gain − v) / boundary_drag`, an acceleration, added × dt. Where the fluid already moves
 with the body the force is 0; where the body stops and the trail dies, nothing pulls, and the water
-coasts on its own inertia. In the shader (`boundary_velocity_3d.comp`):
+coasts on its own inertia. In the shader (`add_to_faces_3d.comp`, per face):
 `v ← v + (v_body × gain − v) × pull`, with `pull = share × g × weight × slab`. `share` is
 `1 − exp(−dt / velocity_drag)`, `velocity_drag` in ms, and 0 sets the velocity. `g` says where the body is:
 the trail's speed above a floor, `min(|v_body| / DRAG_FLOOR, 1)`, `DRAG_FLOOR` a constant 0.02
@@ -180,9 +171,10 @@ the last mirrors it:
 | the pressure                         | the same: no push across                         | its negative: 0 on the wall's face, on every level |
 | the curl's size, for the confinement | the same: no slope toward the wall               | the same                                           |
 
-So the face between the last cell and the ghost carries nothing through a closed wall and k of the
-velocity along it. The gradient also keeps the velocity from pointing into a closed wall, as into an
-obstacle's face.
+On the faces (`faces.glsl`) the wall's own face is stored: closed, it is 0 and never written; open, the
+gradient sets it from the ghost pressure. A face along the wall reads beyond it the face at the edge, and
+the curl's ghost carries (2k − 1) of it. An obstacle's cell is a closed wall inside the box: the faces on
+its sides 0, its curl's ghost the closed wall's.
 
 A closed wall slips (Navier slip): `slip_time`, the seconds the water along it takes to slow to 1%,
 0 free-slip (the default). It models the layer along the wall a coarse grid cannot resolve, where
@@ -262,10 +254,10 @@ velocity's divergence, central differences, a cell's share:
 
 One V-cycle leaves a sixteenth of Jacobi's residual in less time; each further cycle divides it by
 about thirteen. SOR's sweeps cost 0.34 ms each, two dispatches from global memory, and over-relaxed it
-leaves the high frequencies, which the mean residual counts, worse than Jacobi does. The divergence after
-the projection hardly moves with any of them: the divergence and the gradient are central differences
-on one grid, whose Laplacian is not the 7-point one every solver solves, so even an exact solve leaves
-it ([Plan](#1-the-projections-floor)). With the solve exact the water keeps more of its speed, 0.150
+leaves the high frequencies, which the mean residual counts, worse than Jacobi does. These were measured
+on the centered velocity, whose central differences' Laplacian is not the 7-point one the solvers solve;
+on the faces it is ([The staggered velocity](#the-staggered-velocity)), and the divergence the multigrid
+leaves is the half float's rounding. With the solve exact the water keeps more of its speed, 0.150
 widths/s in the mean against Jacobi's 0.134.
 
 ### The guard
@@ -674,8 +666,7 @@ its row in TIMING.md.
 
 ## The staggered velocity
 
-Not built; the answer to [the projection's floor](#1-the-projections-floor). The velocity moves to the
-cells' faces, the MAC grid (Harlow and Welch 1965; Bridson, *Fluid Simulation for Computer Graphics*,
+Built (2026-11-09). The velocity is on the cells' faces, the MAC grid (Harlow and Welch 1965; Bridson, *Fluid Simulation for Computer Graphics*,
 2nd ed. 2015, ch. 2): each component on the faces across its own axis, x between left and right
 neighbors, y between upper and lower, z between front and back. The divergence and the gradient become
 one-cell differences, whose product is the 7-point Laplacian the solvers solve, so an exact solve leaves
@@ -692,8 +683,10 @@ divergence-free, the second decouples the cells into a checkerboard.
 | the density, the temperature | advected by the faces; the particles, the upscaled density and the monitors read the centers            |
 | unchanged                    | the pressure solvers, the multigrid, the obstacle's cells, the bridge, the motion                       |
 
-The storage. Two layouts, the faster kept at step 3a. Three volumes: at 256 × 448 × 128 cells, x's
-faces are 257 × 448 × 128, y's 256 × 449 × 128 and z's 256 × 448 × 129: a row of 256 cells has 257 faces, the box's two walls included. The far wall's face is
+The storage, `FaceVelocity`: one RGBA16F volume at 257 × 449 × 129 for 256 × 448 × 128 cells, a texel's
+x, y and z the faces on its cell's left, bottom and front, w unused. Three R16F volumes, one a component
+(x's faces 257 × 448 × 128, y's 256 × 449 × 128, z's 256 × 448 × 129), were timed against it in the app
+and were slower in every pass, so the packed volume is the one kept: a row of 256 cells has 257 faces, the box's two walls included. The far wall's face is
 stored, since at an open wall it is an unknown the projection sets; at a closed wall it is 0. The grid,
 every dispatch and the multigrid's levels stay multiples of 16: one thread per cell, the last cell's
 thread along an axis also writing that far face. Any size is a valid texture, and the driver pads to its
@@ -776,6 +769,34 @@ staggered velocity:
 Sources: Harlow and Welch 1965, the MAC grid; Bridson 2015, ch. 2 (the grid), 3 (advecting it), 5
 (the pressure on it); Fedkiw, Stam and Jensen 2001, the confinement on it; the walls folded into the
 operators on the GPU (Zaspel).
+
+### Measured
+
+The same runs on the centered velocity (the baseline, `28655856`) and on the faces, deep_flow's preset. In the app (`trial_runs.py`, standmoves, the pose on), ms mean, two runs each within 0.03:
+
+| Pass                     | Centered | Faces   | Faces, three R16F |
+|--------------------------|----------|---------|-------------------|
+| advect velocity          | 0.18     | 0.35    | 0.46              |
+| pressure                 | 1.80     | 1.61    |                   |
+| density                  | 1.48     | 1.59    |                   |
+| faces to centers         |          | 0.16    | 0.24              |
+| the step                 | 4.44     | 4.61    |                   |
+| viscosity, 20 iterations | 1.16     | 3.6–4.0 | 4.88              |
+
+The swirl (`maccormack_check.py --test swirl`, multigrid), at 10 s:
+
+| Advection       | Swirl kept, centered | faces | Density total | The floor, centered | faces   |
+|-----------------|----------------------|-------|---------------|---------------------|---------|
+| semi-Lagrangian | 0.602                | 0.651 | the same      | 0.00009             | 0.00010 |
+| MacCormack      | 0.573                | 0.625 | the same      | 0.00050             | 0.00010 |
+
+The floor at the multigrid is the half float's rounding on both grids: 4 cycles leave the same 0.0001.
+Jacobi's 40 iterations leave 0.002 on both, and the density's total in the swirl grows by a third, the
+solve unconverged. On the swing at ε 1.93, closed, the water keeps more of its speed (inside at 12 s
+0.0103 against 0.0080, semi-Lagrangian), and at ε 5 MacCormack's inside holds at 0.033 where the centered
+held at 0.021; `slip_time` 2 decays as before. Through `fluid_compare.py` the water against the body is
+the same within 0.01 on stillslowfast and standmoves. An obstacle's cells read 0 (`--obstacle`). Open
+walls grow ([Plan](#1-open-walls-on-the-faces)).
 
 ## Parked
 

@@ -352,6 +352,15 @@ Sources: [McAdams, Sifakis, Teran 2010](https://pages.cs.wisc.edu/~sifakis/proje
 [sorting particles by a space-filling curve](https://forums.developer.nvidia.com/t/fast-texture-fetching-an-algorithm-for-fast-texture-fetching/5489);
 [StarsX/Smoke3D, a compute-shader 3D smoke](https://github.com/StarsX/Smoke3D).
 
+## The staggered velocity
+
+The velocity on the cells' faces against the centered one, two runs each at the preset (`trial_runs.py`),
+ms mean: the step 4.61 against 4.44; the velocity's advection 0.35 against 0.18 (three faces traced a
+cell), the pressure 1.61 against 1.80 (the divergence and the gradient on 2-byte faces), the density 1.59
+against 1.48, the faces averaged to the centers 0.16; with `viscosity` on at 20 iterations, the viscosity
+3.6 to 4.0 against 1.16. Its layouts and the rest of its measures are in
+[FLUID_3D.md](FLUID_3D.md#measured).
+
 ## The density at the output's 4K
 
 The upscaled density ([FLUID_3D.md](FLUID_3D.md#the-densitys-detail)): the amount at 2160 × 3840 ×
