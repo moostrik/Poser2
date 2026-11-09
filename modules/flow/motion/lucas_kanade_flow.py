@@ -142,12 +142,9 @@ class LucasKanadeFlow:
         estimate: Texture | None = None
         for level in reversed(range(min(s.levels, MAX_LEVELS))):
             target: SwapFbo = solve if level == 0 else self._levels[level - 1]
-            if estimate is None:
-                target.clear_all()                          # the coarsest level starts from no motion
             target.swap()
             target.begin()
-            self._shader.use(previous, current, target.back if estimate is None else estimate, level, s.window, s.damping,
-                             depth, tolerance)
+            self._shader.use(previous, current, estimate, level, s.window, s.damping, depth, tolerance)     # the coarsest from no motion
             target.end()
             estimate = target
 

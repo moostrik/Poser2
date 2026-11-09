@@ -4,13 +4,14 @@
 // the previous frame, warped by it, onto the current one, solved over a (2·window+1)² window of this
 // level's texels. Run from the coarsest level to the finest, each into a target of its level's size, so
 // every window sits on the level's texel centers; `estimate` is the coarser level's solve, read linear
-// (uv, so it needs no scaling), or zeros at the coarsest. With `same_surface`, a sample counts only where
+// (uv, so it needs no scaling); the coarsest has none (`has_estimate` off) and starts from no motion. With `same_surface`, a sample counts only where
 // its depth is within `tolerance` of the centre's (so the background does not drag a silhouette along, at
 // every level), and `damping` scales with the share kept. The numpy reference is lucas_kanade_flow.lucas_kanade
 
 uniform sampler2D previous;     // luminance, mipmapped
 uniform sampler2D current;      // luminance, mipmapped
-uniform sampler2D estimate;     // displacement so far, uv per frame (RG)
+uniform sampler2D estimate;     // displacement so far, uv per frame (RG), read with has_estimate
+uniform bool has_estimate;      // off at the coarsest level: it starts from no motion, no buffer read
 uniform int level;
 uniform int window;
 uniform float damping;
@@ -22,7 +23,7 @@ in vec2 texCoord;
 out vec4 fragColor;
 
 void main() {
-    vec2 d = texture(estimate, texCoord).xy;
+    vec2 d = has_estimate ? texture(estimate, texCoord).xy : vec2(0.0);
     float lod = float(level);
     vec2 texel = 1.0 / vec2(textureSize(current, level));
     vec2 dx = vec2(texel.x, 0.0);

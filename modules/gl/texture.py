@@ -26,6 +26,29 @@ def get_numpy_dtype(data_type: Constant) -> type | None:
     return None
 
 
+# The clear colors handed to glClearTexImage, kept for the life of the process: the driver can read a clear
+# color after the call returns, and a temporary array's memory is then already reused (measured: a clear
+# to 0 left 1.75, 3.75 and the bit pattern of 100 at startup). Zero passes no memory at all.
+_CLEAR_VALUES: dict[tuple, np.ndarray] = {}
+
+
+def clear_value(data_type: Constant, channels: int, color: tuple[float, float, float, float]) -> np.ndarray | None:
+    """The clear color for glClearTexImage: None for zero (GL fills zeros without reading memory), else
+    an array that is never freed, one per value."""
+    values = color[:channels]
+    if all(v == 0.0 for v in values):
+        return None
+    key = (int(data_type), values)
+    if key not in _CLEAR_VALUES:
+        if data_type == GL_UNSIGNED_BYTE:
+            _CLEAR_VALUES[key] = np.array([v * 255 for v in values], dtype=np.uint8)
+        elif data_type == GL_HALF_FLOAT:
+            _CLEAR_VALUES[key] = np.array(values, dtype=np.float16)
+        else:
+            _CLEAR_VALUES[key] = np.array(values, dtype=np.float32)
+    return _CLEAR_VALUES[key]
+
+
 def get_channel_count(format: Constant) -> int | None:
     """Get number of channels from OpenGL format.
 
@@ -241,14 +264,8 @@ class Texture():
         if channels is None:
             return
 
-        # Prepare clear color data based on data_type
-        if self.data_type == GL_UNSIGNED_BYTE:
-            # Convert [0.0, 1.0] to [0, 255]
-            clear_data = np.array([r * 255, g * 255, b * 255, a * 255][:channels], dtype=np.uint8)
-        elif self.data_type == GL_HALF_FLOAT:
-            clear_data = np.array([r, g, b, a][:channels], dtype=np.float16)
-        else:  # GL_FLOAT
-            clear_data = np.array([r, g, b, a][:channels], dtype=np.float32)
+        # The clear color, kept alive (clear_value)
+        clear_data = clear_value(self.data_type, channels, (r, g, b, a))
 
         # Clear texture directly (OpenGL 4.4+) - use self.format directly
         glClearTexImage(self.tex_id, 0, self.format, self.data_type, clear_data)

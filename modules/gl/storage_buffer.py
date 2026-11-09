@@ -43,7 +43,7 @@ class StorageBuffer:
         if not self.allocated:
             return
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, self.buffer_id)
-        glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, np.zeros(1, np.uint32))
+        glClearBufferData(GL_SHADER_STORAGE_BUFFER, GL_R32UI, GL_RED_INTEGER, GL_UNSIGNED_INT, None)     # None: zeros, no client memory read
         glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0)
 
     def bind_base(self, index: int) -> None:

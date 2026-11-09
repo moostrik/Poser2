@@ -49,7 +49,12 @@ class LuminanceFrames:
         self._shader.deallocate()
 
     def reset(self) -> None:
+        """Both frames black, their mip levels with them, and no frame in."""
         FlowUtil.zero(self._frames)
+        for texture in (self._frames, self._frames.back):
+            glBindTexture(GL_TEXTURE_2D, texture.tex_id)
+            glGenerateMipmap(GL_TEXTURE_2D)
+        glBindTexture(GL_TEXTURE_2D, 0)
         self._frame_count = 0
 
     def set_input(self, texture: Texture) -> None:

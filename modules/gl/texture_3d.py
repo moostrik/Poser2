@@ -13,7 +13,7 @@ Usage:
 from OpenGL.GL import Constant, GL_CLAMP_TO_EDGE, GL_HALF_FLOAT, GL_LINEAR, GL_NONE, GL_ONE, GL_RED, GL_TEXTURE_3D, GL_TEXTURE_BORDER_COLOR, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, GL_TEXTURE_SWIZZLE_A, GL_TEXTURE_SWIZZLE_B, GL_TEXTURE_SWIZZLE_G, GL_TEXTURE_SWIZZLE_R, GL_TEXTURE_WRAP_R, GL_TEXTURE_WRAP_S, GL_TEXTURE_WRAP_T, GL_UNSIGNED_BYTE, glBindTexture, glClearTexImage, glDeleteTextures, glGenTextures, glGetTexImage, glTexImage3D, glTexParameterfv, glTexParameteri
 import numpy as np
 
-from .texture import get_format, get_data_type, get_channel_count, get_numpy_dtype
+from .texture import clear_value, get_format, get_data_type, get_channel_count, get_numpy_dtype
 
 
 class Texture3D:
@@ -155,12 +155,7 @@ class Texture3D:
         if channels is None:
             return
 
-        if self.data_type == GL_UNSIGNED_BYTE:
-            clear_data = np.array([r * 255, g * 255, b * 255, a * 255][:channels], dtype=np.uint8)
-        elif self.data_type == GL_HALF_FLOAT:
-            clear_data = np.array([r, g, b, a][:channels], dtype=np.float16)
-        else:  # GL_FLOAT
-            clear_data = np.array([r, g, b, a][:channels], dtype=np.float32)
+        clear_data = clear_value(self.data_type, channels, (r, g, b, a))
 
         glClearTexImage(self.tex_id, 0, self.format, self.data_type, clear_data)
 

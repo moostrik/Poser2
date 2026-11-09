@@ -24,3 +24,4 @@ from .text import Text
 # PROFILING
 from .profiler import Profiler
 from .gpu_timer import GpuTimer
+from .gl_state import gl_state
