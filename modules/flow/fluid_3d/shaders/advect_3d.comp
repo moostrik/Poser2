@@ -28,10 +28,20 @@ uniform vec3  uRdx;           // (1, width/height, 1/z_extent): the uv a width o
 uniform float uDissipation;   // Exponential decay multiplier
 uniform float uEvaporation;   // Subtracted this step; unlike the multiplicative fade it reaches
                               // zero, so low-level haze clears. 0 for a signed field
+uniform int   uMeasure;       // how the evaporation reads a field's size: 0 its alpha, 1 its vector's length, 2 |r|
 uniform ivec3 uSize;          // Volume dimensions (width, height, depth)
 uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
 uniform float uDampenThreshold; // The velocity's speed above which its excess decays (widths/s)
 uniform float uDampenFactor;  // The excess's share kept this step; 1 = no dampen, every field but the velocity
+
+// The evaporation: the field's size taken down by uEvaporation, every channel scaled with it, so a
+// color keeps its hue, a velocity its direction and a signed value its sign; its size the alpha of a
+// premultiplied density (0), the length of a vector (1), or the first channel's magnitude (2)
+vec4 evaporate(vec4 value) {
+    float size = uMeasure == 0 ? value.a : (uMeasure == 1 ? length(value.xyz) : abs(value.r));
+    if (size <= 0.0) return value;
+    return value * (max(size - uEvaporation, 0.0) / size);
+}
 
 void main() {
     ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
@@ -65,7 +75,7 @@ void main() {
     // Sample source with trilinear interpolation and apply dissipation
     vec4 result = uDissipation * texture(uSource, st_back);
     if (uEvaporation > 0.0) {
-        result = max(result - vec4(uEvaporation), vec4(0.0));
+        result = evaporate(result);
     }
 
     if (uDampenFactor < 1.0) {      // the dampen, on the step's result

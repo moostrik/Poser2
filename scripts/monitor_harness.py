@@ -330,6 +330,7 @@ def check_cube_order(results: Results) -> None:
 
     monitor.layer.reset_view()
     monitor.settings.advanced.slice = True
+    monitor.settings.advanced.slice_focus = 0.9     # the slice well in focus, the front at a tenth
     monitor.layer.scroll(d, d)                   # the back layer
     monitor.tick(PANEL)
     red, blue = middle(monitor)[0], middle(monitor)[2]
@@ -485,8 +486,9 @@ def check_3d_glyphs(results: Results) -> None:
     results.save('4_dots_turned', dots.picture())
     empty = glyph_monitor(np.zeros((d, h, w, 4), np.float32), TextureKind.SCALAR)
     empty.tick(PANEL)
-    edges = drawn(empty.picture())
-    results.check('values too small to see draw no dots, only the edges', len(edges) > 0 and bool(np.all(np.abs(edges[:, 0].astype(int) - edges[:, 1].astype(int)) < 4)))
+    drawn_pixels = drawn(empty.picture())
+    results.check('values too small to see draw no dots; without the overlay, no outlines either', len(drawn_pixels) == 0,
+                  f'{len(drawn_pixels)} pixels')
 
     big = glyph_monitor(np.repeat(np.repeat(np.repeat(swirl(448, 800)[None], 16, axis=0), 1, axis=1), 1, axis=2), TextureKind.VELOCITY, 0.14)
     big.tick(PANEL)

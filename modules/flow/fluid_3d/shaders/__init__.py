@@ -13,7 +13,7 @@ from .jacobi_diffusion_3d import JacobiDiffusion3D
 from .vorticity_curl_3d import VorticityCurl3D
 from .vorticity_force_3d import VorticityForce3D
 from .buoyancy_3d import Buoyancy3D
-from .inject_3d import Inject3D
+from .inject_3d import Inject3D, InjectMode
 from .inject_amount_3d import InjectAmount3D
 from .velocity_average_3d import VelocityAverage3D
 from .noise_coordinates_3d import NoiseCoordinates3D
@@ -22,7 +22,7 @@ from .boundary_velocity_3d import BoundaryVelocity3D
 from .body_force_acceleration_3d import BodyForceAcceleration3D
 from .add_3d import Add3D
 from .inject_binary_3d import InjectBinary3D
-from .composite_3d import Composite3D, CompositeLight
+from .composite_3d import Composite3D, CompositeLight, view_march, OPACITY_LIMIT
 from .light_volume_3d import LightVolume3D
 from .light_blur_3d import LightBlur3D
 from .composite_over import CompositeOver

@@ -1,5 +1,11 @@
 # The 3D fluid
 
+**Meaningful units.** Every quantity and every setting is in a unit that means something on its own:
+widths/s, widths/s², seconds, ms, a dye from 0 (clear) to 1 (fully dyed), a warmth from −1 to 1, a
+share of the box's depth. A setting's value is chosen for what that unit says, never derived from an
+old look or from another setting by a factor; a value that would need such a factor means a unit is
+wrong, and the unit is fixed where the quantity is made.
+
 The 3D fluid's document, as [FLOW.md](FLOW.md) is the flow's: what the fluid is, how it takes what
 the bridge gives it, how it is measured, and what is open. "Code" is what the files show;
 **(deduction)** marks what is inferred from them, **(site fact)** what the operator saw.
@@ -20,7 +26,7 @@ A step (`Fluid3D.update`), in order, at the preset (`apps/deep_flow/data/setting
 | advect_temp | off: `buoyancy` 0 clears the temperature once, and nothing is injected into it  | temperature           | the trace distance   |
 | buoyancy    | gravity × (sink × density − buoyancy × ΔT), kept as an acceleration, added × dt; gravity is 0 in the preset | acceleration | no |
 | incompress  | divergence, the pressure by `pressure.solver` ([The pressure](#the-pressure)), gradient subtraction, on the walls ([The walls](#the-walls)) | pressure, velocity | no |
-| advect_den  | semi-Lagrangian advection, one trilinear read per texel, the evaporation subtracted   | density 256×448×128   | the trace distance   |
+| advect_den  | semi-Lagrangian advection, one trilinear read per texel, the evaporation taking the alpha down, the color with it | density 256×448×128   | the trace distance   |
 | composite   | front-to-back march, one step per layer                                               | output 2160×3840      | no                   |
 
 Every field is a `GL_TEXTURE_3D` on one grid of cubic cells at the stage's size, 256 × 448 by
@@ -43,10 +49,10 @@ into the gaussian slab at `input.layer` 0.5, `input.spread` 0.075 widths:
 |--------------------------------|----------------------------------------------------------------------|------------------------------|
 | `boundary_velocity`            | dragged toward, [The drag](#the-drag), w = −z × the z scale        | `boundary_velocity_3d`       |
 | `body_force_acceleration`      | added × `input.body_force.acceleration_gain` × dt, w = −z × the z scale                | `body_force_acceleration_3d` |
-| `boundary_density` (RGBA)      | added × `input.boundary.density_gain` × dt                                 | `inject_3d`                  |
-| `body_force_density` (RGBA)    | added × `input.body_force.density_gain` × dt                               | `inject_3d`                  |
-| `boundary_temperature`         | added × `input.boundary.temperature_gain` × dt                             | `inject_3d`                  |
-| `body_force_temperature`       | added × `input.body_force.temperature_gain` × dt                           | `inject_3d`                  |
+| `boundary_density` (RGBA)      | the water filled toward the dye × `input.boundary.density_gain` over `density_drag`, never past it | `inject_3d` (FILL)    |
+| `body_force_density` (RGBA)    | added at `input.body_force.density_rate` × dt, capped at fully dyed               | `inject_3d` (RATE)    |
+| `boundary_temperature`         | dragged toward the warmth over `input.boundary.temperature_drag` where the body is | `inject_3d` (FILL)   |
+| `body_force_temperature`       | added at `input.body_force.temperature_rate` × dt, capped at ±1                   | `inject_3d` (RATE)    |
 
 The depth scale is the box's depth over the smaller of its width and height (`depth` / 448 at 448 × 800,
 0.07 at 32 layers, 0.5 at 256 × 448 × 128): the box's depth stands for as much real depth as its width does, so
@@ -65,7 +71,7 @@ The velocity is in image widths per second, as the bridge's; the advection moves
 velocity × dt × `density.advection_scale` (1) in uv, so 1 width/s crosses the width in 1 s.
 
 The volume's settings: `input.layer` and `input.spread`, where the body sits in
-the volume; `emission`, `absorption`, `glow`, `tint` and `fog`, the composite's march; `wall`, the
+the volume; `emission`, `opacity`, `glow`, `tint` and `fog`, the composite's march; `wall`, the
 z walls. Obstacles stay supported (`set_obstacle`, `add_obstacle`, `clear_obstacles`, no caller
 today): one R8 volume on the simulation's grid, which every field's pass samples.
 
@@ -100,11 +106,11 @@ per output, each meaning one thing:
 | Subpanel     | Output        | Unit                       | The fluid                                                                        | The fluid's setting        | 1 means                               |
 |--------------|---------------|----------------------------|----------------------------------------------------------------------------------|----------------------------|---------------------------------------|
 | `boundary`   | `velocity`    | widths/s                   | drags the water toward it where it is non-zero, over `velocity_drag`, never past it  | `input.boundary.velocity_gain`            | the water as fast as the body         |
-| `boundary`   | `density`     | widths/s, times the color  | adds it × dt into the slab: the brush, per width of travel                       | `input.boundary.density_gain`    | one unit of density per width         |
-| `boundary`   | `temperature` | widths/s, by the color     | adds it × dt into the slab                                                       | `input.boundary.temperature_gain` | the same, signed by the color        |
+| `boundary`   | `density`     | the dye: color × presence, 0 to 1 | fills the water toward it × `density_gain` (at most 1) in the slab, never past it, over `density_drag` | `input.boundary.density_gain`    | fully dyed at 1 width/s               |
+| `boundary`   | `temperature` | warmth, -1 to 1            | drags the water toward it × `temperature_gain` (at most ±1) in the slab where the body is, over `temperature_drag` | `input.boundary.temperature_gain` | fully warm or cold at 1 width/s |
 | `body_force` | `acceleration`| widths/s²                  | adds it × dt                                                                     | `input.body_force.acceleration_gain`          | a Δv added once                       |
-| `body_force` | `density`     | widths/s², times the color | adds it × dt into the slab: the pipette, per Δv                                  | `input.body_force.density_gain`  | one unit of density per width/s of Δv |
-| `body_force` | `temperature` | widths/s², by the color    | adds it × dt into the slab                                                       | `input.body_force.temperature_gain` | the same, signed by the color      |
+| `body_force` | `density`     | a push's dye, presence 0 to 1 | adds it at a rate × dt into the slab, capped at fully dyed: the pipette       | `input.body_force.density_rate`  | fully dyed per second at a full push  |
+| `body_force` | `temperature` | a push's warmth, -1 to 1   | adds it at a rate × dt into the slab, capped at ±1                               | `input.body_force.temperature_rate` | full warmth per second at a full push |
 
 The two subpanels are the two systems every solver distinguishes: a moving boundary, whose
 velocity the water takes, and the body force, which accelerates it. So a wake may drag (its share
@@ -236,7 +242,7 @@ role.
 | the bridge's subpanels, the two systems | readings; `boundary`, the body as a moving boundary; `body_force`, the Navier–Stokes force term       |                     |
 | the bridge's outputs, the fluid's inputs | `boundary.velocity`, `boundary.density`, `boundary.temperature`; `body_force.acceleration`, `body_force.density`, `body_force.temperature`; on `BridgeOutput` and `Injection` with `_` | widths/s; widths/s² |
 | the mixes' knobs                      | shares, 0 to 1, one per reading in each output, summed                                                  |                     |
-| the fluid's input groups              | `input` (`layer`, `spread`, `depth_span`), with `boundary` (`velocity_drag`, `velocity_gain`, `density_gain`, `temperature_gain`) and `body_force` (`acceleration_gain`, `density_gain`, `temperature_gain`); gains in the motion and the fluid, shares in the bridge | |
+| the fluid's input groups              | `input` (`layer`, `spread`, `depth_span`), with `boundary` (a line per field: `velocity_drag`, `velocity_gain`; `density_drag`, `density_gain`; `temperature_drag`, `temperature_gain`) and `body_force` (`acceleration_gain`, `density_rate`, `temperature_rate`); gains in the motion and the fluid, shares in the bridge | |
 | the fluid's input methods             | `drag_velocity`, `add_acceleration`, `add_boundary_density`, `add_body_force_density`, `add_boundary_temperature`, `add_body_force_temperature` | |
 | the fluid's fields                    | `velocity` (its own settings: fade, dampen, vorticity, viscosity, self-advection), `density`, `temperature`, `pressure`, `volume` | |
 | the fluid's edge condition            | `wall` (`WallMode`), open or closed, in every field's group and the volume's, in both fluids; not `boundary`, which is the body |  |
@@ -300,7 +306,7 @@ as a tuning:
 | `input.boundary.velocity_gain`                                                                  | 1               | the water as fast as the body           |
 | `input.boundary.velocity_drag`                                                             | 50 ms           | how fast the water takes the body's speed |
 | `input.body_force.acceleration_gain`                                                                | 1               | a Δv added once                         |
-| `input.boundary.density_gain`, `input.body_force.density_gain`, `input.boundary.temperature_gain`, `input.body_force.temperature_gain` | 1 | one unit per width, per Δv |
+| `input.boundary.density_drag`, `temperature_drag`; `density_gain`, `temperature_gain`; `input.body_force.density_rate`, `temperature_rate` | 200 ms; 1; 1 /s | the water takes the dye in a fifth of a second, fully dyed where the body moves at 1 width/s; a full push dyes fully in a second |
 | `density.advection_scale`, `temperature.advection_scale`                         | 1               | the density moves with the water        |
 | `velocity.advection_scale`                                                       | 1               | the velocity carries itself the full step |
 | `width`, `height`, `depth`                                                       | 256, 448, 128   | half a width deep, within 60 fps        |
@@ -318,7 +324,7 @@ coast is the fluid's now; the confinement Fedkiw's ε 0.3 over the neighbors (`v
 in z, `input.layer` 0.5 and `input.spread` 0.075 widths, a body's thickness of about 0.3
 widths at the camera's crop (from its `view_span` of 0.76 m, **(deduction)**) as four sigma, three
 sigma inside the 0.5-width slab. Kept as tuned: the composite's look (`emission`,
-`absorption`, `glow`, `tint`, `fog`).
+`opacity`, `glow`, `tint`, `fog`).
 
 Measured with these on standmoves through the harness: the water 0.89 of the body's speed in the
 fast halves, its peak 0.76 of the body's, the step 11.5 ms with the harness (mean; p95 12.8).
@@ -401,6 +407,7 @@ made.
 | 10   | The density's detail: the amount at 4K × its own layers, the color on the grid ([Step 10](#step-10-the-densitys-detail)) | the old 16-layer 4K look, in the budget |
 | 11   | The 4K layers' look: depth from the coarse grid ([Step 11](#step-11-the-4k-layers-look)) | near density covering far as finely as the fluid; the depth reads |
 | 12   | A staggered velocity, later ([Step 12](#step-12-a-staggered-velocity-later)) | the water exactly incompressible; the walls as now |
+| 13   | Meaningful units: the bridge says what the body is, the fluid how the water follows ([Step 13](#step-13-meaningful-units)) | every setting reads in a unit of its own: 1 fully dyed, ±1 fully warm, widths/s |
 
 ### MacCormack
 
@@ -635,10 +642,10 @@ How step 10's 4K layers are drawn, using the depth the coarse fluid already simu
 
 | Part       | How |
 |------------|-----|
-| shadows    | built (`LightVolume3D`, `Fluid3D._lit`): a light grid at a quarter of the simulation's size, each step, each cell's RGB transmittance toward the light: the simulation density's amount summed along the way at one light cell a step (at most 256), times `absorption` per width (it is over the box's depth), and the water's `fog` over the whole distance, both per channel by `tint`, so deep light turns bluish and a lamp falls off; the composite's each sample's emission × mix(1, the light there, `shadow`); off and released at `shadow` 0; a step's GPU time with it on within the noise of one without it, under 0.5 ms, in a smoke run at 448 × 800 × 64 with the upscaled density (not yet in TIMING.md) |
+| shadows    | built (`LightVolume3D`, `Fluid3D._lit`): a light grid at a quarter of the simulation's size, each step, each cell's RGB transmittance toward the light: the simulation density's amount summed along the way at one light cell a step (at most 256), times the extinction `opacity` gives over the view, per width of the box's depth, and the water's `fog` over the whole distance, both per channel by `tint`, so deep light turns bluish and a lamp falls off; the composite's each sample's emission × mix(1, the light there, `shadow`); off and released at `shadow` 0; a step's GPU time with it on within the noise of one without it, under 0.5 ms, in a smoke run at 448 × 800 × 64 with the upscaled density (not yet in TIMING.md) |
 | the light  | built: `composite.light`, `DIRECTIONAL` (a sun: one direction, parallel shadows) or `POINT` (a lamp, shadows fanning out); `light_x`, `light_y`, `light_z` toward the sun or the lamp's place (±1 the box's sides; x right, y down the screen, z away from the viewer), first above and a little toward the front; `shadow` how dark the shadowed parts get. `Fluid3D.set_light` overrides the settings, the hook for a light the app derives from the pose (a lamp at the nose), the pose pipeline's value handed over; the monitor shows the light grid as the port `light`. Still to do: the light drawn in the monitor's cube (a sun line, or a dot at the lamp) |
 | scattering | built: `scattering`, the light grid blurred (`LightBlur3D`, a separable 5-tap gaussian) and mixed into the direct light, for thick parts glowing within and soft shadow edges; `anisotropy`, the Henyey–Greenstein g of each lit sample toward the viewer, 1 at g 0, a silver lining against a light from behind; both 0 off, at no cost |
-| absorption | built: a sample covers by its amount, not its color's brightest channel, so the same amount covers the same whatever its color; `emission` and `absorption` are over the box's whole depth, as `fog` is, not per layer, so the look holds at any number of layers: `emission` the brightness of an amount of 1 filling the depth with nothing covering it, `absorption` 1 letting a third through, about 50 a front skin; log sliders 0.1 to 100; a particle look takes them over its `slices` |
+| opacity    | built (`view_march`): the look is set on the view, the same at any number of layers and any depth: `opacity`, 0 to 1, how much fully dyed water filling the view covers what is behind it (Beer–Lambert, its extinction −ln(1 − opacity), 1 drawn at 0.999), and `emission`, how bright that water is seen, 1 its own color, its covering of its own far side made up for; a sample covers by its amount, not its color's brightest channel; a particle look takes both over its `slices` |
 | occlusion  | what covers what measured through the coarse grid's layers, the 4K detail laid over it: the order in depth as fine as the fluid's, the detail 4K × `upscaled.depth` |
 | highlights | built (`Knee`, one pass on the output after the particles): the composite's color through a knee, straight up to 0.8 and bent softly toward 1 above it, each channel on its own, so the image below 0.8 keeps its contrast, thick cores no longer clip flat and the brightest drift a little toward white, as film does; no setting, `composite.emission` keeps its meaning |
 | blend      | built: the composite writes its color premultiplied (times its coverage) and the coverage as alpha, so the fluid layer draws it with the premultiplied form of `composite.blend_mode` (`BlendMode.premultiplied`: `ADD` as `GL_ONE, GL_ONE`, `ALPHA` as `GL_ONE, GL_ONE_MINUS_SRC_ALPHA`), not multiplied by its alpha a second time; thin density brighter than before, `composite.emission` to retune |
@@ -660,6 +667,28 @@ and an exact solve leaves the water exactly incompressible, with no pattern alte
 | re-check  | the walls (the explosion fixed by the ghosts), the drag's water against the body, the y metric and the resolution checks, through the harness |
 
 Sources: the face counts and the boundary faces zeroed ([oxiphysics MAC grid](https://docs.rs/oxiphysics-gpu/0.1.1/src/oxiphysics_gpu/gpu_fluid_euler.rs.html)); the walls folded into the operators on the GPU (Zaspel).
+
+### Step 13: meaningful units
+
+Built (the bridge's part here too); the look not yet matched to the one before on the harness.
+The boundary is what the water is dragged toward (the glossary's), for every field, not the velocity
+alone; the body force is what is added × dt. Each output says what the body is in a unit of its own, and
+the fluid's settings say how the water follows:
+
+| Output                   | Now                                   | Meaningful                                                                   |
+|--------------------------|---------------------------------------|------------------------------------------------------------------------------|
+| `boundary_velocity`      | widths/s, the water dragged toward it | as now                                                                       |
+| `boundary_density`       | the speed × the color, added × dt     | dye: the body's color with its presence, 0 to 1 (where the body is and moves); the water dragged toward it |
+| `boundary_temperature`   | the speed signed by the color, added  | warmth, −1 cold to 1 hot; the water dragged toward it                        |
+| `body_force_acceleration`| widths/s², added × dt                 | as now                                                                       |
+| `body_force_density`     | the change of speed × the color, added| dye per second, a push's color added at a rate, the water capped at fully dyed |
+| `body_force_temperature` | the change of speed signed, added     | warmth per second, capped at ±1                                              |
+
+| Part           | What changes |
+|----------------|--------------|
+| the bridge     | built here, not in the bridge thread: the density as dye and presence, presence the trail's speed in widths/s, capped at 1, so a part moving at 1 width/s is fully there and a still body leaves no dye; the temperature as warmth the same way, signed by the color; the body force's density and temperature as a push's presence, its change of speed in widths/s, capped at 1 |
+| the fluid      | `input.boundary`: `velocity_drag`, `density_drag`, `temperature_drag`, each a time (ms) the water takes to close the gap to the body's value, beside a gain each, a line per field: the body's value × the gain is the target, capped at fully dyed and ±1, 1 = as the body's speed says; `input.body_force`: `density_rate` and `temperature_rate`, fully dyed or warm per second at a full push, replacing the gains; the density never above 1, the temperature never past ±1 |
+| the look       | built: `composite.emission` and `opacity` refer to fully dyed water filling the view (1 and 0.6 in the preset); every field (velocity, density, temperature) a `fade_time` and an `evaporation_time`, both seconds, 0 to 300 in steps of 1, 0 off: the fade the seconds to 1% (a share, never zero), the evaporation the seconds a full value takes to reach 0 (a fixed amount, faint first: fully dyed, ±1 warm, 1 width/s; on the velocity a constant braking that stops slow water); `temperature.buoyancy` per unit of warmth; the monitor's `scale` 1 a full value for density and temperature as for a velocity of 1 width/s |
 
 ## Later
 

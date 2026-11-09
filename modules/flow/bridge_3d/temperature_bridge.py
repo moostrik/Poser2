@@ -7,7 +7,8 @@ Color interpretation:
     - G channel = neutral/dampening
     - B channel = cold
 
-Formula: temp = (warm - cold) * (1.0 - neutral * 0.5) * mask * speed
+Formula: warmth = (warm - cold) * (1.0 - neutral * 0.5) * presence, presence = min(mask, 1), the mask the
+readings' speed in widths/s, so warmth is -1 cold to 1 hot, the value the water is dragged toward
 
 Ported from ofxFlowTools ftTemperatureBridgeFlow.h
 """
@@ -22,8 +23,8 @@ from .shaders import TemperatureBridgeShader
 
 
 class TemperatureBridgeSettings(BaseSettings):
-    """Configuration for temperature bridge."""
-    scale = Field(0.5, min=-1.0, max=2.0, newline=True, description="Temperature output multiplier")
+    """Configuration for temperature bridge: none; its warmth is the color with the presence, 1 at 1 width/s."""
+
 
 
 class TemperatureBridge(FlowBase):
@@ -34,7 +35,7 @@ class TemperatureBridge(FlowBase):
         - G = neutral/dampening (reduces temperature)
         - B = cold (negative contribution)
 
-    Formula: temp = (R - B) * (1.0 - G * 0.5) * mask * speed
+    Formula: warmth = (R - B) * (1.0 - G * 0.5) * min(mask, 1)
 
     Pipeline:
         1. Receive RGB color via set_color() → input_fbo (RGB32F)
@@ -135,7 +136,7 @@ class TemperatureBridge(FlowBase):
         self._temperature_bridge_shader.use(
             self._input,                    # RGB color (R=warm, G=neutral, B=cold)
             self._mask_fbo,        # Velocity magnitude mask
-            self.settings.scale
+            1.0                    # 1 width/s is fully there
         )
         self._output_fbo.end()
 

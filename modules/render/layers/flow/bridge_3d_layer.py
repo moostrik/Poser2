@@ -1,7 +1,9 @@
 """The 3D bridge layer: the velocity lowpass and the velocity bandpass read a 3D velocity (xyz) into six
 readings, each as a velocity and as an acceleration; two mixes make what the fluid takes from them: the
 boundary (a velocity, density, temperature from the readings as velocities) and the body force (an
-acceleration, density, temperature from the readings as accelerations)."""
+acceleration from the readings as accelerations, its density and temperature a push's presence from the
+readings as velocities, the change of speed). Each density and temperature is 0 to 1 (±1 warm): a presence,
+the readings' speed in widths/s, capped at 1, the dye the fluid fills the water toward or adds at a rate."""
 
 # Standard library imports
 from collections.abc import Callable
@@ -42,15 +44,15 @@ class BoundaryDensitySettings(DensityBridgeSettings, BoundaryMixSettings):
 
 
 class BoundaryTemperatureSettings(TemperatureBridgeSettings, BoundaryMixSettings):
-    """The boundary's temperature: its mask's mix, the readings' speeds, then its scale."""
+    """The boundary's temperature: its mask's mix, the readings' speeds, then its warmth."""
 
 
 class BodyForceDensitySettings(DensityBridgeSettings, MixSettings):
-    """The body force's density: its amount's mix, the readings' accelerations' sizes, then its color."""
+    """The body force's density: its amount's mix, the readings' speeds (a push's change of speed), then its color."""
 
 
 class BodyForceTemperatureSettings(TemperatureBridgeSettings, MixSettings):
-    """The body force's temperature: its mask's mix, the readings' accelerations' sizes, then its scale."""
+    """The body force's temperature: its mask's mix, the readings' speeds (a push's change of speed), then its warmth."""
 
 
 class Bridge3DReadingsSettings(BaseSettings):
@@ -90,8 +92,8 @@ class Bridge3DLayer(BridgeLayer):
     reading as a velocity (widths/s) and as an acceleration (widths/s²). Each output mixes the six at a share,
     0 to 1, as the light renderer mixes its layers; the readings of one unit share it, so the mix has no gain.
         boundary     the readings as velocities: `velocity`; `density` and `temperature` from their sizes
-        body_force   the readings as accelerations: `acceleration`; `density` and `temperature` from their
-                     sizes; each None while its shares are all 0
+        body_force   the readings as accelerations: `acceleration`; `density` and `temperature` from the
+                     readings as velocities, a push's change of speed; each None while its shares are all 0
     The density and the temperature are colored by a density and a temperature bridge per side, with the
     same color. The defaults are the boundary's trail alone.
 
@@ -220,11 +222,11 @@ class Bridge3DLayer(BridgeLayer):
 
         self._lowpass_timer.begin()
         self._lowpass.set_velocity(input.velocity)
-        self._lowpass.update(input.dt, self._lowpass_shown or any(mix.trail > 0.0 for mix in body_force))
+        self._lowpass.update(input.dt, self._lowpass_shown or self.settings.body_force.acceleration.trail > 0.0)
         self._lowpass_timer.end()
         self._bandpass_timer.begin()
         self._update_bandpass(input, self._bandpass_shown or any(self._mixed(mix, BANDPASS_READINGS) for mix in mixes),
-                              self._bandpass_shown or any(self._mixed(mix, BANDPASS_READINGS) for mix in body_force))
+                              self._bandpass_shown or self._mixed(self.settings.body_force.acceleration, BANDPASS_READINGS))
         self._bandpass_timer.end()
         self._lowpass_shown = self._bandpass_shown = False
         self._mix_timer.begin()
@@ -240,10 +242,10 @@ class Bridge3DLayer(BridgeLayer):
         if self._mixed(side.acceleration):
             self._mix(self._body_force_acceleration, self._accelerations(), side.acceleration)
         if self._mixed(side.density):
-            self._mix(self._body_force_density_amount, self._accelerations(), side.density, lengths=True)
+            self._mix(self._body_force_density_amount, self._velocities(), side.density, lengths=True)
             self._update_density(self._body_force_density, self._body_force_density_amount, color)
         if self._mixed(side.temperature):
-            self._mix(self._body_force_temperature_amount, self._accelerations(), side.temperature, lengths=True)
+            self._mix(self._body_force_temperature_amount, self._velocities(), side.temperature, lengths=True)
             self._update_temperature(self._body_force_temperature, self._body_force_temperature_amount, color)
         self._mix_timer.end()
         self._gpu_timer.end()

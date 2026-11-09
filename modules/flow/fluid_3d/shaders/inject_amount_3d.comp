@@ -16,6 +16,8 @@ uniform float uTargetLayer;  // normalized depth [0, 1] of the slab's center
 uniform float uSpread;       // the gaussian's sigma in normalized depth
 uniform float uStrength;
 uniform bool  uCubic;        // the source enlarged by a cubic B-spline, else bilinearly
+uniform int   uMode;         // 0 ADD, 1 RATE (capped at 1), 2 FILL (toward the source's amount × uGain, at most 1, never past it)
+uniform float uGain;         // FILL: the source's amount times this, at most 1, is the target
 uniform ivec3 uSize;
 
 float bspline_alpha(vec2 uv) {
@@ -44,6 +46,10 @@ void main() {
     float weight = exp(-0.5 * dz * dz) * uStrength;
     if (weight < 0.001) return;
     vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
-    float amount = (uCubic ? bspline_alpha(uv) : texture(uInput, uv).a) * weight;
-    imageStore(uVolume, gid, vec4(imageLoad(uVolume, gid).r + amount, 0.0, 0.0, 0.0));
+    float source = uCubic ? bspline_alpha(uv) : texture(uInput, uv).a;
+    float current = imageLoad(uVolume, gid).r;
+    if (uMode == 2) current += max(min(source * uGain, 1.0) - current, 0.0) * min(weight, 1.0);
+    else current += source * weight;
+    if (uMode == 1) current = min(current, 1.0);
+    imageStore(uVolume, gid, vec4(current, 0.0, 0.0, 0.0));
 }

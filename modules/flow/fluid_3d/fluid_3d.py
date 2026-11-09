@@ -55,7 +55,7 @@ from .shaders import (
     VorticityCurl3D, VorticityForce3D, Buoyancy3D,
     Inject3D, BoundaryVelocity3D, BodyForceAcceleration3D,
     Add3D, CompositeOver, Knee,
-    CompositeLight, LightVolume3D, LightBlur3D,
+    CompositeLight, LightVolume3D, LightBlur3D, InjectMode, view_march,
     InjectBinary3D
 )
 
@@ -463,11 +463,14 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def _advect_field(self, field: SwapTexture3D, scratch: Texture3D, velocity: Texture3D | None, step: float,
-                      dissipation: float, internal_format: int, dampen: tuple[float, float] = (0.0, 1.0)) -> None:
+                      dissipation: float, internal_format: int, dampen: tuple[float, float] = (0.0, 1.0),
+                      evaporation: float = 0.0, measure: int = 0) -> None:
         """Carry `field` one step along the velocity (`velocity`, or the field's own previous buffer for the
-        velocity's self-advection), by `settings.advection`."""
+        velocity's self-advection), by `settings.advection`; its size taken down by `evaporation`, read by
+        `measure` (0 a density's alpha, 1 a vector's length, 2 |r|)."""
         if self._advection.carry(self.settings.advection, field, scratch, velocity, self._obstacle, self._aspect,
-                                 self._z_extent, step, dissipation, internal_format, self._has_obstacles, dampen=dampen):
+                                 self._z_extent, step, dissipation, internal_format, self._has_obstacles,
+                                 evaporation=evaporation, dampen=dampen, measure=measure):
             self._apply_wall_modes()
 
     def _advect_velocity(self) -> None:
@@ -475,7 +478,8 @@ class Fluid3D:
         advect_step = self._dt * self.settings.velocity.advection_scale
         dissipation = self._calculate_dissipation(self._dt, self.settings.velocity.fade_time)
         self._advect_field(self._velocity, self._velocity_scratch, None, advect_step, dissipation, GL_RGBA16F,
-                           dampen=self._dampen_step())
+                           dampen=self._dampen_step(),
+                           evaporation=self._evaporation(self._dt, self.settings.velocity.evaporation_time), measure=1)
 
     def _apply_viscosity(self) -> None:
         """Diffuse velocity via Jacobi viscosity solver."""
@@ -546,7 +550,8 @@ class Fluid3D:
 
         advect_step = self._dt * self.settings.temperature.advection_scale
         dissipation = self._calculate_dissipation(self._dt, self.settings.temperature.fade_time)
-        self._advect_field(self._temperature, self._temperature_scratch, self._velocity, advect_step, dissipation, GL_R16F)
+        self._advect_field(self._temperature, self._temperature_scratch, self._velocity, advect_step, dissipation, GL_R16F,
+                           evaporation=self._evaporation(self._dt, self.settings.temperature.evaporation_time), measure=2)
 
     def _apply_buoyancy(self) -> None:
         """Apply buoyancy to velocity: the acceleration f = gravity * (κρ − σ(T − T_ambient)) (widths/s²),
@@ -635,7 +640,7 @@ class Fluid3D:
             velocity=self._velocity, obstacle=self._obstacle, has_obstacles=self._has_obstacles,
             aspect=self._aspect, z_extent=self._z_extent, dt=self._dt, step=self._dt * self.settings.density.advection_scale,
             dissipation=self._calculate_dissipation(self._dt, self.settings.density.fade_time),
-            evaporation=self.settings.density.evaporation * self._dt, advection=self.settings.advection,
+            evaporation=self._evaporation(self._dt, self.settings.density.evaporation_time), advection=self.settings.advection,
             curl=self._curl_vol if self._needs_curl else None, cell=self._cell)
         for carrier in self._densities:
             carrier.update(step)
@@ -667,8 +672,8 @@ class Fluid3D:
 
     def _lit(self) -> CompositeLight | None:
         """The light this step, from the simulation density: each light cell marched toward the light, then
-        with `scattering` blurred and mixed in; None while `shadow` is 0, the light released. `absorption` and
-        `fog` are over the box's depth, so per width they are over its depth in widths."""
+        with `scattering` blurred and mixed in; None while `shadow` is 0, the light released. `opacity` and
+        `fog` are over the view, the box's depth, so per width they are over its depth in widths."""
         composite = self.settings.composite
         density: Texture3D | None = self._simulation_density.weight
         if composite.shadow <= 0.0 or density is None:
@@ -682,7 +687,7 @@ class Fluid3D:
         box = (1.0, 1.0 / self._aspect, self._z_extent)
         chan = tuple(1.0 + (water - 1.0) * composite.tint for water in WATER_CHANNELS)
         per_width = 1.0 / max(self._z_extent, 1e-6)
-        sigma = tuple(composite.absorption * per_width * c for c in chan)
+        sigma = tuple(view_march(composite.opacity, composite.emission)[0] * per_width * c for c in chan)
         fog = tuple(composite.fog * per_width * c for c in chan)
         point: bool = composite.light == Light.POINT
         vector = self._light_override or (composite.light_x, composite.light_y, composite.light_z)
@@ -760,9 +765,16 @@ class Fluid3D:
     def _calculate_dissipation(delta_time: float, decay_time: float) -> float:
         """Calculate frame-rate independent decay multiplier.
 
-        Returns pow(0.01, dt / decay_time) -- field reaches 1% after decay_time seconds.
+        Returns pow(0.01, dt / decay_time) -- field reaches 1% after decay_time seconds; 1 at 0, off.
         """
-        return pow(0.01, delta_time / max(0.001, decay_time))
+        if decay_time <= 0.0:
+            return 1.0
+        return pow(0.01, delta_time / decay_time)
+
+    @staticmethod
+    def _evaporation(delta_time: float, evaporation_time: float) -> float:
+        """The share of a field's full value taken off this step, so it is gone in evaporation_time; 0 off."""
+        return delta_time / evaporation_time if evaporation_time > 0.0 else 0.0
 
     # ========== Input Methods (2D -> 3D injection) ==========
 
@@ -799,44 +811,46 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def add_boundary_density(self, texture: Texture, weight: float = 1.0) -> None:
-        """The boundary's density (RGBA, widths/s times the color) × input.boundary.density_gain × dt into the slab,
-        by the carrier."""
-        self._add_density(texture, weight * self.settings.input.boundary.density_gain)
+        """The boundary's dye (RGBA, its color times its presence, the presence as alpha, 0 to 1): the water in the
+        slab filled toward it times input.boundary.density_gain (at most fully dyed) over density_drag, never past
+        it, by the carriers."""
+        boundary = self.settings.input.boundary
+        share: float = drag_share(self._dt, boundary.density_drag) * weight
+        self._add_density(texture, share, InjectMode.FILL, boundary.density_gain)
 
     def add_body_force_density(self, texture: Texture, weight: float = 1.0) -> None:
-        """The body force's density (RGBA, widths/s² times the color) × input.body_force.density_gain × dt into the slab,
-        by the carrier."""
-        self._add_density(texture, weight * self.settings.input.body_force.density_gain)
+        """The body force's dye (RGBA, a push's color times its presence) at input.body_force.density_rate, fully
+        dyed water per second at a full push, × dt into the slab, capped at fully dyed, by the carriers."""
+        self._add_density(texture, weight * self.settings.input.body_force.density_rate, InjectMode.RATE)
 
-    def _add_density(self, texture: Texture, gain: float) -> None:
+    def _add_density(self, texture: Texture, gain: float, mode: InjectMode, target_gain: float = 1.0) -> None:
         if not self._allocated:
             return
         for carrier in self._densities:
-            carrier.add(texture, gain, self._dt, self.settings.input.layer, self._spread())
+            carrier.add(texture, gain, self._dt, self.settings.input.layer, self._spread(), mode, target_gain)
 
     def add_boundary_temperature(self, texture: Texture, weight: float = 1.0) -> None:
-        """The boundary's temperature (widths/s, signed by the color) × input.boundary.temperature_gain × dt into the slab."""
+        """The boundary's warmth (-1 cold to 1 hot, its presence folded in): the water in the slab dragged toward
+        it times input.boundary.temperature_gain (at most ±1) over temperature_drag where the body is."""
         if self.settings.temperature.buoyancy == 0.0:      # nothing reads it
             return
-        self._add_source(texture, self._temperature, weight * self.settings.input.boundary.temperature_gain, GL_R16F)
+        boundary = self.settings.input.boundary
+        share: float = drag_share(self._dt, boundary.temperature_drag) * weight
+        self._add_temperature(texture, share, InjectMode.FILL, boundary.temperature_gain)
 
     def add_body_force_temperature(self, texture: Texture, weight: float = 1.0) -> None:
-        """The body force's temperature (widths/s², signed by the color) × input.body_force.temperature_gain × dt into the slab."""
+        """The body force's warmth at input.body_force.temperature_rate, full warmth per second at a full push,
+        × dt into the slab, capped at ±1."""
         if self.settings.temperature.buoyancy == 0.0:      # nothing reads it
             return
-        self._add_source(texture, self._temperature, weight * self.settings.input.body_force.temperature_gain, GL_R16F)
+        self._add_temperature(texture, weight * self.settings.input.body_force.temperature_rate * self._dt, InjectMode.RATE)
 
-    def _add_source(self, texture: Texture, volume: SwapTexture3D, gain: float, internal_format: int) -> None:
-        """A source: `texture` × gain × dt added into the volume's gaussian birth slab."""
+    def _add_temperature(self, texture: Texture, strength: float, mode: InjectMode, target_gain: float = 1.0) -> None:
+        """The warmth into the temperature's gaussian birth slab: dragged toward (FILL) or added (RATE)."""
         if not self._allocated:
             return
-        self._inject_shader.use(
-            texture, volume,
-            self.settings.input.layer,
-            self._spread(),
-            gain * self._dt,
-            internal_format=internal_format
-        )
+        self._inject_shader.use(texture, self._temperature, self.settings.input.layer, self._spread(), strength,
+                                internal_format=GL_R16F, mode=int(mode), scalar=True, gain=target_gain)
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def set_obstacle(self, texture: Texture) -> None:

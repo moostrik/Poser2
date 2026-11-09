@@ -1,9 +1,18 @@
 """Inject3D - Inject 2D input into 3D volume at a target depth with gaussian spread."""
 from __future__ import annotations
 
+from enum import IntEnum
+
 from OpenGL.GL import GL_RGBA16F, GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform3i, glUseProgram
 
 from modules.gl import Texture, Texture3D, ComputeShader
+
+
+class InjectMode(IntEnum):
+    """How a source goes into a field."""
+    ADD = 0         # added × dt, unbounded
+    RATE = 1        # added × dt, the field capped at its full value (fully dyed, ±1 warm)
+    FILL = 2        # the field dragged toward the source by the drag's share, never past it
 
 
 class Inject3D(ComputeShader):
@@ -18,7 +27,7 @@ class Inject3D(ComputeShader):
 
     def use(self, input_2d: Texture, volume: Texture3D,
             target_layer: float, spread: float, strength: float = 1.0,
-            internal_format: int = GL_RGBA16F) -> None:
+            internal_format: int = GL_RGBA16F, mode: int = 0, scalar: bool = False, gain: float = 1.0) -> None:
         """Add the 2D input into the 3D volume.
 
         Args:
@@ -28,6 +37,9 @@ class Inject3D(ComputeShader):
             spread: Gaussian sigma in normalized depth units
             strength: Injection strength multiplier
             internal_format: Image format for volume binding
+            mode: 0 ADD, 1 RATE (added, capped at full), 2 FILL (dragged toward the input, never past it)
+            scalar: A signed scalar in r, capped at ±1, else a premultiplied density, its alpha at 1
+            gain: FILL: the input times this, at most full, is the target
         """
         if not self.allocated or not self.shader_program:
             return
@@ -46,6 +58,9 @@ class Inject3D(ComputeShader):
         glUniform1f(self.get_uniform_loc("uTargetLayer"), target_layer)
         glUniform1f(self.get_uniform_loc("uSpread"), spread)
         glUniform1f(self.get_uniform_loc("uStrength"), strength)
+        glUniform1i(self.get_uniform_loc("uMode"), mode)
+        glUniform1i(self.get_uniform_loc("uScalar"), int(scalar))
+        glUniform1f(self.get_uniform_loc("uGain"), gain)
         glUniform3i(self.get_uniform_loc("uSize"),
                     volume.width, volume.height, volume.depth)
 

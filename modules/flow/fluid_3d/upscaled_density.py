@@ -18,7 +18,7 @@ from .density_carrier import CarrierStep, DensityCarrier
 from .field_advection import FieldAdvection
 from .fluid_settings import DensitySample, Fluid3DSettings
 from .simulation_density import SimulationDensity
-from .shaders import Composite3D, CompositeLight, InjectAmount3D, NoiseCoordinates3D, TurbulentAdvect3D, VelocityAverage3D
+from .shaders import view_march, Composite3D, CompositeLight, InjectAmount3D, InjectMode, NoiseCoordinates3D, TurbulentAdvect3D, VelocityAverage3D
 from .swirl_noise import swirl_noise
 
 _BARRIER: int = int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
@@ -91,10 +91,12 @@ class UpscaledDensity(DensityCarrier):
     def reset(self) -> None:
         self._amount.clear_all()
 
-    def add(self, texture: Texture, gain: float, dt: float, layer: float, spread: float) -> None:
+    def add(self, texture: Texture, gain: float, dt: float, layer: float, spread: float, mode: InjectMode = InjectMode.RATE,
+            target_gain: float = 1.0) -> None:
         if not self.allocated:
             return
-        self._inject_shader.use(texture, self._amount, layer, spread, gain * dt, cubic=self.settings.upscaled.cubic)
+        strength: float = gain if mode == InjectMode.FILL else gain * dt
+        self._inject_shader.use(texture, self._amount, layer, spread, strength, cubic=self.settings.upscaled.cubic, mode=int(mode), gain=target_gain)
         glMemoryBarrier(_BARRIER)
 
     def update(self, step: CarrierStep) -> None:
@@ -110,7 +112,7 @@ class UpscaledDensity(DensityCarrier):
             self._turbulent_step(step, velocity, turbulence)
         elif self._advection.carry(step.advection, self._amount, self._scratch, velocity, step.obstacle,
                                    step.aspect, step.z_extent, step.step, step.dissipation, GL_R16F,
-                                   step.has_obstacles, evaporation=step.evaporation):
+                                   step.has_obstacles, evaporation=step.evaporation, measure=2):
             self._apply_walls()
 
     def _turbulent_step(self, step: CarrierStep, velocity: Texture3D, turbulence: float) -> None:
@@ -142,7 +144,8 @@ class UpscaledDensity(DensityCarrier):
         if not self.allocated:
             return
         volume = self.settings.composite
-        self._composite_shader.use(self._amount, output, emission=volume.emission, absorption=volume.absorption,
+        extinction, emission = view_march(volume.opacity, volume.emission)
+        self._composite_shader.use(self._amount, output, emission=emission, absorption=extinction,
                                    tint=volume.tint, fog=volume.fog, glow=volume.glow, color=self._color.weight, light=light)
         glMemoryBarrier(_BARRIER)
 

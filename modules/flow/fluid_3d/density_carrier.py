@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from modules.gl import Texture, Texture3D
 from ..port import Port
 from .fluid_settings import Advection
-from .shaders import CompositeLight
+from .shaders import CompositeLight, InjectMode
 
 
 @dataclass
@@ -50,9 +50,11 @@ class DensityCarrier(ABC):
         """No density anywhere."""
 
     @abstractmethod
-    def add(self, texture: Texture, gain: float, dt: float, layer: float, spread: float) -> None:
-        """A source: `texture` (RGBA: the amount times the color, the amount as alpha) × gain × dt into the
-        gaussian slab at `layer` (0 to 1) with sigma `spread`."""
+    def add(self, texture: Texture, gain: float, dt: float, layer: float, spread: float, mode: InjectMode = InjectMode.RATE,
+            target_gain: float = 1.0) -> None:
+        """A source, `texture` (RGBA: the dye, its color times its presence, the presence as alpha, 0 to 1), into
+        the gaussian slab at `layer` (0 to 1) with sigma `spread`: by `mode`, added × gain × dt and capped at
+        fully dyed (RATE), or the water filled toward it times `target_gain` (at most fully dyed) by the share `gain`, never past it (FILL)."""
 
     @abstractmethod
     def update(self, step: CarrierStep) -> None:

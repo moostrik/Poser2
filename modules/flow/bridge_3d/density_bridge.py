@@ -1,6 +1,7 @@
 """Density Bridge.
 
-Combines RGB density with an amount, its alpha, for fluid simulation: the trail's speed.
+Combines RGB density with its presence, its alpha: the readings' speed in widths/s, capped at 1, so a part
+moving at 1 width/s or faster is fully there, its color the dye the water is dragged toward.
 
 Ported from ofxFlowTools ftDensityBridgeFlow.h
 """
@@ -100,12 +101,8 @@ class DensityBridge(FlowBase):
         super().reset()
         FlowUtil.zero(self._alpha_fbo)
 
-    def update(self, speed: float = 1.0) -> None:
-        """Update density bridge processing.
-
-        Args:
-            speed: Speed multiplier for alpha
-        """
+    def update(self) -> None:
+        """The density: the color with its presence, the amount (widths/s) capped at 1, as alpha."""
         if not self._allocated:
             return
 
@@ -113,8 +110,8 @@ class DensityBridge(FlowBase):
         self._output_fbo.begin()
         self._density_bridge_shader.use(
             self._input,                    # Density RGB from input_fbo
-            self._alpha_fbo,        # The amount
-            speed                             # Speed multiplier for alpha
+            self._alpha_fbo,                    # The amount, widths/s
+            1.0                                 # 1 width/s is fully there
         )
         self._output_fbo.end()
 

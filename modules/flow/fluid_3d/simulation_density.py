@@ -8,7 +8,7 @@ from ..port import Port, TextureKind
 from .density_carrier import CarrierStep, DensityCarrier
 from .field_advection import FieldAdvection
 from .fluid_settings import Fluid3DSettings
-from .shaders import Inject3D, Composite3D, CompositeLight
+from .shaders import view_march, Inject3D, InjectMode, Composite3D, CompositeLight
 
 _BARRIER_IMAGE: int = int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 
@@ -50,10 +50,12 @@ class SimulationDensity(DensityCarrier):
     def reset(self) -> None:
         self._density.clear_all()
 
-    def add(self, texture: Texture, gain: float, dt: float, layer: float, spread: float) -> None:
+    def add(self, texture: Texture, gain: float, dt: float, layer: float, spread: float, mode: InjectMode = InjectMode.RATE,
+            target_gain: float = 1.0) -> None:
         if not self.allocated:
             return
-        self._inject_shader.use(texture, self._density, layer, spread, gain * dt, internal_format=GL_RGBA16F)
+        strength: float = gain if mode == InjectMode.FILL else gain * dt
+        self._inject_shader.use(texture, self._density, layer, spread, strength, internal_format=GL_RGBA16F, mode=int(mode), gain=target_gain)
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def update(self, step: CarrierStep) -> None:
@@ -68,7 +70,8 @@ class SimulationDensity(DensityCarrier):
         if not self.allocated:
             return
         volume = self.settings.composite
-        self._composite_shader.use(self._density, output, emission=volume.emission, absorption=volume.absorption,
+        extinction, emission = view_march(volume.opacity, volume.emission)
+        self._composite_shader.use(self._density, output, emission=emission, absorption=extinction,
                                    tint=volume.tint, fog=volume.fog, glow=volume.glow, light=light)
         glMemoryBarrier(_BARRIER_IMAGE)
 

@@ -28,8 +28,8 @@ layout(rgba16f, binding = 0) writeonly uniform image2D uOutput;
 
 uniform int   uDepth;        // Number of layers, the march's steps
 uniform ivec2 uOutputSize;   // 2D output dimensions
-uniform float uEmission;     // Brightness of an amount of 1 filling the whole depth, unoccluded
-uniform float uAbsorption;   // Extinction of an amount of 1 over the whole depth
+uniform float uEmission;     // The emission of an amount of 1 over the whole view
+uniform float uAbsorption;   // The extinction of an amount of 1 over the whole view
 uniform float uTint;         // 0..1 mix toward per-channel water extinction
 uniform float uFog;          // Medium extinction over the full depth
 uniform float uGlow;         // 0 = occluded volumetric, 1 = additive

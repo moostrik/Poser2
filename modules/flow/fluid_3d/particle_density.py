@@ -31,7 +31,7 @@ from ..port import Port
 from ..wall_mode import WallMode
 from .density_carrier import CarrierStep, DensityCarrier
 from .fluid_settings import Fluid3DSettings, Overlap, ParticleDraw
-from .shaders import (RING_BYTES, CompositeLight, ParticleAdvect, ParticleComposite, ParticleEmit, ParticleRing, ParticleSprites, ParticleSurface, ParticleWeighted,
+from .shaders import (RING_BYTES, view_march, CompositeLight, InjectMode, ParticleAdvect, ParticleComposite, ParticleEmit, ParticleRing, ParticleSprites, ParticleSurface, ParticleWeighted,
                       ParticleSurfaceShade, ParticleSurfaceSmooth)
 
 PARTICLE_BYTES: int = 32        # position and mass/age (vec4), previous position and color (vec4)
@@ -148,14 +148,18 @@ class ParticleDensity(DensityCarrier):
     # ========== The step ==========
 
     def _reference_mass(self) -> float:
-        """The mass a texel of amount 1 gives each of its particles at the boundary's density gain: a blob of
-        this mass has `radius`, so the gain changes how much density there is, not how big a drop is."""
+        """The mass a texel of fully dyed water gives each of its particles: a blob of this mass has `radius`, so
+        how much dye there is changes how many drops there are, not how big a drop is."""
         settings = self.settings
         spread: float = max(settings.input.spread / max(self._z_extent, 1e-6), 0.001)     # widths, as a share of the slab
-        return (slab_sum(settings.input.layer, spread, self._layers) * self.settings.input.boundary.density_gain
-                / max(self.settings.particles.rate, 1e-6))
+        return slab_sum(settings.input.layer, spread, self._layers) / max(self.settings.particles.rate, 1e-6)
 
-    def add(self, texture: Texture, gain: float, dt: float, layer: float, spread: float) -> None:
+    def add(self, texture: Texture, gain: float, dt: float, layer: float, spread: float, mode: InjectMode = InjectMode.RATE,
+            target_gain: float = 1.0) -> None:
+        """Particles born where the dye is, as many as its presence × the rate; a FILL's share counted as that
+        share of fully dyed added in the step, so a particle look sees both systems alike."""
+        if mode == InjectMode.FILL:
+            gain = gain * target_gain / max(dt, 1e-6)
         if not self.allocated or not texture.allocated or gain <= 0.0:
             return
         self._seed += 1
@@ -175,7 +179,7 @@ class ParticleDensity(DensityCarrier):
         self._ring_shader.use(self._ring, self._count, vertices, ParticleAdvect.WORKGROUP_SIZE_X)
         self._advect_shader.use(self._particles, self._ring, self._count, step.velocity, aspect=step.aspect, z_extent=step.z_extent,
                                 timestep=step.step, dt=step.dt, dissipation=step.dissipation,
-                                evaporation=self.settings.density.evaporation * step.dt * self._reference_mass(),
+                                evaporation=step.evaporation * self._reference_mass(),
                                 closed_xy=self.settings.wall == WallMode.CLOSED,
                                 closed_z=self.settings.wall == WallMode.CLOSED)
         self._advect_timer.end()
@@ -198,6 +202,7 @@ class ParticleDensity(DensityCarrier):
     def _composite_sprites(self, output: Texture) -> None:
         particles = self.settings.particles
         volume = self.settings.composite
+        extinction, emission = view_march(volume.opacity, volume.emission)
         additive: bool = particles.overlap == Overlap.ADDITIVE
         slices: int = 1 if additive else int(particles.slices)
         target: LayeredFbo = self._slices
@@ -224,7 +229,7 @@ class ParticleDensity(DensityCarrier):
         self._draw_timer.end()
 
         self._march_timer.begin()
-        self._composite_shader.use(target, slices, output, emission=volume.emission / self.settings.particles.slices, absorption=volume.absorption / self.settings.particles.slices,
+        self._composite_shader.use(target, slices, output, emission=emission / self.settings.particles.slices, absorption=extinction / self.settings.particles.slices,
                                    tint=volume.tint, fog=0.0 if additive else volume.fog, glow=volume.glow)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._march_timer.end()
@@ -233,6 +238,7 @@ class ParticleDensity(DensityCarrier):
         """The sprites into the weighted look's three targets in one pass, then into the output."""
         particles = self.settings.particles
         volume = self.settings.composite
+        extinction, emission = view_march(volume.opacity, volume.emission)
         width, height = self._output
         if not self._weighted_fbo or (self._weighted_sum.width, self._weighted_sum.height) != (width, height):
             self._deallocate_weighted()
@@ -252,8 +258,8 @@ class ParticleDensity(DensityCarrier):
                                  size=particles.size, streak=particles.streak, radius=particles.radius,
                                  reference_mass=self._reference_mass(), spread=particles.spread,
                                  fade_time=self.settings.density.fade_time, max_point_size=self._max_point_size,
-                                 fog=volume.fog, tint=volume.tint, weighted=True, emission=volume.emission / self.settings.particles.slices,
-                                 absorption=volume.absorption / self.settings.particles.slices)
+                                 fog=volume.fog, tint=volume.tint, weighted=True, emission=emission / self.settings.particles.slices,
+                                 absorption=extinction / self.settings.particles.slices)
         Style.pop_style()
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
@@ -309,6 +315,7 @@ class ParticleDensity(DensityCarrier):
     def _composite_surface(self, output: Texture) -> None:
         particles = self.settings.particles
         volume = self.settings.composite
+        extinction, emission = view_march(volume.opacity, volume.emission)
         width, height = self._output
         if not self._surface_fbo or (self._surface_depth.width, self._surface_depth.height) != (width, height):
             self._deallocate_surface()
@@ -345,8 +352,8 @@ class ParticleDensity(DensityCarrier):
             glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
             depth = target
         self._shade_shader.use(depth, self._surface_thickness, self._surface_color, output,
-                               depth_per_pixel=width * self._z_extent, emission=volume.emission / self.settings.particles.slices,
-                               absorption=volume.absorption / self.settings.particles.slices, tint=volume.tint, fog=volume.fog)
+                               depth_per_pixel=width * self._z_extent, emission=emission / self.settings.particles.slices,
+                               absorption=extinction / self.settings.particles.slices, tint=volume.tint, fog=volume.fog)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._march_timer.end()
 

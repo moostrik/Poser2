@@ -1,11 +1,25 @@
 """Composite3D - the density volume marched front to back into the 2D output."""
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
 from OpenGL.GL import GL_RGBA16F, glUniform1f, glUniform1i, glUniform2i, glUniform3f, glUseProgram
 
 from modules.gl import Texture, Texture3D, ComputeShader
+
+
+OPACITY_LIMIT: float = 0.999     # opacity 1, covering all, needs infinitely thick dye: it is drawn as this
+
+
+def view_march(opacity: float, emission: float) -> tuple[float, float]:
+    """The march's extinction and emission over the whole view from what the panel says: fully dyed water
+    filling the view covers `opacity` of what is behind it (Beer-Lambert: its extinction -ln(1 - opacity)) and
+    is seen at its color times `emission`, its own covering of its far side made up for (its emission over
+    the view the extinction / the opacity times `emission`; at opacity 0, `emission` itself)."""
+    covered: float = min(max(opacity, 0.0), OPACITY_LIMIT)
+    extinction: float = -math.log(1.0 - covered)
+    return extinction, emission * (extinction / covered if covered > 0.0 else 1.0)
 
 
 @dataclass
@@ -31,8 +45,8 @@ class Composite3D(ComputeShader):
         Args:
             density: Density volume (RGBA16F)
             output_2d: 2D output texture (RGBA16F)
-            emission: Brightness of an amount of 1 filling the whole depth, unoccluded
-            absorption: Extinction of an amount of 1 over the whole depth
+            emission: The emission of an amount of 1 over the whole view (`view_march`'s)
+            absorption: The extinction of an amount of 1 over the whole view (`view_march`'s)
             tint: 0..1 mix toward per-channel water extinction (red dies first)
             fog: Medium extinction over the full depth
             glow: 0 = occluded volumetric, 1 = additive

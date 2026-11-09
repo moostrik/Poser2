@@ -31,7 +31,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 812,
+        "iso": 873,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -480,8 +480,7 @@
           "start": 0.0,
           "bow": 0.0,
           "stop": 0.0,
-          "wake": 0.0,
-          "scale": 0.5
+          "wake": 0.0
         }
       },
       "body_force": {
@@ -509,8 +508,7 @@
           "start": 0.0,
           "bow": 0.0,
           "stop": 0.0,
-          "wake": 0.0,
-          "scale": 0.5
+          "wake": 0.0
         }
       }
     },
@@ -528,38 +526,42 @@
       },
       "input": {
         "layer": 0.5,
-        "spread": 0.05,
-        "depth_span": 1.0,
+        "spread": 0.01,
+        "depth_span": 0.3,
         "boundary": {
           "velocity_drag": 500.0,
           "velocity_gain": 2.57,
+          "density_drag": 200.0,
           "density_gain": 1.0,
+          "temperature_drag": 200.0,
           "temperature_gain": 1.0
         },
         "body_force": {
           "acceleration_gain": 1.0,
-          "density_gain": 1.0,
-          "temperature_gain": 1.0
+          "density_rate": 1.0,
+          "temperature_rate": 1.0
         }
       },
       "velocity": {
         "advection_scale": 1.0,
-        "fade_time": 60.0,
+        "fade_time": 0.0,
+        "evaporation_time": 0.0,
         "dampen_threshold": 50.0,
         "dampen_time": 0.5,
-        "vorticity": 1.93,
+        "vorticity": 0.0,
         "vorticity_radius": 1.0,
         "viscosity": 0.0,
         "viscosity_iter": 20
       },
       "density": {
         "advection_scale": 1.0,
-        "fade_time": 2.0,
-        "evaporation": 0.01
+        "fade_time": 0.0,
+        "evaporation_time": 300.0
       },
       "temperature": {
         "advection_scale": 1.0,
         "fade_time": 12.0,
+        "evaporation_time": 0.0,
         "buoyancy": 0.0,
         "sink": 0.0,
         "gravity_x": 0.0,
@@ -597,16 +599,16 @@
         "smooth": 3
       },
       "composite": {
-        "emission": 32.0,
-        "absorption": 1.0,
-        "glow": 0.0,
+        "emission": 5.01,
+        "opacity": 1.0,
+        "glow": 1.0,
         "tint": 0.0,
-        "fog": 1.0,
+        "fog": 0.8,
         "light": "POINT",
         "light_x": 0.05,
         "light_y": 0.11,
-        "light_z": -0.3,
-        "shadow": 0.31,
+        "light_z": -1.0,
+        "shadow": 0.0,
         "scattering": 0.0,
         "anisotropy": 0.0,
         "blend_mode": "ADD"
@@ -622,14 +624,14 @@
         "opacity": 6.0,
         "depth_fade": 0.0,
         "slice": true,
-        "slice_position": 0.5703125,
+        "slice_position": 0.5390625,
         "slice_focus": 0.5,
         "glyph_spacing": "SPACING_16",
         "legend": true,
         "blend_mode": "ADD",
         "orbit": {
-          "yaw": -26.316193399846554,
-          "pitch": 5.798076923076927,
+          "yaw": -86.20107444359162,
+          "pitch": 6.490384615384608,
           "zoom": 0.7184107424569811
         }
       }
@@ -644,14 +646,14 @@
         "opacity": 3.0,
         "depth_fade": 0.0,
         "slice": true,
-        "slice_position": 0.5703125,
-        "slice_focus": 0.75,
+        "slice_position": 0.5390625,
+        "slice_focus": 0.0,
         "glyph_spacing": "SPACING_32",
         "legend": true,
         "blend_mode": "ADD",
         "orbit": {
-          "yaw": -26.316193399846554,
-          "pitch": 5.798076923076927,
+          "yaw": -86.20107444359162,
+          "pitch": 6.490384615384608,
           "zoom": 0.7184107424569811
         }
       }

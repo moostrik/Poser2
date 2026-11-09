@@ -2,7 +2,7 @@
 
 uniform sampler2D uColor;      // Color input (RGB: R=warm, G=neutral, B=cold)
 uniform sampler2D uMask;       // Velocity magnitude mask (R32F)
-uniform float uScale;          // Output multiplier
+uniform float uScale;          // the presence per width/s of the mask's speed: 1
 
 in vec2 texCoord;
 out vec4 fragColor;
@@ -17,7 +17,7 @@ void main() {
 
     // Temperature = (warm - cold) dampened by green
     float temp = (warm - cold) * (1.0 - neutral * 0.5);
-    temp *= mask * uScale;     // Apply velocity mask and scale
+    temp *= min(abs(mask) * uScale, 1.0);    // the presence, capped: warmth -1 to 1
 
     fragColor = vec4(temp, 0.0, 0.0, 0.0);
 }

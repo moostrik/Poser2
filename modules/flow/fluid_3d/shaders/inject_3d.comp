@@ -1,10 +1,14 @@
 #version 460 core
 
 /*
- * Inject3D - Add a 2D input into a 3D volume at a target depth layer.
- *
- * Uses a gaussian spread along the Z axis centered on uTargetLayer.
- * Weight = exp(-0.5 * ((z_norm - target) / spread)²)
+ * Inject3D - a 2D input into a 3D volume at a target depth layer, in the gaussian slab around uTargetLayer:
+ * weight = exp(-0.5 * ((z_norm - target) / spread)²) × uStrength. By uMode:
+ *   0 ADD     the input × weight added
+ *   1 RATE    the same, the field capped at its full value: a density's alpha at 1 (its color scaled with it),
+ *             a scalar (uScalar) at ±1
+ *   2 FILL    the field dragged toward the input times uGain (capped at full) by weight, never past it: a density only where the input's
+ *             alpha is above the field's, a scalar only where the input is not 0, so where the body is not
+ *             nothing is pulled toward 0
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick of cells, so z neighbors share the cache
@@ -18,7 +22,10 @@ layout(rgba16f, binding = 0) uniform image3D uVolume;  // Read-write
 // Parameters
 uniform float uTargetLayer;  // Normalized depth [0, 1] — center of injection
 uniform float uSpread;       // Gaussian sigma in normalized depth units
-uniform float uStrength;     // Injection strength multiplier
+uniform float uStrength;     // Injection strength multiplier: × dt for ADD and RATE, the drag's share for FILL
+uniform int   uMode;         // 0 ADD, 1 RATE, 2 FILL
+uniform float uGain;         // FILL: the input times this, at most full, is the target
+uniform bool  uScalar;       // a signed scalar in r (the temperature), else a premultiplied density
 uniform ivec3 uSize;
 
 void main() {
@@ -40,8 +47,22 @@ void main() {
 
     // Sample 2D input at this XY position
     vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
-    vec4 input_val = texture(uInput, uv) * weight;
-
+    vec4 source = texture(uInput, uv);
     vec4 current = imageLoad(uVolume, gid);
-    imageStore(uVolume, gid, current + input_val);
+    if (uMode == 2) {
+        if (uScalar) {
+            source.r = clamp(source.r * uGain, -1.0, 1.0);
+        } else if (source.a > 0.0) {
+            source *= min(source.a * uGain, 1.0) / source.a;     // the presence times the gain, the color kept
+        }
+        bool fills = uScalar ? source.r != 0.0 : source.a > current.a;
+        if (fills) current += (source - current) * min(weight, 1.0);
+    } else {
+        current += source * weight;
+        if (uMode == 1) {
+            if (uScalar) current.r = clamp(current.r, -1.0, 1.0);
+            else if (current.a > 1.0) current /= current.a;
+        }
+    }
+    imageStore(uVolume, gid, current);
 }

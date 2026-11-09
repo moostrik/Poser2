@@ -74,18 +74,21 @@ class TimeSettings(BaseSettings):
 
 
 class BoundarySettings(BaseSettings):
-    """The boundary, the body in the water: the drag toward its velocity and the gains on its outputs."""
-    velocity_drag: Field[float]     = Field(50.0,   min=0.0,    max=1000.0, step=1.0, color="cyan", description="Time the water takes to close the gap to the body's velocity (ms); 0 = at once")
+    """The boundary, the body in the water: what the water is dragged toward, each field a line, its target the
+    body's value times a gain (capped at fully dyed and ±1 warm) and the time it takes to follow."""
+    velocity_drag: Field[float]     = Field(50.0,   min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to close the gap to the body's velocity (ms); 0 = at once")
     velocity_gain: Field[float]     = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's velocity times this is what the water is dragged toward; 1 = as fast as the body")
-    density_gain: Field[float]      = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The boundary's density times this is added × dt; 1 = one unit per width of travel")
-    temperature_gain: Field[float]  = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The boundary's temperature times this is added × dt, signed by the color")
+    density_drag: Field[float]      = Field(200.0,  min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to take on the body's dye (ms); 0 = at once")
+    density_gain: Field[float]      = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's dye times this, at most fully dyed, is the target; 1 = fully dyed at 1 width/s")
+    temperature_drag: Field[float]  = Field(200.0,  min=0.0,    max=1000.0, step=1.0, color="cyan", newline=True, description="Time the water takes to take on the body's warmth (ms); 0 = at once")
+    temperature_gain: Field[float]  = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body's warmth times this, at most ±1, is the target; 1 = fully warm at 1 width/s")
 
 
 class BodyForceSettings(BaseSettings):
-    """The body force, the Navier–Stokes force term: the gains on its outputs, each added × dt."""
+    """The body force, the Navier–Stokes force term: the acceleration added × dt, a push's dye and warmth at a rate."""
     acceleration_gain: Field[float] = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's acceleration times this is added × dt; 1 = its Δv added once")
-    density_gain: Field[float]      = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's density times this is added × dt; 1 = one unit per width/s of Δv")
-    temperature_gain: Field[float]  = Field(1.0,    min=0.0,    max=10.0,   color="teal",           description="The body force's temperature times this is added × dt, signed by the color")
+    density_rate: Field[float]      = Field(1.0,    min=0.0,    max=20.0,   color="teal",           description="Fully dyed water a full push adds per second, never past fully dyed")
+    temperature_rate: Field[float]  = Field(1.0,    min=0.0,    max=20.0,   color="teal",           description="Full warmth a full push adds per second, never past ±1")
 
 
 class InputSettings(BaseSettings):
@@ -101,7 +104,8 @@ class InputSettings(BaseSettings):
 class VelocitySettings(BaseSettings):
     """The velocity: how it carries itself, fades, swirls and thickens."""
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=1.0,    color="blue-grey",      description="How far the velocity carries itself per step; 1 = with the water, the physics")
-    fade_time: Field[float]         = Field(60.0,   min=0.1,    max=60.0,   color="deep-blue",      description="Seconds until velocity fades to ~1%; 60 = water keeps its momentum")
+    fade_time: Field[float]         = Field(60.0,   min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the velocity fades to 1%, a share at a time; 0 = off")
+    evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds 1 width/s takes to brake to rest, a fixed amount at a time; 0 = off")
     dampen_threshold: Field[float]  = Field(3.0,    min=0.1,    max=50.0,   color="cyan",           description="Speed above which velocity is dampened (widths/s); a guard just above the fastest body")
     dampen_time: Field[float]       = Field(0.5,    min=0.0,    max=10.0,   color="light-blue",     description="Seconds for excess above threshold to decay to ~1%. 0=off")
     vorticity: Field[float]         = Field(0.3,    min=0.0,    max=5.0,    color="purple",         description="Vortex confinement's epsilon, its force epsilon × cell × (N × curl) (Fedkiw 2001)")
@@ -113,8 +117,8 @@ class VelocitySettings(BaseSettings):
 class DensitySettings(BaseSettings):
     """The density: how it is carried, fades and evaporates."""
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the density is carried per step; 1 = with the water, above it runs ahead")
-    fade_time: Field[float]         = Field(60.0,   min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until density fades to ~1%; 60 = density stays")
-    evaporation: Field[float]       = Field(0.0,    min=0.0,    max=2.0,    color="grey",           description="Density removed per second; clears low-level haze (0 = off)")
+    fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the density fades to 1%, a share at a time; 0 = off")
+    evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds fully dyed water takes to clear, faint first; 0 = off")
 
 
 class UpscaledDensitySettings(BaseSettings):
@@ -131,7 +135,8 @@ class UpscaledDensitySettings(BaseSettings):
 class TemperatureSettings(BaseSettings):
     """The temperature: how it is carried, fades, and lifts or sinks the water."""
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the temperature is carried per step; 1 = with the water, above it runs ahead")
-    fade_time: Field[float]         = Field(3.0,   min=0.01,   max=60.0,   color="deep-blue",      description="Seconds until temperature fades to ~1%")
+    fade_time: Field[float]         = Field(3.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the warmth fades to 1%, a share at a time; 0 = off")
+    evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds full warmth (±1) takes to reach 0, a fixed amount at a time; 0 = off")
     buoyancy: Field[float]          = Field(0.0,    min=0.0,    max=10.0,   color="deep-orange",    description="Lift per unit of temperature above ambient (widths/s²) against gravity; 0 = none")
     sink: Field[float]              = Field(0.0,    min=0.0,    max=20.0,   color="red",            description="Weight per unit of density (widths/s²) along gravity; 0 = as heavy as the water")
     gravity_x: Field[float]         = Field(0.0,    min=-1.0,   max=1.0,    color="deep-orange",    description="Gravity direction X")
@@ -150,8 +155,8 @@ class PressureSettings(BaseSettings):
 
 class CompositeSettings(BaseSettings):
     """The composite: how the density volume is marched front to back into the output."""
-    emission: Field[float]          = Field(16.0, min=0.1,  max=100.0,  widget=Widget.log_slider, color="amber", description="Brightness of an amount of 1 filling the whole depth, nothing covering it")
-    absorption: Field[float]        = Field(1.0,  min=0.1,  max=100.0,  widget=Widget.log_slider, color="deep-orange", description="How much an amount of 1 over the whole depth covers: 1 lets a third through, 50 a skin")
+    emission: Field[float]          = Field(1.0,  min=0.1,  max=10.0,   widget=Widget.log_slider, color="amber", description="How bright fully dyed water filling the view is seen: 1 = its own color")
+    opacity: Field[float]           = Field(0.6,  min=0.0,  max=1.0,    step=0.01, color="deep-orange", description="How much fully dyed water filling the view covers behind it: 0 see-through, 1 only the front")
     glow: Field[float]              = Field(0.0,  min=0.0,  max=1.0,    color="yellow",         description="Additive glow mix: 1 = additive (depth invisible)")
     tint: Field[float]              = Field(0.5,  min=0.0,  max=1.0,    color="light-blue",     description="Far density shifts toward water color (red absorbed first)")
     fog: Field[float]               = Field(0.5,  min=0.0,  max=4.0,    color="blue-grey",      description="Water extinction over the full depth; dims far layers, and the light on its way in")
@@ -168,8 +173,9 @@ class Fluid3DSettings(BaseSettings):
     """The 3D fluid's configuration: the box, then one group per concern.
 
     Fade_time model:
-        Exponential frame-rate-independent decay: multiplier = 0.01^(dt/fade_time).
-        fade_time=3.0 means the field retains ~1% after 3 seconds.
+        Exponential frame-rate-independent decay: multiplier = 0.01^(dt/fade_time), 0 = off.
+        fade_time=3.0 means the field retains ~1% after 3 seconds. The evaporation takes a field's full
+        value (fully dyed, ±1 warm, 1 width/s) to 0 in evaporation_time, dt / evaporation_time a step.
     """
 
     # ---- How the fields are carried and walled, then the box (multiples of 32) ----

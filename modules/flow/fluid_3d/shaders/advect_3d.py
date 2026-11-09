@@ -26,7 +26,7 @@ class Advect3D(ComputeShader):
                velocity: Texture3D, obstacle: Texture3D,
                aspect: float, z_extent: float, timestep: float, dissipation: float,
                internal_format: int = GL_RGBA16F,
-               has_obstacles: bool = True, evaporation: float = 0.0,
+               has_obstacles: bool = True, evaporation: float = 0.0, measure: int = 0,
             dampen: tuple[float, float] = (0.0, 1.0)) -> None:
         """Advect from source_read into result_write (separate read/write buffers).
 
@@ -43,7 +43,8 @@ class Advect3D(ComputeShader):
             dissipation: Decay multiplier
             internal_format: Image format for output (default RGBA16F)
             has_obstacles: Whether obstacle logic is active
-            evaporation: Amount subtracted this step, for the density; 0 for a signed field
+            evaporation: The size taken off this step, every channel scaled with it
+            measure: How the size is read: 0 a premultiplied density's alpha, 1 a vector's length, 2 |r|
             dampen: The velocity's dampen, its threshold (widths/s) and the excess's share kept; (0, 1) is none
         """
         if not self.allocated or not self.shader_program:
@@ -66,6 +67,7 @@ class Advect3D(ComputeShader):
         glUniform3f(self.get_uniform_loc("uRdx"), 1.0, rdx_y, rdx_z)
         glUniform1f(self.get_uniform_loc("uDissipation"), dissipation)
         glUniform1f(self.get_uniform_loc("uEvaporation"), evaporation)
+        glUniform1i(self.get_uniform_loc("uMeasure"), measure)
         glUniform1f(self.get_uniform_loc("uDampenThreshold"), dampen[0])
         glUniform1f(self.get_uniform_loc("uDampenFactor"), dampen[1])
         glUniform3i(self.get_uniform_loc("uSize"),
