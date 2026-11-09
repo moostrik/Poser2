@@ -9,8 +9,9 @@
  *
  *     phi = forward(x) + 0.5 * (source(x) - forward(x + dt * v(x)))
  *
- * and clamped to the source's eight texels around the backward trace, so the correction never
- * makes a value the step could not have read (no overshoot, no ringing). Then the dissipation and
+ * and bounded by the source's eight texels around the backward trace: where it leaves them, the
+ * predictor stands (Selle's revert), so the correction never makes a value the step could not have
+ * read (no overshoot, no ringing) and never keeps energy the step lost. Then the dissipation and
  * the evaporation, as the plain step applies them. The velocity and the obstacle are sampled by
  * uv, so the field may sit on a finer grid than they do.
  */
@@ -109,7 +110,12 @@ void main() {
             lo = min(lo, value);
             hi = max(hi, value);
         }
-        result = any(greaterThan(lo, hi)) ? forward : clamp(result, lo, hi);     // no finite texel: no bounds
+        // Out of those bounds the correction reverts to the predictor, the semi-Lagrangian step (Selle et al.
+        // 2008's revert): a clamp would keep it at the bound, which holds energy the step lost, and with the
+        // vorticity confinement adding more the water grew step after step (measured: the mean speed rose
+        // after the body stopped at the textbook epsilon 0.3, where the revert decays as the plain step does)
+        bool out_of_bounds = any(lessThan(result, lo)) || any(greaterThan(result, hi));
+        result = (any(greaterThan(lo, hi)) || out_of_bounds) ? forward : result;     // no finite texel: no bounds
     }
 
     result *= uDissipation;

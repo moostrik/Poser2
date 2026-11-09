@@ -50,9 +50,11 @@ z speeds on standmoves and stillslowfast first.
 
 ### 2. MacCormack, stable
 
-`advection` `MACCORMACK` keeps swirls and edges ([The advection](#the-advection)) and looks promising
-**(site fact)**, but is not stable. To be found: where it grows, against the semi-Lagrangian step on
-the same input, with the guards' counts and the top speed off.
+Found and fixed ([The advection](#the-advection)): the limiter clamped the correction to its bounds,
+which kept energy, and with the confinement the water grew; it now reverts to the semi-Lagrangian step,
+keeps the detail and decays as that step does. Left: the confinement above about 1 grows the water in
+both advections (measured, the same table), an epsilon to choose with that in mind, or a confinement
+that adds no energy, to be decided.
 
 ### 3. The walls
 
@@ -410,8 +412,9 @@ with the body force's density; the burst's fps; the wall.
 `advection` carries the velocity, the density and the temperature: `SEMI_LAGRANGIAN`, the default,
 or `MACCORMACK` (Selle 2008, `maccormack_3d.comp`). The semi-Lagrangian step writes a predictor into
 a scratch volume per field (allocated at its first MacCormack step); traced forward again, it gives
-back the source up to the step's error, half of which is added back, clamped to the source's eight
-texels around the backward trace. Where that trace reads past a wall the predictor stands: the
+back the source up to the step's error, half of which is added back, bounded by the source's eight
+texels around the backward trace: where the correction leaves them, the predictor stands (Selle's
+revert), as it does where that trace reads past a wall: the
 wall's value is in no texel, and the correction kept there grew the velocity at the walls step
 after step, to eight times its speed in a second at the preset's grid (measured without the guard).
 
@@ -427,6 +430,23 @@ the preset:
 | stillslowfast: water / body, fast              | 0.55            | 0.60       |
 | stillslowfast: peak / body                     | 0.74            | 0.82       |
 | stillslowfast: the step with the harness, ms   | 9.5             | 11.0       |
+
+The revert, not a clamp to the bounds: a clamp keeps the corrected value at the bound, energy the
+step lost, and with the vorticity confinement adding more the water grew after the body stopped.
+Measured with `scripts/maccormack_check.py` at deep_flow's preset (256 × 448 × 128), a disc swinging
+through the water for 3 s, the water's mean speed (widths/s) after the body stopped, 4 s and 20 s, and a
+square of density carried 2 s by a steady swirl at 128 × 224 × 32, no confinement:
+
+| | Semi-Lagrangian | MacCormack, clamp | MacCormack, revert |
+|---|---|---|---|
+| vorticity 0.3: mean speed at 4 s → 20 s | 0.0233 → 0.0082 | 0.0286 → 0.0285, not decaying | 0.0256 → 0.0080 |
+| vorticity 1.93: mean speed at 4 s → 20 s | 0.0271 → 0.0968 | 0.0303 → 0.2458 | 0.0268 → 0.0884 |
+| the density's edge (99.5% gradient over the max) | 0.099 | 0.173 | 0.172 |
+| the swirl's mean speed after 2 s, of its start | 0.703 | 0.742 | 0.723 |
+
+The revert keeps MacCormack's detail and decays as the plain step does. Above about 1 the confinement
+grows the water in both advections, after the body stopped: the confinement adds energy every step,
+which the step's own loss balances only at a small epsilon.
 
 ## The density
 
