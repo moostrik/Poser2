@@ -11,7 +11,7 @@ class InjectAmount3D(ComputeShader):
 
     WORKGROUP_SIZE_X = 8
     WORKGROUP_SIZE_Y = 8
-    WORKGROUP_SIZE_Z = 4
+    WORKGROUP_SIZE_Z = 8
 
     def use(self, source: Texture, volume: Texture3D, target_layer: float, spread: float, strength: float,
             cubic: bool = False, mode: int = 0, gain: float = 1.0) -> None:

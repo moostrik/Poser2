@@ -17,8 +17,8 @@ class Advect3D(ComputeShader):
     """
 
     WORKGROUP_SIZE_X = 8
-    WORKGROUP_SIZE_Y = 8
-    WORKGROUP_SIZE_Z = 4
+    WORKGROUP_SIZE_Y = 4
+    WORKGROUP_SIZE_Z = 8
 
     def __init__(self) -> None:
         super().__init__()

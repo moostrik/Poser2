@@ -11,7 +11,7 @@
  *             nothing is pulled toward 0
  */
 
-layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick of cells, so z neighbors share the cache
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;     // a brick of cells, so z neighbors share the cache
 
 // 2D input texture
 layout(binding = 0) uniform sampler2D uInput;     // 2D source (any format)
