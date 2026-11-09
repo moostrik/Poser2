@@ -1,0 +1,83 @@
+#version 460 core
+
+/*
+ * AddToFaces3D - what is added to the velocity on the cells' faces, in place (faces.glsl):
+ *
+ *   0  a force: an RGBA volume at the cells (the confinement's, the buoyancy's), each face its two cells' mean,
+ *      times uStrength (dt)
+ *   1  the boundary's drag: each face pulled toward the body's velocity (uInput, the bridge's, at its place on
+ *      the image plane) × uGain, by uShare × the body's presence × the injection's weight × the slab, never past it
+ *   2  the body force: the bridge's acceleration at the face's place × uStrength (weight × gain × dt) × the slab
+ *
+ * The body's z is the volume's w turned (w away from the viewer) and scaled by uDepthScale. A face held at 0
+ * (a closed wall's, an obstacle's) is left.
+ */
+
+#pragma optionNV(unroll all)
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(binding = 2) uniform sampler3D uObstacle;
+layout(binding = 0) uniform sampler3D uForce;      // mode 0: RGBA at the cells
+layout(binding = 1) uniform sampler2D uInput;      // modes 1, 2: the bridge's texture
+
+uniform int   uMode;
+uniform ivec3 uCells;
+uniform ivec3 uClosed;
+uniform bool  uHasObstacles;
+uniform float uStrength;      // modes 0, 2
+uniform float uTargetLayer;   // modes 1, 2: the slab's center, 0 front to 1 back
+uniform float uSpread;        // modes 1, 2: its sigma, a share of the depth
+uniform float uGain;          // mode 1
+uniform float uShare;         // mode 1: 1 - exp(-dt / velocity_drag)
+uniform float uWeight;        // mode 1
+uniform float uFloor;         // mode 1: widths/s below which the body drags nothing
+uniform float uDepthScale;    // modes 1, 2
+
+#define FACES_IN_PLACE
+#include "walls.glsl"
+#include "faces.glsl"
+
+// The slab: the gaussian around the injection's layer, at depth `z` (cells)
+float slab(float z) {
+    float z_norm = z / float(uCells.z);
+    float target = (0.5 + uTargetLayer * (float(uCells.z) - 1.0)) / float(uCells.z);
+    float d = (z_norm - target) / max(uSpread, 0.001);
+    return exp(-0.5 * d * d);
+}
+
+// The bridge's vector at `p` (cells), in the volume's axes: z turned into w and scaled
+vec3 body_at(vec3 p) {
+    vec3 body = texture(uInput, p.xy / vec2(uCells.xy)).xyz;
+    return vec3(body.xy, -body.z * uDepthScale);
+}
+
+void main() {
+    ivec3 i = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThan(i, uCells))) return;
+    vec3 v = load_faces(i);
+    vec3 before = v;
+    for (int c = 0; c < 3; c++) {
+        if (!is_face(c, i) || held_face(c, i)) continue;
+        vec3 p = face_position(c, i);
+        if (uMode == 0) {
+            ivec3 left = i;
+            left[c] -= 1;
+            ivec3 last = uCells - 1;
+            float f = 0.5 * (texelFetch(uForce, clamp(left, ivec3(0), last), 0)[c] + texelFetch(uForce, clamp(i, ivec3(0), last), 0)[c]);
+            v[c] += f * uStrength;
+            continue;
+        }
+        float s = slab(p.z);
+        if (s < 0.001) continue;
+        vec3 body = body_at(p);
+        if (uMode == 1) {
+            float presence = min(length(body) / max(uFloor, 1e-6), 1.0);     // the 2D body's |xyz| as the centers' read
+            float pull = uShare * presence * uWeight * s;
+            v[c] += (body[c] * uGain - v[c]) * pull;
+        } else {
+            v[c] += body[c] * uStrength * s;
+        }
+    }
+    if (v != before) store_faces(i, v);
+}

@@ -52,13 +52,13 @@ from .upscaled_density import UpscaledDensity
 from .field_advection import FieldAdvection
 from .simulation_density import SimulationDensity
 from .particle_density import ParticleDensity
-from .shaders import (AdvectFaces3D, FacesToCenters3D, CentersToFaces3D, ViscosityFaces3D, SEMI_LAGRANGIAN, PREDICTOR, CORRECTION,
+from .shaders import (AdvectFaces3D, FacesToCenters3D, ViscosityFaces3D, SEMI_LAGRANGIAN, PREDICTOR, CORRECTION,
                       
     Divergence3D, Gradient3D,
     JacobiPressure3D, SorPressure3D,
-    VorticityCurl3D, VorticityForce3D, Buoyancy3D,
-    Inject3D, BoundaryVelocity3D, BodyForceAcceleration3D,
-    Add3D, CompositeOver, Knee,
+    VorticityCurl3D, VorticityForce3D, Buoyancy3D, AddToFaces3D,
+    Inject3D,
+    CompositeOver, Knee,
     CompositeLight, LightVolume3D, LightBlur3D, InjectMode, view_march,
     InjectBinary3D
 )
@@ -74,9 +74,8 @@ _WALL_GL: dict = {
     WallMode.CLOSED: (GL_CLAMP_TO_EDGE,   (0.0, 0.0, 0.0, 0.0)),
 }
 
-FLUID_PASSES: tuple[str, ...] = ('scaffold to faces', 'advect velocity', 'viscosity', 'scaffold to centers', 'vorticity',
-                                 'advect temperature', 'buoyancy', 'scaffold to faces 2', 'pressure', 'faces to centers',
-                                 'density', 'composite')     # a step's passes, each a GPU timer
+FLUID_PASSES: tuple[str, ...] = ('advect velocity', 'viscosity', 'vorticity', 'advect temperature', 'buoyancy', 'pressure',
+                                 'faces to centers', 'density', 'composite')     # a step's passes, each a GPU timer
 DRAG_FLOOR: float = 0.02    # widths/s: the body's speed below which it drags nothing, so a dead trail pulls nothing toward 0
 
 import logging
@@ -114,7 +113,7 @@ def soft_limit(velocity: np.ndarray, max_speed: float) -> np.ndarray:
 def drag_velocity_step(velocity: np.ndarray, boundary: np.ndarray, gain: float, share: float, weight: float = 1.0,
                        slab: float = 1.0) -> np.ndarray:
     """One drag step on (..., 3) velocities, in the volume's frame: v + (boundary × gain − v) × pull, with
-    pull = share × gate × weight × slab, `boundary` the body's velocity. Mirrors boundary_velocity_3d.comp,
+    pull = share × gate × weight × slab, `boundary` the body's velocity. Mirrors add_to_faces_3d.comp's drag,
     without its w = −z."""
     gate: np.ndarray = drag_gate(np.linalg.norm(boundary, axis=-1, keepdims=True))
     pull: np.ndarray = share * gate * weight * slab
@@ -214,6 +213,7 @@ class Fluid3D:
         # Curl is sampled at neighbor offsets by VorticityForce3D — border must return zero
         self._curl_vol: Texture3D = Texture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
         self._buoyancy_force_vol: Texture3D = Texture3D()
+        self._vorticity_force_vol: Texture3D = Texture3D()     # the confinement's force × dt at the cells
 
         # ---- 2D composited output (for downstream render layers) ----
         self._output_texture: Texture = Texture()
@@ -230,14 +230,11 @@ class Fluid3D:
         self._advect_faces_shader: AdvectFaces3D = AdvectFaces3D()
         self._viscosity_faces_shader: ViscosityFaces3D = ViscosityFaces3D()
         self._faces_to_centers_shader: FacesToCenters3D = FacesToCenters3D()
-        self._centers_to_faces_shader: CentersToFaces3D = CentersToFaces3D()
         self._vorticity_curl_shader: VorticityCurl3D = VorticityCurl3D()
         self._vorticity_force_shader: VorticityForce3D = VorticityForce3D()
         self._buoyancy_shader: Buoyancy3D = Buoyancy3D()
         self._inject_shader: Inject3D = Inject3D()
-        self._boundary_velocity_shader: BoundaryVelocity3D = BoundaryVelocity3D()
-        self._body_force_acceleration_shader: BodyForceAcceleration3D = BodyForceAcceleration3D()
-        self._add_shader: Add3D = Add3D()
+        self._add_to_faces_shader: AddToFaces3D = AddToFaces3D()     # the forces, the drag and the body force
         self._inject_binary_shader: InjectBinary3D = InjectBinary3D()
         self._add_boolean_shader: AddBoolean = AddBoolean()
 
@@ -290,9 +287,7 @@ class Fluid3D:
         self._vorticity_force_shader.allocate()
         self._buoyancy_shader.allocate()
         self._inject_shader.allocate()
-        self._boundary_velocity_shader.allocate()
-        self._body_force_acceleration_shader.allocate()
-        self._add_shader.allocate()
+        self._add_to_faces_shader.allocate()
         self._inject_binary_shader.allocate()
         self._add_boolean_shader.allocate()
         self._over_shader.allocate()
@@ -366,6 +361,7 @@ class Fluid3D:
         # Intermediate volumes
         self._divergence_vol.allocate(sim_w, sim_h, d, GL_R16F)
         self._curl_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
+        self._vorticity_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
         self._buoyancy_force_vol.allocate(sim_w, sim_h, d, GL_RGBA16F)
 
         self._apply_wall_modes()
@@ -388,6 +384,7 @@ class Fluid3D:
         self._obstacle_source.deallocate()
         self._divergence_vol.deallocate()
         self._curl_vol.deallocate()
+        self._vorticity_force_vol.deallocate()
         self._buoyancy_force_vol.deallocate()
         self._output_texture.deallocate()
         for scratch in (self._temperature_scratch,):
@@ -406,9 +403,7 @@ class Fluid3D:
         self._vorticity_force_shader.deallocate()
         self._buoyancy_shader.deallocate()
         self._inject_shader.deallocate()
-        self._boundary_velocity_shader.deallocate()
-        self._body_force_acceleration_shader.deallocate()
-        self._add_shader.deallocate()
+        self._add_to_faces_shader.deallocate()
         self._inject_binary_shader.deallocate()
         self._add_boolean_shader.deallocate()
         self._over_shader.deallocate()
@@ -440,9 +435,7 @@ class Fluid3D:
         self._vorticity_force_shader.reload()
         self._buoyancy_shader.reload()
         self._inject_shader.reload()
-        self._boundary_velocity_shader.reload()
-        self._body_force_acceleration_shader.reload()
-        self._add_shader.reload()
+        self._add_to_faces_shader.reload()
         self._inject_binary_shader.reload()
 
     # ========== Update Pipeline ==========
@@ -473,14 +466,11 @@ class Fluid3D:
         self._gpu_timer.begin()
 
         # Simulation steps, each its own GPU timer inside the step's
-        self._timed('scaffold to faces', self._centers_to_faces)
         self._timed('advect velocity', self._advect_velocity)
         self._timed('viscosity', self._apply_viscosity)
-        self._timed('scaffold to centers', self._faces_to_centers)
         self._timed('vorticity', self._confine_vorticity)
         self._timed('advect temperature', self._advect_temperature)
         self._timed('buoyancy', self._apply_buoyancy)
-        self._timed('scaffold to faces 2', self._centers_to_faces)
         self._timed('pressure', self._enforce_incompressibility)
         self._timed('faces to centers', self._faces_to_centers)
         self._timed('density', self._advect_density)
@@ -499,9 +489,10 @@ class Fluid3D:
     # ========== Pipeline Steps ==========
 
     def _add_force_to_velocity(self, force: Texture3D, strength: float = 1.0) -> None:
-        """Add 3D force volume to velocity in-place (no swap needed)."""
-        self._add_shader.use(self._velocity, force, strength)
-        glMemoryBarrier(_BARRIER_IMAGE)
+        """A force at the cells (widths/s²) × `strength` added to the faces, each its two cells' mean."""
+        self._add_to_faces_shader.add_force(self._faces.volume, force, strength, self._obstacle, self._closed,
+                                            self._has_obstacles)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _advect_field(self, field: SwapTexture3D, scratch: Texture3D, velocity: Texture3D, step: float,
                       dissipation: float, internal_format: int,
@@ -518,15 +509,9 @@ class Fluid3D:
     def _cells(self) -> tuple[int, int, int]:
         return (self._simulation_width, self._simulation_height, self._depth)
 
-    def _centers_to_faces(self) -> None:
-        """The scaffold while passes still write the centers: the centers put on the faces, each the mean of its two
-        cells."""
-        self._centers_to_faces_shader.use(self._velocity, self._faces.volume, self._obstacle, self._closed,
-                                          self._has_obstacles)
-        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
-
     def _faces_to_centers(self) -> None:
-        """The centers' volume: each component the mean of its cell's two faces."""
+        """The centers' volume, after the projection: each component the mean of its cell's two faces, which the
+        particles, the upscaled density and the monitors read."""
         self._faces_to_centers_shader.use(self._faces.volume, self._velocity, self._obstacle, self._closed,
                                           self._has_obstacles)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
@@ -572,7 +557,7 @@ class Fluid3D:
         confining: bool = self.settings.velocity.vorticity > 0.0 and self.settings.velocity.vorticity_radius > 0.0
         if not confining:
             if self._needs_curl:
-                self._vorticity_curl_shader.use(self._velocity, self._obstacle, self._curl_vol, self._cell, 1.0,
+                self._vorticity_curl_shader.use(self._faces.volume, self._obstacle, self._curl_vol, self._cell, 1.0,
                                                 has_obstacles=self._has_obstacles, closed=self._closed, wall_keep=self._wall_keep)
                 glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
             return
@@ -580,9 +565,9 @@ class Fluid3D:
         vorticity_radius = self.settings.velocity.vorticity_radius        # cells
         vorticity_force = self.settings.velocity.vorticity * self._cell * self._dt     # epsilon h (N x omega), Fedkiw 2001
 
-        # a. Compute curl
+        # a. The curl at the cells, from the faces
         self._vorticity_curl_shader.use(
-            self._velocity,
+            self._faces.volume,
             self._obstacle,
             self._curl_vol,
             self._cell,
@@ -593,15 +578,12 @@ class Fluid3D:
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-        # b. The confinement force, added to the velocity in the same pass
-        self._vorticity_force_shader.use(
-            self._curl_vol,
-            self._obstacle,
-            self._velocity,
-            self._cell,
-            vorticity_force,
-            has_obstacles=self._has_obstacles,
-        )
+        # b. The confinement's force × dt at the cells, then onto the faces
+        self._vorticity_force_shader.use(self._curl_vol, self._obstacle, self._vorticity_force_vol, self._cell,
+                                         vorticity_force, has_obstacles=self._has_obstacles)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        self._add_to_faces_shader.add_force(self._faces.volume, self._vorticity_force_vol, 1.0, self._obstacle,
+                                            self._closed, self._has_obstacles)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _advect_temperature(self) -> None:
@@ -711,8 +693,7 @@ class Fluid3D:
 
     @property
     def _face_shaders(self) -> tuple[ComputeShader, ...]:
-        return (self._advect_faces_shader, self._viscosity_faces_shader, self._faces_to_centers_shader,
-                self._centers_to_faces_shader)
+        return (self._advect_faces_shader, self._viscosity_faces_shader, self._faces_to_centers_shader)
 
     @property
     def _wall_keep(self) -> float:
@@ -855,26 +836,20 @@ class Fluid3D:
         if not self._allocated:
             return
         boundary = self.settings.input.boundary
-        self._boundary_velocity_shader.use(
-            texture, self._velocity,
-            self.settings.input.layer,
-            self._spread(),
-            boundary.velocity_gain, drag_share(self._dt, boundary.velocity_drag), weight, DRAG_FLOOR, self._z_scale,
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
+        self._add_to_faces_shader.drag(self._faces.volume, self._cells, texture, self.settings.input.layer, self._spread(),
+                                       boundary.velocity_gain, drag_share(self._dt, boundary.velocity_drag), weight,
+                                       DRAG_FLOOR, self._z_scale, self._obstacle, self._closed, self._has_obstacles)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def add_acceleration(self, texture: Texture, weight: float = 1.0) -> None:
         """The body force: add the acceleration (x, y on the image plane, z toward the camera; widths/s²)
         × input.body_force.acceleration_gain × dt into the gaussian birth slab; w is -z, as the boundary's."""
         if not self._allocated:
             return
-        self._body_force_acceleration_shader.use(
-            texture, self._velocity,
-            self.settings.input.layer,
-            self._spread(),
-            weight * self.settings.input.body_force.acceleration_gain * self._dt, self._z_scale,
-        )
-        glMemoryBarrier(_BARRIER_IMAGE)
+        self._add_to_faces_shader.add_acceleration(self._faces.volume, self._cells, texture, self.settings.input.layer,
+                                                   self._spread(), weight * self.settings.input.body_force.acceleration_gain * self._dt,
+                                                   self._z_scale, self._obstacle, self._closed, self._has_obstacles)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def add_boundary_density(self, texture: Texture, weight: float = 1.0) -> None:
         """The boundary's dye (RGBA, its color times its presence, the presence as alpha, 0 to 1): the water in the

@@ -17,9 +17,6 @@ from .inject_amount_3d import InjectAmount3D
 from .velocity_average_3d import VelocityAverage3D
 from .noise_coordinates_3d import NoiseCoordinates3D
 from .turbulent_advect_3d import TurbulentAdvect3D
-from .boundary_velocity_3d import BoundaryVelocity3D
-from .body_force_acceleration_3d import BodyForceAcceleration3D
-from .add_3d import Add3D
 from .inject_binary_3d import InjectBinary3D
 from .composite_3d import Composite3D, CompositeLight, view_march, OPACITY_LIMIT
 from .light_volume_3d import LightVolume3D
@@ -41,5 +38,5 @@ from .particle_surface_shade import ParticleSurfaceShade
 # The velocity on the faces
 from .advect_faces_3d import AdvectFaces3D, SEMI_LAGRANGIAN, PREDICTOR, CORRECTION
 from .faces_to_centers_3d import FacesToCenters3D
-from .centers_to_faces_3d import CentersToFaces3D
 from .viscosity_faces_3d import ViscosityFaces3D
+from .add_to_faces_3d import AddToFaces3D

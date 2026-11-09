@@ -1,72 +1,58 @@
 #version 460 core
 
 /*
- * VorticityCurl3D - Compute 3D curl (vorticity vector) of velocity field.
+ * VorticityCurl3D - the curl (vorticity vector) of the velocity on the cells' faces, at the cells' centers:
  *
- * In 3D, curl is a vector:
  *   ω = (∂w/∂y - ∂v/∂z, ∂u/∂z - ∂w/∂x, ∂v/∂x - ∂u/∂y)
  *
- * Uses sampler3D for filtered neighbor access; a neighbor beyond the box is the wall's ghost (walls.glsl),
- * the same wall the projection reads, not the texture's border of 0, which would read the free-slip wall as a
- * shear and give the water sliding along it a curl no wall has.
+ * each derivative a difference of the velocity interpolated from the faces (faces.glsl) `uRadius` cells to
+ * either side, so the step needs no velocity at the centers midway. A neighbor beyond the box is the wall's
+ * ghost (walls.glsl), the same wall the projection reads: a closed wall's (2k - 1) along it, the slip.
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick of cells, so z neighbors share the cache
 
-layout(binding = 0) uniform sampler3D uVelocity;  // Velocity (RGBA16F: xyz)
-layout(binding = 1) uniform sampler3D uObstacle;   // Obstacle mask (R8)
+layout(binding = 2) uniform sampler3D uObstacle;   // R8 at the cells
 
 layout(rgba16f, binding = 0) writeonly uniform image3D uCurl;
 
-uniform vec3  uHalfRdxInv;  // (0.5/dx, 0.5/dy, 0.5/dz)
-uniform float uRadius;       // Sampling radius in texels
-uniform ivec3 uSize;
-uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
-uniform ivec3 uClosed;        // Per axis, 1 where the domain's walls are closed
+uniform vec3  uHalfRdxInv;   // (0.5/dx, 0.5/dy, 0.5/dz)
+uniform float uRadius;       // the sampling radius in cells
+uniform ivec3 uCells;
+uniform ivec3 uClosed;
+uniform bool  uHasObstacles;
 
 #include "walls.glsl"
+#include "faces.glsl"
 
 void main() {
-    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
-    if (any(greaterThanEqual(gid, uSize))) return;
-
-    vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
-
-    if (uHasObstacles) {
-        float obs = texture(uObstacle, st).r;
-        if (obs > 0.5) {
-            imageStore(uCurl, gid, vec4(0.0));
-            return;
-        }
+    ivec3 i = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(i, uCells))) return;
+    if (solid_cell(i)) {
+        imageStore(uCurl, i, vec4(0.0));
+        return;
     }
+    vec3 p = vec3(i) + 0.5;
+    vec3 vR = velocity_at(p + vec3(uRadius, 0.0, 0.0));
+    vec3 vL = velocity_at(p - vec3(uRadius, 0.0, 0.0));
+    vec3 vT = velocity_at(p + vec3(0.0, uRadius, 0.0));
+    vec3 vB = velocity_at(p - vec3(0.0, uRadius, 0.0));
+    vec3 vF = velocity_at(p + vec3(0.0, 0.0, uRadius));
+    vec3 vK = velocity_at(p - vec3(0.0, 0.0, uRadius));
 
-    // Sampling offsets scaled by radius
-    vec3 dx = vec3(uRadius / float(uSize.x), 0.0, 0.0);
-    vec3 dy = vec3(0.0, uRadius / float(uSize.y), 0.0);
-    vec3 dz = vec3(0.0, 0.0, uRadius / float(uSize.z));
-
-    vec3 vR = texture(uVelocity, st + dx).xyz;
-    vec3 vL = texture(uVelocity, st - dx).xyz;
-    vec3 vT = texture(uVelocity, st + dy).xyz;
-    vec3 vB = texture(uVelocity, st - dy).xyz;
-    vec3 vF = texture(uVelocity, st + dz).xyz;
-    vec3 vK = texture(uVelocity, st - dz).xyz;
-
-    // A neighbor beyond the box: the wall's ghost of this cell
-    vec3 vC = texture(uVelocity, st).xyz;
+    vec3 vC = cell_velocity(i);
     int reach = max(int(round(uRadius)), 1);
-    if (gid.x + reach >= uSize.x) vR = wall_velocity(vC, 0);
-    if (gid.x - reach < 0)        vL = wall_velocity(vC, 0);
-    if (gid.y + reach >= uSize.y) vT = wall_velocity(vC, 1);
-    if (gid.y - reach < 0)        vB = wall_velocity(vC, 1);
-    if (gid.z + reach >= uSize.z) vF = wall_velocity(vC, 2);
-    if (gid.z - reach < 0)        vK = wall_velocity(vC, 2);
+    if (i.x + reach >= uCells.x) vR = wall_velocity(vC, 0);
+    if (i.x - reach < 0)         vL = wall_velocity(vC, 0);
+    if (i.y + reach >= uCells.y) vT = wall_velocity(vC, 1);
+    if (i.y - reach < 0)         vB = wall_velocity(vC, 1);
+    if (i.z + reach >= uCells.z) vF = wall_velocity(vC, 2);
+    if (i.z - reach < 0)         vK = wall_velocity(vC, 2);
 
-    // 3D curl = (∂w/∂y - ∂v/∂z, ∂u/∂z - ∂w/∂x, ∂v/∂x - ∂u/∂y)
     vec3 curl;
     curl.x = uHalfRdxInv.y * (vT.z - vB.z) - uHalfRdxInv.z * (vF.y - vK.y);
     curl.y = uHalfRdxInv.z * (vF.x - vK.x) - uHalfRdxInv.x * (vR.z - vL.z);
     curl.z = uHalfRdxInv.x * (vR.y - vL.y) - uHalfRdxInv.y * (vT.x - vB.x);
 
-    imageStore(uCurl, gid, vec4(curl, 0.0));
+    imageStore(uCurl, i, vec4(curl, 0.0));
 }

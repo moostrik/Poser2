@@ -117,18 +117,34 @@ def upload(volume, values: np.ndarray) -> None:
     glBindTexture(GL_TEXTURE_3D, 0)
 
 
-def swirl_start(w: int, h: int, d: int) -> tuple[np.ndarray, np.ndarray]:
-    """The swirl's velocity (widths/s, y down the screen) and the density cube, (d, h, w, 4) each."""
-    z, y, x = np.mgrid[0:d, 0:h, 0:w].astype(np.float32)
-    px, py = (x + 0.5) / w, (y + 0.5) / w                   # widths
-    cx, cy = 0.5, 0.5 * h / w
-    dx, dy = px - cx, py - cy
+def swirl_velocity(px: np.ndarray, py: np.ndarray, w: int, h: int) -> tuple[np.ndarray, np.ndarray]:
+    """The swirl's x and y (widths/s, y down the screen) at `px`, `py` (widths): a Rankine vortex about the box's
+    middle, 0.5 widths/s at its edge 0.25 widths out."""
+    dx, dy = px - 0.5, py - 0.5 * h / w
     r = np.sqrt(dx * dx + dy * dy) + 1e-6
     radius = 0.25
     speed = 0.5 * np.where(r < radius, r / radius, radius / r)
+    return -speed * dy / r, speed * dx / r
+
+
+def swirl_faces(w: int, h: int, d: int) -> np.ndarray:
+    """The swirl on the faces (d + 1, h + 1, w + 1, 4): a texel's x the face on its cell's left, y its bottom."""
+    z, y, x = np.mgrid[0:d + 1, 0:h + 1, 0:w + 1].astype(np.float32)
+    faces = np.zeros((d + 1, h + 1, w + 1, 4), np.float32)
+    faces[..., 0] = swirl_velocity(x / w, (y + 0.5) / w, w, h)[0]
+    faces[..., 1] = swirl_velocity((x + 0.5) / w, y / w, w, h)[1]
+    faces[:, :, 0, 0] = faces[:, :, w, 0] = 0.0                # the closed walls' faces
+    faces[:, 0, :, 1] = faces[:, h, :, 1] = 0.0
+    return faces
+
+
+def swirl_start(w: int, h: int, d: int) -> tuple[np.ndarray, np.ndarray]:
+    """The swirl's velocity at the cells (widths/s, y down the screen) and the density cube, (d, h, w, 4) each."""
+    z, y, x = np.mgrid[0:d, 0:h, 0:w].astype(np.float32)
+    px, py = (x + 0.5) / w, (y + 0.5) / w                   # widths
+    cx, cy = 0.5, 0.5 * h / w
     velocity = np.zeros((d, h, w, 4), np.float32)
-    velocity[..., 0] = -speed * dy / r
-    velocity[..., 1] = speed * dx / r
+    velocity[..., 0], velocity[..., 1] = swirl_velocity(px, py, w, h)
     density = np.zeros((d, h, w, 4), np.float32)
     cube = (np.abs(px - (cx + 0.15)) < 0.08) & (np.abs(py - cy) < 0.08) & (np.abs(z - d / 2) < d / 4)
     density[cube] = 1.0
@@ -187,6 +203,8 @@ def run_swirl(advection: Advection, seconds: float, overrides: list[str]) -> lis
     density_volume = fluid._simulation_density._density
     velocity, density = swirl_start(velocity_volume.width, velocity_volume.height, velocity_volume.depth)
     upload(velocity_volume, velocity)
+    if hasattr(fluid, '_faces'):
+        upload(fluid._faces.volume, swirl_faces(velocity_volume.width, velocity_volume.height, velocity_volume.depth))
     upload(density_volume, density)
     start_speed = float(np.linalg.norm(velocity[..., :3], axis=-1).mean())
     rows: list[tuple[float, ...]] = []

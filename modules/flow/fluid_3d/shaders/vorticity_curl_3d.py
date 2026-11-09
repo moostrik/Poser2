@@ -4,6 +4,7 @@ from __future__ import annotations
 from OpenGL.GL import GL_RGBA16F, glUniform1f, glUniform1i, glUniform3f, glUniform3i, glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
+from .face_binding import bind_faces
 
 
 class VorticityCurl3D(ComputeShader):
@@ -16,7 +17,7 @@ class VorticityCurl3D(ComputeShader):
     def __init__(self) -> None:
         super().__init__()
 
-    def use(self, velocity: Texture3D, obstacle: Texture3D,
+    def use(self, faces: Texture3D, obstacle: Texture3D,
             curl_out: Texture3D,
             cell: float,
             radius: float, has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True),
@@ -24,7 +25,7 @@ class VorticityCurl3D(ComputeShader):
         """Compute 3D velocity curl.
 
         Args:
-            velocity: 3D velocity field (RGBA16F)
+            faces: The velocity's faces (`FaceVelocity`)
             obstacle: 3D obstacle mask (R8)
             curl_out: Output curl volume (RGBA16F: xyz = curl vector)
             cell: The cubic cell's size in widths
@@ -38,8 +39,8 @@ class VorticityCurl3D(ComputeShader):
 
         glUseProgram(self.shader_program)
 
-        self.bind_texture_3d(0, velocity, "uVelocity")
-        self.bind_texture_3d(1, obstacle, "uObstacle")
+        cells = (curl_out.width, curl_out.height, curl_out.depth)
+        bind_faces(self, faces, cells, closed, has_obstacles, obstacle)
         self.bind_image_3d_write(0, curl_out, GL_RGBA16F)
 
         dx = cell                         # cubic cells, in widths
@@ -51,10 +52,6 @@ class VorticityCurl3D(ComputeShader):
                     0.5 / (dy * max(radius, 1e-6)),
                     0.5 / (dz * max(radius, 1e-6)))
         glUniform1f(self.get_uniform_loc("uRadius"), radius)
-        glUniform3i(self.get_uniform_loc("uSize"),
-                    curl_out.width, curl_out.height, curl_out.depth)
-        glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
-        glUniform3i(self.get_uniform_loc("uClosed"), *(int(c) for c in closed))
         glUniform1f(self.get_uniform_loc("uWallKeep"), wall_keep)
 
         self.dispatch(curl_out.width, curl_out.height, curl_out.depth)
