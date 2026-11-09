@@ -110,14 +110,14 @@ The outputs, in two subpanels, one per system, each a mix of the six readings; t
 say how the water follows each; the densities and the temperatures go in by `inject_3d`, `FILL` for
 the boundary, `RATE` for the body force:
 
-| Subpanel     | Output         | Unit                              | The fluid                                                                                                                           | The fluid's setting                  | 1 means                               |
-|--------------|----------------|-----------------------------------|-------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------|---------------------------------------|
+| Subpanel     | Output         | Unit                              | The fluid                                                                                                                      | The fluid's setting                  | 1 means                               |
+|--------------|----------------|-----------------------------------|--------------------------------------------------------------------------------------------------------------------------------|--------------------------------------|---------------------------------------|
 | `boundary`   | `velocity`     | widths/s                          | drags the water toward it where it is non-zero, over `velocity_drag`, never past it (`add_to_faces_3d`, [The drag](#the-drag)) | `input.boundary.velocity_gain`       | the water as fast as the body         |
-| `boundary`   | `density`      | the dye: color × presence, 0 to 1 | fills the water toward it × `density_gain` (at most 1) in the slab, never past it, over `density_drag`                              | `input.boundary.density_gain`        | fully dyed at 1 width/s               |
-| `boundary`   | `temperature`  | warmth, -1 to 1                   | drags the water toward it × `temperature_gain` (at most ±1) in the slab where the body is, over `temperature_drag`                  | `input.boundary.temperature_gain`    | fully warm or cold at 1 width/s       |
-| `body_force` | `acceleration` | widths/s²                         | adds it × dt (`add_to_faces_3d`)                                                                                                 | `input.body_force.acceleration_gain` | a Δv added once                       |
-| `body_force` | `density`      | a push's dye, presence 0 to 1     | adds it at a rate × dt into the slab, capped at fully dyed: the pipette                                                             | `input.body_force.density_rate`      | fully dyed per second at a full push  |
-| `body_force` | `temperature`  | a push's warmth, -1 to 1          | adds it at a rate × dt into the slab, capped at ±1                                                                                  | `input.body_force.temperature_rate`  | full warmth per second at a full push |
+| `boundary`   | `density`      | the dye: color × presence, 0 to 1 | fills the water toward it × `density_gain` (at most 1) in the slab, never past it, over `density_drag`                         | `input.boundary.density_gain`        | fully dyed at 1 width/s               |
+| `boundary`   | `temperature`  | warmth, -1 to 1                   | drags the water toward it × `temperature_gain` (at most ±1) in the slab where the body is, over `temperature_drag`             | `input.boundary.temperature_gain`    | fully warm or cold at 1 width/s       |
+| `body_force` | `acceleration` | widths/s²                         | adds it × dt (`add_to_faces_3d`)                                                                                               | `input.body_force.acceleration_gain` | a Δv added once                       |
+| `body_force` | `density`      | a push's dye, presence 0 to 1     | adds it at a rate × dt into the slab, capped at fully dyed: the pipette                                                        | `input.body_force.density_rate`      | fully dyed per second at a full push  |
+| `body_force` | `temperature`  | a push's warmth, -1 to 1          | adds it at a rate × dt into the slab, capped at ±1                                                                             | `input.body_force.temperature_rate`  | full warmth per second at a full push |
 
 The two subpanels are the two systems every solver distinguishes: a moving boundary, whose values
 the water takes, and the body force, which adds to it. The boundary's density and temperature are
@@ -767,14 +767,19 @@ operators on the GPU (Zaspel).
 
 The same runs on the centered velocity (the baseline, `28655856`) and on the faces, deep_flow's preset. In the app (`trial_runs.py`, standmoves, the pose on), ms mean, two runs each within 0.03:
 
-| Pass                     | Centered | Faces   | Faces, three R16F |
-|--------------------------|----------|---------|-------------------|
-| advect velocity          | 0.18     | 0.35    | 0.46              |
-| pressure                 | 1.80     | 1.61    |                   |
-| density                  | 1.48     | 1.59    |                   |
-| faces to centers         |          | 0.16    | 0.24              |
-| the step                 | 4.44     | 4.61    |                   |
-| viscosity, 20 iterations | 1.16     | 3.6–4.0 | 4.88              |
+| Pass                     | Centered | Faces | Faces, three R16F |
+|--------------------------|----------|-------|-------------------|
+| advect velocity          | 0.18     | 0.35  | 0.46              |
+| pressure                 | 1.80     | 1.61  |                   |
+| density                  | 1.48     | 1.59  |                   |
+| faces to centers         |          | 0.16  | 0.24              |
+| the step                 | 4.44     | 4.61  |                   |
+| viscosity, 20 iterations | 1.16     | 0.95  | 4.88              |
+
+The viscosity works out each face's weights (the walls', the slip's, the obstacles') once a dispatch;
+worked out for every face they cost more than the iterations (3.6 to 4.0 ms), so only the faces next to a
+wall or an obstacle do, the rest summing their six neighbors plainly, and the test whether a face is held
+reads all three components at once.
 
 The swirl (`maccormack_check.py --test swirl`, multigrid), at 10 s:
 

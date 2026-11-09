@@ -358,7 +358,7 @@ The velocity on the cells' faces against the centered one, two runs each at the 
 ms mean: the step 4.61 against 4.44; the velocity's advection 0.35 against 0.18 (three faces traced a
 cell), the pressure 1.61 against 1.80 (the divergence and the gradient on 2-byte faces), the density 1.59
 against 1.48, the faces averaged to the centers 0.16; with `viscosity` on at 20 iterations, the viscosity
-3.6 to 4.0 against 1.16. Its layouts and the rest of its measures are in
+0.95 against 1.16. Its layouts and the rest of its measures are in
 [FLUID_3D.md](FLUID_3D.md#measured).
 
 ## The density at the output's 4K
