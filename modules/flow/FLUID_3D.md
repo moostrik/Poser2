@@ -35,6 +35,20 @@ the stage where a bad value is made, and the cause is fixed there. The bridge ha
 no non-finite value itself, every division in its shaders held above a small floor, and its input is
 the guarded motion. The guards' cost goes in [TIMING.md](TIMING.md) once the fluid is stable.
 
+### 3. The composite: its look and its cost together
+
+The look is a mess now **(site fact)**; the composite is reworked for the best picture and its cost in
+one go. Its cost at the preset (2160 × 3840, the 4K amount's 16 layers): 0.65 ms alone, about twice the
+time its data takes to move once (`fluid_pass_check.py`) **(deduction)**. Every output pixel steps through
+every layer, each step reading the amount and the color volume (and the light when lit) and working out
+three `exp`s, empty water or not; it stops early only where the water turns opaque.
+
+Measured against the worst case, not the average: a box full of density in every layer sets the frame's
+budget, so a skip of empty steps lowers only the average and makes the frame's time follow the picture.
+Work every step does whatever is there is what to cut: the fog's per-step factor is the same each step and
+can be worked out once, the color's divide can be a multiply. An occupancy volume of empty 8³ blocks was
+slower ([TIMING.md](TIMING.md), Faster item 2).
+
 ## The fluid
 
 A step (`Fluid3D.update`), in order, at the code's defaults:
