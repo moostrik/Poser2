@@ -58,6 +58,15 @@ void main() {
     if (gid.y - 1 < 0)        magB = magC;
     if (gid.z + 1 >= uSize.z) magF = magC;
     if (gid.z - 1 < 0)        magK = magC;
+    // An obstacle's cell is a closed wall inside the box: its curl's size this cell's, as beyond the walls
+    if (uHasObstacles) {
+        if (texture(uObstacle, st + vec3(texel.x, 0, 0)).r > 0.5) magR = magC;
+        if (texture(uObstacle, st - vec3(texel.x, 0, 0)).r > 0.5) magL = magC;
+        if (texture(uObstacle, st + vec3(0, texel.y, 0)).r > 0.5) magT = magC;
+        if (texture(uObstacle, st - vec3(0, texel.y, 0)).r > 0.5) magB = magC;
+        if (texture(uObstacle, st + vec3(0, 0, texel.z)).r > 0.5) magF = magC;
+        if (texture(uObstacle, st - vec3(0, 0, texel.z)).r > 0.5) magK = magC;
+    }
 
     vec3 gradMag = vec3(
         uHalfRdxInv.x * (magR - magL),

@@ -7,7 +7,8 @@
  *
  * each derivative a difference of the velocity interpolated from the faces (faces.glsl) `uRadius` cells to
  * either side, so the step needs no velocity at the centers midway. A neighbor beyond the box is the wall's
- * ghost (walls.glsl), the same wall the projection reads: a closed wall's (2k - 1) along it, the slip.
+ * ghost (walls.glsl), the same wall the projection reads: a closed wall's (2k - 1) along it, the slip; an
+ * obstacle's cell is a closed wall's ghost too.
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick of cells, so z neighbors share the cache
@@ -48,6 +49,13 @@ void main() {
     if (i.y - reach < 0)         vB = wall_velocity(vC, 1);
     if (i.z + reach >= uCells.z) vF = wall_velocity(vC, 2);
     if (i.z - reach < 0)         vK = wall_velocity(vC, 2);
+    // an obstacle is a closed wall inside the box: its cell's ghost the closed wall's
+    if (solid_cell(i + ivec3(reach, 0, 0))) vR = closed_velocity(vC, 0);
+    if (solid_cell(i - ivec3(reach, 0, 0))) vL = closed_velocity(vC, 0);
+    if (solid_cell(i + ivec3(0, reach, 0))) vT = closed_velocity(vC, 1);
+    if (solid_cell(i - ivec3(0, reach, 0))) vB = closed_velocity(vC, 1);
+    if (solid_cell(i + ivec3(0, 0, reach))) vF = closed_velocity(vC, 2);
+    if (solid_cell(i - ivec3(0, 0, reach))) vK = closed_velocity(vC, 2);
 
     vec3 curl;
     curl.x = uHalfRdxInv.y * (vT.z - vB.z) - uHalfRdxInv.z * (vF.y - vK.y);

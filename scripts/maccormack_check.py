@@ -83,11 +83,30 @@ def fluid_settings(advection: Advection, overrides: list[str]) -> Fluid3DSetting
     return settings
 
 
-def run(advection: Advection, seconds: float, move: float, overrides: list[str]) -> list[tuple[float, float, float, int, float, float]]:
+def obstacle_mask() -> np.ndarray:
+    """A disc below the body's swing, an obstacle through every layer."""
+    values = np.zeros((H, W, 4), np.float32)
+    y, x = np.mgrid[0:H, 0:W]
+    values[(x - W * 0.5) ** 2 + (y - H * 0.7) ** 2 < (W * 0.1) ** 2] = 1.0
+    return values
+
+
+def run(advection: Advection, seconds: float, move: float, overrides: list[str],
+        obstacle: bool = False) -> list[tuple[float, float, float, int, float, float]]:
     settings = fluid_settings(advection, overrides)
     fluid = Fluid3D(settings)
     fluid.allocate(2160, 3840)
     fluid.update(1.0 / FPS)
+    solid: np.ndarray | None = None
+    if obstacle:
+        mask = mh.texture_of(obstacle_mask())
+        fluid.set_obstacle(mask)
+        fluid.update(1.0 / FPS)
+        glFinish()
+        cells = fluid._obstacle.read_to_numpy()
+        assert cells is not None
+        solid = cells.astype(np.float32) > (0.5 * 255 if cells.dtype == np.uint8 else 0.5)
+        print(f'{advection.name}: {int(solid.sum())} solid cells', flush=True)
     rows: list[tuple[float, float, float, int, float, float]] = []
     steps = int(seconds * FPS)
     for i in range(steps):
@@ -104,6 +123,8 @@ def run(advection: Advection, seconds: float, move: float, overrides: list[str])
             speed = np.linalg.norm(np.nan_to_num(v[..., :3]), axis=-1)
             wall = np.zeros(speed.shape, bool)               # the two cells next to any side of the box
             wall[:2], wall[-2:], wall[:, :2], wall[:, -2:], wall[:, :, :2], wall[:, :, -2:] = (True,) * 6
+            if solid is not None:                            # with an obstacle the wall column is its cells' speed
+                wall = solid
             rows.append((t + 1.0 / FPS, float(speed.max()), float(speed.mean()), bad, float(speed[wall].mean()), float(speed[~wall].mean())))
     fluid.deallocate()
     return rows
@@ -231,6 +252,7 @@ def main() -> None:
     parser.add_argument('--seconds', type=float, default=10.0)
     parser.add_argument('--move', type=float, default=3.0, help='seconds the body moves')
     parser.add_argument('--set', action='append', default=[], help='a setting by path, e.g. velocity.vorticity=0.3')
+    parser.add_argument('--obstacle', action='store_true', help='swing: a disc obstacle below the body; the wall column is its cells')
     args = parser.parse_args()
     mh.context()
     if args.test == 'swirl':
@@ -240,7 +262,7 @@ def main() -> None:
             for t, kept, total, peak, sharp, unbalanced in swirl[advection]:
                 print(f'{t:5.1f}  {label:>2} {kept:6.3f} {total:10.1f} {peak:6.3f} {sharp:6.3f} {unbalanced:8.5f}')
         return
-    results = {advection: run(advection, args.seconds, args.move, args.set) for advection in (Advection.SEMI_LAGRANGIAN, Advection.MACCORMACK)}
+    results = {advection: run(advection, args.seconds, args.move, args.set, args.obstacle) for advection in (Advection.SEMI_LAGRANGIAN, Advection.MACCORMACK)}
     print(f"{'t s':>5}  {'SL top':>8} {'SL mean':>8} {'SL wall':>8} {'SL inner':>8}  {'MC top':>8} {'MC mean':>8} {'MC wall':>8} {'MC inner':>8} {'MC bad':>7}")
     for sl, mc in zip(results[Advection.SEMI_LAGRANGIAN], results[Advection.MACCORMACK]):
         print(f'{sl[0]:5.1f}  {sl[1]:8.3f} {sl[2]:8.4f} {sl[4]:8.4f} {sl[5]:8.4f}  {mc[1]:8.3f} {mc[2]:8.4f} {mc[4]:8.4f} {mc[5]:8.4f} {mc[3]:7d}')

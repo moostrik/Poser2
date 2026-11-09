@@ -23,15 +23,21 @@ float wall_pressure(float p, int axis) {
     return uClosed[axis] == 1 ? p : -p;
 }
 
+// The velocity beyond a closed wall on `axis`, or inside an obstacle's cell, the cell beside it moving `v`: its
+// component through the wall turned, along it (2 keep - 1) of it (the slip)
+vec3 closed_velocity(vec3 v, int axis) {
+    float normal = -v[axis];
+    v *= 2.0 * uWallKeep - 1.0;
+    v[axis] = normal;
+    return v;
+}
+
 // The velocity beyond the wall on `axis`, the cell inside moving `v`: closed, its component through the wall
 // turned, so the face between them carries nothing, and along the wall (2 keep - 1) of it, so the face moves
 // with the share the wall keeps: all of it free-slip (no shear), none with the water held; open, the same
 // (zero gradient), so it leaves as it came
 vec3 wall_velocity(vec3 v, int axis) {
     if (uClosed[axis] == 0) return v;
-    float normal = -v[axis];
-    v *= 2.0 * uWallKeep - 1.0;
-    v[axis] = normal;
-    return v;
+    return closed_velocity(v, axis);
 }
 
