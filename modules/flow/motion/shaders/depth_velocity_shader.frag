@@ -43,6 +43,16 @@ uniform float max_speed; // The fastest a body part moves in depth (m/s): a trac
 in vec2 texCoord;
 out vec4 fragColor;
 
+// The guard (FiniteGuard): a value whose exponent bits are all ones is an infinity or a NaN; it becomes 0 and is counted
+layout(std430, binding = 7) buffer FiniteGuard { uint uNonFinite[]; };
+uniform int uGuardSlot;  // The output's slot in the motion's FiniteGuard; -1 no guard
+
+vec4 guard(vec4 value) {
+    if (uGuardSlot < 0 || !any(equal(floatBitsToUint(value) & 0x7F800000u, uvec4(0x7F800000u)))) return value;
+    atomicAdd(uNonFinite[uGuardSlot], 1u);
+    return vec4(0.0);
+}
+
 float depth_at(vec2 uv) {
     ivec2 size = textureSize(tex0, 0);
     ivec2 texel = clamp(ivec2(floor(uv * vec2(size))), ivec2(0), size - 1);
@@ -95,7 +105,8 @@ bool moving(vec2 size) {
     return largest > motion_floor;
 }
 
-void main() {
+// One frame of the track or its catch-up into fragColor
+void step_track() {
     float center = depth_at(texCoord);
     if (center <= 0.0 || view_span <= 0.0) {
         fragColor = vec4(0.0);
@@ -168,4 +179,9 @@ void main() {
         anchor = tracked;
     }
     fragColor = vec4(z, disparity, rate, anchor);
+}
+
+void main() {
+    step_track();
+    fragColor = guard(fragColor);
 }

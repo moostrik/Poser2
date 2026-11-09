@@ -2,12 +2,14 @@
 
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1i, glUniform3f, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
+from ...finite_guard import GuardSlot
 
 
 class ComposeVelocity(Shader):
-    """Writes (x, y, z) times strength, and times the mask when given, to RGB, zero where it is not finite."""
+    """Writes (x, y, z) times strength, and times the mask when given, to RGB, 0 where it is not finite, counted by the guard."""
 
-    def use(self, xy: Texture, z: Texture | None, strength: tuple[float, float, float], mask: Texture | None = None) -> None:
+    def use(self, xy: Texture, z: Texture | None, strength: tuple[float, float, float], mask: Texture | None = None,
+            guard: GuardSlot | None = None) -> None:
         """Compose the velocity.
 
         Args:
@@ -15,6 +17,7 @@ class ComposeVelocity(Shader):
             z: z in R, None without depth (z is 0)
             strength: Multiplier on x, y and z
             mask: Multiplier in R (0 to 1), None for no mask
+            guard: The velocity's slot in the motion's FiniteGuard; None no guard
         """
         if not self.allocated or not self.shader_program or not xy.allocated:
             return
@@ -36,5 +39,9 @@ class ComposeVelocity(Shader):
         glUniform1i(self.get_uniform_loc("has_depth"), 1 if z is not None else 0)
         glUniform1i(self.get_uniform_loc("has_mask"), 1 if mask is not None else 0)
         glUniform3f(self.get_uniform_loc("strength"), *strength)
+        if guard is not None:
+            guard.use(self.get_uniform_loc("uGuardSlot"))
+        else:
+            glUniform1i(self.get_uniform_loc("uGuardSlot"), -1)
 
         draw_quad()

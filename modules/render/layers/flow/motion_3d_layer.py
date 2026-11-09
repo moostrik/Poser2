@@ -58,5 +58,5 @@ class Motion3DLayer(MotionLayer):
         self._gpu_timer.begin()
         flow.update(depth.texture if depth is not None else None, interval,
                     depth.view_span if depth is not None else 0.0,
-                    depth.depth_step if depth is not None else (0.0, 0.0))
+                    depth.depth_step if depth is not None else (0.0, 0.0), guarded=self.settings.guard)
         self._gpu_timer.end()

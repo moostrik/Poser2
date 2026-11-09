@@ -31,7 +31,9 @@ from OpenGL.GL import GL_RG32F, GL_RGBA16F, GL_RGBA32F
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import BaseSettings, Field, Group, Widget
 from .. import FlowUtil, Port, TextureKind, prefixed
+from ..finite_guard import FiniteGuard, GuardSlot
 from .depth_velocity import DepthVelocity, DepthVelocitySettings, track_weights
+from .solve_capture import SolveCapture
 from .lucas_kanade_flow import LucasKanadeFlow, LucasKanadeFlowSettings, _bilinear
 from .shaders import ComposeVelocity, DisplacementFilter, DisplacementThreshold
 
@@ -57,6 +59,11 @@ class LucasKanadeFlow3D:
         self.settings: LucasKanadeFlow3DSettings = settings
         self._flow: LucasKanadeFlow = LucasKanadeFlow(settings.xy)
         self._depth_velocity: DepthVelocity = DepthVelocity()
+        # The outputs' non-finite values, set to 0 where each is written, counted and reported: the velocity, and the
+        # two memories a reset clears, the x/y filter's (displacement) and z's (depth_velocity)
+        self._guard: FiniteGuard = FiniteGuard('motion', ('velocity', 'displacement', 'depth_velocity'))
+        # The solve's inputs kept when it comes out wrong, with POSER_SOLVE_CAPTURE set (a debugging tool)
+        self._capture: SolveCapture | None = SolveCapture.from_environment()
         self._mask: Texture | None = None
 
         self._filtered: SwapFbo = SwapFbo()         # with xy_smooth: the filter, its displacement and position error
@@ -100,6 +107,7 @@ class LucasKanadeFlow3D:
         self._threshold_shader.allocate()
         self._filter_shader.allocate()
         self._compose_shader.allocate()
+        self._guard.allocate()
         self.reset()
 
     def deallocate(self) -> None:
@@ -111,6 +119,7 @@ class LucasKanadeFlow3D:
         self._threshold_shader.deallocate()
         self._filter_shader.deallocate()
         self._compose_shader.deallocate()
+        self._guard.deallocate()
 
     def reset(self) -> None:
         self._flow.reset()
@@ -118,6 +127,10 @@ class LucasKanadeFlow3D:
         self._filtered.clear_all()
         self._followed.clear()
         self._velocity.clear()
+
+    def _slot(self, output: str, guarded: bool) -> GuardSlot | None:
+        """The output's slot in the motion's guard while `guarded`, else None."""
+        return self._guard.slot(output) if guarded else None
 
     def set_input(self, texture: Texture) -> None:
         """Take `texture` as the newest frame."""
@@ -127,7 +140,8 @@ class LucasKanadeFlow3D:
         """The player's mask (red, 0 to 1) the velocity is multiplied by with `use_mask`, or None for no mask."""
         self._mask = texture
 
-    def update(self, depth: Texture | None, delta_time: float, view_span: float, depth_step: tuple[float, float]) -> None:
+    def update(self, depth: Texture | None, delta_time: float, view_span: float, depth_step: tuple[float, float],
+               guarded: bool = False) -> None:
         """Measure between the newest two frames.
 
         Args:
@@ -135,6 +149,7 @@ class LucasKanadeFlow3D:
             delta_time: Seconds since the previous frame
             view_span: Metres one view width spans per metre of depth, for z
             depth_step: uv between two depth samples in the flow's view, for z
+            guarded: Set the outputs' non-finite values to 0, count and log them (`guard`)
         """
         if not self._flow.ready:
             FlowUtil.zero(self._velocity)
@@ -143,13 +158,17 @@ class LucasKanadeFlow3D:
         xy_s: LucasKanadeFlowSettings = s.xy
         z_s: DepthVelocitySettings = s.z
 
+        captured = self._capture.before(self._flow.previous_luminance, self._flow.luminance, xy_s.levels, depth) if self._capture else None
         self._flow.update(depth, z_s.tolerance)
         solved: Texture = self._flow.solved
+        if self._capture is not None:
+            self._capture.after(captured, solved, {'levels': xy_s.levels, 'window': int(xy_s.window), 'damping': xy_s.damping,
+                                                   'same_surface': xy_s.same_surface, 'tolerance': z_s.tolerance})
 
         if depth is not None:
             self._depth_velocity.update_depth(depth, delta_time, view_span, depth_step, z_s.window, z_s.smooth,
                                               z_s.threshold, z_s.tolerance, z_s.dead_zone, z_s.catch_up, xy_s.threshold,
-                                              solved, z_s.edge, z_s.max_speed)
+                                              solved, z_s.edge, z_s.max_speed, self._slot('depth_velocity', guarded))
 
         xy: Texture = self._flow.displacement
         if z_s.xy_smooth:
@@ -159,7 +178,7 @@ class LucasKanadeFlow3D:
             alpha, _ = track_weights(delta_time, z_s.smooth, 1.0)
             self._filtered.swap()
             self._filtered.begin()
-            self._filter_shader.use(solved, self._filtered.back, solved, float(alpha))
+            self._filter_shader.use(solved, self._filtered.back, solved, float(alpha), self._slot('displacement', guarded))
             self._filtered.end()
             self._followed.begin()
             self._threshold_shader.use(self._filtered, xy_s.threshold)
@@ -176,8 +195,10 @@ class LucasKanadeFlow3D:
         mask: Texture | None = self._mask if s.use_mask and self._mask is not None and self._mask.allocated else None
         self._velocity.begin()
         self._compose_shader.use(xy, self._depth_velocity.depth_velocity if depth is not None else None,
-                                 (per_second * s.x_gain, per_second * aspect * s.y_gain, per_second * s.z_gain), mask)
+                                 (per_second * s.x_gain, per_second * aspect * s.y_gain, per_second * s.z_gain), mask,
+                                 self._slot('velocity', guarded))
         self._velocity.end()
+        self._guard.update(delta_time)
 
 
 # ── numpy reference ─────────────────────────────────────────────────────

@@ -31,7 +31,6 @@ from OpenGL.GL import (GL_ALREADY_SIGNALED, GL_CONDITION_SATISFIED, GL_SYNC_GPU_
                        glDeleteSync, glFenceSync, glUniform1i)
 
 from modules.gl import StorageBuffer
-from modules.settings import BaseSettings, Field
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +42,6 @@ def guard_report(stage: str, fields: tuple[str, ...], counts: list[int], period:
     """The warnings for one read: one per field whose count is above 0."""
     return [f"{stage}: {count} non-finite {field} values set to 0 in the last {period:.1f} s"
             for field, count in zip(fields, counts) if count > 0]
-
-
-class FiniteGuardSettings(BaseSettings):
-    """A stage's guard, its settings group `guard`."""
-    enabled: Field[bool] = Field(True, description="Set non-finite values to 0, count and log them; off once the stage is stable")
 
 
 @dataclass(frozen=True)

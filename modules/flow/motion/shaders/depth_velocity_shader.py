@@ -5,7 +5,9 @@ disparity carried along the motion and corrected by the mean over a window of de
 """
 
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE3, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUniform2f, glUseProgram
+
 from modules.gl import Shader, draw_quad, Texture
+from ...finite_guard import GuardSlot
 
 
 class DepthVelocityShader(Shader):
@@ -14,7 +16,8 @@ class DepthVelocityShader(Shader):
 
     def use(self, depth: Texture, track: Texture, catch_up: Texture, catch_up_pass: bool, alpha: float, smooth: float, catch_up_smooth: float,
             ema: float, motion_floor: float, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
-            tolerance: float, dead_zone: float, displacement: Texture | None = None, max_speed: float = 0.0) -> None:
+            tolerance: float, dead_zone: float, displacement: Texture | None = None, max_speed: float = 0.0,
+            guard: GuardSlot | None = None) -> None:
         """Correct the track by the new depth, or with `catch_up_pass` write this frame's catch-up.
 
         Args:
@@ -35,6 +38,7 @@ class DepthVelocityShader(Shader):
             dead_zone: Depth the track wanders within its anchor without z (m); 0 is none
             displacement: uv per frame; when given, the track is carried from where each pixel came from
             max_speed: The fastest a body part moves in depth (m/s); a track past it starts over. 0 is none
+            guard: The depth velocity's slot in the motion's FiniteGuard; None no guard
         """
         if not self.allocated or not self.shader_program:
             return
@@ -74,5 +78,9 @@ class DepthVelocityShader(Shader):
         glUniform1f(self.get_uniform_loc("view_span"), view_span)
         glUniform1f(self.get_uniform_loc("dead_zone"), dead_zone)
         glUniform1f(self.get_uniform_loc("max_speed"), max_speed)
+        if guard is not None:
+            guard.use(self.get_uniform_loc("uGuardSlot"))
+        else:
+            glUniform1i(self.get_uniform_loc("uGuardSlot"), -1)
 
         draw_quad()

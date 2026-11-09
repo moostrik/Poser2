@@ -1,12 +1,14 @@
 """The 2D motion layer: the gradient flow, x/y from the image, as on main."""
 
 # Local application imports
+from modules.settings import Field
 from modules.flow import GradientFlow, GradientFlowSettings, HasPorts
 from .motion_layer import MotionLayer, MotionLayerSettings, MotionInput, MotionOutput
 
 
 class Motion2DLayerSettings(GradientFlowSettings, MotionLayerSettings):
     """Configuration for Motion2DLayer: the stage's settings and its flow's own, one panel, the stage's first."""
+    guard: Field[bool] = Field(False, visible=False, description="The 2D flow has no guard")
 
 
 class Motion2DLayer(MotionLayer):

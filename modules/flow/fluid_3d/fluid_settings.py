@@ -5,7 +5,6 @@ from enum import IntEnum
 
 from modules.settings import Field, BaseSettings, Group, Widget
 
-from ..finite_guard import FiniteGuardSettings
 from ..wall_mode import WallMode
 from ..time_step import TimeStepMode
 
@@ -178,7 +177,8 @@ class Fluid3DSettings(BaseSettings):
         value (fully dyed, ±1 warm, 1 width/s) to 0 in evaporation_time, dt / evaporation_time a step.
     """
 
-    # ---- How the fields are carried and walled, then the box (multiples of 32) ----
+    # ---- The guard, how the fields are carried and walled, then the box (multiples of 32) ----
+    guard: Field[bool]              = Field(True,                                       description="Set non-finite values to 0, count and log them; off once the fluid is stable")
     advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the fields are carried: MacCormack keeps swirls and edges, at about twice the reads")
     wall: Field[WallMode]           = Field(WallMode.CLOSED,                            description="Every side of every field. Closed: solid, it reflects. Open: it absorbs")
     width: Field[int]               = Field(256,    min=32,     max=4096,   step=32,    newline=True, description="Simulation grid width")
@@ -192,7 +192,6 @@ class Fluid3DSettings(BaseSettings):
     density: Group[DensitySettings]         = Group(DensitySettings)
     temperature: Group[TemperatureSettings] = Group(TemperatureSettings)
     pressure: Group[PressureSettings]       = Group(PressureSettings)
-    guard: Group[FiniteGuardSettings]       = Group(FiniteGuardSettings)
     upscaled: Group[UpscaledDensitySettings] = Group(UpscaledDensitySettings)
     particles: Group[ParticleSettings]      = Group(ParticleSettings)
     composite: Group[CompositeSettings]     = Group(CompositeSettings)

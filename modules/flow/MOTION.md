@@ -102,7 +102,41 @@ The flow's velocity is in image widths per second times its gains.
   z's `smooth`. It is the only x/y state kept from frame to frame: the solve starts each frame from
   no motion. The motion's reset clears it.
 
+## The guard
+
+`guard`, beside `reset` on the 3D motion's panel, on by default: the motion's output and its two
+memories set a non-finite value to 0 and count it into the motion's `FiniteGuard`, logged as
+`motion: … non-finite <output> values` ([FLUID_3D.md's guard](FLUID_3D.md#the-guard) has how):
+
+| Output           | Where                                 | Holds                                          |
+|------------------|---------------------------------------|------------------------------------------------|
+| `velocity`       | `compose_velocity.frag`               | the motion's output, x/y/z in widths/s         |
+| `displacement`   | `displacement_filter.frag`            | the x/y filter's memory, with `xy_smooth`      |
+| `depth_velocity` | `depth_velocity_shader.frag`          | z's memory: the followed disparity, its rate and anchor (`track`) |
+
+Measured in a hidden window at 448 × 800, 40 frames at 25 fps: a NaN mask over 200 × 200 px gave
+1 000 000 non-finite velocity values in the first second, zeroed, the velocity finite after; the x/y
+filter's memory filled with NaN, 358 400 displacement values once, every pixel, and the filter went on
+from 0. z's memory filled with NaN was counted 0 times and the velocity stayed finite: the carry takes
+a track's texel only within `tolerance` of the measurement, a comparison a NaN fails, so the track
+starts over and the NaN is gone without a non-finite value written.
+
+## Debugging a solve
+
+With the environment variable `POSER_SOLVE_CAPTURE` set to a folder, a solve that comes out wrong (a
+non-finite value, or a step past half the image a frame) is saved there with the two luminance frames
+at each mip level and the depth as they were just before it ran (`motion/solve_capture.py`), up to three
+a run. `scripts/solve_replay.py` reruns a capture through the GPU solve in a hidden window and the
+numpy reference: a capture the solve gets right there and wrong in the app points at the app's state,
+not at the solve. `gl_state()` (`modules/gl`) returns the GL state a pass runs with.
+
 ## Constraints
+
+- The coarsest level starts from no motion inside the shader (`has_estimate` off), never from a
+  cleared buffer: a clear handed a temporary array for its color sometimes left garbage at startup,
+  the bit pattern of 100 or 1.75 in one channel, 7 of 8 starts, and the whole pyramid took it as the
+  start, every x/y arrow the same ("all arrows up"); with the `xy_smooth` filter it stuck until a reset.
+  Every clear to 0 now passes no memory (`clear_value`, `modules/gl/texture.py`).
 
 - The false z at an edge cannot be told from a push by time. Restarting the track where the depth
   changed past the tolerance over 2 frames cuts the edge z, and a push's z by 26%.

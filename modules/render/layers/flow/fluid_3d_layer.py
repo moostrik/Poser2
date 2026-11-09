@@ -9,7 +9,6 @@ from modules.gl import GpuTimer, Style, Texture
 from modules.flow import CompositeSettings, Fluid3D, Fluid3DSettings, HasPorts
 from modules.settings import Field, Group
 from .fluid_layer import FluidLayer, FluidLayerSettings, FluidOutput, Injection
-from .stage_layer import Stage3DLayerSettings
 
 
 class Fluid3DCompositeSettings(CompositeSettings):
@@ -17,9 +16,9 @@ class Fluid3DCompositeSettings(CompositeSettings):
     blend_mode: Field[Style.BlendMode] =    Field(Style.BlendMode.ADD, description="How the show is drawn over the layers before it")
 
 
-class Fluid3DLayerSettings(Fluid3DSettings, FluidLayerSettings, Stage3DLayerSettings):
+class Fluid3DLayerSettings(Fluid3DSettings, FluidLayerSettings):
     """Configuration for Fluid3DLayer: the stage's settings and its fluid's own, one panel, the stage's
-    first; the stage's width, height and depth are the fluid's simulation grid."""
+    first; the fluid's width, height and depth are the stage's working size."""
     composite: Group[Fluid3DCompositeSettings] = Group(Fluid3DCompositeSettings)
 
 

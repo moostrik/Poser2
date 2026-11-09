@@ -15,9 +15,19 @@ uniform float alpha;     // Weight of the measurement on the position
 in vec2 texCoord;
 out vec4 fragColor;
 
+// The guard (FiniteGuard): a value whose exponent bits are all ones is an infinity or a NaN; it becomes 0 and is counted
+layout(std430, binding = 7) buffer FiniteGuard { uint uNonFinite[]; };
+uniform int uGuardSlot;  // The output's slot in the motion's FiniteGuard; -1 no guard
+
+vec4 guard(vec4 value) {
+    if (uGuardSlot < 0 || !any(equal(floatBitsToUint(value) & 0x7F800000u, uvec4(0x7F800000u)))) return value;
+    atomicAdd(uNonFinite[uGuardSlot], 1u);
+    return vec4(0.0);
+}
+
 void main() {
     vec4 carried = texture(tex1, texCoord - texture(carry, texCoord).xy);
     float beta = alpha * alpha / (2.0 - alpha);
     vec2 residual = texture(tex0, texCoord).xy - carried.ba - carried.rg;
-    fragColor = vec4(carried.rg + beta * residual, -(1.0 - alpha) * residual);
+    fragColor = guard(vec4(carried.rg + beta * residual, -(1.0 - alpha) * residual));
 }

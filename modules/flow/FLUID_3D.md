@@ -40,10 +40,10 @@ the test.
 |------|-------------------------------------------------------------------------------------------|-------|
 | 1    | the fluid: the finite guard and `max_speed` in place of the dampen ([The guard](#the-guard)); vorticity's range to 100 for the test | built |
 | –    | a test for every step: open walls make non-finite values ([2](#2-open-walls-make-non-finite-values)) | |
-| 2    | the bridge: the finite guard where it writes its outputs, the mixes and the density and temperature bridges | |
-| 3    | the motion: the finite guard in the compose; an x/y speed gate, one `max_speed` in m/s for the 3D velocity, as z's | design to confirm |
+| 2    | the bridge: not needed. It makes no non-finite value itself (every division in its shaders is held above a small floor); one could only come in from the motion, which now guards its output. Its trails would hold one until a reset | not needed |
+| 3    | the motion: the finite guard on its output (`velocity`) and on its two memories, the x/y filter's (`displacement`) and z's (`depth_velocity`), in `MOTION.md` ([The guard](MOTION.md#the-guard)); no x/y speed gate: the burst's x/y, about 1.4 m/s at 1 m, is a speed a body can move | built |
 | 4    | the app, watching the warnings; the guards' timing once the fluid is stable, a row in [TIMING.md](TIMING.md) | |
-| 5    | the sticking itself, from `xy_smooth` off and on at the app                                 | |
+| 5    | the sticking itself: the LK solve's coarsest level started from a cleared buffer, and the clear sometimes left garbage at startup; it now starts from no motion in the shader, and clears to 0 pass no memory ([MOTION.md](MOTION.md#constraints)); 8 starts without a bad frame | built |
 
 Besides the water's top speed ([The guard](#the-guard)), a guard to try on the motion: a soft limit on
 its z speed, z as measured to a knee (about 1.5 m/s), compressed above it toward a maximum (about 3 m/s),
@@ -260,7 +260,7 @@ and is never hidden:
 
 | Guard     | What                                                                                                             | Setting |
 |-----------|------------------------------------------------------------------------------------------------------------------|---------|
-| finite    | a value whose exponent bits are all ones, an infinity or a NaN, becomes 0: a cell that held one before the step, or that the step made one; each counted per field into the stage's `FiniteGuard` (`finite_guard.py`), read once a second from the other of two buffers once a fence says the GPU is done, so nothing waits, and logged as a warning naming the stage, the field and the count; on the velocity, the density and the temperature | none, always on |
+| finite    | a value whose exponent bits are all ones, an infinity or a NaN, becomes 0: a cell that held one before the step, or that the step made one; each counted per field into the stage's `FiniteGuard` (`finite_guard.py`), read once a second from the other of two buffers once a fence says the GPU is done, so nothing waits, and logged as a warning naming the stage, the field and the count; on the velocity, the density and the temperature | `guard`, beside `reset`, on by default; off once the fluid is stable |
 | top speed | the velocity's speed untouched up to half of `max_speed`, above it bent smoothly toward it (tanh), the direction kept (`limit_speed`, `soft_limit` its numpy reference) | `velocity.max_speed`, widths/s, 0 off (the default), a failsafe, so a runaway shows until it is set |
 
 The bit test, not `isnan`: GLSL may assume no NaN exists and drop `isnan`. A NaN slips past every comparison

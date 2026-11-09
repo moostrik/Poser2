@@ -67,6 +67,7 @@ class MotionOutput(StageOutput):
 
 class MotionLayerSettings(StageLayerSettings):
     """What the 2D and the 3D motion layer share; each adds its optical flow's group."""
+    guard: Field[bool] =                    Field(True, description="Set non-finite values to 0, count and log them; off once the motion is stable")
     width: Field[int] =                     Field(512, min=32, max=4096, step=32, description="Optical flow processing width")
     height: Field[int] =                    Field(288, min=32, max=4096, step=32, description="Optical flow processing height")
     fps: Field[float] =                     Field(30.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate the capture gaps are held around")

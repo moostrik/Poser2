@@ -670,8 +670,8 @@ class Fluid3D:
             carrier.update(step)
 
     def _guard_slot(self, field: str) -> GuardSlot | None:
-        """The field's slot in the fluid's guard, None while `guard.enabled` is off or no field is named."""
-        return self._guard.slot(field) if field and self.settings.guard.enabled else None
+        """The field's slot in the fluid's guard, None while `guard` is off or no field is named."""
+        return self._guard.slot(field) if field and self.settings.guard else None
 
     @property
     def _needs_curl(self) -> bool:

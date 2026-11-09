@@ -55,6 +55,7 @@ from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import BaseSettings, Field
 from .. import FlowBase, FlowUtil, Port, TextureKind
 from .patch import Patch
+from ..finite_guard import GuardSlot
 from .shaders import DepthStepFilter, DepthThreshold, DepthVelocityShader
 
 
@@ -152,7 +153,8 @@ class DepthVelocity(FlowBase):
 
     def update_depth(self, depth: Texture, delta_time: float, view_span: float, depth_step: tuple[float, float], window: int,
                      smooth: float, threshold: float, tolerance: float, dead_zone: float, catch_up_smooth: float, motion_floor: float,
-                     displacement: Texture | None = None, edge: float | None = None, max_speed: float = 0.0) -> None:
+                     displacement: Texture | None = None, edge: float | None = None, max_speed: float = 0.0,
+                     guard: GuardSlot | None = None) -> None:
         """Advance on a new flow frame: correct the track by the new depth, then take the noise floor off.
 
         Args:
@@ -171,6 +173,7 @@ class DepthVelocity(FlowBase):
                 along the motion (Lucas–Kanade flow)
             edge: Depth step within a 3×3 of depth samples that marks an edge, dropped (m); None takes `tolerance`
             max_speed: The fastest a body part moves in depth (m/s), the speed gate; 0 is none
+            guard: The depth velocity's slot in the motion's FiniteGuard: a non-finite track 0 and counted; None no guard
         """
         if not self._allocated:
             return
@@ -191,7 +194,7 @@ class DepthVelocity(FlowBase):
             target.begin()
             self._velocity_shader.use(self._input_fbo, self._track.back, self._catch_up.back, catch_up_pass,
                                       float(alpha), smooth, catch_up_smooth, float(alpha), motion_floor, max(delta_time, 1e-6), view_span,
-                                      step, window, tolerance, dead_zone, displacement, max_speed)
+                                      step, window, tolerance, dead_zone, displacement, max_speed, guard)
             target.end()
 
         self._output_fbo.begin()

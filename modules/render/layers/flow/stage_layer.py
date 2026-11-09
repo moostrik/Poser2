@@ -28,16 +28,9 @@ class StageOutput:
 
 
 class StageLayerSettings(BaseSettings):
-    """What every stage layer's settings hold, first on its panel: the reset and the stage's working
-    size, which each stage's settings declare again with its own meaning and default."""
+    """What every stage layer's settings hold, first on its panel: the reset. Each stage declares its
+    working size itself (`width`, `height`, the 3D fluid's `depth`), after the switches it puts first."""
     reset: Field[bool] =    Field(False, widget=Widget.button, description="Start the stage from rest")
-    width: Field[int] =     Field(512, min=32, max=4096, step=32, description="Working width")
-    height: Field[int] =    Field(288, min=32, max=4096, step=32, description="Working height")
-
-
-class Stage3DLayerSettings(StageLayerSettings):
-    """A stage whose working size has a depth: its depth in z right after its width and height."""
-    depth: Field[int] =     Field(16, min=4, max=256, step=4, description="Working depth in z")
 
 
 class StageLayer[I, O: StageOutput](LayerBase, ABC):
