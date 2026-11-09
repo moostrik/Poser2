@@ -7,7 +7,7 @@
     "keyframe_interval": 50,
     "color": true,
     "resolution": "P720",
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "fov": 80.0,
     "split_seconds": 60,
@@ -272,8 +272,7 @@
     "layer": {
       "select": {
         "left": [
-          "fluid",
-          "monitor_a"
+          "fluid"
         ],
         "right": [
           "monitor_b"
@@ -518,6 +517,7 @@
       "guard": true,
       "advection": "SEMI_LAGRANGIAN",
       "wall": "CLOSED",
+      "slip_time": 0.0,
       "width": 288,
       "height": 512,
       "depth": 64,
@@ -574,7 +574,7 @@
       "pressure": {
         "solver": "MULTIGRID",
         "iterations": 40,
-        "relaxation": 1.8,
+        "relaxation": 1.85,
         "cycles": 1
       },
       "upscaled": {
@@ -745,10 +745,10 @@
       "title": "Poser",
       "v_sync": false,
       "monitor": "M0",
-      "x": 1233,
+      "x": 1293,
       "y": 31,
-      "width": 2606,
-      "height": 2080,
+      "width": 1266,
+      "height": 1360,
       "secondary_list": [
         "M1"
       ],
