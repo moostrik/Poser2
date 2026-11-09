@@ -48,6 +48,8 @@ void main() {
     // Sample 2D input at this XY position
     vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
     vec4 source = texture(uInput, uv);
+    // Nothing to add or fill where the image is empty (most of it): the texel stays as it is, unread and unwritten
+    if (all(equal(source, vec4(0.0)))) return;
     vec4 current = imageLoad(uVolume, gid);
     if (uMode == 2) {
         if (uScalar) {

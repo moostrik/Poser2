@@ -47,6 +47,7 @@ void main() {
     if (weight < 0.001) return;
     vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
     float source = uCubic ? bspline_alpha(uv) : texture(uInput, uv).a;
+    if (source == 0.0) return;      // nothing to add or fill: the texel stays as it is, unread and unwritten
     float current = imageLoad(uVolume, gid).r;
     if (uMode == 2) current += max(min(source * uGain, 1.0) - current, 0.0) * min(weight, 1.0);
     else current += source * weight;
