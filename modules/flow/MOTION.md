@@ -15,12 +15,11 @@ How the flow works is in the module docstrings of `motion/lucas_kanade_flow_3d.p
 ## When it measures
 
 The motion layer measures once per camera frame: when `timestamp` differs from the one it last
-measured; a source without stamps (`None`) measures every tick. A gap wider than the expected
-frame interval is a dropped frame. For its first `WARM_UP_TIME` seconds after start the motion
-layer stays at rest: the camera's exposure settles then, and the Lucas–Kanade solve reads the
-brightening as motion, x/y at full reach over the whole image **(site fact)**. It is 0 while the
-explosion guards are tested ([FLUID_3D.md's Plan](FLUID_3D.md#1-the-explosions)), so the start's
-burst is the test. A camera frame has
+measured. A frame is a picture with a capture time: a view exists, black, from the app's start, before
+the camera delivers, and its `timestamp` is `None` until then. So `None` is no frame: the motion stays
+at rest and counts nothing, and a `None` after frames (the camera lost) starts it over. The solve needs
+two counted frames, so its first measurement is always a real frame against a real frame. A gap wider
+than the expected frame interval is a dropped frame. A camera frame has
 no other identity: `CameraFrame` and `Capture` carry a timestamp and no sequence number, because the
 device's sequence numbers skip on the depth while every frame arrives (`modules/camera/oak4/OAK4.md`).
 A source layer keeps the capture time of the frame it holds (`CaptureImageLayer`, `DepthSourceLayer`,
@@ -151,5 +150,5 @@ not at the solve. `gl_state()` (`modules/gl`) returns the GL state a pass runs w
   flips from pixel to pixel in rows and columns: streaks from 4 levels up. A median between levels
   also removes them, at +0.35 ms or more, so there is none.
 - The exposure is the camera's to settle, not the solve's: the solve matches no brightness between
-  frames, and the warm-up keeps the start's ramp out.
+  frames.
 

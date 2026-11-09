@@ -21,9 +21,7 @@ What is next for the fluid, in order; what is open elsewhere in the flow is
 A value runs out of range and stays there, in the motion and in the fluid:
 
 - The motion sticks: x and y stop following the body while z still does, until the motion's reset
-  **(site fact)**, on the current code and the one before it. The warm-up
-  ([MOTION.md](MOTION.md#when-it-measures)) hides the same at the start, where the exposure ramp
-  reads as x/y at full reach. The one x/y state kept from frame to frame is the x/y filter of
+  **(site fact)**, on the current code and the one before it. The one x/y state kept from frame to frame is the x/y filter of
   `z.xy_smooth` (`LucasKanadeFlow3D`), which the reset clears; the solve starts each frame from no
   motion, and z has its own track **(deduction)**. The check at the app: when it sticks,
   `xy_smooth` off and on clears that filter alone.
@@ -33,38 +31,44 @@ A value runs out of range and stays there, in the motion and in the fluid:
   range (a half float's infinity, a NaN) would fit both **(deduction)**.
 
 The work: each stage guards its output, so a bad value stops where it was made and the warning names
-the stage; then the cause is fixed there. `WARM_UP_TIME` is 0 while this runs, so the start's burst is
-the test.
+the stage; then the cause is fixed there.
 
 | Step | What                                                                                      | State |
 |------|-------------------------------------------------------------------------------------------|-------|
 | 1    | the fluid: the finite guard and `max_speed` in place of the dampen ([The guard](#the-guard)); vorticity's range to 100 for the test | built |
-| –    | a test for every step: open walls make non-finite values ([2](#2-open-walls-make-non-finite-values)) | |
+| –    | a test for every step: open walls make non-finite values ([2](#3-the-walls)) | |
 | 2    | the bridge: not needed. It makes no non-finite value itself (every division in its shaders is held above a small floor); one could only come in from the motion, which now guards its output. Its trails would hold one until a reset | not needed |
 | 3    | the motion: the finite guard on its output (`velocity`) and on its two memories, the x/y filter's (`displacement`) and z's (`depth_velocity`), in `MOTION.md` ([The guard](MOTION.md#the-guard)); no x/y speed gate: the burst's x/y, about 1.4 m/s at 1 m, is a speed a body can move | built |
 | 4    | the app, watching the warnings; the guards' timing once the fluid is stable, a row in [TIMING.md](TIMING.md) | |
 | 5    | the sticking itself: the LK solve's coarsest level started from a cleared buffer, and the clear sometimes left garbage at startup; it now starts from no motion in the shader, and clears to 0 pass no memory ([MOTION.md](MOTION.md#constraints)); 8 starts without a bad frame | built |
+| 6    | the first frame: a view is black before the camera delivers; the motion counts only frames with a capture time, so `WARM_UP_TIME` is gone ([MOTION.md](MOTION.md#when-it-measures)) | built |
 
 Besides the water's top speed ([The guard](#the-guard)), a guard to try on the motion: a soft limit on
 its z speed, z as measured to a knee (about 1.5 m/s), compressed above it toward a maximum (about 3 m/s),
 the speed gate (6 m/s) behind it; a curve per reading, no time filter, checked against the spread of
 z speeds on standmoves and stillslowfast first.
 
-### 2. Open walls make non-finite values
+### 2. MacCormack, stable
+
+`advection` `MACCORMACK` keeps swirls and edges ([The advection](#the-advection)) and looks promising
+**(site fact)**, but is not stable. To be found: where it grows, against the semi-Lagrangian step on
+the same input, with the guards' counts and the top speed off.
+
+### 3. The walls
 
 With `wall` open the fluid makes non-finite values **(site fact)**, while the vorticity stays stable. Not yet
 looked into. Until it is fixed it is a test for the guards: open the walls and the fluid's finite guard
 should zero the values and log `fluid: … non-finite … values` ([The guard](#the-guard)). An open wall takes
 the last cell's velocity as the ghost and 0 as the pressure ([The walls](#the-walls)), the place to start.
 
-### 3. The water looks too fast
+### 4. The water looks too fast
 
 Seen in the app **(site fact)** after the depth scale: everything moves very fast. Measured, the
 water follows the body at 0.8–0.9 of its speed in fast moves, so it is the water's own motion
 **(deduction)**; the candidates are the preset's confinement (1.69, the textbook 0.3), the
 velocity's fade (60 s, viscosity 0) and MacCormack keeping the swirls.
 
-### 4. The projection's floor
+### 5. The projection's floor
 
 The projection's divergence and gradient are central differences on the cell centers, and the
 solvers solve the compact 7-point Laplacian; the two differ, so the velocity keeps a divergence of
@@ -73,7 +77,7 @@ grid makes the divergence of the gradient the 7-point Laplacian, and the solve's
 reaches the velocity **(deduction)**. It changes every pass that reads the velocity; its design is
 [The staggered velocity](#the-staggered-velocity).
 
-### 5. Unused channels written 0
+### 6. Unused channels written 0
 
 The 3D motion's and the 3D bridge's velocities write 0 in their unused w (`compose_velocity.frag`,
 `velocity_trail.frag`, `velocity_bandpass_direction.frag`), so a monitor shows w as nothing rather
@@ -250,7 +254,7 @@ about thirteen. SOR's sweeps cost 0.34 ms each, two dispatches from global memor
 leaves the high frequencies, which the mean residual counts, worse than Jacobi does. The divergence after
 the projection hardly moves with any of them: the divergence and the gradient are central differences
 on one grid, whose Laplacian is not the 7-point one every solver solves, so even an exact solve leaves
-it ([Plan](#4-the-projections-floor)). With the solve exact the water keeps more of its speed, 0.150
+it ([Plan](#5-the-projections-floor)). With the solve exact the water keeps more of its speed, 0.150
 widths/s in the mean against Jacobi's 0.134.
 
 ### The guard
@@ -643,7 +647,7 @@ its row in TIMING.md.
 
 ## The staggered velocity
 
-Not built; the answer to [the projection's floor](#4-the-projections-floor): the velocity on the cells' faces (Harlow and
+Not built; the answer to [the projection's floor](#5-the-projections-floor): the velocity on the cells' faces (Harlow and
 Welch's MAC grid), so the divergence and the gradient are one-cell differences, the Laplacian the solvers solve,
 and an exact solve leaves the water exactly incompressible, with no pattern alternating cell by cell left behind.
 

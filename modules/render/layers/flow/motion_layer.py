@@ -6,9 +6,9 @@ from it, so an input built before the render loop names the object the stage bef
 
 `MotionLayer` is the shape the 2D and the 3D motion layer share: it measures once per camera frame,
 when the input's `timestamp` differs from the one it measured last, over the interval the stamps
-give (`frame_interval`). For its first WARM_UP_TIME seconds it stays at rest, as the camera's
-exposure settles and the flow would read the brightening as motion. It draws nothing; the monitors
-draw its output's `textures`."""
+give (`frame_interval`). A frame is a picture with a capture time: without one (`timestamp` None) no
+camera frame is there yet, only a texture, so the motion stays at rest and counts nothing, and after a
+frame a None starts it over. It draws nothing; the monitors draw its output's `textures`."""
 
 from abc import abstractmethod
 from dataclasses import dataclass
@@ -20,7 +20,6 @@ from modules.flow import DepthView, TextureKind
 from modules.settings import Field
 from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 
-WARM_UP_TIME: float = 0.0           # s after start the motion stays at rest, while the camera's exposure settles
 MAX_FRAME_INTERVAL: float = 0.5    # s: a longer gap between two captures is a pause or a loop, not a frame's
 FRAME_INTERVAL_BAND: tuple[float, float] = (0.5, 2.0)  # a capture gap is held to this share of the expected frame interval
 
@@ -49,7 +48,7 @@ class MotionInput:
     """One camera's picture for the motion stage, built by the app each tick. `image` is the picture
     the velocity is measured on by its brightness; `timestamp` the capture time of the camera frame it
     holds, the frame's identity: the stage measures when it differs from the one it measured last
-    (None: every tick); `dt` the render tick's; `depth` the camera's depth on the same view, or None;
+    (None: no camera frame yet, nothing to measure); `dt` the render tick's; `depth` the camera's depth on the same view, or None;
     `mask` the player's mask on the view, or None."""
     image: Annotated[Texture, TextureKind.IMAGE]
     timestamp: float | None
@@ -84,7 +83,6 @@ class MotionLayer(StageLayer[MotionInput, MotionOutput]):
         self._timestamp: float | None = None        # the capture time of the frame measured last
         self._ticks: float = 0.0                    # time counted in ticks since the last measurement (s)
         self._flow_size: tuple[int, int] = (0, 0)   # the size the flow runs at; follows settings.width/height
-        self._warm_up: float = 0.0                  # render time since the first input (s), up to WARM_UP_TIME
 
     # ========== Lifecycle ==========
 
@@ -139,19 +137,18 @@ class MotionLayer(StageLayer[MotionInput, MotionOutput]):
             return
         self._follow_flow_size()
 
-        # the camera's exposure settles over its first seconds, which the flow reads as motion: at rest until then
-        if self._warm_up < WARM_UP_TIME:
-            self._warm_up += input.dt if math.isfinite(input.dt) and input.dt > 0.0 else 0.0
-            self.reset()
+        # no capture time is no camera frame, only a texture: nothing to measure, and the next frame starts over
+        if input.timestamp is None or not math.isfinite(input.timestamp):
+            if self._timestamp is not None:
+                self.reset()
             return
 
         self._ticks += input.dt
-        if input.timestamp is None or input.timestamp != self._timestamp:
+        if input.timestamp != self._timestamp:
             Style.push_style()
             Style.set_blend_mode(Style.BlendMode.DISABLED)
             interval: float = frame_interval(input.timestamp, self._timestamp, self.settings.fps, self._ticks, input.dt)
-            if input.timestamp is not None and math.isfinite(input.timestamp):
-                self._timestamp = input.timestamp
+            self._timestamp = input.timestamp
             self._measure(input, interval)
             self._ticks = 0.0
             Style.pop_style()

@@ -227,7 +227,8 @@ The shader loader finds a shader's source by its `.py` module name beside it
   thread and is not board data. The layers read nothing from the board; the app's wiring pass
   reads the pose frames there for the weights.
 - A layer has no change flag: a source layer's `timestamp`, the capture time of the frame it
-  holds, says whether it holds a new one. `MotionInput.timestamp` tells the motion layer, and
+  holds, says whether it holds a new one, and `None` that it holds none yet: a stage that compares
+  frames over time counts only frames with a capture time, and one that only draws may draw black. `MotionInput.timestamp` tells the motion layer, and
   `DepthMaskLayer` reads its depth source's the same way.
 - The time step has one transport: the app hands the tick's `dt` in the inputs, and the fluid's
   `TimeStep` smooths it over `fps_smoothing`, or steps fixed at `fixed_fps`. No `fps` or
