@@ -533,7 +533,7 @@ class Fluid3D:
         if not confining:
             if self._needs_curl:
                 self._vorticity_curl_shader.use(self._velocity, self._obstacle, self._curl_vol, self._cell, 1.0,
-                                                has_obstacles=self._has_obstacles)
+                                                has_obstacles=self._has_obstacles, closed=self._closed)
                 glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
             return
 
@@ -547,7 +547,8 @@ class Fluid3D:
             self._curl_vol,
             self._cell,
             vorticity_radius,
-            has_obstacles=self._has_obstacles
+            has_obstacles=self._has_obstacles,
+            closed=self._closed
         )
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
@@ -610,7 +611,7 @@ class Fluid3D:
     def _enforce_incompressibility(self) -> None:
         """Pressure projection (divergence → Jacobi solve → gradient subtraction), the three passes on one set
         of walls, closed or open by `wall`."""
-        closed: tuple[bool, bool, bool] = (self.settings.wall == WallMode.CLOSED,) * 3
+        closed: tuple[bool, bool, bool] = self._closed
         # a. Compute divergence
         self._divergence_shader.use(
             self._velocity,
@@ -672,6 +673,11 @@ class Fluid3D:
     def _guard_slot(self, field: str) -> GuardSlot | None:
         """The field's slot in the fluid's guard, None while `guard` is off or no field is named."""
         return self._guard.slot(field) if field and self.settings.guard else None
+
+    @property
+    def _closed(self) -> tuple[bool, bool, bool]:
+        """Per axis, whether the box's walls are closed (`wall`), as every pass reading beyond the box takes them."""
+        return (self.settings.wall == WallMode.CLOSED,) * 3
 
     @property
     def _needs_curl(self) -> bool:

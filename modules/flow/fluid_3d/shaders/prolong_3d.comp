@@ -1,21 +1,44 @@
 #version 460 core
 
 /*
- * Prolong3D - the coarser level's correction added to a level, read trilinearly at the fine cell's center,
- * the coarse volume's edge held (CLAMP_TO_EDGE).
+ * Prolong3D - the coarser level's correction added to a level, read trilinearly at the fine cell's center. A
+ * coarse cell beyond the box is the wall's ghost (walls.glsl), the correction a pressure: the same beyond a
+ * closed wall, its negative beyond an open one, so the correction is 0 on an open wall's face on every level.
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
 
-layout(binding = 0) uniform sampler3D uCoarse;      // R32F, linear
+layout(r32f, binding = 1) readonly uniform image3D uCoarse;
 layout(r32f, binding = 0) uniform image3D uFine;
 
 uniform ivec3 uFineSize;
+uniform ivec3 uCoarseSize;
+uniform ivec3 uClosed;         // Per axis, 1 where the domain's walls are closed
+
+#include "walls.glsl"
+
+// The coarse correction at `cell`, a ghost beyond the box mirrored from the cell inside
+float coarse(ivec3 cell) {
+    ivec3 inside = clamp(cell, ivec3(0), uCoarseSize - 1);
+    float value = imageLoad(uCoarse, inside).r;
+    for (int axis = 0; axis < 3; axis++) {
+        if (beyond(cell, uCoarseSize, axis)) value = wall_pressure(value, axis);
+    }
+    return value;
+}
 
 void main() {
     ivec3 gid = ivec3(gl_GlobalInvocationID);
     if (any(greaterThanEqual(gid, uFineSize))) return;
-    vec3 uv = (vec3(gid) + 0.5) / vec3(uFineSize);
-    float correction = texture(uCoarse, uv).r;
+    // The fine cell's center in coarse cells, centers at integers
+    vec3 position = (vec3(gid) + 0.5) * vec3(uCoarseSize) / vec3(uFineSize) - 0.5;
+    ivec3 base = ivec3(floor(position));
+    vec3 f = position - vec3(base);
+    float correction = 0.0;
+    for (int k = 0; k < 8; k++) {
+        ivec3 corner = ivec3(k & 1, (k >> 1) & 1, (k >> 2) & 1);
+        vec3 weight = mix(1.0 - f, f, vec3(corner));
+        correction += weight.x * weight.y * weight.z * coarse(base + corner);
+    }
     imageStore(uFine, gid, vec4(imageLoad(uFine, gid).r + correction, 0.0, 0.0, 0.0));
 }

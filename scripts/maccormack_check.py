@@ -54,7 +54,7 @@ def body(t: float, moving: bool) -> np.ndarray:
     return values
 
 
-def run(advection: Advection, seconds: float, move: float, overrides: list[str]) -> list[tuple[float, float, float, int]]:
+def run(advection: Advection, seconds: float, move: float, overrides: list[str]) -> list[tuple[float, float, float, int, float, float]]:
     settings = Fluid3DSettings()
     settings.update_from_dict(preset_fluid())
     settings.advection = advection
@@ -74,7 +74,7 @@ def run(advection: Advection, seconds: float, move: float, overrides: list[str])
     fluid = Fluid3D(settings)
     fluid.allocate(2160, 3840)
     fluid.update(1.0 / FPS)
-    rows: list[tuple[float, float, float, int]] = []
+    rows: list[tuple[float, float, float, int, float, float]] = []
     steps = int(seconds * FPS)
     for i in range(steps):
         t = i / FPS
@@ -88,7 +88,9 @@ def run(advection: Advection, seconds: float, move: float, overrides: list[str])
             assert v is not None
             bad = int((~np.isfinite(v[..., :3])).sum())
             speed = np.linalg.norm(np.nan_to_num(v[..., :3]), axis=-1)
-            rows.append((t + 1.0 / FPS, float(speed.max()), float(speed.mean()), bad))
+            wall = np.zeros(speed.shape, bool)               # the two cells next to any side of the box
+            wall[:2], wall[-2:], wall[:, :2], wall[:, -2:], wall[:, :, :2], wall[:, :, -2:] = (True,) * 6
+            rows.append((t + 1.0 / FPS, float(speed.max()), float(speed.mean()), bad, float(speed[wall].mean()), float(speed[~wall].mean())))
     fluid.deallocate()
     return rows
 
@@ -101,9 +103,9 @@ def main() -> None:
     args = parser.parse_args()
     mh.context()
     results = {advection: run(advection, args.seconds, args.move, args.set) for advection in (Advection.SEMI_LAGRANGIAN, Advection.MACCORMACK)}
-    print(f"{'t s':>5}  {'SL top':>8} {'SL mean':>8}  {'MC top':>8} {'MC mean':>8} {'MC bad':>7}")
+    print(f"{'t s':>5}  {'SL top':>8} {'SL mean':>8} {'SL wall':>8} {'SL inner':>8}  {'MC top':>8} {'MC mean':>8} {'MC wall':>8} {'MC inner':>8} {'MC bad':>7}")
     for sl, mc in zip(results[Advection.SEMI_LAGRANGIAN], results[Advection.MACCORMACK]):
-        print(f'{sl[0]:5.1f}  {sl[1]:8.3f} {sl[2]:8.4f}  {mc[1]:8.3f} {mc[2]:8.4f} {mc[3]:7d}')
+        print(f'{sl[0]:5.1f}  {sl[1]:8.3f} {sl[2]:8.4f} {sl[4]:8.4f} {sl[5]:8.4f}  {mc[1]:8.3f} {mc[2]:8.4f} {mc[4]:8.4f} {mc[5]:8.4f} {mc[3]:7d}')
 
 
 if __name__ == '__main__':

@@ -6,8 +6,9 @@
  * In 3D, curl is a vector:
  *   ω = (∂w/∂y - ∂v/∂z, ∂u/∂z - ∂w/∂x, ∂v/∂x - ∂u/∂y)
  *
- * Uses sampler3D for filtered neighbor access.
- * Border color (0) handles domain boundaries naturally.
+ * Uses sampler3D for filtered neighbor access; a neighbor beyond the box is the wall's ghost (walls.glsl),
+ * the same wall the projection reads, not the texture's border of 0, which would read the free-slip wall as a
+ * shear and give the water sliding along it a curl no wall has.
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick of cells, so z neighbors share the cache
@@ -21,6 +22,9 @@ uniform vec3  uHalfRdxInv;  // (0.5/dx, 0.5/dy, 0.5/dz)
 uniform float uRadius;       // Sampling radius in texels
 uniform ivec3 uSize;
 uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
+uniform ivec3 uClosed;        // Per axis, 1 where the domain's walls are closed
+
+#include "walls.glsl"
 
 void main() {
     ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
@@ -47,6 +51,16 @@ void main() {
     vec3 vB = texture(uVelocity, st - dy).xyz;
     vec3 vF = texture(uVelocity, st + dz).xyz;
     vec3 vK = texture(uVelocity, st - dz).xyz;
+
+    // A neighbor beyond the box: the wall's ghost of this cell
+    vec3 vC = texture(uVelocity, st).xyz;
+    int reach = max(int(round(uRadius)), 1);
+    if (gid.x + reach >= uSize.x) vR = wall_velocity(vC, 0);
+    if (gid.x - reach < 0)        vL = wall_velocity(vC, 0);
+    if (gid.y + reach >= uSize.y) vT = wall_velocity(vC, 1);
+    if (gid.y - reach < 0)        vB = wall_velocity(vC, 1);
+    if (gid.z + reach >= uSize.z) vF = wall_velocity(vC, 2);
+    if (gid.z - reach < 0)        vK = wall_velocity(vC, 2);
 
     // 3D curl = (∂w/∂y - ∂v/∂z, ∂u/∂z - ∂w/∂x, ∂v/∂x - ∂u/∂y)
     vec3 curl;

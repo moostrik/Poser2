@@ -248,13 +248,32 @@ class Shader():
 
     # STATIC METHODS
     @staticmethod
-    def read_shader_source(filename: str) -> str:
-        """Read shader source code from file."""
+    def read_shader_source(filename: str, _included: frozenset[str] = frozenset()) -> str:
+        """Read shader source code from file; a line `#include "name.glsl"` is replaced by that file, beside
+        the including one, so passes can share one rule (each file included once per shader)."""
         try:
             with open(filename, 'r') as file:
-                return file.read()
+                source = file.read()
         except FileNotFoundError:
             return ''
+        if '#include' not in source:
+            return source
+        folder: Path = Path(filename).parent
+        lines: list[str] = []
+        for line in source.splitlines():
+            stripped = line.strip()
+            if stripped.startswith('#include "') and stripped.endswith('"'):
+                name: str = stripped[len('#include "'):-1]
+                path = str(folder / name)
+                if path in _included:
+                    continue
+                included = Shader.read_shader_source(path, _included | {path})
+                if not included:
+                    logger.error(f"{filename}: include {name} not found")
+                lines.append(included)
+            else:
+                lines.append(line)
+        return '\n'.join(lines)
 
 
     # CLASS METHODS FOR HOT-RELOAD MANAGEMENT

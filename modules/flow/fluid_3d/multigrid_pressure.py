@@ -81,7 +81,7 @@ class MultigridPressure:
         correction.clear()
         glMemoryBarrier(_BARRIER)
         self._cycle(level + 1, correction, source, obstacle, cell * 2.0, False, closed)
-        self._prolong_shader.use(correction, x)
+        self._prolong_shader.use(correction, x, closed)
         glMemoryBarrier(_BARRIER)
         self._smoother.solve(x, b, obstacle, cell, SMOOTHING, 1.0, has_obstacles, closed)
         glMemoryBarrier(_BARRIER)

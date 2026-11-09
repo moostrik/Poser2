@@ -18,12 +18,14 @@ uniform ivec3 uSize;
 uniform bool  uHasObstacles;
 uniform ivec3 uClosed;
 
+#include "walls.glsl"
+
 bool isObstacle(ivec3 coord) {
     return texture(uObstacle, (vec3(coord) + 0.5) / vec3(uSize)).r > 0.5;
 }
 
 float neighbor(ivec3 coord, float pC, int axis) {
-    if (coord[axis] < 0 || coord[axis] >= uSize[axis]) return uClosed[axis] == 1 ? pC : 0.0;
+    if (coord[axis] < 0 || coord[axis] >= uSize[axis]) return wall_pressure(pC, axis);     // walls.glsl
     if (uHasObstacles && isObstacle(coord)) return pC;
     return imageLoad(uPressure, coord).r;
 }

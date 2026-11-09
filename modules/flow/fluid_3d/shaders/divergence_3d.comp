@@ -27,6 +27,8 @@ uniform ivec3 uSize;          // Volume dimensions
 uniform bool  uHasObstacles;  // Skip obstacle logic when no obstacles present
 uniform ivec3 uClosed;        // Per axis, 1 where the domain's walls are closed (solid), 0 where open
 
+#include "walls.glsl"
+
 void main() {
     ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
     if (any(greaterThanEqual(gid, uSize))) return;
@@ -54,14 +56,13 @@ void main() {
     vec3 vF = texture(uVelocity, st + vec3(0.0, 0.0, texel.z)).xyz;  // Front (+z)
     vec3 vK = texture(uVelocity, st - vec3(0.0, 0.0, texel.z)).xyz;  // Back  (-z)
 
-    // The domain's walls: the ghost beyond the last cell, closed or open
-    vec3 ghost = mix(vC, -vC, vec3(uClosed));
-    if (gid.x == uSize.x - 1) vR.x = ghost.x;
-    if (gid.x == 0)           vL.x = ghost.x;
-    if (gid.y == uSize.y - 1) vT.y = ghost.y;
-    if (gid.y == 0)           vB.y = ghost.y;
-    if (gid.z == uSize.z - 1) vF.z = ghost.z;
-    if (gid.z == 0)           vK.z = ghost.z;
+    // The domain's walls: the ghost beyond the last cell (walls.glsl)
+    if (gid.x == uSize.x - 1) vR = wall_velocity(vC, 0);
+    if (gid.x == 0)           vL = wall_velocity(vC, 0);
+    if (gid.y == uSize.y - 1) vT = wall_velocity(vC, 1);
+    if (gid.y == 0)           vB = wall_velocity(vC, 1);
+    if (gid.z == uSize.z - 1) vF = wall_velocity(vC, 2);
+    if (gid.z == 0)           vK = wall_velocity(vC, 2);
 
     // No-slip boundary: if neighbor is interior obstacle, use -vCenter
     if (uHasObstacles) {

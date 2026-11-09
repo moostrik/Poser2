@@ -52,16 +52,28 @@ z speeds on standmoves and stillslowfast first.
 
 Found and fixed ([The advection](#the-advection)): the limiter clamped the correction to its bounds,
 which kept energy, and with the confinement the water grew; it now reverts to the semi-Lagrangian step,
-keeps the detail and decays as that step does. Left: the confinement above about 1 grows the water in
-both advections (measured, the same table), an epsilon to choose with that in mind, or a confinement
-that adds no energy, to be decided.
+keeps the detail and decays as that step does. Left, the confinement: by the textbook (Fedkiw, Stam
+and Jensen 2001) it adds energy on purpose, to put back the swirl the semi-Lagrangian step smears
+away, and stays stable only while the advection loses at least that much; above about 1 it grows the
+water in both advections (measured, the same table, with the walls' false curl included; with the
+wall rule both decay at 1.93, and at 5 MacCormack's inside holds, [The walls](#the-walls)). The look
+above the textbook epsilon, smoke curling out of the water, is wanted **(site fact)**: more swirl than
+the advection lost. So, after the walls: measure the high epsilon again with consistent walls; if it is
+stable, nothing more; if it still grows, either the confinement kept as the look and capped where its
+push would raise the water's energy, or IVOCK (Zhang, Bridson and Greif 2015, the vorticity the
+advection destroyed added back, never energy created) with a gain above 1 for the look, capped as well.
 
 ### 3. The walls
 
-With `wall` open the fluid makes non-finite values **(site fact)**, while the vorticity stays stable. Not yet
-looked into. Until it is fixed it is a test for the guards: open the walls and the fluid's finite guard
-should zero the values and log `fluid: … non-finite … values` ([The guard](#the-guard)). An open wall takes
-the last cell's velocity as the ghost and 0 as the pressure ([The walls](#the-walls)), the place to start.
+- **One wall rule, free-slip consistent, open fixed**: built ([The walls](#the-walls)). The vorticity
+  unstable at the walls was the curl and the confinement reading a no-slip wall the projection does not
+  have; the open walls' non-finite values were the multigrid putting an open wall's 0 in a different place
+  on each level. Both measured gone.
+- **Partial slip, an option, next.** Navier slip models the layer along a wall a coarse grid cannot
+  resolve, so it suits our grid (no-slip would need that layer resolved): the water along a wall slows
+  over a time, seconds to 1%, 0 free-slip (the default). It changes only the tangential velocity in the
+  rule's ghost: the pressure's condition stays, so curl, confinement and pressure still agree. It makes a
+  wall curl in proportion to its braking, which the confinement amplifies.
 
 ### 4. The water looks too fast
 
@@ -203,13 +215,36 @@ stopped, while the coast is the fluid's own inertia ([Measuring](#measuring) sho
 ### The walls
 
 The domain is a box with solid walls, as the textbook's (Bridson): beyond a closed wall the water
-cannot pass, v·n = 0, and the pressure has no gradient across it, ∂p/∂n = 0. The projection's three
-passes take the walls the same way, by a ghost beyond the last cell (`uClosed`, per axis): the
-divergence a ghost velocity whose normal component is the last cell's turned, so the flux through the
-wall's face is 0; the Jacobi solve and the gradient the last cell's pressure as the ghost; and the
-gradient keeps the velocity from pointing into the wall, as into an obstacle's face. An open wall
-takes the last cell's velocity as the ghost and 0 as the pressure: the water leaves. x and y are
-closed or open by `wall`, z by `wall`.
+cannot pass, v·n = 0, it slides along freely (free-slip), and the pressure has no gradient across it,
+∂p/∂n = 0. One rule says what lies beyond the box, `walls.glsl`, included by every pass that reads
+there: the divergence, the gradient, the Jacobi and SOR solves, the multigrid's residual and
+prolongation, the curl and the confinement (`uClosed`, per axis, from `wall`). A ghost cell beyond the
+last mirrors it:
+
+| | closed | open |
+|---|---|---|
+| the velocity | its component through the wall turned, along it the same: the face carries nothing, no shear | the same: it leaves as it came |
+| the pressure | the same: no push across | its negative: 0 on the wall's face, on every multigrid level alike |
+| the curl's size, for the confinement | the same: no slope toward the wall | the same |
+
+The gradient also keeps the velocity from pointing into a closed wall, as into an obstacle's face.
+
+The curl and the confinement once read the textures' border of 0 instead: a wall the water slid along
+read as a shear, a curl no wall has, and the confinement pushed along the wall and made it bigger the
+next step. The multigrid once put an open wall's 0 one ghost cell out, a different place on each level,
+and its coarse correction spread to the edge as at a closed wall, so it diverged. Measured with
+`scripts/maccormack_check.py` at deep_flow's preset (the multigrid), a disc swinging for 3 s, then
+still; the mean speed (widths/s) in the two cells next to the walls and inside them, at 4 s and 12 s:
+
+| Run | wall band, before | inside, before | wall band, the rule | inside, the rule |
+|---|---|---|---|---|
+| closed, vorticity 1.93, semi-Lagrangian | 0.060 → 0.212 | 0.024 → 0.069 | 0.032 → 0.011 | 0.022 → 0.008 |
+| closed, vorticity 1.93, MacCormack | 0.049 → 0.227 | 0.025 → 0.061 | 0.031 → 0.009 | 0.025 → 0.007 |
+| closed, vorticity 5, MacCormack | | | 0.027 → 0.015 | 0.025 → 0.021 |
+| open, both advections | the half float's top within 1.5 s, then non-finite | | 0.004 → 0.002 (6 s) | 0.007 → 0.004 (6 s) |
+
+Jacobi and SOR, closed and open, decay as well; the density's edge and the swirl MacCormack keeps are as
+before (0.172, 0.723).
 
 The walls must be the ghosts, not the texture's border. With the border as the wall (the velocity
 0 beyond it, the pressure its edge, the obstacle's face rule off), the divergence sees a face at the
