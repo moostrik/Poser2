@@ -366,15 +366,15 @@ restriction ([FLUID_3D.md](FLUID_3D.md#the-pressure)) the step is 4.40 ms, the p
 
 Seven shapes swept over the fluid's 14 compute passes (`fluid_pass_check.py`, each pass alone), at the preset's
 288 × 512 × 64 and at depth 144 and 256. 8 × 8 × 4 is the best or tied for the stencil passes and the velocity's
-advection at depth 64. Two passes take others, at every depth:
+advection at depth 64. The density injections take 8 × 8 × 8, at every depth:
 
-| Pass                                  | Shape     | Depth 64      | Depth 144     | Depth 256     |
-|---------------------------------------|-----------|---------------|---------------|---------------|
-| the density injections (each)         | 8 × 8 × 8 | 0.393 → 0.330 | 0.386 → 0.321 | 0.322 → 0.302 |
-| the field advection (density with 4K) | 8 × 4 × 8 | 0.991 → 0.955 | 1.149 → 1.116 | 1.390 → 1.354 |
+| Pass                          | Shape     | Depth 64      | Depth 144     | Depth 256     |
+|-------------------------------|-----------|---------------|---------------|---------------|
+| the density injections (each) | 8 × 8 × 8 | 0.393 → 0.330 | 0.386 → 0.321 | 0.322 → 0.302 |
 
 An injection's threads mostly read the bridge's image at their x, y and stop; a group 8 layers deep shares that
-read 8 ways. At depth 144 and 256 the stencils lean toward deeper groups too, the pressure 3.15 → 3.01 ms
+read 8 ways. The field advection measured about 3.5% faster at 8 × 4 × 8 (the density with its 4K amount
+0.991 → 0.955 ms), with no reason that follows from what it does, so it stays at 8 × 8 × 4. At depth 144 and 256 the stencils lean toward deeper groups too, the pressure 3.15 → 3.01 ms
 (8 × 8 × 8) and 4.98 → 4.75 (4 × 8 × 8), about twice a pass's spread between runs at those sizes, while at
 depth 64 the finest smoothing is 7% slower at 8 × 8 × 8; a grid of 144 or deeper wants the pressure's shaders
 measured again.

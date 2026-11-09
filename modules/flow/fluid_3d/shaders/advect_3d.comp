@@ -12,7 +12,7 @@
  * Velocity is stored as RGBA16F with xyz = (u, v, w).
  */
 
-layout(local_size_x = 8, local_size_y = 4, local_size_z = 8) in;     // a brick of cells, so z neighbors share the cache
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick of cells, so z neighbors share the cache
 
 // Input textures (sampler3D for trilinear filtered backtrace)
 layout(binding = 0) uniform sampler3D uVelocity;  // Velocity field (RGBA16F: xyz = u,v,w)
