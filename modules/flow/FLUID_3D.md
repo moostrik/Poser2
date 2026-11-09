@@ -16,17 +16,7 @@ fluid is `Fluid3D` (`fluid_3d/fluid_3d.py`), its layer `Fluid3DLayer`
 What is next for the fluid, in order; what is open elsewhere in the flow is
 [FLOW.md's Open](FLOW.md#open).
 
-### 1. Open walls on the faces
-
-With `wall` open the water on the faces grows: on the swing at ε 0 the mean speed rises from 0.002
-to 0.004 widths/s in the two seconds after the body stops, and at ε 1.93 to 0.84 within 6 s, where the
-centered velocity decayed (0.008 → 0.003). The divergence stays 0 at every cell, the boundary's
-included, so the projection holds; the growth sits at the open walls' cells and spreads in. The
-textbook outflow on a MAC grid (Bridson ch. 5) is the pressure 0 on the wall's face, as built; what the
-advection and the forces do with the wall's face and the faces along it is to check first. The preset's
-walls are closed, which the staggered velocity takes as tested ([The walls](#the-walls)).
-
-### 2. High vorticity
+### 1. High vorticity
 
 The confinement adds energy by design (Fedkiw, Stam and Jensen 2001), to put back the swirl the
 semi-Lagrangian step smears away, and stays stable only while the advection loses at least that
@@ -37,7 +27,7 @@ kept as the look and capped where its push would raise the water's energy, or IV
 and Greif 2015: the vorticity the advection destroyed added back, never energy created) with a gain
 above 1 for the look, capped as well.
 
-### 3. The guards at the app
+### 2. The guards at the app
 
 The fluid became unstable sometimes **(site fact)**, not reproduced in the harness. Each stage now
 guards its output ([The guard](#the-guard), [MOTION.md](MOTION.md#the-guard)), so the warning names
@@ -172,8 +162,11 @@ the last mirrors it:
 | the curl's size, for the confinement | the same: no slope toward the wall               | the same                                           |
 
 On the faces (`faces.glsl`) the wall's own face is stored: closed, it is 0 and never written; open, the
-gradient sets it from the ghost pressure. A face along the wall reads beyond it the face at the edge, and
-the curl's ghost carries (2k − 1) of it. An obstacle's cell is a closed wall inside the box: the faces on
+gradient sets it from the ghost pressure. Beyond a closed wall a read takes the face at the edge, and the
+curl's ghost carries (2k − 1) of it. Beyond an open wall a read takes the water outside, at rest, 0,
+faded in over the last texel as a border of 0 is: a trace from outside carries still water in. Read as
+the face at the edge instead, the boundary fed its own inflow back in and the water grew (0.84 widths/s
+within 6 s on the swing at ε 1.93), the divergence 0 throughout. An obstacle's cell is a closed wall inside the box: the faces on
 its sides 0, its curl's ghost the closed wall's.
 
 A closed wall slips (Navier slip): `slip_time`, the seconds the water along it takes to slow to 1%,
@@ -796,7 +789,9 @@ solve unconverged. On the swing at ε 1.93, closed, the water keeps more of its 
 0.0103 against 0.0080, semi-Lagrangian), and at ε 5 MacCormack's inside holds at 0.033 where the centered
 held at 0.021; `slip_time` 2 decays as before. Through `fluid_compare.py` the water against the body is
 the same within 0.01 on stillslowfast and standmoves. An obstacle's cells read 0 (`--obstacle`). Open
-walls grow ([Plan](#1-open-walls-on-the-faces)).
+walls decay as the centered velocity's did (the swing at ε 1.93, the mean at 4 s and 6 s: 0.0073 and
+0.0032 against 0.0077 and 0.0031); the open swirl drains alike, its floor 0.0001 against the centered
+0.0005 to 0.0015.
 
 ## Parked
 

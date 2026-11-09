@@ -37,12 +37,22 @@ vec3 face_position(int c, ivec3 i) {
     return p;
 }
 
-// Component `c` interpolated at `p` (cells) from its own faces, clamped to them
+// Component `c` interpolated at `p` (cells) from its own faces. Beyond a closed wall it reads the face at the
+// edge (the wall's own across, its neighbor's along: the free-slip mirror); beyond an open wall the water
+// outside, at rest, 0, faded in over the last texel as a border of 0 is: so a trace from outside carries
+// still water in, and the boundary never feeds itself
 float face_at(int c, vec3 p) {
     vec3 t = p;
     t[c] += 0.5;                                        // a face's texel center is half a cell along its axis
-    t = clamp(t, vec3(0.5), vec3(face_count(c)) - 0.5);
-    return texture(uFaces, t / vec3(uCells + 1))[c];
+    vec3 count = vec3(face_count(c));
+    float outside = 1.0;
+    for (int axis = 0; axis < 3; axis++) {
+        if (uClosed[axis] == 0) {
+            outside *= clamp(t[axis] + 0.5, 0.0, 1.0) * clamp(count[axis] + 0.5 - t[axis], 0.0, 1.0);
+        }
+    }
+    t = clamp(t, vec3(0.5), count - 0.5);
+    return outside * texture(uFaces, t / vec3(uCells + 1))[c];
 }
 
 // The velocity at `p` (cells), each component from its own faces (Bridson)
