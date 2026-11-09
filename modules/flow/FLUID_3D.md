@@ -23,7 +23,19 @@ solvers solve the compact 7-point Laplacian; the two differ, so the velocity kee
 about 0.0075 of a cell whatever the solver ([The pressure](#the-pressure)). A staggered grid makes
 the divergence of the gradient the 7-point Laplacian, and the solve's accuracy then reaches the
 velocity **(deduction)**. It changes every pass that reads the velocity; its design is
-[The staggered velocity](#the-staggered-velocity).
+[The staggered velocity](#the-staggered-velocity). A replacement, not an option: the centered velocity
+goes in the same change.
+
+| Step | What                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+|------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1    | the measures the tests need and lack, in `maccormack_check.py`: the divergence after the projection, the compression                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| 2    | the baseline: every test of [The staggered velocity](#the-staggered-velocity) on the code as it is, the look's frames saved                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 3a   | the faces' storage, and on them the velocity's advection (with its guard, top speed and slip) and the viscosity, its Jacobi iterations the velocity's one repeated pass; the walls' faces in both; a pass after them averaging the faces to the centers, and one before the advection interpolating the centers to the faces, so every other pass reads the centers as now; built in both storages, three R16F volumes and one RGBA16F volume a face longer on every axis, timed in the app with the pose (`trial_runs.py`, each pass's own timer; the step's total includes the scaffold), `viscosity` above 0 at the preset's `viscosity_iter` 20 for the timing; the faster storage kept |
+| 3b   | the divergence and the gradient on the faces, with their walls; the scaffold's two passes move around the passes still on the centers                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| 3c   | the curl, the confinement, the buoyancy, the drag and the body force on the faces; the scaffold gone, the average to the centers at the step's end; timed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| 3d   | the obstacles' face rule in every pass                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| 3e   | the density and the temperature advected by the faces; the face volumes as monitor ports beside the centers' `velocity`; timed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| 4    | the same tests, against the baseline; the rows in TIMING.md and this document; a commit after each step                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 
 ### 2. High vorticity
 
@@ -488,7 +500,7 @@ back:
 
 | Part                              | How                                                                                                                                                                                                                                                                                                                                          | Why                                                                                                                              |
 |-----------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------|
-| storage                           | one SSBO, 32 bytes a particle: position and age (vec4), the previous position (vec3), color RGBA8 packed in a uint; 32 M is 1 GB, 100 M 3.2 GB                                                                                                                                                                                               | each particle updates itself in place, so no swap pair                                                                           |
+| storage                           | three R16F volumes, one per component, or one RGBA16F volume, each a face longer along an axis: the faster at step 3a                                                                                                                                                                                                                        |                                                                                                                                  |
 | emission                          | a compute pass over the bridge's density at the bridge's size: each texel's count, amount × rate × dt, rounded by a hash so a small amount still spawns; an atomic head (`atomicAdd`) gives the slots, modulo the count                                                                                                                      | a ring buffer: no free list, no compaction, no count read back                                                                   |
 | the ring's fade                   | a particle's place in the ring, (head − slot) mod N over N, is how near it is to being overwritten; its alpha falls to 0 over the ring's last share (`ring_fade`, 0.1), so the oldest fade out at whatever rate the body emits; the age's own fade by `density.fade_time` on top                                                             | no particle vanishes in a frame, whatever the emission                                                                           |
 | advection                         | a compute pass, 256 a group, RK2 (midpoint) through the velocity's `sampler3D`, the same uv metric as `advect_3d` (`uRdx`, `advection_scale`); the walls clamp                                                                                                                                                                               | two trilinear fetches a particle, the hardware's; the grid sets the motion                                                       |
@@ -662,24 +674,108 @@ its row in TIMING.md.
 
 ## The staggered velocity
 
-Not built; the answer to [the projection's floor](#1-the-projections-floor): the velocity on the cells'
-faces (Harlow and Welch's MAC grid), so the divergence and the gradient are one-cell differences, the
-Laplacian the solvers solve, and an exact solve leaves the water exactly incompressible, with no pattern
-alternating cell by cell left behind.
+Not built; the answer to [the projection's floor](#1-the-projections-floor). The velocity moves to the
+cells' faces, the MAC grid (Harlow and Welch 1965; Bridson, *Fluid Simulation for Computer Graphics*,
+2nd ed. 2015, ch. 2): each component on the faces across its own axis, x between left and right
+neighbors, y between upper and lower, z between front and back. The divergence and the gradient become
+one-cell differences, whose product is the 7-point Laplacian the solvers solve, so an exact solve leaves
+the water exactly incompressible, with no pattern alternating cell by cell. A collocated grid patched by
+Rhie–Chow interpolation, or a solve of the wide Laplacian the central differences make, are the
+alternatives: the first is engineering CFD's fix and keeps a velocity the projection did not make
+divergence-free, the second decouples the cells into a checkerboard.
 
-| Part      | How                                                                                                                                                                                                                                                                                                                   |
-|-----------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| storage   | one RGBA16F volume at the cells' size: a texel's x, y, z the velocity on its left, bottom and front faces; the right, top and back faces on the domain's walls not stored, their value the walls' rule (0 closed, the neighbor's open), as the ghosts (`uClosed`) take them, so the sizes stay multiples of 16 and 32 |
-| rewritten | the velocity's advection and its MacCormack, the divergence, the gradient, the viscosity, the confinement's force, the buoyancy's add, the drag and the body force, the walls in each                                                                                                                                 |
-| new       | one pass a step averaging the faces to the cells' centers, so the density's carriers, the curl, the particles and the monitors read the velocity as now                                                                                                                                                               |
-| unchanged | the pressure solvers, the carriers, the bridge, the motion                                                                                                                                                                                                                                                            |
-| cost      | about +1 to 1.5 ms a step at 256 × 448 × 128, the velocity's advection reading two to three times as much **(deduction)**                                                                                                                                                                                             |
-| looks     | the density's brightness kept (no gathering or thinning by compression), less fine jitter for the confinement to spin up, swirls holding longer, pushes carrying further; subtle with the calm preset **(deduction)**                                                                                                 |
-| re-check  | the walls' ghosts, the drag's water against the body, the y metric and the resolution checks, through the harness                                                                                                                                                                                                     |
+| Part                         | How                                                                                                     |
+|------------------------------|---------------------------------------------------------------------------------------------------------|
+| storage                      | three R16F volumes, one per component, each one face longer along its own axis                          |
+| the step                     | each pass reads and writes the faces; the pressure, the density and the temperature stay at the centers |
+| the centers                  | one pass at the step's end averaging the faces to an RGBA16F volume at the cells' centers               |
+| the density, the temperature | advected by the faces; the particles, the upscaled density and the monitors read the centers            |
+| unchanged                    | the pressure solvers, the multigrid, the obstacle's cells, the bridge, the motion                       |
 
-Sources: the face counts and the boundary faces zeroed ([oxiphysics MAC
-grid](https://docs.rs/oxiphysics-gpu/0.1.1/src/oxiphysics_gpu/gpu_fluid_euler.rs.html)); the walls folded
-into the operators on the GPU (Zaspel).
+The storage. Two layouts, the faster kept at step 3a. Three volumes: at 256 × 448 × 128 cells, x's
+faces are 257 × 448 × 128, y's 256 × 449 × 128 and z's 256 × 448 × 129: a row of 256 cells has 257 faces, the box's two walls included. The far wall's face is
+stored, since at an open wall it is an unknown the projection sets; at a closed wall it is 0. The grid,
+every dispatch and the multigrid's levels stay multiples of 16: one thread per cell, the last cell's
+thread along an axis also writing that far face. Any size is a valid texture, and the driver pads to its
+own tiles, so 257 costs what a hand-padded 272 would **(deduction)**. One component per volume, not an
+RGBA texel per cell: an interpolated read of one component fetches only that component, 2 bytes a
+texel instead of 8, and nothing is stored unused. R16F takes image load and store and trilinear
+filtering as the temperature does. Each volume sits half a cell off along its own axis, so each read
+takes its own uv. One volume: RGBA16F at 257 × 449 × 129, a texel's x, y and z the faces on its cell's
+left, bottom and front, w unused; one fetch reads all three where a pass reads them together (the
+divergence, the gradient), but an interpolated read of one component fetches all four.
+
+The step, pass by pass:
+
+| Pass                      | On the faces                                                                                                                                                                                                                                                            |
+|---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| the velocity's advection  | each face traced back on its own from the velocity at the face (its own component, the other two averaged from their four nearest faces), its component read at the departure point from its own volume (Bridson ch. 3)                                                 |
+| MacCormack                | the same per component, its bounds the eight texels of that component's volume                                                                                                                                                                                          |
+| the top speed             | on the full vector at the face, the other two components averaged as in the trace                                                                                                                                                                                       |
+| the slip                  | the tangential faces along a closed wall braked by k                                                                                                                                                                                                                    |
+| the viscosity             | each component's Laplacian on its own faces                                                                                                                                                                                                                             |
+| the curl, the confinement | the curl at the centers straight from the faces, each derivative a difference of two face averages, so the step needs no centers' volume midway; the force averaged to the faces (Fedkiw, Stam and Jensen 2001)                                                         |
+| the buoyancy              | the temperature and the density averaged to each face, x, y and z, since gravity has all three (`gravity_x`, `gravity_y`, `gravity_z`)                                                                                                                                  |
+| the drag, the body force  | the bridge's textures read at each face's place                                                                                                                                                                                                                         |
+| the divergence            | per cell, its six faces' one-cell differences                                                                                                                                                                                                                           |
+| the gradient              | per face, its two cells' pressures                                                                                                                                                                                                                                      |
+| the obstacles             | a face with a solid cell on either side solid, 0 and never written; see below                                                                                                                                                                                           |
+| the walls                 | closed: the faces on the wall 0, never written; open: the face on the wall set by the gradient from the ghost pressure −p; the curl's tangential ghost (2k − 1); the face volumes sampled clamped to their edge, so a face along the wall reads its own value beyond it |
+
+The order in a step. The velocity is on the faces from the advection to the projection; the curl reads
+the faces directly, so nothing midway needs the centers. After the projection one pass averages the faces
+to the centers, the velocity the projection made, which the particles, the upscaled density and the
+monitors read.
+
+The density and the temperature. Their advection reads each component from its own faces at the traced
+point: the field the projection made divergence-free, interpolated once. The centers' copy is the faces
+averaged, a two-tap blur along each axis, then interpolated again, so it smooths more and is not exactly
+divergence-free. The 4K upscaled density moves to the faces too only if its timing allows: three reads a
+texel instead of one.
+
+The obstacles: a solid cell is one whose obstacle value (R8, at the cells, extruded from the 2D mask
+`set_obstacle`) is above 0.5, static, so a solid face's velocity is 0. A face between two fluid cells is
+fluid; a face with a solid cell on either side is solid, held at 0 like a closed wall's face, so the
+divergence reads it as no flow through, the gradient skips it and every pass that writes the velocity
+leaves it. The pressure's solvers keep their rule, a solid neighbor's pressure the cell's own, the
+Neumann condition the solid face makes. The faces along an obstacle are fluid, so the water slides past
+it; the curl's ghost inside a solid cell is the closed wall's, (2k − 1) of the face along it, so
+`slip_time` acts on obstacles as on the walls: an obstacle is a closed wall inside the box. A trace
+ending inside a solid cell reads the faces there, 0 on its solid sides, as today's advection reads the
+cell's own value **(deduction)**. Cut cells (Batty, Bertails and Bridson 2007), the obstacle as a
+fraction of a cell, are for later.
+
+Cost and gain **(deduction)**, against today's RGBA16F at the centers:
+
+| Pass                     | Expected                                                                                            |
+|--------------------------|-----------------------------------------------------------------------------------------------------|
+| the velocity's advection | slower: three traces a cell instead of one, each a velocity at its face and a read at its departure |
+| the centers' average     | new: one pass reading the faces, writing the RGBA volume                                            |
+| the divergence           | faster: six 2-byte faces a cell instead of six 8-byte neighbors                                     |
+| the gradient             | faster: the velocity read and written at 6 bytes a cell instead of 16                               |
+| the viscosity            | faster where on: 6 bytes a cell an iteration instead of 8                                           |
+| the step                 | about even to 1 ms slower at 256 × 448 × 128                                                        |
+
+The look **(deduction)**: the density's brightness kept (no bunching or thinning by compression), less
+cell-by-cell jitter for the confinement to spin up, swirls holding longer, pushes carrying further,
+sharper density edges; subtle at the calm preset.
+
+Measured before and after, the same runs on the code before (the baseline, taken first) and with the
+staggered velocity:
+
+| Test        | Run                                                                                                                                                                                                                                      |
+|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| timing      | `trial_runs.py`, baseline, staggered, baseline (`-timing 60 -warmup 10`, the pose on, standmoves): the step and each pass, the noise the two baselines' difference ([TIMING.md](TIMING.md#measured))                                     |
+| the floor   | the velocity's divergence after the projection, a cell's share, per solver, each grid by its own stencil: what the solve leaves on the grid it solves                                                                                    |
+| compression | a square of density in a closed box, a steady swirl, no fade and no evaporation: its total and its peak over 10 s, the same measure on both grids, since the water squeezed or stretched gathers or thins the density as the eye sees it |
+| the walls   | `maccormack_check.py`: the wall band and the inside, closed and open, both advections, ε 1.93 and 5, `slip_time` 0 and 2                                                                                                                 |
+| the detail  | `maccormack_check.py`: the density's edge and the swirl kept after 2 s                                                                                                                                                                   |
+| the water   | `fluid_compare.py` on stillslowfast and standmoves: water over body, peak, coast                                                                                                                                                         |
+| the look    | `fluid_compare.py --save` on stillslowfast: the composited output at four steps, side by side                                                                                                                                            |
+
+Sources: Harlow and Welch 1965, the MAC grid; Bridson 2015, ch. 2 (the grid), 3 (advecting it), 5
+(the pressure on it); Fedkiw, Stam and Jensen 2001, the confinement on it; the walls folded into the
+operators on the GPU (Zaspel).
 
 ## Parked
 

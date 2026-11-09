@@ -1,11 +1,19 @@
-"""MacCormack against semi-Lagrangian on one input: the fluid at deep_flow's preset, a body moving through it.
+"""MacCormack against semi-Lagrangian on one input: the fluid at deep_flow's preset.
 
-A disc of velocity (the body) sweeps left and right through the water for `--move` seconds, then stops; the fluid
-runs on for the rest of `--seconds`. Each half second it prints, per advection, the water's top and mean speed
-(widths/s) and its non-finite count, so a growth MacCormack has and the semi-Lagrangian step has not shows as a
-column that keeps rising after the body stops. Settings can be changed by path: `--set velocity.vorticity=0.3`.
+`--test swing` (the default): a disc of velocity (the body) sweeps left and right through the water for `--move`
+seconds, then stops; the fluid runs on for the rest of `--seconds`. Each half second it prints, per advection, the
+water's top and mean speed (widths/s), in the two cells next to the walls and inside them, and its non-finite count.
 
-    python scripts/maccormack_check.py [--seconds 10] [--move 3] [--set path=value ...]
+`--test swirl`: no body; the water starts as a swirl about the box's z axis (a Rankine vortex, 0.5 widths/s at
+its edge) and a cube of fully dyed density beside its center, no fade, no evaporation, no confinement, and runs
+`--seconds`. Each second it prints, per advection, the swirl kept (the mean speed over its start), the density's
+total and peak (the compression: water squeezed or stretched gathers or thins it), its edge (the 99.5% gradient
+over the max, per texel) and the floor: the share of a cell's flux its faces leave unbalanced after the
+projection, mean over the cells inside, by the grid's own stencil.
+
+Settings can be changed by path: `--set velocity.vorticity=0.3`.
+
+    python scripts/maccormack_check.py [--test swing|swirl] [--seconds 10] [--move 3] [--set path=value ...]
 """
 
 import json
@@ -16,7 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import numpy as np  # noqa: E402
-from OpenGL.GL import glFinish  # noqa: E402
+from OpenGL.GL import GL_FLOAT, GL_RGBA, GL_TEXTURE_3D, glBindTexture, glFinish, glTexSubImage3D  # noqa: E402
 
 import monitor_harness as mh  # noqa: E402
 from modules.flow import Advection, Fluid3D, Fluid3DSettings  # noqa: E402
@@ -54,7 +62,8 @@ def body(t: float, moving: bool) -> np.ndarray:
     return values
 
 
-def run(advection: Advection, seconds: float, move: float, overrides: list[str]) -> list[tuple[float, float, float, int, float, float]]:
+def fluid_settings(advection: Advection, overrides: list[str]) -> Fluid3DSettings:
+    """deep_flow's preset fluid, its advection and the settings changed by path."""
     settings = Fluid3DSettings()
     settings.update_from_dict(preset_fluid())
     settings.advection = advection
@@ -71,6 +80,11 @@ def run(advection: Advection, seconds: float, move: float, overrides: list[str])
             setattr(target, name, type(current)[value])
         else:
             setattr(target, name, type(current)(float(value)))
+    return settings
+
+
+def run(advection: Advection, seconds: float, move: float, overrides: list[str]) -> list[tuple[float, float, float, int, float, float]]:
+    settings = fluid_settings(advection, overrides)
     fluid = Fluid3D(settings)
     fluid.allocate(2160, 3840)
     fluid.update(1.0 / FPS)
@@ -95,13 +109,103 @@ def run(advection: Advection, seconds: float, move: float, overrides: list[str])
     return rows
 
 
+def upload(volume, values: np.ndarray) -> None:
+    """`values` (depth, height, width, 4) into the RGBA volume's current buffer."""
+    d, h, w, _ = values.shape
+    glBindTexture(GL_TEXTURE_3D, volume.tex_id)
+    glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, w, h, d, GL_RGBA, GL_FLOAT, np.ascontiguousarray(values, np.float32))
+    glBindTexture(GL_TEXTURE_3D, 0)
+
+
+def swirl_start(w: int, h: int, d: int) -> tuple[np.ndarray, np.ndarray]:
+    """The swirl's velocity (widths/s, y down the screen) and the density cube, (d, h, w, 4) each."""
+    z, y, x = np.mgrid[0:d, 0:h, 0:w].astype(np.float32)
+    px, py = (x + 0.5) / w, (y + 0.5) / w                   # widths
+    cx, cy = 0.5, 0.5 * h / w
+    dx, dy = px - cx, py - cy
+    r = np.sqrt(dx * dx + dy * dy) + 1e-6
+    radius = 0.25
+    speed = 0.5 * np.where(r < radius, r / radius, radius / r)
+    velocity = np.zeros((d, h, w, 4), np.float32)
+    velocity[..., 0] = -speed * dy / r
+    velocity[..., 1] = speed * dx / r
+    density = np.zeros((d, h, w, 4), np.float32)
+    cube = (np.abs(px - (cx + 0.15)) < 0.08) & (np.abs(py - cy) < 0.08) & (np.abs(z - d / 2) < d / 4)
+    density[cube] = 1.0
+    return velocity, density
+
+
+def floor(v: np.ndarray) -> float:
+    """The share of a cell's flux its six faces leave unbalanced, mean over the cells inside, on the centered
+    grid: a face's flux the mean of its two cells' velocity, so the imbalance is the central-difference
+    divergence the projection makes 0 on its own stencil only approximately."""
+    inner = (slice(1, -1),) * 3
+    net = np.zeros(v.shape[:3], np.float32)
+    total = np.zeros(v.shape[:3], np.float32)
+    for axis, channel in ((2, 0), (1, 1), (0, 2)):          # x along the width, y the height, z the depth
+        component = v[..., channel]
+        after = 0.5 * (component + np.roll(component, -1, axis))
+        before = np.roll(after, 1, axis)
+        net += after - before
+        total += np.abs(after) + np.abs(before)
+    net, total = np.abs(net[inner]), total[inner]
+    moving = total > 1e-3 * float(total.max())
+    return float(net[moving].sum() / max(float(total[moving].sum()), 1e-12))
+
+
+def edge(alpha: np.ndarray) -> float:
+    """The density's edge: the 90% of its gradient's size per texel over its max, among the texels it dyes
+    (above 1% of its max), 0.5 for a cube's sharp step."""
+    gz, gy, gx = np.gradient(alpha)
+    size = np.sqrt(gx * gx + gy * gy + gz * gz)
+    dyed = alpha > 0.01 * float(alpha.max())
+    return float(np.percentile(size[dyed], 90.0) / max(float(alpha.max()), 1e-6)) if dyed.any() else 0.0
+
+
+def run_swirl(advection: Advection, seconds: float, overrides: list[str]) -> list[tuple[float, ...]]:
+    calm = ['velocity.vorticity=0', 'density.fade_time=0', 'density.evaporation_time=0',
+            'velocity.fade_time=0', 'velocity.evaporation_time=0']
+    fluid = Fluid3D(fluid_settings(advection, calm + overrides))
+    fluid.allocate(2160, 3840)
+    fluid.update(1.0 / FPS)
+    velocity_volume = fluid._velocity
+    density_volume = fluid._simulation_density._density
+    velocity, density = swirl_start(velocity_volume.width, velocity_volume.height, velocity_volume.depth)
+    upload(velocity_volume, velocity)
+    upload(density_volume, density)
+    start_speed = float(np.linalg.norm(velocity[..., :3], axis=-1).mean())
+    rows: list[tuple[float, ...]] = []
+    for i in range(int(seconds * FPS) + 1):
+        if i % int(FPS) == 0:
+            glFinish()
+            v = velocity_volume.read_to_numpy()
+            a = density_volume.read_to_numpy()
+            assert v is not None and a is not None
+            v = v.astype(np.float32)
+            alpha = a[..., 3].astype(np.float32)
+            speed = float(np.linalg.norm(v[..., :3], axis=-1).mean())
+            rows.append((i / FPS, speed / start_speed, float(alpha.sum()), float(alpha.max()), edge(alpha),
+                         floor(v) if i else float('nan')))
+        fluid.update(1.0 / FPS)
+    fluid.deallocate()
+    return rows
+
+
 def main() -> None:
     parser = ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument('--test', choices=('swing', 'swirl'), default='swing')
     parser.add_argument('--seconds', type=float, default=10.0)
     parser.add_argument('--move', type=float, default=3.0, help='seconds the body moves')
     parser.add_argument('--set', action='append', default=[], help='a setting by path, e.g. velocity.vorticity=0.3')
     args = parser.parse_args()
     mh.context()
+    if args.test == 'swirl':
+        swirl = {advection: run_swirl(advection, args.seconds, args.set) for advection in (Advection.SEMI_LAGRANGIAN, Advection.MACCORMACK)}
+        print(f"{'t s':>5}  {'':>2} {'swirl':>6} {'total':>10} {'peak':>6} {'edge':>6} {'floor':>8}")
+        for advection, label in ((Advection.SEMI_LAGRANGIAN, 'SL'), (Advection.MACCORMACK, 'MC')):
+            for t, kept, total, peak, sharp, unbalanced in swirl[advection]:
+                print(f'{t:5.1f}  {label:>2} {kept:6.3f} {total:10.1f} {peak:6.3f} {sharp:6.3f} {unbalanced:8.5f}')
+        return
     results = {advection: run(advection, args.seconds, args.move, args.set) for advection in (Advection.SEMI_LAGRANGIAN, Advection.MACCORMACK)}
     print(f"{'t s':>5}  {'SL top':>8} {'SL mean':>8} {'SL wall':>8} {'SL inner':>8}  {'MC top':>8} {'MC mean':>8} {'MC wall':>8} {'MC inner':>8} {'MC bad':>7}")
     for sl, mc in zip(results[Advection.SEMI_LAGRANGIAN], results[Advection.MACCORMACK]):
