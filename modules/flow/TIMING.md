@@ -395,6 +395,21 @@ so one solve differs on 30% of its values by up to 3e-4 uv, and with exact cente
 last bits the solve amplifies. Not kept: the bandpass's four parts in one pass (0.140 → 0.117 ms), and the
 lowpass's advect fused into its trail, at most 0.005 ms of its 0.076 (its blur, 4 steps of 2 passes, is 0.064).
 
+## The density's own advection
+
+`density.advection` apart from the velocity's, deep_flow's preset (288 × 512 × 64 cells, the 4K amount
+2160 × 3840 × 24, `upscaled.sample` MIDDLE): the density's pass alone (`fluid_pass_check.py`), and on
+stillslowfast at 2160 × 3840 the composited output's sharpness, its luminance's gradient mean and p99 over
+the lit pixels, at four steps of the loop (`fluid_compare.py --save`):
+
+| `density.advection` | density pass, ms | the fluid's step, ms mean / p95 | gradient mean | gradient p99 |
+|---------------------|------------------|---------------------------------|---------------|--------------|
+| `SEMI_LAGRANGIAN`   | 1.37             | 9.22 / 11.27                    | 4.9 to 7.5    | 32 to 37     |
+| `MACCORMACK`        | 4.07             | 12.60 / 15.60                   | 6.9 to 11.1   | 57 to 72     |
+
+MacCormack's edges are half again to twice as sharp; close up its sharper patches show blocky squares and
+speckle where the limiter clamps **(deduction from the picture)**.
+
 ## The box as deep as it is wide
 
 `depth_check.py` on stillslowfast's fast half, deep_flow's preset (288 × 512 × 64 cells), the body's own z

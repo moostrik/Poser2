@@ -503,12 +503,12 @@ class Fluid3D:
                                             self._has_obstacles)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-    def _advect_field(self, field: SwapTexture3D, scratch: Texture3D, velocity: Texture3D, step: float,
-                      dissipation: float, internal_format: int,
+    def _advect_field(self, field: SwapTexture3D, scratch: Texture3D, velocity: Texture3D, advection: Advection,
+                      step: float, dissipation: float, internal_format: int,
                       evaporation: float = 0.0, measure: int = 0, guard: str = '') -> None:
-        """Carry `field` one step along `velocity` by `settings.advection`; its size taken down by `evaporation`,
+        """Carry `field` one step along `velocity` by `advection`; its size taken down by `evaporation`,
         read by `measure` (0 a density's alpha, 1 a vector's length, 2 |r|); `guard` the field's name in the guard."""
-        if self._advection.carry(self.settings.advection, field, scratch, velocity, self._obstacle, self._aspect,
+        if self._advection.carry(advection, field, scratch, velocity, self._obstacle, self._aspect,
                                  self._z_extent, step, dissipation, internal_format, self._has_obstacles,
                                  evaporation=evaporation, measure=measure,
                                  guard=self._guard_slot(guard), closed=self._closed, faces=self._faces.volume):
@@ -526,7 +526,7 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _advect_velocity(self) -> None:
-        """The faces carried one step along themselves by `advection`: each traced back on its own; on the result the
+        """The faces carried one step along themselves by `velocity.advection`: each traced back on its own; on the result the
         fade, the evaporation, the guard, the top speed and the slip."""
         velocity = self.settings.velocity
         step = self._dt * velocity.advection_scale
@@ -537,7 +537,7 @@ class Fluid3D:
                       guard=self._guard_slot('velocity'), wall_keep=self._wall_keep)
         self._faces.swap()
         source = self._faces.back
-        if self.settings.advection != Advection.MACCORMACK:
+        if self.settings.velocity.advection != Advection.MACCORMACK:
             self._advect_faces_shader.use(SEMI_LAGRANGIAN, source, self._faces.volume, **common, **finish)
         else:
             if not self._faces_scratch.allocated:
@@ -606,7 +606,7 @@ class Fluid3D:
 
         advect_step = self._dt * self.settings.temperature.advection_scale
         dissipation = self._calculate_dissipation(self._dt, self.settings.temperature.fade_time)
-        self._advect_field(self._temperature, self._temperature_scratch, self._velocity, advect_step, dissipation, GL_R16F,
+        self._advect_field(self._temperature, self._temperature_scratch, self._velocity, self.settings.temperature.advection, advect_step, dissipation, GL_R16F,
                            evaporation=self._evaporation(self._dt, self.settings.temperature.evaporation_time), measure=2,
                            guard='temperature')
 
@@ -686,7 +686,7 @@ class Fluid3D:
             velocity=self._velocity, obstacle=self._obstacle, has_obstacles=self._has_obstacles,
             aspect=self._aspect, z_extent=self._z_extent, dt=self._dt, step=self._dt * self.settings.density.advection_scale,
             dissipation=self._calculate_dissipation(self._dt, self.settings.density.fade_time),
-            evaporation=self._evaporation(self._dt, self.settings.density.evaporation_time), advection=self.settings.advection,
+            evaporation=self._evaporation(self._dt, self.settings.density.evaporation_time), advection=self.settings.density.advection,
             curl=self._curl_vol if self._needs_curl else None, cell=self._cell[0], guard=self._guard_slot('density'),
             faces=self._faces.volume)
         for carrier in self._densities:

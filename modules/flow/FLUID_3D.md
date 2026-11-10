@@ -26,7 +26,7 @@ What decides it in the upscale now (the code and deep_flow's preset):
 | What                     | Now                                                                                   | Against the goal                                                                          |
 |--------------------------|---------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
 | the density's own layers | the 4K amount 16 layers deep (`upscaled.depth`), the velocity's grid 64               | a sheet thinner than a sixteenth of the box blurs into its neighbors: the layers it can hold |
-| its edges as it moves    | semi-Lagrangian advection (`advection`), MacCormack 2.8 ms on the 4K amount            | the plain step blurs a little each step, MacCormack keeps edges sharp                      |
+| its edges as it moves    | `density.advection`: semi-Lagrangian 1.37 ms on the 4K amount at 24 layers, MacCormack 4.07 | the plain step blurs a little each step, MacCormack keeps edges sharp                      |
 | the layers kept apart    | xy turning into z around the flat body ([TIMING.md](TIMING.md#the-box-as-deep-as-it-is-wide)), the confinement at a small radius, viscosity | each crosses one layer's motion into the others' and mixes them; viscosity 0 the sharpest |
 
 ## Plan
@@ -36,18 +36,7 @@ What is next for the fluid, in order; what is open elsewhere in the flow is
 
 Weighed by [the goal](#the-goal): sharp, translucent ink patterns, layers distinct.
 
-### 1. Sharp edges: an advection for each field
-
-One `advection` moves every field the same way. Each field's group gets its own, beside its
-`advection_scale`: `velocity.advection`, `density.advection` (the simulation density and the upscaled
-density alike), `temperature.advection`. The density's sets the sharpness of what is seen: MacCormack
-keeps the 4K amount's edges where the semi-Lagrangian step blurs them a little each step, at about 2.8 ms
-on the 4K amount at 16 layers, so about 4 at 24 **(deduction)**, inside the frame's room (its p95 11.7 ms
-at 60 fps, [TIMING.md](TIMING.md)). The velocity's keeps swirls (0.65 against 0.24 ms); the temperature is
-seen only as the buoyancy it drives, so its semi-Lagrangian costs nothing to the look. Judged on
-stillslowfast through `fluid_compare.py`, the composited output side by side, and in the app.
-
-### 2. The body at its own depth
+### 1. The body at its own depth
 
 The body goes in as one flat slab at `layer`, a cut-out: every pixel at the same z. The camera measures
 each pixel's depth, and the motion reads it already for the z velocity. Each pixel in at its own depth
@@ -60,7 +49,7 @@ stands for (`depth_ratio`) is what lets the real depth fit. With the box deep, t
 into z more, not less ([TIMING.md](TIMING.md#the-box-as-deep-as-it-is-wide)): the body's shape in depth is
 what should let the water go around it across as well.
 
-### 3. Swirls at more than one size
+### 2. Swirls at more than one size
 
 The confinement keeps swirls alive at one size, `vorticity_radius`: fine wisps or big eddies, not both.
 More than one radius, each with its own strength (multi-scale vorticity confinement), keeps fine and large
@@ -71,7 +60,7 @@ lands. The upscaled density's turbulence already adds swirls below the grid to t
 radius adds to the look is judged against it, and by whether the layers stay apart: the confinement
 also carries one layer's motion into the next.
 
-### 4. The smaller side as the unit
+### 3. The smaller side as the unit
 
 Every length in the flow is in widths: the motion's velocity (widths/s of the camera's image), the bridge's
 readings, the fluid's inputs (`spread`), its look (`opacity`, `fog`), the box's depth, the monitor's scale.
@@ -91,7 +80,7 @@ A step (`Fluid3D.update`), in order, at the code's defaults:
 
 | Pass        | What                                                                                                                                                                                                                                                                    | On                  | Depends on the input |
 |-------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|----------------------|
-| advect_vel  | self-advection on the faces by `advection`, each face traced on its own ([The staggered velocity](#the-staggered-velocity)), `velocity.advection_scale` 1, fade 60 s; on its result the guard ([The guard](#the-guard)) and the slip | velocity's faces    | the trace distance   |
+| advect_vel  | self-advection on the faces by `velocity.advection`, each face traced on its own ([The staggered velocity](#the-staggered-velocity)), `velocity.advection_scale` 1, fade 60 s; on its result the guard ([The guard](#the-guard)) and the slip | velocity's faces    | the trace distance   |
 | viscosity   | Jacobi diffusion on the faces, off (`viscosity` 0)                                                                                                                                                                                                                      | velocity's faces    | no                   |
 | vorticity   | the curl at the cells from the faces, the confinement's force at the cells, each face given its two cells' mean                                                                                                                                                         | faces, curl         | no                   |
 | advect_temp | off: `buoyancy` 0 clears the temperature once, and nothing is injected into it                                                                                                                                                                                          | temperature         | the trace distance   |
@@ -464,7 +453,8 @@ with the body force's density; the burst's fps; the wall.
 
 ## The advection
 
-`advection` carries the velocity, the density and the temperature: `SEMI_LAGRANGIAN`, the default,
+Each field's `advection` (`velocity.advection`, `density.advection` for the simulation's and the upscaled
+density, `temperature.advection`) carries it: `SEMI_LAGRANGIAN`, the default,
 or `MACCORMACK` (Selle 2008, `maccormack_3d.comp`). The semi-Lagrangian step writes a predictor into
 a scratch volume per field (allocated at its first MacCormack step); traced forward again, it gives
 back the source up to the step's error, half of which is added back, bounded by the source's eight
@@ -612,7 +602,7 @@ detail than the bridge's 448 × 800 it comes from.
 |-------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | two volumes | the upscaled density (`UpscaledDensity`): the color, the simulation density's RGBA volume (color × amount, the amount); the amount alone (R16F) at `upscaled.width` × `upscaled.height` × `upscaled.depth` (2160 × 3840 × 16, the output's size), over the same box; at 16 layers 265 MB a buffer                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | injection   | the bridge's density into both: the RGBA into the color, its amount into the detail's gaussian slab                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| a step      | both carried by the velocity, by `advection`; where the detail has fewer layers than the grid, one pass first averages the velocity over each detail layer's thickness and the detail moves with that; the fade and the evaporation as on the grid                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| a step      | both carried by the velocity, by `density.advection`; where the detail has fewer layers than the grid, one pass first averages the velocity over each detail layer's thickness and the detail moves with that; the fade and the evaporation as on the grid                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | composite   | the detail's layers marched at the output: the brightness and the opacity from the detail's amount, the color the color volume's rgb over its amount at the same place                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | off         | `upscaled.enabled` off: the detail is not allocated, the simulation density drawn                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | settings    | `upscaled.enabled`, its size, and `upscaled.sample` (`MIDDLE` or `AVERAGE`, the velocity a layer spanning several of the grid's moves with); smaller than the output, the composite enlarges it by uv; on the monitor the amount is `upscaled_density`, the color `density`; timed in [TIMING.md](TIMING.md#the-density-at-the-outputs-4k)                                                                                                                                                                                                                                                                                                                                                                                                       |
@@ -691,7 +681,7 @@ switch, measured against the baseline, and then kept one of two ways or dropped:
 | Outcome                                           | Kept as                                                                                                 |
 |---------------------------------------------------|---------------------------------------------------------------------------------------------------------|
 | faster, and the same result                       | a replacement: the old path removed, no setting                                                         |
-| faster, and a different result (a solver, a look) | an option on the panel, as `advection` is, the current way staying the default until the operator picks |
+| faster, and a different result (a solver, a look) | an option on the panel, as a field's `advection` is, the current way staying the default until the operator picks |
 | not faster                                        | dropped, its row kept in TIMING.md                                                                      |
 
 The test, the same for every item: three timing runs back to back, baseline, change, baseline

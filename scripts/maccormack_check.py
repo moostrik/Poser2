@@ -63,10 +63,11 @@ def body(t: float, moving: bool) -> np.ndarray:
 
 
 def fluid_settings(advection: Advection, overrides: list[str]) -> Fluid3DSettings:
-    """deep_flow's preset fluid, its advection and the settings changed by path."""
+    """deep_flow's preset fluid, every field carried by `advection`, and the settings changed by path."""
     settings = Fluid3DSettings()
     settings.update_from_dict(preset_fluid())
-    settings.advection = advection
+    for field in (settings.velocity, settings.density, settings.temperature):
+        field.advection = advection
     for item in overrides:
         path, value = item.split('=', 1)
         target = settings

@@ -115,6 +115,7 @@ class InputSettings(BaseSettings):
 
 class VelocitySettings(BaseSettings):
     """The velocity: how it carries itself, fades, swirls and thickens."""
+    advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the velocity carries itself: MacCormack keeps swirls, at about twice the reads")
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=1.0,    color="blue-grey",      description="How far the velocity carries itself per step; 1 = with the water, the physics")
     fade_time: Field[float]         = Field(60.0,   min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the velocity fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds 1 width/s takes to brake to rest, a fixed amount at a time; 0 = off")
@@ -126,6 +127,7 @@ class VelocitySettings(BaseSettings):
 
 class DensitySettings(BaseSettings):
     """The density: how it is carried, fades and evaporates."""
+    advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the density is carried, the simulation's and the upscaled: MacCormack keeps its edges sharp")
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the density is carried per step; 1 = with the water, above it runs ahead")
     fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the density fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds fully dyed water takes to clear, faint first; 0 = off")
@@ -144,6 +146,7 @@ class UpscaledDensitySettings(BaseSettings):
 
 class TemperatureSettings(BaseSettings):
     """The temperature: how it is carried, fades, and lifts or sinks the water."""
+    advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the warmth is carried; only its buoyancy is seen")
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the temperature is carried per step; 1 = with the water, above it runs ahead")
     fade_time: Field[float]         = Field(3.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the warmth fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds full warmth (±1) takes to reach 0, a fixed amount at a time; 0 = off")
@@ -206,7 +209,6 @@ class Fluid3DSettings(BaseSettings):
 
     # ---- The guard, how the fields are carried and walled, then the box (multiples of 32) ----
     guard: Field[bool]              = Field(True,                                       description="Set non-finite values to 0, count and log them; off once the fluid is stable")
-    advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the fields are carried: MacCormack keeps swirls and edges, at about twice the reads")
     wall: Field[WallMode]           = Field(WallMode.CLOSED,                            newline=True, description="Every side of every field. Closed: solid, the water slides along. Open: it leaves")
     slip_time: Field[float]         = Field(0.0,    min=0.0,    max=60.0,   step=0.1,   description="Seconds the water along a closed wall takes to slow to 1%; 0 = free-slip")
     width: Field[int]               = Field(256,    min=32,     max=4096,   step=32,    newline=True, description="Simulation grid width")

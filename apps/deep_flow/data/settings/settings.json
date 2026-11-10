@@ -516,7 +516,6 @@
     },
     "fluid": {
       "guard": true,
-      "advection": "SEMI_LAGRANGIAN",
       "wall": "CLOSED",
       "slip_time": 0.0,
       "width": 288,
@@ -547,6 +546,7 @@
         }
       },
       "velocity": {
+        "advection": "SEMI_LAGRANGIAN",
         "advection_scale": 1.0,
         "fade_time": 0.0,
         "evaporation_time": 0.0,
@@ -556,11 +556,13 @@
         "viscosity_iter": 20
       },
       "density": {
+        "advection": "SEMI_LAGRANGIAN",
         "advection_scale": 0.88,
         "fade_time": 0.0,
         "evaporation_time": 300.0
       },
       "temperature": {
+        "advection": "SEMI_LAGRANGIAN",
         "advection_scale": 1.0,
         "fade_time": 12.0,
         "evaporation_time": 0.0,
