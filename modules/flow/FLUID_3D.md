@@ -16,27 +16,16 @@ fluid is `Fluid3D` (`fluid_3d/fluid_3d.py`), its layer `Fluid3DLayer`
 What is next for the fluid, in order; what is open elsewhere in the flow is
 [FLOW.md's Open](FLOW.md#open).
 
-### 1. The composite: its look and its cost together
+The composite's look is a mess now **(site fact)**: items 1 to 5 rework it for the best picture, its cost
+comes last, once the look has set which of its options are on.
 
-The look is a mess now **(site fact)**; the composite is reworked for the best picture and its cost in
-one go. Its cost at the preset (2160 × 3840, the 4K amount's 16 layers): 0.65 ms alone, about twice the
-time its data takes to move once (`fluid_pass_check.py`) **(deduction)**. Every output pixel steps through
-every layer, each step reading the amount and the color volume (and the light when lit) and working out
-three `exp`s, empty water or not; it stops early only where the water turns opaque.
-
-Measured against the worst case, not the average: a box full of density in every layer sets the frame's
-budget, so a skip of empty steps lowers only the average and makes the frame's time follow the picture.
-Work every step does whatever is there is what to cut: the fog's per-step factor is the same each step and
-can be worked out once, the color's divide can be a multiply. An occupancy volume of empty 8³ blocks was
-slower ([TIMING.md](TIMING.md), Faster item 2).
-
-### 2. The finer light
+### 1. The finer light
 
 The light grid is a quarter of the simulation grid each way and marched through the simulation density,
 so its shadows are blobs **(site fact: the light shows little)**. The light from the upscaled density,
 where it is on, at a finer grid, its size and cost measured against the picture.
 
-### 3. The rays
+### 2. The rays
 
 The water only absorbs: the fog sends no light toward the viewer, so empty water stays black and no
 shaft of light can show. The fog's in-scattering added to the march (single scattering): each step the
@@ -56,7 +45,7 @@ where it enters the box, so the shafts flicker and drift; an option, 0 off. With
 under water is the rays, the caustics, the `tint` (far water turning blue-green, red dying first, kept
 for it) and the fog dimming the light on its way down.
 
-### 4. The scattering and the anisotropy
+### 3. The scattering and the anisotropy
 
 The scattering blurs the coarse light grid, which spreads light into empty water and through thin walls
 of density, and looks ugly **(site fact)**; the anisotropy is hardly seen and costs a `pow` at every
@@ -70,16 +59,29 @@ picks:
 | sky fill   | a second, soft light from above, so no shadow is fully black                                                                              |
 | anisotropy | the phase worked out once per light cell (a sun's the same everywhere) into the light grid's unused fourth channel; a second lobe to make it seen |
 
-### 5. The light in the cube view
+### 4. The light in the cube view
 
 The light's place drawn in the cube's scene with its camera, by `CubeEdges` as the box's edges are: a
 lamp as a small cube at its place, a sun as a line from outside the box to its center along its
 direction, the small cube at the line's outer end, in the light settings' amber.
 
-### 6. A dramatic look
+### 5. A dramatic look
 
 Every composite setting, the light's place included, given defaults that make a beautiful, dramatic
 scene, judged in the app.
+
+### 6. The composite's cost
+
+Its cost at the preset (2160 × 3840, the 4K amount's 16 layers), before items 1 to 5: 0.65 ms alone,
+about twice the time its data takes to move once (`fluid_pass_check.py`) **(deduction)**. Every output
+pixel steps through every layer, each step reading the amount and the color volume (and the light when
+lit) and working out three `exp`s, empty water or not; it stops early only where the water turns opaque.
+
+Measured against the worst case, not the average, with the look's options on: a box full of density in
+every layer sets the frame's budget, so a skip of empty steps lowers only the average and makes the frame's
+time follow the picture. Work every step does whatever is there is what to cut: the fog's per-step factor
+is the same each step and can be worked out once, the color's divide can be a multiply. An occupancy
+volume of empty 8³ blocks was slower ([TIMING.md](TIMING.md), Faster item 2).
 
 ## The fluid
 
