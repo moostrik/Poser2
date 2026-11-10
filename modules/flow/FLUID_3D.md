@@ -46,6 +46,16 @@ What reads the cell as cubic, and what it becomes:
 | the lamp's march, the layer light, the rays | in widths over the box                    | the same                                                                             |
 | the particles                             | their own `z_extent`, layers over width     | the box's depth                                                                      |
 
+The injection's slab, the same for the boundary and the body force, the density and the temperature:
+`layer` stays its center, a share of the box's depth, 0 the front, 1 the back, smooth, never snapped
+to a cell, since the cells change with `depth`. `spread` becomes the body's thickness in z, front to back,
+in widths, 0 to 1 (now a gaussian's sigma, the thickness about four times it); the sigma is worked out
+from it. Each z cell takes the share of the body that lies in it, the profile's area between its two
+faces (an erf), where it is now sampled at the cell's middle: a body thinner than a cell dyes and drags
+the part of the cell it covers, moves smoothly between cells as `layer` changes, and comes to the same
+amount at any `depth` or `depth_ratio`. At `spread` 0 nothing goes in, a body with no thickness
+touching no water; no clamp, which would stop the slider below it and move with the grid.
+
 Measured before and after, on stillslowfast through `fluid_compare.py`: the water's z speed over its xy
 speed in the slab and beside it, and the share of the body's own z it keeps; the pressure's residual
 after its iterations or V-cycles at the stretched cells; the step's GPU time. An isotropy check in the
