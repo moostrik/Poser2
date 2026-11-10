@@ -16,7 +16,7 @@ from modules.board import HasFrames
 
 from .capture_poses import CapturePoses
 from .render_board import RenderBoard
-from .settings import Layers, MaskSource, RenderSettings, FlowInputSettings
+from .settings import Layers, MaskSource, RenderSettings, FlowInputSettings, View
 
 
 UPDATE_LAYERS: list[Layers] = [
@@ -363,6 +363,10 @@ class DeepFlowRender(RenderBase):
     # ========== Drawing ==========
 
     def draw_main(self, width: int, height: int) -> None:
+        if self.settings.layer.select.view == View.SHOW:
+            self._draw_show(width, height)      # the show alone, on one screen
+            return
+
         clear_color()
 
         Style.reset_state()
@@ -377,6 +381,10 @@ class DeepFlowRender(RenderBase):
         self._draw_fit(self._right_layers, right_rect.x, height - right_rect.y - right_rect.height, right_rect.width, right_rect.height, True)
 
     def draw_secondary(self, monitor_id: int, width: int, height: int) -> None:
+        self._draw_show(width, height)
+
+    def _draw_show(self, width: int, height: int) -> None:
+        """The show: the composite alone, fit to `width` × `height`."""
         clear_color()
 
         Style.reset_state()

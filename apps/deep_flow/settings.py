@@ -85,7 +85,14 @@ class MaskSource(IntEnum):
 #  Layer selection settings (split view)
 # ---------------------------------------------------------------------------
 
+class View(IntEnum):
+    """What the main window shows: the debug panels, or the show alone."""
+    DEBUG = 0       # the left and the right panel, as `left` and `right` pick them
+    SHOW = auto()   # the composite alone, fit to the whole window, as a secondary window shows it
+
+
 class LayerSettings(BaseSettings):
+    view:   Field[View]         = Field(View.DEBUG,                          description="The main window: the debug panels, or the show alone (one screen)")
     left:   Field[list[Layers]] = Field([Layers.composite],                  description="Layers drawn in the left viewport",  widget=Widget.playlist)
     right:  Field[list[Layers]] = Field([Layers.pose],                       description="Layers drawn in the right viewport", widget=Widget.playlist)
     output: Field[list[Layers]] = Field([Layers.fluid, Layers.color_mask], description="Layers mixed into the show texture", widget=Widget.playlist)
