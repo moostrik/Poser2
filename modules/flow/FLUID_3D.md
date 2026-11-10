@@ -19,14 +19,6 @@ What is next for the fluid, in order; what is open elsewhere in the flow is
 The composite's look is a mess now **(site fact)**: items 1 to 6 rework it for the best picture, its cost
 comes last, once the look has set which of its options are on. Each item's cost is timed as it lands.
 
-### 6. A dramatic look
-
-Every composite setting, the light's place included, given defaults that make a beautiful, dramatic
-scene, judged in the app. The look includes what deep_flow does after the fluid: the app's grade (its
-composite's LUT and blend, Blockbuster in SCREEN at the preset) and the fluid's knee, which bends each
-channel above 0.8 toward 1; at emission 34.6 with nothing covered much of the picture may sit in the
-knee and turn flat **(deduction)**.
-
 ### 7. The composite's cost
 
 Its cost at the preset (2160 × 3840, the 4K amount's 16 layers), before items 1 to 6: 0.65 ms alone,
@@ -641,6 +633,16 @@ of warmth.
 How the density is drawn, using the depth the coarse fluid already simulates (its 128 layers). The look
 is set on the view: `composite.emission` and `opacity` refer to fully dyed water filling the view, and the
 monitor's `scale` 1 shows a full value for the density and the temperature as for a velocity of 1 width/s.
+
+deep_flow's preset is a sun in water, dye in it lit from above: a sun a little right and behind
+(`light_x` 0.2, `light_y` −1, `light_z` 0.3) at `light_intensity` 18, nearly opaque dye (`opacity` 0.995)
+with a faint glow (`emission` 0.1), the water turning blue with depth and dark below (`tint` 0.7, `fog`
+0.45), its shafts from `fog_scattering` 0.15 and broad caustics (`caustics` 0.6, `caustic_size` 0.25,
+`caustic_depth` 0.8), the dye glowing within by octaves (`scattering` 0.4), dark-rimmed by `powder` 0.6,
+its shadows lifted by `sky_fill` 0.15, the light a little forward (`anisotropy` 0.3, `back_scattering`
+0.2). Judged on stillslowfast through `fluid_compare.py` at 1080 × 1920, from the fluid's output alone:
+the app's grade after it (its composite's LUT and blend) and the camera's colors on the dye, white on the
+recording, are not in that picture.
 
 | Part       | How                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 |------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
