@@ -65,16 +65,7 @@ harness: a swirl in the xz plane at stretched cells keeps its shape as one in th
 preset's `depth_span` 10, chosen to scale the body's z, goes with it; `depth_ratio` 1 is the box as
 deep as it is wide.
 
-### 2. The smaller side as the unit
-
-Every length in the flow is in widths: the motion's velocity (widths/s of the camera's image), the bridge's
-readings, the fluid's inputs (`spread`), its look (`opacity`, `fog`), the box's depth, the monitor's scale.
-In portrait the width is the smaller side; in landscape it is the longer, and the same settings would
-then mean less against what is seen. One unit across the stages, the smaller side, keeps a preset's look
-and feel when the box turns: in portrait nothing changes. It reaches past the fluid (the motion, the
-bridge, the monitor), so it is one rule for all of them, made where each length is made.
-
-### 3. The body at its own depth
+### 2. The body at its own depth
 
 The body goes in as one flat slab at `layer`, a cut-out: every pixel at the same z. The camera measures
 each pixel's depth, and the motion reads it already for the z velocity. Each pixel in at its own depth
@@ -84,6 +75,15 @@ thickness around each pixel's depth. An arm reaching toward the camera then push
 front and the torso further back: the body in the water with its shape in depth. It needs the bridge
 to hand over each pixel's depth beside its velocity, and the injection to read it; item 1's depth as
 deep as it stands for is what lets the real depth fit.
+
+### 3. The smaller side as the unit
+
+Every length in the flow is in widths: the motion's velocity (widths/s of the camera's image), the bridge's
+readings, the fluid's inputs (`spread`), its look (`opacity`, `fog`), the box's depth, the monitor's scale.
+In portrait the width is the smaller side; in landscape it is the longer, and the same settings would
+then mean less against what is seen. One unit across the stages, the smaller side, keeps a preset's look
+and feel when the box turns: in portrait nothing changes. It reaches past the fluid (the motion, the
+bridge, the monitor), so it is one rule for all of them, made where each length is made.
 
 ### After the plan
 
