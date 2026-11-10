@@ -43,7 +43,7 @@ uniform of a pass's own:
 | the fields' advection, MacCormack, the upscaled density's and the particles' carry | uvw by the box's extent (`z_extent`) | the same, `z_extent` the box's depth                                    |
 | divergence, gradient                      | one cell size `h`                           | `h` per axis                                                                         |
 | the pressure: Jacobi, SOR, multigrid      | one `1/h²` for the six neighbors            | per axis; the multigrid halves z only once the xy cells are as long as the z (semi-coarsening), a point smoother converging poorly across a stretched cell otherwise |
-| the curl (`VorticityCurl3D`)              | one cell size                               | per axis; `vorticity_radius` in xy cells, z reaching the same distance               |
+| the curl (`VorticityCurl3D`)              | one cell size; `vorticity_radius` in cells  | per axis; `vorticity_radius` in widths (the swirls' size, kept at any grid), a log slider up to 0.1, at least one cell inside the shader (the curl cannot be measured closer); above 0.1 its two samples an axis skip the swirls between |
 | the confinement's force                   | per axis already (`uHalfRdxInv`), ε × h     | h the xy cell, the image's detail                                                    |
 | viscosity                                 | one `1/h²`                                  | per axis                                                                             |
 | the upscaled density's swirl noise        | a tile spanning 8 grid cells                | a tile in widths, so its swirls stay round in depth                                  |
@@ -70,7 +70,7 @@ after its iterations or V-cycles at the stretched cells; the step's GPU time. An
 harness: a swirl in the xz plane at stretched cells keeps its shape as one in the xy plane does. The
 preset's `depth_span` 10, chosen to scale the body's z, goes with it; `depth_ratio` 1 is the box as
 deep as it is wide. The preset's `spread` converted to its new unit (its sigma × 2.355) and
-`vorticity_radius` kept in xy cells; the glossary's `input` line follows: `depth_span` out, `spread`
+`vorticity_radius` converted to widths (its cells over the width); the glossary's `input` line follows: `depth_span` out, `spread`
 the body's thickness, `depth_ratio` beside the grid's size.
 
 ### 2. The body at its own depth
