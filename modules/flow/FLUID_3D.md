@@ -78,7 +78,7 @@ The velocity is in image widths per second, as the bridge's; the advection moves
 velocity × dt × `density.advection_scale` (1) in uv, so 1 width/s crosses the width in 1 s.
 
 The volume's settings: `input.layer` and `input.spread`, where the body sits in the volume;
-`emission`, `opacity`, `glow`, `tint` and `fog`, the composite's march; `wall` and `slip_time`, every
+`emission`, `opacity`, `tint` and `fog`, the composite's march; `wall` and `slip_time`, every
 side of the box ([The walls](#the-walls)). Obstacles stay supported (`set_obstacle`, `add_obstacle`,
 `clear_obstacles`, no caller today): one R8 volume on the simulation's grid, which every field's pass
 samples.
@@ -371,7 +371,7 @@ speed off, a failsafe; the bridge's mix the boundary's trail alone and its lowpa
 (`vorticity_radius` 1); in z, `input.layer` 0.5 and `input.spread` 0.075 widths, a body's thickness of
 about 0.3 widths at the camera's crop (from its `view_span` of 0.76 m, **(deduction)**) as four sigma,
 three sigma inside the 0.5-width slab. Kept as tuned: the composite's look (`emission`, `opacity`,
-`glow`, `tint`, `fog`).
+`tint`, `fog`).
 
 Measured with these on standmoves through the harness: the water 0.89 of the body's speed in the
 fast halves, its peak 0.76 of the body's, the step 11.5 ms with the harness (mean; p95 12.8).
@@ -494,7 +494,7 @@ back:
 | drawing                           | no copy: a vertex shader pulls the SSBO by `gl_VertexID`; points `glDrawArrays(GL_POINTS, 0, N)`, streaks `GL_LINES` with 2 N vertices, the previous and the current position; a dead or unborn particle leaves the clip space                                                                                                               | the rasterizer splats millions faster than atomics in compute, and draws lines, which compute would not                          |
 | overlap (`OCCLUDED`, the default) | the particles drawn additively into depth slices, a `GL_TEXTURE_2D_ARRAY` at the output's size, a layered draw (`gl_Layer` from the particle's z): 16 slices at 2160 × 3840 RGBA16F, 1 GB, the color and the optical depth; then a front-to-back march through the slices, Beer–Lambert, `absorption`, `tint`, `fog` as the grid's composite | near dye covers far dye between slices, exact for emission and absorption inside one; a bucket sort by depth, no particle sorted |
 | overlap (`ADDITIVE`)              | the same draw into one RGBA16F target, each particle's fog and tint by its z; one pass: exp(−τ) and the emission                                                                                                                                                                                                                             | order-independent, one target; the depth only as fog                                                                             |
-| overlap (`WEIGHTED`)              | weighted blended order-independent transparency (McGuire and Bavoil 2013): one pass into three targets at the output's size, the emission and the opacity weighted by depth (RGBA32F), the revealage per channel (×(1 − α)), the plain emission for the glow; one pass then divides and mixes                                                | one pass, no slices to clear or march; the order approximate, by a weight                                                        |
+| overlap (`WEIGHTED`)              | weighted blended order-independent transparency (McGuire and Bavoil 2013): one pass into two targets at the output's size, the emission and the opacity weighted by depth (RGBA32F) and the revealage per channel (×(1 − α)); one pass then divides                                                                             | one pass, no slices to clear or march; the order approximate, by a weight                                                        |
 
 Two more ways to draw the same particles, as options: blobby, where each particle carries
 a smooth kernel and the kernels' sum melts near particles into one shape (Blinn's blobby objects,

@@ -14,14 +14,13 @@ flat in float vSigma;
 flat in float vPointSize;
 flat in float vDepth;
 
-uniform bool  uWeighted;        // the weighted look: three targets, the weighted sum, the revealage, the plain sum
+uniform bool  uWeighted;        // the weighted look: two targets, the weighted sum and the revealage
 uniform float uEmission;
 uniform float uAbsorption;
 uniform float uTint;
 
 layout(location = 0) out vec4 fragColor;      // the slice's sum; the weighted look's weighted emission and opacity
 layout(location = 1) out vec4 fragReveal;     // the weighted look's opacity per channel, multiplied out of 1
-layout(location = 2) out vec4 fragAdditive;   // the weighted look's plain emission sum, for the glow
 
 const vec3 WATER_CHAN = vec3(1.8, 1.0, 0.6);
 
@@ -38,7 +37,6 @@ void emit(vec4 c) {
     float w = clamp(0.03 / (1e-5 + pow(vDepth + 0.05, 4.0)), 1e-2, 3e3);
     fragColor = vec4(e * w, a * w);
     fragReveal = vec4(alpha, 0.0);
-    fragAdditive = vec4(e, 0.0);
 }
 
 void main() {

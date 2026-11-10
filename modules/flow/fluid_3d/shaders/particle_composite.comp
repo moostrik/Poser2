@@ -3,7 +3,7 @@
 /*
  * ParticleComposite - the particles' depth slices marched front to back into the 2D output, as
  * Composite3D marches the grid: per slice, per-channel Beer-Lambert extinction (near ink covers far
- * ink), the additive glow mixed in, the water's tint and fog. A slice holds the sum of the grid's
+ * ink), the water's tint and fog. A slice holds the sum of the grid's
  * layers it spans, so its extinction is theirs. One slice is the additive look: its fog and tint
  * were given per particle, so uFog is 0 then.
  */
@@ -20,7 +20,6 @@ uniform float uEmission;
 uniform float uAbsorption;
 uniform float uTint;
 uniform float uFog;
-uniform float uGlow;
 
 const vec3 WATER_CHAN = vec3(1.8, 1.0, 0.6);
 
@@ -34,18 +33,16 @@ void main() {
 
     vec3 T   = vec3(1.0);
     vec3 vol = vec3(0.0);
-    vec3 add = vec3(0.0);
     for (int i = 0; i < uDepth; i++) {
         vec4 s = texelFetch(uSlices, ivec3(gid, i), 0);
         vec3 e = uEmission * max(s.rgb, vec3(0.0));
         vol += T * e;
-        add += e;
         float d = max(s.r, max(s.g, s.b));
         T *= exp(-(sigma * d + fog_s));
-        if (uGlow <= 0.0 && all(lessThan(T, vec3(0.004)))) break;
+        if (all(lessThan(T, vec3(0.004)))) break;     // fully occluded
     }
 
-    vec3 rgb = mix(vol, add, uGlow);
+    vec3 rgb = vol;
     float alpha = 1.0 - dot(T, vec3(0.299, 0.587, 0.114));
     imageStore(uOutput, gid, vec4(rgb, alpha));
 }

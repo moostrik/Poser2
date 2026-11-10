@@ -82,11 +82,10 @@ class ParticleDensity(DensityCarrier):
         self._surface_thickness: Texture = Texture()
         self._surface_color: Texture = Texture()
         self._smoothed: tuple[Texture, Texture] = (Texture(), Texture())
-        # The weighted look's targets: the weighted emission and opacity, the revealage, the plain emission
+        # The weighted look's targets: the weighted emission and opacity, and the revealage
         self._weighted_fbo: int = 0
         self._weighted_sum: Texture = Texture()
         self._weighted_reveal: Texture = Texture()
-        self._weighted_additive: Texture = Texture()
         self._emit_shader: ParticleEmit = ParticleEmit()
         self._ring_shader: ParticleRing = ParticleRing()
         self._advect_shader: ParticleAdvect = ParticleAdvect()
@@ -230,12 +229,12 @@ class ParticleDensity(DensityCarrier):
 
         self._march_timer.begin()
         self._composite_shader.use(target, slices, output, emission=emission / self.settings.particles.slices, absorption=extinction / self.settings.particles.slices,
-                                   tint=volume.tint, fog=0.0 if additive else volume.fog, glow=volume.glow)
+                                   tint=volume.tint, fog=0.0 if additive else volume.fog)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._march_timer.end()
 
     def _composite_weighted(self, output: Texture) -> None:
-        """The sprites into the weighted look's three targets in one pass, then into the output."""
+        """The sprites into the weighted look's two targets in one pass, then into the output."""
         particles = self.settings.particles
         volume = self.settings.composite
         extinction, emission = view_march(volume.opacity, volume.emission)
@@ -249,7 +248,6 @@ class ParticleDensity(DensityCarrier):
         glViewport(0, 0, width, height)
         glClearBufferfv(GL_COLOR, 0, (0.0, 0.0, 0.0, 0.0))
         glClearBufferfv(GL_COLOR, 1, (1.0, 1.0, 1.0, 1.0))
-        glClearBufferfv(GL_COLOR, 2, (0.0, 0.0, 0.0, 0.0))
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.SUM)
         glBlendFunci(1, GL_ZERO, GL_ONE_MINUS_SRC_COLOR)        # the revealage: × (1 - alpha) per channel
@@ -266,7 +264,7 @@ class ParticleDensity(DensityCarrier):
         self._draw_timer.end()
 
         self._march_timer.begin()
-        self._weighted_shader.use(self._weighted_sum, self._weighted_reveal, self._weighted_additive, output, volume.glow)
+        self._weighted_shader.use(self._weighted_sum, self._weighted_reveal, output)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._march_timer.end()
 
@@ -274,20 +272,18 @@ class ParticleDensity(DensityCarrier):
         width, height = self._output
         self._weighted_sum.allocate(width, height, GL_RGBA32F)      # the weight reaches 3000: past a half float's sum
         self._weighted_reveal.allocate(width, height, GL_RGBA16F)
-        self._weighted_additive.allocate(width, height, GL_RGBA16F)
         self._weighted_fbo = int(glGenFramebuffers(1))
         glBindFramebuffer(GL_FRAMEBUFFER, self._weighted_fbo)
-        for attachment, texture in ((GL_COLOR_ATTACHMENT0, self._weighted_sum), (GL_COLOR_ATTACHMENT1, self._weighted_reveal),
-                                    (GL_COLOR_ATTACHMENT2, self._weighted_additive)):
+        for attachment, texture in ((GL_COLOR_ATTACHMENT0, self._weighted_sum), (GL_COLOR_ATTACHMENT1, self._weighted_reveal)):
             glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, texture.tex_id, 0)
-        glDrawBuffers(3, [GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2])
+        glDrawBuffers(2, [GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1])
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
     def _deallocate_weighted(self) -> None:
         if self._weighted_fbo:
             glDeleteFramebuffers(1, [self._weighted_fbo])
             self._weighted_fbo = 0
-        for texture in (self._weighted_sum, self._weighted_reveal, self._weighted_additive):
+        for texture in (self._weighted_sum, self._weighted_reveal):
             texture.deallocate()
 
     def _allocate_surface(self) -> None:
@@ -302,7 +298,7 @@ class ParticleDensity(DensityCarrier):
         for attachment, texture in ((GL_COLOR_ATTACHMENT0, self._surface_depth), (GL_COLOR_ATTACHMENT1, self._surface_thickness),
                                     (GL_COLOR_ATTACHMENT2, self._surface_color)):
             glFramebufferTexture2D(GL_FRAMEBUFFER, attachment, GL_TEXTURE_2D, texture.tex_id, 0)
-        glDrawBuffers(3, [GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2])
+        glDrawBuffers(2, [GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1])
         glBindFramebuffer(GL_FRAMEBUFFER, 0)
 
     def _deallocate_surface(self) -> None:
@@ -326,7 +322,6 @@ class ParticleDensity(DensityCarrier):
         glViewport(0, 0, width, height)
         glClearBufferfv(GL_COLOR, 0, (1.0, 1.0, 1.0, 1.0))
         glClearBufferfv(GL_COLOR, 1, (0.0, 0.0, 0.0, 0.0))
-        glClearBufferfv(GL_COLOR, 2, (0.0, 0.0, 0.0, 0.0))
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.SUM)
         glBlendEquationi(0, GL_MIN)

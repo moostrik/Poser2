@@ -6,8 +6,6 @@
  *
  * Per ray step (front -> back, trilinear reads):
  *   occlusion    per-channel Beer-Lambert extinction; near density covers far density
- *   glow         the unoccluded additive sum is accumulated alongside and
- *                mixed in: uGlow = 1 is the additive composite
  *   tint + fog   far density shifts toward water color and fades
  *   light        with uLit, each sample's emission × mix(1, the light reaching it, uShadow), the light
  *                grid's transmittance times the Henyey–Greenstein phase toward the viewer
@@ -32,7 +30,6 @@ uniform float uEmission;     // The emission of an amount of 1 over the whole vi
 uniform float uAbsorption;   // The extinction of an amount of 1 over the whole view
 uniform float uTint;         // 0..1 mix toward per-channel water extinction
 uniform float uFog;          // Medium extinction over the full depth
-uniform float uGlow;         // 0 = occluded volumetric, 1 = additive
 uniform bool  uSplit;        // the amount from uDensity, its color from uColor (the upscaled density)
 uniform bool  uLit;          // the density lit by uLight
 uniform float uShadow;       // how dark the shadowed parts get, 0 to 1
@@ -69,7 +66,6 @@ void main() {
 
     vec3 T   = vec3(1.0);  // transmittance
     vec3 vol = vec3(0.0);  // occluded accumulation
-    vec3 add = vec3(0.0);  // unoccluded additive sum
 
     for (int i = 0; i < steps; i++) {
         float z_norm = (float(i) + 0.5) * inv_steps;
@@ -85,16 +81,14 @@ void main() {
             e *= mix(vec3(1.0), texture(uLight, uvw).rgb * phase(uvw), uShadow);
         }
         vol += T * e;
-        add += e;
 
         float d = max(s.a, 0.0);          // the amount: the same amount covers the same, whatever its color
         T *= exp(-(sigma * d + fog_s));
 
-        // Fully occluded and no additive term left to accumulate
-        if (uGlow <= 0.0 && all(lessThan(T, vec3(0.004)))) break;
+        if (all(lessThan(T, vec3(0.004)))) break;     // fully occluded
     }
 
-    vec3 rgb = mix(vol, add, uGlow);
+    vec3 rgb = vol;
     float alpha = 1.0 - dot(T, vec3(0.299, 0.587, 0.114));
     imageStore(uOutput, gid, vec4(rgb, alpha));
 }

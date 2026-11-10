@@ -72,7 +72,7 @@ class SimulationDensity(DensityCarrier):
         volume = self.settings.composite
         extinction, emission = view_march(volume.opacity, volume.emission)
         self._composite_shader.use(self._density, output, emission=emission, absorption=extinction,
-                                   tint=volume.tint, fog=volume.fog, glow=volume.glow, light=light)
+                                   tint=volume.tint, fog=volume.fog, light=light)
         glMemoryBarrier(_BARRIER_IMAGE)
 
     @property

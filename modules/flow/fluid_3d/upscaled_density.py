@@ -146,7 +146,7 @@ class UpscaledDensity(DensityCarrier):
         volume = self.settings.composite
         extinction, emission = view_march(volume.opacity, volume.emission)
         self._composite_shader.use(self._amount, output, emission=emission, absorption=extinction,
-                                   tint=volume.tint, fog=volume.fog, glow=volume.glow, color=self._color.weight, light=light)
+                                   tint=volume.tint, fog=volume.fog, color=self._color.weight, light=light)
         glMemoryBarrier(_BARRIER)
 
     @property

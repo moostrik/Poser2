@@ -154,9 +154,8 @@ class PressureSettings(BaseSettings):
 
 class CompositeSettings(BaseSettings):
     """The composite: how the density volume is marched front to back into the output."""
-    emission: Field[float]          = Field(1.0,  min=0.1,  max=10.0,   widget=Widget.log_slider, color="amber", description="How bright fully dyed water filling the view is seen: 1 = its own color")
+    emission: Field[float]          = Field(1.0,  min=0.1,  max=100.0,  widget=Widget.log_slider, color="amber", description="How bright fully dyed water filling the view is seen: 1 = its own color")
     opacity: Field[float]           = Field(0.6,  min=0.0,  max=1.0,    step=0.01, color="deep-orange", description="How much fully dyed water filling the view covers behind it: 0 see-through, 1 only the front")
-    glow: Field[float]              = Field(0.0,  min=0.0,  max=1.0,    color="yellow",         description="Additive glow mix: 1 = additive (depth invisible)")
     tint: Field[float]              = Field(0.5,  min=0.0,  max=1.0,    color="light-blue",     description="Far density shifts toward water color (red absorbed first)")
     fog: Field[float]               = Field(0.5,  min=0.0,  max=4.0,    color="blue-grey",      description="Water extinction over the full depth; dims far layers, and the light on its way in")
     light: Field[Light]             = Field(Light.DIRECTIONAL,                                  description="A sun from one direction, or a lamp at one place")

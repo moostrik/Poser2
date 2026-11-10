@@ -282,8 +282,8 @@ and the streaks are longer with it **(deduction)**.
 
 Item 2 was slower in both forms, one thread a block (3.84 ms) and one workgroup a block (3.49): on the
 recording the density fills most blocks, so the skip saves little and its pass and branch cost more. The
-early exit at opacity was not built: with `glow` above 0 the additive sum behind opaque density is part of
-the picture, so stopping there changes it.
+march stops where the transmittance is under 0.004 in every channel, the output's precision; what it saves
+follows how much of the view is opaque, and is not measured.
 
 Item 4 was not built: the correction reads the predictor at the forward-traced point, between other cells,
 so one dispatch would trace eight predictors a cell to get it, more than the scratch volume's write and read

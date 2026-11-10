@@ -7,10 +7,10 @@ from modules.gl import ComputeShader, Texture, Texture2DArray
 
 
 class ParticleComposite(ComputeShader):
-    """March `depth` slices of the slice array into the output: Beer–Lambert, glow, tint, fog."""
+    """March `depth` slices of the slice array into the output: Beer–Lambert, tint, fog."""
 
     def use(self, slices: Texture2DArray, depth: int, output: Texture, *, emission: float, absorption: float,
-            tint: float, fog: float, glow: float) -> None:
+            tint: float, fog: float) -> None:
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
@@ -22,5 +22,4 @@ class ParticleComposite(ComputeShader):
         glUniform1f(self.get_uniform_loc("uAbsorption"), absorption)
         glUniform1f(self.get_uniform_loc("uTint"), tint)
         glUniform1f(self.get_uniform_loc("uFog"), fog)
-        glUniform1f(self.get_uniform_loc("uGlow"), glow)
         self.dispatch(output.width, output.height)

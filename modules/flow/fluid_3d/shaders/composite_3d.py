@@ -34,11 +34,11 @@ class CompositeLight:
 
 
 class Composite3D(ComputeShader):
-    """Composite the density volume into the 2D output: per-channel Beer–Lambert occlusion, a glow mix,
-    the water's tint and fog. The output may be larger than the volume; the volume is sampled by uv."""
+    """Composite the density volume into the 2D output: per-channel Beer–Lambert occlusion, the water's
+    tint and fog. The output may be larger than the volume; the volume is sampled by uv."""
 
     def use(self, density: Texture3D, output_2d: Texture, *,
-            emission: float, absorption: float, tint: float, fog: float, glow: float,
+            emission: float, absorption: float, tint: float, fog: float,
             color: Texture3D | None = None, light: CompositeLight | None = None) -> None:
         """Composite the density volume into the 2D output, one march step per layer.
 
@@ -49,7 +49,6 @@ class Composite3D(ComputeShader):
             absorption: The extinction of an amount of 1 over the whole view (`view_march`'s)
             tint: 0..1 mix toward per-channel water extinction (red dies first)
             fog: Medium extinction over the full depth
-            glow: 0 = occluded volumetric, 1 = additive
             color: With it, `density` is the amount alone and its color is this volume's (color × amount, amount)
             light: With it, each sample's emission darkened by the light reaching it, by `light.shadow`
         """
@@ -67,7 +66,6 @@ class Composite3D(ComputeShader):
         glUniform1f(self.get_uniform_loc("uAbsorption"), absorption)
         glUniform1f(self.get_uniform_loc("uTint"), tint)
         glUniform1f(self.get_uniform_loc("uFog"), fog)
-        glUniform1f(self.get_uniform_loc("uGlow"), glow)
         glUniform1i(self.get_uniform_loc("uSplit"), int(color is not None))
         if color is not None:
             self.bind_texture_3d(1, color, "uColor")
