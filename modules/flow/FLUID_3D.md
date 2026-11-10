@@ -26,10 +26,11 @@ it; and the confinement tilts swirls out of the image plane into walls a few cel
 What is wanted: the depth means what the width means, one width of z one width on screen, however few
 cells it has.
 
-The box's depth in widths set apart from its cells: `input.depth_span` (now the real depth the box stands
-for, the body's z scaled down to fit) becomes the box's own depth, a share of its smaller side, and the
-z cells stretch to it (at 1 and the preset's grid, 4.5 times as long as they are wide). The body's z then
-needs no scaling (`_z_scale` 1), and everything that measures in widths (the composite's `opacity` and
+The box's depth set apart from its cells: `depth_ratio`, beside `width`, `height` and `depth` (the cells),
+the box's depth over its width, 1 as deep as it is wide. The box is then 1 × height / width × `depth_ratio`
+widths, and the z cells stretch to it (at 1 and the preset's grid, 4.5 times as long as they are wide).
+`input.depth_span` (now the real depth the box stands for, the body's z scaled down to fit) goes: the
+body's z needs no scaling (`_z_scale` 1), and everything that measures in widths (the composite's `opacity` and
 `fog`, the light, the rays, the injection's `spread`, the monitor's box) means the same along z as across.
 
 What reads the cell as cubic, and what it becomes:
@@ -49,7 +50,7 @@ Measured before and after, on stillslowfast through `fluid_compare.py`: the wate
 speed in the slab and beside it, and the share of the body's own z it keeps; the pressure's residual
 after its iterations or V-cycles at the stretched cells; the step's GPU time. An isotropy check in the
 harness: a swirl in the xz plane at stretched cells keeps its shape as one in the xy plane does. The
-preset's `depth_span` 10, chosen to scale the body's z, then means a box ten widths deep; 1 is the box as
+preset's `depth_span` 10, chosen to scale the body's z, goes with it; `depth_ratio` 1 is the box as
 deep as it is wide.
 
 ### 2. The smaller side as the unit
