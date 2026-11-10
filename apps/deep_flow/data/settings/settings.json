@@ -601,11 +601,10 @@
         "smooth": 3
       },
       "composite": {
-        "emission": 5.01,
-        "opacity": 1.0,
-        "glow": 1.0,
+        "emission": 34.6,
+        "opacity": 0.0,
         "tint": 0.0,
-        "fog": 0.8,
+        "fog": 0.0,
         "light": "POINT",
         "light_x": 0.05,
         "light_y": 0.11,

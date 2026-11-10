@@ -314,7 +314,7 @@ class MonitorLayer(LayerBase):
             self._shown_3d = self._volume_cube.process(volume, self._orbit, BOX_DEPTH, scale, channel, color,
                                                        advanced.opacity, advanced.depth_fade,
                                                        advanced.slice_position if advanced.slice else None, advanced.legend,
-                                                       advanced.slice_focus)
+                                                       advanced.slice_focus, port.light)
 
     def _flat(self, port: Port, view: MonitorView) -> Texture:
         """The 2D texture a view draws: the port's own, or for a volume its front, whose mean the strip

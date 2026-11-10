@@ -1,16 +1,20 @@
 """The cube: a volume drawn continuously in its box from the orbit camera, a ray per pixel, each sample
-colored by its kind (`CubeColor`) and its amount its opacity; with `outlines` the box's edges, its axes and the slice's frame, in the scene. With a
+colored by its kind (`CubeColor`) and its amount its opacity; with `outlines` the box's edges, its axes, the slice's frame and the
+light's place (`light_marks`), in the scene. With a
 slice, the selected layer is read where a ray crosses it and framed, opacity moved from the rest to it by `slice_focus`."""
 
 import numpy as np
 from OpenGL.GL import GL_RGBA8
 
 from modules.gl import Fbo, Style, Texture, Texture3D
+from ..port import LightPlace
+from .light_marks import light_marks
 from .orbit import Orbit, box_size
 from .shaders import CubeAxes, CubeColor, CubeEdges, VolumeCubeShader
 
 STEPS: int = 96             # samples along a ray through the whole box
 FRAME_COLOR: tuple[float, float, float, float] = (1.0, 1.0, 1.0, 1.0)     # the slice's frame
+LIGHT_COLOR: tuple[float, float, float, float] = (1.0, 0.757, 0.027, 1.0)  # the light's marks: amber, the light settings' color
 
 
 class VolumeCube:
@@ -45,9 +49,9 @@ class VolumeCube:
 
     def process(self, volume: Texture3D, orbit: Orbit, extent: float, scale: float, channel: int, color: CubeColor,
                 opacity: float, depth_fade: float, slice_z: float | None, outlines: bool = True,
-                slice_focus: float = 0.5) -> Texture:
-        """Draw the cube of `volume`, the layer at `slice_z` (0 front to 1 back) in focus unless None;
-        returns its texture."""
+                slice_focus: float = 0.5, light: LightPlace | None = None) -> Texture:
+        """Draw the cube of `volume`, the layer at `slice_z` (0 front to 1 back) in focus unless None, and
+        with `outlines` where `light` is; returns its texture."""
         if not self._fbo.allocated or not volume.allocated:
             return self._fbo
         box: tuple[float, float, float] = box_size(volume.width, volume.height, extent)
@@ -66,6 +70,9 @@ class VolumeCube:
                 at_layer: np.ndarray = np.eye(4)
                 at_layer[2, 3] = box[2] * (0.5 - slice_z)
                 self._edges.use(matrix @ at_layer, (box[0], box[1], 0.0), FRAME_COLOR)
+            if light is not None:
+                for mark in light_marks(light, box):
+                    self._edges.use(matrix @ mark, (1.0, 1.0, 1.0), LIGHT_COLOR)
             self._axes.reload()
             self._axes.use(matrix, box)
         Style.pop_style()

@@ -131,7 +131,10 @@ as it is.
   front layer), 3 px wide in the colormap's colors at 1 (`CubeAxes`), x red along the width, y green
   up, z blue into the depth, each axis's letter past its end (`axis_labels`, the legend redrawn when
   the camera moves). So the views themselves hold only what they show, and the harness, which draws
-  without the legend, checks them alone.
+  without the legend, checks them alone. With the legend the cube also draws where the light is, when
+  its port carries one (`Port.light`, the fluid's volumes while the light is on): a lamp as a small cube
+  at its place, a sun as a line from the box's center out past where its light enters, the small cube
+  at the line's end, in amber (`light_marks`, outlined by `CubeEdges`).
 - The strip reads a volume's front mean (`VolumeCut`, the projection along z), the volume's mean;
   the histogram counts a grid through every layer, at most 128 × 128 across
   (`histogram_volume_grid`). `VolumeCut` also lays a volume flat for the scripts that read layers

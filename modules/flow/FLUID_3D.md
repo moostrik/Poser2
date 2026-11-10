@@ -19,13 +19,6 @@ What is next for the fluid, in order; what is open elsewhere in the flow is
 The composite's look is a mess now **(site fact)**: items 1 to 6 rework it for the best picture, its cost
 comes last, once the look has set which of its options are on. Each item's cost is timed as it lands.
 
-### 1. The light in the cube view
-
-The light's place drawn in the cube's scene with its camera, by `CubeEdges` as the box's edges are: a
-lamp as a small cube at its place, a sun as a line from outside the box to its center along its
-direction, the small cube at the line's outer end, in the light settings' amber. First, since it shows
-where the light is while items 2 to 6 are tuned.
-
 ### 2. The lit dye
 
 The density glows; it is not lit. The light only darkens its emission (the light grid's transmittance,
@@ -103,8 +96,14 @@ Measured against the worst case, not the average, with the look's options on: a 
 every layer sets the frame's budget, so a skip of empty steps lowers only the average and makes the frame's
 time follow the picture. Work every step does whatever is there is what to cut: the fog's per-step factor
 is the same each step and can be worked out once, the color's divide can be a multiply. An occupancy
-volume of empty 8³ blocks was slower ([TIMING.md](TIMING.md), Faster item 2). The light's passes have
-no timer of their own yet; they get one with item 1, so each item's cost is known as it lands.
+volume of empty 8³ blocks was slower ([TIMING.md](TIMING.md), Faster item 2).
+
+Each item's cost as it lands, `fluid_pass_check.py` at the preset (288 × 512 × 64 cells, the 4K amount):
+
+| After                | light (`GPU fluid light`) | composite |
+|----------------------|---------------------------|-----------|
+| none, the light off  | 0                         | 0.65      |
+| none, `shadow` 1     | 0.09                      | 0.74      |
 
 ### After the plan
 

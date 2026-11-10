@@ -30,6 +30,14 @@ class TextureKind(IntEnum):
         return self in (TextureKind.VELOCITY, TextureKind.ACCELERATION)
 
 
+@dataclass(frozen=True)
+class LightPlace:
+    """Where the light a volume is lit by is, in the volume's texture coordinates (0 to 1, z 0 the front):
+    a lamp's place, or for a sun where its light enters the box."""
+    point: bool                             # a lamp, else a sun
+    uvw: tuple[float, float, float]
+
+
 @dataclass
 class Port:
     """A named texture with its kind. `texture` is the `Fbo`, `SwapFbo`, `Tensor` or 3D texture object
@@ -37,12 +45,13 @@ class Port:
     it with one sampler type; `extent` is its depth as a share of its width, the box a view draws it
     in, so a layer gap looks as deep as it is. `prepare`, when set, is what a view calls before it
     reads the texture: its owner brings it up to date there, once however many views ask, or learns
-    that it is shown."""
+    that it is shown. `light`, on a volume, is where the light it is lit by is, drawn in its box."""
     texture: Texture | Texture3D
     kind: TextureKind
     extent: float = 0.0
     prepare: Callable[[], None] | None = None
     held: int = 0           # the channels holding its values, x first; 0 from its kind and format (`channels`)
+    light: LightPlace | None = None
 
     @property
     def volume(self) -> bool:

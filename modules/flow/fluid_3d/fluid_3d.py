@@ -33,6 +33,7 @@ acceleration added × dt (`add_acceleration`). The densities and the temperature
 slab at `input.layer`.
 """
 import math
+from dataclasses import replace
 
 import numpy as np
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_R16F, GL_R32F, GL_R8, GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
@@ -44,7 +45,7 @@ from .multigrid_pressure import MultigridPressure
 from .face_velocity import FaceVelocity
 from ..shaders import AddBoolean
 from ..flow_util import FlowUtil
-from ..port import Port, TextureKind
+from ..port import LightPlace, Port, TextureKind
 from ..time_step import REFERENCE_STEP, TimeStep, viscosity_iterations
 from ..finite_guard import FiniteGuard, GuardSlot
 from .density_carrier import CarrierStep, DensityCarrier
@@ -75,7 +76,7 @@ _WALL_GL: dict = {
 }
 
 FLUID_PASSES: tuple[str, ...] = ('advect velocity', 'viscosity', 'vorticity', 'advect temperature', 'buoyancy', 'pressure',
-                                 'faces to centers', 'density', 'composite')     # a step's passes, each a GPU timer
+                                 'faces to centers', 'density', 'light', 'composite')     # a step's passes, each a GPU timer
 DRAG_FLOOR: float = 0.02    # widths/s: the body's speed below which it drags nothing, so a dead trail pulls nothing toward 0
 
 import logging
@@ -202,6 +203,7 @@ class Fluid3D:
         self._light_blur_shader: LightBlur3D = LightBlur3D()
         self._light_override: tuple[float, float, float] | None = None     # set_light's, over the settings
         self._light_shown: Texture3D = self._light      # the light the composite read last: direct, or scattered
+        self._light_now: CompositeLight | None = None   # this step's light, `_update_light`'s, for the composite
         self._no_density: Texture3D = Texture3D()
         # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds = obstacle
         self._obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
@@ -474,6 +476,7 @@ class Fluid3D:
         self._timed('pressure', self._enforce_incompressibility)
         self._timed('faces to centers', self._faces_to_centers)
         self._timed('density', self._advect_density)
+        self._timed('light', self._update_light)
         self._timed('composite', self._composite_output)
 
         self._gpu_timer.end()
@@ -710,13 +713,17 @@ class Fluid3D:
         """The volume into the 2D output, the upscaled amount's where enabled, else the simulation's; the particles
         drawn into their own image and laid over it; then the highlights bent above the knee instead of clipped."""
         volume: DensityCarrier = self._upscaled_density if self.settings.upscaled.enabled else self._simulation_density
-        volume.composite(self._output_texture, self._lit())
+        volume.composite(self._output_texture, self._light_now)
         if self.settings.particles.enabled and self._particle_texture.allocated:
             self._particle_density.composite(self._particle_texture)
             self._over_shader.use(self._particle_texture, self._output_texture)
             glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._knee_shader.use(self._output_texture)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+
+    def _update_light(self) -> None:
+        """The light this step, for the composite."""
+        self._light_now = self._lit()
 
     def _lit(self) -> CompositeLight | None:
         """The light this step, from the simulation density: each light cell marched toward the light, then
@@ -750,6 +757,22 @@ class Fluid3D:
             light = a
         self._light_shown = light
         return CompositeLight(light, composite.shadow, composite.anisotropy, point, vector, box)
+
+    def _light_place(self) -> LightPlace | None:
+        """Where the light is, in the box's texture coordinates, None while it is off: a lamp at its place, a sun
+        where its light, coming in toward the box's center, enters the box."""
+        composite = self.settings.composite
+        if composite.shadow <= 0.0:
+            return None
+        vector = self._light_override or (composite.light_x, composite.light_y, composite.light_z)
+        if composite.light == Light.POINT:
+            return LightPlace(True, (0.5 + 0.5 * vector[0], 0.5 + 0.5 * vector[1], 0.5 + 0.5 * vector[2]))
+        length: float = math.sqrt(sum(c * c for c in vector))
+        toward = tuple(c / length for c in vector) if length > 1e-6 else (0.0, -1.0, 0.0)   # the light shader's default
+        box = (1.0, 1.0 / self._aspect, self._z_extent)
+        reach: float = min(0.5 * side / abs(c) for side, c in zip(box, toward) if abs(c) > 1e-9)
+        x, y, z = (0.5 + c * reach / side for side, c in zip(box, toward))
+        return LightPlace(False, (x, y, z))
 
     def set_light(self, vector: tuple[float, float, float] | None) -> None:
         """The light's direction toward the sun, or the lamp's place (±1 the box's sides; x right, y down the
@@ -956,9 +979,10 @@ class Fluid3D:
         """Its fields in the order a step reaches them, each a volume in a box `_z_extent` deep, the 2D
         obstacle as it comes, and the running carriers' (the simulation's `density`, the `upscaled_density`)."""
         extent: float = self._z_extent
+        light: LightPlace | None = self._light_place()
 
         def volume(texture: Texture3D, kind: TextureKind) -> Port:
-            return Port(texture, kind, extent)
+            return Port(texture, kind, extent, light=light)
 
         return {'obstacle_source': Port(self._obstacle_source, TextureKind.SCALAR),
                 'obstacle': volume(self._obstacle, TextureKind.SCALAR),
@@ -969,5 +993,6 @@ class Fluid3D:
                 'buoyancy': volume(self._buoyancy_force_vol, TextureKind.ACCELERATION),
                 'divergence': volume(self._divergence_vol, TextureKind.SCALAR),
                 'pressure': volume(self._pressure, TextureKind.SCALAR),
-                **({'light': Port(self._light_shown, TextureKind.IMAGE, extent, held=3)} if self._light_shown.allocated else {}),
-                **{name: port for carrier in self._densities for name, port in carrier.ports.items()}}
+                **({'light': Port(self._light_shown, TextureKind.IMAGE, extent, held=3, light=light)} if self._light_shown.allocated else {}),
+                **{name: replace(port, light=light) if port.volume else port
+                   for carrier in self._densities for name, port in carrier.ports.items()}}

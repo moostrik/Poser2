@@ -6,7 +6,7 @@ subpackages (e.g. ``from modules.flow import Fluid2D``, never
 """
 
 # Ports: named textures with their kinds, what the monitors show
-from .port import Port, Ports, TextureKind, HasPorts, OnDemand, prefixed, ports_of
+from .port import Port, Ports, TextureKind, HasPorts, OnDemand, LightPlace, prefixed, ports_of
 
 # Base classes
 from .flow_base import FlowBase

@@ -95,6 +95,7 @@ def main() -> None:
         ('pressure', fluid._enforce_incompressibility, 0.0),
         ('faces to centers', fluid._faces_to_centers, 8.0 * faces + 8.0 * cells),
         ('density', fluid._advect_density, (8.0 + 8.0 + 8.0) * cells + 4.0 * fine),
+        ('light', fluid._update_light, 8.0 * cells / 64),
         ('composite', fluid._composite_output, 8.0 * cells + 8.0 * output),
         ('inject: drag', lambda: fluid.drag_velocity(body), 16.0 * faces),
         ('inject: body force', lambda: fluid.add_acceleration(body), 16.0 * faces),
