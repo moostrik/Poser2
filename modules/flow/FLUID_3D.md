@@ -50,6 +50,12 @@ grid is already view-aligned; a pass walks each of its columns in fine sub-steps
 the march's layers, the in-scattering integrated exactly over the layer; the march reads one value more
 a step and adds it under the transmittance in front, so the density still covers the rays behind it.
 
+Sunlight under water shafts mostly by the waves on its surface, which focus it into a moving net; the
+density's shadows cannot give that. The caustics: an animated caustic pattern multiplied into the light
+where it enters the box, so the shafts flicker and drift; an option, 0 off. With them the look of a sun
+under water is the rays, the caustics, the `tint` (far water turning blue-green, red dying first, kept
+for it) and the fog dimming the light on its way down.
+
 ### 4. The scattering and the anisotropy
 
 The scattering blurs the coarse light grid, which spreads light into empty water and through thin walls
