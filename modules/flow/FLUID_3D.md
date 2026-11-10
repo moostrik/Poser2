@@ -29,6 +29,9 @@ cells it has.
 The box's depth set apart from its cells: `depth_ratio`, beside `width`, `height` and `depth` (the cells),
 the box's depth over its width, 1 as deep as it is wide. The box is then 1 × height / width × `depth_ratio`
 widths, and the z cells stretch to it (at 1 and the preset's grid, 4.5 times as long as they are wide).
+Beside it, read-only, `z_stretch`: how many times longer a z cell is than an xy cell, set when the grid
+is allocated, so the panel shows how coarse the depth is and how `spread` and `vorticity_radius` compare
+to a z cell.
 `input.depth_span` (now the real depth the box stands for, the body's z scaled down to fit) goes: the
 body's z needs no scaling (`_z_scale` 1), and everything that measures in widths (the composite's `opacity` and
 `fog`, the light, the rays, the injection's `spread`, the monitor's box) means the same along z as across.
