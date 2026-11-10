@@ -16,13 +16,44 @@ fluid is `Fluid3D` (`fluid_3d/fluid_3d.py`), its layer `Fluid3DLayer`
 What is next for the fluid, in order; what is open elsewhere in the flow is
 [FLOW.md's Open](FLOW.md#open).
 
-Nothing is planned for the fluid now; what is noted for later:
+### 1. A box as deep as it stands for
+
+Motion in x and y turns into motion in z very fast, taking over from the body's own z motion **(site
+fact)**. The box is as deep as its cells: cubic, so at the preset's 288 × 512 × 64 it is 0.22 widths
+deep, its front and back walls close. A push across has the projection let the water out the shortest
+way, in z; the body is a thin slab in z (`input.spread` 0.01), a sheet that answers with z flow beside
+it; and the confinement tilts swirls out of the image plane into walls a few cells away **(deduction)**.
+What is wanted: the depth means what the width means, one width of z one width on screen, however few
+cells it has.
+
+The box's depth in widths set apart from its cells: `input.depth_span` (now the real depth the box stands
+for, the body's z scaled down to fit) becomes the box's own depth, a share of its smaller side, and the
+z cells stretch to it (at 1 and the preset's grid, 4.5 times as long as they are wide). The body's z then
+needs no scaling (`_z_scale` 1), and everything that measures in widths (the composite's `opacity` and
+`fog`, the light, the rays, the injection's `spread`, the monitor's box) means the same along z as across.
+
+What reads the cell as cubic, and what it becomes:
+
+| Part                                      | Now                                         | With stretched cells                                                                 |
+|-------------------------------------------|---------------------------------------------|--------------------------------------------------------------------------------------|
+| advection, MacCormack, the upscaled and the particles' carry | uvw by the box's extent (`z_extent`) | the same, `z_extent` the box's depth                                                 |
+| divergence, gradient                      | one cell size `h`                           | `h` per axis                                                                         |
+| the pressure: Jacobi, SOR, multigrid      | one `1/h²` for the six neighbors            | per axis; the multigrid halves z only once the xy cells are as long as the z (semi-coarsening), a point smoother converging poorly across a stretched cell otherwise |
+| the curl and the confinement              | per axis already (`uHalfRdxInv`)            | the confinement's `vorticity_radius` in widths, not cells                            |
+| viscosity                                 | one `1/h²`                                  | per axis                                                                             |
+| the sun's sweep                           | cubic light cells, a step one cell          | the light's way measured in widths: its slope and step from the cells' sizes         |
+| the lamp's march, the layer light, the rays | in widths over the box                    | the same                                                                             |
+| the particles                             | their own `z_extent`, layers over width     | the box's depth                                                                      |
+
+Measured before and after, on stillslowfast through `fluid_compare.py`: the water's z speed over its xy
+speed in the slab and beside it, and the share of the body's own z it keeps; the pressure's residual
+after its iterations or V-cycles at the stretched cells; the step's GPU time. An isotropy check in the
+harness: a swirl in the xz plane at stretched cells keeps its shape as one in the xy plane does. The
+preset's `depth_span` 10, chosen to scale the body's z, then means a box ten widths deep; 1 is the box as
+deep as it is wide.
 
 ### After the plan
 
-- The z depth: motion in x and y turns into motion in z very fast **(site fact)**; why, and the fix.
-  A body thin in z (`input.spread`) pushes water that the projection lets out the shortest way, in z,
-  is one reading to check **(deduction)**.
 - The body force's acceleration: tested, tweaked and made useful.
 - The particles: worked on, and how they combine with the upscaled density.
 
