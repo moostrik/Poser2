@@ -39,9 +39,16 @@ where it is on, at a finer grid, its size and cost measured against the picture.
 ### 3. The rays
 
 The water only absorbs: the fog sends no light toward the viewer, so empty water stays black and no
-shaft of light can show. The fog's in-scattering added to the march, each step the fog's share of the
-light reaching it, from the light grid that already covers the whole box; one setting, how much the fog
-glows in the light, 0 off.
+shaft of light can show. The fog's in-scattering added to the march (single scattering): each step the
+light reaching the water there, from the light grid that already covers the whole box, times the fog's
+extinction over the step and `fog_scattering`, the share of what the fog takes out that it sends on
+(0 to 1, 0 the water as now), dimmed by what lies in front.
+
+Sampled only at the march's 16 depths a shadow's edge jumps between steps and the shafts band. The rays
+per layer instead, as froxels (Wronski 2014; Hillaire 2015): the view looks straight down z, so the light
+grid is already view-aligned; a pass walks each of its columns in fine sub-steps and stores, for each of
+the march's layers, the in-scattering integrated exactly over the layer; the march reads one value more
+a step and adds it under the transmittance in front, so the density still covers the rays behind it.
 
 ### 4. The scattering and the anisotropy
 
