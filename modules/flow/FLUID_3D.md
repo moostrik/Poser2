@@ -34,6 +34,19 @@ What decides it in the upscale now (the code and deep_flow's preset):
 What is next for the fluid, in order; what is open elsewhere in the flow is
 [FLOW.md's Open](FLOW.md#open).
 
+Weighed by [the goal](#the-goal): sharp, translucent ink patterns, layers distinct.
+
+### 1. Sharp edges: an advection for each field
+
+One `advection` moves every field the same way. Each field's group gets its own, beside its
+`advection_scale`: `velocity.advection`, `density.advection` (the simulation density and the upscaled
+density alike), `temperature.advection`. The density's sets the sharpness of what is seen: MacCormack
+keeps the 4K amount's edges where the semi-Lagrangian step blurs them a little each step, at about 2.8 ms
+on the 4K amount at 16 layers, so about 4 at 24 **(deduction)**, inside the frame's room (its p95 11.7 ms
+at 60 fps, [TIMING.md](TIMING.md)). The velocity's keeps swirls (0.65 against 0.24 ms); the temperature is
+seen only as the buoyancy it drives, so its semi-Lagrangian costs nothing to the look. Judged on
+stillslowfast through `fluid_compare.py`, the composited output side by side, and in the app.
+
 ### 2. The body at its own depth
 
 The body goes in as one flat slab at `layer`, a cut-out: every pixel at the same z. The camera measures
@@ -47,16 +60,7 @@ stands for (`depth_ratio`) is what lets the real depth fit. With the box deep, t
 into z more, not less ([TIMING.md](TIMING.md#the-box-as-deep-as-it-is-wide)): the body's shape in depth is
 what should let the water go around it across as well.
 
-### 3. The smaller side as the unit
-
-Every length in the flow is in widths: the motion's velocity (widths/s of the camera's image), the bridge's
-readings, the fluid's inputs (`spread`), its look (`opacity`, `fog`), the box's depth, the monitor's scale.
-In portrait the width is the smaller side; in landscape it is the longer, and the same settings would
-then mean less against what is seen. One unit across the stages, the smaller side, keeps a preset's look
-and feel when the box turns: in portrait nothing changes. It reaches past the fluid (the motion, the
-bridge, the monitor), so it is one rule for all of them, made where each length is made.
-
-### 4. Swirls at more than one size
+### 3. Swirls at more than one size
 
 The confinement keeps swirls alive at one size, `vorticity_radius`: fine wisps or big eddies, not both.
 More than one radius, each with its own strength (multi-scale vorticity confinement), keeps fine and large
@@ -64,7 +68,17 @@ at once. Starting with two: the curl at both radii in the same pass (six more ve
 force from both curls in one pass (a curl volume more), their sum added to the faces once. About a third
 to a half more of the confinement's 0.57 ms at the preset, 0.2 to 0.3 ms **(deduction)**, measured as it
 lands. The upscaled density's turbulence already adds swirls below the grid to the dye, so what a second
-radius adds to the look is judged against it.
+radius adds to the look is judged against it, and by whether the layers stay apart: the confinement
+also carries one layer's motion into the next.
+
+### 4. The smaller side as the unit
+
+Every length in the flow is in widths: the motion's velocity (widths/s of the camera's image), the bridge's
+readings, the fluid's inputs (`spread`), its look (`opacity`, `fog`), the box's depth, the monitor's scale.
+In portrait the width is the smaller side; in landscape it is the longer, and the same settings would
+then mean less against what is seen. One unit across the stages, the smaller side, keeps a preset's look
+and feel when the box turns: in portrait nothing changes. It reaches past the fluid (the motion, the
+bridge, the monitor), so it is one rule for all of them, made where each length is made.
 
 ### After the plan
 
