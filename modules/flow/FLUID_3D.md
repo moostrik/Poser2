@@ -49,8 +49,10 @@ What reads the cell as cubic, and what it becomes:
 The injection's slab, the same for the boundary and the body force, the density and the temperature:
 `layer` stays its center, a share of the box's depth, 0 the front, 1 the back, smooth, never snapped
 to a cell, since the cells change with `depth`. `spread` becomes the body's thickness in z, front to back,
-in widths, 0 to 1 (now a gaussian's sigma, the thickness about four times it); the sigma is worked out
-from it. Each z cell takes the share of the body that lies in it, the profile's area between its two
+in widths, 0 to 1 (now a gaussian's sigma, the thickness about four times it). The profile stays the
+gaussian's curve, fullest at `layer` and fading to the front and back; `spread` is its width where the
+body is half as present as at its middle (its full width at half maximum, 2.355 sigma), and the sigma is
+worked out from it. Each z cell takes the share of the body that lies in it, the profile's area between its two
 faces (an erf), where it is now sampled at the cell's middle: a body thinner than a cell dyes and drags
 the part of the cell it covers, moves smoothly between cells as `layer` changes, and comes to the same
 amount at any `depth` or `depth_ratio`. At `spread` 0 nothing goes in, a body with no thickness
@@ -62,6 +64,17 @@ after its iterations or V-cycles at the stretched cells; the step's GPU time. An
 harness: a swirl in the xz plane at stretched cells keeps its shape as one in the xy plane does. The
 preset's `depth_span` 10, chosen to scale the body's z, goes with it; `depth_ratio` 1 is the box as
 deep as it is wide.
+
+### 3. The body at its own depth
+
+The body goes in as one flat slab at `layer`, a cut-out: every pixel at the same z. The camera measures
+each pixel's depth, and the motion reads it already for the z velocity. Each pixel in at its own depth
+instead: its distance from the camera in widths (a width the view's real span at the player,
+`view_span`), measured from the player's middle depth, which `layer` places in the box; `spread` the
+thickness around each pixel's depth. An arm reaching toward the camera then pushes the water near the
+front and the torso further back: the body in the water with its shape in depth. It needs the bridge
+to hand over each pixel's depth beside its velocity, and the injection to read it; item 1's depth as
+deep as it stands for is what lets the real depth fit.
 
 ### 2. The smaller side as the unit
 
