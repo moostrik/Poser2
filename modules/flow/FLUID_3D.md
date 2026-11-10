@@ -83,6 +83,16 @@ time follow the picture. Work every step does whatever is there is what to cut: 
 is the same each step and can be worked out once, the color's divide can be a multiply. An occupancy
 volume of empty 8³ blocks was slower ([TIMING.md](TIMING.md), Faster item 2).
 
+### After the plan
+
+Noted, not started:
+
+- The z depth: motion in x and y turns into motion in z very fast **(site fact)**; why, and the fix.
+  A body thin in z (`input.spread`) pushes water that the projection lets out the shortest way, in z,
+  is one reading to check **(deduction)**.
+- The body force's acceleration: tested, tweaked and made useful.
+- The particles: worked on, and how they combine with the upscaled density.
+
 ## The fluid
 
 A step (`Fluid3D.update`), in order, at the code's defaults:
@@ -862,7 +872,6 @@ Not worked on until asked for; each with what is known.
   was found is in [The density's detail](#the-densitys-detail).
 - The particles' weight: the particles splatted into an `r32ui` grid by fixed-point
   `imageAtomicAdd` (it needs integers), converted to the density volume the buoyancy reads.
-- The light drawn in the monitor's cube: a sun line, or a dot at the lamp.
 - The sparse grid: each step a pass marks the 8 × 8 × 8 bricks whose velocity or density is above
   a floor, grown by one brick, into a list with an atomic counter; every pass but the pressure then
   runs `glDispatchComputeIndirect` over the list, one workgroup a brick, and a brick off the list
