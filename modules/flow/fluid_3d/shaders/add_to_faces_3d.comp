@@ -37,13 +37,11 @@ uniform float uDepthScale;    // modes 1, 2
 #define FACES_IN_PLACE
 #include "walls.glsl"
 #include "faces.glsl"
+#include "slab.glsl"
 
-// The slab: the gaussian around the injection's layer, at depth `z` (cells)
+// The slab at depth `z` (cells): the body's share over a layer's length around it
 float slab(float z) {
-    float z_norm = z / float(uCells.z);
-    float target = (0.5 + uTargetLayer * (float(uCells.z) - 1.0)) / float(uCells.z);
-    float d = (z_norm - target) / max(uSpread, 0.001);
-    return exp(-0.5 * d * d);
+    return slab_at(z, uCells.z);
 }
 
 // The bridge's vector at `p` (cells), in the volume's axes: z turned into w and scaled

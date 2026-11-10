@@ -51,11 +51,11 @@ class UpscaledDensity(DensityCarrier):
         self._turbulent_shader: TurbulentAdvect3D = TurbulentAdvect3D()
         self._clock: float = 0.0
 
-    def allocate(self, width: int, height: int, layers: int, output_width: int, output_height: int) -> None:
+    def allocate(self, width: int, height: int, layers: int, extent: float, output_width: int, output_height: int) -> None:
         upscaled = self.settings.upscaled
         density_layers: int = int(upscaled.depth)
         self._amount.allocate(int(upscaled.width), int(upscaled.height), density_layers, GL_R16F)
-        self._z_extent = layers / max(1, width)
+        self._z_extent = extent
         if layers > density_layers:
             self._average.allocate(width, height, density_layers, GL_RGBA16F)
         for displacement in self._displacements:

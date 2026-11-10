@@ -12,8 +12,8 @@ layout(local_size_x = 1024) in;
 layout(binding = 0) uniform sampler3D uDivergence;   // the level's right-hand side (R32F)
 layout(r32f, binding = 0) uniform image3D uPressure;
 
-uniform float uAlpha;        // 1 / h²
-uniform float uBeta;         // 1 / (6 alpha)
+uniform vec3  uAlpha;        // 1 / h², per axis
+uniform float uBeta;         // 1 / (2 (ax + ay + az))
 uniform int   uSweeps;
 uniform ivec3 uSize;
 uniform ivec3 uClosed;
@@ -52,9 +52,9 @@ void main() {
                 ivec3 c = cell_of(i);
                 if (((c.x + c.y + c.z) & 1) != color) continue;
                 float pC = s_pressure[i];
-                float gauss_seidel = uBeta * (uAlpha * (neighbor(c - ivec3(1, 0, 0), pC, 0) + neighbor(c + ivec3(1, 0, 0), pC, 0))
-                                            + uAlpha * (neighbor(c - ivec3(0, 1, 0), pC, 1) + neighbor(c + ivec3(0, 1, 0), pC, 1))
-                                            + uAlpha * (neighbor(c - ivec3(0, 0, 1), pC, 2) + neighbor(c + ivec3(0, 0, 1), pC, 2))
+                float gauss_seidel = uBeta * (uAlpha.x * (neighbor(c - ivec3(1, 0, 0), pC, 0) + neighbor(c + ivec3(1, 0, 0), pC, 0))
+                                            + uAlpha.y * (neighbor(c - ivec3(0, 1, 0), pC, 1) + neighbor(c + ivec3(0, 1, 0), pC, 1))
+                                            + uAlpha.z * (neighbor(c - ivec3(0, 0, 1), pC, 2) + neighbor(c + ivec3(0, 0, 1), pC, 2))
                                             - s_divergence[i]);
                 s_pressure[i] = mix(pC, gauss_seidel, 1.0);
             }

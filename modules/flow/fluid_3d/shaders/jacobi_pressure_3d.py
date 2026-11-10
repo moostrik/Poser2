@@ -27,7 +27,7 @@ class JacobiPressure3D(ComputeShader):
 
     def use(self, pressure_in: Texture3D, pressure_out: Texture3D,
             divergence: Texture3D, obstacle: Texture3D,
-            cell: float,
+            cell: tuple[float, float, float],
             iterations: int = DEFAULT_ITERATIONS_PER_DISPATCH,
             has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True)) -> None:
         """Run multiple 3D Jacobi pressure iterations.
@@ -37,15 +37,14 @@ class JacobiPressure3D(ComputeShader):
             pressure_out: Output pressure volume (R16F) — write via image
             divergence: Velocity divergence volume (R16F) — read via sampler
             obstacle: 3D obstacle mask (R8) — read via sampler
-            cell: The cubic cell's size in widths
+            cell: A cell's sides in widths, x, y and z
             iterations: Number of iterations per dispatch
             has_obstacles: Whether obstacle logic is active
         """
         if not self.allocated or not self.shader_program:
             return
 
-        dx = cell                         # cubic cells, in widths
-        dy = dz = cell
+        dx, dy, dz = cell
 
         alpha_x = 1.0 / (dx * dx)
         alpha_y = 1.0 / (dy * dy)
@@ -75,7 +74,7 @@ class JacobiPressure3D(ComputeShader):
 
     def solve(self, pressure_a: Texture3D, pressure_b: Texture3D,
               divergence: Texture3D, obstacle: Texture3D,
-              cell: float,
+              cell: tuple[float, float, float],
               total_iterations: int = 40,
               iterations_per_dispatch: int = DEFAULT_ITERATIONS_PER_DISPATCH,
               has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True)) -> Texture3D:
@@ -85,7 +84,7 @@ class JacobiPressure3D(ComputeShader):
             pressure_a, pressure_b: Ping-pong pressure buffers
             divergence: Velocity divergence volume
             obstacle: 3D obstacle mask
-            cell: The cubic cell's size in widths
+            cell: A cell's sides in widths, x, y and z
             total_iterations: Total Jacobi iterations
             iterations_per_dispatch: Iterations per compute dispatch
             has_obstacles: Whether obstacle logic is active

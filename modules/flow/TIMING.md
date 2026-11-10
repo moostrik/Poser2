@@ -395,6 +395,25 @@ so one solve differs on 30% of its values by up to 3e-4 uv, and with exact cente
 last bits the solve amplifies. Not kept: the bandpass's four parts in one pass (0.140 → 0.117 ms), and the
 lowpass's advect fused into its trail, at most 0.005 ms of its 0.076 (its blur, 4 steps of 2 passes, is 0.064).
 
+## The box as deep as it is wide
+
+`depth_check.py` on stillslowfast's fast half, deep_flow's preset (288 × 512 × 64 cells), the body's own z
+off (`input.depth_gain` 0) so what shows is xy turned into z; `isotropy_check.py` for the swirls:
+
+| The box                                  | water z / xy | divergence after the projection, /s | the step, ms mean / p95 |
+|------------------------------------------|--------------|--------------------------------------|-------------------------|
+| 0.22 widths deep, cubic cells (before)   | 0.28         | 0.014                                | 7.30 / 8.91             |
+| as deep as wide (`depth_ratio` 1)        | 0.43         | 0.0015                               | 7.26 / 8.92             |
+| as deep as wide, `spread` 0.2            | 0.46         | 0.009                                | 7.45 / 8.97             |
+
+The thin box's close walls held z back: with room the water turns more into z, at any `spread`, so the turn
+is the injection's, a flat sheet that the water flows around over its faces **(deduction)**, not the box's.
+At `depth_ratio` 1 a swirl in the depth plane, 0.1 widths in radius, stays round (its aspect 1.00 after 2 s)
+and keeps 0.88 of its speed, one in the image plane 0.84. The body's z from the bridge is 5.8 times its xy on
+this recording, where the player moves mostly sideways: depth noise **(deduction)**, which `depth_gain` keeps
+out (the preset's 0.022, what `depth_span` 10 scaled it by). The pressure pass at the preset 1.22 ms, the
+multigrid's semi-coarsened levels, where it was 1.04.
+
 ## The light and the composite
 
 `fluid_pass_check.py` and the same passes alone with a swinging body's density, at deep_flow's preset

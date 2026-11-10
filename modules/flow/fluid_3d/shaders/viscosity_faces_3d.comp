@@ -22,9 +22,9 @@ layout(binding = 2) uniform sampler3D uObstacle;
 uniform ivec3 uCells;
 uniform ivec3 uClosed;
 uniform bool  uHasObstacles;
-uniform float uAlpha;         // 1 / h²
+uniform vec3  uAlpha;         // 1 / h², per axis
 uniform float uGamma;         // 1 / (ν Δt)
-uniform float uBeta;          // 1 / (6 α + γ)
+uniform float uBeta;          // 1 / (2 (αx + αy + αz) + γ)
 uniform int   uIterations;
 
 #include "walls.glsl"
@@ -58,7 +58,7 @@ uint neighbor_weights(ivec3 i, int axis, int step, inout vec3 own) {
     bvec3 beyond = n[axis] < 0 ? bvec3(true) : greaterThanEqual(vec3(float(n[axis])), count);
     vec3 ghost = vec3(uClosed[axis] == 1 ? 2.0 * uWallKeep - 1.0 : 1.0);
     ghost[axis] = 1.0;
-    own += vec3(beyond) * ghost;
+    own += vec3(beyond) * ghost * uAlpha[axis];
     bvec3 counts = not(bvec3(uvec3(beyond) | uvec3(held_at(n))));
     return uint(counts.x) | (uint(counts.y) << 1) | (uint(counts.z) << 2);
 }
@@ -109,10 +109,11 @@ void main() {
         vec3 r = s_faces[sz][sid.y][sid.x + 1].xyz, l = s_faces[sz][sid.y][sid.x - 1].xyz;
         vec3 t = s_faces[sz][sid.y + 1][sid.x].xyz, b = s_faces[sz][sid.y - 1][sid.x].xyz;
         vec3 f = s_faces[sz + 1][sid.y][sid.x].xyz, k = s_faces[sz - 1][sid.y][sid.x].xyz;
-        vec3 sum = interior ? r + l + t + b + f + k
-                            : weight(mask, 0) * r + weight(mask, 1) * l + weight(mask, 2) * t + weight(mask, 3) * b
-                              + weight(mask, 4) * f + weight(mask, 5) * k + own * current;
-        vec3 next = live * (uBeta * (uAlpha * sum + uGamma * v_old.xyz));
+        vec3 sum = interior ? uAlpha.x * (r + l) + uAlpha.y * (t + b) + uAlpha.z * (f + k)
+                            : uAlpha.x * (weight(mask, 0) * r + weight(mask, 1) * l)
+                              + uAlpha.y * (weight(mask, 2) * t + weight(mask, 3) * b)
+                              + uAlpha.z * (weight(mask, 4) * f + weight(mask, 5) * k) + own * current;
+        vec3 next = live * (uBeta * (sum + uGamma * v_old.xyz));
         barrier();
         s_faces[sz][sid.y][sid.x] = vec4(next, 0.0);
         current = next;

@@ -5,7 +5,7 @@ from OpenGL.GL import glUniform1f, glUniform1i, glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
 from ...finite_guard import GuardSlot
-from .face_binding import bind_faces, bind_face_writes
+from .face_binding import Cell, bind_faces, bind_face_writes
 
 SEMI_LAGRANGIAN: int = 0
 PREDICTOR: int = 1
@@ -19,7 +19,7 @@ class AdvectFaces3D(ComputeShader):
     WORKGROUP_SIZE_Z = 4
 
     def use(self, mode: int, source: Texture3D, result: Texture3D, obstacle: Texture3D,
-            cells: tuple[int, int, int], step: float, dissipation: float = 1.0, evaporation: float = 0.0,
+            cells: tuple[int, int, int], cell: Cell, step: float, dissipation: float = 1.0, evaporation: float = 0.0,
             max_speed: float = 0.0, guard: GuardSlot | None = None, closed: tuple[bool, bool, bool] = (True, True, True),
             wall_keep: float = 1.0, has_obstacles: bool = True, predictor: Texture3D | None = None) -> None:
         """Advect `source` into `result`.
@@ -29,6 +29,7 @@ class AdvectFaces3D(ComputeShader):
             source: The faces before the step (`FaceVelocity`)
             result: The faces written
             cells: The cell counts (width, height, depth)
+            cell: A cell's sides in widths, x, y and z
             step: dt × advection_scale
             dissipation: The fade's multiplier this step
             evaporation: Widths/s taken off the speed this step
@@ -40,12 +41,11 @@ class AdvectFaces3D(ComputeShader):
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
-        bind_faces(self, source, cells, closed, has_obstacles, obstacle)
+        bind_faces(self, source, cells, cell, closed, has_obstacles, obstacle)
         bind_face_writes(self, result)
         if predictor is not None:
             self.bind_texture_3d(8, predictor, 'uPred')
         glUniform1i(self.get_uniform_loc('uMode'), mode)
-        glUniform1f(self.get_uniform_loc('uCellsPerWidth'), float(cells[0]))
         glUniform1f(self.get_uniform_loc('uTimestep'), step)
         glUniform1f(self.get_uniform_loc('uDissipation'), dissipation)
         glUniform1f(self.get_uniform_loc('uEvaporation'), evaporation)

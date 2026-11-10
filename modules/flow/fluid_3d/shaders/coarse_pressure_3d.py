@@ -1,7 +1,7 @@
 """CoarsePressure3D - the multigrid's coarsest level solved in one dispatch."""
 from __future__ import annotations
 
-from OpenGL.GL import GL_R32F, glDispatchCompute, glUniform1f, glUniform1i, glUniform3i, glUseProgram
+from OpenGL.GL import GL_R32F, glDispatchCompute, glUniform1f, glUniform1i, glUniform3f, glUniform3i, glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
 
@@ -14,17 +14,17 @@ class CoarsePressure3D(ComputeShader):
     def fits(self, pressure: Texture3D) -> bool:
         return pressure.width * pressure.height * pressure.depth <= self.MAX_CELLS
 
-    def solve(self, pressure: Texture3D, divergence: Texture3D, cell: float, sweeps: int,
+    def solve(self, pressure: Texture3D, divergence: Texture3D, cell: tuple[float, float, float], sweeps: int,
               closed: tuple[bool, bool, bool]) -> None:
         """`sweeps` red-black sweeps on `pressure` in place (R32F), `divergence` its right-hand side."""
         if not self.allocated or not self.shader_program:
             return
-        alpha = 1.0 / (cell * cell)
+        alpha = (1.0 / (cell[0] * cell[0]), 1.0 / (cell[1] * cell[1]), 1.0 / (cell[2] * cell[2]))
         glUseProgram(self.shader_program)
         self.bind_texture_3d(0, divergence, "uDivergence")
         self.bind_image_3d_readwrite(0, pressure, GL_R32F)
-        glUniform1f(self.get_uniform_loc("uAlpha"), alpha)
-        glUniform1f(self.get_uniform_loc("uBeta"), 1.0 / (6.0 * alpha))
+        glUniform3f(self.get_uniform_loc("uAlpha"), *alpha)
+        glUniform1f(self.get_uniform_loc("uBeta"), 1.0 / (2.0 * sum(alpha)))
         glUniform1i(self.get_uniform_loc("uSweeps"), sweeps)
         glUniform3i(self.get_uniform_loc("uSize"), pressure.width, pressure.height, pressure.depth)
         glUniform3i(self.get_uniform_loc("uClosed"), *(int(c) for c in closed))

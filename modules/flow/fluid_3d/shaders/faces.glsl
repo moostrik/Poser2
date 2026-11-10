@@ -12,6 +12,8 @@
 
 layout(binding = 4) uniform sampler3D uFaces;
 
+uniform vec3 uCell;           // a cell's sides in widths, x, y and z (`bind_faces`): the box's spacing, stretched in z
+
 #ifdef FACES_IN_PLACE
 layout(rgba16f, binding = 4) uniform image3D uOutFaces;
 #else

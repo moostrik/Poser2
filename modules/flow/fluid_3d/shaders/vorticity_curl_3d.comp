@@ -18,7 +18,7 @@ layout(binding = 2) uniform sampler3D uObstacle;   // R8 at the cells
 layout(rgba16f, binding = 0) writeonly uniform image3D uCurl;
 
 uniform vec3  uHalfRdxInv;   // (0.5/dx, 0.5/dy, 0.5/dz)
-uniform float uRadius;       // the sampling radius in cells
+uniform vec3  uRadius;       // the sampling radius in cells per axis, at least one: the radius in widths over each cell's side
 uniform ivec3 uCells;
 uniform ivec3 uClosed;
 uniform bool  uHasObstacles;
@@ -34,28 +34,28 @@ void main() {
         return;
     }
     vec3 p = vec3(i) + 0.5;
-    vec3 vR = velocity_at(p + vec3(uRadius, 0.0, 0.0));
-    vec3 vL = velocity_at(p - vec3(uRadius, 0.0, 0.0));
-    vec3 vT = velocity_at(p + vec3(0.0, uRadius, 0.0));
-    vec3 vB = velocity_at(p - vec3(0.0, uRadius, 0.0));
-    vec3 vF = velocity_at(p + vec3(0.0, 0.0, uRadius));
-    vec3 vK = velocity_at(p - vec3(0.0, 0.0, uRadius));
+    vec3 vR = velocity_at(p + vec3(uRadius.x, 0.0, 0.0));
+    vec3 vL = velocity_at(p - vec3(uRadius.x, 0.0, 0.0));
+    vec3 vT = velocity_at(p + vec3(0.0, uRadius.y, 0.0));
+    vec3 vB = velocity_at(p - vec3(0.0, uRadius.y, 0.0));
+    vec3 vF = velocity_at(p + vec3(0.0, 0.0, uRadius.z));
+    vec3 vK = velocity_at(p - vec3(0.0, 0.0, uRadius.z));
 
     vec3 vC = cell_velocity(i);
-    int reach = max(int(round(uRadius)), 1);
-    if (i.x + reach >= uCells.x) vR = wall_velocity(vC, 0);
-    if (i.x - reach < 0)         vL = wall_velocity(vC, 0);
-    if (i.y + reach >= uCells.y) vT = wall_velocity(vC, 1);
-    if (i.y - reach < 0)         vB = wall_velocity(vC, 1);
-    if (i.z + reach >= uCells.z) vF = wall_velocity(vC, 2);
-    if (i.z - reach < 0)         vK = wall_velocity(vC, 2);
+    ivec3 reach = max(ivec3(round(uRadius)), ivec3(1));
+    if (i.x + reach.x >= uCells.x) vR = wall_velocity(vC, 0);
+    if (i.x - reach.x < 0)         vL = wall_velocity(vC, 0);
+    if (i.y + reach.y >= uCells.y) vT = wall_velocity(vC, 1);
+    if (i.y - reach.y < 0)         vB = wall_velocity(vC, 1);
+    if (i.z + reach.z >= uCells.z) vF = wall_velocity(vC, 2);
+    if (i.z - reach.z < 0)         vK = wall_velocity(vC, 2);
     // an obstacle is a closed wall inside the box: its cell's ghost the closed wall's
-    if (solid_cell(i + ivec3(reach, 0, 0))) vR = closed_velocity(vC, 0);
-    if (solid_cell(i - ivec3(reach, 0, 0))) vL = closed_velocity(vC, 0);
-    if (solid_cell(i + ivec3(0, reach, 0))) vT = closed_velocity(vC, 1);
-    if (solid_cell(i - ivec3(0, reach, 0))) vB = closed_velocity(vC, 1);
-    if (solid_cell(i + ivec3(0, 0, reach))) vF = closed_velocity(vC, 2);
-    if (solid_cell(i - ivec3(0, 0, reach))) vK = closed_velocity(vC, 2);
+    if (solid_cell(i + ivec3(reach.x, 0, 0))) vR = closed_velocity(vC, 0);
+    if (solid_cell(i - ivec3(reach.x, 0, 0))) vL = closed_velocity(vC, 0);
+    if (solid_cell(i + ivec3(0, reach.y, 0))) vT = closed_velocity(vC, 1);
+    if (solid_cell(i - ivec3(0, reach.y, 0))) vB = closed_velocity(vC, 1);
+    if (solid_cell(i + ivec3(0, 0, reach.z))) vF = closed_velocity(vC, 2);
+    if (solid_cell(i - ivec3(0, 0, reach.z))) vK = closed_velocity(vC, 2);
 
     vec3 curl;
     curl.x = uHalfRdxInv.y * (vT.z - vB.z) - uHalfRdxInv.z * (vF.y - vK.y);

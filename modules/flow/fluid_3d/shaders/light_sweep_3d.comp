@@ -26,9 +26,9 @@ uniform int   uDirection;     // +1: the light travels toward higher cells along
 uniform vec2  uSlope;         // cells slid across (the other two axes, in order) per cell along the sweep axis
 uniform ivec2 uLineStart;     // the first line across, before the first cell where the light slides in from a side
 uniform ivec2 uLines;         // the lines across
-uniform vec3  uSigma;         // the density's extinction per cell per unit of amount, per channel
-uniform vec3  uFog;           // the water's extinction per cell, per channel
-uniform float uStepCells;     // a step's length along the line, in cells
+uniform vec3  uSigma;         // the density's extinction per width per unit of amount, per channel
+uniform vec3  uFog;           // the water's extinction per width, per channel
+uniform float uStep;          // a step's length along the line, widths
 
 ivec3 to_grid(int along, ivec2 across) {
     if (uAxis == 0) return ivec3(along, across.x, across.y);
@@ -70,17 +70,17 @@ void main() {
     int k_first = int(floor(first));
     int k_last = int(ceil(last));
 
-    vec3 depth = float(k_first) * uStepCells * uFog;      // the water crossed before
+    vec3 depth = float(k_first) * uStep * uFog;           // the water crossed before
     float dyed = 0.0;                           // the density's alone, grey
     for (int k = k_first; k <= k_last; k++) {
         int along = uDirection > 0 ? k : n_along - 1 - k;
         vec2 here = line + 0.5 + uSlope * float(k);     // where the line passes, in cells across
-        vec3 half_step = 0.5 * uStepCells * uFog;
+        vec3 half_step = 0.5 * uStep * uFog;
         float half_dyed = 0.0;
         if (all(greaterThanEqual(here, vec2(0.0))) && all(lessThan(here, vec2(n_across)))) {
             float amount = max(texture(uDensity, to_grid(float(along) + 0.5, here) / size).a, 0.0);
-            half_dyed = 0.5 * uStepCells * uSigma.g * amount;      // green: the tint's neutral channel
-            half_step += 0.5 * uStepCells * uSigma * amount;
+            half_dyed = 0.5 * uStep * uSigma.g * amount;      // green: the grey density's
+            half_step += 0.5 * uStep * uSigma * amount;
         }
         imageStore(uLight, to_grid(along, column), exp(-vec4(depth + half_step, dyed + half_dyed)));
         depth += 2.0 * half_step;

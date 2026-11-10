@@ -53,6 +53,7 @@ from .upscaled_density import UpscaledDensity
 from .field_advection import FieldAdvection
 from .simulation_density import SimulationDensity
 from .particle_density import ParticleDensity
+from .shaders.face_binding import Cell
 from .shaders import (AdvectFaces3D, FacesToCenters3D, ViscosityFaces3D, SEMI_LAGRANGIAN, PREDICTOR, CORRECTION,
                       
     Divergence3D, Gradient3D,
@@ -76,6 +77,7 @@ _WALL_GL: dict = {
 
 FLUID_PASSES: tuple[str, ...] = ('advect velocity', 'viscosity', 'vorticity', 'advect temperature', 'buoyancy', 'pressure',
                                  'faces to centers', 'density', 'light', 'composite')     # a step's passes, each a GPU timer
+FULL_WIDTH_HALF_MAXIMUM: float = 2.0 * math.sqrt(2.0 * math.log(2.0))   # a gaussian's width at half its height, in sigmas
 CAUSTIC_NET_SIZE: int = 256   # the caustic net's texels across its tile
 DRAG_FLOOR: float = 0.02    # widths/s: the body's speed below which it drags nothing, so a dead trail pulls nothing toward 0
 
@@ -156,14 +158,13 @@ class Fluid3D:
         self._output_height: int = 0
         self._depth: int = 0              # layers, every field's
         self._aspect: float = 1.0
-        self._cell: float = 1.0           # the cubic cell's size in widths: 1 / the grid's width
+        self._cell: Cell = (1.0, 1.0, 1.0)   # a cell's sides in widths, x, y and z: 1 / the grid's width across, stretched in z
 
         self._dt: float = REFERENCE_STEP
         self._time_step: TimeStep = TimeStep()
 
         # The slab's thickness in width units: cubic cells, so layers / width (advection: uRdx.z = 1/z_extent)
         self._z_extent: float = 1.0
-        self._depth_scale: float = 1.0      # the body's z to the box's: its depth over the smaller of its width and height
 
         self._has_obstacles: bool = False
 
@@ -254,6 +255,7 @@ class Fluid3D:
 
         # Bind settings actions
         self.settings.bind(Fluid3DSettings.depth, lambda _: self._request_reallocate())
+        self.settings.bind(Fluid3DSettings.depth_ratio, lambda _: self._request_reallocate())
         reallocate_densities = lambda _: setattr(self, '_densities_pending', True)
         for field in (UpscaledDensitySettings.enabled, UpscaledDensitySettings.width, UpscaledDensitySettings.height,
                       UpscaledDensitySettings.depth):
@@ -319,20 +321,22 @@ class Fluid3D:
         self._simulation_width = self._align32(self.settings.width)
         self._simulation_height = self._align32(self.settings.height)
         self._aspect = self._simulation_width / self._simulation_height if self._simulation_height > 0 else 1.0
-        self._cell = 1.0 / max(1, self._simulation_width)
         self._depth = self.settings.depth
-        self._z_extent = self._depth / max(1, self._simulation_width)
-        self._depth_scale = self._depth / max(1, min(self._simulation_width, self._simulation_height))
+        self._z_extent = self.settings.depth_ratio      # the box's depth in widths
+        across: float = 1.0 / max(1, self._simulation_width)
+        self._cell = (across, across, self._z_extent / max(1, self._depth))
+        self.settings.z_stretch = self._cell[2] / across
 
     def _spread(self) -> float:
-        """The injection's gaussian sigma as a share of the slab's depth, from `input.spread` in widths."""
-        return max(self.settings.input.spread / max(self._z_extent, 1e-6), 0.001)
+        """The injection's gaussian sigma as a share of the box's depth, from `input.spread`, the body's thickness
+        in widths where it is at least half there (its full width at half maximum, 2.355 sigma)."""
+        return self.settings.input.spread / FULL_WIDTH_HALF_MAXIMUM / max(self._z_extent, 1e-6)
 
     @property
     def _z_scale(self) -> float:
-        """The body's z to the box's: the box's depth over the real depth it stands for, `input.depth_span`
-        times the smaller of its width and height."""
-        return self._depth_scale / max(self.settings.input.depth_span, 1e-6)
+        """The body's z's share that goes in, `input.depth_gain`: the box is as deep as it stands for, so z goes in
+        in widths/s as x and y do."""
+        return self.settings.input.depth_gain
 
     @property
     def _densities(self) -> list[DensityCarrier]:
@@ -350,7 +354,7 @@ class Fluid3D:
             carrier.deallocate()
         self._particle_texture.deallocate()
         for carrier in self._densities:
-            carrier.allocate(self._simulation_width, self._simulation_height, self._depth,
+            carrier.allocate(self._simulation_width, self._simulation_height, self._depth, self._z_extent,
                              self._output_width, self._output_height)
         if self.settings.particles.enabled:
             self._particle_texture.allocate(self._output_width, self._output_height, GL_RGBA16F)
@@ -369,7 +373,7 @@ class Fluid3D:
         self._faces.allocate(sim_w, sim_h, d)
         self._temperature.allocate(sim_w, sim_h, d, GL_R16F)
         self._pressure.allocate(sim_w, sim_h, d, GL_R32F)     # a cell in widths makes it small, past half floats
-        self._multigrid.allocate(sim_w, sim_h, d)
+        self._multigrid.allocate(sim_w, sim_h, d, self._cell)
         self._obstacle.allocate(sim_w, sim_h, d, GL_R8)
         if self._has_obstacles:
             self._inject_binary_shader.use(self._obstacle_source, self._obstacle, mode=1)
@@ -545,7 +549,7 @@ class Fluid3D:
         fade, the evaporation, the guard, the top speed and the slip."""
         velocity = self.settings.velocity
         step = self._dt * velocity.advection_scale
-        common = dict(obstacle=self._obstacle, cells=self._cells, step=step,
+        common = dict(obstacle=self._obstacle, cells=self._cells, cell=self._cell, step=step,
                       closed=self._closed, has_obstacles=self._has_obstacles)
         finish = dict(dissipation=self._calculate_dissipation(self._dt, velocity.fade_time),
                       evaporation=self._evaporation(self._dt, velocity.evaporation_time), max_speed=velocity.max_speed,
@@ -581,13 +585,13 @@ class Fluid3D:
         confining: bool = self.settings.velocity.vorticity > 0.0 and self.settings.velocity.vorticity_radius > 0.0
         if not confining:
             if self._needs_curl:
-                self._vorticity_curl_shader.use(self._faces.volume, self._obstacle, self._curl_vol, self._cell, 1.0,
+                self._vorticity_curl_shader.use(self._faces.volume, self._obstacle, self._curl_vol, self._cell, self._cell[0],
                                                 has_obstacles=self._has_obstacles, closed=self._closed, wall_keep=self._wall_keep)
                 glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
             return
 
-        vorticity_radius = self.settings.velocity.vorticity_radius        # cells
-        vorticity_force = self.settings.velocity.vorticity * self._cell * self._dt     # epsilon h (N x omega), Fedkiw 2001
+        vorticity_radius = self.settings.velocity.vorticity_radius        # widths
+        vorticity_force = self.settings.velocity.vorticity * self._cell[0] * self._dt     # epsilon h (N x omega), Fedkiw 2001; h the xy cell
 
         # a. The curl at the cells, from the faces
         self._vorticity_curl_shader.use(
@@ -702,7 +706,7 @@ class Fluid3D:
             aspect=self._aspect, z_extent=self._z_extent, dt=self._dt, step=self._dt * self.settings.density.advection_scale,
             dissipation=self._calculate_dissipation(self._dt, self.settings.density.fade_time),
             evaporation=self._evaporation(self._dt, self.settings.density.evaporation_time), advection=self.settings.advection,
-            curl=self._curl_vol if self._needs_curl else None, cell=self._cell, guard=self._guard_slot('density'),
+            curl=self._curl_vol if self._needs_curl else None, cell=self._cell[0], guard=self._guard_slot('density'),
             faces=self._faces.volume)
         for carrier in self._densities:
             carrier.update(step)
@@ -830,8 +834,9 @@ class Fluid3D:
         vector = self._light_override or (lit.x, lit.y, lit.z)
         length: float = math.sqrt(sum(c * c for c in vector))
         toward = (vector[0] / length, vector[1] / length, vector[2] / length) if length > 1e-6 else (0.0, -1.0, 0.0)
-        stored = size if point else sweep_size(size, toward)     # a sun's grid is stored sheared, a line a column
-        light_map: tuple[float, ...] = IDENTITY if point else sweep_map(size, toward)
+        light_cell = (self._cell[0] * share, self._cell[1] * share, self._z_extent / size[2])
+        stored = size if point else sweep_size(size, toward, light_cell)     # a sun's grid is stored sheared, a line a column
+        light_map: tuple[float, ...] = IDENTITY if point else sweep_map(size, toward, light_cell)
         blurred: bool = lit.scattering > 0.0 and lit.scattering_model == ScatteringModel.BLUR
         for light in (self._light, *self._light_blur) if blurred else (self._light,):
             if not light.allocated or (light.width, light.height, light.depth) != stored:
@@ -844,7 +849,7 @@ class Fluid3D:
         if point:
             self._light_shader.use(density, self._light, box=box, point=True, vector=vector, sigma=sigma, fog=fog)
         else:
-            self._light_sweep_shader.use(density, self._light, size, toward=toward, sigma=sigma, fog=fog)
+            self._light_sweep_shader.use(density, self._light, size, light_cell, toward=toward, sigma=sigma, fog=fog)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         light: Texture3D = self._light
         if blurred:
@@ -867,12 +872,13 @@ class Fluid3D:
         sigma, fog = self._light_extinction()
         size = (max(1, self._simulation_width // 4), max(1, self._simulation_height // 4), max(1, self._depth // 4))
         above = (0.0, -1.0, 0.0)
-        stored = sweep_size(size, above)
+        sky_cell = (self._cell[0] * 4, self._cell[1] * 4, self._z_extent / size[2])
+        stored = sweep_size(size, above, sky_cell)
         if not self._sky.allocated or (self._sky.width, self._sky.height, self._sky.depth) != stored:
             self._sky.allocate(*stored, GL_RGBA16F)
-        self._light_sweep_shader.use(density, self._sky, size, toward=above, sigma=sigma, fog=fog)
+        self._light_sweep_shader.use(density, self._sky, size, sky_cell, toward=above, sigma=sigma, fog=fog)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
-        return self._sky, sweep_map(size, above)
+        return self._sky, sweep_map(size, above, sky_cell)
 
     def _light_place(self) -> LightPlace | None:
         """Where the light is, in the box's texture coordinates, None while it is off: a lamp at its place, a sun
@@ -912,9 +918,9 @@ class Fluid3D:
         """Process reset and reallocation requests queued from the UI thread."""
         if self._reallocate_pending:
             self._reallocate_pending = False
-            old_sim = (self._simulation_width, self._simulation_height, self._depth)
+            old_sim = (self._simulation_width, self._simulation_height, self._depth, self._cell)
             self._update_dimensions()
-            if (self._simulation_width, self._simulation_height, self._depth) != old_sim:
+            if (self._simulation_width, self._simulation_height, self._depth, self._cell) != old_sim:
                 self._allocate_simulation_fields()
                 self._densities_pending = True
 
@@ -968,9 +974,9 @@ class Fluid3D:
     def drag_velocity(self, texture: Texture, weight: float = 1.0) -> None:
         """The boundary: drag the velocity in the gaussian birth slab toward the body's velocity (x, y on
         the image plane, z toward the camera; widths/s) × input.boundary.velocity_gain, over input.boundary.velocity_drag, where
-        the body moves (its speed above DRAG_FLOOR), never past it. The volume's w is -z × `_z_scale`:
-        the box's depth stands for `input.depth_span` × the smaller of its width and height of real depth,
-        so z is scaled by its depth over that; +W moves fluid away from the viewer (layer 0 is the front face).
+        the body moves (its speed above DRAG_FLOOR), never past it. The volume's w is -z × `input.depth_gain`
+        (the box as deep as it stands for, z in widths/s as x and y); +W moves fluid away from the viewer (layer 0
+        is the front face).
         Without depth, z is 0, and so is w.
         """
         if not self._allocated:

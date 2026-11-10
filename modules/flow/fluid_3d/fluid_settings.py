@@ -106,11 +106,11 @@ class BodyForceSettings(BaseSettings):
 
 
 class InputSettings(BaseSettings):
-    """The bridge's input: where the body sits in the box's depth, how deep the real space is that the box
-    stands for, and each system's gains."""
+    """The bridge's input: where the body sits in the box's depth and how thick it is, its z's gain, and each
+    system's gains."""
     layer: Field[float]             = Field(0.5,    min=0.0,    max=1.0,                            description="Normalized depth of the injection's center, where the body sits")
-    spread: Field[float]            = Field(0.075,  min=0.001,  max=0.2,    step=0.001,             description="Gaussian sigma of the injection's depth (widths); 0.075 = a body 0.3 widths thick")
-    depth_span: Field[float]        = Field(1.0,    min=0.1,    max=10.0,                           description="The real depth the box's depth stands for, as a share of its smaller side; 2 = the body's z half as strong")
+    spread: Field[float]            = Field(0.2,    min=0.0,    max=1.0,    step=0.001,             description="The body's thickness in z, widths, where it is at least half there; 0 = none")
+    depth_gain: Field[float]        = Field(1.0,    min=0.0,    max=1.0,    step=0.001,             description="The body's z velocity's share that goes in, 1 = as measured; below while the depth is noisy")
     boundary: Group[BoundarySettings]       = Group(BoundarySettings)
     body_force: Group[BodyForceSettings]    = Group(BodyForceSettings)
 
@@ -122,7 +122,7 @@ class VelocitySettings(BaseSettings):
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds 1 width/s takes to brake to rest, a fixed amount at a time; 0 = off")
     max_speed: Field[float]         = Field(0.0,    min=0.0,    max=20.0,   step=0.1, color="cyan", description="The water's top speed (widths/s), bent softly toward from half; 0 = no limit, a failsafe")
     vorticity: Field[float]         = Field(0.3,    min=0.0,    max=100.0,    color="purple",         description="Vortex confinement's epsilon, its force epsilon × cell × (N × curl) (Fedkiw 2001)")
-    vorticity_radius: Field[float]  = Field(1.0,    min=1.0,    max=8.0,    color="deep-purple",    description="Curl sampling radius in cells; 1 = the neighbors")
+    vorticity_radius: Field[float]  = Field(0.004,  min=0.001,  max=0.1,    widget=Widget.log_slider, color="deep-purple", description="The size of the swirls it keeps, widths; at least one cell")
     viscosity: Field[float]         = Field(0.0,    min=0.0,    max=0.01,   step=0.0001, color="indigo", description="Kinematic viscosity (widths² per second); 0 = water at this scale")
     viscosity_iter: Field[int]      = Field(20,     min=1,      max=60,     color="orange",         description="Viscosity solver iterations at 60 fps; fewer at a higher rate, never more")
 
@@ -214,7 +214,9 @@ class Fluid3DSettings(BaseSettings):
     slip_time: Field[float]         = Field(0.0,    min=0.0,    max=60.0,   step=0.1,   description="Seconds the water along a closed wall takes to slow to 1%; 0 = free-slip")
     width: Field[int]               = Field(256,    min=32,     max=4096,   step=32,    newline=True, description="Simulation grid width")
     height: Field[int]              = Field(448,    min=32,     max=4096,   step=32,    description="Simulation grid height")
-    depth: Field[int]               = Field(128,    min=4,      max=256,    step=4,     description="Simulation grid depth in z; the cells are cubic, so the box is depth / width deep")
+    depth: Field[int]               = Field(128,    min=4,      max=256,    step=4,     description="Simulation grid depth in z, its cells")
+    depth_ratio: Field[float]       = Field(1.0,    min=0.05,   max=4.0,    step=0.01,  description="The box's depth over its width, 1 = as deep as it is wide; the z cells stretch to it")
+    z_stretch: Field[float]         = Field(1.0,    access=Field.READ,                  description="How many times longer a z cell is than an xy cell")
 
     # ---- The groups ----
     time: Group[TimeSettings]               = Group(TimeSettings)

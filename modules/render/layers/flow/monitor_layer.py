@@ -99,7 +99,10 @@ class MonitorInput:
     ports: dict[FlowStage, dict[str, Port]] = field(default_factory=dict)
 
 
-BOX_DEPTH: float = 1.0      # a volume's box is drawn as deep as it is wide, for now, not at its port's extent
+def box_depth(port: Port) -> float:
+    """How deep a volume's box is drawn, as a share of its width: its port's extent, as deep as the box it stands
+    for; as deep as it is wide where the port gives none."""
+    return port.extent if port.extent > 0.0 else 1.0
 
 
 _CUBE_COLORS: dict[TextureKind, CubeColor] = {
@@ -299,19 +302,20 @@ class MonitorLayer(LayerBase):
         volume = port.texture
         assert isinstance(volume, Texture3D)
         width, height = self._rendered_size
-        box: tuple[float, float, float] = box_size(volume.width, volume.height, BOX_DEPTH)
+        depth: float = box_depth(port)
+        box: tuple[float, float, float] = box_size(volume.width, volume.height, depth)
         orbit: OrbitSettings = self.settings.advanced.orbit
         self._orbit = Orbit(orbit.yaw, orbit.pitch, orbit.zoom)
         self._axes = axis_labels(self._orbit.view_projection(box, width / max(height, 1)), box, width, height)
         if view == MonitorView.GLYPHS:
             spacing: float = float(self.settings.advanced.glyph_spacing.value)
-            self._shown_3d = self._volume_glyphs.process(volume, self._orbit, BOX_DEPTH, spacing, scale,
+            self._shown_3d = self._volume_glyphs.process(volume, self._orbit, depth, spacing, scale,
                                                          not port.kind.vector, channel, port.kind == TextureKind.ACCELERATION,
                                                          self.settings.advanced.legend)
         else:
             advanced = self.settings.advanced
             color: CubeColor = _CUBE_COLORS[port.kind] if view == MonitorView.COLORMAP else CubeColor.AS_STORED
-            self._shown_3d = self._volume_cube.process(volume, self._orbit, BOX_DEPTH, scale, channel, color,
+            self._shown_3d = self._volume_cube.process(volume, self._orbit, depth, scale, channel, color,
                                                        advanced.opacity, advanced.depth_fade,
                                                        advanced.slice_position if advanced.slice else None, advanced.legend,
                                                        advanced.slice_focus, port.light)
@@ -326,7 +330,7 @@ class MonitorLayer(LayerBase):
         assert isinstance(volume, Texture3D)
         if view == MonitorView.HISTOGRAM:
             return self._volume_cut.texture         # not drawn: the histogram counts the volume
-        return self._volume_cut.process(volume, Cut.FRONT, 0.5, port.kind, BOX_DEPTH)
+        return self._volume_cut.process(volume, Cut.FRONT, 0.5, port.kind, box_depth(port))
 
     # ========== Rendering ==========
 

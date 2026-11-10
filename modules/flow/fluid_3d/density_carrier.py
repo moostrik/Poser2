@@ -29,7 +29,7 @@ class CarrierStep:
     evaporation: float      # subtracted this step
     advection: Advection
     curl: Texture3D | None = None   # the velocity's curl (1/s), while the turbulence needs it
-    cell: float = 0.0               # the grid's cubic cell (widths)
+    cell: float = 0.0               # the grid's cell across, in x and y (widths)
     guard: GuardSlot | None = None  # the density's slot in the fluid's FiniteGuard
     faces: Texture3D | None = None  # the velocity on its faces, which a carrier on the simulation's grid moves by
 
@@ -38,8 +38,9 @@ class DensityCarrier(ABC):
     """The density's carrier: allocated on the simulation's grid, fed sources, moved, drawn."""
 
     @abstractmethod
-    def allocate(self, width: int, height: int, layers: int, output_width: int, output_height: int) -> None:
-        """Allocate on the simulation's grid (`width` × `height` × `layers`) for an output of the given size."""
+    def allocate(self, width: int, height: int, layers: int, extent: float, output_width: int, output_height: int) -> None:
+        """Allocate on the simulation's grid (`width` × `height` × `layers`, a box `extent` widths deep) for an
+        output of the given size."""
 
     @abstractmethod
     def deallocate(self) -> None: ...

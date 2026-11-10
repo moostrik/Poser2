@@ -15,7 +15,6 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick 
 layout(binding = 2) uniform sampler3D uObstacle;   // R8 at the cells
 layout(r16f, binding = 0) writeonly uniform image3D uDivergence;
 
-uniform float uRdxInv;        // 1 / h, the cubic cell in widths
 uniform ivec3 uCells;
 uniform ivec3 uClosed;
 uniform bool  uHasObstacles;
@@ -30,8 +29,8 @@ void main() {
         imageStore(uDivergence, i, vec4(0.0));
         return;
     }
-    float div = face_fetch(0, i + ivec3(1, 0, 0)) - face_fetch(0, i)
-              + face_fetch(1, i + ivec3(0, 1, 0)) - face_fetch(1, i)
-              + face_fetch(2, i + ivec3(0, 0, 1)) - face_fetch(2, i);
-    imageStore(uDivergence, i, vec4(div * uRdxInv, 0.0, 0.0, 0.0));
+    float div = (face_fetch(0, i + ivec3(1, 0, 0)) - face_fetch(0, i)) / uCell.x
+              + (face_fetch(1, i + ivec3(0, 1, 0)) - face_fetch(1, i)) / uCell.y
+              + (face_fetch(2, i + ivec3(0, 0, 1)) - face_fetch(2, i)) / uCell.z;
+    imageStore(uDivergence, i, vec4(div, 0.0, 0.0, 0.0));
 }

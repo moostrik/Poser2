@@ -27,7 +27,6 @@ layout(binding = 8) uniform sampler3D uPred;      // mode 2: the predictor's fac
 
 uniform int   uMode;          // 0 semi-Lagrangian, 1 the MacCormack predictor, 2 its correction
 uniform ivec3 uCells;         // the cell counts
-uniform float uCellsPerWidth; // cells a width (cubic cells): a velocity in widths/s × it × dt is cells
 uniform float uTimestep;      // dt * advection_scale
 uniform float uDissipation;   // the fade's multiplier this step
 uniform float uEvaporation;   // widths/s taken off the speed this step
@@ -90,7 +89,7 @@ float advect(int c, ivec3 i) {
     }
     vec3 p = face_position(c, i);
     vec3 v = velocity_at(p);
-    vec3 step = uTimestep * uCellsPerWidth * v;
+    vec3 step = uTimestep * v / uCell;          // in cells, each axis by its cell's side
     vec3 back = p - step;
     float result;
     if (uMode == 2) {

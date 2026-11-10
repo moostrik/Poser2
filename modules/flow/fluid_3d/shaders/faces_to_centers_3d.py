@@ -4,7 +4,7 @@ from __future__ import annotations
 from OpenGL.GL import GL_RGBA16F, glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
-from .face_binding import bind_faces
+from .face_binding import UNSPACED, bind_faces
 
 
 class FacesToCenters3D(ComputeShader):
@@ -20,6 +20,6 @@ class FacesToCenters3D(ComputeShader):
             return
         glUseProgram(self.shader_program)
         cells = (centers.width, centers.height, centers.depth)
-        bind_faces(self, faces, cells, closed, has_obstacles, obstacle)
+        bind_faces(self, faces, cells, UNSPACED, closed, has_obstacles, obstacle)
         self.bind_image_3d_write(0, centers, GL_RGBA16F)
         self.dispatch(*cells)

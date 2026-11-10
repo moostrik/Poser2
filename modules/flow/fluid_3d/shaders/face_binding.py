@@ -1,18 +1,22 @@
 """Binding the velocity's faces for the shaders that include `faces.glsl`."""
 
-from OpenGL.GL import GL_RGBA16F, GL_READ_WRITE, GL_WRITE_ONLY, glUniform1i, glUniform3i
+from OpenGL.GL import GL_RGBA16F, GL_READ_WRITE, GL_WRITE_ONLY, glUniform1i, glUniform3f, glUniform3i
 
 from modules.gl import ComputeShader, Texture3D
 
 FACE_SAMPLER_UNIT: int = 4      # uFaces
 FACE_IMAGE_UNIT: int = 4        # uOutFaces
 
+Cell = tuple[float, float, float]     # a cell's sides in widths, x, y and z: the box's spacing, stretched in z
+UNSPACED: Cell = (1.0, 1.0, 1.0)      # for a pass that reads no spacing (it adds or averages faces in place)
 
-def bind_faces(shader: ComputeShader, faces: Texture3D, cells: tuple[int, int, int], closed: tuple[bool, bool, bool],
-               has_obstacles: bool, obstacle: Texture3D) -> None:
-    """The faces read (`faces.glsl`'s sampler), the cell counts, the walls and the obstacle."""
+
+def bind_faces(shader: ComputeShader, faces: Texture3D, cells: tuple[int, int, int], cell: Cell,
+               closed: tuple[bool, bool, bool], has_obstacles: bool, obstacle: Texture3D) -> None:
+    """The faces read (`faces.glsl`'s sampler), the cell counts, the cell's sides, the walls and the obstacle."""
     shader.bind_texture_3d(FACE_SAMPLER_UNIT, faces, 'uFaces')
     glUniform3i(shader.get_uniform_loc('uCells'), *cells)
+    glUniform3f(shader.get_uniform_loc('uCell'), *cell)
     glUniform3i(shader.get_uniform_loc('uClosed'), *(int(c) for c in closed))
     glUniform1i(shader.get_uniform_loc('uHasObstacles'), int(has_obstacles))
     shader.bind_texture_3d(2, obstacle, 'uObstacle')

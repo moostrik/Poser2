@@ -15,7 +15,6 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick 
 layout(binding = 0) uniform sampler3D uPressure;   // R32F at the cells
 layout(binding = 2) uniform sampler3D uObstacle;   // R8 at the cells
 
-uniform float uRdxInv;        // 1 / h
 uniform ivec3 uCells;
 uniform ivec3 uClosed;
 uniform bool  uHasObstacles;
@@ -37,7 +36,7 @@ void main() {
         float p_left = left_beyond ? 0.0 : texelFetch(uPressure, left, 0).r;
         if (right_beyond) p_right = wall_pressure(p_left, c);
         if (left_beyond) p_left = wall_pressure(p_right, c);
-        v[c] = face_fetch(c, i) - (p_right - p_left) * uRdxInv;
+        v[c] = face_fetch(c, i) - (p_right - p_left) / uCell[c];
     }
     store_faces(i, v);
 }

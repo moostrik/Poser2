@@ -37,13 +37,12 @@ float bspline_alpha(vec2 uv) {
          + s0.x * s1.y * texture(uInput, vec2(t0.x, t1.y)).a + s1.x * s1.y * texture(uInput, t1).a;
 }
 
+#include "slab.glsl"
+
 void main() {
     ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
     if (any(greaterThanEqual(gid, uSize))) return;
-    float z_norm = (float(gid.z) + 0.5) / float(uSize.z);
-    float target = (0.5 + uTargetLayer * (float(uSize.z) - 1.0)) / float(uSize.z);
-    float dz = (z_norm - target) / max(uSpread, 0.001);
-    float weight = exp(-0.5 * dz * dz) * uStrength;
+    float weight = slab_cell(gid.z, uSize.z) * uStrength;     // the body's share of this cell (slab.glsl)
     if (weight < 0.001) return;
     vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
     float source = uCubic ? bspline_alpha(uv) : texture(uInput, uv).a;

@@ -5,7 +5,7 @@ from __future__ import annotations
 from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
 
 from modules.gl import Texture, Texture3D, ComputeShader
-from .face_binding import bind_faces, bind_face_writes
+from .face_binding import UNSPACED, bind_faces, bind_face_writes
 
 FORCE: int = 0
 DRAG: int = 1
@@ -59,7 +59,7 @@ class AddToFaces3D(ComputeShader):
         if not self.allocated or not self.shader_program:
             return False
         glUseProgram(self.shader_program)
-        bind_faces(self, faces, cells, closed, has_obstacles, obstacle)
+        bind_faces(self, faces, cells, UNSPACED, closed, has_obstacles, obstacle)
         bind_face_writes(self, faces, in_place=True)
         glUniform1i(self.get_uniform_loc('uMode'), mode)
         self._cells = cells

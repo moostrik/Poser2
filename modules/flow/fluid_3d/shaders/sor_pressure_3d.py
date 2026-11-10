@@ -13,7 +13,7 @@ class SorPressure3D(ComputeShader):
     WORKGROUP_SIZE_Y = 8
     WORKGROUP_SIZE_Z = 4
 
-    def solve(self, pressure: Texture3D, divergence: Texture3D, obstacle: Texture3D, cell: float, sweeps: int,
+    def solve(self, pressure: Texture3D, divergence: Texture3D, obstacle: Texture3D, cell: tuple[float, float, float], sweeps: int,
               omega: float, has_obstacles: bool = True, closed: tuple[bool, bool, bool] = (True, True, True)) -> None:
         """`sweeps` red-black sweeps on `pressure` in place, warm from its last values.
 
@@ -21,7 +21,7 @@ class SorPressure3D(ComputeShader):
             pressure: The pressure (R32F), read and written
             divergence: The velocity's divergence (R16F)
             obstacle: The obstacle mask (R8)
-            cell: The cubic cell's size in widths
+            cell: A cell's sides in widths, x, y and z
             sweeps: Red-black sweeps, each a red and a black half
             omega: The over-relaxation, 1 (Gauss–Seidel) to under 2
             has_obstacles: Whether obstacle logic is active
@@ -29,13 +29,13 @@ class SorPressure3D(ComputeShader):
         """
         if not self.allocated or not self.shader_program:
             return
-        alpha = 1.0 / (cell * cell)
+        alpha = (1.0 / (cell[0] * cell[0]), 1.0 / (cell[1] * cell[1]), 1.0 / (cell[2] * cell[2]))
         glUseProgram(self.shader_program)
         self.bind_texture_3d(0, divergence, "uDivergence")
         self.bind_texture_3d(1, obstacle, "uObstacle")
         self.bind_image_3d_readwrite(0, pressure, GL_R32F)
-        glUniform3f(self.get_uniform_loc("uAlpha"), alpha, alpha, alpha)
-        glUniform1f(self.get_uniform_loc("uBeta"), 1.0 / (6.0 * alpha))
+        glUniform3f(self.get_uniform_loc("uAlpha"), *alpha)
+        glUniform1f(self.get_uniform_loc("uBeta"), 1.0 / (2.0 * sum(alpha)))
         glUniform1f(self.get_uniform_loc("uOmega"), omega)
         glUniform3i(self.get_uniform_loc("uSize"), pressure.width, pressure.height, pressure.depth)
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))

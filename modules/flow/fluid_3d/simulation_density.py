@@ -26,9 +26,9 @@ class SimulationDensity(DensityCarrier):
         self._inject_shader: Inject3D = Inject3D()
         self._composite_shader: Composite3D = Composite3D()
 
-    def allocate(self, width: int, height: int, layers: int, output_width: int, output_height: int) -> None:
+    def allocate(self, width: int, height: int, layers: int, extent: float, output_width: int, output_height: int) -> None:
         self._density.allocate(width, height, layers, GL_RGBA16F)
-        self._z_extent = layers / max(1, width)
+        self._z_extent = extent
         self._inject_shader.allocate()
         self._composite_shader.allocate()
         self._apply_walls()

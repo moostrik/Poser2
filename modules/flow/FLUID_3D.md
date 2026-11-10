@@ -16,66 +16,6 @@ fluid is `Fluid3D` (`fluid_3d/fluid_3d.py`), its layer `Fluid3DLayer`
 What is next for the fluid, in order; what is open elsewhere in the flow is
 [FLOW.md's Open](FLOW.md#open).
 
-### 1. A box as deep as it stands for
-
-Motion in x and y turns into motion in z very fast, taking over from the body's own z motion **(site
-fact)**. The box is as deep as its cells: cubic, so at the preset's 288 × 512 × 64 it is 0.22 widths
-deep, its front and back walls close. A push across has the projection let the water out the shortest
-way, in z; the body is a thin slab in z (`input.spread` 0.01), a sheet that answers with z flow beside
-it; and the confinement tilts swirls out of the image plane into walls a few cells away **(deduction)**.
-What is wanted: the depth means what the width means, one width of z one width on screen, however few
-cells it has.
-
-The box's depth set apart from its cells: `depth_ratio`, beside `width`, `height` and `depth` (the cells),
-the box's depth over its width, 1 as deep as it is wide. The box is then 1 × height / width × `depth_ratio`
-widths, and the z cells stretch to it (at 1 and the preset's grid, 4.5 times as long as they are wide).
-Beside it, read-only, `z_stretch`: how many times longer a z cell is than an xy cell, set when the grid
-is allocated, so the panel shows how coarse the depth is and how `spread` and `vorticity_radius` compare
-to a z cell.
-`input.depth_span` (now the real depth the box stands for, the body's z scaled down to fit) goes: the
-body's z needs no scaling (`_z_scale` 1), and everything that measures in widths (the composite's `opacity` and
-`fog`, the light, the rays, the injection's `spread`, the monitor's box) means the same along z as across.
-
-What reads the cell as cubic, and what it becomes. The spacing comes from one place: the fluid's cell
-as three sizes, x, y and z in widths, handed to every face pass by `bind_faces` (`faces.glsl`), never a
-uniform of a pass's own:
-
-| Part                                      | Now                                         | With stretched cells                                                                 |
-|-------------------------------------------|---------------------------------------------|--------------------------------------------------------------------------------------|
-| the velocity's own advection (`AdvectFaces3D`) | traced in cells by one cells-per-width  | cells per width per axis                                                             |
-| the fields' advection, MacCormack, the upscaled density's and the particles' carry | uvw by the box's extent (`z_extent`) | the same, `z_extent` the box's depth                                    |
-| divergence, gradient                      | one cell size `h`                           | `h` per axis                                                                         |
-| the pressure: Jacobi, SOR, multigrid      | one `1/h²` for the six neighbors            | per axis; the multigrid halves z only once the xy cells are as long as the z (semi-coarsening), a point smoother converging poorly across a stretched cell otherwise |
-| the curl (`VorticityCurl3D`)              | one cell size; `vorticity_radius` in cells  | per axis; `vorticity_radius` in widths (the swirls' size, kept at any grid), a log slider up to 0.1, at least one cell inside the shader (the curl cannot be measured closer); above 0.1 its two samples an axis skip the swirls between |
-| the confinement's force                   | per axis already (`uHalfRdxInv`), ε × h     | h the xy cell, the image's detail                                                    |
-| viscosity                                 | one `1/h²`                                  | per axis                                                                             |
-| the upscaled density's swirl noise        | a tile spanning 8 grid cells                | a tile in widths, so its swirls stay round in depth                                  |
-| the sun's sweep                           | cubic light cells, a step one cell          | the light's way measured in widths: its slope and step from the cells' sizes         |
-| the lamp's march, the layer light, the rays | in widths over the box                    | the same                                                                             |
-| the particles                             | their own `z_extent`, layers over width     | the box's depth                                                                      |
-| the monitor's cube                        | every volume one width deep (`BOX_DEPTH`)   | its port's extent, the box as deep as it is                                          |
-
-The injection's slab, the same for the boundary and the body force, the density and the temperature:
-`layer` stays its center, a share of the box's depth, 0 the front, 1 the back, smooth, never snapped
-to a cell, since the cells change with `depth`. `spread` becomes the body's thickness in z, front to back,
-in widths, 0 to 1 (now a gaussian's sigma, the thickness about four times it). The profile stays the
-gaussian's curve, fullest at `layer` and fading to the front and back; `spread` is its width where the
-body is half as present as at its middle (its full width at half maximum, 2.355 sigma), and the sigma is
-worked out from it. Each z cell takes the share of the body that lies in it, the profile's area between its two
-faces (an erf), where it is now sampled at the cell's middle: a body thinner than a cell dyes and drags
-the part of the cell it covers, moves smoothly between cells as `layer` changes, and comes to the same
-amount at any `depth` or `depth_ratio`. At `spread` 0 nothing goes in, a body with no thickness
-touching no water; no clamp, which would stop the slider below it and move with the grid.
-
-Measured before and after, on stillslowfast through `fluid_compare.py`: the water's z speed over its xy
-speed in the slab and beside it, and the share of the body's own z it keeps; the pressure's residual
-after its iterations or V-cycles at the stretched cells; the step's GPU time. An isotropy check in the
-harness: a swirl in the xz plane at stretched cells keeps its shape as one in the xy plane does. The
-preset's `depth_span` 10, chosen to scale the body's z, goes with it; `depth_ratio` 1 is the box as
-deep as it is wide. The preset's `spread` converted to its new unit (its sigma × 2.355) and
-`vorticity_radius` converted to widths (its cells over the width); the glossary's `input` line follows: `depth_span` out, `spread`
-the body's thickness, `depth_ratio` beside the grid's size.
-
 ### 2. The body at its own depth
 
 The body goes in as one flat slab at `layer`, a cut-out: every pixel at the same z. The camera measures
@@ -84,8 +24,10 @@ instead: its distance from the camera in widths (a width the view's real span at
 `view_span`), measured from the player's middle depth, which `layer` places in the box; `spread` the
 thickness around each pixel's depth. An arm reaching toward the camera then pushes the water near the
 front and the torso further back: the body in the water with its shape in depth. It needs the bridge
-to hand over each pixel's depth beside its velocity, and the injection to read it; item 1's depth as
-deep as it stands for is what lets the real depth fit.
+to hand over each pixel's depth beside its velocity, and the injection to read it; the box as deep as it
+stands for (`depth_ratio`) is what lets the real depth fit. With the box deep, the flat sheet's water turns
+into z more, not less ([TIMING.md](TIMING.md#the-box-as-deep-as-it-is-wide)): the body's shape in depth is
+what should let the water go around it across as well.
 
 ### 3. The smaller side as the unit
 
@@ -142,8 +84,9 @@ read every field as it is. The GPU is a 24 GB RTX 4090, so nothing pages. Every 
 [TIMING.md](TIMING.md).
 
 The layer injects the bridge's six outputs before the step (`Fluid3DLayer._inject`), each at the
-injection's `weight`, into the gaussian slab at `input.layer` (0.5) with sigma `input.spread` (0.075
-widths), each velocity's z as the volume's w = −z × the z scale; what the fluid does with each is
+injection's `weight`, into the gaussian slab at `input.layer` (0.5) `input.spread` thick (0.2 widths,
+its width at half its height), each cell the body's share between its faces, each velocity's z as the
+volume's w = −z × `input.depth_gain`; what the fluid does with each is
 [What the fluid takes](#what-the-fluid-takes).
 
 The depth scale is the box's depth over the smaller of its width and height (`depth` / 448 at 448 × 800,
@@ -158,7 +101,9 @@ included, so at 0.5 the whole fluid runs at half speed and keeps its shapes. A v
 The velocity is in image widths per second, as the bridge's; the advection moves a texel by
 velocity × dt × `density.advection_scale` (1) in uv, so 1 width/s crosses the width in 1 s.
 
-The volume's settings: `input.layer` and `input.spread`, where the body sits in the volume;
+The volume's settings: `depth_ratio`, the box's depth over its width, its z cells stretched to it (`z_stretch`
+how many times longer a z cell is than an xy cell); `input.layer` and `input.spread`, where the body sits in
+the volume and how thick it is;
 `emission`, `opacity`, `tint` and `fog`, the composite's march; `wall` and `slip_time`, every
 side of the box ([The walls](#the-walls)). Obstacles stay supported (`set_obstacle`, `add_obstacle`,
 `clear_obstacles`, no caller today): one R8 volume on the simulation's grid, which every field's pass
@@ -439,7 +384,7 @@ as a tuning:
 | `velocity.advection_scale`                                                                                                                 | 1               | the velocity carries itself the full step                                                                                        |
 | `width`, `height`, `depth`                                                                                                                 | 256, 448, 128   | half a width deep, within 60 fps                                                                                                 |
 | `upscaled.enabled`, `particles.enabled`                                                                                                    | off, off        | the density on the simulation's grid                                                                                             |
-| `input.layer`, `input.spread`                                                                                                              | 0.5, 0.075      | the body mid-volume, 0.3 widths thick                                                                                            |
+| `input.layer`, `input.spread`                                                                                                              | 0.5, 0.2        | the body mid-volume, 0.2 widths thick at half its height                                                                         |
 | `wall` (every field, the volume)                                                                                                           | closed          | the operator's settings                                                                                                          |
 
 The fields' physics take the textbook's water, with no artificial decay or thickness, as defaults: the
@@ -449,9 +394,8 @@ velocity's `fade_time` 60 s (it keeps its momentum), `viscosity` 0 (water at thi
 0 (the density as heavy as the water, no buoyancy), gravity down the screen, every wall closed; the top
 speed off, a failsafe; the bridge's mix the boundary's trail alone and its lowpass's `smooth` its default
 160 ms, since the coast is the fluid's; the confinement Fedkiw's ε 0.3 over the neighbors
-(`vorticity_radius` 1); in z, `input.layer` 0.5 and `input.spread` 0.075 widths, a body's thickness of
-about 0.3 widths at the camera's crop (from its `view_span` of 0.76 m, **(deduction)**) as four sigma,
-three sigma inside the 0.5-width slab. Kept as tuned: the composite's look (`emission`, `opacity`,
+(`vorticity_radius` one cell); in z, `input.layer` 0.5 and `input.spread` 0.2 widths, a body's thickness at
+the camera's crop (from its `view_span` of 0.76 m, **(deduction)**) where it is at least half there. Kept as tuned: the composite's look (`emission`, `opacity`,
 `tint`, `fog`).
 
 Measured with these on standmoves through the harness: the water 0.89 of the body's speed in the
@@ -460,12 +404,16 @@ fast halves, its peak 0.76 of the body's, the step 11.5 ms with the harness (mea
 ### One unit
 
 Every length in the fluid is in image widths, the motion's and the bridge's unit, and every time in
-seconds: the cell h = 1 / the grid's width (the cells are cubic). The solvers' differences are over h
-(the divergence, the gradient, the pressure's and the viscosity's Jacobi solves, the curl); the
-confinement's force is ε × h × (N × ω) (Fedkiw 2001) with the curl over `vorticity_radius` cells;
+seconds: a cell's sides 1 / the grid's width across and `depth_ratio` / `depth` in z (the z cells stretched),
+one `Cell` the fluid hands every face pass through `bind_faces`. The solvers' differences are over each
+axis's side (the divergence, the gradient, the pressure's solves, the viscosity, the curl, the velocity's own
+advection); the multigrid halves an axis only while its cells are shorter than the longest by more than 1.5,
+all of them once near cubic (semi-coarsening, `coarsening`), so a level's cells grow toward cubic before the
+stretched axis is halved; the confinement's force is ε × h × (N × ω) (Fedkiw 2001), h the xy cell, with the
+curl over `vorticity_radius` widths, at least a cell on each axis;
 the buoyancy is an acceleration, widths/s² per unit of density or temperature; the viscosity a
 kinematic viscosity in widths²/s; `input.spread` a thickness in widths. The advection moves a
-texel by v × dt in uv as (1, width / height, 1 / slab depth) × v, x, y and z each a width per width.
+texel by v × dt in uv as (1, width / height, 1 / `depth_ratio`) × v, x, y and z each a width per width.
 The pressure is 32-bit: in these units it is small, past the half float's precision.
 
 The output's allocation is not in it. A cell taken as the grid's width over the output's (448 /

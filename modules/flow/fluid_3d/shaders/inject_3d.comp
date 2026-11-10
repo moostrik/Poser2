@@ -2,7 +2,7 @@
 
 /*
  * Inject3D - a 2D input into a 3D volume at a target depth layer, in the gaussian slab around uTargetLayer:
- * weight = exp(-0.5 * ((z_norm - target) / spread)²) × uStrength. By uMode:
+ * weight = the body's share of the cell (slab.glsl) × uStrength. By uMode:
  *   0 ADD     the input × weight added
  *   1 RATE    the same, the field capped at its full value: a density's alpha at 1 (its color scaled with it),
  *             a scalar (uScalar) at ±1
@@ -28,20 +28,14 @@ uniform float uGain;         // FILL: the input times this, at most full, is the
 uniform bool  uScalar;       // a signed scalar in r (the temperature), else a premultiplied density
 uniform ivec3 uSize;
 
+#include "slab.glsl"
+
 void main() {
     ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
     if (any(greaterThanEqual(gid, uSize))) return;
 
-    // Normalized Z position of this voxel
-    float z_norm = (float(gid.z) + 0.5) / float(uSize.z);
-
-    // Remap uTargetLayer [0,1] to texel-center space:
-    // 0.0 -> center of first layer, 1.0 -> center of last layer
-    float target = (0.5 + uTargetLayer * (float(uSize.z) - 1.0)) / float(uSize.z);
-
-    // Gaussian weight along depth
-    float dz = (z_norm - target) / max(uSpread, 0.001);
-    float weight = exp(-0.5 * dz * dz) * uStrength;
+    // The body's share of this cell's depth (slab.glsl)
+    float weight = slab_cell(gid.z, uSize.z) * uStrength;
 
     if (weight < 0.001) return;  // Skip negligible contributions
 

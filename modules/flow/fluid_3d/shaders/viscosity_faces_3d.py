@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import math
 
-from OpenGL.GL import glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUniform3f, glUseProgram
 
 from modules.gl import Texture3D, ComputeShader
-from .face_binding import bind_faces, bind_face_writes
+from .face_binding import Cell, bind_faces, bind_face_writes
 
 class ViscosityFaces3D(ComputeShader):
     """Each component's 7-point Laplacian over its own faces, iterated in shared memory a tile at a time."""
@@ -17,18 +17,18 @@ class ViscosityFaces3D(ComputeShader):
     ITERATIONS_PER_DISPATCH = 5
 
     def use(self, source: Texture3D, result: Texture3D, obstacle: Texture3D, cells: tuple[int, int, int],
-            cell: float, viscosity_dt: float, iterations: int, closed: tuple[bool, bool, bool], wall_keep: float,
+            cell: Cell, viscosity_dt: float, iterations: int, closed: tuple[bool, bool, bool], wall_keep: float,
             has_obstacles: bool) -> None:
         if not self.allocated or not self.shader_program:
             return
-        alpha = 1.0 / (cell * cell)
+        alpha = (1.0 / (cell[0] * cell[0]), 1.0 / (cell[1] * cell[1]), 1.0 / (cell[2] * cell[2]))
         gamma = 1.0 / max(viscosity_dt, 1e-6)
         glUseProgram(self.shader_program)
-        bind_faces(self, source, cells, closed, has_obstacles, obstacle)
+        bind_faces(self, source, cells, cell, closed, has_obstacles, obstacle)
         bind_face_writes(self, result)
-        glUniform1f(self.get_uniform_loc('uAlpha'), alpha)
+        glUniform3f(self.get_uniform_loc('uAlpha'), *alpha)
         glUniform1f(self.get_uniform_loc('uGamma'), gamma)
-        glUniform1f(self.get_uniform_loc('uBeta'), 1.0 / (6.0 * alpha + gamma))
+        glUniform1f(self.get_uniform_loc('uBeta'), 1.0 / (2.0 * sum(alpha) + gamma))
         glUniform1f(self.get_uniform_loc('uWallKeep'), wall_keep)
         glUniform1i(self.get_uniform_loc('uIterations'), iterations)
         self.dispatch(cells[0] + 1, cells[1] + 1, cells[2] + 1)

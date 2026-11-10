@@ -44,15 +44,19 @@ _SPRITES: dict[ParticleDraw, int] = {ParticleDraw.POINTS: ParticleSprites.POINTS
                                      ParticleDraw.BLOBS: ParticleSprites.BLOBS}
 
 
+FULL_WIDTH_HALF_MAXIMUM: float = 2.0 * math.sqrt(2.0 * math.log(2.0))   # a gaussian's width at half its height, in sigmas
+
+
 def slab_sum(layer: float, spread: float, layers: int) -> float:
-    """The injection gaussian's sum over the grid's layers, as `inject_3d.comp` weighs them: what one unit of
-    density a step puts into a texel's column."""
+    """The body's shares summed over the grid's layers, as `slab.glsl` gives them (each cell the profile's mean
+    between its faces): what one unit of density a step puts into a texel's column. `spread` the sigma, a share
+    of the depth."""
+    if spread <= 1e-6:
+        return 0.0
     target: float = (0.5 + layer * (layers - 1)) / layers
-    total: float = 0.0
-    for z in range(layers):
-        weight: float = math.exp(-0.5 * (((z + 0.5) / layers - target) / max(spread, 0.001)) ** 2)
-        total += weight if weight >= 0.001 else 0.0
-    return total
+    scale: float = 1.0 / (spread * math.sqrt(2.0))
+    area: float = 0.5 * spread * math.sqrt(2.0 * math.pi) * (math.erf((1.0 - target) * scale) - math.erf(-target * scale))
+    return area * layers        # each cell's mean, over a cell of 1 / layers: the area over the column times the layers
 
 
 def layer_center(layer: float, layers: int) -> float:
@@ -107,12 +111,12 @@ class ParticleDensity(DensityCarrier):
 
     # ========== Lifecycle ==========
 
-    def allocate(self, width: int, height: int, layers: int, output_width: int, output_height: int) -> None:
+    def allocate(self, width: int, height: int, layers: int, extent: float, output_width: int, output_height: int) -> None:
         self._count = int(self.settings.particles.count)
         self._layers = layers
         self._grid_width = width
         self._output = (output_width, output_height)
-        self._z_extent = layers / max(1, width)
+        self._z_extent = extent
         self._scale = (output_width * output_height) / max(1, width * height)
         self._particles.allocate(self._count * PARTICLE_BYTES)
         self._ring.allocate(RING_BYTES)
@@ -150,7 +154,7 @@ class ParticleDensity(DensityCarrier):
         """The mass a texel of fully dyed water gives each of its particles: a blob of this mass has `radius`, so
         how much dye there is changes how many drops there are, not how big a drop is."""
         settings = self.settings
-        spread: float = max(settings.input.spread / max(self._z_extent, 1e-6), 0.001)     # widths, as a share of the slab
+        spread: float = settings.input.spread / FULL_WIDTH_HALF_MAXIMUM / max(self._z_extent, 1e-6)     # the sigma, a share of the depth
         return slab_sum(settings.input.layer, spread, self._layers) / max(self.settings.particles.rate, 1e-6)
 
     def add(self, texture: Texture, gain: float, dt: float, layer: float, spread: float, mode: InjectMode = InjectMode.RATE,

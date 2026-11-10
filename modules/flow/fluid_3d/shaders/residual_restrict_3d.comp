@@ -2,7 +2,7 @@
 
 /*
  * ResidualRestrict3D - the multigrid's residual restricted to the next coarser level in one pass: each coarse
- * cell the mean of its up to eight fine cells' residuals, div - L p, each worked out where it is read, so the
+ * cell the mean of its fine cells' residuals (two along an axis the level halves, one along one it keeps), div - L p, each worked out where it is read, so the
  * fine residual is never written and read back. The residual and the mean are PressureResidual3D's and
  * Restrict3D's, in the same order.
  */
@@ -14,7 +14,8 @@ layout(binding = 1) uniform sampler3D uObstacle;    // R8
 layout(r32f, binding = 0) readonly uniform image3D uPressure;
 layout(r32f, binding = 1) writeonly uniform image3D uCoarse;
 
-uniform float uAlpha;        // 1 / h², the fine level's
+uniform vec3  uAlpha;        // 1 / h², the fine level's, per axis
+uniform ivec3 uFactor;       // per axis, 2 where the coarse level halves the fine, 1 where it keeps it
 uniform ivec3 uSize;         // the fine level's cells
 uniform ivec3 uCoarseSize;
 uniform bool  uHasObstacles;
@@ -35,11 +36,11 @@ float neighbor(ivec3 coord, float pC, int axis) {
 float residual(ivec3 gid) {
     if (uHasObstacles && isObstacle(gid)) return 0.0;
     float pC = imageLoad(uPressure, gid).r;
-    float sum = neighbor(gid - ivec3(1, 0, 0), pC, 0) + neighbor(gid + ivec3(1, 0, 0), pC, 0)
-              + neighbor(gid - ivec3(0, 1, 0), pC, 1) + neighbor(gid + ivec3(0, 1, 0), pC, 1)
-              + neighbor(gid - ivec3(0, 0, 1), pC, 2) + neighbor(gid + ivec3(0, 0, 1), pC, 2);
+    float laplacian = uAlpha.x * (neighbor(gid - ivec3(1, 0, 0), pC, 0) + neighbor(gid + ivec3(1, 0, 0), pC, 0) - 2.0 * pC)
+                    + uAlpha.y * (neighbor(gid - ivec3(0, 1, 0), pC, 1) + neighbor(gid + ivec3(0, 1, 0), pC, 1) - 2.0 * pC)
+                    + uAlpha.z * (neighbor(gid - ivec3(0, 0, 1), pC, 2) + neighbor(gid + ivec3(0, 0, 1), pC, 2) - 2.0 * pC);
     float divergence = texture(uDivergence, (vec3(gid) + 0.5) / vec3(uSize)).r;
-    return divergence - uAlpha * (sum - 6.0 * pC);
+    return divergence - laplacian;
 }
 
 void main() {
@@ -48,7 +49,9 @@ void main() {
     float sum = 0.0;
     float count = 0.0;
     for (int k = 0; k < 8; k++) {
-        ivec3 fine = gid * 2 + ivec3(k & 1, (k >> 1) & 1, (k >> 2) & 1);
+        ivec3 offset = ivec3(k & 1, (k >> 1) & 1, (k >> 2) & 1);
+        if (any(greaterThanEqual(offset, uFactor))) continue;      // an axis kept has one fine cell
+        ivec3 fine = gid * uFactor + offset;
         if (any(greaterThanEqual(fine, uSize))) continue;
         sum += residual(fine);
         count += 1.0;
