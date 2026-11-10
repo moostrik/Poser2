@@ -36,7 +36,7 @@ import math
 from dataclasses import replace
 
 import numpy as np
-from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_R16F, GL_R32F, GL_R8, GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
+from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_REPEAT, GL_R16F, GL_R32F, GL_R8, GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRIER_BIT, glMemoryBarrier
 
 from modules.gl import ComputeShader, SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
@@ -60,7 +60,7 @@ from .shaders import (AdvectFaces3D, FacesToCenters3D, ViscosityFaces3D, SEMI_LA
     VorticityCurl3D, VorticityForce3D, Buoyancy3D, AddToFaces3D,
     Inject3D,
     CompositeOver, Knee,
-    CompositeLight, LightVolume3D, LightSweep3D, LightBlur3D, InjectMode, view_march,
+    CompositeLight, LightVolume3D, LightSweep3D, LightBlur3D, CausticNet, Rays3D, InjectMode, view_march,
     InjectBinary3D
 )
 
@@ -77,6 +77,7 @@ _WALL_GL: dict = {
 
 FLUID_PASSES: tuple[str, ...] = ('advect velocity', 'viscosity', 'vorticity', 'advect temperature', 'buoyancy', 'pressure',
                                  'faces to centers', 'density', 'light', 'composite')     # a step's passes, each a GPU timer
+CAUSTIC_NET_SIZE: int = 256   # the caustic net's texels across its tile
 DRAG_FLOOR: float = 0.02    # widths/s: the body's speed below which it drags nothing, so a dead trail pulls nothing toward 0
 
 import logging
@@ -205,6 +206,13 @@ class Fluid3D:
         self._light_override: tuple[float, float, float] | None = None     # set_light's, over the settings
         self._light_shown: Texture3D = self._light      # the light the composite read last: direct, or scattered
         self._light_now: CompositeLight | None = None   # this step's light, `_update_light`'s, for the composite
+        # The caustic net, drawn each step while `caustics` is on, and the water's light a layer of the march at a
+        # time while `fog_scattering` is on; the clock the net moves by
+        self._caustic_net: Texture = Texture(wrap=GL_REPEAT)
+        self._caustic_shader: CausticNet = CausticNet()
+        self._rays: Texture3D = Texture3D(wrap=GL_CLAMP_TO_EDGE)
+        self._rays_shader: Rays3D = Rays3D()
+        self._light_clock: float = 0.0
         self._no_density: Texture3D = Texture3D()
         # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds = obstacle
         self._obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
@@ -297,6 +305,8 @@ class Fluid3D:
         self._knee_shader.allocate()
         self._light_shader.allocate()
         self._light_sweep_shader.allocate()
+        self._caustic_shader.allocate()
+        self._rays_shader.allocate()
         self._light_blur_shader.allocate()
 
         self._allocated = True
@@ -414,8 +424,10 @@ class Fluid3D:
         self._knee_shader.deallocate()
         self._light_shader.deallocate()
         self._light_sweep_shader.deallocate()
+        self._caustic_shader.deallocate()
+        self._rays_shader.deallocate()
         self._light_blur_shader.deallocate()
-        for light in (self._light, *self._light_blur):
+        for light in (self._light, *self._light_blur, self._rays, self._caustic_net):
             light.deallocate()
 
         self._allocated = False
@@ -429,6 +441,8 @@ class Fluid3D:
         self._knee_shader.reload()
         self._light_shader.reload()
         self._light_sweep_shader.reload()
+        self._caustic_shader.reload()
+        self._rays_shader.reload()
         self._light_blur_shader.reload()
         self._divergence_shader.reload()
         self._gradient_shader.reload()
@@ -726,8 +740,45 @@ class Fluid3D:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _update_light(self) -> None:
-        """The light this step, for the composite."""
-        self._light_now = self._lit()
+        """The light this step, for the composite: the light grid, the caustic net and the rays."""
+        self._light_clock += self._dt
+        light: CompositeLight | None = self._lit()
+        if light is not None:
+            light = self._with_caustics(light)
+            light = self._with_rays(light)
+        self._light_now = light
+
+    def _with_caustics(self, light: CompositeLight) -> CompositeLight:
+        """The light with the caustic net drawn at this moment, while `caustics` is on; released while off."""
+        composite = self.settings.composite
+        if composite.caustics <= 0.0:
+            self._caustic_net.deallocate()
+            return light
+        if not self._caustic_net.allocated:
+            self._caustic_net.allocate(CAUSTIC_NET_SIZE, CAUSTIC_NET_SIZE, GL_R16F)
+        self._caustic_shader.use(self._caustic_net, self._light_clock * composite.caustic_speed)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        return replace(light, caustics=composite.caustics, caustic_size=composite.caustic_size,
+                       caustic_depth=composite.caustic_depth, net=self._caustic_net)
+
+    def _with_rays(self, light: CompositeLight) -> CompositeLight:
+        """The light with the water's light per column and layer of the march, while `fog_scattering` and `fog`
+        are on: the light grid's columns, the composited volume's layers; released while off."""
+        composite = self.settings.composite
+        if composite.fog_scattering <= 0.0 or composite.fog <= 0.0:
+            self._rays.deallocate()
+            return light
+        layers: int = self.settings.upscaled.depth if self.settings.upscaled.enabled else self._depth
+        size = (light.volume.width, light.volume.height, max(1, layers))
+        if not self._rays.allocated or (self._rays.width, self._rays.height, self._rays.depth) != size:
+            self._rays.allocate(*size, GL_RGBA16F)
+        chan = tuple(1.0 + (water - 1.0) * composite.tint for water in WATER_CHANNELS)
+        fog = (composite.fog * chan[0], composite.fog * chan[1], composite.fog * chan[2])
+        sub_steps: int = max(2, 2 * -(-light.volume.depth // size[2]))      # two a light cell the layer spans
+        self._rays_shader.use(light, self._rays, fog=fog, fog_grey=composite.fog, scatter=composite.fog_scattering * composite.light_intensity,
+                              sub_steps=sub_steps)
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        return replace(light, rays=self._rays)
 
     def _lit(self) -> CompositeLight | None:
         """The light this step, from the simulation density: a sun's swept through the light grid in parallel lines,
@@ -737,7 +788,7 @@ class Fluid3D:
         composite = self.settings.composite
         density: Texture3D | None = self._simulation_density.weight
         if composite.light_intensity <= 0.0 or density is None:
-            for light in (self._light, *self._light_blur):
+            for light in (self._light, *self._light_blur, self._rays, self._caustic_net):
                 light.deallocate()
             return None
         share: int = int(composite.light_grid)

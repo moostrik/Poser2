@@ -19,30 +19,6 @@ What is next for the fluid, in order; what is open elsewhere in the flow is
 The composite's look is a mess now **(site fact)**: items 1 to 6 rework it for the best picture, its cost
 comes last, once the look has set which of its options are on. Each item's cost is timed as it lands.
 
-### 4. The rays
-
-The water only absorbs: the fog sends no light toward the viewer, so empty water stays black and no
-shaft of light can show. The fog's in-scattering added to the march (single scattering): each step the
-light reaching the water there, from the light grid that already covers the whole box, times the fog's
-extinction over the step and `fog_scattering`, the share of what the fog takes out that it sends on
-(0 to 1, 0 the water as now), dimmed by what lies in front.
-
-Sampled only at the march's 16 depths a shadow's edge jumps between steps and the shafts band. The rays
-per layer instead, as froxels (Wronski 2014; Hillaire 2015): the view looks straight down z, so the light
-grid is already view-aligned; a pass walks each of its columns in fine sub-steps and stores, for each of
-the march's layers, the in-scattering integrated exactly over the layer; the march reads one value more
-a step and adds it under the transmittance in front, so the density still covers the rays behind it.
-The fog's in-scattering takes the phase as well, the shafts brighter looking toward the sun (item 5's
-anisotropy), and a lamp's light falls off with its distance, which the light grid does not hold now.
-
-Sunlight under water shafts mostly by the waves on its surface, which focus it into a moving net; the
-density's shadows cannot give that. The caustics: an animated caustic pattern multiplied into the light
-where it enters the box, so the shafts flicker and drift; an option, 0 off. Worked out per sample in the
-march, where the light's line from the sample leaves the box, not stored in the light grid, whose cells
-would blur the net. With them the look of a sun
-under water is the rays, the caustics, the `tint` (far water turning blue-green, red dying first, kept
-for it) and the fog dimming the light on its way down.
-
 ### 5. The scattering and the anisotropy
 
 The scattering blurs the coarse light grid, which spreads light into empty water and through thin walls
@@ -91,12 +67,16 @@ Each item's cost as it lands, `fluid_pass_check.py` at the preset (288 × 512 ×
 | 3, a sun, `FULL`     | 0.17                      | 0.79      |
 | 3, a lamp, `QUARTER` | 0.14                      | 0.74      |
 | 3, a lamp, `FULL`    | 3.34                      | 0.79      |
+| 4, a sun, `FULL`, no rays | 0.32                 | 0.90      |
+| 4, rays and caustics | 0.42                      | 1.21      |
 
 The sun's sweep against the march it replaces, on the same grid (288 × 512 × 64 at `FULL`), a swinging
-body's density, three suns: the march 1.1 to 2.7 ms at `FULL`, the sweep 0.16 to 0.18; the transmittance's
-mean the same to 0.001, the difference's mean 0.002 to 0.003 and its p99 under 0.01 at `FULL` (twice that
-at `HALF`, four times at `QUARTER`), from a line passing a cell off its center. A lamp stays marched: at
-`FULL` it costs 3.3 ms, so a lamp takes `HALF` or `QUARTER`.
+body's density, three suns, the density alone (the sweep's fog goes on past the box, the march's stops at
+it): the march 1.1 to 2.7 ms at `FULL`, the sweep 0.21 to 0.36 (each cell the mix of four lines; written to
+the one cell a line passes it took 0.17 and drew stripes); the transmittance's mean the same to 0.001, the
+difference's mean under 0.0002 and its p99 0.003 at `FULL`. A lamp stays marched: at `FULL` it costs
+3.3 ms, so a lamp takes `HALF` or `QUARTER`. Rows 4 are at `light_intensity` 20, `fog` 0.3, a sun from
+above and a little right and behind.
 
 ### After the plan
 
@@ -682,6 +662,9 @@ monitor's `scale` 1 shows a full value for the density and the temperature as fo
 |------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | shadows    | `Fluid3D._lit`: a light grid at `light_grid`'s share of the simulation's cells each way (`FULL`, all of them, the default; `HALF`, `QUARTER`), each step, each cell's RGB transmittance toward the light: for a sun one sweep of parallel lines (`LightSweep3D`), one thread a line stepping a cell at a time along the axis the light mostly travels and sliding across by its slope, each cell passed by one line, under half a cell off its center, one density read a cell; for a lamp each cell marched to it (`LightVolume3D`, at most 256 steps); the simulation density's amount summed along the way (the upscaled amount has 16 layers to the simulation's 64, and its detail is finer than a light cell), times the extinction `opacity` gives over the view, per width of the box's depth, and the water's `fog` over the whole distance, both per channel by `tint`, so deep light turns bluish and a lamp falls off; the composite's each sample lit beside its own emission (the glow): its color × the light there × `light_intensity`, made per view as `emission` is (`view_march`); off and released at `light_intensity` 0; a step's GPU time with it on within the noise of one without it, under 0.5 ms, in a smoke run at 448 × 800 × 64 with the upscaled density (not yet in TIMING.md) |
 | the light  | `composite.light`, `DIRECTIONAL` (a sun: one direction, parallel shadows) or `POINT` (a lamp, shadows fanning out); `light_x`, `light_y`, `light_z` toward the sun or the lamp's place (±1 the box's sides; x right, y down the screen, z away from the viewer), first above and a little toward the front; `light_intensity` how bright the light shows fully dyed water filling the view lit straight on, 1 its color, 0 no light. `Fluid3D.set_light` overrides the settings, the hook for a light the app derives from the pose (a lamp at the nose), the pose pipeline's value handed over; the monitor shows the light grid as the port `light`.                                                                                                                                                                 |
+| rays       | `Rays3D`, while `fog_scattering` and `fog` are on: the water's own light, per column of the light grid and layer of the march (froxels: the view looks straight down z, so the light grid's columns are the view's), the fog's in-scattering integrated exactly over each layer from its front, two sub-steps a light cell, over each the light taken as even (exp(−fog × from the front) − exp(−fog × to the back)); the water scatters every color alike and takes red out first, so the scattering's share is the grey `fog` over the tinted extinction; × the phase, the caustic net and `fog_scattering` × `light_intensity`; the march adds a layer's value under what lies in front, so the density covers the rays behind it and a shadow's edge falls between layers without banding; the light grid's fog goes on past the box's sides (the water does), a sun's from the plane it enters by, a lamp's over its whole way |
+| caustics   | `CausticNet`, while `caustics` is on: the bright net sunlight makes under a wavy surface, a 256² tileable texture each step, two Voronoi patterns of drifting points (their cells' edges the net's lines, the second finer), its mean 1 so it moves light without adding any; read per sample of the lit dye and per sub-step of the rays (`light.glsl`'s `caustic`), the same all along each of the light's lines so it is carried down them as shafts: a sun's net laid flat across its way, a lamp's spread from it; `caustic_size` its cell (widths), `caustic_depth` the widths down the light's way over which its contrast fades to 37%, `caustic_speed` its points' turns per second |
+| a lamp     | falls off as 1 / its distance², 1 at the box's center, at most 16 times that near it |
 | scattering | `scattering`, the light grid blurred (`LightBlur3D`, a separable 5-tap gaussian) and mixed into the direct light, for thick parts glowing within and soft shadow edges; `anisotropy`, the Henyey–Greenstein g of each lit sample toward the viewer, 1 at g 0, a silver lining against a light from behind; both 0 off, at no cost                                                                                                                                                                                                                                                                                                                                                                                                       |
 | opacity    | `view_march`: the look is set on the view, the same at any number of layers and any depth: `opacity`, 0 to 1, how much fully dyed water filling the view covers what is behind it (Beer–Lambert, its extinction −ln(1 − opacity), 1 drawn at 0.999), and `emission`, how bright that water is seen, 1 its own color, its covering of its own far side made up for; a sample covers by its amount, not its color's brightest channel; a particle look takes both over its `slices`                                                                                                                                                                                                                                                       |
 | occlusion  | what covers what measured through the coarse grid's layers, the upscaled density laid over it: the order in depth as fine as the fluid's, the detail at `upscaled.width` × `upscaled.height` × `upscaled.depth`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |

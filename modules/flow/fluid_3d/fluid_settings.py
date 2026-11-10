@@ -171,6 +171,11 @@ class CompositeSettings(BaseSettings):
     light_z: Field[float]           = Field(-0.3, min=-1.0, max=1.0,    color="amber",          description="z away from the viewer; -1 = from the front")
     light_grid: Field[LightGrid]    = Field(LightGrid.FULL,                                     description="The light's grid: a quarter, half or all of the simulation's cells each way; finer, sharper shadows")
     light_intensity: Field[float]   = Field(0.0,  min=0.0,  max=100.0,  widget=Widget.log_slider, color="amber", description="How bright the light shows fully dyed water filling the view, lit straight on: 1 = its color; 0 = no light")
+    fog_scattering: Field[float]    = Field(0.0,  min=0.0,  max=1.0,    color="light-blue",     description="Share of the light the fog takes out that it sends on: the water glows, shafts in the shadows; 0 = off")
+    caustics: Field[float]          = Field(0.0,  min=0.0,  max=1.0,    color="amber",          description="Contrast of the caustic net, the light under a wavy surface, carried down as shafts; 0 = off")
+    caustic_size: Field[float]      = Field(0.08, min=0.01, max=1.0,    widget=Widget.log_slider, color="amber", description="The caustic net's cell, widths")
+    caustic_depth: Field[float]     = Field(0.5,  min=0.05, max=4.0,    widget=Widget.log_slider, color="amber", description="Widths down the light's way over which the caustic net fades to 37%")
+    caustic_speed: Field[float]     = Field(0.15, min=0.0,  max=2.0,    color="amber",          description="How fast the caustic net shifts: its points' turns per second")
     scattering: Field[float]        = Field(0.0,  min=0.0,  max=1.0,    color="light-blue",     description="Light bounced inside the density: soft shadows, thick parts glowing within; 0 = off")
     anisotropy: Field[float]        = Field(0.0,  min=0.0,  max=0.9,    color="yellow",         description="Henyey–Greenstein g: 0 scatters evenly, higher forward, a silver lining against the light")
 

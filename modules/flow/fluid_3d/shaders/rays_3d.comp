@@ -1,0 +1,42 @@
+#version 460 core
+
+/*
+ * Rays3D - the light the water sends toward the viewer, per layer of the march (froxels: the view looks
+ * straight down z, so the light grid's columns are the view's): for each column and each of the march's
+ * layers, the fog's in-scattering integrated exactly over the layer, from the layer's front. Over a
+ * sub-step the light is taken as even, so the fog's share of it there is exp(-fog × from the front) −
+ * exp(-fog × to the back), of which the scattering's share, its grey over the extinction's channels (the
+ * water takes red out first, it scatters every color alike): the water's light, dark where the density's
+ * shadow keeps it, a shadow's edge falling between layers without banding. The march adds a layer's value
+ * under what lies in front.
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(binding = 0) uniform sampler3D uLight;       // the light reaching each place, RGB
+layout(rgba16f, binding = 0) writeonly uniform image3D uRays;
+
+#include "light.glsl"
+
+uniform ivec3 uSize;          // the rays' columns and the march's layers
+uniform vec3  uFog;           // the water's extinction over the whole depth, per channel
+uniform float uFogGrey;       // the water's extinction over the whole depth without the tint, its scattering's
+uniform float uScatter;       // the fog's share sent on × the light's intensity
+uniform int   uSubSteps;      // sub-steps a layer
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(gid, uSize))) return;
+    vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
+    float layer = 1.0 / float(uSize.z);
+    float sub = layer / float(uSubSteps);
+    float front = float(gid.z) * layer;
+    vec3 sent = vec3(0.0);
+    for (int s = 0; s < uSubSteps; s++) {
+        float a = float(s) * sub;
+        vec3 uvw = vec3(uv, front + a + 0.5 * sub);
+        vec3 light = texture(uLight, uvw).rgb * phase(uvw) * caustic(uvw);
+        sent += light * (exp(-uFog * a) - exp(-uFog * (a + sub)));
+    }
+    imageStore(uRays, gid, vec4(sent * uScatter * uFogGrey / max(uFog, vec3(1e-6)), 0.0));
+}

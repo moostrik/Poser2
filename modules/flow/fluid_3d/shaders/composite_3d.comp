@@ -8,8 +8,9 @@
  *   occlusion    per-channel Beer-Lambert extinction; near density covers far density
  *   tint + fog   far density shifts toward water color and fades
  *   glow         each sample's own emission, its color × uEmission
- *   light        with uLit, each sample lit as well: its color × the light reaching it (the light grid's
- *                transmittance) × the Henyey–Greenstein phase toward the viewer × uIntensity
+ *   light        with uLit, each sample lit as well: its color × the light reaching it (the light grid)
+ *                × the Henyey–Greenstein phase toward the viewer × the caustic net × uIntensity
+ *   rays         with uHasRays, the water's own light in the layer (Rays3D), under what lies in front
  *
  * Dispatched as a 2D compute (one thread per output pixel). The output may
  * be larger than the volume: the volume is sampled by uv. Split, the amount is
@@ -21,9 +22,12 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 layout(binding = 0) uniform sampler3D uDensity;  // RGBA16F, or with uSplit the amount alone (R16F)
 layout(binding = 1) uniform sampler3D uColor;    // with uSplit: the color volume, color × amount and the amount
-layout(binding = 2) uniform sampler3D uLight;    // with uLit: the light reaching each place, RGB transmittance
+layout(binding = 2) uniform sampler3D uLight;    // with uLit: the light reaching each place, RGB
+layout(binding = 3) uniform sampler3D uRays;     // with uHasRays: the water's light, a column and a layer each
 
 layout(rgba16f, binding = 0) writeonly uniform image2D uOutput;
+
+#include "light.glsl"
 
 uniform int   uDepth;        // Number of layers, the march's steps
 uniform ivec2 uOutputSize;   // 2D output dimensions
@@ -33,23 +37,10 @@ uniform float uTint;         // 0..1 mix toward per-channel water extinction
 uniform float uFog;          // Medium extinction over the full depth
 uniform bool  uSplit;        // the amount from uDensity, its color from uColor (the upscaled density)
 uniform bool  uLit;          // the density lit by uLight
+uniform bool  uHasRays;      // the water's light added from uRays
 uniform float uIntensity;    // the lit color's emission of an amount of 1 over the whole view, at full light
-uniform float uAnisotropy;   // Henyey–Greenstein g, 0 even, toward 1 forward
-uniform bool  uPoint;        // a lamp at uVector's place, else a sun toward uVector
-uniform vec3  uVector;       // toward the sun, or the lamp's place, ±1 the box's sides
-uniform vec3  uBox;          // the box in widths: 1, height over width, depth over width
 
 const vec3 WATER_CHAN = vec3(1.8, 1.0, 0.6);  // relative extinction: red dies first
-
-// The share of light a sample sends toward the viewer (along -z), 1 for g = 0: Henyey–Greenstein,
-// its cosine between the light's travel and the way to the eye, which is the light's direction's z
-float phase(vec3 uvw) {
-    if (uAnisotropy <= 0.0) return 1.0;
-    vec3 to_light = uPoint ? (0.5 + 0.5 * uVector) * uBox - uvw * uBox : uVector;
-    float cosine = normalize(length(to_light) > 1e-6 ? to_light : vec3(0.0, -1.0, 0.0)).z;
-    float g = uAnisotropy;
-    return (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * cosine, 1.5);
-}
 
 void main() {
     ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
@@ -71,17 +62,20 @@ void main() {
 
     for (int i = 0; i < steps; i++) {
         float z_norm = (float(i) + 0.5) * inv_steps;
-        vec4 s = texture(uDensity, vec3(uv, z_norm));
+        vec3 uvw = vec3(uv, z_norm);
+        vec4 s = texture(uDensity, uvw);
         if (uSplit) {
-            vec4 c = texture(uColor, vec3(uv, z_norm));
+            vec4 c = texture(uColor, uvw);
             s = vec4(c.rgb / max(c.a, 1e-4) * s.r, s.r);
         }
 
         vec3 dye = max(s.rgb, vec3(0.0));
         vec3 e = emission * dye;
         if (uLit) {
-            vec3 uvw = vec3(uv, z_norm);
-            e += intensity * dye * texture(uLight, uvw).rgb * phase(uvw);
+            e += intensity * dye * texture(uLight, uvw).rgb * phase(uvw) * caustic(uvw);
+        }
+        if (uHasRays) {
+            e += texture(uRays, uvw).rgb;     // the layer's middle: its own value, not its neighbors'
         }
         vol += T * e;
 

@@ -1,0 +1,54 @@
+#version 460 core
+
+/*
+ * CausticNet - the bright net sunlight makes under a wavy surface, as a tileable 2D texture: two
+ * Voronoi patterns of drifting points, their cells' edges the net's bright lines (where the second
+ * nearest point is about as near as the nearest), the second finer and on top. A tile holds CELLS cells;
+ * every point circles its cell, its own phase and turn, so the net shifts and never repeats in a loop.
+ * Its mean is about 1, so the net moves light around without changing how much there is.
+ */
+
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+layout(r16f, binding = 0) writeonly uniform image2D uNet;
+
+uniform ivec2 uSize;          // the texture's texels
+uniform float uTime;          // seconds × the net's speed: a point's turns about its cell, on average
+
+const int CELLS = 8;          // cells across a tile
+const float MEAN = 0.62;      // the mean of the raw net, measured, which the output is divided by
+
+vec2 hash2(ivec2 cell) {
+    uvec2 q = uvec2(cell) * uvec2(1597334673u, 3812015801u);
+    uint n = (q.x ^ q.y) * 1597334673u;
+    return vec2(uvec2(n, n * 16807u)) / 4294967295.0;
+}
+
+// The edge weight at p (in cells) of a tile `cells` wide: 1 on an edge, falling to 0 inside a cell
+float edges(vec2 p, int cells, float time) {
+    ivec2 base = ivec2(floor(p));
+    float first = 1e9;
+    float second = 1e9;
+    for (int j = -1; j <= 1; j++) {
+        for (int i = -1; i <= 1; i++) {
+            ivec2 cell = base + ivec2(i, j);
+            vec2 random = hash2((cell % cells + cells) % cells);
+            float angle = 6.2831853 * (random.x + time * (0.6 + 0.8 * random.y));
+            vec2 point = vec2(cell) + 0.5 + 0.32 * vec2(cos(angle), sin(1.3 * angle));
+            float d = length(p - point);
+            if (d < first) { second = first; first = d; } else if (d < second) { second = d; }
+        }
+    }
+    float gap = second - first;
+    return exp(-gap * 9.0);
+}
+
+void main() {
+    ivec2 gid = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(gid, uSize))) return;
+    vec2 uv = (vec2(gid) + 0.5) / vec2(uSize);
+    float coarse = edges(uv * float(CELLS), CELLS, uTime);
+    float fine = edges(uv * float(2 * CELLS) + 0.37, 2 * CELLS, 1.7 * uTime + 3.1);
+    float net = 0.15 + coarse + 0.5 * fine;
+    imageStore(uNet, gid, vec4(net / MEAN, 0.0, 0.0, 0.0));
+}

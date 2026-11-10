@@ -4,8 +4,9 @@
  * LightVolume3D - how much light reaches each cell of a coarse grid over the box: from each cell's center
  * toward the light (a sun's direction, or a lamp's place), the density's amount summed along the way
  * (single scattering's shadow ray), and the water's fog over the whole distance, both per channel by the
- * tint, so light deep in the water turns bluish. Out comes the transmittance, RGB, 1 where nothing is
- * in the way. Distances are in widths; the density is sampled by uvw.
+ * tint, so light deep in the water turns bluish. Out comes the light reaching the cell, RGB: the
+ * transmittance, 1 where nothing is in the way, and for a lamp × its fall-off, 1 at the box's center.
+ * Distances are in widths; the density is sampled by uvw.
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
@@ -43,6 +44,7 @@ void main() {
     // where the ray leaves the box (the slab test from inside)
     vec3 inv = 1.0 / dir;
     vec3 t_exit = max((vec3(0.0) - p) * inv, (uBox - p) * inv);
+    float to_lamp = distance;       // the water goes on past the box: a lamp's fog is over its whole way
     distance = min(distance, min(t_exit.x, min(t_exit.y, t_exit.z)));
 
     float amount = 0.0;
@@ -52,6 +54,13 @@ void main() {
         vec3 q = p + dir * (float(i) + 0.5) * step;
         amount += texture(uDensity, q / uBox).a * step;
     }
-    vec3 transmittance = exp(-(uSigma * amount + uFog * distance));
+    vec3 transmittance = exp(-(uSigma * amount + uFog * (uPoint ? to_lamp : distance)));
+    if (uPoint) {
+        // a lamp falls off as 1 / its distance², 1 at the box's center, at most 16 times that near it
+        vec3 lamp = (0.5 + 0.5 * uVector) * uBox;
+        float to_center = max(length(lamp - 0.5 * uBox), 1e-3);
+        float near = max(length(lamp - p), 0.25 * to_center);
+        transmittance *= (to_center * to_center) / (near * near);
+    }
     imageStore(uLight, gid, vec4(transmittance, 0.0));     // w unused
 }
