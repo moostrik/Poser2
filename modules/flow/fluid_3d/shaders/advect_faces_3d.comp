@@ -30,7 +30,6 @@ uniform ivec3 uCells;         // the cell counts
 uniform float uTimestep;      // dt * advection_scale
 uniform float uDissipation;   // the fade's multiplier this step
 uniform float uEvaporation;   // widths/s taken off the speed this step
-uniform float uMaxSpeed;      // the top speed (widths/s), bent softly toward from half; 0 no limit
 uniform int   uGuardSlot;     // the velocity's slot in the stage's FiniteGuard; -1 no guard
 uniform ivec3 uClosed;        // per axis, 1 where the walls are closed
 uniform bool  uHasObstacles;
@@ -61,22 +60,11 @@ float fetch_pred(int c, ivec3 i) {
     return texelFetch(uPred, i, 0)[c];
 }
 
-// The speed's limit on component `c`, the face's full vector `v`: the factor its length is scaled by
+// The evaporation on the face's full vector `v`: the factor its length is scaled by
 float speed_factor(vec3 v) {
     float speed = length(v);
-    float factor = 1.0;
-    if (uEvaporation > 0.0 && speed > 0.0) {
-        factor = max(speed - uEvaporation, 0.0) / speed;
-        speed *= factor;
-    }
-    if (uMaxSpeed > 0.0) {
-        float knee = 0.5 * uMaxSpeed;
-        if (speed > knee) {
-            float span = uMaxSpeed - knee;
-            factor *= (knee + span * tanh((speed - knee) / span)) / speed;
-        }
-    }
-    return factor;
+    if (uEvaporation > 0.0 && speed > 0.0) return max(speed - uEvaporation, 0.0) / speed;
+    return 1.0;
 }
 
 // Component `c`'s face `i` after the step

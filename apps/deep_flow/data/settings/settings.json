@@ -550,7 +550,6 @@
         "advection_scale": 1.0,
         "fade_time": 0.0,
         "evaporation_time": 0.0,
-        "max_speed": 0.0,
         "vorticity": 1.0,
         "vorticity_radius": 0.006771,
         "viscosity": 0.0015,

@@ -38,4 +38,4 @@ from .finite_guard import FiniteGuard, GuardSlot, guard_report
 from .fluid_2d import Fluid2D, Fluid2DSettings
 
 # 3D fluid simulation
-from .fluid_3d import Fluid3D, soft_limit, Fluid3DSettings, CompositeSettings, Advection, ParticleDraw, Overlap, DRAG_FLOOR, drag_share, drag_gate, drag_velocity_step, swirl_noise
+from .fluid_3d import Fluid3D, Fluid3DSettings, CompositeSettings, Advection, ParticleDraw, Overlap, DRAG_FLOOR, drag_share, drag_gate, drag_velocity_step, swirl_noise

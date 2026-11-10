@@ -20,7 +20,7 @@ class AdvectFaces3D(ComputeShader):
 
     def use(self, mode: int, source: Texture3D, result: Texture3D, obstacle: Texture3D,
             cells: tuple[int, int, int], cell: Cell, step: float, dissipation: float = 1.0, evaporation: float = 0.0,
-            max_speed: float = 0.0, guard: GuardSlot | None = None, closed: tuple[bool, bool, bool] = (True, True, True),
+            guard: GuardSlot | None = None, closed: tuple[bool, bool, bool] = (True, True, True),
             wall_keep: float = 1.0, has_obstacles: bool = True, predictor: Texture3D | None = None) -> None:
         """Advect `source` into `result`.
 
@@ -33,7 +33,6 @@ class AdvectFaces3D(ComputeShader):
             step: dt × advection_scale
             dissipation: The fade's multiplier this step
             evaporation: Widths/s taken off the speed this step
-            max_speed: The top speed (widths/s); 0 no limit
             guard: The velocity's slot in the stage's FiniteGuard; None no guard
             closed: Per axis, whether the walls are closed
             wall_keep: The share along a closed wall kept this step (slip_time's); 1 free-slip
@@ -49,7 +48,6 @@ class AdvectFaces3D(ComputeShader):
         glUniform1f(self.get_uniform_loc('uTimestep'), step)
         glUniform1f(self.get_uniform_loc('uDissipation'), dissipation)
         glUniform1f(self.get_uniform_loc('uEvaporation'), evaporation)
-        glUniform1f(self.get_uniform_loc('uMaxSpeed'), max_speed)
         glUniform1f(self.get_uniform_loc('uWallKeep'), wall_keep)
         if guard is not None:
             guard.use(self.get_uniform_loc('uGuardSlot'))

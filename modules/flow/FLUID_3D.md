@@ -7,6 +7,12 @@ the bridge gives it ([BRIDGE.md](BRIDGE.md)), its density and its look, and how 
 is next is its [Plan](#plan). "Code" is what the files show;
 **(deduction)** marks what is inferred from them, **(site fact)** what the operator saw.
 
+What the fluid is for, its upscaled density's look above all: the density spread in depth, layers of
+water flowing in different directions **(site fact)**. The body's z serves that, not a measurement's
+truth: an arm moving before the body reads as z that is not there, and it scans the body into the water,
+which is wanted; `z_gain` trades it against the true depth motion by the look. What turns one layer's
+motion into z and across the others works against it.
+
 The 2D fluid (`fluid_2d/`, `Fluid2DLayer`, hd_trio) is apart: nothing here changes it. The 3D
 fluid is `Fluid3D` (`fluid_3d/fluid_3d.py`), its layer `Fluid3DLayer`
 (`modules/render/layers/flow/fluid_3d_layer.py`), run by deep_flow alone.
@@ -59,7 +65,7 @@ A step (`Fluid3D.update`), in order, at the code's defaults:
 
 | Pass        | What                                                                                                                                                                                                                                                                    | On                  | Depends on the input |
 |-------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|----------------------|
-| advect_vel  | self-advection on the faces by `advection`, each face traced on its own ([The staggered velocity](#the-staggered-velocity)), `velocity.advection_scale` 1, fade 60 s; on its result the guard ([The guard](#the-guard)), the top speed `max_speed` (0 off) and the slip | velocity's faces    | the trace distance   |
+| advect_vel  | self-advection on the faces by `advection`, each face traced on its own ([The staggered velocity](#the-staggered-velocity)), `velocity.advection_scale` 1, fade 60 s; on its result the guard ([The guard](#the-guard)) and the slip | velocity's faces    | the trace distance   |
 | viscosity   | Jacobi diffusion on the faces, off (`viscosity` 0)                                                                                                                                                                                                                      | velocity's faces    | no                   |
 | vorticity   | the curl at the cells from the faces, the confinement's force at the cells, each face given its two cells' mean                                                                                                                                                         | faces, curl         | no                   |
 | advect_temp | off: `buoyancy` 0 clears the temperature once, and nothing is injected into it                                                                                                                                                                                          | temperature         | the trace distance   |
@@ -283,20 +289,19 @@ widths/s in the mean against Jacobi's 0.134.
 
 ### The guard
 
-Two guards on the advection of each field, at the step's first pass, so a bad value stops where it was made
+A guard on the advection of each field, at the step's first pass, so a bad value stops where it was made
 and is never hidden:
 
 | Guard     | What                                                                                                                                                                                                                                                                                                                                                                                                                                             | Setting                                                                                             |
 |-----------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------|
 | finite    | a value whose exponent bits are all ones, an infinity or a NaN, becomes 0: a cell that held one before the step, or that the step made one; each counted per field into the stage's `FiniteGuard` (`finite_guard.py`), read once a second from the other of two buffers once a fence says the GPU is done, so nothing waits, and logged as a warning naming the stage, the field and the count; on the velocity, the density and the temperature | `guard`, beside `reset`, on by default; off once the fluid is stable                                |
-| top speed | the velocity's speed untouched up to half of `max_speed`, above it bent smoothly toward it (tanh), the direction kept (`limit_speed`, `soft_limit` its numpy reference)                                                                                                                                                                                                                                                                          | `velocity.max_speed`, widths/s, 0 off (the default), a failsafe, so a runaway shows until it is set |
 
 The bit test, not `isnan`: GLSL may assume no NaN exists and drop `isnan`. A NaN slips past every comparison
 (`speed > threshold` is false), so a threshold could not catch it, and it spreads to every value computed from
 it. An infinite velocity traces off the grid and reads the border's 0, so it is caught where it is held. Where all
 eight texels MacCormack's limiter reads are non-finite it has no bounds, and the predictor stands for the guard
-to take. With the drag the injection cannot exceed the body's own speed, so what the top speed guards is the
-simulation's own growth, from the vorticity force above all.
+to take. With the drag the injection cannot exceed the body's own speed; the simulation's own growth, from the
+vorticity force above all, is the walls' and the advection's to hold, with no top speed over it.
 
 Measured in a hidden window at 64 × 128 × 32, the velocity filled with each value and stepped, semi-Lagrangian
 and MacCormack alike:
@@ -305,8 +310,7 @@ and MacCormack alike:
 |----------------------------|-----------------------------------------------|----------------------------------------------------|
 | infinity                   | 0 everywhere, the output finite               | 262144 non-finite velocity values, every cell once |
 | NaN                        | 0 everywhere, the output finite               | 262144, every cell once                            |
-| 50 widths/s, `max_speed` 0 | top speed 44.7 (the walls and the projection) | none                                               |
-| 50 widths/s, `max_speed` 3 | top speed 2.73                                | none                                               |
+| 50 widths/s                | top speed 44.7 (the walls and the projection) | none                                               |
 
 ### Names
 

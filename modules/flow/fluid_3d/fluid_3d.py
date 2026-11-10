@@ -9,7 +9,7 @@ simulation density's) and the particles (`ParticleDensity`), all moved through t
 drawn is the upscaled one where enabled, else the simulation's; the particles are laid over it.
 
 Pipeline:
-    1. Advect velocity (3D self-advection, on its result the guard and `max_speed`; every advection semi-Lagrangian
+    1. Advect velocity (3D self-advection, on its result the guard; every advection semi-Lagrangian
        or MacCormack, `advection`; each field's advection sets its non-finite values to 0 and counts them, `FiniteGuard`)
     2. (the top speed is the advection's)
     3. Apply viscosity (3D Jacobi diffusion solver)
@@ -98,19 +98,6 @@ def drag_share(delta_time: float, drag_time: float) -> float:
 def drag_gate(speed: np.ndarray) -> np.ndarray:
     """Where the body is: its speed (widths/s) over the floor, at most 1."""
     return np.minimum(speed / DRAG_FLOOR, 1.0)
-
-
-def soft_limit(velocity: np.ndarray, max_speed: float) -> np.ndarray:
-    """The velocity's top speed, as the advection's `limit_speed`: (..., 3) widths/s untouched up to half of
-    `max_speed`, above it bent smoothly toward it by a tanh, its direction kept; 0 no limit."""
-    if max_speed <= 0.0:
-        return velocity
-    speed: np.ndarray = np.linalg.norm(velocity, axis=-1, keepdims=True)
-    knee: float = 0.5 * max_speed
-    span: float = max_speed - knee
-    bent: np.ndarray = knee + span * np.tanh((speed - knee) / span)
-    scale: np.ndarray = np.where(speed > knee, bent / np.maximum(speed, 1e-12), 1.0)
-    return velocity * scale
 
 
 def drag_velocity_step(velocity: np.ndarray, boundary: np.ndarray, gain: float, share: float, weight: float = 1.0,
@@ -546,7 +533,7 @@ class Fluid3D:
         common = dict(obstacle=self._obstacle, cells=self._cells, cell=self._cell, step=step,
                       closed=self._closed, has_obstacles=self._has_obstacles)
         finish = dict(dissipation=self._calculate_dissipation(self._dt, velocity.fade_time),
-                      evaporation=self._evaporation(self._dt, velocity.evaporation_time), max_speed=velocity.max_speed,
+                      evaporation=self._evaporation(self._dt, velocity.evaporation_time),
                       guard=self._guard_slot('velocity'), wall_keep=self._wall_keep)
         self._faces.swap()
         source = self._faces.back
