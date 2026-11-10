@@ -7,15 +7,27 @@ the bridge gives it ([BRIDGE.md](BRIDGE.md)), its density and its look, and how 
 is next is its [Plan](#plan). "Code" is what the files show;
 **(deduction)** marks what is inferred from them, **(site fact)** what the operator saw.
 
-What the fluid is for, its upscaled density's look above all: the density spread in depth, layers of
-water flowing in different directions **(site fact)**. The body's z serves that, not a measurement's
-truth: an arm moving before the body reads as z that is not there, and it scans the body into the water,
-which is wanted; `z_gain` trades it against the true depth motion by the look. What turns one layer's
-motion into z and across the others works against it.
-
 The 2D fluid (`fluid_2d/`, `Fluid2DLayer`, hd_trio) is apart: nothing here changes it. The 3D
 fluid is `Fluid3D` (`fluid_3d/fluid_3d.py`), its layer `Fluid3DLayer`
 (`modules/render/layers/flow/fluid_3d_layer.py`), run by deep_flow alone.
+
+## The goal
+
+A visualization inspired by ink in water: high detail at 4K, sharp, translucent ink patterns; smoke
+patterns a second goal **(site fact)**. Two ways draw it, the particles and the upscaled density; the
+upscaled density is the one worked on now, the particles and probably a combination of both later. Its
+way there: layers of water with sharp, well-defined motion of their own, that influence each other and
+stay distinct. Ink's thin sheets folding into tendrils are shear, water at one depth moving otherwise than
+the water beside it, their boundary rolling up **(deduction)**. The light is a means to it, not a goal of
+its own, and so far not a good one **(site fact)**.
+
+What decides it in the upscale now (the code and deep_flow's preset):
+
+| What                     | Now                                                                                   | Against the goal                                                                          |
+|--------------------------|---------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
+| the density's own layers | the 4K amount 16 layers deep (`upscaled.depth`), the velocity's grid 64               | a sheet thinner than a sixteenth of the box blurs into its neighbors: the layers it can hold |
+| its edges as it moves    | semi-Lagrangian advection (`advection`), MacCormack 2.8 ms on the 4K amount            | the plain step blurs a little each step, MacCormack keeps edges sharp                      |
+| the layers kept apart    | xy turning into z around the flat body ([TIMING.md](TIMING.md#the-box-as-deep-as-it-is-wide)), the confinement at a small radius, viscosity | each crosses one layer's motion into the others' and mixes them; viscosity 0 the sharpest |
 
 ## Plan
 
