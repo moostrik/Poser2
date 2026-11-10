@@ -8,10 +8,10 @@
  *   occlusion    per-channel Beer-Lambert extinction; near density covers far density
  *   tint + fog   far density shifts toward water color and fades
  *   glow         each sample's own emission, its color × uEmission
- *   light        with uLit, each sample lit as well: its color × the light reaching it (the light grid)
- *                × the phase toward the viewer, its octaves, × the caustic net and the powder, + the sky's
- *                light, × uIntensity
- *   rays         with uHasRays, the water's own light in the layer (Rays3D), under what lies in front
+ *   light        with uLit, each sample lit as well: its color × the light per layer of the march (the sun's
+ *                and the sky's, LayerLight3D) × the caustic net on the sun's share × uIntensity, the net at
+ *                its own size
+ *   rays         with uHasRays, the water's own light in the layer (LayerLight3D), under what lies in front
  *
  * Dispatched as a 2D compute (one thread per output pixel). The output may
  * be larger than the volume: the volume is sampled by uv. Split, the amount is
@@ -23,9 +23,8 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 
 layout(binding = 0) uniform sampler3D uDensity;  // RGBA16F, or with uSplit the amount alone (R16F)
 layout(binding = 1) uniform sampler3D uColor;    // with uSplit: the color volume, color × amount and the amount
-layout(binding = 2) uniform sampler3D uLight;    // with uLit: the light reaching each place, RGB
+layout(binding = 2) uniform sampler3D uDirect;   // with uLit: the direct light per layer, RGB; alpha the caustic net's contrast
 layout(binding = 3) uniform sampler3D uRays;     // with uHasRays: the water's light, a column and a layer each
-layout(binding = 5) uniform sampler3D uSky;      // with uSkyFill: the light from straight above, RGB
 
 layout(rgba16f, binding = 0) writeonly uniform image2D uOutput;
 
@@ -38,12 +37,9 @@ uniform float uAbsorption;   // The extinction of an amount of 1 over the whole 
 uniform float uTint;         // 0..1 mix toward per-channel water extinction
 uniform float uFog;          // Medium extinction over the full depth
 uniform bool  uSplit;        // the amount from uDensity, its color from uColor (the upscaled density)
-uniform bool  uLit;          // the density lit by uLight
+uniform bool  uLit;          // the density lit by uDirect
 uniform bool  uHasRays;      // the water's light added from uRays
 uniform float uIntensity;    // the lit color's emission of an amount of 1 over the whole view, at full light
-uniform float uOctaves;      // the octaves' share: light bounced within, by less extinction (Wrenninge); 0 off
-uniform float uPowder;       // edges facing the light darkened (Beer–powder), 0 off to 1
-uniform float uSkyFill;      // the sky's light, a share of the light's intensity; 0 off
 
 const vec3 WATER_CHAN = vec3(1.8, 1.0, 0.6);  // relative extinction: red dies first
 
@@ -77,18 +73,10 @@ void main() {
         vec3 dye = max(s.rgb, vec3(0.0));
         vec3 e = emission * dye;
         if (uLit) {
-            vec4 light = texture(uLight, uvw);
-            vec3 reaching = light.rgb * phase(uvw);
-            if (uOctaves > 0.0) {       // two octaves, each half the extinction and half the light, evenly spread
-                vec3 half_way = sqrt(light.rgb);
-                reaching += uOctaves * (0.5 * half_way + 0.25 * sqrt(half_way));
-            }
-            reaching *= caustic(uvw);
-            if (uPowder > 0.0) {        // Beer–powder over Beer: 2 (1 - T²) on the density's own transmittance
-                reaching *= mix(1.0, 2.0 * (1.0 - light.a * light.a), uPowder);
-            }
-            if (uSkyFill > 0.0) {
-                reaching += uSkyFill * texture(uSky, uvw).rgb;
+            vec4 direct = texture(uDirect, uvw);
+            vec3 reaching = direct.rgb;
+            if (direct.a > 0.0) {       // the caustic net, at its own size, by its contrast there
+                reaching *= 1.0 + direct.a * (caustic_net(uvw) - 1.0);
             }
             e += intensity * dye * reaching;
         }

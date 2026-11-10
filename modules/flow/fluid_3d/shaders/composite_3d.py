@@ -4,11 +4,12 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from OpenGL.GL import GL_RGBA16F, glUniform1f, glUniform1i, glUniform2i, glUniform3f, glUseProgram
+from OpenGL.GL import GL_RGBA16F, glUniform1f, glUniform1i, glUniform2f, glUniform2i, glUniform3f, glUseProgram
 
 from modules.gl import Texture, Texture3D, ComputeShader
 
 
+IDENTITY: tuple[float, ...] = (1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
 OPACITY_LIMIT: float = 0.999     # opacity 1, covering all, needs infinitely thick dye: it is drawn as this
 
 
@@ -39,23 +40,41 @@ def view_march(opacity: float, emission: float) -> tuple[float, float]:
 
 @dataclass
 class CompositeLight:
-    """The light a composite lights the density by: the light grid, how it is read, and the rays."""
-    volume: Texture3D                       # the light reaching each place, RGB, over the box
+    """The light a composite lights the density by: the light grid and how it is read, and the light per
+    column and layer of the march (`LayerLight3D`) the composite reads."""
+    volume: Texture3D                       # the light reaching each place, RGB, over the box; alpha the density's alone
     intensity: float                        # the lit dye's emission over the whole view at full light (`view_march`'s)
     anisotropy: float                       # Henyey–Greenstein g
     back_scattering: float                  # the share of a backward lobe as strong
     point: bool                             # a lamp at `vector`'s place, else a sun toward `vector`
     vector: tuple[float, float, float]      # ±1 the box's sides
     box: tuple[float, float, float]         # the box in widths
+    grid: tuple[int, int, int] = (1, 1, 1)  # the light grid's cells, unsheared
+    light_map: tuple[float, ...] = IDENTITY # a place's texture coordinates to `volume`'s, row-major 4 × 4
     caustics: float = 0.0                   # the caustic net's contrast, 0 off to 1
     caustic_size: float = 0.1               # the net's cell, widths
     caustic_depth: float = 0.5              # widths down the light's way over which the net fades to 37%
     net: Texture | None = None              # the caustic net, tileable, its mean 1
-    rays: Texture3D | None = None           # the water's light per column and layer of the march, None off
-    octaves: float = 0.0                    # the octaves' share, `scattering` with the octaves; 0 off
-    powder: float = 0.0                     # the edges facing the light darkened, 0 off to 1
-    sky: Texture3D | None = None            # the light from straight above, None off
-    sky_fill: float = 0.0                   # the sky's light, a share of the light's intensity
+    direct: Texture3D | None = None         # the light on the dye per layer, the sun's and the sky's; alpha the net's contrast
+    rays: Texture3D | None = None           # the water's light per layer, None off
+
+
+def net_tiles(vector: tuple[float, float, float], box: tuple[float, float, float], size: float) -> tuple[tuple[float, float], ...]:
+    """A sun's caustic net laid across its way: the net's tile coordinates per uvw x, y and z (`light.glsl`'s
+    uNetX, uNetY, uNetZ), a tile holding 8 cells of `size` widths."""
+    length: float = math.sqrt(sum(c * c for c in vector))
+    axis = tuple(c / length for c in vector) if length > 1e-6 else (0.0, -1.0, 0.0)
+    helper = (0.0, 1.0, 0.0) if abs(axis[1]) < 0.9 else (1.0, 0.0, 0.0)
+    side = _cross(axis, helper)
+    side_length: float = math.sqrt(sum(c * c for c in side))
+    side = tuple(c / side_length for c in side)
+    up = _cross(axis, side)
+    scale: float = 1.0 / (8.0 * max(size, 1e-4))
+    return tuple((box[k] * side[k] * scale, box[k] * up[k] * scale) for k in range(3))
+
+
+def _cross(a: tuple[float, ...], b: tuple[float, ...]) -> tuple[float, float, float]:
+    return (a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0])
 
 
 def bind_light(shader: ComputeShader, light: CompositeLight, net: Texture | None, unit: int) -> None:
@@ -70,6 +89,8 @@ def bind_light(shader: ComputeShader, light: CompositeLight, net: Texture | None
     glUniform1f(shader.get_uniform_loc("uCaustics"), light.caustics if on else 0.0)
     glUniform1f(shader.get_uniform_loc("uCausticSize"), light.caustic_size)
     glUniform1f(shader.get_uniform_loc("uCausticDepth"), light.caustic_depth)
+    for name, tile in zip(("uNetX", "uNetY", "uNetZ"), net_tiles(light.vector, light.box, light.caustic_size)):
+        glUniform2f(shader.get_uniform_loc(name), *tile)
     if on and net is not None:
         shader.bind_texture(unit, net, "uCausticNet")
     else:       # its own unit even unread: a sampler2D on a unit with a sampler3D fails the dispatch
@@ -94,8 +115,8 @@ class Composite3D(ComputeShader):
             tint: 0..1 mix toward per-channel water extinction (red dies first)
             fog: Medium extinction over the full depth
             color: With it, `density` is the amount alone and its color is this volume's (color × amount, amount)
-            light: With it, each sample also lit (its color × the light there × `light.intensity`) and, with its
-                rays, the water's light added a layer at a time
+            light: With its light per layer, each sample also lit: its color × that light, the caustic net on the
+                sun's share, × `light.intensity`; with its rays, the water's light added
         """
         if not self.allocated or not self.shader_program:
             return
@@ -114,22 +135,18 @@ class Composite3D(ComputeShader):
         glUniform1i(self.get_uniform_loc("uSplit"), int(color is not None))
         if color is not None:
             self.bind_texture_3d(1, color, "uColor")
-        glUniform1i(self.get_uniform_loc("uLit"), int(light is not None))
+        direct: Texture3D | None = light.direct if light is not None else None
         rays: Texture3D | None = light.rays if light is not None else None
+        glUniform1i(self.get_uniform_loc("uLit"), int(direct is not None))
         glUniform1i(self.get_uniform_loc("uHasRays"), int(rays is not None))
         if light is not None:
-            self.bind_texture_3d(2, light.volume, "uLight")
             glUniform1f(self.get_uniform_loc("uIntensity"), light.intensity)
             bind_light(self, light, light.net, 4)
-            if rays is not None:
-                self.bind_texture_3d(3, rays, "uRays")
-            glUniform1f(self.get_uniform_loc("uOctaves"), light.octaves)
-            glUniform1f(self.get_uniform_loc("uPowder"), light.powder)
-            sky_on: bool = light.sky is not None and light.sky_fill > 0.0
-            glUniform1f(self.get_uniform_loc("uSkyFill"), light.sky_fill if sky_on else 0.0)
-            if sky_on and light.sky is not None:
-                self.bind_texture_3d(5, light.sky, "uSky")
         else:       # the net's sampler on its own unit, unread
             glUniform1i(self.get_uniform_loc("uCausticNet"), 4)
+        if direct is not None:
+            self.bind_texture_3d(2, direct, "uDirect")
+        if rays is not None:
+            self.bind_texture_3d(3, rays, "uRays")
 
         self.dispatch(output_2d.width, output_2d.height)

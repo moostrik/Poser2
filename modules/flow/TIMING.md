@@ -395,6 +395,38 @@ so one solve differs on 30% of its values by up to 3e-4 uv, and with exact cente
 last bits the solve amplifies. Not kept: the bandpass's four parts in one pass (0.140 → 0.117 ms), and the
 lowpass's advect fused into its trail, at most 0.005 ms of its 0.076 (its blur, 4 steps of 2 passes, is 0.064).
 
+## The light and the composite
+
+`fluid_pass_check.py` and the same passes alone with a swinging body's density, at deep_flow's preset
+(288 × 512 × 64 cells, the 4K amount's 2160 × 3840 × 16, the light grid `FULL`), ms:
+
+| The look                                               | light | composite | sum  |
+|--------------------------------------------------------|-------|-----------|------|
+| the light off                                          | 0     | 0.65      | 0.65 |
+| a lamp at a quarter grid, marched (before)             | 0.09  | 0.74      | 0.83 |
+| the preset's sun, rays, caustics, octaves, powder, sky | 0.55  | 1.41      | 1.96 |
+| the light per layer (`LayerLight3D`)                   | 0.56  | 1.32      | 1.88 |
+| the sweep stored sheared, only the layers in the box   | 0.31  | 1.32      | 1.64 |
+| the sky's light in the light on the dye                | 0.30  | 1.13      | 1.43 |
+
+The picture stays the same over the changes: on stillslowfast at 2160 × 3840, against the third row, the
+8-bit outputs at four steps differ by 0.01 to 0.05 on average, their p99 1.
+
+| Part of the look      | its cost, light + composite |
+|-----------------------|-----------------------------|
+| the rays              | 0.24                        |
+| the caustics          | 0.12                        |
+| the sky fill          | 0.04                        |
+| octaves, powder, phase| under 0.01                  |
+
+The sun's sweep against the march from every cell it replaces, on the same grid, three suns, the density
+alone: the march 1.1 to 2.7 ms, the sweep 0.13 to 0.16; the transmittance's mean the same to 0.001. A lamp
+stays marched: at `FULL` it costs 3.3 ms, so a lamp takes `HALF` or `QUARTER`.
+
+Tried and dropped: the rays' fog worked out as a power of one sub-step's instead of two `exp`s a sub-step,
+no faster (0.163 against 0.166 ms); written to the one cell a line passes the sweep took 0.17 ms and drew
+stripes across the lit density, mixing four lines through shared memory took 0.33 to 0.39.
+
 ## The density at the output's 4K
 
 The upscaled density ([FLUID_3D.md](FLUID_3D.md#the-densitys-detail)): the amount at 2160 × 3840 ×

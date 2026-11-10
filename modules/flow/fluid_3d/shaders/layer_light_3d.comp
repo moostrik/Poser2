@@ -1,0 +1,84 @@
+#version 460 core
+
+/*
+ * LayerLight3D - the light per column of the light grid and layer of the march, so the composite reads
+ * what varies smoothly once a light cell and a layer instead of working it out at every 4K sample; the
+ * view looks straight down z, so the light grid's columns are the view's (froxels). Two volumes:
+ *
+ *   direct    the light reaching the dye, times its phase toward the viewer, its octaves added (two, each
+ *             half the extinction and half the light, evenly spread: T^½ and T^¼), times the powder (2 (1 -
+ *             T²) on the density's own transmittance, the light grid's alpha), and the sky's light added
+ *             (uSkyFill × the light from straight above); alpha the caustic net's contrast there, for the
+ *             composite to read the net at its own size, times the direct light's share of the whole's
+ *             brightness, so the net moves the direct light alone (its tint follows the whole's, the sky a
+ *             small part of it)
+ *   rays      the water's own light: the fog's in-scattering integrated exactly over the layer, from its
+ *             front; over a sub-step the light is taken as even, so the fog's share of it there is
+ *             exp(-fog × from the front) − exp(-fog × to the back), of which the scattering's, its grey over
+ *             the extinction's channels (the water takes red out first, it scatters every color alike);
+ *             dark where the density's shadow keeps it, a shadow's edge falling between layers without
+ *             banding; the march adds it under what lies in front
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
+
+layout(binding = 0) uniform sampler3D uLight;       // the light reaching each place, RGB; alpha the density's alone
+layout(binding = 2) uniform sampler3D uSky;         // with uSkyFill: the light from straight above, RGB
+uniform mat4 uLightMap;      // a place's texture coordinates to the light grid's (a sun's is stored sheared)
+uniform mat4 uSkyMap;        // and to the sky's
+layout(rgba16f, binding = 0) writeonly uniform image3D uDirect;
+layout(rgba16f, binding = 2) writeonly uniform image3D uRays;
+
+#include "light.glsl"
+
+uniform ivec3 uSize;          // the light grid's columns and the march's layers
+uniform float uOctaves;       // the octaves' share; 0 off
+uniform float uPowder;        // the powder, 0 off to 1
+uniform float uSkyFill;       // the sky's light, a share of the light's intensity; 0 off
+uniform bool  uHasRays;       // the rays worked out
+uniform vec3  uFog;           // the water's extinction over the whole depth, per channel
+uniform float uFogGrey;       // the water's extinction over the whole depth without the tint, its scattering's
+uniform float uScatter;       // the fog's share sent on × the light's intensity
+uniform int   uSubSteps;      // the rays' sub-steps a layer
+
+vec4 light_at(vec3 uvw) {
+    return texture(uLight, (uLightMap * vec4(uvw, 1.0)).xyz);
+}
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(gid, uSize))) return;
+    vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
+    float layer = 1.0 / float(uSize.z);
+    float front = float(gid.z) * layer;
+    vec3 middle = vec3(uv, front + 0.5 * layer);
+
+    vec4 light = light_at(middle);
+    vec3 direct = light.rgb * phase(middle);
+    if (uOctaves > 0.0) {
+        vec3 half_way = sqrt(max(light.rgb, vec3(0.0)));
+        direct += uOctaves * (0.5 * half_way + 0.25 * sqrt(half_way));
+    }
+    if (uPowder > 0.0) {
+        direct *= mix(1.0, 2.0 * (1.0 - light.a * light.a), uPowder);
+    }
+    vec3 whole = direct;
+    if (uSkyFill > 0.0) {
+        whole += uSkyFill * texture(uSky, (uSkyMap * vec4(middle, 1.0)).xyz).rgb;
+    }
+    const vec3 LUMINANCE = vec3(0.2126, 0.7152, 0.0722);
+    float share = dot(direct, LUMINANCE) / max(dot(whole, LUMINANCE), 1e-6);
+    imageStore(uDirect, gid, vec4(whole, caustic_contrast(middle) * share));
+
+    if (uHasRays) {
+        float sub = layer / float(uSubSteps);
+        vec3 sent = vec3(0.0);
+        for (int s = 0; s < uSubSteps; s++) {
+            float a = float(s) * sub;
+            vec3 uvw = vec3(uv, front + a + 0.5 * sub);
+            vec3 reaching = light_at(uvw).rgb * phase(uvw) * caustic(uvw);
+            sent += reaching * (exp(-uFog * a) - exp(-uFog * (a + sub)));
+        }
+        imageStore(uRays, gid, vec4(sent * uScatter * uFogGrey / max(uFog, vec3(1e-6)), 0.0));
+    }
+}
