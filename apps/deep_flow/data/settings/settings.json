@@ -581,8 +581,8 @@
         "enabled": true,
         "width": 2160,
         "height": 3840,
-        "depth": 16,
-        "sample": "AVERAGE",
+        "depth": 32,
+        "sample": "MIDDLE",
         "cubic": true,
         "turbulence": 0.0
       },
