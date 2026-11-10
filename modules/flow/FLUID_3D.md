@@ -33,18 +33,24 @@ widths, and the z cells stretch to it (at 1 and the preset's grid, 4.5 times as 
 body's z needs no scaling (`_z_scale` 1), and everything that measures in widths (the composite's `opacity` and
 `fog`, the light, the rays, the injection's `spread`, the monitor's box) means the same along z as across.
 
-What reads the cell as cubic, and what it becomes:
+What reads the cell as cubic, and what it becomes. The spacing comes from one place: the fluid's cell
+as three sizes, x, y and z in widths, handed to every face pass by `bind_faces` (`faces.glsl`), never a
+uniform of a pass's own:
 
 | Part                                      | Now                                         | With stretched cells                                                                 |
 |-------------------------------------------|---------------------------------------------|--------------------------------------------------------------------------------------|
-| advection, MacCormack, the upscaled and the particles' carry | uvw by the box's extent (`z_extent`) | the same, `z_extent` the box's depth                                                 |
+| the velocity's own advection (`AdvectFaces3D`) | traced in cells by one cells-per-width  | cells per width per axis                                                             |
+| the fields' advection, MacCormack, the upscaled density's and the particles' carry | uvw by the box's extent (`z_extent`) | the same, `z_extent` the box's depth                                    |
 | divergence, gradient                      | one cell size `h`                           | `h` per axis                                                                         |
 | the pressure: Jacobi, SOR, multigrid      | one `1/h²` for the six neighbors            | per axis; the multigrid halves z only once the xy cells are as long as the z (semi-coarsening), a point smoother converging poorly across a stretched cell otherwise |
-| the curl and the confinement              | per axis already (`uHalfRdxInv`)            | the confinement's `vorticity_radius` in widths, not cells                            |
+| the curl (`VorticityCurl3D`)              | one cell size                               | per axis; `vorticity_radius` in xy cells, z reaching the same distance               |
+| the confinement's force                   | per axis already (`uHalfRdxInv`), ε × h     | h the xy cell, the image's detail                                                    |
 | viscosity                                 | one `1/h²`                                  | per axis                                                                             |
+| the upscaled density's swirl noise        | a tile spanning 8 grid cells                | a tile in widths, so its swirls stay round in depth                                  |
 | the sun's sweep                           | cubic light cells, a step one cell          | the light's way measured in widths: its slope and step from the cells' sizes         |
 | the lamp's march, the layer light, the rays | in widths over the box                    | the same                                                                             |
 | the particles                             | their own `z_extent`, layers over width     | the box's depth                                                                      |
+| the monitor's cube                        | every volume one width deep (`BOX_DEPTH`)   | its port's extent, the box as deep as it is                                          |
 
 The injection's slab, the same for the boundary and the body force, the density and the temperature:
 `layer` stays its center, a share of the box's depth, 0 the front, 1 the back, smooth, never snapped
@@ -63,7 +69,9 @@ speed in the slab and beside it, and the share of the body's own z it keeps; the
 after its iterations or V-cycles at the stretched cells; the step's GPU time. An isotropy check in the
 harness: a swirl in the xz plane at stretched cells keeps its shape as one in the xy plane does. The
 preset's `depth_span` 10, chosen to scale the body's z, goes with it; `depth_ratio` 1 is the box as
-deep as it is wide.
+deep as it is wide. The preset's `spread` converted to its new unit (its sigma × 2.355) and
+`vorticity_radius` kept in xy cells; the glossary's `input` line follows: `depth_span` out, `spread`
+the body's thickness, `depth_ratio` beside the grid's size.
 
 ### 2. The body at its own depth
 
