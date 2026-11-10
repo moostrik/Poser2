@@ -16,26 +16,7 @@ fluid is `Fluid3D` (`fluid_3d/fluid_3d.py`), its layer `Fluid3DLayer`
 What is next for the fluid, in order; what is open elsewhere in the flow is
 [FLOW.md's Open](FLOW.md#open).
 
-### 1. High vorticity
-
-The confinement adds energy by design (Fedkiw, Stam and Jensen 2001), to put back the swirl the
-semi-Lagrangian step smears away, and stays stable only while the advection loses at least that
-much. With the walls' rule both advections decay at ε 1.93, and at ε 5 MacCormack's inside holds
-([The walls](#the-walls)). The look above the textbook ε, smoke curling out of the water, is wanted
-**(site fact)**. To check at the app: if the water still grows at a high ε, either the confinement
-kept as the look and capped where its push would raise the water's energy, or IVOCK (Zhang, Bridson
-and Greif 2015: the vorticity the advection destroyed added back, never energy created) with a gain
-above 1 for the look, capped as well.
-
-### 2. The guards at the app
-
-The fluid became unstable sometimes **(site fact)**, not reproduced in the harness. Each stage now
-guards its output ([The guard](#the-guard), [MOTION.md](MOTION.md#the-guard)), so the warning names
-the stage where a bad value is made, and the cause is fixed there. The bridge has no guard: it makes
-no non-finite value itself, every division in its shaders held above a small floor, and its input is
-the guarded motion. The guards' cost goes in [TIMING.md](TIMING.md) once the fluid is stable.
-
-### 3. The composite: its look and its cost together
+### 1. The composite: its look and its cost together
 
 The look is a mess now **(site fact)**; the composite is reworked for the best picture and its cost in
 one go. Its cost at the preset (2160 × 3840, the 4K amount's 16 layers): 0.65 ms alone, about twice the

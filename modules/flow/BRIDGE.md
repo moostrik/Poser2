@@ -149,6 +149,10 @@ leave dye where it is or push it in, or any of these at once; the same reading i
 choice, not an error. The change beside its parts lets a preset take the physics (the true
 acceleration, braking at stops) or the look (a stop that pushes).
 
+The bridge has no finite guard, unlike the motion and the fluid ([MOTION.md](MOTION.md#the-guard),
+[FLUID_3D.md](FLUID_3D.md#the-guard)): it makes no non-finite value itself, every division in its
+shaders held above a small floor, and its input is the guarded motion.
+
 ## Measured
 
 `scripts/bridge_compare.py` on the standmoves recording (`20261103-215324`: four whole-arm moves
