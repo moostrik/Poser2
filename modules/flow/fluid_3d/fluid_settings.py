@@ -165,18 +165,16 @@ class PressureSettings(BaseSettings):
     cycles: Field[int]              = Field(1,      min=1,      max=8,      color="orange",         description="Multigrid V-cycles per step")
 
 
-class CompositeSettings(BaseSettings):
-    """The composite: how the density volume is marched front to back into the output."""
-    emission: Field[float]          = Field(1.0,  min=0.1,  max=100.0,  widget=Widget.log_slider, color="amber", description="How bright fully dyed water filling the view is seen: 1 = its own color")
-    opacity: Field[float]           = Field(0.6,  min=0.0,  max=1.0,    step=0.01, color="deep-orange", description="How much fully dyed water filling the view covers behind it: 0 see-through, 1 only the front")
-    tint: Field[float]              = Field(0.5,  min=0.0,  max=1.0,    color="light-blue",     description="Far density shifts toward water color (red absorbed first)")
-    fog: Field[float]               = Field(0.5,  min=0.0,  max=4.0,    color="blue-grey",      description="Water extinction over the full depth; dims far layers, and the light on its way in")
-    light: Field[Light]             = Field(Light.DIRECTIONAL,                                  description="A sun from one direction, or a lamp at one place")
-    light_x: Field[float]           = Field(0.0,  min=-1.0, max=1.0,    color="amber",          description="Toward the sun, or the lamp's place (±1 the box's sides); x right")
-    light_y: Field[float]           = Field(-1.0, min=-1.0, max=1.0,    color="amber",          description="y down the screen; -1 = from above")
-    light_z: Field[float]           = Field(-0.3, min=-1.0, max=1.0,    color="amber",          description="z away from the viewer; -1 = from the front")
-    light_grid: Field[LightGrid]    = Field(LightGrid.FULL,                                     description="The light's grid: a quarter, half or all of the simulation's cells each way; finer, sharper shadows")
-    light_intensity: Field[float]   = Field(0.0,  min=0.0,  max=50.0,   step=0.1, color="amber", description="How bright the light shows fully dyed water filling the view, lit straight on: 1 = its color; 0 = no light")
+class LightSettings(BaseSettings):
+    """The light on the density and in the water: a sun or a lamp, its shadows, the rays, the caustics and the
+    bounced light; off, the composite is the plain march, every light pass skipped and its memory released."""
+    enabled: Field[bool]            = Field(False,                                              description="The light on: the dye lit, its shadows, the rays and the caustics")
+    source: Field[Light]            = Field(Light.DIRECTIONAL,                                  description="A sun from one direction, or a lamp at one place")
+    x: Field[float]                 = Field(0.0,  min=-1.0, max=1.0,    color="amber",          description="Toward the sun, or the lamp's place (±1 the box's sides); x right")
+    y: Field[float]                 = Field(-1.0, min=-1.0, max=1.0,    color="amber",          description="y down the screen; -1 = from above")
+    z: Field[float]                 = Field(-0.3, min=-1.0, max=1.0,    color="amber",          description="z away from the viewer; -1 = from the front")
+    grid: Field[LightGrid]          = Field(LightGrid.FULL,                                     description="The light's grid: a quarter, half or all of the simulation's cells each way; finer, sharper shadows")
+    intensity: Field[float]         = Field(1.0,  min=0.0,  max=50.0,   step=0.1, color="amber", description="How bright the light shows fully dyed water filling the view, lit straight on: 1 = its color")
     fog_scattering: Field[float]    = Field(0.0,  min=0.0,  max=1.0,    color="light-blue",     description="Share of the light the fog takes out that it sends on: the water glows, shafts in the shadows; 0 = off")
     caustics: Field[float]          = Field(0.0,  min=0.0,  max=1.0,    color="amber",          description="Contrast of the caustic net, the light under a wavy surface, carried down as shafts; 0 = off")
     caustic_size: Field[float]      = Field(0.08, min=0.01, max=1.0,    widget=Widget.log_slider, color="amber", description="The caustic net's cell, widths")
@@ -188,6 +186,15 @@ class CompositeSettings(BaseSettings):
     sky_fill: Field[float]          = Field(0.0,  min=0.0,  max=1.0,    color="light-blue",     description="Light from the sky straight above, a share of the light's intensity, so no shadow is black; 0 = off")
     anisotropy: Field[float]        = Field(0.0,  min=0.0,  max=0.9,    color="yellow",         description="Henyey–Greenstein g: 0 scatters evenly, higher forward, a silver lining against the light")
     back_scattering: Field[float]   = Field(0.0,  min=0.0,  max=1.0,    color="yellow",         description="Share scattered back toward the light by a second lobe as strong, lit from the front; 0 = off")
+
+
+class CompositeSettings(BaseSettings):
+    """The composite: how the density volume is marched front to back into the output, and the light on it."""
+    emission: Field[float]          = Field(1.0,  min=0.1,  max=100.0,  widget=Widget.log_slider, color="amber", description="How bright fully dyed water filling the view is seen: 1 = its own color")
+    opacity: Field[float]           = Field(0.6,  min=0.0,  max=1.0,    step=0.01, color="deep-orange", description="How much fully dyed water filling the view covers behind it: 0 see-through, 1 only the front")
+    tint: Field[float]              = Field(0.5,  min=0.0,  max=1.0,    color="light-blue",     description="Far density shifts toward water color (red absorbed first)")
+    fog: Field[float]               = Field(0.5,  min=0.0,  max=4.0,    color="blue-grey",      description="Water extinction over the full depth; dims far layers, and the light on its way in")
+    light: Group[LightSettings]     = Group(LightSettings)
 
 
 class Fluid3DSettings(BaseSettings):

@@ -271,6 +271,7 @@
     "stage": "LERP",
     "layer": {
       "select": {
+        "view": "DEBUG",
         "left": [
           "fluid"
         ],
@@ -528,12 +529,12 @@
         "time_scale": 1.0
       },
       "input": {
-        "layer": 0.5,
+        "layer": 0.21,
         "spread": 0.01,
-        "depth_span": 1.0,
+        "depth_span": 10.0,
         "boundary": {
-          "velocity_drag": 500.0,
-          "velocity_gain": 2.57,
+          "velocity_drag": 0.0,
+          "velocity_gain": 1.0,
           "density_drag": 500.0,
           "density_gain": 1.0,
           "temperature_drag": 200.0,
@@ -547,18 +548,18 @@
       },
       "velocity": {
         "advection_scale": 1.0,
-        "fade_time": 120.0,
+        "fade_time": 0.0,
         "evaporation_time": 0.0,
         "max_speed": 0.0,
-        "vorticity": 0.0,
-        "vorticity_radius": 1.0,
-        "viscosity": 0.0,
+        "vorticity": 1.0,
+        "vorticity_radius": 1.95,
+        "viscosity": 0.0015,
         "viscosity_iter": 20
       },
       "density": {
-        "advection_scale": 1.0,
-        "fade_time": 20.0,
-        "evaporation_time": 0.0
+        "advection_scale": 0.88,
+        "fade_time": 0.0,
+        "evaporation_time": 300.0
       },
       "temperature": {
         "advection_scale": 1.0,
@@ -601,27 +602,30 @@
         "smooth": 3
       },
       "composite": {
-        "emission": 0.1,
+        "emission": 3.89,
         "opacity": 0.995,
-        "tint": 0.7,
-        "fog": 0.45,
-        "light": "DIRECTIONAL",
-        "light_x": 0.2,
-        "light_y": -1.0,
-        "light_z": 0.3,
-        "light_grid": "FULL",
-        "light_intensity": 18.0,
-        "fog_scattering": 0.15,
-        "caustics": 0.6,
-        "caustic_size": 0.25,
-        "caustic_depth": 0.8,
-        "caustic_speed": 0.15,
-        "scattering_model": "OCTAVES",
-        "scattering": 0.4,
-        "powder": 0.6,
-        "sky_fill": 0.15,
-        "anisotropy": 0.3,
-        "back_scattering": 0.2,
+        "tint": 1.0,
+        "fog": 0.05,
+        "light": {
+          "enabled": false,
+          "source": "DIRECTIONAL",
+          "x": 0.07,
+          "y": 0.2,
+          "z": -0.14,
+          "grid": "FULL",
+          "intensity": 0.0,
+          "fog_scattering": 0.1,
+          "caustics": 0.0,
+          "caustic_size": 0.25,
+          "caustic_depth": 0.8,
+          "caustic_speed": 0.15,
+          "scattering_model": "OCTAVES",
+          "scattering": 0.72,
+          "powder": 0.0,
+          "sky_fill": 1.0,
+          "anisotropy": 0.13,
+          "back_scattering": 0.46
+        },
         "blend_mode": "ADD"
       }
     },
