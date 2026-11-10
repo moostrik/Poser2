@@ -5,6 +5,8 @@ uniform bool  uPoint;         // a lamp at uVector's place, else a sun toward uV
 uniform vec3  uVector;        // toward the sun, or the lamp's place, ±1 the box's sides
 uniform vec3  uBox;           // the box in widths: 1, height over width, depth over width
 uniform float uAnisotropy;    // Henyey–Greenstein g, 0 even, toward 1 forward
+uniform float uBackScattering; // the share of a backward lobe as strong
+uniform float uSunPhase;      // a sun's phase, the same everywhere
 uniform float uCaustics;      // the caustic net's contrast, 0 off to 1
 uniform float uCausticSize;   // the net's cell, widths
 uniform float uCausticDepth;  // widths down the light's way over which the net fades to 37%
@@ -16,13 +18,19 @@ vec3 to_light(vec3 uvw) {
     return normalize(length(toward) > 1e-6 ? toward : vec3(0.0, -1.0, 0.0));
 }
 
-// The share of light a place sends toward the viewer (along -z), 1 for g = 0: Henyey–Greenstein, its
-// cosine between the light's travel and the way to the eye, which is the way to the light's z
+// Henyey–Greenstein, 1 for g = 0, at the cosine between the light's travel and the way to the eye
+float henyey_greenstein(float g, float cosine) {
+    return (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * cosine, 1.5);
+}
+
+// The share of light a place sends toward the viewer (along -z): a forward lobe of g uAnisotropy and a
+// backward one as strong, uBackScattering its share; the cosine is the way to the light's z. A sun's is the
+// same everywhere, worked out once (uSunPhase)
 float phase(vec3 uvw) {
+    if (!uPoint) return uSunPhase;
     if (uAnisotropy <= 0.0) return 1.0;
     float cosine = to_light(uvw).z;
-    float g = uAnisotropy;
-    return (1.0 - g * g) / pow(1.0 + g * g - 2.0 * g * cosine, 1.5);
+    return mix(henyey_greenstein(uAnisotropy, cosine), henyey_greenstein(-uAnisotropy, cosine), uBackScattering);
 }
 
 // The caustic net at a place, the same all along each of the light's lines, so it is carried down them as

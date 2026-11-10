@@ -6,7 +6,8 @@
  * (single scattering's shadow ray), and the water's fog over the whole distance, both per channel by the
  * tint, so light deep in the water turns bluish. Out comes the light reaching the cell, RGB: the
  * transmittance, 1 where nothing is in the way, and for a lamp × its fall-off, 1 at the box's center.
- * Distances are in widths; the density is sampled by uvw.
+ * Alpha is the density's transmittance alone, grey, for the powder. Distances are in widths; the density
+ * is sampled by uvw.
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;
@@ -62,5 +63,5 @@ void main() {
         float near = max(length(lamp - p), 0.25 * to_center);
         transmittance *= (to_center * to_center) / (near * near);
     }
-    imageStore(uLight, gid, vec4(transmittance, 0.0));     // w unused
+    imageStore(uLight, gid, vec4(transmittance, exp(-uSigma.g * amount)));     // alpha: the density's alone, grey
 }

@@ -32,5 +32,5 @@ void main() {
     if (uAxis == 2) {
         sum = mix(texelFetch(uDirect, gid, 0).rgb, sum, uScattering);
     }
-    imageStore(uResult, gid, vec4(sum, 0.0));     // w unused
+    imageStore(uResult, gid, vec4(sum, texelFetch(uSource, gid, 0).a));     // alpha, the density's alone, carried
 }

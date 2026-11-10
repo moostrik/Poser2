@@ -35,6 +35,12 @@ class LightGrid(IntEnum):
     FULL = 1
 
 
+class ScatteringModel(IntEnum):
+    """How light bounced inside the density is made."""
+    BLUR = 0                # the light grid blurred and mixed in: soft, but it spreads light into empty water
+    OCTAVES = 1             # octaves of the light with less extinction summed (Wrenninge): thick parts glow within
+
+
 class DensitySample(IntEnum):
     """Which velocity moves an upscaled density layer that spans several of the simulation's layers."""
     MIDDLE = 0              # the velocity at the layer's middle
@@ -176,8 +182,12 @@ class CompositeSettings(BaseSettings):
     caustic_size: Field[float]      = Field(0.08, min=0.01, max=1.0,    widget=Widget.log_slider, color="amber", description="The caustic net's cell, widths")
     caustic_depth: Field[float]     = Field(0.5,  min=0.05, max=4.0,    widget=Widget.log_slider, color="amber", description="Widths down the light's way over which the caustic net fades to 37%")
     caustic_speed: Field[float]     = Field(0.15, min=0.0,  max=2.0,    color="amber",          description="How fast the caustic net shifts: its points' turns per second")
+    scattering_model: Field[ScatteringModel] = Field(ScatteringModel.BLUR,                   description="How the bounced light is made: the light grid blurred, or octaves of less extinction")
     scattering: Field[float]        = Field(0.0,  min=0.0,  max=1.0,    color="light-blue",     description="Light bounced inside the density: soft shadows, thick parts glowing within; 0 = off")
+    powder: Field[float]            = Field(0.0,  min=0.0,  max=1.0,    color="blue-grey",      description="Edges facing the light darker, thin dye glowing less than thick (Beer–powder); 0 = off")
+    sky_fill: Field[float]          = Field(0.0,  min=0.0,  max=1.0,    color="light-blue",     description="Light from the sky straight above, a share of the light's intensity, so no shadow is black; 0 = off")
     anisotropy: Field[float]        = Field(0.0,  min=0.0,  max=0.9,    color="yellow",         description="Henyey–Greenstein g: 0 scatters evenly, higher forward, a silver lining against the light")
+    back_scattering: Field[float]   = Field(0.0,  min=0.0,  max=1.0,    color="yellow",         description="Share scattered back toward the light by a second lobe as strong, lit from the front; 0 = off")
 
 
 class Fluid3DSettings(BaseSettings):

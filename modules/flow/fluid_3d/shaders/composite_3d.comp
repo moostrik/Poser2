@@ -9,7 +9,8 @@
  *   tint + fog   far density shifts toward water color and fades
  *   glow         each sample's own emission, its color × uEmission
  *   light        with uLit, each sample lit as well: its color × the light reaching it (the light grid)
- *                × the Henyey–Greenstein phase toward the viewer × the caustic net × uIntensity
+ *                × the phase toward the viewer, its octaves, × the caustic net and the powder, + the sky's
+ *                light, × uIntensity
  *   rays         with uHasRays, the water's own light in the layer (Rays3D), under what lies in front
  *
  * Dispatched as a 2D compute (one thread per output pixel). The output may
@@ -24,6 +25,7 @@ layout(binding = 0) uniform sampler3D uDensity;  // RGBA16F, or with uSplit the 
 layout(binding = 1) uniform sampler3D uColor;    // with uSplit: the color volume, color × amount and the amount
 layout(binding = 2) uniform sampler3D uLight;    // with uLit: the light reaching each place, RGB
 layout(binding = 3) uniform sampler3D uRays;     // with uHasRays: the water's light, a column and a layer each
+layout(binding = 5) uniform sampler3D uSky;      // with uSkyFill: the light from straight above, RGB
 
 layout(rgba16f, binding = 0) writeonly uniform image2D uOutput;
 
@@ -39,6 +41,9 @@ uniform bool  uSplit;        // the amount from uDensity, its color from uColor 
 uniform bool  uLit;          // the density lit by uLight
 uniform bool  uHasRays;      // the water's light added from uRays
 uniform float uIntensity;    // the lit color's emission of an amount of 1 over the whole view, at full light
+uniform float uOctaves;      // the octaves' share: light bounced within, by less extinction (Wrenninge); 0 off
+uniform float uPowder;       // edges facing the light darkened (Beer–powder), 0 off to 1
+uniform float uSkyFill;      // the sky's light, a share of the light's intensity; 0 off
 
 const vec3 WATER_CHAN = vec3(1.8, 1.0, 0.6);  // relative extinction: red dies first
 
@@ -72,7 +77,20 @@ void main() {
         vec3 dye = max(s.rgb, vec3(0.0));
         vec3 e = emission * dye;
         if (uLit) {
-            e += intensity * dye * texture(uLight, uvw).rgb * phase(uvw) * caustic(uvw);
+            vec4 light = texture(uLight, uvw);
+            vec3 reaching = light.rgb * phase(uvw);
+            if (uOctaves > 0.0) {       // two octaves, each half the extinction and half the light, evenly spread
+                vec3 half_way = sqrt(light.rgb);
+                reaching += uOctaves * (0.5 * half_way + 0.25 * sqrt(half_way));
+            }
+            reaching *= caustic(uvw);
+            if (uPowder > 0.0) {        // Beer–powder over Beer: 2 (1 - T²) on the density's own transmittance
+                reaching *= mix(1.0, 2.0 * (1.0 - light.a * light.a), uPowder);
+            }
+            if (uSkyFill > 0.0) {
+                reaching += uSkyFill * texture(uSky, uvw).rgb;
+            }
+            e += intensity * dye * reaching;
         }
         if (uHasRays) {
             e += texture(uRays, uvw).rgb;     // the layer's middle: its own value, not its neighbors'

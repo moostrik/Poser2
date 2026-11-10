@@ -6,7 +6,7 @@
  * axis) and sliding across the other two by the light's slope. Each line carries the optical depth from
  * the entry layer's plane, the density's amount × uSigma inside the box (read where the line passes) and
  * the water's uFog all the way (the water goes on past the box's sides, so light entering a side has come
- * down as far). At each layer a cell's light is the bilinear mix of the four lines around its middle, so
+ * down as far); and in alpha the density's alone, grey, for the powder. At each layer a cell's light is the bilinear mix of the four lines around its middle, so
  * the light is that of straight lines at every cell: a line written to the cell it passes instead
  * steps sideways every few rows, and the steps show as stripes across the lit density.
  *
@@ -29,7 +29,7 @@ uniform vec3  uSigma;         // the density's extinction per cell per unit of a
 uniform vec3  uFog;           // the water's extinction per cell, per channel
 uniform float uStepCells;     // a step's length along the line, in cells
 
-shared vec3 lines[8][8];      // this layer's transmittance on each of the workgroup's lines
+shared vec4 lines[8][8];      // this layer's transmittance on each of the workgroup's lines; alpha the density's alone
 
 ivec3 to_grid(int along, ivec2 across) {
     if (uAxis == 0) return ivec3(along, across.x, across.y);
@@ -51,17 +51,21 @@ void main() {
     vec3 size = vec3(uSize);
 
     vec3 depth = vec3(0.0);                     // the optical depth so far, per channel
+    float dyed = 0.0;                           // the density's alone, grey
     for (int k = 0; k < n_along; k++) {
         int along = uDirection > 0 ? k : n_along - 1 - k;
         vec2 slid = uSlope * float(k);
         vec2 here = vec2(line) + 0.5 + slid;    // where the line passes, in cells across
         vec3 half_step = 0.5 * uStepCells * uFog;
+        float half_dyed = 0.0;
         if (all(greaterThanEqual(here, vec2(0.0))) && all(lessThan(here, vec2(n_across)))) {
             float amount = max(texture(uDensity, to_grid(float(along) + 0.5, here) / size).a, 0.0);
+            half_dyed = 0.5 * uStepCells * uSigma.g * amount;      // green: the tint's neutral channel
             half_step += 0.5 * uStepCells * uSigma * amount;
         }
-        lines[local.x][local.y] = exp(-(depth + half_step));
+        lines[local.x][local.y] = exp(-vec4(depth + half_step, dyed + half_dyed));
         depth += 2.0 * half_step;
+        dyed += 2.0 * half_dyed;
         barrier();
 
         // the cell whose middle this line and the next ones surround, and how far past this line it lies
@@ -69,9 +73,9 @@ void main() {
         vec2 w = up - slid;
         ivec2 cell = line + ivec2(up);
         if (all(lessThan(local, ivec2(7))) && all(greaterThanEqual(cell, ivec2(0))) && all(lessThan(cell, n_across))) {
-            vec3 low = mix(lines[local.x][local.y], lines[local.x + 1][local.y], w.x);
-            vec3 high = mix(lines[local.x][local.y + 1], lines[local.x + 1][local.y + 1], w.x);
-            imageStore(uLight, to_grid(along, cell), vec4(mix(low, high, w.y), 0.0));
+            vec4 low = mix(lines[local.x][local.y], lines[local.x + 1][local.y], w.x);
+            vec4 high = mix(lines[local.x][local.y + 1], lines[local.x + 1][local.y + 1], w.x);
+            imageStore(uLight, to_grid(along, cell), mix(low, high, w.y));
         }
         barrier();
     }

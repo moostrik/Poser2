@@ -12,6 +12,21 @@ from modules.gl import Texture, Texture3D, ComputeShader
 OPACITY_LIMIT: float = 0.999     # opacity 1, covering all, needs infinitely thick dye: it is drawn as this
 
 
+def henyey_greenstein(g: float, cosine: float) -> float:
+    """Henyey–Greenstein's phase, 1 for g = 0, at the cosine between the light's travel and the way to the eye."""
+    return (1.0 - g * g) / (1.0 + g * g - 2.0 * g * cosine) ** 1.5
+
+
+def sun_phase(vector: tuple[float, float, float], anisotropy: float, back_scattering: float) -> float:
+    """A sun's phase toward the viewer, the same everywhere: `light.glsl`'s two lobes at the sun's z."""
+    if anisotropy <= 0.0:
+        return 1.0
+    length: float = math.sqrt(sum(c * c for c in vector))
+    cosine: float = vector[2] / length if length > 1e-6 else 0.0
+    forward: float = henyey_greenstein(anisotropy, cosine)
+    return forward + (henyey_greenstein(-anisotropy, cosine) - forward) * back_scattering
+
+
 def view_march(opacity: float, emission: float) -> tuple[float, float]:
     """The march's extinction and emission over the whole view from what the panel says: fully dyed water
     filling the view covers `opacity` of what is behind it (Beer-Lambert: its extinction -ln(1 - opacity)) and
@@ -28,6 +43,7 @@ class CompositeLight:
     volume: Texture3D                       # the light reaching each place, RGB, over the box
     intensity: float                        # the lit dye's emission over the whole view at full light (`view_march`'s)
     anisotropy: float                       # Henyey–Greenstein g
+    back_scattering: float                  # the share of a backward lobe as strong
     point: bool                             # a lamp at `vector`'s place, else a sun toward `vector`
     vector: tuple[float, float, float]      # ±1 the box's sides
     box: tuple[float, float, float]         # the box in widths
@@ -36,6 +52,10 @@ class CompositeLight:
     caustic_depth: float = 0.5              # widths down the light's way over which the net fades to 37%
     net: Texture | None = None              # the caustic net, tileable, its mean 1
     rays: Texture3D | None = None           # the water's light per column and layer of the march, None off
+    octaves: float = 0.0                    # the octaves' share, `scattering` with the octaves; 0 off
+    powder: float = 0.0                     # the edges facing the light darkened, 0 off to 1
+    sky: Texture3D | None = None            # the light from straight above, None off
+    sky_fill: float = 0.0                   # the sky's light, a share of the light's intensity
 
 
 def bind_light(shader: ComputeShader, light: CompositeLight, net: Texture | None, unit: int) -> None:
@@ -44,6 +64,8 @@ def bind_light(shader: ComputeShader, light: CompositeLight, net: Texture | None
     glUniform3f(shader.get_uniform_loc("uVector"), *light.vector)
     glUniform3f(shader.get_uniform_loc("uBox"), *light.box)
     glUniform1f(shader.get_uniform_loc("uAnisotropy"), light.anisotropy)
+    glUniform1f(shader.get_uniform_loc("uBackScattering"), light.back_scattering)
+    glUniform1f(shader.get_uniform_loc("uSunPhase"), sun_phase(light.vector, light.anisotropy, light.back_scattering))
     on: bool = light.caustics > 0.0 and net is not None and net.allocated
     glUniform1f(shader.get_uniform_loc("uCaustics"), light.caustics if on else 0.0)
     glUniform1f(shader.get_uniform_loc("uCausticSize"), light.caustic_size)
@@ -101,6 +123,12 @@ class Composite3D(ComputeShader):
             bind_light(self, light, light.net, 4)
             if rays is not None:
                 self.bind_texture_3d(3, rays, "uRays")
+            glUniform1f(self.get_uniform_loc("uOctaves"), light.octaves)
+            glUniform1f(self.get_uniform_loc("uPowder"), light.powder)
+            sky_on: bool = light.sky is not None and light.sky_fill > 0.0
+            glUniform1f(self.get_uniform_loc("uSkyFill"), light.sky_fill if sky_on else 0.0)
+            if sky_on and light.sky is not None:
+                self.bind_texture_3d(5, light.sky, "uSky")
         else:       # the net's sampler on its own unit, unread
             glUniform1i(self.get_uniform_loc("uCausticNet"), 4)
 

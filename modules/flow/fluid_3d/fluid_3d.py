@@ -40,7 +40,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_REPEA
 
 from modules.gl import ComputeShader, SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
-from .fluid_settings import Advection, Light, PressureSolver, Fluid3DSettings, PressureSettings, ParticleSettings, UpscaledDensitySettings
+from .fluid_settings import Advection, Light, PressureSolver, ScatteringModel, Fluid3DSettings, PressureSettings, ParticleSettings, UpscaledDensitySettings
 from .multigrid_pressure import MultigridPressure
 from .face_velocity import FaceVelocity
 from ..shaders import AddBoolean
@@ -213,6 +213,7 @@ class Fluid3D:
         self._rays: Texture3D = Texture3D(wrap=GL_CLAMP_TO_EDGE)
         self._rays_shader: Rays3D = Rays3D()
         self._light_clock: float = 0.0
+        self._sky: Texture3D = Texture3D(wrap=GL_CLAMP_TO_EDGE)     # the light from straight above, while `sky_fill` is on
         self._no_density: Texture3D = Texture3D()
         # Obstacle: CLAMP_TO_BORDER(1) = out-of-bounds = obstacle
         self._obstacle: Texture3D = Texture3D(interpolation=GL_NEAREST, wrap=GL_CLAMP_TO_BORDER, border_color=(1.0, 0.0, 0.0, 0.0))
@@ -427,7 +428,7 @@ class Fluid3D:
         self._caustic_shader.deallocate()
         self._rays_shader.deallocate()
         self._light_blur_shader.deallocate()
-        for light in (self._light, *self._light_blur, self._rays, self._caustic_net):
+        for light in (self._light, *self._light_blur, self._rays, self._caustic_net, self._sky):
             light.deallocate()
 
         self._allocated = False
@@ -788,14 +789,18 @@ class Fluid3D:
         composite = self.settings.composite
         density: Texture3D | None = self._simulation_density.weight
         if composite.light_intensity <= 0.0 or density is None:
-            for light in (self._light, *self._light_blur, self._rays, self._caustic_net):
+            for light in (self._light, *self._light_blur, self._rays, self._caustic_net, self._sky):
                 light.deallocate()
             return None
         share: int = int(composite.light_grid)
         size = (max(1, self._simulation_width // share), max(1, self._simulation_height // share), max(1, self._depth // share))
-        for light in (self._light, *self._light_blur):
+        blurred: bool = composite.scattering > 0.0 and composite.scattering_model == ScatteringModel.BLUR
+        for light in (self._light, *self._light_blur) if blurred else (self._light,):
             if not light.allocated or (light.width, light.height, light.depth) != size:
                 light.allocate(*size, GL_RGBA16F)
+        if not blurred:
+            for blur in self._light_blur:
+                blur.deallocate()
         box = (1.0, 1.0 / self._aspect, self._z_extent)
         chan = tuple(1.0 + (water - 1.0) * composite.tint for water in WATER_CHANNELS)
         per_width = 1.0 / max(self._z_extent, 1e-6)
@@ -811,7 +816,7 @@ class Fluid3D:
             self._light_sweep_shader.use(density, self._light, toward=toward, sigma=sigma, fog=fog)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         light: Texture3D = self._light
-        if composite.scattering > 0.0:
+        if blurred:
             a, b = self._light_blur
             for axis, source, result in ((0, self._light, a), (1, a, b), (2, b, a)):
                 self._light_blur_shader.use(source, self._light, result, axis, composite.scattering)
@@ -819,7 +824,24 @@ class Fluid3D:
             light = a
         self._light_shown = light
         intensity: float = view_march(composite.opacity, composite.light_intensity)[1]
-        return CompositeLight(light, intensity, composite.anisotropy, point, vector, box)
+        octaves: float = composite.scattering if composite.scattering_model == ScatteringModel.OCTAVES else 0.0
+        return CompositeLight(light, intensity, composite.anisotropy, composite.back_scattering, point, vector, box,
+                              octaves=octaves, powder=composite.powder, sky=self._lit_sky(density, sigma, fog),
+                              sky_fill=composite.sky_fill)
+
+    def _lit_sky(self, density: Texture3D, sigma: tuple[float, ...], fog: tuple[float, ...]) -> Texture3D | None:
+        """The light from straight above while `sky_fill` is on, swept at a quarter of the simulation's cells each
+        way, soft for its coarseness as light from the whole sky is; released while off."""
+        if self.settings.composite.sky_fill <= 0.0:
+            self._sky.deallocate()
+            return None
+        size = (max(1, self._simulation_width // 4), max(1, self._simulation_height // 4), max(1, self._depth // 4))
+        if not self._sky.allocated or (self._sky.width, self._sky.height, self._sky.depth) != size:
+            self._sky.allocate(*size, GL_RGBA16F)
+        self._light_sweep_shader.use(density, self._sky, toward=(0.0, -1.0, 0.0), sigma=(sigma[0], sigma[1], sigma[2]),
+                                     fog=(fog[0], fog[1], fog[2]))
+        glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
+        return self._sky
 
     def _light_place(self) -> LightPlace | None:
         """Where the light is, in the box's texture coordinates, None while it is off: a lamp at its place, a sun
