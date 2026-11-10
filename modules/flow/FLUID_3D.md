@@ -30,6 +30,44 @@ Work every step does whatever is there is what to cut: the fog's per-step factor
 can be worked out once, the color's divide can be a multiply. An occupancy volume of empty 8³ blocks was
 slower ([TIMING.md](TIMING.md), Faster item 2).
 
+### 2. The finer light
+
+The light grid is a quarter of the simulation grid each way and marched through the simulation density,
+so its shadows are blobs **(site fact: the light shows little)**. The light from the upscaled density,
+where it is on, at a finer grid, its size and cost measured against the picture.
+
+### 3. The rays
+
+The water only absorbs: the fog sends no light toward the viewer, so empty water stays black and no
+shaft of light can show. The fog's in-scattering added to the march, each step the fog's share of the
+light reaching it, from the light grid that already covers the whole box; one setting, how much the fog
+glows in the light, 0 off.
+
+### 4. The scattering and the anisotropy
+
+The scattering blurs the coarse light grid, which spreads light into empty water and through thin walls
+of density, and looks ugly **(site fact)**; the anisotropy is hardly seen and costs a `pow` at every
+sample, 4K × 16 layers. Each of these an option on the panel, the current way staying until the operator
+picks:
+
+| Option     | What                                                                                                                                      |
+|------------|-------------------------------------------------------------------------------------------------------------------------------------------|
+| octaves    | the light march sums a few octaves, each with less extinction and a flatter phase (Wrenninge): thick parts glow from within, no blur |
+| powder     | the edges facing the light darker (Schneider, Horizon Zero Dawn): dark-rimmed density                                                   |
+| sky fill   | a second, soft light from above, so no shadow is fully black                                                                              |
+| anisotropy | the phase worked out once per light cell (a sun's the same everywhere) into the light grid's unused fourth channel; a second lobe to make it seen |
+
+### 5. The light in the cube view
+
+The light's place drawn in the cube's scene with its camera, by `CubeEdges` as the box's edges are: a
+lamp as a small cube at its place, a sun as a line from outside the box to its center along its
+direction, the small cube at the line's outer end, in the light settings' amber.
+
+### 6. A dramatic look
+
+Every composite setting, the light's place included, given defaults that make a beautiful, dramatic
+scene, judged in the app.
+
 ## The fluid
 
 A step (`Fluid3D.update`), in order, at the code's defaults:
