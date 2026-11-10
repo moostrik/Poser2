@@ -106,11 +106,9 @@ class BodyForceSettings(BaseSettings):
 
 
 class InputSettings(BaseSettings):
-    """The bridge's input: where the body sits in the box's depth and how thick it is, its z's gain, and each
-    system's gains."""
+    """The bridge's input: where the body sits in the box's depth and how thick it is, and each system's gains."""
     layer: Field[float]             = Field(0.5,    min=0.0,    max=1.0,                            description="Normalized depth of the injection's center, where the body sits")
     spread: Field[float]            = Field(0.2,    min=0.0,    max=1.0,    step=0.001,             description="The body's thickness in z, widths, where it is at least half there; 0 = none")
-    depth_gain: Field[float]        = Field(1.0,    min=0.0,    max=1.0,    step=0.001,             description="The body's z velocity's share that goes in, 1 = as measured; below while the depth is noisy")
     boundary: Group[BoundarySettings]       = Group(BoundarySettings)
     body_force: Group[BodyForceSettings]    = Group(BodyForceSettings)
 

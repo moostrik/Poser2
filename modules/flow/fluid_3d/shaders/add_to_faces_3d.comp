@@ -9,7 +9,7 @@
  *      the image plane) × uGain, by uShare × the body's presence × the injection's weight × the slab, never past it
  *   2  the body force: the bridge's acceleration at the face's place × uStrength (weight × gain × dt) × the slab
  *
- * The body's z is the volume's w turned (w away from the viewer) and scaled by uDepthScale. A face held at 0
+ * The body's z is the volume's w turned (w away from the viewer), in widths/s as x and y. A face held at 0
  * (a closed wall's, an obstacle's) is left.
  */
 
@@ -32,7 +32,6 @@ uniform float uGain;          // mode 1
 uniform float uShare;         // mode 1: 1 - exp(-dt / velocity_drag)
 uniform float uWeight;        // mode 1
 uniform float uFloor;         // mode 1: widths/s below which the body drags nothing
-uniform float uDepthScale;    // modes 1, 2
 
 #define FACES_IN_PLACE
 #include "walls.glsl"
@@ -47,7 +46,7 @@ float slab(float z) {
 // The bridge's vector at `p` (cells), in the volume's axes: z turned into w and scaled
 vec3 body_at(vec3 p) {
     vec3 body = texture(uInput, p.xy / vec2(uCells.xy)).xyz;
-    return vec3(body.xy, -body.z * uDepthScale);
+    return vec3(body.xy, -body.z);
 }
 
 void main() {

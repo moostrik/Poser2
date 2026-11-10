@@ -398,7 +398,7 @@ lowpass's advect fused into its trail, at most 0.005 ms of its 0.076 (its blur, 
 ## The box as deep as it is wide
 
 `depth_check.py` on stillslowfast's fast half, deep_flow's preset (288 × 512 × 64 cells), the body's own z
-off (`input.depth_gain` 0) so what shows is xy turned into z; `isotropy_check.py` for the swirls:
+off (its share 0) so what shows is xy turned into z; `isotropy_check.py` for the swirls:
 
 | The box                                  | water z / xy | divergence after the projection, /s | the step, ms mean / p95 |
 |------------------------------------------|--------------|--------------------------------------|-------------------------|
@@ -410,8 +410,8 @@ The thin box's close walls held z back: with room the water turns more into z, a
 is the injection's, a flat sheet that the water flows around over its faces **(deduction)**, not the box's.
 At `depth_ratio` 1 a swirl in the depth plane, 0.1 widths in radius, stays round (its aspect 1.00 after 2 s)
 and keeps 0.88 of its speed, one in the image plane 0.84. The body's z from the bridge is 5.8 times its xy on
-this recording, where the player moves mostly sideways: depth noise **(deduction)**, which `depth_gain` keeps
-out (the preset's 0.022, what `depth_span` 10 scaled it by). The pressure pass at the preset 1.22 ms, the
+this recording, where the player moves mostly sideways: depth noise **(deduction)**; the motion's `z_gain`
+sets its share. The pressure pass at the preset 1.22 ms, the
 multigrid's semi-coarsened levels, where it was 1.04.
 
 ## The light and the composite

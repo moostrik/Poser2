@@ -333,12 +333,6 @@ class Fluid3D:
         return self.settings.input.spread / FULL_WIDTH_HALF_MAXIMUM / max(self._z_extent, 1e-6)
 
     @property
-    def _z_scale(self) -> float:
-        """The body's z's share that goes in, `input.depth_gain`: the box is as deep as it stands for, so z goes in
-        in widths/s as x and y do."""
-        return self.settings.input.depth_gain
-
-    @property
     def _densities(self) -> list[DensityCarrier]:
         """The carriers running: the simulation density, then the upscaled and the particles where enabled."""
         densities: list[DensityCarrier] = [self._simulation_density]
@@ -974,8 +968,8 @@ class Fluid3D:
     def drag_velocity(self, texture: Texture, weight: float = 1.0) -> None:
         """The boundary: drag the velocity in the gaussian birth slab toward the body's velocity (x, y on
         the image plane, z toward the camera; widths/s) × input.boundary.velocity_gain, over input.boundary.velocity_drag, where
-        the body moves (its speed above DRAG_FLOOR), never past it. The volume's w is -z × `input.depth_gain`
-        (the box as deep as it stands for, z in widths/s as x and y); +W moves fluid away from the viewer (layer 0
+        the body moves (its speed above DRAG_FLOOR), never past it. The volume's w is -z, in widths/s as x
+        and y (the box as deep as it stands for); +W moves fluid away from the viewer (layer 0
         is the front face).
         Without depth, z is 0, and so is w.
         """
@@ -984,7 +978,7 @@ class Fluid3D:
         boundary = self.settings.input.boundary
         self._add_to_faces_shader.drag(self._faces.volume, self._cells, texture, self.settings.input.layer, self._spread(),
                                        boundary.velocity_gain, drag_share(self._dt, boundary.velocity_drag), weight,
-                                       DRAG_FLOOR, self._z_scale, self._obstacle, self._closed, self._has_obstacles)
+                                       DRAG_FLOOR, self._obstacle, self._closed, self._has_obstacles)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def add_acceleration(self, texture: Texture, weight: float = 1.0) -> None:
@@ -994,7 +988,7 @@ class Fluid3D:
             return
         self._add_to_faces_shader.add_acceleration(self._faces.volume, self._cells, texture, self.settings.input.layer,
                                                    self._spread(), weight * self.settings.input.body_force.acceleration_gain * self._dt,
-                                                   self._z_scale, self._obstacle, self._closed, self._has_obstacles)
+                                                   self._obstacle, self._closed, self._has_obstacles)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def add_boundary_density(self, texture: Texture, weight: float = 1.0) -> None:

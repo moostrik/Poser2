@@ -86,7 +86,7 @@ read every field as it is. The GPU is a 24 GB RTX 4090, so nothing pages. Every 
 The layer injects the bridge's six outputs before the step (`Fluid3DLayer._inject`), each at the
 injection's `weight`, into the gaussian slab at `input.layer` (0.5) `input.spread` thick (0.2 widths,
 its width at half its height), each cell the body's share between its faces, each velocity's z as the
-volume's w = −z × `input.depth_gain`; what the fluid does with each is
+volume's w = −z, in widths/s as x and y (the motion's `z_gain` its share); what the fluid does with each is
 [What the fluid takes](#what-the-fluid-takes).
 
 The depth scale is the box's depth over the smaller of its width and height (`depth` / 448 at 448 × 800,

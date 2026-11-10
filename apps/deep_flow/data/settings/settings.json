@@ -532,7 +532,6 @@
       "input": {
         "layer": 0.21,
         "spread": 0.02355,
-        "depth_gain": 0.02222,
         "boundary": {
           "velocity_drag": 0.0,
           "velocity_gain": 1.0,
