@@ -24,9 +24,9 @@ def view_march(opacity: float, emission: float) -> tuple[float, float]:
 
 @dataclass
 class CompositeLight:
-    """The light a composite darkens the density by: the light grid and how it is read."""
+    """The light a composite lights the density by: the light grid and how it is read."""
     volume: Texture3D                       # RGB transmittance toward the light, over the box
-    shadow: float                           # how dark the shadowed parts get, 0 to 1
+    intensity: float                        # the lit dye's emission over the whole view at full light (`view_march`'s)
     anisotropy: float                       # Henyey–Greenstein g
     point: bool                             # a lamp at `vector`'s place, else a sun toward `vector`
     vector: tuple[float, float, float]      # ±1 the box's sides
@@ -50,7 +50,7 @@ class Composite3D(ComputeShader):
             tint: 0..1 mix toward per-channel water extinction (red dies first)
             fog: Medium extinction over the full depth
             color: With it, `density` is the amount alone and its color is this volume's (color × amount, amount)
-            light: With it, each sample's emission darkened by the light reaching it, by `light.shadow`
+            light: With it, each sample also lit: its color × the light reaching it × `light.intensity`
         """
         if not self.allocated or not self.shader_program:
             return
@@ -72,7 +72,7 @@ class Composite3D(ComputeShader):
         glUniform1i(self.get_uniform_loc("uLit"), int(light is not None))
         if light is not None:
             self.bind_texture_3d(2, light.volume, "uLight")
-            glUniform1f(self.get_uniform_loc("uShadow"), light.shadow)
+            glUniform1f(self.get_uniform_loc("uIntensity"), light.intensity)
             glUniform1f(self.get_uniform_loc("uAnisotropy"), light.anisotropy)
             glUniform1i(self.get_uniform_loc("uPoint"), int(light.point))
             glUniform3f(self.get_uniform_loc("uVector"), *light.vector)

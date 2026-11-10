@@ -7,8 +7,9 @@
  * Per ray step (front -> back, trilinear reads):
  *   occlusion    per-channel Beer-Lambert extinction; near density covers far density
  *   tint + fog   far density shifts toward water color and fades
- *   light        with uLit, each sample's emission × mix(1, the light reaching it, uShadow), the light
- *                grid's transmittance times the Henyey–Greenstein phase toward the viewer
+ *   glow         each sample's own emission, its color × uEmission
+ *   light        with uLit, each sample lit as well: its color × the light reaching it (the light grid's
+ *                transmittance) × the Henyey–Greenstein phase toward the viewer × uIntensity
  *
  * Dispatched as a 2D compute (one thread per output pixel). The output may
  * be larger than the volume: the volume is sampled by uv. Split, the amount is
@@ -32,7 +33,7 @@ uniform float uTint;         // 0..1 mix toward per-channel water extinction
 uniform float uFog;          // Medium extinction over the full depth
 uniform bool  uSplit;        // the amount from uDensity, its color from uColor (the upscaled density)
 uniform bool  uLit;          // the density lit by uLight
-uniform float uShadow;       // how dark the shadowed parts get, 0 to 1
+uniform float uIntensity;    // the lit color's emission of an amount of 1 over the whole view, at full light
 uniform float uAnisotropy;   // Henyey–Greenstein g, 0 even, toward 1 forward
 uniform bool  uPoint;        // a lamp at uVector's place, else a sun toward uVector
 uniform vec3  uVector;       // toward the sun, or the lamp's place, ±1 the box's sides
@@ -63,6 +64,7 @@ void main() {
     vec3 sigma = (uAbsorption / float(steps)) * chan;     // per layer: the depth's over its layers
     vec3 fog_s = (uFog / float(steps)) * chan;
     float emission = uEmission / float(steps);
+    float intensity = uIntensity / float(steps);
 
     vec3 T   = vec3(1.0);  // transmittance
     vec3 vol = vec3(0.0);  // occluded accumulation
@@ -75,10 +77,11 @@ void main() {
             s = vec4(c.rgb / max(c.a, 1e-4) * s.r, s.r);
         }
 
-        vec3 e = emission * max(s.rgb, vec3(0.0));
+        vec3 dye = max(s.rgb, vec3(0.0));
+        vec3 e = emission * dye;
         if (uLit) {
             vec3 uvw = vec3(uv, z_norm);
-            e *= mix(vec3(1.0), texture(uLight, uvw).rgb * phase(uvw), uShadow);
+            e += intensity * dye * texture(uLight, uvw).rgb * phase(uvw);
         }
         vol += T * e;
 

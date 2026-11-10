@@ -196,7 +196,7 @@ class Fluid3D:
         self._over_shader: CompositeOver = CompositeOver()
         self._knee_shader: Knee = Knee()               # the output's highlights bent, not clipped
         # The light: how much reaches each cell of a grid at a quarter of the simulation's size, and its blur
-        # for the scattering; allocated while `composite.shadow` is above 0
+        # for the scattering; allocated while `composite.light_intensity` is above 0
         self._light: Texture3D = Texture3D(wrap=GL_CLAMP_TO_EDGE)
         self._light_blur: tuple[Texture3D, Texture3D] = (Texture3D(wrap=GL_CLAMP_TO_EDGE), Texture3D(wrap=GL_CLAMP_TO_EDGE))
         self._light_shader: LightVolume3D = LightVolume3D()
@@ -727,11 +727,11 @@ class Fluid3D:
 
     def _lit(self) -> CompositeLight | None:
         """The light this step, from the simulation density: each light cell marched toward the light, then
-        with `scattering` blurred and mixed in; None while `shadow` is 0, the light released. `opacity` and
-        `fog` are over the view, the box's depth, so per width they are over its depth in widths."""
+        with `scattering` blurred and mixed in; None while `light_intensity` is 0, the light released. `opacity`
+        and `fog` are over the view, the box's depth, so per width they are over its depth in widths."""
         composite = self.settings.composite
         density: Texture3D | None = self._simulation_density.weight
-        if composite.shadow <= 0.0 or density is None:
+        if composite.light_intensity <= 0.0 or density is None:
             for light in (self._light, *self._light_blur):
                 light.deallocate()
             return None
@@ -756,13 +756,14 @@ class Fluid3D:
                 glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
             light = a
         self._light_shown = light
-        return CompositeLight(light, composite.shadow, composite.anisotropy, point, vector, box)
+        intensity: float = view_march(composite.opacity, composite.light_intensity)[1]
+        return CompositeLight(light, intensity, composite.anisotropy, point, vector, box)
 
     def _light_place(self) -> LightPlace | None:
         """Where the light is, in the box's texture coordinates, None while it is off: a lamp at its place, a sun
         where its light, coming in toward the box's center, enters the box."""
         composite = self.settings.composite
-        if composite.shadow <= 0.0:
+        if composite.light_intensity <= 0.0:
             return None
         vector = self._light_override or (composite.light_x, composite.light_y, composite.light_z)
         if composite.light == Light.POINT:

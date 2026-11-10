@@ -609,7 +609,6 @@
         "light_x": 0.05,
         "light_y": 0.11,
         "light_z": -1.0,
-        "shadow": 0.0,
         "scattering": 0.0,
         "anisotropy": 0.0,
         "blend_mode": "ADD"

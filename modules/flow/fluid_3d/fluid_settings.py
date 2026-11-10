@@ -162,7 +162,7 @@ class CompositeSettings(BaseSettings):
     light_x: Field[float]           = Field(0.0,  min=-1.0, max=1.0,    color="amber",          description="Toward the sun, or the lamp's place (±1 the box's sides); x right")
     light_y: Field[float]           = Field(-1.0, min=-1.0, max=1.0,    color="amber",          description="y down the screen; -1 = from above")
     light_z: Field[float]           = Field(-0.3, min=-1.0, max=1.0,    color="amber",          description="z away from the viewer; -1 = from the front")
-    shadow: Field[float]            = Field(0.0,  min=0.0,  max=1.0,    color="blue-grey",      description="How dark the density's shadowed parts get; 0 = no light, as unlit")
+    light_intensity: Field[float]   = Field(0.0,  min=0.0,  max=100.0,  widget=Widget.log_slider, color="amber", description="How bright the light shows fully dyed water filling the view, lit straight on: 1 = its color; 0 = no light")
     scattering: Field[float]        = Field(0.0,  min=0.0,  max=1.0,    color="light-blue",     description="Light bounced inside the density: soft shadows, thick parts glowing within; 0 = off")
     anisotropy: Field[float]        = Field(0.0,  min=0.0,  max=0.9,    color="yellow",         description="Henyey–Greenstein g: 0 scatters evenly, higher forward, a silver lining against the light")
 
