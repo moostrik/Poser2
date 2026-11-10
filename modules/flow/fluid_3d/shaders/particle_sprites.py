@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import ctypes
 
-from OpenGL.GL import (GL_DRAW_INDIRECT_BUFFER, GL_LINES, GL_POINTS, glBindBuffer, glDrawArraysIndirect, glUniform1f, glUniform1i, glUniform1ui, glUniform2f,
+from OpenGL.GL import (GL_DRAW_INDIRECT_BUFFER, GL_LINES, GL_POINTS, glBindBuffer, glDrawArraysIndirect, glUniform1f, glUniform1i, glUniform1ui, glUniform2f, glUniform3f,
                        glUseProgram)
 
 from modules.gl import Shader, StorageBuffer
@@ -20,7 +20,7 @@ class ParticleSprites(Shader):
     def use(self, particles: StorageBuffer, ring: StorageBuffer, count: int, mode: int, *, slices: int,
             scale: float, ring_fade: float, output_size: tuple[int, int], size: float, streak: float,
             radius: float, reference_mass: float, spread: float, fade_time: float, max_point_size: float,
-            fog: float, tint: float, weighted: bool = False, emission: float = 1.0, absorption: float = 1.0) -> None:
+            fog: tuple[float, float, float], weighted: bool = False, emission: float = 1.0, absorption: float = 1.0) -> None:
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
@@ -39,8 +39,7 @@ class ParticleSprites(Shader):
         glUniform1f(self.get_uniform_loc("uSpread"), spread)
         glUniform1f(self.get_uniform_loc("uFadeTime"), fade_time)
         glUniform1f(self.get_uniform_loc("uMaxPointSize"), max_point_size)
-        glUniform1f(self.get_uniform_loc("uFog"), fog)
-        glUniform1f(self.get_uniform_loc("uTint"), tint)
+        glUniform3f(self.get_uniform_loc("uFog"), *fog)
         glUniform1i(self.get_uniform_loc("uWeighted"), int(weighted))
         glUniform1f(self.get_uniform_loc("uEmission"), emission)
         glUniform1f(self.get_uniform_loc("uAbsorption"), absorption)

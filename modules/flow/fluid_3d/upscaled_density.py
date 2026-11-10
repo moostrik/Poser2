@@ -18,7 +18,7 @@ from .density_carrier import CarrierStep, DensityCarrier
 from .field_advection import FieldAdvection
 from .fluid_settings import DensitySample, Fluid3DSettings
 from .simulation_density import SimulationDensity
-from .shaders import view_march, Composite3D, CompositeLight, InjectAmount3D, InjectMode, NoiseCoordinates3D, TurbulentAdvect3D, VelocityAverage3D
+from .shaders import MarchLook, Composite3D, CompositeLight, InjectAmount3D, InjectMode, NoiseCoordinates3D, TurbulentAdvect3D, VelocityAverage3D
 from .swirl_noise import swirl_noise
 
 _BARRIER: int = int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
@@ -140,13 +140,10 @@ class UpscaledDensity(DensityCarrier):
                                    has_obstacles=step.has_obstacles)
         glMemoryBarrier(_BARRIER)
 
-    def composite(self, output: Texture, light: CompositeLight | None = None) -> None:
+    def composite(self, output: Texture, look: MarchLook, light: CompositeLight | None = None) -> None:
         if not self.allocated:
             return
-        volume = self.settings.composite
-        extinction, emission = view_march(volume.opacity, volume.emission)
-        self._composite_shader.use(self._amount, output, emission=emission, absorption=extinction,
-                                   tint=volume.tint, fog=volume.fog, color=self._color.weight, light=light)
+        self._composite_shader.use(self._amount, output, look, color=self._color.weight, light=light)
         glMemoryBarrier(_BARRIER)
 
     @property

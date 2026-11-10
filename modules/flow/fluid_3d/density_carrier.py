@@ -12,7 +12,7 @@ from modules.gl import Texture, Texture3D
 from ..finite_guard import GuardSlot
 from ..port import Port
 from .fluid_settings import Advection
-from .shaders import CompositeLight, InjectMode
+from .shaders import CompositeLight, MarchLook, InjectMode
 
 
 @dataclass
@@ -64,8 +64,8 @@ class DensityCarrier(ABC):
         """Move the density one step along the solver's velocity, faded."""
 
     @abstractmethod
-    def composite(self, output: Texture, light: CompositeLight | None = None) -> None:
-        """Draw the density into the 2D output (RGBA16F), lit by `light` where it is given."""
+    def composite(self, output: Texture, look: MarchLook, light: CompositeLight | None = None) -> None:
+        """Draw the density into the 2D output (RGBA16F) by the march's `look`, lit by `light` where it is given."""
 
     @property
     @abstractmethod

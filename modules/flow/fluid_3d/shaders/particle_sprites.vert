@@ -24,15 +24,13 @@ uniform float uReferenceMass;   // the mass a texel of amount 1 gives a particle
 uniform float uSpread;          // a blob's widening: sigma² grows by 2 × spread × age (pixels²)
 uniform float uFadeTime;        // the density's fade (s): the birth mass from the mass and the age
 uniform float uMaxPointSize;    // the implementation's largest point
-uniform float uFog;             // the additive look's fog by depth, per particle
-uniform float uTint;            // the additive look's water tint by depth, per particle
+uniform vec3  uFog;             // the additive look's fog by depth, per particle: the water's extinction over the depth, per channel
 
 flat out vec4 vColor;           // rgb × value, value
 flat out float vSigma;          // a blob's sigma in pixels
 flat out float vPointSize;
 flat out float vDepth;          // the particle's z, 0 at the front, for the weighted look
 
-const vec3 WATER_CHAN = vec3(1.8, 1.0, 0.6);
 
 const float CUT = 2.5;          // a blob is drawn out to this many sigma, 95.6% of its gaussian
 
@@ -73,8 +71,7 @@ void main() {
     }
 
     if (uSlices == 1) {
-        vec3 chan = mix(vec3(1.0), WATER_CHAN, uTint);
-        color *= exp(-uFog * particle.position.z * chan);
+        color *= exp(-uFog * particle.position.z);
     }
     vColor = vec4(color * value, value);
     vPointSize = point;

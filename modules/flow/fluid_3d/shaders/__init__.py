@@ -18,7 +18,7 @@ from .velocity_average_3d import VelocityAverage3D
 from .noise_coordinates_3d import NoiseCoordinates3D
 from .turbulent_advect_3d import TurbulentAdvect3D
 from .inject_binary_3d import InjectBinary3D
-from .composite_3d import Composite3D, CompositeLight, IDENTITY, bind_light, view_march, OPACITY_LIMIT
+from .composite_3d import Composite3D, CompositeLight, IDENTITY, LUMINANCE, MarchLook, bind_light, march_look, half_extinction, fog_extinction
 from .caustic_net import CausticNet
 from .layer_light_3d import LayerLight3D
 from .light_volume_3d import LightVolume3D

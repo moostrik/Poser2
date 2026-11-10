@@ -60,11 +60,10 @@ from .shaders import (AdvectFaces3D, FacesToCenters3D, ViscosityFaces3D, SEMI_LA
     VorticityCurl3D, VorticityForce3D, Buoyancy3D, AddToFaces3D,
     Inject3D,
     CompositeOver, Knee,
-    CompositeLight, LightVolume3D, LightSweep3D, LightBlur3D, CausticNet, LayerLight3D, IDENTITY, sweep_map, sweep_size, InjectMode, view_march,
+    CompositeLight, LightVolume3D, LightSweep3D, LightBlur3D, CausticNet, LayerLight3D, IDENTITY, MarchLook, march_look, half_extinction, fog_extinction, sweep_map, sweep_size, InjectMode,
     InjectBinary3D
 )
 
-WATER_CHANNELS: tuple[float, float, float] = (1.8, 1.0, 0.6)    # the water's relative extinction, red first; composite_3d's
 
 # Combined memory barrier bits (cast to int for Pylance compatibility)
 _BARRIER_FETCH_AND_IMAGE: int = int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
@@ -735,9 +734,10 @@ class Fluid3D:
         """The volume into the 2D output, the upscaled amount's where enabled, else the simulation's; the particles
         drawn into their own image and laid over it; then the highlights bent above the knee instead of clipped."""
         volume: DensityCarrier = self._upscaled_density if self.settings.upscaled.enabled else self._simulation_density
-        volume.composite(self._output_texture, self._light_now)
+        look: MarchLook = self._march_look()
+        volume.composite(self._output_texture, look, self._light_now)
         if self.settings.particles.enabled and self._particle_texture.allocated:
-            self._particle_density.composite(self._particle_texture)
+            self._particle_density.composite(self._particle_texture, look)
             self._over_shader.use(self._particle_texture, self._output_texture)
             glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._knee_shader.use(self._output_texture)
@@ -747,6 +747,12 @@ class Fluid3D:
     def _light_volumes(self) -> tuple[Texture | Texture3D, ...]:
         """Everything the light allocates, released while it is off."""
         return (self._light, *self._light_blur, self._sky, self._caustic_net, self._direct, self._rays)
+
+    def _march_look(self) -> MarchLook:
+        """The composite's terms over the view, the box's depth in widths, from the panel's."""
+        composite = self.settings.composite
+        tint = composite.tint
+        return march_look(composite.emission, composite.opacity, composite.fog, (tint.r, tint.g, tint.b), self._z_extent)
 
     def _update_light(self) -> None:
         """The light this step, for the composite: the light grid, the caustic net and the light per layer."""
@@ -777,10 +783,9 @@ class Fluid3D:
         composite = self.settings.composite
         layers: int = self.settings.upscaled.depth if self.settings.upscaled.enabled else self._depth
         size = (light.grid[0], light.grid[1], max(1, layers))
-        fog: float = composite.fog
         lit = composite.light
         has_sky: bool = lit.sky_fill > 0.0
-        has_rays: bool = lit.fog_scattering > 0.0 and fog > 0.0
+        has_rays: bool = lit.fog_scattering > 0.0
         for volume, on in ((self._direct, True), (self._rays, has_rays)):
             if not on:
                 volume.deallocate()
@@ -789,32 +794,29 @@ class Fluid3D:
         sky, sky_map = self._lit_sky() if has_sky else (None, IDENTITY)
         if not has_sky:
             self._sky.deallocate()
-        chan = tuple(1.0 + (water - 1.0) * composite.tint for water in WATER_CHANNELS)
+        fog = self._march_look().fog
         octaves: float = lit.scattering if lit.scattering_model == ScatteringModel.OCTAVES else 0.0
         self._layer_light_shader.use(light, sky, sky_map, self._direct, self._rays if has_rays else None,
                                      octaves=octaves, powder=lit.powder,
                                      sky_fill=lit.sky_fill,
-                                     fog=(fog * chan[0], fog * chan[1], fog * chan[2]),
-                                     fog_grey=fog, scatter=lit.fog_scattering * lit.intensity,
+                                     fog=fog, fog_grey=half_extinction(composite.fog) * self._z_extent,
+                                     scatter=lit.fog_scattering * lit.intensity,
                                      sub_steps=max(2, 2 * -(-light.grid[2] // size[2])))   # two a light cell the layer spans
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         return replace(light, direct=self._direct, rays=self._rays if has_rays else None)
 
     def _light_extinction(self) -> tuple[tuple[float, float, float], tuple[float, float, float]]:
-        """The light's extinction per width, per channel: the density's per unit of amount, from `opacity` over the
-        view (the box's depth), and the water's `fog`."""
+        """The light's extinction per width: the density's per unit of amount, grey, from its half-thickness
+        `opacity`, and the water's per channel, from its half-distance `fog` and `tint`."""
         composite = self.settings.composite
-        chan = tuple(1.0 + (water - 1.0) * composite.tint for water in WATER_CHANNELS)
-        per_width = 1.0 / max(self._z_extent, 1e-6)
-        extinction: float = view_march(composite.opacity, composite.emission)[0] * per_width
-        fog: float = composite.fog * per_width
-        return ((extinction * chan[0], extinction * chan[1], extinction * chan[2]), (fog * chan[0], fog * chan[1], fog * chan[2]))
+        density: float = half_extinction(composite.opacity)
+        tint = composite.tint
+        return (density, density, density), fog_extinction(composite.fog, (tint.r, tint.g, tint.b))
 
     def _lit(self) -> CompositeLight | None:
         """The light this step, from the simulation density: a sun's swept through the light grid in parallel lines,
         each light cell marched toward a lamp; then with `scattering` blurred and mixed in; None while
-        the light is off, the light released. `opacity` and `fog` are over the view, the box's depth, so per
-        width they are over its depth in widths."""
+        the light is off, the light released."""
         composite = self.settings.composite
         density: Texture3D | None = self._simulation_density.weight
         lit = composite.light
@@ -852,7 +854,7 @@ class Fluid3D:
                 glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
             light = a
         self._light_shown = light
-        intensity: float = view_march(composite.opacity, lit.intensity)[1]
+        intensity: float = lit.intensity
         return CompositeLight(light, intensity, lit.anisotropy, lit.back_scattering, point, vector, box,
                               grid=size, light_map=light_map)
 

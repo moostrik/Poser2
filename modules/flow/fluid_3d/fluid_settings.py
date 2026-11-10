@@ -4,6 +4,7 @@ pressure, composite, upscaled, particles), with the concern's name as the group'
 from enum import IntEnum
 
 from modules.settings import Field, BaseSettings, Group, Widget
+from modules.utils import Color
 
 from ..wall_mode import WallMode
 from ..time_step import TimeStepMode
@@ -190,10 +191,10 @@ class LightSettings(BaseSettings):
 
 class CompositeSettings(BaseSettings):
     """The composite: how the density volume is marched front to back into the output, and the light on it."""
-    emission: Field[float]          = Field(1.0,  min=0.1,  max=100.0,  widget=Widget.log_slider, color="amber", description="How bright fully dyed water filling the view is seen: 1 = its own color")
-    opacity: Field[float]           = Field(0.6,  min=0.0,  max=1.0,    step=0.01, color="deep-orange", description="How much fully dyed water filling the view covers behind it: 0 see-through, 1 only the front")
-    tint: Field[float]              = Field(0.5,  min=0.0,  max=1.0,    color="light-blue",     description="Far density shifts toward water color (red absorbed first)")
-    fog: Field[float]               = Field(0.5,  min=0.0,  max=4.0,    color="blue-grey",      description="Water extinction over the full depth; dims far layers, and the light on its way in")
+    emission: Field[float]          = Field(1.0,  min=0.0,  max=20.0,   step=0.01, color="amber", description="Glow of thick density: 1 = its own color, 0 = none")
+    opacity: Field[float]           = Field(0.1,  min=0.001, max=10.0,  widget=Widget.log_slider, color="deep-orange", description="Widths of fully dyed water that hide half of what is behind it")
+    fog: Field[float]               = Field(1.0,  min=0.01, max=1000.0, widget=Widget.log_slider, color="blue-grey", description="Widths of water that dim light to half")
+    tint: Field[Color]              = Field(Color(1.0, 1.0, 1.0), widget=Widget.color,         description="The water's color, the hue light turns in it; white = none")
     light: Group[LightSettings]     = Group(LightSettings)
 
 

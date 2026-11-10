@@ -1,7 +1,7 @@
 """ParticleSurfaceShade - the surface's normals, absorption and light into the 2D output."""
 from __future__ import annotations
 
-from OpenGL.GL import GL_RGBA16F, glUniform1f, glUniform2i, glUseProgram
+from OpenGL.GL import GL_RGBA16F, glUniform1f, glUniform2i, glUniform3f, glUseProgram
 
 from modules.gl import ComputeShader, Texture
 
@@ -10,7 +10,7 @@ class ParticleSurfaceShade(ComputeShader):
     """Shade the smoothed depth: color through thickness, diffuse, specular, Fresnel, fog."""
 
     def use(self, depth: Texture, thickness: Texture, color: Texture, output: Texture, *, depth_per_pixel: float,
-            emission: float, absorption: float, tint: float, fog: float) -> None:
+            emission: float, absorption: float, fog: tuple[float, float, float]) -> None:
         if not self.allocated or not self.shader_program:
             return
         glUseProgram(self.shader_program)
@@ -22,6 +22,5 @@ class ParticleSurfaceShade(ComputeShader):
         glUniform1f(self.get_uniform_loc("uDepthPerPixel"), depth_per_pixel)
         glUniform1f(self.get_uniform_loc("uEmission"), emission)
         glUniform1f(self.get_uniform_loc("uAbsorption"), absorption)
-        glUniform1f(self.get_uniform_loc("uTint"), tint)
-        glUniform1f(self.get_uniform_loc("uFog"), fog)
+        glUniform3f(self.get_uniform_loc("uFog"), *fog)
         self.dispatch(output.width, output.height)

@@ -10,7 +10,22 @@ from modules.gl import Texture, Texture3D, ComputeShader
 
 
 IDENTITY: tuple[float, ...] = (1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 1.0)
-OPACITY_LIMIT: float = 0.999     # opacity 1, covering all, needs infinitely thick dye: it is drawn as this
+LUMINANCE: tuple[float, float, float] = (0.2126, 0.7152, 0.0722)    # Rec. 709: how bright a color is seen
+
+
+def half_extinction(distance: float) -> float:
+    """The extinction per width of what halves the light over `distance` widths: fully dyed water over its
+    half-thickness (`opacity`), clear water over its half-distance (`fog`)."""
+    return math.log(2.0) / max(distance, 1e-6)
+
+
+def fog_extinction(fog: float, tint: tuple[float, float, float]) -> tuple[float, float, float]:
+    """The water's extinction per width per channel: over `fog` widths it dims white light to half its
+    brightness, and turns it toward `tint`'s hue (white: every channel alike), each channel kept below all of it."""
+    brightness: float = max(sum(w * c for w, c in zip(LUMINANCE, tint)), 1e-6)
+    kept = tuple(min(max(0.5 * c / brightness, 1e-4), 0.999) for c in tint)
+    distance: float = max(fog, 1e-6)
+    return (-math.log(kept[0]) / distance, -math.log(kept[1]) / distance, -math.log(kept[2]) / distance)
 
 
 def henyey_greenstein(g: float, cosine: float) -> float:
@@ -28,14 +43,20 @@ def sun_phase(vector: tuple[float, float, float], anisotropy: float, back_scatte
     return forward + (henyey_greenstein(-anisotropy, cosine) - forward) * back_scattering
 
 
-def view_march(opacity: float, emission: float) -> tuple[float, float]:
-    """The march's extinction and emission over the whole view from what the panel says: fully dyed water
-    filling the view covers `opacity` of what is behind it (Beer-Lambert: its extinction -ln(1 - opacity)) and
-    is seen at its color times `emission`, its own covering of its far side made up for (its emission over
-    the view the extinction / the opacity times `emission`; at opacity 0, `emission` itself)."""
-    covered: float = min(max(opacity, 0.0), OPACITY_LIMIT)
-    extinction: float = -math.log(1.0 - covered)
-    return extinction, emission * (extinction / covered if covered > 0.0 else 1.0)
+@dataclass
+class MarchLook:
+    """The composite's terms over the whole view, the box's depth: what the march works with."""
+    emission: float                                 # the glow of thick density, 1 = its own color
+    absorption: float                               # the density's extinction of an amount of 1 over the view
+    fog: tuple[float, float, float]                 # the water's extinction over the view, per channel
+
+
+def march_look(emission: float, opacity: float, fog: float, tint: tuple[float, float, float], depth: float) -> MarchLook:
+    """The march's terms from the panel's, the box `depth` widths deep: thick density glows at its color times
+    `emission`, `opacity` its half-thickness and `fog` the water's half-distance, both in widths."""
+    absorption: float = half_extinction(opacity) * depth
+    water = fog_extinction(fog, tint)
+    return MarchLook(emission, absorption, (water[0] * depth, water[1] * depth, water[2] * depth))
 
 
 @dataclass
@@ -43,7 +64,7 @@ class CompositeLight:
     """The light a composite lights the density by: the light grid and how it is read, and the light per
     column and layer of the march (`LayerLight3D`) the composite reads."""
     volume: Texture3D                       # the light reaching each place, RGB, over the box; alpha the density's alone
-    intensity: float                        # the lit dye's emission over the whole view at full light (`view_march`'s)
+    intensity: float                        # the light on thick density at full light, 1 = its own color
     anisotropy: float                       # Henyey–Greenstein g
     back_scattering: float                  # the share of a backward lobe as strong
     point: bool                             # a lamp at `vector`'s place, else a sun toward `vector`
@@ -98,22 +119,17 @@ def bind_light(shader: ComputeShader, light: CompositeLight, net: Texture | None
 
 
 class Composite3D(ComputeShader):
-    """Composite the density volume into the 2D output: per-channel Beer–Lambert occlusion, the water's
-    tint and fog, the light on the dye and in the water. The output may be larger than the volume; the
+    """Composite the density volume into the 2D output: Beer–Lambert occlusion, the water's fog per channel, the light on the dye and in the water. The output may be larger than the volume; the
     volume is sampled by uv."""
 
-    def use(self, density: Texture3D, output_2d: Texture, *,
-            emission: float, absorption: float, tint: float, fog: float,
+    def use(self, density: Texture3D, output_2d: Texture, look: MarchLook, *,
             color: Texture3D | None = None, light: CompositeLight | None = None) -> None:
         """Composite the density volume into the 2D output, one march step per layer.
 
         Args:
             density: Density volume (RGBA16F)
             output_2d: 2D output texture (RGBA16F)
-            emission: The emission of an amount of 1 over the whole view (`view_march`'s)
-            absorption: The extinction of an amount of 1 over the whole view (`view_march`'s)
-            tint: 0..1 mix toward per-channel water extinction (red dies first)
-            fog: Medium extinction over the full depth
+            look: The march's terms over the view (`march_look`)
             color: With it, `density` is the amount alone and its color is this volume's (color × amount, amount)
             light: With its light per layer, each sample also lit: its color × that light, the caustic net on the
                 sun's share, × `light.intensity`; with its rays, the water's light added
@@ -128,10 +144,9 @@ class Composite3D(ComputeShader):
 
         glUniform1i(self.get_uniform_loc("uDepth"), density.depth)
         glUniform2i(self.get_uniform_loc("uOutputSize"), output_2d.width, output_2d.height)
-        glUniform1f(self.get_uniform_loc("uEmission"), emission)
-        glUniform1f(self.get_uniform_loc("uAbsorption"), absorption)
-        glUniform1f(self.get_uniform_loc("uTint"), tint)
-        glUniform1f(self.get_uniform_loc("uFog"), fog)
+        glUniform1f(self.get_uniform_loc("uEmission"), look.emission)
+        glUniform1f(self.get_uniform_loc("uAbsorption"), look.absorption)
+        glUniform3f(self.get_uniform_loc("uFog"), *look.fog)
         glUniform1i(self.get_uniform_loc("uSplit"), int(color is not None))
         if color is not None:
             self.bind_texture_3d(1, color, "uColor")

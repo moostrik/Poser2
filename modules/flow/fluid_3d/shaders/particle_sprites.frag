@@ -17,12 +17,9 @@ flat in float vDepth;
 uniform bool  uWeighted;        // the weighted look: two targets, the weighted sum and the revealage
 uniform float uEmission;
 uniform float uAbsorption;
-uniform float uTint;
 
 layout(location = 0) out vec4 fragColor;      // the slice's sum; the weighted look's weighted emission and opacity
 layout(location = 1) out vec4 fragReveal;     // the weighted look's opacity per channel, multiplied out of 1
-
-const vec3 WATER_CHAN = vec3(1.8, 1.0, 0.6);
 
 void emit(vec4 c) {
     if (!uWeighted) {
@@ -32,7 +29,7 @@ void emit(vec4 c) {
     // A particle's emission and its opacity per channel; the depth weight puts near ink over far
     // (McGuire and Bavoil 2013), its range kept inside a float's
     vec3 e = uEmission * max(c.rgb, vec3(0.0));
-    vec3 alpha = 1.0 - exp(-uAbsorption * mix(vec3(1.0), WATER_CHAN, uTint) * max(c.a, 0.0));
+    vec3 alpha = vec3(1.0 - exp(-uAbsorption * max(c.a, 0.0)));
     float a = dot(alpha, vec3(1.0 / 3.0));
     float w = clamp(0.03 / (1e-5 + pow(vDepth + 0.05, 4.0)), 1e-2, 3e3);
     fragColor = vec4(e * w, a * w);

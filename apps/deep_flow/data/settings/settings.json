@@ -602,10 +602,15 @@
         "smooth": 3
       },
       "composite": {
-        "emission": 3.89,
-        "opacity": 0.995,
-        "tint": 1.0,
-        "fog": 0.05,
+        "emission": 3.9095,
+        "opacity": 0.02907,
+        "tint": {
+          "r": 0.4708,
+          "g": 0.778,
+          "b": 1.0,
+          "a": 1.0
+        },
+        "fog": 2.7899,
         "light": {
           "enabled": false,
           "source": "DIRECTIONAL",
