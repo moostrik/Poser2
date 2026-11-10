@@ -16,16 +16,34 @@ fluid is `Fluid3D` (`fluid_3d/fluid_3d.py`), its layer `Fluid3DLayer`
 What is next for the fluid, in order; what is open elsewhere in the flow is
 [FLOW.md's Open](FLOW.md#open).
 
-The composite's look is a mess now **(site fact)**: items 1 to 5 rework it for the best picture, its cost
-comes last, once the look has set which of its options are on.
+The composite's look is a mess now **(site fact)**: items 1 to 6 rework it for the best picture, its cost
+comes last, once the look has set which of its options are on. Each item's cost is timed as it lands.
 
-### 1. The finer light
+### 1. The light in the cube view
+
+The light's place drawn in the cube's scene with its camera, by `CubeEdges` as the box's edges are: a
+lamp as a small cube at its place, a sun as a line from outside the box to its center along its
+direction, the small cube at the line's outer end, in the light settings' amber. First, since it shows
+where the light is while items 2 to 6 are tuned.
+
+### 2. The lit dye
+
+The density glows; it is not lit. The light only darkens its emission (the light grid's transmittance,
+at most 1, mixed in by `shadow`), and there is no light strength, no light color and no light from
+around, so a lit part can never be brighter than an unlit one, only its shadow darker **(site fact: the
+light shows little)**. The dye lit as a surface color is lit by the light: its color × (the light reaching
+it × the light's strength + the sky fill), the emission kept beside it as its glow. The rays, the caustics
+and the octaves have something to be bright with only then.
+
+### 3. The finer light
 
 The light grid is a quarter of the simulation grid each way and marched through the simulation density,
-so its shadows are blobs **(site fact: the light shows little)**. The light from the upscaled density,
-where it is on, at a finer grid, its size and cost measured against the picture.
+so its shadows are blobs. The light from the upscaled density, where it is on, at a finer grid, its size
+and cost measured against the picture. Each light cell marched to the light through the 4K amount reads
+about 100 texels **(deduction)**; a sun's light swept instead layer by layer along its direction, each layer
+from the one before it, one read a cell. A lamp's light, radial, keeps the march.
 
-### 2. The rays
+### 4. The rays
 
 The water only absorbs: the fog sends no light toward the viewer, so empty water stays black and no
 shaft of light can show. The fog's in-scattering added to the march (single scattering): each step the
@@ -38,14 +56,18 @@ per layer instead, as froxels (Wronski 2014; Hillaire 2015): the view looks stra
 grid is already view-aligned; a pass walks each of its columns in fine sub-steps and stores, for each of
 the march's layers, the in-scattering integrated exactly over the layer; the march reads one value more
 a step and adds it under the transmittance in front, so the density still covers the rays behind it.
+The fog's in-scattering takes the phase as well, the shafts brighter looking toward the sun (item 5's
+anisotropy), and a lamp's light falls off with its distance, which the light grid does not hold now.
 
 Sunlight under water shafts mostly by the waves on its surface, which focus it into a moving net; the
 density's shadows cannot give that. The caustics: an animated caustic pattern multiplied into the light
-where it enters the box, so the shafts flicker and drift; an option, 0 off. With them the look of a sun
+where it enters the box, so the shafts flicker and drift; an option, 0 off. Worked out per sample in the
+march, where the light's line from the sample leaves the box, not stored in the light grid, whose cells
+would blur the net. With them the look of a sun
 under water is the rays, the caustics, the `tint` (far water turning blue-green, red dying first, kept
 for it) and the fog dimming the light on its way down.
 
-### 3. The scattering and the anisotropy
+### 5. The scattering and the anisotropy
 
 The scattering blurs the coarse light grid, which spreads light into empty water and through thin walls
 of density, and looks ugly **(site fact)**; the anisotropy is hardly seen and costs a `pow` at every
@@ -59,20 +81,20 @@ picks:
 | sky fill   | a second, soft light from above, so no shadow is fully black                                                                              |
 | anisotropy | the phase worked out once per light cell (a sun's the same everywhere) into the light grid's unused fourth channel; a second lobe to make it seen |
 
-### 4. The light in the cube view
+The sky fill and a lamp's phase both want the light grid's one unused channel; one of them takes a second
+volume.
 
-The light's place drawn in the cube's scene with its camera, by `CubeEdges` as the box's edges are: a
-lamp as a small cube at its place, a sun as a line from outside the box to its center along its
-direction, the small cube at the line's outer end, in the light settings' amber.
-
-### 5. A dramatic look
+### 6. A dramatic look
 
 Every composite setting, the light's place included, given defaults that make a beautiful, dramatic
-scene, judged in the app.
+scene, judged in the app. The look includes what deep_flow does after the fluid: the app's grade (its
+composite's LUT and blend, Blockbuster in SCREEN at the preset) and the fluid's knee, which bends each
+channel above 0.8 toward 1; at emission 34.6 with nothing covered much of the picture may sit in the
+knee and turn flat **(deduction)**.
 
-### 6. The composite's cost
+### 7. The composite's cost
 
-Its cost at the preset (2160 × 3840, the 4K amount's 16 layers), before items 1 to 5: 0.65 ms alone,
+Its cost at the preset (2160 × 3840, the 4K amount's 16 layers), before items 1 to 6: 0.65 ms alone,
 about twice the time its data takes to move once (`fluid_pass_check.py`) **(deduction)**. Every output
 pixel steps through every layer, each step reading the amount and the color volume (and the light when
 lit) and working out three `exp`s, empty water or not; it stops early only where the water turns opaque.
@@ -81,7 +103,8 @@ Measured against the worst case, not the average, with the look's options on: a 
 every layer sets the frame's budget, so a skip of empty steps lowers only the average and makes the frame's
 time follow the picture. Work every step does whatever is there is what to cut: the fog's per-step factor
 is the same each step and can be worked out once, the color's divide can be a multiply. An occupancy
-volume of empty 8³ blocks was slower ([TIMING.md](TIMING.md), Faster item 2).
+volume of empty 8³ blocks was slower ([TIMING.md](TIMING.md), Faster item 2). The light's passes have
+no timer of their own yet; they get one with item 1, so each item's cost is known as it lands.
 
 ### After the plan
 
