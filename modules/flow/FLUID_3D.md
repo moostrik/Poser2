@@ -19,23 +19,6 @@ What is next for the fluid, in order; what is open elsewhere in the flow is
 The composite's look is a mess now **(site fact)**: items 1 to 6 rework it for the best picture, its cost
 comes last, once the look has set which of its options are on. Each item's cost is timed as it lands.
 
-### 2. The lit dye
-
-The density glows; it is not lit. The light only darkens its emission (the light grid's transmittance,
-at most 1, mixed in by `shadow`), and there is no light strength, no light color and no light from
-around, so a lit part can never be brighter than an unlit one, only its shadow darker **(site fact: the
-light shows little)**. The dye lit as a surface color is lit by the light: its color × (the light reaching
-it × the light's strength + the sky fill), the emission kept beside it as its glow. The rays, the caustics
-and the octaves have something to be bright with only then.
-
-### 3. The finer light
-
-The light grid is a quarter of the simulation grid each way and marched through the simulation density,
-so its shadows are blobs. The light from the upscaled density, where it is on, at a finer grid, its size
-and cost measured against the picture. Each light cell marched to the light through the 4K amount reads
-about 100 texels **(deduction)**; a sun's light swept instead layer by layer along its direction, each layer
-from the one before it, one read a cell. A lamp's light, radial, keeps the march.
-
 ### 4. The rays
 
 The water only absorbs: the fog sends no light toward the viewer, so empty water stays black and no
@@ -104,6 +87,16 @@ Each item's cost as it lands, `fluid_pass_check.py` at the preset (288 × 512 ×
 |----------------------|---------------------------|-----------|
 | none, the light off  | 0                         | 0.65      |
 | none, the light on   | 0.09                      | 0.74      |
+| 3, a sun, `QUARTER`  | 0.03                      | 0.74      |
+| 3, a sun, `FULL`     | 0.17                      | 0.79      |
+| 3, a lamp, `QUARTER` | 0.14                      | 0.74      |
+| 3, a lamp, `FULL`    | 3.34                      | 0.79      |
+
+The sun's sweep against the march it replaces, on the same grid (288 × 512 × 64 at `FULL`), a swinging
+body's density, three suns: the march 1.1 to 2.7 ms at `FULL`, the sweep 0.16 to 0.18; the transmittance's
+mean the same to 0.001, the difference's mean 0.002 to 0.003 and its p99 under 0.01 at `FULL` (twice that
+at `HALF`, four times at `QUARTER`), from a line passing a cell off its center. A lamp stays marched: at
+`FULL` it costs 3.3 ms, so a lamp takes `HALF` or `QUARTER`.
 
 ### After the plan
 
@@ -687,7 +680,7 @@ monitor's `scale` 1 shows a full value for the density and the temperature as fo
 
 | Part       | How                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 |------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| shadows    | `LightVolume3D`, `Fluid3D._lit`: a light grid at a quarter of the simulation's size, each step, each cell's RGB transmittance toward the light: the simulation density's amount summed along the way at one light cell a step (at most 256), times the extinction `opacity` gives over the view, per width of the box's depth, and the water's `fog` over the whole distance, both per channel by `tint`, so deep light turns bluish and a lamp falls off; the composite's each sample lit beside its own emission (the glow): its color × the light there × `light_intensity`, made per view as `emission` is (`view_march`); off and released at `light_intensity` 0; a step's GPU time with it on within the noise of one without it, under 0.5 ms, in a smoke run at 448 × 800 × 64 with the upscaled density (not yet in TIMING.md) |
+| shadows    | `Fluid3D._lit`: a light grid at `light_grid`'s share of the simulation's cells each way (`FULL`, all of them, the default; `HALF`, `QUARTER`), each step, each cell's RGB transmittance toward the light: for a sun one sweep of parallel lines (`LightSweep3D`), one thread a line stepping a cell at a time along the axis the light mostly travels and sliding across by its slope, each cell passed by one line, under half a cell off its center, one density read a cell; for a lamp each cell marched to it (`LightVolume3D`, at most 256 steps); the simulation density's amount summed along the way (the upscaled amount has 16 layers to the simulation's 64, and its detail is finer than a light cell), times the extinction `opacity` gives over the view, per width of the box's depth, and the water's `fog` over the whole distance, both per channel by `tint`, so deep light turns bluish and a lamp falls off; the composite's each sample lit beside its own emission (the glow): its color × the light there × `light_intensity`, made per view as `emission` is (`view_march`); off and released at `light_intensity` 0; a step's GPU time with it on within the noise of one without it, under 0.5 ms, in a smoke run at 448 × 800 × 64 with the upscaled density (not yet in TIMING.md) |
 | the light  | `composite.light`, `DIRECTIONAL` (a sun: one direction, parallel shadows) or `POINT` (a lamp, shadows fanning out); `light_x`, `light_y`, `light_z` toward the sun or the lamp's place (±1 the box's sides; x right, y down the screen, z away from the viewer), first above and a little toward the front; `light_intensity` how bright the light shows fully dyed water filling the view lit straight on, 1 its color, 0 no light. `Fluid3D.set_light` overrides the settings, the hook for a light the app derives from the pose (a lamp at the nose), the pose pipeline's value handed over; the monitor shows the light grid as the port `light`.                                                                                                                                                                 |
 | scattering | `scattering`, the light grid blurred (`LightBlur3D`, a separable 5-tap gaussian) and mixed into the direct light, for thick parts glowing within and soft shadow edges; `anisotropy`, the Henyey–Greenstein g of each lit sample toward the viewer, 1 at g 0, a silver lining against a light from behind; both 0 off, at no cost                                                                                                                                                                                                                                                                                                                                                                                                       |
 | opacity    | `view_march`: the look is set on the view, the same at any number of layers and any depth: `opacity`, 0 to 1, how much fully dyed water filling the view covers what is behind it (Beer–Lambert, its extinction −ln(1 − opacity), 1 drawn at 0.999), and `emission`, how bright that water is seen, 1 its own color, its covering of its own far side made up for; a sample covers by its amount, not its color's brightest channel; a particle look takes both over its `slices`                                                                                                                                                                                                                                                       |

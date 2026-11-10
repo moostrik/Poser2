@@ -1,0 +1,63 @@
+#version 460 core
+
+/*
+ * LightSweep3D - a sun's light through the box in one sweep: parallel lines along the light's travel, one
+ * thread a line, each stepping one light cell a step along the axis the light mostly travels (the sweep
+ * axis) and sliding across the other two by the light's slope. Each line carries the optical depth from
+ * where it enters the box, the density's amount × uSigma and the water's uFog inside the box, and writes
+ * each cell it passes the transmittance at its middle. The lines start on a grid one cell apart across
+ * the entry layer, widened by how far the slope slides them, so at every layer each cell gets exactly one
+ * line: one density read a cell, where a march from every cell toward the sun reads its whole way. A line
+ * passes a cell off its center by under half a cell across the sweep axis.
+ */
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(binding = 0) uniform sampler3D uDensity;     // RGBA16F: color × amount, the amount as alpha
+layout(rgba16f, binding = 0) writeonly uniform image3D uLight;
+
+uniform ivec3 uSize;          // the light grid's cells
+uniform int   uAxis;          // the sweep axis: 0 x, 1 y, 2 z
+uniform int   uDirection;     // +1: the light travels toward higher cells along the sweep axis, -1 lower
+uniform vec2  uSlope;         // cells slid across (the other two axes, in order) per cell along the sweep axis
+uniform ivec2 uMargin;        // lines started before the first cell across, to cover the cells entered from a side
+uniform vec3  uSigma;         // the density's extinction per cell per unit of amount, per channel
+uniform vec3  uFog;           // the water's extinction per cell, per channel
+uniform float uStepCells;     // a step's length along the line, in cells
+
+ivec3 to_grid(int along, ivec2 across) {
+    if (uAxis == 0) return ivec3(along, across.x, across.y);
+    if (uAxis == 1) return ivec3(across.x, along, across.y);
+    return ivec3(across.x, across.y, along);
+}
+
+vec3 to_grid(float along, vec2 across) {
+    if (uAxis == 0) return vec3(along, across.x, across.y);
+    if (uAxis == 1) return vec3(across.x, along, across.y);
+    return vec3(across.x, across.y, along);
+}
+
+void main() {
+    int n_along = uAxis == 0 ? uSize.x : (uAxis == 1 ? uSize.y : uSize.z);
+    ivec2 n_across = uAxis == 0 ? uSize.yz : (uAxis == 1 ? uSize.xz : uSize.xy);
+    ivec2 line = ivec2(gl_GlobalInvocationID.xy) - uMargin;
+    if (any(greaterThanEqual(line, n_across + uMargin))) return;
+
+    vec2 across = vec2(line) + 0.5;             // the line's place across, in cells, at the entry layer's middle
+    vec3 depth = vec3(0.0);                     // the optical depth so far, per channel
+    vec3 size = vec3(uSize);
+    for (int k = 0; k < n_along; k++) {
+        int along = uDirection > 0 ? k : n_along - 1 - k;
+        vec2 slid = uSlope * float(k);
+        vec2 here = across + slid;
+        ivec2 cell = line + ivec2(floor(0.5 + slid));      // the same shift for every line: each cell one line's
+        bool inside = all(greaterThanEqual(cell, ivec2(0))) && all(lessThan(cell, n_across));
+        vec3 half_step = vec3(0.0);
+        if (inside) {
+            float amount = max(texture(uDensity, to_grid(float(along) + 0.5, here) / size).a, 0.0);
+            half_step = 0.5 * uStepCells * (uSigma * amount + uFog);
+            imageStore(uLight, to_grid(along, cell), vec4(exp(-(depth + half_step)), 0.0));
+        }
+        depth += 2.0 * half_step;
+    }
+}

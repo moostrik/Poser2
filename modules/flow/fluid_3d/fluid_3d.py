@@ -60,7 +60,7 @@ from .shaders import (AdvectFaces3D, FacesToCenters3D, ViscosityFaces3D, SEMI_LA
     VorticityCurl3D, VorticityForce3D, Buoyancy3D, AddToFaces3D,
     Inject3D,
     CompositeOver, Knee,
-    CompositeLight, LightVolume3D, LightBlur3D, InjectMode, view_march,
+    CompositeLight, LightVolume3D, LightSweep3D, LightBlur3D, InjectMode, view_march,
     InjectBinary3D
 )
 
@@ -195,11 +195,12 @@ class Fluid3D:
         self._particle_texture: Texture = Texture()
         self._over_shader: CompositeOver = CompositeOver()
         self._knee_shader: Knee = Knee()               # the output's highlights bent, not clipped
-        # The light: how much reaches each cell of a grid at a quarter of the simulation's size, and its blur
+        # The light: how much reaches each cell of a grid at `light_grid`'s share of the simulation's size, and its blur
         # for the scattering; allocated while `composite.light_intensity` is above 0
         self._light: Texture3D = Texture3D(wrap=GL_CLAMP_TO_EDGE)
         self._light_blur: tuple[Texture3D, Texture3D] = (Texture3D(wrap=GL_CLAMP_TO_EDGE), Texture3D(wrap=GL_CLAMP_TO_EDGE))
-        self._light_shader: LightVolume3D = LightVolume3D()
+        self._light_shader: LightVolume3D = LightVolume3D()        # a lamp's: each cell marched to it
+        self._light_sweep_shader: LightSweep3D = LightSweep3D()    # a sun's: one sweep of parallel lines
         self._light_blur_shader: LightBlur3D = LightBlur3D()
         self._light_override: tuple[float, float, float] | None = None     # set_light's, over the settings
         self._light_shown: Texture3D = self._light      # the light the composite read last: direct, or scattered
@@ -295,6 +296,7 @@ class Fluid3D:
         self._over_shader.allocate()
         self._knee_shader.allocate()
         self._light_shader.allocate()
+        self._light_sweep_shader.allocate()
         self._light_blur_shader.allocate()
 
         self._allocated = True
@@ -411,6 +413,7 @@ class Fluid3D:
         self._over_shader.deallocate()
         self._knee_shader.deallocate()
         self._light_shader.deallocate()
+        self._light_sweep_shader.deallocate()
         self._light_blur_shader.deallocate()
         for light in (self._light, *self._light_blur):
             light.deallocate()
@@ -425,6 +428,7 @@ class Fluid3D:
         self._over_shader.reload()
         self._knee_shader.reload()
         self._light_shader.reload()
+        self._light_sweep_shader.reload()
         self._light_blur_shader.reload()
         self._divergence_shader.reload()
         self._gradient_shader.reload()
@@ -726,16 +730,18 @@ class Fluid3D:
         self._light_now = self._lit()
 
     def _lit(self) -> CompositeLight | None:
-        """The light this step, from the simulation density: each light cell marched toward the light, then
-        with `scattering` blurred and mixed in; None while `light_intensity` is 0, the light released. `opacity`
-        and `fog` are over the view, the box's depth, so per width they are over its depth in widths."""
+        """The light this step, from the simulation density: a sun's swept through the light grid in parallel lines,
+        each light cell marched toward a lamp; then with `scattering` blurred and mixed in; None while
+        `light_intensity` is 0, the light released. `opacity` and `fog` are over the view, the box's depth, so per
+        width they are over its depth in widths."""
         composite = self.settings.composite
         density: Texture3D | None = self._simulation_density.weight
         if composite.light_intensity <= 0.0 or density is None:
             for light in (self._light, *self._light_blur):
                 light.deallocate()
             return None
-        size = (max(1, self._simulation_width // 4), max(1, self._simulation_height // 4), max(1, self._depth // 4))
+        share: int = int(composite.light_grid)
+        size = (max(1, self._simulation_width // share), max(1, self._simulation_height // share), max(1, self._depth // share))
         for light in (self._light, *self._light_blur):
             if not light.allocated or (light.width, light.height, light.depth) != size:
                 light.allocate(*size, GL_RGBA16F)
@@ -746,7 +752,12 @@ class Fluid3D:
         fog = tuple(composite.fog * per_width * c for c in chan)
         point: bool = composite.light == Light.POINT
         vector = self._light_override or (composite.light_x, composite.light_y, composite.light_z)
-        self._light_shader.use(density, self._light, box=box, point=point, vector=vector, sigma=sigma, fog=fog)
+        if point:
+            self._light_shader.use(density, self._light, box=box, point=True, vector=vector, sigma=sigma, fog=fog)
+        else:
+            length: float = math.sqrt(sum(c * c for c in vector))
+            toward = (vector[0] / length, vector[1] / length, vector[2] / length) if length > 1e-6 else (0.0, -1.0, 0.0)
+            self._light_sweep_shader.use(density, self._light, toward=toward, sigma=sigma, fog=fog)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         light: Texture3D = self._light
         if composite.scattering > 0.0:

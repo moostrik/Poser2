@@ -28,6 +28,13 @@ class Light(IntEnum):
     POINT = 1               # a lamp at one place: shadows fanning out from it
 
 
+class LightGrid(IntEnum):
+    """The light grid's cells along each axis, as a share of the simulation's."""
+    QUARTER = 4
+    HALF = 2
+    FULL = 1
+
+
 class DensitySample(IntEnum):
     """Which velocity moves an upscaled density layer that spans several of the simulation's layers."""
     MIDDLE = 0              # the velocity at the layer's middle
@@ -162,6 +169,7 @@ class CompositeSettings(BaseSettings):
     light_x: Field[float]           = Field(0.0,  min=-1.0, max=1.0,    color="amber",          description="Toward the sun, or the lamp's place (±1 the box's sides); x right")
     light_y: Field[float]           = Field(-1.0, min=-1.0, max=1.0,    color="amber",          description="y down the screen; -1 = from above")
     light_z: Field[float]           = Field(-0.3, min=-1.0, max=1.0,    color="amber",          description="z away from the viewer; -1 = from the front")
+    light_grid: Field[LightGrid]    = Field(LightGrid.FULL,                                     description="The light's grid: a quarter, half or all of the simulation's cells each way; finer, sharper shadows")
     light_intensity: Field[float]   = Field(0.0,  min=0.0,  max=100.0,  widget=Widget.log_slider, color="amber", description="How bright the light shows fully dyed water filling the view, lit straight on: 1 = its color; 0 = no light")
     scattering: Field[float]        = Field(0.0,  min=0.0,  max=1.0,    color="light-blue",     description="Light bounced inside the density: soft shadows, thick parts glowing within; 0 = off")
     anisotropy: Field[float]        = Field(0.0,  min=0.0,  max=0.9,    color="yellow",         description="Henyey–Greenstein g: 0 scatters evenly, higher forward, a silver lining against the light")

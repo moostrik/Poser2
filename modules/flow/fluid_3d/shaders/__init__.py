@@ -20,6 +20,7 @@ from .turbulent_advect_3d import TurbulentAdvect3D
 from .inject_binary_3d import InjectBinary3D
 from .composite_3d import Composite3D, CompositeLight, view_march, OPACITY_LIMIT
 from .light_volume_3d import LightVolume3D
+from .light_sweep_3d import LightSweep3D, sweep_lines
 from .light_blur_3d import LightBlur3D
 from .composite_over import CompositeOver
 from .knee import Knee
