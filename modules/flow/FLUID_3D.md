@@ -93,6 +93,16 @@ then mean less against what is seen. One unit across the stages, the smaller sid
 and feel when the box turns: in portrait nothing changes. It reaches past the fluid (the motion, the
 bridge, the monitor), so it is one rule for all of them, made where each length is made.
 
+### 4. Swirls at more than one size
+
+The confinement keeps swirls alive at one size, `vorticity_radius`: fine wisps or big eddies, not both.
+More than one radius, each with its own strength (multi-scale vorticity confinement), keeps fine and large
+at once. Starting with two: the curl at both radii in the same pass (six more velocity reads a cell), the
+force from both curls in one pass (a curl volume more), their sum added to the faces once. About a third
+to a half more of the confinement's 0.57 ms at the preset, 0.2 to 0.3 ms **(deduction)**, measured as it
+lands. The upscaled density's turbulence already adds swirls below the grid to the dye, so what a second
+radius adds to the look is judged against it.
+
 ### After the plan
 
 - The body force's acceleration: tested, tweaked and made useful.
