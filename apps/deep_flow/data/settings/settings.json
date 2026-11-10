@@ -417,7 +417,7 @@
       "use_mask": true,
       "x_gain": 1.0,
       "y_gain": 1.0,
-      "z_gain": 0.0,
+      "z_gain": 0.4,
       "xy": {
         "levels": 4,
         "window": "SEVEN",
