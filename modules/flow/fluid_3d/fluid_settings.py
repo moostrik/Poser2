@@ -176,7 +176,7 @@ class CompositeSettings(BaseSettings):
     light_y: Field[float]           = Field(-1.0, min=-1.0, max=1.0,    color="amber",          description="y down the screen; -1 = from above")
     light_z: Field[float]           = Field(-0.3, min=-1.0, max=1.0,    color="amber",          description="z away from the viewer; -1 = from the front")
     light_grid: Field[LightGrid]    = Field(LightGrid.FULL,                                     description="The light's grid: a quarter, half or all of the simulation's cells each way; finer, sharper shadows")
-    light_intensity: Field[float]   = Field(0.0,  min=0.0,  max=100.0,  widget=Widget.log_slider, color="amber", description="How bright the light shows fully dyed water filling the view, lit straight on: 1 = its color; 0 = no light")
+    light_intensity: Field[float]   = Field(0.0,  min=0.0,  max=50.0,   step=0.1, color="amber", description="How bright the light shows fully dyed water filling the view, lit straight on: 1 = its color; 0 = no light")
     fog_scattering: Field[float]    = Field(0.0,  min=0.0,  max=1.0,    color="light-blue",     description="Share of the light the fog takes out that it sends on: the water glows, shafts in the shadows; 0 = off")
     caustics: Field[float]          = Field(0.0,  min=0.0,  max=1.0,    color="amber",          description="Contrast of the caustic net, the light under a wavy surface, carried down as shafts; 0 = off")
     caustic_size: Field[float]      = Field(0.08, min=0.01, max=1.0,    widget=Widget.log_slider, color="amber", description="The caustic net's cell, widths")
