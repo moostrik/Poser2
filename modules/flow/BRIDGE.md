@@ -52,8 +52,12 @@ so a flick reaches the fluid at full strength and a stop coasts. Both filters tr
 alike: z is a little noisier than x/y, and its one time constant is the motion's (the depth
 velocity's `smooth`), which every reader of z then shares, as a z time per filter would add the
 same lag in more places. `advect` moves the trail with its own motion before each step, so the
-average follows a moving limb instead of a fixed pixel. `blur_radius` and `blur_steps` spread it in
-space; the ring it leaves around the body is part of the look **(site fact)**.
+average follows a moving limb instead of a fixed pixel. `blur` spreads it in space; the ring it leaves
+around the body is part of the look **(site fact)**. The blur runs on the trail each step feeds back, so
+blurring every step is diffusion: `blur` is how far the trail spreads in one second, in widths at half its
+height, and each step blurs by σ = `blur` / 2.355 × √dt widths (σ² = 2 D dt), the same spread at any frame
+rate and resolution. It is the textbook separable Gaussian, both directions in one compute dispatch
+(`LowpassBlur`), the trail and its rate together.
 
 ### The changes
 

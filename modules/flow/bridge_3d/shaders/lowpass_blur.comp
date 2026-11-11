@@ -1,0 +1,76 @@
+#version 460 core
+
+// Lowpass Blur
+// The lowpass's Gaussian blur by one sigma, up to three fields in one dispatch: the textbook separable
+// Gaussian, its weights exp(-k^2 / 2 sigma^2) out to uRadius, normalized, both directions in one 16 x 16
+// tile and its border in shared memory. Outside the image is 0, as the trail's border is. The numpy
+// reference is velocity_lowpass.gaussian_blur
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+const int TILE = 16;
+const int MAX_RADIUS = 8;                       // LowpassBlur.MAX_RADIUS
+const int SPAN = TILE + 2 * MAX_RADIUS;
+
+uniform sampler2D uSource0;
+uniform sampler2D uSource1;
+uniform sampler2D uSource2;
+layout(rgba16f, binding = 0) writeonly uniform image2D uTarget0;
+layout(rgba16f, binding = 1) writeonly uniform image2D uTarget1;
+layout(rg32f, binding = 2) writeonly uniform image2D uTarget2;
+uniform int uCount;                             // fields, 1 to 3
+uniform int uRadius;                            // taps on each side, MAX_RADIUS at most
+uniform float uWeights[MAX_RADIUS + 1];         // tap k's weight, normalized over -uRadius..uRadius
+uniform ivec2 uSize;
+
+shared vec4 sTexels[SPAN][SPAN];                // the tile and its border
+shared vec4 sRows[SPAN][TILE];                  // each row blurred along x, at the tile's columns
+
+vec4 texel(int field, ivec2 p) {
+    if (any(lessThan(p, ivec2(0))) || any(greaterThanEqual(p, uSize))) return vec4(0.0);
+    if (field == 0) return texelFetch(uSource0, p, 0);
+    if (field == 1) return texelFetch(uSource1, p, 0);
+    return texelFetch(uSource2, p, 0);
+}
+
+void store(int field, ivec2 p, vec4 value) {
+    if (field == 0) imageStore(uTarget0, p, value);
+    else if (field == 1) imageStore(uTarget1, p, value);
+    else imageStore(uTarget2, p, value);
+}
+
+void main() {
+    ivec2 origin = ivec2(gl_WorkGroupID.xy) * TILE - MAX_RADIUS;
+    ivec2 local = ivec2(gl_LocalInvocationID.xy);
+    int index = local.y * TILE + local.x;
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+
+    for (int field = 0; field < 3; field++) {
+        if (field >= uCount) break;
+
+        for (int i = index; i < SPAN * SPAN; i += TILE * TILE) {
+            ivec2 s = ivec2(i % SPAN, i / SPAN);
+            sTexels[s.y][s.x] = texel(field, origin + s);
+        }
+        barrier();
+
+        for (int i = index; i < SPAN * TILE; i += TILE * TILE) {
+            int row = i / TILE;
+            int column = i % TILE + MAX_RADIUS;
+            vec4 sum = uWeights[0] * sTexels[row][column];
+            for (int k = 1; k <= uRadius; k++) {
+                sum += uWeights[k] * (sTexels[row][column - k] + sTexels[row][column + k]);
+            }
+            sRows[row][i % TILE] = sum;
+        }
+        barrier();
+
+        int row = local.y + MAX_RADIUS;
+        vec4 sum = uWeights[0] * sRows[row][local.x];
+        for (int k = 1; k <= uRadius; k++) {
+            sum += uWeights[k] * (sRows[row - k][local.x] + sRows[row + k][local.x]);
+        }
+        if (all(lessThan(pixel, uSize))) store(field, pixel, sum);
+        barrier();                              // the next field reuses the tile
+    }
+}

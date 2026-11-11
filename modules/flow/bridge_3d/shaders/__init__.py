@@ -1,6 +1,7 @@
 """Bridge-specific shaders."""
 
 from .density_bridge_shader import DensityBridgeShader
+from .lowpass_blur import LowpassBlur
 from .trail_advect import TrailAdvect
 from .velocity_bandpass_change import Change, VelocityBandpassChange
 from .velocity_bandpass_direction import VelocityBandpassDirection

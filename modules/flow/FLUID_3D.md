@@ -38,16 +38,89 @@ Weighed by [the goal](#the-goal): sharp, translucent ink patterns, layers distin
 
 ### 1. The body at its own depth
 
-The body goes in as one flat slab at `layer`, a cut-out: every pixel at the same z. The camera measures
-each pixel's depth, and the motion reads it already for the z velocity. Each pixel in at its own depth
-instead: its distance from the camera in widths (a width the view's real span at the player,
-`view_span`), measured from the player's middle depth, which `layer` places in the box; `spread` the
-thickness around each pixel's depth. An arm reaching toward the camera then pushes the water near the
-front and the torso further back: the body in the water with its shape in depth. It needs the bridge
-to hand over each pixel's depth beside its velocity, and the injection to read it; the box as deep as it
-stands for (`depth_ratio`) is what lets the real depth fit. With the box deep, the flat sheet's water turns
-into z more, not less ([TIMING.md](TIMING.md#the-box-as-deep-as-it-is-wide)): the body's shape in depth is
-what should let the water go around it across as well.
+The body goes in as one flat slab at `layer`, a cut-out: every pixel at the same z. The camera sees only
+the body's front surface, a plane of x, y and depth, not a volume. Each pixel goes in as a thin skin
+instead, centered on its own depth, `spread` its thickness. An arm reaching toward the camera then
+pushes the water near the front and the torso further back: the body in the water with its shape in
+depth. With the box deep, the flat sheet's water turns into z more, not less
+([TIMING.md](TIMING.md#the-box-as-deep-as-it-is-wide)): the body's shape in depth is what should let the
+water go around it across as well.
+
+The box's depth is the player's depth range, the depth source's near (0.1 m) and far (1.7 m), with no
+setting of its own. A pixel's z position is (depth − near) / (far − near), 0 front to 1 back.
+
+A trail holds the history of the motion: its velocity and its z position. A reading's z position is
+where the motion it holds was, the z positions the trail averages, weighted by the speed each brought. The z position
+travels as its own small texture beside what holds it: the z position times its weight, and the weight;
+the z position is red over green. A clear, a reset and a `CLAMP_TO_BORDER` edge write 0, a weight of 0,
+which is "no z position", not the front; and a linear read, the advect and the blur mix z positions only
+where they are known, by their weights. A state fed back each step is RG32F, as a weight decays far
+below what half float keeps; an output is RG16F. The velocity's textures and their shaders stay as they
+are.
+
+| Stage  | Its z positions                                                                                                                  |
+|--------|----------------------------------------------------------------------------------------------------------------------------------|
+| motion | the current z position, `z_position`: from the tracked depth (1 / the track's disparity), near and far read through `DepthView`; its weight the mask where the depth lies from near to far, else 0; with `use_mask` off or no mask, 1 where the depth lies in the range |
+| bridge | a z position beside each trail, the lowpass's and the bandpass's fast and slow: the current z position times the motion's speed there (and the current weight), through the trail's own Ema step, in the same pass, since a pixel's attack or release weight is picked by its velocity; the lowpass's moves with the trail (`TrailAdvect`) and is blurred with it, in the trail's order. So an arm leaving the torso leaves its wake at the arm's depth, as the still torso brings no speed, and a z position whose motion has died counts for nothing |
+| bridge | a z position per velocity and acceleration output, weighted by its readings' sizes at their shares, each times the share of its trail's speed that came with a z position (its weight over its trail's speed), so motion without depth does not pull it: the trail and its rate the lowpass's, start and bow the fast trail's, stop and wake the slow trail's, the change the fast trail's where the fast trail is the faster, else the slow's; so the fluid's linear reads of it stay weighted. The density and the temperature, on the body only (the mask), take the current z position |
+| fluid  | each pixel's skin centered on its z position, `layer` where its weight is 0: the drag and the body force (`add_to_faces_3d`), the density and the temperature (`inject_3d`), the upscaled amount (`inject_amount_3d`), the particles (`particle_emit`); `slab.glsl` takes the center as an argument instead of `uTargetLayer`, and the particles' `uSlab`, the profile's share inside the box, is per pixel, from erf at the two ends; `layer`'s description becomes the fallback's |
+| panel  | each z position a port of a new kind (`TextureKind`), drawn as red over green by the monitor's `Visualizer` and colored in the cube (`_CUBE_COLORS`) |
+
+The z positions go out beside their values: `MotionOutput.z_position`, one per `BridgeOutput` field
+(`boundary_velocity_z_position`, `body_force_acceleration_z_position`, and `z_position` for the density and the
+temperature), read by `Injection`; the 2D flow takes none. The lowpass's and the bandpass's reset clear
+their z positions with their trails. Each new shader has its numpy reference and a test, as the bridge's
+filters have; `test_drag` follows the slab's new argument. FLOW.md's stages and ports, BRIDGE.md, MOTION.md
+and MONITOR.md state the z positions and the blur; TIMING.md holds the fusions' times.
+
+The z positions ride in the passes that already read what they need, at the motion's and the bridge's
+448 × 800: a fragment pass writing several targets (MRT) where it reads the same inputs, and a compute
+dispatch where one pixel's inputs make many outputs of different formats, or a pass needs its
+neighbors twice:
+
+| Pass                                   | Kind     | Writes in one pass                                                                 | Saves                                                    |
+|----------------------------------------|----------|------------------------------------------------------------------------------------|----------------------------------------------------------|
+| motion: `compose_velocity`             | fragment | the velocity and its z position                                                    | a z position pass                                        |
+| lowpass: `TrailAdvect`                 | fragment | the trail and its z position, by the one carrier read                              | the z position's advect                                  |
+| lowpass: `velocity_trail`              | fragment | the trail and its z position, one Ema step                                         | the z position's Ema pass                                |
+| lowpass: the textbook Gaussian blur    | compute  | the trail, its rate and its z position, both directions in a shared-memory tile (16 × 16 and a 3σ border); a σ past the border's cap blurs in k dispatches of σ / √k | `blur_steps`, the second direction's pass and its in-between textures |
+| bandpass: the trails                   | compute  | the fast and the slow trail and their z positions, and the region's two trails     | three of the four trail passes                           |
+| bandpass: the changes                  | compute  | the change, each part's speed, velocity and acceleration, the change's acceleration | about 10 passes that each read the fast and the slow trail again |
+| the mix: `WeightedSum`                 | fragment | an output's velocity or acceleration and its z position                            | a z position pass for each output                        |
+| fluid: each injection                  | compute  | reads its z position where it reads its value                                      | nothing to add: the same dispatch                        |
+
+The bandpass's region means stay their own passes, between its two dispatches: they read mip levels of
+the trails the first writes, and the second reads them. The blur's
+and the bandpass's dispatches also cut today's passes. A shared shader keeps its one-target use beside
+the fused one. The bridge's textures are bound as images with a memory barrier, as the fluid binds its
+volumes. Each fusion is timed on the GPU harness against today's passes, in [TIMING.md](TIMING.md), and
+kept where the time it saves follows from the passes and reads it removes.
+
+The lowpass's blur becomes the textbook separable Gaussian: the weights exp(−i² / 2σ²) out to 3σ,
+normalized, computed once on the CPU. Today's `GaussianBlur` is not one: hand-picked weights at 11 taps
+that `blur_radius` only spaces, and `blur_steps` repeating it, n passes of a Gaussian being one √n wider;
+at the preset, 4 px × 4 steps, it adds up to a near-Gaussian 0.010 widths wide at half its height. The
+blur runs inside the trail's feedback, every frame on the trail before, so a blur per frame spreads
+the trail with the frame rate. Blurring every frame is diffusion: the setting is the trail's `blur`,
+how far it spreads in one second, in widths at half its height, and each frame the lowpass blurs by
+σ = √(2 D dt), D the diffusion it stands for (the spread / 2.355, squared, over 2 s): the same spread at
+any frame rate and resolution. The preset starts at today's look at 60 fps, 0.081 widths; `blur_radius`
+and `blur_steps` go. The shader itself is an ordinary blur by one σ, so a component that blurs once
+sets a width. The blur is the lowpass's own compute shader (`LowpassBlur`); the shared `GaussianBlur` stays as it is
+for the 2D bridge.
+
+z stays in widths/s, as the motion measures it: the bridge takes the length of x, y and z for the
+presence, the stop's region speed and every direction, and the depth velocity's threshold is in pixels,
+so z in a share of the range would mix units in each. The z position and the z velocity then move at different scales in
+the box: a hand's skin moves by its share of the range, the water it pushes by its widths at that
+distance; `z_gain` scales the push. If that shows, the fluid can convert each pixel's z by its own depth
+into shares of the box (× `view_span` × depth / (far − near)), exact per pixel.
+
+The z position is held in the bridge because the readings coast: a trail stays where a limb was after it
+moved on, and its z position must stay with it. A depth outside near to far has no z position, not clamped: the
+range is what the player is, so a dilated mask over the background, or a player the segmentation finds
+outside the range, goes in at `layer`. In half float the z position keeps about 0.001, against a cell of 1/64.
+Without depth, every weight is 0 and the body goes in at `layer`, as now.
 
 ### 2. Swirls at more than one size
 
@@ -70,6 +143,8 @@ and feel when the box turns: in portrait nothing changes. It reaches past the fl
 bridge, the monitor), so it is one rule for all of them, made where each length is made.
 
 ### After the plan
+
+- The masking in the bridge: the mask (`inputs.mask`, R16F 0 to 1, the depth's or the segmentation's) gates the velocity in the motion (`use_mask`) and the density's color in the bridge; in the bridge alone it is one gate in one stage.
 
 - The body force's acceleration: tested, tweaked and made useful.
 - The particles: worked on, and how they combine with the upscaled density.

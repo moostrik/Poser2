@@ -30,6 +30,7 @@ Each bullet names the term to use and, after "not", the synonyms it replaces. A 
 - The bridge's filters, named by what they do: `lowpass` (`VelocityLowpass`, gives the trail) and `bandpass` (`VelocityBandpass`, `Change`, gives the change and its parts); not `VelocityTrailBridge`, `VelocityChangeBridge`, `impulse`, `MotionEvent`
 - The pixels around one, which tell a part of the body changing speed from a limb arriving or leaving: `region` (`start_region_size`, `start_region_weight`, `stop_region_*`); not `patch`, `tile`, `gate`
 - The two systems a fluid takes the bridge in: `boundary`, the body in the water, what the water is dragged toward (`boundary_velocity`, `boundary_density`, `boundary_temperature`); `body_force`, the Navier–Stokes force term, what is added × dt (`body_force_acceleration`, `body_force_density`, `body_force_temperature`); `wall`, the domain's edge
+- A pixel's position in the box's depth, a share of it, 0 front to 1 back, from the player's depth range: `z_position`; not `place`, `z`. `layer` is the one the body takes where it has none; `depth` is the camera's, in metres
 - "impulse", "body", "force", "delta" and "drag" name nothing on their own; a name says the quantity (`velocity`, `acceleration`) or the textbook term (`body_force`), or pairs with what it acts on (`boundary.velocity_drag`, the time the water takes to close in on the body's velocity)
 
 ## Render

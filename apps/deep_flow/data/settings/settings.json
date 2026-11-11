@@ -445,8 +445,7 @@
           "advect": 0.5,
           "attack": 1.0,
           "smooth": 200.0,
-          "blur_radius": 4.0,
-          "blur_steps": 4
+          "blur": 0.081
         },
         "bandpass": {
           "fast_smooth": 25.0,
