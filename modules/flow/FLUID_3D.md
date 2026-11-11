@@ -147,6 +147,9 @@ bridge, the monitor), so it is one rule for all of them, made where each length 
 - The masking in the bridge: the mask (`inputs.mask`, R16F 0 to 1, the depth's or the segmentation's) gates the velocity in the motion (`use_mask`) and the density's color in the bridge; in the bridge alone it is one gate in one stage.
 
 - The body force's acceleration: tested, tweaked and made useful.
+- The temperature: whether a field of its own is needed. Buoyancy needs only a scalar the water is lighter
+  or heavier by; the density alone can be it (ink sinks), and the temperature adds currents apart from the
+  dye (warm clear water rising). Off in the preset (`buoyancy` 0).
 - The particles: worked on, and how they combine with the upscaled density.
 
 ## The fluid

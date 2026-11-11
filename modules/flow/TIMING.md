@@ -395,6 +395,40 @@ so one solve differs on 30% of its values by up to 3e-4 uv, and with exact cente
 last bits the solve amplifies. Not kept: the bandpass's four parts in one pass (0.140 → 0.117 ms), and the
 lowpass's advect fused into its trail, at most 0.005 ms of its 0.076 (its blur, 4 steps of 2 passes, is 0.064).
 
+### The body at its own depth
+
+The z positions and the passes they ride in ([BRIDGE.md](BRIDGE.md#the-z-positions)), each pass alone on the
+stillslowfast frames as above, the second of two runs, deep_flow's preset with the lowpass's `blur` at 0.081:
+
+| Step                                                         | lowpass | with its rate | bandpass | with its accelerations | the bridge whole | motion whole |
+|--------------------------------------------------------------|---------|---------------|----------|------------------------|------------------|--------------|
+| before: blur 4 px × 4 steps of 2 passes, no z positions       | 0.075   | 0.141         | 0.144    | 0.177                  | 0.297            | 0.199        |
+| the textbook blur, one compute dispatch (`LowpassBlur`)       | 0.047   | 0.077         | 0.147    | 0.178                  | 0.266            |              |
+| the z positions: the lowpass's step in one dispatch, the bandpass's trails in one, the mixes | 0.066 | 0.090 | 0.150 | 0.180          | 0.295            | 0.205        |
+| the bandpass's changes in two dispatches                     | 0.066   | 0.089         | 0.110    | 0.119                  | 0.258            | 0.204        |
+
+The blur: 8 fragment passes per texture become one dispatch for the trail and its rate together, both
+directions in a shared-memory tile. The z positions add the lowpass's RG32F position to its step and blur,
+the bandpass's two to its trail dispatch, the motion's one pass and a mix pass per velocity and acceleration
+output. The bandpass's changes: a change and a direction pass for each of the four parts, the whole change's
+and the accelerations' sums (about 13 passes, each reading the fast and the slow trail again) become two
+dispatches, the parts' sizes the same to the bit and their velocities within half float's step (the old
+direction pass read the size back from R16F). Not fused: the motion's z position and the mixes' z positions
+stay passes of their own, as one framebuffer writing two of `modules.gl`'s FBOs would need attachments it
+does not have.
+
+The fluid with the z positions against the same run without them (`fluid_compare.py`, a `flat` side), its
+step's GPU time, mean / p95, ms:
+
+| Clip          | without (`flat`) | with          |
+|---------------|------------------|---------------|
+| stillslowfast | 9.52 / 10.80     | 9.86 / 11.11  |
+| standmoves    | 7.12 / 10.37     | 7.18 / 10.39  |
+
+The density injects a column a thread, the source and its z position read once, then only the cells the
+slab reaches; the drag and the body force read the z position at each face. The fluid's step varies by
+2 ms between runs of the same code on this harness, so only a side against a side in one run compares.
+
 ## The density's own advection
 
 `density.advection` apart from the velocity's, deep_flow's preset (288 × 512 × 64 cells, the 4K amount

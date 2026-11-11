@@ -64,7 +64,7 @@ from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil, Port, TextureKind
 from ..shaders import Trail
 from .trails import EPSILON, decay_weight, direction
-from .shaders import BandpassTrails, Change, VelocityBandpassChange, VelocityBandpassDirection, VelocityBandpassRegion, VelocityBandpassRegionMean, VelocityBandpassRegionSpeed, WeightedSum
+from .shaders import BandpassAccelerations, BandpassChanges, BandpassTrails, Change, VelocityBandpassRegion, VelocityBandpassRegionMean, VelocityBandpassRegionSpeed
 
 logger = logging.getLogger(__name__)
 
@@ -165,12 +165,11 @@ class VelocityBandpass(FlowBase):
 
         self._trail_shader: Trail = Trail()
         self._trails_shader: BandpassTrails = BandpassTrails()
+        self._changes_shader: BandpassChanges = BandpassChanges()
+        self._accelerations_shader: BandpassAccelerations = BandpassAccelerations()
         self._moving_shader: VelocityBandpassRegion = VelocityBandpassRegion()
         self._moving_mean_shader: VelocityBandpassRegionMean = VelocityBandpassRegionMean()
         self._region_speed_shader: VelocityBandpassRegionSpeed = VelocityBandpassRegionSpeed()
-        self._change_shader: VelocityBandpassChange = VelocityBandpassChange()
-        self._direction_shader: VelocityBandpassDirection = VelocityBandpassDirection()
-        self._sum_shader: WeightedSum = WeightedSum()
 
     @property
     def velocity_input(self) -> Texture:
@@ -268,12 +267,11 @@ class VelocityBandpass(FlowBase):
 
         self._trail_shader.allocate()
         self._trails_shader.allocate()
+        self._changes_shader.allocate()
+        self._accelerations_shader.allocate()
         self._moving_shader.allocate()
         self._moving_mean_shader.allocate()
         self._region_speed_shader.allocate()
-        self._change_shader.allocate()
-        self._direction_shader.allocate()
-        self._sum_shader.allocate()
 
     def deallocate(self) -> None:
         """Release all resources."""
@@ -284,12 +282,11 @@ class VelocityBandpass(FlowBase):
         self._size = (0, 0)
         self._trail_shader.deallocate()
         self._trails_shader.deallocate()
+        self._changes_shader.deallocate()
+        self._accelerations_shader.deallocate()
         self._moving_shader.deallocate()
         self._moving_mean_shader.deallocate()
         self._region_speed_shader.deallocate()
-        self._change_shader.deallocate()
-        self._direction_shader.deallocate()
-        self._sum_shader.deallocate()
 
     def reset(self) -> None:
         """Reset all fields to zero."""
@@ -372,33 +369,16 @@ class VelocityBandpass(FlowBase):
         # As an acceleration the difference is over the band's width instead (`band_width`): × dt over the pulse is its Δv
         acceleration_scale: float = change_acceleration_scale(s.fast_smooth, s.slow_smooth, delta_time)
 
-        self._sum(self._change_fbo, [(self.fast, scale), (self.slow, -scale)])
-        if acceleration:
-            self._sum(self._change_acceleration_fbo, [(self.fast, acceleration_scale), (self.slow, -acceleration_scale)])
-
-        for change in Change:
-            rise: bool = change.sign > 0.0
-            region_weight: float = s.start_region_weight if rise else s.stop_region_weight
-            region_fast: Texture = self._region_fast_fbo if rise else self._region_speed_fbo
-            region_slow: Texture = self._region_slow_fbo if rise else self._region_speed_fbo
-            speed: Fbo = self._speeds[change]
-            speed.begin()
-            self._change_shader.use(self.fast, self.slow, change, scale, region_fast, region_slow, region_weight, stop_lod)
-            speed.end()
-
-            velocity: Fbo = self._velocities[change]
-            velocity.begin()
-            self._direction_shader.use(self.fast if rise else self.slow, speed)
-            velocity.end()
-            if acceleration:
-                # the same pulse over the band's width instead of the step peak
-                self._sum(self._accelerations[change], [(velocity, acceleration_scale * peak)])
-
-    def _sum(self, target: Fbo, sources: list[tuple[Texture, float]]) -> None:
-        """The sources at their weights, summed into `target`."""
-        target.begin()
-        self._sum_shader.use(sources)
-        target.end()
+        # The four parts, each its size and its velocity, in one dispatch; then the whole change and, with
+        # `acceleration`, every reading over the band's width instead of the step peak, in one more
+        parts: tuple[Change, ...] = (Change.START, Change.BOW, Change.STOP, Change.WAKE)
+        speeds = tuple(self._speeds[part] for part in parts)
+        velocities = tuple(self._velocities[part] for part in parts)
+        self._changes_shader.use(self.fast, self.slow, self._region_fast_fbo, self._region_slow_fbo, self._region_speed_fbo,
+                                 speeds, velocities, scale, s.start_region_weight, s.stop_region_weight, stop_lod)
+        accelerations = (self._change_acceleration_fbo, *(self._accelerations[part] for part in parts)) if acceleration else None
+        self._accelerations_shader.use(self.fast, self.slow, velocities, self._change_fbo, accelerations,
+                                       scale, acceleration_scale, peak)
 
     @staticmethod
     def _mipmap(regions: Fbo) -> None:
@@ -421,7 +401,7 @@ def velocity_change(fast: np.ndarray, slow: np.ndarray, sign: float, share: np.n
                      edge: bool = False, scale: float = 1.0) -> np.ndarray:
     """One change (..., ) from the trails (..., 3): max(sign * (fast - slow) along the motion, 0) times `scale`
     (1 / `step_peak`), times the share its region shares (a start or a stop), or with `edge` times the rest (a bow
-    or a wake). Mirrors velocity_bandpass_change.frag."""
+    or a wake). Mirrors bandpass_changes.comp."""
     unit: np.ndarray = direction(fast, slow)
     part: np.ndarray | float = 1.0 - share if edge else share
     return np.maximum(0.0, sign * np.sum((fast - slow) * unit, axis=-1)) * scale * part
@@ -437,7 +417,7 @@ def moving_mean(velocity: np.ndarray) -> np.ndarray:
 def start_region_share(region_fast: np.ndarray, region_slow: np.ndarray, region_weight: float) -> float:
     """How much of a start counts, 0..1, from its region's mean moving velocity through the fast and the slow trail
     (`moving_mean` of each frame, smoothed): as far as it grows; region weight 0 lets all count. Mirrors
-    velocity_bandpass_change.frag."""
+    bandpass_changes.comp."""
     fast: float = float(np.linalg.norm(region_fast))
     change: float = (fast - float(np.linalg.norm(region_slow))) / max(fast, EPSILON)
     return 1.0 + (min(max(change, 0.0), 1.0) - 1.0) * region_weight
@@ -445,7 +425,7 @@ def start_region_share(region_fast: np.ndarray, region_slow: np.ndarray, region_
 
 def stop_region_share(fast: np.ndarray, slow: np.ndarray, region_weight: float) -> float:
     """How much of a stop counts, 0..1, from the trails over its region's pixels (N, 3): as far as their mean speed
-    falls; region weight 0 lets all count. Mirrors velocity_bandpass_change.frag."""
+    falls; region weight 0 lets all count. Mirrors bandpass_changes.comp."""
     fast_speed: float = float(np.mean(np.linalg.norm(fast, axis=-1)))
     slow_speed: float = float(np.mean(np.linalg.norm(slow, axis=-1)))
     change: float = (slow_speed - fast_speed) / max(slow_speed, EPSILON)
@@ -453,7 +433,7 @@ def stop_region_share(fast: np.ndarray, slow: np.ndarray, region_weight: float) 
 
 
 def change_velocity(trail: np.ndarray, change: np.ndarray) -> np.ndarray:
-    """The change (...) along the trail's direction (..., 3). Mirrors velocity_bandpass_direction.frag."""
+    """The change (...) along the trail's direction (..., 3). Mirrors bandpass_changes.comp."""
     length: np.ndarray = np.linalg.norm(trail, axis=-1, keepdims=True)
     unit: np.ndarray = np.divide(trail, length, out=np.zeros_like(trail), where=length > EPSILON)
     return unit * np.maximum(0.0, change)[..., None]
