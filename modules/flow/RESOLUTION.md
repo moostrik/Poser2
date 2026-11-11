@@ -105,7 +105,7 @@ The input first, as good as it gets, before the 4K density's heavy side.
 
 ### 1. The depth read across a surface
 
-Where the depth is resampled into the view, in the uploader's one resample ([INPUT_THREADS.md](INPUT_THREADS.md),
+Where the depth is cut into the view, in the flow's input stage ([INPUT_THREADS.md](INPUT_THREADS.md),
 built there), each view pixel reads the four depth pixels around it and interpolates them where they lie
 within the same-surface tolerance of each other (the motion's `z.tolerance`, shared), else takes the
 nearest, so an edge never reads as a distance in between. A depth pixel of 0, no depth (where the
