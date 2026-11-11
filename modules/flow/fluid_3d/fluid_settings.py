@@ -113,12 +113,6 @@ class InputSettings(BaseSettings):
     body_force: Group[BodyForceSettings]    = Group(BodyForceSettings)
 
 
-class ConfinementSettings(BaseSettings):
-    """One vorticity confinement: the swirls of one size it keeps alive (Fedkiw 2001)."""
-    strength: Field[float]  = Field(0.0,    min=0.0,    max=100.0,    color="purple",         description="Its epsilon, the force epsilon × cell × (N × curl); 0 = off")
-    radius: Field[float]    = Field(0.004,  min=0.001,  max=0.1,    newline=True, widget=Widget.log_slider, color="deep-purple", description="The size of the swirls it keeps, widths; at least one cell")
-
-
 class VelocitySettings(BaseSettings):
     """The velocity: how it carries itself, fades, swirls and thickens."""
     advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the velocity carries itself: MacCormack keeps swirls, at about twice the reads")
@@ -127,9 +121,14 @@ class VelocitySettings(BaseSettings):
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds 1 width/s takes to brake to rest, a fixed amount at a time; 0 = off")
     viscosity: Field[float]         = Field(0.0,    min=0.0,    max=0.01,   step=0.0001, color="indigo", description="Kinematic viscosity (widths² per second); 0 = water at this scale")
     viscosity_iter: Field[int]      = Field(20,     min=1,      max=60,     color="orange",         description="Viscosity solver iterations at 60 fps; fewer at a higher rate, never more")
-    confinement_1: Group[ConfinementSettings] = Group(ConfinementSettings)
-    confinement_2: Group[ConfinementSettings] = Group(ConfinementSettings)
-    confinement_3: Group[ConfinementSettings] = Group(ConfinementSettings)
+    # Three vorticity confinements (Fedkiw 2001), each keeping swirls of one size alive: the strengths on a row,
+    # each radius under its strength
+    vorticity_1: Field[float]         = Field(0.0,    min=0.0,    max=100.0,  newline=True, color="purple", description="Confinement 1's epsilon, the force epsilon × cell × (N × curl); 0 = off")
+    vorticity_2: Field[float]         = Field(0.0,    min=0.0,    max=100.0,  color="purple",         description="Confinement 2's epsilon; 0 = off")
+    vorticity_3: Field[float]         = Field(0.0,    min=0.0,    max=100.0,  color="purple",         description="Confinement 3's epsilon; 0 = off")
+    vorticity_radius_1: Field[float]  = Field(0.004,  min=0.001,  max=0.1,    newline=True, widget=Widget.log_slider, color="deep-purple", description="The size of the swirls confinement 1 keeps, widths; at least one cell")
+    vorticity_radius_2: Field[float]  = Field(0.004,  min=0.001,  max=0.1,    widget=Widget.log_slider, color="deep-purple", description="The size of the swirls confinement 2 keeps, widths")
+    vorticity_radius_3: Field[float]  = Field(0.004,  min=0.001,  max=0.1,    widget=Widget.log_slider, color="deep-purple", description="The size of the swirls confinement 3 keeps, widths")
 
 
 class DensitySettings(BaseSettings):

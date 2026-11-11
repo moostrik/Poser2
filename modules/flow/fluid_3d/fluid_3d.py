@@ -40,7 +40,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_REPEA
 
 from modules.gl import ComputeShader, SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
-from .fluid_settings import Advection, ConfinementSettings, Light, PressureSolver, ScatteringModel, Fluid3DSettings, PressureSettings, ParticleSettings, UpscaledDensitySettings
+from .fluid_settings import Advection, Light, PressureSolver, ScatteringModel, Fluid3DSettings, PressureSettings, ParticleSettings, UpscaledDensitySettings
 from .multigrid_pressure import MultigridPressure
 from .face_velocity import FaceVelocity
 from ..shaders import AddBoolean
@@ -566,13 +566,16 @@ class Fluid3D:
             glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _confine_vorticity(self) -> None:
-        """Vorticity confinement, each of the three (`confinement_1` to `confinement_3`) keeping swirls of its own
+        """Vorticity confinement, each of the three (`vorticity_1` to `vorticity_3` at `vorticity_radius_1` to `_3`) keeping swirls of its own
         size alive: every curl in one pass, their forces summed at the cells in one, added to the faces once, each
         face its two cells' mean. The first running confinement's curl is the one the upscaled density's turbulence reads; the
         curl alone while only it does."""
         velocity = self.settings.velocity
-        running: list[ConfinementSettings] = [c for c in (velocity.confinement_1, velocity.confinement_2, velocity.confinement_3)
-                                              if c.strength > 0.0 and c.radius > 0.0]
+        running: list[tuple[float, float]] = [(strength, radius) for strength, radius in
+                                              ((velocity.vorticity_1, velocity.vorticity_radius_1),
+                                               (velocity.vorticity_2, velocity.vorticity_radius_2),
+                                               (velocity.vorticity_3, velocity.vorticity_radius_3))
+                                              if strength > 0.0 and radius > 0.0]
         if not running:
             if self._needs_curl:
                 self._vorticity_curl_shader.use(self._faces.volume, self._obstacle, [self._curl_vol], self._cell, [self._cell[0]],
@@ -588,14 +591,14 @@ class Fluid3D:
             curls.append(curl)
 
         # a. The curls at the cells, from the faces, in one pass
-        self._vorticity_curl_shader.use(self._faces.volume, self._obstacle, curls, self._cell, [c.radius for c in running],
+        self._vorticity_curl_shader.use(self._faces.volume, self._obstacle, curls, self._cell, [radius for _, radius in running],
                                         has_obstacles=self._has_obstacles, closed=self._closed, wall_keep=self._wall_keep)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
         # b. Their force × dt at the cells, epsilon h (N x omega) each (Fedkiw 2001; h the xy cell), summed, then onto the faces
         h_dt: float = self._cell[0] * self._dt
         self._vorticity_force_shader.use(curls, self._obstacle, self._vorticity_force_vol, self._cell,
-                                         [c.strength * h_dt for c in running], has_obstacles=self._has_obstacles)
+                                         [strength * h_dt for strength, _ in running], has_obstacles=self._has_obstacles)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._add_to_faces_shader.add_force(self._faces.volume, self._vorticity_force_vol, 1.0, self._obstacle,
                                             self._closed, self._has_obstacles)

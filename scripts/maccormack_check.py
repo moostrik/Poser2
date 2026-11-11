@@ -11,7 +11,7 @@ total and peak (the compression: water squeezed or stretched gathers or thins it
 over the max, per texel) and the floor: the share of a cell's flux its faces leave unbalanced after the
 projection, mean over the cells inside, by the grid's own stencil (the faces' where the fluid has them).
 
-Settings can be changed by path: `--set velocity.confinement_1.strength=0.3`.
+Settings can be changed by path: `--set velocity.vorticity_1=0.3`.
 
     python scripts/maccormack_check.py [--test swing|swirl] [--seconds 10] [--move 3] [--set path=value ...]
 """
@@ -216,7 +216,7 @@ def edge(alpha: np.ndarray) -> float:
 
 
 def run_swirl(advection: Advection, seconds: float, overrides: list[str]) -> list[tuple[float, ...]]:
-    calm = ['velocity.confinement_1.strength=0', 'velocity.confinement_2.strength=0', 'density.fade_time=0', 'density.evaporation_time=0',
+    calm = ['velocity.vorticity_1=0', 'velocity.vorticity_2=0', 'density.fade_time=0', 'density.evaporation_time=0',
             'velocity.fade_time=0', 'velocity.evaporation_time=0']
     fluid = Fluid3D(fluid_settings(advection, calm + overrides))
     fluid.allocate(2160, 3840)
@@ -252,7 +252,7 @@ def main() -> None:
     parser.add_argument('--test', choices=('swing', 'swirl'), default='swing')
     parser.add_argument('--seconds', type=float, default=10.0)
     parser.add_argument('--move', type=float, default=3.0, help='seconds the body moves')
-    parser.add_argument('--set', action='append', default=[], help='a setting by path, e.g. velocity.confinement_1.strength=0.3')
+    parser.add_argument('--set', action='append', default=[], help='a setting by path, e.g. velocity.vorticity_1=0.3')
     parser.add_argument('--obstacle', action='store_true', help='swing: a disc obstacle below the body; the wall column is its cells')
     args = parser.parse_args()
     mh.context()

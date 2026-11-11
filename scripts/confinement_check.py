@@ -1,10 +1,10 @@
 """The vorticity confinements against each other: the swinging body for `--seconds`, each run's velocity at
 the end, the largest difference between runs that should agree, and how much the second changes the water.
 
-    1 alone         confinement_1 (ε, R), the others off
-    3 alone         confinement_3 (ε, R), the others off: the same water
+    1 alone         confinement 1 (ε, R), the others off
+    3 alone         confinement 3 (ε, R), the others off: the same water
     split           all three at (ε / 4, ε / 4, ε / 2, R): the forces summed, the same water
-    two sizes       confinement_1 (ε, R), confinement_2 (ε, r): what a second size adds
+    two sizes       confinement 1 (ε, R), confinement 2 (ε, r): what a second size adds
 
 deep_flow's preset otherwise (`maccormack_check.fluid_settings`). No app: a hidden window gives the GL context.
 
@@ -52,9 +52,9 @@ def main() -> None:
     e, r, small = args.strength, args.radius, args.small
 
     def config(e1: float, r1: float, e2: float, r2: float, e3: float = 0.0, r3: float = 0.02) -> list[str]:
-        return [f'velocity.confinement_1.strength={e1}', f'velocity.confinement_1.radius={r1}',
-                f'velocity.confinement_2.strength={e2}', f'velocity.confinement_2.radius={r2}',
-                f'velocity.confinement_3.strength={e3}', f'velocity.confinement_3.radius={r3}']
+        return [f'velocity.vorticity_1={e1}', f'velocity.vorticity_radius_1={r1}',
+                f'velocity.vorticity_2={e2}', f'velocity.vorticity_radius_2={r2}',
+                f'velocity.vorticity_3={e3}', f'velocity.vorticity_radius_3={r3}']
 
     one = run(config(e, r, 0.0, small), args.seconds)
     three = run(config(0.0, r, 0.0, small, e, r), args.seconds)

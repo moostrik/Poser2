@@ -31,8 +31,8 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 3313,
-        "auto_exposure": true,
+        "iso": 2499,
+        "auto_exposure": false,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
         "auto_iso_limit": 16585,
@@ -551,24 +551,18 @@
         "evaporation_time": 0.0,
         "viscosity": 0.0,
         "viscosity_iter": 20,
-        "confinement_1": {
-          "strength": 45.05,
-          "radius": 0.1
-        },
-        "confinement_2": {
-          "strength": 0.0,
-          "radius": 0.006
-        },
-        "confinement_3": {
-          "strength": 0.0,
-          "radius": 0.025
-        }
+        "vorticity_1": 45.05,
+        "vorticity_2": 0.0,
+        "vorticity_3": 0.0,
+        "vorticity_radius_1": 0.1,
+        "vorticity_radius_2": 0.006,
+        "vorticity_radius_3": 0.025
       },
       "density": {
         "advection": "MACCORMACK",
         "advection_scale": 0.88,
-        "fade_time": 59.0,
-        "evaporation_time": 62.0
+        "fade_time": 30.0,
+        "evaporation_time": 0.0
       },
       "temperature": {
         "advection": "SEMI_LAGRANGIAN",
@@ -777,9 +771,7 @@
       "y": 31,
       "width": 1918,
       "height": 2080,
-      "secondary_list": [
-        "M1"
-      ],
+      "secondary_list": [],
       "secondary_fullscreen": false,
       "fullscreen_mode": "WINDOWED",
       "fullscreen_mouse": false
