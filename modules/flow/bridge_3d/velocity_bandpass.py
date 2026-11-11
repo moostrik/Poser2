@@ -44,6 +44,12 @@ widths/s² (RGBA16F, xyz):
                                     it ended
 and each part's size, `<part>_speed` (R16F, widths/s).
 
+Each trail holds its z position beside it, where the motion it holds was: the motion's z position
+(`set_z_position`) through the trail's own Ema step, weighted by the speed each step brings (red the z
+position times its weight, green the weight). A start and a bow are where the fast trail's motion was, a stop
+and a wake where the slow trail's was: what a limb leaves behind stays at the limb's depth. One dispatch
+steps both trails and their z positions (`BandpassTrails`).
+
 Steps every tick on its dt while it runs.
 """
 
@@ -51,14 +57,14 @@ import logging
 import math
 
 import numpy as np
-from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R16F, GL_RG16F, GL_RGBA16F, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
+from OpenGL.GL import GL_LINEAR, GL_LINEAR_MIPMAP_LINEAR, GL_R16F, GL_RG16F, GL_RG32F, GL_RGBA16F, GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_TEXTURE_MIN_FILTER, glBindTexture, glGenerateMipmap, glTexParameteri
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil, Port, TextureKind
 from ..shaders import Trail
 from .trails import EPSILON, decay_weight, direction
-from .shaders import Change, VelocityBandpassChange, VelocityBandpassDirection, VelocityBandpassRegion, VelocityBandpassRegionMean, VelocityBandpassRegionSpeed, WeightedSum
+from .shaders import BandpassTrails, Change, VelocityBandpassChange, VelocityBandpassDirection, VelocityBandpassRegion, VelocityBandpassRegionMean, VelocityBandpassRegionSpeed, WeightedSum
 
 logger = logging.getLogger(__name__)
 
@@ -141,6 +147,9 @@ class VelocityBandpass(FlowBase):
 
         self._fast_fbo: SwapFbo = SwapFbo()
         self._slow_fbo: SwapFbo = SwapFbo()
+        self._fast_z_position_fbo: SwapFbo = SwapFbo()     # the fast trail's z position, red over green (RG32F)
+        self._slow_z_position_fbo: SwapFbo = SwapFbo()     # the slow trail's
+        self._current: Texture | None = None               # the motion's z position now
         self._moving_fbo: Fbo = Fbo()                   # the start's: velocity * moving, moving
         self._moving_mean_fbo: Fbo = Fbo()              # a region's mean velocity over its moving pixels, a texel per region
         self._region_fast_fbo: SwapFbo = SwapFbo()      # that mean, through the fast trail
@@ -155,6 +164,7 @@ class VelocityBandpass(FlowBase):
         self._warned_peak: bool = False     # slow_smooth not slower than fast_smooth was logged
 
         self._trail_shader: Trail = Trail()
+        self._trails_shader: BandpassTrails = BandpassTrails()
         self._moving_shader: VelocityBandpassRegion = VelocityBandpassRegion()
         self._moving_mean_shader: VelocityBandpassRegionMean = VelocityBandpassRegionMean()
         self._region_speed_shader: VelocityBandpassRegionSpeed = VelocityBandpassRegionSpeed()
@@ -176,6 +186,16 @@ class VelocityBandpass(FlowBase):
     def slow(self) -> Texture:
         """Slow trail (RGBA16F, xyz)."""
         return self._slow_fbo
+
+    @property
+    def fast_z_position(self) -> Texture:
+        """Where the motion the fast trail holds was, red over green (RG32F): a start's and a bow's."""
+        return self._fast_z_position_fbo
+
+    @property
+    def slow_z_position(self) -> Texture:
+        """Where the motion the slow trail holds was, red over green (RG32F): a stop's and a wake's."""
+        return self._slow_z_position_fbo
 
     @property
     def change(self) -> Texture:
@@ -206,6 +226,8 @@ class VelocityBandpass(FlowBase):
         ports: dict[str, Port] = {'input': Port(self._input_fbo, TextureKind.VELOCITY),
                                   'fast': Port(self._fast_fbo, TextureKind.VELOCITY),
                                   'slow': Port(self._slow_fbo, TextureKind.VELOCITY),
+                                  'fast_z_position': Port(self._fast_z_position_fbo, TextureKind.Z_POSITION),
+                                  'slow_z_position': Port(self._slow_z_position_fbo, TextureKind.Z_POSITION),
                                   'change': Port(self._change_fbo, TextureKind.VELOCITY),
                                   'change_acceleration': Port(self._change_acceleration_fbo, TextureKind.ACCELERATION)}
         for change in Change:
@@ -226,6 +248,8 @@ class VelocityBandpass(FlowBase):
         self._size = (width, height)
         self._fast_fbo.allocate(width, height, GL_RGBA16F)
         self._slow_fbo.allocate(width, height, GL_RGBA16F)
+        self._fast_z_position_fbo.allocate(width, height, GL_RG32F)
+        self._slow_z_position_fbo.allocate(width, height, GL_RG32F)
         for regions, internal_format in ((self._moving_fbo, GL_RGBA16F), (self._region_speed_fbo, GL_RG16F)):
             regions.allocate(width // 2, height // 2, internal_format)
             glBindTexture(GL_TEXTURE_2D, regions.tex_id)
@@ -243,6 +267,7 @@ class VelocityBandpass(FlowBase):
         self.reset()
 
         self._trail_shader.allocate()
+        self._trails_shader.allocate()
         self._moving_shader.allocate()
         self._moving_mean_shader.allocate()
         self._region_speed_shader.allocate()
@@ -253,11 +278,12 @@ class VelocityBandpass(FlowBase):
     def deallocate(self) -> None:
         """Release all resources."""
         super().deallocate()
-        for fbo in (self._fast_fbo, self._slow_fbo, self._moving_fbo, self._moving_mean_fbo, self._region_fast_fbo,
-                    self._region_slow_fbo, self._region_speed_fbo, *self._readings()):
+        for fbo in (self._fast_fbo, self._slow_fbo, self._fast_z_position_fbo, self._slow_z_position_fbo, self._moving_fbo,
+                    self._moving_mean_fbo, self._region_fast_fbo, self._region_slow_fbo, self._region_speed_fbo, *self._readings()):
             fbo.deallocate()
         self._size = (0, 0)
         self._trail_shader.deallocate()
+        self._trails_shader.deallocate()
         self._moving_shader.deallocate()
         self._moving_mean_shader.deallocate()
         self._region_speed_shader.deallocate()
@@ -268,7 +294,8 @@ class VelocityBandpass(FlowBase):
     def reset(self) -> None:
         """Reset all fields to zero."""
         super().reset()
-        for fbo in (self._fast_fbo, self._slow_fbo, self._region_fast_fbo, self._region_slow_fbo, *self._readings()):
+        for fbo in (self._fast_fbo, self._slow_fbo, self._fast_z_position_fbo, self._slow_z_position_fbo,
+                    self._region_fast_fbo, self._region_slow_fbo, *self._readings()):
             FlowUtil.zero(fbo)
 
     def _start_region_grid(self) -> tuple[int, int]:
@@ -292,6 +319,10 @@ class VelocityBandpass(FlowBase):
             return
         FlowUtil.blit(self._input_fbo, velocity)
 
+    def set_z_position(self, z_position: Texture | None) -> None:
+        """The motion's z position now (red over green), what the trails take in with the velocity; None: none."""
+        self._current = z_position
+
     def update(self, delta_time: float = 1.0 / 60.0, acceleration: bool = False) -> None:
         """Advance the trails by `delta_time` and read the changes.
 
@@ -305,8 +336,11 @@ class VelocityBandpass(FlowBase):
         fast_weight: float = decay_weight(delta_time, s.fast_smooth)
         slow_weight: float = decay_weight(delta_time, s.slow_smooth)
 
-        self._advance_trail(self._fast_fbo, self._input, fast_weight)
-        self._advance_trail(self._slow_fbo, self._input, slow_weight)
+        for fbo in (self._fast_fbo, self._slow_fbo, self._fast_z_position_fbo, self._slow_z_position_fbo):
+            fbo.swap()
+        self._trails_shader.use(self._input, self._fast_fbo.back, self._slow_fbo.back, self._fast_z_position_fbo.back,
+                                self._slow_z_position_fbo.back, self._current, self._fast_fbo, self._slow_fbo,
+                                self._fast_z_position_fbo, self._slow_z_position_fbo, fast_weight, slow_weight)
 
         # The mip level of a region: the region textures are half size
         start_lod: float = math.log2(max(s.start_region_size, 2.0)) - 1.0

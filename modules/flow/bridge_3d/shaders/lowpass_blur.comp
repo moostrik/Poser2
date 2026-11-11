@@ -1,7 +1,7 @@
 #version 460 core
 
 // Lowpass Blur
-// The lowpass's Gaussian blur by one sigma, up to three fields in one dispatch: the textbook separable
+// The lowpass's Gaussian blur by one sigma, up to three fields (slots) in one dispatch: the textbook separable
 // Gaussian, its weights exp(-k^2 / 2 sigma^2) out to uRadius, normalized, both directions in one 16 x 16
 // tile and its border in shared memory. Outside the image is 0, as the trail's border is. The numpy
 // reference is velocity_lowpass.gaussian_blur
@@ -18,7 +18,7 @@ uniform sampler2D uSource2;
 layout(rgba16f, binding = 0) writeonly uniform image2D uTarget0;
 layout(rgba16f, binding = 1) writeonly uniform image2D uTarget1;
 layout(rg32f, binding = 2) writeonly uniform image2D uTarget2;
-uniform int uCount;                             // fields, 1 to 3
+uniform int uFields;                            // the slots blurred, a bit each
 uniform int uRadius;                            // taps on each side, MAX_RADIUS at most
 uniform float uWeights[MAX_RADIUS + 1];         // tap k's weight, normalized over -uRadius..uRadius
 uniform ivec2 uSize;
@@ -46,7 +46,7 @@ void main() {
     ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
 
     for (int field = 0; field < 3; field++) {
-        if (field >= uCount) break;
+        if ((uFields & (1 << field)) == 0) continue;
 
         for (int i = index; i < SPAN * SPAN; i += TILE * TILE) {
             ivec2 s = ivec2(i % SPAN, i / SPAN);

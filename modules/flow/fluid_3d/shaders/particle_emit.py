@@ -1,9 +1,10 @@
 """ParticleEmit - new particles from a density source into the ring."""
 from __future__ import annotations
 
-from OpenGL.GL import glUniform1f, glUniform1ui, glUseProgram
+from OpenGL.GL import glUniform1f, glUniform1i, glUniform1ui, glUseProgram
 
 from modules.gl import ComputeShader, StorageBuffer, Texture
+from .z_position_binding import bind_z_position
 
 
 class ParticleEmit(ComputeShader):
@@ -17,8 +18,8 @@ class ParticleEmit(ComputeShader):
         super().__init__()
 
     def use(self, source: Texture, particles: StorageBuffer, ring: StorageBuffer, count: int, *,
-            gain: float, dt: float, rate: float, floor: float, slab: float, layer: float, spread: float,
-            seed: int) -> None:
+            gain: float, dt: float, rate: float, floor: float, layer: float, layers: int, spread: float,
+            seed: int, z_position: Texture | None = None) -> None:
         """Emit from `source` into the ring of `count` particles.
 
         Args:
@@ -30,10 +31,11 @@ class ParticleEmit(ComputeShader):
             dt: The step (s)
             rate: Particles per texel per second where ink is
             floor: The amount below which a texel spawns fewer
-            slab: The injection gaussian's sum over the grid's layers
-            layer: The slab's center in the volume's z, 0 to 1
+            layer: The slab's center where a texel has no z position, 0 to 1, as `layer` is
+            layers: The grid's layers, which place the center and sum the slab for the mass
             spread: Its sigma
             seed: The frame, for the hash
+            z_position: The source's z position (red over green), or None: every texel at `layer`
         """
         if not self.allocated or not self.shader_program or not source.allocated:
             return
@@ -45,8 +47,8 @@ class ParticleEmit(ComputeShader):
         glUniform1f(self.get_uniform_loc("uDt"), dt)
         glUniform1f(self.get_uniform_loc("uRate"), rate)
         glUniform1f(self.get_uniform_loc("uFloor"), floor)
-        glUniform1f(self.get_uniform_loc("uSlab"), slab)
-        glUniform1f(self.get_uniform_loc("uLayer"), layer)
+        bind_z_position(self, 1, z_position, layer)
+        glUniform1i(self.get_uniform_loc("uLayers"), layers)
         glUniform1f(self.get_uniform_loc("uSpread"), spread)
         glUniform1ui(self.get_uniform_loc("uCount"), count)
         glUniform1ui(self.get_uniform_loc("uSeed"), seed & 0xFFFFFFFF)

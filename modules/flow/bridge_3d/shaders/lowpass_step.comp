@@ -1,0 +1,50 @@
+#version 460 core
+
+// Lowpass Step
+// One step of the lowpass's trail and its z position in one dispatch. The trail before, and its z position,
+// are first moved with the trail's motion (uCarry, uv per frame per unit of its velocity): each pixel takes
+// them from where the trail says it came from, linear between pixels, 0 outside. Then one unit-gain Ema
+// step: weight * previous + (1 - weight) * input, the attack weight where the 3D speed rises above the
+// trail's, else the release; the z position the same step on the motion's z position weighted by the speed it
+// brings, so it is where the motion it holds was (red the z position times the weight, green the weight).
+// With uAcceleration, the trail's rate: (new - moved) / dt.
+// The numpy references are trails.advect, velocity_lowpass.velocity_trail, trail_acceleration and z_position_trail
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+uniform sampler2D uTrail;           // the trail before (RGBA16F, xyz widths/s), 0 outside
+uniform sampler2D uZPosition;       // its z position before (RG32F), 0 outside
+uniform sampler2D uVelocity;        // the input velocity (xyz widths/s)
+uniform sampler2D uCurrent;         // the motion's z position now (red over green), read with uHasCurrent
+uniform bool uHasCurrent;
+uniform vec2 uCarry;                // uv per frame per unit of trail velocity, times the advect amount; 0 none
+uniform float uAttack;              // what remains of the trail where the speed rises
+uniform float uRelease;             // what remains elsewhere
+uniform bool uAcceleration;
+uniform float uRate;                // 1 / dt
+uniform ivec2 uSize;
+
+layout(rgba16f, binding = 0) writeonly uniform image2D uTrailOut;
+layout(rg32f, binding = 1) writeonly uniform image2D uZPositionOut;
+layout(rgba16f, binding = 2) writeonly uniform image2D uAccelerationOut;
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(pixel, uSize))) return;
+    vec2 uv = (vec2(pixel) + 0.5) / vec2(uSize);
+
+    vec2 from = uv - texture(uTrail, uv).xy * uCarry;
+    vec3 previous = texture(uTrail, from).xyz;
+    vec2 previous_z = texture(uZPosition, from).rg;
+
+    vec3 velocity = texture(uVelocity, uv).xyz;
+    float speed = length(velocity);
+    float weight = speed > length(previous) ? uAttack : uRelease;
+    vec3 trail = mix(velocity, previous, weight);
+    vec2 current = uHasCurrent ? texture(uCurrent, uv).rg : vec2(0.0);
+    vec2 z_position = weight * previous_z + (1.0 - weight) * speed * current;
+
+    imageStore(uTrailOut, pixel, vec4(trail, 0.0));
+    imageStore(uZPositionOut, pixel, vec4(z_position, 0.0, 0.0));
+    if (uAcceleration) imageStore(uAccelerationOut, pixel, vec4((trail - previous) * uRate, 0.0));
+}

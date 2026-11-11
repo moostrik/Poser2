@@ -59,11 +59,6 @@ def slab_sum(layer: float, spread: float, layers: int) -> float:
     return area * layers        # each cell's mean, over a cell of 1 / layers: the area over the column times the layers
 
 
-def layer_center(layer: float, layers: int) -> float:
-    """The slab's center in the volume's z (0 to 1), as the grid's injection places it."""
-    return (0.5 + layer * (layers - 1)) / layers
-
-
 class ParticleDensity(DensityCarrier):
     """The particle carrier: a ring of `particles.count` particles, emitted, moved and drawn on the GPU."""
 
@@ -158,7 +153,7 @@ class ParticleDensity(DensityCarrier):
         return slab_sum(settings.input.layer, spread, self._layers) / max(self.settings.particles.rate, 1e-6)
 
     def add(self, texture: Texture, gain: float, dt: float, layer: float, spread: float, mode: InjectMode = InjectMode.RATE,
-            target_gain: float = 1.0) -> None:
+            target_gain: float = 1.0, z_position: Texture | None = None) -> None:
         """Particles born where the dye is, as many as its presence × the rate; a FILL's share counted as that
         share of fully dyed added in the step, so a particle look sees both systems alike."""
         if mode == InjectMode.FILL:
@@ -170,8 +165,7 @@ class ParticleDensity(DensityCarrier):
         self._emit_timer.begin()
         self._emit_shader.use(texture, self._particles, self._ring, self._count, gain=gain, dt=dt,
                               rate=self.settings.particles.rate, floor=AMOUNT_FLOOR,
-                              slab=slab_sum(layer, spread, self._layers), layer=layer_center(layer, self._layers),
-                              spread=spread, seed=self._seed)
+                              layer=layer, layers=self._layers, spread=spread, seed=self._seed, z_position=z_position)
         self._emit_timer.end()
 
     def update(self, step: CarrierStep) -> None:

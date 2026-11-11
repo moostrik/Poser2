@@ -321,7 +321,8 @@ class DeepFlowRender(RenderBase):
             mask: Texture | None = mask_layer.texture if mask_layer is not None else None
             depth: DepthView = cast(ls.CenterDepthLayer, self.L[Layers.center_depth][i]).depth_view
             motion.set_input(ls.MotionInput(image.texture, timestamp, dt, depth, mask))
-            bridges[i].set_input(ls.BridgeInput(motion.output.velocity, dt, color.texture if color is not None else None, mask=mask))
+            bridges[i].set_input(ls.BridgeInput(motion.output.velocity, dt, color.texture if color is not None else None, mask=mask,
+                                                z_position=motion.output.z_position))
 
         for i, _fluid in self.L[Layers.fluid].items():
             fluid = cast(ls.Fluid3DLayer, _fluid)
@@ -331,7 +332,10 @@ class DeepFlowRender(RenderBase):
                 output: ls.BridgeOutput = bridge.output
                 injections.append(ls.Injection(output.boundary_velocity, output.boundary_density, output.boundary_temperature,
                                                output.body_force_acceleration, output.body_force_density,
-                                               output.body_force_temperature, weight=self._weight(pose, i, j)))
+                                               output.body_force_temperature, weight=self._weight(pose, i, j),
+                                               boundary_velocity_z_position=output.boundary_velocity_z_position,
+                                               body_force_acceleration_z_position=output.body_force_acceleration_z_position,
+                                               z_position=output.z_position))
             fluid.set_input(ls.FluidInput(dt, injections))
 
         for i, _motion in self.L[Layers.motion].items():

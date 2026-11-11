@@ -10,6 +10,11 @@ widths per frame like the displacement, so all three become view widths per seco
 comes one 3D velocity in image widths per second times `x_gain`, `y_gain` and `z_gain` (1 = true speed,
 0 = that axis off, negative = inverted). With `use_mask`, the velocity is multiplied by the mask.
 
+Beside it, `z_position`: where the body is now in the player's depth range (the depth source's near to
+far), (depth - near) / (far - near), 0 front to 1 back, from the depth track, times its weight in red and
+the weight in green (RG16F): the mask's with `use_mask` (1 without), where the depth lies in the range,
+else 0, no z position. z stays in view widths per second, as x/y.
+
 z lags its motion by the time it is smoothed over. With `z.xy_smooth`, x/y goes through the
 same filter over `z.smooth` before its threshold, carried along the displacement as z is, so
 both lag alike. A displacement is a step of position, so the filter is the same one: with a steady frame
@@ -20,13 +25,13 @@ still moves the tracks with it, or on a slope it would read as z.
 The settings in flow pixels go with the flow's resolution: the solve's, and `z.threshold`.
 Those in metres and milliseconds do not.
 
-`filter_displacement` and `displacement_velocity` below are the numpy references of the shaders.
+`filter_displacement`, `displacement_velocity` and `z_position` below are the numpy references of the shaders.
 """
 
 import math
 
 import numpy as np
-from OpenGL.GL import GL_RG32F, GL_RGBA16F, GL_RGBA32F
+from OpenGL.GL import GL_RG16F, GL_RG32F, GL_RGBA16F, GL_RGBA32F
 
 from modules.gl import Fbo, SwapFbo, Texture
 from modules.settings import BaseSettings, Field, Group, Widget
@@ -35,7 +40,7 @@ from ..finite_guard import FiniteGuard, GuardSlot
 from .depth_velocity import DepthVelocity, DepthVelocitySettings, track_weights
 from .solve_capture import SolveCapture
 from .lucas_kanade_flow import LucasKanadeFlow, LucasKanadeFlowSettings, _bilinear
-from .shaders import ComposeVelocity, DisplacementFilter, DisplacementThreshold
+from .shaders import ComposeVelocity, DisplacementFilter, DisplacementThreshold, ZPosition
 
 MIN_DELTA_TIME: float = 1e-3        # s: an interval at or below this is not a frame's
 FALLBACK_DELTA_TIME: float = 1.0 / 30.0     # s: the interval taken in its place
@@ -70,6 +75,8 @@ class LucasKanadeFlow3D:
         self._followed: Fbo = Fbo()                 # the filtered displacement with the noise floor taken off
         self._following: bool = False
         self._velocity: Fbo = Fbo()
+        self._z_position: Fbo = Fbo()               # where the body is now in the depth range, red over green
+        self._z_position_shader: ZPosition = ZPosition()
         self._threshold_shader: DisplacementThreshold = DisplacementThreshold()
         self._filter_shader: DisplacementFilter = DisplacementFilter()
         self._compose_shader: ComposeVelocity = ComposeVelocity()
@@ -85,6 +92,12 @@ class LucasKanadeFlow3D:
         return self._velocity
 
     @property
+    def z_position(self) -> Texture:
+        """Where the body is now in the depth range, 0 front to 1 back, times its weight in red, the weight in
+        green (RG16F); 0 without depth."""
+        return self._z_position
+
+    @property
     def depth_velocity(self) -> DepthVelocity:
         """Its z, before `z_gain` and the mask."""
         return self._depth_velocity
@@ -96,7 +109,8 @@ class LucasKanadeFlow3D:
         return {**prefixed('xy', {**self._flow.ports,
                                   'filtered': Port(self._filtered, TextureKind.VELOCITY, held=2),     # BA the position error, state
                                   'followed': Port(self._followed, TextureKind.VELOCITY)}),
-                **prefixed('z', self._depth_velocity.ports)}
+                **prefixed('z', self._depth_velocity.ports),
+                'z_position': Port(self._z_position, TextureKind.Z_POSITION)}
 
     def allocate(self, width: int, height: int) -> None:
         self._flow.allocate(width, height)
@@ -104,6 +118,8 @@ class LucasKanadeFlow3D:
         self._filtered.allocate(width, height, GL_RGBA32F)
         self._followed.allocate(width, height, GL_RG32F)
         self._velocity.allocate(width, height, GL_RGBA16F)
+        self._z_position.allocate(width, height, GL_RG16F)
+        self._z_position_shader.allocate()
         self._threshold_shader.allocate()
         self._filter_shader.allocate()
         self._compose_shader.allocate()
@@ -116,6 +132,8 @@ class LucasKanadeFlow3D:
         self._filtered.deallocate()
         self._followed.deallocate()
         self._velocity.deallocate()
+        self._z_position.deallocate()
+        self._z_position_shader.deallocate()
         self._threshold_shader.deallocate()
         self._filter_shader.deallocate()
         self._compose_shader.deallocate()
@@ -127,6 +145,7 @@ class LucasKanadeFlow3D:
         self._filtered.clear_all()
         self._followed.clear()
         self._velocity.clear()
+        self._z_position.clear()
 
     def _slot(self, output: str, guarded: bool) -> GuardSlot | None:
         """The output's slot in the motion's guard while `guarded`, else None."""
@@ -141,7 +160,7 @@ class LucasKanadeFlow3D:
         self._mask = texture
 
     def update(self, depth: Texture | None, delta_time: float, view_span: float, depth_step: tuple[float, float],
-               guarded: bool = False) -> None:
+               guarded: bool = False, depth_range: tuple[float, float] = (0.0, 0.0)) -> None:
         """Measure between the newest two frames.
 
         Args:
@@ -150,6 +169,7 @@ class LucasKanadeFlow3D:
             view_span: Metres one view width spans per metre of depth, for z
             depth_step: uv between two depth samples in the flow's view, for z
             guarded: Set the outputs' non-finite values to 0, count and log them (`guard`)
+            depth_range: The player's depth range, near and far (m), for `z_position`
         """
         if not self._flow.ready:
             FlowUtil.zero(self._velocity)
@@ -198,10 +218,30 @@ class LucasKanadeFlow3D:
                                  (per_second * s.x_gain, per_second * aspect * s.y_gain, per_second * s.z_gain), mask,
                                  self._slot('velocity', guarded))
         self._velocity.end()
+
+        if depth is not None:
+            self._z_position.begin()
+            self._z_position_shader.use(self._depth_velocity.difference, depth_range[0], depth_range[1],
+                                        self._mask if s.use_mask and self._mask is not None and self._mask.allocated else None)
+            self._z_position.end()
+        else:
+            self._z_position.clear()
         self._guard.update(delta_time)
 
 
 # ── numpy reference ─────────────────────────────────────────────────────
+
+def z_position(disparity: np.ndarray, near: float, far: float, mask: np.ndarray | None = None) -> np.ndarray:
+    """Where the body is now in the depth range (..., 2): the z position, (depth - near) / (far - near), times its
+    weight, and the weight, the mask's (1 without) where the depth (1 / `disparity`, m) lies from near to far,
+    else 0. Mirrors z_position.frag."""
+    depth: np.ndarray = np.where(disparity > 1e-6, 1.0 / np.maximum(disparity, 1e-6), 0.0)
+    weight: np.ndarray = ((depth >= near) & (depth <= far) & (far > near)).astype(np.float64)
+    if mask is not None:
+        weight = weight * mask
+    z: np.ndarray = np.where(weight > 0.0, (depth - near) / max(far - near, 1e-9), 0.0)
+    return np.stack((z * weight, weight), axis=-1)
+
 
 def filter_displacement(displacement: np.ndarray, state: np.ndarray, carry: np.ndarray, alpha: float) -> np.ndarray:
     """The filter x/y goes through with z.xy_smooth, one frame on (H, W, 4): the filtered

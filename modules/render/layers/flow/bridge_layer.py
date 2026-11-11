@@ -27,12 +27,13 @@ class BridgeInput:
     """One camera's velocity for the bridge stage, built by the app each tick. `velocity` is the
     motion output; `dt` the render tick's; `image`, or None, the picture whose RGB colors the
     density; `color` an RGB tint on it, white by default, the color alone without an image; `mask`
-    the player's mask on the view, or None, which gates the image."""
+    the player's mask on the view, or None, which gates the image; `z_position` the motion's, or None."""
     velocity: Annotated[Texture, TextureKind.VELOCITY]
     dt: float
     image: Annotated[Texture | None, TextureKind.IMAGE] = None
     color: tuple[float, float, float] = (1.0, 1.0, 1.0)
     mask: Annotated[Texture | None, TextureKind.SCALAR] = None
+    z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
 
 
 @dataclass
@@ -41,13 +42,18 @@ class BridgeOutput(StageOutput):
     dragged toward: `boundary_velocity`, widths/s; `boundary_density`, in 2D the amount alone, in 3D RGBA,
     the amount times the color, with the amount as alpha; `boundary_temperature`. The body force, what is
     added × dt, the 3D bridge's only: `body_force_acceleration`, widths/s², `body_force_density`,
-    `body_force_temperature`, each None while the bridge gives none."""
+    `body_force_temperature`, each None while the bridge gives none. Where each goes in depth, the 3D bridge's
+    only: `boundary_velocity_z_position` and `body_force_acceleration_z_position`, their readings' z positions,
+    and `z_position`, the body's now, for the densities and the temperatures; None without."""
     boundary_velocity: Annotated[Texture, TextureKind.VELOCITY]
     boundary_density: Annotated[Texture, TextureKind.IMAGE]
     boundary_temperature: Annotated[Texture, TextureKind.SCALAR]
     body_force_acceleration: Annotated[Texture | None, TextureKind.ACCELERATION] = None
     body_force_density: Annotated[Texture | None, TextureKind.IMAGE] = None
     body_force_temperature: Annotated[Texture | None, TextureKind.SCALAR] = None
+    boundary_velocity_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
+    body_force_acceleration_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
+    z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
 
 
 class BridgeLayerSettings(StageLayerSettings):

@@ -1,8 +1,9 @@
 #version 460 core
 
 /*
- * Inject3D - a 2D input into a 3D volume at a target depth layer, in the gaussian slab around uTargetLayer:
- * weight = the body's share of the cell (slab.glsl) × uStrength. By uMode:
+ * Inject3D - a 2D input into a 3D volume, in the gaussian slab around each pixel's z position (uTargetLayer
+ * without one): weight = the body's share of the cell (slab.glsl) × uStrength. One invocation a column: the
+ * input and its z position read once, then the cells the slab reaches. By uMode:
  *   0 ADD     the input × weight added
  *   1 RATE    the same, the field capped at its full value: a density's alpha at 1 (its color scaled with it),
  *             a scalar (uScalar) at ±1
@@ -11,16 +12,18 @@
  *             nothing is pulled toward 0
  */
 
-layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;     // a brick of cells, so z neighbors share the cache
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;   // a column of cells each
 
 // 2D input texture
 layout(binding = 0) uniform sampler2D uInput;     // 2D source (any format)
+layout(binding = 1) uniform sampler2D uZPosition; // its z position, red over green
 
 // 3D output volume
 layout(rgba16f, binding = 0) uniform image3D uVolume;  // Read-write
 
 // Parameters
-uniform float uTargetLayer;  // Normalized depth [0, 1] — center of injection
+uniform float uTargetLayer;  // Normalized depth [0, 1]: the center where the input has no z position
+uniform bool  uHasZPosition;
 uniform float uSpread;       // Gaussian sigma in normalized depth units
 uniform float uStrength;     // Injection strength multiplier: × dt for ADD and RATE, the drag's share for FILL
 uniform int   uMode;         // 0 ADD, 1 RATE, 2 FILL
@@ -31,34 +34,41 @@ uniform ivec3 uSize;
 #include "slab.glsl"
 
 void main() {
-    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
-    if (any(greaterThanEqual(gid, uSize))) return;
-
-    // The body's share of this cell's depth (slab.glsl)
-    float weight = slab_cell(gid.z, uSize.z) * uStrength;
-
-    if (weight < 0.001) return;  // Skip negligible contributions
+    ivec2 column = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(column, uSize.xy))) return;
 
     // Sample 2D input at this XY position
-    vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
+    vec2 uv = (vec2(column) + 0.5) / vec2(uSize.xy);
     vec4 source = texture(uInput, uv);
-    // Nothing to add or fill where the image is empty (most of it): the texel stays as it is, unread and unwritten
+    // Nothing to add or fill where the image is empty (most of it): the column stays as it is, unread and unwritten
     if (all(equal(source, vec4(0.0)))) return;
-    vec4 current = imageLoad(uVolume, gid);
     if (uMode == 2) {
         if (uScalar) {
             source.r = clamp(source.r * uGain, -1.0, 1.0);
         } else if (source.a > 0.0) {
             source *= min(source.a * uGain, 1.0) / source.a;     // the presence times the gain, the color kept
         }
-        bool fills = uScalar ? source.r != 0.0 : source.a > current.a;
-        if (fills) current += (source - current) * min(weight, 1.0);
-    } else {
-        current += source * weight;
-        if (uMode == 1) {
-            if (uScalar) current.r = clamp(current.r, -1.0, 1.0);
-            else if (current.a > 1.0) current /= current.a;
-        }
     }
-    imageStore(uVolume, gid, current);
+
+    float center = slab_center(uv);
+    ivec2 cells = slab_cells(center, uSize.z);
+    for (int z = cells.x; z <= cells.y; z++) {
+        // The body's share of this cell's depth (slab.glsl)
+        float weight = slab_cell(z, center, uSize.z) * uStrength;
+        if (weight < 0.001) continue;  // Skip negligible contributions
+        ivec3 gid = ivec3(column, z);
+        vec4 current = imageLoad(uVolume, gid);
+        if (uMode == 2) {
+            bool fills = uScalar ? source.r != 0.0 : source.a > current.a;
+            if (!fills) continue;
+            current += (source - current) * min(weight, 1.0);
+        } else {
+            current += source * weight;
+            if (uMode == 1) {
+                if (uScalar) current.r = clamp(current.r, -1.0, 1.0);
+                else if (current.a > 1.0) current /= current.a;
+            }
+        }
+        imageStore(uVolume, gid, current);
+    }
 }

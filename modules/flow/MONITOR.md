@@ -36,7 +36,8 @@ The monitor's panel group (`MonitorLayerSettings`) says what is drawn; its `adva
 An arrow reaches one spacing at speed 1 and at most two (the shader rolls its length off toward
 2), and its lines are spacing / 20 wide (`ARROW_WIDTH`), so the arrows keep their proportions at
 every spacing. A scalar's dot is the colormap's color of its value, its radius half a spacing
-times `tanh` of its amount, so small values draw small dots.
+times `tanh` of its amount, so small values draw small dots. A z position is drawn as itself, 0 front
+to 1 back, in X and its weight in Y (`ZPositionView`), not as the weighted pair it travels as.
 
 The strip starts over when `stage`, `texture` or `channel` changes, or when `view` turns to
 `STRIP`, so it never shows another texture's history and needs no reset button.

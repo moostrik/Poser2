@@ -59,7 +59,8 @@ class CenterDepthLayer(LayerBase):
     def depth_view(self) -> DepthView:
         """The depth as the flow measures z from it: `depth`, with the view's span and the uv between
         two of the depth's own samples in it."""
-        return DepthView(self._depth, self._geometry.view_span, self._geometry.depth_step(self._depth_source.sample_size))
+        return DepthView(self._depth, self._geometry.view_span, self._geometry.depth_step(self._depth_source.sample_size),
+                         self._view_settings.near, self._view_settings.far)
 
     @property
     def texture(self) -> Texture:

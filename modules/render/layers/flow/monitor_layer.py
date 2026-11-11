@@ -15,7 +15,7 @@ from enum import IntEnum, auto
 from OpenGL.GL import GL_VIEWPORT, glGetIntegerv, glViewport
 
 from modules.gl import Texture, Texture3D, Style, Blit, MouseButton
-from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind, VolumeCut, VolumeCube, CubeColor, VolumeGlyphs, Cut, Orbit, PITCH_LIMIT, ZOOM_LIMITS, box_size, axis_labels, REFERENCE_STEP
+from modules.flow import Visualizer, Strip, ALL_CHANNELS, Legend, LegendKind, DrawnSize, Port, TextureKind, VolumeCut, VolumeCube, CubeColor, VolumeGlyphs, Cut, Orbit, PITCH_LIMIT, ZOOM_LIMITS, box_size, axis_labels, REFERENCE_STEP, ZPositionView
 from modules.settings import Field, BaseSettings, Group, Widget
 from ..layer_base import LayerBase
 
@@ -110,6 +110,7 @@ _CUBE_COLORS: dict[TextureKind, CubeColor] = {
     TextureKind.VELOCITY: CubeColor.DIRECTION,
     TextureKind.SCALAR: CubeColor.CENTERED,
     TextureKind.ACCELERATION: CubeColor.DIRECTION,
+    TextureKind.Z_POSITION: CubeColor.CENTERED,
 }
 
 
@@ -134,6 +135,7 @@ class MonitorLayer(LayerBase):
         self._volume_cut: VolumeCut = VolumeCut()   # a volume's front, flat, for the strip
         self._volume_cube: VolumeCube = VolumeCube()    # a volume in 3D, for the colormap and image views
         self._volume_glyphs: VolumeGlyphs = VolumeGlyphs()  # a volume in 3D, for the glyphs
+        self._z_position_view: ZPositionView = ZPositionView()  # a z position drawn as itself and its weight
         self._shown_3d: Texture | None = None       # what it rendered last, when it is one of the 3D views
         self._axes: list[tuple[str, float, float]] = []     # a 3D view's axis letters and their places, for the legend
         self._orbit: Orbit = Orbit()                # the 3D views' camera, set from `advanced.orbit` at each draw
@@ -191,12 +193,14 @@ class MonitorLayer(LayerBase):
         self._volume_cut.allocate()
         self._volume_cube.allocate()
         self._volume_glyphs.allocate()
+        self._z_position_view.allocate()
         self._allocated = True
 
     def deallocate(self) -> None:
         self._volume_cut.deallocate()
         self._volume_cube.deallocate()
         self._volume_glyphs.deallocate()
+        self._z_position_view.deallocate()
         self._visualizer.deallocate()
         self._strip.deallocate()
         self._legend.deallocate()
@@ -325,6 +329,8 @@ class MonitorLayer(LayerBase):
         reads, the volume's mean; the histogram counts the volume itself."""
         if not port.volume:
             assert isinstance(port.texture, Texture)
+            if port.kind == TextureKind.Z_POSITION:
+                return self._z_position_view.process(port.texture)     # the z position over its weight, and the weight
             return port.texture
         volume = port.texture
         assert isinstance(volume, Texture3D)

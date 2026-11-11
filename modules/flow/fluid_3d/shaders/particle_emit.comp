@@ -8,7 +8,7 @@
  * spawns now and then; each new particle takes amount × gain × dt × slab / expected as its mass, so
  * the texel's mass is the grid's in expectation (slab: the gaussian's sum over the grid's layers)
  * and a strong drop makes heavy particles. Its color is the source's, its place a random point in
- * the texel, its z drawn from the injection's gaussian. The slots come from an atomic head, modulo
+ * the texel, its z drawn from the injection's gaussian around the texel's z position (uLayer without one). The slots come from an atomic head, modulo
  * the count: a ring, the oldest overwritten.
  *
  * A particle: position (xyz in the volume's uv, w = packHalf2x16(mass, age)), previous (xyz,
@@ -22,18 +22,22 @@ layout(std430, binding = 0) buffer Particles { Particle particles[]; };
 layout(std430, binding = 1) buffer Ring { uint head; };
 
 layout(binding = 0) uniform sampler2D uSource;
+layout(binding = 1) uniform sampler2D uZPosition;   // the source's z position, red over green
 
 uniform float uGain;        // the source's gain × the injection's weight
 uniform float uDt;          // s
 uniform float uRate;        // particles per texel per second where ink is
 uniform float uFloor;       // the amount below which a texel spawns fewer
-uniform float uSlab;        // the gaussian's sum over the grid's layers
-uniform float uLayer;       // the slab's center in the volume's z, 0 to 1, as the grid's layers place it
+uniform float uTargetLayer; // the slab's center where the source has no z position, 0 to 1, as `layer` is
+uniform bool  uHasZPosition;
+uniform int   uLayers;      // the grid's layers, which place the center and sum the slab
 uniform float uSpread;      // its sigma
 uniform uint  uCount;       // the ring's size
 uniform uint  uSeed;        // the frame
 
 const int MAX_PER_TEXEL = 16;
+
+#include "slab.glsl"
 
 uint hash(uint x) {
     x ^= x >> 16; x *= 0x7feb352du;
@@ -62,7 +66,9 @@ void main() {
     n = min(n, MAX_PER_TEXEL);
     if (n <= 0) return;
 
-    float mass = amount * uGain * uDt * uSlab / max(expected, 1e-6);
+    float center = slab_center((vec2(gid) + 0.5) / vec2(size));
+    float middle = slab_middle(center, uLayers);    // the slab's center in the volume's z, as the grid's layers place it
+    float mass = amount * uGain * uDt * slab_column(center, uLayers) / max(expected, 1e-6);
     vec3 color = clamp(source.rgb / amount, 0.0, 1.0);
     float packed_color = uintBitsToFloat(packUnorm4x8(vec4(color, 1.0)));
     float packed_mass = uintBitsToFloat(packHalf2x16(vec2(mass, 0.0)));
@@ -73,7 +79,7 @@ void main() {
         vec2 uv = (vec2(gid) + vec2(random(state), random(state))) / vec2(size);
         // a gaussian z by Box-Muller
         float r = sqrt(-2.0 * log(max(random(state), 1e-7)));
-        float z = clamp(uLayer + uSpread * r * cos(6.2831853 * random(state)), 0.0, 1.0);
+        float z = clamp(middle + uSpread * r * cos(6.2831853 * random(state)), 0.0, 1.0);
         vec3 position = vec3(uv, z);
         particles[slot].position = vec4(position, packed_mass);
         particles[slot].previous = vec4(position, packed_color);

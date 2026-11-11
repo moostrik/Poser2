@@ -15,3 +15,4 @@ from .glyph_arrows import GlyphArrows
 from .glyph_dots import GlyphDots
 from .volume_cube import VolumeCubeShader, CubeColor
 from .histogram_count_volume import HistogramCountVolume
+from .z_position_resolve import ZPositionResolve

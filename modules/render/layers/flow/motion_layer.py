@@ -60,8 +60,10 @@ class MotionInput:
 @dataclass
 class MotionOutput(StageOutput):
     """The motion stage's textures: `velocity` (x, y, z) in view widths per second, gated by the mask
-    with the flow's `use_mask`, z 0 without depth."""
+    with the flow's `use_mask`, z 0 without depth; `z_position`, the body's now in the player's depth range,
+    the 3D motion's only, None without."""
     velocity: Annotated[Texture, TextureKind.VELOCITY]
+    z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
 
 
 class MotionLayerSettings(StageLayerSettings):

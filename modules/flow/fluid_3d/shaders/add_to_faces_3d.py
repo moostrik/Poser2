@@ -6,6 +6,7 @@ from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE_2D, glActiveTexture, glBindTexture
 
 from modules.gl import Texture, Texture3D, ComputeShader
 from .face_binding import UNSPACED, bind_faces, bind_face_writes
+from .z_position_binding import bind_z_position
 
 FORCE: int = 0
 DRAG: int = 1
@@ -32,12 +33,13 @@ class AddToFaces3D(ComputeShader):
 
     def drag(self, faces: Texture3D, cells: tuple[int, int, int], velocity: Texture, target_layer: float,
              spread: float, gain: float, share: float, weight: float, floor: float,
-             obstacle: Texture3D, closed: tuple[bool, bool, bool], has_obstacles: bool) -> None:
+             obstacle: Texture3D, closed: tuple[bool, bool, bool], has_obstacles: bool,
+             z_position: Texture | None = None) -> None:
         """Each face in the slab pulled toward the body's velocity (widths/s) × `gain` by `share` × its presence
-        × `weight`, never past it."""
+        × `weight`, never past it; the slab centered on `z_position` (red over green), `target_layer` without one."""
         if not self._begin(DRAG, faces, cells, obstacle, closed, has_obstacles):
             return
-        self._bind_input(velocity, target_layer, spread)
+        self._bind_input(velocity, target_layer, spread, z_position)
         glUniform1f(self.get_uniform_loc('uGain'), gain)
         glUniform1f(self.get_uniform_loc('uShare'), share)
         glUniform1f(self.get_uniform_loc('uWeight'), weight)
@@ -46,11 +48,13 @@ class AddToFaces3D(ComputeShader):
 
     def add_acceleration(self, faces: Texture3D, cells: tuple[int, int, int], acceleration: Texture,
                          target_layer: float, spread: float, strength: float,
-                         obstacle: Texture3D, closed: tuple[bool, bool, bool], has_obstacles: bool) -> None:
-        """The body's acceleration (widths/s²) × `strength` (weight × gain × dt) added in the slab."""
+                         obstacle: Texture3D, closed: tuple[bool, bool, bool], has_obstacles: bool,
+                         z_position: Texture | None = None) -> None:
+        """The body's acceleration (widths/s²) × `strength` (weight × gain × dt) added in the slab, centered on
+        `z_position` (red over green), `target_layer` without one."""
         if not self._begin(BODY_FORCE, faces, cells, obstacle, closed, has_obstacles):
             return
-        self._bind_input(acceleration, target_layer, spread)
+        self._bind_input(acceleration, target_layer, spread, z_position)
         glUniform1f(self.get_uniform_loc('uStrength'), strength)
         self._dispatch()
 
@@ -65,11 +69,11 @@ class AddToFaces3D(ComputeShader):
         self._cells = cells
         return True
 
-    def _bind_input(self, texture: Texture, target_layer: float, spread: float) -> None:
+    def _bind_input(self, texture: Texture, target_layer: float, spread: float, z_position: Texture | None) -> None:
         glActiveTexture(int(GL_TEXTURE0) + 1)
         glBindTexture(GL_TEXTURE_2D, texture.tex_id)
         glUniform1i(self.get_uniform_loc('uInput'), 1)
-        glUniform1f(self.get_uniform_loc('uTargetLayer'), target_layer)
+        bind_z_position(self, 3, z_position, target_layer)
         glUniform1f(self.get_uniform_loc('uSpread'), spread)
 
     def _dispatch(self) -> None:

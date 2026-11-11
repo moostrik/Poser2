@@ -16,7 +16,7 @@ def decay_weight(dt: float, time: float) -> float:
 
 def advect(field: np.ndarray, displacement: np.ndarray, amount: float) -> np.ndarray:
     """`field` (H, W, C) moved along `displacement` (H, W, 2, uv per frame) by `amount`: each pixel takes the
-    value from where it came from, linear between pixels, clamped at the edges. Mirrors trail_advect.frag."""
+    value from where it came from, linear between pixels, clamped at the edges. Mirrors lowpass_step.comp."""
     h, w = field.shape[:2]
     rows, columns = np.mgrid[0:h, 0:w].astype(np.float64)
     x: np.ndarray = np.clip(columns - amount * displacement[..., 0] * w, 0.0, w - 1.0)

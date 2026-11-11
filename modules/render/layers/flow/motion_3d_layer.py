@@ -28,7 +28,7 @@ class Motion3DLayer(MotionLayer):
 
     @property
     def output(self) -> MotionOutput:
-        return MotionOutput(self._flow.velocity)
+        return MotionOutput(self._flow.velocity, self._flow.z_position)
 
     def _components(self) -> dict[str, HasPorts]:
         return {'': self._flow}     # its own parts carry their groups' names, xy and z
@@ -58,5 +58,6 @@ class Motion3DLayer(MotionLayer):
         self._gpu_timer.begin()
         flow.update(depth.texture if depth is not None else None, interval,
                     depth.view_span if depth is not None else 0.0,
-                    depth.depth_step if depth is not None else (0.0, 0.0), guarded=self.settings.guard)
+                    depth.depth_step if depth is not None else (0.0, 0.0), guarded=self.settings.guard,
+                    depth_range=(depth.near, depth.far) if depth is not None else (0.0, 0.0))
         self._gpu_timer.end()

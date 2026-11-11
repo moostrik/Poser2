@@ -952,73 +952,78 @@ class Fluid3D:
 
     # ========== Input Methods (2D -> 3D injection) ==========
 
-    def drag_velocity(self, texture: Texture, weight: float = 1.0) -> None:
+    def drag_velocity(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
         """The boundary: drag the velocity in the gaussian birth slab toward the body's velocity (x, y on
         the image plane, z toward the camera; widths/s) × input.boundary.velocity_gain, over input.boundary.velocity_drag, where
         the body moves (its speed above DRAG_FLOOR), never past it. The volume's w is -z, in widths/s as x
         and y (the box as deep as it stands for); +W moves fluid away from the viewer (layer 0
         is the front face).
-        Without depth, z is 0, and so is w.
+        Without depth, z is 0, and so is w. The slab is centered on each pixel's `z_position` (red over green),
+        on input.layer where it has none or without one.
         """
         if not self._allocated:
             return
         boundary = self.settings.input.boundary
         self._add_to_faces_shader.drag(self._faces.volume, self._cells, texture, self.settings.input.layer, self._spread(),
                                        boundary.velocity_gain, drag_share(self._dt, boundary.velocity_drag), weight,
-                                       DRAG_FLOOR, self._obstacle, self._closed, self._has_obstacles)
+                                       DRAG_FLOOR, self._obstacle, self._closed, self._has_obstacles, z_position)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-    def add_acceleration(self, texture: Texture, weight: float = 1.0) -> None:
+    def add_acceleration(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
         """The body force: add the acceleration (x, y on the image plane, z toward the camera; widths/s²)
-        × input.body_force.acceleration_gain × dt into the gaussian birth slab; w is -z, as the boundary's."""
+        × input.body_force.acceleration_gain × dt into the gaussian birth slab at `z_position`; w is -z, as the
+        boundary's."""
         if not self._allocated:
             return
         self._add_to_faces_shader.add_acceleration(self._faces.volume, self._cells, texture, self.settings.input.layer,
                                                    self._spread(), weight * self.settings.input.body_force.acceleration_gain * self._dt,
-                                                   self._obstacle, self._closed, self._has_obstacles)
+                                                   self._obstacle, self._closed, self._has_obstacles, z_position)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-    def add_boundary_density(self, texture: Texture, weight: float = 1.0) -> None:
+    def add_boundary_density(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
         """The boundary's dye (RGBA, its color times its presence, the presence as alpha, 0 to 1): the water in the
         slab filled toward it times input.boundary.density_gain (at most fully dyed) over density_drag, never past
         it, by the carriers."""
         boundary = self.settings.input.boundary
         share: float = drag_share(self._dt, boundary.density_drag) * weight
-        self._add_density(texture, share, InjectMode.FILL, boundary.density_gain)
+        self._add_density(texture, share, InjectMode.FILL, boundary.density_gain, z_position)
 
-    def add_body_force_density(self, texture: Texture, weight: float = 1.0) -> None:
+    def add_body_force_density(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
         """The body force's dye (RGBA, a push's color times its presence) at input.body_force.density_rate, fully
         dyed water per second at a full push, × dt into the slab, capped at fully dyed, by the carriers."""
-        self._add_density(texture, weight * self.settings.input.body_force.density_rate, InjectMode.RATE)
+        self._add_density(texture, weight * self.settings.input.body_force.density_rate, InjectMode.RATE, z_position=z_position)
 
-    def _add_density(self, texture: Texture, gain: float, mode: InjectMode, target_gain: float = 1.0) -> None:
+    def _add_density(self, texture: Texture, gain: float, mode: InjectMode, target_gain: float = 1.0,
+                     z_position: Texture | None = None) -> None:
         if not self._allocated:
             return
         for carrier in self._densities:
-            carrier.add(texture, gain, self._dt, self.settings.input.layer, self._spread(), mode, target_gain)
+            carrier.add(texture, gain, self._dt, self.settings.input.layer, self._spread(), mode, target_gain, z_position)
 
-    def add_boundary_temperature(self, texture: Texture, weight: float = 1.0) -> None:
+    def add_boundary_temperature(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
         """The boundary's warmth (-1 cold to 1 hot, its presence folded in): the water in the slab dragged toward
         it times input.boundary.temperature_gain (at most ±1) over temperature_drag where the body is."""
         if self.settings.temperature.buoyancy == 0.0:      # nothing reads it
             return
         boundary = self.settings.input.boundary
         share: float = drag_share(self._dt, boundary.temperature_drag) * weight
-        self._add_temperature(texture, share, InjectMode.FILL, boundary.temperature_gain)
+        self._add_temperature(texture, share, InjectMode.FILL, boundary.temperature_gain, z_position)
 
-    def add_body_force_temperature(self, texture: Texture, weight: float = 1.0) -> None:
+    def add_body_force_temperature(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
         """The body force's warmth at input.body_force.temperature_rate, full warmth per second at a full push,
         × dt into the slab, capped at ±1."""
         if self.settings.temperature.buoyancy == 0.0:      # nothing reads it
             return
-        self._add_temperature(texture, weight * self.settings.input.body_force.temperature_rate * self._dt, InjectMode.RATE)
+        self._add_temperature(texture, weight * self.settings.input.body_force.temperature_rate * self._dt, InjectMode.RATE,
+                              z_position=z_position)
 
-    def _add_temperature(self, texture: Texture, strength: float, mode: InjectMode, target_gain: float = 1.0) -> None:
+    def _add_temperature(self, texture: Texture, strength: float, mode: InjectMode, target_gain: float = 1.0,
+                         z_position: Texture | None = None) -> None:
         """The warmth into the temperature's gaussian birth slab: dragged toward (FILL) or added (RATE)."""
         if not self._allocated:
             return
         self._inject_shader.use(texture, self._temperature, self.settings.input.layer, self._spread(), strength,
-                                internal_format=GL_R16F, mode=int(mode), scalar=True, gain=target_gain)
+                                internal_format=GL_R16F, mode=int(mode), scalar=True, gain=target_gain, z_position=z_position)
         glMemoryBarrier(_BARRIER_IMAGE)
 
     def set_obstacle(self, texture: Texture) -> None:

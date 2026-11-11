@@ -74,16 +74,16 @@ class Fluid3DLayer(FluidLayer):
     @staticmethod
     def _inject_into(fluid: Fluid3D, injection: Injection) -> None:
         # The boundary's velocity is dragged toward, the body force's acceleration added × dt; the z (blue) of
-        # each is the w
-        fluid.drag_velocity(injection.boundary_velocity, injection.weight)
+        # each is the w. Each goes in at its own z position, the density and the temperature at the body's now
+        fluid.drag_velocity(injection.boundary_velocity, injection.weight, injection.boundary_velocity_z_position)
         if injection.body_force_acceleration is not None:
-            fluid.add_acceleration(injection.body_force_acceleration, injection.weight)
-        fluid.add_boundary_density(injection.boundary_density, injection.weight)
+            fluid.add_acceleration(injection.body_force_acceleration, injection.weight, injection.body_force_acceleration_z_position)
+        fluid.add_boundary_density(injection.boundary_density, injection.weight, injection.z_position)
         if injection.body_force_density is not None:
-            fluid.add_body_force_density(injection.body_force_density, injection.weight)
-        fluid.add_boundary_temperature(injection.boundary_temperature, injection.weight)
+            fluid.add_body_force_density(injection.body_force_density, injection.weight, injection.z_position)
+        fluid.add_boundary_temperature(injection.boundary_temperature, injection.weight, injection.z_position)
         if injection.body_force_temperature is not None:
-            fluid.add_body_force_temperature(injection.body_force_temperature, injection.weight)
+            fluid.add_body_force_temperature(injection.body_force_temperature, injection.weight, injection.z_position)
 
     def _step(self, dt: float) -> None:
         self._fluid.update(dt)

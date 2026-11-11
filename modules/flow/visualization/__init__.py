@@ -9,3 +9,4 @@ from .strip import Strip, ALL_CHANNELS, summary_grid
 from .legend import Legend, LegendKind
 from .drawn_size import DrawnSize
 from .orbit import Orbit, PITCH_LIMIT, ZOOM_LIMITS, box_size, axis_labels
+from .z_position_view import ZPositionView

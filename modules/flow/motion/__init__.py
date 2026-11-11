@@ -5,4 +5,4 @@ from .depth_velocity import DepthVelocity, DepthVelocitySettings, catch_up_share
 from .gradient_flow import GradientFlow, GradientFlowSettings
 from .patch import Patch
 from .lucas_kanade_flow import LucasKanadeFlow, LucasKanadeFlowSettings, lucas_kanade, threshold_displacement
-from .lucas_kanade_flow_3d import LucasKanadeFlow3D, LucasKanadeFlow3DSettings, filter_displacement, displacement_velocity
+from .lucas_kanade_flow_3d import LucasKanadeFlow3D, LucasKanadeFlow3DSettings, filter_displacement, displacement_velocity, z_position

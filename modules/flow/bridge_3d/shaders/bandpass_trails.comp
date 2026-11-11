@@ -1,0 +1,39 @@
+#version 460 core
+
+// Bandpass Trails
+// One step of the bandpass's fast and slow trail and their z positions in one dispatch: each a unit-gain Ema
+// of the velocity, weight * previous + (1 - weight) * velocity, by its own weight; each z position the same
+// step on the motion's z position weighted by the speed it brings, so it is where the motion the trail holds
+// was (red the z position times the weight, green the weight).
+// The numpy references are velocity_bandpass's trail step and velocity_lowpass.z_position_trail
+
+layout(local_size_x = 16, local_size_y = 16) in;
+
+uniform sampler2D uVelocity;        // the input velocity (xyz widths/s)
+uniform sampler2D uFast;            // the fast trail before
+uniform sampler2D uSlow;            // the slow trail before
+uniform sampler2D uFastZPosition;   // their z positions before (RG32F)
+uniform sampler2D uSlowZPosition;
+uniform sampler2D uCurrent;         // the motion's z position now (red over green), read with uHasCurrent
+uniform bool uHasCurrent;
+uniform float uFastWeight;          // what remains of the fast trail a step
+uniform float uSlowWeight;          // and of the slow one
+uniform ivec2 uSize;
+
+layout(rgba16f, binding = 0) writeonly uniform image2D uFastOut;
+layout(rgba16f, binding = 1) writeonly uniform image2D uSlowOut;
+layout(rg32f, binding = 2) writeonly uniform image2D uFastZPositionOut;
+layout(rg32f, binding = 3) writeonly uniform image2D uSlowZPositionOut;
+
+void main() {
+    ivec2 pixel = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(pixel, uSize))) return;
+    vec2 uv = (vec2(pixel) + 0.5) / vec2(uSize);
+
+    vec4 velocity = texture(uVelocity, uv);
+    vec2 brought = length(velocity.xyz) * (uHasCurrent ? texture(uCurrent, uv).rg : vec2(0.0));
+    imageStore(uFastOut, pixel, mix(velocity, texture(uFast, uv), uFastWeight));
+    imageStore(uSlowOut, pixel, mix(velocity, texture(uSlow, uv), uSlowWeight));
+    imageStore(uFastZPositionOut, pixel, vec4(mix(brought, texture(uFastZPosition, uv).rg, uFastWeight), 0.0, 0.0));
+    imageStore(uSlowZPositionOut, pixel, vec4(mix(brought, texture(uSlowZPosition, uv).rg, uSlowWeight), 0.0, 0.0));
+}

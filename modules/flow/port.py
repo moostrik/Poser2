@@ -23,6 +23,7 @@ class TextureKind(IntEnum):
     VELOCITY = auto()
     SCALAR = auto()
     ACCELERATION = auto()
+    Z_POSITION = auto()     # a z position, 0 front to 1 back, times its weight in red, the weight in green
 
     @property
     def vector(self) -> bool:

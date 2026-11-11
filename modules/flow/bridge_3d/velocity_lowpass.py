@@ -16,6 +16,13 @@ The blur runs inside the Ema's loop, on the trail each step feeds back, so blurr
 sigma = blur / 2.355 × sqrt(dt) widths (σ² = 2 D dt), the same spread at any frame rate and resolution; what
 is seen also grows with the trail's memory. The blur is the textbook Gaussian (`gaussian_blur`).
 
+The trail holds the history of the motion: its velocity and its z position. The z position is where the
+motion it holds was: the motion's z position (`set_z_position`) through the same Ema step, weighted by the
+speed each step brings, moved and blurred with the trail (red the z position times its weight, green the
+weight). So an arm leaving the torso leaves its trail at the arm's depth, as the still torso brings no speed,
+and a z position whose motion has died counts for nothing. One dispatch moves, steps and rates the trail
+and its z position (`LowpassStep`), one blurs them (`LowpassBlur`).
+
 The trail is read in two units:
     trail                the trail, widths/s
     trail_acceleration   the trail's rate, widths/s²: its Ema step over dt, (1 − w)(velocity − trail) / dt,
@@ -28,13 +35,13 @@ The trail is read in two units:
 import math
 
 import numpy as np
-from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_RGBA16F
+from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_RG32F, GL_RGBA16F
 
 from modules.gl import SwapFbo, Texture
 from modules.settings import Field, BaseSettings
 from .. import FlowBase, FlowUtil, Port, TextureKind
 from .trails import decay_weight
-from .shaders import LowpassBlur, TrailAdvect, VelocityTrail, WeightedSum
+from .shaders import LowpassBlur, LowpassStep
 
 FULL_WIDTH_HALF_MAXIMUM: float = 2.0 * math.sqrt(2.0 * math.log(2.0))     # a Gaussian's width at half its height, in sigmas
 
@@ -52,9 +59,9 @@ class VelocityLowpass(FlowBase):
 
     Pipeline:
         1. Take the velocity into the input FBO (`set_velocity`)
-        2. Move the previous trail with its own motion (`advect`), then blend the input in, a unit-gain Ema over
-           `attack` or `smooth` (temporal smoothing); with `acceleration`, the step over dt
-        3. Blur the trail, and the acceleration with it, by this step's share of `blur` (spatial diffusion)
+        2. Move the previous trail and its z position with its own motion (`advect`), then blend the input in, a
+           unit-gain Ema over `attack` or `smooth` (temporal smoothing); with `acceleration`, the step over dt
+        3. Blur the trail, its z position and the acceleration with them, by this step's share of `blur` (spatial diffusion)
 
     FBOs (from FlowBase):
         - input_fbo: The velocity
@@ -71,12 +78,12 @@ class VelocityLowpass(FlowBase):
 
         self.settings: VelocityLowpassSettings = settings or VelocityLowpassSettings()
         self._acceleration_fbo: SwapFbo = SwapFbo()     # the trail's rate, widths/s² (RGBA16F, xyz)
+        self._z_position_fbo: SwapFbo = SwapFbo()       # the trail's z position, red over green (RG32F)
+        self._current: Texture | None = None            # the motion's z position now
 
         # Shaders
-        self._advect_shader: TrailAdvect = TrailAdvect()
-        self._trail_shader: VelocityTrail = VelocityTrail()
+        self._step_shader: LowpassStep = LowpassStep()
         self._blur_shader: LowpassBlur = LowpassBlur()
-        self._sum_shader: WeightedSum = WeightedSum()
 
     @property
     def trail(self) -> Texture:
@@ -89,6 +96,12 @@ class VelocityLowpass(FlowBase):
         return self._acceleration_fbo
 
     @property
+    def z_position(self) -> Texture:
+        """Where the motion the trail holds was, 0 front to 1 back, times its weight in red, the weight (its
+        speed) in green (RG32F)."""
+        return self._z_position_fbo
+
+    @property
     def velocity_input(self) -> Texture:
         """The velocity the trail reads."""
         return self._input
@@ -97,7 +110,8 @@ class VelocityLowpass(FlowBase):
     def ports(self) -> dict[str, Port]:
         return {'input': Port(self._input_fbo, TextureKind.VELOCITY),
                 'trail': Port(self._output_fbo, TextureKind.VELOCITY),
-                'trail_acceleration': Port(self._acceleration_fbo, TextureKind.ACCELERATION)}
+                'trail_acceleration': Port(self._acceleration_fbo, TextureKind.ACCELERATION),
+                'z_position': Port(self._z_position_fbo, TextureKind.Z_POSITION)}
 
     def allocate(self, width: int, height: int, output_width: int | None = None, output_height: int | None = None) -> None:
         """Allocate the trail.
@@ -115,30 +129,35 @@ class VelocityLowpass(FlowBase):
         self._acceleration_fbo.allocate(self._output_fbo.width, self._output_fbo.height, GL_RGBA16F)
         self._acceleration_fbo.set_wrap(GL_CLAMP_TO_BORDER, (0.0, 0.0, 0.0, 0.0))
         FlowUtil.zero(self._acceleration_fbo)
-        self._advect_shader.allocate()
-        self._trail_shader.allocate()
+        self._z_position_fbo.allocate(self._output_fbo.width, self._output_fbo.height, GL_RG32F)
+        self._z_position_fbo.set_wrap(GL_CLAMP_TO_BORDER, (0.0, 0.0, 0.0, 0.0))
+        FlowUtil.zero(self._z_position_fbo)
+        self._step_shader.allocate()
         self._blur_shader.allocate()
-        self._sum_shader.allocate()
 
     def deallocate(self) -> None:
         """Deallocate all resources."""
         super().deallocate()
         self._acceleration_fbo.deallocate()
-        self._advect_shader.deallocate()
-        self._trail_shader.deallocate()
+        self._z_position_fbo.deallocate()
+        self._step_shader.deallocate()
         self._blur_shader.deallocate()
-        self._sum_shader.deallocate()
 
     def reset(self) -> None:
-        """Reset the trail and its rate to zero."""
+        """Reset the trail, its rate and its z position to zero."""
         super().reset()
         FlowUtil.zero(self._acceleration_fbo)
+        FlowUtil.zero(self._z_position_fbo)
 
     def set_velocity(self, velocity: Texture) -> None:
         """Take a flow's 3D velocity as the trail's next input."""
         if not self._allocated:
             return
         FlowUtil.blit(self._input_fbo, velocity)
+
+    def set_z_position(self, z_position: Texture | None) -> None:
+        """The motion's z position now (red over green), what the step takes in with the velocity; None: none."""
+        self._current = z_position
 
     def update(self, delta_time: float = 1.0 / 60.0, acceleration: bool = False) -> None:
         """Advance the trail with the input by `delta_time` (s): temporal, then spatial smoothing; with
@@ -147,44 +166,45 @@ class VelocityLowpass(FlowBase):
             return
         s: VelocityLowpassSettings = self.settings
 
-        # Stage 1: The trail moves with its motion: x is widths/s, y widths/s on the x scale, so uv per step
-        # is v * dt, and v * dt * width / height on y
-        if s.advect > 0.0:
-            step: float = s.advect * delta_time
-            fbo: SwapFbo = self._output_fbo
-            fbo.swap()
-            fbo.begin()
-            self._advect_shader.use(fbo.back, fbo.back, (step, step * fbo.width / max(fbo.height, 1)))
-            fbo.end()
-
-        # Stage 2: Temporal smoothing, one unit-gain Ema step per pixel: weight * previous + (1 - weight) * input
+        # Stages 1 and 2 in one dispatch: the trail and its z position move with its motion (x is widths/s, y widths/s
+        # on the x scale, so uv per step is v * dt, and v * dt * width / height on y), then one unit-gain Ema step
+        # per pixel, weight * previous + (1 - weight) * input; with `acceleration`, the step over dt
+        trail: SwapFbo = self._output_fbo
+        step: float = s.advect * delta_time
         release: float = decay_weight(delta_time, s.smooth)
         attack: float = decay_weight(delta_time, s.attack) if s.attack > 0.0 else release
-        self._output_fbo.swap()
-        self._output_fbo.begin()
-        self._trail_shader.use(self._output_fbo.back, self._input_fbo, attack, release)
-        self._output_fbo.end()
+        rate: float = 1.0 / delta_time if delta_time > 0.0 else 0.0
+        trail.swap()
+        self._z_position_fbo.swap()
+        self._step_shader.use(trail.back, self._z_position_fbo.back, self._input_fbo, self._current,
+                              trail, self._z_position_fbo, self._acceleration_fbo if acceleration else None,
+                              (step, step * trail.width / max(trail.height, 1)), attack, release, rate)
 
-        # The rate: the Ema's step over dt, new minus previous (advected)
-        if acceleration:
-            rate: float = 1.0 / delta_time if delta_time > 0.0 else 0.0
-            self._acceleration_fbo.begin()
-            self._sum_shader.use([(self._output_fbo, rate), (self._output_fbo.back, -rate)])
-            self._acceleration_fbo.end()
-
-        # Stage 3: Spatial diffusion, this step's sigma, the rate with the trail, both in one dispatch
-        sigma: float = blur_sigma(s.blur, delta_time, self._output_fbo.width)
+        # Stage 3: Spatial diffusion, this step's sigma, the trail, the rate and the z position in one dispatch
+        sigma: float = blur_sigma(s.blur, delta_time, trail.width)
         if sigma > 0.0:
-            blurred: tuple[SwapFbo, ...] = (self._output_fbo, self._acceleration_fbo) if acceleration else (self._output_fbo,)
+            blurred: list[SwapFbo | None] = [trail, self._acceleration_fbo if acceleration else None, self._z_position_fbo]
             count, each = blur_dispatches(sigma, LowpassBlur.MAX_RADIUS)
             weights: list[float] = gaussian_weights(each).tolist()
             for _ in range(count):
                 for fbo in blurred:
-                    fbo.swap()
-                self._blur_shader.use([fbo.back for fbo in blurred], list(blurred), weights)
+                    if fbo is not None:
+                        fbo.swap()
+                self._blur_shader.use([fbo.back if fbo is not None else None for fbo in blurred], list(blurred), weights)
 
 
 # ── numpy reference ─────────────────────────────────────────────────────
+
+def z_position_trail(previous: np.ndarray, previous_trail: np.ndarray, velocity: np.ndarray, current: np.ndarray,
+                     attack: float, release: float) -> np.ndarray:
+    """One step of the trail's z position (..., 2, red the z position times its weight, green the weight): the same
+    Ema step as the trail's, by `attack` where the 3D speed rises above the trail's, else by `release`, on the
+    motion's z position `current` weighted by the speed it brings. Mirrors lowpass_step.comp."""
+    speed: np.ndarray = np.linalg.norm(velocity, axis=-1, keepdims=True)
+    rising: np.ndarray = speed > np.linalg.norm(previous_trail, axis=-1, keepdims=True)
+    weight: np.ndarray = np.where(rising, attack, release)
+    return weight * previous + (1.0 - weight) * speed * current
+
 
 def blur_sigma(blur: float, delta_time: float, width: int) -> float:
     """One step's sigma in pixels: a spread of `blur` widths at half its height in one second, as diffusion
@@ -223,7 +243,7 @@ def gaussian_blur(field: np.ndarray, sigma: float) -> np.ndarray:
 
 def velocity_trail(previous: np.ndarray, velocity: np.ndarray, attack: float, release: float) -> np.ndarray:
     """One step of the trail (..., 3): by `attack` where the 3D speed rises above the trail's, else by `release`.
-    Mirrors velocity_trail.frag."""
+    Mirrors lowpass_step.comp."""
     rising: np.ndarray = np.linalg.norm(velocity, axis=-1, keepdims=True) > np.linalg.norm(previous, axis=-1, keepdims=True)
     weight: np.ndarray = np.where(rising, attack, release)
     return weight * previous + (1.0 - weight) * velocity

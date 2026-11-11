@@ -55,9 +55,10 @@ class DensityCarrier(ABC):
 
     @abstractmethod
     def add(self, texture: Texture, gain: float, dt: float, layer: float, spread: float, mode: InjectMode = InjectMode.RATE,
-            target_gain: float = 1.0) -> None:
+            target_gain: float = 1.0, z_position: Texture | None = None) -> None:
         """A source, `texture` (RGBA: the dye, its color times its presence, the presence as alpha, 0 to 1), into
-        the gaussian slab at `layer` (0 to 1) with sigma `spread`: by `mode`, added × gain × dt and capped at
+        the gaussian slab at each pixel's `z_position` (red over green), at `layer` (0 to 1) where it has none or
+        without one, with sigma `spread`: by `mode`, added × gain × dt and capped at
         fully dyed (RATE), or the water filled toward it times `target_gain` (at most fully dyed) by the share `gain`, never past it (FILL)."""
 
     @abstractmethod

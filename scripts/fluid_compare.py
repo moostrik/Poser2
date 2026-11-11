@@ -10,7 +10,8 @@ and every side is a `Bridge3DLayer` and a `Fluid3DLayer` on its velocity, with d
 fluid step once per flow frame by the frame's saved interval; `--every N` steps them once per N frames with the
 frames' summed interval (the flow still measures every frame), a frame-rate check. `--save DIR` writes every side's
 composited output at four steps of the loop, a quarter apart, as 8-bit PNGs (DIR/<side>_<step>.png), for a picture
-compared across two runs.
+compared across two runs, and its density seen from the side (DIR/<side>_<step>_side.png, depth across, the front at
+the left). A side named `flat` takes no z position: the body goes in at `layer`, as without depth.
 
 Measured per frame on the moving player (the mask, 12 px and more inside, where it moves in the loop):
     body       the boundary velocity's |xy| mean, widths/s: what the water is dragged toward
@@ -47,7 +48,7 @@ from modules.gl import Texture, Texture3D  # noqa: E402
 from modules.flow import Cut, LucasKanadeFlow3D, LucasKanadeFlow3DSettings, TextureKind, VolumeCut  # noqa: E402
 from modules.render.layers import (Bridge3DLayer, Bridge3DLayerSettings, BridgeInput, Fluid3DLayer, Fluid3DLayerSettings,  # noqa: E402
                                    FluidInput, Injection)
-from bridge_compare import COAST_SHARE, PRESET, SETTLE, coast_s, events_max, set_path, windows  # noqa: E402
+from bridge_compare import COAST_SHARE, PRESET, SETTLE, coast_s, depth_range, events_max, set_path, windows  # noqa: E402
 from depth_velocity_compare import Frames, context, overrides, read_back, recorded_settings, setting_owner, upload  # noqa: E402
 
 STEADY_AFTER: float = 0.3   # s of a half left out of its steady mean
@@ -94,12 +95,15 @@ class Side:
         self.series: dict[str, Series] = {'body': Series(), 'water': Series(), 'density': Series()}
         self.milliseconds: list[float] = []
 
-    def step(self, velocity: Texture, mask: Texture, delta_time: float) -> None:
-        self.bridge.set_input(BridgeInput(velocity, delta_time, None, mask=mask))
+    def step(self, velocity: Texture, mask: Texture, delta_time: float, z_position: Texture | None = None) -> None:
+        self.bridge.set_input(BridgeInput(velocity, delta_time, None, mask=mask, z_position=z_position))
         self.bridge.update()
         out = self.bridge.output
         injection = Injection(out.boundary_velocity, out.boundary_density, out.boundary_temperature,
-                              out.body_force_acceleration, out.body_force_density, out.body_force_temperature)
+                              out.body_force_acceleration, out.body_force_density, out.body_force_temperature,
+                              boundary_velocity_z_position=out.boundary_velocity_z_position,
+                              body_force_acceleration_z_position=out.body_force_acceleration_z_position,
+                              z_position=out.z_position)
         self.fluid.set_input(FluidInput(delta_time, [injection]))
         glFinish()
         began = time.perf_counter()
@@ -169,6 +173,13 @@ def save_output(side: Side, path: Path) -> None:
     rgba = read_back(side.fluid.texture)
     rgb = np.clip(rgba[..., :3], 0.0, 1.0)
     cv2.imwrite(str(path), cv2.cvtColor((rgb * 255.0 + 0.5).astype(np.uint8), cv2.COLOR_RGB2BGR))
+    if 'density' in side.fluid.ports:      # and the density seen from the side, depth across, front at the left
+        port = side.fluid.ports['density']
+        volume = port.texture
+        assert isinstance(volume, Texture3D)
+        cut = read_back(side.cut.process(volume, Cut.SIDE, 0.5, TextureKind.IMAGE, port.extent))
+        amount = np.clip(np.max(cut[..., :3], axis=-1), 0.0, 1.0)
+        cv2.imwrite(str(path.with_name(path.stem + '_side.png')), (amount * 255.0 + 0.5).astype(np.uint8))
 
 
 def main() -> int:
@@ -206,7 +217,7 @@ def main() -> int:
         c = frames.calls[k]
         flow.set_input(luminance)
         flow.set_mask(mask_texture)
-        flow.update(depth_texture, c['delta_time'], c['view_span'], tuple(c['depth_step']))
+        flow.update(depth_texture, c['delta_time'], c['view_span'], tuple(c['depth_step']), depth_range=depth_range())
         pending += c['delta_time']
         if (k + 1) % args.every != 0:
             continue
@@ -215,7 +226,7 @@ def main() -> int:
         moving = core & frames.moved
         still = frames.segment(k) == 'still' and frames.t[k] >= frames.still[0] + SETTLE
         for side in sides:
-            side.step(flow.velocity, mask_texture, pending)
+            side.step(flow.velocity, mask_texture, pending, None if side.name == 'flat' else flow.z_position)
             side.measure(moving, core, still)
             step = len(side.milliseconds)
             if args.save is not None and step in saved:

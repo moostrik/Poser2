@@ -101,6 +101,15 @@ The flow's velocity is in image widths per second times its gains.
   z's `smooth`. It is the only x/y state kept from frame to frame: the solve starts each frame from
   no motion. The motion's reset clears it.
 
+Beside the velocity the 3D motion hands out where the body is now in the box's depth, `z_position`
+(`ZPosition`): from the depth track's disparity, (depth − near) / (far − near) over the player's depth
+range, the depth source's `near` and `far` (`DepthView`), 0 front to 1 back, times its weight in red and
+the weight in green (RG16F). The weight is the mask's with `use_mask` (1 without) where the depth lies in
+the range, else 0: a depth outside it is no z position, not clamped, as the range is what the player is.
+z stays in view widths per second: the bridge takes the length of x, y and z, so z in a share of the
+range would mix units there. What the bridge and the fluid do with it is in
+[BRIDGE.md](BRIDGE.md#the-z-positions).
+
 ## The guard
 
 `guard`, beside `reset` on the 3D motion's panel, on by default: the motion's output and its two

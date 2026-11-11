@@ -14,28 +14,32 @@ class LowpassBlur(ComputeShader):
     WORKGROUP_SIZE_Y = 16
     MAX_RADIUS: int = 8         # taps on each side one dispatch reaches: MAX_RADIUS in the shader
 
-    def use(self, sources: list[Texture], targets: list[Texture], weights: list[float]) -> None:
-        """Blur `sources` into `targets`, the same size, one to three of each.
+    def use(self, sources: list[Texture | None], targets: list[Texture | None], weights: list[float]) -> None:
+        """Blur each source into its target, the same size, up to three slots, a slot None or left out unused.
 
         Args:
             sources: Fields to blur, read as textures
-            targets: Where each goes, written as images: RGBA16F for the first two, RG32F for the third
+            targets: Where each goes, written as images: RGBA16F in the first two slots, RG32F in the third
             weights: Tap k's weight for k = 0..radius, normalized over both sides (`gaussian_weights`)
         """
-        if not self.allocated or not self.shader_program or not sources or len(sources) != len(targets):
+        if not self.allocated or not self.shader_program or len(sources) != len(targets):
             return
-        if not all(texture.allocated for texture in (*sources, *targets)):
+        slots: list[tuple[int, Texture, Texture]] = [(unit, source, target) for unit, (source, target) in enumerate(zip(sources[:3], targets[:3]))
+                                                     if source is not None and target is not None and source.allocated and target.allocated]
+        if not slots:
             return
         radius: int = min(len(weights) - 1, self.MAX_RADIUS)
         glUseProgram(self.shader_program)
-        for unit, (source, target) in enumerate(zip(sources[:3], targets[:3])):
+        fields: int = 0
+        for unit, source, target in slots:
             self.bind_texture(unit, source, f"uSource{unit}")
             self.bind_image_write(unit, target)
-        glUniform1i(self.get_uniform_loc("uCount"), min(len(sources), 3))
+            fields |= 1 << unit
+        glUniform1i(self.get_uniform_loc("uFields"), fields)
         glUniform1i(self.get_uniform_loc("uRadius"), radius)
         padded: list[float] = (list(weights[:radius + 1]) + [0.0] * (self.MAX_RADIUS + 1))[:self.MAX_RADIUS + 1]
         glUniform1fv(self.get_uniform_loc("uWeights"), self.MAX_RADIUS + 1, padded)
-        width, height = targets[0].width, targets[0].height
+        width, height = slots[0][2].width, slots[0][2].height
         glUniform2i(self.get_uniform_loc("uSize"), width, height)
         self.dispatch(width, height)
         glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT | GL_FRAMEBUFFER_BARRIER_BIT)    # read next by textures and FBOs

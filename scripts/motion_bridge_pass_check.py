@@ -26,7 +26,7 @@ from OpenGL.raw.GL.VERSION.GL_3_3 import glGetQueryObjectui64v as raw_get_query 
 from modules.gl import Texture  # noqa: E402
 from modules.flow import LucasKanadeFlow3D, LucasKanadeFlow3DSettings  # noqa: E402
 from modules.render.layers import Bridge3DLayer, Bridge3DLayerSettings, BridgeInput  # noqa: E402
-from bridge_compare import PRESET  # noqa: E402
+from bridge_compare import PRESET, depth_range  # noqa: E402
 from depth_velocity_compare import Frames, context, recorded_settings, upload  # noqa: E402
 
 GL_QUERY_RESULT = 0x8866
@@ -76,8 +76,8 @@ def main() -> None:
         c = frames.calls[k]
         flow.set_input(luminance)
         flow.set_mask(mask)
-        flow.update(depth, c['delta_time'], c['view_span'], tuple(c['depth_step']))
-        bridge.set_input(BridgeInput(flow.velocity, c['delta_time'], None, mask=mask))
+        flow.update(depth, c['delta_time'], c['view_span'], tuple(c['depth_step']), depth_range=depth_range())
+        bridge.set_input(BridgeInput(flow.velocity, c['delta_time'], None, mask=mask, z_position=flow.z_position))
         bridge.update()
     glFinish()
     c = frames.calls[last]
@@ -87,7 +87,7 @@ def main() -> None:
     dv = flow._depth_velocity
 
     rows = [
-        ('motion, whole', lambda: flow.update(depth, dt, span, step)),
+        ('motion, whole', lambda: flow.update(depth, dt, span, step, depth_range=depth_range())),
         ('motion: x/y solve (pyramid, threshold)', lambda: flow._flow.update(depth, z.tolerance)),
         ('motion: depth velocity', lambda: dv.update_depth(depth, dt, span, step, z.window, z.smooth, z.threshold, z.tolerance,
                                                            z.dead_zone, z.catch_up, xy.threshold, flow._flow.solved, z.edge,

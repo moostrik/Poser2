@@ -2,17 +2,19 @@
 
 /*
  * InjectAmount3D - a 2D source's amount (its alpha) into a one-channel volume, in the gaussian slab around
- * uTargetLayer, as Inject3D adds the whole RGBA. The source is read by uv, so the volume may be finer: then
+ * each pixel's z position (uTargetLayer without one), as Inject3D adds the whole RGBA, one invocation a column. The source is read by uv, so the volume may be finer: then
  * uCubic enlarges it by a cubic B-spline, smooth through the source's texel corners, where a bilinear read keeps
  * them as steps a source texel apart; four bilinear reads (Sigg and Hadwiger, GPU Gems 2).
  */
 
-layout(local_size_x = 8, local_size_y = 8, local_size_z = 8) in;
+layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;   // a column of cells each
 
 layout(binding = 0) uniform sampler2D uInput;      // RGBA: the amount times the color, the amount as alpha
+layout(binding = 1) uniform sampler2D uZPosition;  // its z position, red over green
 layout(r16f, binding = 0) uniform image3D uVolume;
 
-uniform float uTargetLayer;  // normalized depth [0, 1] of the slab's center
+uniform float uTargetLayer;  // normalized depth [0, 1] of the slab's center where the source has no z position
+uniform bool  uHasZPosition;
 uniform float uSpread;       // the gaussian's sigma in normalized depth
 uniform float uStrength;
 uniform bool  uCubic;        // the source enlarged by a cubic B-spline, else bilinearly
@@ -40,16 +42,21 @@ float bspline_alpha(vec2 uv) {
 #include "slab.glsl"
 
 void main() {
-    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
-    if (any(greaterThanEqual(gid, uSize))) return;
-    float weight = slab_cell(gid.z, uSize.z) * uStrength;     // the body's share of this cell (slab.glsl)
-    if (weight < 0.001) return;
-    vec2 uv = (vec2(gid.xy) + 0.5) / vec2(uSize.xy);
+    ivec2 column = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(column, uSize.xy))) return;
+    vec2 uv = (vec2(column) + 0.5) / vec2(uSize.xy);
     float source = uCubic ? bspline_alpha(uv) : texture(uInput, uv).a;
-    if (source == 0.0) return;      // nothing to add or fill: the texel stays as it is, unread and unwritten
-    float current = imageLoad(uVolume, gid).r;
-    if (uMode == 2) current += max(min(source * uGain, 1.0) - current, 0.0) * min(weight, 1.0);
-    else current += source * weight;
-    if (uMode == 1) current = min(current, 1.0);
-    imageStore(uVolume, gid, vec4(current, 0.0, 0.0, 0.0));
+    if (source == 0.0) return;      // nothing to add or fill: the column stays as it is, unread and unwritten
+    float center = slab_center(uv);
+    ivec2 cells = slab_cells(center, uSize.z);
+    for (int z = cells.x; z <= cells.y; z++) {
+        float weight = slab_cell(z, center, uSize.z) * uStrength;     // the body's share of this cell (slab.glsl)
+        if (weight < 0.001) continue;
+        ivec3 gid = ivec3(column, z);
+        float current = imageLoad(uVolume, gid).r;
+        if (uMode == 2) current += max(min(source * uGain, 1.0) - current, 0.0) * min(weight, 1.0);
+        else current += source * weight;
+        if (uMode == 1) current = min(current, 1.0);
+        imageStore(uVolume, gid, vec4(current, 0.0, 0.0, 0.0));
+    }
 }

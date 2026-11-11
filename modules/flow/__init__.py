@@ -15,19 +15,21 @@ from .flow_util import FlowUtil
 # Motion: the optical flow
 from .motion import DepthView, DepthVelocity, DepthVelocitySettings, catch_up_share, color_motion, filter_depth_steps, track_depth, track_weights, depth_threshold, \
                     GradientFlow, GradientFlowSettings, Patch, LucasKanadeFlow, LucasKanadeFlowSettings, lucas_kanade, threshold_displacement, \
-                    LucasKanadeFlow3D, LucasKanadeFlow3DSettings, filter_displacement, displacement_velocity
+                    LucasKanadeFlow3D, LucasKanadeFlow3DSettings, filter_displacement, displacement_velocity, z_position
 
 # Bridges: the 3D bridge by name, the 2D bridge as `bridge_2d` (bridge_2d.DensityBridge, ...)
 from . import bridge_2d
 from .bridge_3d import  DensityBridge, DensityBridgeSettings, Magnitude, VelocityMagnitude, \
                         decay_weight, direction, advect, \
-                        VelocityLowpass, VelocityLowpassSettings, velocity_trail, trail_acceleration, \
+                        VelocityLowpass, VelocityLowpassSettings, velocity_trail, trail_acceleration, z_position_trail, \
+                        gaussian_blur, gaussian_weights, blur_sigma, blur_dispatches, z_position_mix, ZPositionMix, \
                         VelocityBandpass, VelocityBandpassSettings, Change, WeightedSum, velocity_change, step_peak, moving_mean, start_region_share, stop_region_share, change_velocity, band_width, change_acceleration_scale, whole_change, \
                         TemperatureBridge, TemperatureBridgeSettings
 
 # Visualization
 from .visualization import Visualizer, histogram_grid, histogram_volume_grid, Strip, ALL_CHANNELS, summary_grid, Legend, LegendKind, DrawnSize, \
-                           VolumeCut, VolumeCube, CubeColor, VolumeGlyphs, glyph_grid, Cut, cut_size, projects_max, Orbit, PITCH_LIMIT, ZOOM_LIMITS, box_size, axis_labels
+                           VolumeCut, VolumeCube, CubeColor, VolumeGlyphs, glyph_grid, Cut, cut_size, projects_max, Orbit, PITCH_LIMIT, ZOOM_LIMITS, box_size, axis_labels, \
+                           ZPositionView
 
 # Shared by the 2D and 3D fluid
 from .time_step import TimeStep, TimeStepMode, hold_tick, viscosity_iterations, MAX_STEP, REFERENCE_STEP

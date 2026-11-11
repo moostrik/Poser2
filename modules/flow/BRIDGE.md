@@ -157,6 +157,33 @@ The bridge has no finite guard, unlike the motion and the fluid ([MOTION.md](MOT
 [FLUID_3D.md](FLUID_3D.md#the-guard)): it makes no non-finite value itself, every division in its
 shaders held above a small floor, and its input is the guarded motion.
 
+## The z positions
+
+The camera sees the body's front surface, a plane of x, y and depth, so the fluid takes each pixel as a
+thin skin at its own depth ([FLUID_3D.md](FLUID_3D.md#the-inputs)). Where that is, a z position, the
+motion makes from the depth track: (depth − near) / (far − near) over the player's depth range, 0 front
+to 1 back ([MOTION.md](MOTION.md#depth_velocity-z)). Every z position travels as itself times its
+weight in red and the weight in green, so a clear, a reset or the image's border (0) is no z position,
+not the front, and a linear read, the advect and the blur mix z positions only where they are known.
+
+A trail holds the history of the motion: its velocity and its z position. Each trail's z position is
+the motion's through the trail's own Ema step, in the same pass (a pixel's attack or release weight is
+picked by its velocity), weighted by the speed each step brings, so it is where the motion the trail
+holds was: an arm leaving the torso leaves its trail and its wake at the arm's depth, as the still
+torso brings no speed, and a z position whose motion has died counts for nothing. The lowpass's moves
+and blurs with its trail; the bandpass's fast and slow trail each hold one.
+
+| Output                               | Its z position                                                                                                       |
+|--------------------------------------|----------------------------------------------------------------------------------------------------------------------|
+| `boundary_velocity_z_position`       | its readings' z positions weighted by their sizes at their shares (`ZPositionMix`)                                  |
+| `body_force_acceleration_z_position` | the same, by the accelerations' sizes                                                                                |
+| `z_position`                         | the motion's now: the densities and the temperatures are on the body only (the mask)                                 |
+
+A reading reads its trail's z position: the trail the lowpass's, a start and a bow the fast trail's, a
+stop and a wake the slow trail's, the change the fast trail's where it is the faster, else the slow's.
+Each counts by its size at its share times the share of its trail's speed that came with a z position,
+so motion without depth does not pull an output's.
+
 ## Measured
 
 `scripts/bridge_compare.py` on the standmoves recording (`20261103-215324`: four whole-arm moves

@@ -59,6 +59,12 @@ EPSILON: float = 1e-4       # below this a speed is no motion, as in the bridge
 PRESET: Path = Path(__file__).resolve().parent.parent / 'apps' / 'deep_flow' / 'data' / 'settings' / 'settings.json'
 
 
+def depth_range() -> tuple[float, float]:
+    """The player's depth range in the preset, the depth source's near and far (m), which the z position spans."""
+    depth: dict = json.loads(PRESET.read_text())['render']['depth']
+    return float(depth['near']), float(depth['far'])
+
+
 def set_path(settings: object, path: str, value: str) -> object:
     owner, name = setting_owner(settings, path)  # pyright: ignore[reportArgumentType]
     kind = type(getattr(owner, name))

@@ -33,6 +33,9 @@ class Injection:
     body_force_density: Texture | None = None
     body_force_temperature: Texture | None = None
     weight: float = 1.0
+    boundary_velocity_z_position: Texture | None = None
+    body_force_acceleration_z_position: Texture | None = None
+    z_position: Texture | None = None
     color: tuple[float, float, float] = (1.0, 1.0, 1.0)
 
 

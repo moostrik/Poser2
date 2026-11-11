@@ -241,6 +241,25 @@ the water takes, and the body force, which adds to it. The boundary's density an
 dragged toward as its velocity is, each over its own time and never past the body's value; the body
 force's are added at a rate, capped at fully dyed and ±1.
 
+### The body's depth
+
+The camera sees the body's front surface, a plane of x, y and depth, not a volume, so each pixel goes in
+as a thin skin centered on its own z position, `spread` its thickness: an arm reaching toward the camera
+pushes the water near the front and the torso further back. The box's depth is the player's depth range,
+the depth source's near to far, 0 front to 1 back, with no setting of its own. Each injection reads its
+output's z position ([BRIDGE.md](BRIDGE.md#the-z-positions)), red over green, at the pixel it reads
+(`slab.glsl`'s `slab_center`): the drag and the body force at their readings' depths, the densities and the
+temperatures, the upscaled amount and the particles at the body's now. A pixel without one (no depth, out
+of the range) goes in at `layer`, and so does every pixel without depth. The densities and the
+temperature go in a column a thread (`inject_3d`, `inject_amount_3d`): the source and its z position read
+once, then the cells the slab reaches, out to 4 sigmas. The particles' mass is the slab's share inside
+the box per pixel, from erf at its two ends (`slab_column`).
+
+z stays in widths/s, as the motion measures it, so the water's z and the skin's place move at different
+scales: a hand's skin moves by its share of the range, the water it pushes by its widths at that distance;
+`z_gain` scales the push. If that shows, the fluid can convert each pixel's z by its own depth into shares
+of the box (× `view_span` × depth / (far − near)), exact per pixel.
+
 ### The drag
 
 A body moving through water drags the water toward its own speed: the force is the difference,
