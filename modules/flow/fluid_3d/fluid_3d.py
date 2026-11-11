@@ -40,7 +40,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_REPEA
 
 from modules.gl import ComputeShader, SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
-from .fluid_settings import Advection, Light, PressureSolver, ScatteringModel, Fluid3DSettings, PressureSettings, ParticleSettings, UpscaledDensitySettings
+from .fluid_settings import Advection, ConfinementSettings, Light, PressureSolver, ScatteringModel, Fluid3DSettings, PressureSettings, ParticleSettings, UpscaledDensitySettings
 from .multigrid_pressure import MultigridPressure
 from .face_velocity import FaceVelocity
 from ..shaders import AddBoolean
@@ -214,6 +214,7 @@ class Fluid3D:
         self._divergence_vol: Texture3D = Texture3D()
         # Curl is sampled at neighbor offsets by VorticityForce3D — border must return zero
         self._curl_vol: Texture3D = Texture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))
+        self._curl_vol_2: Texture3D = Texture3D(wrap=GL_CLAMP_TO_BORDER, border_color=(0.0, 0.0, 0.0, 0.0))   # the second confinement's, once it runs
         self._buoyancy_force_vol: Texture3D = Texture3D()
         self._vorticity_force_vol: Texture3D = Texture3D()     # the confinement's force × dt at the cells
 
@@ -386,6 +387,7 @@ class Fluid3D:
         self._obstacle_source.deallocate()
         self._divergence_vol.deallocate()
         self._curl_vol.deallocate()
+        self._curl_vol_2.deallocate()
         self._vorticity_force_vol.deallocate()
         self._buoyancy_force_vol.deallocate()
         self._output_texture.deallocate()
@@ -561,35 +563,38 @@ class Fluid3D:
             glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _confine_vorticity(self) -> None:
-        """Vorticity confinement: the curl, then its force added to the velocity. The curl alone while only the
-        upscaled density's turbulence reads it."""
-        confining: bool = self.settings.velocity.vorticity > 0.0 and self.settings.velocity.vorticity_radius > 0.0
-        if not confining:
+        """Vorticity confinement, each of the two (`confinement_1`, `confinement_2`) keeping swirls of its own size
+        alive: both curls in one pass, both forces in one, their sum added to the faces once. The first running
+        confinement's curl is the one the upscaled density's turbulence reads; the curl alone while only it does."""
+        velocity = self.settings.velocity
+        running: list[ConfinementSettings] = [c for c in (velocity.confinement_1, velocity.confinement_2)
+                                              if c.strength > 0.0 and c.radius > 0.0]
+        if not running:
             if self._needs_curl:
                 self._vorticity_curl_shader.use(self._faces.volume, self._obstacle, self._curl_vol, self._cell, self._cell[0],
                                                 has_obstacles=self._has_obstacles, closed=self._closed, wall_keep=self._wall_keep)
                 glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
             return
+        first: ConfinementSettings = running[0]
+        second: ConfinementSettings | None = running[1] if len(running) > 1 else None
+        curl = self._curl_vol
+        if second is not None and (self._curl_vol_2.width, self._curl_vol_2.height, self._curl_vol_2.depth) != (curl.width, curl.height, curl.depth):
+            self._curl_vol_2.deallocate()
+            self._curl_vol_2.allocate(curl.width, curl.height, curl.depth, GL_RGBA16F)     # once, when the second first runs
 
-        vorticity_radius = self.settings.velocity.vorticity_radius        # widths
-        vorticity_force = self.settings.velocity.vorticity * self._cell[0] * self._dt     # epsilon h (N x omega), Fedkiw 2001; h the xy cell
-
-        # a. The curl at the cells, from the faces
-        self._vorticity_curl_shader.use(
-            self._faces.volume,
-            self._obstacle,
-            self._curl_vol,
-            self._cell,
-            vorticity_radius,
-            has_obstacles=self._has_obstacles,
-            closed=self._closed,
-            wall_keep=self._wall_keep
-        )
+        # a. The curls at the cells, from the faces, in one pass
+        self._vorticity_curl_shader.use(self._faces.volume, self._obstacle, self._curl_vol, self._cell, first.radius,
+                                        has_obstacles=self._has_obstacles, closed=self._closed, wall_keep=self._wall_keep,
+                                        curl_out_2=self._curl_vol_2 if second is not None else None,
+                                        radius_2=second.radius if second is not None else 0.0)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
-        # b. The confinement's force × dt at the cells, then onto the faces
+        # b. The confinements' force × dt at the cells, epsilon h (N x omega) each (Fedkiw 2001; h the xy cell), then onto the faces
+        h_dt: float = self._cell[0] * self._dt
         self._vorticity_force_shader.use(self._curl_vol, self._obstacle, self._vorticity_force_vol, self._cell,
-                                         vorticity_force, has_obstacles=self._has_obstacles)
+                                         first.strength * h_dt, has_obstacles=self._has_obstacles,
+                                         curl_2=self._curl_vol_2 if second is not None else None,
+                                         timestep_2=second.strength * h_dt if second is not None else 0.0)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._add_to_faces_shader.add_force(self._faces.volume, self._vorticity_force_vol, 1.0, self._obstacle,
                                             self._closed, self._has_obstacles)

@@ -113,16 +113,22 @@ class InputSettings(BaseSettings):
     body_force: Group[BodyForceSettings]    = Group(BodyForceSettings)
 
 
+class ConfinementSettings(BaseSettings):
+    """One vorticity confinement: the swirls of one size it keeps alive (Fedkiw 2001)."""
+    strength: Field[float]  = Field(0.0,    min=0.0,    max=100.0,    color="purple",         description="Its epsilon, the force epsilon × cell × (N × curl); 0 = off")
+    radius: Field[float]    = Field(0.004,  min=0.001,  max=0.1,    widget=Widget.log_slider, color="deep-purple", description="The size of the swirls it keeps, widths; at least one cell")
+
+
 class VelocitySettings(BaseSettings):
     """The velocity: how it carries itself, fades, swirls and thickens."""
     advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the velocity carries itself: MacCormack keeps swirls, at about twice the reads")
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=1.0,    color="blue-grey",      description="How far the velocity carries itself per step; 1 = with the water, the physics")
     fade_time: Field[float]         = Field(60.0,   min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the velocity fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds 1 width/s takes to brake to rest, a fixed amount at a time; 0 = off")
-    vorticity: Field[float]         = Field(0.3,    min=0.0,    max=100.0,    color="purple",         description="Vortex confinement's epsilon, its force epsilon × cell × (N × curl) (Fedkiw 2001)")
-    vorticity_radius: Field[float]  = Field(0.004,  min=0.001,  max=0.1,    widget=Widget.log_slider, color="deep-purple", description="The size of the swirls it keeps, widths; at least one cell")
     viscosity: Field[float]         = Field(0.0,    min=0.0,    max=0.01,   step=0.0001, color="indigo", description="Kinematic viscosity (widths² per second); 0 = water at this scale")
     viscosity_iter: Field[int]      = Field(20,     min=1,      max=60,     color="orange",         description="Viscosity solver iterations at 60 fps; fewer at a higher rate, never more")
+    confinement_1: Group[ConfinementSettings] = Group(ConfinementSettings)
+    confinement_2: Group[ConfinementSettings] = Group(ConfinementSettings)
 
 
 class DensitySettings(BaseSettings):

@@ -6,49 +6,40 @@
  * f = ε h (N × ω) Δt
  * where N = ∇|ω| / |∇|ω||  (normalized gradient of curl magnitude)
  *
- * In 3D, the confinement force is computed via cross product of N and ω.
+ * In 3D, the confinement force is computed via cross product of N and ω. With uSecond, a second confinement's
+ * from its own curl (uCurl2) and strength is added: two sizes of swirl kept at once.
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick of cells, so z neighbors share the cache
 
 layout(binding = 0) uniform sampler3D uCurl;      // Curl vector field (RGBA16F: xyz)
+layout(binding = 2) uniform sampler3D uCurl2;     // the second confinement's, read with uSecond
 layout(binding = 1) uniform sampler3D uObstacle;   // Obstacle mask (R8)
 
 layout(rgba16f, binding = 0) writeonly uniform image3D uForce;    // the force × dt at the cells
 
 uniform vec3  uHalfRdxInv;    // (0.5/dx, 0.5/dy, 0.5/dz)
 uniform float uTimestep;       // Vorticity strength * dt
+uniform bool  uSecond;
+uniform float uTimestep2;      // the second's
 uniform ivec3 uSize;
 uniform bool  uHasObstacles;   // Skip obstacle logic when no obstacles present
 
-void main() {
-    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
-    if (any(greaterThanEqual(gid, uSize))) return;
-
-    vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
-
-    // Obstacle check
-    if (uHasObstacles) {
-        float obstacle = texture(uObstacle, st).r;
-        if (obstacle > 0.5) {
-            imageStore(uForce, gid, vec4(0.0));
-            return;
-        }
-    }
-
+// One confinement's N × ω at `gid` (texture coordinate `st`), from its curl
+vec3 confinement(sampler3D curl, ivec3 gid, vec3 st) {
     vec3 texel = 1.0 / vec3(uSize);
 
     // Center curl
-    vec3 curlC = texture(uCurl, st).xyz;
+    vec3 curlC = texture(curl, st).xyz;
     float magC = length(curlC);
 
     // Gradient of curl magnitude (6 neighbors)
-    float magR = length(texture(uCurl, st + vec3(texel.x, 0, 0)).xyz);
-    float magL = length(texture(uCurl, st - vec3(texel.x, 0, 0)).xyz);
-    float magT = length(texture(uCurl, st + vec3(0, texel.y, 0)).xyz);
-    float magB = length(texture(uCurl, st - vec3(0, texel.y, 0)).xyz);
-    float magF = length(texture(uCurl, st + vec3(0, 0, texel.z)).xyz);
-    float magK = length(texture(uCurl, st - vec3(0, 0, texel.z)).xyz);
+    float magR = length(texture(curl, st + vec3(texel.x, 0, 0)).xyz);
+    float magL = length(texture(curl, st - vec3(texel.x, 0, 0)).xyz);
+    float magT = length(texture(curl, st + vec3(0, texel.y, 0)).xyz);
+    float magB = length(texture(curl, st - vec3(0, texel.y, 0)).xyz);
+    float magF = length(texture(curl, st + vec3(0, 0, texel.z)).xyz);
+    float magK = length(texture(curl, st - vec3(0, 0, texel.z)).xyz);
 
     // Beyond the box the wall's ghost has this cell's curl, mirrored, so its size is the same: no slope toward
     // the wall for the force to push along (the curl volume's border of 0 made every wall a cliff of |curl|)
@@ -78,8 +69,28 @@ void main() {
     float gradLen = length(gradMag);
     vec3 N = (gradLen > 1e-6) ? gradMag / gradLen : vec3(0.0);
 
-    // Confinement force: F = ε * (N × ω) * dt  (standard Fedkiw formulation)
-    vec3 force = uTimestep * cross(N, curlC);
+    // Confinement force: F = ε * (N × ω) * dt  (standard Fedkiw formulation), ε dt the caller's
+    return cross(N, curlC);
+
+}
+
+void main() {
+    ivec3 gid = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(gid, uSize))) return;
+
+    vec3 st = (vec3(gid) + 0.5) / vec3(uSize);
+
+    // Obstacle check
+    if (uHasObstacles) {
+        float obstacle = texture(uObstacle, st).r;
+        if (obstacle > 0.5) {
+            imageStore(uForce, gid, vec4(0.0));
+            return;
+        }
+    }
+
+    vec3 force = uTimestep * confinement(uCurl, gid, st);
+    if (uSecond) force += uTimestep2 * confinement(uCurl2, gid, st);
 
     imageStore(uForce, gid, vec4(force, 0.0));
 }

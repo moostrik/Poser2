@@ -515,7 +515,7 @@
     },
     "fluid": {
       "guard": true,
-      "wall": "CLOSED",
+      "wall": "OPEN",
       "slip_time": 0.0,
       "width": 288,
       "height": 512,
@@ -528,12 +528,12 @@
         "time_scale": 1.0
       },
       "input": {
-        "layer": 0.21,
-        "spread": 0.02355,
+        "layer": 0.0,
+        "spread": 0.237,
         "boundary": {
-          "velocity_drag": 0.0,
+          "velocity_drag": 75.0,
           "velocity_gain": 1.0,
-          "density_drag": 500.0,
+          "density_drag": 1000.0,
           "density_gain": 1.0,
           "temperature_drag": 200.0,
           "temperature_gain": 1.0
@@ -549,16 +549,22 @@
         "advection_scale": 1.0,
         "fade_time": 0.0,
         "evaporation_time": 0.0,
-        "vorticity": 1.0,
-        "vorticity_radius": 0.006771,
-        "viscosity": 0.0015,
-        "viscosity_iter": 20
+        "viscosity": 0.0,
+        "viscosity_iter": 20,
+        "confinement_1": {
+          "strength": 45.05,
+          "radius": 0.1
+        },
+        "confinement_2": {
+          "strength": 0.0,
+          "radius": 0.006
+        }
       },
       "density": {
-        "advection": "SEMI_LAGRANGIAN",
+        "advection": "MACCORMACK",
         "advection_scale": 0.88,
-        "fade_time": 0.0,
-        "evaporation_time": 300.0
+        "fade_time": 59.0,
+        "evaporation_time": 62.0
       },
       "temperature": {
         "advection": "SEMI_LAGRANGIAN",
@@ -604,13 +610,14 @@
       "composite": {
         "emission": 3.9095,
         "opacity": 0.02907,
+        "fog": 2.7899,
         "tint": {
           "r": 0.4708,
           "g": 0.778,
           "b": 1.0,
           "a": 1.0
         },
-        "fog": 2.7899,
+        "blend_mode": "ADD",
         "light": {
           "enabled": false,
           "source": "DIRECTIONAL",
@@ -630,8 +637,7 @@
           "sky_fill": 1.0,
           "anisotropy": 0.13,
           "back_scattering": 0.46
-        },
-        "blend_mode": "ADD"
+        }
       }
     },
     "monitor_a": {

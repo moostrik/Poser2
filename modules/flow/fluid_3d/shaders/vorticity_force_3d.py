@@ -18,7 +18,7 @@ class VorticityForce3D(ComputeShader):
 
     def use(self, curl: Texture3D, obstacle: Texture3D, force_out: Texture3D,
             cell: tuple[float, float, float],
-            timestep: float, has_obstacles: bool = True) -> None:
+            timestep: float, has_obstacles: bool = True, curl_2: Texture3D | None = None, timestep_2: float = 0.0) -> None:
         """Compute vorticity confinement force.
 
         Args:
@@ -28,6 +28,7 @@ class VorticityForce3D(ComputeShader):
             cell: A cell's sides in widths, x, y and z
             timestep: Vorticity strength * dt
             has_obstacles: Whether obstacle logic is active
+            curl_2: A second confinement's curl, its force added with `timestep_2`; None for one
         """
         if not self.allocated or not self.shader_program:
             return
@@ -40,6 +41,10 @@ class VorticityForce3D(ComputeShader):
 
         glUniform3f(self.get_uniform_loc("uHalfRdxInv"), 0.5 / cell[0], 0.5 / cell[1], 0.5 / cell[2])
         glUniform1f(self.get_uniform_loc("uTimestep"), timestep)
+        if curl_2 is not None:
+            self.bind_texture_3d(2, curl_2, "uCurl2")
+        glUniform1i(self.get_uniform_loc("uSecond"), int(curl_2 is not None))
+        glUniform1f(self.get_uniform_loc("uTimestep2"), timestep_2)
         glUniform3i(self.get_uniform_loc("uSize"),
                     force_out.width, force_out.height, force_out.depth)
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))

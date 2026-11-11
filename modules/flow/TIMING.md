@@ -429,6 +429,21 @@ The density injects a column a thread, the source and its z position read once, 
 slab reaches; the drag and the body force read the z position at each face. The fluid's step varies by
 2 ms between runs of the same code on this harness, so only a side against a side in one run compares.
 
+### Two confinements
+
+The vorticity pass alone (`fluid_pass_check.py`), deep_flow's preset, ms, the median of 40:
+
+| Confinements                                   | Before (one) | Two in one pass each |
+|------------------------------------------------|--------------|----------------------|
+| one at 0.1 widths (the preset; 2 off)          | 0.515        | 0.526                |
+| one at 0.006 widths                            | 0.552        | 0.557                |
+| 0.1 and 0.006 widths                           |              | 0.862                |
+
+The second confinement reads six more velocities a cell in the curl's pass, writes a second curl volume,
+and reads seven more curl texels a cell in the force's: +0.34 ms with both on, none with the second off.
+`confinement_check.py`: the second alone gives the first's water to the bit, and two at half the strength
+one at the full.
+
 ## The density's own advection
 
 `density.advection` apart from the velocity's, deep_flow's preset (288 × 512 × 64 cells, the 4K amount

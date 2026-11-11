@@ -1,7 +1,8 @@
 #version 460 core
 
 /*
- * VorticityCurl3D - the curl (vorticity vector) of the velocity on the cells' faces, at the cells' centers:
+ * VorticityCurl3D - the curl (vorticity vector) of the velocity on the cells' faces, at the cells' centers,
+ * at one radius into uCurl and, with uSecond, at a second into uCurl2, from the same cell's setup:
  *
  *   ω = (∂w/∂y - ∂v/∂z, ∂u/∂z - ∂w/∂x, ∂v/∂x - ∂u/∂y)
  *
@@ -16,9 +17,13 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick 
 layout(binding = 2) uniform sampler3D uObstacle;   // R8 at the cells
 
 layout(rgba16f, binding = 0) writeonly uniform image3D uCurl;
+layout(rgba16f, binding = 1) writeonly uniform image3D uCurl2;
 
-uniform vec3  uHalfRdxInv;   // (0.5/dx, 0.5/dy, 0.5/dz)
+uniform vec3  uHalfRdxInv;   // (0.5/dx, 0.5/dy, 0.5/dz) over the radius per axis
 uniform vec3  uRadius;       // the sampling radius in cells per axis, at least one: the radius in widths over each cell's side
+uniform bool  uSecond;       // a second curl, at uRadius2, into uCurl2
+uniform vec3  uHalfRdxInv2;
+uniform vec3  uRadius2;
 uniform ivec3 uCells;
 uniform ivec3 uClosed;
 uniform bool  uHasObstacles;
@@ -26,23 +31,17 @@ uniform bool  uHasObstacles;
 #include "walls.glsl"
 #include "faces.glsl"
 
-void main() {
-    ivec3 i = ivec3(gl_GlobalInvocationID.xyz);
-    if (any(greaterThanEqual(i, uCells))) return;
-    if (solid_cell(i)) {
-        imageStore(uCurl, i, vec4(0.0));
-        return;
-    }
+// The curl at cell `i` (its velocity `vC`) from the velocity `radius` cells to either side per axis
+vec3 curl_at(ivec3 i, vec3 vC, vec3 radius, vec3 half_rdx_inv) {
     vec3 p = vec3(i) + 0.5;
-    vec3 vR = velocity_at(p + vec3(uRadius.x, 0.0, 0.0));
-    vec3 vL = velocity_at(p - vec3(uRadius.x, 0.0, 0.0));
-    vec3 vT = velocity_at(p + vec3(0.0, uRadius.y, 0.0));
-    vec3 vB = velocity_at(p - vec3(0.0, uRadius.y, 0.0));
-    vec3 vF = velocity_at(p + vec3(0.0, 0.0, uRadius.z));
-    vec3 vK = velocity_at(p - vec3(0.0, 0.0, uRadius.z));
+    vec3 vR = velocity_at(p + vec3(radius.x, 0.0, 0.0));
+    vec3 vL = velocity_at(p - vec3(radius.x, 0.0, 0.0));
+    vec3 vT = velocity_at(p + vec3(0.0, radius.y, 0.0));
+    vec3 vB = velocity_at(p - vec3(0.0, radius.y, 0.0));
+    vec3 vF = velocity_at(p + vec3(0.0, 0.0, radius.z));
+    vec3 vK = velocity_at(p - vec3(0.0, 0.0, radius.z));
 
-    vec3 vC = cell_velocity(i);
-    ivec3 reach = max(ivec3(round(uRadius)), ivec3(1));
+    ivec3 reach = max(ivec3(round(radius)), ivec3(1));
     if (i.x + reach.x >= uCells.x) vR = wall_velocity(vC, 0);
     if (i.x - reach.x < 0)         vL = wall_velocity(vC, 0);
     if (i.y + reach.y >= uCells.y) vT = wall_velocity(vC, 1);
@@ -58,9 +57,21 @@ void main() {
     if (solid_cell(i - ivec3(0, 0, reach.z))) vK = closed_velocity(vC, 2);
 
     vec3 curl;
-    curl.x = uHalfRdxInv.y * (vT.z - vB.z) - uHalfRdxInv.z * (vF.y - vK.y);
-    curl.y = uHalfRdxInv.z * (vF.x - vK.x) - uHalfRdxInv.x * (vR.z - vL.z);
-    curl.z = uHalfRdxInv.x * (vR.y - vL.y) - uHalfRdxInv.y * (vT.x - vB.x);
+    curl.x = half_rdx_inv.y * (vT.z - vB.z) - half_rdx_inv.z * (vF.y - vK.y);
+    curl.y = half_rdx_inv.z * (vF.x - vK.x) - half_rdx_inv.x * (vR.z - vL.z);
+    curl.z = half_rdx_inv.x * (vR.y - vL.y) - half_rdx_inv.y * (vT.x - vB.x);
+    return curl;
+}
 
-    imageStore(uCurl, i, vec4(curl, 0.0));
+void main() {
+    ivec3 i = ivec3(gl_GlobalInvocationID.xyz);
+    if (any(greaterThanEqual(i, uCells))) return;
+    if (solid_cell(i)) {
+        imageStore(uCurl, i, vec4(0.0));
+        if (uSecond) imageStore(uCurl2, i, vec4(0.0));
+        return;
+    }
+    vec3 vC = cell_velocity(i);
+    imageStore(uCurl, i, vec4(curl_at(i, vC, uRadius, uHalfRdxInv), 0.0));
+    if (uSecond) imageStore(uCurl2, i, vec4(curl_at(i, vC, uRadius2, uHalfRdxInv2), 0.0));
 }
