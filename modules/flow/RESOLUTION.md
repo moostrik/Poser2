@@ -28,7 +28,7 @@ The picture, what becomes the dye (deep_flow's preset):
 |-------------------------------------------|-------------------------------------------|-------------------------------------------------------------|
 | camera color                              | 896 × 720 (P720 cut to 5:4), cropped around the player | the real detail: the crop at most 720 rows tall      |
 | depth, the player's mask                  | about 480 lines (NEURAL_480), cropped     | the mask's edge in the depth's pixels                        |
-| center view, image and mask               | 1080 × 1920                               | upscaled at least 2.7× to here: no new detail                |
+| center view, image and mask               | 448 × 800, the motion's size              | drawn once from the crop, read by the flow as made           |
 | bridge: the dye, image × mask × speed     | 448 × 800                                 | about all the real detail: 800 rows against at most 720      |
 | simulation density, its color             | 288 × 512 × 64                            | the 4K density's color                                       |
 | upscaled density, its amount              | 2160 × 3840 × 24                          | filled from the 448 × 800 dye, stretched 4.8×                |
@@ -39,10 +39,10 @@ The motion, what moves the water:
 | Stage                                     | Size                                      | What it does to the motion                                   |
 |-------------------------------------------|-------------------------------------------|--------------------------------------------------------------|
 | camera color                              | 896 × 720, 50 fps                         | the real detail and the real frame rate                      |
-| center view, the motion's input           | 1080 × 1920                               | upscaled: no new detail                                      |
+| center view, the motion's input           | 448 × 800                                 | the crop at the motion's size: no resample after it          |
 | motion x/y (Lucas–Kanade)                 | 448 × 800, 4 levels, 7 × 7 window         | smooth over about 7 px there, 34 px at 4K                    |
 | motion z (the depth velocity)             | 448 × 800, from about 480 depth lines     | coarser than x/y by the depth's pixels                       |
-| the mask on the velocity (`use_mask`)     | 1080 × 1920, read at 448 × 800            | the depth's staircase at the motion's size                   |
+| the mask on the velocity (`use_mask`)     | 448 × 800                                 | the depth's staircase at the motion's size                   |
 | bridge readings and mixes                 | 448 × 800, at the 60 Hz render tick       | held between the camera's frames                             |
 | fluid: the drag and the body force        | 288 × 512 × 64                            | the motion finer than a cell averaged away                   |
 | upscaled density, carried by the fluid    | 2160 × 3840 × 24                          | moved by a velocity 7.5× coarser, linear between its cells   |
@@ -58,49 +58,68 @@ pixels, and the dye stretched 4.8× from 448 × 800 to 4K, straight between its 
 nothing; the 4K density's own detail comes from its advection (MacCormack) and the turbulence below the
 grid, never from the motion.
 
-## What each needs
+## The chain as it should run
 
-| Quantity               | Comes from                         | Needed at                                   |
-|------------------------|------------------------------------|---------------------------------------------|
-| the mask's outline     | the depth, steered by the image    | the image's size, the view's 1080 × 1920    |
-| the dye's color        | the camera image                   | the 4K density's size                        |
-| the dye's amount       | the motion's speed (the readings)  | smooth from the motion's 448 × 800           |
-| the velocity           | the motion                         | the fluid's grid                             |
-| the water's motion     | the fluid                          | its grid; the 4K density moved by it, read smoothly |
+Two rules, from the fluid's side. No size above what the information holds: an enlargement only where the
+result is seen, at the output, never between stages that read it back smaller. And no detail thrown away
+before it is used: a step down of 2× or more averages what it leaves (area, a box or a mip level), never
+point- or bilinear-samples a smaller grid out of a larger one, which drops texels and aliases; a step up, at the
+output, is smooth (a cubic B-spline), not straight between texels.
+
+| Data                      | Its information           | Made at                         | Read by                           | Resampled                              |
+|---------------------------|---------------------------|---------------------------------|-----------------------------------|----------------------------------------|
+| the image, for the flow   | the crop, at most 720 rows | 448 × 800, from the camera crop in one draw | the motion, the bridge's dye | once, the crop to 448 × 800            |
+| the player's mask         | the depth, ~480 lines     | 448 × 800, guided by that image  | the motion, the bridge's dye      | once, the depth to 448 × 800, then guided |
+| the velocity, the readings | the motion               | 448 × 800                        | the bridge, the fluid             | down to the fluid's grid, bilinear      |
+| the dye: color and amount | the image × mask × speed  | 448 × 800                        | the fluid's densities             | down to 288 × 512, bilinear; up to 4K, a B-spline |
+| the 4K density's color    | the dye's color           | a color field at the dye's 448 × 800, its depth the 4K amount's | the composite | carried with the amount; up to 4K, a B-spline |
+| the water's velocity      | the fluid                 | 288 × 512 × 64                   | the 4K density's advection        | read smoothly (tricubic), weighed by cost |
+
+- **The center view at the motion's size.** The crop is there for the fluid **(site fact)**; the center
+  layers' other readers, the debug panels and the color mask over the composite, are for debugging. So
+  deep_flow allocates its center layers (`CENTER_LAYERS` in `apps/deep_flow/render.py`) at the motion's
+  `width` and `height` and follows them when they change: the crop is drawn once, at the size the motion's
+  luminance (`LuminanceFrames`) and the bridge read it, where a larger view read back bilinearly 2.4× down
+  would hand the solve an aliased image; the guided filter runs at that size (`guided_radius` is in widths);
+  and the debug views show the same detail enlarged on screen, as the crop holds no more. The center layers
+  take 0.18 ms of GPU a frame at 448 × 800 against 0.46 ms at 1080 × 1920 (`GPU center`, deep_flow's
+  preset with the guided filter off, 40 s of `-sim`).
+
+What changes against now, and why:
+
+- **Into the fluid, bilinear as now.** The fluid reads the bridge's 448 × 800 outputs at its 288 × 512 cells
+  bilinearly (`inject_3d`, `add_to_faces_3d`). At 1.56× that drops little: the velocity and the readings are
+  smooth over the motion's 7 × 7 window and the lowpass's blur, and the 4K amount reads the dye at 448 × 800
+  itself (`inject_amount_3d`), not through the grid **(deduction)**.
+- **The 4K density's color at the dye's size.** Today its hue comes from the simulation density, 288 × 512,
+  over the amount; a color field at 448 × 800 by the 4K amount's 24 layers (8.6 M texels, RGBA16F 69 MB, as
+  8 bits would round at every advection) holds the dye's color as it was made, carried by the same
+  advection as the amount, 8.6 M texels against the amount's 199 M **(deduction: its pass time to
+  measure)**; the coarse simulation density then carries only what the water's buoyancy weighs.
+- **Up once, smoothly, at the output.** The 4K amount is filled by a B-spline already (`upscaled.cubic`); the
+  color field and the composite's read of it the same.
+- **The velocity for the 4K density.** Read straight between its 288 × 512 cells, its kinks show as the
+  coarse cells in a sharp density; a tricubic read where the amount is carried, timed against today's. It
+  is 8 trilinear reads for 1, at each of the amount's 199 M texels a step, MacCormack's two reads twice
+  that **(deduction)**.
 
 ## Plan
 
-### 1. The mask's outline from the image
+### 1. The 4K density's color at the dye's size
 
-The coarse depth mask's edge moved to where the camera image's edges run, at the view's 1080 × 1920
-(guided filter, He et al. 2010; joint bilateral upsampling, Kopf et al. 2007): `center.mask.guided_radius`
-(widths, 0 off) and `guided_epsilon`, in `CenterMaskLayer`, guided by the capture image, deep_flow's depth
-mask only. Built: the staircase becomes a smooth contour in the saved masks; 0.22 ms at 0.01 widths, 0.35 at
-0.02, 0.47 at 0.03. The motion takes the same mask.
+A color field at the dye's 448 × 800 by the 4K amount's depth, filled with the dye's color where the
+amount is, carried with the amount, read by the composite with a B-spline; the coarse simulation density's
+color no longer drawn. Measured: memory, the pass, the look on the blocky recording.
 
-### 2. The dye at full size
+### 2. The velocity for the 4K density
 
-The bridge's dye, the image × the mask, at the view's 1080 × 1920 (or the upscaled density's size) instead
-of the bridge's 448 × 800; only its amount, the readings' speed, from 448 × 800, read smoothly (a cubic
-B-spline) where the dye is made. One pass at the larger size; the filters stay at 448 × 800. It adds no
-camera detail, as 448 × 800 holds about all of it: what it gains is the guided mask's outline at the view's
-size and a smoother enlargement to 4K; weighed by that against step 1 alone.
-
-### 3. The 4K density's color from the dye
-
-The 4K density takes its color from the 288 × 512 simulation density. With the dye at full size (2), the
-color can follow it at injection, in a color field finer than the simulation's (a middle size, e.g. 1080 ×
-1920 × 24) or the amount's own channels; measured against the memory and the density pass's time.
-
-### 4. The water at the 4K density
-
-The 4K density moved by the 288 × 512 velocity read linearly, straight between its cells: a smooth
-(tricubic) read of the velocity where the amount is carried, weighed against its cost (eight reads where one
-is now).
+A tricubic read of the 288 × 512 velocity where the 4K amount is carried; kept if the look gains for its
+cost.
 
 ## Open
 
-- A finer depth would give the mask a finer outline at the source; the camera stays as it is now.
+- The whole chain before the fluid, camera to bridge (the center layers, the mask, the motion, the bridge),
+  checked for performance as one: each pass timed at deep_flow's preset, and what it costs against what it
+  gives the fluid.
 
-- Where the mask is made (the depth's size) against the view: the guide moves the edge at the view's size;
-  a mask cut at the image's size from the start is an option once the camera runs as an OAK App.
+- A finer depth would give the mask a finer outline at the source; the camera stays as it is now.

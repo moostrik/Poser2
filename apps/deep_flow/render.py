@@ -6,7 +6,7 @@ from typing import cast
 import numpy as np
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
-from modules.gl import RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId, MouseButton
+from modules.gl import GpuTimer, RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId, MouseButton
 from modules.flow import DepthView, Port, hold_tick
 from modules.pose import Frame, Similarity, AngleMotion
 from modules.render import layers as ls, shaders, make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
@@ -55,6 +55,17 @@ LARGE_LAYERS: list[Layers] = [
     Layers.monitor_a,
     Layers.monitor_b,
     Layers.composite,
+]
+
+# The center view: the crop around the player and what is made from it, timed together ("GPU center")
+CENTER_LAYERS: list[Layers] = [
+    Layers.center_geometry,
+    Layers.center_mask,
+    Layers.center_capture,
+    Layers.center_depth,
+    Layers.center_foreground,
+    Layers.center_pose,
+    Layers.color_mask,
 ]
 
 OUTPUT_WIDTH: int = 1080
@@ -164,6 +175,9 @@ class DeepFlowRender(RenderBase):
         # A reset asked for from another thread, applied at the next update on the GL thread
         self._reset_fluid: Event = Event()
 
+        self._center_timer: GpuTimer = GpuTimer("GPU center")
+        self._center_size: tuple[int, int] = (0, 0)     # the center layers' size: the motion's, set in allocate
+
         # The border around each layer in the main window
         self._border: shaders.DrawRectangleOutline = shaders.DrawRectangleOutline()
 
@@ -205,10 +219,13 @@ class DeepFlowRender(RenderBase):
         self.allocate_window_renders()
 
     def allocate(self) -> None:
+        self._center_size = (self.settings.motion.width, self.settings.motion.height)
         for layer_type, cam_dict in self.L.items():
             for layer in cam_dict.values():
                 if layer_type in LARGE_LAYERS:
                     layer.allocate(OUTPUT_WIDTH * 2, OUTPUT_HEIGHT * 2, GL_RGBA16F)
+                elif layer_type in CENTER_LAYERS:
+                    layer.allocate(*self._center_size, GL_RGBA16F)
                 else:
                     layer.allocate(OUTPUT_WIDTH, OUTPUT_HEIGHT, GL_RGBA16F)
         self.allocate_window_renders()
@@ -222,11 +239,24 @@ class DeepFlowRender(RenderBase):
                 w, h = self.subdivision.get_allocation_size('panels', 0)
                 self.L[layer_type][i].allocate(w, h, GL_RGBA)
 
+    def _follow_center_size(self) -> None:
+        """Reallocate the center layers when the motion's size changed: the crop is drawn at the size the
+        motion and the bridge read it."""
+        size: tuple[int, int] = (self.settings.motion.width, self.settings.motion.height)
+        if size == self._center_size:
+            return
+        self._center_size = size
+        for layer_type in CENTER_LAYERS:
+            for layer in self.L[layer_type].values():
+                layer.deallocate()
+                layer.allocate(*size, GL_RGBA16F)
+
     def deallocate(self) -> None:
         for cam_dict in self.L.values():
             for layer in cam_dict.values():
                 layer.deallocate()
         self._border.deallocate()
+        self._center_timer.deallocate()
 
     def _measure_tick(self, now: float) -> None:
         if self._last_tick > 0.0:
@@ -279,6 +309,7 @@ class DeepFlowRender(RenderBase):
         self._right_layers = select.right
         self._output_layers = select.output
         self._update_layout()
+        self._follow_center_size()
 
         self._wire_flow()
 
@@ -292,11 +323,20 @@ class DeepFlowRender(RenderBase):
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[Layers] = set()
+        timing: bool = False        # inside the center layers, which run one after another in UPDATE_LAYERS
         for layer_type in self._update_layers + self._interface_layers + self._left_layers + self._right_layers + self._output_layers:
             if layer_type not in seen:
                 seen.add(layer_type)
+                if (layer_type in CENTER_LAYERS) != timing:
+                    timing = not timing
+                    if timing:
+                        self._center_timer.begin()
+                    else:
+                        self._center_timer.end()
                 for layer in self.L[layer_type].values():
                     layer.update()
+        if timing:
+            self._center_timer.end()
 
     # ========== The flow's wiring ==========
 
