@@ -98,7 +98,7 @@ def main() -> None:
     parser.add_argument('--set', action='append', default=[])
     args = parser.parse_args()
     mh.context()
-    calm = ['velocity.vorticity_1=0', 'velocity.vorticity_2=0', 'velocity.fade_time=0', 'velocity.evaporation_time=0', 'velocity.viscosity=0']
+    calm = ['vorticity.strength_1=0', 'vorticity.strength_2=0', 'vorticity.strength_3=0', 'velocity.fade_time=0', 'velocity.evaporation_time=0', 'velocity.viscosity=0']
     print(f"{'plane':>5} {'t s':>5} {'kept':>6} {'aspect':>7} {'residual':>9}")
     for plane in ('xy', 'xz'):
         fluid = Fluid3D(mc.fluid_settings(Advection.SEMI_LAGRANGIAN, calm + args.set))

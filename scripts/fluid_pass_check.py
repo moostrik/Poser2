@@ -8,7 +8,7 @@ memory speed (`--bandwidth`, GB/s; the RTX 4090's 1008): a pass far above it spe
 count the upscaled amount too where the preset runs it. A pass that skips what it need not touch can run under
 its floor; the floor counts every texel. Passes off at the preset
 run with what turns them on (the viscosity, the vorticity, the buoyancy, MacCormack). Settings by path as in
-maccormack_check: `--set velocity.vorticity_1=1`.
+maccormack_check: `--set vorticity.strength_1=1`.
 
     python scripts/fluid_pass_check.py [--warmup 2] [--repeats 40] [--set path=value ...]
 """
@@ -73,7 +73,7 @@ def main() -> None:
     args = parser.parse_args()
     mh.context()
     query = glGenQueries(1)[0]
-    on = ['velocity.viscosity=0.0001', 'velocity.vorticity_1=1', 'temperature.buoyancy=1']
+    on = ['velocity.viscosity=0.0001', 'vorticity.strength_1=1', 'temperature.buoyancy=1']
     fluid = fluid_at(on + args.set, args.warmup)
     w, h, d = fluid._simulation_width, fluid._simulation_height, fluid._depth
     cells = w * h * d

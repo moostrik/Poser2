@@ -550,19 +550,15 @@
         "fade_time": 0.0,
         "evaporation_time": 0.0,
         "viscosity": 0.0,
-        "viscosity_iter": 20,
-        "vorticity_1": 45.05,
-        "vorticity_2": 0.0,
-        "vorticity_3": 0.0,
-        "vorticity_radius_1": 0.1,
-        "vorticity_radius_2": 0.006,
-        "vorticity_radius_3": 0.025
+        "viscosity_iter": 20
       },
-      "density": {
-        "advection": "MACCORMACK",
-        "advection_scale": 0.88,
-        "fade_time": 30.0,
-        "evaporation_time": 0.0
+      "vorticity": {
+        "strength_1": 45.05,
+        "strength_2": 0.0,
+        "strength_3": 0.0,
+        "radius_1": 0.1,
+        "radius_2": 0.006,
+        "radius_3": 0.025
       },
       "temperature": {
         "advection": "SEMI_LAGRANGIAN",
@@ -581,6 +577,12 @@
         "iterations": 40,
         "relaxation": 1.85,
         "cycles": 1
+      },
+      "density": {
+        "advection": "MACCORMACK",
+        "advection_scale": 0.88,
+        "fade_time": 30.0,
+        "evaporation_time": 0.0
       },
       "upscaled": {
         "enabled": true,

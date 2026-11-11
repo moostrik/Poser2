@@ -566,15 +566,15 @@ class Fluid3D:
             glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _confine_vorticity(self) -> None:
-        """Vorticity confinement, each of the three (`vorticity_1` to `vorticity_3` at `vorticity_radius_1` to `_3`) keeping swirls of its own
+        """Vorticity confinement, each of the three (`vorticity.strength_1` to `_3` at `vorticity.radius_1` to `_3`) keeping swirls of its own
         size alive: every curl in one pass, their forces summed at the cells in one, added to the faces once, each
         face its two cells' mean. The first running confinement's curl is the one the upscaled density's turbulence reads; the
         curl alone while only it does."""
-        velocity = self.settings.velocity
+        vorticity = self.settings.vorticity
         running: list[tuple[float, float]] = [(strength, radius) for strength, radius in
-                                              ((velocity.vorticity_1, velocity.vorticity_radius_1),
-                                               (velocity.vorticity_2, velocity.vorticity_radius_2),
-                                               (velocity.vorticity_3, velocity.vorticity_radius_3))
+                                              ((vorticity.strength_1, vorticity.radius_1),
+                                               (vorticity.strength_2, vorticity.radius_2),
+                                               (vorticity.strength_3, vorticity.radius_3))
                                               if strength > 0.0 and radius > 0.0]
         if not running:
             if self._needs_curl:
