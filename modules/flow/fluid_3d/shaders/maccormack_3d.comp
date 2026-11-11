@@ -11,9 +11,9 @@
  *
  * and bounded by the source's eight texels around the backward trace: where it leaves them, the
  * predictor stands (Selle's revert), so the correction never makes a value the step could not have
- * read (no overshoot, no ringing) and never keeps energy the step lost; or, with uClamp (a density's
- * choice), the corrected value is cut to them, so neighbors never flip between sharp and soft. uBlend
- * mixes that share of the predictor in. Then the dissipation and
+ * read (no overshoot, no ringing) and never keeps energy the step lost; or, with uClamp (the field's
+ * `limiter`), the corrected value is cut to them, so the edge stays steep where the revert gives up the
+ * whole correction. Then the dissipation and
  * the evaporation, as the plain step applies them. The velocity and the obstacle are sampled by
  * uv, so the field may sit on a finer grid than they do.
  */
@@ -39,7 +39,6 @@ uniform ivec3 uClosed;        // Per axis, 1 where the domain's walls are closed
 uniform bool  uFromFaces;     // the velocity read from its faces (faces.glsl, a field on the simulation's grid), else uVelocity
 uniform ivec3 uCells;         // the simulation's cells, with uFromFaces
 uniform bool  uClamp;         // where the correction overshoots: cut to the bounds, else revert to the predictor
-uniform float uBlend;         // the predictor's share mixed into the result
 
 #include "walls.glsl"
 #include "faces.glsl"
@@ -121,7 +120,6 @@ void main() {
             result = out_of_bounds ? forward : result;
         }
     }
-    result = mix(result, forward, uBlend);
 
     result *= uDissipation;
     if (uEvaporation > 0.0) {

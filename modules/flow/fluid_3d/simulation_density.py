@@ -65,7 +65,7 @@ class SimulationDensity(DensityCarrier):
         if self._advection.carry(step.advection, self._density, self._scratch, step.velocity, step.obstacle,
                                  step.aspect, step.z_extent, step.step, step.dissipation, GL_RGBA16F,
                                  step.has_obstacles, evaporation=step.evaporation, guard=step.guard, faces=step.faces,
-                                 limiter=step.limiter, blend=step.blend):
+                                 limiter=step.limiter):
             self._apply_walls()
 
     def composite(self, output: Texture, look: MarchLook, light: CompositeLight | None = None) -> None:

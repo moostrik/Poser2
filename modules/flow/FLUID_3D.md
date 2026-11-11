@@ -84,6 +84,9 @@ gravity) weighs dyed water wherever it is, with `buoyancy` 0, in the same pass, 
 - The masking in the bridge: the mask (`inputs.mask`, R16F 0 to 1, the depth's or the segmentation's) gates the velocity in the motion (`use_mask`) and the density's color in the bridge; in the bridge alone it is one gate in one stage.
 
 - The body force's acceleration: tested, tweaked and made useful.
+- The velocity loses its energy faster than expected **(site fact)**, with the plain step on the velocity: the
+  plain step's own loss (a swirl keeps 52% of its speed in 2 s, MacCormack 62%), the drag now over the body's
+  whole depth, or another cause; MacCormack with the clamp on the velocity is the first thing to try.
 - The particles: worked on, and how they combine with the upscaled density.
 
 ## The fluid
@@ -525,11 +528,15 @@ The revert keeps MacCormack's detail and decays as the plain step does. Above ab
 grows the water in both advections, after the body stopped: the confinement adds energy every step,
 which the step's own loss balances only at a small epsilon.
 
-The density chooses its own limiter (`density.limiter`): REVERT, the velocity's, or CLAMP, the corrected value
-cut to the bounds, which a density can take as it feeds nothing back; and `density.blend`, the plain step's
-share mixed into the corrected value (Houdini's remedy for the revert's grid artifacts). On standmoves at 4K,
-the luminance's gradient (mean / p99) over the lit pixels: revert 8.3 / 73, clamp 10.3 / 92, blend 0.05
-8.0 / 69, the plain step 5.1 / 45; the density pass 4.1 ms for each MacCormack choice, 1.37 for the plain.
+Each field chooses its limiter beside its advection (`velocity.limiter`, `density.limiter`,
+`temperature.limiter`), both Selle 2008's: CLAMP, the default, the corrected value cut to the bounds, or
+REVERT, the paper's recommendation, the predictor where the correction overshoots. The correction overshoots
+at the sharpest features: the revert gives up the whole correction there, the clamp keeps the edge steep and
+flattens only its top; it keeps more of what the step lost, energy in a velocity, and clamps each channel on
+its own (a slight hue shift at an RGBA density's sharp edges). On standmoves at 4K, the luminance's gradient
+(mean / p99) over the lit pixels: revert 8.3 / 73, clamp 10.3 / 92, the plain step 5.1 / 45; the density pass
+4.1 ms for either limiter, 1.37 for the plain step. A blend of the plain step into the corrected value
+(Houdini's remedy for the revert's grid artifacts) took sharpness back for nothing else to gain, and went.
 
 The upscaled density's color is the simulation density's color over its amount, at the same place; where the
 two are carried apart, the 4K amount lies where the coarse amount is near 0 (3.9% of the pixels under 0.01 on

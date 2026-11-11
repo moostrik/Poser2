@@ -35,10 +35,10 @@ class FieldAdvection:
               internal_format: int, has_obstacles: bool, evaporation: float = 0.0,
               measure: int = 0, guard: GuardSlot | None = None,
               closed: tuple[bool, bool, bool] = (True, True, True), faces: Texture3D | None = None,
-              limiter: Limiter = Limiter.REVERT, blend: float = 0.0) -> bool:
+              limiter: Limiter = Limiter.CLAMP) -> bool:
         """Carry `field` one step along `velocity`, or along `faces` (`FaceVelocity`) for a field on the simulation's grid. Semi-Lagrangian into the field; or its step into `scratch` as
         the predictor and the MacCormack correction into the field; on the step's result `guard` (a non-finite
-        value 0 and counted); MacCormack's `limiter` and `blend` as the field's settings say. Returns whether `scratch` was (re)allocated, so its owner sets its walls."""
+        value 0 and counted); MacCormack's `limiter` as the field's settings say. Returns whether `scratch` was (re)allocated, so its owner sets its walls."""
         field.swap()
         source: Texture3D = field.back
         if advection != Advection.MACCORMACK:
@@ -58,6 +58,6 @@ class FieldAdvection:
         self._maccormack_shader.use(source, scratch, field, velocity, obstacle, aspect, z_extent, step, dissipation,
                                     internal_format=internal_format, has_obstacles=has_obstacles,
                                     evaporation=evaporation, measure=measure, guard=guard, closed=closed, faces=faces,
-                                    clamp=limiter == Limiter.CLAMP, blend=blend)
+                                    clamp=limiter == Limiter.CLAMP)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         return allocated

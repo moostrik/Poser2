@@ -11,7 +11,7 @@
  *   1  the MacCormack predictor: the plain step alone, into the scratch faces
  *   2  the MacCormack correction (Selle et al. 2008): the predictor (uPred) traced forward again gives back
  *      the source up to the step's error, half of which is added back, bounded by the source's eight faces
- *      around the backward trace, else the predictor stands; then as mode 0
+ *      around the backward trace: clamped to them (uClamp), else the predictor stands; then as mode 0
  *
  * A face on a closed wall or with an obstacle's cell on either side is 0 and stays 0. Along a closed wall the
  * velocity is braked by uWallKeep (the slip); the evaporation and the top speed read the face's full vector,
@@ -33,6 +33,7 @@ uniform float uEvaporation;   // widths/s taken off the speed this step
 uniform int   uGuardSlot;     // the velocity's slot in the stage's FiniteGuard; -1 no guard
 uniform ivec3 uClosed;        // per axis, 1 where the walls are closed
 uniform bool  uHasObstacles;
+uniform bool  uClamp;         // mode 2: where the correction overshoots, cut it to the bounds, else revert
 
 #include "walls.glsl"
 #include "faces.glsl"
@@ -98,7 +99,9 @@ float advect(int c, ivec3 i) {
                 lo = min(lo, value);
                 hi = max(hi, value);
             }
-            result = (lo > hi || result < lo || result > hi) ? forward : result;
+            if (lo > hi) result = forward;                  // no bounds
+            else if (uClamp) result = clamp(result, lo, hi);
+            else if (result < lo || result > hi) result = forward;
         }
     } else {
         result = face_at(c, back);

@@ -18,8 +18,8 @@ class Advection(IntEnum):
 
 class Limiter(IntEnum):
     """What MacCormack does where its correction leaves the eight texels the plain step read between (Selle 2008)."""
-    REVERT = 0      # the plain step's value: no energy kept that the step lost (the velocity's, always)
-    CLAMP = 1       # the corrected value cut to those bounds: no flip between sharp and soft texels
+    CLAMP = 0       # the corrected value cut to those bounds: the edge kept steep, its top flat
+    REVERT = 1      # the plain step's value there: what a step really made, softer at the sharpest features
 
 
 class PressureSolver(IntEnum):
@@ -122,6 +122,7 @@ class InputSettings(BaseSettings):
 class VelocitySettings(BaseSettings):
     """The velocity: how it carries itself, fades, swirls and thickens."""
     advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the velocity carries itself: MacCormack keeps swirls, at about twice the reads")
+    limiter: Field[Limiter]         = Field(Limiter.CLAMP,                              description="MacCormack where its correction overshoots: clamp it to the step's bounds, or revert to the plain step")
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=1.0,    color="blue-grey",      description="How far the velocity carries itself per step; 1 = with the water, the physics")
     fade_time: Field[float]         = Field(60.0,   min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the velocity fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds 1 width/s takes to brake to rest, a fixed amount at a time; 0 = off")
@@ -143,11 +144,10 @@ class VorticitySettings(BaseSettings):
 class DensitySettings(BaseSettings):
     """The density: how it is carried, fades and evaporates."""
     advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the density is carried, the simulation's and the upscaled: MacCormack keeps its edges sharp")
+    limiter: Field[Limiter]         = Field(Limiter.CLAMP,                              description="MacCormack where its correction overshoots: clamp it to the step's bounds, or revert to the plain step")
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the density is carried per step; 1 = with the water, above it runs ahead")
     fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the density fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds fully dyed water takes to clear, faint first; 0 = off")
-    limiter: Field[Limiter]         = Field(Limiter.REVERT,     newline=True,           description="MacCormack where its correction overshoots: revert to the plain step, or clamp to its bounds")
-    blend: Field[float]             = Field(0.0,    min=0.0,    max=0.2,    step=0.01,  description="MacCormack: the plain step's share mixed into the corrected one; 0 = none")
 
 
 class UpscaledDensitySettings(BaseSettings):
@@ -164,6 +164,7 @@ class UpscaledDensitySettings(BaseSettings):
 class TemperatureSettings(BaseSettings):
     """The temperature: how it is carried, fades, and lifts or sinks the water."""
     advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the warmth is carried; only its buoyancy is seen")
+    limiter: Field[Limiter]         = Field(Limiter.CLAMP,                              description="MacCormack where its correction overshoots: clamp it to the step's bounds, or revert to the plain step")
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the temperature is carried per step; 1 = with the water, above it runs ahead")
     fade_time: Field[float]         = Field(3.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the warmth fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds full warmth (±1) takes to reach 0, a fixed amount at a time; 0 = off")

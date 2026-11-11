@@ -40,7 +40,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_REPEA
 
 from modules.gl import ComputeShader, SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
-from .fluid_settings import Advection, Light, PressureSolver, ScatteringModel, Fluid3DSettings, PressureSettings, ParticleSettings, UpscaledDensitySettings
+from .fluid_settings import Advection, Light, Limiter, PressureSolver, ScatteringModel, Fluid3DSettings, PressureSettings, ParticleSettings, UpscaledDensitySettings
 from .multigrid_pressure import MultigridPressure
 from .face_velocity import FaceVelocity
 from ..shaders import AddBoolean
@@ -510,13 +510,13 @@ class Fluid3D:
 
     def _advect_field(self, field: SwapTexture3D, scratch: Texture3D, velocity: Texture3D, advection: Advection,
                       step: float, dissipation: float, internal_format: int,
-                      evaporation: float = 0.0, measure: int = 0, guard: str = '') -> None:
+                      evaporation: float = 0.0, measure: int = 0, guard: str = '', limiter: Limiter = Limiter.CLAMP) -> None:
         """Carry `field` one step along `velocity` by `advection`; its size taken down by `evaporation`,
         read by `measure` (0 a density's alpha, 1 a vector's length, 2 |r|); `guard` the field's name in the guard."""
         if self._advection.carry(advection, field, scratch, velocity, self._obstacle, self._aspect,
                                  self._z_extent, step, dissipation, internal_format, self._has_obstacles,
                                  evaporation=evaporation, measure=measure,
-                                 guard=self._guard_slot(guard), closed=self._closed, faces=self._faces.volume):
+                                 guard=self._guard_slot(guard), closed=self._closed, faces=self._faces.volume, limiter=limiter):
             self._apply_wall_modes()
 
     @property
@@ -550,7 +550,7 @@ class Fluid3D:
             self._advect_faces_shader.use(PREDICTOR, source, self._faces_scratch.volume, **common)
             glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
             self._advect_faces_shader.use(CORRECTION, source, self._faces.volume, **common, **finish,
-                                          predictor=self._faces_scratch.volume)
+                                          predictor=self._faces_scratch.volume, clamp=velocity.limiter == Limiter.CLAMP)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
     def _apply_viscosity(self) -> None:
@@ -617,7 +617,7 @@ class Fluid3D:
         dissipation = self._calculate_dissipation(self._dt, self.settings.temperature.fade_time)
         self._advect_field(self._temperature, self._temperature_scratch, self._velocity, self.settings.temperature.advection, advect_step, dissipation, GL_R16F,
                            evaporation=self._evaporation(self._dt, self.settings.temperature.evaporation_time), measure=2,
-                           guard='temperature')
+                           guard='temperature', limiter=self.settings.temperature.limiter)
 
     def _apply_buoyancy(self) -> None:
         """Apply buoyancy to velocity: the acceleration f = gravity * (κρ − σ(T − T_ambient)) (widths/s²),
@@ -697,7 +697,7 @@ class Fluid3D:
             dissipation=self._calculate_dissipation(self._dt, self.settings.density.fade_time),
             evaporation=self._evaporation(self._dt, self.settings.density.evaporation_time), advection=self.settings.density.advection,
             curl=self._curl_vol if self._needs_curl else None, cell=self._cell[0], guard=self._guard_slot('density'),
-            faces=self._faces.volume, limiter=self.settings.density.limiter, blend=self.settings.density.blend)
+            faces=self._faces.volume, limiter=self.settings.density.limiter)
         for carrier in self._densities:
             carrier.update(step)
 

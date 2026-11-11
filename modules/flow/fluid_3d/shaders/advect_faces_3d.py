@@ -21,7 +21,7 @@ class AdvectFaces3D(ComputeShader):
     def use(self, mode: int, source: Texture3D, result: Texture3D, obstacle: Texture3D,
             cells: tuple[int, int, int], cell: Cell, step: float, dissipation: float = 1.0, evaporation: float = 0.0,
             guard: GuardSlot | None = None, closed: tuple[bool, bool, bool] = (True, True, True),
-            wall_keep: float = 1.0, has_obstacles: bool = True, predictor: Texture3D | None = None) -> None:
+            wall_keep: float = 1.0, has_obstacles: bool = True, predictor: Texture3D | None = None, clamp: bool = True) -> None:
         """Advect `source` into `result`.
 
         Args:
@@ -36,6 +36,7 @@ class AdvectFaces3D(ComputeShader):
             guard: The velocity's slot in the stage's FiniteGuard; None no guard
             closed: Per axis, whether the walls are closed
             wall_keep: The share along a closed wall kept this step (slip_time's); 1 free-slip
+            clamp: CORRECTION: where it overshoots, cut it to the bounds instead of reverting to the predictor
         """
         if not self.allocated or not self.shader_program:
             return
@@ -45,6 +46,7 @@ class AdvectFaces3D(ComputeShader):
         if predictor is not None:
             self.bind_texture_3d(8, predictor, 'uPred')
         glUniform1i(self.get_uniform_loc('uMode'), mode)
+        glUniform1i(self.get_uniform_loc('uClamp'), int(clamp))
         glUniform1f(self.get_uniform_loc('uTimestep'), step)
         glUniform1f(self.get_uniform_loc('uDissipation'), dissipation)
         glUniform1f(self.get_uniform_loc('uEvaporation'), evaporation)

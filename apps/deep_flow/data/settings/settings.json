@@ -580,11 +580,10 @@
       },
       "density": {
         "advection": "MACCORMACK",
+        "limiter": "CLAMP",
         "advection_scale": 0.88,
         "fade_time": 30.0,
-        "evaporation_time": 0.0,
-        "limiter": "CLAMP",
-        "blend": 0.02
+        "evaporation_time": 0.0
       },
       "upscaled": {
         "enabled": true,

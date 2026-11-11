@@ -32,8 +32,7 @@ class CarrierStep:
     cell: float = 0.0               # the grid's cell across, in x and y (widths)
     guard: GuardSlot | None = None  # the density's slot in the fluid's FiniteGuard
     faces: Texture3D | None = None  # the velocity on its faces, which a carrier on the simulation's grid moves by
-    limiter: Limiter = Limiter.REVERT   # MacCormack where its correction overshoots
-    blend: float = 0.0                  # MacCormack: the plain step's share mixed in
+    limiter: Limiter = Limiter.CLAMP    # MacCormack where its correction overshoots
 
 
 class DensityCarrier(ABC):
