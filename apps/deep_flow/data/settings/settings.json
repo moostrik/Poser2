@@ -352,11 +352,11 @@
       },
       "mask": {
         "blend_factor": 1.0,
-        "dilation_steps": -1,
+        "dilation_steps": 0,
         "blur_steps": 0,
         "blur_radius": 1.0,
-        "guided_radius": 0.0,
-        "guided_epsilon": 0.001
+        "guided_radius": 2.0,
+        "edge_contrast": 0.03
       },
       "cam": {
         "blend_factor": 0.2,

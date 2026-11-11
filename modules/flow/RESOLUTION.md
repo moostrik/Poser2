@@ -80,7 +80,7 @@ output, is smooth (a cubic B-spline), not straight between texels.
   deep_flow allocates its center layers (`CENTER_LAYERS` in `apps/deep_flow/render.py`) at the motion's
   `width` and `height` and follows them when they change: the crop is drawn once, at the size the motion's
   luminance (`LuminanceFrames`) and the bridge read it, where a larger view read back bilinearly 2.4× down
-  would hand the solve an aliased image; the guided filter runs at that size (`guided_radius` is in widths);
+  would hand the solve an aliased image; the guided filter runs at that size (`guided_radius` is in the depth's pixels);
   and the debug views show the same detail enlarged on screen, as the crop holds no more. The center layers
   take 0.18 ms of GPU a frame at 448 × 800 against 0.46 ms at 1080 × 1920 (`GPU center`, deep_flow's
   preset with the guided filter off, 40 s of `-sim`). The guided filter alone, median of 40 on its own:
@@ -96,6 +96,36 @@ output, is smooth (a cubic B-spline), not straight between texels.
   the simulation density's 288 × 512 color (SIMULATION) stays as the cheaper choice. The composite reads the
   color linearly between its texels.
 
+- **The mask and the depth mask.** The player's shape and where the depth is the player's are two things,
+  made in one place, the center mask layer. Its `texture`, the mask: the depth's cut with its edge moved onto
+  the camera image's by the guided filter, then the AA's threshold, a crisp edge where the image puts it;
+  where the image has no edge the filter only averages the cut and the threshold makes that a smoothed
+  outline. `guided_radius` is in the cut's (the depth's) pixels, how far its edge may be off, turned into
+  the view's each frame from the crop; `edge_contrast` the image's brightness spread (0 to 1) above which
+  the edge follows the image's, squared inside as the filter's ε. It gates x/y in the motion with
+  `use_mask`, and the dye's color in the bridge. Its `unrefined`, the cut on the view as it comes, is the
+  motion's `depth_mask` while the mask is cut from the depth: it gates z on top of the mask, always, and it
+  is the z position's weight with the mask (its value held to 0..1 where the track lags past the range).
+  The depth's mask with another mask source (RVM) is later ([FLOW.md's Open](FLOW.md#7-the-depths-mask-with-another-mask-source)).
+
+  deep_flow's preset: `guided_radius` 2, `edge_contrast` 0.03, `dilation_steps` 0, as the erosion pulls the
+  guided edge off the image's. On stillslowfast, one loop a run, the motion's thresholds at 0, the still
+  part; z and x/y in widths/s, p99 within 6 px of the mask's edge and inside it; fit, the image's
+  brightness gradient along the mask's edge, higher the closer the edge sits on the image's:
+
+  | Mask                                   | Runs | z at edge (p99 / mean) | z inside | x/y at edge | Fit    |
+  |----------------------------------------|------|------------------------|----------|-------------|--------|
+  | the cut, erosion 1, z by the mask      | 3    | 0.053 / 0.0040         | 0.087    | 0.030       | 0.0308 |
+  | guided 1.5, erosion 0                  | 3    | 0.053 / 0.0036         | 0.064    | 0.028       | 0.0435 |
+  | guided 2, erosion 0                    | 3    | 0.050 / 0.0036         | 0.057    | 0.028       | 0.0449 |
+  | guided 1.5, erosion 1                  | 1    | 0.052 / 0.0041         | 0.063    | 0.025       | 0.0276 |
+  | guided 1.5, erosion 2                  | 1    | 0.053 / 0.0041         | 0.066    | 0.030       | 0.0210 |
+  | guided 2, erosion 0, contrast 0.015    | 1    | 0.053 / 0.0037         | 0.106    | 0.027       | 0.0450 |
+  | guided 2, erosion 0, contrast 0.06     | 1    | 0.065 / 0.0041         | 0.078    | 0.027       | 0.0442 |
+
+  One loop's p99 swings by about ±0.02 between runs of one setting, so a single run's noise says little; the
+  fit is steady to ±0.0003.
+
 What changes against now, and why:
 
 - **Into the fluid, bilinear as now.** The fluid reads the bridge's 448 × 800 outputs at its 288 × 512 cells
@@ -110,6 +140,8 @@ What changes against now, and why:
   that **(deduction)**.
 
 ## Plan
+
+The input first, as good as it gets, before the 4K density's heavy side.
 
 ### 1. The velocity for the 4K density
 

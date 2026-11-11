@@ -49,18 +49,20 @@ class MotionInput:
     the velocity is measured on by its brightness; `timestamp` the capture time of the camera frame it
     holds, the frame's identity: the stage measures when it differs from the one it measured last
     (None: no camera frame yet, nothing to measure); `dt` the render tick's; `depth` the camera's depth on the same view, or None;
-    `mask` the player's mask on the view, or None."""
+    `mask` the player's mask on the view, or None; `depth_mask` where the depth is the player's on the view
+    (the depth's own cut, unrefined), which gates z, or None."""
     image: Annotated[Texture, TextureKind.IMAGE]
     timestamp: float | None
     dt: float
     depth: Annotated[DepthView | None, TextureKind.SCALAR] = None
     mask: Annotated[Texture | None, TextureKind.SCALAR] = None
+    depth_mask: Annotated[Texture | None, TextureKind.SCALAR] = None
 
 
 @dataclass
 class MotionOutput(StageOutput):
     """The motion stage's textures: `velocity` (x, y, z) in view widths per second, gated by the mask
-    with the flow's `use_mask`, z 0 without depth; `z_position`, the body's now in the player's depth range,
+    with the flow's `use_mask`, z also by the depth mask, z 0 without depth; `z_position`, the body's now in the player's depth range,
     the 3D motion's only, None without."""
     velocity: Annotated[Texture, TextureKind.VELOCITY]
     z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None

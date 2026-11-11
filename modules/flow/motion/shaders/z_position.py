@@ -1,20 +1,21 @@
 """Z Position shader: where the body is now in the player's depth range."""
 
-from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
+from OpenGL.GL import GL_TEXTURE0, GL_TEXTURE1, GL_TEXTURE2, GL_TEXTURE_2D, glActiveTexture, glBindTexture, glUniform1f, glUniform1i, glUseProgram
 from modules.gl import Shader, draw_quad, Texture
 
 
 class ZPosition(Shader):
     """Writes the z position from the depth track times its weight to R, the weight to G."""
 
-    def use(self, track: Texture, near: float, far: float, mask: Texture | None = None) -> None:
+    def use(self, track: Texture, near: float, far: float, mask: Texture | None = None, depth_mask: Texture | None = None) -> None:
         """The z position.
 
         Args:
             track: The depth track (RGBA32F), its disparity (1/m) in green
             near: The range's front, m
             far: The range's back, m
-            mask: The weight in R (0 to 1), None for 1
+            mask: A weight in R (0 to 1), None for 1
+            depth_mask: A weight in R (0 to 1), where the depth is the player's, None for 1
         """
         if not self.allocated or not self.shader_program or not track.allocated:
             return
@@ -27,7 +28,12 @@ class ZPosition(Shader):
             glActiveTexture(GL_TEXTURE1)
             glBindTexture(GL_TEXTURE_2D, mask.tex_id)
             glUniform1i(self.get_uniform_loc("tex1"), 1)
+        if depth_mask is not None:
+            glActiveTexture(GL_TEXTURE2)
+            glBindTexture(GL_TEXTURE_2D, depth_mask.tex_id)
+            glUniform1i(self.get_uniform_loc("tex2"), 2)
         glUniform1i(self.get_uniform_loc("has_mask"), 1 if mask is not None else 0)
+        glUniform1i(self.get_uniform_loc("has_depth_mask"), 1 if depth_mask is not None else 0)
         glUniform1f(self.get_uniform_loc("near"), near)
         glUniform1f(self.get_uniform_loc("far"), far)
         draw_quad()

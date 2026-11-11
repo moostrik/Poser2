@@ -49,17 +49,20 @@ def check_z_position(rng: np.random.Generator) -> bool:
     disparity = np.where(rng.uniform(size=(h, w)) < 0.2, 0.0, 1.0 / rng.uniform(0.05, 2.0, (h, w)))
     mask = rng.uniform(size=(h, w))
     track = texture(np.stack((np.zeros_like(disparity), disparity, np.zeros_like(disparity), np.zeros_like(disparity)), -1), GL_RGBA32F)
+    depth_mask = (rng.uniform(size=(h, w)) > 0.3).astype(np.float64)
     mask_texture = texture(np.stack((mask,) * 4, -1), GL_RGBA16F)
+    depth_mask_texture = texture(np.stack((depth_mask,) * 4, -1), GL_RGBA16F)
     shader = ZPosition()
     shader.allocate()
     out = Fbo()
     out.allocate(w, h, GL_RG16F)
     passed = True
-    for name, m in (('with a mask', mask_texture), ('without', None)):
+    for name, m, d in (('with both masks', mask_texture, depth_mask_texture), ('with the depth mask', None, depth_mask_texture),
+                       ('without', None, None)):
         out.begin()
-        shader.use(track, 0.1, 1.7, m)
+        shader.use(track, 0.1, 1.7, m, d)
         out.end()
-        expected = z_position(disparity, 0.1, 1.7, mask if m is not None else None)
+        expected = z_position(disparity, 0.1, 1.7, mask if m is not None else None, depth_mask if d is not None else None)
         passed &= report(f"motion z position, {name}", read_back(out)[..., :2], expected, 4e-3)
     return passed
 

@@ -20,13 +20,21 @@ class TestMotionZPosition(unittest.TestCase):
         np.testing.assert_allclose(place(z), [0.0, 0.5, 1.0], atol=1e-9)
         np.testing.assert_allclose(z[..., 1], 1.0)
 
-    def test_outside_the_range_or_without_depth_is_no_z_position_not_the_front(self) -> None:
-        z = z_position(np.array([1.0 / 0.05, 1.0 / 3.0, 0.0]), 0.1, 1.7)
+    def test_without_depth_is_no_z_position_not_the_front(self) -> None:
+        z = z_position(np.array([0.0]), 0.1, 1.7)
         np.testing.assert_array_equal(z, 0.0)
 
-    def test_the_mask_is_the_weight(self) -> None:
-        z = z_position(np.array([1.0 / 0.9]), 0.1, 1.7, np.array([0.25]))
-        self.assertAlmostEqual(float(z[0, 1]), 0.25)
+    def test_a_track_out_of_the_range_is_held_to_its_ends(self) -> None:
+        z = z_position(np.array([1.0 / 0.05, 1.0 / 3.0]), 0.1, 1.7)
+        np.testing.assert_allclose(place(z), [0.0, 1.0], atol=1e-9)
+
+    def test_the_depth_mask_says_where_the_depth_is_the_players(self) -> None:
+        z = z_position(np.array([1.0 / 0.9, 1.0 / 0.9]), 0.1, 1.7, depth_mask=np.array([1.0, 0.0]))
+        np.testing.assert_allclose(z[..., 1], [1.0, 0.0])
+
+    def test_the_weight_is_the_depth_mask_times_the_mask(self) -> None:
+        z = z_position(np.array([1.0 / 0.9]), 0.1, 1.7, np.array([0.25]), np.array([0.5]))
+        self.assertAlmostEqual(float(z[0, 1]), 0.125)
         self.assertAlmostEqual(float(place(z)[0]), 0.5)
 
 

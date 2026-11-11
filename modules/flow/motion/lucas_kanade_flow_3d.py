@@ -8,12 +8,13 @@ corrected each frame by the mean over `z.window` depth samples and smoothed over
 `z.smooth`; `z.threshold` comes off it. The depth change comes in view
 widths per frame like the displacement, so all three become view widths per second the same way. Out
 comes one 3D velocity in image widths per second times `x_gain`, `y_gain` and `z_gain` (1 = true speed,
-0 = that axis off, negative = inverted). With `use_mask`, the velocity is multiplied by the mask.
+0 = that axis off, negative = inverted). With `use_mask`, the velocity is multiplied by the mask; z also,
+always, by the depth mask, where the depth is the player's (`set_depth_mask`).
 
 Beside it, `z_position`: where the body is now in the player's depth range (the depth source's near to
-far), (depth - near) / (far - near), 0 front to 1 back, from the depth track, times its weight in red and
-the weight in green (RG16F): the mask's with `use_mask` (1 without), where the depth lies in the range,
-else 0, no z position. z stays in view widths per second, as x/y.
+far), (depth - near) / (far - near) held to 0..1, 0 front to 1 back, from the depth track, times its weight
+in red and the weight in green (RG16F): the depth mask's times the mask's with `use_mask` (each 1 without),
+0 without depth, no z position. z stays in view widths per second, as x/y.
 
 z lags its motion by the time it is smoothed over. With `z.xy_smooth`, x/y goes through the
 same filter over `z.smooth` before its threshold, carried along the displacement as z is, so
@@ -70,6 +71,7 @@ class LucasKanadeFlow3D:
         # The solve's inputs kept when it comes out wrong, with POSER_SOLVE_CAPTURE set (a debugging tool)
         self._capture: SolveCapture | None = SolveCapture.from_environment()
         self._mask: Texture | None = None
+        self._depth_mask: Texture | None = None
 
         self._filtered: SwapFbo = SwapFbo()         # with xy_smooth: the filter, its displacement and position error
         self._followed: Fbo = Fbo()                 # the filtered displacement with the noise floor taken off
@@ -159,6 +161,11 @@ class LucasKanadeFlow3D:
         """The player's mask (red, 0 to 1) the velocity is multiplied by with `use_mask`, or None for no mask."""
         self._mask = texture
 
+    def set_depth_mask(self, texture: Texture | None) -> None:
+        """Where the depth is the player's (red, 0 to 1): z and the z position's weight are multiplied by it,
+        always; None for none."""
+        self._depth_mask = texture
+
     def update(self, depth: Texture | None, delta_time: float, view_span: float, depth_step: tuple[float, float],
                guarded: bool = False, depth_range: tuple[float, float] = (0.0, 0.0)) -> None:
         """Measure between the newest two frames.
@@ -213,16 +220,16 @@ class LucasKanadeFlow3D:
         per_second: float = 1.0 / delta_time if math.isfinite(delta_time) and delta_time > MIN_DELTA_TIME else 1.0 / FALLBACK_DELTA_TIME
         aspect: float = self._velocity.height / max(self._velocity.width, 1)
         mask: Texture | None = self._mask if s.use_mask and self._mask is not None and self._mask.allocated else None
+        depth_mask: Texture | None = self._depth_mask if self._depth_mask is not None and self._depth_mask.allocated else None
         self._velocity.begin()
         self._compose_shader.use(xy, self._depth_velocity.depth_velocity if depth is not None else None,
                                  (per_second * s.x_gain, per_second * aspect * s.y_gain, per_second * s.z_gain), mask,
-                                 self._slot('velocity', guarded))
+                                 self._slot('velocity', guarded), depth_mask)
         self._velocity.end()
 
         if depth is not None:
             self._z_position.begin()
-            self._z_position_shader.use(self._depth_velocity.difference, depth_range[0], depth_range[1],
-                                        self._mask if s.use_mask and self._mask is not None and self._mask.allocated else None)
+            self._z_position_shader.use(self._depth_velocity.difference, depth_range[0], depth_range[1], mask, depth_mask)
             self._z_position.end()
         else:
             self._z_position.clear()
@@ -231,15 +238,18 @@ class LucasKanadeFlow3D:
 
 # ── numpy reference ─────────────────────────────────────────────────────
 
-def z_position(disparity: np.ndarray, near: float, far: float, mask: np.ndarray | None = None) -> np.ndarray:
-    """Where the body is now in the depth range (..., 2): the z position, (depth - near) / (far - near), times its
-    weight, and the weight, the mask's (1 without) where the depth (1 / `disparity`, m) lies from near to far,
-    else 0. Mirrors z_position.frag."""
+def z_position(disparity: np.ndarray, near: float, far: float, mask: np.ndarray | None = None,
+               depth_mask: np.ndarray | None = None) -> np.ndarray:
+    """Where the body is now in the depth range (..., 2): the z position, (depth - near) / (far - near) held to
+    0..1, times its weight, and the weight: the depth mask's times the mask's (each 1 without), 0 without depth
+    (1 / `disparity`, m). Mirrors z_position.frag."""
     depth: np.ndarray = np.where(disparity > 1e-6, 1.0 / np.maximum(disparity, 1e-6), 0.0)
-    weight: np.ndarray = ((depth >= near) & (depth <= far) & (far > near)).astype(np.float64)
+    weight: np.ndarray = ((depth > 0.0) & (far > near)).astype(np.float64)
+    if depth_mask is not None:
+        weight = weight * depth_mask
     if mask is not None:
         weight = weight * mask
-    z: np.ndarray = np.where(weight > 0.0, (depth - near) / max(far - near, 1e-9), 0.0)
+    z: np.ndarray = np.where(weight > 0.0, np.clip((depth - near) / max(far - near, 1e-9), 0.0, 1.0), 0.0)
     return np.stack((z * weight, weight), axis=-1)
 
 

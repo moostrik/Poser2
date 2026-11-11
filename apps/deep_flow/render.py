@@ -112,6 +112,7 @@ class DeepFlowRender(RenderBase):
 
         cmt: dict[int, Texture] = {}    # the center masks
         depth_source: bool = mask_source == MaskSource.DEPTH
+        self._depth_source: bool = depth_source     # the mask is cut from the depth, so the center mask's unrefined cut is the depth mask
         space: ls.SourceSpace = ls.SourceSpace.IMAGE if depth_source else ls.SourceSpace.CROP
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.board)
@@ -368,7 +369,9 @@ class DeepFlowRender(RenderBase):
             mask_layer: ls.LayerBase | None = self._layer(inputs.mask, i)
             mask: Texture | None = mask_layer.texture if mask_layer is not None else None
             depth: DepthView = cast(ls.CenterDepthLayer, self.L[Layers.center_depth][i]).depth_view
-            motion.set_input(ls.MotionInput(image.texture, timestamp, dt, depth, mask))
+            # where the depth is the player's: the depth's own cut on the view, with the depth as the mask source
+            depth_mask: Texture | None = cast(ls.CenterMaskLayer, self.L[Layers.center_mask][i]).unrefined if self._depth_source else None
+            motion.set_input(ls.MotionInput(image.texture, timestamp, dt, depth, mask, depth_mask))
             bridges[i].set_input(ls.BridgeInput(motion.output.velocity, dt, color.texture if color is not None else None, mask=mask,
                                                 z_position=motion.output.z_position))
 

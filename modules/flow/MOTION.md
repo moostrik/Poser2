@@ -104,8 +104,12 @@ The flow's velocity is in image widths per second times its gains.
 Beside the velocity the 3D motion hands out where the body is now in the box's depth, `z_position`
 (`ZPosition`): from the depth track's disparity, (depth − near) / (far − near) over the player's depth
 range, the depth source's `near` and `far` (`DepthView`), 0 front to 1 back, times its weight in red and
-the weight in green (RG16F). The weight is the mask's with `use_mask` (1 without) where the depth lies in
-the range, else 0: a depth outside it is no z position, not clamped, as the range is what the player is.
+the weight in green (RG16F). The weight is the depth mask's, where the depth is the player's (the depth's
+own cut on the view, `MotionInput.depth_mask`), times the mask's with `use_mask` (each 1 without), and 0
+without depth: the cut decides where the player's depth is, so the z position is held to 0..1 where the
+track lags past the range. The depth mask gates z the same way, always: with `use_mask` the mask gates
+x, y and z, and z also takes the depth mask, so z exists only where the depth itself is the player's, never
+on an edge the mask's guided filter moved onto the wall's depth.
 z stays in view widths per second: the bridge takes the length of x, y and z, so z in a share of the
 range would mix units there. What the bridge and the fluid do with it is in
 [BRIDGE.md](BRIDGE.md#the-z-positions).

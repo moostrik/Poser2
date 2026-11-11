@@ -49,6 +49,7 @@ class Motion3DLayer(MotionLayer):
         flow: LucasKanadeFlow3D = self._flow
         flow.set_input(input.image)
         flow.set_mask(input.mask)
+        flow.set_depth_mask(input.depth_mask)
         depth: DepthView | None = input.depth
         if depth is not None and not depth.texture.allocated:
             depth = None
