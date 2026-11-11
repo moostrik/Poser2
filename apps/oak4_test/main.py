@@ -27,6 +27,8 @@ APP_NAME = 'oak4_test'
 
 class Oak4TestMain:
     def __init__(self, simulation: bool = False, interface: bool = True) -> None:
+        raise RuntimeError("oak4_test waits for the input refactor: the uploader has its own thread now, and oak4_test still runs its "
+                           "pose step on the camera's thread (modules/flow/INPUT_THREADS.md, Open 2). Run it from the main branch.")
         if simulation:
             raise RuntimeError('oak4_test has no simulator: it needs the OAK4 and the pose model on it')
 

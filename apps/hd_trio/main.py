@@ -29,6 +29,8 @@ DATA_PATH = 'apps/hd_trio/data'
 
 class HDTrioMain:
     def __init__(self, simulation: bool = False, interface: bool = True) -> None:
+        raise RuntimeError("hd_trio waits for the input refactor: the uploader has its own thread now, and hd_trio still runs its "
+                           "pose step on the camera's thread (modules/flow/INPUT_THREADS.md, Open 2). Run it from the main branch.")
 
         self.is_running: bool = False
         self.is_finished: bool = False

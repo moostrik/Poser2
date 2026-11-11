@@ -115,9 +115,7 @@
       "add_height_threshold": 0.25,
       "update_height_threshold": 0.2,
       "add_bottom_threshold": 1.0
-    },
-    "frame_sync": {},
-    "tracklet_sync": {}
+    }
   },
   "cadence": {},
   "pose": {

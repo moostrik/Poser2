@@ -1,18 +1,23 @@
+"""The uploader: the camera's one hand-off. The camera's thread queues its frames here and returns; this thread
+puts each on the GPU and hands it on, in arrival order, so no GPU work and no consumer runs on the camera's thread."""
+
 import time
 import logging
-from threading import Lock
+from collections import deque
+from threading import Condition, Lock, Thread
 
 import numpy as np
 import torch
 import torch.nn.functional as F
 
-from modules.camera import CameraFrame, FrameType
+from modules.camera import CameraFrame, CameraFrameCallback, FrameType
 from modules.utils import PerformanceTimer
 from .source import GpuImage, GpuImageCallback, ImageDict, TimestampDict
 
 logger = logging.getLogger(__name__)
 
-STAGING_COUNT: int = 3      # pinned buffers per camera: frames the GPU may be behind before the camera's thread waits
+STAGING_COUNT: int = 3      # pinned buffers per camera: frames the GPU may be behind before the uploader's thread waits
+QUEUED: int = 2             # frames of a kind waiting per camera; beyond that the oldest is dropped and counted
 
 
 def nv12_to_rgb(y: torch.Tensor, uv: torch.Tensor) -> torch.Tensor:
@@ -46,21 +51,23 @@ def warp_grid(homography: torch.Tensor, height: int, width: int) -> torch.Tensor
     return uv.unsqueeze(0)
 
 
-class Uploader:
-    """Uploads CPU numpy frames to GPU float16 CHW tensors without the camera's thread waiting for the GPU:
-    each frame goes through a pinned staging buffer, and the copy and every op after it are queued on the
-    upload stream (no op that sizes its output on the GPU), so a frame is handed on at the camera's cadence.
+class Uploader(Thread):
+    """Takes the camera's frames on the camera's thread (`submit_frame`) and does all the rest on its own: the color
+    goes to the GPU through a pinned staging buffer, is converted, straightened and flipped there, and is handed on
+    as a `GpuImage` with the event that says it is written; the depth is handed on as it came. Neither the camera's
+    thread nor this one waits for the GPU while the GPU has room. A frame waits for this thread in a queue of
+    `QUEUED` per camera and kind; a frame that finds it full drops the oldest of its kind (`dropped`), so a thread
+    that cannot keep up loses frames instead of falling behind.
 
-    Maintains a previous-frame buffer per camera for use by downstream
-    processors (e.g. optical flow). Call snapshot() once per tick to
-    synchronize the CUDA stream and retrieve both buffers, with the current
-    images' capture times.
+    Maintains a previous-frame buffer per camera for use by downstream processors (e.g. optical flow). `snapshot()`
+    returns both with the current images' capture times.
 
     Input:  BGR uint8 (H, W, 3), grayscale uint8 (H, W) or packed NV12 uint8 (H * 3 / 2, W)
     Output: float16 RGB CHW [0, 1] tensors keyed by cam_id
     """
 
     def __init__(self) -> None:
+        super().__init__(daemon=True, name='Uploader')
         self._gpu_images: dict[int, torch.Tensor] = {}
         self._prev_gpu_images: dict[int, torch.Tensor] = {}
         self._timestamps: TimestampDict = {}
@@ -74,22 +81,69 @@ class Uploader:
             name="GPU Image Upload  ", sample_count=200, report_interval=100,
             color="green", omit_init=25,
         )
-        self._gpu_image_callbacks: list[GpuImageCallback] = []     # run in registration order, on the uploading thread
+        self._gpu_image_callbacks: list[GpuImageCallback] = []     # run in registration order, on this thread
+        self._depth_callbacks: list[CameraFrameCallback] = []      # run in registration order, on this thread
+        self._queue: deque[CameraFrame] = deque()
+        self._wake: Condition = Condition()
+        self._running: bool = False
+        self._dropped: int = 0
+
+    @property
+    def dropped(self) -> int:
+        """Frames dropped because this thread had not taken the ones before them yet."""
+        return self._dropped
+
+    def start(self) -> None:
+        self._running = True
+        super().start()
+
+    def stop(self) -> None:
+        with self._wake:
+            self._running = False
+            self._wake.notify()
+        if self.is_alive():
+            self.join(timeout=2.0)
+
+    def submit_frame(self, frame: CameraFrame) -> None:
+        """A camera frame callback, on the camera's thread: queues the frame and returns."""
+        with self._wake:
+            waiting: list[CameraFrame] = [f for f in self._queue if f.cam_id == frame.cam_id and f.kind == frame.kind]
+            if len(waiting) >= QUEUED:
+                self._queue.remove(waiting[0])
+                self._dropped += 1
+            self._queue.append(frame)
+            self._wake.notify()
+
+    def run(self) -> None:
+        while True:
+            with self._wake:
+                while self._running and not self._queue:
+                    self._wake.wait()
+                if not self._running:
+                    return
+                frame: CameraFrame = self._queue.popleft()
+            try:
+                if frame.kind == FrameType.VIDEO:
+                    self._upload(frame)
+                elif frame.kind == FrameType.DEPTH:
+                    for callback in self._depth_callbacks:
+                        callback(frame)
+            except Exception:
+                logger.exception("Uploader: frame of camera %d failed", frame.cam_id)
 
     def add_gpu_image_callback(self, callback: GpuImageCallback) -> None:
-        """Every uploaded image, with its capture time and the event that says it is written."""
+        """Every uploaded image, with its capture time and the event that says it is written, on this thread."""
         if callback not in self._gpu_image_callbacks:
             self._gpu_image_callbacks.append(callback)
 
-    def set_image(self, frame: CameraFrame) -> None:
-        """Upload a camera frame to GPU. Only VIDEO frames are stored.
+    def add_depth_callback(self, callback: CameraFrameCallback) -> None:
+        """Every depth frame, as it came, in its place among the images, on this thread."""
+        if callback not in self._depth_callbacks:
+            self._depth_callbacks.append(callback)
 
-        Shifts current to previous as the new frame is stored, with its capture time. The image is BGR uint8
-        (H, W, 3), grayscale uint8 (H, W) or packed NV12, converted, straightened and flipped here
-        on the GPU so the camera's thread does none of it.
-        """
-        if frame.kind != FrameType.VIDEO:
-            return
+    def _upload(self, frame: CameraFrame) -> None:
+        """A color frame to the GPU: converted, straightened and flipped there, stored as the camera's current
+        image (the one before it as its previous) with its capture time, and handed on."""
         cam_id: int = frame.cam_id
         image: np.ndarray = frame.image
 
@@ -139,7 +193,7 @@ class Uploader:
 
     def _staging_buffer(self, cam_id: int, image: np.ndarray) -> torch.Tensor:
         """The camera's next pinned buffer for `image`, (re)made at its shape. From pinned memory the copy to the
-        GPU is queued and the camera's thread goes on; from the frame's own pageable memory it would wait until the
+        GPU is queued and this thread goes on; from the frame's own pageable memory it would wait until the
         GPU had taken it. A buffer is reused once the copy queued from it has run, its event passed; only a GPU
         `STAGING_COUNT` frames behind makes the thread wait."""
         buffers, events, index = self._staging.get(cam_id, ([], [], -1))

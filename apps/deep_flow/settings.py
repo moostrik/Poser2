@@ -13,7 +13,7 @@ from enum import IntEnum, auto
 
 from modules.settings import BaseSettings, Field, Group, Widget
 from modules.panel import PanelSettings
-from modules.camera import CameraCheckSettings, CameraResolution, PlayerSettings, RecorderSettings, SyncSettings
+from modules.camera import CameraCheckSettings, CameraResolution, PlayerSettings, RecorderSettings
 from modules.camera.oak4 import Oak4CameraSettings
 from modules.session import SessionSettings
 from modules.render import layers, ColorSettings
@@ -130,8 +130,6 @@ class Oak4Group(BaseSettings):
     control        : Group[SessionSettings]                = Group(SessionSettings, share=[start, stop, split, split_seconds])
     recorder       : Group[RecorderSettings]               = Group(RecorderSettings, share=[num_cams, fps, keyframe_interval, start, stop, split])
     tracker        : Group[OnePerCamTrackerSettings]       = Group(OnePerCamTrackerSettings)
-    frame_sync     : Group[SyncSettings]                   = Group(SyncSettings, share=[num_cams, fps])
-    tracklet_sync  : Group[SyncSettings]                   = Group(SyncSettings, share=[num_cams, fps])
 
     @property
     def cameras(self) -> list[Oak4CameraSettings]:
