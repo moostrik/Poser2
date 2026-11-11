@@ -117,8 +117,8 @@ RGBA16F with its color baked in, each a swap pair, the obstacle R8. The simulati
 width in x, y and z, so the slab is 128 / 256 = 0.5 widths deep (`_z_extent`). The grid is the one
 that holds 60 fps in deep_flow with the pose on the same GPU ([TIMING.md](TIMING.md#the-grid)). The density is carried
 on the same grid always (the simulation density), and where enabled by the upscaled density, its amount at
-`upscaled.width` × `upscaled.height` × `upscaled.depth` with its color the simulation density's
-([The density's detail](#the-densitys-detail)), and by the particles, drawn over the volume. Every pass
+`upscaled.width` × `upscaled.height` × `upscaled.depth` with its color at the dye's size, or the simulation
+density's (`upscaled.color`, [The density's detail](#the-densitys-detail)), and by the particles, drawn over the volume. Every pass
 that reads the velocity or the obstacle against the density samples by uv, so the shaders are the same
 (`advect_3d`, `inject_3d`, `buoyancy_3d`). The composite reads the volume at the output's 2160 × 3840. The monitors
 read every field as it is. The GPU is a 24 GB RTX 4090, so nothing pages. Every pass's time is in
@@ -543,7 +543,13 @@ its own (a slight hue shift at an RGBA density's sharp edges). On standmoves at 
 4.1 ms for either limiter, 1.37 for the plain step. A blend of the plain step into the corrected value
 (Houdini's remedy for the revert's grid artifacts) took sharpness back for nothing else to gain, and went.
 
-The upscaled density's color is the simulation density's color over its amount, at the same place; where the
+The upscaled density's color is a color volume's color over its amount, at the same place: with
+`upscaled.color` DYE (the default) a volume of its own at the dye's width and height by the amount's layers
+(448 × 800 × 24 at deep_flow's preset, RGBA16F, as 8 bits would round at every advection), injected and carried
+with the amount, faded and evaporated as it is, without the turbulence; with SIMULATION the simulation
+density's, on its 288 × 512 cells. The dye's own volume costs 1.3 ms of the density pass (5.4 to 6.8 ms,
+deep_flow's preset, 40 s of `-sim`) and keeps the dye's color as the bridge made it, its bands and edges
+included, where the simulation's cells blurred them **(site fact: less blocky)**. Where the
 two are carried apart, the 4K amount lies where the coarse amount is near 0 (3.9% of the pixels under 0.01 on
 the blocky recording at 4.7 s), and divided by almost nothing the color jumped from cell to cell: squares the
 coarse cell's size (7.5 px at 4K), worse the sharper the 4K amount. Each takes `COLOR_FLOOR` (0.01) of white

@@ -54,6 +54,12 @@ class DensitySample(IntEnum):
     AVERAGE = 1             # the velocity averaged over the grid's layers the layer spans
 
 
+class DensityColor(IntEnum):
+    """Where the upscaled density's color is kept."""
+    DYE = 0                 # a volume of its own at the dye's width and height, carried with the amount
+    SIMULATION = 1          # the simulation density's, on the simulation's cells
+
+
 class ParticleDraw(IntEnum):
     """How the particles are drawn."""
     POINTS = 0              # one pixel a particle
@@ -158,6 +164,7 @@ class UpscaledDensitySettings(BaseSettings):
     depth: Field[int]               = Field(16,     min=4,      max=256,    step=4,                 description="The amount's depth in z, over the simulation's depth")
     sample: Field[DensitySample]    = Field(DensitySample.AVERAGE,                                  description="The velocity at a layer's middle, or averaged over the simulation's layers it spans")
     cubic: Field[bool]              = Field(True,                                                   description="The bridge's density enlarged by a cubic B-spline, without its texels' steps; off: bilinear")
+    color: Field[DensityColor]      = Field(DensityColor.DYE,                                       description="Its color at the dye's size, or the simulation's cells' (coarser, cheaper)")
     turbulence: Field[float]        = Field(0.0,    min=0.0,    max=50.0,   step=0.5,              description="Swirls below the simulation's cells where the water churns, as its curl × cell; 0 = off")
 
 

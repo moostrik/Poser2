@@ -30,7 +30,7 @@ The picture, what becomes the dye (deep_flow's preset):
 | depth, the player's mask                  | about 480 lines (NEURAL_480), cropped     | the mask's edge in the depth's pixels                        |
 | center view, image and mask               | 448 × 800, the motion's size              | drawn once from the crop, read by the flow as made           |
 | bridge: the dye, image × mask × speed     | 448 × 800                                 | about all the real detail: 800 rows against at most 720      |
-| simulation density, its color             | 288 × 512 × 64                            | the 4K density's color                                       |
+| upscaled density, its color               | 448 × 800 × 24, the dye's size            | the dye's color as made, carried with the amount             |
 | upscaled density, its amount              | 2160 × 3840 × 24                          | filled from the 448 × 800 dye, stretched 4.8×                |
 | composite                                 | 2160 × 3840                               |                                                              |
 
@@ -83,7 +83,18 @@ output, is smooth (a cubic B-spline), not straight between texels.
   would hand the solve an aliased image; the guided filter runs at that size (`guided_radius` is in widths);
   and the debug views show the same detail enlarged on screen, as the crop holds no more. The center layers
   take 0.18 ms of GPU a frame at 448 × 800 against 0.46 ms at 1080 × 1920 (`GPU center`, deep_flow's
-  preset with the guided filter off, 40 s of `-sim`).
+  preset with the guided filter off, 40 s of `-sim`). The guided filter alone, median of 40 on its own:
+
+  | `guided_radius` | 1080 × 1920 | 448 × 800 |
+  |-----------------|-------------|-----------|
+  | 0.01 widths     | 0.22 ms     | 0.05 ms   |
+  | 0.02 widths     | 0.35 ms     | 0.06 ms   |
+  | 0.03 widths     | 0.47 ms     | 0.07 ms   |
+- **The 4K density's color at the dye's size.** The upscaled density keeps its color in a volume of its own at
+  the dye's width and height by the amount's layers (`upscaled.color` DYE, [FLUID_3D.md](FLUID_3D.md#the-densitys-detail)),
+  448 × 800 × 24 at the preset, 8.6 M texels against the amount's 199 M, and costs 1.3 ms of the density pass;
+  the simulation density's 288 × 512 color (SIMULATION) stays as the cheaper choice. The composite reads the
+  color linearly between its texels.
 
 What changes against now, and why:
 
@@ -91,13 +102,8 @@ What changes against now, and why:
   bilinearly (`inject_3d`, `add_to_faces_3d`). At 1.56× that drops little: the velocity and the readings are
   smooth over the motion's 7 × 7 window and the lowpass's blur, and the 4K amount reads the dye at 448 × 800
   itself (`inject_amount_3d`), not through the grid **(deduction)**.
-- **The 4K density's color at the dye's size.** Today its hue comes from the simulation density, 288 × 512,
-  over the amount; a color field at 448 × 800 by the 4K amount's 24 layers (8.6 M texels, RGBA16F 69 MB, as
-  8 bits would round at every advection) holds the dye's color as it was made, carried by the same
-  advection as the amount, 8.6 M texels against the amount's 199 M **(deduction: its pass time to
-  measure)**; the coarse simulation density then carries only what the water's buoyancy weighs.
 - **Up once, smoothly, at the output.** The 4K amount is filled by a B-spline already (`upscaled.cubic`); the
-  color field and the composite's read of it the same.
+  composite's read of the color the same, in place of its linear read, if the look gains for its cost.
 - **The velocity for the 4K density.** Read straight between its 288 × 512 cells, its kinks show as the
   coarse cells in a sharp density; a tricubic read where the amount is carried, timed against today's. It
   is 8 trilinear reads for 1, at each of the amount's 199 M texels a step, MacCormack's two reads twice
@@ -105,13 +111,7 @@ What changes against now, and why:
 
 ## Plan
 
-### 1. The 4K density's color at the dye's size
-
-A color field at the dye's 448 × 800 by the 4K amount's depth, filled with the dye's color where the
-amount is, carried with the amount, read by the composite with a B-spline; the coarse simulation density's
-color no longer drawn. Measured: memory, the pass, the look on the blocky recording.
-
-### 2. The velocity for the 4K density
+### 1. The velocity for the 4K density
 
 A tricubic read of the 288 × 512 velocity where the 4K amount is carried; kept if the look gains for its
 cost.

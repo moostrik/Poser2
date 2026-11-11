@@ -4,8 +4,8 @@ Every field is a GL_TEXTURE_3D on one grid of cubic cells: the velocity (RGBA16F
 and the pressure (R16F) and the obstacle (R8) at the simulation's size, `depth` deep. The
 density is carried by the simulation density always (`SimulationDensity`, RGBA16F, its color baked in at
 injection, on the same grid), and where enabled by the upscaled density (`UpscaledDensity`, its amount at
-`upscaled`'s size, sampled by uv wherever a pass reads it against the simulation's fields, its color the
-simulation density's) and the particles (`ParticleDensity`), all moved through the same velocity. The volume
+`upscaled`'s size, sampled by uv wherever a pass reads it against the simulation's fields, its color a
+volume at the dye's size or the simulation density's, `upscaled.color`) and the particles (`ParticleDensity`), all moved through the same velocity. The volume
 drawn is the upscaled one where enabled, else the simulation's; the particles are laid over it.
 
 Pipeline:

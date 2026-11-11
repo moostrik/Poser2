@@ -7,7 +7,7 @@
     "keyframe_interval": 50,
     "color": true,
     "resolution": "P800",
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "fov": 80.0,
     "split_seconds": 60,
@@ -354,7 +354,9 @@
         "blend_factor": 1.0,
         "dilation_steps": -1,
         "blur_steps": 0,
-        "blur_radius": 1.0
+        "blur_radius": 1.0,
+        "guided_radius": 0.0,
+        "guided_epsilon": 0.001
       },
       "cam": {
         "blend_factor": 0.2,
@@ -533,7 +535,7 @@
         "boundary": {
           "velocity_drag": 75.0,
           "velocity_gain": 1.0,
-          "density_drag": 1000.0,
+          "density_drag": 0.0,
           "density_gain": 1.0,
           "temperature_drag": 200.0,
           "temperature_gain": 1.0
@@ -546,6 +548,7 @@
       },
       "velocity": {
         "advection": "SEMI_LAGRANGIAN",
+        "limiter": "CLAMP",
         "advection_scale": 1.0,
         "fade_time": 0.0,
         "evaporation_time": 0.0,
@@ -562,6 +565,7 @@
       },
       "temperature": {
         "advection": "SEMI_LAGRANGIAN",
+        "limiter": "CLAMP",
         "advection_scale": 1.0,
         "fade_time": 12.0,
         "evaporation_time": 0.0,
@@ -592,6 +596,7 @@
         "depth": 24,
         "sample": "MIDDLE",
         "cubic": true,
+        "color": "DYE",
         "turbulence": 0.0
       },
       "particles": {
@@ -609,7 +614,7 @@
         "smooth": 3
       },
       "composite": {
-        "emission": 3.9095,
+        "emission": 1.0,
         "opacity": 0.02907,
         "fog": 2.7899,
         "tint": {
