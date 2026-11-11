@@ -367,7 +367,7 @@ class DeepFlowRender(RenderBase):
     # ========== Drawing ==========
 
     def draw_main(self, width: int, height: int) -> None:
-        if self.settings.layer.select.view == View.SHOW:
+        if self.settings.view == View.SHOW:
             self._draw_show(width, height)      # the show alone, on one screen
             return
 

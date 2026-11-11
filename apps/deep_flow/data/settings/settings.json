@@ -268,10 +268,10 @@
     }
   },
   "render": {
+    "view": "DEBUG",
     "stage": "LERP",
     "layer": {
       "select": {
-        "view": "DEBUG",
         "left": [
           "fluid"
         ],

@@ -92,7 +92,6 @@ class View(IntEnum):
 
 
 class LayerSettings(BaseSettings):
-    view:   Field[View]         = Field(View.DEBUG,                          description="The main window: the debug panels, or the show alone (one screen)")
     left:   Field[list[Layers]] = Field([Layers.composite],                  description="Layers drawn in the left viewport",  widget=Widget.playlist)
     right:  Field[list[Layers]] = Field([Layers.pose],                       description="Layers drawn in the right viewport", widget=Widget.playlist)
     output: Field[list[Layers]] = Field([Layers.fluid, Layers.color_mask], description="Layers mixed into the show texture", widget=Widget.playlist)
@@ -280,6 +279,7 @@ class CenterGroup(BaseSettings):
     color     : Group[layers.MSColorMaskLayerSettings]      = Group(layers.MSColorMaskLayerSettings)
 
 class RenderSettings(BaseSettings):
+    view   : Field[View]                         = Field(View.DEBUG, description="The main window: the debug panels, or the show alone")
     stage  : Field[Stage]                        = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")
     input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
     layer  : Group[LayerGroup]                   = Group(LayerGroup)
