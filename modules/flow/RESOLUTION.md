@@ -5,6 +5,9 @@ stage needs, and the plan to give each what it needs at a cost deep_flow can run
 show; **(deduction)** marks what is inferred, **(site fact)** what the operator saw; the camera's and the
 depth's sizes are their models' nominal ones.
 
+The camera is a given **(site fact)**: its color and depth sizes are set for USB and network alike, and the
+chain makes the most of them; more color detail would not help, a finer depth would, later.
+
 The rule: a quantity is made at the size of what it comes from and carried at the size where it is used.
 The dye's picture, its color and its outline, comes from the camera image and is seen at 4K; the motion's
 speed comes from the motion; the water's motion is the fluid's grid. hd_trio's 2D chain keeps it by running
@@ -82,17 +85,15 @@ The 4K density takes its color from the 288 × 512 simulation density. With the 
 color can follow it at injection, in a color field finer than the simulation's (a middle size, e.g. 1080 ×
 1920 × 24) or the amount's own channels; measured against the memory and the density pass's time.
 
-### 4. The camera
-
-P1080 gives real detail where upscaling gives none; a setting to try, at the camera pipeline's cost.
-
-### 5. The water at the 4K density
+### 4. The water at the 4K density
 
 The 4K density moved by the 288 × 512 velocity read linearly, straight between its cells: a smooth
 (tricubic) read of the velocity where the amount is carried, weighed against its cost (eight reads where one
 is now).
 
 ## Open
+
+- A finer depth would give the mask a finer outline at the source; the camera stays as it is now.
 
 - Where the mask is made (the depth's size) against the view: the guide moves the edge at the view's size;
   a mask cut at the image's size from the start is an option once the camera runs as an OAK App.
