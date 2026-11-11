@@ -21,9 +21,9 @@ The picture, what becomes the dye (deep_flow's preset):
 
 | Stage                                     | Size                                      | What it does to the dye                                     |
 |-------------------------------------------|-------------------------------------------|-------------------------------------------------------------|
-| camera color                              | 1280 × 720 (P720), cropped around the player | the real detail, about 700 to 900 px tall in the crop **(deduction)** |
+| camera color                              | 1280 × 720 (P720), cropped around the player | the real detail: the crop at most 720 px tall, the image's rows (the recording's frames are 720 tall) |
 | depth, the player's mask                  | about 480 lines (NEURAL_480), cropped     | the mask's edge in the depth's pixels                        |
-| center view, image and mask               | 1080 × 1920                               | upscaled to here: no new detail                              |
+| center view, image and mask               | 1080 × 1920                               | upscaled at least 2.7× to here: no new detail                |
 | bridge: the dye, image × mask × speed     | 448 × 800                                 | the 1920 image cut back to 448                               |
 | simulation density, its color             | 288 × 512 × 64                            | the 4K density's color                                       |
 | upscaled density, its amount              | 2160 × 3840 × 24                          | filled from the 448 × 800 dye, stretched 4.8×                |
