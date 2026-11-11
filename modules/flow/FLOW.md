@@ -250,28 +250,9 @@ The shader loader finds a shader's source by its `.py` module name beside it
 
 ## The input's cadence
 
-Every camera frame reaches the motion at the camera's cadence, and the motion measures one capture per
-frame. The camera's thread hands its frame to `Uploader.set_image` (`PoseInference.set_camera_frame`),
-which copies it into the camera's next pinned staging buffer (`STAGING_COUNT` 3) and queues the copy to
-the GPU, the NV12 conversion and the straightening on the upload stream, with the `ready` event the
-readers wait on; it never waits for the GPU itself. A copy from the frame's own pageable memory, or an op
-that sizes its output on the GPU (`repeat_interleave`), makes the thread wait for the GPU, behind the
-fluid's GL work: the sync then hands its captures on bunched, and the render, which measures the newest
-capture per tick, loses those that land in one tick with the next.
-
-Live, P800 at 50 fps, NEURAL_480, USB, 45 s each, the moments of each capture, motion step and render tick:
-
-| Stream                         | Waiting on the GPU      | Not waiting               |
-|--------------------------------|-------------------------|---------------------------|
-| the camera's thread in `set_image` | mean 5.6, p95 16 ms | mean 1.6, p95 2.6 ms      |
-| captures arriving, p95 / max   | 34.6 / 92 ms            | 22.2 / 30.5 ms            |
-| captures the motion measures   | 1816 of 2202 (82%)      | 2235 of 2249 (99.4%)      |
-| the dye still for over 50 ms   | 197 times, up to 104 ms | 0, at most 45.6 ms        |
-| render ticks                   | 80/s                    | 118/s                     |
-
-The panel pins the cadence beside the camera's video rates (`CadenceSettings` in deep_flow): the captures
-the sync hands on and the frames the motion measures, each as an average and a minimum (1 / the worst gap),
-so a frame lost after the camera shows where it is lost.
+Every camera frame is to reach the motion at the camera's cadence, the motion measuring one capture per
+frame. How a frame gets there, thread by thread, what costs frames and the plan are in
+[INPUT_THREADS.md](INPUT_THREADS.md).
 
 ## Constraints
 
@@ -378,6 +359,6 @@ speeds on standmoves and stillslowfast.
 ### 7. The depth's mask with another mask source
 
 With `mask_source` RVM, deep_flow makes no `DepthMaskLayer`, so the motion's `depth_mask`, the depth's own
-cut that gates z ([RESOLUTION.md](RESOLUTION.md#1-the-mask-and-the-depth-mask)), has nothing to come from: the
+cut that gates z ([RESOLUTION.md](RESOLUTION.md#the-mask-and-the-depth-mask)), has nothing to come from: the
 depth's cut has to be made whatever the mask source, cropped by the center mask layer in the image's space,
 as RVM's mask is in the crop's. Later; the depth source comes first.

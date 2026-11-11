@@ -7,7 +7,7 @@
     "keyframe_interval": 50,
     "color": true,
     "resolution": "P800",
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "fov": 80.0,
     "split_seconds": 60,
@@ -77,7 +77,7 @@
         "DEPTH"
       ],
       "apply_warp": false,
-      "folder": "20261111-091147_blocky",
+      "folder": "20261111-123241",
       "sim_passthrough": false,
       "replay": true
     },
@@ -119,6 +119,7 @@
     "frame_sync": {},
     "tracklet_sync": {}
   },
+  "cadence": {},
   "pose": {
     "model_type": "TRT",
     "model_path": "apps/deep_flow/data/models",
