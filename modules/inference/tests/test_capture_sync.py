@@ -109,15 +109,30 @@ class CaptureSyncTest(unittest.TestCase):
         self.assertEqual([c.timestamp for c in self.captures], [1.0 + FRAME])
         self.assertEqual(self.settings.misses, 1)
 
-    def test_a_capture_passed_over_while_waiting_for_poses_is_skipped_not_missed(self) -> None:
+    def test_a_capture_waiting_for_its_poses_goes_out_when_a_newer_one_is_complete(self) -> None:
         self.sync.submit_poses(poses(1.0 - FRAME))              # a player is in view
         self.sync.submit_image(image(1.0))
         self.sync.submit_depth(depth(1.0))                      # waits for its poses
         self.sync.submit_image(image(1.0 + FRAME))
-        self.sync.submit_depth(depth(1.0 + FRAME))              # the newer one waits instead
-        self.sync.submit_poses(poses(1.0 + FRAME))
-        self.assertEqual([c.timestamp for c in self.captures], [1.0 + FRAME])
-        self.assertEqual((self.settings.misses, self.settings.skipped), (0, 1))
+        self.sync.submit_depth(depth(1.0 + FRAME))              # complete: the waiting one goes out, with what it has,
+        self.assertEqual([c.timestamp for c in self.captures], [1.0, 1.0 + FRAME])     # then this one, the poses behind
+        self.assertFalse(self.captures[0].poses_synced or self.captures[1].poses_synced)
+        self.assertEqual(self.settings.misses, 0)
+
+    def test_complete_captures_go_out_in_the_order_of_capture(self) -> None:
+        for i in range(5):
+            self.sync.submit_image(image(1.0 + i * FRAME))
+        for i in range(5):
+            self.sync.submit_depth(depth(1.0 + i * FRAME))
+        self.assertEqual([c.timestamp for c in self.captures], [1.0 + i * FRAME for i in range(5)])
+
+    def test_with_pose_wait_zero_nothing_waits(self) -> None:
+        self.settings.pose_wait = 0.0
+        self.sync.submit_poses(poses(1.0 - FRAME))              # a player is in view
+        self.sync.submit_image(image(1.0))
+        self.sync.submit_depth(depth(1.0))
+        self.assertEqual(len(self.captures), 1)
+        self.assertEqual(self.captures[0].poses[0].timestamp, 1.0 - FRAME)
 
     def test_masks_in_before_the_depth_are_synced(self) -> None:
         self.sync.submit_image(image(1.0))

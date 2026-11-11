@@ -7,8 +7,10 @@ depth. Each is kept a few frames per camera and matched by capture time within `
 A capture is complete with its image and its depth. While the poses keep up, the newest as new as
 the last capture, it waits up to `pose_wait` for its own, and while the masks keep up, up to
 `mask_wait` for its own; otherwise (nobody in view, no masks, or either behind) it takes the newest
-from before it at once, so a missing pose or mask never holds it longer. The wait runs on this
-sync's own thread: no submit blocks, and a capture goes out on whichever thread completes it.
+from before it at once, so a missing pose or mask never holds it longer. Every complete capture goes
+out, in the order of capture: one still waiting goes out with what it has as soon as a newer one is
+complete, so a late part never costs a capture. The wait runs on this sync's own thread: no submit
+blocks, and a capture goes out on whichever thread completes it, under one lock, so they leave in order.
 """
 
 from __future__ import annotations
@@ -40,7 +42,6 @@ class CaptureSyncSettings(BaseSettings):
     pose_wait: Field[float] = Field(10.0, min=0.0, max=50.0, step=0.5, description="Longest a capture waits for its own poses (ms)")
     mask_wait: Field[float] = Field(8.0, min=0.0, max=50.0, step=0.5, description="Longest a capture waits for its own masks (ms)")
     misses:    Field[int]   = Field(0, access=Field.READ, description="Depth frames that found no image")
-    skipped:   Field[int]   = Field(0, access=Field.READ, description="Captures passed over for a newer one while waiting for poses or masks")
 
 
 @dataclass
@@ -69,7 +70,7 @@ class CaptureSync(Thread):
         self._last: dict[int, float] = {}               # the capture time of each camera's last capture
         self._waiting: dict[int, _Waiting] = {}
         self._misses: int = 0
-        self._skipped: int = 0
+        self._emit_lock: Lock = Lock()                  # matching and sending as one step, so captures leave in order
         self._callbacks: list[CaptureCallback] = []     # run in registration order
 
     def add_capture_callback(self, callback: CaptureCallback) -> None:
@@ -93,43 +94,47 @@ class CaptureSync(Thread):
         """Send out a waiting capture whose deadline has passed, with what came in for it or before it."""
         while True:
             with self._lock:
-                capture: Capture | None = None
-                while self._running and capture is None:
-                    capture = self._overdue()
+                while self._running and not self._due():
+                    pass
                 if not self._running:
                     return
-            self._emit(capture)
+            with self._emit_lock:
+                with self._lock:
+                    captures: list[Capture] = self._overdue()
+                self._emit(captures)
 
     # ── Inputs ─────────────────────────────────────────────────────────
 
     def submit_image(self, image: GpuImage) -> None:
-        """An uploaded color image (`Uploader`'s callback, the camera's thread)."""
-        with self._lock:
-            self._images[image.cam_id].append(image)
-            capture: Capture | None = self._match(image.cam_id)
-        self._emit(capture)
+        """An uploaded color image (`Uploader`'s callback, the uploader's thread)."""
+        with self._emit_lock:
+            with self._lock:
+                self._images[image.cam_id].append(image)
+                captures: list[Capture] = self._match(image.cam_id)
+            self._emit(captures)
 
     def submit_depth(self, frame: CameraFrame) -> None:
-        """A camera frame callback: the DEPTH frames, the others pass."""
+        """A depth frame (`Uploader`'s depth callback); other kinds pass."""
         if frame.kind != FrameType.DEPTH:
             return
-        with self._lock:
-            self._depths[frame.cam_id].append(frame)
-            capture: Capture | None = self._match(frame.cam_id)
-        self._emit(capture)
+        with self._emit_lock:
+            with self._lock:
+                self._depths[frame.cam_id].append(frame)
+                captures: list[Capture] = self._match(frame.cam_id)
+            self._emit(captures)
 
     def submit_poses(self, poses: FrameDict) -> None:
         """A pipeline stage's poses, each camera's stamped with its image's time."""
         by_cam: dict[int, FrameDict] = defaultdict(dict)
         for track_id, pose in poses.items():
             by_cam[pose.cam_id][track_id] = pose
-        captures: list[Capture | None] = []
-        with self._lock:
-            for cam_id, cam_poses in by_cam.items():
-                self._poses[cam_id].append((max(pose.timestamp for pose in cam_poses.values()), cam_poses))
-                captures.append(self._match(cam_id))
-        for capture in captures:
-            self._emit(capture)
+        with self._emit_lock:
+            captures: list[Capture] = []
+            with self._lock:
+                for cam_id, cam_poses in by_cam.items():
+                    self._poses[cam_id].append((max(pose.timestamp for pose in cam_poses.values()), cam_poses))
+                    captures += self._match(cam_id)
+            self._emit(captures)
 
     def submit_masks(self, poses: FrameDict, masks: ImageDict) -> None:
         """RVM's masks per track_id, with the poses they were cut for, each stamped with its image's time.
@@ -142,51 +147,62 @@ class CaptureSync(Thread):
                 continue
             by_cam[pose.cam_id][track_id] = mask
             times[pose.cam_id] = max(times.get(pose.cam_id, pose.timestamp), pose.timestamp)
-        captures: list[Capture | None] = []
-        with self._lock:
-            for cam_id, cam_masks in by_cam.items():
-                self._masks[cam_id].append((times[cam_id], cam_masks))
-                captures.append(self._match(cam_id))
-        for capture in captures:
-            self._emit(capture)
+        with self._emit_lock:
+            captures: list[Capture] = []
+            with self._lock:
+                for cam_id, cam_masks in by_cam.items():
+                    self._masks[cam_id].append((times[cam_id], cam_masks))
+                    captures += self._match(cam_id)
+            self._emit(captures)
 
     # ── Matching, under the lock ───────────────────────────────────────
 
-    def _match(self, cam_id: int) -> Capture | None:
-        """The newest moment of this camera with its image and its depth, newer than its last capture:
-        out with its poses and masks, or waiting for those that keep up and are still on their way."""
+    def _match(self, cam_id: int) -> list[Capture]:
+        """This camera's complete moments newer than its last capture, oldest first: each out with its poses and
+        masks, or the newest, while it waits for those that keep up and are still on their way; one that waits
+        goes out with what it has as soon as a newer moment is complete."""
+        captures: list[Capture] = []
+        complete: list[tuple[GpuImage, CameraFrame]] = []
         last: float = self._last.get(cam_id, float('-inf'))
-        for depth in reversed(self._depths[cam_id]):
+        for depth in self._depths[cam_id]:
             if depth.timestamp <= last + CAPTURE_TOLERANCE:
-                break
-            image: GpuImage | None = self._image_at(cam_id, depth.timestamp)
-            if image is None:
                 continue
+            image: GpuImage | None = self._image_at(cam_id, depth.timestamp)
+            if image is not None:
+                complete.append((image, depth))
+        for index, (image, depth) in enumerate(complete):
             wait: float = 0.0
-            if _at(self._poses[cam_id], depth.timestamp) is None and _keep_up(self._poses[cam_id], last):
-                wait = max(wait, self.settings.pose_wait / 1000.0)
-            if _at(self._masks[cam_id], depth.timestamp) is None and _keep_up(self._masks[cam_id], last):
-                wait = max(wait, self.settings.mask_wait / 1000.0)
+            if index + 1 == len(complete):          # the newest: it may wait; an older one goes out now
+                if _at(self._poses[cam_id], depth.timestamp) is None and _keep_up(self._poses[cam_id], last):
+                    wait = max(wait, self.settings.pose_wait / 1000.0)
+                if _at(self._masks[cam_id], depth.timestamp) is None and _keep_up(self._masks[cam_id], last):
+                    wait = max(wait, self.settings.mask_wait / 1000.0)
             if wait > 0.0:
                 waiting: _Waiting | None = self._waiting.get(cam_id)
                 if waiting is None or waiting.depth is not depth:
                     self._waiting[cam_id] = _Waiting(image, depth, time.perf_counter() + wait)
                     self._wake.notify()
-                return None
-            return self._capture(image, depth)
-        return None
+                break
+            captures.append(self._capture(image, depth))
+            last = depth.timestamp
+        return captures
 
-    def _overdue(self) -> Capture | None:
-        """The waiting capture whose deadline has passed, after waiting for the earliest one."""
+    def _due(self) -> bool:
+        """Whether a waiting capture's deadline has passed, after waiting for the earliest one."""
         if not self._waiting:
             self._wake.wait()
-            return None
+            return False
         waiting: _Waiting = min(self._waiting.values(), key=lambda item: item.deadline)
         remaining: float = waiting.deadline - time.perf_counter()
         if remaining > 0.0:
             self._wake.wait(remaining)
-            return None
-        return self._capture(waiting.image, waiting.depth)
+            return False
+        return True
+
+    def _overdue(self) -> list[Capture]:
+        """The waiting captures whose deadline has passed, still waiting when this runs."""
+        now: float = time.perf_counter()
+        return [self._capture(waiting.image, waiting.depth) for waiting in list(self._waiting.values()) if waiting.deadline <= now]
 
     def _capture(self, image: GpuImage, depth: CameraFrame) -> Capture:
         """The capture of `depth`'s moment, with its own poses and masks where they came in, else the newest from before it."""
@@ -200,10 +216,7 @@ class CaptureSync(Thread):
         while depths and depths[0].timestamp <= timestamp + CAPTURE_TOLERANCE:
             older: CameraFrame = depths.popleft()
             if older.timestamp < timestamp - CAPTURE_TOLERANCE:
-                if self._image_at(cam_id, older.timestamp) is None:
-                    self._misses += 1           # it never met its image
-                else:
-                    self._skipped += 1          # it was complete, but waited until a newer one went out
+                self._misses += 1               # it never met its image: a complete one would have gone out before
         images: deque[GpuImage] = self._images[cam_id]
         while images and images[0].timestamp <= timestamp + CAPTURE_TOLERANCE:
             images.popleft()
@@ -219,19 +232,18 @@ class CaptureSync(Thread):
 
     # ── Output ─────────────────────────────────────────────────────────
 
-    def _emit(self, capture: Capture | None) -> None:
-        """A complete capture to the callbacks, outside the lock."""
-        if capture is None:
+    def _emit(self, captures: list[Capture]) -> None:
+        """Complete captures to the callbacks, in order, under the emit lock and outside the matching lock."""
+        if not captures:
             return
         if self.settings.misses != self._misses:
             self.settings.misses = self._misses
-        if self.settings.skipped != self._skipped:
-            self.settings.skipped = self._skipped
-        for callback in self._callbacks:
-            try:
-                callback(capture)
-            except Exception:
-                logger.exception('Error in capture callback')
+        for capture in captures:
+            for callback in self._callbacks:
+                try:
+                    callback(capture)
+                except Exception:
+                    logger.exception('Error in capture callback')
 
 
 # ── A stream of (capture time, value), kept per camera ─────────────────

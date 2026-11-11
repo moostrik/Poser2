@@ -147,7 +147,7 @@
       "enable_prev_crop": false
     },
     "capture_sync": {
-      "pose_wait": 10.0,
+      "pose_wait": 0.0,
       "mask_wait": 8.0
     },
     "angle_extractor": {
