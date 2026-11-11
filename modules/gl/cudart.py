@@ -2,7 +2,7 @@
 
 torch's wheel brings its own CUDA runtime (`cudart64_<major>.dll` on Windows, `libcudart.so.<major>` on
 Linux) and has it loaded by the time this module is imported, so no CUDA toolkit and no cuda-python
-package is needed. Only the six calls the `Tensor` texture uses are bound.
+package is needed. Only the calls the `Tensor` texture uses are bound.
 """
 
 import ctypes
@@ -52,9 +52,9 @@ _lib.cudaGraphicsMapResources.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_
 _lib.cudaGraphicsUnmapResources.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_void_p), ctypes.c_void_p]
 _lib.cudaGraphicsResourceGetMappedPointer.argtypes = [ctypes.POINTER(ctypes.c_void_p), ctypes.POINTER(ctypes.c_size_t),
                                                       ctypes.c_void_p]
-_lib.cudaMemcpy.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int]
+_lib.cudaMemcpyAsync.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_size_t, ctypes.c_int, ctypes.c_void_p]
 for _name in ('cudaGraphicsGLRegisterBuffer', 'cudaGraphicsUnregisterResource', 'cudaGraphicsMapResources',
-              'cudaGraphicsUnmapResources', 'cudaGraphicsResourceGetMappedPointer', 'cudaMemcpy'):
+              'cudaGraphicsUnmapResources', 'cudaGraphicsResourceGetMappedPointer', 'cudaMemcpyAsync'):
     getattr(_lib, _name).restype = ctypes.c_int
 
 
@@ -93,5 +93,7 @@ def mapped_pointer(resource: int) -> tuple[int, int]:
     return pointer.value or 0, size.value
 
 
-def memcpy_device_to_device(dst: int, src: int, size: int) -> None:
-    _check(_lib.cudaMemcpy(dst, src, size, MEMCPY_DEVICE_TO_DEVICE), 'cudaMemcpy')
+def memcpy_device_to_device(dst: int, src: int, size: int, stream: int) -> None:
+    """A device-to-device copy queued on `stream`; the caller does not wait for it. Work queued on the same stream
+    after it runs after it, and the unmap of a mapped resource on that stream finishes it before OpenGL reads."""
+    _check(_lib.cudaMemcpyAsync(dst, src, size, MEMCPY_DEVICE_TO_DEVICE, stream), 'cudaMemcpyAsync')

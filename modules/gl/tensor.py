@@ -296,17 +296,16 @@ class Tensor(Texture):
         # Ensure contiguous memory for GPU copy
         tensor = tensor.contiguous()
 
-        # Synchronize to ensure all prior CUDA operations are complete
-        # This is critical when tensor comes from TensorRT on different streams
-        # torch.cuda.synchronize()
-
-        # Map the PBO on the current stream, copy the tensor into it on the device, unmap
+        # Map the PBO on the current stream, queue the copy of the tensor into it there, unmap: the copy runs after
+        # the conversions above on the same stream, and the unmap has it done before OpenGL reads the PBO, so the
+        # render thread queues it and goes on. A tensor written on another stream is waited for by its reader
+        # (`stream.wait_event`) before it gets here.
         assert self._cuda_gl_resource is not None
         stream = torch.cuda.current_stream().cuda_stream
         cudart.map_resource(self._cuda_gl_resource, stream)
         try:
             pbo_dev_ptr, _ = cudart.mapped_pointer(self._cuda_gl_resource)
-            cudart.memcpy_device_to_device(pbo_dev_ptr, tensor.data_ptr(), self._pbo_size)
+            cudart.memcpy_device_to_device(pbo_dev_ptr, tensor.data_ptr(), self._pbo_size, stream)
         finally:
             cudart.unmap_resource(self._cuda_gl_resource, stream)
 
