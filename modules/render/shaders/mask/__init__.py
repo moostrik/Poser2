@@ -6,4 +6,5 @@ from .mask_dilate import     MaskDilate
 from .mask_erode import      MaskErode
 from .mask_hard_step import  MaskHardStep
 from .mask_multiply import   MaskMultiply
+from .guided_filter import   GuidedFilter
 from .ms_color_mask import   MSColorMask

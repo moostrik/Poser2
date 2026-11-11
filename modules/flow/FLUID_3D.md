@@ -36,19 +36,10 @@ What is next for the fluid, in order; what is open elsewhere in the flow is
 
 Weighed by [the goal](#the-goal): sharp, translucent ink patterns, layers distinct.
 
-### 1. The player's mask at the image's edges
+### 1. The resolutions
 
-The player's mask comes from the depth (`mask_source` DEPTH), at the depth camera's resolution: its edge
-steps in the depth's pixels, holding a column for 14 to 16 rows of the flow's 448 × 800 and then jumping 2
-to 3 (the blocky recording, 2026-11-11). The dye is the image × the mask, so the dye's outline is that
-staircase, 15 to 40 px steps at 4K, and the 4K density carries it faithfully. Softening the mask
-(`center.mask.blur_steps`) did not take it away and blurs where the motion starts **(site fact)**.
-
-The mask made right instead of softer: upsampled to the view guided by the camera image, whose edges are
-sharp on the same view (guided filter, He et al. 2010; joint bilateral upsampling, Kopf et al. 2007). The
-coarse mask's edge moves to where the image's edge runs, at the image's resolution, as sharp as before: the
-motion and the dye both get the body's outline. One pass where the mask is made, timed before and after;
-where body and background are alike in brightness the guide has no edge to follow and the step stays.
+The dye's picture and its outline at the size of what they come from, the mask steered by the camera image:
+[RESOLUTION.md](RESOLUTION.md), its own plan.
 
 ### 2. Swirls at more than one size
 

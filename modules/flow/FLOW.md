@@ -20,6 +20,7 @@ holds what the stages share and what is open outside the 3D fluid; each stage's 
 | [MOTION.md](MOTION.md)     | the motion: when it measures, the Lucas–Kanade solve and the depth velocity, their settings |
 | [BRIDGE.md](BRIDGE.md)     | the 3D bridge: the filters, the readings, the mix and its outputs' units                    |
 | [FLUID_3D.md](FLUID_3D.md) | the 3D fluid: its plan, how it takes the bridge, its fields, density and look               |
+| [RESOLUTION.md](RESOLUTION.md) | every size the picture and the motion pass through, what each needs, and its plan       |
 | [MONITOR.md](MONITOR.md)   | the monitors' views                                                                         |
 | [TIMING.md](TIMING.md)     | every stage's GPU time in deep_flow                                                         |
 

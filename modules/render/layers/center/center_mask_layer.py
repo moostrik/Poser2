@@ -1,13 +1,13 @@
-"""Renders centered and rotated mask with temporal blending and blur."""
+"""Renders centered and rotated mask with temporal blending and blur, its edge guided by the camera image."""
 
 # Third-party imports
-from OpenGL.GL import GL_R16F
+from OpenGL.GL import GL_R16F, GL_RG32F, GL_RGBA16F, GL_RGBA32F
 
 # Local application imports
 from modules.settings import Field, BaseSettings
 from ..layer_base import LayerBase, HasCaptureTime
 from .center_geometry import CenterGeometry, SourceSpace
-from ...shaders import DrawRoi, MaskAA, MaskBlend, MaskBlur, MaskDilate, MaskErode
+from ...shaders import DrawRoi, GuidedFilter, MaskAA, MaskBlend, MaskBlur, MaskDilate, MaskErode
 from modules.gl import Fbo, SwapFbo, Texture, Style
 from modules.utils import Rect
 
@@ -20,18 +20,24 @@ class CenterMaskLayerSettings(BaseSettings):
     dilation_steps: Field[int]   = Field(0, min=-10, max=10, description="Mask dilation iterations (positive=expand, negative=shrink)")
     blur_steps:     Field[int]   = Field(0, min=0, max=10, description="Number of blur iterations")
     blur_radius:    Field[float] = Field(1.0, min=0.0, max=20.0, description="Blur kernel radius in pixels")
+    guided_radius:  Field[float] = Field(0.0, min=0.0, max=0.1, step=0.001, newline=True, description="How far the image moves the mask's edge to its own, widths; 0 = off")
+    guided_epsilon: Field[float] = Field(0.001, min=0.00001, max=0.1, step=0.00001, description="The image's contrast (a variance) below which the edge is only averaged")
 
 
 class CenterMaskLayer(LayerBase):
     """Renders mask image cropped and rotated with temporal blending and blur. `space` says whether
     the mask is on the pose's crop or on the camera image. `source` is the layer whose texture it
-    draws; `timestamp` is that frame's capture time, forwarded."""
+    draws; `timestamp` is that frame's capture time, forwarded. `guide`, an image in the same space, moves
+    the mask's edge to where its own edges run (a guided filter, He et al. 2010) over `guided_radius`, so a
+    mask coarser than the image, the depth's, takes the image's outline instead of its own pixels."""
 
-    def __init__(self, cam_id: int, geometry: CenterGeometry, source: LayerBase, space: SourceSpace, settings: CenterMaskLayerSettings | None = None) -> None:
+    def __init__(self, cam_id: int, geometry: CenterGeometry, source: LayerBase, space: SourceSpace, settings: CenterMaskLayerSettings | None = None,
+                 guide: LayerBase | None = None) -> None:
         self._cam_id: int = cam_id
         self._geometry: CenterGeometry = geometry
         self._source: LayerBase = source
         self._space: SourceSpace = space
+        self._guide: LayerBase | None = guide
         self._timestamp: float | None = None     # the capture time of the frame drawn last
 
         # Configuration
@@ -42,6 +48,9 @@ class CenterMaskLayer(LayerBase):
         self._blend_fbo: SwapFbo = SwapFbo()
         self._mask_blur_fbo: SwapFbo = SwapFbo()  # Used for AA output, dilation, and blur
         self._mask_fbo: Fbo = Fbo()  # Output, one buffer however many passes swapped the blur buffer
+        self._guide_fbo: Fbo = Fbo()                    # the guide's ROI, the mask's view
+        self._products_fbo: SwapFbo = SwapFbo()         # the guided filter's products and their means (32-bit: a variance)
+        self._coefficients_fbo: SwapFbo = SwapFbo()     # its coefficients a, b and their means
 
         # Shaders
         self._roi_shader = DrawRoi()
@@ -50,6 +59,7 @@ class CenterMaskLayer(LayerBase):
         self._mask_dilate_shader = MaskDilate()
         self._mask_erode_shader = MaskErode()
         self._mask_blur_shader = MaskBlur()
+        self._guided_shader = GuidedFilter()
 
     @property
     def texture(self) -> Texture:
@@ -66,6 +76,10 @@ class CenterMaskLayer(LayerBase):
         self._blend_fbo.allocate(width, height, GL_R16F)
         self._mask_blur_fbo.allocate(width, height, GL_R16F)
         self._mask_fbo.allocate(width, height, GL_R16F)
+        if self._guide is not None:
+            self._guide_fbo.allocate(width, height, GL_RGBA16F)
+            self._products_fbo.allocate(width, height, GL_RGBA32F)
+            self._coefficients_fbo.allocate(width, height, GL_RG32F)
 
         self._roi_shader.allocate()
         self._mask_blend_shader.allocate()
@@ -73,12 +87,16 @@ class CenterMaskLayer(LayerBase):
         self._mask_dilate_shader.allocate()
         self._mask_erode_shader.allocate()
         self._mask_blur_shader.allocate()
+        self._guided_shader.allocate()
 
     def deallocate(self) -> None:
         self._roi_fbo.deallocate()
         self._blend_fbo.deallocate()
         self._mask_blur_fbo.deallocate()
         self._mask_fbo.deallocate()
+        self._guide_fbo.deallocate()
+        self._products_fbo.deallocate()
+        self._coefficients_fbo.deallocate()
 
         self._roi_shader.deallocate()
         self._mask_blend_shader.deallocate()
@@ -86,6 +104,7 @@ class CenterMaskLayer(LayerBase):
         self._mask_dilate_shader.deallocate()
         self._mask_erode_shader.deallocate()
         self._mask_blur_shader.deallocate()
+        self._guided_shader.deallocate()
 
     def update(self) -> None:
         """Render the mask centered by CenterGeometry, in the mask's space."""
@@ -108,6 +127,7 @@ class CenterMaskLayer(LayerBase):
         self._roi_fbo.begin()
         self._roi_shader.use(source, *self._geometry.source_roi(self._space, source))
         self._roi_fbo.end()
+        self._guide_edge()
 
         # Temporal blending
         self._blend_fbo.swap()
@@ -165,3 +185,33 @@ class CenterMaskLayer(LayerBase):
         self._mask_fbo.end()
 
         Style.pop_style()
+
+    def _guide_edge(self) -> None:
+        """The ROI's mask, its edge moved to the guide's (the guided filter): the products, their box means, the
+        coefficients, their box means, the output, into the ROI buffer."""
+        radius: int = round(self.settings.guided_radius * self._roi_fbo.width)
+        guide: LayerBase | None = self._guide
+        if guide is None or radius < 1 or not self._guide_fbo.allocated or not guide.texture.allocated:
+            return
+        image: Texture = guide.texture
+        self._guide_fbo.begin()
+        self._roi_shader.use(image, *self._geometry.source_roi(self._space, image))
+        self._guide_fbo.end()
+
+        products, coefficients = self._products_fbo, self._coefficients_fbo
+        products.begin()
+        self._guided_shader.products(self._guide_fbo, self._roi_fbo)
+        products.end()
+        for fbo in (products, coefficients):
+            if fbo is coefficients:
+                coefficients.begin()
+                self._guided_shader.coefficients(products, self.settings.guided_epsilon)
+                coefficients.end()
+            for horizontal in (True, False):
+                fbo.swap()
+                fbo.begin()
+                self._guided_shader.box(fbo.back, horizontal, radius)
+                fbo.end()
+        self._roi_fbo.begin()
+        self._guided_shader.output(coefficients, self._guide_fbo)
+        self._roi_fbo.end()

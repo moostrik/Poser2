@@ -124,7 +124,8 @@ class DeepFlowRender(RenderBase):
 
             # placed by the pose of the capture it shows, so view, image and depth are one moment
             center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, cast(HasFrames, CapturePoses(self.board)), cam_image.texture, settings.center.geometry, fov)
-            center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask,               space, settings.center.mask)
+            center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask,               space, settings.center.mask,
+                                                                                guide=capture_image if depth_source else None)
             cmt[i] = center_mask.texture
             center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image,          cmt[i], settings.center.cam)
             center_capture = self.L[Layers.center_capture][i] = ls.CenterCamLayer(  i, center_geometry, capture_image,      cmt[i], settings.center.capture)

@@ -1,6 +1,6 @@
 """Save what the Lucas–Kanade flow gets, frame by frame, from one loop of a recording, for depth_velocity_compare.
 
-    python scripts/depth_velocity_capture.py RECORDING [--out temp/depth_velocity]
+    python scripts/depth_velocity_capture.py RECORDING [--out temp/depth_velocity] [--set PATH=VALUE ...]
 
 Runs deep_flow on the recording (as -sim, without the panel), from the start of its loop to the next,
 with the preset's settings and the Lucas–Kanade flow. Each measure of the flow is saved to
@@ -41,6 +41,8 @@ def main() -> int:
     parser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument('recording', help='the recording folder name under the app\'s recordings')
     parser.add_argument('--out', type=Path, default=Path('temp/depth_velocity'))
+    parser.add_argument('--set', action='append', default=[], metavar='PATH=VALUE',
+                        help="an app setting by its path for this capture, e.g. render.center.mask.guided_radius=0.02")
     args = parser.parse_args()
     out_dir: Path = args.out / args.recording
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -92,6 +94,13 @@ def main() -> int:
 
     def run() -> None:
         time.sleep(8.0)                           # the app and its models come up
+        for item in args.set:                     # the settings the capture runs with, beside the preset's
+            path, value = item.split('=', 1)
+            *groups, name = path.split('.')
+            owner = app.settings
+            for group in groups:
+                owner = getattr(owner, group)
+            setattr(owner, name, type(getattr(owner, name))(float(value)))
         simulator = app.settings.camera.simulator
         simulator.folder = args.recording
         time.sleep(0.5)
