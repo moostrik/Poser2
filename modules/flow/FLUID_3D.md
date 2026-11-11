@@ -36,7 +36,21 @@ What is next for the fluid, in order; what is open elsewhere in the flow is
 
 Weighed by [the goal](#the-goal): sharp, translucent ink patterns, layers distinct.
 
-### 1. Swirls at more than one size
+### 1. The player's mask at the image's edges
+
+The player's mask comes from the depth (`mask_source` DEPTH), at the depth camera's resolution: its edge
+steps in the depth's pixels, holding a column for 14 to 16 rows of the flow's 448 × 800 and then jumping 2
+to 3 (the blocky recording, 2026-11-11). The dye is the image × the mask, so the dye's outline is that
+staircase, 15 to 40 px steps at 4K, and the 4K density carries it faithfully. Softening the mask
+(`center.mask.blur_steps`) did not take it away and blurs where the motion starts **(site fact)**.
+
+The mask made right instead of softer: upsampled to the view guided by the camera image, whose edges are
+sharp on the same view (guided filter, He et al. 2010; joint bilateral upsampling, Kopf et al. 2007). The
+coarse mask's edge moves to where the image's edge runs, at the image's resolution, as sharp as before: the
+motion and the dye both get the body's outline. One pass where the mask is made, timed before and after;
+where body and background are alike in brightness the guide has no edge to follow and the step stays.
+
+### 2. Swirls at more than one size
 
 The confinement keeps swirls alive at one size, `vorticity_radius`: fine wisps or big eddies, not both.
 More than one radius, each with its own strength (multi-scale vorticity confinement), keeps fine and large
@@ -47,7 +61,7 @@ lands. The upscaled density's turbulence already adds swirls below the grid to t
 radius adds to the look is judged against it, and by whether the layers stay apart: the confinement
 also carries one layer's motion into the next.
 
-### 2. The smaller side as the unit
+### 3. The smaller side as the unit
 
 Every length in the flow is in widths: the motion's velocity (widths/s of the camera's image), the bridge's
 readings, the fluid's inputs (`spread`), its look (`opacity`, `fog`), the box's depth, the monitor's scale.
@@ -56,13 +70,13 @@ then mean less against what is seen. One unit across the stages, the smaller sid
 and feel when the box turns: in portrait nothing changes. It reaches past the fluid (the motion, the
 bridge, the monitor), so it is one rule for all of them, made where each length is made.
 
-### 3. The fade and the evaporation
+### 4. The fade and the evaporation
 
 Each field's `fade_time` (seconds to 1%, a share at a time) and `evaporation_time` (seconds a full value takes
 to reach 0, a fixed amount at a time) do not yet give what is wanted **(site fact)**; what each should do
 for the look is the first question.
 
-### 4. The temperature
+### 5. The temperature
 
 Whether the temperature needs a field of its own. Buoyancy needs only a scalar the water is lighter or
 heavier by: the density alone can be it (ink sinks), and the temperature adds currents apart from the dye
