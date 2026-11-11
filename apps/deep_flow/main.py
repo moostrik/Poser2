@@ -102,7 +102,6 @@ class DeepFlowMain:
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
 
         # The segmentation and the optical flow read the same crops the pose model gets.
-        self.pose_inference.add_camera_images_callback(self.board.set_camera_images)
         if self.segmentation_predictor is not None:
             self.pose_inference.add_crop_callback(self.segmentation_predictor.submit)
             self.segmentation_predictor.add_segmentation_callback(self.capture_sync.submit_masks)
@@ -125,6 +124,7 @@ class DeepFlowMain:
         if self.person_detector is not None:
             self.uploader.add_gpu_image_callback(self.person_detector.submit)
         self.uploader.add_gpu_image_callback(self.capture_sync.submit_image)
+        self.uploader.add_gpu_image_callback(self.board.set_camera_image)
         self.uploader.add_gpu_image_callback(self._on_image)
         self.uploader.add_depth_callback(self.capture_sync.submit_depth)
 

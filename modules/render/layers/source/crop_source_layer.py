@@ -40,5 +40,9 @@ class CropSourceLayer(LayerBase):
         if self._data_cache.idle or gpu_frame is None:
             return
 
+        if gpu_frame.ready is not None:     # written on the crop stream: wait for it there
+            stream: torch.cuda.Stream = torch.cuda.current_stream()
+            stream.wait_event(gpu_frame.ready)
+            gpu_frame.crop.record_stream(stream)
         self._cuda_image.set_tensor(gpu_frame.crop)
         self._cuda_image.update()

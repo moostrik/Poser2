@@ -1,5 +1,8 @@
 from threading import Lock
 from typing import TYPE_CHECKING, TypeAlias
+
+import torch
+
 from .. import crop, ModelType
 from modules.pose import Points2D, FrameDictCallbackMixin, replace, FrameDict
 from .settings import Settings
@@ -71,18 +74,20 @@ class Predictor(FrameDictCallbackMixin):
 
         track_ids: list[int] = []
         gpu_image_list: list = []  # list[cp.ndarray]
+        ready: torch.cuda.Event | None = None      # the crops' event, one for the batch
 
         for track_id in poses.keys():
             if track_id in crops:
                 track_ids.append(track_id)
                 gpu_image_list.append(crops[track_id].crop)
+                ready = crops[track_id].ready
 
         with self._lock:
             self._batch_counter += 1
             batch_id: int = self._batch_counter
             self._waiting_batches[batch_id] = (poses, track_ids)
 
-        self._runner.submit(PoseInput(batch_id=batch_id, gpu_images=gpu_image_list))
+        self._runner.submit(PoseInput(batch_id=batch_id, gpu_images=gpu_image_list, ready=ready))
 
     def _on_pose_result(self, output: PoseOutput) -> None:
         """Callback from the runner thread when results are ready or dropped.

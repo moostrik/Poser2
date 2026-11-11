@@ -17,9 +17,12 @@ class Image:
         crop:      Resized crop on GPU (3, H, W) float16 RGB CHW [0, 1]
         prev_crop: Previous frame cropped at current bbox for optical flow,
                    or None if no previous frame is available.
+        ready:     Recorded on the crop stream after the crops are written; a reader on another stream
+                   waits on it (`stream.wait_event`) first. None for crops already written.
     """
     crop: torch.Tensor
     prev_crop: torch.Tensor | None = None
+    ready: torch.cuda.Event | None = None
 
 
 CropImageDict: TypeAlias = dict[int, Image]

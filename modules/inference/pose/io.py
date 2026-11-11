@@ -15,6 +15,7 @@ class PoseInput:
     """
     batch_id: int
     gpu_images: list[torch.Tensor] = field(default_factory=list)  # GPU tensors (H, W, 3) RGB uint8
+    ready: torch.cuda.Event | None = None   # recorded after the images are written; the runner's stream waits on it
 
 @dataclass
 class PoseOutput:

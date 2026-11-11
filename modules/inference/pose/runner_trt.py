@@ -270,6 +270,8 @@ class RunnerTRT(Thread):
         if not gpu_images:
             output = PoseOutput(batch_id=batch.batch_id, processed=True)
         else:
+            if batch.ready is not None:
+                self.stream.wait_event(batch.ready)     # the crops are written on the crop stream
             keypoints, scores, process_time_ms, lock_wait_ms = self._infer(gpu_images)
 
             # Normalize coordinates to [0, 1]

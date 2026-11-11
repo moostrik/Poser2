@@ -34,6 +34,7 @@ class CropExtractor:
         images: ImageDict,
         prev_images: ImageDict,
         timestamps: TimestampDict,
+        ready: torch.cuda.Event | None = None,
     ) -> None:
         """Crop images for each pose and notify callbacks.
 
@@ -42,14 +43,20 @@ class CropExtractor:
             images:      Current GPU images (from Uploader.snapshot)
             prev_images: Previous GPU images (from Uploader.snapshot)
             timestamps:  The current images' capture times (from Uploader.snapshot)
+            ready:       Recorded after the images are written (from Uploader.snapshot); the crops wait on it
+                         on the crop stream. The crops are queued, not waited for: each carries the event
+                         recorded after them, and their readers wait on that.
         """
         cropped_poses: FrameDict = {}
         crop_images: CropImageDict = {}
+        crops_ready: torch.cuda.Event = torch.cuda.Event()      # recorded after the last crop, before anyone reads one
         pose_count = 0
         # Live settings, read once so every pose in this batch is cropped with the same padding.
         zoom: float = 1.0 + self.settings.padding
 
         with torch.cuda.stream(self._stream):
+            if ready is not None:
+                self._stream.wait_event(ready)
             for track_id, pose in poses.items():
                 cam_id = pose.cam_id
                 if cam_id not in images:
@@ -63,6 +70,7 @@ class CropExtractor:
 
                 try:
                     gpu_image = images[cam_id]
+                    gpu_image.record_stream(self._stream)       # read here: not reused before this stream has run
                     img_height, img_width = gpu_image.shape[1:3]
                     bbox_rect = pose[BBox].to_rect().zoom(zoom)
                     crop_roi = self._calculate_crop_roi(bbox_rect, img_width, img_height)
@@ -71,6 +79,7 @@ class CropExtractor:
                     prev_crop: torch.Tensor | None = None
                     if self.settings.enable_prev_crop and cam_id in prev_images:
                         prev_img = prev_images[cam_id]
+                        prev_img.record_stream(self._stream)
                         prev_h, prev_w = prev_img.shape[1:3]
                         prev_crop = self._gpu_crop_resize(prev_img, crop_roi, prev_w, prev_h)
 
@@ -79,13 +88,13 @@ class CropExtractor:
                     crop_images[track_id] = Image(
                         crop=crop_tensor,
                         prev_crop=prev_crop,
+                        ready=crops_ready,
                     )
                     pose_count += 1
 
                 except Exception:
                     logger.exception(f"Error processing pose {track_id}")
-
-        self._stream.synchronize()
+            crops_ready.record(self._stream)
 
         for callback in self._callbacks:
             try:

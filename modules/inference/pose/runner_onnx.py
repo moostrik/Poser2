@@ -250,6 +250,8 @@ class RunnerONNX(Thread):
             output = PoseOutput(batch_id=batch.batch_id, processed=True)
         else:
             batch_start = time.perf_counter()
+            if batch.ready is not None:
+                self.stream.wait_event(batch.ready)     # the crops are written on the crop stream
             keypoints, scores = self._infer(gpu_images)
 
             keypoints[:, :, 0] /= self.model_width
