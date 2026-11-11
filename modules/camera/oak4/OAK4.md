@@ -405,7 +405,9 @@ Dragging a marker on the player's bar pauses playback and shows the frame under 
 
 ### Detector in replay
 
-Replay finds players on the PC with [`PersonDetector`](../../inference/detection/person_detector.py). Its `resolution` is set to match `PERSON_DETECTOR_ARCHIVE` on the camera, and its `model_type` picks ONNX Runtime or TensorRT. Time per frame on an empty `P1080` frame, 500 runs each, batch 1, FP32, GPU otherwise idle:
+Replay finds players on the PC with [`PersonDetector`](../../inference/detection/person_detector.py). Its `resolution` is set to match `PERSON_DETECTOR_ARCHIVE` on the camera, and its `model_type` picks ONNX Runtime or TensorRT. It takes the `Uploader`'s images, so a frame goes to the GPU once: both runtimes stretch it into the model on the GPU and hand back only the box and person rows. The uploaded image is straightened, so the boxes are found in the straightened frame and need no `corrected_roi`, where the camera's detector looks at the frame before the correction.
+
+Time per frame on an empty `P1080` frame, 500 runs each, batch 1, FP32, GPU otherwise idle, with the frame resized and converted on the CPU:
 
 | `resolution` | ONNX, back to back | TensorRT, back to back | ONNX, at 60 Hz | TensorRT, at 60 Hz |
 |--------------|--------------------|------------------------|----------------|--------------------|
@@ -413,7 +415,7 @@ Replay finds players on the PC with [`PersonDetector`](../../inference/detection
 | `R512X416`   | 4.6 ms             | 4.0 ms                 | 8.4 ms         | 8.1 ms             |
 | `R480X384`   | 4.3 ms             | 3.6 ms                 | 8.2 ms         | 7.4 ms             |
 
-The times cover preprocessing on the CPU, inference and decoding. At 60 Hz the GPU drops to idle clocks between runs, which nearly doubles them, and the slowest frame at `R640X512` was 20.1 ms on both runtimes. Back to back, the slowest frame at any size was about 8 ms. Both runtimes find the same players on a photo of people, with scores within 0.001 and boxes within 0.03 px. ONNX Runtime stays the default, as TensorRT saves about 1 ms and takes turns with the other TensorRT models on their shared execution lock.
+The times cover the preprocessing, inference and decoding; with the preprocessing on the GPU they are not measured. At 60 Hz the GPU drops to idle clocks between runs, which nearly doubles them, and the slowest frame at `R640X512` was 20.1 ms on both runtimes. Back to back, the slowest frame at any size was about 8 ms. Both runtimes find the same players on a photo of people, with scores within 0.001 and boxes within 0.03 px. ONNX Runtime stays the default, as TensorRT saves about 1 ms and takes turns with the other TensorRT models on their shared execution lock.
 
 ## Open
 

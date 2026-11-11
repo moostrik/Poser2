@@ -100,6 +100,8 @@ class WhiteSpaceMain:
         self.tracker = PanoramicTracker(self.settings.tracker, max_players, num_cams)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
         self.pose_inference = PoseInference(ps.image_crop, ps.pose)      # the crop and the pose model, the frame domain's async step
+        if self.person_detector is not None:
+            self.pose_inference.add_gpu_image_callback(self.person_detector.submit)     # it looks at the uploaded images
 
         for camera in self.cameras:
             camera.add_frame_callback(self.video_recorder.submit_frame)

@@ -3,10 +3,11 @@ and emitted as they were recorded, and the people in them found by a detector an
 tracker on the host, so `-sim` needs no OAK plugged in.
 
 The detector and the tracker are the app's to give (`modules/inference/detection` and the
-`Tracker` beside this file); without a detector the camera is frames only, as a rig without
-`yolo` is. The device's warp is not applied here: a replay plays what was recorded. A recording
-with depth and metadata plays as the camera did: depth frames too, with the recorded alignment,
-and with `tilt` the frames straightened from the recorded tilt plus the live offset, boxes with them.
+`Tracker` beside this file); the app feeds the detector the uploaded images, and the camera hears its
+boxes. Without a detector the camera is frames only, as a rig without `yolo` is. The device's warp is
+not applied here: a replay plays what was recorded. A recording with depth and metadata plays as the
+camera did: depth frames too, with the recorded alignment, and with `tilt` the frames straightened from
+the recorded tilt plus the live offset; the detector looks at the straightened frames, so its boxes are.
 """
 
 import logging
@@ -18,7 +19,7 @@ import numpy as np
 from modules.utils import FPS, Rect
 
 from .. import CameraFrame, CameraTracklet, CameraFrameCallback, ChunkInfo, DepthAlignment, FrameReadings, FrameType, Player, RigCameraReadings, \
-    RigCameraSettings, TiltCorrection, TiltCorrectionSettings, TrackletCallback, corrected_roi, mirrored_alignment, mirrored_intrinsics
+    RigCameraSettings, TiltCorrection, TiltCorrectionSettings, TrackletCallback, mirrored_alignment, mirrored_intrinsics
 from .tracker import Track
 
 logger = logging.getLogger(__name__)
@@ -32,10 +33,9 @@ class Detection(Protocol):
 
 
 class PersonDetector(Protocol):
-    """A person detector the camera submits frames to and hears back from, on the detector's
-    thread: `modules.inference.detection.PersonDetector`. Named here so the contract does not import
-    the inference package."""
-    def submit(self, cam_id: int, image: np.ndarray, timestamp: float) -> None: ...
+    """A person detector the camera hears back from, on the detector's thread:
+    `modules.inference.detection.PersonDetector`. The app feeds it the uploaded images, straightened and
+    mirrored, so its boxes are too. Named here so the contract does not import the inference package."""
     def add_detection_callback(self, callback) -> None: ...
 
 
@@ -120,8 +120,6 @@ class Camera:
         frame = CameraFrame(cam_id=self.id, kind=frame_type, image=image, timestamp=timestamp, homography=homography, alignment=alignment)
         for c in self.frame_callbacks:
             c(frame)
-        if self.detector is not None and frame_type == FrameType.VIDEO:
-            self.detector.submit(self.id, image, timestamp)
 
     def _depth_alignment(self, width: int) -> DepthAlignment | None:
         """The recorded depth's alignment, mirrored as its frames were stored; one object per chunk,
@@ -147,16 +145,15 @@ class Camera:
 
     def _on_detection(self, detection: Detection) -> None:
         """The detector's boxes for one frame, on its thread: through the tracker, out as the
-        contract's tracklets with that frame's time, an empty list included."""
+        contract's tracklets with that frame's time, an empty list included. The boxes were found in the
+        straightened frame, so they are straightened already."""
         if not self.running or detection.cam_id != self.id or self.tracker is None:
             return
         timestamp: float = detection.timestamp
         self.tracklet_fps.processed()
         self.settings.readings.tracker_fps = self.tracklet_fps.get_rate_average()
-        homography: np.ndarray | None = self.tilt_correction.homography if self.tilt_correction is not None else None
         tracklets: list[CameraTracklet] = [
-            CameraTracklet(cam_id=self.id, id=t.id, status=t.status, roi=corrected_roi(t.roi, homography) if homography is not None else t.roi,
-                           age=t.age, timestamp=timestamp)
+            CameraTracklet(cam_id=self.id, id=t.id, status=t.status, roi=t.roi, age=t.age, timestamp=timestamp)
             for t in self.tracker.update(detection.boxes)]
         self.settings.readings.tracklets = len(tracklets)
         for c in self.tracklet_callbacks:

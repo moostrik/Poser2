@@ -1,9 +1,11 @@
-"""A YOLO person detector on the host, for the replay backend: the frames of every camera of a round
-in one batch, through ONNX Runtime or TensorRT, out as `Detection`s with boxes normalised to the frame.
+"""A YOLO person detector on the host, for the replay backend: the uploaded images of every camera of a
+round in one batch, through ONNX Runtime or TensorRT, out as `Detection`s with boxes normalised to the frame.
 
-The frame is stretched whole into the model's input, as the device manip does (nothing cropped,
-nobody lost at the edges, boxes map 1:1 onto the frame). A newer frame of a camera replaces one
-still waiting: the latest wins, as in the other runners.
+It takes the `Uploader`'s images (`GpuImage`), so a frame goes to the GPU once and nothing of it is worked
+on the CPU: each image is stretched whole into the model's input on the GPU, as the device manip does
+(nothing cropped, nobody lost at the edges, boxes map 1:1 onto the frame), and only the person rows
+come back. The image is straightened and mirrored, so are its boxes. A newer image of a camera replaces
+one still waiting: the latest wins, as in the other runners.
 """
 
 import logging
@@ -11,12 +13,14 @@ import time
 from threading import Event, Lock, Thread
 from typing import TYPE_CHECKING, TypeAlias
 
-import cv2
 import numpy as np
+import torch
+import torch.nn.functional as F
 
 from modules.utils import PerformanceTimer, Rect
 
 from ..model_types import ModelType
+from ..source import GpuImage
 from .decode import normalise, person_boxes
 from .io import Detection, DetectionCallback
 from .runner_onnx import RunnerONNX
@@ -44,13 +48,14 @@ class PersonDetector(Thread):
         else:
             from .runner_trt import RunnerTRT
             self._runner = RunnerTRT(settings.model_file)
+        self._stream: torch.cuda.Stream | None = None      # made on this thread, in `_setup`
 
         self._shutdown: Event = Event()
         self._wake: Event = Event()
         self._ready: Event = Event()
 
         self._lock: Lock = Lock()
-        self._pending: dict[int, tuple[np.ndarray, float]] = {}    # the newest frame per camera with its time, waiting
+        self._pending: dict[int, GpuImage] = {}     # the newest image per camera, waiting
         self._dropped: int = 0
 
         self._callback_lock: Lock = Lock()
@@ -64,7 +69,7 @@ class PersonDetector(Thread):
 
     @property
     def dropped(self) -> int:
-        """Frames replaced by a newer one before they were looked at."""
+        """Images replaced by a newer one before they were looked at."""
         return self._dropped
 
     def stop(self) -> None:
@@ -80,14 +85,14 @@ class PersonDetector(Thread):
             if callback not in self._callbacks:
                 self._callbacks.append(callback)
 
-    def submit(self, cam_id: int, image: np.ndarray, timestamp: float) -> None:
-        """A frame to look at, with its time, on the caller's thread; the newest per camera is kept."""
+    def submit(self, image: GpuImage) -> None:
+        """An uploaded image to look at (`Uploader`'s callback, the camera's thread); the newest per camera is kept."""
         if not self.is_ready:
             return
         with self._lock:
-            if cam_id in self._pending:
+            if image.cam_id in self._pending:
                 self._dropped += 1
-            self._pending[cam_id] = (image, timestamp)
+            self._pending[image.cam_id] = image
         self._wake.set()
 
     def run(self) -> None:
@@ -108,31 +113,37 @@ class PersonDetector(Thread):
 
     def _setup(self) -> None:
         self._runner.setup()
-        self._runner.infer(np.zeros((1, 3, self.height, self.width), dtype=np.float32))     # warm-up
+        self._stream = torch.cuda.Stream()
+        with torch.cuda.stream(self._stream):
+            warm_up: torch.Tensor = torch.zeros((1, 3, self.height, self.width), dtype=torch.float32, device='cuda')
+        self._runner.infer(warm_up, self._stream)
         self._ready.set()
         logger.info("Person detector: %s ready", self.settings.model)
 
-    def _claim(self) -> dict[int, tuple[np.ndarray, float]]:
+    def _claim(self) -> dict[int, GpuImage]:
         with self._lock:
             pending = self._pending
             self._pending = {}
             return pending
 
     def _process(self) -> None:
-        pending: dict[int, tuple[np.ndarray, float]] = self._claim()
+        """The pending images as one batch. They are held until the runner has synchronized its stream,
+        so the upload's memory is not reused while this stream reads it."""
+        pending: dict[int, GpuImage] = self._claim()
         if not pending:
             return
+        assert self._stream is not None
         start: float = time.perf_counter()
         cam_ids: list[int] = list(pending.keys())
-        batch: np.ndarray = np.stack([self._preprocess(pending[cam_id][0]) for cam_id in cam_ids])
-        output: np.ndarray = self._runner.infer(batch)
+        batch: torch.Tensor = self._batch([pending[cam_id] for cam_id in cam_ids])
+        output: np.ndarray = self._runner.infer(batch, self._stream)
         confidence: float = self.settings.confidence
         overlap: float = self.settings.overlap
         detections: list[Detection] = []
         for i, cam_id in enumerate(cam_ids):
             boxes, scores = person_boxes(output[i], confidence, overlap)
             rects: np.ndarray = normalise(boxes, self.width, self.height)
-            detections.append(Detection(cam_id=cam_id, timestamp=pending[cam_id][1], boxes=[Rect(*map(float, r)) for r in rects],
+            detections.append(Detection(cam_id=cam_id, timestamp=pending[cam_id].timestamp, boxes=[Rect(*map(float, r)) for r in rects],
                                         scores=[float(s) for s in scores]))
         self._timer.add_time((time.perf_counter() - start) * 1000.0, report=self.settings.verbose)
         with self._callback_lock:
@@ -144,12 +155,14 @@ class PersonDetector(Thread):
                 except Exception:
                     logger.exception("Error in detection callback")
 
-    def _preprocess(self, image: np.ndarray) -> np.ndarray:
-        """BGR or gray, any size, to the model's RGB planar float input, stretched to its size. In C
-        order: a transposed array keeps its pixels interleaved, and TensorRT reads the memory as it lies."""
-        resized: np.ndarray = cv2.resize(image, (self.width, self.height), interpolation=cv2.INTER_LINEAR)
-        if resized.ndim == 2:
-            rgb: np.ndarray = cv2.cvtColor(resized, cv2.COLOR_GRAY2RGB)
-        else:
-            rgb = cv2.cvtColor(resized, cv2.COLOR_BGR2RGB)
-        return rgb.transpose(2, 0, 1).astype(np.float32, order='C') / 255.0
+    def _batch(self, images: list[GpuImage]) -> torch.Tensor:
+        """The images stretched to the model's size, (N, 3, height, width) float32 RGB in [0, 1], on this
+        detector's stream once each image's upload is written."""
+        assert self._stream is not None
+        with torch.cuda.stream(self._stream):
+            resized: list[torch.Tensor] = []
+            for image in images:
+                self._stream.wait_event(image.ready)
+                resized.append(F.interpolate(image.image.unsqueeze(0).float(), size=(self.height, self.width),
+                                             mode='bilinear', align_corners=False)[0])
+            return torch.stack(resized)

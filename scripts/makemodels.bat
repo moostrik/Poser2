@@ -66,7 +66,7 @@ call :build "python tools\models\export_raft_onnx_to_trt.py --onnx data\models\r
 
 call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_480x384.onnx --output apps\deep_flow\data\models\yolov8n_coco_480x384.trt --opt-batch 1 --max-batch 1"
 call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_512x416.onnx --output apps\deep_flow\data\models\yolov8n_coco_512x416.trt --opt-batch 1 --max-batch 1"
-call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_640x512.onnx --output apps\deep_flow\data\models\yolov8n_coco_640x512.trt --opt-batch 1 --max-batch 1"
+call :build "python tools\models\export_yolo_onnx_to_trt.py --onnx data\models\yolov8n_coco_640x512.onnx --output apps\deep_flow\data\models\yolov8n_coco_640x512.trt --opt-batch 1 --max-batch 1 --fp16"
 exit /b 0
 
 :build

@@ -1,8 +1,7 @@
 """The detector thread end to end on a stub model: a graph with the YOLOv8 output shape that
-reports the same person in every image, so the batching, the decoding and the callbacks are
-checked without the real model or a GPU (ONNX Runtime's CPU provider)."""
+reports the same person in every image, so the batching on the GPU, the decoding and the callbacks
+are checked without the real model (ONNX Runtime's CUDA provider)."""
 
-import logging
 import os
 import tempfile
 import time
@@ -10,9 +9,10 @@ import unittest
 
 import numpy as np
 import onnx
+import torch
 from onnx import TensorProto, helper, numpy_helper
 
-from modules.inference import ModelType
+from modules.inference import GpuImage, ModelType
 from modules.inference.detection import PersonDetector, Resolution, Settings
 from modules.utils import Rect
 
@@ -47,6 +47,14 @@ def write_stub_model(path: str, symbolic: bool = False) -> None:
     onnx.save(model, path)
 
 
+def uploaded(cam_id: int, height: int, width: int, timestamp: float) -> GpuImage:
+    """An image as the `Uploader` hands it on: float16 RGB CHW on the GPU, with its written event."""
+    image: torch.Tensor = torch.zeros((3, height, width), dtype=torch.float16, device='cuda')
+    ready = torch.cuda.Event()
+    ready.record()
+    return GpuImage(cam_id, timestamp, image, ready)
+
+
 def wait_for(condition, timeout: float = 5.0) -> bool:
     end = time.perf_counter() + timeout
     while time.perf_counter() < end:
@@ -67,17 +75,15 @@ class PersonDetectorTest(unittest.TestCase):
         self.detector = PersonDetector(self.settings)
         self.detections = []
         self.detector.add_detection_callback(self.detections.append)
-        logging.disable(logging.WARNING)        # the CPU-provider warning
         self.detector.start()
         self.assertTrue(wait_for(lambda: self.detector.is_ready))
 
     def tearDown(self) -> None:
         self.detector.stop()
-        logging.disable(logging.NOTSET)
 
-    def test_every_submitted_frame_gets_its_detection_with_boxes_normalised_to_the_frame_and_its_time(self) -> None:
-        self.detector.submit(0, np.zeros((600, 800, 3), dtype=np.uint8), 1.5)  # colour, another size
-        self.detector.submit(2, np.zeros((300, 400), dtype=np.uint8), 2.5)     # gray
+    def test_every_submitted_image_gets_its_detection_with_boxes_normalised_to_the_frame_and_its_time(self) -> None:
+        self.detector.submit(uploaded(0, 600, 800, 1.5))       # another size
+        self.detector.submit(uploaded(2, 300, 400, 2.5))
         self.assertTrue(wait_for(lambda: len(self.detections) == 2))
         by_cam = {d.cam_id: d for d in self.detections}
         self.assertEqual(set(by_cam), {0, 2})
@@ -87,16 +93,26 @@ class PersonDetectorTest(unittest.TestCase):
             self.assertEqual(d.boxes[0], Rect(0.375, 0.25, 0.25, 0.5))
             self.assertAlmostEqual(d.scores[0], 0.9, places=5)
 
-    def test_the_input_lies_in_memory_as_its_shape_says(self) -> None:
-        """TensorRT takes the buffer's address, so an array that is only a view of another order
+    def test_the_batch_is_the_images_at_the_model_s_size_lying_in_memory_as_its_shape_says(self) -> None:
+        """The runners take the buffer's address, so a tensor that is only a view of another order
         reaches the model scrambled."""
-        image = np.zeros((600, 800, 3), dtype=np.uint8)
-        batch = np.stack([self.detector._preprocess(image), self.detector._preprocess(image)])
-        self.assertTrue(batch.flags['C_CONTIGUOUS'])
+        batch = self.detector._batch([uploaded(0, 600, 800, 0.0), uploaded(1, 720, 896, 0.0)])
+        torch.cuda.synchronize()
+        self.assertEqual(tuple(batch.shape), (2, 3, HEIGHT, WIDTH))
+        self.assertEqual(batch.dtype, torch.float32)
+        self.assertTrue(batch.is_contiguous())
+
+    def test_the_image_is_stretched_whole_into_the_model(self) -> None:
+        image = uploaded(0, 600, 800, 0.0)
+        image.image[0, :, :400] = 1.0                           # red on the left half
+        batch = self.detector._batch([image])
+        torch.cuda.synchronize()
+        red = batch[0, 0].cpu().numpy()
+        self.assertTrue(np.allclose(red[:, :WIDTH // 2 - 1], 1.0) and np.allclose(red[:, WIDTH // 2 + 1:], 0.0))
 
     def test_the_threshold_is_read_at_use(self) -> None:
         self.settings.confidence = 0.1
-        self.detector.submit(0, np.zeros((448, 512, 3), dtype=np.uint8), 0.0)
+        self.detector.submit(uploaded(0, 448, 512, 0.0))
         self.assertTrue(wait_for(lambda: len(self.detections) == 1))
         self.assertEqual(len(self.detections[0].boxes), 2)
 

@@ -80,6 +80,8 @@ class DeepFlowMain:
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
         self.pose_inference = PoseInference(p.image_crop, p.pose)        # the crop and the pose model, the frame domain's async step
+        if self.person_detector is not None:
+            self.pose_inference.add_gpu_image_callback(self.person_detector.submit)     # it looks at the uploaded images
         self.capture_sync = CaptureSync(p.capture_sync)                  # the color, depth and poses of one moment, for the render
         self.capture_rate: FPS = FPS(120)                                # the captures it hands on, for the panel's cadence
 

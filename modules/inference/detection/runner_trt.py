@@ -6,6 +6,7 @@ import tensorrt as trt
 import torch
 
 from ..trt_runtime import get_exec_lock, get_init_lock, get_tensorrt_runtime
+from .decode import PERSON_ROWS
 
 
 class RunnerTRT:
@@ -13,9 +14,10 @@ class RunnerTRT:
         self.model_file: str = model_file
         self._engine: trt.ICudaEngine
         self._context: trt.IExecutionContext
-        self._stream: torch.cuda.Stream
         self._input_name: str = ''
         self._output_name: str = ''
+        self._input_dtype: torch.dtype = torch.float32
+        self._output_dtype: torch.dtype = torch.float32
         self._output_shape: tuple[int, int] = (0, 0)    # per image: 4 + classes, candidates
 
     def setup(self) -> None:
@@ -31,19 +33,27 @@ class RunnerTRT:
                 self._input_name = name
             else:
                 self._output_name = name
+        self._input_dtype = torch_dtype(self._engine.get_tensor_dtype(self._input_name))
+        self._output_dtype = torch_dtype(self._engine.get_tensor_dtype(self._output_name))
         shape = self._engine.get_tensor_shape(self._output_name)
         self._output_shape = (shape[1], shape[2])
-        self._stream = torch.cuda.Stream()
 
-    def infer(self, batch: np.ndarray) -> np.ndarray:
-        """The output (N, 4 + classes, candidates) of a float32 batch (N, 3, height, width) in C order."""
-        with torch.cuda.stream(self._stream):
-            gpu_batch: torch.Tensor = torch.from_numpy(batch).to('cuda')
-            output: torch.Tensor = torch.empty((batch.shape[0], *self._output_shape), dtype=gpu_batch.dtype, device='cuda')
+    def infer(self, batch: torch.Tensor, stream: torch.cuda.Stream) -> np.ndarray:
+        """The person rows (N, `PERSON_ROWS`, candidates) of an RGB batch (N, 3, height, width) in [0, 1] on the
+        GPU, written on `stream`; only those rows come back to the CPU."""
+        with torch.cuda.stream(stream):
+            model_input: torch.Tensor = batch.to(self._input_dtype).contiguous()
+            output: torch.Tensor = torch.empty((batch.shape[0], *self._output_shape), dtype=self._output_dtype, device='cuda')
         with get_exec_lock():
-            self._context.set_input_shape(self._input_name, tuple(gpu_batch.shape))
-            self._context.set_tensor_address(self._input_name, gpu_batch.data_ptr())
+            self._context.set_input_shape(self._input_name, tuple(model_input.shape))
+            self._context.set_tensor_address(self._input_name, model_input.data_ptr())
             self._context.set_tensor_address(self._output_name, output.data_ptr())
-            self._context.execute_async_v3(stream_handle=self._stream.cuda_stream)
-            self._stream.synchronize()
-        return output.cpu().numpy()
+            self._context.execute_async_v3(stream_handle=stream.cuda_stream)
+            stream.synchronize()
+        with torch.cuda.stream(stream):
+            return output[:, :PERSON_ROWS].float().cpu().numpy()
+
+
+def torch_dtype(dtype: trt.DataType) -> torch.dtype:
+    """The torch type of a TensorRT tensor type."""
+    return torch.from_numpy(np.empty(0, dtype=trt.nptype(dtype))).dtype

@@ -28,11 +28,7 @@ class FakePlayer:
 
 class FakePersonDetector:
     def __init__(self) -> None:
-        self.submitted: list[tuple[int, np.ndarray, float]] = []
         self.callbacks = []
-
-    def submit(self, cam_id: int, image: np.ndarray, timestamp: float) -> None:
-        self.submitted.append((cam_id, image, timestamp))
 
     def add_detection_callback(self, callback) -> None:
         self.callbacks.append(callback)
@@ -68,7 +64,7 @@ class ReplayCameraTest(unittest.TestCase):
         self.camera.add_tracklet_callback(lambda cam_id, tracklets, t: self.messages.append((cam_id, tracklets, t)))
         self.camera.start()
 
-    def test_a_clip_frame_of_this_camera_is_stamped_and_handed_to_the_detector(self) -> None:
+    def test_a_clip_frame_of_this_camera_is_stamped_and_handed_over(self) -> None:
         image = np.zeros((4, 6, 3), dtype=np.uint8)
         before = time.perf_counter()
         self.player.push(0, image)          # another camera's frame
@@ -77,7 +73,6 @@ class ReplayCameraTest(unittest.TestCase):
         self.assertEqual(self.frames[0].cam_id, 1)
         self.assertIs(self.frames[0].image, image)
         self.assertGreaterEqual(self.frames[0].timestamp, before)
-        self.assertEqual(self.detector.submitted, [(1, image, self.frames[0].timestamp)])
         self.assertTrue(self.camera.connected)
 
     def test_a_recorded_frame_s_depth_takes_its_video_s_time(self) -> None:
