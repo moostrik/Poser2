@@ -248,6 +248,31 @@ are 2D and of a 3- or 4-channel one 3D (`Visualizer.process_glyphs`).
 The shader loader finds a shader's source by its `.py` module name beside it
 (`modules/gl/shader.py`), so moved shaders need no edit.
 
+## The input's cadence
+
+Every camera frame reaches the motion at the camera's cadence, and the motion measures one capture per
+frame. The camera's thread hands its frame to `Uploader.set_image` (`PoseInference.set_camera_frame`),
+which copies it into the camera's next pinned staging buffer (`STAGING_COUNT` 3) and queues the copy to
+the GPU, the NV12 conversion and the straightening on the upload stream, with the `ready` event the
+readers wait on; it never waits for the GPU itself. A copy from the frame's own pageable memory, or an op
+that sizes its output on the GPU (`repeat_interleave`), makes the thread wait for the GPU, behind the
+fluid's GL work: the sync then hands its captures on bunched, and the render, which measures the newest
+capture per tick, loses those that land in one tick with the next.
+
+Live, P800 at 50 fps, NEURAL_480, USB, 45 s each, the moments of each capture, motion step and render tick:
+
+| Stream                         | Waiting on the GPU      | Not waiting               |
+|--------------------------------|-------------------------|---------------------------|
+| the camera's thread in `set_image` | mean 5.6, p95 16 ms | mean 1.6, p95 2.6 ms      |
+| captures arriving, p95 / max   | 34.6 / 92 ms            | 22.2 / 30.5 ms            |
+| captures the motion measures   | 1816 of 2202 (82%)      | 2235 of 2249 (99.4%)      |
+| the dye still for over 50 ms   | 197 times, up to 104 ms | 0, at most 45.6 ms        |
+| render ticks                   | 80/s                    | 118/s                     |
+
+The panel pins the cadence beside the camera's video rates (`CadenceSettings` in deep_flow): the captures
+the sync hands on and the frames the motion measures, each as an average and a minimum (1 / the worst gap),
+so a frame lost after the camera shows where it is lost.
+
 ## Constraints
 
 - Each pipeline stage is one package and one layer; a 2D and a 3D version of a stage sit side by

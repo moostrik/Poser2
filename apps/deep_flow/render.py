@@ -10,7 +10,7 @@ from modules.gl import GpuTimer, RenderBase, Shader, Style, clear_color, fit, Te
 from modules.flow import DepthView, Port, hold_tick
 from modules.pose import Frame, Similarity, AngleMotion
 from modules.render import layers as ls, shaders, make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
-from modules.utils import Rect, Point2f
+from modules.utils import FPS, Rect, Point2f
 
 from modules.board import HasFrames
 
@@ -177,6 +177,10 @@ class DeepFlowRender(RenderBase):
 
         self._center_timer: GpuTimer = GpuTimer("GPU center")
         self._center_size: tuple[int, int] = (0, 0)     # the center layers' size: the motion's, set in allocate
+
+        # Each camera's frames the motion measures, for the panel's cadence (read on any thread)
+        self.motion_rates: dict[int, FPS] = {}
+        self._motion_timestamps: dict[int, float] = {}
 
         # The border around each layer in the main window
         self._border: shaders.DrawRectangleOutline = shaders.DrawRectangleOutline()
@@ -357,6 +361,9 @@ class DeepFlowRender(RenderBase):
             if image is None or i not in bridges:
                 continue
             timestamp: float | None = image.timestamp if isinstance(image, ls.HasCaptureTime) else None
+            if timestamp is not None and timestamp != self._motion_timestamps.get(i):    # a new frame for the motion to measure
+                self._motion_timestamps[i] = timestamp
+                self.motion_rates.setdefault(i, FPS(120)).processed()
             color: ls.LayerBase | None = self._layer(inputs.bridge_image, i)
             mask_layer: ls.LayerBase | None = self._layer(inputs.mask, i)
             mask: Texture | None = mask_layer.texture if mask_layer is not None else None

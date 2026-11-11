@@ -298,6 +298,19 @@ class RenderSettings(BaseSettings):
     window : Group[WindowSettings]               = Group(WindowSettings)
 
 
+class CadenceSettings(BaseSettings):
+    """Pinned beside the camera's video rates: the frames that get past the camera, so a frame lost on its
+    way to the flow shows where (the sync's captures, then the motion's measures)."""
+    capture_fps:     Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Captures", unit="fps",
+                                          description="Captures the sync hands on, average")
+    capture_min_fps: Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Captures min", unit="fps",
+                                          description="Captures: 1 / the worst gap between two")
+    motion_fps:      Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Motion", unit="fps",
+                                          description="Frames the motion measures, average")
+    motion_min_fps:  Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Motion min", unit="fps",
+                                          description="Motion: 1 / the worst gap between two measures")
+
+
 # ---------------------------------------------------------------------------
 #  Root settings
 # ---------------------------------------------------------------------------
@@ -309,6 +322,7 @@ class Settings(BaseSettings):
     mask_source:        Field[MaskSource] = Field(MaskSource.DEPTH, access=Field.INIT, description="Where the player's mask comes from; RVM runs only for RVM (restart to change)")
 
     camera: Group[Oak4Group]      = Group(Oak4Group, share=[num_cams, input_fps.as_('fps')])
+    cadence: Group[CadenceSettings] = Group(CadenceSettings)
     pose  : Group[PoseGroup]      = Group(PoseGroup, share=[max_players, input_fps.as_('frequency')])
     render: Group[RenderSettings] = Group(RenderSettings, share=[input_fps])
     inout : Group[InOutGroup]     = Group(InOutGroup)

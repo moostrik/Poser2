@@ -12,6 +12,8 @@ from .source import GpuImage, GpuImageCallback, ImageDict, TimestampDict
 
 logger = logging.getLogger(__name__)
 
+STAGING_COUNT: int = 3      # pinned buffers per camera: frames the GPU may be behind before the camera's thread waits
+
 
 def nv12_to_rgb(y: torch.Tensor, uv: torch.Tensor) -> torch.Tensor:
     """RGB CHW float32 in [0, 1] from NV12's planes, uint8: Y (H, W) and interleaved UV (H / 2, W).
@@ -19,7 +21,10 @@ def nv12_to_rgb(y: torch.Tensor, uv: torch.Tensor) -> torch.Tensor:
     BT.601 limited range with the chroma repeated, which is how `getCvFrame` reads an OAK4's frame,
     so the colors match the BGR it replaces.
     """
-    chroma: torch.Tensor = uv.reshape(uv.shape[0], -1, 2).repeat_interleave(2, 0).repeat_interleave(2, 1).float() - 128.0
+    # The chroma repeated by a broadcast view: `repeat_interleave` waits for the GPU to size its output
+    half: torch.Tensor = uv.reshape(uv.shape[0], -1, 2)
+    rows, columns = half.shape[0], half.shape[1]
+    chroma: torch.Tensor = half[:, None, :, None, :].expand(rows, 2, columns, 2, 2).reshape(rows * 2, columns * 2, 2).float() - 128.0
     u, v = chroma[..., 0], chroma[..., 1]
     luma: torch.Tensor = (y.float() - 16.0) * 1.164383
     rgb: torch.Tensor = torch.stack((luma + 1.596027 * v, luma - 0.391762 * u - 0.812968 * v, luma + 2.017232 * u))
@@ -42,7 +47,9 @@ def warp_grid(homography: torch.Tensor, height: int, width: int) -> torch.Tensor
 
 
 class Uploader:
-    """Uploads CPU numpy frames to GPU float16 CHW tensors.
+    """Uploads CPU numpy frames to GPU float16 CHW tensors without the camera's thread waiting for the GPU:
+    each frame goes through a pinned staging buffer, and the copy and every op after it are queued on the
+    upload stream (no op that sizes its output on the GPU), so a frame is handed on at the camera's cadence.
 
     Maintains a previous-frame buffer per camera for use by downstream
     processors (e.g. optical flow). Call snapshot() once per tick to
@@ -60,6 +67,8 @@ class Uploader:
         self._lock: Lock = Lock()       # an image and its time are stored and read together
         self._warp_grids: dict[int, tuple[np.ndarray, torch.Tensor]] = {}   # each camera's homography and its grid
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
+        # Each camera's pinned staging buffers, the events of the copies queued from them, the one used last
+        self._staging: dict[int, tuple[list[torch.Tensor], list[torch.cuda.Event | None], int]] = {}
         self._accumulated_upload_ms: float = 0.0
         self._timer: PerformanceTimer = PerformanceTimer(
             name="GPU Image Upload  ", sample_count=200, report_interval=100,
@@ -86,8 +95,10 @@ class Uploader:
 
         start = time.perf_counter()
 
+        staging: torch.Tensor = self._staging_buffer(cam_id, image)
+        staging.copy_(torch.from_numpy(image))
         with torch.cuda.stream(self._stream):
-            gpu_img = torch.from_numpy(image).cuda(non_blocking=True)
+            gpu_img = staging.cuda(non_blocking=True)
             if frame.nv12:
                 rows: int = image.shape[0] * 2 // 3
                 rgb: torch.Tensor = nv12_to_rgb(gpu_img[:rows], gpu_img[rows:]).to(dtype=torch.float16)
@@ -109,6 +120,8 @@ class Uploader:
                 rgb = rgb.flip(-1)
             ready: torch.cuda.Event = torch.cuda.Event()
             ready.record(self._stream)
+        _, events, index = self._staging[cam_id]
+        events[index] = ready           # the buffer is free again once the copy queued from it has run
         with self._lock:
             if cam_id in self._gpu_images:
                 self._prev_gpu_images[cam_id] = self._gpu_images[cam_id]
@@ -123,6 +136,22 @@ class Uploader:
                 callback(gpu_image)
             except Exception:
                 logger.exception("Error in GPU image callback")
+
+    def _staging_buffer(self, cam_id: int, image: np.ndarray) -> torch.Tensor:
+        """The camera's next pinned buffer for `image`, (re)made at its shape. From pinned memory the copy to the
+        GPU is queued and the camera's thread goes on; from the frame's own pageable memory it would wait until the
+        GPU had taken it. A buffer is reused once the copy queued from it has run, its event passed; only a GPU
+        `STAGING_COUNT` frames behind makes the thread wait."""
+        buffers, events, index = self._staging.get(cam_id, ([], [], -1))
+        if not buffers or buffers[0].shape != image.shape or buffers[0].dtype != torch.from_numpy(image[:0]).dtype:
+            buffers = [torch.empty(image.shape, dtype=torch.from_numpy(image[:0]).dtype, pin_memory=True) for _ in range(STAGING_COUNT)]
+            events = [None] * STAGING_COUNT
+        index = (index + 1) % STAGING_COUNT
+        event: torch.cuda.Event | None = events[index]
+        if event is not None:
+            event.synchronize()
+        self._staging[cam_id] = (buffers, events, index)
+        return buffers[index]
 
     def _straightened(self, cam_id: int, rgb: torch.Tensor, homography: np.ndarray) -> torch.Tensor:
         """`rgb` drawn through the homography. The grid is made once per homography."""

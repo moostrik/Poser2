@@ -18,7 +18,7 @@ from modules.pose import configure_features
 from modules.pose.pipeline import Domain, PosePipeline
 from modules.inference import segmentation, optical_flow, detection, PoseInference, Capture, CaptureSync
 from modules.pose import FrameDict
-from modules.utils import PerformanceTimer
+from modules.utils import FPS, PerformanceTimer
 
 from .render_board import RenderBoard
 from .series import Series, TIMER_SERIES
@@ -81,6 +81,7 @@ class DeepFlowMain:
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')
         self.pose_inference = PoseInference(p.image_crop, p.pose)        # the crop and the pose model, the frame domain's async step
         self.capture_sync = CaptureSync(p.capture_sync)                  # the color, depth and poses of one moment, for the render
+        self.capture_rate: FPS = FPS(120)                                # the captures it hands on, for the panel's cadence
 
         for camera in self.cameras:
             if self.recorder:
@@ -138,6 +139,7 @@ class DeepFlowMain:
         self.render.add_update_callback(self.camera_check.update)
 
         self.render.add_update_callback(self._update_poses)
+        self.render.add_update_callback(self._update_cadence)
 
         # Every loop of a recording starts on clear water, so two runs of one clip compare
         if self.player:
@@ -182,6 +184,7 @@ class DeepFlowMain:
             self.board.submit_time_sample(Series.CAMERA_INTERVAL, (frame.timestamp - last) * 1000.0, frame.timestamp)
 
     def _on_capture(self, capture: Capture) -> None:
+        self.capture_rate.processed()
         self.board.set_capture(capture)
         if capture.masks:
             self.board.set_segmentation_images(capture.masks)       # the layers draw the capture's own masks
@@ -218,6 +221,15 @@ class DeepFlowMain:
         series: Series | None = TIMER_SERIES.get(name)
         if series is not None:
             self.board.submit_time_sample(series, time_ms, timestamp)
+
+    def _update_cadence(self, now: float) -> None:
+        """The panel's cadence: the captures the sync hands on and the frames the motion measures, the slowest camera's."""
+        cadence = self.settings.cadence
+        cadence.capture_fps = round(self.capture_rate.get_rate_average(), 1)
+        cadence.capture_min_fps = round(self.capture_rate.get_rate_minimum(), 1)
+        rates = list(self.render.motion_rates.values())
+        cadence.motion_fps = round(min((rate.get_rate_average() for rate in rates), default=0.0), 1)
+        cadence.motion_min_fps = round(min((rate.get_rate_minimum() for rate in rates), default=0.0), 1)
 
     def _update_poses(self, now: float) -> None:
         """The render tick drives the pipeline's output domain (LERP) at the frame's time."""
