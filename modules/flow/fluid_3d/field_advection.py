@@ -4,7 +4,7 @@ from OpenGL.GL import GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, GL_TEXTURE_FETCH_BARRI
 
 from modules.gl import Texture3D, SwapTexture3D
 from ..finite_guard import GuardSlot
-from .fluid_settings import Advection
+from .fluid_settings import Advection, Limiter
 from .shaders import Advect3D, MacCormack3D
 
 _BARRIER_FETCH_AND_IMAGE: int = int(GL_TEXTURE_FETCH_BARRIER_BIT) | int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
@@ -34,10 +34,11 @@ class FieldAdvection:
               obstacle: Texture3D, aspect: float, z_extent: float, step: float, dissipation: float,
               internal_format: int, has_obstacles: bool, evaporation: float = 0.0,
               measure: int = 0, guard: GuardSlot | None = None,
-              closed: tuple[bool, bool, bool] = (True, True, True), faces: Texture3D | None = None) -> bool:
+              closed: tuple[bool, bool, bool] = (True, True, True), faces: Texture3D | None = None,
+              limiter: Limiter = Limiter.REVERT, blend: float = 0.0) -> bool:
         """Carry `field` one step along `velocity`, or along `faces` (`FaceVelocity`) for a field on the simulation's grid. Semi-Lagrangian into the field; or its step into `scratch` as
         the predictor and the MacCormack correction into the field; on the step's result `guard` (a non-finite
-        value 0 and counted). Returns whether `scratch` was (re)allocated, so its owner sets its walls."""
+        value 0 and counted); MacCormack's `limiter` and `blend` as the field's settings say. Returns whether `scratch` was (re)allocated, so its owner sets its walls."""
         field.swap()
         source: Texture3D = field.back
         if advection != Advection.MACCORMACK:
@@ -56,6 +57,7 @@ class FieldAdvection:
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         self._maccormack_shader.use(source, scratch, field, velocity, obstacle, aspect, z_extent, step, dissipation,
                                     internal_format=internal_format, has_obstacles=has_obstacles,
-                                    evaporation=evaporation, measure=measure, guard=guard, closed=closed, faces=faces)
+                                    evaporation=evaporation, measure=measure, guard=guard, closed=closed, faces=faces,
+                                    clamp=limiter == Limiter.CLAMP, blend=blend)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
         return allocated

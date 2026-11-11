@@ -16,6 +16,12 @@ class Advection(IntEnum):
     MACCORMACK = 1          # the same, corrected by half its error traced forward, clamped (Selle 2008)
 
 
+class Limiter(IntEnum):
+    """What MacCormack does where its correction leaves the eight texels the plain step read between (Selle 2008)."""
+    REVERT = 0      # the plain step's value: no energy kept that the step lost (the velocity's, always)
+    CLAMP = 1       # the corrected value cut to those bounds: no flip between sharp and soft texels
+
+
 class PressureSolver(IntEnum):
     """How the pressure's Poisson equation is solved each step, warm from the last step's pressure."""
     JACOBI = 0              # every cell from its neighbors' last values; five iterations a dispatch in shared memory
@@ -140,6 +146,8 @@ class DensitySettings(BaseSettings):
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the density is carried per step; 1 = with the water, above it runs ahead")
     fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the density fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds fully dyed water takes to clear, faint first; 0 = off")
+    limiter: Field[Limiter]         = Field(Limiter.REVERT,     newline=True,           description="MacCormack where its correction overshoots: revert to the plain step, or clamp to its bounds")
+    blend: Field[float]             = Field(0.0,    min=0.0,    max=0.2,    step=0.01,  description="MacCormack: the plain step's share mixed into the corrected one; 0 = none")
 
 
 class UpscaledDensitySettings(BaseSettings):

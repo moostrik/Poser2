@@ -697,7 +697,7 @@ class Fluid3D:
             dissipation=self._calculate_dissipation(self._dt, self.settings.density.fade_time),
             evaporation=self._evaporation(self._dt, self.settings.density.evaporation_time), advection=self.settings.density.advection,
             curl=self._curl_vol if self._needs_curl else None, cell=self._cell[0], guard=self._guard_slot('density'),
-            faces=self._faces.volume)
+            faces=self._faces.volume, limiter=self.settings.density.limiter, blend=self.settings.density.blend)
         for carrier in self._densities:
             carrier.update(step)
 

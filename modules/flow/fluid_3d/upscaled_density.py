@@ -113,7 +113,8 @@ class UpscaledDensity(DensityCarrier):
             self._turbulent_step(step, velocity, turbulence)
         elif self._advection.carry(step.advection, self._amount, self._scratch, velocity, step.obstacle,
                                    step.aspect, step.z_extent, step.step, step.dissipation, GL_R16F,
-                                   step.has_obstacles, evaporation=step.evaporation, measure=2):
+                                   step.has_obstacles, evaporation=step.evaporation, measure=2,
+                                   limiter=step.limiter, blend=step.blend):
             self._apply_walls()
 
     def _turbulent_step(self, step: CarrierStep, velocity: Texture3D, turbulence: float) -> None:

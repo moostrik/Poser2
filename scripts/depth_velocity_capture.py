@@ -68,7 +68,7 @@ def main() -> int:
 
     update = LucasKanadeFlow3D.update
 
-    def saved(self, depth, delta_time, view_span, depth_step) -> None:
+    def saved(self, depth, delta_time, view_span, depth_step, **flags) -> None:
         if starting.is_set():                     # on the render thread: the loop starts here
             starting.clear()
             recording.set()
@@ -82,7 +82,7 @@ def main() -> int:
             np.save(out_dir / f'mask_{index:04d}.npy', (read('mask', mask, w, h)[..., 0] > 0.5) if mask is not None else np.ones((h, w), bool))
             calls.append(dict(t=time.perf_counter(), delta_time=delta_time, view_span=view_span, depth_step=list(depth_step),
                               width=w, height=h, settings=self.settings.to_dict()))
-        update(self, depth, delta_time, view_span, depth_step)
+        update(self, depth, delta_time, view_span, depth_step, **flags)
 
     LucasKanadeFlow3D.update = saved
     app = DeepFlowMain(simulation=True, interface=False)

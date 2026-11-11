@@ -23,7 +23,8 @@ class MacCormack3D(ComputeShader):
             aspect: float, z_extent: float, timestep: float, dissipation: float,
             internal_format: int = GL_RGBA16F, has_obstacles: bool = True, evaporation: float = 0.0, measure: int = 0,
             guard: GuardSlot | None = None,
-            closed: tuple[bool, bool, bool] = (True, True, True), faces: Texture3D | None = None) -> None:
+            closed: tuple[bool, bool, bool] = (True, True, True), faces: Texture3D | None = None,
+            clamp: bool = False, blend: float = 0.0) -> None:
         """Write the corrected step into `result`.
 
         Args:
@@ -44,6 +45,8 @@ class MacCormack3D(ComputeShader):
             closed: Per axis, whether the box's walls are closed (walls.glsl)
             faces: The velocity's faces (`FaceVelocity`), read instead of `velocity` for a field on the
                 simulation's grid; None reads `velocity`
+            clamp: Where the correction overshoots, cut it to the bounds instead of reverting to the predictor
+            blend: The predictor's share mixed into the corrected value, 0 none
         """
         if not self.allocated or not self.shader_program:
             return
@@ -74,5 +77,7 @@ class MacCormack3D(ComputeShader):
             glUniform1i(self.get_uniform_loc("uGuardSlot"), -1)
         glUniform3i(self.get_uniform_loc("uSize"), result.width, result.height, result.depth)
         glUniform1i(self.get_uniform_loc("uHasObstacles"), int(has_obstacles))
+        glUniform1i(self.get_uniform_loc("uClamp"), int(clamp))
+        glUniform1f(self.get_uniform_loc("uBlend"), blend)
 
         self.dispatch(result.width, result.height, result.depth)

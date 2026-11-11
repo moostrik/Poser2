@@ -18,10 +18,14 @@
  * Dispatched as a 2D compute (one thread per output pixel). The output may
  * be larger than the volume: the volume is sampled by uv. Split, the amount is
  * one volume and its color another, coarser: the color is the color volume's
- * color × amount over its amount, at the same place.
+ * color × amount over its amount, at the same place, each with COLOR_FLOOR of white
+ * added, so where the coarse amount thins out under the finer one the color fades to
+ * white instead of dividing by almost nothing (which drew the coarse cells as blocks).
  */
 
 layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
+
+const float COLOR_FLOOR = 0.01;     // the coarse amount below which the split color leans to white
 
 layout(binding = 0) uniform sampler3D uDensity;  // RGBA16F, or with uSplit the amount alone (R16F)
 layout(binding = 1) uniform sampler3D uColor;    // with uSplit: the color volume, color × amount and the amount
@@ -63,7 +67,7 @@ void main() {
         vec4 s = texture(uDensity, uvw);
         if (uSplit) {
             vec4 c = texture(uColor, uvw);
-            s = vec4(c.rgb / max(c.a, 1e-4) * s.r, s.r);
+            s = vec4((max(c.rgb, vec3(0.0)) + COLOR_FLOOR) / (max(c.a, 0.0) + COLOR_FLOOR) * s.r, s.r);
         }
 
         vec3 dye = max(s.rgb, vec3(0.0));

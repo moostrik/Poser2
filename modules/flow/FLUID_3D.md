@@ -525,6 +525,18 @@ The revert keeps MacCormack's detail and decays as the plain step does. Above ab
 grows the water in both advections, after the body stopped: the confinement adds energy every step,
 which the step's own loss balances only at a small epsilon.
 
+The density chooses its own limiter (`density.limiter`): REVERT, the velocity's, or CLAMP, the corrected value
+cut to the bounds, which a density can take as it feeds nothing back; and `density.blend`, the plain step's
+share mixed into the corrected value (Houdini's remedy for the revert's grid artifacts). On standmoves at 4K,
+the luminance's gradient (mean / p99) over the lit pixels: revert 8.3 / 73, clamp 10.3 / 92, blend 0.05
+8.0 / 69, the plain step 5.1 / 45; the density pass 4.1 ms for each MacCormack choice, 1.37 for the plain.
+
+The upscaled density's color is the simulation density's color over its amount, at the same place; where the
+two are carried apart, the 4K amount lies where the coarse amount is near 0 (3.9% of the pixels under 0.01 on
+the blocky recording at 4.7 s), and divided by almost nothing the color jumped from cell to cell: squares the
+coarse cell's size (7.5 px at 4K), worse the sharper the 4K amount. Each takes `COLOR_FLOOR` (0.01) of white
+before the division, so there the color fades to white; elsewhere the frames move by 1 of 255 on average.
+
 ## The density
 
 The solver owns the velocity, the pressure and the temperature; the density is its carriers'

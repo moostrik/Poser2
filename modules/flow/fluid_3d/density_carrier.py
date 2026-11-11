@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from modules.gl import Texture, Texture3D
 from ..finite_guard import GuardSlot
 from ..port import Port
-from .fluid_settings import Advection
+from .fluid_settings import Advection, Limiter
 from .shaders import CompositeLight, MarchLook, InjectMode
 
 
@@ -32,6 +32,8 @@ class CarrierStep:
     cell: float = 0.0               # the grid's cell across, in x and y (widths)
     guard: GuardSlot | None = None  # the density's slot in the fluid's FiniteGuard
     faces: Texture3D | None = None  # the velocity on its faces, which a carrier on the simulation's grid moves by
+    limiter: Limiter = Limiter.REVERT   # MacCormack where its correction overshoots
+    blend: float = 0.0                  # MacCormack: the plain step's share mixed in
 
 
 class DensityCarrier(ABC):

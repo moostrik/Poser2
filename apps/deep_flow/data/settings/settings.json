@@ -7,7 +7,7 @@
     "keyframe_interval": 50,
     "color": true,
     "resolution": "P720",
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "fov": 80.0,
     "split_seconds": 60,
@@ -77,7 +77,7 @@
         "DEPTH"
       ],
       "apply_warp": false,
-      "folder": "20261103-215324_standmoves",
+      "folder": "20261111-091147_blocky",
       "sim_passthrough": false,
       "replay": true
     },
@@ -516,7 +516,7 @@
     "fluid": {
       "guard": true,
       "wall": "OPEN",
-      "slip_time": 0.0,
+      "slip_time": 60.0,
       "width": 288,
       "height": 512,
       "depth": 64,
@@ -553,7 +553,7 @@
         "viscosity_iter": 20
       },
       "vorticity": {
-        "strength_1": 45.05,
+        "strength_1": 0.0,
         "strength_2": 0.0,
         "strength_3": 0.0,
         "radius_1": 0.1,
@@ -582,7 +582,9 @@
         "advection": "MACCORMACK",
         "advection_scale": 0.88,
         "fade_time": 30.0,
-        "evaporation_time": 0.0
+        "evaporation_time": 0.0,
+        "limiter": "CLAMP",
+        "blend": 0.02
       },
       "upscaled": {
         "enabled": true,
