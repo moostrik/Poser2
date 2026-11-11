@@ -2,7 +2,7 @@
 
 /*
  * VorticityCurl3D - the curl (vorticity vector) of the velocity on the cells' faces, at the cells' centers,
- * at one radius into uCurl and, with uSecond, at a second into uCurl2, from the same cell's setup:
+ * at each of uCount radii into its own volume (uCurl0, uCurl1, uCurl2), from the same cell's setup:
  *
  *   ω = (∂w/∂y - ∂v/∂z, ∂u/∂z - ∂w/∂x, ∂v/∂x - ∂u/∂y)
  *
@@ -16,14 +16,15 @@ layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick 
 
 layout(binding = 2) uniform sampler3D uObstacle;   // R8 at the cells
 
-layout(rgba16f, binding = 0) writeonly uniform image3D uCurl;
-layout(rgba16f, binding = 1) writeonly uniform image3D uCurl2;
+const int MAX_CURLS = 3;     // VorticityCurl3D.MAX_CURLS
 
-uniform vec3  uHalfRdxInv;   // (0.5/dx, 0.5/dy, 0.5/dz) over the radius per axis
-uniform vec3  uRadius;       // the sampling radius in cells per axis, at least one: the radius in widths over each cell's side
-uniform bool  uSecond;       // a second curl, at uRadius2, into uCurl2
-uniform vec3  uHalfRdxInv2;
-uniform vec3  uRadius2;
+layout(rgba16f, binding = 0) writeonly uniform image3D uCurl0;
+layout(rgba16f, binding = 1) writeonly uniform image3D uCurl1;
+layout(rgba16f, binding = 2) writeonly uniform image3D uCurl2;
+
+uniform int   uCount;                       // the curls, 1 to MAX_CURLS
+uniform vec3  uHalfRdxInv[MAX_CURLS];       // (0.5/dx, 0.5/dy, 0.5/dz) over each radius per axis
+uniform vec3  uRadius[MAX_CURLS];           // each sampling radius in cells per axis, at least one: the radius in widths over each cell's side
 uniform ivec3 uCells;
 uniform ivec3 uClosed;
 uniform bool  uHasObstacles;
@@ -67,11 +68,13 @@ void main() {
     ivec3 i = ivec3(gl_GlobalInvocationID.xyz);
     if (any(greaterThanEqual(i, uCells))) return;
     if (solid_cell(i)) {
-        imageStore(uCurl, i, vec4(0.0));
-        if (uSecond) imageStore(uCurl2, i, vec4(0.0));
+        imageStore(uCurl0, i, vec4(0.0));
+        if (uCount > 1) imageStore(uCurl1, i, vec4(0.0));
+        if (uCount > 2) imageStore(uCurl2, i, vec4(0.0));
         return;
     }
     vec3 vC = cell_velocity(i);
-    imageStore(uCurl, i, vec4(curl_at(i, vC, uRadius, uHalfRdxInv), 0.0));
-    if (uSecond) imageStore(uCurl2, i, vec4(curl_at(i, vC, uRadius2, uHalfRdxInv2), 0.0));
+    imageStore(uCurl0, i, vec4(curl_at(i, vC, uRadius[0], uHalfRdxInv[0]), 0.0));
+    if (uCount > 1) imageStore(uCurl1, i, vec4(curl_at(i, vC, uRadius[1], uHalfRdxInv[1]), 0.0));
+    if (uCount > 2) imageStore(uCurl2, i, vec4(curl_at(i, vC, uRadius[2], uHalfRdxInv[2]), 0.0));
 }

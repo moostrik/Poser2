@@ -116,7 +116,7 @@ class InputSettings(BaseSettings):
 class ConfinementSettings(BaseSettings):
     """One vorticity confinement: the swirls of one size it keeps alive (Fedkiw 2001)."""
     strength: Field[float]  = Field(0.0,    min=0.0,    max=100.0,    color="purple",         description="Its epsilon, the force epsilon × cell × (N × curl); 0 = off")
-    radius: Field[float]    = Field(0.004,  min=0.001,  max=0.1,    widget=Widget.log_slider, color="deep-purple", description="The size of the swirls it keeps, widths; at least one cell")
+    radius: Field[float]    = Field(0.004,  min=0.001,  max=0.1,    newline=True, widget=Widget.log_slider, color="deep-purple", description="The size of the swirls it keeps, widths; at least one cell")
 
 
 class VelocitySettings(BaseSettings):
@@ -129,6 +129,7 @@ class VelocitySettings(BaseSettings):
     viscosity_iter: Field[int]      = Field(20,     min=1,      max=60,     color="orange",         description="Viscosity solver iterations at 60 fps; fewer at a higher rate, never more")
     confinement_1: Group[ConfinementSettings] = Group(ConfinementSettings)
     confinement_2: Group[ConfinementSettings] = Group(ConfinementSettings)
+    confinement_3: Group[ConfinementSettings] = Group(ConfinementSettings)
 
 
 class DensitySettings(BaseSettings):

@@ -74,7 +74,7 @@ A step (`Fluid3D.update`), in order, at the code's defaults:
 |-------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------|----------------------|
 | advect_vel  | self-advection on the faces by `velocity.advection`, each face traced on its own ([The staggered velocity](#the-staggered-velocity)), `velocity.advection_scale` 1, fade 60 s; on its result the guard ([The guard](#the-guard)) and the slip | velocity's faces    | the trace distance   |
 | viscosity   | Jacobi diffusion on the faces, off (`viscosity` 0)                                                                                                                                                                                                                      | velocity's faces    | no                   |
-| vorticity   | the two confinements (`confinement_1`, `confinement_2`, each a `strength` and a `radius`): both curls at the cells from the faces in one pass, both forces at the cells in one, each face given its two cells' mean of their sum | faces, curl         | no                   |
+| vorticity   | the confinements (`confinement_1` to `confinement_3`, each a `strength` and a `radius`): every running one's curl at the cells from the faces in one pass, their forces summed at the cells in one, each face given its two cells' mean | faces, curl         | no                   |
 | advect_temp | off: `buoyancy` 0 clears the temperature once, and nothing is injected into it                                                                                                                                                                                          | temperature         | the trace distance   |
 | buoyancy    | gravity × (sink × density − buoyancy × ΔT), kept as an acceleration at the cells, each face given its two cells' mean × dt; gravity down the screen (`gravity_y` 1)                                                                                                     | acceleration        | no                   |
 | incompress  | the divergence per cell from its six faces, the pressure by `pressure.solver` ([The pressure](#the-pressure)), the gradient per face from its two cells, on the walls ([The walls](#the-walls))                                                                         | pressure, faces     | no                   |
@@ -423,7 +423,7 @@ velocity's `fade_time` 60 s (it keeps its momentum), `viscosity` 0 (water at thi
 `evaporation_time` 0 (off: it stays until the water carries it away), `temperature.sink` 0 and `ambient`
 0 (the density as heavy as the water, no buoyancy), gravity down the screen, every wall closed; the top
 speed off, a failsafe; the bridge's mix the boundary's trail alone and its lowpass's `smooth` its default
-160 ms, since the coast is the fluid's; the two confinements off (`strength` 0), each over its neighbors
+160 ms, since the coast is the fluid's; the three confinements off (`strength` 0), each over its neighbors
 (`radius` one cell) where it runs, Fedkiw's ε 0.3 the textbook's start; in z, `input.layer` 0.5 and `input.spread` 0.2 widths, a body's thickness at
 the camera's crop (from its `view_span` of 0.76 m, **(deduction)**) where it is at least half there. Kept as tuned: the composite's look (`emission`, `opacity`,
 `tint`, `fog`).
@@ -440,7 +440,7 @@ axis's side (the divergence, the gradient, the pressure's solves, the viscosity,
 advection); the multigrid halves an axis only while its cells are shorter than the longest by more than 1.5,
 all of them once near cubic (semi-coarsening, `coarsening`), so a level's cells grow toward cubic before the
 stretched axis is halved; the confinement's force is ε × h × (N × ω) (Fedkiw 2001), h the xy cell, with the
-curl over each confinement's `radius` widths, at least a cell on each axis, and the two confinements' forces
+curl over each confinement's `radius` widths, at least a cell on each axis, and the confinements' forces
 summed;
 the buoyancy is an acceleration, widths/s² per unit of density or temperature; the viscosity a
 kinematic viscosity in widths²/s; `input.spread` a thickness in widths. The advection moves a

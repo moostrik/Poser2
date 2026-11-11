@@ -7,7 +7,7 @@
     "keyframe_interval": 50,
     "color": true,
     "resolution": "P720",
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "fov": 80.0,
     "split_seconds": 60,
@@ -31,7 +31,7 @@
       },
       "sensor": {
         "exposure": 19218,
-        "iso": 1559,
+        "iso": 3313,
         "auto_exposure": true,
         "auto_exposure_lock": false,
         "exposure_compensation": 0,
@@ -558,6 +558,10 @@
         "confinement_2": {
           "strength": 0.0,
           "radius": 0.006
+        },
+        "confinement_3": {
+          "strength": 0.0,
+          "radius": 0.025
         }
       },
       "density": {
@@ -769,10 +773,10 @@
       "title": "Poser",
       "v_sync": false,
       "monitor": "M0",
-      "x": 1293,
+      "x": 1921,
       "y": 31,
-      "width": 1266,
-      "height": 1360,
+      "width": 1918,
+      "height": 2080,
       "secondary_list": [
         "M1"
       ],

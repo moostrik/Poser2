@@ -6,22 +6,24 @@
  * f = ε h (N × ω) Δt
  * where N = ∇|ω| / |∇|ω||  (normalized gradient of curl magnitude)
  *
- * In 3D, the confinement force is computed via cross product of N and ω. With uSecond, a second confinement's
- * from its own curl (uCurl2) and strength is added: two sizes of swirl kept at once.
+ * In 3D, the confinement force is computed via cross product of N and ω. Each of uCount confinements gives its
+ * own from its own curl and strength, summed: up to three sizes of swirl kept at once.
  */
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 4) in;     // a brick of cells, so z neighbors share the cache
 
-layout(binding = 0) uniform sampler3D uCurl;      // Curl vector field (RGBA16F: xyz)
-layout(binding = 2) uniform sampler3D uCurl2;     // the second confinement's, read with uSecond
+const int MAX_CONFINEMENTS = 3;     // VorticityForce3D.MAX_CONFINEMENTS
+
+layout(binding = 0) uniform sampler3D uCurl0;     // each confinement's curl (RGBA16F: xyz)
+layout(binding = 2) uniform sampler3D uCurl1;
+layout(binding = 3) uniform sampler3D uCurl2;
 layout(binding = 1) uniform sampler3D uObstacle;   // Obstacle mask (R8)
 
 layout(rgba16f, binding = 0) writeonly uniform image3D uForce;    // the force × dt at the cells
 
 uniform vec3  uHalfRdxInv;    // (0.5/dx, 0.5/dy, 0.5/dz)
-uniform float uTimestep;       // Vorticity strength * dt
-uniform bool  uSecond;
-uniform float uTimestep2;      // the second's
+uniform int   uCount;                         // the confinements, 1 to MAX_CONFINEMENTS
+uniform float uTimestep[MAX_CONFINEMENTS];    // each one's strength × h × dt
 uniform ivec3 uSize;
 uniform bool  uHasObstacles;   // Skip obstacle logic when no obstacles present
 
@@ -89,8 +91,9 @@ void main() {
         }
     }
 
-    vec3 force = uTimestep * confinement(uCurl, gid, st);
-    if (uSecond) force += uTimestep2 * confinement(uCurl2, gid, st);
+    vec3 force = uTimestep[0] * confinement(uCurl0, gid, st);
+    if (uCount > 1) force += uTimestep[1] * confinement(uCurl1, gid, st);
+    if (uCount > 2) force += uTimestep[2] * confinement(uCurl2, gid, st);
 
     imageStore(uForce, gid, vec4(force, 0.0));
 }

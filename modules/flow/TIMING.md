@@ -429,20 +429,25 @@ The density injects a column a thread, the source and its z position read once, 
 slab reaches; the drag and the body force read the z position at each face. The fluid's step varies by
 2 ms between runs of the same code on this harness, so only a side against a side in one run compares.
 
-### Two confinements
+### The confinements
 
-The vorticity pass alone (`fluid_pass_check.py`), deep_flow's preset, ms, the median of 40:
+The vorticity pass alone (`fluid_pass_check.py`), deep_flow's preset, ms, the median of 40, its floor 0.529:
 
-| Confinements                                   | Before (one) | Two in one pass each |
-|------------------------------------------------|--------------|----------------------|
-| one at 0.1 widths (the preset; 2 off)          | 0.515        | 0.526                |
-| one at 0.006 widths                            | 0.552        | 0.557                |
-| 0.1 and 0.006 widths                           |              | 0.862                |
+| Confinements running                           | One (before) | Up to three, each curl in one pass, the forces summed in one |
+|------------------------------------------------|--------------|--------------------------------------------------------------|
+| one at 0.1 widths (the preset; 2 and 3 off)    | 0.515        | 0.521                                                        |
+| one at 0.006 widths                            | 0.552        | 0.557                                                        |
+| 0.1 and 0.006 widths                           |              | 0.868                                                        |
+| 0.1, 0.006 and 0.025 widths                    |              | 1.200                                                        |
 
-The second confinement reads six more velocities a cell in the curl's pass, writes a second curl volume,
-and reads seven more curl texels a cell in the force's: +0.34 ms with both on, none with the second off.
-`confinement_check.py`: the second alone gives the first's water to the bit, and two at half the strength
-one at the full.
+Each confinement more reads six velocities a cell in the curl's pass, writes its curl volume, and reads seven
+curl texels a cell in the force's: about +0.34 ms each, none while it is off. `confinement_check.py`: the third
+alone gives the first's water to the bit, and three summing to one strength the same water as one.
+
+Not kept: the force added straight onto the faces, each workgroup computing its cells' and one more cell's
+force into shared memory, no force volume written and read back: 0.537 ms with one, 0.921 with two. The
+border's forces, computed again by every workgroup (405 for 256 faces' cells), cost more than the force
+volume's round trip saves.
 
 ## The density's own advection
 

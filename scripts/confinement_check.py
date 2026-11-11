@@ -1,9 +1,9 @@
-"""The two vorticity confinements against each other: the swinging body for `--seconds`, each run's velocity at
+"""The vorticity confinements against each other: the swinging body for `--seconds`, each run's velocity at
 the end, the largest difference between runs that should agree, and how much the second changes the water.
 
-    1 alone         confinement_1 (ε, R), confinement_2 off
-    2 alone         confinement_1 off, confinement_2 (ε, R): the second's path, the same water
-    split           both at (ε / 2, R): the forces summed, the same water
+    1 alone         confinement_1 (ε, R), the others off
+    3 alone         confinement_3 (ε, R), the others off: the same water
+    split           all three at (ε / 4, ε / 4, ε / 2, R): the forces summed, the same water
     two sizes       confinement_1 (ε, R), confinement_2 (ε, r): what a second size adds
 
 deep_flow's preset otherwise (`maccormack_check.fluid_settings`). No app: a hidden window gives the GL context.
@@ -51,18 +51,19 @@ def main() -> None:
     mh.context()
     e, r, small = args.strength, args.radius, args.small
 
-    def config(e1: float, r1: float, e2: float, r2: float) -> list[str]:
+    def config(e1: float, r1: float, e2: float, r2: float, e3: float = 0.0, r3: float = 0.02) -> list[str]:
         return [f'velocity.confinement_1.strength={e1}', f'velocity.confinement_1.radius={r1}',
-                f'velocity.confinement_2.strength={e2}', f'velocity.confinement_2.radius={r2}']
+                f'velocity.confinement_2.strength={e2}', f'velocity.confinement_2.radius={r2}',
+                f'velocity.confinement_3.strength={e3}', f'velocity.confinement_3.radius={r3}']
 
     one = run(config(e, r, 0.0, small), args.seconds)
-    two = run(config(0.0, small, e, r), args.seconds)
-    split = run(config(e / 2, r, e / 2, r), args.seconds)
+    three = run(config(0.0, r, 0.0, small, e, r), args.seconds)
+    split = run(config(e / 4, r, e / 4, r, e / 2, r), args.seconds)
     sizes = run(config(e, r, e, small), args.seconds)
     still = run(config(0.0, r, 0.0, small), args.seconds)
     scale = float(np.abs(one).max())
     print(f'velocity max {scale:.4f} widths/s')
-    print(f'2 alone against 1 alone: max diff {np.abs(two - one).max() / scale:.2e} of the max')
+    print(f'3 alone against 1 alone: max diff {np.abs(three - one).max() / scale:.2e} of the max')
     print(f'split against 1 alone:   max diff {np.abs(split - one).max() / scale:.2e} of the max')
     print(f'1 alone against none:    mean |diff| {np.abs(one - still).mean() / scale:.2e} of the max')
     print(f'two sizes against 1:     mean |diff| {np.abs(sizes - one).mean() / scale:.2e} of the max')
