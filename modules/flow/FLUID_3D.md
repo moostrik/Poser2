@@ -56,7 +56,13 @@ then mean less against what is seen. One unit across the stages, the smaller sid
 and feel when the box turns: in portrait nothing changes. It reaches past the fluid (the motion, the
 bridge, the monitor), so it is one rule for all of them, made where each length is made.
 
-### 3. The temperature
+### 3. The fade and the evaporation
+
+Each field's `fade_time` (seconds to 1%, a share at a time) and `evaporation_time` (seconds a full value takes
+to reach 0, a fixed amount at a time) do not yet give what is wanted **(site fact)**; what each should do
+for the look is the first question.
+
+### 4. The temperature
 
 Whether the temperature needs a field of its own. Buoyancy needs only a scalar the water is lighter or
 heavier by: the density alone can be it (ink sinks), and the temperature adds currents apart from the dye
@@ -67,6 +73,11 @@ Where it is kept, its advection moves to the density's: today it is carried mid-
 confinement and before the projection, by a velocity not yet free of divergence; the textbook carries every
 scalar by the same projected velocity (Fedkiw 2001, Bridson), and the buoyancy reads the temperature of the
 step before.
+
+Making the density sink needs no temperature: `temperature.sink` (widths/s² per unit of density, along
+gravity) weighs dyed water wherever it is, with `buoyancy` 0, in the same pass, its direction `gravity_x`,
+`_y`, `_z`. It sits in the temperature's panel though it is the density's weight: if the temperature goes,
+`sink` and the gravity move to a panel of their own or the density's.
 
 ### After the plan
 
