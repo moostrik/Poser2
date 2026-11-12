@@ -20,7 +20,7 @@ from OpenGL.GL import GL_NEAREST, GL_R32F, GL_R32UI, GL_RED, GL_FLOAT, GL_TEXTUR
 
 import monitor_harness as mh  # noqa: E402
 from modules.camera import (DepthAlignment, FrameType, TiltCorrection, TiltCorrectionSettings, aligned_depth_size, depth_projection,  # noqa: E402
-                            mirrored_alignment, mirrored_intrinsics, read_metadata)
+                            read_metadata)
 from modules.gl import Image, Texture  # noqa: E402
 from modules.inference.depth_align import DepthAligner, depth_metres  # noqa: E402
 from modules.render.shaders import DepthAlign  # noqa: E402
@@ -67,8 +67,8 @@ def main() -> int:
     assert info is not None and info.depth_alignment is not None, 'the recording has no depth alignment'
     frames = depth_frames(chunk, args.frames)
     depth_size = (frames[0].shape[1], frames[0].shape[0])
-    alignment: DepthAlignment = mirrored_alignment(info.depth_alignment, depth_size[0]) if info.flip_h else info.depth_alignment
-    intrinsics = mirrored_intrinsics(info.intrinsics, info.width) if info.flip_h else info.intrinsics
+    alignment: DepthAlignment = info.depth_alignment
+    intrinsics = info.intrinsics
     to_ray, to_uv = depth_projection(alignment, depth_size)
     size = aligned_depth_size(depth_size, alignment)
 
@@ -100,7 +100,8 @@ def main() -> int:
             for i, frame in enumerate(frames):
                 homography: np.ndarray | None = None
                 if extra is not None:
-                    tilt = metadata.readings[i].tilt if i < len(metadata.readings) else 0.0
+                    readings = metadata.frames[i].readings if i < len(metadata.frames) else None
+                    tilt = readings.tilt if readings is not None else 0.0
                     correction = TiltCorrection(tilt_settings)
                     correction.update(tilt + extra, intrinsics, (info.width, info.height))
                     homography = correction.homography

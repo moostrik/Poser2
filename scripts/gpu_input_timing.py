@@ -17,7 +17,7 @@ import numpy as np  # noqa: E402
 import torch  # noqa: E402
 import torch.nn.functional as F  # noqa: E402
 
-from modules.camera import FrameType, TiltCorrection, TiltCorrectionSettings, mirrored_intrinsics, read_metadata  # noqa: E402
+from modules.camera import FrameType, TiltCorrection, TiltCorrectionSettings, read_metadata  # noqa: E402
 from modules.inference.uploader import nv12_to_rgb, warp_grid  # noqa: E402
 from modules.video import StreamReader  # noqa: E402
 
@@ -77,8 +77,8 @@ def main() -> int:
     settings.initialize()
     settings.enabled = True
     correction = TiltCorrection(settings)
-    intrinsics = mirrored_intrinsics(info.intrinsics, info.width) if info.flip_h else info.intrinsics
-    correction.update(metadata.readings[0].tilt if metadata.readings else 0.0, intrinsics, (width, height))
+    readings = metadata.frames[0].readings if metadata.frames else None
+    correction.update(readings.tilt if readings is not None else 0.0, info.intrinsics, (width, height))
     homography = correction.homography
     print(f'{args.recording}: color {width} x {height}, homography {"yes" if homography is not None else "none"}, {args.runs} runs each')
 

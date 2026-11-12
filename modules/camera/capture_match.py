@@ -29,8 +29,11 @@ class CaptureStream[T]:
     def __len__(self) -> int:
         return len(self._values)
 
-    def add(self, timestamp: float, value: T) -> None:
+    def add(self, timestamp: float, value: T) -> bool:
+        """Keep `value`; True when the oldest went to make room, a value no capture took."""
+        full: bool = len(self._values) == self._values.maxlen
         self._values.append((timestamp, value))
+        return full
 
     def at(self, timestamp: float) -> T | None:
         """The value captured at `timestamp`; None when it has not come in."""

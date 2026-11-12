@@ -1,19 +1,18 @@
 """Records every camera's frames to chunked clips: one ffmpeg stream per camera and frame kind,
 files named `<cam>_<kind>_<chunk>` in a folder named after the start time, written to a temp folder
-and moved into place chunk by chunk.
+and merged into one `<cam>_<chunk>.mkv` per camera when a chunk ends (`chunk.merge_chunk`), with the
+metadata attached: the chunk's info line and one line per frame.
 
-With DEPTH in `video_frame_types` a chunk ends as one `<cam>_<chunk>.mkv` (`chunk.merge_chunk`): each
-depth frame is written with the color frame captured with it, their timestamps within
-`CAPTURE_TOLERANCE`, so the two streams count alike, and a metadata line per frame goes beside them.
-A color frame waits for its depth, which arrives later, and one whose depth never comes is left
-out, as is everything before the first depth. Recordings hold what the camera delivered, mirrored and not straightened, so the
-correction can still be tuned on them. Both streams share `keyframe_interval`: a seek in a chunk goes
-to a colour keyframe, so a depth stream with its keyframes elsewhere comes back with its references missing."""
+The frames and the camera's tracklets of one capture are brought together by a `RecordingSync`: the
+color frame, its depth when DEPTH is in `video_frame_types`, and the tracklets of a camera that sends
+them, each capture waiting for its tracklets up to `tracklet_wait`. Recordings hold what the camera
+delivered, not straightened and not mirrored, so the correction can still be tuned on them; `flip_h`
+says the frames are still to be mirrored. What a capture went without is counted on the panel and
+warned of. Both streams share `keyframe_interval`: a seek in a chunk goes to a color keyframe, so a
+depth stream with its keyframes elsewhere comes back with its references missing."""
 
-from collections import deque
 from threading import Thread, Lock, Event
 from pathlib import Path
-import shutil
 import time
 from enum import Enum, auto
 from queue import Queue, Empty
@@ -22,8 +21,10 @@ from typing import TextIO
 from modules.settings import BaseSettings, Field, Widget
 from modules.video import CoderType, CoderFormat, DEPTH_ENCODER, encoder_name, StreamWriter
 
-from .chunk import METADATA_SUFFIX, ChunkInfo, finish_unmerged, info_line, merge_chunk, readings_line
-from .frame import CAPTURE_TOLERANCE, FrameType, CameraFrame, mirrored_image
+from .chunk import METADATA_SUFFIX, ChunkInfo, FrameMetadata, finish_unmerged, frame_line, info_line, merge_chunk
+from .frame import FrameType, CameraFrame
+from .recording_sync import RecordedCapture, RecordingSync
+from .tracklet import CameraTracklets
 
 import logging
 logger = logging.getLogger(__name__)
@@ -49,6 +50,12 @@ class RecorderSettings(BaseSettings):
     split:              Field[bool]             = Field(False, widget=Widget.button, description="Split chunk")
     output_path:        Field[str]              = Field("recordings", access=Field.INIT, description="Video recordings directory")
     name:               Field[str]              = Field("", widget=Widget.input, description="Recording name")
+    tracklet_wait:      Field[float]            = Field(100.0, min=0.0, max=1000.0, step=10.0, description="Longest a frame waits for its tracklets (ms)")
+
+    # ── What a recording went without ─────────────────────────────────
+    missed_depth:       Field[int]              = Field(0, access=Field.READ, description="Color frames left out, their depth missing")
+    missed_color:       Field[int]              = Field(0, access=Field.READ, description="Depth frames left out, their color frame missing")
+    missed_tracklets:   Field[int]              = Field(0, access=Field.READ, description="Frames recorded without their tracklets")
 
 
 # The letter in a clip's file name: `0_C_001.mp4` is camera 0's video, chunk 1.
@@ -58,7 +65,6 @@ FRAME_TYPE_LABELS: dict[FrameType, str] = {
 }
 METADATA_LABEL: str = 'M'
 DEPTH_SUFFIX: str = '.mkv'
-WAITING_VIDEO: int = 8      # color frames a camera's depth may lag; it arrives about one frame later
 
 
 def make_file_name(cam_id: int, frame_type: FrameType, chunk: int, suffix: str) -> str:
@@ -66,7 +72,7 @@ def make_file_name(cam_id: int, frame_type: FrameType, chunk: int, suffix: str) 
 
 
 def make_chunk_name(cam_id: int, chunk: int) -> str:
-    """The one file a chunk with depth ends as."""
+    """The one file a chunk ends as."""
     return f"{cam_id}_{chunk:03d}.mkv"
 
 
@@ -75,6 +81,10 @@ def make_folder_name(name: str = "") -> str:
     if name:
         folder += f"_{name}"
     return folder
+
+
+def _latency(arrival: float | None, timestamp: float) -> float | None:
+    return arrival - timestamp if arrival is not None else None
 
 
 class RecState(Enum):
@@ -93,9 +103,9 @@ class Recorder(Thread):
 
         self.with_depth: bool = FrameType.DEPTH in settings.video_frame_types
         self.recorders: dict[int, dict[FrameType, StreamWriter]] = {}
-        self.frames: dict[int, Queue[tuple[CameraFrame, CameraFrame | None]]] = {}    # a colour frame and its depth
-        self.waiting_video: dict[int, deque[CameraFrame]] = {}      # color frames whose depth has not arrived yet
-        self.waiting_lock: Lock = Lock()                            # video and depth arrive on different threads
+        self.frames: dict[int, Queue[RecordedCapture]] = {}
+        self.sync: RecordingSync = RecordingSync(self.with_depth, lambda: self.settings.tracklet_wait)
+        self.sync.add_capture_callback(self._on_capture)
         self.metadata: dict[int, TextIO] = {}
         self.metadata_frames: dict[int, int] = {}       # the frames of the chunk so far, per camera
         self.folder_path: Path | None = None
@@ -103,7 +113,6 @@ class Recorder(Thread):
         for c in range(settings.num_cams):
             self.recorders[c] = {}
             self.frames[c] = Queue()
-            self.waiting_video[c] = deque(maxlen=WAITING_VIDEO)
             for t in self.settings.video_frame_types:
                 vcodec: str = DEPTH_ENCODER if t == FrameType.DEPTH else encoder_name(settings.video_format, settings.video_encoder)
                 self.recorders[c][t] = StreamWriter(vcodec, settings.keyframe_interval, settings.video_quality)
@@ -128,6 +137,10 @@ class Recorder(Thread):
     def stop(self) -> None:
         self.stop_event.set()
         self.join()
+        self.settings.unbind(RecorderSettings.start, self._on_start)
+        self.settings.unbind(RecorderSettings.stop, self._on_stop)
+        self.settings.unbind(RecorderSettings.split, self._on_split)
+        self.settings.unbind(RecorderSettings.enabled, self._on_enabled)
 
     def run(self) -> None:
         self._set_state(RecState.IDLE)
@@ -170,8 +183,7 @@ class Recorder(Thread):
 
     def _start_recording(self) -> None:
         output_path: Path = Path(self.data_path) / self.settings.output_path
-        if self.with_depth:
-            finish_unmerged(self.temp_path, output_path)
+        finish_unmerged(self.temp_path, output_path)
 
         self.folder_name = make_folder_name(self.settings.name)
         self.folder_path = self.temp_path / self.folder_name
@@ -182,18 +194,16 @@ class Recorder(Thread):
 
         self.chunk_index = 0
 
-        with self.waiting_lock:
-            for waiting in self.waiting_video.values():
-                waiting.clear()
+        self.sync.reset()
         for c in range(self.settings.num_cams):
             for t in self.settings.video_frame_types:
                 self.recorders[c][t].start(str(self._stream_path(c, t, self.chunk_index)), self.settings.fps)
-        if self.with_depth:
-            self._open_metadata()
+        self._open_metadata()
 
         logger.info("VideoRecorder started → %s", self.output_folder_path)
 
     def _stop_recording(self) -> None:
+        self.sync.flush()
         self._write_queued()
         for c in range(self.settings.num_cams):
             for t in self.settings.video_frame_types:
@@ -205,6 +215,7 @@ class Recorder(Thread):
             merge.join()
         self.merges.clear()
         self._remove_temp_folder()
+        self._update_missed()
         logger.info("VideoRecorder stopped")
 
     def _do_split(self) -> None:
@@ -215,15 +226,11 @@ class Recorder(Thread):
         for c in range(self.settings.num_cams):
             for t in self.settings.video_frame_types:
                 self.recorders[c][t].split(str(self._stream_path(c, t, self.chunk_index)), self.settings.fps)
-        if self.with_depth:
-            self._close_metadata()
-            self._open_metadata()
+        self._close_metadata()
+        self._open_metadata()
         self._finish_chunk(old_chunk)
 
     def _finish_chunk(self, chunk_index: int) -> None:
-        if not self.with_depth:
-            self._move_chunk_files(chunk_index)
-            return
         if self.folder_path is None:
             return
         for c in range(self.settings.num_cams):
@@ -233,28 +240,14 @@ class Recorder(Thread):
 
     def _merge_chunk(self, cam_id: int, chunk_index: int) -> None:
         video: Path = self._stream_path(cam_id, FrameType.VIDEO, chunk_index)
-        depth: Path = self._stream_path(cam_id, FrameType.DEPTH, chunk_index)
+        depth: Path | None = self._stream_path(cam_id, FrameType.DEPTH, chunk_index) if self.with_depth else None
         metadata: Path = self._metadata_path(cam_id, chunk_index)
-        if not (video.exists() and depth.exists() and metadata.exists()):
+        if not (video.exists() and (depth is None or depth.exists()) and metadata.exists()):
             for part in (video, depth, metadata):
-                part.unlink(missing_ok=True)    # a chunk that never got a frame
+                if part is not None:
+                    part.unlink(missing_ok=True)    # a chunk that never got a frame
             return
         merge_chunk(video, depth, metadata, self.output_folder_path / make_chunk_name(cam_id, chunk_index))
-
-    def _move_chunk_files(self, chunk_index: int) -> None:
-        if not hasattr(self, 'output_folder_path'):
-            return
-        assert self.folder_path is not None     # set before output_folder_path
-        for c in range(self.settings.num_cams):
-            for t in self.settings.video_frame_types:
-                name = make_file_name(c, t, chunk_index, self.suffix)
-                src = self.folder_path / name
-                dst = self.output_folder_path / name
-                if src.exists():
-                    try:
-                        shutil.move(str(src), str(dst))
-                    except Exception:
-                        logger.exception("Failed to move %s → %s", src, dst)
 
     def _remove_temp_folder(self) -> None:
         if self.folder_path is not None and self.folder_path.exists():
@@ -265,10 +258,22 @@ class Recorder(Thread):
 
     def _update_recording(self) -> None:
         split: bool = self.split_requested.is_set()      # read first: what was queued before the request ends its chunk
+        self.sync.update()
         self._write_queued()
+        self._update_missed()
         if split:
             self.split_requested.clear()
             self._do_split()
+
+    def _update_missed(self) -> None:
+        """The counts of what a recording went without, to the panel when they change."""
+        depth, color, tracklets = (self.sync.missed.total(part) for part in ('depth', 'color', 'tracklets'))
+        if self.settings.missed_depth != depth:
+            self.settings.missed_depth = depth
+        if self.settings.missed_color != color:
+            self.settings.missed_color = color
+        if self.settings.missed_tracklets != tracklets:
+            self.settings.missed_tracklets = tracklets
 
     def _write_queued(self) -> None:
         """Everything queued, on every pass: with depth two streams arrive per camera at the full
@@ -276,25 +281,30 @@ class Recorder(Thread):
         for c in range(self.settings.num_cams):
             while True:
                 try:
-                    frame, depth = self.frames[c].get_nowait()
+                    capture: RecordedCapture = self.frames[c].get_nowait()
                 except Empty:
                     break
-                self.recorders[c][frame.kind].submit_frame(mirrored_image(frame) if frame.flip_h else frame.image, frame.nv12)
-                if depth is not None:
-                    self.recorders[c][depth.kind].submit_frame(mirrored_image(depth) if depth.flip_h else depth.image)
-                    self._write_metadata(c, frame, depth)
+                self.recorders[c][FrameType.VIDEO].submit_frame(capture.video.image, capture.video.nv12)
+                if capture.depth is not None:
+                    self.recorders[c][FrameType.DEPTH].submit_frame(capture.depth.image)
+                self._write_metadata(c, capture)
 
-    def _write_metadata(self, cam_id: int, frame: CameraFrame, depth: CameraFrame) -> None:
+    def _write_metadata(self, cam_id: int, capture: RecordedCapture) -> None:
         file: TextIO | None = self.metadata.get(cam_id)
         if file is None:
             return
+        frame: CameraFrame = capture.video
         count: int = self.metadata_frames[cam_id]
         if count == 0:
             height: int = frame.image.shape[0] * 2 // 3 if frame.nv12 else frame.image.shape[0]
+            alignment = capture.depth.alignment if capture.depth is not None else None
             file.write(info_line(ChunkInfo(frame.image.shape[1], height, frame.intrinsics, frame.flip_h, self.settings.fps,
-                                           depth.alignment)))
-        if frame.readings is not None:
-            file.write(readings_line(count, frame.timestamp, frame.readings))
+                                           alignment, self.with_depth)))
+        tracklets: CameraTracklets | None = capture.tracklets
+        file.write(frame_line(count, FrameMetadata(
+            frame.timestamp, frame.readings, _latency(frame.arrival, frame.timestamp),
+            tracklets.tracklets if tracklets is not None else None,
+            _latency(tracklets.arrival, tracklets.timestamp) if tracklets is not None else None)))
         self.metadata_frames[cam_id] = count + 1
 
     def _get_state(self) -> RecState:
@@ -312,29 +322,18 @@ class Recorder(Thread):
 
     # EXTERNAL METHODS
     def submit_frame(self, frame: CameraFrame) -> None:
-        """A camera's frame callback: queued while recording, of the kinds the recorder writes. With
-        depth a color frame waits, and each depth frame takes the color frame captured with it."""
-        if frame.kind not in self.settings.video_frame_types or self._get_state() != RecState.REC:
-            return
-        if not self.with_depth:
-            self.frames[frame.cam_id].put((frame, None))
-            return
-        video: CameraFrame | None = None
-        with self.waiting_lock:
-            waiting: deque[CameraFrame] = self.waiting_video[frame.cam_id]
-            if frame.kind == FrameType.VIDEO:
-                waiting.append(frame)
-                return
-            while waiting:
-                candidate: CameraFrame = waiting.popleft()
-                if abs(candidate.timestamp - frame.timestamp) <= CAPTURE_TOLERANCE:
-                    video = candidate
-                    break
-                if candidate.timestamp > frame.timestamp:
-                    waiting.appendleft(candidate)      # captured after this depth: it waits for its own
-                    break
-        if video is not None:
-            self.frames[frame.cam_id].put((video, frame))
+        """A camera's frame callback: while recording, a frame of a kind the recorder writes to its sync,
+        which puts each capture on the queue once it is complete."""
+        if frame.kind in self.settings.video_frame_types and self._get_state() == RecState.REC:
+            self.sync.submit_frame(frame)
+
+    def submit_tracklets(self, cam_tracklets: CameraTracklets) -> None:
+        """A camera's tracklet callback, the tracklets as the camera gave them: while recording, to the sync."""
+        if self._get_state() == RecState.REC:
+            self.sync.submit_tracklets(cam_tracklets)
+
+    def _on_capture(self, capture: RecordedCapture) -> None:
+        self.frames[capture.video.cam_id].put(capture)
 
     # SETTINGS CALLBACKS
     def _on_enabled(self, value: bool) -> None:

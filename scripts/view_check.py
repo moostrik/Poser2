@@ -24,7 +24,7 @@ import torch  # noqa: E402
 from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_FLOAT, GL_NEAREST, GL_RED, GL_RGBA, GL_TEXTURE_2D, glBindTexture, glFinish, glGetTexImage  # noqa: E402
 
 import monitor_harness as mh  # noqa: E402
-from modules.camera import CameraFrame, FrameType, mirrored_alignment, read_metadata  # noqa: E402
+from modules.camera import CameraFrame, FrameType, read_metadata  # noqa: E402
 from modules.flow import DepthVelocitySettings, edge_aware_depth  # noqa: E402
 from modules.gl import Tensor, Texture  # noqa: E402
 from modules.inference import GpuDepth, GpuImage, Uploader, UploaderSettings  # noqa: E402
@@ -74,8 +74,6 @@ def main() -> int:
     depths = frames(chunk, args.frames, depth=True)
     count = min(len(colors), len(depths))
     alignment = info.depth_alignment
-    if alignment is not None and info.flip_h:
-        alignment = mirrored_alignment(alignment, depths[0].shape[1])
 
     preset = json.loads(PRESET.read_text(encoding='utf-8'))['render']
     window = mh.context()

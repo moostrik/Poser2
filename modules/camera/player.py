@@ -1,8 +1,8 @@
 """Plays a folder of camera recordings: every camera's chunks in step, frames of one round handed
 over together, between in and out markers on the timeline, and the panel's playback readouts. It
 feeds a source (the oak `Simulator` or the replay backend), which stamps the frames at hand-over. A
-chunk is one `.mkv` with colour, depth and metadata (`chunk`), or a colour-only clip; a folder plays
-with the streams it has, whatever `video_frame_types` asks for.
+chunk is one `.mkv` with color, depth when it was recorded, and metadata (`chunk`), or a color-only
+clip of before; a folder plays with the streams it has, whatever `video_frame_types` asks for.
 
 The markers belong to the recording: each folder keeps its own in a file, so they survive a restart
 and a change of preset. Dragging one pauses playback and shows the frame under it, the newest one
@@ -22,8 +22,8 @@ from time import perf_counter, sleep
 from modules.settings import BaseSettings, Field, Widget
 from modules.video import CoderType, CoderFormat, hwaccel, StreamFrameCallback, StreamReader
 
-from .chunk import ChunkInfo, ChunkMetadata, read_metadata
-from .frame import FrameReadings, FrameType
+from .chunk import ChunkInfo, ChunkMetadata, FrameMetadata, read_metadata
+from .frame import FrameType
 from .recorder import make_chunk_name, make_file_name
 
 import logging
@@ -61,10 +61,10 @@ class PlayerSettings(BaseSettings):
     max_chunks:         Field[int]              = Field(0, access=Field.READ, description="Total chunks")
 
 
-# A clip frame as the player decodes it: (cam_id, frame_type, image, readings). The source it feeds
-# makes the `CameraFrame`, since the arrival time is its hand-over, not the decode. `readings` is
-# None for a recording without metadata.
-ClipFrameCallback: TypeAlias = Callable[[int, FrameType, ndarray, FrameReadings | None], None]
+# A clip frame as the player decodes it: (cam_id, frame_type, image, metadata), the metadata the
+# chunk keeps of the frame. The source it feeds makes the `CameraFrame`, since the arrival time is
+# its hand-over, not the decode. The metadata is None for a recording without it.
+ClipFrameCallback: TypeAlias = Callable[[int, FrameType, ndarray, FrameMetadata | None], None]
 # Playback (re)starting at the in marker: the first play of a folder and every loop, not a scrub.
 LoopCallback: TypeAlias = Callable[[], None]
 
@@ -294,9 +294,11 @@ class Player(Thread):
         for c in range(self.num_cams):
             chunk_path: Path = folder.path / make_chunk_name(c, self.load_chunk)
             if chunk_path.is_file():
-                self.chunk_metadata[(c, self.load_chunk)] = read_metadata(chunk_path)
+                metadata: ChunkMetadata = read_metadata(chunk_path, c)
+                self.chunk_metadata[(c, self.load_chunk)] = metadata
+                with_depth: bool = metadata.info is None or metadata.info.depth
                 for stream, t in enumerate((FrameType.VIDEO, FrameType.DEPTH)):
-                    if t in self.types:
+                    if t in self.types and (t == FrameType.VIDEO or with_depth):
                         self._load_stream(c, t, chunk_path, stream, lo, hi)
                 continue
             for t in self.types:
@@ -450,13 +452,13 @@ class Player(Thread):
         self._calcuate_drift(cam_id, frame_id)
 
         metadata: ChunkMetadata | None = self.chunk_metadata.get((cam_id, chunk_id))
-        readings: FrameReadings | None = None
-        if metadata is not None and frame_id < len(metadata.readings):
-            readings = metadata.readings[frame_id]
+        frame_metadata: FrameMetadata | None = None
+        if metadata is not None and frame_id < len(metadata.frames):
+            frame_metadata = metadata.frames[frame_id]
         for ft in self.types:       # VIDEO first: its readings set up what the depth of the frame uses
             if ft in sync_frames:
                 for callback in self.frame_callbacks:
-                    callback(cam_id, ft, sync_frames[ft], readings)
+                    callback(cam_id, ft, sync_frames[ft], frame_metadata)
 
     def _clear_frame_sync(self) -> None:
         with self.sync_lock:

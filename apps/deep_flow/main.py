@@ -93,6 +93,7 @@ class DeepFlowMain:
         for camera in self.cameras:
             if self.recorder:
                 camera.add_frame_callback(self.recorder.submit_frame)
+                camera.add_tracklet_callback(self.recorder.submit_tracklets)
             camera.add_frame_callback(self.uploader.submit_frame)
             camera.add_tracklet_callback(self.uploader.submit_tracklets)
         self.uploader.add_tracklet_callback(self.tracker.submit_cam_tracklets)
