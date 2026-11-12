@@ -44,17 +44,20 @@ class LogRingBuffer(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
         try:
             short_name = record.name.rsplit('.', 1)[-1]
-            entry = LogEntry(
+            self.add(LogEntry(
                 timestamp=self.format_time(record),
                 level=record.levelname,
                 source=short_name,
                 message=self.format_message(record),
-            )
-            with self._lock:
-                self._entries.append(entry)
-                self._counter += 1
+            ))
         except Exception:
             self.handleError(record)
+
+    def add(self, entry: LogEntry) -> None:
+        """Append an entry made elsewhere: the panel process holds the app's entries this way."""
+        with self._lock:
+            self._entries.append(entry)
+            self._counter += 1
 
     @property
     def cursor(self) -> int:

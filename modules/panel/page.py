@@ -22,7 +22,7 @@ from modules.settings import BaseSettings, Field, Access, Widget
 from .controls import ActionButton, Control, PinnedReadout, access_css_class, build_control, build_entry, generate_label
 from .log_drawer import LOG_DRAWER_DEFAULT_HEIGHT, build_log_drawer
 from .poll import POLL_INTERVAL, tick
-from .preset_controls import preset_controls
+from .preset_controls import PresetStore, preset_controls
 from .state import PanelState
 
 logger = logging.getLogger(__name__)
@@ -195,7 +195,7 @@ def _js(value: str) -> str:
     return json.dumps(value).replace("</", "<\\/")
 
 
-def header(root: BaseSettings, *, title: str, port: int, on_exit: Callable[[], None] | None,
+def header(presets_store: PresetStore, *, title: str, port: int, on_exit: Callable[[], None] | None,
            toggle_log: list[Callable[[], None]]) -> None:
     """The title, the log and connection buttons, the preset controls and the exit button, in one row.
 
@@ -235,7 +235,7 @@ def header(root: BaseSettings, *, title: str, port: int, on_exit: Callable[[], N
         connection.on("click", add_ip_links)
 
         with ui.row().classes("flex-1 items-center gap-1 flex-nowrap justify-center"):
-            preset_controls(root)
+            preset_controls(presets_store)
 
         if on_exit:
             async def do_exit() -> None:
@@ -378,18 +378,19 @@ class TabBar:
 # -- the page ----------------------------------------------------------------------------
 
 def build_page(root: BaseSettings, state: PanelState, *, title: str, port: int,
-               on_exit: Callable[[], None] | None, log_buffer: LogRingBuffer | None) -> int:
+               on_exit: Callable[[], None] | None, log_buffer: LogRingBuffer | None,
+               presets_store: PresetStore) -> int:
     """Build the panel page for one client inside the current NiceGUI page context.
 
     Returns the number of polled controls. *on_exit* is called by the exit button; *log_buffer*
-    feeds the log drawer."""
+    feeds the log drawer; *presets_store* loads and saves the presets."""
     controls: list[Control] = []    # the polled controls of this client
     head(title)
     entries = tab_entries(root)
     toggle_log: list[Callable[[], None]] = []
 
     with ui.column().classes("w-full sticky top-0 z-50 bg-[#121212] text-white gap-2 px-3 pt-3 pb-2"):
-        header(root, title=title, port=port, on_exit=on_exit, toggle_log=toggle_log)
+        header(presets_store, title=title, port=port, on_exit=on_exit, toggle_log=toggle_log)
         pinned_bar(root, controls)
         if entries:
             tab_bar = TabBar([name for name, _ in entries], state)

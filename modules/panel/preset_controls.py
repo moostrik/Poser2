@@ -3,15 +3,25 @@
 from __future__ import annotations
 
 import logging
+from typing import Protocol
 
 from nicegui import ui
 
-from modules.settings import BaseSettings, presets
+from modules.settings import presets
 
 logger = logging.getLogger(__name__)
 
 
-def preset_controls(root: BaseSettings) -> None:
+class PresetStore(Protocol):
+    """Where a preset is loaded into and saved from: the app's settings tree, in the app's process.
+    The files themselves (the list, the startup star, a delete) are the panel's."""
+
+    def load(self, name: str) -> bool: ...
+
+    def save(self, name: str) -> bool: ...
+
+
+def preset_controls(store: PresetStore) -> None:
     """The star that marks the startup preset, the dropdown that loads a preset when picked, and
     the reload, save, save-as and delete buttons, in the caller's row."""
     names = presets.scan()
@@ -48,22 +58,24 @@ def preset_controls(root: BaseSettings) -> None:
         show_star(name)
         if not name:
             return
-        path = presets.path(name)
-        if path.exists():
-            presets.load(root, path)
-            ui.notify(f"Loaded '{name}'", type="positive")
+        if presets.path(name).exists():
+            notify_load(name)
 
     dropdown.on_value_change(on_preset_change)
+
+    def notify_load(name: str) -> None:
+        if store.load(name):
+            ui.notify(f"Loaded '{name}'", type="positive")
+        else:
+            ui.notify(f"Preset '{name}' could not be loaded", type="negative")
 
     def load() -> None:
         name = dropdown.value
         if not name:
             ui.notify("Select a preset first", type="warning")
             return
-        path = presets.path(name)
-        if path.exists():
-            presets.load(root, path)
-            ui.notify(f"Loaded '{name}'", type="positive")
+        if presets.path(name).exists():
+            notify_load(name)
         else:
             ui.notify(f"Preset '{name}' not found", type="negative")
 
@@ -72,8 +84,10 @@ def preset_controls(root: BaseSettings) -> None:
         if not name:
             ui.notify("Select a preset to overwrite, or use Save As", type="warning")
             return
-        presets.save(root, presets.path(name))
-        ui.notify(f"Saved '{name}'", type="positive")
+        if store.save(name):
+            ui.notify(f"Saved '{name}'", type="positive")
+        else:
+            ui.notify(f"Preset '{name}' could not be saved", type="negative")
 
     def save_as() -> None:
         with ui.dialog() as dialog, ui.card().classes("min-w-[300px]"):
@@ -93,7 +107,9 @@ def preset_controls(root: BaseSettings) -> None:
                     except ValueError:
                         ui.notify("Invalid preset name — no slashes or leading dots", type="negative")
                         return
-                    presets.save(root, presets.path(name))
+                    if not store.save(name):
+                        ui.notify(f"Preset '{name}' could not be saved", type="negative")
+                        return
                     refresh_dropdown()
                     dropdown.set_value(name)
                     ui.notify(f"Saved '{name}'", type="positive")

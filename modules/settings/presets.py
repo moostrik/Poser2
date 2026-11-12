@@ -22,6 +22,16 @@ def set_app(app_name: str | None, default_startup: str = "studio") -> None:
     _default_startup = default_startup
 
 
+def current_app() -> str | None:
+    """The active app name, as `set_app` was given it."""
+    return _current_app
+
+
+def default_startup() -> str:
+    """The preset loaded at startup while no .ui_preset.json names one, as `set_app` was given it."""
+    return _default_startup
+
+
 def app_dir(app_name: str | None = None) -> Path:
     """Return the data directory for the given (or current) app."""
     name = app_name if app_name is not None else _current_app
