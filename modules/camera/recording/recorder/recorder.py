@@ -26,11 +26,11 @@ from typing import TextIO
 from modules.settings import BaseSettings, Field, Widget
 from modules.video import CoderType, CoderFormat, DEPTH_ENCODER, encoder_name, StreamWriter
 
-from .chunk import DEPTH_SUFFIX, METADATA_LABEL, METADATA_SUFFIX, ChunkInfo, FrameMetadata, finish_unmerged, frame_line, info_line, \
+from ..container.chunk import DEPTH_SUFFIX, METADATA_LABEL, METADATA_SUFFIX, ChunkInfo, FrameMetadata, finish_unmerged, frame_line, info_line, \
     make_chunk_name, make_file_name, make_folder_name, merge_chunk
-from .frame import FrameType, CameraFrame
+from ...frame import FrameType, CameraFrame
 from .recording_sync import FramePoses, RecordedCapture, RecordingSync
-from .tracklet import CameraTracklets
+from ...tracklet import CameraTracklets
 
 import logging
 logger = logging.getLogger(__name__)

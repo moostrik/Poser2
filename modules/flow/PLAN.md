@@ -15,7 +15,7 @@ inferred, **(site fact)** what the operator saw.
 | 4   | [The other apps on deep_flow's input](#4-the-other-apps-on-deep_flows-input) | planned                                                    | [INPUT_THREADS.md](INPUT_THREADS.md)                         |
 | 5   | [The 2D flow follows the 3D](#5-the-2d-flow-follows-the-3d)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
 | 6   | [A camera without depth](#6-a-camera-without-depth)                       | not started                                                   | [FLOW.md](FLOW.md), [VIEW.md](VIEW.md)                       |
-| 7   | [Recording and -sim](#7-recording-and--sim)                               | built; checks open                                            | [RECORDING.md](../camera/RECORDING.md), [INPUT_THREADS.md](INPUT_THREADS.md) |
+| 7   | [Recording and -sim](#7-recording-and--sim)                               | built; checks open                                            | [RECORDING.md](../camera/recording/RECORDING.md), [INPUT_THREADS.md](INPUT_THREADS.md) |
 
 The 3D fluid's lines are weighed by [its goal](FLUID_3D.md#the-goal): sharp, translucent ink patterns, layers
 distinct.
@@ -218,7 +218,7 @@ Each 2D stage gets its document as it is rebuilt (`BRIDGE_2D.md`, `FLUID_2D.md`)
 - deep_flow live: the cadence with the camera and a player in view; the view's outputs on the monitors; the
   depth's edges on the measure recording (z's step inside the body, z's noise at the edge and inside); the dye
   at drag 0.
-- The recorded tracklets' checks: [RECORDING.md's Open](../camera/RECORDING.md#open).
+- The recorded tracklets' checks: [RECORDING.md's Open](../camera/recording/RECORDING.md#open).
 
 ## The motion's details
 

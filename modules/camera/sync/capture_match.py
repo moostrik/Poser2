@@ -9,7 +9,7 @@ from collections import deque
 from threading import Lock
 from typing import Iterator
 
-from .frame import CAPTURE_TOLERANCE
+from ..frame import CAPTURE_TOLERANCE
 
 logger = logging.getLogger(__name__)
 

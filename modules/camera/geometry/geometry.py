@@ -12,7 +12,7 @@ import numpy as np
 
 from modules.utils import Rect
 
-from .frame import DepthAlignment
+from ..frame import DepthAlignment
 
 import logging
 logger = logging.getLogger(__name__)

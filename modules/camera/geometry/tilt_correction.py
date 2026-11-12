@@ -6,7 +6,7 @@ import math
 import numpy as np
 
 from .geometry import tilt_homography
-from .settings import TiltCorrectionSettings
+from ..settings import TiltCorrectionSettings
 
 # How far (°) the tilt must move before the frames are straightened anew: the reading is noisy,
 # and a picture that followed it would shimmer.

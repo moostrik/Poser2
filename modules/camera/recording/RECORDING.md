@@ -6,14 +6,14 @@ the design and its reasons; how each part works is in its module's docstring:
 
 | Part                         | Module                                                          |
 |------------------------------|-----------------------------------------------------------------|
-| what a chunk holds           | `chunk.py`                                                      |
-| a capture's parts together   | `recording_sync.py`, `capture_match.py`                         |
-| writing                      | `recorder.py`, `modules/video/stream_writer.py`                 |
-| playing                      | `player.py` and [its parts](#the-players-parts)                 |
-| the camera of a recording    | `replay/camera.py`, `replay/tracker.py`                         |
+| what a chunk holds           | `container/chunk.py`                                            |
+| a capture's parts together   | `recorder/recording_sync.py`, `../sync/capture_match.py`        |
+| writing                      | `recorder/recorder.py`, `modules/video/stream_writer.py`        |
+| playing                      | `player/player.py` and [its parts](#the-players-parts)          |
+| the camera of a recording    | `../replay/camera.py`, `../replay/tracker.py`                   |
 | the poses of a recording     | `modules/inference/recorded_poses.py`                           |
 
-The threads a frame goes through after it are deep_flow's ([INPUT_THREADS.md](../flow/INPUT_THREADS.md)).
+The threads a frame goes through after it are deep_flow's ([INPUT_THREADS.md](../../flow/INPUT_THREADS.md)).
 
 **(deduction)** marks what is inferred from the code, **(site fact)** what was told; the rest is in the code.
 
@@ -133,13 +133,13 @@ loaded and the last played, and its lines are parsed as the frames are read, so 
 
 ### The player's parts
 
-| File                  | Class                         | Holds                                                           |
-|-----------------------|-------------------------------|-----------------------------------------------------------------|
-| `player.py`           | `Player`                      | the thread, its states and messages, the settings, the readouts |
-| `play_clock.py`       | `PlayClock`                   | the recorded time of a play                                     |
-| `recording_folder.py` | `RecordingFolder`, `Timeline` | the folders, a folder's chunks and markers, places on them      |
-| `chunk_readers.py`    | `ChunkReaders`                | one chunk's readers of every camera, its metadata and its clock |
-| `frame_hand_over.py`  | `FrameHandOver`               | each camera's frames handed over in order, the drift            |
+| File                            | Class                         | Holds                                                           |
+|---------------------------------|-------------------------------|-----------------------------------------------------------------|
+| `player/player.py`              | `Player`                      | the thread, its states and messages, the settings, the readouts |
+| `player/play_clock.py`          | `PlayClock`                   | the recorded time of a play                                     |
+| `player/chunk_readers.py`       | `ChunkReaders`                | one chunk's readers of every camera, its metadata and its clock |
+| `player/frame_hand_over.py`     | `FrameHandOver`               | each camera's frames handed over in order, the drift            |
+| `container/recording_folder.py` | `RecordingFolder`, `Timeline` | the folders, a folder's chunks and markers, places on them      |
 
 ## The replay camera
 
@@ -171,6 +171,32 @@ A recording without poses plays boxes without points while it is on, as one with
 the detector off. The pose recorder of `modules/pose` (`Recorder`, HDF5 per stage) is another thing: it records a
 stage's features for the show to play, on the wall clock, apart from the video.
 
+## The camera module's layout
+
+`modules/camera` is split by role, as capture libraries are (RealSense, ffmpeg, GStreamer): the data types, the
+devices, the calibration, the matching by time, the file's format, the recorder and the player.
+
+| Folder                 | Role                         | Holds                                                               |
+|------------------------|------------------------------|---------------------------------------------------------------------|
+| the root               | the contract                 | `source`, `frame`, `tracklet`, `settings`, `camera_check`, `depthai_backend` |
+| `oak`, `oak4`, `replay`, `vimba`, `webcam` | the devices | a backend each                                                    |
+| `geometry`             | the calibration              | the lens, the warp, the tilt (`geometry`, `tilt_correction`)        |
+| `sync`                 | matching by capture time     | `capture_match` (shared with `modules/inference`'s `CaptureSync`), `frame_trigger` |
+| `recording/container`  | the file's format            | `chunk`, `recording_folder`                                         |
+| `recording/recorder`   | writing                      | `recorder`, `recording_sync`                                        |
+| `recording/player`     | playing                      | `player`, `play_clock`, `chunk_readers`, `frame_hand_over`          |
+
+`modules/camera/__init__.py` is the one public boundary and exports every folder's names; each folder has its tests
+beside it, and `recording/tests` holds the tests through the real encoders (`test_round_trip`, `test_rig`) and what
+the recording tests share (`recordings.py`).
+
+- The devices sit at the root, not under a `backends` folder: `CLAUDE.md` names `modules/camera/oak/` and
+  `modules/camera/oak4/`.
+- Recording sits inside `modules/camera`, not in a module of its own: the replay camera and the oak simulator use
+  the player, so the two modules would import each other.
+- `FrameTrigger` matches nothing and hands no frames on: it fires one callback per round of the cameras' frames,
+  when the round's last camera delivers, for hd_trio's and white_space's tracker and poses.
+
 ## Measured
 
 | What                                                    | Value                        | On                                              |
@@ -201,7 +227,7 @@ the live host's own delay too (the callback waits for Python's lock, up to 5 ms 
 
 - A new recording with a player in view: its counts on the panel, its tracklets and latencies in the metadata.
 - -sim on it with the recorded tracklets against live on the same scene, by `scripts/cadence_probe.py`, and against
-  -sim with the detector. Whether the live 99.4% of [INPUT_THREADS.md](../flow/INPUT_THREADS.md#the-cadence) had a
+  -sim with the detector. Whether the live 99.4% of [INPUT_THREADS.md](../../flow/INPUT_THREADS.md#the-cadence) had a
   player in view is not known, likely yes **(site fact)**, so the live number is taken anew.
 - The pose points and boxes over the image, live and in a replay, to see the tracklets straightened with their own
   frame and the board's poses as live's.
@@ -212,7 +238,7 @@ the live host's own delay too (the callback waits for Python's lock, up to 5 ms 
 
 1. The oak backend (depthai 2) stamps a frame's arrival, not its capture, so hd_trio and white_space record and
    replay with USB's jitter in their times. Its capture time as oak4's `capture_time` makes it, with the apps'
-   move ([PLAN.md's line 4](../flow/PLAN.md#4-the-other-apps-on-deep_flows-input)).
+   move ([PLAN.md's line 4](../../flow/PLAN.md#4-the-other-apps-on-deep_flows-input)).
 2. hd_trio and white_space wire the camera's tracklets to their tracker directly, not through the uploader, and do
    not say `Recorder.expect_poses`: they pose in rounds, and say it per camera and image when they move.
 
@@ -241,69 +267,3 @@ In order:
   camera sends them. To fix: the recorder is told at its start which parts each camera sends.
 - Two recordings started in one second get one folder name. To fix: the name takes a counter when the folder
   exists.
-
-### 5. The module's structure
-
-`modules/camera` holds 19 files at its root. The structure to build splits it by role, as capture libraries do
-(RealSense, ffmpeg, GStreamer): the data types, the devices, the calibration, the matching by time, the file's
-format, the recorder and the player. The root keeps six files, and each folder has one job.
-
-```
-modules/camera/
-    __init__.py              the public boundary; exports the names it exports now
-    source.py                the contract: CameraSource and its callbacks
-    frame.py                 CameraFrame, FrameType, FrameReadings, DepthAlignment
-    tracklet.py              CameraTracklet, CameraTracklets
-    settings.py              CameraSettings and the readings
-    camera_check.py          CameraCheck
-    depthai_backend.py       oak_backend
-    oak/  oak4/  replay/  vimba/  webcam/        the devices
-    geometry/                the lens, the warp, the tilt
-        geometry.py
-        tilt_correction.py
-        tests/
-    sync/                    matching by capture time
-        capture_match.py     CaptureStream, MissedParts: shared with modules/inference's CaptureSync
-        frame_trigger.py     FrameTrigger, FrameTriggerSettings
-        tests/
-    recording/
-        RECORDING.md
-        container/           the file's format
-            chunk.py         ChunkInfo, FrameMetadata, the file names, merge and read
-            recording_folder.py   RecordingFolder, Timeline, the markers
-            tests/
-        recorder/
-            recorder.py      Recorder
-            recording_sync.py     RecordingSync
-            tests/
-        player/
-            player.py        Player
-            play_clock.py    PlayClock
-            chunk_readers.py ChunkReaders
-            frame_hand_over.py    FrameHandOver
-            tests/
-    tests/                   the contract's
-```
-
-| Step | What                                                                                                          |
-|------|---------------------------------------------------------------------------------------------------------------|
-| 1    | `FramePairing` becomes `FrameHandOver` (`frame_hand_over.py`): it hands a camera's frames over in order       |
-| 2    | `Sync` becomes `FrameTrigger` (`frame_trigger.py`, `FrameTriggerSettings`, `add_trigger_callback`)            |
-| 3    | the chunks' file names move from `recorder.py` to `chunk.py`, so the player does not import the recorder      |
-| 4    | the files move into `geometry`, `sync` and `recording`; each folder's `__init__.py` exports its own names     |
-| 5    | `tests/test_recording.py` splits by subject into the folders' `tests`; the other tests move with their files  |
-
-- `Sync` matches nothing and hands no frames on: it fires one callback per round of the cameras' frames, when the
-  round's last camera delivers, for hd_trio's and white_space's tracker and poses. That is a trigger. The apps'
-  settings groups `frame_sync` and `tracklet_sync` become `frame_trigger` and `tracklet_trigger`, in their presets
-  too.
-- `modules/camera/__init__.py` exports the same names from the folders, so outside the renames no app and no other
-  module changes.
-- `test_recording.py` (44 KB) splits into `container/tests/test_chunk`, `recorder/tests/test_recording_sync` and
-  `test_recorder`, `player/tests/test_play_clock`, `test_frame_hand_over` and `test_timeline`, and
-  `recording/tests/test_round_trip` (one camera through the encoders) and `test_rig` (several).
-- The devices stay at the root, not under a `backends` folder: `CLAUDE.md` names `modules/camera/oak/` and
-  `modules/camera/oak4/`.
-- Recording stays inside `modules/camera`, not a module of its own: the replay camera and the oak simulator use the
-  player, so the two modules would import each other.
-- `CLAUDE.md`'s test line gains the new test folders, on the user's word.

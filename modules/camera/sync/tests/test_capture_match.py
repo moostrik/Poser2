@@ -55,9 +55,9 @@ class MissedPartsTest(unittest.TestCase):
     def test_counting_logs_nothing_the_owner_warns(self) -> None:
         missed = MissedParts('test')
         missed.started()
-        with self.assertNoLogs('modules.camera.capture_match', 'WARNING'):
+        with self.assertNoLogs('modules.camera.sync.capture_match', 'WARNING'):
             missed.count(0, 'depth')
-        with self.assertLogs('modules.camera.capture_match', 'WARNING') as logs:
+        with self.assertLogs('modules.camera.sync.capture_match', 'WARNING') as logs:
             missed.warn()
             missed.count(0, 'depth')
             missed.warn()           # within the second: not again
@@ -66,7 +66,7 @@ class MissedPartsTest(unittest.TestCase):
     def test_nothing_new_nothing_said(self) -> None:
         missed = MissedParts('test')
         missed.started()
-        with self.assertNoLogs('modules.camera.capture_match', 'WARNING'):
+        with self.assertNoLogs('modules.camera.sync.capture_match', 'WARNING'):
             missed.warn()
 
 

@@ -6,8 +6,8 @@ from typing import Any, Callable
 
 from modules.settings import BaseSettings, Field
 
-from .frame import CameraFrame, FrameType
-from .tracklet import CameraTracklets
+from ..frame import CameraFrame, FrameType
+from ..tracklet import CameraTracklets
 
 import logging
 logger = logging.getLogger(__name__)

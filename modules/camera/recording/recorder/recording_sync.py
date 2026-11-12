@@ -18,10 +18,10 @@ from dataclasses import dataclass, field
 from threading import Lock
 from typing import Callable, TypeAlias
 
-from .capture_match import CaptureStream, MissedParts
-from .chunk import PoseArrays
-from .frame import CAPTURE_TOLERANCE, CameraFrame, FrameType
-from .tracklet import CameraTracklets
+from ...sync.capture_match import CaptureStream, MissedParts
+from ..container.chunk import PoseArrays
+from ...frame import CAPTURE_TOLERANCE, CameraFrame, FrameType
+from ...tracklet import CameraTracklets
 
 KEPT: int = 16      # frames of each part kept, and captures waiting, per camera: 320 ms at 50 fps, three times the slowest pose
 

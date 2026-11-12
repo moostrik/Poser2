@@ -1,6 +1,6 @@
 """The OAK board's IMU frame: how a gravity vector gets into the camera's frame, and the quarter
 turn the board mounts it at (`IMU_BOARD_ROLL`). The angles themselves are the contract's
-(`modules/camera/tests/test_orientation.py`)."""
+(`modules/camera/geometry/tests/test_orientation.py`)."""
 
 import math
 import unittest

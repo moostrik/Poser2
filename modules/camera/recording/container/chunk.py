@@ -25,8 +25,8 @@ import numpy as np
 from modules.utils import Rect
 from modules.video import popen
 
-from .frame import DepthAlignment, FrameReadings, FrameType
-from .tracklet import CameraTracklet, TrackingStatus
+from ...frame import DepthAlignment, FrameReadings, FrameType
+from ...tracklet import CameraTracklet, TrackingStatus
 
 logger = logging.getLogger(__name__)
 

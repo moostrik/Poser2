@@ -22,11 +22,11 @@ from time import perf_counter, sleep
 from modules.settings import BaseSettings, Field, Widget
 from modules.video import CoderType, CoderFormat, hwaccel
 
-from .chunk import ChunkInfo
+from ..container.chunk import ChunkInfo
 from .chunk_readers import ChunkReaders, Decoding
-from .frame import FrameType
+from ...frame import FrameType
 from .frame_hand_over import ClipFrameCallback, FrameHandOver
-from .recording_folder import RecordingFolder, Timeline, locate
+from ..container.recording_folder import RecordingFolder, Timeline, locate
 
 import logging
 logger = logging.getLogger(__name__)

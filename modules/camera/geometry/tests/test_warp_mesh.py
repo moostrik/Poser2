@@ -1,6 +1,6 @@
 """Tests for the warp mesh and the lens-geometry helpers it rests on.
 
-These cover `modules/camera/geometry.py` only, which has no OpenCV dependency and opens
+These cover `modules/camera/geometry/geometry.py` only, which has no OpenCV dependency and opens
 no device, so the whole warp model is testable without hardware. The forward model of the real
 lens (`equidistant_pixel`) is written independently here, in the plain form of the maths, so a
 mistake in the module cannot pass by agreeing with itself.
@@ -496,9 +496,9 @@ class FrameSizeTest(unittest.TestCase):
         self.assertEqual(frame_size(False, CameraResolution.P800, square=True, height=1136), (800, 800))
 
     def test_frame_height_is_aligned_to_the_warp(self) -> None:
-        from modules.camera.geometry import _warned_heights
+        from modules.camera.geometry.geometry import _warned_heights
         _warned_heights.discard(1130)
-        with self.assertLogs('modules.camera.geometry', level='WARNING') as captured:
+        with self.assertLogs('modules.camera.geometry.geometry', level='WARNING') as captured:
             self.assertEqual(aligned_height(1130), 1136)
         self.assertIn('1130', captured.output[0])
         self.assertEqual(aligned_height(1136), 1136)
@@ -527,9 +527,9 @@ class ResolutionTest(unittest.TestCase):
             self.assertEqual(resolve_resolution(color=True, resolution=label), label)
 
     def test_mono_falls_back_from_a_colour_only_label(self) -> None:
-        from modules.camera.geometry import _warned_resolutions
+        from modules.camera.geometry.geometry import _warned_resolutions
         _warned_resolutions.discard((False, CameraResolution.P1080))
-        with self.assertLogs('modules.camera.geometry', level='WARNING') as captured:
+        with self.assertLogs('modules.camera.geometry.geometry', level='WARNING') as captured:
             resolved = resolve_resolution(color=False, resolution=CameraResolution.P1080)
         self.assertEqual(resolved, CameraResolution.P800)
         self.assertIn('P1080', captured.output[0])
@@ -537,9 +537,9 @@ class ResolutionTest(unittest.TestCase):
 
     def test_the_fallback_warns_once_not_once_a_frame(self) -> None:
         """`frame_size` is called per frame by the simulator's size check."""
-        from modules.camera.geometry import _warned_resolutions
+        from modules.camera.geometry.geometry import _warned_resolutions
         _warned_resolutions.discard((False, CameraResolution.P1080))
-        with self.assertLogs('modules.camera.geometry', level='WARNING') as captured:
+        with self.assertLogs('modules.camera.geometry.geometry', level='WARNING') as captured:
             for _ in range(50):
                 frame_size(False, CameraResolution.P1080)
         self.assertEqual(len(captured.output), 1)

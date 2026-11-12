@@ -14,9 +14,9 @@ from typing import Callable, TypeAlias
 
 from numpy import ndarray
 
-from .chunk import ChunkInfo, FrameMetadata
+from ..container.chunk import ChunkInfo, FrameMetadata
 from .chunk_readers import ChunkReaders
-from .frame import FrameType
+from ...frame import FrameType
 
 logger = logging.getLogger(__name__)
 

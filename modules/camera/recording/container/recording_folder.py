@@ -12,7 +12,7 @@ from pathlib import Path
 from modules.video import CoderFormat, StreamReader
 
 from .chunk import make_chunk_name, make_file_name
-from .frame import FrameType
+from ...frame import FrameType
 
 logger = logging.getLogger(__name__)
 
