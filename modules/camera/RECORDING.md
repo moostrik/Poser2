@@ -55,11 +55,20 @@ says for every image whether the pose model was asked poses for it (`Recorder.ex
 `PosesFromTracklets.process` returns). A capture waits to know, and for the poses asked for, settled by the order
 as the tracklets are; a frame nobody asked poses for does not wait.
 
-What a capture went without is counted on the panel (`missed_depth`, `missed_color`, `missed_tracklets`,
-`missed_poses`: asked for, a batch the model dropped) and warned
-of, at most once a second (`MissedParts`); what came before a recording's first capture, a few frames at every
-start, is counted apart and not warned of. The live `CaptureSync` (`modules/inference`) shares the matching and the
-counting and puts latency first instead: its newest capture wins and a late part is left out.
+A waiting capture keeps its parts as they come, so newer ones cannot push them out of their stream. What a capture
+went without is counted on the panel (`missed_depth`, `missed_color`, `missed_tracklets`, `missed_poses`: asked
+for, a batch the model dropped) and warned of by the recorder's thread, at most once a second (`MissedParts`
+counts where the parts come, on a camera's thread under the sync's lock, and its owner logs); what came before a
+recording's first capture, a few frames at every start, is counted apart and not warned of. The live `CaptureSync`
+(`modules/inference`) shares the matching and the counting and puts latency first instead: its newest capture wins
+and a late part is left out.
+
+The recorder sits behind the live path: deep_flow hands a camera's frames and tracklets to the uploader first. Its
+queue and each writer's hold at most 150 frames (3 s at 50 fps, over an encoder's start-up); beyond that the oldest
+is dropped and counted (`dropped`). An encoder that dies (an error, a full disk) ends its writer, which drops what it
+holds and says so, and the recording ends; a recording that cannot start says why once and is given up. The queue
+is emptied at every start, so nothing of one recording reaches the next, and what a crash left is merged on a
+thread of its own beside the new recording.
 
 A recording is a folder named after its start time (and the panel's `name`), split into chunks by the session. Each
 chunk ends as one `<cam>_<chunk>.mkv`, with depth or color only, merged by stream copy when the chunk ends
@@ -97,13 +106,23 @@ before this layout play wrong: their `flip_h` meant "mirrored before storing", a
 ## Playback
 
 `Player` plays a recording folder between the panel's in and out markers, every camera's chunks in step, on one
-clock, the recorded time (`PlayClock`): at the start of a chunk's play it sets an origin, and every reader of every
-camera hands frame `n`, its color and depth together, at the origin plus its recorded capture time minus the first
-frame's plus its `video_latency`, so a frame comes as late after its capture as it came live and a frame lost live
-leaves its gap. The frame is stamped with its capture on that clock. Each stream has its own `StreamReader`, on
-its own thread, which takes its moments from the clock (`FrameSchedule`), never earlier than the frame before; a
-reader that falls behind by more than a frame moves the origin for all of them, so the cameras and the streams stay
-together. A clip without metadata plays at `fps`.
+clock, the recorded time (`PlayClock`): at the start of a play it sets an origin, and every reader of every camera
+hands frame `n`, its color and depth together, at the origin plus its recorded capture time minus the first frame's
+plus its `video_latency`, so a frame comes as late after its capture as it came live and a frame lost live leaves
+its gap. The frame is stamped with its capture on that clock, its streams with one stamp. The chunk after the one
+playing carries the clock on (`carry_on`), so the recorded time runs on across chunks; a loop, a seek or another
+folder starts it anew, and the player says so (`add_jump_callback`): the replay camera and `RecordedPoses` drop what
+waits for the frames before. Each stream has its own `StreamReader`, on its own thread, which takes its moments from
+the clock (`FrameSchedule`), never earlier than the frame before; a reader that falls behind by more than a frame
+moves the origin for all of them, as far as its frame is still behind, so one stall moves it once. A frame's streams
+go out under one lock in frame order, and a frame older than one gone out is dropped, counted with the frames left
+without their other stream and logged by the player's thread, which also writes the panel's readouts. A stop ends a
+reader's decoder, so a decoder that stalled cannot hold the player. A clip without metadata plays at `fps`.
+
+deep_flow's player decodes color to NV12 (`Player(nv12=True)`), as the camera hands it: half the bytes of BGR
+through the pipe, and live's upload path. A chunk's metadata is read once per chunk and kept for the chunk playing
+and the one loaded; its lines are parsed as the frames are read (`FrameLines`: 8.3 ms for 597 lines with poses at
+once, a minute's chunk about 40 ms), so no load holds the interpreter for it.
 
 The recorded latencies hold the live host's own delay (the callback waits for Python's lock, up to 5 ms under a
 busy render), and -sim adds its own, so a frame arrives a little later after its stamp in -sim than live
@@ -189,122 +208,24 @@ first run waited for the poses up to a timed 150 ms, which the order of the stre
 
 Waiting for the camera: the board's poses over the image in a replay against live.
 
-### 3. The recorder's faults
+### 3. The split of `Player`
 
-From a reading of `recorder.py`, `recording_sync.py`, `capture_match.py` and `modules/video/stream_writer.py`; none
-is reproduced **(deduction)**. The layers are sound: the camera's thread only matches and queues, the encoding and
-the files are the recorder's and the writers' threads'. To fix as one change, in this order:
-
-Bugs:
-
-1. A dead encoder hangs the recorder: when ffmpeg dies (an encoder error, a full disk) the writer's thread dies on
-   the broken pipe, its queue never empties, and `StreamWriter.stop` waits for it for ever; the recorder's thread
-   hangs, and the app at quitting, while the frames keep queuing at 1.2 MB each. The writer is to notice its
-   process ending, say so, drop what is queued and let `stop` return; the recorder ends the recording.
-2. No queue is bounded: with a slow encoder the recorder's queue and the writers' grow, uncounted. A bound per
-   queue, the oldest dropped beyond it, counted on the panel and warned of, as every other stage's drops.
-3. A start that fails is tried again every 10 ms: the state stays START, the exception is logged each time and the
-   panel says recording. One failure ends the start, says why, and clears `recording`.
-4. A frame can pass into the next recording: the camera's thread can be in a submit while the recorder ends, so a
-   capture reaches the queue after the last write and waits there. The queue is emptied at the start.
-5. In a stall, tracklets that came can be recorded as missed: a capture's parts are looked up when it goes out, and
-   when it waits `KEPT` frames for its poses, newer tracklets push its own out of the stream. A part is kept with
-   its waiting capture when it comes.
-
-Latency:
-
-6. The warnings of `MissedParts` are logged where the count is made: on the camera's thread, under the sync's
-   locks, which the tracklets', the poses' and the uploader's threads share; a console write can take milliseconds.
-   The count only counts, and the recorder's thread (and the capture sync's) logs.
-7. The recorder's callbacks run before the uploader's on every frame and tracklet message (their order in
-   deep_flow's `main.py`). The uploader first, so the live path is never behind the recorder.
-
-Small:
-
-8. `StreamWriter.start` followed at once by `stop` leaves the writer running: `is_recording` is set by the thread,
-   not by `start`. `start` sets it before it starts the thread.
-9. Each frame is copied twice before the pipe (`astype(np.uint8).tobytes()` on a uint8 frame). The frame's own
-   buffer is written, converted only when it is not uint8 and contiguous.
-10. A start first merges what a crash left (`finish_unmerged`), on the recorder's thread, so the first frames of
-    the new recording are lost for as long as that takes. It is merged on a thread of its own, joined at the stop
-    with the chunks' merges.
-11. "VideoRecorder stopped" is logged twice at quitting, and the arrow in the start's log line cannot be written
-    on a Windows console, which fails that line on every start. The thread's last stop runs only while a
-    recording is open, and the line says "to" for the arrow.
-
-Tests: a writer whose process dies (stop returns, the recorder ends the recording); a full queue dropping and
-counting; a start that raises; a capture queued after a stop not in the next recording; a waiting capture keeping
-its tracklets past `KEPT` newer ones; `MissedParts` not logging in `count`.
-
-### 4. The playback's faults
-
-From a reading of `player.py`, `modules/video/stream_reader.py`, `replay/camera.py` and
-`modules/inference/recorded_poses.py`; none is reproduced **(deduction)**. The layers are sound and the hand-over
-is cheap. To fix in this order, the split last, on the fixed code:
-
-Bugs:
-
-1. A hung decoder hangs the app at quitting: a reader blocks in its read from ffmpeg and sees its stop only
-   between frames, so a decoder that stalls (the iGPU's does on some frame widths) leaves a reader that never
-   ends, and the player's thread waits for it. `StreamReader.stop` ends the process itself, which ends the read.
-2. Frames can be handed over out of order, and a depth can take the next frame's stamp: a pair goes out on the
-   reader's thread that completed it, without a lock, so the next pair can start on the other thread while this
-   one is in its callbacks, and the replay camera's stamp of "the video being handed over" is shared. The player
-   hands the pairs over under one lock, in frame order, and passes each pair's stamp with both its frames, so the
-   replay camera keeps none.
-3. A stall can move the clock twice: the color's and the depth's reader each move the shared origin by their own
-   lateness, and both can read it before either has moved it. `PlayClock.delay` takes the moment the reader was
-   due and moves the origin only as far as that moment is still behind.
-4. A chunk can keep another folder's metadata: the cache is by camera and chunk number. It is by folder too, and
-   emptied when the folder changes.
-
-Latency and fidelity:
-
-5. A hitch at every chunk's start: each chunk gets a new clock, set when the player's 10 ms poll finds the chunk
-   before it ended, and the first frame is due one latency later, about 45 ms where the recording has 20 ms
-   between the two frames. The next chunk's clock carries the origin on (its base the playing chunk's), and its
-   readers start before the playing ones end, so the recorded times run on. A loop and a seek set a new origin,
-   as now.
-6. A chunk's metadata is parsed while the chunk before it plays: up to 3000 JSON lines with tracklets and poses,
-   in Python, which holds the interpreter for 50 to 100 ms **(deduction)**; it is read again through ffmpeg on
-   every loop and scrub step, and kept for every chunk played. It is read once per chunk and kept for the chunk
-   playing and the one loaded only; the line's arrays are made when a frame is handed over, not at the load, so
-   the load only splits the lines. Measured first: the parse's time on a 60 s chunk.
-7. -sim uploads another frame than live: the reader decodes to BGR (2.4 MB a frame through the pipe), live hands
-   NV12 (1.2 MB) and converts on the GPU. The reader decodes color to NV12 and the replay camera hands it as
-   `nv12`, so the pipe halves and -sim takes live's upload path.
-8. The panel's readout is written from the reader's thread, four times a second, its settings callbacks with it.
-   The reader's thread notes the frame number, and the player's thread writes the readout.
-
-Small:
-
-9. A 100 ms sleep in the player's thread after every start holds its state machine up. It goes with the clock
-   carried on (5), which is what keeps the chunks together.
-10. A log line per dropped pairing entry, on the reader's thread. Counted, and the count logged by the player's
-    thread.
-11. A gap over 1 s in the recorded time is taken for a jump and drops the waiting tracklets and poses. The player
-    says when it jumps (a loop, a seek, a scrub: the loop callback made a jump callback), and the replay camera
-    and `RecordedPoses` drop on that, not on the gap.
-
-The split of `Player` (800 lines: the state machine, the folders, the markers' file, the panel's readouts, the
-pairing of color and depth, the drift, the clock), each part a class in its own file of `modules/camera`, the
-player composing them:
+`Player` holds, in some 850 lines, the state machine, the folders, the markers' file, the panel's readouts, the
+pairing of color and depth, the drift and the chunks' readers and metadata. Each part a class in its own file of
+`modules/camera`, the player composing them:
 
 | Class             | Holds                                                                                   |
 |-------------------|-----------------------------------------------------------------------------------------|
 | `Player`          | the thread and its state machine: load, play, seek, scrub, stop; the callbacks          |
-| `PlayClock`       | the recorded time of a play (as now), carried from chunk to chunk                       |
+| `PlayClock`       | the recorded time of a play, carried from chunk to chunk (as now, out of `player.py`)   |
 | `ChunkReaders`    | one chunk's readers and its metadata: load, start, stop, whether they finished          |
 | `FramePairing`    | a frame's color and depth by frame number, handed over in order under one lock, the drift |
 | `RecordingFolder` | the folders found, a folder's chunks and frame counts, its in and out markers and file  |
 
-Tests: a reader whose decoder stalls stopping; pairs handed over in order from two threads, each with its own
-stamp; two readers late at once moving the clock once; a folder change dropping the metadata; two chunks played
-with their frames at the recorded times across the boundary; NV12 frames through the replay camera and the
-uploader; a jump said by the player dropping what waits; the split classes' own (the pairing, the folder's
-markers and frame positions, which `test_in_out.py` holds now).
+Tests: the split classes' own (the pairing, the folder's markers and frame positions, which `test_in_out.py` holds
+now), and the player's as they are.
 
-### 5. The poses the pose model drops
+### 4. The poses the pose model drops
 
 In -sim, with the recorded tracklets and the pose model on, about one frame in six with a player gets no poses (107
 of 596 on `hands`): the pose model's TensorRT runner keeps one batch in flight and one waiting
