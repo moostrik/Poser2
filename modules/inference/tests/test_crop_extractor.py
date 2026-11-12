@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 from modules.camera import CameraFrame, FrameType
-from modules.inference import CropExtractor, Uploader, crop
+from modules.inference import CropExtractor, Uploader, UploaderSettings, crop
 from modules.pose import BBox, Frame, FrameDict
 from modules.utils import Rect
 
@@ -14,7 +14,7 @@ from modules.utils import Rect
 @unittest.skipUnless(torch.cuda.is_available(), 'needs CUDA')
 class CropStampTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.uploader = Uploader()
+        self.uploader = Uploader(UploaderSettings())
         self.settings = crop.Settings()
         self.settings.initialize()
         self.extractor = CropExtractor(self.settings)

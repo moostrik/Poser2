@@ -11,6 +11,7 @@ import torch
 import torch.nn.functional as F
 
 from modules.camera import CameraFrame, DepthAlignment, FrameType, aligned_depth_size, depth_projection
+from modules.settings import BaseSettings, Field
 from modules.utils import PerformanceTimer
 from .depth_align import DepthAligner
 from .source import GpuDepth, GpuDepthCallback, GpuImage, GpuImageCallback, ImageDict, TimestampDict
@@ -52,6 +53,11 @@ def warp_grid(homography: torch.Tensor, height: int, width: int) -> torch.Tensor
     return uv.unsqueeze(0)
 
 
+class UploaderSettings(BaseSettings):
+    """How the uploader does its GPU work."""
+    depth_kernels: Field[bool] = Field(True, description="Align the depth with CUDA kernels compiled at runtime; off, with torch ops as a CUDA graph")
+
+
 class Uploader(Thread):
     """Takes the camera's frames on the camera's thread (`submit_frame`) and does all the rest on its own: the color
     goes to the GPU through a pinned staging buffer, is converted, straightened and flipped there, and is handed on
@@ -69,8 +75,9 @@ class Uploader(Thread):
     Output: float16 RGB CHW [0, 1] tensors keyed by cam_id
     """
 
-    def __init__(self) -> None:
+    def __init__(self, settings: UploaderSettings) -> None:
         super().__init__(daemon=True, name='Uploader')
+        self.settings: UploaderSettings = settings
         self._gpu_images: dict[int, torch.Tensor] = {}
         self._prev_gpu_images: dict[int, torch.Tensor] = {}
         self._timestamps: TimestampDict = {}
@@ -211,7 +218,8 @@ class Uploader(Thread):
         staging: torch.Tensor = self._staging_buffer((cam_id, FrameType.DEPTH), image)
         staging.copy_(torch.from_numpy(image))
         with torch.cuda.stream(self._stream):
-            depth: torch.Tensor = aligner.align_staged(staging, to_ray, to_uv, frame.homography, frame.flip_h, aligned_size)
+            depth: torch.Tensor = aligner.align_staged(staging, to_ray, to_uv, frame.homography, frame.flip_h, aligned_size,
+                                                       kernels=self.settings.depth_kernels)
             ready: torch.cuda.Event = torch.cuda.Event()
             ready.record(self._stream)
         _, events, index = self._staging[(cam_id, FrameType.DEPTH)]

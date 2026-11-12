@@ -16,7 +16,8 @@ class DepthAlignerTest(unittest.TestCase):
         self.to_ray, self.to_uv = depth_projection(None, self.size)      # depth already on the color's view
 
     def align(self, depth: np.ndarray, flip_h: bool = False, homography: np.ndarray | None = None) -> np.ndarray:
-        return self.aligner.align(torch.from_numpy(depth.astype(np.float32)), self.to_ray, self.to_uv, homography, flip_h, self.size).numpy()
+        """The aligned depth to a tenth of a millimetre: the paths round the float's last bits each their own way."""
+        return np.round(self.aligner.align(torch.from_numpy(depth.astype(np.float32)), self.to_ray, self.to_uv, homography, flip_h, self.size).numpy(), 4)
 
     def test_millimetres_become_metres_and_none_stays_none(self) -> None:
         metres = depth_metres(torch.tensor([[0, 1500]], dtype=torch.int32))
@@ -60,23 +61,27 @@ class DepthAlignerTest(unittest.TestCase):
 
 
 @unittest.skipUnless(torch.cuda.is_available(), 'needs CUDA')
-class AlignStagedTest(unittest.TestCase):
-    def test_the_graph_gives_what_align_gives_frame_after_frame_and_after_a_new_homography(self) -> None:
-        aligner = DepthAligner()
-        size = (8, 6)
-        to_ray, to_uv = depth_projection(None, size)
-        rng = np.random.default_rng(1)
-        homographies = [None, None, np.diag([1.0, 1.0, 1.25])]
-        results = []
-        for homography in homographies:
-            frame = rng.integers(0, 3000, (6, 8)).astype(np.uint16)
-            staged = torch.from_numpy(frame).pin_memory()
-            got = aligner.align_staged(staged, to_ray, to_uv, homography, False, size)
-            want = aligner.align(depth_metres(torch.from_numpy(frame).cuda()), to_ray, to_uv, homography, False, size)
-            torch.cuda.synchronize()
-            results.append(got)
-            np.testing.assert_allclose(got.cpu().numpy(), want.cpu().numpy(), rtol=1e-6)
-        self.assertIsNot(results[0], results[1])                    # each frame a tensor of its own
+class AlignStagedTest(DepthAlignerTest):
+    """The same cases through the CUDA kernels, from uint16 millimetres in a pinned buffer."""
+    kernels: bool = True
+
+    def align(self, depth: np.ndarray, flip_h: bool = False, homography: np.ndarray | None = None) -> np.ndarray:
+        staged = torch.from_numpy(np.round(depth * 1000.0).astype(np.uint16)).pin_memory()
+        aligned = self.aligner.align_staged(staged, self.to_ray, self.to_uv, homography, flip_h, self.size, kernels=self.kernels)
+        torch.cuda.synchronize()
+        return np.round(aligned.cpu().numpy(), 4)
+
+    def test_each_frame_is_a_tensor_of_its_own_and_the_cells_start_empty(self) -> None:
+        first = self.align(np.full((6, 8), 2.0))
+        second = self.align(np.zeros((6, 8)))
+        self.assertEqual(float(first[0, 0]), 2.0)
+        self.assertEqual(float(second.max()), 0.0)                  # nothing of the frame before
+
+
+@unittest.skipUnless(torch.cuda.is_available(), 'needs CUDA')
+class AlignStagedGraphTest(AlignStagedTest):
+    """The same cases with the kernels off: `align` as a CUDA graph."""
+    kernels = False
 
 
 if __name__ == '__main__':

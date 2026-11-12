@@ -88,43 +88,54 @@ def main() -> int:
     tilt_settings.enabled = True
     print(f'{args.recording}: depth {depth_size}, aligned {size}, {len(frames)} frames, flip_h {info.flip_h}')
     worst = 0
-    for label, extra in (('level', None), ('recorded tilt', 0.0), ('tilt + 15 deg', 15.0)):
-        differing, rounding, largest, landed = 0, 0.0, 0.0, 0
-        for i, frame in enumerate(frames):
-            homography: np.ndarray | None = None
-            if extra is not None:
-                tilt = metadata.readings[i].tilt if i < len(metadata.readings) else 0.0
-                correction = TiltCorrection(tilt_settings)
-                correction.update(tilt + extra, intrinsics, (info.width, info.height))
-                homography = correction.homography
-            metres = frame.astype(np.float32) / 1000.0
-            want = gl_align(shader, source, nearest, aligned, metres, to_ray, to_uv, homography)
-            got = aligner.align(depth_metres(torch.from_numpy(frame.astype(np.int32)).cuda()), to_ray, to_uv, homography, False, size).cpu().numpy()
-            diff = np.abs(got - want)
-            border = diff > 0.001                   # a neighbour's depth, not a rounding
-            differing += int(border.sum())
-            both = (want > 0.0) & (got > 0.0) & ~border
-            if both.any():
-                rounding = max(rounding, float((diff[both] / want[both]).max()))
-            largest = max(largest, float(diff.max()))
-            landed += int((want > 0.0).sum())
-        print(f'{label:14}: {differing} of {landed} pixels with depth differ by over 1 mm over {len(frames)} frames '
-              f'(largest {largest:.4f} m); the rest within {rounding:.1e} of the depth')
-        worst = max(worst, differing)
 
-    # GPU time per frame, each alone
+    def ours(path: str, frame: np.ndarray, homography: np.ndarray | None) -> np.ndarray:
+        if path == 'kernels':
+            return aligner.align_staged(torch.from_numpy(frame).pin_memory(), to_ray, to_uv, homography, False, size).cpu().numpy()
+        return aligner.align(depth_metres(torch.from_numpy(frame.astype(np.int32)).cuda()), to_ray, to_uv, homography, False, size).cpu().numpy()
+
+    for path in ('torch', 'kernels'):
+        for label, extra in (('level', None), ('recorded tilt', 0.0), ('tilt + 15 deg', 15.0)):
+            differing, rounding, largest, landed = 0, 0.0, 0.0, 0
+            for i, frame in enumerate(frames):
+                homography: np.ndarray | None = None
+                if extra is not None:
+                    tilt = metadata.readings[i].tilt if i < len(metadata.readings) else 0.0
+                    correction = TiltCorrection(tilt_settings)
+                    correction.update(tilt + extra, intrinsics, (info.width, info.height))
+                    homography = correction.homography
+                metres = frame.astype(np.float32) / 1000.0
+                want = gl_align(shader, source, nearest, aligned, metres, to_ray, to_uv, homography)
+                got = ours(path, frame, homography)
+                diff = np.abs(got - want)
+                border = diff > 0.001                   # a neighbour's depth, not a rounding
+                differing += int(border.sum())
+                both = (want > 0.0) & (got > 0.0) & ~border
+                if both.any():
+                    rounding = max(rounding, float((diff[both] / want[both]).max()))
+                largest = max(largest, float(diff.max()))
+                landed += int((want > 0.0).sum())
+            print(f'{path:7} {label:14}: {differing} of {landed} pixels with depth differ by over 1 mm over {len(frames)} frames '
+                  f'(largest {largest:.4f} m); the rest within {rounding:.1e} of the depth')
+            worst = max(worst, differing)
+
+    # GPU time per frame, each alone: torch from metres on the GPU; the kernels from the pinned millimetres, the copy included
     metres_np = frames[0].astype(np.float32) / 1000.0
     tensor = depth_metres(torch.from_numpy(frames[0].astype(np.int32)).cuda())
-    for _ in range(10):
-        aligner.align(tensor, to_ray, to_uv, None, False, size)
-    torch.cuda.synchronize()
-    start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
-    start.record()
-    for _ in range(200):
-        aligner.align(tensor, to_ray, to_uv, None, False, size)
-    end.record()
-    torch.cuda.synchronize()
-    torch_ms = start.elapsed_time(end) / 200
+    staged = torch.from_numpy(frames[0]).pin_memory()
+    timings: dict[str, float] = {}
+    for path, run in (('torch', lambda: aligner.align(tensor, to_ray, to_uv, None, False, size)),
+                      ('kernels', lambda: aligner.align_staged(staged, to_ray, to_uv, None, False, size))):
+        for _ in range(10):
+            run()
+        torch.cuda.synchronize()
+        start, end = torch.cuda.Event(enable_timing=True), torch.cuda.Event(enable_timing=True)
+        start.record()
+        for _ in range(200):
+            run()
+        end.record()
+        torch.cuda.synchronize()
+        timings[path] = start.elapsed_time(end) / 200
     for _ in range(10):
         gl_align(shader, source, nearest, aligned, metres_np, to_ray, to_uv, None)
     t0 = time.perf_counter()
@@ -132,7 +143,7 @@ def main() -> int:
         shader.use(source, nearest, aligned, to_ray, to_uv, None, False)
     glFinish()
     gl_ms = (time.perf_counter() - t0) * 1000.0 / 200
-    print(f'per frame: torch {torch_ms:.3f} ms (GPU), GL {gl_ms:.3f} ms (wall, the shader alone)')
+    print(f"per frame: torch {timings['torch']:.3f} ms, kernels {timings['kernels']:.3f} ms (GPU, with the copy), GL {gl_ms:.3f} ms (wall, the shader alone)")
     return 1 if worst > 5 * args.frames else 0      # more than a few border pixels a frame is a real difference
 
 

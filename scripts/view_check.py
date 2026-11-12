@@ -27,7 +27,7 @@ import monitor_harness as mh  # noqa: E402
 from modules.camera import CameraFrame, FrameType, mirrored_alignment, read_metadata  # noqa: E402
 from modules.flow import DepthVelocitySettings, edge_aware_depth  # noqa: E402
 from modules.gl import Tensor, Texture  # noqa: E402
-from modules.inference import GpuDepth, GpuImage, Uploader  # noqa: E402
+from modules.inference import GpuDepth, GpuImage, Uploader, UploaderSettings  # noqa: E402
 from modules.render.layers import ViewInput, ViewLayer, ViewLayerSettings  # noqa: E402
 from modules.video import StreamReader  # noqa: E402
 
@@ -89,7 +89,7 @@ def main() -> int:
     view = ViewLayer(settings, depth_settings, json.loads(PRESET.read_text(encoding='utf-8'))['camera']['fov'])
     view.allocate(preset['motion']['width'], preset['motion']['height'])
 
-    uploader = Uploader()
+    uploader = Uploader(UploaderSettings())
     images: list[GpuImage] = []
     gpu_depths: list[GpuDepth] = []
     uploader.add_gpu_image_callback(images.append)

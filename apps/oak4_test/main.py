@@ -15,7 +15,7 @@ from modules.panel import PanelServer
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
 from modules.pose import configure_features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import Uploader
+from modules.inference import Uploader, UploaderSettings
 
 from .render_board import RenderBoard
 from .pose.pipeline import pipeline_spec
@@ -55,7 +55,7 @@ class Oak4TestMain:
         # CAMERA — the frames go to the GPU for the window; the tracklets carry the keypoints.
         configure_features(max_players)
         self.camera = Camera(self.settings.camera.cam_0)
-        self.uploader = Uploader()
+        self.uploader = Uploader(UploaderSettings())
         self.frame_sync_bang = Sync(self.settings.camera.frame_sync, False, 'frame_sync')
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
         self.tracklet_sync_bang = Sync(self.settings.camera.tracklet_sync, False, 'tracklet_sync')

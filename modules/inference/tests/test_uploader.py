@@ -12,7 +12,7 @@ import torch
 import torch.nn.functional as F
 
 from modules.camera import CameraFrame, FrameType
-from modules.inference import GpuDepth, GpuImage, Uploader
+from modules.inference import GpuDepth, GpuImage, Uploader, UploaderSettings
 from modules.inference.uploader import QUEUED, nv12_to_rgb, warp_grid
 
 
@@ -71,7 +71,7 @@ def _depth(timestamp: float, cam_id: int = 0) -> CameraFrame:
 @unittest.skipUnless(torch.cuda.is_available(), 'needs CUDA')
 class HandOffTest(unittest.TestCase):
     def setUp(self) -> None:
-        self.uploader = Uploader()
+        self.uploader = Uploader(UploaderSettings())
         self.handed: list[tuple[str, float, str]] = []      # kind, time, the thread it came on
         self.uploader.add_gpu_image_callback(
             lambda image: self.handed.append(('image', image.timestamp, threading.current_thread().name)))

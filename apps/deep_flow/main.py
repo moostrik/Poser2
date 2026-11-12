@@ -77,7 +77,7 @@ class DeepFlowMain:
             for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
-        self.uploader = Uploader()                                       # the camera's hand-off: the frames onto the GPU, on its own thread
+        self.uploader = Uploader(self.settings.camera.uploader)          # the camera's hand-off: the frames onto the GPU, on its own thread
         self.pose_inference = PoseInference(p.image_crop, p.pose, self.uploader)    # the crop and the pose model, the frame domain's async step
         self.capture_sync = CaptureSync(p.capture_sync)                  # the color, depth and poses of one moment, for the render
         self.capture_rate: FPS = FPS(120)                                # the captures it hands on, for the panel's cadence
