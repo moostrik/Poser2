@@ -4,7 +4,7 @@ A frame goes from the camera to the screen through several threads. Each thread 
 on; a hand-off returns at once, so no thread waits for another's work, and a frame is dropped only where a
 stage cannot keep up, counted, never because a part of it is late. Nothing but the camera runs on a camera's
 thread, and no thread waits for the GPU while the GPU has room. deep_flow runs this way; the other apps follow
-in [Open](#open).
+in the [Plan](#plan).
 
 "Code" is what the files show; **(deduction)** marks what is inferred from them, **(site fact)** what the
 operator saw.
@@ -172,45 +172,39 @@ the crops cut without `synchronize` (`test_crop_extractor`), the alignment's two
 (`test_depth_align`), the view's geometry and the depth's read (`test_view_window`), the board's captures
 (`test_captures`); in GL, by the scripts above and `scripts/capture_max_check.py`.
 
-## Open
+## Plan
 
-### 1. The other apps
+### 1. white_space and hd_trio on deep_flow's input
 
 white_space (four mono OAK-D cameras at 23 fps, the panoramic tracker, the light) and hd_trio (three color OAK-D
 cameras, P720 square at 23 fps, RVM's masks, the 2D flow) still run their pose step on the camera's thread
-through the frame bang; on this branch they stop at start with a message saying why, and run on `main`. Both run in `.venv` (depthai 2, the `oak` backend);
-neither camera delivers depth. The refactor moves them to deep_flow's input, by the same rules:
-
-- the camera's thread only hands over: to the uploader and the recorder;
-- the uploader makes the corrected camera frame on its own thread and hands it on; nothing there waits for the GPU;
-- the pose step runs off the camera's thread, its crops cut at the pose model's size and not waited for;
-- every frame a stage measures over time is measured once, in order, and a frame is dropped only where a stage
-  cannot keep up, counted and shown on the panel;
-- the render takes GPU images in without waiting, and a stage runs once per frame, not once per tick.
+through the frame bang; on this branch they stop at start with a message saying why, and run on `main`. Both run
+in `.venv` (depthai 2, the `oak` backend); neither camera delivers depth. They move to deep_flow's input: the
+camera's thread only hands over, the uploader makes the corrected camera frame on its own thread, the pose step
+runs off the camera's thread with its crops cut at the pose model's size and not waited for, and every drop is
+counted and shown on the panel. hd_trio's 2D flow and its center layers stay as they are; the 2D flow follows
+the 3D's principles once the 3D is finished.
 
 #### Shared parts (`modules/`)
 
-1. `Sync` takes the uploaded images (`submit_image(GpuImage)`, on the uploader's thread) as well as the camera's
-   frames: a round is one uploaded image per camera, so the bang fires on the uploader's thread, after every
-   camera's image of the round is on the GPU. The tracklet `Sync` is unchanged.
-2. The uploader hands a frame as it came to CPU readers on its own thread (`add_frame_callback`), for a reader that
-   needs the CPU image (white_space's light calibration); the camera's thread keeps only the hand-off.
-3. `CropExtractor` cuts each pose's region at every size asked for, one region per pose and one antialiased resize
+1. The frame `Sync` takes the uploaded images (`submit_image(GpuImage)`) instead of the camera's frames: a round
+   is one uploaded image per camera, and its bang fires on the uploader's thread once every camera's image of the
+   round is on the GPU. The tracklet `Sync` stays on the tracklets' thread.
+2. `CropExtractor` cuts each pose's region at every size asked for, one region per pose and one antialiased resize
    per size: the pose model's input size for RTMPose, and a larger one for RVM (hd_trio's 768 × 1024).
-4. `CaptureMax` moves from the 3D bridge to the flow's shared parts, and the 2D bridge takes `BridgeInput.same_tick`
-   with it: its density is an amount (red) and its temperature ± (red), both kept by their size.
-5. The probe (`scripts/cadence_probe.py`) takes the app as an argument, with each app's measures: the camera's
-   thread per frame, the rounds per second, the pose step's rate per camera, the frames the motion measures
-   (hd_trio), the render's tick, the drops.
+3. The probe (`scripts/cadence_probe.py`) takes the app as an argument, with each app's measures: the camera's
+   thread per frame, the rounds per second, the pose step's rate per camera, the render's tick, the drops.
 
 #### white_space
 
 1. Each camera hands its frames to the uploader (`Uploader(settings)`) and the video recorder only.
-2. The uploader's images go to the -sim detector, the board (`set_camera_image`, the previews), and the frame
+2. The uploader's images go to the -sim detector, the board (`set_camera_image`, the previews) and the frame
    `Sync`, whose bang runs `PosesFromTracklets.process` and `PoseInference.submit` on every camera's newest image
    (`PoseInference(crop, pose, uploader)`, its crops already at the model's size); the crops go to the board.
-3. The light's calibration layer (`test_calibration.py`) reads the CPU frame from the uploader's frame callback
-   instead of the camera's (`_store_video_frame`).
+3. The light's calibration layer (`test_calibration.py`) reads the uploaded image instead of the CPU frame the
+   camera's thread puts on the board (`_store_video_frame`, the board's video images, which go): it reduces its
+   band of rows to one row on the GPU, queues that row's copy into pinned memory with an event, and uses on a later
+   tick the newest row whose event has passed, so nothing waits.
 4. The device simulator (`Simulator`, the recordings played through an OAK) hands over the same way as the camera.
 5. Measured live with four cameras and in -sim against `main`: the camera's thread per frame (deep_flow's went from
    5.9 to 0.02 ms at the mean), the rounds per second against the cameras' rate, the pose rate per camera, the
@@ -220,56 +214,45 @@ neither camera delivers depth. The refactor moves them to deep_flow's input, by 
 
 1. The cameras, the uploader and the frame `Sync` as white_space's (1, 2, 4 above).
 2. The crops: the pose model's at its input size (an antialiased cut where today it gets 768 × 1024 shrunk 4× by
-   plain bilinear, an aliased input), RVM's at 768 × 1024 from the same region (shared part 3).
-3. Every RVM result is measured. A result (`segmentation.Predictor`'s callback) carries the poses, the masks and
-   the foregrounds of one moment, cut from one uploaded image, so it is hd_trio's capture: complete when RVM hands
-   it on, with nothing to wait for. The board keeps the results until the render takes them, at most a few, the
-   oldest beyond that dropped and counted, as deep_flow's captures. The render runs each result, in order, through
-   the center layers (placed by the result's own poses), the 2D motion on the centered mask and the 2D bridge
-   stepping over the time since the result before; the fluids run every tick, each taking every camera's bridge,
-   and two results of one camera in one tick give the larger amount per pixel (shared part 4).
-4. The center layers' temporal blends (the mask's, the camera image's, the foreground's) then run once per result
-   instead of once per tick: with their factors as they are, a blend takes the render's rate over the cameras' as
-   long (about 2.6× at 60 ticks/s and 23 fps), so the factors are set again, on the look.
-5. Measured in -sim and live against `main`: the RVM results the motion measures, the render's tick, the latency
-   from the camera's stamp to the result on the board, the camera's thread.
+   plain bilinear, an aliased input), RVM's at 768 × 1024 from the same region (shared part 2). RVM and the board
+   take their crops and masks as they do now.
+3. Measured in -sim and live against `main`: the camera's thread, the rounds per second, the pose rate per camera,
+   the render's tick.
 
 #### Decisions
 
-- hd_trio's capture is RVM's result, not `CaptureSync`'s image and depth: its flow reads only what RVM makes
-  (the mask the motion measures, the foreground the bridge colors with), and the poses those were cut for.
 - RVM's crop comes from `CropExtractor` at its own size, not from RVM resizing the pose model's crop: a 192 × 256
   crop enlarged to RVM's input would lose the mask's detail.
-- hd_trio keeps its center layers, following the pose, fed per result. A view stage for the 2D flow beside
-  deep_flow's (`ViewLayer`), placed by the pose and masked by RVM, is the next step after this, not part of it.
 - One uploader thread for all of an app's cameras, which at 23 fps take 69 to 92 frames a second together against
   deep_flow's 50: the probe's uploader times say whether it keeps up, and one uploader per camera follows only if
   not.
 
 #### Order and done
 
-white_space first (the uploader's API, the rounds across cameras, no flow), then hd_trio (RVM's results, the 2D
-flow per result). Each is done when it starts on this branch without the start-up error, its camera threads only
-hand over (under 1 ms per frame at p95), every round runs the pose step and (hd_trio) every RVM result is measured,
-the render's tick and the latency are no worse than on `main` by runs back to back, and its tests pass.
+white_space first (the uploader's API, the rounds across cameras), then hd_trio (the crops' two sizes). Each is
+done when it starts on this branch without the start-up error, its camera threads only hand over (under 1 ms per
+frame at p95), every round runs the pose step, the render's tick and the latency are no worse than on `main` by
+runs back to back, and its tests pass.
 
-### 2. deep_flow live
+## Open
+
+### 1. deep_flow live
 
 The cadence with the camera and a player in view; the view's outputs on the monitors against the center layers'
 on the same recording; the depth's edges by the resolution probe on stillslowfast (z's step inside the body, z's
 noise at the edge and inside); the dye at drag 0.
 
-### 3. The color in one kernel
+### 2. The color in one kernel
 
 The color's conversion, straightening and mirroring as one CUDA kernel: from the camera's NV12 23 GPU ops become
 2, about 0.4 ms less GPU a frame **(deduction)**. After the live run, which measures it on the camera.
 
-### 4. The previous crop
+### 3. The previous crop
 
 The optical flow on the crops (`enable_prev_crop`, off in deep_flow, so it runs nothing) does not wait for the
 crops' event, and its pairing of the current and the previous image is to be checked when it is used.
 
-### 5. No captures
+### 4. No captures
 
 While no capture comes (the camera stalls, -sim is paused) the bridge keeps its last output and the fluid keeps
 taking it, where the motion holds its last velocity. What the flow should do then is not decided.
