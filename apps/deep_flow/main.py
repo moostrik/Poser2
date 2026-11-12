@@ -45,6 +45,12 @@ class DeepFlowMain:
         self.settings.camera.sim_enabled = simulation
         if not interface:
             self.settings.panel.browser = False  # launcher override; the preset cannot turn it back on
+        # The crop is the pose model's input, so it is cut at that size: one antialiased resample
+        # from the camera frame, rather than a larger crop the runner scales down again. Derived
+        # from the model so a change of pose resolution cannot silently reintroduce the second one.
+        crop_settings = self.settings.pose.image_crop
+        crop_settings.output_width = self.settings.pose.pose.width
+        crop_settings.output_height = self.settings.pose.pose.height
         self.settings.initialize()
         self.panel_server = PanelServer(self.settings, self.settings.panel, on_exit=self.stop)
 

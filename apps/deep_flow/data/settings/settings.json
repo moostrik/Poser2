@@ -137,8 +137,8 @@
     },
     "image_crop": {
       "padding": 0.1,
-      "output_width": 768,
-      "output_height": 1024,
+      "output_width": 192,
+      "output_height": 256,
       "enable_prev_crop": false
     },
     "capture_sync": {
