@@ -13,6 +13,7 @@ from .geometry import       CameraResolution, RESOLUTION_SIZES, MONO_RESOLUTIONS
                             mirrored_alignment, aligned_depth_size
 from .tilt_correction import TiltCorrection, TILT_STEP
 from .sync import           Sync, SyncSettings
+from .capture_match import  CaptureStream, MissedParts
 from .chunk import          ChunkInfo, ChunkMetadata, merge_chunk, read_metadata, finish_unmerged
 from .recorder import       Recorder, RecorderSettings, make_file_name, make_chunk_name, make_folder_name
 from .player import         Player, PlayerSettings, ClipFrameCallback, LoopCallback
