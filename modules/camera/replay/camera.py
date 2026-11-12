@@ -18,7 +18,7 @@ import numpy as np
 
 from modules.utils import FPS, Rect
 
-from .. import CameraFrame, CameraTracklet, CameraFrameCallback, ChunkInfo, DepthAlignment, FrameReadings, FrameType, Player, RigCameraReadings, \
+from .. import CameraFrame, CameraTracklet, CameraTracklets, CameraFrameCallback, ChunkInfo, DepthAlignment, FrameReadings, FrameType, Player, RigCameraReadings, \
     RigCameraSettings, TiltCorrection, TiltCorrectionSettings, TrackletCallback, mirrored_alignment, mirrored_intrinsics
 from .tracker import Track
 
@@ -156,5 +156,6 @@ class Camera:
             CameraTracklet(cam_id=self.id, id=t.id, status=t.status, roi=t.roi, age=t.age, timestamp=timestamp)
             for t in self.tracker.update(detection.boxes)]
         self.settings.readings.tracklets = len(tracklets)
+        message = CameraTracklets(cam_id=self.id, timestamp=timestamp, tracklets=tracklets, arrival=time.perf_counter())
         for c in self.tracklet_callbacks:
-            c(self.id, tracklets, timestamp)
+            c(message)

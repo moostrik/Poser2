@@ -5,7 +5,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 
 # Local application imports
-from modules.camera import CameraTracklet
+from modules.camera import CameraTracklets
 
 # Forward declaration to avoid circular import
 if TYPE_CHECKING:
@@ -27,7 +27,7 @@ class BaseTracker(ABC):
     def update(self, timestamp: float) -> None: ...
 
     @abstractmethod
-    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[CameraTracklet], timestamp: float) -> None: ...
+    def submit_cam_tracklets(self, cam_tracklets: CameraTracklets) -> None: ...
 
     @abstractmethod
     def add_tracklet_callback(self, callback: TrackletDictCallback) -> None: ...

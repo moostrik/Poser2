@@ -61,7 +61,7 @@ class ReplayCameraTest(unittest.TestCase):
         self.frames = []
         self.messages = []
         self.camera.add_frame_callback(self.frames.append)
-        self.camera.add_tracklet_callback(lambda cam_id, tracklets, t: self.messages.append((cam_id, tracklets, t)))
+        self.camera.add_tracklet_callback(self.messages.append)
         self.camera.start()
 
     def test_a_clip_frame_of_this_camera_is_stamped_and_handed_over(self) -> None:
@@ -86,8 +86,9 @@ class ReplayCameraTest(unittest.TestCase):
         self.detector.report(1, [Rect(0.1, 0.2, 0.3, 0.4), Rect(0.5, 0.5, 0.2, 0.3)], 12.5)
         self.detector.report(0, [Rect(0.1, 0.2, 0.3, 0.4)])         # not this camera
         self.assertEqual(len(self.messages), 1)
-        cam_id, tracklets, t = self.messages[0]
-        self.assertEqual(cam_id, 1)
+        message = self.messages[0]
+        tracklets, t = message.tracklets, message.timestamp
+        self.assertEqual(message.cam_id, 1)
         self.assertEqual([tr.id for tr in tracklets], [0, 1])
         self.assertEqual(tracklets[0].roi, Rect(0.1, 0.2, 0.3, 0.4))
         self.assertEqual(tracklets[0].cam_id, 1)
@@ -98,7 +99,7 @@ class ReplayCameraTest(unittest.TestCase):
     def test_nobody_is_a_message_too(self) -> None:
         self.detector.report(1, [])
         self.assertEqual(len(self.messages), 1)
-        self.assertEqual(self.messages[0][1], [])
+        self.assertEqual(self.messages[0].tracklets, [])
 
     def test_stopped_it_emits_nothing(self) -> None:
         self.camera.stop()

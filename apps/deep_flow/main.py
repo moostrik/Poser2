@@ -7,7 +7,7 @@ recordings on the host with the replay backend, with no camera attached.
 import time
 from functools import partial
 
-from modules.camera import CameraSource, CameraCheck, CameraTracklet, Player, Recorder, replay
+from modules.camera import CameraSource, CameraCheck, CameraTracklets, Player, Recorder, replay
 from modules.camera.oak4 import Camera, ModelChain
 from modules.session import Session
 from modules.settings import presets
@@ -182,9 +182,9 @@ class DeepFlowMain:
         if last is not None:
             self.board.submit_time_sample(Series.CAMERA_INTERVAL, (image.timestamp - last) * 1000.0, image.timestamp)
 
-    def _on_tracklets(self, cam_id: int, tracklets: list[CameraTracklet], timestamp: float) -> None:
+    def _on_tracklets(self, cam_tracklets: CameraTracklets) -> None:
         """The camera's tracklets have reached the tracker's queue: its update, at their capture time."""
-        self.tracker.update(timestamp)
+        self.tracker.update(cam_tracklets.timestamp)
 
     def _on_capture(self, capture: Capture) -> None:
         self.capture_rate.processed()

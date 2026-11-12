@@ -4,10 +4,10 @@ from typing import Callable, Protocol, TypeAlias
 
 from .frame import CameraFrame
 from .settings import CameraReadings
-from .tracklet import CameraTracklet
+from .tracklet import CameraTracklets
 
 CameraFrameCallback: TypeAlias = Callable[[CameraFrame], None]
-TrackletCallback: TypeAlias = Callable[[int, list[CameraTracklet], float], None]
+TrackletCallback: TypeAlias = Callable[[CameraTracklets], None]
 
 
 class CameraSource(Protocol):
@@ -17,9 +17,9 @@ class CameraSource(Protocol):
     registered before `start()` and run on the backend's own thread in registration order, so
     they must be short and thread-safe. A frame or tracklet message is stamped once at hand-over
     with the moment of its capture, or its arrival where the backend cannot know that, on
-    `time.perf_counter()` (`CameraFrame.timestamp`, `CameraTracklet.timestamp`). The
-    tracklet callback gets every message with its time, an empty list included: no person is a
-    tick too; a backend without a detector never calls it. `connected` says whether the device is open now: a backend that keeps looking
+    `time.perf_counter()` (`CameraFrame.timestamp`, `CameraTracklets.timestamp`), and, where the
+    two differ, with its arrival (`arrival`). The tracklet callback gets every message
+    (`CameraTracklets`), an empty one included: no person is a tick too; a backend without a detector never calls it. `connected` says whether the device is open now: a backend that keeps looking
     for its device (Vimba) is started without one and connects when it is there.
     """
     id: int

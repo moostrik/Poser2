@@ -16,7 +16,7 @@ from typing import cast
 import depthai as dai
 from numpy import ndarray
 
-from .. import CameraResolution, CameraFrame, RigCameraReadings, CameraTracklet, FrameType, CameraFrameCallback, \
+from .. import CameraResolution, CameraFrame, RigCameraReadings, CameraTracklet, CameraTracklets, FrameType, CameraFrameCallback, \
     TrackletCallback, orientation_from_gravity, mode_size, frame_size, frame_window, frame_coverage, coverage_summary, \
     delivered_height, lens_field, lens_deviation, imu_to_camera, unroll_imu_frame
 from modules.utils import FPS, Rect
@@ -290,8 +290,9 @@ class Camera(Thread):
     def _emit_tracklets(self, tracklets: list[CameraTracklet], timestamp: float) -> None:
         if not self.running:
             return
+        message = CameraTracklets(cam_id=self.id, timestamp=timestamp, tracklets=tracklets)
         for c in self.tracklet_callbacks:
-            c(self.id, tracklets, timestamp)
+            c(message)
 
     # ── CameraSource ───────────────────────────────────────────────────
 

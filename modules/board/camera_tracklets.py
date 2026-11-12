@@ -4,13 +4,13 @@ from threading import Lock
 from typing import Protocol, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from modules.camera import CameraTracklet
+    from modules.camera import CameraTracklet, CameraTracklets
 
 
 class HasCameraTracklets(Protocol):
     """The tracklets each camera reports, as it reports them."""
     def get_camera_tracklets(self, cam_id: int) -> list[CameraTracklet] | None: ...
-    def set_camera_tracklets(self, cam_id: int, tracklets: list[CameraTracklet], timestamp: float) -> None: ...
+    def set_camera_tracklets(self, cam_tracklets: CameraTracklets) -> None: ...
 
 
 class CameraTrackletStoreMixin:
@@ -24,6 +24,6 @@ class CameraTrackletStoreMixin:
         with self._camera_tracklet_lock:
             return self._camera_tracklets.get(cam_id)
 
-    def set_camera_tracklets(self, cam_id: int, tracklets: list[CameraTracklet], timestamp: float) -> None:
+    def set_camera_tracklets(self, cam_tracklets: CameraTracklets) -> None:
         with self._camera_tracklet_lock:
-            self._camera_tracklets[cam_id] = tracklets
+            self._camera_tracklets[cam_tracklets.cam_id] = cam_tracklets.tracklets

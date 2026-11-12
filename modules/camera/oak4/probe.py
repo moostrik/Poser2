@@ -72,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
     tracklets: list[list[CameraTracklet]] = []
     camera = Camera(settings)
     camera.add_frame_callback(lambda frame: (frames if frame.kind == FrameType.VIDEO else depths).append(frame))
-    camera.add_tracklet_callback(lambda cam_id, message, timestamp: tracklets.append(message))
+    camera.add_tracklet_callback(lambda message: tracklets.append(message.tracklets))
     camera.start()
     started: float = time.perf_counter()
     video_latency: list[float] = []

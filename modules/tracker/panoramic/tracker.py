@@ -6,7 +6,7 @@ from queue import Empty, Queue
 from threading import Lock, Thread, Event
 
 # Local application imports
-from modules.camera import CameraTracklet, TrackingStatus
+from modules.camera import CameraTracklets, TrackingStatus
 from modules.utils import PerformanceTimer
 from ..tracker_base import BaseTracker
 from ..tracklet import Tracklet, TrackletDict, TrackletDictCallback, TrackletListCallback
@@ -386,6 +386,6 @@ class Tracker(Thread, BaseTracker):
             if callback not in self._observation_callbacks:
                 self._observation_callbacks.append(callback)
 
-    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[CameraTracklet], timestamp: float) -> None:
-        for t in cam_tracklets:
+    def submit_cam_tracklets(self, cam_tracklets: CameraTracklets) -> None:
+        for t in cam_tracklets.tracklets:
             self._input_queue.put(Tracklet.from_camera(t))

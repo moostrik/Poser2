@@ -35,3 +35,18 @@ class CameraTracklet:
     age: int
     timestamp: float
     keypoints: np.ndarray | None = None
+
+
+@dataclass(frozen=True)
+class CameraTracklets:
+    """A camera's tracklets of one frame, as one message: what a tracklet callback gets.
+
+    `timestamp` is the capture time of the frame the tracker looked at, the same as each
+    tracklet's; `arrival` the moment the backend handed the message over, on the same clock, None
+    where the backend stamps the arrival as the capture. `tracklets` may be empty: no player is a
+    message too.
+    """
+    cam_id: int
+    timestamp: float
+    tracklets: list[CameraTracklet]
+    arrival: float | None = None

@@ -30,7 +30,7 @@ from typing import cast
 import depthai as dai
 from numpy import ndarray
 
-from .. import CameraResolution, CameraFrame, DepthAlignment, FrameReadings, RigCameraReadings, CameraTracklet, FrameType, CameraFrameCallback, \
+from .. import CameraResolution, CameraFrame, DepthAlignment, FrameReadings, RigCameraReadings, CameraTracklet, CameraTracklets, FrameType, CameraFrameCallback, \
     TrackletCallback, orientation_from_gravity, frame_window, frame_coverage, coverage_summary, \
     delivered_height, lens_field, rectilinear_field, lens_deviation, imu_to_camera, unroll_imu_frame, TiltCorrection, corrected_roi, corrected_keypoints
 from modules.utils import FPS, Rect
@@ -331,8 +331,9 @@ class Camera(Thread):
     # ── The queues' callbacks: the hand-over to the contract ───────────
 
     def _video_callback(self, name: str, msg: dai.ImgFrame) -> None:
+        arrival: float = time.perf_counter()
         timestamp: float = capture_time(msg)
-        self._last_frame = time.perf_counter()
+        self._last_frame = arrival
         if self._problem:
             logger.info(f'{self.device_id} delivers frames again')
             self._problem = ''
@@ -352,9 +353,9 @@ class Camera(Thread):
                 self._intrinsics = msg.getTransformation().getIntrinsicMatrix()
                 self.settings.readings.fov_factory = rectilinear_field(self._intrinsics[0][0], self._intrinsics[0][2], self.frame_size[0])
                 logger.info(f'{self.device_id} delivered lens: {self._intrinsics}, field {self.settings.readings.fov_factory:.1f} deg')
-            self._emit_frame(FrameType.VIDEO, packed_nv12(msg), timestamp, nv12=True, readings=self._frame_readings())
+            self._emit_frame(FrameType.VIDEO, packed_nv12(msg), timestamp, arrival, nv12=True, readings=self._frame_readings())
         else:
-            self._emit_frame(FrameType.VIDEO, msg.getCvFrame(), timestamp, readings=self._frame_readings())
+            self._emit_frame(FrameType.VIDEO, msg.getCvFrame(), timestamp, arrival, readings=self._frame_readings())
 
     def _frame_readings(self) -> FrameReadings:
         readings: RigCameraReadings = self.settings.readings
@@ -364,6 +365,7 @@ class Camera(Thread):
         """The hand-over of the depth: uint16 millimetres on the left camera's view, with the capture
         time of the video frame taken with it (the sensors end their exposures together). Until a
         video frame has said where depth lands in it, there is nothing to put it on."""
+        arrival: float = time.perf_counter()
         timestamp: float = capture_time(msg)
         readings: RigCameraReadings = self.settings.readings
         readings.depth_latency = smoothed_latency(readings.depth_latency, msg)
@@ -372,7 +374,7 @@ class Camera(Thread):
         alignment: DepthAlignment | None = self._depth_alignment(msg)
         if alignment is None:
             return
-        self._emit_frame(FrameType.DEPTH, msg.getFrame().copy(), timestamp, alignment=alignment)
+        self._emit_frame(FrameType.DEPTH, msg.getFrame().copy(), timestamp, arrival, alignment=alignment)
 
     def _depth_alignment(self, msg: dai.ImgFrame) -> DepthAlignment | None:
         """Where this camera's depth lands in its video frames, made once from the calibration the
@@ -400,6 +402,7 @@ class Camera(Thread):
         """The hand-over of the device's tracklets: the contract's, with the keypoints the pose model
         found for each, and the capture time of the frame they were found in. In the two-model chain
         the keypoints come with the poses (`_poses_callback`), and the tracklets wait in the join for them."""
+        arrival: float = time.perf_counter()
         timestamp: float = capture_time(msg)
         self.settings.readings.tracker_latency = smoothed_latency(self.settings.readings.tracker_latency, msg)
         self.tracklet_fps.processed()
@@ -411,13 +414,13 @@ class Camera(Thread):
         self.num_tracklets = len(tracklets)
         self.settings.readings.tracklets = self.num_tracklets
         if self.pose_join is None:
-            self._emit_tracklets(tracklets, timestamp)
+            self._emit_tracklets(tracklets, timestamp, arrival)
             return
         boxes: list[Box] = [(t.srcImgDetection.xmin, t.srcImgDetection.ymin, t.srcImgDetection.xmax,
                              t.srcImgDetection.ymax) for t in msg.tracklets]
         joined = self.pose_join.put_tracklets(msg.getSequenceNum(), tracklets, boxes)
         if joined is not None:
-            self._emit_tracklets(joined, timestamp)
+            self._emit_tracklets(joined, timestamp, arrival)
 
     def _poses_callback(self, name: str, msg) -> None:
         """The two-model chain's poses: depthai-nodes' `GatheredData`, the people's detections of one
@@ -425,6 +428,7 @@ class Camera(Thread):
         each remapped from its crop into the delivered frame."""
         if self.pose_join is None:
             return
+        arrival: float = time.perf_counter()
         detections = msg.reference_data
         boxes: list[Box] = [(d.xmin, d.ymin, d.xmax, d.ymax) for d in detections.detections]
         keypoints = [keypoints_in_frame(item, self._frame_transformation) for item in msg.items]
@@ -438,7 +442,7 @@ class Camera(Thread):
             keypoints = [mirrored_keypoints(points) for points in keypoints]
         joined = self.pose_join.put_poses(detections.getSequenceNum(), boxes, keypoints)
         if joined is not None:
-            self._emit_tracklets(joined, capture_time(detections))
+            self._emit_tracklets(joined, capture_time(detections), arrival)
 
     def _system_callback(self, name: str, msg: dai.SystemInformationRVC4) -> None:
         readings: RigCameraReadings = self.settings.readings
@@ -466,20 +470,21 @@ class Camera(Thread):
         self.settings.readings.roll_measured = roll - self.settings.readings.roll_offset
         self.tilt_correction.update(tilt, self._intrinsics, self.frame_size)
 
-    def _emit_frame(self, kind: FrameType, image: ndarray, timestamp: float, nv12: bool = False, readings: FrameReadings | None = None,
-                    alignment: DepthAlignment | None = None) -> None:
-        """The hand-over: the frame, with its capture time (`capture_time`), goes to every callback."""
+    def _emit_frame(self, kind: FrameType, image: ndarray, timestamp: float, arrival: float, nv12: bool = False,
+                    readings: FrameReadings | None = None, alignment: DepthAlignment | None = None) -> None:
+        """The hand-over: the frame, with its capture time (`capture_time`) and its arrival, goes to every callback."""
         frame = CameraFrame(cam_id=self.id, kind=kind, image=image, timestamp=timestamp,
                             nv12=nv12, flip_h=self.flip_on_host, homography=self.tilt_correction.homography,
-                            readings=readings, intrinsics=self._intrinsics, alignment=alignment)
+                            readings=readings, intrinsics=self._intrinsics, alignment=alignment, arrival=arrival)
         for c in self.frame_callbacks:
             c(frame)
 
-    def _emit_tracklets(self, tracklets: list[CameraTracklet], timestamp: float) -> None:
+    def _emit_tracklets(self, tracklets: list[CameraTracklet], timestamp: float, arrival: float) -> None:
         if not self.running:
             return
+        message = CameraTracklets(cam_id=self.id, timestamp=timestamp, tracklets=tracklets, arrival=arrival)
         for c in self.tracklet_callbacks:
-            c(self.id, tracklets, timestamp)
+            c(message)
 
     # ── CameraSource ───────────────────────────────────────────────────
 

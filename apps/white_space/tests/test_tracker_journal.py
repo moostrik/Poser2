@@ -6,7 +6,7 @@ import time
 import unittest
 from pathlib import Path
 
-from modules.camera import CameraTracklet, TrackingStatus
+from modules.camera import CameraTracklet, CameraTracklets, TrackingStatus
 from modules.tracker import PanoramicAnnotation, Tracklet
 from modules.utils import Rect
 
@@ -94,7 +94,7 @@ class TestJournalWriter(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             journal = TrackerJournal(settings, data_path=tmp)
             journal.start()
-            journal.submit_cam_tracklets(2, [raw], 1.5)
+            journal.submit_cam_tracklets(CameraTracklets(cam_id=2, timestamp=1.5, tracklets=[raw]))
             journal.stop()
 
             lines = self.read_lines(self.capture_folders(tmp, settings)[0])

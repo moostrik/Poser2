@@ -7,7 +7,7 @@ from typing import Any, Callable
 from modules.settings import BaseSettings, Field
 
 from .frame import CameraFrame, FrameType
-from .tracklet import CameraTracklet
+from .tracklet import CameraTracklets
 
 import logging
 logger = logging.getLogger(__name__)
@@ -40,8 +40,8 @@ class Sync:
         if frame.kind == FrameType.VIDEO:
             self._submit(frame.cam_id, frame.timestamp)
 
-    def submit_tracklets(self, cam_id: int, tracklets: list[CameraTracklet], timestamp: float) -> None:
-        self._submit(cam_id, timestamp)
+    def submit_tracklets(self, cam_tracklets: CameraTracklets) -> None:
+        self._submit(cam_tracklets.cam_id, cam_tracklets.timestamp)
 
     def _submit(self, cam_id: int, timestamp: float) -> None:
         """A message with its host time; the bang carries the time of the message that triggered it."""

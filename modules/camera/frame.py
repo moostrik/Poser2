@@ -44,7 +44,8 @@ class CameraFrame:
 
     `timestamp` is the moment of capture on the one clock, `time.perf_counter()`, stamped by the
     backend at hand-over: the end of the exposure where the backend knows it (oak4), else the
-    arrival. A depth frame and the video frame captured with it carry timestamps within
+    arrival. `arrival` is the hand-over itself, stamped with it, None where `timestamp` is the
+    arrival already; the two give the frame's latency without a clock read downstream. A depth frame and the video frame captured with it carry timestamps within
     `CAPTURE_TOLERANCE`, so time pairs them. Everything downstream takes its time from the frame
     instead of reading a clock (the wall clock is for file names only).
     `image` is BGR uint8 (H, W, 3) or gray uint8 (H, W), as the backend delivers it; with `nv12` it is
@@ -68,6 +69,7 @@ class CameraFrame:
     readings: FrameReadings | None = None
     intrinsics: list[list[float]] | None = None
     alignment: DepthAlignment | None = None
+    arrival: float | None = None
 
 
 def mirrored_image(frame: CameraFrame) -> np.ndarray:

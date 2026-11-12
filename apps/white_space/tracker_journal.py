@@ -24,7 +24,7 @@ from queue import Empty, Full, Queue
 from threading import Lock, Thread
 from typing import Callable
 
-from modules.camera import CameraTracklet, make_folder_name
+from modules.camera import CameraTracklets, make_folder_name
 from modules.settings import BaseSettings, Field, Widget
 from modules.tracker import PanoramicAnnotation, Tracklet, TrackletDict
 
@@ -222,12 +222,12 @@ class TrackerJournal:
             self._dropped += 1
 
     # INTAKE — wired beside the board's taps; one flag check when idle, one queue put capturing
-    def submit_cam_tracklets(self, cam_id: int, cam_tracklets: list[CameraTracklet], timestamp: float) -> None:
+    def submit_cam_tracklets(self, cam_tracklets: CameraTracklets) -> None:
         """The raw camera tracklets, converted exactly as the tracker converts them."""
         if not self._capturing:
             return
-        tracklets: list[Tracklet] = [Tracklet.from_camera(t) for t in cam_tracklets]
-        self._put(('in', time.time(), cam_id, tracklets))
+        tracklets: list[Tracklet] = [Tracklet.from_camera(t) for t in cam_tracklets.tracklets]
+        self._put(('in', time.time(), cam_tracklets.cam_id, tracklets))
 
     def submit_observations(self, observations: list[Tracklet]) -> None:
         """Every observation plus every rejected detection — once per tracker tick."""
