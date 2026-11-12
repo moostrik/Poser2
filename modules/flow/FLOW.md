@@ -13,16 +13,24 @@ camera. Either system takes either kind of camera. An app picks a system and wir
 to it.
 
 "Code" is what the files show; **(deduction)** marks what is inferred from them. This document
-holds what the stages share and what is open outside the 3D fluid; each stage's design is its own:
+holds what the stages share; each stage's design is its own, named after its package, and what is
+next is in the one plan:
 
-| Document                   | Holds                                                                                       |
-|----------------------------|---------------------------------------------------------------------------------------------|
-| [MOTION.md](MOTION.md)     | the motion: when it measures, the Lucas–Kanade solve and the depth velocity, their settings |
-| [BRIDGE.md](BRIDGE.md)     | the 3D bridge: the filters, the readings, the mix and its outputs' units                    |
-| [FLUID_3D.md](FLUID_3D.md) | the 3D fluid: its plan, how it takes the bridge, its fields, density and look               |
-| [RESOLUTION.md](RESOLUTION.md) | every size the picture and the motion pass through, what each needs, and its plan       |
-| [MONITOR.md](MONITOR.md)   | the monitors' views                                                                         |
-| [TIMING.md](TIMING.md)     | every stage's GPU time in deep_flow                                                         |
+| Document                             | Holds                                                                                       |
+|--------------------------------------|---------------------------------------------------------------------------------------------|
+| [PLAN.md](PLAN.md)                   | what is next: the main lines in order, their items, the details, what is parked             |
+| [INPUT_THREADS.md](INPUT_THREADS.md) | the threads a frame passes from the camera to the render, and the cadence                   |
+| [VIEW.md](VIEW.md)                   | the view stage: the window, the depth read, the mask and the depth mask                     |
+| [MOTION.md](MOTION.md)               | the motion: when it measures, the Lucas–Kanade solve and the depth velocity, their settings |
+| [BRIDGE_3D.md](BRIDGE_3D.md)         | the 3D bridge: the filters, the readings, the mix and its outputs' units                    |
+| [FLUID_3D.md](FLUID_3D.md)           | the 3D fluid: how it takes the bridge, its fields, density and look                         |
+| [RESOLUTION.md](RESOLUTION.md)       | every size the picture and the motion pass through, and why                                 |
+| [MONITOR.md](MONITOR.md)             | the monitors' views                                                                         |
+| [TIMING.md](TIMING.md)               | every stage's GPU time in deep_flow                                                         |
+
+The 2D bridge and the 2D fluid have no document yet; what holds for them is under
+[Constraints](#constraints), and they get theirs when they are rebuilt
+([PLAN.md](PLAN.md#5-the-2d-flow-follows-the-3d)).
 
 ## The two systems
 
@@ -36,7 +44,7 @@ those and a depth image on the same view. Every combination is a wiring, not a c
 
 | Camera | 2D flow                 | 3D flow                              |
 |--------|-------------------------|--------------------------------------|
-| 2D     | image, mask             | no z position, so nothing goes in ([Open 8](#8-a-depth-for-a-2d-camera)) |
+| 2D     | image, mask             | no z position, so nothing goes in ([PLAN.md](PLAN.md#6-a-camera-without-depth)) |
 | 3D     | image, mask; depth idle | image, mask, depth; z and w measured |
 
 ## Terms
@@ -116,7 +124,7 @@ an output, or they would be the tick before's.
 | Stage   | Input `@dataclass`, built by the app each tick                                                                                                                                                                                                                                                                                                                                                     | Output `@dataclass`, the stage's textures                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 |---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | motion  | `MotionInput`: `image`, the picture the velocity is measured on by its brightness; `timestamp`, the capture time of the camera frame `image` holds, the frame's identity; `dt`, the render tick's; `depth`, a `DepthView` or `None`; `mask`, or `None`; `depth_mask`, where the depth is the player's, or `None` | `MotionOutput`: `velocity` (x, y, z), gated by `mask` with the 3D flow's `use_mask`, z also by `depth_mask`; z is 0 without depth; `z_position`, the body's now, the 3D motion's, or `None`                                                                                                                                                                                                                                                                                                       |
-| bridge  | `BridgeInput`: `velocity`, from the motion output; `dt`; `image`, or `None`, the picture whose RGB colors the density; `color`, an RGB tint on it, white by default; `mask`, or `None`, which gates the image; `z_position`, the motion's, or `None`                                                                                                                                                  | `BridgeOutput`, what the fluid injects in two systems ([BRIDGE.md](BRIDGE.md#the-mix)): the boundary, `boundary_velocity`; `boundary_density`, in 2D the amount alone, the trail's speed (R), in 3D RGBA, the amount times `color`, times the image's RGB where there is one, with the amount as alpha; `boundary_temperature`; and the 3D bridge's body force, `body_force_acceleration`, `body_force_density`, `body_force_temperature`, each `None` while it gives none; where each goes in depth, the 3D bridge's: each output's `_z_position`, mixed from its readings' as its amount is ([BRIDGE.md](BRIDGE.md#the-z-positions)) |
+| bridge  | `BridgeInput`: `velocity`, from the motion output; `dt`; `image`, or `None`, the picture whose RGB colors the density; `color`, an RGB tint on it, white by default; `mask`, or `None`, which gates the image; `z_position`, the motion's, or `None`                                                                                                                                                  | `BridgeOutput`, what the fluid injects in two systems ([BRIDGE_3D.md](BRIDGE_3D.md#the-mix)): the boundary, `boundary_velocity`; `boundary_density`, in 2D the amount alone, the trail's speed (R), in 3D RGBA, the amount times `color`, times the image's RGB where there is one, with the amount as alpha; `boundary_temperature`; and the 3D bridge's body force, `body_force_acceleration`, `body_force_density`, `body_force_temperature`, each `None` while it gives none; where each goes in depth, the 3D bridge's: each output's `_z_position`, mixed from its readings' as its amount is ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)) |
 | fluid   | `FluidInput`: `dt`, and `injections`, a list of `Injection`: the six outputs of one bridge output and their z positions, with `weight`, 0 to 1, the injection's share of the fluid's velocity, density and temperature, as a layer's weight in the light renderer's mix, and `color`, the color the 2D fluid gives the injection's density at its output; the app builds one injection per bridge it wants in that fluid | `FluidOutput`: `density`, the show, which the composite draws as the layer's `texture`                                                                                                                                                                                                                                                                                                                                                                                     |
 | monitor | `MonitorInput`: `ports`, every stage's ports keyed by stage; the monitor picks by its own `stage` and `texture`                                                                                                                                                                                                                                                                                    | none: it draws                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 
@@ -176,7 +184,7 @@ Lucas–Kanade solve.
 
 `BridgeLayer`'s `_update()`: the density's color (`DensityColor`: the image, or white, times the tint,
 gated by the mask), then `_bridge` the input's velocity into velocity, density and temperature
-([BRIDGE.md](BRIDGE.md)). The bridges' filters run at the velocity's size and their outputs at
+([BRIDGE_3D.md](BRIDGE_3D.md)). The bridges' filters run at the velocity's size and their outputs at
 `settings.width` by `settings.height`; the layer follows both. It draws nothing.
 
 `FluidLayer`'s `_update()`: `_inject` each injection's velocity, density and temperature at its
@@ -235,7 +243,7 @@ any layer, and two show A beside B.
 |----------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `modules/flow/motion/`                                   | `GradientFlow`; `LucasKanadeFlow`, the x/y solve with `LucasKanadeFlowSettings`; `LucasKanadeFlow3D`, composing it with `DepthVelocity`, with `LucasKanadeFlow3DSettings` (`use_mask`, the gains, `xy`, `z`); `DepthVelocitySettings`; `DepthView`; its document [MOTION.md](MOTION.md)                                                                                                                                                                                                                                          |
 | `modules/flow/bridge_2d/`                                | the 2D bridge                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
-| `modules/flow/bridge_3d/`                                | the 3D bridge; its document [BRIDGE.md](BRIDGE.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `modules/flow/bridge_3d/`                                | the 3D bridge; its document [BRIDGE_3D.md](BRIDGE_3D.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
 | `modules/flow/fluid_2d/`                                 | `Fluid2D`, `Fluid2DSettings` with its own `VelocitySettings`, `DensitySettings`, `TemperatureSettings`, `PressureSettings`; `shaders/`                                                                                                                                                                                                                                                                                                                                                                                           |
 | `modules/flow/fluid_3d/`                                 | `Fluid3D`, `Fluid3DSettings` with the box and one group per concern (`TimeSettings`, `CompositeSettings`, `ParticleSettings`, ...); the density's carriers (`DensityCarrier`: `Density`, `FineDensity`, `ParticleDensity`), `FieldAdvection`; `shaders/`; its document [FLUID_3D.md](FLUID_3D.md)                                                                                                                                                                                                                  |
 | `modules/flow/shaders/`                                  | the shared fragment shaders, `AddBoolean` among them                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
@@ -256,7 +264,7 @@ The shader loader finds a shader's source by its `.py` module name beside it
 ## The input's cadence
 
 Every camera frame is to reach the motion at the camera's cadence, the motion measuring one capture per
-frame. How a frame gets there, thread by thread, what costs frames and the plan are in
+frame. How a frame gets there, thread by thread, and what costs frames are in
 [INPUT_THREADS.md](INPUT_THREADS.md).
 
 ## Constraints
@@ -314,62 +322,3 @@ frame. How a frame gets there, thread by thread, what costs frames and the plan 
   in `modules/flow` or `modules/render/layers/flow` names: such a field is dead **(deduction)**.
 - `modules/render/tests/test_stage_layer.py` checks, without GL, that a reset button asks and the
   stage's next update resets once before it runs, and asks nothing after `deallocate`.
-
-## Open
-
-What is open outside the 3D fluid, in order; what touches the fluid is in
-[FLUID_3D.md's Plan](FLUID_3D.md#plan).
-
-### 1. The motion's false z at a limb's edge
-
-A limb moving sideways before the body reads false z at its edges: the leading edge carries 43% of a
-sweep's z, the trailing edge 12%. The cause is the depth's ramp at the limb's edge. The camera's
-temporal filter is off and its confidence does not sharpen the ramp. Accepted for now; the cue not
-yet tried is a forward-splat count of the x/y motion (0 = uncovered, above 1 = covered).
-
-### 2. The motion's range
-
-`edge`, `tolerance` and `dead_zone` are in metres and tuned at 0.65–1.5 m. Stereo noise grows with
-the square of the distance, so at 2–3.5 m they may need to be in disparity **(deduction)**. This
-needs a recording at that distance.
-
-### 3. The 2D fluid follows the 3D one
-
-The 2D fluid adds the injected velocity times dt (`Fluid2D.add_velocity`), as Stam's Stable Fluids
-adds a source; but the bridge's velocity is a velocity, in view widths per second like the
-fluid's, so it is taken as an acceleration, `velocity.gain` acts as a rate, and the fluid stays
-near 0.05 to 0.1 of the motion's speed **(deduction)**, a monitor needing a scale of 20 to 30 to
-show it. The 3D fluid takes the boundary by a drag and the body force's acceleration times dt
-([FLUID_3D.md](FLUID_3D.md#the-inputs)); the 2D fluid is to follow it: the drag, the two systems,
-the one grid.
-
-### 4. The depth velocity's `track`
-
-The depth velocity's memory is named `track` in the code (`DepthVelocity._track`, the monitor's
-`z.track`), a word that says nothing on its own; it holds the followed disparity, its rate and its
-anchor. To be renamed by what it holds, with the monitor's port.
-
-### 5. hd_trio's density fade from motion
-
-Its wiring pass writes `density.fade_time` every tick from the pose's motion, a settings field
-written per tick. A per-tick value on the fluid layer would take it off the settings.
-
-### 6. A soft limit on the motion's z speed
-
-A guard to try on the motion beside its finite guard ([MOTION.md](MOTION.md#the-guard)): z as
-measured up to a knee (about 1.5 m/s), compressed above it toward a maximum (about 3 m/s), the speed
-gate (6 m/s) behind it; a curve per reading, no time filter, checked first against the spread of z
-speeds on standmoves and stillslowfast.
-
-### 7. The depth's mask with another mask source
-
-deep_flow's mask is the depth's ([INPUT_THREADS.md](INPUT_THREADS.md#the-view-stage)); a
-mask from RVM, for a camera without depth, would come back from hd_trio. With it the motion's `depth_mask`,
-the depth's own cut that gates z ([RESOLUTION.md](RESOLUTION.md#the-mask-and-the-depth-mask)), is still the
-view stage's, and RVM's mask, on the crop, would have to be cut into the view's window.
-
-### 8. A depth for a 2D camera
-
-The 3D fluid puts a pixel in at its z position and nothing where it has none
-([FLUID_3D.md](FLUID_3D.md#the-bodys-depth)), so a 2D camera gives it nothing. A depth made from the image
-(a monocular depth model) on the view would give the motion its z and z position as a depth camera's does.

@@ -4,8 +4,8 @@ Every quantity and setting here is in a meaningful unit ([FLOW.md](FLOW.md#the-2
 
 The motion stage measures a velocity field from two camera frames, the optical flow: x and y on the
 image plane by a Lucas–Kanade solve, and in the 3D flow z toward the camera by the depth velocity.
-How the stages fit together is in [FLOW.md](FLOW.md); what is open, the motion's included, in
-[FLOW.md's Open](FLOW.md#open). "Code" is what the files show; **(deduction)** marks what is inferred
+How the stages fit together is in [FLOW.md](FLOW.md); what is next, the motion's included, in
+[PLAN.md](PLAN.md#the-motions-details). "Code" is what the files show; **(deduction)** marks what is inferred
 from them, **(site fact)** what the operator saw.
 
 How the flow works is in the module docstrings of `motion/lucas_kanade_flow_3d.py`,
@@ -77,7 +77,7 @@ The flow's velocity is in image widths per second times its gains.
 - same_surface works only where a no-depth band separates the hand from what is behind it, as with a
   hand held far out. Where a limb is about 20 cm before the body, Neural Depth ramps over about 30 px
   instead of stepping, and the patch's samples stay within the tolerance; see
-  [FLOW.md's Open](FLOW.md#open). It costs +0.05 ms.
+  [PLAN.md](PLAN.md#the-motions-details). It costs +0.05 ms.
 
 ### depth_velocity (z)
 
@@ -95,7 +95,7 @@ The flow's velocity is in image widths per second times its gains.
 - tolerance at 0.05: a push loses 77% of its z, and the track restarts 6× as often while moving.
 - smooth: lower lags less; keep it as low as looks right. The bridges read z as they read x/y, so
   this is z's one time constant; what it does to them, and the 200 ms advised for them, is in
-  [BRIDGE.md's Measured](BRIDGE.md#measured).
+  [BRIDGE_3D.md's Measured](BRIDGE_3D.md#measured).
 - xy_smooth puts x/y through the depth velocity's alpha–beta filter, carried along the motion, with
   z's `smooth`. It is the only x/y state kept from frame to frame: the solve starts each frame from
   no motion. The motion's reset clears it.
@@ -111,7 +111,7 @@ x, y and z, and z also takes the depth mask, so z exists only where the depth it
 on an edge the mask's guided filter moved onto the wall's depth.
 z stays in view widths per second: the bridge takes the length of x, y and z, so z in a share of the
 range would mix units there. What the bridge and the fluid do with it is in
-[BRIDGE.md](BRIDGE.md#the-z-positions).
+[BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions).
 
 ## The guard
 

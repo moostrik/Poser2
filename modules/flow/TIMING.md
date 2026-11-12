@@ -12,7 +12,7 @@ from the numbers.
 | GPU               | GeForce RTX 4090, 24 GB                                                                 |
 | Target            | 60 fps, 16.7 ms a frame                                                                 |
 | App               | deep_flow, `launcher.py -app deep_flow -sim -ni -timing 60 -warmup 10`                  |
-| Input             | the standmoves recording (`-sim`), one camera, 50 fps                                   |
+| Input             | the standmoves recording (`-sim`), one camera, 50 fps; it and stillslowfast are no longer kept |
 | Preset            | `apps/deep_flow/data/settings/settings.json`, one setting changed per run               |
 | Pose              | on: the person detection and RTM pose on TensorRT, on the same GPU                      |
 | Segmentation      | off: the mask is the depth's, the RVM model not run                                     |
@@ -213,9 +213,58 @@ estimate is **(deduction)** unless its source measured it; a source's numbers ar
 | 5   | The draw by the alive count: `glDrawArraysIndirect` with the count the emission's head gives, so the vertex shader runs for the particles there are, not for every slot of the ring                                                 | the vertex shader over `count` slots a frame                        | up to the ring's empty share; 0 once it wraps            | the code: the draw over `count`                                                                             |
 | 6   | The ring sorted by the Morton order of the particles' cells now and then (a bitonic sort in compute), so a group's particles read the same velocity texels                                                                          | the advection, 0.2 ms a million                                     | under 0.5 ms at the baseline; 1.5 to 2 × at 8 M and more | a 3.2 × gain from sorting in a molecular-dynamics benchmark (NVIDIA forum); Morton-sorted SPH               |
 
+### How each is judged
+
+The changes above, one at a time, numbered here as [Measured](#measured) lists them. Each is built behind its own
+switch, measured against the baseline, and then kept one of two ways or dropped:
+
+| Outcome                                           | Kept as                                                                                                 |
+|---------------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| faster, and the same result                       | a replacement: the old path removed, no setting                                                         |
+| faster, and a different result (a solver, a look) | an option on the panel, as a field's `advection` is, the current way staying the default until the operator picks |
+| not faster                                        | dropped, its row kept under Measured                                                                    |
+
+The test, the same for every item: three timing runs back to back, baseline, change, baseline
+(`-timing 60 -warmup 10`, the pose on, standmoves), the pass's own GPU timer the measure: the two
+baselines' difference is the noise, and the change counts as faster when it beats the pass it
+replaces by at least 2.5 times that; then
+`scripts/fluid_compare.py` on stillslowfast, A the baseline, B the change, its numbers and the
+composited output side by side (a `--save` to add). The same numbers and the same picture: a
+replacement. Different: an option, judged on the look in the app.
+
+| #   | Change                                                   | Expected                                  | Kept as, if faster                                                                      |
+|-----|----------------------------------------------------------|-------------------------------------------|-----------------------------------------------------------------------------------------|
+| 1   | the temperature cleared once, its injection skipped at 0 | 0.4 to 0.5 ms                             | replacement                                                                             |
+| 2   | the composite's early exit and the occupancy volume      | 0.5 to 1.5 ms                             | replacement                                                                             |
+| 3   | 3D workgroups for the stencil passes                     | 0.3 to 0.6 ms                             | replacement                                                                             |
+| 4   | MacCormack in one dispatch                               | 0.4 to 0.6 ms                             | replacement                                                                             |
+| 5   | fused passes                                             | 1 to 1.5 ms                               | replacement                                                                             |
+| 6   | red-black SOR                                            | 1.5 to 2.5 ms                             | option, decided: `pressure.solver`, `JACOBI` (the default), `SOR`, whatever it measures |
+| 7   | multigrid, or MGPCG                                      | 2.5 to 3.5 ms                             | option, decided: the same option gains `MULTIGRID`                                      |
+| 8   | the sparse grid                                          | 0 to half the step                        | its plan written, not built: it touches every pass                                      |
+| 9   | the sprites cut at 2 sigma                               | half the blobs' fill                      | replacement; the growth cap stays as it is, a look                                      |
+| 10  | the draw by the alive count                              | the ring's empty share                    | replacement                                                                             |
+| 11  | weighted blended OIT                                     | the march, the clear, a third of the draw | option: `overlap` gains `WEIGHTED`                                                      |
+| 12  | points and streaks rasterized in compute                 | 2 to 5 × on the draw                      | replacement for points; streaks if the lines match                                      |
+| 13  | the narrow-range filter and the narrow band              | 0.3 to 1 ms                               | the band a replacement; the filter an option if the surface differs                     |
+| 14  | the Morton sort                                          | under 0.5 ms at 2 M                       | replacement; the ring's fade must then go by the particle's age, not its slot           |
+
+Beside 5 and 6, the memory a step: the bytes read and written per cell by every pass, counted from
+the shaders before and after, since the passes are bandwidth-bound and the three force and curl
+volumes (24 bytes a cell) exist only between passes. A winning solver becomes the preset's
+`pressure.solver` too.
+
+What each came to is under [Measured](#measured): kept as replacements 1, 3, 5,
+9 and 10; options 6 (`SOR`), 7 (`MULTIGRID`, the preset's) and 11 (`WEIGHTED`); dropped 2, 12 and 13,
+slower; not built 4 and 14, for the reasons there; 8 parked ([PLAN.md](PLAN.md#parked)).
+
+The panel gains at most three options from it: `pressure.solver`, `overlap`'s `WEIGHTED`, and the
+surface's filter if it comes. Everything else is the same picture faster, and leaves no trace but
+its row under Measured.
+
 ### Measured
 
-Each change of [Faster](FLUID_3D.md#faster), by its number there, against the code before it, three runs back to back (`trial_runs.py`, the preset with the
+Each change, by its number in [How each is judged](#how-each-is-judged), against the code before it, three runs back to back (`trial_runs.py`, the preset with the
 density on the grid unless the row says otherwise): the pass before, with the change, before again. The
 noise is the two befores' difference; a change counts as faster when it beats both by 2.5 times that.
 The harness's check is `fluid_compare.py` on stillslowfast, its water numbers and four saved outputs
@@ -354,13 +403,26 @@ Sources: [McAdams, Sifakis, Teran 2010](https://pages.cs.wisc.edu/~sifakis/proje
 
 ## The staggered velocity
 
-The velocity on the cells' faces against the centered one, two runs each at the preset (`trial_runs.py`),
-ms mean: the step 4.61 against 4.44; the velocity's advection 0.35 against 0.18 (three faces traced a
-cell), the pressure 1.61 against 1.80 (the divergence and the gradient on 2-byte faces), the density 1.59
-against 1.48, the faces averaged to the centers 0.16; with `viscosity` on at 20 iterations, the viscosity
-0.95 against 1.16. With the multigrid's coarsest level in one dispatch and its residual fused into the
-restriction ([FLUID_3D.md](FLUID_3D.md#the-pressure)) the step is 4.40 ms, the pressure 1.44. Its layouts and the rest of its measures are in
-[FLUID_3D.md](FLUID_3D.md#measured).
+The velocity on the cells' faces ([FLUID_3D.md](FLUID_3D.md#the-staggered-velocity)) against the centered one
+(`28655856`), deep_flow's preset, in the app (`trial_runs.py`, standmoves, the pose on), ms mean, two runs each
+within 0.03:
+
+| Pass                     | Centered | Faces | Faces, three R16F |
+|--------------------------|----------|-------|-------------------|
+| advect velocity          | 0.18     | 0.35  | 0.46              |
+| pressure                 | 1.80     | 1.61  |                   |
+| density                  | 1.48     | 1.59  |                   |
+| faces to centers         |          | 0.16  | 0.24              |
+| the step                 | 4.44     | 4.61  |                   |
+| viscosity, 20 iterations | 1.16     | 0.95  | 4.88              |
+
+The viscosity works out each face's weights (the walls', the slip's, the obstacles') once a dispatch;
+worked out for every face they cost more than the iterations (3.6 to 4.0 ms), so only the faces next to a
+wall or an obstacle do, the rest summing their six neighbors plainly, and the test whether a face is held
+reads all three components at once.
+
+With the multigrid's coarsest level in one dispatch and its residual fused into the restriction
+([FLUID_3D.md](FLUID_3D.md#the-pressure)) the step is 4.40 ms, the pressure 1.44.
 
 ## Workgroup shapes
 
@@ -397,7 +459,7 @@ lowpass's advect fused into its trail, at most 0.005 ms of its 0.076 (its blur, 
 
 ### The body at its own depth
 
-The z positions and the passes they ride in ([BRIDGE.md](BRIDGE.md#the-z-positions)), each pass alone on the
+The z positions and the passes they ride in ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)), each pass alone on the
 stillslowfast frames as above, the second of two runs, deep_flow's preset with the lowpass's `blur` at 0.081:
 
 | Step                                                         | lowpass | with its rate | bandpass | with its accelerations | the bridge whole | motion whole |
@@ -539,12 +601,4 @@ Within 60 fps: up to 32 fluid layers with the density at 32, 48 with it at 24 or
 layers up the pressure solve is the largest pass (3.7–5.3 ms). The density's
 4K × 16 costs 1.3 ms to carry and 0.9 to march, the old 16-layer look's 2 GB a step now under a quarter of it.
 MacCormack, timed before the depth scale while the water still burst, took 9.1 ms a frame at 16 and 16 and was
-over the budget from 32 fluid layers up; its cost is in [FLUID_3D.md's Parked](FLUID_3D.md#parked).
-
-## Open
-
-- The blobs' and the surface's p95: a sprite that grows to twice `radius` on a strong drop fills
-  four times the pixels. The cut at 2 sigma and the lower cap ([The particles](#the-particles-1), 3)
-  are the fix, judged on the look.
-- The run-to-run spread of the pose's load, 1 to 1.5 ms of the step between two runs of one
-  configuration: the person detection's rate is not fixed.
+over the budget from 32 fluid layers up; its cost is in [PLAN.md's Parked](PLAN.md#parked).

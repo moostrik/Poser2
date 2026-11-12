@@ -3,8 +3,8 @@
 Every quantity and setting here is in a meaningful unit ([FLOW.md](FLOW.md#the-2d-and-3d-flow-systems)).
 
 The 3D fluid's document, as [FLOW.md](FLOW.md) is the flow's: what the fluid is, how it takes what
-the bridge gives it ([BRIDGE.md](BRIDGE.md)), its density and its look, and how it is measured; what
-is next is its [Plan](#plan). "Code" is what the files show;
+the bridge gives it ([BRIDGE_3D.md](BRIDGE_3D.md)), its density and its look, and how it is measured; what
+is next is in [PLAN.md](PLAN.md). "Code" is what the files show;
 **(deduction)** marks what is inferred from them, **(site fact)** what the operator saw.
 
 The 2D fluid (`fluid_2d/`, `Fluid2DLayer`, hd_trio) is apart: nothing here changes it. The 3D
@@ -28,72 +28,6 @@ What decides it in the upscale now (the code and deep_flow's preset):
 | the density's own layers | the fine density 24 layers deep (`fine_density.depth`), the velocity's grid 64        | a sheet thinner than a 24th of the box blurs into its neighbors: the layers it can hold |
 | its edges as it moves    | `density.advection`: semi-Lagrangian 1.37 ms on the 4K amount at 24 layers, MacCormack 4.07 | the plain step blurs a little each step, MacCormack keeps edges sharp                      |
 | the layers kept apart    | the body at its own depth ([The body's depth](#the-bodys-depth)), the confinement at a small radius, viscosity | the body's shape in depth lets the water go around it; the confinement and viscosity cross one layer's motion into the others'; viscosity 0 the sharpest |
-
-## Plan
-
-What is next for the fluid, in order; what is open elsewhere in the flow is
-[FLOW.md's Open](FLOW.md#open).
-
-Weighed by [the goal](#the-goal): sharp, translucent ink patterns, layers distinct.
-
-### 1. The resolutions
-
-The dye's picture and its outline at the size of what they come from, the mask steered by the camera image:
-[RESOLUTION.md](RESOLUTION.md), its own plan: the z position without the depth's staircase, the velocity for
-the fine density.
-
-### 2. Swirls at more than one size
-
-The confinement keeps swirls alive at one size, `vorticity_radius`: fine wisps or big eddies, not both.
-More than one radius, each with its own strength (multi-scale vorticity confinement), keeps fine and large
-at once. Starting with two: the curl at both radii in the same pass (six more velocity reads a cell), the
-force from both curls in one pass (a curl volume more), their sum added to the faces once. About a third
-to a half more of the confinement's 0.57 ms at the preset, 0.2 to 0.3 ms **(deduction)**, measured as it
-lands. The fine density's turbulence already adds swirls below the grid to the dye, so what a second
-radius adds to the look is judged against it, and by whether the layers stay apart: the confinement
-also carries one layer's motion into the next.
-
-### 3. The smaller side as the unit
-
-Every length in the flow is in widths: the motion's velocity (widths/s of the camera's image), the bridge's
-readings, the fluid's inputs (`spread`), its look (`opacity`, `fog`), the box's depth, the monitor's scale.
-In portrait the width is the smaller side; in landscape it is the longer, and the same settings would
-then mean less against what is seen. One unit across the stages, the smaller side, keeps a preset's look
-and feel when the box turns: in portrait nothing changes. It reaches past the fluid (the motion, the
-bridge, the monitor), so it is one rule for all of them, made where each length is made.
-
-### 4. The fade and the evaporation
-
-Each field's `fade_time` (seconds to 1%, a share at a time) and `evaporation_time` (seconds a full value takes
-to reach 0, a fixed amount at a time) do not yet give what is wanted **(site fact)**; what each should do
-for the look is the first question.
-
-### 5. The temperature
-
-Whether the temperature needs a field of its own. Buoyancy needs only a scalar the water is lighter or
-heavier by: the density alone can be it (ink sinks), and the temperature adds currents apart from the dye
-(warm clear water rising), the textbook smoke's soot and heat. Off in the preset (`buoyancy` 0), and nothing
-is injected into it then.
-
-Where it is kept, its advection moves to the density's: today it is carried mid-step, after the
-confinement and before the projection, by a velocity not yet free of divergence; the textbook carries every
-scalar by the same projected velocity (Fedkiw 2001, Bridson), and the buoyancy reads the temperature of the
-step before.
-
-Making the density sink needs no temperature: `temperature.sink` (widths/s² per unit of density, along
-gravity) weighs dyed water wherever it is, with `buoyancy` 0, in the same pass, its direction `gravity_x`,
-`_y`, `_z`. It sits in the temperature's panel though it is the density's weight: if the temperature goes,
-`sink` and the gravity move to a panel of their own or the density's.
-
-### After the plan
-
-- The masking in the bridge: the mask (`inputs.mask`, R16F 0 to 1, the depth's or the segmentation's) gates the velocity in the motion (`use_mask`) and the density's color in the bridge; in the bridge alone it is one gate in one stage.
-
-- The body force's acceleration: tested, tweaked and made useful.
-- The velocity loses its energy faster than expected **(site fact)**, with the plain step on the velocity: the
-  plain step's own loss (a swirl keeps 52% of its speed in 2 s, MacCormack 62%), the drag now over the body's
-  whole depth, or another cause; MacCormack with the clamp on the velocity is the first thing to try.
-- The particles: worked on, and how they combine with the fine density.
 
 ## The fluid
 
@@ -165,7 +99,7 @@ acceleration per unit mass; a body in the fluid is a boundary that moves.
 ### What the fluid takes
 
 What the fluid does with each of the bridge's outputs; the readings they are mixed from, and what
-each output says of the body, are in [BRIDGE.md](BRIDGE.md#the-mix).
+each output says of the body, are in [BRIDGE_3D.md](BRIDGE_3D.md#the-mix).
 
 The outputs, in two subpanels, one per system, each a mix of the six readings; the fluid's settings
 say how the water follows each; the densities and the temperatures go in by `inject_3d`, `FILL` for
@@ -191,7 +125,7 @@ The camera sees the body's front surface, a plane of x, y and depth, not a volum
 as a thin skin centered on its own z position, `spread` its thickness: an arm reaching toward the camera
 pushes the water near the front and the torso further back. The box's depth is the player's depth range,
 the depth source's near to far, 0 front to 1 back, with no setting of its own. Each injection reads its
-output's z position ([BRIDGE.md](BRIDGE.md#the-z-positions)), red over green, at the pixel it reads
+output's z position ([BRIDGE_3D.md](BRIDGE_3D.md#the-z-positions)), red over green, at the pixel it reads
 (`slab.glsl`'s `slab_center`), each at its readings' depths, so an output's amount and its place come from
 the same trails; the fine density and the particles take the density's. A pixel without one puts nothing
 in, and an injection without a z position puts nothing in at all: a body has no place in the box without a
@@ -684,7 +618,7 @@ What a 4K volume cannot do, and so where the detail comes from:
   it for a smoother upscale.
 - A march at the grid's 256 × 448 (0.11 M pixels instead of 8.3 M, about 70 times cheaper
   **(deduction)**) with an edge-aware upscale of the flat result is parked
-  ([Parked](#parked)).
+  ([PLAN.md](PLAN.md#parked)).
 
 The grid's depth: 256 × 448 × 128, half a width deep, so the body's z motion has room before a wall.
 A coarser grid across buys the depth: the detail it gives up in x and y is what the fine density
@@ -733,58 +667,9 @@ recording, are not in that picture.
 | highlights | `Knee`, one pass on the output after the particles: the composite's color through a knee, straight up to 0.8 and bent softly toward 1 above it, each channel on its own, so the image below 0.8 keeps its contrast, thick cores do not clip flat and the brightest drift a little toward white, as film does; no setting, `composite.emission` keeps its meaning                                                                                                                                                                                                                                                                                                                                                                        |
 | blend      | the composite writes its color premultiplied (times its coverage) and the coverage as alpha, so the fluid layer draws it with the premultiplied form of `composite.blend_mode` (`BlendMode.premultiplied`: `ADD` as `GL_ONE, GL_ONE`, `ALPHA` as `GL_ONE, GL_ONE_MINUS_SRC_ALPHA`), not multiplied by its alpha a second time                                                                                                                                                                                                                                                                                                                                                                                                           |
 
-## Faster
-
-The changes of [TIMING.md's Faster](TIMING.md#faster), one at a time. Each is built behind its own
-switch, measured against the baseline, and then kept one of two ways or dropped:
-
-| Outcome                                           | Kept as                                                                                                 |
-|---------------------------------------------------|---------------------------------------------------------------------------------------------------------|
-| faster, and the same result                       | a replacement: the old path removed, no setting                                                         |
-| faster, and a different result (a solver, a look) | an option on the panel, as a field's `advection` is, the current way staying the default until the operator picks |
-| not faster                                        | dropped, its row kept in TIMING.md                                                                      |
-
-The test, the same for every item: three timing runs back to back, baseline, change, baseline
-(`-timing 60 -warmup 10`, the pose on, standmoves), the pass's own GPU timer the measure: the two
-baselines' difference is the noise, and the change counts as faster when it beats the pass it
-replaces by at least 2.5 times that; then
-`scripts/fluid_compare.py` on stillslowfast, A the baseline, B the change, its numbers and the
-composited output side by side (a `--save` to add). The same numbers and the same picture: a
-replacement. Different: an option, judged on the look in the app.
-
-| #   | Change                                                   | Expected                                  | Kept as, if faster                                                                      |
-|-----|----------------------------------------------------------|-------------------------------------------|-----------------------------------------------------------------------------------------|
-| 1   | the temperature cleared once, its injection skipped at 0 | 0.4 to 0.5 ms                             | replacement                                                                             |
-| 2   | the composite's early exit and the occupancy volume      | 0.5 to 1.5 ms                             | replacement                                                                             |
-| 3   | 3D workgroups for the stencil passes                     | 0.3 to 0.6 ms                             | replacement                                                                             |
-| 4   | MacCormack in one dispatch                               | 0.4 to 0.6 ms                             | replacement                                                                             |
-| 5   | fused passes                                             | 1 to 1.5 ms                               | replacement                                                                             |
-| 6   | red-black SOR                                            | 1.5 to 2.5 ms                             | option, decided: `pressure.solver`, `JACOBI` (the default), `SOR`, whatever it measures |
-| 7   | multigrid, or MGPCG                                      | 2.5 to 3.5 ms                             | option, decided: the same option gains `MULTIGRID`                                      |
-| 8   | the sparse grid                                          | 0 to half the step                        | its plan written, not built: it touches every pass                                      |
-| 9   | the sprites cut at 2 sigma                               | half the blobs' fill                      | replacement; the growth cap stays as it is, a look                                      |
-| 10  | the draw by the alive count                              | the ring's empty share                    | replacement                                                                             |
-| 11  | weighted blended OIT                                     | the march, the clear, a third of the draw | option: `overlap` gains `WEIGHTED`                                                      |
-| 12  | points and streaks rasterized in compute                 | 2 to 5 × on the draw                      | replacement for points; streaks if the lines match                                      |
-| 13  | the narrow-range filter and the narrow band              | 0.3 to 1 ms                               | the band a replacement; the filter an option if the surface differs                     |
-| 14  | the Morton sort                                          | under 0.5 ms at 2 M                       | replacement; the ring's fade must then go by the particle's age, not its slot           |
-
-Beside 5 and 6, the memory a step: the bytes read and written per cell by every pass, counted from
-the shaders before and after, since the passes are bandwidth-bound and the three force and curl
-volumes (24 bytes a cell) exist only between passes. A winning solver becomes the preset's
-`pressure.solver` too.
-
-What each came to, measured, is [TIMING.md's Measured](TIMING.md#measured): kept as replacements 1, 3, 5,
-9 and 10; options 6 (`SOR`), 7 (`MULTIGRID`, the preset's) and 11 (`WEIGHTED`); dropped 2, 12 and 13,
-slower; not built 4 and 14, for the reasons there; 8 parked ([Parked](#parked)).
-
-The panel gains at most three options from it: `pressure.solver`, `overlap`'s `WEIGHTED`, and the
-surface's filter if it comes. Everything else is the same picture faster, and leaves no trace but
-its row in TIMING.md.
-
 ## The staggered velocity
 
-Built (2026-11-09). The velocity is on the cells' faces, the MAC grid (Harlow and Welch 1965; Bridson, *Fluid Simulation for Computer Graphics*,
+The velocity is on the cells' faces, the MAC grid (Harlow and Welch 1965; Bridson, *Fluid Simulation for Computer Graphics*,
 2nd ed. 2015, ch. 2): each component on the faces across its own axis, x between left and right
 neighbors, y between upper and lower, z between front and back. The divergence and the gradient become
 one-cell differences, whose product is the 7-point Laplacian the solvers solve, so an exact solve leaves
@@ -795,33 +680,29 @@ divergence-free, the second decouples the cells into a checkerboard.
 
 | Part                         | How                                                                                                     |
 |------------------------------|---------------------------------------------------------------------------------------------------------|
-| storage                      | three R16F volumes, one per component, each one face longer along its own axis                          |
+| storage                      | one RGBA16F volume, a face longer on every axis, a texel its cell's three near faces                    |
 | the step                     | each pass reads and writes the faces; the pressure, the density and the temperature stay at the centers |
 | the centers                  | one pass at the step's end averaging the faces to an RGBA16F volume at the cells' centers               |
 | the temperature              | advected by the faces; the densities, the particles and the monitors read the centers                   |
 | unchanged                    | the pressure solvers, the multigrid, the obstacle's cells, the bridge, the motion                       |
 
 The storage, `FaceVelocity`: one RGBA16F volume at 257 × 449 × 129 for 256 × 448 × 128 cells, a texel's
-x, y and z the faces on its cell's left, bottom and front, w unused. Three R16F volumes, one a component
-(x's faces 257 × 448 × 128, y's 256 × 449 × 128, z's 256 × 448 × 129), were timed against it in the app
-and were slower in every pass, so the packed volume is the one kept: a row of 256 cells has 257 faces, the box's two walls included. The far wall's face is
-stored, since at an open wall it is an unknown the projection sets; at a closed wall it is 0. The grid,
-every dispatch and the multigrid's levels stay multiples of 16: one thread per cell, the last cell's
-thread along an axis also writing that far face. Any size is a valid texture, and the driver pads to its
-own tiles, so 257 costs what a hand-padded 272 would **(deduction)**. One component per volume, not an
-RGBA texel per cell: an interpolated read of one component fetches only that component, 2 bytes a
-texel instead of 8, and nothing is stored unused. R16F takes image load and store and trilinear
-filtering as the temperature does. Each volume sits half a cell off along its own axis, so each read
-takes its own uv. One volume: RGBA16F at 257 × 449 × 129, a texel's x, y and z the faces on its cell's
-left, bottom and front, w unused; one fetch reads all three where a pass reads them together (the
-divergence, the gradient), but an interpolated read of one component fetches all four.
+x, y and z the faces on its cell's left, bottom and front, w unused. One fetch reads all three where a pass
+reads them together (the divergence, the gradient); an interpolated read of one component fetches all four.
+Three R16F volumes, one a component, fetch 2 bytes a texel instead of 8 there, and are slower in every pass
+in the app ([TIMING.md](TIMING.md#the-staggered-velocity)). A row of 256 cells has 257 faces, the box's two
+walls included. The far wall's face is stored, since at an open wall it is an unknown the projection sets; at
+a closed wall it is 0. The grid, every dispatch and the multigrid's levels stay multiples of 16: one thread
+per cell, the last cell's thread along an axis also writing that far face. Any size is a valid texture, and
+the driver pads to its own tiles, so 257 costs what a hand-padded 272 would **(deduction)**. Each component
+sits half a cell off along its own axis, so each read of one takes its own uv.
 
 The step, pass by pass:
 
 | Pass                      | On the faces                                                                                                                                                                                                                                                            |
 |---------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| the velocity's advection  | each face traced back on its own from the velocity at the face (its own component, the other two averaged from their four nearest faces), its component read at the departure point from its own volume (Bridson ch. 3)                                                 |
-| MacCormack                | the same per component, its bounds the eight texels of that component's volume                                                                                                                                                                                          |
+| the velocity's advection  | each face traced back on its own from the velocity at the face (its own component, the other two averaged from their four nearest faces), its component read at the departure point at its own uv (Bridson ch. 3)                                                       |
+| MacCormack                | the same per component, its bounds that component in the eight texels around its departure point                                                                                                                                                                        |
 | the top speed             | on the full vector at the face, the other two components averaged as in the trace                                                                                                                                                                                       |
 | the slip                  | the tangential faces along a closed wall braked by k                                                                                                                                                                                                                    |
 | the viscosity             | each component's Laplacian on its own faces                                                                                                                                                                                                                             |
@@ -852,37 +733,8 @@ leaves it. The pressure's solvers keep their rule, a solid neighbor's pressure t
 Neumann condition the solid face makes. The faces along an obstacle are fluid, so the water slides past
 it; the curl's ghost inside a solid cell is the closed wall's, (2k − 1) of the face along it, so
 `slip_time` acts on obstacles as on the walls: an obstacle is a closed wall inside the box. A trace
-ending inside a solid cell reads the faces there, 0 on its solid sides, as today's advection reads the
-cell's own value **(deduction)**. Cut cells (Batty, Bertails and Bridson 2007), the obstacle as a
+ending inside a solid cell reads the faces there, 0 on its solid sides **(deduction)**. Cut cells (Batty, Bertails and Bridson 2007), the obstacle as a
 fraction of a cell, are for later.
-
-Cost and gain **(deduction)**, against today's RGBA16F at the centers:
-
-| Pass                     | Expected                                                                                            |
-|--------------------------|-----------------------------------------------------------------------------------------------------|
-| the velocity's advection | slower: three traces a cell instead of one, each a velocity at its face and a read at its departure |
-| the centers' average     | new: one pass reading the faces, writing the RGBA volume                                            |
-| the divergence           | faster: six 2-byte faces a cell instead of six 8-byte neighbors                                     |
-| the gradient             | faster: the velocity read and written at 6 bytes a cell instead of 16                               |
-| the viscosity            | faster where on: 6 bytes a cell an iteration instead of 8                                           |
-| the step                 | about even to 1 ms slower at 256 × 448 × 128                                                        |
-
-The look **(deduction)**: the density's brightness kept (no bunching or thinning by compression), less
-cell-by-cell jitter for the confinement to spin up, swirls holding longer, pushes carrying further,
-sharper density edges; subtle at the calm preset.
-
-Measured before and after, the same runs on the code before (the baseline, taken first) and with the
-staggered velocity:
-
-| Test        | Run                                                                                                                                                                                                                                      |
-|-------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| timing      | `trial_runs.py`, baseline, staggered, baseline (`-timing 60 -warmup 10`, the pose on, standmoves): the step and each pass, the noise the two baselines' difference ([TIMING.md](TIMING.md#measured))                                     |
-| the floor   | the velocity's divergence after the projection, a cell's share, per solver, each grid by its own stencil: what the solve leaves on the grid it solves                                                                                    |
-| compression | a square of density in a closed box, a steady swirl, no fade and no evaporation: its total and its peak over 10 s, the same measure on both grids, since the water squeezed or stretched gathers or thins the density as the eye sees it |
-| the walls   | `maccormack_check.py`: the wall band and the inside, closed and open, both advections, ε 1.93 and 5, `slip_time` 0 and 2                                                                                                                 |
-| the detail  | `maccormack_check.py`: the density's edge and the swirl kept after 2 s                                                                                                                                                                   |
-| the water   | `fluid_compare.py` on stillslowfast and standmoves: water over body, peak, coast                                                                                                                                                         |
-| the look    | `fluid_compare.py --save` on stillslowfast: the composited output at four steps, side by side                                                                                                                                            |
 
 Sources: Harlow and Welch 1965, the MAC grid; Bridson 2015, ch. 2 (the grid), 3 (advecting it), 5
 (the pressure on it); Fedkiw, Stam and Jensen 2001, the confinement on it; the walls folded into the
@@ -890,23 +742,8 @@ operators on the GPU (Zaspel).
 
 ### Measured
 
-The same runs on the centered velocity (the baseline, `28655856`) and on the faces, deep_flow's preset. In the app (`trial_runs.py`, standmoves, the pose on), ms mean, two runs each within 0.03:
-
-| Pass                     | Centered | Faces | Faces, three R16F |
-|--------------------------|----------|-------|-------------------|
-| advect velocity          | 0.18     | 0.35  | 0.46              |
-| pressure                 | 1.80     | 1.61  |                   |
-| density                  | 1.48     | 1.59  |                   |
-| faces to centers         |          | 0.16  | 0.24              |
-| the step                 | 4.44     | 4.61  |                   |
-| viscosity, 20 iterations | 1.16     | 0.95  | 4.88              |
-
-The viscosity works out each face's weights (the walls', the slip's, the obstacles') once a dispatch;
-worked out for every face they cost more than the iterations (3.6 to 4.0 ms), so only the faces next to a
-wall or an obstacle do, the rest summing their six neighbors plainly, and the test whether a face is held
-reads all three components at once.
-
-The swirl (`maccormack_check.py --test swirl`, multigrid), at 10 s:
+Against the centered velocity, deep_flow's preset; what the faces cost is in
+[TIMING.md](TIMING.md#the-staggered-velocity). The swirl (`maccormack_check.py --test swirl`, multigrid), at 10 s:
 
 | Advection       | Swirl kept, centered | faces | Density total | The floor, centered | faces   |
 |-----------------|----------------------|-------|---------------|---------------------|---------|
@@ -922,34 +759,3 @@ the same within 0.01 on stillslowfast and standmoves. An obstacle's cells read 0
 walls decay as the centered velocity's did (the swing at ε 1.93, the mean at 4 s and 6 s: 0.0073 and
 0.0032 against 0.0077 and 0.0031); the open swirl drains alike, its floor 0.0001 against the centered
 0.0005 to 0.0015.
-
-## Parked
-
-Not worked on until asked for; each with what is known.
-
-- The 4K upscale: depth in 3D at the grid and detail in 2D at 4K, a march at the grid's size, one
-  edge-aware upscale of the flat result and a 4K detail layer advected by the grid's velocity; what
-  was found is in [The density's detail](#the-densitys-detail).
-- The particles' weight: the particles splatted into an `r32ui` grid by fixed-point
-  `imageAtomicAdd` (it needs integers), converted to the density volume the buoyancy reads.
-- The sparse grid: each step a pass marks the 8 × 8 × 8 bricks whose velocity or density is above
-  a floor, grown by one brick, into a list with an atomic counter; every pass but the pressure then
-  runs `glDispatchComputeIndirect` over the list, one workgroup a brick, and a brick off the list
-  keeps its values. The volumes stay dense: 24 GB holds them, so GVDB's atlas, which saves memory,
-  buys nothing here. The multigrid's coarse levels stay whole, an eighth and less of the work. Its
-  gain is the share of bricks off the list; first one cheap pass counts the active share on
-  standmoves and stillslowfast, and the grid is built only if it is under half.
-- MacCormack's cost at 4K: a 4K texel reads 41 texels a step against semi-Lagrangian's 16 (the
-  predictor, the velocity again, the forward trace, the cell, the limiter's eight), 3.7 ms for the
-  4K × 16 density. Two ways down: MacCormack on the velocity and semi-Lagrangian on the 4K density,
-  a setting; or the predictor reading its eight texels itself and keeping their min and max for the
-  limiter, about a fifth less **(deduction)**.
-- The density's detail carried by a flow map (BiMocq², Qu et al. 2019): the coordinates moved on
-  the coarse grid and the 4K density read through them, baked every half second; its benefit to be
-  shown first.
-- Vortex particles shed by the body for swirls below the grid (He et al. 2011; Weißmann and
-  Pinkall 2009).
-- Each field panel showing its own input gains as well, the same values as `input`'s: shared
-  between sibling panels, which `share` cannot do (it runs parent to child), so either hidden fields
-  at the top shared down to both, or a share between panels. In a field panel the system's name is
-  dropped as in `input`.

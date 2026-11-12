@@ -4,8 +4,8 @@ Every quantity and setting here is in a meaningful unit ([FLOW.md](FLOW.md#the-2
 
 The bridge turns the motion's velocity into what the fluid takes, in units of the body: how fast it
 moves, the dye it brings, its warmth. How the stages fit together is in [FLOW.md](FLOW.md), what
-the fluid does with each output in [FLUID_3D.md](FLUID_3D.md#the-inputs), what is open in
-[FLOW.md's Open](FLOW.md#open). "Code" is what the files show; **(deduction)** marks what is
+the fluid does with each output in [FLUID_3D.md](FLUID_3D.md#the-inputs), what is next in
+[PLAN.md](PLAN.md). "Code" is what the files show; **(deduction)** marks what is
 inferred from them, **(site fact)** what the operator saw. The 2D bridge (`bridge_2d/`) gives the
 boundary only and stays as on `main` until it is rebuilt on the Lucas–Kanade flow.
 

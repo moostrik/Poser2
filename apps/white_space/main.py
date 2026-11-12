@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 class WhiteSpaceMain:
     def __init__(self, simulation: bool = False, interface: bool = True) -> None:
         raise RuntimeError("white_space waits for the input refactor: the uploader has its own thread now, and white_space still runs its "
-                           "pose step on the camera's thread (modules/flow/INPUT_THREADS.md, Open 2). Run it from the main branch.")
+                           "pose step on the camera's thread (modules/flow/PLAN.md, line 4). Run it from the main branch.")
 
         self.is_running: bool = False
         self.is_finished: bool = False
