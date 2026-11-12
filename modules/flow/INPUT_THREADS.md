@@ -176,32 +176,82 @@ the crops cut without `synchronize` (`test_crop_extractor`), the alignment's two
 
 ### 1. The other apps
 
-hd_trio (three cameras) and white_space (four) run their pose step on the camera's thread through the frame
-bang; on this branch they stop at start with a message saying why, and run on `main`. Each moves
-to deep_flow's input, which takes the work off the camera's thread (in deep_flow 5.9 to 0.02 ms per frame at the
-mean) and loses no frame to a wait:
+white_space (four mono OAK-D cameras at 23 fps, the panoramic tracker, the light) and hd_trio (three color OAK-D
+cameras, P720 square at 23 fps, RVM's masks, the 2D flow) still run their pose step on the camera's thread
+through the frame bang; on this branch they stop at start with a message saying why, and run on `main`. Both run in `.venv` (depthai 2, the `oak` backend);
+neither camera delivers depth. The refactor moves them to deep_flow's input, by the same rules:
 
-1. The camera hands its frames to the uploader (`Uploader(settings)`, `submit_frame`) and the recorder only;
-   `PoseInference(crop, pose, uploader)` replaces `set_camera_frame`; the -sim detector takes the uploader's
-   images (`add_gpu_image_callback`) instead of `PoseInference`'s. white_space's `_store_video_frame`, which puts
-   the CPU frame on the board for the light renderer on the camera's thread, moves to the uploader's thread or
-   reads the uploaded image.
-2. The pose step runs on the uploader's thread, once per round of the cameras' frames: the frame `Sync` takes the
-   uploaded images' capture times instead of the camera frames', and its bang runs `PosesFromTracklets.process`
-   and `PoseInference.submit` on every camera's newest uploaded image. The tracklet `Sync` stays.
-3. The crops are cut at the pose model's input size (white_space does already). hd_trio cuts them at 768 × 1024 for
-   RVM, which the pose runner shrinks 4× with plain bilinear, an aliased input: the pose's crops at the model's size
-   and RVM's at its own, by a second size in `CropExtractor` or RVM resizing its input.
-4. hd_trio measures every capture, as deep_flow: `CaptureSync` completes a capture without depth on its image,
-   poses and masks; the board keeps the captures; the center layers, the 2D motion and the 2D bridge run per
-   capture, their temporal blends with them; and the 2D bridge, whose density is an amount, gets the max over a
-   tick's captures.
-5. The probe takes the app as an argument, and each app is measured against `main`: the camera's thread, the pose
-   step's rate per camera, the captures and the motion's measures (hd_trio), the render's tick.
-6. The start-up error and the tests marked as expected to fail go.
+- the camera's thread only hands over: to the uploader and the recorder;
+- the uploader makes the corrected camera frame on its own thread and hands it on; nothing there waits for the GPU;
+- the pose step runs off the camera's thread, its crops cut at the pose model's size and not waited for;
+- every frame a stage measures over time is measured once, in order, and a frame is dropped only where a stage
+  cannot keep up, counted and shown on the panel;
+- the render takes GPU images in without waiting, and a stage runs once per frame, not once per tick.
 
-In this order: white_space (the uploader's API, the rounds across cameras), then hd_trio (captures without depth,
-the 2D flow per capture).
+#### Shared parts (`modules/`)
+
+1. `Sync` takes the uploaded images (`submit_image(GpuImage)`, on the uploader's thread) as well as the camera's
+   frames: a round is one uploaded image per camera, so the bang fires on the uploader's thread, after every
+   camera's image of the round is on the GPU. The tracklet `Sync` is unchanged.
+2. The uploader hands a frame as it came to CPU readers on its own thread (`add_frame_callback`), for a reader that
+   needs the CPU image (white_space's light calibration); the camera's thread keeps only the hand-off.
+3. `CropExtractor` cuts each pose's region at every size asked for, one region per pose and one antialiased resize
+   per size: the pose model's input size for RTMPose, and a larger one for RVM (hd_trio's 768 × 1024).
+4. `CaptureMax` moves from the 3D bridge to the flow's shared parts, and the 2D bridge takes `BridgeInput.same_tick`
+   with it: its density is an amount (red) and its temperature ± (red), both kept by their size.
+5. The probe (`scripts/cadence_probe.py`) takes the app as an argument, with each app's measures: the camera's
+   thread per frame, the rounds per second, the pose step's rate per camera, the frames the motion measures
+   (hd_trio), the render's tick, the drops.
+
+#### white_space
+
+1. Each camera hands its frames to the uploader (`Uploader(settings)`) and the video recorder only.
+2. The uploader's images go to the -sim detector, the board (`set_camera_image`, the previews), and the frame
+   `Sync`, whose bang runs `PosesFromTracklets.process` and `PoseInference.submit` on every camera's newest image
+   (`PoseInference(crop, pose, uploader)`, its crops already at the model's size); the crops go to the board.
+3. The light's calibration layer (`test_calibration.py`) reads the CPU frame from the uploader's frame callback
+   instead of the camera's (`_store_video_frame`).
+4. The device simulator (`Simulator`, the recordings played through an OAK) hands over the same way as the camera.
+5. Measured live with four cameras and in -sim against `main`: the camera's thread per frame (deep_flow's went from
+   5.9 to 0.02 ms at the mean), the rounds per second against the cameras' rate, the pose rate per camera, the
+   uploader's drops; the light's own tick unchanged.
+
+#### hd_trio
+
+1. The cameras, the uploader and the frame `Sync` as white_space's (1, 2, 4 above).
+2. The crops: the pose model's at its input size (an antialiased cut where today it gets 768 × 1024 shrunk 4× by
+   plain bilinear, an aliased input), RVM's at 768 × 1024 from the same region (shared part 3).
+3. Every RVM result is measured. A result (`segmentation.Predictor`'s callback) carries the poses, the masks and
+   the foregrounds of one moment, cut from one uploaded image, so it is hd_trio's capture: complete when RVM hands
+   it on, with nothing to wait for. The board keeps the results until the render takes them, at most a few, the
+   oldest beyond that dropped and counted, as deep_flow's captures. The render runs each result, in order, through
+   the center layers (placed by the result's own poses), the 2D motion on the centered mask and the 2D bridge
+   stepping over the time since the result before; the fluids run every tick, each taking every camera's bridge,
+   and two results of one camera in one tick give the larger amount per pixel (shared part 4).
+4. The center layers' temporal blends (the mask's, the camera image's, the foreground's) then run once per result
+   instead of once per tick: with their factors as they are, a blend takes the render's rate over the cameras' as
+   long (about 2.6× at 60 ticks/s and 23 fps), so the factors are set again, on the look.
+5. Measured in -sim and live against `main`: the RVM results the motion measures, the render's tick, the latency
+   from the camera's stamp to the result on the board, the camera's thread.
+
+#### Decisions
+
+- hd_trio's capture is RVM's result, not `CaptureSync`'s image and depth: its flow reads only what RVM makes
+  (the mask the motion measures, the foreground the bridge colors with), and the poses those were cut for.
+- RVM's crop comes from `CropExtractor` at its own size, not from RVM resizing the pose model's crop: a 192 × 256
+  crop enlarged to RVM's input would lose the mask's detail.
+- hd_trio keeps its center layers, following the pose, fed per result. A view stage for the 2D flow beside
+  deep_flow's (`ViewLayer`), placed by the pose and masked by RVM, is the next step after this, not part of it.
+- One uploader thread for all of an app's cameras, which at 23 fps take 69 to 92 frames a second together against
+  deep_flow's 50: the probe's uploader times say whether it keeps up, and one uploader per camera follows only if
+  not.
+
+#### Order and done
+
+white_space first (the uploader's API, the rounds across cameras, no flow), then hd_trio (RVM's results, the 2D
+flow per result). Each is done when it starts on this branch without the start-up error, its camera threads only
+hand over (under 1 ms per frame at p95), every round runs the pose step and (hd_trio) every RVM result is measured,
+the render's tick and the latency are no worse than on `main` by runs back to back, and its tests pass.
 
 ### 2. deep_flow live
 
