@@ -3,9 +3,10 @@ files named `<cam>_<kind>_<chunk>` in a folder named after the start time, writt
 and merged into one `<cam>_<chunk>.mkv` per camera when a chunk ends (`chunk.merge_chunk`), with the
 metadata attached: the chunk's info line and one line per frame.
 
-The frames and the camera's tracklets of one capture are brought together by a `RecordingSync`: the
-color frame, its depth when DEPTH is in `video_frame_types`, and the tracklets of a camera that sends
-them, each capture waiting for its tracklets up to `tracklet_wait`. Recordings hold what the camera
+The parts of one capture are brought together by a `RecordingSync`: the color frame, its depth when
+DEPTH is in `video_frame_types`, the camera's tracklets and the host's poses, each part settled by the
+order its stream comes in. On stop no frame is taken any more, and the captures still waiting are
+settled by the parts that still come, for at most `STOP_WAIT`. Recordings hold what the camera
 delivered, not straightened and not mirrored, so the correction can still be tuned on them; `flip_h`
 says the frames are still to be mirrored. What a capture went without is counted on the panel and
 warned of. Both streams share `keyframe_interval`: a seek in a chunk goes to a color keyframe, so a
@@ -50,8 +51,6 @@ class RecorderSettings(BaseSettings):
     split:              Field[bool]             = Field(False, widget=Widget.button, description="Split chunk")
     output_path:        Field[str]              = Field("recordings", access=Field.INIT, description="Video recordings directory")
     name:               Field[str]              = Field("", widget=Widget.input, description="Recording name")
-    tracklet_wait:      Field[float]            = Field(100.0, min=0.0, max=1000.0, step=10.0, description="Longest a frame waits for its tracklets (ms)")
-    pose_wait:          Field[float]            = Field(150.0, min=0.0, max=1000.0, step=10.0, description="Longest a frame waits for its poses (ms)")
 
     # ── What a recording went without ─────────────────────────────────
     missed_depth:       Field[int]              = Field(0, access=Field.READ, description="Color frames left out, their depth missing")
@@ -66,6 +65,7 @@ FRAME_TYPE_LABELS: dict[FrameType, str] = {
     FrameType.DEPTH: 'D',
 }
 METADATA_LABEL: str = 'M'
+STOP_WAIT: float = 1.0      # s a stopping recording waits for the parts its last captures wait for
 DEPTH_SUFFIX: str = '.mkv'
 
 
@@ -106,7 +106,7 @@ class Recorder(Thread):
         self.with_depth: bool = FrameType.DEPTH in settings.video_frame_types
         self.recorders: dict[int, dict[FrameType, StreamWriter]] = {}
         self.frames: dict[int, Queue[RecordedCapture]] = {}
-        self.sync: RecordingSync = RecordingSync(self.with_depth, lambda: self.settings.tracklet_wait, lambda: self.settings.pose_wait)
+        self.sync: RecordingSync = RecordingSync(self.with_depth)
         self.sync.add_capture_callback(self._on_capture)
         self.metadata: dict[int, TextIO] = {}
         self.metadata_frames: dict[int, int] = {}       # the frames of the chunk so far, per camera
@@ -205,6 +205,12 @@ class Recorder(Thread):
         logger.info("VideoRecorder started → %s", self.output_folder_path)
 
     def _stop_recording(self) -> None:
+        """No frame is taken any more; the captures waiting are settled by the tracklets and poses that still come,
+        for at most `STOP_WAIT`, which only a stream that stopped with the recording runs out."""
+        deadline: float = time.perf_counter() + STOP_WAIT
+        while self.sync.waiting and time.perf_counter() < deadline:
+            self._write_queued()
+            time.sleep(0.01)
         self.sync.flush()
         self._write_queued()
         for c in range(self.settings.num_cams):
@@ -260,7 +266,6 @@ class Recorder(Thread):
 
     def _update_recording(self) -> None:
         split: bool = self.split_requested.is_set()      # read first: what was queued before the request ends its chunk
-        self.sync.update()
         self._write_queued()
         self._update_missed()
         if split:
@@ -337,19 +342,24 @@ class Recorder(Thread):
     def submit_tracklets(self, cam_tracklets: CameraTracklets) -> None:
         """A camera's tracklet callback, the tracklets as the camera gave them: while recording, to the sync.
         Tracklets found on the straightened image (the host detector's in -sim) are not a camera's, and stay out."""
-        if self._get_state() == RecState.REC and not cam_tracklets.straightened:
+        if self._taking_parts() and not cam_tracklets.straightened:
             self.sync.submit_tracklets(cam_tracklets)
 
     def expect_poses(self, cam_id: int, timestamp: float, asked: bool) -> None:
         """Whether the pose model was asked poses for the camera's frame captured at `timestamp`: while
         recording, to the sync, so a frame nobody asked poses for does not wait for them."""
-        if self._get_state() == RecState.REC:
+        if self._taking_parts():
             self.sync.expect_poses(cam_id, timestamp, asked)
 
     def submit_poses(self, frame_poses: FramePoses) -> None:
         """The host's poses of one camera's frame: while recording, to the sync."""
-        if self._get_state() == RecState.REC:
+        if self._taking_parts():
             self.sync.submit_poses(frame_poses)
+
+    def _taking_parts(self) -> bool:
+        """The tracklets and poses are taken while recording and while it stops: the captures waiting for them
+        when the recording stops are settled by those of the frames after it."""
+        return self._get_state() in (RecState.REC, RecState.STOP)
 
     def _on_capture(self, capture: RecordedCapture) -> None:
         self.frames[capture.video.cam_id].put(capture)

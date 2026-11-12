@@ -37,9 +37,14 @@ pose model on.
 `Recorder` takes the camera's frames (`submit_frame`) and tracklets (`submit_tracklets`) on the camera's threads and
 hands them to its `RecordingSync`, which brings the parts of one capture together, completeness first: the color
 frame, its depth when DEPTH is in `video_frame_types`, and the tracklets of a camera that sends them, matched by
-capture time within `CAPTURE_TOLERANCE` (2 ms, `CaptureStream`). Every complete capture waits for its tracklets up
-to `tracklet_wait` (100 ms, three times their latency), in the order of capture, and a newer capture never ends the
-wait; a camera that never sent tracklets is not waited for. The recorder's thread writes what the sync sends out.
+capture time within `CAPTURE_TOLERANCE` (2 ms, `CaptureStream`). Every complete capture waits for its tracklets, in
+the order of capture, and a newer capture never ends the wait; a camera that never sent tracklets is not waited
+for. No wait is timed: each stream comes in the order of capture, so a part of a later frame says this frame's will
+not come, and the capture goes out without it. At most `KEPT` captures (16, 320 ms at 50 fps, three times the
+slowest pose measured) wait per camera, beyond which the oldest goes out without what it waits for: the one case
+order cannot settle, a stream that stopped. On stop no frame is taken any more, and the captures still waiting are
+settled by the tracklets and poses of the frames after the stop, which keep coming, for at most `STOP_WAIT` (1 s,
+run out only by a stream that stopped with the recording). The recorder's thread writes what the sync sends out.
 
 The host's poses come too: the RAW stage's output, each pose's crop as its box (`BBox`) and the pose model's points
 in it with their scores (`Points2D`), stamped with the image's capture by the crops (`CropExtractor.process`). The
@@ -47,8 +52,8 @@ box goes with the points, so a replay does not depend on the box smoother and pr
 predictor reads time, and a replay's stamps are not live's arrivals. The app hands them over (`Recorder.submit_poses`
 through `modules.inference.frame_poses`, the camera contract knowing no pose), stamping their arrival there, and
 says for every image whether the pose model was asked poses for it (`Recorder.expect_poses`, from what
-`PosesFromTracklets.process` returns). A capture waits up to `pose_wait` (150 ms, until the poses' latency is
-measured live) to know and for the poses asked for; a frame nobody asked poses for does not wait.
+`PosesFromTracklets.process` returns). A capture waits to know, and for the poses asked for, settled by the order
+as the tracklets are; a frame nobody asked poses for does not wait.
 
 What a capture went without is counted on the panel (`missed_depth`, `missed_color`, `missed_tracklets`,
 `missed_poses`: asked for, a batch the model dropped) and warned
@@ -177,11 +182,10 @@ Measured by `scripts/pose_recording_probe.py`, on `20261112-124918_hands` (P800,
 | played with the pose model on, recorded again  | 594    | 488 (82%)            | 64.5 / 97.5 / 111                    |
 | that recording played with its recorded poses  | 463    | 463, all as recorded | 72.3 / 105 / 114                     |
 
-No pose came later than `pose_wait` (150 ms); the 106 frames without poses are batches the pose model dropped under
--sim's load **(deduction)**, which the replay drops alike. In the replay every RAW pose had its recorded box and
-points, no `track_id` was missed, and the poses came about 8 ms later after their capture than recorded: -sim's own
-delay on top of the recorded one.
+The 106 frames without poses are batches the pose model dropped under -sim's load **(deduction)**, which the
+replay drops alike. In the replay every RAW pose had its recorded box and points, no `track_id` was missed, and the
+poses came about 8 ms later after their capture than recorded: -sim's own delay on top of the recorded one. The
+first run waited for the poses up to a timed 150 ms, which the order of the streams has replaced since.
 
-Waiting for the camera: the poses' latency live, from a new recording's `pose_latency`, to set `pose_wait` to about
-three times it; the board's poses over the image in a replay against live.
+Waiting for the camera: the board's poses over the image in a replay against live.
 

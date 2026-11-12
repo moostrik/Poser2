@@ -15,6 +15,7 @@ from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, ChunkIn
     Player, PlayerSettings, Recorder, RecorderSettings, TrackingStatus, make_chunk_name, read_metadata
 from modules.camera.chunk import frame_line, info_line, parse_metadata
 from modules.camera.recorder import RecState
+from modules.camera.recording_sync import KEPT
 from modules.utils import Rect
 
 LENS: list[list[float]] = [[538.0, 0.0, 450.0], [0.0, 538.0, 360.0], [0.0, 0.0, 1.0]]
@@ -136,23 +137,28 @@ class TrackletTest(unittest.TestCase):
         for i in (1, 2):
             self.recorder.submit_frame(video_frame(i))
             self.recorder.submit_frame(depth_frame(1000, float(i)))
-        self.recorder.submit_tracklets(tracklets(2.0))          # frame 1's still on their way
-        self.assertEqual(self.recorder.frames[0].qsize(), 1)
+        self.assertEqual(self.recorder.frames[0].qsize(), 1)    # frames 1 and 2 wait, however long
         self.recorder.submit_tracklets(tracklets(1.0))
+        self.recorder.submit_tracklets(tracklets(2.0))
         self.assertEqual([self.recorder.frames[0].get_nowait().video.timestamp for _ in range(3)], [0.0, 1.0, 2.0])
 
-    def test_tracklets_that_do_not_come_in_time_are_counted(self) -> None:
-        self.recorder.settings.tracklet_wait = 5.0
+    def test_a_later_frame_s_tracklets_settle_a_frame_without_its_own(self) -> None:
         self.recorder.submit_tracklets(tracklets(0.0))
         self.recorder.submit_frame(video_frame(0))
         self.recorder.submit_frame(depth_frame(1000, 0.0))
         self.recorder.submit_frame(video_frame(1))
         self.recorder.submit_frame(depth_frame(1000, 1.0))
-        time.sleep(0.01)
-        self.recorder.sync.update()
+        self.recorder.submit_tracklets(tracklets(2.0))          # frame 1's never came
         captures = [self.recorder.frames[0].get_nowait() for _ in range(2)]
         self.assertIsNone(captures[1].tracklets)
         self.assertEqual(self.recorder.sync.missed.total('tracklets'), 1)
+
+    def test_a_stream_that_stopped_holds_no_more_than_kept(self) -> None:
+        self.recorder.submit_tracklets(tracklets(0.0))
+        for i in range(KEPT + 3):
+            self.recorder.submit_frame(video_frame(i))
+            self.recorder.submit_frame(depth_frame(1000, float(i)))
+        self.assertEqual(self.recorder.sync.waiting, KEPT)
 
     def test_a_camera_without_tracklets_is_not_waited_for(self) -> None:
         self.recorder.submit_frame(video_frame(0))
@@ -187,15 +193,22 @@ class TrackletTest(unittest.TestCase):
         self.recorder.expect_poses(0, 1.0, False)
         self.assertEqual(self.recorder.frames[0].qsize(), 2)
 
-    def test_poses_asked_for_that_never_come_are_counted(self) -> None:
-        self.recorder.settings.pose_wait = 5.0
+    def test_poses_asked_for_and_passed_by_a_later_frame_s_are_counted(self) -> None:
         self.recorder.expect_poses(0, 0.0, True)
         self.recorder.submit_frame(video_frame(0))
         self.recorder.submit_frame(depth_frame(1000, 0.0))
-        time.sleep(0.01)
-        self.recorder.sync.update()
+        self.assertTrue(self.recorder.frames[0].empty())
+        self.recorder.submit_poses(poses(1.0))                  # the batch of frame 0 was dropped
         self.assertIsNone(self.recorder.frames[0].get_nowait().poses)
-        self.assertEqual(self.recorder.sync.missed.total('poses') + self.recorder.sync.missed.at_start('poses'), 1)
+        self.assertEqual(self.recorder.sync.missed.total('poses'), 1)
+
+    def test_a_later_frame_s_word_settles_a_frame_none_was_said_of(self) -> None:
+        self.recorder.expect_poses(0, 0.0, False)
+        self.recorder.submit_frame(video_frame(1))
+        self.recorder.submit_frame(depth_frame(1000, 1.0))      # no word of frame 1: its image was dropped
+        self.assertTrue(self.recorder.frames[0].empty())
+        self.recorder.expect_poses(0, 2.0, False)
+        self.assertIsNone(self.recorder.frames[0].get_nowait().poses)
 
     def test_the_end_writes_what_waits(self) -> None:
         self.recorder.submit_tracklets(tracklets(0.0))

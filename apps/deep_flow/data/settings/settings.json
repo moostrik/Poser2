@@ -108,8 +108,7 @@
       ],
       "enabled": true,
       "output_path": "recordings",
-      "name": "",
-      "tracklet_wait": 100.0
+      "name": ""
     },
     "tracker": {
       "tracklet_min_age": 3,

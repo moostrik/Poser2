@@ -1,19 +1,16 @@
 """RecordingSync: the color frame, its depth, the camera's tracklets and the host's poses of one capture, brought
-together for the recorder. Completeness first: every capture waits for its parts in the order of capture, as long
-as the slowest takes, and a newer capture never ends the wait; the live `CaptureSync` puts latency first instead.
+together for the recorder. Completeness first: every capture waits for its parts in the order of capture, and a
+newer capture never ends the wait; the live `CaptureSync` puts latency first instead.
 
 A capture is complete with its color frame and, when depth is recorded, its depth, matched by capture time
-(`CaptureStream`). Once a camera has sent tracklets it sends them for every frame, about 33 ms after the frame's
-capture on the P800, so a complete capture then waits for its own up to `RecorderSettings.tracklet_wait`;
-a camera that never sent any is not waited for. The poses come only for a frame the pose model was asked poses
-for: once the app has said for any frame whether it asked (`expect_poses`), a capture waits up to
-`RecorderSettings.pose_wait` to know, and for the poses it was asked; a frame nobody asked poses for does not
-wait for them. Captures go out in order: one still waiting holds the newer ones behind it. A color frame or a
-depth no capture took, and a capture that went out without its tracklets or the poses asked for, are counted and
-warned of (`MissedParts`: `depth`, `color`, `tracklets`, `poses`). The submits only take note, on the threads they
-come on; `update`, on the recorder's thread, sends out the captures whose wait has ended."""
+(`CaptureStream`). Then it waits for its tracklets, once the camera has sent any, and for its poses, once the app
+says per frame whether the pose model was asked poses for it (`expect_poses`); a frame nobody asked poses for does
+not wait for them. No wait is timed: each stream comes in the order of capture, so a part of a later frame says
+that this frame's part will not come. Then the capture goes out without it, counted and warned of (`MissedParts`:
+`tracklets`, `poses`; and a color frame or a depth no capture took: `depth`, `color`). Captures go out in order:
+one still waiting holds the newer ones behind it, at most `KEPT` of them, beyond which the oldest goes out without
+what it waits for, for a stream that stopped. The submits only take note, on the threads they come on."""
 
-import time
 from collections import defaultdict, deque
 from dataclasses import dataclass
 from threading import Lock
@@ -24,7 +21,7 @@ from .chunk import PoseArrays
 from .frame import CAPTURE_TOLERANCE, CameraFrame, FrameType
 from .tracklet import CameraTracklets
 
-KEPT: int = 16      # frames of each part kept per camera: the depth trails its color by about one, the tracklets by two
+KEPT: int = 16      # frames of each part kept, and captures waiting, per camera: 320 ms at 50 fps, three times the slowest pose
 
 
 @dataclass(frozen=True)
@@ -54,17 +51,17 @@ RecordedCaptureCallback: TypeAlias = Callable[[RecordedCapture], None]
 class _Waiting:
     video: CameraFrame
     depth: CameraFrame | None
-    tracklet_deadline: float        # perf_counter: when it goes out without its tracklets
-    pose_deadline: float            # and without its poses
+
+
+def _later(stream: CaptureStream, timestamp: float) -> bool:
+    """A part of a frame captured after `timestamp` has come: the stream is past it."""
+    newest: float | None = stream.newest()
+    return newest is not None and newest > timestamp + CAPTURE_TOLERANCE
 
 
 class RecordingSync:
-    def __init__(self, with_depth: bool, tracklet_wait: Callable[[], float], pose_wait: Callable[[], float]) -> None:
-        """`tracklet_wait`, `pose_wait`: the longest a capture waits for its tracklets and its poses, in ms, read
-        when a capture completes."""
+    def __init__(self, with_depth: bool) -> None:
         self.with_depth: bool = with_depth
-        self._tracklet_wait: Callable[[], float] = tracklet_wait
-        self._pose_wait: Callable[[], float] = pose_wait
         self._lock: Lock = Lock()
         self._emit_lock: Lock = Lock()          # matching and sending as one step, so captures leave in order
         self._videos: dict[int, CaptureStream[CameraFrame]] = defaultdict(lambda: CaptureStream(KEPT))
@@ -93,6 +90,12 @@ class RecordingSync:
             self._asks_poses.clear()
             self._waiting.clear()
             self.missed.reset()
+
+    @property
+    def waiting(self) -> int:
+        """The captures complete and waiting for their tracklets or poses, over every camera."""
+        with self._lock:
+            return sum(len(waiting) for waiting in self._waiting.values())
 
     # ── Inputs ────────────────────────────────────────────────────────
 
@@ -135,22 +138,13 @@ class RecordingSync:
                 captures: list[RecordedCapture] = self._release(frame_poses.cam_id, force=False)
             self._emit(captures)
 
-    # ── Out, on the recorder's thread ─────────────────────────────────
-
-    def update(self) -> None:
-        """Send out the captures whose wait for their tracklets and poses has ended."""
-        self._send_all(force=False)
-
     def flush(self) -> None:
         """Send out every capture waiting, without the parts that have not come: the recording ends."""
-        self._send_all(force=True)
-
-    def _send_all(self, force: bool) -> None:
         with self._emit_lock:
             with self._lock:
                 captures: list[RecordedCapture] = []
                 for cam_id in list(self._waiting):
-                    captures += self._release(cam_id, force)
+                    captures += self._release(cam_id, force=True)
             self._emit(captures)
 
     # ── Matching, under the lock ──────────────────────────────────────
@@ -167,31 +161,32 @@ class RecordingSync:
                         complete.append((video.timestamp, video, depth))
         else:
             complete = [(video_time, video, None) for video_time, video in self._videos[cam_id] if video_time > last + CAPTURE_TOLERANCE]
-        now: float = time.perf_counter()
         for timestamp, video, depth in complete:
             self.missed.count(cam_id, 'depth', self._videos[cam_id].take_through(timestamp))     # color frames without depth
             if self.with_depth:
                 self.missed.count(cam_id, 'color', self._depths[cam_id].take_through(timestamp))
             self._last[cam_id] = timestamp
-            self._waiting[cam_id].append(_Waiting(video, depth, now + self._tracklet_wait() / 1000.0, now + self._pose_wait() / 1000.0))
+            self._waiting[cam_id].append(_Waiting(video, depth))
             self.missed.started()
 
     def _release(self, cam_id: int, force: bool) -> list[RecordedCapture]:
-        """The captures at the head of this camera's line whose parts are in or whose wait for them has ended."""
+        """The captures at the head of this camera's line whose parts are in, or whose streams are past them."""
         captures: list[RecordedCapture] = []
         waiting: deque[_Waiting] = self._waiting[cam_id]
         tracklets: CaptureStream[CameraTracklets] = self._tracklets[cam_id]
+        asks: CaptureStream[bool] = self._asks[cam_id]
         poses: CaptureStream[FramePoses] = self._poses[cam_id]
-        now: float = time.perf_counter()
         while waiting:
             head: _Waiting = waiting[0]
             timestamp: float = head.video.timestamp
             found_tracklets: CameraTracklets | None = tracklets.at(timestamp)
-            tracklets_due: bool = found_tracklets is None and cam_id in self._sends_tracklets and now < head.tracklet_deadline
-            asked: bool | None = self._asks[cam_id].at(timestamp) if cam_id in self._asks_poses else False
+            tracklets_due: bool = found_tracklets is None and cam_id in self._sends_tracklets and not _later(tracklets, timestamp)
+            asked: bool | None = asks.at(timestamp) if cam_id in self._asks_poses else False
+            if asked is None and _later(asks, timestamp):
+                asked = False           # the stream is past it without a word: no image was posed
             found_poses: FramePoses | None = poses.at(timestamp) if asked else None
-            poses_due: bool = (asked is None or (asked and found_poses is None)) and now < head.pose_deadline
-            if not force and (tracklets_due or poses_due):
+            poses_due: bool = asked is None or (asked and found_poses is None and not _later(poses, timestamp))
+            if not force and len(waiting) <= KEPT and (tracklets_due or poses_due):
                 break
             waiting.popleft()
             if found_tracklets is None and cam_id in self._sends_tracklets:
@@ -200,7 +195,7 @@ class RecordingSync:
                 self.missed.count(cam_id, 'poses')      # asked, or never said, and none came
             tracklets.take_through(timestamp)
             poses.take_through(timestamp)
-            self._asks[cam_id].take_through(timestamp)
+            asks.take_through(timestamp)
             captures.append(RecordedCapture(head.video, head.depth, found_tracklets, found_poses))
         return captures
 
