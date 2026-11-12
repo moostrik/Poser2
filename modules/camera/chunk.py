@@ -16,6 +16,7 @@ import subprocess
 import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import TypeAlias
 
 import numpy as np
 
@@ -45,17 +46,25 @@ class ChunkInfo:
     depth: bool = True
 
 
+# A frame's poses by track_id: the box they were found in (x, y, width, height, float32 (4,)) and the
+# points in it (float32 (17, 3): x, y, score). The camera contract knows no pose; the app converts.
+PoseArrays: TypeAlias = dict[int, tuple[np.ndarray, np.ndarray]]
+
+
 @dataclass(frozen=True)
 class FrameMetadata:
     """What a chunk keeps of one frame beside its images: its capture time, the camera's readings,
     the frame's latency (its arrival minus its capture, s), the camera's tracklets of it as the
-    camera gave them and their latency. None where the frame had none: `tracklets` None is a
-    frame no tracklets came for, an empty list a frame with no player."""
+    camera gave them and their latency, and the host's poses of it and their latency. None where
+    the frame had none: `tracklets` None is a frame no tracklets came for, an empty list a frame with
+    no player; `poses` None is a frame no poses came for."""
     timestamp: float
     readings: FrameReadings | None = None
     video_latency: float | None = None
     tracklets: list[CameraTracklet] | None = None
     tracklet_latency: float | None = None
+    poses: PoseArrays | None = None
+    pose_latency: float | None = None
 
 
 @dataclass(frozen=True)
@@ -85,14 +94,24 @@ def frame_line(number: int, frame: FrameMetadata) -> str:
     if frame.tracklets is not None:
         tracklets = [{'id': t.id, 'status': t.status.name, 'roi': [t.roi.x, t.roi.y, t.roi.width, t.roi.height], 'age': t.age,
                       'keypoints': t.keypoints.tolist() if t.keypoints is not None else None} for t in frame.tracklets]
+    poses: dict[str, dict] | None = None
+    if frame.poses is not None:
+        poses = {str(track_id): {'box': _rounded(box), 'points': _rounded(points)} for track_id, (box, points) in frame.poses.items()}
     return json.dumps({'frame': number, 'timestamp': frame.timestamp, 'readings': readings, 'video_latency': frame.video_latency,
-                       'tracklets': tracklets, 'tracklet_latency': frame.tracklet_latency}) + '\n'
+                       'tracklets': tracklets, 'tracklet_latency': frame.tracklet_latency,
+                       'poses': poses, 'pose_latency': frame.pose_latency}) + '\n'
+
+
+def _rounded(values: np.ndarray) -> list:
+    """An array as lists at five decimals: a pose's coordinates and scores need no more."""
+    return np.round(values.astype(np.float64), 5).tolist()
 
 
 def _frame(values: dict, cam_id: int) -> FrameMetadata:
     timestamp: float = values['timestamp']
     readings: dict | None = values.get('readings')
     tracklets: list[dict] | None = values.get('tracklets')
+    poses: dict[str, dict] | None = values.get('poses')
     return FrameMetadata(
         timestamp,
         FrameReadings(**readings) if readings is not None else None,
@@ -100,7 +119,10 @@ def _frame(values: dict, cam_id: int) -> FrameMetadata:
         [CameraTracklet(cam_id=cam_id, id=t['id'], status=TrackingStatus[t['status']], roi=Rect(*t['roi']), age=t['age'], timestamp=timestamp,
                         keypoints=np.array(t['keypoints'], dtype=np.float32) if t['keypoints'] is not None else None)
          for t in tracklets] if tracklets is not None else None,
-        values.get('tracklet_latency'))
+        values.get('tracklet_latency'),
+        {int(track_id): (np.array(p['box'], dtype=np.float32), np.array(p['points'], dtype=np.float32)) for track_id, p in poses.items()}
+        if poses is not None else None,
+        values.get('pose_latency'))
 
 
 def parse_metadata(text: str, cam_id: int = 0) -> ChunkMetadata:

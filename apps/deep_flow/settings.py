@@ -121,6 +121,7 @@ class Oak4Group(BaseSettings):
     simulator      : Group[PlayerSettings]                 = Group(PlayerSettings, share=[num_cams, fps])
     uploader       : Group[inference.UploaderSettings]     = Group(inference.UploaderSettings)
     person_detector: Group[inference.detection.Settings]   = Group(inference.detection.Settings)   # the replay backend's person detector
+    recorded_poses : Group[inference.RecordedPosesSettings] = Group(inference.RecordedPosesSettings)   # the replay's poses in place of the pose model
     control        : Group[SessionSettings]                = Group(SessionSettings, share=[start, stop, split, split_seconds])
     recorder       : Group[RecorderSettings]               = Group(RecorderSettings, share=[num_cams, fps, keyframe_interval, start, stop, split])
     tracker        : Group[OnePerCamTrackerSettings]       = Group(OnePerCamTrackerSettings)

@@ -14,8 +14,8 @@ from .geometry import       CameraResolution, RESOLUTION_SIZES, MONO_RESOLUTIONS
 from .tilt_correction import TiltCorrection, TILT_STEP
 from .sync import           Sync, SyncSettings
 from .capture_match import  CaptureStream, MissedParts
-from .chunk import          ChunkInfo, ChunkMetadata, FrameMetadata, merge_chunk, read_metadata, finish_unmerged
-from .recording_sync import RecordingSync, RecordedCapture
+from .chunk import          ChunkInfo, ChunkMetadata, FrameMetadata, PoseArrays, merge_chunk, read_metadata, finish_unmerged
+from .recording_sync import RecordingSync, RecordedCapture, FramePoses
 from .recorder import       Recorder, RecorderSettings, make_file_name, make_chunk_name, make_folder_name
 from .player import         Player, PlayerSettings, ClipFrameCallback, LoopCallback
 from .depthai_backend import oak_backend, require_backend

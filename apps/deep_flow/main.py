@@ -16,7 +16,7 @@ from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
 from modules.pose import configure_features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import optical_flow, detection, GpuImage, PoseInference, Capture, CaptureSync, Uploader
+from modules.inference import optical_flow, detection, GpuImage, PoseInference, RecordedPoses, Capture, CaptureSync, Uploader, frame_poses
 from modules.pose import FrameDict
 from modules.utils import FPS, PerformanceTimer
 
@@ -85,6 +85,12 @@ class DeepFlowMain:
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
         self.uploader = Uploader(self.settings.camera.uploader)          # the camera's hand-off: the frames onto the GPU, on its own thread
         self.pose_inference = PoseInference(p.image_crop, p.pose, self.uploader)    # the crop and the pose model, the frame domain's async step
+        # -sim plays the recording's poses in place of the pose model, around it (`recorded_poses.enabled`)
+        self.recorded_poses: RecordedPoses | None = None
+        if self.player is not None:
+            self.recorded_poses = RecordedPoses(self.settings.camera.recorded_poses, self.pose_inference)
+            self.player.add_frame_callback(self.recorded_poses.set_clip_frame)
+        pose_step: PoseInference | RecordedPoses = self.recorded_poses if self.recorded_poses is not None else self.pose_inference
         self.capture_sync = CaptureSync(p.capture_sync)                  # the color, depth and poses of one moment, for the render
         self.capture_rate: FPS = FPS(120)                                # the captures it hands on, for the panel's cadence
 
@@ -112,12 +118,14 @@ class DeepFlowMain:
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded image drives the frame domain
         # through the tracklet poses (`_on_image`); the render tick drives the output domain (LERP). Every stage's frames
         # go to the board and the sound; the board also reads each stage's window.
-        self.pipeline = PosePipeline(pipeline_spec(p, self.poses_from_tracklets, self.pose_inference))
+        self.pipeline = PosePipeline(pipeline_spec(p, self.poses_from_tracklets, pose_step))
         for stage in Stage:
             self.pipeline.add_frames_callback(stage, partial(self.board.set_frames, stage))
             self.pipeline.add_frames_callback(stage, partial(self.osc_sound.submit_frames, stage))
             self.board.set_window_source(stage, self.pipeline.window(stage))
         self.pipeline.add_frames_callback(Stage.RAW, partial(self._on_pose_frames, Series.POSE_LATENCY_RAW))
+        if self.recorder is not None:
+            self.pipeline.add_frames_callback(Stage.RAW, self._record_poses)     # the pose model's poses, with the video
         self.pipeline.add_frames_callback(Stage.SMOOTH, partial(self._on_pose_frames, Series.POSE_LATENCY_SMOOTH))
 
         # THE UPLOADER'S HAND-OFFS, in order on its thread: each uploaded image to the detector (-sim), the capture
@@ -162,7 +170,10 @@ class DeepFlowMain:
             camera.start()
 
         self.tracker.start()
-        self.pose_inference.start()
+        if self.recorded_poses is not None:
+            self.recorded_poses.start()         # starts the pose model with it
+        else:
+            self.pose_inference.start()
         self.capture_sync.start()
         self.optical_flow_predictor.start()
 
@@ -178,12 +189,22 @@ class DeepFlowMain:
 
     def _on_image(self, image: GpuImage) -> None:
         """An uploaded image, on the uploader's thread: the pose step for it, and the camera's interval. With one
-        camera every image is a round, so the frame domain runs on each, at the image's capture time."""
-        self.poses_from_tracklets.process(image.timestamp)
+        camera every image is a round, so the frame domain runs on each, at the image's capture time. The recorder
+        hears whether the pose model was asked poses for the image, so a frame without a player does not wait."""
+        asked: FrameDict = self.poses_from_tracklets.process(image.timestamp)
+        if self.recorder is not None:
+            self.recorder.expect_poses(image.cam_id, image.timestamp, bool(asked) and self.settings.pose.pose.enabled)
         last: float | None = self._last_camera_frame.get(image.cam_id)
         self._last_camera_frame[image.cam_id] = image.timestamp
         if last is not None:
             self.board.submit_time_sample(Series.CAMERA_INTERVAL, (image.timestamp - last) * 1000.0, image.timestamp)
+
+    def _record_poses(self, frames: FrameDict) -> None:
+        """The RAW stage's poses, on the pose model's thread, to the recorder: their hand-over, stamped here."""
+        assert self.recorder is not None
+        arrival: float = time.perf_counter()
+        for poses in frame_poses(frames, arrival):
+            self.recorder.submit_poses(poses)
 
     def _on_tracklets(self, cam_tracklets: CameraTracklets) -> None:
         """The camera's tracklets have reached the tracker's queue: its update, at their capture time."""
@@ -246,7 +267,10 @@ class DeepFlowMain:
         self.tracker.stop()
         self.osc_sound.stop()
 
-        self.pose_inference.stop()
+        if self.recorded_poses is not None:
+            self.recorded_poses.stop()          # stops the pose model with it
+        else:
+            self.pose_inference.stop()
         self.capture_sync.stop()
         if self.person_detector is not None:
             self.person_detector.stop()

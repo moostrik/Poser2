@@ -35,8 +35,8 @@ class CropExtractor:
         prev_images: ImageDict,
         timestamps: TimestampDict,
         ready: torch.cuda.Event | None = None,
-    ) -> None:
-        """Crop images for each pose and notify callbacks.
+    ) -> tuple[FrameDict, CropImageDict]:
+        """Crop images for each pose, notify callbacks and return the cropped poses and their crops.
 
         Args:
             poses:       FrameDict with BBox features, keyed by track_id
@@ -101,6 +101,7 @@ class CropExtractor:
                 callback(cropped_poses, crop_images)
             except Exception:
                 logger.exception("Error in crop callback")
+        return cropped_poses, crop_images
 
     def _calculate_crop_roi(self, bbox_rect: Rect, img_width: int, img_height: int) -> Rect:
         image_rect = Rect(0.0, 0.0, float(img_width), float(img_height))

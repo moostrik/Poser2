@@ -1,9 +1,9 @@
 # Recording and playback
 
-How a camera's frames and tracklets are recorded and played back, so `-sim` runs an app on a recording without a
-device, with the camera's own tracklets, their timing and live's GPU load. The modules' docstrings own the details:
-`recorder.py`, `recording_sync.py`, `capture_match.py`, `chunk.py`, `player.py`, `replay/camera.py`,
-`replay/tracker.py`. The threads a frame then goes through are deep_flow's ([INPUT_THREADS.md](../flow/INPUT_THREADS.md)).
+How a camera's frames, its tracklets and the host's poses are recorded and played back, so `-sim` runs an app on a
+recording without a device, with the camera's own tracklets and live's poses, at their timing. The modules'
+docstrings own the details: `recorder.py`, `recording_sync.py`, `capture_match.py`, `chunk.py`, `player.py`,
+`replay/camera.py`, `replay/tracker.py`, `modules/inference/recorded_poses.py`. The threads a frame then goes through are deep_flow's ([INPUT_THREADS.md](../flow/INPUT_THREADS.md)).
 
 "Code" is what the files show; **(deduction)** marks what is inferred from them, **(site fact)** what was told.
 
@@ -25,7 +25,7 @@ frames, about 33 ms after their frame's capture **(site fact)**.
 
 Tracklets found on the uploaded image are in its frame already (`straightened`): the host detector's in -sim.
 hd_trio and white_space still wire the camera's tracklets to their tracker directly; they are off on this branch and
-take the uploader's with [INPUT_THREADS.md Plan 1](../flow/INPUT_THREADS.md#1-white_space-and-hd_trio-on-deep_flows-input).
+take the uploader's with [PLAN.md's line 4](../flow/PLAN.md#4-the-other-apps-on-deep_flows-input).
 
 ## Recording
 
@@ -36,7 +36,17 @@ capture time within `CAPTURE_TOLERANCE` (2 ms, `CaptureStream`). Every complete 
 to `tracklet_wait` (100 ms, three times their latency), in the order of capture, and a newer capture never ends the
 wait; a camera that never sent tracklets is not waited for. The recorder's thread writes what the sync sends out.
 
-What a capture went without is counted on the panel (`missed_depth`, `missed_color`, `missed_tracklets`) and warned
+The host's poses come too: the RAW stage's output, each pose's crop as its box (`BBox`) and the pose model's points
+in it with their scores (`Points2D`), stamped with the image's capture by the crops (`CropExtractor.process`). The
+box goes with the points, so a replay does not depend on the box smoother and predictor reproducing live's box: the
+predictor reads time, and a replay's stamps are not live's arrivals. The app hands them over (`Recorder.submit_poses`
+through `modules.inference.frame_poses`, the camera contract knowing no pose), stamping their arrival there, and
+says for every image whether the pose model was asked poses for it (`Recorder.expect_poses`, from what
+`PosesFromTracklets.process` returns). A capture waits up to `pose_wait` (150 ms, until the poses' latency is
+measured live) to know and for the poses asked for; a frame nobody asked poses for does not wait.
+
+What a capture went without is counted on the panel (`missed_depth`, `missed_color`, `missed_tracklets`,
+`missed_poses`: asked for, a batch the model dropped) and warned
 of, at most once a second (`MissedParts`); what came before a recording's first capture, a few frames at every
 start, is counted apart and not warned of. The live `CaptureSync` (`modules/inference`) shares the matching and the
 counting and puts latency first instead: its newest capture wins and a late part is left out.
@@ -63,9 +73,13 @@ A chunk holds nothing straightened and nothing mirrored, and only what its playb
 | per frame  | `video_latency` (s): the frame's arrival minus its capture                              |
 | per frame  | the tracklets: `id`, `status`, `roi`, `age`, `keypoints` (null without a pose model)    |
 | per frame  | `tracklet_latency` (s): their arrival minus their frame's capture                       |
+| per frame  | `poses`: per `track_id`, the box (x, y, width, height) and the points (17 × x, y, score) |
+| per frame  | `pose_latency` (s): the poses' arrival minus the frame's capture                        |
 
 One line per frame, always, so a line's place is its frame's number. The tracklets are null for a frame none came
-for and an empty list for a frame with no player. Not recorded: the homography and the tilt offset (a playback
+for and an empty list for a frame with no player; the poses are null for a frame the model gave none (no player,
+or a batch it dropped), so a replay drops the same frames live did. A player's poses take about 400 bytes a frame,
+at five decimals **(deduction)**. Not recorded: the homography and the tilt offset (a playback
 makes its own, from the tilt and the live offset), the model chain (the keypoints say whether a pose model ran),
 the camera's settings, the depth's latency (the player hands a frame's depth with its color). Recordings made
 before this layout play wrong: their `flip_h` meant "mirrored before storing", and their readings are not read.
@@ -106,6 +120,24 @@ Its tracklets come one of two ways:
   through `replay.Tracker` (the device's tracker in software, SORT's shape), out as tracklets marked `straightened`.
   They differ from live's in their model, their timing (the detector's thread) and the GPU load (1 ms a frame).
 
+## The recorded poses
+
+`RecordedPoses` (`modules/inference`) is the RAW stage's async step in -sim, around `PoseInference`. It hears the
+player's frames (`set_clip_frame`, a `ClipFrameCallback`) and keeps each frame's recorded poses by its capture on
+the play's clock, the stamp the crops give the stage's poses. With `recorded_poses.enabled` on (deep_flow's default),
+it cuts the crops for what reads them (`PoseInference.cut_crops`: the optical flow on the crops, hd_trio's masks,
+the crop previews) without the pose model, sets each pose's box and points from the recording by `track_id`, and
+hands them on after the recorded `pose_latency`, from its own thread. A frame the recording has no poses for sends
+none; a pose whose `track_id` it has not goes on without points, counted and warned of. The `track_id`s come from
+the host tracker on the recorded tracklets, the same tracker on the same messages as live, so they match the
+recording's **(deduction)**. With it off the pose model runs as live, with live's GPU load, its poses differing a
+little every play; it is apart from `pose.enabled`, which the preset shares between live and -sim. A jump in the
+recorded time (a loop, a seek) drops what waits. A recording without poses plays boxes without points while it is
+on, as one without tracklets plays no players with the detector off.
+
+The pose recorder of `modules/pose` (`Recorder`, HDF5 per stage, hd_trio's session and intro sequence) is another
+thing: it records a stage's features for the show to play, on the wall clock, apart from the video.
+
 ## Open
 
 ### 1. Checks of the recorded tracklets
@@ -125,3 +157,18 @@ Waiting for the camera:
   **(site fact)**, so the live number is taken anew;
 - the pose points and boxes over the image, live and in -sim, to see the tracklets straightened with their own
   frame.
+
+### 2. Checks of the recorded poses
+
+Built 2026-11-12 in one commit, tested without the camera: the chunk's poses in and out, the recorder waiting for
+the poses asked for and not for a frame nobody asked, the poses asked for that never came counted, `RecordedPoses`
+playing the recorded box and points by `track_id` after their latency, a missing `track_id`, a jump, and `enabled`
+off leaving the pose model's poses.
+
+Waiting for the camera:
+
+- the poses' latency live (capture to the RAW stage's output: the camera's delivery, the upload, the crops and
+  RTMPose **(deduction)**), from a new recording's `pose_latency`, to set `pose_wait` to about three times it;
+- -sim with the recorded poses against live on the same scene: the SMOOTH stage's angles of one player, frame by
+  frame, and the board's poses over the image; `missed_poses` and the `track_id`s missed in -sim.
+

@@ -23,7 +23,7 @@ from modules.video import CoderType, CoderFormat, DEPTH_ENCODER, encoder_name, S
 
 from .chunk import METADATA_SUFFIX, ChunkInfo, FrameMetadata, finish_unmerged, frame_line, info_line, merge_chunk
 from .frame import FrameType, CameraFrame
-from .recording_sync import RecordedCapture, RecordingSync
+from .recording_sync import FramePoses, RecordedCapture, RecordingSync
 from .tracklet import CameraTracklets
 
 import logging
@@ -51,11 +51,13 @@ class RecorderSettings(BaseSettings):
     output_path:        Field[str]              = Field("recordings", access=Field.INIT, description="Video recordings directory")
     name:               Field[str]              = Field("", widget=Widget.input, description="Recording name")
     tracklet_wait:      Field[float]            = Field(100.0, min=0.0, max=1000.0, step=10.0, description="Longest a frame waits for its tracklets (ms)")
+    pose_wait:          Field[float]            = Field(150.0, min=0.0, max=1000.0, step=10.0, description="Longest a frame waits for its poses (ms)")
 
     # ── What a recording went without ─────────────────────────────────
     missed_depth:       Field[int]              = Field(0, access=Field.READ, description="Color frames left out, their depth missing")
     missed_color:       Field[int]              = Field(0, access=Field.READ, description="Depth frames left out, their color frame missing")
     missed_tracklets:   Field[int]              = Field(0, access=Field.READ, description="Frames recorded without their tracklets")
+    missed_poses:       Field[int]              = Field(0, access=Field.READ, description="Frames recorded without the poses asked for")
 
 
 # The letter in a clip's file name: `0_C_001.mp4` is camera 0's video, chunk 1.
@@ -104,7 +106,7 @@ class Recorder(Thread):
         self.with_depth: bool = FrameType.DEPTH in settings.video_frame_types
         self.recorders: dict[int, dict[FrameType, StreamWriter]] = {}
         self.frames: dict[int, Queue[RecordedCapture]] = {}
-        self.sync: RecordingSync = RecordingSync(self.with_depth, lambda: self.settings.tracklet_wait)
+        self.sync: RecordingSync = RecordingSync(self.with_depth, lambda: self.settings.tracklet_wait, lambda: self.settings.pose_wait)
         self.sync.add_capture_callback(self._on_capture)
         self.metadata: dict[int, TextIO] = {}
         self.metadata_frames: dict[int, int] = {}       # the frames of the chunk so far, per camera
@@ -267,13 +269,15 @@ class Recorder(Thread):
 
     def _update_missed(self) -> None:
         """The counts of what a recording went without, to the panel when they change."""
-        depth, color, tracklets = (self.sync.missed.total(part) for part in ('depth', 'color', 'tracklets'))
+        depth, color, tracklets, poses = (self.sync.missed.total(part) for part in ('depth', 'color', 'tracklets', 'poses'))
         if self.settings.missed_depth != depth:
             self.settings.missed_depth = depth
         if self.settings.missed_color != color:
             self.settings.missed_color = color
         if self.settings.missed_tracklets != tracklets:
             self.settings.missed_tracklets = tracklets
+        if self.settings.missed_poses != poses:
+            self.settings.missed_poses = poses
 
     def _write_queued(self) -> None:
         """Everything queued, on every pass: with depth two streams arrive per camera at the full
@@ -301,10 +305,13 @@ class Recorder(Thread):
             file.write(info_line(ChunkInfo(frame.image.shape[1], height, frame.intrinsics, frame.flip_h, self.settings.fps,
                                            alignment, self.with_depth)))
         tracklets: CameraTracklets | None = capture.tracklets
+        poses: FramePoses | None = capture.poses
         file.write(frame_line(count, FrameMetadata(
             frame.timestamp, frame.readings, _latency(frame.arrival, frame.timestamp),
             tracklets.tracklets if tracklets is not None else None,
-            _latency(tracklets.arrival, tracklets.timestamp) if tracklets is not None else None)))
+            _latency(tracklets.arrival, tracklets.timestamp) if tracklets is not None else None,
+            poses.poses if poses is not None else None,
+            _latency(poses.arrival, frame.timestamp) if poses is not None else None)))
         self.metadata_frames[cam_id] = count + 1
 
     def _get_state(self) -> RecState:
@@ -331,6 +338,17 @@ class Recorder(Thread):
         """A camera's tracklet callback, the tracklets as the camera gave them: while recording, to the sync."""
         if self._get_state() == RecState.REC:
             self.sync.submit_tracklets(cam_tracklets)
+
+    def expect_poses(self, cam_id: int, timestamp: float, asked: bool) -> None:
+        """Whether the pose model was asked poses for the camera's frame captured at `timestamp`: while
+        recording, to the sync, so a frame nobody asked poses for does not wait for them."""
+        if self._get_state() == RecState.REC:
+            self.sync.expect_poses(cam_id, timestamp, asked)
+
+    def submit_poses(self, frame_poses: FramePoses) -> None:
+        """The host's poses of one camera's frame: while recording, to the sync."""
+        if self._get_state() == RecState.REC:
+            self.sync.submit_poses(frame_poses)
 
     def _on_capture(self, capture: RecordedCapture) -> None:
         self.frames[capture.video.cam_id].put(capture)

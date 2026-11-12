@@ -11,8 +11,8 @@ from pathlib import Path
 import numpy as np
 
 from modules import video
-from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, ChunkInfo, DepthAlignment, FrameMetadata, FrameReadings, FrameType, Player, \
-    PlayerSettings, Recorder, RecorderSettings, TrackingStatus, make_chunk_name, read_metadata
+from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, ChunkInfo, DepthAlignment, FrameMetadata, FramePoses, FrameReadings, FrameType, \
+    Player, PlayerSettings, Recorder, RecorderSettings, TrackingStatus, make_chunk_name, read_metadata
 from modules.camera.chunk import frame_line, info_line, parse_metadata
 from modules.camera.recorder import RecState
 from modules.utils import Rect
@@ -25,6 +25,14 @@ def video_frame(i: int, timestamp: float | None = None) -> CameraFrame:
     t: float = float(i) if timestamp is None else timestamp
     return CameraFrame(0, FrameType.VIDEO, np.full((720, 896, 3), i % 255, np.uint8), t, readings=FrameReadings(-30.0 + i, 1.0, 1000, 100),
                        intrinsics=LENS, arrival=t + 0.01)
+
+
+POINTS: np.ndarray = np.tile(np.array([[0.25, 0.5, 0.9]], dtype=np.float32), (17, 1))
+
+
+def poses(timestamp: float) -> FramePoses:
+    """The host's poses of camera 0's frame captured at `timestamp`: one player, track 3."""
+    return FramePoses(0, timestamp, {3: (np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32), POINTS)}, timestamp + 0.05)
 
 
 def tracklets(timestamp: float) -> CameraTracklets:
@@ -152,6 +160,43 @@ class TrackletTest(unittest.TestCase):
         self.assertIsNone(self.recorder.frames[0].get_nowait().tracklets)
         self.assertEqual(self.recorder.sync.missed.total('tracklets'), 0)
 
+    def test_a_capture_waits_for_the_poses_asked_for(self) -> None:
+        self.recorder.expect_poses(0, 0.0, True)
+        self.recorder.submit_frame(video_frame(0))
+        self.recorder.submit_frame(depth_frame(1000, 0.0))
+        self.assertTrue(self.recorder.frames[0].empty())
+        self.recorder.submit_poses(poses(0.0))
+        capture = self.recorder.frames[0].get_nowait()
+        assert capture.poses is not None
+        self.assertEqual(list(capture.poses.poses), [3])
+
+    def test_a_frame_nobody_asked_poses_for_does_not_wait(self) -> None:
+        self.recorder.expect_poses(0, 0.0, False)
+        self.recorder.submit_frame(video_frame(0))
+        self.recorder.submit_frame(depth_frame(1000, 0.0))
+        self.assertIsNone(self.recorder.frames[0].get_nowait().poses)
+        self.assertEqual(self.recorder.sync.missed.total('poses'), 0)
+
+    def test_a_frame_not_yet_said_waits_to_know(self) -> None:
+        self.recorder.expect_poses(0, 0.0, False)               # this app says per frame
+        self.recorder.submit_frame(video_frame(0))
+        self.recorder.submit_frame(depth_frame(1000, 0.0))
+        self.recorder.submit_frame(video_frame(1))
+        self.recorder.submit_frame(depth_frame(1000, 1.0))      # not said yet for frame 1
+        self.assertEqual(self.recorder.frames[0].qsize(), 1)
+        self.recorder.expect_poses(0, 1.0, False)
+        self.assertEqual(self.recorder.frames[0].qsize(), 2)
+
+    def test_poses_asked_for_that_never_come_are_counted(self) -> None:
+        self.recorder.settings.pose_wait = 5.0
+        self.recorder.expect_poses(0, 0.0, True)
+        self.recorder.submit_frame(video_frame(0))
+        self.recorder.submit_frame(depth_frame(1000, 0.0))
+        time.sleep(0.01)
+        self.recorder.sync.update()
+        self.assertIsNone(self.recorder.frames[0].get_nowait().poses)
+        self.assertEqual(self.recorder.sync.missed.total('poses') + self.recorder.sync.missed.at_start('poses'), 1)
+
     def test_the_end_writes_what_waits(self) -> None:
         self.recorder.submit_tracklets(tracklets(0.0))
         self.recorder.submit_frame(video_frame(0))
@@ -176,7 +221,9 @@ class MetadataTest(unittest.TestCase):
         info = ChunkInfo(900, 720, LENS, True, 60.0)
         points = np.array([[0.1, 0.2, 0.9]] * 17, dtype=np.float32)
         tracklet = CameraTracklet(cam_id=2, id=4, status=TrackingStatus.TRACKED, roi=Rect(0.1, 0.2, 0.3, 0.4), age=7, timestamp=1.5, keypoints=points)
-        text = (info_line(info) + frame_line(0, FrameMetadata(1.5, FrameReadings(-30.0, 1.0, 1000, 100), 0.01, [tracklet], 0.033))
+        box = np.array([0.1, 0.2, 0.3, 0.4], dtype=np.float32)
+        text = (info_line(info) + frame_line(0, FrameMetadata(1.5, FrameReadings(-30.0, 1.0, 1000, 100), 0.01, [tracklet], 0.033,
+                                                              {3: (box, points)}, 0.05))
                 + frame_line(1, FrameMetadata(1.6, FrameReadings(math.nan, 1.0, 1000, 100), None, None, None))
                 + frame_line(2, FrameMetadata(1.7, None, 0.01, [], 0.03)))
         metadata = parse_metadata(text, cam_id=2)
@@ -188,6 +235,11 @@ class MetadataTest(unittest.TestCase):
         self.assertEqual((first.tracklets[0].cam_id, first.tracklets[0].id, first.tracklets[0].status, first.tracklets[0].roi, first.tracklets[0].age),
                          (2, 4, TrackingStatus.TRACKED, Rect(0.1, 0.2, 0.3, 0.4), 7))
         np.testing.assert_array_almost_equal(first.tracklets[0].keypoints, points)
+        assert first.poses is not None
+        np.testing.assert_array_almost_equal(first.poses[3][0], box)
+        np.testing.assert_array_almost_equal(first.poses[3][1], points)
+        self.assertEqual(first.pose_latency, 0.05)
+        self.assertIsNone(metadata.frames[1].poses)
         assert metadata.frames[1].readings is not None
         self.assertTrue(math.isnan(metadata.frames[1].readings.tilt))
         self.assertIsNone(metadata.frames[1].tracklets)

@@ -6,5 +6,6 @@ from .crop_extractor import CropExtractor
 from .uploader import Uploader, UploaderSettings
 from .depth_align import DepthAligner, depth_metres
 from .pose_inference import PoseInference
+from .recorded_poses import RecordedPoses, RecordedPosesSettings, frame_poses
 from .capture import Capture
 from .capture_sync import CaptureSync, CaptureSyncSettings
