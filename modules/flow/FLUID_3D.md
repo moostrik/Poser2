@@ -117,7 +117,7 @@ RGBA16F with its color baked in, each a swap pair, the obstacle R8. The simulati
 width in x, y and z, so the slab is 128 / 256 = 0.5 widths deep (`_z_extent`). The grid is the one
 that holds 60 fps in deep_flow with the pose on the same GPU ([TIMING.md](TIMING.md#the-grid)). The density is carried
 on the same grid always (the simulation density), and where enabled by the upscaled density, its amount at
-`upscaled.width` × `upscaled.height` × `upscaled.depth` with its color at the dye's size, or the simulation
+`upscaled.width` × `upscaled.height` × `upscaled.depth` with its color in a volume of its own, or the simulation
 density's (`upscaled.color`, [The density's detail](#the-densitys-detail)), and by the particles, drawn over the volume. Every pass
 that reads the velocity or the obstacle against the density samples by uv, so the shaders are the same
 (`advect_3d`, `inject_3d`, `buoyancy_3d`). The composite reads the volume at the output's 2160 × 3840. The monitors
@@ -544,8 +544,8 @@ its own (a slight hue shift at an RGBA density's sharp edges). On standmoves at 
 (Houdini's remedy for the revert's grid artifacts) took sharpness back for nothing else to gain, and went.
 
 The upscaled density's color is a color volume's color over its amount, at the same place: with
-`upscaled.color` DYE (the default) a volume of its own at the dye's width and height by the amount's layers
-(448 × 800 × 24 at deep_flow's preset, RGBA16F, as 8 bits would round at every advection), injected and carried
+`upscaled.color` DYE (the default) a volume of its own, `upscaled.color_width` × `color_height` × `color_depth`
+(448 × 800 × 24 at deep_flow's preset, the dye's size by the amount's layers, RGBA16F, as 8 bits would round at every advection), injected and carried
 with the amount, faded and evaporated as it is, without the turbulence; with SIMULATION the simulation
 density's, on its 288 × 512 cells. The dye's own volume costs 1.3 ms of the density pass (5.4 to 6.8 ms,
 deep_flow's preset, 40 s of `-sim`) and keeps the dye's color as the bridge made it, its bands and edges

@@ -1,9 +1,10 @@
 """The density upscaled past the simulation: its amount a one-channel `GL_TEXTURE_3D` of `upscaled.width` ×
-`upscaled.height` × `upscaled.depth` over the simulation's box, its color a volume of its own at the dye's width
-and height by the amount's layers (`upscaled.color` DYE), or the simulation density's, borrowed (SIMULATION).
+`upscaled.height` × `upscaled.depth` over the simulation's box, its color a volume of its own of
+`upscaled.color_width` × `color_height` × `color_depth` (`upscaled.color` DYE), or the simulation density's,
+borrowed (SIMULATION).
 
-The color never holds more detail than the bridge's dye it comes from, so it is made at the dye's size (it
-follows the injected texture's), color × amount and the amount like the simulation density, injected and
+The color never holds more detail than the bridge's dye it comes from, so the dye's size is its natural one,
+color × amount and the amount like the simulation density, injected and
 carried with the amount, faded and evaporated as it is; the amount, moved by the grid's velocity read between
 its cells, is stretched into threads finer than a cell and keeps them from step to step. The color moves
 without the turbulence below the grid, which only the amount takes. A density layer that spans several of the
@@ -108,10 +109,10 @@ class UpscaledDensity(DensityCarrier):
             self._color_scratch.deallocate()
         return False
 
-    def _follow_color_size(self, texture: Texture) -> None:
-        """Allocate the color at the dye's width and height by the amount's layers, again when the dye's size
-        changes: the color holds what the dye's pixels hold, no more."""
-        size: tuple[int, int, int] = (texture.width, texture.height, self._amount.depth)
+    def _follow_color_size(self) -> None:
+        """Allocate the color at `upscaled.color_width` × `color_height` × `color_depth`, again when they change."""
+        upscaled = self.settings.upscaled
+        size: tuple[int, int, int] = (int(upscaled.color_width), int(upscaled.color_height), int(upscaled.color_depth))
         if self._color.allocated and (self._color.width, self._color.height, self._color.depth) == size:
             return
         self._color.deallocate()
@@ -127,7 +128,7 @@ class UpscaledDensity(DensityCarrier):
         self._inject_shader.use(texture, self._amount, layer, spread, strength, cubic=self.settings.upscaled.cubic, mode=int(mode), gain=target_gain,
                                 z_position=z_position)
         if self._own_color():
-            self._follow_color_size(texture)
+            self._follow_color_size()
             self._color_inject_shader.use(texture, self._color, layer, spread, strength, internal_format=GL_RGBA16F, mode=int(mode),
                                           gain=target_gain, z_position=z_position)
         glMemoryBarrier(_BARRIER)

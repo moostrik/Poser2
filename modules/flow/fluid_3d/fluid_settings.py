@@ -164,7 +164,10 @@ class UpscaledDensitySettings(BaseSettings):
     depth: Field[int]               = Field(16,     min=4,      max=256,    step=4,                 description="The amount's depth in z, over the simulation's depth")
     sample: Field[DensitySample]    = Field(DensitySample.AVERAGE,                                  description="The velocity at a layer's middle, or averaged over the simulation's layers it spans")
     cubic: Field[bool]              = Field(True,                                                   description="The bridge's density enlarged by a cubic B-spline, without its texels' steps; off: bilinear")
-    color: Field[DensityColor]      = Field(DensityColor.DYE,                                       description="Its color at the dye's size, or the simulation's cells' (coarser, cheaper)")
+    color: Field[DensityColor]      = Field(DensityColor.DYE,                                       description="Its color in a volume of its own (DYE), or the simulation's cells' (coarser, cheaper)")
+    color_width: Field[int]         = Field(448,    min=32,     max=4096,   step=8,    newline=True, description="The color volume's width (DYE); the dye's is the bridge's width")
+    color_height: Field[int]        = Field(800,    min=32,     max=4096,   step=8,                 description="The color volume's height (DYE); the dye's is the bridge's height")
+    color_depth: Field[int]         = Field(24,     min=4,      max=256,    step=4,                 description="The color volume's depth in z (DYE)")
     turbulence: Field[float]        = Field(0.0,    min=0.0,    max=50.0,   step=0.5,              description="Swirls below the simulation's cells where the water churns, as its curl × cell; 0 = off")
 
 
