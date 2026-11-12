@@ -44,8 +44,8 @@ def record(root: Path, count: int) -> Path:
     while rec._get_state() != RecState.REC and time.perf_counter() < deadline:
         time.sleep(0.01)
     for i in range(count):
-        rec.submit_frame(video_frame(i))
-        rec.submit_frame(depth_frame(1000 + i * 30, float(i)))
+        rec.submit_frame(video_frame(i, i / 30.0))     # captured at 30 fps: it plays at that rate
+        rec.submit_frame(depth_frame(1000 + i * 30, i / 30.0))
         time.sleep(0.002)
     rec.settings.stop = True
     while rec._get_state() != RecState.IDLE and time.perf_counter() < deadline + 10.0:
@@ -94,7 +94,7 @@ class PlaybackTest(unittest.TestCase):
         self.colours: list[int] = []
         self.player: Player = make_player(self.root, self.recording)
 
-        def on_frame(_cam: int, kind: FrameType, image: np.ndarray, _readings: object) -> None:
+        def on_frame(_cam: int, kind: FrameType, image: np.ndarray, _metadata: object, _captured: float | None) -> None:
             if kind == FrameType.DEPTH:
                 self.depths.append(round((int(np.median(image)) - 1000) / 30))
             else:

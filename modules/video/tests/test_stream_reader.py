@@ -27,6 +27,21 @@ def wait_for(condition, seconds: float = 5.0) -> bool:
     return False
 
 
+class FixedSchedule:
+    """Frame `n` due at `origin + offsets[n]`; `delay` moves the origin and sums what it moved."""
+    def __init__(self, origin: float, offsets: list[float]) -> None:
+        self.origin: float = origin
+        self.offsets: list[float] = offsets
+        self.delayed: float = 0.0
+
+    def moment(self, cam_id: int, frame_id: int) -> float | None:
+        return self.origin + self.offsets[frame_id] if frame_id < len(self.offsets) else None
+
+    def delay(self, seconds: float) -> None:
+        self.origin += seconds
+        self.delayed += seconds
+
+
 @unittest.skipUnless(video.available(), 'ffmpeg not on the PATH')
 class StreamReaderTest(unittest.TestCase):
     def setUp(self) -> None:
@@ -57,6 +72,31 @@ class StreamReaderTest(unittest.TestCase):
         reader.stop()
         reader.join()
         self.assertFalse(reader.is_loaded())
+
+    def test_a_schedule_sets_when_each_frame_comes_never_out_of_order(self) -> None:
+        schedule = FixedSchedule(time.perf_counter() + 0.5, [0.0, 0.02, 0.01, 0.04])     # frame 2 due before frame 1
+        came: list[tuple[int, float]] = []
+        reader = StreamReader(0, 'video', lambda _c, _t, _f, _chunk, frame_id: came.append((frame_id, time.perf_counter())), True,
+                              fps=30.0, schedule=schedule)
+        reader.load(self.path, 0, 0, 4)
+        self.assertTrue(wait_for(reader.is_loaded))
+        reader.play()
+        self.assertTrue(wait_for(lambda: not reader.is_playing()))
+        reader.join()
+        self.assertEqual([frame for frame, _ in came], [0, 1, 2, 3])
+        self.assertGreaterEqual(came[1][1], schedule.origin + 0.02 - 0.002)
+        self.assertGreaterEqual(came[2][1], came[1][1])
+        self.assertGreaterEqual(came[3][1], schedule.origin + 0.04 - 0.002)
+
+    def test_a_reader_behind_its_schedule_delays_it(self) -> None:
+        schedule = FixedSchedule(time.perf_counter() - 1.0, [0.0, 0.01])      # both a second overdue
+        reader = StreamReader(0, 'video', lambda _c, _t, _f, _chunk, frame_id: None, True, fps=1000.0, schedule=schedule)
+        reader.load(self.path, 0, 0, 2)
+        self.assertTrue(wait_for(reader.is_loaded))
+        reader.play()
+        self.assertTrue(wait_for(lambda: not reader.is_playing()))
+        reader.join()
+        self.assertGreater(schedule.delayed, 0.9)
 
     def test_a_range_counts_from_its_first_frame(self) -> None:
         reader = self.reader()

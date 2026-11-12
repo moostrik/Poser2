@@ -21,9 +21,9 @@ class FakePlayer:
     def get_chunk_info(self, cam_id: int) -> None:
         return None
 
-    def push(self, cam_id: int, image: np.ndarray, frame_type: FrameType = FrameType.VIDEO) -> None:
+    def push(self, cam_id: int, image: np.ndarray, frame_type: FrameType = FrameType.VIDEO, captured: float | None = None) -> None:
         for c in self.callbacks:
-            c(cam_id, frame_type, image, None)
+            c(cam_id, frame_type, image, None, captured)
 
 
 class FakePersonDetector:
@@ -74,6 +74,12 @@ class ReplayCameraTest(unittest.TestCase):
         self.assertIs(self.frames[0].image, image)
         self.assertGreaterEqual(self.frames[0].timestamp, before)
         self.assertTrue(self.camera.connected)
+
+    def test_a_frame_is_stamped_with_its_capture_on_the_play_s_clock(self) -> None:
+        self.player.push(1, np.zeros((4, 6, 3), dtype=np.uint8), captured=12.5)
+        self.assertEqual(self.frames[0].timestamp, 12.5)
+        assert self.frames[0].arrival is not None
+        self.assertGreater(self.frames[0].arrival, 12.5)
 
     def test_a_recorded_frame_s_depth_takes_its_video_s_time(self) -> None:
         self.player.push(1, np.zeros((4, 6, 3), dtype=np.uint8))

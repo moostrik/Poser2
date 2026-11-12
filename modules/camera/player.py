@@ -1,5 +1,6 @@
-"""Plays a folder of camera recordings: every camera's chunks in step, frames of one round handed
-over together, between in and out markers on the timeline, and the panel's playback readouts. It
+"""Plays a folder of camera recordings: every camera's chunks in step on one clock, the recorded time
+(`PlayClock`), each frame handed over as late after its recorded capture as it came live, a frame's
+streams together, between in and out markers on the timeline, and the panel's playback readouts. It
 feeds a source (the oak `Simulator` or the replay backend), which stamps the frames at hand-over. A
 chunk is one `.mkv` with color, depth when it was recorded, and metadata (`chunk`), or a color-only
 clip of before; a folder plays with the streams it has, whatever `video_frame_types` asks for.
@@ -61,10 +62,11 @@ class PlayerSettings(BaseSettings):
     max_chunks:         Field[int]              = Field(0, access=Field.READ, description="Total chunks")
 
 
-# A clip frame as the player decodes it: (cam_id, frame_type, image, metadata), the metadata the
-# chunk keeps of the frame. The source it feeds makes the `CameraFrame`, since the arrival time is
-# its hand-over, not the decode. The metadata is None for a recording without it.
-ClipFrameCallback: TypeAlias = Callable[[int, FrameType, ndarray, FrameMetadata | None], None]
+# A clip frame as the player hands it over: (cam_id, frame_type, image, metadata, timestamp), the
+# metadata the chunk keeps of the frame and its capture on the play's clock (`PlayClock.capture`).
+# Both are None for a recording without metadata: the source it feeds stamps the frame at its
+# hand-over then.
+ClipFrameCallback: TypeAlias = Callable[[int, FrameType, ndarray, FrameMetadata | None, float | None], None]
 # Playback (re)starting at the in marker: the first play of a folder and every loop, not a scrub.
 LoopCallback: TypeAlias = Callable[[], None]
 
@@ -124,6 +126,54 @@ class Folder():
 
 FolderDict = dict[str, Folder]
 
+
+class PlayClock:
+    """The recorded time of one chunk's play, on `perf_counter`: the `FrameSchedule` every reader of the chunk
+    shares. From `start` frame `n` of a camera is captured at the origin plus its recorded capture time minus the
+    first frame's (`capture`), and due at that plus its recorded latency (`moment`), so a frame comes as late after
+    its capture as it came live, and a frame lost live leaves its gap. A reader that falls behind moves the origin
+    for every reader (`delay`). Frames the chunk has no time for are not on it: their readers pace at `fps`."""
+
+    def __init__(self, frames: dict[int, list[FrameMetadata]], first: int) -> None:
+        """`frames`: each camera's metadata by frame number; `first`: the frame number the play starts at."""
+        self._frames: dict[int, list[FrameMetadata]] = frames
+        starts: list[float] = [cam_frames[first].timestamp for cam_frames in frames.values() if first < len(cam_frames)]
+        self._base: float | None = min(starts) if starts else None
+        self._origin: float | None = None
+        self._lock: Lock = Lock()
+
+    def start(self, origin: float) -> None:
+        with self._lock:
+            self._origin = origin
+
+    def delay(self, seconds: float) -> None:
+        with self._lock:
+            if self._origin is not None:
+                self._origin += seconds
+
+    def capture(self, cam_id: int, frame_id: int) -> float | None:
+        """When the frame was captured, on the play's clock."""
+        frame: FrameMetadata | None = self._frame(cam_id, frame_id)
+        with self._lock:
+            if frame is None or self._origin is None or self._base is None:
+                return None
+            return self._origin + frame.timestamp - self._base
+
+    def moment(self, cam_id: int, frame_id: int) -> float | None:
+        """When the frame is handed over: its capture plus the latency it came with live."""
+        captured: float | None = self.capture(cam_id, frame_id)
+        if captured is None:
+            return None
+        frame: FrameMetadata | None = self._frame(cam_id, frame_id)
+        latency: float | None = frame.video_latency if frame is not None else None
+        return captured + (latency or 0.0)
+
+    def _frame(self, cam_id: int, frame_id: int) -> FrameMetadata | None:
+        cam_frames: list[FrameMetadata] | None = self._frames.get(cam_id)
+        if cam_frames is None or not 0 <= frame_id < len(cam_frames):
+            return None
+        return cam_frames[frame_id]
+
 class Player(Thread):
     def __init__(self, settings: PlayerSettings, data_path: str = "", gray: bool = False) -> None:
         """``gray``: the consuming pipeline is mono, so video decodes straight to gray."""
@@ -173,6 +223,8 @@ class Player(Thread):
         self.load_types: set[FrameType] = set()     # the streams of the chunk being loaded,
         self.play_types: set[FrameType] = set()     # and of the one playing: what a frame waits for
         self.chunk_metadata: dict[tuple[int, int], ChunkMetadata] = {}      # by (cam_id, chunk)
+        self.load_clock: PlayClock | None = None    # the recorded time of the chunk being loaded,
+        self.play_clock: PlayClock | None = None    # and of the one playing
 
         self.drift_lock: Lock = Lock()
         self.drift_ids: dict[int, int] = {}
@@ -291,27 +343,35 @@ class Player(Thread):
         """The readers of the load chunk's frames `lo` up to `hi`."""
         folder: Folder = self.folders[self.load_folder]
         self.load_types = set()
+        frames: dict[int, list[FrameMetadata]] = {}
         for c in range(self.num_cams):
             chunk_path: Path = folder.path / make_chunk_name(c, self.load_chunk)
             if chunk_path.is_file():
                 metadata: ChunkMetadata = read_metadata(chunk_path, c)
                 self.chunk_metadata[(c, self.load_chunk)] = metadata
-                with_depth: bool = metadata.info is None or metadata.info.depth
+                frames[c] = metadata.frames
+        self.load_clock = PlayClock(frames, lo)
+        for c in range(self.num_cams):
+            chunk_path = folder.path / make_chunk_name(c, self.load_chunk)
+            if chunk_path.is_file():
+                info: ChunkInfo | None = self.chunk_metadata[(c, self.load_chunk)].info
+                with_depth: bool = info is None or info.depth
                 for stream, t in enumerate((FrameType.VIDEO, FrameType.DEPTH)):
                     if t in self.types and (t == FrameType.VIDEO or with_depth):
-                        self._load_stream(c, t, chunk_path, stream, lo, hi)
+                        self._load_stream(c, t, chunk_path, stream, lo, hi, self.load_clock)
                 continue
             for t in self.types:
                 path: Path = folder.path / make_file_name(c, t, self.load_chunk, self.suffix)
                 if path.is_file():
-                    self._load_stream(c, t, path, 0, lo, hi)
+                    self._load_stream(c, t, path, 0, lo, hi, None)
                 elif t == FrameType.VIDEO:
                     logger.warning(f"File {path} not found")
 
-    def _load_stream(self, cam_id: int, frame_type: FrameType, path: Path, stream: int, lo: int, hi: int | None) -> None:
+    def _load_stream(self, cam_id: int, frame_type: FrameType, path: Path, stream: int, lo: int, hi: int | None,
+                     clock: PlayClock | None) -> None:
         color: bool = frame_type == FrameType.VIDEO and not self.gray
         player: StreamReader = StreamReader(cam_id, frame_type, cast(StreamFrameCallback, self._frame_sync_callback), color,
-                                            self.hwaccel, self.hwaccel_device, self.fps, stream, frame_type == FrameType.DEPTH)
+                                            self.hwaccel, self.hwaccel_device, self.fps, stream, frame_type == FrameType.DEPTH, clock)
         player.load(str(path), self.load_chunk, lo, hi)
         self.loaders.append(player)
         self.load_types.add(frame_type)
@@ -328,6 +388,11 @@ class Player(Thread):
         self._clear_drift()
         with self.sync_lock:
             self.play_types = self.load_types
+        clock: PlayClock | None = self.load_clock
+        if clock is not None:
+            clock.start(perf_counter())
+        with self.playback_lock:
+            self.play_clock = clock
 
         for p in self.loaders:
             p.play()
@@ -455,10 +520,13 @@ class Player(Thread):
         frame_metadata: FrameMetadata | None = None
         if metadata is not None and frame_id < len(metadata.frames):
             frame_metadata = metadata.frames[frame_id]
+        with self.playback_lock:
+            clock: PlayClock | None = self.play_clock
+        timestamp: float | None = clock.capture(cam_id, frame_id) if clock is not None else None
         for ft in self.types:       # VIDEO first: its readings set up what the depth of the frame uses
             if ft in sync_frames:
                 for callback in self.frame_callbacks:
-                    callback(cam_id, ft, sync_frames[ft], frame_metadata)
+                    callback(cam_id, ft, sync_frames[ft], frame_metadata, timestamp)
 
     def _clear_frame_sync(self) -> None:
         with self.sync_lock:

@@ -101,26 +101,29 @@ class Camera:
 
     # ── Hand-over ──────────────────────────────────────────────────────
 
-    def _clip_callback(self, cam_id: int, frame_type: FrameType, image: np.ndarray, metadata: FrameMetadata | None) -> None:
-        """A decoded clip frame, on the player's thread: stamped here, to the callbacks and the detector.
-        The player hands a recorded frame's video first, so its depth takes the video's stamp: one
-        capture, one time. The frame goes on as the camera delivered it: `flip_h` as recorded, and the
-        homography of the recorded tilt and the live offset on the recorded lens, as the camera made it."""
+    def _clip_callback(self, cam_id: int, frame_type: FrameType, image: np.ndarray, metadata: FrameMetadata | None,
+                       captured: float | None) -> None:
+        """A clip frame, on the player's thread, to the callbacks: stamped with its capture on the play's clock,
+        or its hand-over for a recording without metadata, and its hand-over as its arrival. The player hands
+        a recorded frame's video first, so its depth takes the video's stamp: one capture, one time. The frame
+        goes on as the camera delivered it: `flip_h` as recorded, and the homography of the recorded tilt and
+        the live offset on the recorded lens, as the camera made it."""
         if not self.running or cam_id != self.id:
             return
+        arrival: float = time.perf_counter()
         info: ChunkInfo | None = self.player.get_chunk_info(self.id)
         if frame_type == FrameType.VIDEO:
-            self._video_timestamp = time.perf_counter()
+            self._video_timestamp = captured if captured is not None else arrival
             self.video_fps.processed()
             self.settings.readings.video_fps = self.video_fps.get_rate_average()
             self.settings.readings.video_min_fps = self.video_fps.get_rate_minimum()
             self._update_tilt(metadata.readings if metadata is not None else None, info)
-        timestamp: float = self._video_timestamp if self._video_timestamp is not None else time.perf_counter()
+        timestamp: float = self._video_timestamp if self._video_timestamp is not None else arrival
         homography: np.ndarray | None = self.tilt_correction.homography if self.tilt_correction is not None else None
         alignment: DepthAlignment | None = info.depth_alignment if frame_type == FrameType.DEPTH and info is not None else None
         flip_h: bool = info.flip_h if info is not None else False
         frame = CameraFrame(cam_id=self.id, kind=frame_type, image=image, timestamp=timestamp, flip_h=flip_h,
-                            homography=homography, alignment=alignment)
+                            homography=homography, alignment=alignment, arrival=arrival)
         for c in self.frame_callbacks:
             c(frame)
 

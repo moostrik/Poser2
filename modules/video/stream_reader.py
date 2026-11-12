@@ -1,10 +1,11 @@
-"""One ffmpeg decoder process read frame by frame on its own schedule: the reader of one camera
-recording stream, paced on `perf_counter` and handing each frame to a callback with its index."""
+"""One ffmpeg decoder process read frame by frame: the reader of one camera recording stream, paced
+on `perf_counter` and handing each frame to a callback with its index. It paces on its own at `fps`
+from its start, or on a `FrameSchedule` it is given, which several readers can share."""
 
 import ffmpeg
 import numpy as np
 from threading import Thread, Event, Lock
-from typing import Callable
+from typing import Callable, Protocol
 import time
 
 from .depth_frame import DEPTH_PIX_FMT, depth_frame_bytes, p012_to_depth
@@ -17,13 +18,28 @@ logger = logging.getLogger(__name__)
 StreamFrameCallback = Callable[[int, object, np.ndarray, int, int], None]
 
 
+class FrameSchedule(Protocol):
+    """When the readers of a recording hand their frames over, on `perf_counter`."""
+    def moment(self, cam_id: int, frame_id: int) -> float | None:
+        """When frame `frame_id` of camera `cam_id` is due; None where the schedule does not know it."""
+        ...
+
+    def delay(self, seconds: float) -> None:
+        """A reader fell behind by `seconds`: every frame of the schedule comes that much later."""
+        ...
+
+
 class StreamReader:
     def __init__(self, cam_id: int, frame_type: object, frame_callback: StreamFrameCallback, color: bool,
-                 hwaccel: str = '', hwaccel_device: str = '', fps: float = 0.0, stream: int = 0, depth: bool = False) -> None:
+                 hwaccel: str = '', hwaccel_device: str = '', fps: float = 0.0, stream: int = 0, depth: bool = False,
+                 schedule: FrameSchedule | None = None) -> None:
         """``color``: decode to BGR; otherwise to gray, so a mono pipeline gets the luma straight from
         ffmpeg, saving the colour conversion and two thirds of the pipe. ``stream``: which video
-        stream of the file. ``depth``: it holds depth, delivered as uint16 millimetres."""
+        stream of the file. ``depth``: it holds depth, delivered as uint16 millimetres. ``schedule``:
+        when each frame is due, in place of every 1 / ``fps`` from the reader's start, for the frames it
+        knows."""
         self.frame_callback: StreamFrameCallback = frame_callback
+        self.schedule: FrameSchedule | None = schedule
 
         self.cam_id: int = cam_id
         self.frame_type: object = frame_type
@@ -174,11 +190,25 @@ class StreamReader:
             else:
                 frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([self.frame_height, self.frame_width])
 
+            due: float | None = self.schedule.moment(self.cam_id, frame_count) if self.schedule is not None else None
+            if due is not None and self.schedule is not None:
+                late: float = time.perf_counter() - due
+                if late > frame_interval:
+                    self.schedule.delay(late)       # behind: every reader of the schedule comes later, together
+                    due += late
+                due = max(due, next_time)           # never before the frame before it
+                remaining: float = due - time.perf_counter()
+                if remaining > 0:
+                    time.sleep(remaining)
+                next_time = due
+
             self.frame_callback(self.cam_id, self.frame_type, frame, self.chunk_id, frame_count)
             frame_count += 1
 
+            if due is not None:
+                continue
             next_time += frame_interval
-            remaining: float = next_time - time.perf_counter()
+            remaining = next_time - time.perf_counter()
             if remaining > 0:
                 time.sleep(remaining)
             elif -remaining > frame_interval:

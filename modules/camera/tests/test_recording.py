@@ -20,9 +20,11 @@ from modules.utils import Rect
 LENS: list[list[float]] = [[538.0, 0.0, 450.0], [0.0, 538.0, 360.0], [0.0, 0.0, 1.0]]
 
 
-def video_frame(i: int) -> CameraFrame:
-    return CameraFrame(0, FrameType.VIDEO, np.full((720, 896, 3), i % 255, np.uint8), float(i), readings=FrameReadings(-30.0 + i, 1.0, 1000, 100),
-                       intrinsics=LENS, arrival=i + 0.01)
+def video_frame(i: int, timestamp: float | None = None) -> CameraFrame:
+    """Frame `i`, captured at `i` s unless given."""
+    t: float = float(i) if timestamp is None else timestamp
+    return CameraFrame(0, FrameType.VIDEO, np.full((720, 896, 3), i % 255, np.uint8), t, readings=FrameReadings(-30.0 + i, 1.0, 1000, 100),
+                       intrinsics=LENS, arrival=t + 0.01)
 
 
 def tracklets(timestamp: float) -> CameraTracklets:
@@ -255,8 +257,8 @@ class RoundTripTest(unittest.TestCase):
             while rec._get_state() != RecState.REC and time.perf_counter() < deadline:
                 time.sleep(0.01)
             for i in range(count):
-                rec.submit_frame(video_frame(i))
-                rec.submit_frame(depth_frame(1000 + i * 30, float(i)))
+                rec.submit_frame(video_frame(i, i / 60.0))
+                rec.submit_frame(depth_frame(1000 + i * 30, i / 60.0))
                 time.sleep(0.002)
             rec.settings.stop = True
             while rec._get_state() != RecState.IDLE and time.perf_counter() < deadline + 10.0:
@@ -280,7 +282,9 @@ class RoundTripTest(unittest.TestCase):
             settings.folder = chunks[0].parent.name
             player = Player(settings, str(root))
             played: list[tuple[FrameType, int, FrameReadings | None]] = []
-            player.add_frame_callback(lambda cam, kind, image, frame: played.append((kind, int(np.median(image)), frame.readings if frame else None)))
+            moments: list[tuple[float, float | None]] = []      # when each color frame came, and its capture on the play's clock
+            player.add_frame_callback(lambda cam, kind, image, frame, captured: played.append((kind, int(np.median(image)), frame.readings if frame else None)))
+            player.add_frame_callback(lambda cam, kind, image, frame, captured: moments.append((time.perf_counter(), captured)) if kind == FrameType.VIDEO else None)
             player.start()
             deadline = time.perf_counter() + 10.0
             while len(played) < 2 * count and time.perf_counter() < deadline:
@@ -295,6 +299,14 @@ class RoundTripTest(unittest.TestCase):
         for i in range(count):
             self.assertLess(abs(depths[i][1] - (1000 + i * 30)), 40)
             self.assertEqual(depths[i][2], FrameReadings(-30.0 + i, 1.0, 1000, 100))
+        # On the recorded time: 1/60 s apart as recorded, not 1/120 as `fps` says, each 10 ms after its capture
+        captures = [captured for _, captured in moments[:count]]
+        assert all(c is not None for c in captures)
+        steps = np.diff(np.array(captures, dtype=np.float64))
+        np.testing.assert_allclose(steps, 1.0 / 60.0, atol=1e-6)
+        lags = [came - captured for came, captured in moments[:count] if captured is not None]
+        self.assertGreater(float(np.median(lags)), 0.009)
+        self.assertLess(float(np.median(lags)), 0.03)
 
     def test_a_color_only_recording_is_one_chunk_with_its_metadata(self) -> None:
         count = 20
