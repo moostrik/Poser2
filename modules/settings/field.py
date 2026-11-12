@@ -414,7 +414,11 @@ class Field(Generic[T]):
 
     def to_json_value(self, obj) -> Any:
         """Return a JSON-serializable representation of the current value."""
-        value = obj._values[self.name]
+        return self.encode(obj._values[self.name])
+
+    def encode(self, value: Any) -> Any:
+        """*value* as a preset holds it: an Enum by its name, a value object as its dict, a list
+        element by element. ``set`` takes it back."""
         if hasattr(value, "to_dict"):
             return value.to_dict()
         if isinstance(value, Enum):
