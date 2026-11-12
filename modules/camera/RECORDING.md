@@ -218,7 +218,71 @@ first run waited for the poses up to a timed 150 ms, which the order of the stre
 
 Waiting for the camera: the board's poses over the image in a replay against live.
 
-### 3. The poses the pose model drops
+### 3. Several cameras
+
+From a reading of the recorder and the player with more than one camera in mind; none is reproduced
+**(deduction)**. The time base holds: every frame carries its capture on the host's clock, and a play schedules each
+camera's frames from its own recorded times on one origin, so cameras that started apart or dropped different
+frames play in step, and a round is the round it was live. To fix in this order:
+
+A fault of the recorder's bounded queues, for one camera too:
+
+1. A writer's own drop breaks its chunk: a full `StreamWriter` drops its oldest frame, after which the color and
+   the depth count unlike and neither matches the metadata's lines, so every later frame of the chunk pairs wrong.
+   `StreamWriter` drops nothing (its queue unbounded again, its length readable); the recorder drops whole
+   captures before it writes any part: in `_write_queued`, a capture is dropped and counted while any writer of its
+   camera holds more than the bound.
+
+Several cameras:
+
+2. A camera without depth does not play beside one with depth: the streams a chunk plays are one set for every
+   camera (`ChunkReaders.types`), and the pairing waits for each of them, so a color-only camera, or one whose
+   depth failed, waits for a depth for ever and its frames are dropped. `ChunkReaders.types` by camera
+   (`dict[int, set[FrameType]]`), and `FramePairing` waits for the camera's own.
+3. A hitch at every chunk's start: the cameras' chunks end at different recorded moments (a split takes what each
+   has queued), the next chunk starts when the last camera's reader has ended, and the camera that ended first
+   finds its next frames overdue and moves the clock for all. Recording: the split is at one capture time for
+   every camera (`Recorder._do_split` takes the newest capture time written, and each camera's captures up to it
+   go into the old chunk, the later ones into the new). Playing: the next chunk's readers start when the first
+   reader of the playing chunk ends, on the clock carried on, and `FramePairing` hands over the frames of both
+   chunks while they overlap, each camera's in its order.
+4. A seek, a scrub and the markers are in camera 0's frame numbers, the same number for every camera: a camera
+   that dropped 50 more frames is a second further at that number, and shows nothing for that second after a seek.
+   `Timeline` keeps each chunk's first and last recorded time beside its frame count (from the metadata, read at
+   the folder's prepare), a place on it is a recorded time, and `ChunkReaders` starts each camera at its first
+   frame at or after that time (a search in its metadata's timestamps).
+5. The bound of what waits for the encoders is per queue: 150 captures a camera, some 2 GB for four cameras with
+   depth **(deduction)**. One bound for the recorder, in bytes (1 GB), over what its queues and its writers hold.
+6. The recorder's start is one for all cameras: the first capture of any camera ends it, and the others' misses
+   of the start are warned of. `MissedParts.started` by camera.
+7. One lock for all cameras in `RecordingSync` and in `FramePairing`. A lock per camera in each; the order between
+   cameras is not kept, as it is not live.
+8. `drift` compares the cameras' frame numbers, which says nothing once they dropped unlike. The difference of the
+   recorded times of the cameras' last frames gone out, in ms.
+
+Smaller, and outside this change:
+
+9. A seek or a scrub's first step reads the chunk's metadata through ffmpeg again (50 to 100 ms): the player
+   keeps the last chunk's readers' metadata past a stop (`_load_chunk`'s `known`).
+10. The oak backend (depthai 2) stamps a frame's arrival, not its capture, so hd_trio and white_space record and
+    replay with USB's jitter in their times. Its capture time as oak4's `capture_time` makes it, with the apps'
+    move ([PLAN.md's line 4](../flow/PLAN.md#4-the-other-apps-on-deep_flows-input)).
+11. `Recorder.expect_poses` is wired in deep_flow; hd_trio and white_space pose in rounds, and say it per camera
+    and image when they move.
+
+Tests, without a camera, through the real encoders where the iGPU is there:
+
+- A recording of two cameras with unlike data, played back: camera 0 with color, depth, tracklets and poses,
+  camera 1 color only. Both play, each frame at its recorded time, camera 0's with its depth, tracklets and poses,
+  camera 1's without; neither waits for the other's streams.
+- The same two cameras, camera 1 dropping every fifth frame live: the chunks cut at one capture time, a split
+  played through without the clock moving, a seek landing both cameras on the same recorded time.
+- Two recordings in one folder, one with poses and one color only, played one after the other: the second takes
+  nothing of the first (its metadata, its streams, what waited).
+- A capture dropped for a full writer: the color, the depth and the metadata of the chunk count alike after it.
+- `Timeline` by recorded time: a place and the markers as a time, each camera's frame at it.
+
+### 4. The poses the pose model drops
 
 In -sim, with the recorded tracklets and the pose model on, about one frame in six with a player gets no poses (107
 of 596 on `hands`): the pose model's TensorRT runner keeps one batch in flight and one waiting
