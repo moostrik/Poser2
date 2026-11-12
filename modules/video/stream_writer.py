@@ -1,12 +1,13 @@
 """One ffmpeg encoder process fed raw frames from a queue: the writer of one camera recording stream.
 
-The queue holds at most `QUEUED` frames; beyond that the oldest is dropped and counted (`dropped`), so an encoder
-that cannot keep up loses frames instead of memory. An encoder that dies (an error, a full disk) ends the writer:
-it says so once (`failed`), drops what is queued, and `stop` and `split` return instead of waiting for it."""
+It writes every frame it is given, in order: a stream of a recording must hold every frame its other streams and its
+metadata hold, so whatever is dropped is dropped whole, by the recorder, before any part of it is written. The bytes
+it holds are readable (`queued_bytes`), for the recorder's bound. An encoder that dies (an error, a full disk) ends
+the writer: it says so once (`failed`), drops what is queued, and `stop` and `split` return instead of waiting."""
 
 import logging
 from threading import Lock, Thread
-from queue import Empty, Full, Queue
+from queue import Empty, Queue
 from time import sleep
 
 import ffmpeg
@@ -16,8 +17,6 @@ from .depth_frame import DEPTH_PIX_FMT, DEPTH_QUALITY, depth_to_p012
 
 logger = logging.getLogger(__name__)
 
-QUEUED: int = 150       # frames waiting for the encoder: 3 s at 50 fps, over its start-up; some 180 MB of NV12 at 992 x 800
-
 
 class StreamWriter:
     def __init__(self, vcodec: str, keyframe_interval: int = 0, quality: int = 0) -> None:
@@ -26,20 +25,20 @@ class StreamWriter:
         self.fps: float = 30.0
         self.is_recording: bool = False
         self.is_receiving: bool = False
-        self.frames: Queue[tuple[np.ndarray, bool]] = Queue(maxsize=QUEUED)
+        self.frames: Queue[tuple[np.ndarray, bool]] = Queue()
         self.thread: Thread | None = None
         self.vcodec: str = vcodec
         self.keyframe_interval: int = keyframe_interval
         self.quality: int = quality
         self._lock: Lock = Lock()
-        self._dropped: int = 0
+        self._queued_bytes: int = 0
         self._failed: bool = False
 
     @property
-    def dropped(self) -> int:
-        """Frames dropped because the encoder had not taken the ones before them, over the writer's life."""
+    def queued_bytes(self) -> int:
+        """The bytes of the frames queued for the encoder."""
         with self._lock:
-            return self._dropped
+            return self._queued_bytes
 
     @property
     def failed(self) -> bool:
@@ -87,17 +86,9 @@ class StreamWriter:
         `nv12` packed NV12 (H * 3 / 2, W), which needs saying because it is 2-D too."""
         if not self.is_receiving:
             return
-        while True:
-            try:
-                self.frames.put_nowait((frame, nv12))
-                return
-            except Full:
-                try:
-                    self.frames.get_nowait()        # the oldest goes
-                except Empty:
-                    pass
-                with self._lock:
-                    self._dropped += 1
+        with self._lock:
+            self._queued_bytes += frame.nbytes
+        self.frames.put((frame, nv12))
 
     def _record(self) -> None:
         process = None
@@ -107,6 +98,8 @@ class StreamWriter:
                     frame, nv12 = self.frames.get(timeout=.1)
                 except Empty:
                     continue
+                with self._lock:
+                    self._queued_bytes -= frame.nbytes
 
                 depth: bool = frame.dtype == np.uint16
                 if process is None:
@@ -153,6 +146,8 @@ class StreamWriter:
     def _clear(self) -> None:
         while True:
             try:
-                self.frames.get_nowait()
+                frame, _ = self.frames.get_nowait()
             except Empty:
                 return
+            with self._lock:
+                self._queued_bytes -= frame.nbytes

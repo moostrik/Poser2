@@ -84,14 +84,19 @@ class MissedParts:
         self._lock: Lock = Lock()
         self._counts: dict[tuple[int, str], int] = {}
         self._at_start: dict[str, int] = {}
-        self._started: bool = False
+        self._started: set[int] = set()         # the cameras whose first capture went out
+        self._all_started: bool = False
         self._warned: float = float('-inf')
         self._unwarned: dict[tuple[int, str], int] = {}
 
-    def started(self) -> None:
-        """The sync's first capture went out: what is counted from here is warned of."""
+    def started(self, cam_id: int | None = None) -> None:
+        """A camera's first capture went out, or with None every camera's: what is counted of it from here is
+        warned of. Each camera has its own start: another camera's first capture does not end it."""
         with self._lock:
-            self._started = True
+            if cam_id is None:
+                self._all_started = True
+            else:
+                self._started.add(cam_id)
 
     def reset(self) -> None:
         """A new start (a new recording): the counts from zero, the start counted apart again."""
@@ -99,13 +104,14 @@ class MissedParts:
             self._counts.clear()
             self._unwarned.clear()
             self._at_start.clear()
-            self._started = False
+            self._started.clear()
+            self._all_started = False
 
     def count(self, cam_id: int, part: str, missed: int = 1) -> None:
         if missed <= 0:
             return
         with self._lock:
-            if not self._started:
+            if not self._all_started and cam_id not in self._started:
                 self._at_start[part] = self._at_start.get(part, 0) + missed
                 return
             key: tuple[int, str] = (cam_id, part)

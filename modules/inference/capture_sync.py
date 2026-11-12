@@ -216,7 +216,7 @@ class CaptureSync(Thread):
         # What came before this capture and was not taken never will be: a complete one would have gone out before
         self._missed.count(cam_id, 'image', self._depths[cam_id].take_through(timestamp))     # a depth without its image
         self._missed.count(cam_id, 'depth', self._images[cam_id].take_through(timestamp))     # an image without its depth
-        self._missed.started()
+        self._missed.started(cam_id)
         return Capture(cam_id=cam_id, timestamp=timestamp, image=image, depth=depth,
                        poses=poses if poses is not None else self._poses[cam_id].before(timestamp) or {}, poses_synced=poses is not None,
                        masks=masks if masks is not None else self._masks[cam_id].before(timestamp) or {}, masks_synced=masks is not None)
