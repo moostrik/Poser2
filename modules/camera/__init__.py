@@ -14,9 +14,10 @@ from .geometry import       CameraResolution, RESOLUTION_SIZES, MONO_RESOLUTIONS
 from .tilt_correction import TiltCorrection, TILT_STEP
 from .frame_trigger import  FrameTrigger, FrameTriggerSettings
 from .capture_match import  CaptureStream, MissedParts
-from .chunk import          ChunkInfo, ChunkMetadata, FrameMetadata, PoseArrays, merge_chunk, read_metadata, finish_unmerged
+from .chunk import          ChunkInfo, ChunkMetadata, FrameMetadata, PoseArrays, merge_chunk, read_metadata, finish_unmerged, \
+                            make_file_name, make_chunk_name, make_folder_name
 from .recording_sync import RecordingSync, RecordedCapture, FramePoses
-from .recorder import       Recorder, RecorderSettings, make_file_name, make_chunk_name, make_folder_name
+from .recorder import       Recorder, RecorderSettings
 from .play_clock import     PlayClock
 from .recording_folder import RecordingFolder, Timeline
 from .frame_hand_over import ClipFrameCallback

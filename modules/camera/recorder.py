@@ -26,7 +26,8 @@ from typing import TextIO
 from modules.settings import BaseSettings, Field, Widget
 from modules.video import CoderType, CoderFormat, DEPTH_ENCODER, encoder_name, StreamWriter
 
-from .chunk import METADATA_SUFFIX, ChunkInfo, FrameMetadata, finish_unmerged, frame_line, info_line, merge_chunk
+from .chunk import DEPTH_SUFFIX, METADATA_LABEL, METADATA_SUFFIX, ChunkInfo, FrameMetadata, finish_unmerged, frame_line, info_line, \
+    make_chunk_name, make_file_name, make_folder_name, merge_chunk
 from .frame import FrameType, CameraFrame
 from .recording_sync import FramePoses, RecordedCapture, RecordingSync
 from .tracklet import CameraTracklets
@@ -65,31 +66,9 @@ class RecorderSettings(BaseSettings):
 
 
 # The letter in a clip's file name: `0_C_001.mp4` is camera 0's video, chunk 1.
-FRAME_TYPE_LABELS: dict[FrameType, str] = {
-    FrameType.VIDEO: 'C',
-    FrameType.DEPTH: 'D',
-}
-METADATA_LABEL: str = 'M'
 STOP_WAIT: float = 1.0          # s a stopping recording waits for the parts its last captures wait for
 SPLIT_WAIT: float = 1.0         # s a split waits for a camera's first capture after its time, before it cuts that camera's chunk anyway
 HELD: int = 1 << 30             # bytes waiting for the encoders, queued here and in the writers: 1 GB, some 6 s of four cameras with depth
-DEPTH_SUFFIX: str = '.mkv'
-
-
-def make_file_name(cam_id: int, frame_type: FrameType, chunk: int, suffix: str) -> str:
-    return f"{cam_id}_{FRAME_TYPE_LABELS[frame_type]}_{chunk:03d}{suffix}"
-
-
-def make_chunk_name(cam_id: int, chunk: int) -> str:
-    """The one file a chunk ends as."""
-    return f"{cam_id}_{chunk:03d}.mkv"
-
-
-def make_folder_name(name: str = "") -> str:
-    folder = time.strftime("%Y%m%d-%H%M%S")
-    if name:
-        folder += f"_{name}"
-    return folder
 
 
 def _latency(arrival: float | None, timestamp: float) -> float | None:

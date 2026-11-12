@@ -11,8 +11,8 @@ from pathlib import Path
 
 from modules.video import CoderFormat, StreamReader
 
+from .chunk import make_chunk_name, make_file_name
 from .frame import FrameType
-from .recorder import make_chunk_name, make_file_name
 
 logger = logging.getLogger(__name__)
 

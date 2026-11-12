@@ -17,10 +17,9 @@ from typing import cast
 
 from modules.video import StreamFrameCallback, StreamReader
 
-from .chunk import ChunkInfo, ChunkMetadata, FrameMetadata, read_metadata
+from .chunk import ChunkInfo, ChunkMetadata, FrameMetadata, make_chunk_name, make_file_name, read_metadata
 from .frame import CAPTURE_TOLERANCE, FrameType
 from .play_clock import PlayClock
-from .recorder import make_chunk_name, make_file_name
 from .recording_folder import RecordingFolder
 
 logger = logging.getLogger(__name__)

@@ -14,6 +14,7 @@ import logging
 import shutil
 import subprocess
 import tempfile
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from collections.abc import Sequence
@@ -24,13 +25,37 @@ import numpy as np
 from modules.utils import Rect
 from modules.video import popen
 
-from .frame import DepthAlignment, FrameReadings
+from .frame import DepthAlignment, FrameReadings, FrameType
 from .tracklet import CameraTracklet, TrackingStatus
 
 logger = logging.getLogger(__name__)
 
 METADATA_MIMETYPE: str = 'application/x-ndjson'
 METADATA_SUFFIX: str = '.jsonl'
+FRAME_TYPE_LABELS: dict[FrameType, str] = {     # a stream's file while the chunk is recorded
+    FrameType.VIDEO: 'C',
+    FrameType.DEPTH: 'D',
+}
+METADATA_LABEL: str = 'M'
+DEPTH_SUFFIX: str = '.mkv'
+
+
+def make_file_name(cam_id: int, frame_type: FrameType, chunk: int, suffix: str) -> str:
+    """A stream's file while the chunk is recorded, and a color-only clip of before."""
+    return f"{cam_id}_{FRAME_TYPE_LABELS[frame_type]}_{chunk:03d}{suffix}"
+
+
+def make_chunk_name(cam_id: int, chunk: int) -> str:
+    """The one file a chunk ends as."""
+    return f"{cam_id}_{chunk:03d}.mkv"
+
+
+def make_folder_name(name: str = "") -> str:
+    """A recording's folder: its start time, and its name."""
+    folder = time.strftime("%Y%m%d-%H%M%S")
+    if name:
+        folder += f"_{name}"
+    return folder
 
 
 @dataclass(frozen=True)
