@@ -189,7 +189,52 @@ first run waited for the poses up to a timed 150 ms, which the order of the stre
 
 Waiting for the camera: the board's poses over the image in a replay against live.
 
-### 3. The poses the pose model drops
+### 3. The recorder's faults
+
+From a reading of `recorder.py`, `recording_sync.py`, `capture_match.py` and `modules/video/stream_writer.py`; none
+is reproduced **(deduction)**. The layers are sound: the camera's thread only matches and queues, the encoding and
+the files are the recorder's and the writers' threads'. To fix as one change, in this order:
+
+Bugs:
+
+1. A dead encoder hangs the recorder: when ffmpeg dies (an encoder error, a full disk) the writer's thread dies on
+   the broken pipe, its queue never empties, and `StreamWriter.stop` waits for it for ever; the recorder's thread
+   hangs, and the app at quitting, while the frames keep queuing at 1.2 MB each. The writer is to notice its
+   process ending, say so, drop what is queued and let `stop` return; the recorder ends the recording.
+2. No queue is bounded: with a slow encoder the recorder's queue and the writers' grow, uncounted. A bound per
+   queue, the oldest dropped beyond it, counted on the panel and warned of, as every other stage's drops.
+3. A start that fails is tried again every 10 ms: the state stays START, the exception is logged each time and the
+   panel says recording. One failure ends the start, says why, and clears `recording`.
+4. A frame can pass into the next recording: the camera's thread can be in a submit while the recorder ends, so a
+   capture reaches the queue after the last write and waits there. The queue is emptied at the start.
+5. In a stall, tracklets that came can be recorded as missed: a capture's parts are looked up when it goes out, and
+   when it waits `KEPT` frames for its poses, newer tracklets push its own out of the stream. A part is kept with
+   its waiting capture when it comes.
+
+Latency:
+
+6. The warnings of `MissedParts` are logged where the count is made: on the camera's thread, under the sync's
+   locks, which the tracklets', the poses' and the uploader's threads share; a console write can take milliseconds.
+   The count only counts, and the recorder's thread (and the capture sync's) logs.
+7. The recorder's callbacks run before the uploader's on every frame and tracklet message (their order in
+   deep_flow's `main.py`). The uploader first, so the live path is never behind the recorder.
+
+Small:
+
+8. `StreamWriter.start` followed at once by `stop` leaves the writer running: `is_recording` is set by the thread,
+   not by `start`.
+9. Each frame is copied twice before the pipe (`astype(np.uint8).tobytes()` on a uint8 frame): the frame's own
+   buffer can be written.
+10. A start first merges what a crash left (`finish_unmerged`), on the recorder's thread, so the first frames of
+    the new recording are lost for as long as that takes: merged on a thread of its own.
+11. "VideoRecorder stopped" is logged twice at quitting, and the arrow in the start's log line cannot be written
+    on a Windows console, which fails that line on every start.
+
+Tests: a writer whose process dies (stop returns, the recorder ends the recording); a full queue dropping and
+counting; a start that raises; a capture queued after a stop not in the next recording; a waiting capture keeping
+its tracklets past `KEPT` newer ones; `MissedParts` not logging in `count`.
+
+### 4. The poses the pose model drops
 
 In -sim, with the recorded tracklets and the pose model on, about one frame in six with a player gets no poses (107
 of 596 on `hands`): the pose model's TensorRT runner keeps one batch in flight and one waiting
