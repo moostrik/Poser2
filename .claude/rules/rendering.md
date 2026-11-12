@@ -33,6 +33,7 @@ paths:
 - Preserve layer boundaries and data ownership
 - Keep layer interfaces narrow and explicit
 - Prefer composition of layers over monolithic render passes
+- A layer hands out its Fbo or SwapFbo, not the texture inside it
 
 ## Performance focus
 

@@ -7,6 +7,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - One rule per bullet, phrased as an instruction
 - Add a short reason only when it marks the rule's boundary or the rule isn't obvious
 - No incident history, no examples unless the rule is ambiguous without one
+- A rule describes the codebase as it should look, not how it shouldn't
 - Put a rule where it loads when the code it governs is written: here, or a `.claude/rules/` file whose `paths` match that code
 
 ## Project shape
@@ -20,12 +21,25 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - `apps/smile/` has its own rules in its `CLAUDE.md`; its `cam` is the app's image source (a `modules/camera` backend, an image folder, a phone), not a camera backend
 - Never change the White Space fixture firmware (`apps/white_space/data/firmware/`); solve everything on the app side of the wire
 
+## Packages
+
+- A package is one thing, and its name is that thing
+- Its `__init__.py` holds what other packages use
+- Its files each hold one class or one subject, named after it
+- Its document opens with a table of its files: the name, what it is, who uses it
+- Its tests sit in its `tests/` folder, its command-line scripts in `scripts/`
+
 ## Naming
 
 - Name a concept after what it is in the domain, and use that one term everywhere it appears: file, class, method, setting, panel label, document
 - Name a module file in snake_case after the class or domain noun it holds
 - Use the terms in `.claude/rules/glossary.md`
 - Use no synonyms for one concept across modules; when a term changes, rename it everywhere in the same change
+
+## Docstrings
+
+- A docstring says what the thing is
+- Reasons sit in the package's document, history in the commit
 
 ## Settings
 
@@ -53,6 +67,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Name output channels verb + domain noun (`submit_frames`, `add_similarity_callback`)
 - Share runtime data through `modules/board/` protocol + mixin pairs; each app composes its own `RenderBoard` from the mixins it needs, and keeps a slice only it reads in `apps/<app>/board/`
 - A value derived from pose data, a threshold on it included (a gate, a dead zone), is the pipeline's and so are its settings; the show owns only what it does with it: timings, looks, sound
+- Fix a problem where it is made, not where it shows
 
 ## Concurrency
 
@@ -133,9 +148,12 @@ python -m unittest discover -s modules/<pkg>/tests -t .    # camera, camera/geom
 - Keep presets and settings schemas in sync with code changes
 - Remove obsolete pathways instead of leaving parallel legacy ones
 
-## Working style
+## Plans and commits
 
+- A plan ends with the rules it touches and how it meets each
+- A plan is built on the user's literal "go"
 - Separate what the code or a measurement shows from what is inferred, and say which is which
-- Do the plan step asked for and stop; don't start the next one
-- Don't offer to revert work
+- One plan step is one commit; experiments and half steps are not committed
+- A finished plan is reported with the rules it touched and how it meets each
+- Push only on the user's word
 - Never delete or rewrite a plan without confirmation; propose the change first
