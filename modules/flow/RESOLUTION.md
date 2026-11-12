@@ -29,7 +29,7 @@ help, more color would not.
 | the bridge's readings, dye   | x/y, z, the image × the mask                | 448 × 800, per capture     | held between the camera's frames                           |
 | the fluid                    | the readings, read bilinearly (1.56× down)  | 288 × 512 × 64             | motion finer than a cell averages away                     |
 | the 4K density's amount      | the dye, by a B-spline (`upscaled.cubic`)   | 2160 × 3840 × 24           | its own threads, from MacCormack and the turbulence        |
-| the 4K density's color       | the dye's color (`upscaled.color` DYE)      | 448 × 800 × 24             | the dye's, read linearly by the composite                  |
+| the 4K density's color       | the dye's color (`upscaled.color` DYE)      | 448 × 800 × 24             | the dye's, read linearly by the composite: a B-spline read cost 0.75 ms and showed nothing on the hands recording |
 
 The tilt is a homography the host applies where the frame is drawn into the view (`tilt_correction`), so
 the frame stays 800 rows at any tilt; a recording holds the frame as delivered. Which IMX586 mode the
@@ -129,7 +129,7 @@ stillslowfast), and the dye at drag 0.
 The 4K amount is carried by the 288 × 512 velocity read straight between its cells, 7.5× coarser, whose
 kinks show as the cells in a sharp density. A tricubic read where the amount is carried: 8 trilinear reads
 for 1 at each of 199 M texels a step, twice that with MacCormack **(deduction)**; kept if the look gains
-for its cost. The composite's read of the color by a B-spline, likewise.
+for its cost.
 
 ## Open
 
