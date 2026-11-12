@@ -687,6 +687,21 @@ def corrected_keypoints(keypoints: np.ndarray | None, homography: np.ndarray) ->
     return corrected
 
 
+def mirrored_roi(roi: Rect) -> Rect:
+    """A normalised box in the frame flipped left to right."""
+    return Rect(1.0 - roi.x - roi.width, roi.y, roi.width, roi.height)
+
+
+def mirrored_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
+    """Keypoints (N, 3) with x flipped left to right. The labels stay: a left shoulder stays the
+    model's left shoulder, as the model saw the frame unflipped."""
+    if keypoints is None:
+        return None
+    mirrored: np.ndarray = keypoints.copy()
+    mirrored[:, 0] = 1.0 - mirrored[:, 0]
+    return mirrored
+
+
 def mirrored_intrinsics(intrinsics: list[list[float]], width: int) -> list[list[float]]:
     """A lens as it is for the frame flipped left to right: a recording stores mirrored frames."""
     mirrored: list[list[float]] = [list(row) for row in intrinsics]

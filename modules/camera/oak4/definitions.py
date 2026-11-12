@@ -10,7 +10,7 @@ from typing import Callable
 import depthai as dai
 import numpy as np
 
-from .. import CameraResolution, resolve_resolution, mode_size, TrackingStatus
+from .. import CameraResolution, resolve_resolution, mode_size, TrackingStatus, mirrored_roi
 from modules.utils import Rect
 
 logger = logging.getLogger(__name__)
@@ -199,21 +199,6 @@ def smoothed_latency(previous: float, message: dai.ImgFrame | dai.Tracklets) -> 
     the message's timestamp is. A reading for the panel; the frame's time is `capture_time`."""
     latency: float = (dai.Clock.now() - message.getTimestamp()).total_seconds() * 1000.0
     return latency if previous == 0.0 else previous + LATENCY_SMOOTHING * (latency - previous)
-
-
-def mirrored_roi(roi: Rect) -> Rect:
-    """A normalised box in the frame flipped left to right."""
-    return Rect(1.0 - roi.x - roi.width, roi.y, roi.width, roi.height)
-
-
-def mirrored_keypoints(keypoints: np.ndarray | None) -> np.ndarray | None:
-    """Keypoints (N, 3) with x flipped left to right. The labels stay: a left shoulder stays the
-    model's left shoulder, as the model saw the frame unflipped."""
-    if keypoints is None:
-        return None
-    mirrored: np.ndarray = keypoints.copy()
-    mirrored[:, 0] = 1.0 - mirrored[:, 0]
-    return mirrored
 
 
 def log_connected_sensors(device: dai.Device, device_id: str = '') -> None:

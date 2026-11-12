@@ -134,18 +134,22 @@ the same players **(deduction)**. The camera cannot straighten its color frame i
 frames only, and the depth is aligned on the GPU, where it is straightened with the color.
 
 - `CameraTracklets`, the contract's tracklets of one frame, as the device gave them: `cam_id`, `timestamp` (their
-  frame's capture), `arrival` and the `CameraTracklet`s; `TrackletCallback` takes one.
+  frame's capture), `arrival`, the `CameraTracklet`s and `straightened` (false from a camera); `TrackletCallback`
+  takes one.
 - `CameraFrame` and `CameraTracklets` carry `arrival`, `perf_counter` stamped by the backend at hand-over beside
   `timestamp`, so nothing downstream reads a clock for a latency.
 - oak4's `_tracklet` and `_poses_callback` neither straighten nor mirror.
 - `Uploader.submit_tracklets`, a tracklet callback beside `submit_frame`: it only queues. `submit_frame` notes each
   color frame's homography and `flip_h` by capture time, for the last few frames, a frame its queue drops included.
   The uploader's thread straightens and mirrors the tracklets with those of their frame
-  (`geometry.straightened_tracklets`: `corrected_roi`, `corrected_keypoints`, the mirror) and hands them to its
-  tracklet callbacks: the tracker and the board. Tracklets whose frame is no longer noted take the newest frame's.
+  (`straightened_tracklets`: `corrected_roi`, `corrected_keypoints`, the mirror), ahead of the frames waiting, and
+  hands them to its tracklet callbacks: the tracker and the board. Tracklets whose frame is no longer noted take the
+  newest frame's. It never drops tracklets.
 - The camera's tracklet thread then only queues, into the uploader and the recorder.
-- The host detector in -sim looks at the uploaded image, straightened and mirrored, so the replay camera's tracklets
-  from it go to the tracker and the board as they are, not through the uploader.
+- The host detector in -sim looks at the uploaded image, straightened and mirrored, so the replay camera marks its
+  tracklets from it `straightened`, and the uploader hands them on as they are.
+- hd_trio and white_space still wire the camera's tracklets to their tracker directly; they are off on this branch
+  and take the uploader's with [INPUT_THREADS.md Plan 1](../flow/INPUT_THREADS.md#1-white_space-and-hd_trio-on-deep_flows-input).
 
 Live on the P800 the tracklets come about as often as the frames, about 33 ms after their frame's capture
 **(site fact)**, so the uploader keeps the homography of more frames than that spans.

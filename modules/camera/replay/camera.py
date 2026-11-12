@@ -156,6 +156,6 @@ class Camera:
             CameraTracklet(cam_id=self.id, id=t.id, status=t.status, roi=t.roi, age=t.age, timestamp=timestamp)
             for t in self.tracker.update(detection.boxes)]
         self.settings.readings.tracklets = len(tracklets)
-        message = CameraTracklets(cam_id=self.id, timestamp=timestamp, tracklets=tracklets, arrival=time.perf_counter())
+        message = CameraTracklets(cam_id=self.id, timestamp=timestamp, tracklets=tracklets, arrival=time.perf_counter(), straightened=True)
         for c in self.tracklet_callbacks:
             c(message)

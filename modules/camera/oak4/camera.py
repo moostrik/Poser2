@@ -12,7 +12,8 @@ sensor controls are `SensorControl`'s for as long as the device is open.
 
 The frame leaves here untouched where it can: an NV12 frame goes on packed, and the GPU upload
 converts, straightens and mirrors it, so this thread does no color work. The camera cannot do
-either to that frame itself, so its boxes and keypoints get the same here to match. The IMU's tilt
+either to that frame itself, and its boxes and keypoints leave here as its model found them, in the
+frame as delivered: the uploader straightens and mirrors them with their frame. The IMU's tilt
 makes the homography every frame carries (`TiltCorrection`), on this one view for color and depth
 alike. `readings.video_latency`,
 `tracker_latency` and `depth_latency` say what each message took from capture to here.
@@ -32,14 +33,13 @@ from numpy import ndarray
 
 from .. import CameraResolution, CameraFrame, DepthAlignment, FrameReadings, RigCameraReadings, CameraTracklet, CameraTracklets, FrameType, CameraFrameCallback, \
     TrackletCallback, orientation_from_gravity, frame_window, frame_coverage, coverage_summary, \
-    delivered_height, lens_field, rectilinear_field, lens_deviation, imu_to_camera, unroll_imu_frame, TiltCorrection, corrected_roi, corrected_keypoints
+    delivered_height, lens_field, rectilinear_field, lens_deviation, imu_to_camera, unroll_imu_frame, TiltCorrection
 from modules.utils import FPS, Rect
 
 from .control import DepthControl, SensorControl
 from .definitions import SENSOR_SOCKET, requested_size, get_device_list, find_device, link_name, link_resolution, log_connected_sensors, \
     read_lens_calibration, imu_rotation_to_camera, IMU_SMOOTHING, IMU_BOARD_ROLL, ModelChain, CameraLink, DepthModel, \
-    model_archives, TRACKING_STATUS, tracklet_keypoints, keypoints_in_frame, packed_nv12, smoothed_latency, capture_time, \
-    mirrored_roi, mirrored_keypoints
+    model_archives, TRACKING_STATUS, tracklet_keypoints, keypoints_in_frame, packed_nv12, smoothed_latency, capture_time
 from .pipeline import build_pipeline, delivered_size, MountConfig, PipelineOutputs
 from .pose_join import PoseJoin, Box
 from .settings import Oak4CameraSettings
@@ -388,13 +388,9 @@ class Camera(Thread):
         return self._alignment
 
     def _tracklet(self, tracklet: dai.Tracklet, keypoints: ndarray | None, timestamp: float) -> CameraTracklet:
-        """One device tracklet as the contract's, straightened and mirrored when the frames are."""
+        """One device tracklet as the contract's, in the frame as delivered: the uploader straightens
+        and mirrors it with its frame."""
         roi = Rect(tracklet.roi.x, tracklet.roi.y, tracklet.roi.width, tracklet.roi.height)
-        homography: ndarray | None = self.tilt_correction.homography
-        if homography is not None:
-            roi, keypoints = corrected_roi(roi, homography), corrected_keypoints(keypoints, homography)
-        if self.flip_on_host:
-            roi, keypoints = mirrored_roi(roi), mirrored_keypoints(keypoints)
         return CameraTracklet(cam_id=self.id, id=tracklet.id, status=TRACKING_STATUS[tracklet.status], roi=roi,
                               age=tracklet.age, timestamp=timestamp, keypoints=keypoints)
 
@@ -435,11 +431,6 @@ class Camera(Thread):
         if len(keypoints) != len(boxes):
             logger.debug(f'{self.device_id} frame {detections.getSequenceNum()}: {len(keypoints)} poses for {len(boxes)} people')
             keypoints = (keypoints + [None] * len(boxes))[:len(boxes)]
-        homography: ndarray | None = self.tilt_correction.homography
-        if homography is not None:
-            keypoints = [corrected_keypoints(points, homography) for points in keypoints]
-        if self.flip_on_host:
-            keypoints = [mirrored_keypoints(points) for points in keypoints]
         joined = self.pose_join.put_poses(detections.getSequenceNum(), boxes, keypoints)
         if joined is not None:
             self._emit_tracklets(joined, capture_time(detections), arrival)

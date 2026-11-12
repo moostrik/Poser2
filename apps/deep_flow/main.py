@@ -88,14 +88,16 @@ class DeepFlowMain:
         self.capture_sync = CaptureSync(p.capture_sync)                  # the color, depth and poses of one moment, for the render
         self.capture_rate: FPS = FPS(120)                                # the captures it hands on, for the panel's cadence
 
-        # The camera's thread only hands its frames over: to the recorder as they came, to the uploader for the rest
+        # The camera's thread only hands its frames and tracklets over: to the recorder as they came, to the uploader
+        # for the rest, which straightens the tracklets with their frame and hands them to the tracker and the board
         for camera in self.cameras:
             if self.recorder:
                 camera.add_frame_callback(self.recorder.submit_frame)
             camera.add_frame_callback(self.uploader.submit_frame)
-            camera.add_tracklet_callback(self.tracker.submit_cam_tracklets)
-            camera.add_tracklet_callback(self.board.set_camera_tracklets)
-            camera.add_tracklet_callback(self._on_tracklets)
+            camera.add_tracklet_callback(self.uploader.submit_tracklets)
+        self.uploader.add_tracklet_callback(self.tracker.submit_cam_tracklets)
+        self.uploader.add_tracklet_callback(self.board.set_camera_tracklets)
+        self.uploader.add_tracklet_callback(self._on_tracklets)
 
         # DETECTION
         self.poses_from_tracklets = PosesFromTracklets(p.tracklets, max_players)

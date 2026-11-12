@@ -11,8 +11,9 @@ import torch
 
 import torch.nn.functional as F
 
-from modules.camera import CameraFrame, FrameType
+from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, FrameType, TrackingStatus
 from modules.inference import GpuDepth, GpuImage, Uploader, UploaderSettings
+from modules.utils import Rect
 from modules.inference.uploader import QUEUED, nv12_to_rgb, warp_grid
 
 
@@ -66,6 +67,10 @@ def _color(timestamp: float, cam_id: int = 0) -> CameraFrame:
 
 def _depth(timestamp: float, cam_id: int = 0) -> CameraFrame:
     return CameraFrame(cam_id, FrameType.DEPTH, np.zeros((30, 40), np.uint16), timestamp)
+
+
+def _tracklet(roi: Rect, timestamp: float) -> CameraTracklet:
+    return CameraTracklet(cam_id=0, id=1, status=TrackingStatus.TRACKED, roi=roi, age=1, timestamp=timestamp)
 
 
 @unittest.skipUnless(torch.cuda.is_available(), 'needs CUDA')
@@ -132,6 +137,35 @@ class HandOffTest(unittest.TestCase):
         self.assertTrue(depths[0].depth.is_cuda)
         self.assertEqual(tuple(depths[0].depth.shape), (30, 40))        # no alignment: on the color's view already
         self.assertAlmostEqual(float(depths[0].depth.max()), 1.5, places=5)
+
+    def test_tracklets_are_straightened_with_their_own_frame(self) -> None:
+        handed: list[CameraTracklets] = []
+        self.uploader.add_tracklet_callback(handed.append)
+        shift = np.array([[1.0, 0.0, 0.25], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+        self.uploader.submit_frame(CameraFrame(0, FrameType.VIDEO, np.zeros((48, 64, 3), np.uint8), 1.0, homography=shift))
+        self.uploader.submit_frame(CameraFrame(0, FrameType.VIDEO, np.zeros((48, 64, 3), np.uint8), 2.0, flip_h=True))
+        box = Rect(0.1, 0.2, 0.3, 0.4)
+        self.uploader.submit_tracklets(CameraTracklets(0, 1.0, [_tracklet(box, 1.0)]))   # the frame of 1.0, after the frame of 2.0
+        self.uploader.submit_tracklets(CameraTracklets(0, 2.0, [_tracklet(box, 2.0)]))
+        self.uploader.start()
+        end = time.perf_counter() + 5.0
+        while len(handed) < 2 and time.perf_counter() < end:
+            time.sleep(0.005)
+        self.assertAlmostEqual(handed[0].tracklets[0].roi.x, 0.35)       # shifted, not mirrored
+        self.assertAlmostEqual(handed[1].tracklets[0].roi.x, 0.6)        # mirrored, not shifted
+        self.assertTrue(all(message.straightened for message in handed))
+
+    def test_tracklets_straightened_already_pass_as_they_are(self) -> None:
+        handed: list[CameraTracklets] = []
+        self.uploader.add_tracklet_callback(handed.append)
+        self.uploader.submit_frame(CameraFrame(0, FrameType.VIDEO, np.zeros((48, 64, 3), np.uint8), 1.0, flip_h=True))
+        message = CameraTracklets(0, 1.0, [_tracklet(Rect(0.1, 0.2, 0.3, 0.4), 1.0)], straightened=True)
+        self.uploader.submit_tracklets(message)
+        self.uploader.start()
+        end = time.perf_counter() + 5.0
+        while not handed and time.perf_counter() < end:
+            time.sleep(0.005)
+        self.assertIs(handed[0], message)
 
     def test_stop_ends_the_thread_with_frames_still_queued(self) -> None:
         self.uploader.start()
