@@ -252,7 +252,16 @@ The color's conversion, straightening and mirroring as one CUDA kernel: from the
 The optical flow on the crops (`enable_prev_crop`, off in deep_flow, so it runs nothing) does not wait for the
 crops' event, and its pairing of the current and the previous image is to be checked when it is used.
 
-### 4. No captures
+### 4. One line per stream: average and 1% low
+
+The panel's rates as frame-time analysis gives them (RTSS, CapFrameX): one pinned line per stream, Render,
+Video, Captures and Motion, `<name>  <average> fps  low <1% low>`, both from one record of each stream's frame
+times. The average says how many frames came (a count for the cadence: 50 when none is lost); the 1% low, the
+rate over the slowest 1% of frames, says how steady, catching hitches without being set for a whole window by
+one, as the minimum (1 / the worst gap) is. It replaces the minimums (`Video min`, `Captures min`, `Motion
+min`) and gives the render the same two numbers; a frame-time line beside it only if asked.
+
+### 5. No captures
 
 While no capture comes (the camera stalls, -sim is paused) the bridge keeps its last output and the fluid keeps
 taking it, where the motion holds its last velocity. What the flow should do then is not decided.
