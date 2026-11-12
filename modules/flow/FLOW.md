@@ -210,17 +210,22 @@ subpanels: `readings`, `lowpass` and `bandpass`; `boundary`, `velocity`, `densit
 `dt` from their input.
 
 The apps' render is a layer graph of `LayerBase` layers updated by one loop calling `update()`
-on each (`apps/deep_flow/render.py`, `apps/hd_trio/render.py`), with a wiring pass before it
-(`_wire_flow`). The wiring pass builds a motion and a bridge input per camera and a fluid input
-per fluid layer, with one injection per bridge that fluid takes, and sets them; the loop, which
-`UPDATE_LAYERS` orders motion, bridge, fluid, stays uniform. Which layers feed the inputs is app
-policy: hd_trio wires fixed layers, measures on its centered mask, gives each bridge the centered
-foreground as the picture behind its density and temperature, each injection the camera's track
-color, and weights the own camera's injection by the player's motion and another's by the
-cross-camera similarity times `similarity_scale`; deep_flow picks the layers on
-its panel, live, one `Layers` field per picture (`motion_image`, `bridge_image`, `mask`) in its
-`inputs` group with `scale_by_motion` (`apps/deep_flow/settings.py`) and reads the fields each
-tick. Both apps give each camera two monitors, `monitor_a`
+on each (`apps/deep_flow/render.py`, `apps/hd_trio/render.py`). hd_trio builds a motion and a
+bridge input per camera and a fluid input per fluid layer in a wiring pass before the loop
+(`_wire_flow`), which `UPDATE_LAYERS` orders motion, bridge, fluid. deep_flow runs its stages per
+capture: each tick it takes the captures that came since the last (`take_captures`) and runs each,
+in order, through the view stage, the motion and the bridge, each input built right before its
+stage (`_run_capture`), the bridge stepping over the time since the capture before; a tick without
+a capture runs none of them, and the fluid, which steps every tick, gets its input right before it
+runs. With two captures in one tick the 3D bridge hands the fluid, per pixel, the density and the
+temperature of the capture with the larger amount (`CaptureMax`), the rest the newest's. Which
+layers feed the inputs is app policy: hd_trio wires fixed layers, measures on its centered mask,
+gives each bridge the centered foreground as the picture behind its density and temperature, each
+injection the camera's track color, and weights the own camera's injection by the player's motion
+and another's by the cross-camera similarity times `similarity_scale`; deep_flow picks the pictures
+on its panel, live, among the view's outputs, one `Layers` field per picture (`motion_image`,
+`bridge_image`) in its `inputs` group with `scale_by_motion` (`apps/deep_flow/settings.py`), and
+takes the mask from the view stage. Both apps give each camera two monitors, `monitor_a`
 and `monitor_b`, each handed every stage's `ports`; they go into the panel's select lists like
 any layer, and two show A beside B.
 
@@ -281,7 +286,7 @@ frame. How a frame gets there, thread by thread, what costs frames and the plan 
 - A layer has no change flag: a source layer's `timestamp`, the capture time of the frame it holds, says
   whether it holds a new one, and `None` that it holds none yet: a stage that compares frames over time
   counts only frames with a capture time, and one that only draws may draw black. `MotionInput.timestamp`
-  tells the motion layer, and `DepthMaskLayer` reads its depth source's the same way.
+  tells the motion layer, and the view stage (`ViewInput.timestamp`) the same way.
 - The time step has one transport: the app hands the tick's `dt` in the inputs, and the fluid's
   `TimeStep` smooths it over `fps_smoothing`, or steps fixed at `fixed_fps`. No `fps` or
   `step_fps` field: runtime data stays off the settings.
@@ -358,7 +363,7 @@ speeds on standmoves and stillslowfast.
 
 ### 7. The depth's mask with another mask source
 
-With `mask_source` RVM, deep_flow makes no `DepthMaskLayer`, so the motion's `depth_mask`, the depth's own
-cut that gates z ([RESOLUTION.md](RESOLUTION.md#the-mask-and-the-depth-mask)), has nothing to come from: the
-depth's cut has to be made whatever the mask source, cropped by the center mask layer in the image's space,
-as RVM's mask is in the crop's. Later; the depth source comes first.
+deep_flow's mask is the depth's ([INPUT_THREADS.md](INPUT_THREADS.md#1-deep_flow-the-input-refactor)); a
+mask from RVM, for a camera without depth, would come back from hd_trio. With it the motion's `depth_mask`,
+the depth's own cut that gates z ([RESOLUTION.md](RESOLUTION.md#the-mask-and-the-depth-mask)), is still the
+view stage's, and RVM's mask, on the crop, would have to be cut into the view's window.

@@ -15,7 +15,7 @@ from the numbers.
 | Input             | the standmoves recording (`-sim`), one camera, 50 fps                                   |
 | Preset            | `apps/deep_flow/data/settings/settings.json`, one setting changed per run               |
 | Pose              | on: the person detection and RTM pose on TensorRT, on the same GPU                      |
-| Segmentation      | off: `mask_source` `DEPTH`, the RVM model not run                                       |
+| Segmentation      | off: the mask is the depth's, the RVM model not run                                     |
 | Output            | the large layers at 2 × the output, 2160 × 3840; no upscale pass beyond that allocation |
 | `v_sync`          | off, so the frame rate shows the headroom                                               |
 | Warm-up, duration | 10 s running before the first sample, then 60 s                                         |

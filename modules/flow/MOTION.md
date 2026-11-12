@@ -22,20 +22,19 @@ two counted frames, so its first measurement is always a real frame against a re
 than the expected frame interval is a dropped frame. A camera frame has
 no other identity: `CameraFrame` and `Capture` carry a timestamp and no sequence number, because the
 device's sequence numbers skip on the depth while every frame arrives (`modules/camera/oak4/OAK4.md`).
-A source layer keeps the capture time of the frame it holds (`CaptureImageLayer`, `DepthSourceLayer`,
-`MaskSourceLayer` and `ForegroundSourceLayer` from `segmentation.Image.timestamp`, `DepthMaskLayer`
-from its depth), and a view (`CenterCamLayer`, `CenterMaskLayer`, `CenterForegroundLayer`,
-`CenterDepthLayer`) takes its source layer and forwards the stamp of the frame it drew, so the app
-reads it off the layer it takes the texture from (`HasCaptureTime`,
-`modules/render/layers/layer_base.py`). The interval a measurement divides by is in
+A source layer keeps the capture time of the frame it holds (`CaptureImageLayer`, `CaptureDepthLayer`,
+`MaskSourceLayer` and `ForegroundSourceLayer` from `segmentation.Image.timestamp`), and a view (the
+view stage, `ViewLayer`; hd_trio's `CenterCamLayer`, `CenterMaskLayer`, `CenterForegroundLayer`) forwards
+the stamp of the frame it drew, so the app reads it off the layer it takes the texture from
+(`HasCaptureTime`, `modules/render/layers/layer_base.py`); deep_flow hands the motion its capture's own. The interval a measurement divides by is in
 [FLOW.md's two clocks](FLOW.md#inputs-and-outputs).
 
 `DepthView(texture, view_span, depth_step)` (`modules/flow/motion/depth_view.py`) is the depth on
 the flow's view: the texture, the metres one view width spans per metre of depth, and the uv
-between two depth samples. The 3D camera's layers make it: `DepthSourceLayer` the texture and its
-`sample_size`, `CenterGeometry` the `view_span` from its crop and the camera's horizontal field of
-view it takes at construction, and the `depth_step` from the sample size and its crop;
-`CenterDepthLayer.depth_view` puts them together.
+between two depth samples. The view stage makes it (`ViewOutput.depth`): the depth read into the
+view's window across a surface, the `view_span` from the window and the camera's horizontal field of
+view it takes at construction, and the `depth_step` from the aligned depth's grid and the window
+(`modules/flow/view/view_window.py`).
 
 ## The settings
 

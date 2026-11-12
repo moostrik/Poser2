@@ -285,7 +285,7 @@ That gives a view of about 79.6° by 67.6° **(deduction)**, and `readings.fov_f
 
 ## Depth
 
-Neural Depth runs on the camera off 640x400 mono frames and arrives as 480x300 uint16 millimeters on the left mono camera's view, with 0 for no depth. Each depth frame carries its `DepthAlignment`: both lenses and the move from the left camera to the color camera, 3.76 cm sideways, read once from the calibration the frames carry. The `DepthAlign` compute shader puts depth on the color view on the GPU, together with the tilt correction and the mirror: each depth pixel goes to its point in space and into the color frame, the nearest point wins where two land on one pixel, and a pixel nothing lands on stays 0. The output is 374x300, the depth's rows at the color frame's aspect (`aligned_depth_size`).
+Neural Depth runs on the camera off 640x400 mono frames and arrives as 480x300 uint16 millimeters on the left mono camera's view, with 0 for no depth. Each depth frame carries its `DepthAlignment`: both lenses and the move from the left camera to the color camera, 3.76 cm sideways, read once from the calibration the frames carry. The uploader puts depth on the color view on the GPU (`DepthAligner` in `modules/inference/depth_align.py`), together with the tilt correction and the mirror: each depth pixel goes to its point in space and into the color frame, the nearest point wins where two land on one pixel, and a pixel nothing lands on stays 0. The output is 374x300, the depth's rows at the color frame's aspect (`aligned_depth_size`).
 
 Next to a near object the color camera sees background the left camera could not, so that band has no depth. It is about `538 px × 3.76 cm × (1/Z_near − 1/Z_far)` wide, 12 px for a player at 1 m before a wall at 2.5 m. The black shadow bands beside near objects are this band and the stereo occlusion.
 
@@ -296,9 +296,9 @@ Next to a near object the color camera sees background the left camera could not
 | Neural Depth    | 36.9 ms | 46.8 ms |
 | `ImageAlign`    | 45.0 ms | 51.5 ms |
 
-The GPU pass takes 0.13 ms and matches a float64 reference on captured frames: the same empty pixels, values within 6 mm. Recordings store the depth on its own view with its alignment in the chunk info; recordings made before hold depth already on the color view and no alignment, and play through the same pass.
+The alignment takes 0.64 ms of GPU a frame, queued as one CUDA graph per lens and tilt; it matches the GL `DepthAlign` shader (0.13 ms), which matches a float64 reference on captured frames (the same empty pixels, values within 6 mm), but for under 2 border pixels a frame (`scripts/depth_align_check.py`). Recordings store the depth on its own view with its alignment in the chunk info; recordings made before hold depth already on the color view and no alignment, and play through the same pass.
 
-`DepthSourceLayer` turns it into float32 meters, straightens it, and exposes it as `depth` for use as data; `texture` is its view. The view's colormap matches depthai's `colorizeDepthFrame` defaults: JET on a log scale from 0.3 to 12 m, which puts the detail close to the camera.
+The uploader hands it on as float32 meters on the color view (`GpuDepth`); deep_flow's view stage reads it into the flow's view ([INPUT_THREADS.md](../../flow/INPUT_THREADS.md)), and `ViewDepthLayer` draws it. The colormap matches depthai's `colorizeDepthFrame` defaults: JET on a log scale from 0.3 to 12 m, which puts the detail close to the camera.
 
 ### IR light
 
@@ -423,7 +423,7 @@ The times cover the preprocessing, inference and decoding; with the preprocessin
 - depthai once stopped listing the camera on USB after an app closed, and kept listing it on Ethernet, while ADB and Windows still saw it on USB. Every open fell back to Ethernet until `oakctl device reboot` brought USB back. The cause is not known.
 - `SpatialDetectionNetwork` has not been measured with a real player, whose larger box holds more depth pixels, or with several players. Which depth frame its `z` comes from is not known: boxes reach the PC before that frame's depth does.
 - Video min sometimes reads about 30 fps **(site fact)**. The cause is not known.
-- `center_depth` has not been seen with a player in view.
+- `view_depth` has not been seen with a player in view live.
 - A standing player reading as one distance from head to feet has not been checked.
 - Depth has one outlier of about 153 mm near the top left on synthetic frames, at all widths. The cause is not known.
 - `StreamReader.frame_count` can read one short on an `.mkv`, as it estimates from the duration.

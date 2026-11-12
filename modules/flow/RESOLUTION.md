@@ -20,13 +20,13 @@ help, more color would not.
 |------------------------------|---------------------------------------------|----------------------------|-----------------------------------------------------------|
 | camera color                 | `P800` cut to 5:4 (`direct_size`)           | 992 × 800, 50 fps          | the crop around the player, at most 800 rows               |
 | camera depth                 | Neural Depth `NEURAL_480`                   | 480 × 300                  | one depth pixel about 15 view rows at the blocky recording's distance |
-| the image (center view)      | the crop, drawn once                        | 448 × 800, the motion's    | the crop's rows, one to one at most                        |
+| the image (the view)         | the view's window, drawn once               | 448 × 800, the motion's    | the window's rows, one to one at most                      |
 | the mask                     | the depth's cut, guided onto the image      | 448 × 800                  | edges the image's                                          |
-| `depth_mask`                 | the depth's cut, unrefined                  | 448 × 800                  | a staircase of depth pixels at the edges                   |
-| the depth on the view        | the camera's depth, NEAREST                 | 448 × 800                  | flat blocks of a depth pixel                               |
+| `depth_mask`                 | the view's depth cut by near and far        | 448 × 800                  | a staircase of depth pixels at the edges                   |
+| the depth on the view        | the aligned depth, read across a surface    | 448 × 800                  | smooth within a surface, a depth pixel's step at an edge   |
 | x/y                          | the image (Lucas–Kanade, 7 × 7 window)      | 448 × 800                  | smooth over ~7 px                                          |
 | z, the z position            | the depth (the depth velocity, its track)   | 448 × 800                  | the depth's                                                |
-| the bridge's readings, dye   | x/y, z, the image × the mask                | 448 × 800, the render tick | held between the camera's frames                           |
+| the bridge's readings, dye   | x/y, z, the image × the mask                | 448 × 800, per capture     | held between the camera's frames                           |
 | the fluid                    | the readings, read bilinearly (1.56× down)  | 288 × 512 × 64             | motion finer than a cell averages away                     |
 | the 4K density's amount      | the dye, by a B-spline (`upscaled.cubic`)   | 2160 × 3840 × 24           | its own threads, from MacCormack and the turbulence        |
 | the 4K density's color       | the dye's color (`upscaled.color` DYE)      | 448 × 800 × 24             | the dye's, read linearly by the composite                  |
@@ -35,16 +35,16 @@ The tilt is a homography the host applies where the frame is drawn into the view
 the frame stays 800 rows at any tilt; a recording holds the frame as delivered. Which IMX586 mode the
 Camera node makes 800 rows from (2000 × 1500 or 1920 × 1080) is not checked.
 
-The center layers (`CENTER_LAYERS` in `apps/deep_flow/render.py`) are allocated at the motion's `width`
-and `height` and follow them, as the crop is there for the fluid **(site fact)** and the other readers,
-the debug panels and the color mask over the composite, show the same detail enlarged. A larger view read
+The view stage and what is drawn from it (`VIEW_LAYERS` in `apps/deep_flow/render.py`) are allocated at the
+motion's `width` and `height` and follow them, as the view is there for the fluid **(site fact)** and the other
+readers, the debug panels and the color mask over the composite, show the same detail enlarged. A larger view read
 back bilinearly 2.4× down would hand the solve an aliased image. The fluid reads the bridge's outputs
 bilinearly: at 1.56× that loses little, as the readings are smooth over the motion's window and the
 lowpass's blur **(deduction)**.
 
 | Pass, GPU per frame                          | 448 × 800  | 1080 × 1920 |
 |----------------------------------------------|------------|-------------|
-| the center layers (`GPU center`), guide off  | 0.18 ms    | 0.46 ms     |
+| the view, as the center layers, guide off    | 0.18 ms    | 0.46 ms     |
 | the guided filter, 1 depth pixel             | 0.05 ms    | 0.22 ms     |
 | the guided filter, 2 depth pixels            | 0.06 ms    | 0.35 ms     |
 
@@ -54,23 +54,23 @@ the cheaper choice.
 
 ## The mask and the depth mask
 
-The player's shape and where the depth is the player's are two things, made in one place, the center mask
-layer:
+The player's shape and where the depth is the player's are two things, made in one place, the view stage
+(`ViewLayer`, [INPUT_THREADS.md](INPUT_THREADS.md#1-deep_flow-the-input-refactor)):
 
-- Its `texture`, the mask: the depth's cut, its edge moved onto the camera image's by the guided filter
+- `mask`: the depth mask, its edge moved onto the camera image's by the guided filter
   (He 2010), then the AA's threshold at 0.5, a crisp edge where the image puts it. Where the image has no
   edge the filter only averages the cut, and the threshold makes that a smoothed outline. `guided_radius`
   is in the cut's (the depth's) pixels, how far its edge may be off, turned into the view's each frame from
-  the crop; `edge_contrast` is the image's brightness spread (0 to 1) above which the edge follows the
+  the window; `edge_contrast` is the image's brightness spread (0 to 1) above which the edge follows the
   image's, squared inside as the filter's ε. It gates x/y in the motion with `use_mask`, and the dye's color
   in the bridge.
-- Its `unrefined`, the cut on the view as it comes, is the motion's `depth_mask`: it gates z on top of the
-  mask, always, and it is the z position's weight with the mask. The z position's value is held to 0..1
-  where the track lags past the range. With another mask source (RVM) there is no depth cut
+- `depth_mask`, the view's depth cut by `near` and `far`, is the motion's `depth_mask`: it gates z on top of
+  the mask, always, and it is the z position's weight with the mask. The z position's value is held to 0..1
+  where the track lags past the range. A mask from another source (RVM) is open
   ([FLOW.md's Open](FLOW.md#7-the-depths-mask-with-another-mask-source)).
 
-The preset: `guided_radius` 2, `edge_contrast` 0.03, `dilation_steps` 0, as an erosion pulls the guided
-edge off the image's. Measured on stillslowfast, the still part, the motion's thresholds at 0; z and x/y in
+The preset: `guided_radius` 2, `edge_contrast` 0.03, and no erosion, as one pulls the guided edge off the
+image's. Measured on stillslowfast, the still part, the motion's thresholds at 0; z and x/y in
 widths/s, p99 within 6 px of the mask's edge and inside it; fit is the image's brightness gradient along
 the mask's edge, higher the closer the edge sits on the image's. One run's p99 swings by about ±0.02; fit
 holds to ±0.0003.

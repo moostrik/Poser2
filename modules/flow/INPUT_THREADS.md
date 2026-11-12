@@ -13,17 +13,17 @@ How deep_flow runs now, per thread, the callbacks in the order they are register
 
 | Thread                                   | Runs                                                                                     | Waits for                                  |
 |------------------------------------------|------------------------------------------------------------------------------------------|--------------------------------------------|
-| the camera's (depthai; -sim: the player's reader) | `Recorder.submit_frame`; `PoseInference.set_camera_frame` (`Uploader.set_image`: the pinned copy, the GPU's conversion and straightening queued, then `CaptureSync.submit_image` and in -sim `PersonDetector.submit`); the frame bang (`Sync.submit_frame` → `PosesFromTracklets.process` → the RAW stage → `PoseInference.submit`: `snapshot()` and the crops); `_on_camera_frame`; `CaptureSync.submit_depth` | the GPU, in the upload's queueing and twice in the pose step's `synchronize` |
-| the depth's (depthai; -sim: the camera's) | `CaptureSync.submit_depth`, which can hand a capture on to the board                    | nothing                                    |
-| the tracklets' (depthai)                 | `Tracker.submit_cam_tracklets` (a queue put), `board.set_camera_tracklets`, the tracklet bang (`tracker.update`: sets the tracker's event) | nothing                                    |
+| the camera's (depthai; -sim: the player's reader) | `Recorder.submit_frame` (live), `Uploader.submit_frame`: each only queues             | nothing                                    |
+| the uploader's (`Uploader`)              | a color frame: the pinned copy, the GPU's conversion and straightening queued, then `PersonDetector.submit` (-sim), `CaptureSync.submit_image`, `board.set_camera_image` and the pose step (`PosesFromTracklets.process` → the RAW stage → `PoseInference.submit`: the crops queued, a "crops ready" event); a depth frame: the pinned copy and the alignment queued as one CUDA graph (`DepthAligner.align_staged`), then `CaptureSync.submit_depth`, which can hand a capture on to the board | the GPU, in the upload's copy from pinned memory while its queue is full |
+| the tracklets' (depthai)                 | `Tracker.submit_cam_tracklets` (a queue put), `board.set_camera_tracklets`, `tracker.update` (sets the tracker's event) | nothing                                    |
 | the tracker's                            | associates the tracklets, hands them to `PosesFromTracklets.set_tracklets` and the board   | nothing                                    |
-| the pose model's (`pose.Predictor`)      | RTMPose on the crops, then the CLEAN and SMOOTH stages, the capture sync, the board, OSC   | its own model                              |
+| the pose model's (`pose.Predictor`)      | RTMPose on the crops after their event, then the CLEAN and SMOOTH stages, the capture sync, the board, OSC | its own model                              |
 | the detector's (-sim)                    | YOLOv8n on the uploaded image (`PersonDetector`), boxes to the replay camera              | its own model                              |
-| the capture sync's                       | hands on a capture whose wait for its poses or masks ran out (`pose_wait`, `mask_wait`)   | the wait                                   |
-| the render                               | each tick the newest capture from the board (`CaptureImageLayer`, `DepthSourceLayer`: the depth to metres on the CPU, a pageable upload, `DepthAlign`), then motion, bridge, fluid | the GPU, in `Tensor._update_with_pbo`'s synchronous `cudaMemcpy` per new image, and the depth's upload |
+| the capture sync's                       | hands on a capture whose wait for its poses ran out (`pose_wait`, 0 in deep_flow: none)   | the wait                                   |
+| the render                               | each tick the captures since the last (`board.take_captures`), each through its image and depth into GL, the view stage, the foreground's look, the motion and the bridge; then the fluid | the GPU, where its copies into the PBOs wait while the queue is full |
 
-The motion measures the newest capture per tick (`_wire_flow`); the board holds one capture per camera
-(`CaptureStoreMixin.set_capture`).
+The board keeps each camera's captures until the render takes them (`CaptureStoreMixin`, at most 4, the oldest
+beyond that dropped and counted).
 
 ## The cadence
 
@@ -207,6 +207,49 @@ overload, and the capture latency and the render's tick p95 are no higher than b
 Not in it: the tracklets recorded with the frames (for -sim, planned apart); the pose model stays FP32, as it
 loses precision in FP16; the previous crop (`enable_prev_crop`, off in deep_flow, so the optical flow on the crops
 runs nothing), whose image pairing is to be checked when it is used.
+
+#### Built
+
+Parts 1 to 7 are built, one commit each (86d67e75, 38136432, 63baf89d, 6d0fa2da, ca3f2ffd, ca373c15, 77cd1f96).
+Measured in -sim on the P800 recording (20261111-123241, 992 × 800, the player in view), per loop of the
+recording, two loops each, by the probe (`scripts/cadence_probe.py`; the baseline and the parts by its first
+version, which timed more and read the tick about 3 ms lower, unexplained):
+
+| Part                     | Motion measures | Tick p95 (ms) | Capture latency p95 (ms) | Camera thread mean / p95 (ms) | Uploader drops |
+|--------------------------|-----------------|---------------|--------------------------|-------------------------------|----------------|
+| 4, the capture sync      | 86–87%          | 26.4–27.0     | 15.5                     | 0.08 / 0.10                   | 19             |
+| 6, the view stage        | 81–83%          | 26.4–27.1     | 20.8–21.0                | 0.09 / 0.12                   | 27             |
+| 7, every capture         | 100% (731/731)  | 25.7–27.1     | 20.0–20.9                | 0.09 / 0.13                   | 23             |
+| 7, the probe in the repo | 100%            | 28.8–31.5     | 19.2–20.0                | 0.02 / 0.02, the hand-off     | 25–29          |
+
+The tick's p95 swings from run to run (26 to 40 ms on the same code), more than the parts differ. The latency rose
+with part 6, where the depth goes through the uploader and its alignment (0.64 ms of GPU a frame, GL's was 0.12)
+adds to the GPU's queue **(deduction)**.
+
+Where the build differs from the plan above:
+- The PBO ring was not built: the copy queued on the render's stream (part 1) took the render's wait from 13 to
+  about 4 ms at p95, and a ring would move the wait, not shrink it.
+- The depth's alignment runs as one CUDA graph per lens, homography and size: its hundred small kernels, launched
+  one by one, held the uploader 12 ms a frame while the GPU's queue was full; as one launch, 0.8 ms. A new tilt
+  (0.25° steps) captures it again, which waits for the GPU once. The homography's numbers go into the kernels as
+  numbers, never copied to the GPU. It matches `DepthAlign` but for under 2 border pixels a frame.
+- The view stage's parts: `ViewLayer` (`ViewInput`, `ViewOutput`, settings `view`) beside the other stages; its
+  geometry and the edge-aware read (`DepthUpscale`, `edge_aware_depth`) in `modules/flow/view`; the pictures for
+  the panels `ViewOutputLayer` and `ViewDepthLayer`; the pose over the view `CenterPoseLayer` on the view's points.
+  `scripts/view_check.py`: the depth read matches its numpy reference exactly, the mask overlaps the depth mask
+  98.8% with its edge on the image's.
+- The foreground's look (blend, cel shade, hue shift, sharpen) is kept, as `ForegroundLook`, on the view's
+  foreground (`foreground_look`, the density's color), so the color does not change; it now runs once per capture,
+  not per tick, which changes its blend's time a little.
+- The mask is the view's, with no pick (`inputs.mask` went); the main window's choice is `main_view`, as `view`
+  is the stage's group; the show's `cam_depth` is `view_depth`.
+- Two captures in one tick: `CaptureMax` in the 3D bridge, by the density's alpha and the temperature's size;
+  `scripts/capture_max_check.py` checks it in GL. The z position the densities go in is the newest capture's.
+- The optical flow on the crops (RAFT) does not wait for the crops' event; it runs nothing in deep_flow
+  (`enable_prev_crop` off) and is to be checked with the previous crop.
+
+Waiting for a live run: the cadence with the camera, the view's ports against the old center layers on the
+monitors, the depth's edges by the resolution probe on stillslowfast, the dye at drag 0.
 
 ### 2. The other apps
 
