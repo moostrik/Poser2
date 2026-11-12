@@ -363,7 +363,7 @@ speeds on standmoves and stillslowfast.
 
 ### 7. The depth's mask with another mask source
 
-deep_flow's mask is the depth's ([INPUT_THREADS.md](INPUT_THREADS.md#1-deep_flow-the-input-refactor)); a
+deep_flow's mask is the depth's ([INPUT_THREADS.md](INPUT_THREADS.md#the-view-stage)); a
 mask from RVM, for a camera without depth, would come back from hd_trio. With it the motion's `depth_mask`,
 the depth's own cut that gates z ([RESOLUTION.md](RESOLUTION.md#the-mask-and-the-depth-mask)), is still the
 view stage's, and RVM's mask, on the crop, would have to be cut into the view's window.

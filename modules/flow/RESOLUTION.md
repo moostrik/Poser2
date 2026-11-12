@@ -55,7 +55,7 @@ the cheaper choice.
 ## The mask and the depth mask
 
 The player's shape and where the depth is the player's are two things, made in one place, the view stage
-(`ViewLayer`, [INPUT_THREADS.md](INPUT_THREADS.md#1-deep_flow-the-input-refactor)):
+(`ViewLayer`, [INPUT_THREADS.md](INPUT_THREADS.md#the-view-stage)):
 
 - `mask`: the depth mask, its edge moved onto the camera image's by the guided filter
   (He 2010), then the AA's threshold at 0.5, a crisp edge where the image puts it. Where the image has no
