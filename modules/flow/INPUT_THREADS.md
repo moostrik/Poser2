@@ -176,8 +176,8 @@ the crops cut without `synchronize` (`test_crop_extractor`), the alignment's two
 
 ### 1. The other apps
 
-hd_trio (three cameras), white_space (four) and `oak4_test` (one) run their pose step on the camera's thread
-through the frame bang; on this branch they stop at start with a message saying why, and run on `main`. Each moves
+hd_trio (three cameras) and white_space (four) run their pose step on the camera's thread through the frame
+bang; on this branch they stop at start with a message saying why, and run on `main`. Each moves
 to deep_flow's input, which takes the work off the camera's thread (in deep_flow 5.9 to 0.02 ms per frame at the
 mean) and loses no frame to a wait:
 
@@ -186,8 +186,7 @@ mean) and loses no frame to a wait:
    images (`add_gpu_image_callback`) instead of `PoseInference`'s. white_space's `_store_video_frame`, which puts
    the CPU frame on the board for the light renderer on the camera's thread, moves to the uploader's thread or
    reads the uploaded image.
-2. The pose step runs on the uploader's thread. With one camera (`oak4_test`) on each uploaded image, as in
-   deep_flow. With several (hd_trio, white_space) once per round of the cameras' frames: the frame `Sync` takes the
+2. The pose step runs on the uploader's thread, once per round of the cameras' frames: the frame `Sync` takes the
    uploaded images' capture times instead of the camera frames', and its bang runs `PosesFromTracklets.process`
    and `PoseInference.submit` on every camera's newest uploaded image. The tracklet `Sync` stays.
 3. The crops are cut at the pose model's input size (white_space does already). hd_trio cuts them at 768 × 1024 for
@@ -201,8 +200,8 @@ mean) and loses no frame to a wait:
    step's rate per camera, the captures and the motion's measures (hd_trio), the render's tick.
 6. The start-up error and the tests marked as expected to fail go.
 
-In this order: `oak4_test` (one camera, the uploader's API), white_space (the rounds across cameras), hd_trio
-(captures without depth, the 2D flow per capture).
+In this order: white_space (the uploader's API, the rounds across cameras), then hd_trio (captures without depth,
+the 2D flow per capture).
 
 ### 2. deep_flow live
 
