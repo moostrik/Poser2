@@ -1,17 +1,20 @@
-"""The hand-over of a chunk's frames: each camera's frame out once all its streams are in (color and, where the chunk
-has it, depth), with one stamp, its capture on the play's clock, and what the chunk keeps of it.
+"""The hand-over of a play's frames: each camera's frame out once all its own streams are in (color and, where its
+chunk has it, depth), with one stamp, its capture on the play's clock, and what the chunk keeps of it.
 
-The streams' readers call `submit_frame` on their own threads; a complete frame goes out under one lock, so frames
-leave in their order, and one older than a frame gone out is dropped, as are frames left without their other
-stream, counted (`take_unpaired`). How far the cameras are apart in frames is `drift`."""
+The streams' readers call `submit_frame` on their own threads. Each camera is handed over apart, under its own lock,
+as live: one camera's frames never wait for another's. A camera's frames leave in their order, the chunk's and then
+the frame's, so the chunk after the one playing can start beside it (`follow`) while the first ends; a frame older
+than one gone out is dropped, as are frames left without their other stream, counted (`take_unpaired`). How far
+the cameras are apart in recorded time is `drift`."""
 
 import logging
+from collections import defaultdict
 from threading import Lock
 from typing import Callable, TypeAlias
 
 from numpy import ndarray
 
-from .chunk import FrameMetadata
+from .chunk import ChunkInfo, FrameMetadata
 from .chunk_readers import ChunkReaders
 from .frame import FrameType
 
@@ -30,37 +33,49 @@ class FramePairing:
         depth of the frame uses."""
         self.types: list[FrameType] = types
         self.frame_callbacks: list[ClipFrameCallback] = []
-        self._lock: Lock = Lock()                   # the frames waiting and the counts
-        self._hand_over_lock: Lock = Lock()         # one frame's streams out at a time, in frame order
-        self._readers: ChunkReaders | None = None   # the chunk playing
-        self._waiting: dict[int, dict[int, dict[FrameType, ndarray]]] = {c: {} for c in range(num_cams)}
-        self._handed_over: dict[int, int] = {}      # each camera's last frame gone out
+        self._lock: Lock = Lock()                   # the chunks handed over and the counts
+        self._camera_locks: dict[int, Lock] = defaultdict(Lock)     # one camera's frames out at a time, in order
+        self._readers: dict[int, ChunkReaders] = {}         # the chunks whose frames go out, by number
+        self._waiting: dict[int, dict[tuple[int, int], dict[FrameType, ndarray]]] = defaultdict(dict)
+        self._handed_over: dict[int, tuple[int, int]] = {}  # each camera's last frame gone out: (chunk, frame)
+        self._recorded: dict[int, float] = {}               # and its recorded capture time
         self._unpaired: int = 0                     # frames dropped without their other stream, since taken
-        self._drift_ids: dict[int, int] = {}
-        self._drift: int = 0
         self.shown_frame: int = -1                  # camera 0's frame last gone out, for the panel
 
     def start(self, readers: ChunkReaders | None) -> None:
-        """Hand over the frames of `readers`' chunk from here; None hands over none."""
+        """Hand over the frames of `readers`' chunk from here, and of no other; None hands over none."""
         with self._lock:
-            self._readers = readers
-            for frames in self._waiting.values():
-                frames.clear()
+            self._readers = {readers.chunk: readers} if readers is not None else {}
+            self._waiting.clear()
             self._handed_over.clear()
-            self._drift_ids.clear()
-            self._drift = 0
+            self._recorded.clear()
+
+    def follow(self, readers: ChunkReaders) -> None:
+        """Hand over `readers`' chunk too, the one after the chunk playing: its frames go out after that chunk's."""
+        with self._lock:
+            self._readers[readers.chunk] = readers
+
+    def retire(self, readers: ChunkReaders) -> None:
+        """The chunk of `readers` ended: none of its frames go out any more."""
+        with self._lock:
+            if self._readers.get(readers.chunk) is readers:
+                del self._readers[readers.chunk]
+
+    def info(self, cam_id: int) -> ChunkInfo | None:
+        """The fixed info of the chunk a camera's last frame came from; of the first chunk before any did."""
+        with self._lock:
+            handed: tuple[int, int] | None = self._handed_over.get(cam_id)
+            readers: ChunkReaders | None = self._readers.get(handed[0]) if handed is not None else None
+            if readers is None and self._readers:
+                readers = self._readers[min(self._readers)]
+        return readers.info(cam_id) if readers is not None else None
 
     @property
-    def chunk(self) -> int:
-        """The chunk whose frames go out; -1 for none."""
+    def drift(self) -> float:
+        """How far apart the cameras' last frames gone out were captured, in ms."""
         with self._lock:
-            return self._readers.chunk if self._readers is not None else -1
-
-    @property
-    def drift(self) -> int:
-        """How many frames apart the cameras' last frames gone out are."""
-        with self._lock:
-            return self._drift
+            times: list[float] = list(self._recorded.values())
+        return (max(times) - min(times)) * 1000.0 if len(times) > 1 else 0.0
 
     def take_unpaired(self) -> int:
         """The frames dropped without their other stream since the last call."""
@@ -71,31 +86,33 @@ class FramePairing:
     def submit_frame(self, cam_id: int, frame_type: FrameType, frame: ndarray, chunk_id: int, frame_id: int) -> None:
         """A stream's frame, on its reader's thread (`StreamFrameCallback`)."""
         with self._lock:
-            readers: ChunkReaders | None = self._readers
-        if readers is None or chunk_id != readers.chunk:
+            readers: ChunkReaders | None = self._readers.get(chunk_id)
+        if readers is None:
             return
         if cam_id == 0 and frame_type == FrameType.VIDEO:
             self.shown_frame = frame_id
+        key: tuple[int, int] = (chunk_id, frame_id)
 
-        with self._hand_over_lock:
+        with self._camera_locks[cam_id]:
             with self._lock:
-                cam_frames: dict[int, dict[FrameType, ndarray]] = self._waiting.setdefault(cam_id, {})
-                cam_frames.setdefault(frame_id, {})[frame_type] = frame
-                if any(t not in cam_frames[frame_id] for t in readers.types):
+                cam_frames: dict[tuple[int, int], dict[FrameType, ndarray]] = self._waiting[cam_id]
+                cam_frames.setdefault(key, {})[frame_type] = frame
+                if any(t not in cam_frames[key] for t in readers.types.get(cam_id, ())):
                     return
-                stale: list[int] = [key for key in cam_frames if key < frame_id]
-                for key in stale:
-                    del cam_frames[key]
+                stale: list[tuple[int, int]] = [k for k in cam_frames if k < key]
+                for k in stale:
+                    del cam_frames[k]
                 self._unpaired += len(stale)
-                frames: dict[FrameType, ndarray] = cam_frames.pop(frame_id)
-                if frame_id <= self._handed_over.get(cam_id, -1):
+                frames: dict[FrameType, ndarray] = cam_frames.pop(key)
+                if key <= self._handed_over.get(cam_id, (-1, -1)):
                     return          # a frame older than one gone out: the order holds
-                self._handed_over[cam_id] = frame_id
-                self._drift_ids[cam_id] = frame_id
-                self._drift = max(self._drift_ids.values()) - min(self._drift_ids.values())
+                self._handed_over[cam_id] = key
 
             metadata: FrameMetadata | None = readers.frame(cam_id, frame_id)
             timestamp: float | None = readers.clock.capture(cam_id, frame_id)
+            if metadata is not None:
+                with self._lock:
+                    self._recorded[cam_id] = metadata.timestamp
             for kind in self.types:
                 if kind in frames:
                     for callback in self.frame_callbacks:

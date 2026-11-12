@@ -128,7 +128,9 @@ class Player(Thread):
 
         self.loading: ChunkReaders | None = None        # the readers of the chunk being loaded,
         self.playing: ChunkReaders | None = None        # of the one playing,
+        self.ending: ChunkReaders | None = None         # of the one before it, its last frames while the next plays,
         self.closing: list[ChunkReaders] = []           # and of those stopped, until their threads end
+        self.known: ChunkReaders | None = None          # the last chunk played: its metadata for a seek after a stop
         self.pairing: FramePairing = FramePairing(self.num_cams, self.types)
 
         self.playback_lock: Lock = Lock()
@@ -210,9 +212,13 @@ class Player(Thread):
                     self._start()
                     self._load()
                     state = State.PLAYING
+                if state == State.PLAYING and self._follows() and self._finished_loading():
+                    self._follow()
+                    self._load()
                 if state == State.PLAYING and self._finished_playing() and self._finished_loading():
                     self._start(follows=True)
                     self._load()
+                self._retire()
                 if state == State.STOP:
                     self._stop()
                     state = State.STOPPING
@@ -242,7 +248,7 @@ class Player(Thread):
 
     def _load_chunk(self, lo: int, hi: int | None) -> None:
         """The readers of the load chunk's frames `lo` up to `hi`."""
-        known: ChunkReaders | None = self.playing if self.playing is not None else self.loading
+        known: ChunkReaders | None = self.playing or self.loading or self.known
         decoding = Decoding(self.gray, self.nv12, self.hwaccel, self.hwaccel_device, self.fps, self.suffix)
         self.loading = ChunkReaders(self.folders[self.load_folder], self._get_load_chunk(), lo, hi, self.num_cams, self.types,
                                     self.pairing.submit_frame, decoding, known)
@@ -254,6 +260,8 @@ class Player(Thread):
         if before is not None:
             before.stop()
             self.closing.append(before)
+            self.known = before
+        self._close_ending()
         readers: ChunkReaders | None = self.loading
         self.loading = None
         self.playing = readers
@@ -283,6 +291,40 @@ class Player(Thread):
                     callback()
                 except Exception:
                     logger.exception("Player loop callback failed")
+
+    def _follows(self) -> bool:
+        """The chunk playing has a reader ended and the one loading is the next in the recording: it starts beside
+        the rest of the playing one, so no camera waits for the last to end."""
+        playing, loading = self.playing, self.loading
+        return (playing is not None and loading is not None and self.ending is None and playing.ending()
+                and not playing.finished() and loading.folder is playing.folder and loading.chunk == playing.chunk + 1)
+
+    def _follow(self) -> None:
+        """Play the loaded next chunk on the playing one's clock, carried on, beside the playing one's last frames."""
+        before: ChunkReaders | None = self.playing
+        readers: ChunkReaders | None = self.loading
+        assert before is not None and readers is not None
+        self.loading = None
+        self.ending = before
+        self.playing = readers
+        self._set_play_chunk(readers.chunk)
+        readers.clock.carry_on(before.clock, perf_counter())
+        self.pairing.follow(readers)
+        readers.play()
+
+    def _retire(self) -> None:
+        """The chunk ending, once all its readers have ended: no more of its frames go out."""
+        if self.ending is not None and self.ending.finished():
+            self._close_ending()
+
+    def _close_ending(self) -> None:
+        ending: ChunkReaders | None = self.ending
+        if ending is None:
+            return
+        self.ending = None
+        self.pairing.retire(ending)
+        ending.stop()
+        self.closing.append(ending)
 
     def _update_scrub(self) -> None:
         """Show one frame of the dragged position through the normal readers, then the newest
@@ -321,6 +363,8 @@ class Player(Thread):
     def _stop(self) -> None:
         self._set_play_chunk(-1)
         self.pairing.start(None)
+        self.known = self.playing or self.loading or self.known
+        self._close_ending()
         for readers in (self.loading, self.playing):
             if readers is not None:
                 readers.stop()
@@ -337,7 +381,7 @@ class Player(Thread):
         return self.loading is None or self.loading.loaded()
 
     def _finished_playing(self) -> bool:
-        return self.playing is None or not self.playing.playing()
+        return self.playing is None or self.playing.finished()
 
     def _finished_stopping(self) -> bool:
         return all(readers.stopped() for readers in self.closing)
@@ -412,13 +456,13 @@ class Player(Thread):
     def get_num_chunks(self) -> int:
         return self.num_chunks
 
-    def get_drift(self) -> int:
+    def get_drift(self) -> float:
+        """How far apart the cameras' last frames gone out were captured, in ms."""
         return self.pairing.drift
 
     def get_chunk_info(self, cam_id: int) -> ChunkInfo | None:
-        """The fixed info of the chunk playing for a camera; None for a recording without it."""
-        readers: ChunkReaders | None = self.playing
-        return readers.info(cam_id) if readers is not None else None
+        """The fixed info of the chunk a camera's frames play from; None for a recording without it."""
+        return self.pairing.info(cam_id)
 
     def add_frame_callback(self, callback: ClipFrameCallback) -> None:
         if self.running:
