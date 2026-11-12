@@ -9,8 +9,6 @@ paths:
 ## Core contract
 
 - These rules apply to pose `Frame` objects in the Frame ECS, not video/image frames
-- `frame[FeatureType]` must never fail in normal flow
-- Missing feature data is represented as NaN values with score `0.0`
 - Consumers read directly and handle NaN, not presence checks
 
 ## Frames are immutable carriers

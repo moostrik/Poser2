@@ -18,7 +18,6 @@ paths:
 - A node takes time from the frame it processes; the crossing stamps a frame with the tick it was made on, so no node reads a clock
 - A stage emits a group record (`GroupRecord`) beside its poses: what belongs to everyone in the frame and to no single pose (a level, a gate, this tick's hits); read it with `add_group_callback` or the board's `get_group`, on the same tick as the poses
 - The group record follows the poses through the stages of a domain; across the crossing and an async step the latest record is held
-- A value derived from pose data, a threshold on it included (a gate, a dead zone), is a pipeline step with its settings; the show reads it from the record or the poses
 
 ## Nodes
 

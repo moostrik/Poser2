@@ -4,22 +4,19 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 
 ## Writing rules in this file
 
-- One rule per bullet, phrased as an instruction
+- One rule per bullet
 - Add a short reason only when it marks the rule's boundary or the rule isn't obvious
 - No incident history, no examples unless the rule is ambiguous without one
-- A rule describes the codebase as it should look, not how it shouldn't
+- A rule describes the codebase as it should look
 - Put a rule where it loads when the code it governs is written: here, or a `.claude/rules/` file whose `paths` match that code
 
 ## Project shape
 
 - Use Python 3.12 and follow PEP 8
 - `apps/` may import `modules/`; `modules/` must never import app code
-- Keep modules independent and cross-module coupling minimal
 - `modules/settings/` is shared infrastructure; any module may depend on it
 - `modules/camera/` is the camera contract; the tracker, inference, board and render import it, never a backend package such as `modules/camera/oak/`
-- `modules/camera/oak/` runs on depthai 2 in `.venv` (`install.bat`) and `modules/camera/oak4/` on depthai 3 in a second venv, `.venv-oak4` (`install.bat oak4`); `oak_backend()` says which the running venv has, so an app never imports both
 - `apps/smile/` has its own rules in its `CLAUDE.md`; its `cam` is the app's image source (a `modules/camera` backend, an image folder, a phone), not a camera backend
-- Never change the White Space fixture firmware (`apps/white_space/data/firmware/`); solve everything on the app side of the wire
 
 ## Packages
 
@@ -27,12 +24,12 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Its `__init__.py` holds what other packages use
 - Its files each hold one class or one subject, named after it
 - Its document opens with a table of its files: the name, what it is, who uses it
-- Its tests sit in its `tests/` folder, its command-line scripts in `scripts/`
+- Its tests sit in its `tests/` folder
+- Command-line scripts sit in the repo's `scripts/` folder
 
 ## Naming
 
 - Name a concept after what it is in the domain, and use that one term everywhere it appears: file, class, method, setting, panel label, document
-- Name a module file in snake_case after the class or domain noun it holds
 - Use the terms in `.claude/rules/glossary.md`
 - Use no synonyms for one concept across modules; when a term changes, rename it everywhere in the same change
 
@@ -74,7 +71,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Use threads with explicit synchronization, not async/await
 - Use `Lock` and `Event` for shared mutable state and lifecycle signals
 - Keep shared critical sections small
-- Treat callback registration and dispatch as thread-sensitive
+- A callback list has its own lock; register under it, copy the list under it, call the callbacks outside it
 - Avoid heavy pure-Python loops in hot paths; they hold the GIL, while numpy, ONNX Runtime, OpenGL and depthai release it
 
 ## Time
@@ -93,7 +90,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 
 - Use modern typing (`list[T]`, `dict[K, V]`, `X | Y`)
 - Give public methods return type hints
-- Use `Protocol` or `ABC` as appropriate, and be consistent
+- Use a `Protocol` for what a consumer needs from a collaborator, an `ABC` for a family of classes that share code
 - Prefer `IntEnum` over string keys for dict lookups and identifiers
 - Fix a type error in this order: correct the annotation, narrow with `assert` or `isinstance` where the code already guarantees the type, `cast` to the type the value really has, and suppress only as a last resort
 - Suppress only when a third-party stub is provably wrong or the type system cannot express the code, never to hide an error in our own code
@@ -106,7 +103,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Import from a package's `__init__.py`, never from its internal files
 - Import the package as a namespace (`from modules import X`, then `X.Y`) when the qualifier adds clarity; import names directly otherwise
 - Put all imports from one package on a single `from` line
-- Export only the package's own public symbols from `__init__.py`, and don't define `__all__`
+- `__init__.py` defines no `__all__`
 - Inside a package, use relative imports, never the full `modules.X.Y` path
 
 ## Error handling
@@ -118,12 +115,11 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 ## Testing
 
 - Rely on running the real-time system for integration; unit-test infrastructure (settings, frame/features, serialization, utility primitives, geometry)
-- Add tests where they give long-term leverage, not ceremony
 - Keep geometry in plain modules and drawing in renderers, so geometry is testable without a GL context
 
 ## Running code
 
-- Run Python and tests through Bash, never PowerShell; PowerShell 5.1 reports unittest's stderr output as a failure
+- Run Python and tests through Bash, never PowerShell
 - Start each Bash command with the program itself (no `cd`, env-var prefix or heredoc) so it matches the allow-rules in `.claude/settings.json`
 - Change files with Edit/Write, not scripts
 - Run a test of the app or a GPU harness only on the user's go, and only what the plan names
@@ -138,7 +134,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 python -m unittest discover -s tests -t .                  # guard tests: import layering, glossary
 python -m unittest discover -s apps/<app>/tests -t .        # white_space, hd_trio, deep_flow; oak4_test in .venv-oak4
 python -m unittest discover -s apps/smile/<pkg>/tests -t .  # tests, comfy, render, player, relay, ...
-python -m unittest discover -s modules/<pkg>/tests -t .    # camera, camera/geometry, camera/sync, camera/recording (and its container, recorder, player), camera/oak, camera/oak4 (.venv-oak4), camera/replay, camera/vimba, camera/webcam, face, inference/detection, inout, pose, render, settings, tracker, video
+python -m unittest discover -s modules/<pkg>/tests -t .    # camera/oak4 in .venv-oak4
 ```
 
 ## API evolution
