@@ -89,7 +89,8 @@ class FluidLayer(StageLayer[FluidInput, FluidOutput]):
         Style.push_style()
         Style.set_blend_mode(Style.BlendMode.DISABLED)
         for injection in input.injections:
-            self._inject(injection)
+            if injection.boundary_velocity.allocated:      # a bridge that has not stepped yet has nothing to give
+                self._inject(injection)
         self._step(input.dt)
         Style.pop_style()
 
