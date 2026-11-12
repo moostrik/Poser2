@@ -244,55 +244,66 @@ In order:
 
 ### 5. The module's structure
 
-`modules/camera` holds 19 files at its root: the camera contract, the geometry, and eight files of recording and
-playback. The proposal: recording and playback become one package, `modules/camera/recording`, with this document
-and their tests; the root keeps the contract and what every backend shares.
+`modules/camera` holds 19 files at its root. The structure to build splits it by role, as capture libraries do
+(RealSense, ffmpeg, GStreamer): the data types, the devices, the calibration, the matching by time, the file's
+format, the recorder and the player. The root keeps six files, and each folder has one job.
 
 ```
 modules/camera/
-    __init__.py            the public boundary; exports the names it exports now
-    source.py              the contract: CameraSource and its callbacks
-    frame.py               CameraFrame, FrameType, FrameReadings, DepthAlignment
-    tracklet.py            CameraTracklet, CameraTracklets
-    settings.py            CameraSettings and the readings
-    capture_match.py       CaptureStream, MissedParts: shared with modules/inference's CaptureSync
-    sync.py                Sync, the round's bang
-    camera_check.py        CameraCheck
-    geometry.py            the lens, the warp, the tilt's homography
-    tilt_correction.py     TiltCorrection
-    depthai_backend.py     oak_backend
+    __init__.py              the public boundary; exports the names it exports now
+    source.py                the contract: CameraSource and its callbacks
+    frame.py                 CameraFrame, FrameType, FrameReadings, DepthAlignment
+    tracklet.py              CameraTracklet, CameraTracklets
+    settings.py              CameraSettings and the readings
+    camera_check.py          CameraCheck
+    depthai_backend.py       oak_backend
+    oak/  oak4/  replay/  vimba/  webcam/        the devices
+    geometry/                the lens, the warp, the tilt
+        geometry.py
+        tilt_correction.py
+        tests/
+    sync/                    matching by capture time
+        capture_match.py     CaptureStream, MissedParts: shared with modules/inference's CaptureSync
+        frame_trigger.py     FrameTrigger, FrameTriggerSettings
+        tests/
     recording/
         RECORDING.md
-        __init__.py
-        chunk.py           what a chunk holds: ChunkInfo, FrameMetadata, the file names, merge and read
-        recording_folder.py  RecordingFolder, Timeline, the markers
-        recording_sync.py  RecordingSync
-        recorder.py        Recorder
-        play_clock.py      PlayClock
-        chunk_readers.py   ChunkReaders
-        frame_pairing.py   FramePairing
-        player.py          Player
-        tests/
-    oak/  oak4/  replay/  vimba/  webcam/
-    tests/                 the contract's and the geometry's
+        container/           the file's format
+            chunk.py         ChunkInfo, FrameMetadata, the file names, merge and read
+            recording_folder.py   RecordingFolder, Timeline, the markers
+            tests/
+        recorder/
+            recorder.py      Recorder
+            recording_sync.py     RecordingSync
+            tests/
+        player/
+            player.py        Player
+            play_clock.py    PlayClock
+            chunk_readers.py ChunkReaders
+            frame_hand_over.py    FrameHandOver
+            tests/
+    tests/                   the contract's
 ```
 
-- One package and not two (`recording`, `playback`): both sides share the chunk's format and the folder, and
-  `replay` reads both.
-- The chunks' file names (`make_chunk_name`, `make_file_name`, `make_folder_name`) move from `recorder.py` to
-  `chunk.py`, so the player does not import the recorder.
-- `modules/camera/__init__.py` exports the same names from the package, so no app and no other module changes.
-- `tests/test_recording.py` (44 KB) splits by subject into `recording/tests`: `test_chunk`, `test_recording_sync`,
-  `test_recorder`, `test_play_clock`, `test_frame_pairing`, `test_timeline`, `test_round_trip` (one camera through
-  the encoders) and `test_rig` (several).
-- `CLAUDE.md`'s test line gains `camera/recording`.
+| Step | What                                                                                                          |
+|------|---------------------------------------------------------------------------------------------------------------|
+| 1    | `FramePairing` becomes `FrameHandOver` (`frame_hand_over.py`): it hands a camera's frames over in order       |
+| 2    | `Sync` becomes `FrameTrigger` (`frame_trigger.py`, `FrameTriggerSettings`, `add_trigger_callback`)            |
+| 3    | the chunks' file names move from `recorder.py` to `chunk.py`, so the player does not import the recorder      |
+| 4    | the files move into `geometry`, `sync` and `recording`; each folder's `__init__.py` exports its own names     |
+| 5    | `tests/test_recording.py` splits by subject into the folders' `tests`; the other tests move with their files  |
 
-To decide with it:
-
-- `FramePairing` hands a camera's frames over in order and no longer only pairs a frame's streams: `FrameHandOver`,
-  or the name stays.
-- Three classes are called a sync: `Sync` (the round's bang), `RecordingSync` (a capture's parts, completeness
-  first) and `CaptureSync` (the same, latency first, in `modules/inference`). `Sync` as `RoundSync`, or the names
-  stay.
-- `geometry.py` (756 lines), `tilt_correction.py` and `camera_check.py` as a package `geometry` of their own, or
-  the root as above.
+- `Sync` matches nothing and hands no frames on: it fires one callback per round of the cameras' frames, when the
+  round's last camera delivers, for hd_trio's and white_space's tracker and poses. That is a trigger. The apps'
+  settings groups `frame_sync` and `tracklet_sync` become `frame_trigger` and `tracklet_trigger`, in their presets
+  too.
+- `modules/camera/__init__.py` exports the same names from the folders, so outside the renames no app and no other
+  module changes.
+- `test_recording.py` (44 KB) splits into `container/tests/test_chunk`, `recorder/tests/test_recording_sync` and
+  `test_recorder`, `player/tests/test_play_clock`, `test_frame_hand_over` and `test_timeline`, and
+  `recording/tests/test_round_trip` (one camera through the encoders) and `test_rig` (several).
+- The devices stay at the root, not under a `backends` folder: `CLAUDE.md` names `modules/camera/oak/` and
+  `modules/camera/oak4/`.
+- Recording stays inside `modules/camera`, not a module of its own: the replay camera and the oak simulator use the
+  player, so the two modules would import each other.
+- `CLAUDE.md`'s test line gains the new test folders, on the user's word.
