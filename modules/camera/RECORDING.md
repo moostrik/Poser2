@@ -210,20 +210,41 @@ Waiting for the camera: the board's poses over the image in a replay against liv
 
 ### 3. The split of `Player`
 
-`Player` holds, in some 850 lines, the state machine, the folders, the markers' file, the panel's readouts, the
-pairing of color and depth, the drift and the chunks' readers and metadata. Each part a class in its own file of
-`modules/camera`, the player composing them:
+`player.py` holds, in some 900 lines, the state machine, the folders, the markers' file, the panel's readouts, the
+pairing of color and depth, the drift, the clock and the chunks' readers and metadata. A form-only change: each part
+a class in its own file of `modules/camera`, the player composing them, the behavior and the player's API as they
+are (`Player(settings, data_path, gray, nv12)`, `start`, `stop`, the frame, loop and jump callbacks,
+`get_chunk_info`, `nv12`, the panel's settings).
 
-| Class             | Holds                                                                                   |
-|-------------------|-----------------------------------------------------------------------------------------|
-| `Player`          | the thread and its state machine: load, play, seek, scrub, stop; the callbacks          |
-| `PlayClock`       | the recorded time of a play, carried from chunk to chunk (as now, out of `player.py`)   |
-| `ChunkReaders`    | one chunk's readers and its metadata: load, start, stop, whether they finished          |
-| `FramePairing`    | a frame's color and depth by frame number, handed over in order under one lock, the drift |
-| `RecordingFolder` | the folders found, a folder's chunks and frame counts, its in and out markers and file  |
+| File                   | Class             | Holds, from `player.py`                                                       |
+|------------------------|-------------------|-------------------------------------------------------------------------------|
+| `player.py`            | `Player`          | the thread, its states and messages, the settings' callbacks, the readouts    |
+| `play_clock.py`        | `PlayClock`       | the recorded time of a play, as now                                           |
+| `recording_folder.py`  | `RecordingFolder` | the folders found, a folder's chunks and their frame counts, its markers' file, the markers and a place on the timeline as a chunk and frame |
+| `chunk_readers.py`     | `ChunkReaders`    | one chunk's readers of every camera and stream, its metadata and its clock: load, play, stop, finished |
+| `frame_pairing.py`     | `FramePairing`    | a frame's streams by frame number, handed over in order under one lock with one stamp, the unpaired count, the drift, the frame callbacks |
 
-Tests: the split classes' own (the pairing, the folder's markers and frame positions, which `test_in_out.py` holds
-now), and the player's as they are.
+What moves where:
+
+- `RecordingFolder`: `Folder`, `_get_video_folders`, `_probe_chunk_frames`, `_prepare_folder`'s probe,
+  `read_in_out`, `write_in_out`, `IN_OUT_FILE`, `_recompute_range`, `_locate`, `_locate_end`, `_global_frame`. No
+  thread and no reader: the markers and the places on the timeline are plain functions of the frame counts.
+- `ChunkReaders`: `_load_chunk`, `_load_stream`, the `loaders`, `players` and `closers` lists as one object per
+  chunk (the player holds the one playing, the one loading and those closing), `load_types` and `play_types` as
+  its streams, `chunk_metadata` as its metadata, `load_clock` and `play_clock` as its clock, `_finished_loading`,
+  `_finished_playing`, `_finished_stopping`. The next chunk's readers take the metadata of the chunk before when it
+  is the same chunk (a loop over one chunk reads it once).
+- `FramePairing`: `_frame_sync_callback`, `frame_sync_dict`, `_handed_over`, `_unpaired`, the drift
+  (`_calcuate_drift`, named `_drift` on the way), `frame_callbacks`. It takes the playing chunk's readers for the
+  metadata and the stamp; a reader's frames go to it.
+- `Player` keeps `run` and its states, `play`, `_load`, `_start`, `_update_scrub`, `_load_seek`, `_stop`, the
+  settings' callbacks, `update_gui` and `_update_readouts`, and the getters, each now asking the part that holds it.
+
+Built in one change: the parts moved one at a time, each followed by the camera's tests (`test_in_out.py`,
+`test_recording.py`, `test_play_clock.py` and the replay camera's), which hold the player's behavior. New tests
+only where a part is testable on its own now: `RecordingFolder`'s markers and places on the timeline without a
+video, and `FramePairing`'s order (moved from `test_play_clock.py`). Then the pose probe on the app, record and
+play, as the check that -sim plays as before.
 
 ### 4. The poses the pose model drops
 
