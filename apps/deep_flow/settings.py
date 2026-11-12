@@ -274,7 +274,7 @@ class RenderSettings(BaseSettings):
 
 class CadenceSettings(BaseSettings):
     """Pinned beside the camera's video rates: the frames that get past the camera, so a frame lost on its
-    way to the flow shows where (the sync's captures, then the motion's measures)."""
+    way to the flow shows where (the sync's captures, then the motion's measures), with the drops counted where they happen."""
     capture_fps:     Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Captures", unit="fps",
                                           description="Captures the sync hands on, average")
     capture_min_fps: Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Captures min", unit="fps",
@@ -283,6 +283,10 @@ class CadenceSettings(BaseSettings):
                                           description="Frames the motion measures, average")
     motion_min_fps:  Field[float] = Field(0.0, access=Field.READ, pinned=True, label="Motion min", unit="fps",
                                           description="Motion: 1 / the worst gap between two measures")
+    upload_drops:    Field[int]   = Field(0, access=Field.READ, pinned=True, label="Upload drops",
+                                          description="Camera frames the uploader dropped, its queue full")
+    capture_drops:   Field[int]   = Field(0, access=Field.READ, pinned=True, label="Capture drops",
+                                          description="Captures dropped before the render took them")
 
 
 # ---------------------------------------------------------------------------

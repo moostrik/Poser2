@@ -8,3 +8,4 @@ from .shaders import Change, WeightedSum, ZPositionMix
 from .velocity_bandpass import VelocityBandpass, VelocityBandpassSettings, velocity_change, step_peak, moving_mean, start_region_share, stop_region_share, change_velocity, band_width, change_acceleration_scale, whole_change
 from .magnitude import Magnitude, VelocityMagnitude
 from .temperature_bridge import TemperatureBridge, TemperatureBridgeSettings
+from .capture_max import CaptureMax

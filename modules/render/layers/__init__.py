@@ -13,7 +13,7 @@ from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOf
                       PoseLineLayer, PoseLineLayerSettings
 from .flow import     StageLayer, StageLayerSettings, StageOutput, \
                       ViewInput, ViewOutput, ViewLayer, ViewLayerSettings, ViewOutputLayer, ViewDepthLayer, ViewDepthLayerSettings, DepthDrawMode, \
-                      MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, \
+                      MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, frame_interval, \
                       BridgeInput, BridgeOutput, BridgeLayer, BridgeLayerSettings, \
                       Injection, FluidInput, FluidOutput, FluidLayer, FluidLayerSettings, \
                       Motion2DLayer, Motion2DLayerSettings, \

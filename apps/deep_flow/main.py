@@ -202,13 +202,15 @@ class DeepFlowMain:
             self.board.submit_time_sample(series, time_ms, timestamp)
 
     def _update_cadence(self, now: float) -> None:
-        """The panel's cadence: the captures the sync hands on and the frames the motion measures, the slowest camera's."""
+        """The panel's cadence: the captures the sync hands on and the frames the motion measures, the slowest camera's, and the drops."""
         cadence = self.settings.cadence
         cadence.capture_fps = round(self.capture_rate.get_rate_average(), 1)
         cadence.capture_min_fps = round(self.capture_rate.get_rate_minimum(), 1)
         rates = list(self.render.motion_rates.values())
         cadence.motion_fps = round(min((rate.get_rate_average() for rate in rates), default=0.0), 1)
         cadence.motion_min_fps = round(min((rate.get_rate_minimum() for rate in rates), default=0.0), 1)
+        cadence.upload_drops = self.uploader.dropped
+        cadence.capture_drops = self.board.get_dropped_captures()
 
     def _update_poses(self, now: float) -> None:
         """The render tick drives the pipeline's output domain (LERP) at the frame's time."""

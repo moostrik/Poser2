@@ -27,7 +27,7 @@ from .bridge_3d import  DensityBridge, DensityBridgeSettings, Magnitude, Velocit
                         VelocityLowpass, VelocityLowpassSettings, velocity_trail, trail_acceleration, z_position_trail, \
                         gaussian_blur, gaussian_weights, blur_sigma, blur_dispatches, z_position_mix, ZPositionMix, \
                         VelocityBandpass, VelocityBandpassSettings, Change, WeightedSum, velocity_change, step_peak, moving_mean, start_region_share, stop_region_share, change_velocity, band_width, change_acceleration_scale, whole_change, \
-                        TemperatureBridge, TemperatureBridgeSettings
+                        TemperatureBridge, TemperatureBridgeSettings, CaptureMax
 
 # Visualization
 from .visualization import Visualizer, histogram_grid, histogram_volume_grid, Strip, ALL_CHANNELS, summary_grid, Legend, LegendKind, DrawnSize, \

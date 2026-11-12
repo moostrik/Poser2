@@ -4,9 +4,10 @@
 only: a texture field holds the `Fbo`, `SwapFbo` or `Tensor` object itself, never a buffer taken
 from it.
 
-`BridgeLayer` is the shape the 2D and the 3D bridge layer share: it steps its bridges every tick on
-the input's `dt` (they are filters in time, so a velocity held between camera frames reads right)
-and makes the density's color from the image, the tint and the mask. It draws nothing; the monitors
+`BridgeLayer` is the shape the 2D and the 3D bridge layer share: it steps its bridges on each update
+by the input's `dt` (they are filters in time) and makes the density's color from the image, the tint
+and the mask. The app updates it once per camera capture, `dt` the interval between captures, or
+once per render tick, `dt` the tick's. It draws nothing; the monitors
 draw its output's `textures`."""
 
 from abc import abstractmethod
@@ -24,16 +25,20 @@ from .stage_layer import StageLayer, StageLayerSettings, StageOutput
 
 @dataclass
 class BridgeInput:
-    """One camera's velocity for the bridge stage, built by the app each tick. `velocity` is the
-    motion output; `dt` the render tick's; `image`, or None, the picture whose RGB colors the
+    """One camera's velocity for the bridge stage, built by the app for each step. `velocity` is the
+    motion output; `dt` the time the step covers (s); `image`, or None, the picture whose RGB colors the
     density; `color` an RGB tint on it, white by default, the color alone without an image; `mask`
-    the player's mask on the view, or None, which gates the image; `z_position` the motion's, or None."""
+    the player's mask on the view, or None, which gates the image; `z_position` the motion's, or None.
+    `same_tick`: this step is another capture in the render tick of the step before, so the fluid, which
+    steps once a tick, takes per pixel the density and the temperature of the step whose amount is larger
+    (the 3D bridge's), and the velocity of this one."""
     velocity: Annotated[Texture, TextureKind.VELOCITY]
     dt: float
     image: Annotated[Texture | None, TextureKind.IMAGE] = None
     color: tuple[float, float, float] = (1.0, 1.0, 1.0)
     mask: Annotated[Texture | None, TextureKind.SCALAR] = None
     z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
+    same_tick: bool = False
 
 
 @dataclass

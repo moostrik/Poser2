@@ -8,6 +8,7 @@ from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import GpuTimer, RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId, MouseButton
 from modules.flow import Port, hold_tick
+from modules.inference import Capture
 from modules.pose import Frame, Similarity, AngleMotion
 from modules.render import layers as ls, shaders, make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
 from modules.utils import FPS, Rect, Point2f
@@ -50,7 +51,17 @@ LARGE_LAYERS: list[Layers] = [
     Layers.composite,
 ]
 
-# The view stage and what is drawn from it, at the motion's size and timed together ("GPU view")
+# Run once per capture, in this order, in place of the first of them in UPDATE_LAYERS (`_run_captures`)
+CAPTURE_LAYERS: list[Layers] = [
+    Layers.capture_image,
+    Layers.capture_depth,
+    Layers.view,
+    Layers.foreground_look,
+    Layers.motion,
+    Layers.bridge,
+]
+
+# The view stage and what is drawn from it, at the motion's size
 VIEW_LAYERS: list[Layers] = [
     Layers.view,
     Layers.view_image,
@@ -108,8 +119,8 @@ class DeepFlowRender(RenderBase):
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.board)
             cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.board)
-            self.L[Layers.capture_image][i] =               ls.CaptureImageLayer(   i, self.board)
-            self.L[Layers.capture_depth][i] =               ls.CaptureDepthLayer(   i, self.board)
+            self.L[Layers.capture_image][i] =               ls.CaptureImageLayer()
+            self.L[Layers.capture_depth][i] =               ls.CaptureDepthLayer()
 
             tracker_compositor = self.L[Layers.tracker][i] = ls.TrackerCompositor(  i, self.board,   cam_image.texture,          settings.preview.tracker,   settings.colors)
             pose_compositor = self.L[Layers.pose][i] =      ls.PoseCompositor(      i, self.board,   cam_image.texture, cam_crop, settings.preview.pose,      settings.colors)
@@ -160,17 +171,15 @@ class DeepFlowRender(RenderBase):
         self._view_timer: GpuTimer = GpuTimer("GPU view")
         self._view_size: tuple[int, int] = (0, 0)       # the view layers' size: the motion's, set in allocate
 
-        # Each stage's input, built right before the stage runs, from what ran before it this tick
+        # The fluid's and the monitors' input, built right before they run, from what ran before them this tick
         self._wirings: dict[Layers, Callable[[], None]] = {
-            Layers.view: self._wire_view,
-            Layers.motion: self._wire_motion,
             Layers.fluid: self._wire_fluid,
             Layers.monitor_a: self._wire_monitors,
         }
 
-        # Each camera's frames the motion measures, for the panel's cadence (read on any thread)
+        # Each camera's captures the motion measures, for the panel's cadence (read on any thread)
         self.motion_rates: dict[int, FPS] = {}
-        self._motion_timestamps: dict[int, float] = {}
+        self._capture_timestamps: dict[int, float] = {}     # each camera's capture run last
 
         # The border around each layer in the main window
         self._border: shaders.DrawRectangleOutline = shaders.DrawRectangleOutline()
@@ -315,62 +324,65 @@ class DeepFlowRender(RenderBase):
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[Layers] = set()
-        timing: bool = False        # inside the view layers, which run one after another in UPDATE_LAYERS
         for layer_type in self._update_layers + self._interface_layers + self._left_layers + self._right_layers + self._output_layers:
-            if layer_type not in seen:
-                seen.add(layer_type)
-                if (layer_type in VIEW_LAYERS) != timing:
-                    timing = not timing
-                    if timing:
-                        self._view_timer.begin()
-                    else:
-                        self._view_timer.end()
-                wiring: Callable[[], None] | None = self._wirings.get(layer_type)
-                if wiring is not None:
-                    wiring()
-                for layer in self.L[layer_type].values():
-                    layer.update()
-        if timing:
-            self._view_timer.end()
+            if layer_type in seen:
+                continue
+            if layer_type in CAPTURE_LAYERS:
+                seen.update(CAPTURE_LAYERS)
+                self._run_captures()
+                continue
+            seen.add(layer_type)
+            wiring: Callable[[], None] | None = self._wirings.get(layer_type)
+            if wiring is not None:
+                wiring()
+            for layer in self.L[layer_type].values():
+                layer.update()
 
     # ========== The flow's wiring ==========
 
     def _layer(self, key: Layers, cam_id: int) -> ls.LayerBase | None:
         return self.L[key][cam_id] if key in self.L and cam_id in self.L[key] else None
 
-    def _wire_view(self) -> None:
-        """Each camera's view input: the capture's image and depth as the source layers took them in this tick, with
-        the pose of that capture's player."""
-        for i, _view in self.L[Layers.view].items():
-            image: ls.CaptureImageLayer = cast(ls.CaptureImageLayer, self.L[Layers.capture_image][i])
-            depth: ls.CaptureDepthLayer = cast(ls.CaptureDepthLayer, self.L[Layers.capture_depth][i])
-            timestamp: float | None = image.timestamp
-            capture = self.board.get_capture(i)
-            pose: Frame | None = None
-            if capture is not None and capture.timestamp == timestamp and capture.poses:
-                pose = capture.poses[min(capture.poses)]
-            cast(ls.ViewLayer, _view).set_input(ls.ViewInput(image.texture, depth.texture, timestamp, pose))
+    def _run_captures(self) -> None:
+        """Every capture since the last tick, each camera's in order, through the capture layers (`_run_capture`).
+        A tick without a capture runs none of them, so no stage works on a frame twice."""
+        for i in self.L[Layers.view]:
+            for index, capture in enumerate(self.board.take_captures(i)):
+                self._run_capture(i, capture, same_tick=index > 0)
 
-    def _wire_motion(self) -> None:
-        """Each camera's motion and bridge input, from the pictures the panel names among the view's outputs."""
+    def _run_capture(self, i: int, capture: Capture, same_tick: bool) -> None:
+        """One capture: its image and depth into GL, the view of it with its player's pose, the foreground's look,
+        the motion, and the bridge stepping over the time since the capture before, from the pictures the panel
+        names. `same_tick`: another capture in this tick, whose bridge outputs the fluid takes with the last's."""
         inputs: FlowInputSettings = self.settings.inputs
-        dt: float = self._dt
-        for i, _motion in self.L[Layers.motion].items():
-            motion = cast(ls.Motion3DLayer, _motion)
-            view = cast(ls.ViewLayer, self.L[Layers.view][i])
-            image: ls.LayerBase | None = self._layer(inputs.motion_image, i)
-            bridge: ls.LayerBase | None = self._layer(Layers.bridge, i)
-            if image is None or bridge is None:
-                continue
-            timestamp: float | None = view.timestamp
-            if timestamp is not None and timestamp != self._motion_timestamps.get(i):    # a new frame for the motion to measure
-                self._motion_timestamps[i] = timestamp
-                self.motion_rates.setdefault(i, FPS(120)).processed()
-            color: ls.LayerBase | None = self._layer(inputs.bridge_image, i)
-            output: ls.ViewOutput = view.output
-            motion.set_input(ls.MotionInput(image.texture, timestamp, dt, output.depth, output.mask, output.depth_mask))
-            cast(ls.Bridge3DLayer, bridge).set_input(ls.BridgeInput(motion.output.velocity, dt, color.texture if color is not None else None,
-                                                                    mask=output.mask, z_position=motion.output.z_position))
+        image = cast(ls.CaptureImageLayer, self.L[Layers.capture_image][i])
+        depth = cast(ls.CaptureDepthLayer, self.L[Layers.capture_depth][i])
+        view = cast(ls.ViewLayer, self.L[Layers.view][i])
+        motion = cast(ls.Motion3DLayer, self.L[Layers.motion][i])
+        bridge = cast(ls.Bridge3DLayer, self.L[Layers.bridge][i])
+
+        image.set_capture(capture)
+        image.update()
+        depth.set_capture(capture)
+        depth.update()
+        pose: Frame | None = capture.poses[min(capture.poses)] if capture.poses else None
+        view.set_input(ls.ViewInput(image.texture, depth.texture, capture.timestamp, pose))
+        self._view_timer.begin()
+        view.update()
+        self._view_timer.end()
+        self.L[Layers.foreground_look][i].update()
+
+        interval: float = ls.frame_interval(capture.timestamp, self._capture_timestamps.get(i), self.settings.motion.fps, self._dt, self._dt)
+        self._capture_timestamps[i] = capture.timestamp
+        self.motion_rates.setdefault(i, FPS(120)).processed()
+        motion_image: ls.LayerBase = self._layer(inputs.motion_image, i) or self.L[Layers.view_image][i]
+        color: ls.LayerBase | None = self._layer(inputs.bridge_image, i)
+        output: ls.ViewOutput = view.output
+        motion.set_input(ls.MotionInput(motion_image.texture, capture.timestamp, interval, output.depth, output.mask, output.depth_mask))
+        motion.update()
+        bridge.set_input(ls.BridgeInput(motion.output.velocity, interval, color.texture if color is not None else None,
+                                        mask=output.mask, z_position=motion.output.z_position, same_tick=same_tick))
+        bridge.update()
 
     def _wire_fluid(self) -> None:
         """Each fluid's input, one injection per bridge, at its weight."""

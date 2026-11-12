@@ -21,7 +21,7 @@ from modules.gl import Fbo, GpuTimer, Texture
 from modules.flow import (
     VelocityLowpass, VelocityLowpassSettings,
     VelocityBandpass, VelocityBandpassSettings, Change, WeightedSum, ZPositionMix,
-    TemperatureBridge, TemperatureBridgeSettings,
+    TemperatureBridge, TemperatureBridgeSettings, CaptureMax,
     DensityBridge, DensityBridgeSettings,
     HasPorts, Port, Ports, TextureKind,
 )
@@ -104,7 +104,10 @@ class Bridge3DLayer(BridgeLayer):
 
     The bandpass runs while a share of one of its readings is above 0, or a monitor shows one of its ports
     (a port's `prepare` says it is shown, and the next tick runs it), from rest when it starts; a filter
-    writes its accelerations while the body force takes one of its readings or a monitor shows it."""
+    writes its accelerations while the body force takes one of its readings or a monitor shows it.
+
+    With several captures in one render tick (`BridgeInput.same_tick`) the densities and the temperatures it
+    hands out are, per pixel, those of the capture with the larger amount (`CaptureMax`); the rest the newest's."""
 
     def __init__(self, settings: Bridge3DLayerSettings) -> None:
         super().__init__(settings)
@@ -133,18 +136,34 @@ class Bridge3DLayer(BridgeLayer):
         self._lowpass_timer: GpuTimer = GpuTimer("GPU bridge lowpass")
         self._bandpass_timer: GpuTimer = GpuTimer("GPU bridge bandpass")
         self._mix_timer: GpuTimer = GpuTimer("GPU bridge mix")      # the outputs' mixes, the densities and temperatures
+        # The densities and temperatures over a tick's captures: boundary and body force, each density and temperature
+        self._capture_max: dict[str, CaptureMax] = {name: CaptureMax(by_alpha=name.endswith('density'))
+                                                    for name in ('boundary_density', 'boundary_temperature', 'body_force_density', 'body_force_temperature')}
+        self._merging: bool = False     # the outputs are the larger of this tick's captures
 
     @property
     def output(self) -> BridgeOutput:
         body_force: BodyForceSettings = self.settings.body_force
+        merged: dict[str, Texture] = self._merged()
         return BridgeOutput(
-            self._boundary_velocity, self._boundary_density.density, self._boundary_temperature.temperature,
+            self._boundary_velocity, merged['boundary_density'], merged['boundary_temperature'],
             self._body_force_acceleration if self._mixed(body_force.acceleration) else None,
-            self._body_force_density.density if self._mixed(body_force.density) else None,
-            self._body_force_temperature.temperature if self._mixed(body_force.temperature) else None,
+            merged['body_force_density'] if self._mixed(body_force.density) else None,
+            merged['body_force_temperature'] if self._mixed(body_force.temperature) else None,
             self._boundary_velocity_z_position,
             self._body_force_acceleration_z_position if self._mixed(body_force.acceleration) else None,
             self._z_position)
+
+    def _outputs(self) -> dict[str, Texture]:
+        """The densities and temperatures as the last step made them."""
+        return {'boundary_density': self._boundary_density.density, 'boundary_temperature': self._boundary_temperature.temperature,
+                'body_force_density': self._body_force_density.density, 'body_force_temperature': self._body_force_temperature.temperature}
+
+    def _merged(self) -> dict[str, Texture]:
+        """The densities and temperatures the fluid takes: the larger of this tick's captures while it had several."""
+        if self._merging:
+            return {name: capture_max.texture for name, capture_max in self._capture_max.items()}
+        return self._outputs()
 
     def _bridges(self) -> dict[str, HasPorts]:
         """The readings, then each side's mix and its density and temperature."""
@@ -199,6 +218,8 @@ class Bridge3DLayer(BridgeLayer):
         self._z_position_mix_shader.deallocate()
         for timer in (self._gpu_timer, self._lowpass_timer, self._bandpass_timer, self._mix_timer):
             timer.deallocate()
+        for capture_max in self._capture_max.values():
+            capture_max.deallocate()
 
     def _mix_fbos(self) -> tuple[tuple[Fbo, int], ...]:
         return ((self._boundary_velocity, GL_RGBA16F), (self._boundary_density_amount, GL_R32F),
@@ -225,6 +246,7 @@ class Bridge3DLayer(BridgeLayer):
             stage.deallocate()
 
     def _reset_stages(self) -> None:
+        self._merging = False
         self._lowpass.reset()
         self._bandpass.reset()
         self._boundary_density.reset()
@@ -234,6 +256,10 @@ class Bridge3DLayer(BridgeLayer):
 
     def _bridge(self, input: BridgeInput, color: Texture) -> None:
         self._gpu_timer.begin()
+        if input.same_tick and not self._merging:      # the tick's second capture: keep the first's
+            for name, texture in self._outputs().items():
+                self._capture_max[name].hold(texture)
+        self._merging = input.same_tick
         body_force: tuple[MixSettings, ...] = self._body_force_mixes()
         mixes: tuple[MixSettings, ...] = (*self._boundary_mixes(), *body_force)
 
@@ -268,6 +294,9 @@ class Bridge3DLayer(BridgeLayer):
         if self._mixed(side.temperature):
             self._mix(self._body_force_temperature_amount, self._velocities(), side.temperature, lengths=True)
             self._update_temperature(self._body_force_temperature, self._body_force_temperature_amount, color)
+        if self._merging:
+            for name, texture in self._outputs().items():
+                self._capture_max[name].take(texture)
         self._mix_timer.end()
         self._gpu_timer.end()
 
