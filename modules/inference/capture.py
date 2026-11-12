@@ -3,10 +3,9 @@
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable, TypeAlias
 
-from modules.camera import CameraFrame
 from modules.pose import FrameDict
 
-from .source import GpuImage
+from .source import GpuDepth, GpuImage
 
 if TYPE_CHECKING:
     from .segmentation import ImageDict
@@ -14,7 +13,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class Capture:
-    """One camera's moment: the color image on the GPU, the depth frame, and the poses and RVM's
+    """One camera's moment: the color image and the depth on the GPU, and the poses and RVM's
     masks found in that image, all captured at `timestamp` (`CameraFrame.timestamp`, within
     `CAPTURE_TOLERANCE`).
 
@@ -25,7 +24,7 @@ class Capture:
     cam_id: int
     timestamp: float
     image: GpuImage
-    depth: CameraFrame
+    depth: GpuDepth
     poses: FrameDict = field(default_factory=dict)
     poses_synced: bool = False
     masks: "ImageDict" = field(default_factory=dict)

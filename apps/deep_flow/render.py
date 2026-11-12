@@ -1,38 +1,31 @@
 """Deep Flow render — split-view layer graph with the 3D flow: motion, bridge and the volumetric fluid."""
 
 from threading import Event
-from typing import cast
+from typing import Callable, cast
 
 import numpy as np
 from OpenGL.GL import GL_RGBA16F, GL_RGBA, glViewport
 
 from modules.gl import GpuTimer, RenderBase, Shader, Style, clear_color, fit, Texture, MonitorId, MouseButton
-from modules.flow import DepthView, Port, hold_tick
+from modules.flow import Port, hold_tick
 from modules.pose import Frame, Similarity, AngleMotion
 from modules.render import layers as ls, shaders, make_subdivision, best_grid, grid_cell_aspect_ratio, SubdivisionRow, Subdivision
 from modules.utils import FPS, Rect, Point2f
 
-from modules.board import HasFrames
-
-from .capture_poses import CapturePoses
 from .render_board import RenderBoard
-from .settings import Layers, MaskSource, RenderSettings, FlowInputSettings, View
+from .settings import Layers, MainView, RenderSettings, FlowInputSettings
 
 
 UPDATE_LAYERS: list[Layers] = [
     Layers.cam_image,
     Layers.cam_crop,
-    Layers.cam_depth,
     Layers.capture_image,
-    Layers.cam_mask,            # after the depth it may cut
-    Layers.cam_foreground,
+    Layers.capture_depth,
 
-    Layers.center_geometry,
-    Layers.center_mask,
-    Layers.center_capture,      # the flow's input: the capture's image, unmasked
-    Layers.center_depth,        # after the image it can lie over
-    Layers.center_foreground,
-    Layers.center_pose,
+    Layers.view,                # the flow's view of the capture: image, depth, masks, foreground
+    Layers.view_depth,
+    Layers.view_pose,
+    Layers.foreground_look,     # the density's color, the look of the view's foreground
 
     Layers.color_mask,
     Layers.motion,
@@ -57,14 +50,16 @@ LARGE_LAYERS: list[Layers] = [
     Layers.composite,
 ]
 
-# The center view: the crop around the player and what is made from it, timed together ("GPU center")
-CENTER_LAYERS: list[Layers] = [
-    Layers.center_geometry,
-    Layers.center_mask,
-    Layers.center_capture,
-    Layers.center_depth,
-    Layers.center_foreground,
-    Layers.center_pose,
+# The view stage and what is drawn from it, at the motion's size and timed together ("GPU view")
+VIEW_LAYERS: list[Layers] = [
+    Layers.view,
+    Layers.view_image,
+    Layers.view_foreground,
+    Layers.view_depth,
+    Layers.view_mask,
+    Layers.view_depth_mask,
+    Layers.view_pose,
+    Layers.foreground_look,
     Layers.color_mask,
 ]
 
@@ -77,18 +72,17 @@ BORDER_WIDTH: float = 2.0       # px
 # The layers that are not output-shaped, each with the layer whose texture holds its shape
 SHAPE_LAYERS: dict[Layers, Layers] = {
     Layers.cam_image:      Layers.cam_image,
-    Layers.cam_mask:       Layers.cam_mask,
-    Layers.cam_foreground: Layers.cam_foreground,
     Layers.cam_crop:       Layers.cam_crop,
-    Layers.cam_depth:      Layers.cam_depth,
     Layers.capture_image:  Layers.capture_image,
+    Layers.capture_depth:  Layers.capture_image,  # on the image's view, at the depth's own grid
     Layers.tracker:        Layers.cam_image,  # camera stretched into a panel-sized FBO
     Layers.pose:           Layers.cam_crop,   # crop stretched into a panel-sized FBO
+    **{layer: Layers.view_image for layer in VIEW_LAYERS},
 }
 
 
 class DeepFlowRender(RenderBase):
-    def __init__(self, board: RenderBoard, settings: RenderSettings, mask_source: MaskSource, fov: float, num_cams: int = 1, max_players: int = 1) -> None:
+    def __init__(self, board: RenderBoard, settings: RenderSettings, fov: float, num_cams: int = 1, max_players: int = 1) -> None:
         """`fov` is the camera image's horizontal field (degrees), for the metres a view width spans."""
         super().__init__(settings.window)
         self.max_players: int = max_players
@@ -110,43 +104,30 @@ class DeepFlowRender(RenderBase):
         settings.data.b.line_smooth = 6.0
         settings.data.b.use_history_color = True
 
-        cmt: dict[int, Texture] = {}    # the center masks
-        depth_source: bool = mask_source == MaskSource.DEPTH
-        self._depth_source: bool = depth_source     # the mask is cut from the depth, so the center mask's unrefined cut is the depth mask
-        space: ls.SourceSpace = ls.SourceSpace.IMAGE if depth_source else ls.SourceSpace.CROP
+        masks: dict[int, Texture] = {}     # the view's masks, for the color mask
         for i in range(self.num_cams):
             cam_image =     self.L[Layers.cam_image][i] =   ls.ImageSourceLayer(    i, self.board)
             cam_crop =      self.L[Layers.cam_crop][i] =    ls.CropSourceLayer(     i, self.board)
-            cam_depth =     self.L[Layers.cam_depth][i] =   ls.DepthSourceLayer(    i, self.board,   cam_image.texture,          settings.depth)
-            capture_image = self.L[Layers.capture_image][i] = ls.CaptureImageLayer(i, self.board)
-
-            # The player's mask and the foreground's source, from the mask source chosen at start-up
-            cam_mask: ls.LayerBase
-            foreground_source: ls.LayerBase
-            if depth_source:
-                cam_mask = self.L[Layers.cam_mask][i] =     ls.DepthMaskLayer(      cam_depth)
-                foreground_source = capture_image           # masked in the center view (`premultiply`)
-            else:
-                cam_mask = self.L[Layers.cam_mask][i] =     ls.MaskSourceLayer(     i, self.board)
-                cam_foreground = self.L[Layers.cam_foreground][i] = ls.ForegroundSourceLayer(i, self.board)
-                foreground_source = cam_foreground          # RVM's, masked already
+            self.L[Layers.capture_image][i] =               ls.CaptureImageLayer(   i, self.board)
+            self.L[Layers.capture_depth][i] =               ls.CaptureDepthLayer(   i, self.board)
 
             tracker_compositor = self.L[Layers.tracker][i] = ls.TrackerCompositor(  i, self.board,   cam_image.texture,          settings.preview.tracker,   settings.colors)
             pose_compositor = self.L[Layers.pose][i] =      ls.PoseCompositor(      i, self.board,   cam_image.texture, cam_crop, settings.preview.pose,      settings.colors)
 
-            # placed by the pose of the capture it shows, so view, image and depth are one moment
-            center_geometry = self.L[Layers.center_geometry][i] = ls.CenterGeometry( i, cast(HasFrames, CapturePoses(self.board)), cam_image.texture, settings.center.geometry, fov)
-            center_mask =   self.L[Layers.center_mask][i] = ls.CenterMaskLayer(     i, center_geometry, cam_mask,               space, settings.center.mask,
-                                                                                guide=capture_image if depth_source else None)
-            cmt[i] = center_mask.texture
-            center_cam =    self.L[Layers.center_cam][i] =  ls.CenterCamLayer(      i, center_geometry, cam_image,          cmt[i], settings.center.cam)
-            center_capture = self.L[Layers.center_capture][i] = ls.CenterCamLayer(  i, center_geometry, capture_image,      cmt[i], settings.center.capture)
-            self.L[Layers.center_depth][i] =                ls.CenterDepthLayer(    i, center_geometry, cam_depth, center_capture, cmt[i], settings.center.depth, settings.depth)
-            center_foreground = self.L[Layers.center_foreground][i] = ls.CenterForegroundLayer(i, center_geometry, foreground_source, cmt[i], space, depth_source,
-                                                                                                settings.center.foreground, settings.colors)
-            center_pose =   self.L[Layers.center_pose][i] = ls.CenterPoseLayer(     i, center_geometry,                             settings.center.pose,       settings.colors)
+            # The flow's view of the capture, and what is drawn from it
+            view =          self.L[Layers.view][i] =        ls.ViewLayer(           settings.view, settings.motion.z, fov)
+            output: ls.ViewOutput = view.output
+            masks[i] = output.mask
+            self.L[Layers.view_image][i] =                  ls.ViewOutputLayer(     view, output.image)
+            self.L[Layers.view_foreground][i] =             ls.ViewOutputLayer(     view, output.foreground)
+            self.L[Layers.view_mask][i] =                   ls.ViewOutputLayer(     view, output.mask)
+            self.L[Layers.view_depth_mask][i] =             ls.ViewOutputLayer(     view, output.depth_mask)
+            self.L[Layers.view_depth][i] =                  ls.ViewDepthLayer(      view, settings.view_depth)
+            self.L[Layers.view_pose][i] =                   ls.CenterPoseLayer(     i, view,                                     settings.view_pose,         settings.colors)
+            view_foreground: ls.LayerBase = self.L[Layers.view_foreground][i]
+            foreground_look = self.L[Layers.foreground_look][i] = ls.ForegroundLookLayer(i, view_foreground, output.mask,           settings.foreground_look, settings.colors)
 
-            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,   center_foreground.texture, cmt, settings.center.color, settings.colors)
+            ms_mask =       self.L[Layers.color_mask][i] =  ls.MSColorMaskLayer(    i, self.board,   foreground_look.texture,   masks, settings.color_mask, settings.colors)
             self.L[Layers.motion][i] =                      ls.Motion3DLayer(       i, settings.motion)
             self.L[Layers.bridge][i] =                      ls.Bridge3DLayer(       settings.bridge)
             fluid =         self.L[Layers.fluid][i] =       ls.Fluid3DLayer(        settings.fluid)
@@ -176,8 +157,16 @@ class DeepFlowRender(RenderBase):
         # A reset asked for from another thread, applied at the next update on the GL thread
         self._reset_fluid: Event = Event()
 
-        self._center_timer: GpuTimer = GpuTimer("GPU center")
-        self._center_size: tuple[int, int] = (0, 0)     # the center layers' size: the motion's, set in allocate
+        self._view_timer: GpuTimer = GpuTimer("GPU view")
+        self._view_size: tuple[int, int] = (0, 0)       # the view layers' size: the motion's, set in allocate
+
+        # Each stage's input, built right before the stage runs, from what ran before it this tick
+        self._wirings: dict[Layers, Callable[[], None]] = {
+            Layers.view: self._wire_view,
+            Layers.motion: self._wire_motion,
+            Layers.fluid: self._wire_fluid,
+            Layers.monitor_a: self._wire_monitors,
+        }
 
         # Each camera's frames the motion measures, for the panel's cadence (read on any thread)
         self.motion_rates: dict[int, FPS] = {}
@@ -224,13 +213,13 @@ class DeepFlowRender(RenderBase):
         self.allocate_window_renders()
 
     def allocate(self) -> None:
-        self._center_size = (self.settings.motion.width, self.settings.motion.height)
+        self._view_size = (self.settings.motion.width, self.settings.motion.height)
         for layer_type, cam_dict in self.L.items():
             for layer in cam_dict.values():
                 if layer_type in LARGE_LAYERS:
                     layer.allocate(OUTPUT_WIDTH * 2, OUTPUT_HEIGHT * 2, GL_RGBA16F)
-                elif layer_type in CENTER_LAYERS:
-                    layer.allocate(*self._center_size, GL_RGBA16F)
+                elif layer_type in VIEW_LAYERS:
+                    layer.allocate(*self._view_size, GL_RGBA16F)
                 else:
                     layer.allocate(OUTPUT_WIDTH, OUTPUT_HEIGHT, GL_RGBA16F)
         self.allocate_window_renders()
@@ -244,14 +233,14 @@ class DeepFlowRender(RenderBase):
                 w, h = self.subdivision.get_allocation_size('panels', 0)
                 self.L[layer_type][i].allocate(w, h, GL_RGBA)
 
-    def _follow_center_size(self) -> None:
-        """Reallocate the center layers when the motion's size changed: the crop is drawn at the size the
+    def _follow_view_size(self) -> None:
+        """Reallocate the view layers when the motion's size changed: the view is drawn at the size the
         motion and the bridge read it."""
         size: tuple[int, int] = (self.settings.motion.width, self.settings.motion.height)
-        if size == self._center_size:
+        if size == self._view_size:
             return
-        self._center_size = size
-        for layer_type in CENTER_LAYERS:
+        self._view_size = size
+        for layer_type in VIEW_LAYERS:
             for layer in self.L[layer_type].values():
                 layer.deallocate()
                 layer.allocate(*size, GL_RGBA16F)
@@ -261,7 +250,7 @@ class DeepFlowRender(RenderBase):
             for layer in cam_dict.values():
                 layer.deallocate()
         self._border.deallocate()
-        self._center_timer.deallocate()
+        self._view_timer.deallocate()
 
     def _measure_tick(self, now: float) -> None:
         if self._last_tick > 0.0:
@@ -314,9 +303,7 @@ class DeepFlowRender(RenderBase):
         self._right_layers = select.right
         self._output_layers = select.output
         self._update_layout()
-        self._follow_center_size()
-
-        self._wire_flow()
+        self._follow_view_size()
 
         for i, _composite_layer in self.L[Layers.composite].items():
             composite_layer = cast(ls.CompositeLayer, _composite_layer)
@@ -328,53 +315,67 @@ class DeepFlowRender(RenderBase):
         Style.reset_state()
         Style.set_blend_mode(Style.BlendMode.ALPHA)
         seen: set[Layers] = set()
-        timing: bool = False        # inside the center layers, which run one after another in UPDATE_LAYERS
+        timing: bool = False        # inside the view layers, which run one after another in UPDATE_LAYERS
         for layer_type in self._update_layers + self._interface_layers + self._left_layers + self._right_layers + self._output_layers:
             if layer_type not in seen:
                 seen.add(layer_type)
-                if (layer_type in CENTER_LAYERS) != timing:
+                if (layer_type in VIEW_LAYERS) != timing:
                     timing = not timing
                     if timing:
-                        self._center_timer.begin()
+                        self._view_timer.begin()
                     else:
-                        self._center_timer.end()
+                        self._view_timer.end()
+                wiring: Callable[[], None] | None = self._wirings.get(layer_type)
+                if wiring is not None:
+                    wiring()
                 for layer in self.L[layer_type].values():
                     layer.update()
         if timing:
-            self._center_timer.end()
+            self._view_timer.end()
 
     # ========== The flow's wiring ==========
 
     def _layer(self, key: Layers, cam_id: int) -> ls.LayerBase | None:
         return self.L[key][cam_id] if key in self.L and cam_id in self.L[key] else None
 
-    def _wire_flow(self) -> None:
-        """Build each stage's input from the layers the panel names and the stage before: a motion and
-        a bridge input per camera, a fluid input per fluid with one injection per bridge, at its weight,
-        and the monitors' input from every stage's ports."""
+    def _wire_view(self) -> None:
+        """Each camera's view input: the capture's image and depth as the source layers took them in this tick, with
+        the pose of that capture's player."""
+        for i, _view in self.L[Layers.view].items():
+            image: ls.CaptureImageLayer = cast(ls.CaptureImageLayer, self.L[Layers.capture_image][i])
+            depth: ls.CaptureDepthLayer = cast(ls.CaptureDepthLayer, self.L[Layers.capture_depth][i])
+            timestamp: float | None = image.timestamp
+            capture = self.board.get_capture(i)
+            pose: Frame | None = None
+            if capture is not None and capture.timestamp == timestamp and capture.poses:
+                pose = capture.poses[min(capture.poses)]
+            cast(ls.ViewLayer, _view).set_input(ls.ViewInput(image.texture, depth.texture, timestamp, pose))
+
+    def _wire_motion(self) -> None:
+        """Each camera's motion and bridge input, from the pictures the panel names among the view's outputs."""
         inputs: FlowInputSettings = self.settings.inputs
         dt: float = self._dt
-        bridges: dict[int, ls.Bridge3DLayer] = {i: cast(ls.Bridge3DLayer, layer) for i, layer in self.L[Layers.bridge].items()}
-
         for i, _motion in self.L[Layers.motion].items():
             motion = cast(ls.Motion3DLayer, _motion)
+            view = cast(ls.ViewLayer, self.L[Layers.view][i])
             image: ls.LayerBase | None = self._layer(inputs.motion_image, i)
-            if image is None or i not in bridges:
+            bridge: ls.LayerBase | None = self._layer(Layers.bridge, i)
+            if image is None or bridge is None:
                 continue
-            timestamp: float | None = image.timestamp if isinstance(image, ls.HasCaptureTime) else None
+            timestamp: float | None = view.timestamp
             if timestamp is not None and timestamp != self._motion_timestamps.get(i):    # a new frame for the motion to measure
                 self._motion_timestamps[i] = timestamp
                 self.motion_rates.setdefault(i, FPS(120)).processed()
             color: ls.LayerBase | None = self._layer(inputs.bridge_image, i)
-            mask_layer: ls.LayerBase | None = self._layer(inputs.mask, i)
-            mask: Texture | None = mask_layer.texture if mask_layer is not None else None
-            depth: DepthView = cast(ls.CenterDepthLayer, self.L[Layers.center_depth][i]).depth_view
-            # where the depth is the player's: the depth's own cut on the view, with the depth as the mask source
-            depth_mask: Texture | None = cast(ls.CenterMaskLayer, self.L[Layers.center_mask][i]).unrefined if self._depth_source else None
-            motion.set_input(ls.MotionInput(image.texture, timestamp, dt, depth, mask, depth_mask))
-            bridges[i].set_input(ls.BridgeInput(motion.output.velocity, dt, color.texture if color is not None else None, mask=mask,
-                                                z_position=motion.output.z_position))
+            output: ls.ViewOutput = view.output
+            motion.set_input(ls.MotionInput(image.texture, timestamp, dt, output.depth, output.mask, output.depth_mask))
+            cast(ls.Bridge3DLayer, bridge).set_input(ls.BridgeInput(motion.output.velocity, dt, color.texture if color is not None else None,
+                                                                    mask=output.mask, z_position=motion.output.z_position))
 
+    def _wire_fluid(self) -> None:
+        """Each fluid's input, one injection per bridge, at its weight."""
+        dt: float = self._dt
+        bridges: dict[int, ls.Bridge3DLayer] = {i: cast(ls.Bridge3DLayer, layer) for i, layer in self.L[Layers.bridge].items()}
         for i, _fluid in self.L[Layers.fluid].items():
             fluid = cast(ls.Fluid3DLayer, _fluid)
             pose: Frame | None = self.board.get_frame(self.settings.stage, i)
@@ -389,12 +390,15 @@ class DeepFlowRender(RenderBase):
                                                z_position=output.z_position))
             fluid.set_input(ls.FluidInput(dt, injections))
 
+    def _wire_monitors(self) -> None:
+        """The monitors' input, every stage's ports."""
         for i, _motion in self.L[Layers.motion].items():
-            if i not in bridges or i not in self.L[Layers.fluid]:
+            if i not in self.L[Layers.bridge] or i not in self.L[Layers.fluid] or i not in self.L[Layers.view]:
                 continue
             ports: dict[ls.FlowStage, dict[str, Port]] = {
+                ls.FlowStage.VIEW: cast(ls.ViewLayer, self.L[Layers.view][i]).ports,
                 ls.FlowStage.MOTION: cast(ls.Motion3DLayer, _motion).ports,
-                ls.FlowStage.BRIDGE: bridges[i].ports,
+                ls.FlowStage.BRIDGE: cast(ls.Bridge3DLayer, self.L[Layers.bridge][i]).ports,
                 ls.FlowStage.FLUID: cast(ls.Fluid3DLayer, self.L[Layers.fluid][i]).ports,
             }
             for key in (Layers.monitor_a, Layers.monitor_b):
@@ -418,7 +422,7 @@ class DeepFlowRender(RenderBase):
     # ========== Drawing ==========
 
     def draw_main(self, width: int, height: int) -> None:
-        if self.settings.view == View.SHOW:
+        if self.settings.main_view == MainView.SHOW:
             self._draw_show(width, height)      # the show alone, on one screen
             return
 

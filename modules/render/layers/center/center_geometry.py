@@ -8,6 +8,7 @@ from dataclasses import dataclass
 
 # Local application imports
 from modules.board import HasFrames
+from modules.flow import fixed_window
 from modules.settings import Field, BaseSettings
 from modules.pose import Frame, Points2D, PointLandmark, BBox
 from ..layer_base import LayerBase, DataCache
@@ -41,13 +42,6 @@ class CenterGeometrySettings(BaseSettings):
     fixed_x:            Field[float] = Field(0.5, min=0.0, max=1.0, description="Fixed window's center across the camera image")
     fixed_y:            Field[float] = Field(0.5, min=0.0, max=1.0, description="Fixed window's center down the camera image")
     fixed_height:       Field[float] = Field(1.0, min=0.05, max=2.0, description="Fixed window's height, as a fraction of the camera image's")
-
-
-def fixed_window(center_x: float, center_y: float, height: float, output_aspect: float, cam_aspect: float) -> Rect:
-    """A window of the camera image (uv, y down) centered at (`center_x`, `center_y`), `height` of the
-    image's height tall, `output_aspect` wide over tall in pixels; `cam_aspect` is the image's width over its height."""
-    width: float = height * output_aspect / cam_aspect
-    return Rect(center_x - width / 2.0, center_y - height / 2.0, width, height)
 
 
 @dataclass

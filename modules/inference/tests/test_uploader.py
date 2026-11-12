@@ -12,7 +12,7 @@ import torch
 import torch.nn.functional as F
 
 from modules.camera import CameraFrame, FrameType
-from modules.inference import GpuImage, Uploader
+from modules.inference import GpuDepth, GpuImage, Uploader
 from modules.inference.uploader import QUEUED, nv12_to_rgb, warp_grid
 
 
@@ -75,8 +75,8 @@ class HandOffTest(unittest.TestCase):
         self.handed: list[tuple[str, float, str]] = []      # kind, time, the thread it came on
         self.uploader.add_gpu_image_callback(
             lambda image: self.handed.append(('image', image.timestamp, threading.current_thread().name)))
-        self.uploader.add_depth_callback(
-            lambda frame: self.handed.append(('depth', frame.timestamp, threading.current_thread().name)))
+        self.uploader.add_gpu_depth_callback(
+            lambda depth: self.handed.append(('depth', depth.timestamp, threading.current_thread().name)))
 
     def tearDown(self) -> None:
         self.uploader.stop()
@@ -119,6 +119,19 @@ class HandOffTest(unittest.TestCase):
         images[0].ready.synchronize()
         self.assertTrue(images[0].image.is_cuda)
         self.assertEqual(tuple(images[0].image.shape), (3, 48, 64))
+
+    def test_the_depth_handed_on_is_metres_on_the_gpu_with_its_event(self) -> None:
+        depths: list[GpuDepth] = []
+        self.uploader.add_gpu_depth_callback(depths.append)
+        self.uploader.start()
+        frame = _depth(3.0)
+        frame.image[:] = 1500
+        self.uploader.submit_frame(frame)
+        self.wait_for(1)
+        depths[0].ready.synchronize()
+        self.assertTrue(depths[0].depth.is_cuda)
+        self.assertEqual(tuple(depths[0].depth.shape), (30, 40))        # no alignment: on the color's view already
+        self.assertAlmostEqual(float(depths[0].depth.max()), 1.5, places=5)
 
     def test_stop_ends_the_thread_with_frames_still_queued(self) -> None:
         self.uploader.start()

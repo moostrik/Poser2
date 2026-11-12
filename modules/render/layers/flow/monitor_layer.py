@@ -22,7 +22,8 @@ from ..layer_base import LayerBase
 
 class FlowStage(IntEnum):
     """A stage of a flow system, as a monitor names it."""
-    MOTION = 0
+    VIEW = 0
+    MOTION = auto()
     BRIDGE = auto()
     FLUID = auto()
 

@@ -3,15 +3,16 @@ from .layer_base import LayerBase, DataCache, HasCaptureTime
 from .cam import      BBoxRenderer, BBoxRendererSettings, CameraReadingsLayer, CropLayer, CropLayerSettings, \
                       PoseRenderer, PoseRendererSettings, PoseCompositor, PoseCompositorSettings, \
                       TrackerCompositor, TrackerCompositorSettings, TrackletRenderer
-from .center import   CenterGeometry, CenterGeometrySettings, SnapPoint, SourceSpace, CenterDepthLayer, CenterDepthLayerSettings, \
+from .center import   CenterGeometry, CenterGeometrySettings, SnapPoint, SourceSpace, \
                       CenterCamLayer, CenterCamLayerSettings, \
                       CenterMaskLayer, CenterMaskLayerSettings, CenterForegroundLayer, CenterForegroundLayerSettings, \
-                      CenterPoseLayer, CenterPoseLayerSettings
+                      CenterPoseLayer, CenterPoseLayerSettings, PosePlacement
 from .data import     DataLayerSettings, ScalarFeatureSelect, LayerMode, AngleOffset, FEATURE_MAP, TRACK_COLOR_FEATURES, \
                       TimeSeriesLayer, TimeSeriesLayerSettings, \
                       FeatureFrameLayer, FeatureWindowLayer, MotionTimeRenderer, MotionTimeRendererSettings, \
                       PoseLineLayer, PoseLineLayerSettings
 from .flow import     StageLayer, StageLayerSettings, StageOutput, \
+                      ViewInput, ViewOutput, ViewLayer, ViewLayerSettings, ViewOutputLayer, ViewDepthLayer, ViewDepthLayerSettings, DepthDrawMode, \
                       MotionInput, MotionOutput, MotionLayer, MotionLayerSettings, \
                       BridgeInput, BridgeOutput, BridgeLayer, BridgeLayerSettings, \
                       Injection, FluidInput, FluidOutput, FluidLayer, FluidLayerSettings, \
@@ -22,10 +23,10 @@ from .flow import     StageLayer, StageLayerSettings, StageOutput, \
                       Fluid2DLayer, Fluid2DLayerSettings, \
                       Fluid3DLayer, Fluid3DLayerSettings, \
                       MonitorLayer, MonitorLayerSettings, MonitorInput, MonitorView, FlowStage, Channel
-from .generic import  CompositeLayer, CompositeLayerSettings, LutSettings, \
+from .generic import  CompositeLayer, CompositeLayerSettings, LutSettings, ForegroundLook, ForegroundLookLayer, ForegroundLookSettings, \
                       MSColorMaskLayer, MSColorMaskLayerSettings
 from .panorama import Compositor, PanoramaLayerSettings, PanoramaBlend, Part, \
                       GridRenderer, LabelRenderer, MarkRenderer, SeamRenderer, \
                       StitchRenderer, Mark, MarkContext, build_marks, strip_spans
-from .source import   CropSourceLayer, DepthSourceLayer, DepthSourceLayerSettings, DepthDrawMode, ForegroundSourceLayer, \
-                      ImageSourceLayer, MaskSourceLayer, CaptureImageLayer, DepthMaskLayer
+from .source import   CropSourceLayer, ForegroundSourceLayer, \
+                      ImageSourceLayer, MaskSourceLayer, CaptureImageLayer, CaptureDepthLayer

@@ -16,14 +16,14 @@ from modules.inout import OscSound
 from modules.tracker import OnePerCamTracker, PosesFromTracklets
 from modules.pose import configure_features
 from modules.pose.pipeline import Domain, PosePipeline
-from modules.inference import segmentation, optical_flow, detection, GpuImage, PoseInference, Capture, CaptureSync, Uploader
+from modules.inference import optical_flow, detection, GpuImage, PoseInference, Capture, CaptureSync, Uploader
 from modules.pose import FrameDict
 from modules.utils import FPS, PerformanceTimer
 
 from .render_board import RenderBoard
 from .series import Series, TIMER_SERIES
 from .pose.pipeline import pipeline_spec
-from .settings import MaskSource, Settings, Stage
+from .settings import Settings, Stage
 from .render import DeepFlowRender
 
 APP_NAME = 'deep_flow'
@@ -93,19 +93,11 @@ class DeepFlowMain:
 
         # DETECTION
         self.poses_from_tracklets = PosesFromTracklets(p.tracklets, max_players)
-        # RVM only when it is the mask source: with the depth mask it is not loaded at all
-        self.segmentation_predictor: segmentation.Predictor | None = None
-        if self.settings.mask_source == MaskSource.RVM:
-            self.segmentation_predictor = segmentation.Predictor(p.segmentation)
         self.optical_flow_predictor  = optical_flow.Predictor(p.optical_flow)
 
         self.tracker.add_tracklet_callback(self.poses_from_tracklets.set_tracklets)
 
-        # The segmentation and the optical flow read the same crops the pose model gets.
-        if self.segmentation_predictor is not None:
-            self.pose_inference.add_crop_callback(self.segmentation_predictor.submit)
-            self.segmentation_predictor.add_segmentation_callback(self.capture_sync.submit_masks)
-            self.segmentation_predictor.add_segmentation_callback(self._on_segmentation)
+        # The optical flow reads the same crops the pose model gets.
         self.pose_inference.add_crop_callback(self.optical_flow_predictor.submit)
 
         # POSE PIPELINE — the stages are declared in pose/pipeline.py. Each uploaded image drives the frame domain
@@ -120,15 +112,15 @@ class DeepFlowMain:
         self.pipeline.add_frames_callback(Stage.SMOOTH, partial(self._on_pose_frames, Series.POSE_LATENCY_SMOOTH))
 
         # THE UPLOADER'S HAND-OFFS, in order on its thread: each uploaded image to the detector (-sim), the capture
-        # sync and the pose step, each depth frame to the capture sync
+        # sync and the pose step, each uploaded depth to the capture sync
         if self.person_detector is not None:
             self.uploader.add_gpu_image_callback(self.person_detector.submit)
         self.uploader.add_gpu_image_callback(self.capture_sync.submit_image)
         self.uploader.add_gpu_image_callback(self.board.set_camera_image)
         self.uploader.add_gpu_image_callback(self._on_image)
-        self.uploader.add_depth_callback(self.capture_sync.submit_depth)
+        self.uploader.add_gpu_depth_callback(self.capture_sync.submit_depth)
 
-        # CAPTURE SYNC — each uploaded image, its depth, its SMOOTH poses and its masks, as one capture on the board
+        # CAPTURE SYNC — each uploaded image, its depth and its SMOOTH poses, as one capture on the board
         self.pipeline.add_frames_callback(Stage.SMOOTH, self.capture_sync.submit_poses)
         self.capture_sync.add_capture_callback(self._on_capture)
 
@@ -136,7 +128,7 @@ class DeepFlowMain:
         self.camera_check = CameraCheck(self.settings.camera.cameras, self.settings.camera.camera_check)
 
         # RENDER
-        self.render = DeepFlowRender(self.board, self.settings.render, self.settings.mask_source, self.settings.camera.fov, num_cams=len(self.cameras), max_players=max_players)
+        self.render = DeepFlowRender(self.board, self.settings.render, self.settings.camera.fov, num_cams=len(self.cameras), max_players=max_players)
         self.render.add_exit_callback(self.stop)
         self.render.add_update_callback(self.camera_check.update)
 
@@ -149,7 +141,6 @@ class DeepFlowMain:
 
         # TIME SERIES — the timings the time series layer plots
         self._last_camera_frame: dict[int, float] = {}
-        self._last_masks: float = 0.0
         PerformanceTimer.add_sample_callback(self._on_timer_sample)
 
     def start(self) -> None:
@@ -164,8 +155,6 @@ class DeepFlowMain:
         self.tracker.start()
         self.pose_inference.start()
         self.capture_sync.start()
-        if self.segmentation_predictor is not None:
-            self.segmentation_predictor.start()
         self.optical_flow_predictor.start()
 
         self.osc_sound.start()
@@ -194,28 +183,10 @@ class DeepFlowMain:
     def _on_capture(self, capture: Capture) -> None:
         self.capture_rate.processed()
         self.board.set_capture(capture)
-        if capture.masks:
-            self.board.set_segmentation_images(capture.masks)       # the layers draw the capture's own masks
         now: float = time.perf_counter()        # when the capture reaches the board: the end of the latency
         self.board.submit_time_sample(Series.CAPTURE_LATENCY, (now - capture.timestamp) * 1000.0, now)
         if capture.poses:
             self.board.submit_time_sample(Series.POSES_UNSYNCED, 0.0 if capture.poses_synced else 1.0, now)
-        if capture.masks:
-            self.board.submit_time_sample(Series.MASKS_UNSYNCED, 0.0 if capture.masks_synced else 1.0, now)
-
-    def _on_segmentation(self, poses: FrameDict, masks: segmentation.ImageDict) -> None:
-        """RVM's timing; the masks reach the board through the capture sync."""
-        now: float = time.perf_counter()        # when the masks come out of RVM: the end of the latency
-        if not masks:
-            if poses:
-                self.board.submit_time_sample(Series.MASK_MISSING, 1.0, now)
-            return
-        self.board.submit_time_sample(Series.MASK_MISSING, 0.0, now)
-        if self._last_masks > 0.0:
-            self.board.submit_time_sample(Series.SEGMENTATION_INTERVAL, (now - self._last_masks) * 1000.0, now)
-        self._last_masks = now
-        oldest: float = min(frame.timestamp for frame in poses.values())
-        self.board.submit_time_sample(Series.SEGMENTATION_LATENCY, (now - oldest) * 1000.0, now)
 
     def _on_pose_frames(self, series: Series, poses: FrameDict) -> None:
         """A stage's poses as they come out: how long after their capture."""
@@ -268,8 +239,6 @@ class DeepFlowMain:
         self.capture_sync.stop()
         if self.person_detector is not None:
             self.person_detector.stop()
-        if self.segmentation_predictor is not None:
-            self.segmentation_predictor.stop()
         self.optical_flow_predictor.stop()
 
         for camera in self.cameras:

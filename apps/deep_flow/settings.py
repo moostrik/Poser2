@@ -42,22 +42,21 @@ class Stage(IntEnum):
 class Layers(IntEnum):
     # source layers
     cam_image =     0
-    cam_mask =      auto()
-    cam_foreground = auto()
     cam_crop =      auto()
-    cam_depth =     auto()
     capture_image = auto()
+    capture_depth = auto()
     # composite layers
     tracker =       auto()
     pose =          auto()
-    # center layers
-    center_geometry = auto()
-    center_cam =    auto()
-    center_capture = auto()
-    center_depth =  auto()
-    center_mask =   auto()
-    center_foreground = auto()
-    center_pose =   auto()
+    # the view stage and its outputs
+    view =          auto()
+    view_image =    auto()
+    view_foreground = auto()
+    view_depth =    auto()
+    view_mask =     auto()
+    view_depth_mask = auto()
+    view_pose =     auto()
+    foreground_look = auto()
     # data layers
     time_series =   auto()
     data_B_W =      auto()
@@ -75,17 +74,11 @@ class Layers(IntEnum):
     composite =     auto()
 
 
-class MaskSource(IntEnum):
-    """Where the player's mask comes from, chosen at start-up."""
-    DEPTH = 0       # the depth band (`DepthMaskLayer`), on the camera image
-    RVM =   auto()  # the RVM segmentation model, on the pose's crop
-
-
 # ---------------------------------------------------------------------------
 #  Layer selection settings (split view)
 # ---------------------------------------------------------------------------
 
-class View(IntEnum):
+class MainView(IntEnum):
     """What the main window shows: the debug panels, or the show alone."""
     DEBUG = 0       # the left and the right panel, as `left` and `right` pick them
     SHOW = auto()   # the composite alone, fit to the whole window, as a secondary window shows it
@@ -195,11 +188,6 @@ class MotionFeature(BaseSettings):
 #  Pose pipeline group (no similarity — single player)
 # ---------------------------------------------------------------------------
 
-class _SegmentationSettings(inference.segmentation.Settings):
-    """No switch here: RVM runs whenever it is the mask source (`Settings.mask_source`)."""
-    enabled: Field[bool] = Field(True, access=Field.READ, visible=False)
-
-
 class PoseGroup(BaseSettings):
     max_players:          Field[int]                  = Field(1, min=1, max=16, access=Field.INIT)
     model_type:         Field[inference.ModelType]  = Field(inference.ModelType.TRT, access=Field.INIT)
@@ -212,7 +200,6 @@ class PoseGroup(BaseSettings):
     _feature_share: list = [frequency, output_frequency]
 
     pose           : Group[inference.pose.Settings]          = Group(inference.pose.Settings, share=_batch_share)
-    segmentation   : Group[_SegmentationSettings]            = Group(_SegmentationSettings, share=_batch_share)
     optical_flow   : Group[inference.optical_flow.Settings]  = Group(inference.optical_flow.Settings, share=_batch_share)
     tracklets      : Group[PosesFromTrackletsSettings]       = Group(PosesFromTrackletsSettings)
     image_crop     : Group[inference.crop.Settings]          = Group(inference.crop.Settings, share=[max_players])
@@ -243,14 +230,10 @@ class _TrackerCompositorSettings(layers.TrackerCompositorSettings):
 class _PoseCompositorSettings(layers.PoseCompositorSettings):
     stage: Field[Stage] = Field(Stage.LERP, description="Pipeline stage for camera crop")
 
-class _CenterGeometrySettings(layers.CenterGeometrySettings):
-    stage: Field[Stage] = Field(Stage.SMOOTH, visible=False, description="Unused: the view follows the capture's poses (SMOOTH)")
-
 class FlowInputSettings(BaseSettings):
     """Which layers feed the flow, chosen live, and how the fluid weights its injections."""
-    motion_image:    Field[Layers] = Field(Layers.center_capture,    description="The picture the motion is measured on")
-    bridge_image:    Field[Layers] = Field(Layers.center_foreground, description="The picture the density's color comes from")
-    mask:            Field[Layers] = Field(Layers.center_mask,       description="The mask that gates the velocity and the density's color")
+    motion_image:    Field[Layers] = Field(Layers.view_image,      description="The picture the motion is measured on")
+    bridge_image:    Field[Layers] = Field(Layers.foreground_look, description="The picture the density's color comes from")
     scale_by_motion: Field[bool]   = Field(True, description="Weight each injection by the player's motion; off is full weight")
 
 
@@ -266,26 +249,19 @@ class PreviewGroup(BaseSettings):
     tracker: Group[_TrackerCompositorSettings] = Group(_TrackerCompositorSettings)
     pose   : Group[_PoseCompositorSettings]    = Group(_PoseCompositorSettings)
 
-class CenterGroup(BaseSettings):
-    geometry  : Group[_CenterGeometrySettings]              = Group(_CenterGeometrySettings)
-    mask      : Group[layers.CenterMaskLayerSettings]       = Group(layers.CenterMaskLayerSettings)
-    cam       : Group[layers.CenterCamLayerSettings]        = Group(layers.CenterCamLayerSettings)
-    capture   : Group[layers.CenterCamLayerSettings]        = Group(layers.CenterCamLayerSettings)
-    depth     : Group[layers.CenterDepthLayerSettings]      = Group(layers.CenterDepthLayerSettings)
-    foreground: Group[layers.CenterForegroundLayerSettings] = Group(layers.CenterForegroundLayerSettings)
-    pose      : Group[layers.CenterPoseLayerSettings]       = Group(layers.CenterPoseLayerSettings)
-    color     : Group[layers.MSColorMaskLayerSettings]      = Group(layers.MSColorMaskLayerSettings)
-
 class RenderSettings(BaseSettings):
-    view   : Field[View]                         = Field(View.DEBUG, description="The main window: the debug panels, or the show alone")
+    main_view: Field[MainView]                   = Field(MainView.DEBUG, description="The main window: the debug panels, or the show alone")
     stage  : Field[Stage]                        = Field(Stage.LERP, description="Pipeline stage for flow/fluid/color layers")
     input_fps: Field[float]                      = Field(60.0, min=1.0, max=120.0, access=Field.INIT, visible=False, description="Camera frame rate")
     layer  : Group[LayerGroup]                   = Group(LayerGroup)
     data   : Group[DataGroup]                    = Group(DataGroup)
     preview: Group[PreviewGroup]                 = Group(PreviewGroup)
-    center : Group[CenterGroup]                  = Group(CenterGroup)
-    depth  : Group[layers.DepthSourceLayerSettings] = Group(layers.DepthSourceLayerSettings)
+    view_depth: Group[layers.ViewDepthLayerSettings] = Group(layers.ViewDepthLayerSettings)
+    view_pose: Group[layers.CenterPoseLayerSettings] = Group(layers.CenterPoseLayerSettings)
+    foreground_look: Group[layers.ForegroundLookSettings] = Group(layers.ForegroundLookSettings)
+    color_mask: Group[layers.MSColorMaskLayerSettings] = Group(layers.MSColorMaskLayerSettings)
     inputs : Group[FlowInputSettings]            = Group(FlowInputSettings)
+    view   : Group[layers.ViewLayerSettings]     = Group(layers.ViewLayerSettings)
     motion : Group[layers.Motion3DLayerSettings] = Group(layers.Motion3DLayerSettings, share=[input_fps.as_('fps')])
     bridge : Group[layers.Bridge3DLayerSettings] = Group(layers.Bridge3DLayerSettings)
     fluid  : Group[layers.Fluid3DLayerSettings]  = Group(layers.Fluid3DLayerSettings)
@@ -317,7 +293,6 @@ class Settings(BaseSettings):
     max_players:        Field[int]   = Field(1, access=Field.INIT, visible=False)
     num_cams:           Field[int]   = Field(1, access=Field.INIT, visible=False, description="Number of cameras")
     input_fps:          Field[float] = Field(60.0, min=1.0, max=120.0, access=Field.INIT)
-    mask_source:        Field[MaskSource] = Field(MaskSource.DEPTH, access=Field.INIT, description="Where the player's mask comes from; RVM runs only for RVM (restart to change)")
 
     camera: Group[Oak4Group]      = Group(Oak4Group, share=[num_cams, input_fps.as_('fps')])
     cadence: Group[CadenceSettings] = Group(CadenceSettings)

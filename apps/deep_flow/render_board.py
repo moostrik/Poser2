@@ -2,12 +2,12 @@
 
 from modules.board import (
     FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CaptureStoreMixin, CropImageStoreMixin,
-    SegmentationImageStoreMixin, CameraTrackletStoreMixin, TimeSeriesStoreMixin,
+    CameraTrackletStoreMixin, TimeSeriesStoreMixin,
 )
 
 
 class RenderBoard(FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, CaptureStoreMixin, CropImageStoreMixin,
-                 SegmentationImageStoreMixin, CameraTrackletStoreMixin, TimeSeriesStoreMixin):
+                 CameraTrackletStoreMixin, TimeSeriesStoreMixin):
 
     def __init__(self) -> None:
         FrameStoreMixin.__init__(self)
@@ -15,6 +15,5 @@ class RenderBoard(FrameStoreMixin, WindowStoreMixin, CameraImageStoreMixin, Capt
         CameraImageStoreMixin.__init__(self)
         CaptureStoreMixin.__init__(self)
         CropImageStoreMixin.__init__(self)
-        SegmentationImageStoreMixin.__init__(self)
         CameraTrackletStoreMixin.__init__(self)
         TimeSeriesStoreMixin.__init__(self)

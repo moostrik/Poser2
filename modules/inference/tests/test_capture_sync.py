@@ -4,11 +4,9 @@ import time
 import unittest
 from typing import cast
 
-import numpy as np
 import torch
 
-from modules.camera import CameraFrame, FrameType
-from modules.inference import Capture, CaptureSync, CaptureSyncSettings, GpuImage, segmentation
+from modules.inference import Capture, CaptureSync, CaptureSyncSettings, GpuDepth, GpuImage, segmentation
 from modules.pose import BBox, Frame, FrameDict
 from modules.utils import Rect
 
@@ -19,8 +17,8 @@ def image(t: float, cam_id: int = 0) -> GpuImage:
     return GpuImage(cam_id, t, torch.zeros(1), cast(torch.cuda.Event, None))
 
 
-def depth(t: float, cam_id: int = 0) -> CameraFrame:
-    return CameraFrame(cam_id, FrameType.DEPTH, np.zeros((2, 2), np.uint16), t)
+def depth(t: float, cam_id: int = 0) -> GpuDepth:
+    return GpuDepth(cam_id, t, torch.zeros(2, 2), cast(torch.cuda.Event, None))
 
 
 def poses(t: float, cam_id: int = 0) -> FrameDict:
@@ -59,11 +57,6 @@ class CaptureSyncTest(unittest.TestCase):
         self.sync.submit_depth(depth(1.0005))                   # within the tolerance
         self.assertEqual(len(self.captures), 1)
         self.assertEqual((self.captures[0].timestamp, self.captures[0].poses, self.captures[0].poses_synced), (1.0005, {}, False))
-
-    def test_a_video_frame_is_not_a_depth_frame(self) -> None:
-        self.sync.submit_image(image(1.0))
-        self.sync.submit_depth(CameraFrame(0, FrameType.VIDEO, np.zeros((2, 2), np.uint8), 1.0))
-        self.assertEqual(self.captures, [])
 
     def test_poses_in_before_the_depth_are_synced(self) -> None:
         self.sync.submit_image(image(1.0))

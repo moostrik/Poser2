@@ -2,7 +2,6 @@
   "max_players": 1,
   "num_cams": 1,
   "input_fps": 50.0,
-  "mask_source": "DEPTH",
   "camera": {
     "keyframe_interval": 50,
     "color": true,
@@ -126,10 +125,6 @@
     "pose": {
       "enabled": true,
       "resolution": "STANDARD"
-    },
-    "segmentation": {
-      "resolution": "ULTRA",
-      "reset_interval": 480
     },
     "optical_flow": {
       "resolution": "STANDARD",
@@ -267,7 +262,7 @@
     }
   },
   "render": {
-    "view": "DEBUG",
+    "main_view": "DEBUG",
     "stage": "LERP",
     "layer": {
       "select": {
@@ -279,7 +274,7 @@
         ],
         "output": [
           "cam_image",
-          "cam_depth"
+          "view_depth"
         ]
       },
       "composite": {
@@ -335,81 +330,52 @@
         "use_gpu_crop": true
       }
     },
-    "center": {
-      "geometry": {
-        "stage": "SMOOTH",
-        "target_x": 0.5,
-        "target_y": 0.9,
-        "target_size": 0.27,
-        "dst_aspectratio": 0.5625,
-        "torso_upright": false,
-        "snap_point": "FEET",
-        "follow_pose": false,
-        "fixed_x": 0.5,
-        "fixed_y": 0.5,
-        "fixed_height": 1.0
-      },
-      "mask": {
-        "blend_factor": 1.0,
-        "dilation_steps": 0,
-        "blur_steps": 0,
-        "blur_radius": 1.0,
-        "guided_radius": 2.0,
-        "edge_contrast": 0.03
-      },
-      "cam": {
-        "blend_factor": 0.2,
-        "mask_opacity": 1.0,
-        "use_mask": true
-      },
-      "capture": {
-        "blend_factor": 1.0,
-        "mask_opacity": 1.0,
-        "use_mask": false
-      },
-      "depth": {
-        "use_mask": true,
-        "mask_opacity": 1.0
-      },
-      "foreground": {
-        "blend_factor": 0.2,
-        "exposure": 0.99,
-        "gamma": 1.0,
-        "offset": 0.0,
-        "contrast": 1.1,
-        "saturation": 1.78,
-        "levels": 3,
-        "smoothness": 0.0,
-        "colorize": 0.0,
-        "sharpen": 0.42,
-        "use_mask": true
-      },
-      "pose": {
-        "line_width": 3.0,
-        "line_smooth": 0.0,
-        "use_scores": false,
-        "draw_anchors": false
-      },
-      "color": {
-        "stage": 3,
-        "max_players": 1,
-        "blend_mode": "ALPHA",
-        "similarity_threshold": 0.1,
-        "motion_exponent": 1.0,
-        "similarity_scale": 1.0,
-        "layered": 0.8
-      }
-    },
-    "depth": {
+    "view_depth": {
       "draw_mode": "OVER_IMAGE",
-      "near": 0.1,
-      "far": 1.7
+      "use_mask": true,
+      "mask_opacity": 1.0
+    },
+    "view_pose": {
+      "line_width": 3.0,
+      "line_smooth": 0.0,
+      "use_scores": false,
+      "draw_anchors": false
+    },
+    "foreground_look": {
+      "blend_factor": 0.2,
+      "exposure": 0.99,
+      "gamma": 1.0,
+      "offset": 0.0,
+      "contrast": 1.1,
+      "saturation": 1.78,
+      "levels": 3,
+      "smoothness": 0.0,
+      "colorize": 0.0,
+      "sharpen": 0.42,
+      "use_mask": true
+    },
+    "color_mask": {
+      "stage": 3,
+      "max_players": 1,
+      "blend_mode": "ALPHA",
+      "similarity_threshold": 0.1,
+      "motion_exponent": 1.0,
+      "similarity_scale": 1.0,
+      "layered": 0.8
     },
     "inputs": {
-      "motion_image": "center_capture",
-      "bridge_image": "center_foreground",
-      "mask": "center_mask",
+      "motion_image": "view_image",
+      "bridge_image": "foreground_look",
       "scale_by_motion": true
+    },
+    "view": {
+      "fixed_x": 0.5,
+      "fixed_y": 0.5,
+      "fixed_height": 1.0,
+      "near": 0.1,
+      "far": 1.7,
+      "guided_radius": 2.0,
+      "edge_contrast": 0.03
     },
     "motion": {
       "guard": true,

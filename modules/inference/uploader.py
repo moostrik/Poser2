@@ -10,13 +10,14 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
-from modules.camera import CameraFrame, CameraFrameCallback, FrameType
+from modules.camera import CameraFrame, DepthAlignment, FrameType, aligned_depth_size, depth_projection
 from modules.utils import PerformanceTimer
-from .source import GpuImage, GpuImageCallback, ImageDict, TimestampDict
+from .depth_align import DepthAligner
+from .source import GpuDepth, GpuDepthCallback, GpuImage, GpuImageCallback, ImageDict, TimestampDict
 
 logger = logging.getLogger(__name__)
 
-STAGING_COUNT: int = 3      # pinned buffers per camera: frames the GPU may be behind before the uploader's thread waits
+STAGING_COUNT: int = 3      # pinned buffers per camera and kind: frames the GPU may be behind before the uploader's thread waits
 QUEUED: int = 2             # frames of a kind waiting per camera; beyond that the oldest is dropped and counted
 
 
@@ -54,7 +55,9 @@ def warp_grid(homography: torch.Tensor, height: int, width: int) -> torch.Tensor
 class Uploader(Thread):
     """Takes the camera's frames on the camera's thread (`submit_frame`) and does all the rest on its own: the color
     goes to the GPU through a pinned staging buffer, is converted, straightened and flipped there, and is handed on
-    as a `GpuImage` with the event that says it is written; the depth is handed on as it came. Neither the camera's
+    as a `GpuImage` with the event that says it is written; the depth goes the same way, is turned into metres and
+    moved onto the color's view (`DepthAligner`, by the camera's calibration, straightened and mirrored as the
+    color), and is handed on as a `GpuDepth`. Neither the camera's
     thread nor this one waits for the GPU while the GPU has room. A frame waits for this thread in a queue of
     `QUEUED` per camera and kind; a frame that finds it full drops the oldest of its kind (`dropped`), so a thread
     that cannot keep up loses frames instead of falling behind.
@@ -74,15 +77,18 @@ class Uploader(Thread):
         self._lock: Lock = Lock()       # an image and its time are stored and read together
         self._warp_grids: dict[int, tuple[np.ndarray, torch.Tensor]] = {}   # each camera's homography and its grid
         self._stream: torch.cuda.Stream = torch.cuda.Stream()
-        # Each camera's pinned staging buffers, the events of the copies queued from them, the one used last
-        self._staging: dict[int, tuple[list[torch.Tensor], list[torch.cuda.Event | None], int]] = {}
+        # Each camera's and kind's pinned staging buffers, the events of the copies queued from them, the one used last
+        self._staging: dict[tuple[int, FrameType], tuple[list[torch.Tensor], list[torch.cuda.Event | None], int]] = {}
+        self._aligners: dict[int, DepthAligner] = {}
+        # Each camera's depth alignment, the depth's size, and what they make: to_ray, to_uv, the aligned size
+        self._projections: dict[int, tuple[DepthAlignment | None, tuple[int, int], np.ndarray, np.ndarray, tuple[int, int]]] = {}
         self._accumulated_upload_ms: float = 0.0
         self._timer: PerformanceTimer = PerformanceTimer(
             name="GPU Image Upload  ", sample_count=200, report_interval=100,
             color="green", omit_init=25,
         )
         self._gpu_image_callbacks: list[GpuImageCallback] = []     # run in registration order, on this thread
-        self._depth_callbacks: list[CameraFrameCallback] = []      # run in registration order, on this thread
+        self._gpu_depth_callbacks: list[GpuDepthCallback] = []     # run in registration order, on this thread
         self._queue: deque[CameraFrame] = deque()
         self._wake: Condition = Condition()
         self._running: bool = False
@@ -126,8 +132,7 @@ class Uploader(Thread):
                 if frame.kind == FrameType.VIDEO:
                     self._upload(frame)
                 elif frame.kind == FrameType.DEPTH:
-                    for callback in self._depth_callbacks:
-                        callback(frame)
+                    self._upload_depth(frame)
             except Exception:
                 logger.exception("Uploader: frame of camera %d failed", frame.cam_id)
 
@@ -136,10 +141,10 @@ class Uploader(Thread):
         if callback not in self._gpu_image_callbacks:
             self._gpu_image_callbacks.append(callback)
 
-    def add_depth_callback(self, callback: CameraFrameCallback) -> None:
-        """Every depth frame, as it came, in its place among the images, on this thread."""
-        if callback not in self._depth_callbacks:
-            self._depth_callbacks.append(callback)
+    def add_gpu_depth_callback(self, callback: GpuDepthCallback) -> None:
+        """Every uploaded depth frame, in its place among the images, with the event that says it is written, on this thread."""
+        if callback not in self._gpu_depth_callbacks:
+            self._gpu_depth_callbacks.append(callback)
 
     def _upload(self, frame: CameraFrame) -> None:
         """A color frame to the GPU: converted, straightened and flipped there, stored as the camera's current
@@ -149,7 +154,7 @@ class Uploader(Thread):
 
         start = time.perf_counter()
 
-        staging: torch.Tensor = self._staging_buffer(cam_id, image)
+        staging: torch.Tensor = self._staging_buffer((cam_id, FrameType.VIDEO), image)
         staging.copy_(torch.from_numpy(image))
         with torch.cuda.stream(self._stream):
             gpu_img = staging.cuda(non_blocking=True)
@@ -174,7 +179,7 @@ class Uploader(Thread):
                 rgb = rgb.flip(-1)
             ready: torch.cuda.Event = torch.cuda.Event()
             ready.record(self._stream)
-        _, events, index = self._staging[cam_id]
+        _, events, index = self._staging[(cam_id, FrameType.VIDEO)]
         events[index] = ready           # the buffer is free again once the copy queued from it has run
         with self._lock:
             if cam_id in self._gpu_images:
@@ -191,12 +196,40 @@ class Uploader(Thread):
             except Exception:
                 logger.exception("Error in GPU image callback")
 
-    def _staging_buffer(self, cam_id: int, image: np.ndarray) -> torch.Tensor:
-        """The camera's next pinned buffer for `image`, (re)made at its shape. From pinned memory the copy to the
+    def _upload_depth(self, frame: CameraFrame) -> None:
+        """A depth frame to the GPU: metres, moved onto the color's view at its own grid, and handed on."""
+        cam_id: int = frame.cam_id
+        image: np.ndarray = frame.image
+        size: tuple[int, int] = (image.shape[1], image.shape[0])
+        projection = self._projections.get(cam_id)
+        if projection is None or projection[0] is not frame.alignment or projection[1] != size:
+            projection = (frame.alignment, size, *depth_projection(frame.alignment, size), aligned_depth_size(size, frame.alignment))
+            self._projections[cam_id] = projection
+        _, _, to_ray, to_uv, aligned_size = projection
+        aligner: DepthAligner = self._aligners.setdefault(cam_id, DepthAligner())
+
+        staging: torch.Tensor = self._staging_buffer((cam_id, FrameType.DEPTH), image)
+        staging.copy_(torch.from_numpy(image))
+        with torch.cuda.stream(self._stream):
+            depth: torch.Tensor = aligner.align_staged(staging, to_ray, to_uv, frame.homography, frame.flip_h, aligned_size)
+            ready: torch.cuda.Event = torch.cuda.Event()
+            ready.record(self._stream)
+        _, events, index = self._staging[(cam_id, FrameType.DEPTH)]
+        events[index] = ready
+
+        gpu_depth: GpuDepth = GpuDepth(cam_id, frame.timestamp, depth, ready)
+        for callback in self._gpu_depth_callbacks:
+            try:
+                callback(gpu_depth)
+            except Exception:
+                logger.exception("Error in GPU depth callback")
+
+    def _staging_buffer(self, key: tuple[int, FrameType], image: np.ndarray) -> torch.Tensor:
+        """The camera's next pinned buffer of the frame's kind for `image`, (re)made at its shape. From pinned memory the copy to the
         GPU is queued and this thread goes on; from the frame's own pageable memory it would wait until the
         GPU had taken it. A buffer is reused once the copy queued from it has run, its event passed; only a GPU
         `STAGING_COUNT` frames behind makes the thread wait."""
-        buffers, events, index = self._staging.get(cam_id, ([], [], -1))
+        buffers, events, index = self._staging.get(key, ([], [], -1))
         if not buffers or buffers[0].shape != image.shape or buffers[0].dtype != torch.from_numpy(image[:0]).dtype:
             buffers = [torch.empty(image.shape, dtype=torch.from_numpy(image[:0]).dtype, pin_memory=True) for _ in range(STAGING_COUNT)]
             events = [None] * STAGING_COUNT
@@ -204,7 +237,7 @@ class Uploader(Thread):
         event: torch.cuda.Event | None = events[index]
         if event is not None:
             event.synchronize()
-        self._staging[cam_id] = (buffers, events, index)
+        self._staging[key] = (buffers, events, index)
         return buffers[index]
 
     def _straightened(self, cam_id: int, rgb: torch.Tensor, homography: np.ndarray) -> torch.Tensor:

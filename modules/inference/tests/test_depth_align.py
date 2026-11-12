@@ -59,5 +59,25 @@ class DepthAlignerTest(unittest.TestCase):
         self.assertAlmostEqual(float(out[0, 0]), 2.5, places=5)
 
 
+@unittest.skipUnless(torch.cuda.is_available(), 'needs CUDA')
+class AlignStagedTest(unittest.TestCase):
+    def test_the_graph_gives_what_align_gives_frame_after_frame_and_after_a_new_homography(self) -> None:
+        aligner = DepthAligner()
+        size = (8, 6)
+        to_ray, to_uv = depth_projection(None, size)
+        rng = np.random.default_rng(1)
+        homographies = [None, None, np.diag([1.0, 1.0, 1.25])]
+        results = []
+        for homography in homographies:
+            frame = rng.integers(0, 3000, (6, 8)).astype(np.uint16)
+            staged = torch.from_numpy(frame).pin_memory()
+            got = aligner.align_staged(staged, to_ray, to_uv, homography, False, size)
+            want = aligner.align(depth_metres(torch.from_numpy(frame).cuda()), to_ray, to_uv, homography, False, size)
+            torch.cuda.synchronize()
+            results.append(got)
+            np.testing.assert_allclose(got.cpu().numpy(), want.cpu().numpy(), rtol=1e-6)
+        self.assertIsNot(results[0], results[1])                    # each frame a tensor of its own
+
+
 if __name__ == '__main__':
     unittest.main()

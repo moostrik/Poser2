@@ -1,12 +1,12 @@
-"""Renders pose lines using pre-transformed points from AnchorPointCalculator."""
+"""Renders pose lines using the points a view placed the pose at (`CenterGeometry`, the flow's `ViewLayer`)."""
 
 # Standard library imports
-import numpy as np
+from typing import Protocol
 
 # Local application imports
 from modules.settings import Field, BaseSettings
 from modules.gl import Fbo, Texture, clear_color
-from modules.pose import PointLandmark
+from modules.pose import PointLandmark, Points2D
 from ..layer_base import LayerBase
 from .center_geometry import CenterGeometry
 from ...shaders import PosePointLines, DrawCircles
@@ -21,12 +21,21 @@ class CenterPoseLayerSettings(BaseSettings):
     draw_anchors:   Field[bool]  = Field(False, description="Show anchor points as circles")
 
 
-class CenterPoseLayer(LayerBase):
-    """Renders pose keypoint lines in crop space."""
+class PosePlacement(Protocol):
+    """Where a view puts the pose: `crop_pose_points` the pose's points in the view, uv with rows down, None
+    without a pose; `lost`, the pose went since the last update."""
+    @property
+    def lost(self) -> bool: ...
+    @property
+    def crop_pose_points(self) -> Points2D | None: ...
 
-    def __init__(self, cam_id: int, geometry: CenterGeometry, settings: CenterPoseLayerSettings, color_settings: ColorSettings) -> None:
+
+class CenterPoseLayer(LayerBase):
+    """Renders pose keypoint lines in the view `geometry` places them in."""
+
+    def __init__(self, cam_id: int, geometry: PosePlacement, settings: CenterPoseLayerSettings, color_settings: ColorSettings) -> None:
         self._cam_id: int = cam_id
-        self._geometry: CenterGeometry = geometry
+        self._geometry: PosePlacement = geometry
         self._fbo: Fbo = Fbo()
         self._shader: PosePointLines = PosePointLines()
         self._circle_shader: DrawCircles = DrawCircles()

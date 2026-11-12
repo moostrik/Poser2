@@ -1,7 +1,7 @@
 """CaptureSync: the color image, the depth frame, the poses and RVM's masks of one moment of capture, brought together.
 
-They arrive on their own threads at their own times: the image as it is uploaded (the camera's
-video thread), the depth frame about 13 ms later (its own thread), the poses out of a pipeline stage
+They arrive on their own threads at their own times: the image and the depth frame as they are uploaded
+(the uploader's thread, the depth about 13 ms after its image), the poses out of a pipeline stage
 (the model's thread) and the masks out of RVM (its thread), both measured to arrive about with the
 depth. Each is kept a few frames per camera and matched by capture time within `CAPTURE_TOLERANCE`.
 A capture is complete with its image and its depth. While the poses keep up, the newest as new as
@@ -22,12 +22,12 @@ from dataclasses import dataclass
 from threading import Condition, Lock, Thread
 from typing import TYPE_CHECKING
 
-from modules.camera import CAPTURE_TOLERANCE, CameraFrame, FrameType
+from modules.camera import CAPTURE_TOLERANCE
 from modules.pose import FrameDict
 from modules.settings import BaseSettings, Field
 
 from .capture import Capture, CaptureCallback
-from .source import GpuImage
+from .source import GpuDepth, GpuImage
 
 if TYPE_CHECKING:
     from .segmentation import ImageDict
@@ -48,13 +48,13 @@ class CaptureSyncSettings(BaseSettings):
 class _Waiting:
     """A capture whose image and depth are in, waiting for its poses or masks until `deadline` (perf_counter)."""
     image: GpuImage
-    depth: CameraFrame
+    depth: GpuDepth
     deadline: float
 
 
 class CaptureSync(Thread):
-    """See the module docstring. Feed it with `submit_image`, `submit_depth` (a camera frame
-    callback), `submit_poses` (a pipeline stage's frames callback) and `submit_masks` (RVM's
+    """See the module docstring. Feed it with `submit_image` and `submit_depth` (the uploader's
+    callbacks), `submit_poses` (a pipeline stage's frames callback) and `submit_masks` (RVM's
     segmentation callback)."""
 
     def __init__(self, settings: CaptureSyncSettings) -> None:
@@ -64,7 +64,7 @@ class CaptureSync(Thread):
         self._wake: Condition = Condition(self._lock)
         self._running: bool = False
         self._images: dict[int, deque[GpuImage]] = defaultdict(lambda: deque(maxlen=KEPT))
-        self._depths: dict[int, deque[CameraFrame]] = defaultdict(lambda: deque(maxlen=KEPT))
+        self._depths: dict[int, deque[GpuDepth]] = defaultdict(lambda: deque(maxlen=KEPT))
         self._poses: dict[int, deque[tuple[float, FrameDict]]] = defaultdict(lambda: deque(maxlen=KEPT))
         self._masks: dict[int, deque[tuple[float, ImageDict]]] = defaultdict(lambda: deque(maxlen=KEPT))
         self._last: dict[int, float] = {}               # the capture time of each camera's last capture
@@ -113,14 +113,12 @@ class CaptureSync(Thread):
                 captures: list[Capture] = self._match(image.cam_id)
             self._emit(captures)
 
-    def submit_depth(self, frame: CameraFrame) -> None:
-        """A depth frame (`Uploader`'s depth callback); other kinds pass."""
-        if frame.kind != FrameType.DEPTH:
-            return
+    def submit_depth(self, depth: GpuDepth) -> None:
+        """An uploaded depth frame (`Uploader`'s GPU depth callback, the uploader's thread)."""
         with self._emit_lock:
             with self._lock:
-                self._depths[frame.cam_id].append(frame)
-                captures: list[Capture] = self._match(frame.cam_id)
+                self._depths[depth.cam_id].append(depth)
+                captures: list[Capture] = self._match(depth.cam_id)
             self._emit(captures)
 
     def submit_poses(self, poses: FrameDict) -> None:
@@ -162,7 +160,7 @@ class CaptureSync(Thread):
         masks, or the newest, while it waits for those that keep up and are still on their way; one that waits
         goes out with what it has as soon as a newer moment is complete."""
         captures: list[Capture] = []
-        complete: list[tuple[GpuImage, CameraFrame]] = []
+        complete: list[tuple[GpuImage, GpuDepth]] = []
         last: float = self._last.get(cam_id, float('-inf'))
         for depth in self._depths[cam_id]:
             if depth.timestamp <= last + CAPTURE_TOLERANCE:
@@ -204,7 +202,7 @@ class CaptureSync(Thread):
         now: float = time.perf_counter()
         return [self._capture(waiting.image, waiting.depth) for waiting in list(self._waiting.values()) if waiting.deadline <= now]
 
-    def _capture(self, image: GpuImage, depth: CameraFrame) -> Capture:
+    def _capture(self, image: GpuImage, depth: GpuDepth) -> Capture:
         """The capture of `depth`'s moment, with its own poses and masks where they came in, else the newest from before it."""
         cam_id: int = depth.cam_id
         timestamp: float = depth.timestamp
@@ -212,9 +210,9 @@ class CaptureSync(Thread):
         masks: ImageDict | None = _at(self._masks[cam_id], timestamp)
         self._last[cam_id] = timestamp
         self._waiting.pop(cam_id, None)
-        depths: deque[CameraFrame] = self._depths[cam_id]
+        depths: deque[GpuDepth] = self._depths[cam_id]
         while depths and depths[0].timestamp <= timestamp + CAPTURE_TOLERANCE:
-            older: CameraFrame = depths.popleft()
+            older: GpuDepth = depths.popleft()
             if older.timestamp < timestamp - CAPTURE_TOLERANCE:
                 self._misses += 1               # it never met its image: a complete one would have gone out before
         images: deque[GpuImage] = self._images[cam_id]

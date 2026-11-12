@@ -7,7 +7,8 @@ from typing import cast
 from modules.board import HasFrames
 from modules.gl import Texture
 from modules.pose import BBox, Frame
-from modules.render.layers.center.center_geometry import CenterGeometry, CenterGeometrySettings, fixed_window
+from modules.flow import fixed_window
+from modules.render.layers.center.center_geometry import CenterGeometry, CenterGeometrySettings
 from modules.utils import Point2f, Rect
 
 
