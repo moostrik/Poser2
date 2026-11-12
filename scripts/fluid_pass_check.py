@@ -5,7 +5,7 @@ so its fields hold real values; then each pass is repeated `--repeats` times bet
 median kept. A pass's floor is the time to read each volume it needs once and write its result once at the GPU's
 memory speed (`--bandwidth`, GB/s; the RTX 4090's 1008): a pass far above it spends its time on something else
 (setup each cell repeats, interpolations, branches), one near it is bound by its memory. The density passes
-count the upscaled amount too where the preset runs it. A pass that skips what it need not touch can run under
+count the fine density too where the preset runs it. A pass that skips what it need not touch can run under
 its floor; the floor counts every texel. Passes off at the preset
 run with what turns them on (the viscosity, the vorticity, the buoyancy, MacCormack). Settings by path as in
 maccormack_check: `--set vorticity.strength_1=1`.
@@ -79,8 +79,8 @@ def main() -> None:
     cells = w * h * d
     faces = (w + 1) * (h + 1) * (d + 1)
     output = fluid._output_width * fluid._output_height
-    upscaled = fluid.settings.upscaled
-    fine = upscaled.width * upscaled.height * upscaled.depth if upscaled.enabled else 0     # the upscaled amount's texels (R16F)
+    fine_density = fluid.settings.fine_density
+    fine = fine_density.width * fine_density.height * fine_density.depth if fine_density.enabled else 0     # the fine density's texels (R16F)
     body = mh.texture_of(mc.body(0.4, True))
     dye = mh.texture_of(np.clip(np.abs(mc.body(0.4, True)), 0.0, 1.0))
     iterations = 20
@@ -102,7 +102,7 @@ def main() -> None:
         ('inject: boundary density', lambda: fluid.add_boundary_density(dye), 16.0 * cells + 4.0 * fine),
         ('inject: body force density', lambda: fluid.add_body_force_density(dye), 16.0 * cells + 4.0 * fine),
     ]
-    print(f'{w} x {h} x {d} cells, the upscaled amount {fine / 1e6:.0f} M texels; floor at {args.bandwidth:.0f} GB/s')
+    print(f'{w} x {h} x {d} cells, the fine density {fine / 1e6:.0f} M texels; floor at {args.bandwidth:.0f} GB/s')
     print(f"{'pass':<30} {'ms':>7} {'floor ms':>9} {'x floor':>8}")
     for name, work, floor_bytes in passes:
         ms = median_ms(work, args.repeats, query)

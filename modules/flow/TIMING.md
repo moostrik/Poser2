@@ -452,7 +452,7 @@ volume's round trip saves.
 ## The density's own advection
 
 `density.advection` apart from the velocity's, deep_flow's preset (288 × 512 × 64 cells, the 4K amount
-2160 × 3840 × 24, `upscaled.sample` MIDDLE): the density's pass alone (`fluid_pass_check.py`), and on
+2160 × 3840 × 24, `fine_density.sample` MIDDLE): the density's pass alone (`fluid_pass_check.py`), and on
 stillslowfast at 2160 × 3840 the composited output's sharpness, its luminance's gradient mean and p99 over
 the lit pixels, at four steps of the loop (`fluid_compare.py --save`):
 
@@ -517,8 +517,8 @@ stripes across the lit density, mixing four lines through shared memory took 0.3
 
 ## The density at the output's 4K
 
-The upscaled density ([FLUID_3D.md](FLUID_3D.md#the-densitys-detail)): the amount at 2160 × 3840 ×
-`upscaled.depth`, the color on the fluid's grid, `upscaled.sample` `AVERAGE`; the fluid at 448 × 800, the preset's
+The fine density ([FLUID_3D.md](FLUID_3D.md#the-densitys-detail)): the amount at 2160 × 3840 ×
+`fine_density.depth`, the color the density's on the fluid's grid, `fine_density.sample` `AVERAGE`; the fluid at 448 × 800, the preset's
 other settings, the pose on, one 60 s run each after 10 s. Semi-Lagrangian, with the depth scale and the dampen
 at 3 widths/s:
 

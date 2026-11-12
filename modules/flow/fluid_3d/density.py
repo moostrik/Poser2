@@ -1,5 +1,7 @@
-"""The density in the simulation's cells: an RGBA16F `GL_TEXTURE_3D` on the simulation's grid, carried by the fluid's advection
-and marched front to back into the output (`Composite3D`)."""
+"""The density: an RGBA16F `GL_TEXTURE_3D` of color × amount and the amount, at its own `density.width` ×
+`density.height` × `density.depth` over the simulation's box, by default the dye's size, carried by the water's
+velocity read by uv between the simulation's cells; marched front to back into the output (`Composite3D`) when it is
+drawn, else the fine density's color. The buoyancy reads its amount, by uv."""
 
 from OpenGL.GL import GL_RGBA16F, GL_SHADER_IMAGE_ACCESS_BARRIER_BIT, glMemoryBarrier
 
@@ -13,8 +15,8 @@ from .shaders import MarchLook, Inject3D, InjectMode, Composite3D, CompositeLigh
 _BARRIER_IMAGE: int = int(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT)
 
 
-class SimulationDensity(DensityCarrier):
-    """The SIMULATION carrier: the density a volume on the simulation's grid."""
+class Density(DensityCarrier):
+    """The density, always on: color × amount at its own size."""
 
     def __init__(self, settings: Fluid3DSettings, advection: FieldAdvection) -> None:
         self.settings: Fluid3DSettings = settings
@@ -27,7 +29,8 @@ class SimulationDensity(DensityCarrier):
         self._composite_shader: Composite3D = Composite3D()
 
     def allocate(self, width: int, height: int, layers: int, extent: float, output_width: int, output_height: int) -> None:
-        self._density.allocate(width, height, layers, GL_RGBA16F)
+        density = self.settings.density
+        self._density.allocate(int(density.width), int(density.height), int(density.depth), GL_RGBA16F)
         self._z_extent = extent
         self._inject_shader.allocate()
         self._composite_shader.allocate()
@@ -64,7 +67,7 @@ class SimulationDensity(DensityCarrier):
             return
         if self._advection.carry(step.advection, self._density, self._scratch, step.velocity, step.obstacle,
                                  step.aspect, step.z_extent, step.step, step.dissipation, GL_RGBA16F,
-                                 step.has_obstacles, evaporation=step.evaporation, guard=step.guard, faces=step.faces,
+                                 step.has_obstacles, evaporation=step.evaporation, guard=step.guard,
                                  limiter=step.limiter):
             self._apply_walls()
 

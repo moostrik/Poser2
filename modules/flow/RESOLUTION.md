@@ -28,8 +28,8 @@ help, more color would not.
 | z, the z position            | the depth (the depth velocity, its track)   | 448 × 800                  | the depth's                                                |
 | the bridge's readings, dye   | x/y, z, the image × the mask                | 448 × 800, per capture     | held between the camera's frames                           |
 | the fluid                    | the readings, read bilinearly (1.56× down)  | 288 × 512 × 64             | motion finer than a cell averages away                     |
-| the 4K density's amount      | the dye, by a B-spline (`upscaled.cubic`)   | 2160 × 3840 × 24           | its own threads, from MacCormack and the turbulence        |
-| the 4K density's color       | the dye's color (`upscaled.color` DYE)      | 448 × 800 × 24             | the dye's, read linearly by the composite: a B-spline read cost 0.75 ms and showed nothing on the hands recording |
+| the density                  | the dye, color × amount                     | 448 × 800 × 24             | the dye's; the fine density's color, read linearly by the composite: a B-spline read cost 0.75 ms and showed nothing on the hands recording |
+| the fine density             | the dye's amount, by a B-spline (`fine_density.cubic`) | 2160 × 3840 × 24 | its own threads, from MacCormack and the turbulence        |
 
 The tilt is a homography the host applies where the frame is drawn into the view (`tilt_correction`), so
 the frame stays 800 rows at any tilt; a recording holds the frame as delivered. Which IMX586 mode the
@@ -48,9 +48,12 @@ lowpass's blur **(deduction)**.
 | the guided filter, 1 depth pixel             | 0.05 ms    | 0.22 ms     |
 | the guided filter, 2 depth pixels            | 0.06 ms    | 0.35 ms     |
 
-The 4K density's color volume costs 1.3 ms of the density pass, 8.6 M texels against the amount's 199 M,
-RGBA16F as 8 bits would round at every advection; SIMULATION, the simulation density's 288 × 512 color, is
-the cheaper choice.
+The density and the fine density ([FLUID_3D.md](FLUID_3D.md#the-densitys-detail)): one RGBA density, color
+× amount, at its own `density.width` × `height` × `depth`, the dye's size by the fine density's layers in the
+preset, 8.6 M texels against the fine density's 199 M, RGBA16F as 8 bits would round at every advection; it is
+the fine density's color and what the buoyancy weighs, by uv. The density at the simulation's 288 × 512 cells
+blurred the dye's color **(site fact)**. On the show recording, `-sim`, 40 s, two runs: the fluid 9.6 / 9.1 ms,
+its density pass 6.1 / 5.8, where the density on the grid beside a color volume took 10.1 / 9.2 and 6.7 / 5.9.
 
 ## The mask and the depth mask
 
@@ -94,7 +97,15 @@ go in. Each shows the depth's pixels in two places:
 | Where           | z                                                          | the z position                         |
 |-----------------|------------------------------------------------------------|----------------------------------------|
 | at the edge     | cut along `depth_mask`'s staircase, a band a depth pixel wide inside the mask's outline | its weight cut along the staircase |
-| inside the body | steps from block to block: the depth velocity's window of depth samples reads the NEAREST depth's blocks | the track steps from block to block |
+| inside the body | smooth: the depth is read across a surface                 | smooth, for the same reason            |
+
+The view stage reads the depth into the view across a surface (`DepthUpscale`, `view_window.edge_aware_depth`):
+each view pixel takes the four depth pixels around it, interpolated where they lie within the motion's
+`z.tolerance` of each other, else the nearest, so an edge never reads as a distance in between, and a 0, no
+depth, is never blended. On stillslowfast, 3 runs, the motion's thresholds at 0: neighbouring pixels inside
+the body with the very same depth 11% (67% read nearest), z inside the mask p99 0.040 widths/s (0.057), z at
+the edge 0.041 (0.050), the mask's fit unchanged. A depth pixel's own flicker stays, as a soft bump of its
+size; removing it would filter the depth's noise.
 
 The dye's outline is the mask's: its color and the x/y of its amount stop at the guided edge; only z's
 share of the amount steps along the staircase.
@@ -103,28 +114,29 @@ share of the amount steps along the staircase.
 
 The input first, as good as it gets, before the 4K density's heavy side.
 
-### 1. The depth read across a surface
+### 1. The z position without the depth's staircase
 
-Where the depth is cut into the view, in the flow's input stage ([INPUT_THREADS.md](INPUT_THREADS.md),
-built there), each view pixel reads the four depth pixels around it and interpolates them where they lie
-within the same-surface tolerance of each other (the motion's `z.tolerance`, shared), else takes the
-nearest, so an edge never reads as a distance in between. A depth pixel of 0, no depth (where the
-alignment's scatter lands nothing), is never blended: with one among the four it takes the nearest.
+The blocks in the 4K density are made at the injection: the bridge's boundary density, color × amount, is
+smooth; each of its pixels goes into the volume at its own depth, the slab around its z position
+(`slab_center`), and the z position steps. It is the motion's z position as made (`ZPosition`), its weight the
+depth mask × the mask: the depth mask is the depth's own cut, a staircase of depth pixels; inside the mask's
+smooth outline but outside that staircase its weight is 0, and a pixel without a z position goes in at
+`input.layer` instead. So neighbouring pixels along the outline go in at their own depth or at `layer`, and the
+composite shows the step between those layers as a staircase. The velocity takes the trails' z positions,
+which the lowpass's blur smooths (`blur`), so the water's placement has no such steps; the densities and the
+warmth take the z position raw.
 
-| Problem                         | Fixed  | Why                                                                     |
-|---------------------------------|--------|-------------------------------------------------------------------------|
-| z's blocks inside               | yes    | the depth samples change smoothly inside a surface, so z does           |
-| the z position's blocks inside  | yes    | the track follows the smooth depth                                      |
-| the staircase at the edge       | no     | at an edge it takes the nearest; the depth holds no finer edge          |
-| a depth pixel's own flicker     | softened | it spreads as a soft bump of a depth pixel, without edges; removing it would filter the depth's noise |
+The fix: the z position spread over its neighbours by a normalized blur where it is made. It is held as z ×
+weight in red over the weight in green, so a blur of both channels and their ratio gives each pixel the
+weighted mean of its neighbours' z: inside the body a smooth placement, and in the staircase band, where the
+weight is 0, its neighbours' z instead of a jump to `layer`; the weight blurred with it says how much of the
+pixel has a z position. The radius in depth pixels, as the step it bridges is one, turned into the view's
+from the depth's spacing in the view (`depth_step`), a setting of the z position beside its range. It
+places where z goes in, not what z is: no filter on the depth or on z.
 
-At the source, every reader gets it, with no setting. A blur in the bridge would fix only the dye's
-amount, need a depth pixel's radius and fade z along the outline; a joint bilateral upsampling of the
-depth (Kopf 2007) would also move its edges onto the image's, at more cost **(deduction)**. Judged by z's
-step between neighbouring pixels inside the body, the noise at the edge and inside (`mask_probe` on
-stillslowfast), and the dye at drag 0.
+Judged on the edges recording at drag 0, fresh injection: the steps along the outline.
 
-### 2. The velocity for the 4K density
+### 2. The velocity for the fine density
 
 The 4K amount is carried by the 288 × 512 velocity read straight between its cells, 7.5× coarser, whose
 kinks show as the cells in a sharp density. A tricubic read where the amount is carried: 8 trilinear reads

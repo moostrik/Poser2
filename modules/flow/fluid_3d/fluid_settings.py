@@ -1,5 +1,5 @@
 """The 3D fluid's settings: the box, then one group per concern (time, velocity, density, temperature,
-pressure, composite, upscaled, particles), with the concern's name as the group's, so the field names carry no prefix."""
+pressure, composite, fine_density, particles), with the concern's name as the group's, so the field names carry no prefix."""
 
 from enum import IntEnum
 
@@ -49,15 +49,9 @@ class ScatteringModel(IntEnum):
 
 
 class DensitySample(IntEnum):
-    """Which velocity moves an upscaled density layer that spans several of the simulation's layers."""
+    """Which velocity moves a fine density layer that spans several of the simulation's layers."""
     MIDDLE = 0              # the velocity at the layer's middle
     AVERAGE = 1             # the velocity averaged over the grid's layers the layer spans
-
-
-class DensityColor(IntEnum):
-    """Where the upscaled density's color is kept."""
-    DYE = 0                 # a volume of its own at the dye's width and height, carried with the amount
-    SIMULATION = 1          # the simulation density's, on the simulation's cells
 
 
 class ParticleDraw(IntEnum):
@@ -148,26 +142,25 @@ class VorticitySettings(BaseSettings):
 
 
 class DensitySettings(BaseSettings):
-    """The density: how it is carried, fades and evaporates."""
-    advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,                  description="How the density is carried, the simulation's and the upscaled: MacCormack keeps its edges sharp")
+    """The density: its size, how it is carried, fades and evaporates."""
+    width: Field[int]               = Field(448,    min=32,     max=4096,   step=8,                 description="The density's width; the dye's is the bridge's width")
+    height: Field[int]              = Field(800,    min=32,     max=4096,   step=8,                 description="The density's height; the dye's is the bridge's height")
+    depth: Field[int]               = Field(24,     min=4,      max=256,    step=4,                 description="The density's depth in z")
+    advection: Field[Advection]     = Field(Advection.SEMI_LAGRANGIAN,  newline=True,   description="How the density and the fine density are carried: MacCormack keeps their edges sharp")
     limiter: Field[Limiter]         = Field(Limiter.CLAMP,                              description="MacCormack where its correction overshoots: clamp it to the step's bounds, or revert to the plain step")
     advection_scale: Field[float]   = Field(1.0,    min=0.0,    max=5.0,    color="blue-grey",      description="How far the density is carried per step; 1 = with the water, above it runs ahead")
     fade_time: Field[float]         = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="deep-blue", description="Seconds until the density fades to 1%, a share at a time; 0 = off")
     evaporation_time: Field[float]  = Field(0.0,    min=0.0,    max=300.0,  step=1.0, color="grey", description="Seconds fully dyed water takes to clear, faint first; 0 = off")
 
 
-class UpscaledDensitySettings(BaseSettings):
-    """The upscaled density: its size, how its layers move, how the bridge's density is enlarged, the swirls."""
-    enabled: Field[bool]            = Field(False,                                                  description="The volume drawn from the upscaled amount instead of the simulation's cells")
-    width: Field[int]               = Field(2160,   min=32,     max=4096,   step=8,                 description="The amount's width; the output's is 2160")
-    height: Field[int]              = Field(3840,   min=32,     max=4096,   step=8,                 description="The amount's height; the output's is 3840")
-    depth: Field[int]               = Field(16,     min=4,      max=256,    step=4,                 description="The amount's depth in z, over the simulation's depth")
+class FineDensitySettings(BaseSettings):
+    """The fine density: its size, how its layers move, how the bridge's density is enlarged, the swirls."""
+    enabled: Field[bool]            = Field(False,                                                  description="The volume drawn from the fine density, its color the density's, instead of the density")
+    width: Field[int]               = Field(2160,   min=32,     max=4096,   step=8,                 description="The fine density's width; the output's is 2160")
+    height: Field[int]              = Field(3840,   min=32,     max=4096,   step=8,                 description="The fine density's height; the output's is 3840")
+    depth: Field[int]               = Field(16,     min=4,      max=256,    step=4,                 description="The fine density's depth in z")
     sample: Field[DensitySample]    = Field(DensitySample.AVERAGE,                                  description="The velocity at a layer's middle, or averaged over the simulation's layers it spans")
     cubic: Field[bool]              = Field(True,                                                   description="The bridge's density enlarged by a cubic B-spline, without its texels' steps; off: bilinear")
-    color: Field[DensityColor]      = Field(DensityColor.DYE,                                       description="Its color in a volume of its own (DYE), or the simulation's cells' (coarser, cheaper)")
-    color_width: Field[int]         = Field(448,    min=32,     max=4096,   step=8,    newline=True, description="The color volume's width (DYE); the dye's is the bridge's width")
-    color_height: Field[int]        = Field(800,    min=32,     max=4096,   step=8,                 description="The color volume's height (DYE); the dye's is the bridge's height")
-    color_depth: Field[int]         = Field(24,     min=4,      max=256,    step=4,                 description="The color volume's depth in z (DYE)")
     turbulence: Field[float]        = Field(0.0,    min=0.0,    max=50.0,   step=0.5,              description="Swirls below the simulation's cells where the water churns, as its curl × cell; 0 = off")
 
 
@@ -254,6 +247,6 @@ class Fluid3DSettings(BaseSettings):
     temperature: Group[TemperatureSettings] = Group(TemperatureSettings)
     pressure: Group[PressureSettings]       = Group(PressureSettings)
     density: Group[DensitySettings]         = Group(DensitySettings)
-    upscaled: Group[UpscaledDensitySettings] = Group(UpscaledDensitySettings)
+    fine_density: Group[FineDensitySettings] = Group(FineDensitySettings)
     particles: Group[ParticleSettings]      = Group(ParticleSettings)
     composite: Group[CompositeSettings]     = Group(CompositeSettings)

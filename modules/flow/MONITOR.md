@@ -105,7 +105,7 @@ shader. The 3D fluid lists its volumes as ports: `velocity`, `density`, `tempera
 `pressure`, `divergence`, `vorticity`, `buoyancy`, `obstacle`, beside the 2D
 `obstacle_source`. Each carries its box's depth (`Port.extent`, the fluid's `depth_ratio`); the
 monitor draws the box that deep (`box_depth`), as deep as it is wide where a port gives none. Every view samples a volume at
-(u, v, w) from 0 to 1 through the box, so the upscaled density, finer than the simulation, is read
+(u, v, w) from 0 to 1 through the box, so the densities, at their own sizes, are read
 as it is.
 
 - `COLORMAP` and `IMAGE` draw a volume as the cube (`VolumeCube`), on the orbit camera: a ray per

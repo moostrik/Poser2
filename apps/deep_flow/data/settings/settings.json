@@ -6,7 +6,7 @@
     "keyframe_interval": 50,
     "color": true,
     "resolution": "P800",
-    "sim_enabled": false,
+    "sim_enabled": true,
     "model_path": "data/models",
     "fov": 80.0,
     "split_seconds": 60,
@@ -76,7 +76,7 @@
         "DEPTH"
       ],
       "apply_warp": false,
-      "folder": "20261111-123241",
+      "folder": "20261112-124918_hands",
       "sim_passthrough": false,
       "replay": true
     },
@@ -275,8 +275,7 @@
           "fluid"
         ],
         "right": [
-          "monitor_b",
-          "foreground_look"
+          "monitor_b"
         ],
         "output": [
           "cam_image",
@@ -354,7 +353,7 @@
       "offset": 0.0,
       "contrast": 1.1,
       "saturation": 1.78,
-      "levels": 12,
+      "levels": 0,
       "smoothness": 0.0,
       "colorize": 0.0,
       "sharpen": 0.82,
@@ -554,20 +553,22 @@
         "cycles": 1
       },
       "density": {
+        "width": 448,
+        "height": 800,
+        "depth": 24,
         "advection": "MACCORMACK",
         "limiter": "CLAMP",
         "advection_scale": 0.88,
         "fade_time": 30.0,
         "evaporation_time": 0.0
       },
-      "upscaled": {
+      "fine_density": {
         "enabled": true,
         "width": 2160,
         "height": 3840,
         "depth": 24,
         "sample": "MIDDLE",
         "cubic": true,
-        "color": "DYE",
         "turbulence": 0.0
       },
       "particles": {
@@ -627,7 +628,7 @@
         "opacity": 6.0,
         "depth_fade": 0.0,
         "slice": true,
-        "slice_position": 0.5390625,
+        "slice_position": 0.5859375,
         "slice_focus": 0.5,
         "glyph_spacing": "SPACING_16",
         "legend": true,
@@ -640,16 +641,16 @@
       }
     },
     "monitor_b": {
-      "stage": "FLUID",
-      "texture": "density",
+      "stage": "BRIDGE",
+      "texture": "boundary_density.output",
       "view": "COLORMAP",
       "advanced": {
         "channel": "ALL",
-        "scale": 10.2,
+        "scale": 1.0,
         "opacity": 3.0,
         "depth_fade": 0.0,
         "slice": true,
-        "slice_position": 0.5390625,
+        "slice_position": 0.5859375,
         "slice_focus": 0.0,
         "glyph_spacing": "SPACING_32",
         "legend": true,

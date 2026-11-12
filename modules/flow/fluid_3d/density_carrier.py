@@ -1,4 +1,4 @@
-"""What carries the 3D fluid's density: the simulation's cells (`SimulationDensity`), a volume upscaled past them (`UpscaledDensity`) and particles (`ParticleDensity`); the first always, the others where enabled.
+"""What carries the 3D fluid's density: the density (`Density`, color × amount at its own size), the fine density (`FineDensity`, its amount finer still, its color the density's) and particles (`ParticleDensity`); the first always, the others where enabled.
 
 The fluid's solver owns the velocity, the pressure and the temperature; the carrier owns the density.
 Each step the fluid hands it its sources (`add`), moves it along the solver's velocity (`update`) and
@@ -31,7 +31,6 @@ class CarrierStep:
     curl: Texture3D | None = None   # the velocity's curl (1/s), while the turbulence needs it
     cell: float = 0.0               # the grid's cell across, in x and y (widths)
     guard: GuardSlot | None = None  # the density's slot in the fluid's FiniteGuard
-    faces: Texture3D | None = None  # the velocity on its faces, which a carrier on the simulation's grid moves by
     limiter: Limiter = Limiter.CLAMP    # MacCormack where its correction overshoots
 
 
@@ -40,8 +39,8 @@ class DensityCarrier(ABC):
 
     @abstractmethod
     def allocate(self, width: int, height: int, layers: int, extent: float, output_width: int, output_height: int) -> None:
-        """Allocate on the simulation's grid (`width` × `height` × `layers`, a box `extent` widths deep) for an
-        output of the given size."""
+        """Allocate, at its own size, for the simulation's grid (`width` × `height` × `layers`, a box `extent`
+        widths deep) it is carried through and an output of the given size."""
 
     @abstractmethod
     def deallocate(self) -> None: ...

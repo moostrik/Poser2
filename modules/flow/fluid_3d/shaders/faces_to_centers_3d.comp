@@ -2,7 +2,7 @@
 
 /*
  * FacesToCenters3D - the velocity at the cells' centers, each component the mean of its cell's two faces
- * (faces.glsl): the RGBA16F volume the passes still on the centers, the particles, the upscaled density and
+ * (faces.glsl): the RGBA16F volume the passes still on the centers, the particles, the densities and
  * the monitors read. w 0, unused.
  */
 

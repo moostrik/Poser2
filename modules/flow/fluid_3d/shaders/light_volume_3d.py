@@ -19,7 +19,7 @@ class LightVolume3D(ComputeShader):
         """March each light cell toward the light.
 
         Args:
-            density: The simulation density (RGBA16F, the amount as alpha)
+            density: The density (RGBA16F, the amount as alpha)
             light: The light grid (RGBA16F), written
             box: The box in widths: 1, height over width, depth over width
             point: A lamp at `vector`'s place, else a sun toward `vector`

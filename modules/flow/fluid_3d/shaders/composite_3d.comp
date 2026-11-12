@@ -17,7 +17,7 @@
  *
  * Dispatched as a 2D compute (one thread per output pixel). The output may
  * be larger than the volume: the volume is sampled by uv. Split, the amount is
- * one volume and its color another, coarser: the color is the color volume's
+ * one volume and its color another, coarser: the color is the density's
  * color × amount over its amount, at the same place, each with COLOR_FLOOR of white
  * added, so where the coarse amount thins out under the finer one the color fades to
  * white instead of dividing by almost nothing (which drew the coarse cells as blocks).
@@ -28,7 +28,7 @@ layout(local_size_x = 16, local_size_y = 16, local_size_z = 1) in;
 const float COLOR_FLOOR = 0.01;     // the coarse amount below which the split color leans to white
 
 layout(binding = 0) uniform sampler3D uDensity;  // RGBA16F, or with uSplit the amount alone (R16F)
-layout(binding = 1) uniform sampler3D uColor;    // with uSplit: the color volume, color × amount and the amount
+layout(binding = 1) uniform sampler3D uColor;    // with uSplit: the density, color × amount and the amount
 layout(binding = 2) uniform sampler3D uDirect;   // with uLit: the direct light per layer, RGB; alpha the caustic net's contrast
 layout(binding = 3) uniform sampler3D uRays;     // with uHasRays: the water's light, a column and a layer each
 
@@ -41,7 +41,7 @@ uniform ivec2 uOutputSize;   // 2D output dimensions
 uniform float uEmission;     // the glow of thick density, 1 = its own color
 uniform float uAbsorption;   // The extinction of an amount of 1 over the whole view
 uniform vec3  uFog;          // the water's extinction over the full depth, per channel
-uniform bool  uSplit;        // the amount from uDensity, its color from uColor (the upscaled density)
+uniform bool  uSplit;        // the amount from uDensity, its color from uColor (the fine density)
 uniform bool  uLit;          // the density lit by uDirect
 uniform bool  uHasRays;      // the water's light added from uRays
 uniform float uIntensity;    // the light on thick density at full light, 1 = its own color

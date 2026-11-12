@@ -2,11 +2,11 @@
 
 Every field is a GL_TEXTURE_3D on one grid of cubic cells: the velocity (RGBA16F), the temperature
 and the pressure (R16F) and the obstacle (R8) at the simulation's size, `depth` deep. The
-density is carried by the simulation density always (`SimulationDensity`, RGBA16F, its color baked in at
-injection, on the same grid), and where enabled by the upscaled density (`UpscaledDensity`, its amount at
-`upscaled`'s size, sampled by uv wherever a pass reads it against the simulation's fields, its color a
-volume at the dye's size or the simulation density's, `upscaled.color`) and the particles (`ParticleDensity`), all moved through the same velocity. The volume
-drawn is the upscaled one where enabled, else the simulation's; the particles are laid over it.
+density is carried by the density always (`Density`, RGBA16F, color × amount at its own `density.width` ×
+`height` × `depth`), and where enabled by the fine density (`FineDensity`, its amount at `fine_density`'s size,
+its color the density's) and the particles (`ParticleDensity`), all moved through the same velocity and sampled
+by uv wherever a pass reads them against the simulation's fields. The volume drawn is the fine density where
+enabled, else the density; the particles are laid over it.
 
 Pipeline:
     1. Advect velocity (3D self-advection, on its result the guard; every advection semi-Lagrangian
@@ -40,7 +40,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_CLAMP_TO_EDGE, GL_NEAREST, GL_REPEA
 
 from modules.gl import ComputeShader, SwapFbo, Texture, Texture3D, SwapTexture3D, GpuTimer
 from ..wall_mode import WallMode
-from .fluid_settings import Advection, Light, Limiter, PressureSolver, ScatteringModel, Fluid3DSettings, PressureSettings, ParticleSettings, UpscaledDensitySettings
+from .fluid_settings import Advection, Light, Limiter, PressureSolver, ScatteringModel, Fluid3DSettings, PressureSettings, ParticleSettings, DensitySettings, FineDensitySettings
 from .multigrid_pressure import MultigridPressure
 from .face_velocity import FaceVelocity
 from ..shaders import AddBoolean
@@ -49,9 +49,9 @@ from ..port import LightPlace, Port, TextureKind
 from ..time_step import REFERENCE_STEP, TimeStep, viscosity_iterations
 from ..finite_guard import FiniteGuard, GuardSlot
 from .density_carrier import CarrierStep, DensityCarrier
-from .upscaled_density import UpscaledDensity
+from .fine_density import FineDensity
 from .field_advection import FieldAdvection
-from .simulation_density import SimulationDensity
+from .density import Density
 from .particle_density import ParticleDensity
 from .shaders.face_binding import Cell
 from .shaders import (AdvectFaces3D, FacesToCenters3D, ViscosityFaces3D, SEMI_LAGRANGIAN, PREDICTOR, CORRECTION,
@@ -119,7 +119,7 @@ class Fluid3D:
 
     Fields:
         velocity:    SwapTexture3D  RGBA16F  (u, v, w, spare)
-        density:     SimulationDensity, with UpscaledDensity and ParticleDensity where enabled
+        density:     Density, with FineDensity and ParticleDensity where enabled
         temperature: SwapTexture3D  R16F
         pressure:    SwapTexture3D  R32F
         obstacle:    Texture3D      R8
@@ -172,14 +172,14 @@ class Fluid3D:
         self._pressure: SwapTexture3D = SwapTexture3D()
         # The MacCormack predictors, one per carried field, allocated at its first MacCormack step
         self._temperature_scratch: Texture3D = Texture3D()
-        # The density's carriers: the simulation density always, the upscaled and the particles by their `enabled`;
+        # The density's carriers: the density always, the fine density and the particles by their `enabled`;
         # the particles drawn into their own image, then over the volume
         self._advection: FieldAdvection = FieldAdvection()
         # The fields' non-finite values, set to 0 where each is advected, counted and reported
         self._guard: FiniteGuard = FiniteGuard('fluid', ('velocity', 'density', 'temperature'))
-        self._simulation_density: SimulationDensity = SimulationDensity(self.settings, self._advection)
+        self._density: Density = Density(self.settings, self._advection)
         self._particle_density: ParticleDensity = ParticleDensity(self.settings)
-        self._upscaled_density: UpscaledDensity = UpscaledDensity(self.settings, self._advection, self._simulation_density)
+        self._fine_density: FineDensity = FineDensity(self.settings, self._advection, self._density)
         self._particle_texture: Texture = Texture()
         self._over_shader: CompositeOver = CompositeOver()
         self._knee_shader: Knee = Knee()               # the output's highlights bent, not clipped
@@ -247,9 +247,11 @@ class Fluid3D:
         self.settings.bind(Fluid3DSettings.depth, lambda _: self._request_reallocate())
         self.settings.bind(Fluid3DSettings.depth_ratio, lambda _: self._request_reallocate())
         reallocate_densities = lambda _: setattr(self, '_densities_pending', True)
-        for field in (UpscaledDensitySettings.enabled, UpscaledDensitySettings.width, UpscaledDensitySettings.height,
-                      UpscaledDensitySettings.depth):
-            self.settings.upscaled.bind(field, reallocate_densities)
+        for field in (FineDensitySettings.enabled, FineDensitySettings.width, FineDensitySettings.height,
+                      FineDensitySettings.depth):
+            self.settings.fine_density.bind(field, reallocate_densities)
+        for field in (DensitySettings.width, DensitySettings.height, DensitySettings.depth):
+            self.settings.density.bind(field, reallocate_densities)
         for field in (ParticleSettings.enabled, ParticleSettings.count, ParticleSettings.slices):
             self.settings.particles.bind(field, reallocate_densities)
         self.settings.bind(Fluid3DSettings.width, lambda _: self._request_reallocate())
@@ -324,17 +326,17 @@ class Fluid3D:
 
     @property
     def _densities(self) -> list[DensityCarrier]:
-        """The carriers running: the simulation density, then the upscaled and the particles where enabled."""
-        densities: list[DensityCarrier] = [self._simulation_density]
-        if self.settings.upscaled.enabled:
-            densities.append(self._upscaled_density)
+        """The carriers running: the density, then the fine density and the particles where enabled."""
+        densities: list[DensityCarrier] = [self._density]
+        if self.settings.fine_density.enabled:
+            densities.append(self._fine_density)
         if self.settings.particles.enabled:
             densities.append(self._particle_density)
         return densities
 
     def _allocate_densities(self) -> None:
-        """(Re)allocate the carriers running on the simulation's grid, the others released."""
-        for carrier in (self._simulation_density, self._upscaled_density, self._particle_density):
+        """(Re)allocate the carriers running, each at its own size, the others released."""
+        for carrier in (self._density, self._fine_density, self._particle_density):
             carrier.deallocate()
         self._particle_texture.deallocate()
         for carrier in self._densities:
@@ -379,7 +381,7 @@ class Fluid3D:
         self._velocity.deallocate()
         self._faces.deallocate()
         self._faces_scratch.deallocate()
-        for carrier in (self._simulation_density, self._particle_density, self._upscaled_density):
+        for carrier in (self._density, self._particle_density, self._fine_density):
             carrier.deallocate()
         self._particle_texture.deallocate()
         self._no_density.deallocate()
@@ -525,7 +527,7 @@ class Fluid3D:
 
     def _faces_to_centers(self) -> None:
         """The centers' volume, after the projection: each component the mean of its cell's two faces, which the
-        particles, the upscaled density and the monitors read."""
+        particles, the densities and the monitors read."""
         self._faces_to_centers_shader.use(self._faces.volume, self._velocity, self._obstacle, self._closed,
                                           self._has_obstacles)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
@@ -568,7 +570,7 @@ class Fluid3D:
     def _confine_vorticity(self) -> None:
         """Vorticity confinement, each of the three (`vorticity.strength_1` to `_3` at `vorticity.radius_1` to `_3`) keeping swirls of its own
         size alive: every curl in one pass, their forces summed at the cells in one, added to the faces once, each
-        face its two cells' mean. The first running confinement's curl is the one the upscaled density's turbulence reads; the
+        face its two cells' mean. The first running confinement's curl is the one the fine density's turbulence reads; the
         curl alone while only it does."""
         vorticity = self.settings.vorticity
         running: list[tuple[float, float]] = [(strength, radius) for strength, radius in
@@ -635,7 +637,7 @@ class Fluid3D:
         kappa = temp.sink
         gravity = (temp.gravity_x, temp.gravity_y, temp.gravity_z)
 
-        weight: Texture3D | None = self._simulation_density.weight
+        weight: Texture3D | None = self._density.weight
         self._buoyancy_shader.use(
             self._temperature,
             weight if weight is not None else self._no_density,
@@ -697,7 +699,7 @@ class Fluid3D:
             dissipation=self._calculate_dissipation(self._dt, self.settings.density.fade_time),
             evaporation=self._evaporation(self._dt, self.settings.density.evaporation_time), advection=self.settings.density.advection,
             curl=self._curl_vol if self._needs_curl else None, cell=self._cell[0], guard=self._guard_slot('density'),
-            faces=self._faces.volume, limiter=self.settings.density.limiter)
+            limiter=self.settings.density.limiter)
         for carrier in self._densities:
             carrier.update(step)
 
@@ -721,13 +723,13 @@ class Fluid3D:
 
     @property
     def _needs_curl(self) -> bool:
-        """Whether the upscaled density's turbulence reads the curl this step."""
-        return self.settings.upscaled.enabled and self.settings.upscaled.turbulence > 0.0
+        """Whether the fine density's turbulence reads the curl this step."""
+        return self.settings.fine_density.enabled and self.settings.fine_density.turbulence > 0.0
 
     def _composite_output(self) -> None:
-        """The volume into the 2D output, the upscaled amount's where enabled, else the simulation's; the particles
+        """The volume into the 2D output, the fine density where enabled, else the density; the particles
         drawn into their own image and laid over it; then the highlights bent above the knee instead of clipped."""
-        volume: DensityCarrier = self._upscaled_density if self.settings.upscaled.enabled else self._simulation_density
+        volume: DensityCarrier = self._fine_density if self.settings.fine_density.enabled else self._density
         look: MarchLook = self._march_look()
         volume.composite(self._output_texture, look, self._light_now)
         if self.settings.particles.enabled and self._particle_texture.allocated:
@@ -775,7 +777,7 @@ class Fluid3D:
         the light on the dye, the sky's in it while `sky_fill` is on, and the water's while `fog_scattering` and
         `fog` are on, released while off."""
         composite = self.settings.composite
-        layers: int = self.settings.upscaled.depth if self.settings.upscaled.enabled else self._depth
+        layers: int = self.settings.fine_density.depth if self.settings.fine_density.enabled else self.settings.density.depth
         size = (light.grid[0], light.grid[1], max(1, layers))
         lit = composite.light
         has_sky: bool = lit.sky_fill > 0.0
@@ -808,11 +810,11 @@ class Fluid3D:
         return (density, density, density), fog_extinction(composite.fog, (tint.r, tint.g, tint.b))
 
     def _lit(self) -> CompositeLight | None:
-        """The light this step, from the simulation density: a sun's swept through the light grid in parallel lines,
+        """The light this step, from the density: a sun's swept through the light grid in parallel lines,
         each light cell marched toward a lamp; then with `scattering` blurred and mixed in; None while
         the light is off, the light released."""
         composite = self.settings.composite
-        density: Texture3D | None = self._simulation_density.weight
+        density: Texture3D | None = self._density.weight
         lit = composite.light
         if not lit.enabled or density is None:
             for light in self._light_volumes:
@@ -856,7 +858,7 @@ class Fluid3D:
     def _lit_sky(self) -> tuple[Texture3D | None, tuple[float, ...]]:
         """The light from straight above, swept at a quarter of the simulation's cells each way, soft for its
         coarseness as light from the whole sky is; with the map from a place to its sheared texel."""
-        density: Texture3D | None = self._simulation_density.weight
+        density: Texture3D | None = self._density.weight
         if density is None:
             return None, IDENTITY
         sigma, fog = self._light_extinction()
@@ -901,7 +903,7 @@ class Fluid3D:
             volume.set_wrap(*wall)
         for volume in (self._velocity, self._temperature, self._pressure, self._temperature_scratch):
             volume.set_wrap_z(*wall)
-        for carrier in (self._simulation_density, self._upscaled_density, self._particle_density):
+        for carrier in (self._density, self._fine_density, self._particle_density):
             carrier.set_walls(wall, wall)
 
     def _handle_deferred_actions(self) -> None:
@@ -1094,7 +1096,7 @@ class Fluid3D:
     @property
     def ports(self) -> dict[str, Port]:
         """Its fields in the order a step reaches them, each a volume in a box `_z_extent` deep, the 2D
-        obstacle as it comes, and the running carriers' (the simulation's `density`, the `upscaled_density`)."""
+        obstacle as it comes, and the running carriers' (the `density`, the `fine_density`)."""
         extent: float = self._z_extent
         light: LightPlace | None = self._light_place()
 

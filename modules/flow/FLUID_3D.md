@@ -14,8 +14,8 @@ fluid is `Fluid3D` (`fluid_3d/fluid_3d.py`), its layer `Fluid3DLayer`
 ## The goal
 
 A visualization inspired by ink in water: high detail at 4K, sharp, translucent ink patterns; smoke
-patterns a second goal **(site fact)**. Two ways draw it, the particles and the upscaled density; the
-upscaled density is the one worked on now, the particles and probably a combination of both later. Its
+patterns a second goal **(site fact)**. Two ways draw it, the particles and the fine density; the
+fine density is the one worked on now, the particles and probably a combination of both later. Its
 way there: layers of water with sharp, well-defined motion of their own, that influence each other and
 stay distinct. Ink's thin sheets folding into tendrils are shear, water at one depth moving otherwise than
 the water beside it, their boundary rolling up **(deduction)**. The light is a means to it, not a goal of
@@ -25,7 +25,7 @@ What decides it in the upscale now (the code and deep_flow's preset):
 
 | What                     | Now                                                                                   | Against the goal                                                                          |
 |--------------------------|---------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------|
-| the density's own layers | the 4K amount 24 layers deep (`upscaled.depth`), the velocity's grid 64               | a sheet thinner than a 24th of the box blurs into its neighbors: the layers it can hold |
+| the density's own layers | the fine density 24 layers deep (`fine_density.depth`), the velocity's grid 64        | a sheet thinner than a 24th of the box blurs into its neighbors: the layers it can hold |
 | its edges as it moves    | `density.advection`: semi-Lagrangian 1.37 ms on the 4K amount at 24 layers, MacCormack 4.07 | the plain step blurs a little each step, MacCormack keeps edges sharp                      |
 | the layers kept apart    | the body at its own depth ([The body's depth](#the-bodys-depth)), the confinement at a small radius, viscosity | the body's shape in depth lets the water go around it; the confinement and viscosity cross one layer's motion into the others'; viscosity 0 the sharpest |
 
@@ -39,7 +39,8 @@ Weighed by [the goal](#the-goal): sharp, translucent ink patterns, layers distin
 ### 1. The resolutions
 
 The dye's picture and its outline at the size of what they come from, the mask steered by the camera image:
-[RESOLUTION.md](RESOLUTION.md), its own plan.
+[RESOLUTION.md](RESOLUTION.md), its own plan: the z position without the depth's staircase, the velocity for
+the fine density.
 
 ### 2. Swirls at more than one size
 
@@ -48,7 +49,7 @@ More than one radius, each with its own strength (multi-scale vorticity confinem
 at once. Starting with two: the curl at both radii in the same pass (six more velocity reads a cell), the
 force from both curls in one pass (a curl volume more), their sum added to the faces once. About a third
 to a half more of the confinement's 0.57 ms at the preset, 0.2 to 0.3 ms **(deduction)**, measured as it
-lands. The upscaled density's turbulence already adds swirls below the grid to the dye, so what a second
+lands. The fine density's turbulence already adds swirls below the grid to the dye, so what a second
 radius adds to the look is judged against it, and by whether the layers stay apart: the confinement
 also carries one layer's motion into the next.
 
@@ -92,7 +93,7 @@ gravity) weighs dyed water wherever it is, with `buoyancy` 0, in the same pass, 
 - The velocity loses its energy faster than expected **(site fact)**, with the plain step on the velocity: the
   plain step's own loss (a swirl keeps 52% of its speed in 2 s, MacCormack 62%), the drag now over the body's
   whole depth, or another cause; MacCormack with the clamp on the velocity is the first thing to try.
-- The particles: worked on, and how they combine with the upscaled density.
+- The particles: worked on, and how they combine with the fine density.
 
 ## The fluid
 
@@ -106,19 +107,18 @@ A step (`Fluid3D.update`), in order, at the code's defaults:
 | advect_temp | off: `buoyancy` 0 clears the temperature once, and nothing is injected into it                                                                                                                                                                                          | temperature         | the trace distance   |
 | buoyancy    | gravity × (sink × density − buoyancy × ΔT), kept as an acceleration at the cells, each face given its two cells' mean × dt; gravity down the screen (`gravity_y` 1)                                                                                                     | acceleration        | no                   |
 | incompress  | the divergence per cell from its six faces, the pressure by `pressure.solver` ([The pressure](#the-pressure)), the gradient per face from its two cells, on the walls ([The walls](#the-walls))                                                                         | pressure, faces     | no                   |
-| centers     | the faces averaged to the cells' centers, which the particles, the upscaled density and the monitors read                                                                                                                                                               | velocity            | no                   |
-| advect_den  | semi-Lagrangian advection, one trilinear read per texel, the evaporation taking the alpha down, the color with it                                                                                                                                                       | density 256×448×128 | the trace distance   |
+| centers     | the faces averaged to the cells' centers, which the densities, the particles and the monitors read                                                                                                                                                                      | velocity            | no                   |
+| advect_den  | semi-Lagrangian advection, one trilinear read per texel, the evaporation taking the alpha down, the color with it                                                                                                                                                       | density 448×800×24  | the trace distance   |
 | composite   | front-to-back march, one step per layer                                                                                                                                                                                                                                 | output 2160×3840    | no                   |
 
 Every field is a `GL_TEXTURE_3D` on one grid of cubic cells at the stage's size, 256 × 448 by
 `depth` 128: the velocity on its faces RGBA16F a face longer on every axis and at the centers RGBA16F, the
-temperature R16F and the pressure R32F, the density
-RGBA16F with its color baked in, each a swap pair, the obstacle R8. The simulation's cell is 1/256
+temperature R16F and the pressure R32F, each a swap pair, the obstacle R8. The simulation's cell is 1/256
 width in x, y and z, so the slab is 128 / 256 = 0.5 widths deep (`_z_extent`). The grid is the one
 that holds 60 fps in deep_flow with the pose on the same GPU ([TIMING.md](TIMING.md#the-grid)). The density is carried
-on the same grid always (the simulation density), and where enabled by the upscaled density, its amount at
-`upscaled.width` × `upscaled.height` × `upscaled.depth` with its color in a volume of its own, or the simulation
-density's (`upscaled.color`, [The density's detail](#the-densitys-detail)), and by the particles, drawn over the volume. Every pass
+at its own size always (`Density`, RGBA16F, color × amount, `density.width` × `height` × `depth`), and where enabled
+by the fine density, its amount at `fine_density.width` × `height` × `depth`, its color the density's
+([The density's detail](#the-densitys-detail)), and by the particles, drawn over the volume. Every pass
 that reads the velocity or the obstacle against the density samples by uv, so the shaders are the same
 (`advect_3d`, `inject_3d`, `buoyancy_3d`). The composite reads the volume at the output's 2160 × 3840. The monitors
 read every field as it is. The GPU is a 24 GB RTX 4090, so nothing pages. Every pass's time is in
@@ -194,7 +194,7 @@ pushes the water near the front and the torso further back. The box's depth is t
 the depth source's near to far, 0 front to 1 back, with no setting of its own. Each injection reads its
 output's z position ([BRIDGE.md](BRIDGE.md#the-z-positions)), red over green, at the pixel it reads
 (`slab.glsl`'s `slab_center`): the drag and the body force at their readings' depths, the densities and the
-temperatures, the upscaled amount and the particles at the body's now. A pixel without one (no depth, out
+temperatures, the fine density and the particles at the body's now. A pixel without one (no depth, out
 of the range) goes in at `layer`, and so does every pixel without depth. The densities and the
 temperature go in a column a thread (`inject_3d`, `inject_amount_3d`): the source and its z position read
 once, then the cells the slab reaches, out to 4 sigmas. The particles' mass is the slab's share inside
@@ -441,7 +441,7 @@ as a tuning:
 | `density.advection_scale`, `temperature.advection_scale`                                                                                   | 1               | the density moves with the water                                                                                                 |
 | `velocity.advection_scale`                                                                                                                 | 1               | the velocity carries itself the full step                                                                                        |
 | `width`, `height`, `depth`                                                                                                                 | 256, 448, 128   | half a width deep, within 60 fps                                                                                                 |
-| `upscaled.enabled`, `particles.enabled`                                                                                                    | off, off        | the density on the simulation's grid                                                                                             |
+| `fine_density.enabled`, `particles.enabled`                                                                                                | off, off        | the density drawn                                                                                                                |
 | `input.layer`, `input.spread`                                                                                                              | 0.5, 0.2        | the body mid-volume, 0.2 widths thick at half its height                                                                         |
 | `wall` (every field, the volume)                                                                                                           | closed          | the operator's settings                                                                                                          |
 
@@ -493,7 +493,7 @@ with the body force's density; the burst's fps; the wall.
 
 ## The advection
 
-Each field's `advection` (`velocity.advection`, `density.advection` for the simulation's and the upscaled
+Each field's `advection` (`velocity.advection`, `density.advection` for the density and the fine
 density, `temperature.advection`) carries it: `SEMI_LAGRANGIAN`, the default,
 or `MACCORMACK` (Selle 2008, `maccormack_3d.comp`). The semi-Lagrangian step writes a predictor into
 a scratch volume per field (allocated at its first MacCormack step); traced forward again, it gives
@@ -543,30 +543,28 @@ its own (a slight hue shift at an RGBA density's sharp edges). On standmoves at 
 4.1 ms for either limiter, 1.37 for the plain step. A blend of the plain step into the corrected value
 (Houdini's remedy for the revert's grid artifacts) took sharpness back for nothing else to gain, and went.
 
-The upscaled density's color is a color volume's color over its amount, at the same place: with
-`upscaled.color` DYE (the default) a volume of its own, `upscaled.color_width` × `color_height` × `color_depth`
-(448 × 800 × 24 at deep_flow's preset, the dye's size by the amount's layers, RGBA16F, as 8 bits would round at every advection), injected and carried
-with the amount, faded and evaporated as it is, without the turbulence; with SIMULATION the simulation
-density's, on its 288 × 512 cells. The dye's own volume costs 1.3 ms of the density pass (5.4 to 6.8 ms,
-deep_flow's preset, 40 s of `-sim`) and keeps the dye's color as the bridge made it, its bands and edges
-included, where the simulation's cells blurred them **(site fact: less blocky)**. Where the
-two are carried apart, the 4K amount lies where the coarse amount is near 0 (3.9% of the pixels under 0.01 on
-the blocky recording at 4.7 s), and divided by almost nothing the color jumped from cell to cell: squares the
-coarse cell's size (7.5 px at 4K), worse the sharper the 4K amount. Each takes `COLOR_FLOOR` (0.01) of white
-before the division, so there the color fades to white; elsewhere the frames move by 1 of 255 on average.
+The fine density's color is the density's color over its amount, at the same place. The density is at the
+dye's size by the fine density's layers in deep_flow's preset (448 × 800 × 24, RGBA16F, as 8 bits would round at
+every advection), so it keeps the dye's color as the bridge made it, its bands and edges included, where the
+simulation's 288 × 512 cells blurred them **(site fact: less blocky)**; it moves without the turbulence below
+the grid, which only the fine density takes. Where the two are carried apart, the fine density lies where the
+density's amount is near 0 (3.9% of the pixels under 0.01 on the blocky recording at 4.7 s, with the density
+on the grid's cells), and divided by almost nothing the color jumped from texel to texel. Each takes
+`COLOR_FLOOR` (0.01) of white before the division, so there the color fades to white; elsewhere the frames
+move by 1 of 255 on average.
 
 ## The density
 
 The solver owns the velocity, the pressure and the temperature; the density is its carriers'
 (`DensityCarrier`, `density_carrier.py`), each taking the bridge's dye in the same units, fully dyed
-water at 1: `SimulationDensity` on the simulation's grid, always on; `UpscaledDensity`, its amount
-finer than the grid, and `ParticleDensity`, each switched by `enabled` and allocated only then. The
+water at 1: `Density`, color × amount at its own size, always on; `FineDensity`, its amount finer still,
+its color the density's, and `ParticleDensity`, each switched by `enabled` and allocated only then. The
 field advection, semi-Lagrangian or MacCormack, is one part they share (`FieldAdvection`).
 
 ### The particles
 
 The particles draw into their own image, laid over the volume
-(`CompositeOver`, Porter–Duff over); the buoyancy weighs the simulation density. Where a sprite would cover
+(`CompositeOver`, Porter–Duff over); the buoyancy weighs the density. Where a sprite would cover
 the frame its birth radius stops at twice `radius`, and the reference mass is a texel of fully dyed water, so
 how much dye there is sets how many drops there are, not how big a drop is.
 
@@ -656,19 +654,19 @@ The goal: at the 4K output the density is as fine as the pixels, thin threads an
 out by the motion, never grainy; near density covers far; all of it at 60 fps with the pose running.
 
 A 2160 × 3840 × 16 RGBA density carried by a coarse velocity, the ofxFlowTools recipe in 3D, costs 2 GB
-of reads and writes a step. The upscaled density is that look with the color split off, as video splits its
+of reads and writes a step. The fine density is that look with the color split off, as video splits its
 color (4:2:0): the eye resolves the brightness much finer than the color, and the color never has more
 detail than the bridge's 448 × 800 it comes from.
 
 | Part        | How                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
 |-------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| two volumes | the upscaled density (`UpscaledDensity`): the color, the simulation density's RGBA volume (color × amount, the amount); the amount alone (R16F) at `upscaled.width` × `upscaled.height` × `upscaled.depth` (2160 × 3840 × 16, the output's size), over the same box; at 16 layers 265 MB a buffer                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| injection   | the bridge's density into both: the RGBA into the color, its amount into the detail's gaussian slab                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| two volumes | the color: the density's RGBA volume (`Density`, color × amount, the amount) at its own size; the amount alone (R16F), the fine density (`FineDensity`), at `fine_density.width` × `height` × `depth` (2160 × 3840 × 16, the output's size), over the same box; at 16 layers 265 MB a buffer                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| injection   | the bridge's density into both: the RGBA into the density, its amount into the fine density's gaussian slab                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | a step      | both carried by the velocity, by `density.advection`; where the detail has fewer layers than the grid, one pass first averages the velocity over each detail layer's thickness and the detail moves with that; the fade and the evaporation as on the grid                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
-| composite   | the detail's layers marched at the output: the brightness and the opacity from the detail's amount, the color the color volume's rgb over its amount at the same place                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| off         | `upscaled.enabled` off: the detail is not allocated, the simulation density drawn                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| settings    | `upscaled.enabled`, its size, and `upscaled.sample` (`MIDDLE` or `AVERAGE`, the velocity a layer spanning several of the grid's moves with); smaller than the output, the composite enlarges it by uv; on the monitor the amount is `upscaled_density`, the color `density`; timed in [TIMING.md](TIMING.md#the-density-at-the-outputs-4k)                                                                                                                                                                                                                                                                                                                                                                                                       |
-| turbulence  | the 4K amount moved semi-Lagrangian by the grid's velocity plus swirls below the grid (wavelet turbulence, Kim et al. 2008): a periodic 64³ tile of divergence-free noise (`swirl_noise`, the curl of random vectors band-passed to 8–16 texels, the tile 8 grid cells, so the swirls are 1 to 2 cells), read where the water started (two displacements of the water on the grid, reset a second apart half a cycle from each other and cross-faded), scaled by the grid's curl × its cell and `upscaled.turbulence`; the curl computed for it when the confinement is off. On stillslowfast with the calm preset, 1 to 3 change the picture by under 0.2 of 255; 10 to 30 give visible fine frizz along the density's edges, where the curl is |
+| composite   | the fine density's layers marched at the output: the brightness and the opacity from its amount, the color the density's rgb over its amount at the same place                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| off         | `fine_density.enabled` off: the fine density is not allocated, the density drawn                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| settings    | `fine_density.enabled`, its size, and `fine_density.sample` (`MIDDLE` or `AVERAGE`, the velocity a layer spanning several of the grid's moves with); smaller than the output, the composite enlarges it by uv; on the monitor the amount is `fine_density`, the color `density`; timed in [TIMING.md](TIMING.md#the-density-at-the-outputs-4k)                                                                                                                                                                                                                                                                                                                                                                                                    |
+| turbulence  | the 4K amount moved semi-Lagrangian by the grid's velocity plus swirls below the grid (wavelet turbulence, Kim et al. 2008): a periodic 64³ tile of divergence-free noise (`swirl_noise`, the curl of random vectors band-passed to 8–16 texels, the tile 8 grid cells, so the swirls are 1 to 2 cells), read where the water started (two displacements of the water on the grid, reset a second apart half a cycle from each other and cross-faded), scaled by the grid's curl × its cell and `fine_density.turbulence`; the curl computed for it when the confinement is off. On stillslowfast with the calm preset, 1 to 3 change the picture by under 0.2 of 255; 10 to 30 give visible fine frizz along the density's edges, where the curl is |
 | storage     | 3D textures, as every field: the advection reads a traced point in one trilinear fetch, z included, and the driver tiles the texels in x, y and z; a texture array filters within a layer only, two fetches and a mix for z, and its layers are tiled apart, which suits drawing into layers (the particles' slices), not tracing through them                                                                                                                                                                                                                                                                                                                                                                                                   |
 
 Measured: the step at 4K × 16, 32 and 64 layers, semi-Lagrangian and MacCormack, against the budget,
@@ -679,7 +677,7 @@ What a 4K volume cannot do, and so where the detail comes from:
 
 - Many layers at 4K do not fit, and a cubic volume at 4K cannot be had: 64 cells
   deep at 448 wide is 64 × 4.8 ≈ 307 layers at 2160 wide, about 20 GB. So the detail at 4K does
-  not come from a cubic volume, but from the upscaled density's few layers, the turbulence below the
+  not come from a cubic volume, but from the fine density's few layers, the turbulence below the
   grid and the particles.
 - A tricubic read in the composite is 8 hardware reads a step instead of 1, 64 steps over
   2160 × 3840 pixels at 64 layers, about 4 G reads a frame, 5 to 10 ms **(deduction)**: not worth
@@ -689,7 +687,7 @@ What a 4K volume cannot do, and so where the detail comes from:
   ([Parked](#parked)).
 
 The grid's depth: 256 × 448 × 128, half a width deep, so the body's z motion has room before a wall.
-A coarser grid across buys the depth: the detail it gives up in x and y is what the upscaled density
+A coarser grid across buys the depth: the detail it gives up in x and y is what the fine density
 and the particles bring back, the trade the density roadmap made at 128 × 224 × 96. The deeper grids
 measured, and why this one, are in [TIMING.md](TIMING.md#the-grid).
 
@@ -723,7 +721,7 @@ recording, are not in that picture.
 
 | Part       | How                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 |------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| shadows    | `Fluid3D._lit`: a light grid at `light.grid`'s share of the simulation's cells each way (`FULL`, all of them, the default; `HALF`, `QUARTER`), each step, each cell's RGB transmittance toward the light: for a sun one sweep of parallel lines (`LightSweep3D`), one thread a line stepping a cell at a time along the axis the light mostly travels and sliding across by its slope, only over the layers where it is in the box (the water before them crossed at once), the density read where the line passes, the grid stored sheared, a line a column (`sweep_size`), and read through `sweep_map`, so the texture's filtering mixes the four lines around a place and every place gets the light of straight lines (the monitor's port `light` shows a sun's grid sheared); for a lamp each cell marched to it (`LightVolume3D`, at most 256 steps); the simulation density's amount summed along the way (the upscaled amount has 16 layers to the simulation's 64, and its detail is finer than a light cell), times the extinction `opacity` gives over the view, per width of the box's depth, and the water's `fog` over the whole distance, both per channel by `tint`, so deep light turns bluish and a lamp falls off; the composite's each sample lit beside its own emission (the glow): its color × the light there × `light.intensity`, made per view as `emission` is (`view_march`); off and released while `light.enabled` is off; a step's GPU time with it on within the noise of one without it, under 0.5 ms, in a smoke run at 448 × 800 × 64 with the upscaled density (not yet in TIMING.md) |
+| shadows    | `Fluid3D._lit`: a light grid at `light.grid`'s share of the simulation's cells each way (`FULL`, all of them, the default; `HALF`, `QUARTER`), each step, each cell's RGB transmittance toward the light: for a sun one sweep of parallel lines (`LightSweep3D`), one thread a line stepping a cell at a time along the axis the light mostly travels and sliding across by its slope, only over the layers where it is in the box (the water before them crossed at once), the density read where the line passes, the grid stored sheared, a line a column (`sweep_size`), and read through `sweep_map`, so the texture's filtering mixes the four lines around a place and every place gets the light of straight lines (the monitor's port `light` shows a sun's grid sheared); for a lamp each cell marched to it (`LightVolume3D`, at most 256 steps); the density's amount summed along the way (the fine density has 16 layers to the simulation's 64, and its detail is finer than a light cell), times the extinction `opacity` gives over the view, per width of the box's depth, and the water's `fog` over the whole distance, both per channel by `tint`, so deep light turns bluish and a lamp falls off; the composite's each sample lit beside its own emission (the glow): its color × the light there × `light.intensity`, made per view as `emission` is (`view_march`); off and released while `light.enabled` is off; a step's GPU time with it on within the noise of one without it, under 0.5 ms, in a smoke run at 448 × 800 × 64 with the fine density (not yet in TIMING.md) |
 | the light  | `composite.light`, a subpanel, `enabled` on top: off, the composite is the plain march, every light pass skipped and its memory released, its settings kept; `source`, `DIRECTIONAL` (a sun: one direction, parallel shadows) or `POINT` (a lamp, shadows fanning out); `x`, `y`, `z` toward the sun or the lamp's place (±1 the box's sides; x right, y down the screen, z away from the viewer), first above and a little toward the front; `intensity` how bright the light shows fully dyed water filling the view lit straight on, 1 its color; the rest below are the subpanel's too. `Fluid3D.set_light` overrides the settings, the hook for a light the app derives from the pose (a lamp at the nose), the pose pipeline's value handed over; the monitor shows the light grid as the port `light`.                                                                                                                                                                 |
 | per layer  | `LayerLight3D`, each step, what the composite reads, per column of the light grid and layer of the march (froxels: the view looks straight down z, so the light grid's columns are the view's), once a light cell and a layer instead of at every 4K sample: the light on the dye, the sun's (its phase, octaves and powder in) and the sky's added, its alpha the caustic net's contrast times the sun's share of the brightness, so the composite reads the net at its own size and moves the sun's light alone; and the rays |
 | rays       | while `fog_scattering` and `fog` are on: the water's own light per column and layer, the fog's in-scattering integrated exactly over each layer from its front, two sub-steps a light cell, over each the light taken as even (exp(−fog × from the front) − exp(−fog × to the back)); the water scatters every color alike and takes red out first, so the scattering's share is the grey `fog` over the tinted extinction; × the phase, the caustic net and `fog_scattering` × `light.intensity`; the march adds a layer's value under what lies in front, so the density covers the rays behind it and a shadow's edge falls between layers without banding; the light grid's fog goes on past the box's sides (the water does), a sun's from the plane it enters by, a lamp's over its whole way |
@@ -731,7 +729,7 @@ recording, are not in that picture.
 | a lamp     | falls off as 1 / its distance², 1 at the box's center, at most 16 times that near it |
 | scattering | `scattering`, the light bounced inside the density, made as `scattering_model` says: `BLUR` (the default), the light grid blurred (`LightBlur3D`, a separable 5-tap gaussian) and mixed into the direct light, soft, but it spreads light into empty water and through thin walls of density; `OCTAVES` (Wrenninge), two octaves of the light, each half the extinction and half the light, evenly spread, worked out per sample from the light grid's transmittance (T^½ and T^¼), no pass, so thick parts glow from within as the density shapes them; `powder` (Schneider), Beer–powder over Beer, 2 (1 − T²) on the density's own transmittance (the light grid's alpha, grey, without the water), the edges facing the light darker and thin dye glowing less than thick; `sky_fill`, the light from straight above, swept at a quarter of the simulation's cells each way, soft for it, a share of `light.intensity`, so no shadow is black; `anisotropy`, the Henyey–Greenstein g of each lit sample toward the viewer, 1 at g 0, a silver lining against a light from behind, and `back_scattering` the share of a backward lobe as strong, for a light from the front; a sun's phase is the same everywhere and worked out once on the CPU; all 0 off, at no cost |
 | the march  | `march_look`: the look in widths, the same at any number of layers and any depth of the box: `opacity` the widths of fully dyed water that hide half of what is behind it (its half-thickness: its extinction ln 2 / `opacity` per width), `fog` the widths of water that dim white light to half its brightness, turning it toward `tint`'s hue (the water's color, white none: each channel kept 0.5 × `tint` / its brightness over `fog`), `emission` the glow of thick density, 1 its own color, 0 none; each layer sends the share of its light that is the density's, exact for an even layer (its part of the layer's extinction × what the layer takes out), so thick density is seen at its color × `emission` however thick a layer is; the density covers grey by its amount, the water per channel; a particle look takes the density's glow and extinction over its `slices` |
-| occlusion  | what covers what measured through the coarse grid's layers, the upscaled density laid over it: the order in depth as fine as the fluid's, the detail at `upscaled.width` × `upscaled.height` × `upscaled.depth`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| occlusion  | what covers what measured through the coarse grid's layers, the fine density laid over it: the order in depth as fine as the fluid's, the detail at `fine_density.width` × `fine_density.height` × `fine_density.depth`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | highlights | `Knee`, one pass on the output after the particles: the composite's color through a knee, straight up to 0.8 and bent softly toward 1 above it, each channel on its own, so the image below 0.8 keeps its contrast, thick cores do not clip flat and the brightest drift a little toward white, as film does; no setting, `composite.emission` keeps its meaning                                                                                                                                                                                                                                                                                                                                                                        |
 | blend      | the composite writes its color premultiplied (times its coverage) and the coverage as alpha, so the fluid layer draws it with the premultiplied form of `composite.blend_mode` (`BlendMode.premultiplied`: `ADD` as `GL_ONE, GL_ONE`, `ALPHA` as `GL_ONE, GL_ONE_MINUS_SRC_ALPHA`), not multiplied by its alpha a second time                                                                                                                                                                                                                                                                                                                                                                                                           |
 
@@ -800,7 +798,7 @@ divergence-free, the second decouples the cells into a checkerboard.
 | storage                      | three R16F volumes, one per component, each one face longer along its own axis                          |
 | the step                     | each pass reads and writes the faces; the pressure, the density and the temperature stay at the centers |
 | the centers                  | one pass at the step's end averaging the faces to an RGBA16F volume at the cells' centers               |
-| the density, the temperature | advected by the faces; the particles, the upscaled density and the monitors read the centers            |
+| the temperature              | advected by the faces; the densities, the particles and the monitors read the centers                   |
 | unchanged                    | the pressure solvers, the multigrid, the obstacle's cells, the bridge, the motion                       |
 
 The storage, `FaceVelocity`: one RGBA16F volume at 257 × 449 × 129 for 256 × 448 × 128 cells, a texel's
@@ -837,14 +835,14 @@ The step, pass by pass:
 
 The order in a step. The velocity is on the faces from the advection to the projection; the curl reads
 the faces directly, so nothing midway needs the centers. After the projection one pass averages the faces
-to the centers, the velocity the projection made, which the particles, the upscaled density and the
+to the centers, the velocity the projection made, which the particles, the densities and the
 monitors read.
 
-The density and the temperature. Their advection reads each component from its own faces at the traced
-point: the field the projection made divergence-free, interpolated once. The centers' copy is the faces
-averaged, a two-tap blur along each axis, then interpolated again, so it smooths more and is not exactly
-divergence-free. The 4K upscaled density moves to the faces too only if its timing allows: three reads a
-texel instead of one.
+The temperature. Its advection reads each component from its own faces at the traced point: the field the
+projection made divergence-free, interpolated once. The centers' copy is the faces averaged, a two-tap blur
+along each axis, then interpolated again, so it smooths more and is not exactly divergence-free. The
+densities, at their own sizes, read the centers by uv; they would move by the faces too only if the timing
+allows: three reads a texel instead of one.
 
 The obstacles: a solid cell is one whose obstacle value (R8, at the cells, extruded from the 2D mask
 `set_obstacle`) is above 0.5, static, so a solid face's velocity is 0. A face between two fluid cells is
