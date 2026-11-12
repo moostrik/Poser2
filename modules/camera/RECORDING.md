@@ -119,6 +119,16 @@ go out under one lock in frame order, and a frame older than one gone out is dro
 without their other stream and logged by the player's thread, which also writes the panel's readouts. A stop ends a
 reader's decoder, so a decoder that stalled cannot hold the player. A clip without metadata plays at `fps`.
 
+The player is composed of parts, each in its own file of `modules/camera`:
+
+| File                   | Class                         | Holds                                                               |
+|------------------------|-------------------------------|---------------------------------------------------------------------|
+| `player.py`            | `Player`                      | the thread, its states and messages, the settings' callbacks, the readouts |
+| `play_clock.py`        | `PlayClock`                   | the recorded time of a play                                         |
+| `recording_folder.py`  | `RecordingFolder`, `Timeline` | the folders found, a folder's chunks, frame counts and markers' file; the markers and places on the timeline |
+| `chunk_readers.py`     | `ChunkReaders`                | one chunk's readers of every camera and stream, its metadata and its clock |
+| `frame_pairing.py`     | `FramePairing`                | a frame's streams handed over in order under one lock with one stamp, the unpaired count, the drift |
+
 deep_flow's player decodes color to NV12 (`Player(nv12=True)`), as the camera hands it: half the bytes of BGR
 through the pipe, and live's upload path. A chunk's metadata is read once per chunk and kept for the chunk playing
 and the one loaded; its lines are parsed as the frames are read (`FrameLines`: 8.3 ms for 597 lines with poses at
@@ -208,45 +218,7 @@ first run waited for the poses up to a timed 150 ms, which the order of the stre
 
 Waiting for the camera: the board's poses over the image in a replay against live.
 
-### 3. The split of `Player`
-
-`player.py` holds, in some 900 lines, the state machine, the folders, the markers' file, the panel's readouts, the
-pairing of color and depth, the drift, the clock and the chunks' readers and metadata. A form-only change: each part
-a class in its own file of `modules/camera`, the player composing them, the behavior and the player's API as they
-are (`Player(settings, data_path, gray, nv12)`, `start`, `stop`, the frame, loop and jump callbacks,
-`get_chunk_info`, `nv12`, the panel's settings).
-
-| File                   | Class             | Holds, from `player.py`                                                       |
-|------------------------|-------------------|-------------------------------------------------------------------------------|
-| `player.py`            | `Player`          | the thread, its states and messages, the settings' callbacks, the readouts    |
-| `play_clock.py`        | `PlayClock`       | the recorded time of a play, as now                                           |
-| `recording_folder.py`  | `RecordingFolder` | the folders found, a folder's chunks and their frame counts, its markers' file, the markers and a place on the timeline as a chunk and frame |
-| `chunk_readers.py`     | `ChunkReaders`    | one chunk's readers of every camera and stream, its metadata and its clock: load, play, stop, finished |
-| `frame_pairing.py`     | `FramePairing`    | a frame's streams by frame number, handed over in order under one lock with one stamp, the unpaired count, the drift, the frame callbacks |
-
-What moves where:
-
-- `RecordingFolder`: `Folder`, `_get_video_folders`, `_probe_chunk_frames`, `_prepare_folder`'s probe,
-  `read_in_out`, `write_in_out`, `IN_OUT_FILE`, `_recompute_range`, `_locate`, `_locate_end`, `_global_frame`. No
-  thread and no reader: the markers and the places on the timeline are plain functions of the frame counts.
-- `ChunkReaders`: `_load_chunk`, `_load_stream`, the `loaders`, `players` and `closers` lists as one object per
-  chunk (the player holds the one playing, the one loading and those closing), `load_types` and `play_types` as
-  its streams, `chunk_metadata` as its metadata, `load_clock` and `play_clock` as its clock, `_finished_loading`,
-  `_finished_playing`, `_finished_stopping`. The next chunk's readers take the metadata of the chunk before when it
-  is the same chunk (a loop over one chunk reads it once).
-- `FramePairing`: `_frame_sync_callback`, `frame_sync_dict`, `_handed_over`, `_unpaired`, the drift
-  (`_calcuate_drift`, named `_drift` on the way), `frame_callbacks`. It takes the playing chunk's readers for the
-  metadata and the stamp; a reader's frames go to it.
-- `Player` keeps `run` and its states, `play`, `_load`, `_start`, `_update_scrub`, `_load_seek`, `_stop`, the
-  settings' callbacks, `update_gui` and `_update_readouts`, and the getters, each now asking the part that holds it.
-
-Built in one change: the parts moved one at a time, each followed by the camera's tests (`test_in_out.py`,
-`test_recording.py`, `test_play_clock.py` and the replay camera's), which hold the player's behavior. New tests
-only where a part is testable on its own now: `RecordingFolder`'s markers and places on the timeline without a
-video, and `FramePairing`'s order (moved from `test_play_clock.py`). Then the pose probe on the app, record and
-play, as the check that -sim plays as before.
-
-### 4. The poses the pose model drops
+### 3. The poses the pose model drops
 
 In -sim, with the recorded tracklets and the pose model on, about one frame in six with a player gets no poses (107
 of 596 on `hands`): the pose model's TensorRT runner keeps one batch in flight and one waiting
