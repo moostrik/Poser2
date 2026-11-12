@@ -37,9 +37,12 @@ class FixedSchedule:
     def moment(self, cam_id: int, frame_id: int) -> float | None:
         return self.origin + self.offsets[frame_id] if frame_id < len(self.offsets) else None
 
-    def delay(self, seconds: float) -> None:
-        self.origin += seconds
-        self.delayed += seconds
+    def catch_up(self, cam_id: int, frame_id: int, now: float) -> float:
+        due: float = self.origin + self.offsets[frame_id]
+        late: float = max(now - due, 0.0)
+        self.origin += late
+        self.delayed += late
+        return due + late
 
 
 @unittest.skipUnless(video.available(), 'ffmpeg not on the PATH')
@@ -97,6 +100,28 @@ class StreamReaderTest(unittest.TestCase):
         self.assertTrue(wait_for(lambda: not reader.is_playing()))
         reader.join()
         self.assertGreater(schedule.delayed, 0.9)
+
+    def test_a_stop_ends_a_reader_waiting_on_its_decoder(self) -> None:
+        schedule = FixedSchedule(time.perf_counter() + 60.0, [0.0] * 30)     # its first frame a minute away
+        reader = StreamReader(0, 'video', lambda *_: None, True, fps=30.0, schedule=schedule)
+        reader.load(self.path, 0)
+        self.assertTrue(wait_for(reader.is_loaded))
+        reader.play()
+        time.sleep(0.1)
+        process = reader.ffmpeg_process
+        reader.stop()
+        self.assertTrue(wait_for(lambda: process is not None and process.poll() is not None))
+        self.assertTrue(wait_for(lambda: not reader.is_playing()))       # the reader's thread ends too
+
+    def test_nv12_comes_packed_at_half_the_bytes(self) -> None:
+        shapes: list[tuple[int, ...]] = []
+        reader = StreamReader(0, 'video', lambda _c, _t, frame, _chunk, _i: shapes.append(frame.shape), True, fps=1000.0, nv12=True)
+        reader.load(self.path, 0, 0, 2)
+        self.assertTrue(wait_for(reader.is_loaded))
+        reader.play()
+        self.assertTrue(wait_for(lambda: not reader.is_playing()))
+        reader.join()
+        self.assertEqual(shapes, [(72, 64), (72, 64)])
 
     def test_a_range_counts_from_its_first_frame(self) -> None:
         reader = self.reader()

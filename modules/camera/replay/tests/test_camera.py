@@ -14,9 +14,18 @@ from modules.utils import Rect
 class FakePlayer:
     def __init__(self) -> None:
         self.callbacks = []
+        self.jump_callbacks = []
+        self.nv12 = False
 
     def add_frame_callback(self, callback) -> None:
         self.callbacks.append(callback)
+
+    def add_jump_callback(self, callback) -> None:
+        self.jump_callbacks.append(callback)
+
+    def jump(self) -> None:
+        for c in self.jump_callbacks:
+            c()
 
     def get_chunk_info(self, cam_id: int) -> None:
         return None
@@ -166,7 +175,8 @@ class RecordedTrackletsTest(unittest.TestCase):
     def test_a_jump_drops_what_waits(self) -> None:
         now = time.perf_counter()
         self.player.push(1, np.zeros((4, 6, 3), dtype=np.uint8), captured=now, metadata=recorded(10.0, 0.2))
-        self.player.push(1, np.zeros((4, 6, 3), dtype=np.uint8), captured=now + 0.01, metadata=recorded(2.0, 0.0))  # a loop
+        self.player.jump()                                                                                         # a loop
+        self.player.push(1, np.zeros((4, 6, 3), dtype=np.uint8), captured=now + 0.01, metadata=recorded(2.0, 0.0))
         self.assertTrue(wait_for(lambda: self.messages))
         time.sleep(0.25)
         self.assertEqual([m.timestamp for _, m in self.messages], [now + 0.01])

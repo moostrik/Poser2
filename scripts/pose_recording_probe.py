@@ -104,11 +104,15 @@ def main() -> int:
     parser.add_argument('phase', choices=['record', 'play'])
     parser.add_argument('folder', nargs='?', default='')
     parser.add_argument('--seconds', type=float, default=12.0)
+    parser.add_argument('--bgr', action='store_true', help='decode the color to BGR, as before the player handed NV12')
     args = parser.parse_args()
 
     setup_logging(verbose=False, name='deep_flow')
     install_excepthooks()
     app = DeepFlowMain(simulation=True, interface=False)
+    if args.bgr:
+        assert app.player is not None
+        app.player.nv12 = False
     if args.folder:
         app.settings.camera.simulator.folder = args.folder
 

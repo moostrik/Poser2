@@ -24,22 +24,25 @@ class FrameSchedule(Protocol):
         """When frame `frame_id` of camera `cam_id` is due; None where the schedule does not know it."""
         ...
 
-    def delay(self, seconds: float) -> None:
-        """A reader fell behind by `seconds`: every frame of the schedule comes that much later."""
+    def catch_up(self, cam_id: int, frame_id: int, now: float) -> float:
+        """A reader found its frame overdue at `now`: every frame of the schedule comes later, as far as that frame
+        is still behind on the schedule as it stands, so two readers late for one stall move it once. The
+        frame's moment after it."""
         ...
 
 
 class StreamReader:
     def __init__(self, cam_id: int, frame_type: object, frame_callback: StreamFrameCallback, color: bool,
                  hwaccel: str = '', hwaccel_device: str = '', fps: float = 0.0, stream: int = 0, depth: bool = False,
-                 schedule: FrameSchedule | None = None) -> None:
-        """``color``: decode to BGR; otherwise to gray, so a mono pipeline gets the luma straight from
-        ffmpeg, saving the colour conversion and two thirds of the pipe. ``stream``: which video
-        stream of the file. ``depth``: it holds depth, delivered as uint16 millimetres. ``schedule``:
-        when each frame is due, in place of every 1 / ``fps`` from the reader's start, for the frames it
-        knows."""
+                 schedule: FrameSchedule | None = None, nv12: bool = False) -> None:
+        """``color``: decode to BGR, or with ``nv12`` to packed NV12 (H * 3 / 2, W), half the bytes, as a camera
+        delivers it; otherwise to gray, so a mono pipeline gets the luma straight from ffmpeg, saving the colour
+        conversion and two thirds of the pipe. ``stream``: which video stream of the file. ``depth``: it holds
+        depth, delivered as uint16 millimetres. ``schedule``: when each frame is due, in place of every 1 / ``fps``
+        from the reader's start, for the frames it knows."""
         self.frame_callback: StreamFrameCallback = frame_callback
         self.schedule: FrameSchedule | None = schedule
+        self.nv12: bool = nv12 and color and not depth
 
         self.cam_id: int = cam_id
         self.frame_type: object = frame_type
@@ -96,10 +99,16 @@ class StreamReader:
 
     def stop(self) -> None:
         """End the reader for good. One that never played ends its decoder here: nothing else would,
-        and a reader still loading ends it when the load is done."""
+        and a reader still loading ends it when the load is done. One that plays has its decoder ended
+        here too, so a read waiting on a decoder that stalled returns and the reader's thread ends."""
         self.stop_event.set()
         if self._play_thread is None:
             self._close()
+            return
+        with self._load_lock:
+            process = self.ffmpeg_process
+        if process is not None:
+            process.terminate()
 
     def join(self) -> None:
         if self._load_thread is not None:
@@ -121,9 +130,10 @@ class StreamReader:
             self.ffmpeg_process = None
             return
 
-        pix_fmt: str = DEPTH_PIX_FMT if self.depth else 'bgr24' if self.color else 'gray'     # BGR matches getCvFrame, no conversion needed
-        self.channels = 3 if self.color and not self.depth else 1
+        pix_fmt: str = DEPTH_PIX_FMT if self.depth else 'nv12' if self.nv12 else 'bgr24' if self.color else 'gray'     # BGR matches getCvFrame
+        self.channels = 3 if self.color and not self.depth and not self.nv12 else 1
         self.bytes_per_frame: int = (depth_frame_bytes(self.frame_width, self.frame_height) if self.depth
+                                     else self.frame_width * self.frame_height * 3 // 2 if self.nv12
                                      else self.frame_width * self.frame_height * self.channels)
 
         ffmpeg_process = None
@@ -177,14 +187,16 @@ class StreamReader:
                 # A bytearray, not bytes: an array over bytes is read-only, and torch warns on it
                 in_bytes = bytearray(self.bytes_per_frame)
                 if self.ffmpeg_process.stdout.readinto(in_bytes) < self.bytes_per_frame:
-                    # print ('End of stream', self.frame_type)
-                    break
-            except ffmpeg.Error as e:
-                logger.error('Error reading frame: %s', e)
+                    break       # the stream's end, or its decoder ended by `stop`
+            except (ffmpeg.Error, OSError, ValueError) as e:
+                if not self.stop_event.is_set():
+                    logger.error('Error reading frame: %s', e)
                 break
 
             if self.depth:
                 frame: np.ndarray = p012_to_depth(in_bytes, self.frame_width, self.frame_height)
+            elif self.nv12:
+                frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([self.frame_height * 3 // 2, self.frame_width])
             elif self.channels == 3:
                 frame: np.ndarray = np.frombuffer(in_bytes, np.uint8).reshape([self.frame_height, self.frame_width, 3])
             else:
@@ -192,14 +204,13 @@ class StreamReader:
 
             due: float | None = self.schedule.moment(self.cam_id, frame_count) if self.schedule is not None else None
             if due is not None and self.schedule is not None:
-                late: float = time.perf_counter() - due
-                if late > frame_interval:
-                    self.schedule.delay(late)       # behind: every reader of the schedule comes later, together
-                    due += late
+                now: float = time.perf_counter()
+                if now - due > frame_interval:
+                    due = self.schedule.catch_up(self.cam_id, frame_count, now)     # behind: every reader comes later, together
                 due = max(due, next_time)           # never before the frame before it
                 remaining: float = due - time.perf_counter()
-                if remaining > 0:
-                    time.sleep(remaining)
+                if remaining > 0 and self.stop_event.wait(remaining):
+                    break               # stopped while it waited
                 next_time = due
 
             self.frame_callback(self.cam_id, self.frame_type, frame, self.chunk_id, frame_count)
@@ -210,7 +221,7 @@ class StreamReader:
             next_time += frame_interval
             remaining = next_time - time.perf_counter()
             if remaining > 0:
-                time.sleep(remaining)
+                self.stop_event.wait(remaining)
             elif -remaining > frame_interval:
                 next_time = time.perf_counter()   # resync after a stall rather than bursting catch-up frames
         self._close()

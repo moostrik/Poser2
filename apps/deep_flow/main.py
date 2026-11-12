@@ -72,7 +72,7 @@ class DeepFlowMain:
         self.session = Session(self.settings.camera.control)       # splits the recording into chunks
         self.person_detector: detection.PersonDetector | None = None      # the replay backend's, shared by its cameras
         if self.settings.camera.sim_enabled:
-            self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH)
+            self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH, nv12=True)     # as the camera hands its frames
             # the recordings on the host, without a device: the people found and followed here
             if self.settings.camera.cam_0.model_chain != ModelChain.OFF:
                 self.person_detector = detection.PersonDetector(self.settings.camera.person_detector)
@@ -90,6 +90,7 @@ class DeepFlowMain:
         if self.player is not None:
             self.recorded_poses = RecordedPoses(self.settings.camera.recorded_poses, self.pose_inference)
             self.player.add_frame_callback(self.recorded_poses.set_clip_frame)
+            self.player.add_jump_callback(self.recorded_poses.clear_waiting)
         pose_step: PoseInference | RecordedPoses = self.recorded_poses if self.recorded_poses is not None else self.pose_inference
         self.capture_sync = CaptureSync(p.capture_sync)                  # the color, depth and poses of one moment, for the render
         self.capture_rate: FPS = FPS(120)                                # the captures it hands on, for the panel's cadence

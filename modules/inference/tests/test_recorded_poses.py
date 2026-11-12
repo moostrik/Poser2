@@ -108,7 +108,8 @@ class RecordedPosesTest(unittest.TestCase):
         captured = time.perf_counter()
         self.clip(captured, 10.0, {3: (BOX, POINTS)}, 0.2)
         self.node.submit({3: pose(3, captured)})
-        self.clip(captured + 0.01, 2.0, {3: (BOX, POINTS)}, 0.0)    # a loop
+        self.node.clear_waiting()                                   # the player's jump: a loop
+        self.clip(captured + 0.01, 2.0, {3: (BOX, POINTS)}, 0.0)
         self.node.submit({3: pose(3, captured + 0.01)})
         self.assertTrue(wait_for(lambda: self.played))
         time.sleep(0.25)

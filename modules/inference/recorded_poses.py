@@ -30,7 +30,6 @@ from .pose_inference import PoseInference
 logger = logging.getLogger(__name__)
 
 KEPT: int = 32          # recorded frames kept per camera: the stage asks for a frame's poses a few frames after it came
-JUMP: float = 1.0       # s of recorded time between two frames beyond which the play jumped: what waits is dropped
 
 
 class RecordedPosesSettings(BaseSettings):
@@ -74,7 +73,6 @@ class RecordedPoses(FrameDictCallbackMixin):
         self._inference.add_frames_callback(self._on_model)
         self._lock: Lock = Lock()
         self._recorded: dict[int, CaptureStream[FrameMetadata]] = defaultdict(lambda: CaptureStream(KEPT))
-        self._recorded_time: dict[int, float] = {}     # each camera's last recorded capture time
         self.missed: MissedParts = MissedParts('Recorded poses')       # poses whose track_id the recording has not
         self.missed.started()
         # The poses waiting for their moment: (due, order, poses), on this node's thread
@@ -109,19 +107,20 @@ class RecordedPoses(FrameDictCallbackMixin):
     def set_clip_frame(self, cam_id: int, frame_type: FrameType, image: np.ndarray, metadata: FrameMetadata | None,
                        captured: float | None) -> None:
         """A `ClipFrameCallback`, on the player's thread: the frame's recorded poses kept by its capture on the
-        play's clock. A jump in the recorded time drops the poses still waiting."""
+        play's clock."""
         if frame_type != FrameType.VIDEO or metadata is None or captured is None:
             return
         with self._lock:
-            last: float | None = self._recorded_time.get(cam_id)
-            jumped: bool = last is not None and not 0.0 < metadata.timestamp - last <= JUMP
-            self._recorded_time[cam_id] = metadata.timestamp
-            if jumped:
-                self._recorded[cam_id].clear()
             self._recorded[cam_id].add(captured, metadata)
-        if jumped:
-            with self._wake:
-                self._waiting.clear()
+
+    def clear_waiting(self) -> None:
+        """The player's jump callback (a loop, a seek): the poses still waiting, and the frames kept, belong to
+        the frames before it, and are dropped."""
+        with self._lock:
+            for recorded in self._recorded.values():
+                recorded.clear()
+        with self._wake:
+            self._waiting.clear()
 
     # ── The async step ─────────────────────────────────────────────────
 

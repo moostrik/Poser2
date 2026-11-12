@@ -15,6 +15,7 @@ import json
 from threading import Thread, Event, Lock
 from pathlib import Path
 from numpy import ndarray
+from collections.abc import Sequence
 from typing import Callable, TypeAlias, cast
 from enum import Enum, auto
 from queue import Queue
@@ -130,13 +131,15 @@ FolderDict = dict[str, Folder]
 class PlayClock:
     """The recorded time of one chunk's play, on `perf_counter`: the `FrameSchedule` every reader of the chunk
     shares. From `start` frame `n` of a camera is captured at the origin plus its recorded capture time minus the
-    first frame's (`capture`), and due at that plus its recorded latency (`moment`), so a frame comes as late after
-    its capture as it came live, and a frame lost live leaves its gap. A reader that falls behind moves the origin
-    for every reader (`delay`). Frames the chunk has no time for are not on it: their readers pace at `fps`."""
+    base, the first frame's (`capture`), and due at that plus its recorded latency (`moment`), so a frame comes as
+    late after its capture as it came live, and a frame lost live leaves its gap. A reader that falls behind moves
+    the origin for every reader, as far as its frame is still behind (`catch_up`). The chunk after it in the
+    recording carries its origin and base on (`carry_on`), so the recorded time runs on across the two. Frames the
+    chunk has no time for are not on it: their readers pace at `fps`."""
 
-    def __init__(self, frames: dict[int, list[FrameMetadata]], first: int) -> None:
+    def __init__(self, frames: dict[int, Sequence[FrameMetadata]], first: int) -> None:
         """`frames`: each camera's metadata by frame number; `first`: the frame number the play starts at."""
-        self._frames: dict[int, list[FrameMetadata]] = frames
+        self._frames: dict[int, Sequence[FrameMetadata]] = frames
         starts: list[float] = [cam_frames[first].timestamp for cam_frames in frames.values() if first < len(cam_frames)]
         self._base: float | None = min(starts) if starts else None
         self._origin: float | None = None
@@ -146,22 +149,47 @@ class PlayClock:
         with self._lock:
             self._origin = origin
 
-    def delay(self, seconds: float) -> None:
+    def carry_on(self, before: 'PlayClock', now: float) -> None:
+        """Run on from `before`, the clock of the chunk played before this one in the recording: its origin and
+        base, when it has both and this chunk has times; else a new start at `now`."""
+        with before._lock:
+            origin, base = before._origin, before._base
         with self._lock:
-            if self._origin is not None:
-                self._origin += seconds
+            if origin is None or base is None or self._base is None:
+                self._origin = now
+                return
+            self._origin, self._base = origin, base
+
+    def catch_up(self, cam_id: int, frame_id: int, now: float) -> float:
+        """The frame found overdue at `now`: the origin moves as far as the frame is still behind, and its moment
+        after it."""
+        with self._lock:
+            due: float | None = self._moment(cam_id, frame_id)
+            if due is None or self._origin is None:
+                return now
+            late: float = now - due
+            if late > 0.0:
+                self._origin += late
+            return due + max(late, 0.0)
 
     def capture(self, cam_id: int, frame_id: int) -> float | None:
         """When the frame was captured, on the play's clock."""
-        frame: FrameMetadata | None = self._frame(cam_id, frame_id)
         with self._lock:
-            if frame is None or self._origin is None or self._base is None:
-                return None
-            return self._origin + frame.timestamp - self._base
+            return self._capture(cam_id, frame_id)
 
     def moment(self, cam_id: int, frame_id: int) -> float | None:
         """When the frame is handed over: its capture plus the latency it came with live."""
-        captured: float | None = self.capture(cam_id, frame_id)
+        with self._lock:
+            return self._moment(cam_id, frame_id)
+
+    def _capture(self, cam_id: int, frame_id: int) -> float | None:
+        frame: FrameMetadata | None = self._frame(cam_id, frame_id)
+        if frame is None or self._origin is None or self._base is None:
+            return None
+        return self._origin + frame.timestamp - self._base
+
+    def _moment(self, cam_id: int, frame_id: int) -> float | None:
+        captured: float | None = self._capture(cam_id, frame_id)
         if captured is None:
             return None
         frame: FrameMetadata | None = self._frame(cam_id, frame_id)
@@ -169,18 +197,20 @@ class PlayClock:
         return captured + (latency or 0.0)
 
     def _frame(self, cam_id: int, frame_id: int) -> FrameMetadata | None:
-        cam_frames: list[FrameMetadata] | None = self._frames.get(cam_id)
+        cam_frames: Sequence[FrameMetadata] | None = self._frames.get(cam_id)
         if cam_frames is None or not 0 <= frame_id < len(cam_frames):
             return None
         return cam_frames[frame_id]
 
 class Player(Thread):
-    def __init__(self, settings: PlayerSettings, data_path: str = "", gray: bool = False) -> None:
-        """``gray``: the consuming pipeline is mono, so video decodes straight to gray."""
+    def __init__(self, settings: PlayerSettings, data_path: str = "", gray: bool = False, nv12: bool = False) -> None:
+        """``gray``: the consuming pipeline is mono, so video decodes straight to gray. ``nv12``: color decodes to
+        packed NV12, as a camera delivers it to an uploader that converts on the GPU (and half the bytes of BGR)."""
         super().__init__()
         self.settings: PlayerSettings = settings
         self.data_path: str = data_path
         self.gray: bool = gray
+        self.nv12: bool = nv12 and not gray
         self.num_cams: int = settings.num_cams
         self.types: list[FrameType] = settings.video_frame_types
         self.fps: float = settings.fps
@@ -225,6 +255,10 @@ class Player(Thread):
         self.chunk_metadata: dict[tuple[int, int], ChunkMetadata] = {}      # by (cam_id, chunk)
         self.load_clock: PlayClock | None = None    # the recorded time of the chunk being loaded,
         self.play_clock: PlayClock | None = None    # and of the one playing
+        self._hand_over_lock: Lock = Lock()         # one frame's streams out at a time, in frame order
+        self._handed_over: dict[int, int] = {}      # each camera's last frame gone out
+        self._unpaired: int = 0                     # frames dropped without their other stream, since the readout
+        self._shown_frame: int = -1                 # camera 0's frame last gone out, for the panel
 
         self.drift_lock: Lock = Lock()
         self.drift_ids: dict[int, int] = {}
@@ -233,6 +267,7 @@ class Player(Thread):
         self.playback_lock: Lock = Lock()
         self.frame_callbacks: list[ClipFrameCallback] = []
         self.loop_callbacks: list[LoopCallback] = []
+        self.jump_callbacks: list[LoopCallback] = []
         self._gui_update_time: float = 0.0
 
         # Bind player settings callbacks
@@ -272,6 +307,7 @@ class Player(Thread):
                 if message and message.state == MessageType.START:
                     if message.prepare:
                         self._prepare_folder(message.value)
+                    self.chunk_metadata.clear()         # another folder's chunks are numbered alike
                     self._set_load_folder(message.value)
                     self._set_load_chunk(-1)
                     self._set_play_chunk(-1)
@@ -292,7 +328,6 @@ class Player(Thread):
                     state = State.SEEKING
                 if state == State.SEEKING and self._finished_loading():
                     self._start(loop=False)
-                    sleep(0.1) # waiting a bit reduces drift
                     if self.seek_outside:
                         self._set_load_chunk(self.start_chunk - 1)      # so the next load is the in marker's
                     self._load()
@@ -305,11 +340,10 @@ class Player(Thread):
                     state = State.LOADING
                 if state == State.LOADING and self._finished_loading():
                     self._start()
-                    sleep(0.1) # waiting a bit reduces drift
                     self._load()
                     state = State.PLAYING
                 if state == State.PLAYING and self._finished_playing() and self._finished_loading():
-                    self._start()
+                    self._start(follows=True)
                     self._load()
                 if state == State.STOP:
                     self._stop()
@@ -317,6 +351,7 @@ class Player(Thread):
                 if state == State.STOPPING and self._finished_stopping():
                     state = State.IDLE
                 self._clean()
+                self._update_readouts()
 
                 if self.stop_event.is_set() and state == State.IDLE:
                     self.running = False
@@ -343,12 +378,18 @@ class Player(Thread):
         """The readers of the load chunk's frames `lo` up to `hi`."""
         folder: Folder = self.folders[self.load_folder]
         self.load_types = set()
-        frames: dict[int, list[FrameMetadata]] = {}
+        frames: dict[int, Sequence[FrameMetadata]] = {}
+        # Only the chunk playing and this one are kept: a loop over one chunk reads its metadata once
+        keep: set[int] = {self._get_play_chunk(), self.load_chunk}
+        for key in [key for key in self.chunk_metadata if key[1] not in keep]:
+            del self.chunk_metadata[key]
         for c in range(self.num_cams):
             chunk_path: Path = folder.path / make_chunk_name(c, self.load_chunk)
             if chunk_path.is_file():
-                metadata: ChunkMetadata = read_metadata(chunk_path, c)
-                self.chunk_metadata[(c, self.load_chunk)] = metadata
+                metadata: ChunkMetadata | None = self.chunk_metadata.get((c, self.load_chunk))
+                if metadata is None:
+                    metadata = read_metadata(chunk_path, c)
+                    self.chunk_metadata[(c, self.load_chunk)] = metadata
                 frames[c] = metadata.frames
         self.load_clock = PlayClock(frames, lo)
         for c in range(self.num_cams):
@@ -370,29 +411,47 @@ class Player(Thread):
     def _load_stream(self, cam_id: int, frame_type: FrameType, path: Path, stream: int, lo: int, hi: int | None,
                      clock: PlayClock | None) -> None:
         color: bool = frame_type == FrameType.VIDEO and not self.gray
+        nv12: bool = color and self.nv12
         player: StreamReader = StreamReader(cam_id, frame_type, cast(StreamFrameCallback, self._frame_sync_callback), color,
-                                            self.hwaccel, self.hwaccel_device, self.fps, stream, frame_type == FrameType.DEPTH, clock)
+                                            self.hwaccel, self.hwaccel_device, self.fps, stream, frame_type == FrameType.DEPTH, clock, nv12)
         player.load(str(path), self.load_chunk, lo, hi)
         self.loaders.append(player)
         self.load_types.add(frame_type)
 
-    def _start(self, loop: bool = True) -> None:
-        """Play what is loaded. ``loop``: the loop callbacks may hear of it, at the in marker."""
+    def _start(self, loop: bool = True, follows: bool = False) -> None:
+        """Play what is loaded. ``loop``: the loop callbacks may hear of it, at the in marker. ``follows``: it is
+        the chunk after the one that played: its clock carries the playing one's on, and no jump is told."""
         for p in self.players:
             p.stop()
             self.closers.append(p)
         self.players.clear()
 
-        self._set_play_chunk(self._get_load_chunk())
+        with self.playback_lock:
+            played: int = self.play_chunk
+            before: PlayClock | None = self.play_clock
+        load_chunk: int = self._get_load_chunk()
+        runs_on: bool = follows and before is not None and load_chunk == played + 1
+        self._set_play_chunk(load_chunk)
         self._clear_frame_sync()
         self._clear_drift()
         with self.sync_lock:
             self.play_types = self.load_types
         clock: PlayClock | None = self.load_clock
         if clock is not None:
-            clock.start(perf_counter())
+            if runs_on:
+                assert before is not None
+                clock.carry_on(before, perf_counter())
+            else:
+                clock.start(perf_counter())
         with self.playback_lock:
             self.play_clock = clock
+
+        if not runs_on:
+            for callback in self.jump_callbacks:
+                try:
+                    callback()
+                except Exception:
+                    logger.exception("Player jump callback failed")
 
         for p in self.loaders:
             p.play()
@@ -483,55 +542,58 @@ class Player(Thread):
 
     # FRAME CALLBACK
     def _frame_sync_callback(self, cam_id: int, frame_type: FrameType, frame: ndarray, chunk_id: int, frame_id: int) -> None:
+        """A stream's frame, on its reader's thread. A frame whose streams are all in goes out, its streams together
+        with one stamp, under one lock, so frames leave in their order; one older than a frame gone out is
+        dropped, and frames left without their other stream are dropped and counted."""
         if chunk_id != self._get_play_chunk():
-            # print(f"Chunk {chunk_id} does not match load chunk {self.get_current_chunk()}, ignoring frame")
             return
 
         if cam_id == 0 and frame_type == FrameType.VIDEO:
-            self.update_gui(frame_id)
+            self._shown_frame = frame_id        # the player's thread shows it on the panel
 
-        sync_frames:dict[FrameType, ndarray] = {}
-        with self.sync_lock:
-            cam_frames: dict[int, dict[FrameType, ndarray]] = self.frame_sync_dict[cam_id]
-            if frame_id not in cam_frames:
-                cam_frames[frame_id] = {}
-            cam_frames[frame_id][frame_type] = frame
-            for t in self.play_types:
-                if t not in cam_frames[frame_id]:
+        with self._hand_over_lock:
+            with self.sync_lock:
+                cam_frames: dict[int, dict[FrameType, ndarray]] = self.frame_sync_dict[cam_id]
+                cam_frames.setdefault(frame_id, {})[frame_type] = frame
+                if any(t not in cam_frames[frame_id] for t in self.play_types):
                     return
+                stale: list[int] = [key for key in cam_frames if key < frame_id]
+                for key in stale:
+                    del cam_frames[key]
+                self._unpaired += len(stale)
+                sync_frames: dict[FrameType, ndarray] = cam_frames.pop(frame_id)
+                if frame_id <= self._handed_over.get(cam_id, -1):
+                    return          # a frame older than one gone out: the order holds
+                self._handed_over[cam_id] = frame_id
 
-            keys_to_delete: list[int] = []
+            self._calcuate_drift(cam_id, frame_id)
 
-            for key in cam_frames.keys():
-                if key < frame_id - 3:
-                    logger.info(f"Frame {key} is older than {frame_id}, marking for removal")
-                    keys_to_delete.append(key)
-
-            for key in keys_to_delete:
-                del cam_frames[key]
-
-            sync_frames = cam_frames[frame_id]
-            del cam_frames[frame_id]
-
-        # make thread safe and reset on start of new chunk
-        self._calcuate_drift(cam_id, frame_id)
-
-        metadata: ChunkMetadata | None = self.chunk_metadata.get((cam_id, chunk_id))
-        frame_metadata: FrameMetadata | None = None
-        if metadata is not None and frame_id < len(metadata.frames):
-            frame_metadata = metadata.frames[frame_id]
-        with self.playback_lock:
-            clock: PlayClock | None = self.play_clock
-        timestamp: float | None = clock.capture(cam_id, frame_id) if clock is not None else None
-        for ft in self.types:       # VIDEO first: its readings set up what the depth of the frame uses
-            if ft in sync_frames:
-                for callback in self.frame_callbacks:
-                    callback(cam_id, ft, sync_frames[ft], frame_metadata, timestamp)
+            metadata: ChunkMetadata | None = self.chunk_metadata.get((cam_id, chunk_id))
+            frame_metadata: FrameMetadata | None = None
+            if metadata is not None and frame_id < len(metadata.frames):
+                frame_metadata = metadata.frames[frame_id]
+            with self.playback_lock:
+                clock: PlayClock | None = self.play_clock
+            timestamp: float | None = clock.capture(cam_id, frame_id) if clock is not None else None
+            for ft in self.types:       # VIDEO first: its readings set up what the depth of the frame uses
+                if ft in sync_frames:
+                    for callback in self.frame_callbacks:
+                        callback(cam_id, ft, sync_frames[ft], frame_metadata, timestamp)
 
     def _clear_frame_sync(self) -> None:
         with self.sync_lock:
             for i in range(self.num_cams):
                 self.frame_sync_dict[i].clear()
+            self._handed_over.clear()
+
+    def _update_readouts(self) -> None:
+        """On the player's thread: the panel's playback readouts, and the frames dropped unpaired since the last."""
+        if self._shown_frame >= 0:
+            self.update_gui(self._shown_frame)
+        with self.sync_lock:
+            unpaired, self._unpaired = self._unpaired, 0
+        if unpaired:
+            logger.info("Player: %d frames dropped without their other stream", unpaired)
 
     # DRIFT CALCULATION
     def _calcuate_drift(self, cam_id, frame_id: int) -> None:
@@ -645,6 +707,15 @@ class Player(Thread):
         if callback not in self.loop_callbacks:
             self.loop_callbacks.append(callback)
 
+    def add_jump_callback(self, callback: LoopCallback) -> None:
+        """Called on the player thread when playback starts somewhere that does not follow what played: a loop, a
+        seek, a scrub's frame, another folder. What waits for the frames before it is to be dropped: keep it short."""
+        if self.running:
+            logger.warning('Player: cannot add callback while it is running')
+            return
+        if callback not in self.jump_callbacks:
+            self.jump_callbacks.append(callback)
+
     # STATIC METHODS
     @staticmethod
     def _get_video_folders(settings: PlayerSettings, data_path: str = "") -> FolderDict:
@@ -711,8 +782,8 @@ class Player(Thread):
         self.state_messages.put(Message(MessageType.SEEK))
 
     def update_gui(self, frame_id: int = 0) -> None:
-        # Settings writes run share propagation and callbacks on this (reader) thread; a GUI
-        # readout needs no more than 4 Hz
+        """The panel's playhead and chunk, on the player's thread, at most 4 times a second: a settings write runs
+        its share propagation and callbacks on the writing thread, never a reader's."""
         now: float = perf_counter()
         if now - self._gui_update_time < 0.25:
             return
