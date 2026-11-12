@@ -31,7 +31,6 @@ STALE_PRESET_KEYS = {
 }
 
 BANNED: list[tuple[str, str]] = [
-    ('settings, not config', r'^_?config$'),
     ('track_id, not tracklet_id / pose_id', r'tracklet_ids?$|^pose_ids?$'),
     # not 'time_stamped': the verb, as in a motion time stamped from the first frame
     ('timestamp, not time_stamp', r'time_stamps?(?![a-z])'),

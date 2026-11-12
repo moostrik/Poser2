@@ -6,7 +6,7 @@ thread; nothing else of the panel runs in the app's process, so a page build nev
 
 What the link carries, as tuples of plain values:
 
-    app → panel   ("init", description, values, setup, log entries), ("values", changes),
+    app → panel   ("init", description, values, config, log entries), ("values", changes),
                   ("log", entries), ("reply", request, ok), ("stop",)
     panel → app   ("set", path, name, value), ("fire", path, name), ("load" | "save", request, preset name),
                   ("exit",), ("log", record)
@@ -138,14 +138,14 @@ class PanelServer:
         cursor, entries = buffer.get_entries_since(0) if buffer is not None else (0, [])
         diff = mirror.ValueDiff(self.root)      # before the values, so a change in between is sent again, not lost
         s = self.settings
-        setup: dict[str, Any] = {      # what the panel process starts with besides the tree
+        config: dict[str, Any] = {
             "title": s.title, "port": s.port, "browser": s.browser,
             "browser_x": s.browser_x, "browser_y": s.browser_y,
             "browser_width": s.browser_width, "browser_height": s.browser_height,
             "app": presets.current_app(), "default_startup": presets.default_startup(),
             "log_level": logging.getLogger().getEffectiveLevel(),
         }
-        self._send(("init", mirror.describe(self.root), mirror.values(self.root), setup, [tuple(e) for e in entries]))
+        self._send(("init", mirror.describe(self.root), mirror.values(self.root), config, [tuple(e) for e in entries]))
         due: float = time.perf_counter()
         while not self._stopped.is_set():
             try:

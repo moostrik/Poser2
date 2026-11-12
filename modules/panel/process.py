@@ -181,7 +181,7 @@ def _connect() -> Connection:
 
 def main() -> None:
     conn = _connect()
-    _, description, values, setup, entries = conn.recv()
+    _, description, values, config, entries = conn.recv()
 
     log_buffer = LogRingBuffer()
     for entry in entries:
@@ -194,17 +194,17 @@ def main() -> None:
     root_logger = logging.getLogger()
     root_logger.handlers.clear()
     root_logger.addHandler(LinkHandler(link))
-    root_logger.setLevel(setup["log_level"])
+    root_logger.setLevel(config["log_level"])
 
     root = mirror.build_mirror(description)
     mirror.apply(root, values)
     link.watch(root)
 
-    presets.set_app(setup["app"], setup["default_startup"])
+    presets.set_app(config["app"], config["default_startup"])
     state = PanelState(presets.app_dir() / STATE_FILE)
     state.load()
-    title: str = setup["title"]
-    port: int = setup["port"]
+    title: str = config["title"]
+    port: int = config["port"]
 
     # The page's stylesheet and script; a short cache age, so an edit shows at the next reload.
     nicegui_app.add_static_files(STATIC_URL, STATIC_DIR, max_cache_age=10)
@@ -225,11 +225,11 @@ def main() -> None:
 
     nicegui_app.on_startup(lambda: threading.Thread(target=link.receive, daemon=True, name="receive").start())
 
-    if setup["browser"]:
+    if config["browser"]:
         threading.Thread(
             target=open_app_window, args=(port,),
-            kwargs=dict(x=setup["browser_x"], y=setup["browser_y"],
-                        width=setup["browser_width"], height=setup["browser_height"]),
+            kwargs=dict(x=config["browser_x"], y=config["browser_y"],
+                        width=config["browser_width"], height=config["browser_height"]),
             daemon=True, name="window",
         ).start()
     for ip in local_ips():
