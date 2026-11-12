@@ -14,7 +14,7 @@ How deep_flow runs now, per thread, the callbacks in the order they are register
 | Thread                                   | Runs                                                                                     | Waits for                                  |
 |------------------------------------------|------------------------------------------------------------------------------------------|--------------------------------------------|
 | the camera's (depthai; -sim: the player's reader) | `Recorder.submit_frame` (live), `Uploader.submit_frame`: each only queues             | nothing                                    |
-| the uploader's (`Uploader`)              | a color frame: the pinned copy, the GPU's conversion and straightening queued, then `PersonDetector.submit` (-sim), `CaptureSync.submit_image`, `board.set_camera_image` and the pose step (`PosesFromTracklets.process` → the RAW stage → `PoseInference.submit`: the crops queued, a "crops ready" event); a depth frame: the pinned copy and the alignment queued as one CUDA graph (`DepthAligner.align_staged`), then `CaptureSync.submit_depth`, which can hand a capture on to the board | the GPU, in the upload's copy from pinned memory while its queue is full |
+| the uploader's (`Uploader`)              | a color frame: the pinned copy, the GPU's conversion and straightening queued, then `PersonDetector.submit` (-sim), `CaptureSync.submit_image`, `board.set_camera_image` and the pose step (`PosesFromTracklets.process` → the RAW stage → `PoseInference.submit`: the crops queued, a "crops ready" event); a depth frame: the pinned copy and the alignment queued as two CUDA kernels (`DepthAligner.align_staged`), then `CaptureSync.submit_depth`, which can hand a capture on to the board | the GPU, in the upload's copy from pinned memory while its queue is full |
 | the tracklets' (depthai)                 | `Tracker.submit_cam_tracklets` (a queue put), `board.set_camera_tracklets`, `tracker.update` (sets the tracker's event) | nothing                                    |
 | the tracker's                            | associates the tracklets, hands them to `PosesFromTracklets.set_tracklets` and the board   | nothing                                    |
 | the pose model's (`pose.Predictor`)      | RTMPose on the crops after their event, then the CLEAN and SMOOTH stages, the capture sync, the board, OSC | its own model                              |
@@ -210,7 +210,8 @@ runs nothing), whose image pairing is to be checked when it is used.
 
 #### Built
 
-Parts 1 to 7 are built, one commit each (86d67e75, 38136432, 63baf89d, 6d0fa2da, ca3f2ffd, ca373c15, 77cd1f96).
+Parts 1 to 7 are built, one commit each (86d67e75, 38136432, 63baf89d, 6d0fa2da, ca3f2ffd, ca373c15, 77cd1f96),
+then the depth's kernels (a4617bd1) and the crop at the pose model's size (0703194d).
 Measured in -sim on the P800 recording (20261111-123241, 992 × 800, the player in view), per loop of the
 recording, two loops each, by the probe (`scripts/cadence_probe.py`; the baseline and the parts by its first
 version, which timed more and read the tick about 3 ms lower, unexplained):
@@ -222,17 +223,26 @@ version, which timed more and read the tick about 3 ms lower, unexplained):
 | 7, every capture         | 100% (731/731)  | 25.7–27.1     | 20.0–20.9                | 0.09 / 0.13                   | 23             |
 | 7, the probe in the repo | 100%            | 28.8–31.5     | 19.2–20.0                | 0.02 / 0.02, the hand-off     | 25–29          |
 
-The tick's p95 swings from run to run (26 to 40 ms on the same code), more than the parts differ. The latency rose
-with part 6, where the depth goes through the uploader and its alignment (0.64 ms of GPU a frame, GL's was 0.12)
-adds to the GPU's queue **(deduction)**.
+The tick's p95 swings from run to run (26 to 40 ms on the same code), and whole batches of runs drift together,
+more than the parts differ: a change is judged by runs back to back. So, by the repo's probe, the depth's alignment:
+
+| Depth alignment            | Ticks     | Tick p95 (ms) | Worst tick (ms) | Capture latency p95 (ms) | Uploader drops |
+|----------------------------|-----------|---------------|-----------------|--------------------------|----------------|
+| torch ops as a CUDA graph  | 66–72/s   | 31–35         | 60–61           | 19.6                     | 29             |
+| CUDA kernels (the default) | 77–80/s   | 25–26         | 53              | 18.0–19.0                | 10             |
+
+The uploader's drops all fall in the app's first 0.3 s, while the panel is built **(site fact)**: none in the
+measured loops. The capture latency rose with part 6, where the depth goes through the uploader, by about 4 ms
+with the kernels.
 
 Where the build differs from the plan above:
 - The PBO ring was not built: the copy queued on the render's stream (part 1) took the render's wait from 13 to
   about 4 ms at p95, and a ring would move the wait, not shrink it.
-- The depth's alignment runs as one CUDA graph per lens, homography and size: its hundred small kernels, launched
-  one by one, held the uploader 12 ms a frame while the GPU's queue was full; as one launch, 0.8 ms. A new tilt
-  (0.25° steps) captures it again, which waits for the GPU once. The homography's numbers go into the kernels as
-  numbers, never copied to the GPU. It matches `DepthAlign` but for under 2 border pixels a frame.
+- The depth's alignment runs as two CUDA kernels compiled at runtime by the NVRTC torch ships (`cuda_kernels.py`),
+  the GL shader's two stages: 0.07 ms of GPU a frame with the copy, against 0.13 for the shader. The torch ops,
+  about a hundred small kernels at 0.6 to 1.3 ms, held the uploader 12 ms a frame launched one by one while the
+  GPU's queue was full; they stay as the fallback (`depth_kernels` off, or the kernels failing), as one CUDA
+  graph per lens, homography and size. The kernels match `DepthAlign` but for about one border pixel a frame.
 - The view stage's parts: `ViewLayer` (`ViewInput`, `ViewOutput`, settings `view`) beside the other stages; its
   geometry and the edge-aware read (`DepthUpscale`, `edge_aware_depth`) in `modules/flow/view`; the pictures for
   the panels `ViewOutputLayer` and `ViewDepthLayer`; the pose over the view `CenterPoseLayer` on the view's points.

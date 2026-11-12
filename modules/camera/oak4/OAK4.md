@@ -296,7 +296,7 @@ Next to a near object the color camera sees background the left camera could not
 | Neural Depth    | 36.9 ms | 46.8 ms |
 | `ImageAlign`    | 45.0 ms | 51.5 ms |
 
-The alignment takes 0.64 ms of GPU a frame, queued as one CUDA graph per lens and tilt; it matches the GL `DepthAlign` shader (0.13 ms), which matches a float64 reference on captured frames (the same empty pixels, values within 6 mm), but for under 2 border pixels a frame (`scripts/depth_align_check.py`). Recordings store the depth on its own view with its alignment in the chunk info; recordings made before hold depth already on the color view and no alignment, and play through the same pass.
+The alignment takes 0.07 ms of GPU a frame with its copy, as two CUDA kernels compiled at runtime; it matches the GL `DepthAlign` shader (0.13 ms), which matches a float64 reference on captured frames (the same empty pixels, values within 6 mm), but for about one border pixel a frame (`scripts/depth_align_check.py`). Recordings store the depth on its own view with its alignment in the chunk info; recordings made before hold depth already on the color view and no alignment, and play through the same pass.
 
 The uploader hands it on as float32 meters on the color view (`GpuDepth`); deep_flow's view stage reads it into the flow's view ([INPUT_THREADS.md](../../flow/INPUT_THREADS.md)), and `ViewDepthLayer` draws it. The colormap matches depthai's `colorizeDepthFrame` defaults: JET on a log scale from 0.3 to 12 m, which puts the detail close to the camera.
 
