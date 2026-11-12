@@ -16,6 +16,7 @@ inferred, **(site fact)** what the operator saw.
 | 5   | [The 2D flow follows the 3D](#5-the-2d-flow-follows-the-3d)               | not started                                                   | [FLOW.md](FLOW.md)                                           |
 | 6   | [A camera without depth](#6-a-camera-without-depth)                       | not started                                                   | [FLOW.md](FLOW.md), [VIEW.md](VIEW.md)                       |
 | 7   | [Recording and -sim](#7-recording-and--sim)                               | built; checks open                                            | [RECORDING.md](../camera/recording/RECORDING.md), [INPUT_THREADS.md](INPUT_THREADS.md) |
+| 8   | [The camera package cleaned](#8-the-camera-package-cleaned)               | planned                                                       | [CAMERA.md](../camera/CAMERA.md)                             |
 
 The 3D fluid's lines are weighed by [its goal](FLUID_3D.md#the-goal): sharp, translucent ink patterns, layers
 distinct.
@@ -219,6 +220,27 @@ Each 2D stage gets its document as it is rebuilt (`BRIDGE_2D.md`, `FLUID_2D.md`)
   depth's edges on the measure recording (z's step inside the body, z's noise at the edge and inside); the dye
   at drag 0.
 - The recorded tracklets' checks: [RECORDING.md's Open](../camera/recording/RECORDING.md#open).
+
+## 8. The camera package cleaned
+
+`modules/camera` holds what is not a camera, files of several subjects and names that do not say what they do
+([CAMERA.md](../camera/CAMERA.md#what-is-wrong)). Form only: no behavior changes, nothing with no caller removed.
+A commit a step, the guard and import tests after each, the full suite once at the end.
+
+1. [Recording leaves the camera](../camera/CAMERA.md#1-recording-leaves-the-camera): `modules/recording`, with the
+   replay camera.
+2. [What is not a camera goes where it belongs](../camera/CAMERA.md#2-what-is-not-a-camera-goes-where-it-belongs):
+   the software tracker, `FrameTrigger`, the OAK4's two scripts.
+3. [One subject per file](../camera/CAMERA.md#3-one-subject-per-file): `geometry.py`, the two `definitions.py`,
+   `settings.py`.
+4. [Names](../camera/CAMERA.md#4-names): `CameraHealth`, `KeypointJoin`, `oak.ClipCamera`.
+5. [The public boundary](../camera/CAMERA.md#5-the-public-boundary): `__init__.py` exports what another package
+   imports.
+6. [Docstrings and comments](../camera/CAMERA.md#6-docstrings-and-comments): three lines at most, the reasons into
+   CAMERA.md.
+7. [What no preset runs](../camera/CAMERA.md#7-what-no-preset-runs): kept, and listed.
+
+The rules that keep a package so are [proposed there](../camera/CAMERA.md#proposed-rules), not yet in `CLAUDE.md`.
 
 ## The motion's details
 
