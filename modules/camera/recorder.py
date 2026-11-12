@@ -335,8 +335,9 @@ class Recorder(Thread):
             self.sync.submit_frame(frame)
 
     def submit_tracklets(self, cam_tracklets: CameraTracklets) -> None:
-        """A camera's tracklet callback, the tracklets as the camera gave them: while recording, to the sync."""
-        if self._get_state() == RecState.REC:
+        """A camera's tracklet callback, the tracklets as the camera gave them: while recording, to the sync.
+        Tracklets found on the straightened image (the host detector's in -sim) are not a camera's, and stay out."""
+        if self._get_state() == RecState.REC and not cam_tracklets.straightened:
             self.sync.submit_tracklets(cam_tracklets)
 
     def expect_poses(self, cam_id: int, timestamp: float, asked: bool) -> None:

@@ -29,6 +29,11 @@ take the uploader's with [PLAN.md's line 4](../flow/PLAN.md#4-the-other-apps-on-
 
 ## Recording
 
+deep_flow records live and in -sim alike: a recording played is recorded again as the replay camera hands it on (its
+frames with their readings and lens, its recorded tracklets; the host detector's tracklets are not a camera's and
+stay out), with the poses the app finds in it, so a recording without poses gets them by being played once with the
+pose model on.
+
 `Recorder` takes the camera's frames (`submit_frame`) and tracklets (`submit_tracklets`) on the camera's threads and
 hands them to its `RecordingSync`, which brings the parts of one capture together, completeness first: the color
 frame, its depth when DEPTH is in `video_frame_types`, and the tracklets of a camera that sends them, matched by
@@ -165,10 +170,18 @@ the poses asked for and not for a frame nobody asked, the poses asked for that n
 playing the recorded box and points by `track_id` after their latency, a missing `track_id`, a jump, and `enabled`
 off leaving the pose model's poses.
 
-Waiting for the camera:
+Measured by `scripts/pose_recording_probe.py`, on `20261112-124918_hands` (P800, one player throughout), 12 s each:
 
-- the poses' latency live (capture to the RAW stage's output: the camera's delivery, the upload, the crops and
-  RTMPose **(deduction)**), from a new recording's `pose_latency`, to set `pose_wait` to about three times it;
-- -sim with the recorded poses against live on the same scene: the SMOOTH stage's angles of one player, frame by
-  frame, and the board's poses over the image; `missed_poses` and the `track_id`s missed in -sim.
+| Run                                            | Frames | With poses           | Pose latency median / p95 / max (ms) |
+|------------------------------------------------|--------|----------------------|--------------------------------------|
+| played with the pose model on, recorded again  | 594    | 488 (82%)            | 64.5 / 97.5 / 111                    |
+| that recording played with its recorded poses  | 463    | 463, all as recorded | 72.3 / 105 / 114                     |
+
+No pose came later than `pose_wait` (150 ms); the 106 frames without poses are batches the pose model dropped under
+-sim's load **(deduction)**, which the replay drops alike. In the replay every RAW pose had its recorded box and
+points, no `track_id` was missed, and the poses came about 8 ms later after their capture than recorded: -sim's own
+delay on top of the recorded one.
+
+Waiting for the camera: the poses' latency live, from a new recording's `pose_latency`, to set `pose_wait` to about
+three times it; the board's poses over the image in a replay against live.
 

@@ -66,8 +66,10 @@ class DeepFlowMain:
         configure_features(max_players)
 
         self.cameras: list[CameraSource] = []
-        self.recorder: Recorder | None = None
         self.player: Player | None = None
+        # Live and in -sim: a recording played can be recorded again, with what the app found in it (its poses)
+        self.recorder: Recorder = Recorder(self.settings.camera.recorder, data_path=DATA_PATH)
+        self.session = Session(self.settings.camera.control)       # splits the recording into chunks
         self.person_detector: detection.PersonDetector | None = None      # the replay backend's, shared by its cameras
         if self.settings.camera.sim_enabled:
             self.player = Player(self.settings.camera.simulator, data_path=DATA_PATH)
@@ -78,8 +80,6 @@ class DeepFlowMain:
                 cam = self.settings.camera.cameras[i]
                 self.cameras.append(replay.Camera(self.player, cam, self.person_detector, replay.Tracker(), i, cam.tilt))
         else:
-            self.recorder = Recorder(self.settings.camera.recorder, data_path=DATA_PATH)
-            self.session = Session(self.settings.camera.control)       # splits the recording into chunks
             for i in range(num_cams):
                 self.cameras.append(Camera(self.settings.camera.cameras[i]))
         self.tracker = OnePerCamTracker(self.settings.camera.tracker, max_players)
@@ -97,9 +97,8 @@ class DeepFlowMain:
         # The camera's thread only hands its frames and tracklets over: to the recorder as they came, to the uploader
         # for the rest, which straightens the tracklets with their frame and hands them to the tracker and the board
         for camera in self.cameras:
-            if self.recorder:
-                camera.add_frame_callback(self.recorder.submit_frame)
-                camera.add_tracklet_callback(self.recorder.submit_tracklets)
+            camera.add_frame_callback(self.recorder.submit_frame)
+            camera.add_tracklet_callback(self.recorder.submit_tracklets)
             camera.add_frame_callback(self.uploader.submit_frame)
             camera.add_tracklet_callback(self.uploader.submit_tracklets)
         self.uploader.add_tracklet_callback(self.tracker.submit_cam_tracklets)
@@ -124,8 +123,7 @@ class DeepFlowMain:
             self.pipeline.add_frames_callback(stage, partial(self.osc_sound.submit_frames, stage))
             self.board.set_window_source(stage, self.pipeline.window(stage))
         self.pipeline.add_frames_callback(Stage.RAW, partial(self._on_pose_frames, Series.POSE_LATENCY_RAW))
-        if self.recorder is not None:
-            self.pipeline.add_frames_callback(Stage.RAW, self._record_poses)     # the pose model's poses, with the video
+        self.pipeline.add_frames_callback(Stage.RAW, self._record_poses)     # the RAW stage's poses, with the video
         self.pipeline.add_frames_callback(Stage.SMOOTH, partial(self._on_pose_frames, Series.POSE_LATENCY_SMOOTH))
 
         # THE UPLOADER'S HAND-OFFS, in order on its thread: each uploaded image to the detector (-sim), the capture
@@ -181,8 +179,7 @@ class DeepFlowMain:
 
         if self.player:
             self.player.start()
-        if self.recorder:
-            self.recorder.start()
+        self.recorder.start()
 
         self.is_running = True
         self.render.start()
@@ -192,8 +189,8 @@ class DeepFlowMain:
         camera every image is a round, so the frame domain runs on each, at the image's capture time. The recorder
         hears whether the pose model was asked poses for the image, so a frame without a player does not wait."""
         asked: FrameDict = self.poses_from_tracklets.process(image.timestamp)
-        if self.recorder is not None:
-            self.recorder.expect_poses(image.cam_id, image.timestamp, bool(asked) and self.settings.pose.pose.enabled)
+        posing: bool = (self.recorded_poses is not None and self.settings.camera.recorded_poses.enabled) or self.settings.pose.pose.enabled
+        self.recorder.expect_poses(image.cam_id, image.timestamp, bool(asked) and posing)
         last: float | None = self._last_camera_frame.get(image.cam_id)
         self._last_camera_frame[image.cam_id] = image.timestamp
         if last is not None:
@@ -201,7 +198,6 @@ class DeepFlowMain:
 
     def _record_poses(self, frames: FrameDict) -> None:
         """The RAW stage's poses, on the pose model's thread, to the recorder: their hand-over, stamped here."""
-        assert self.recorder is not None
         arrival: float = time.perf_counter()
         for poses in frame_poses(frames, arrival):
             self.recorder.submit_poses(poses)
@@ -261,8 +257,7 @@ class DeepFlowMain:
         for camera in self.cameras:
             camera.stop()
         self.uploader.stop()
-        if self.recorder:
-            self.recorder.stop()
+        self.recorder.stop()
 
         self.tracker.stop()
         self.osc_sound.stop()

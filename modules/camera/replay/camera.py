@@ -3,7 +3,8 @@ delivered them, and the players in them as the camera's tracklets, so `-sim` nee
 
 A frame is stamped with its capture on the play's clock (`PlayClock`), arriving as late after it as it
 came live, and goes on as the camera delivered it: `flip_h` as recorded, depth frames with the recorded
-alignment, and with `tilt` the homography of the recorded tilt plus the live offset on the recorded lens.
+alignment, and with `tilt` the homography of the recorded tilt plus the live offset on the recorded lens. It
+carries the recorded readings and lens, so a recording played can be recorded again as it was.
 The device's warp is not applied here: a replay plays what was recorded.
 
 The tracklets come one of two ways. A recording that keeps the camera's tracklets plays them: each
@@ -143,8 +144,10 @@ class Camera:
         homography: np.ndarray | None = self.tilt_correction.homography if self.tilt_correction is not None else None
         alignment: DepthAlignment | None = info.depth_alignment if frame_type == FrameType.DEPTH and info is not None else None
         flip_h: bool = info.flip_h if info is not None else False
+        readings: FrameReadings | None = metadata.readings if frame_type == FrameType.VIDEO and metadata is not None else None
+        intrinsics: list[list[float]] | None = info.intrinsics if info is not None else None
         frame = CameraFrame(cam_id=self.id, kind=frame_type, image=image, timestamp=timestamp, flip_h=flip_h,
-                            homography=homography, alignment=alignment, arrival=arrival)
+                            homography=homography, readings=readings, intrinsics=intrinsics, alignment=alignment, arrival=arrival)
         for c in self.frame_callbacks:
             c(frame)
         if frame_type == FrameType.VIDEO and metadata is not None:
