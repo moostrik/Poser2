@@ -6,7 +6,7 @@
     "keyframe_interval": 50,
     "color": true,
     "resolution": "P800",
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "fov": 80.0,
     "split_seconds": 60,
@@ -80,7 +80,11 @@
       "sim_passthrough": false,
       "replay": true
     },
+    "uploader": {
+      "depth_kernels": true
+    },
     "person_detector": {
+      "enabled": false,
       "model_type": "TRT",
       "resolution": "R640X512",
       "model_path": "data/models",
@@ -104,7 +108,8 @@
       ],
       "enabled": true,
       "output_path": "recordings",
-      "name": ""
+      "name": "",
+      "tracklet_wait": 100.0
     },
     "tracker": {
       "tracklet_min_age": 3,
@@ -270,7 +275,8 @@
           "fluid"
         ],
         "right": [
-          "monitor_b"
+          "monitor_b",
+          "foreground_look"
         ],
         "output": [
           "cam_image",
@@ -348,10 +354,10 @@
       "offset": 0.0,
       "contrast": 1.1,
       "saturation": 1.78,
-      "levels": 3,
+      "levels": 12,
       "smoothness": 0.0,
       "colorize": 0.0,
-      "sharpen": 0.42,
+      "sharpen": 0.82,
       "use_mask": true
     },
     "color_mask": {

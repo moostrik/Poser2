@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     """A YOLO person detector on the host, the replay backend's stand-in for the device's detector;
     `confidence` and `overlap` default to the values the oak pipeline sets."""
 
+    enabled:     Field[bool]  = Field(True, description="Find the players on the host; off, a recording's own tracklets play")
     model_type:  Field[ModelType]  = Field(ModelType.ONNX, access=Field.INIT, description="Runtime the model runs on")
     resolution:  Field[Resolution] = Field(Resolution.R512X448, access=Field.INIT, description="Model input size, width x height")
     model_path:  Field[str]   = Field("data/models", access=Field.INIT, visible=False, description="ONNX model files directory")

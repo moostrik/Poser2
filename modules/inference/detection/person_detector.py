@@ -85,9 +85,15 @@ class PersonDetector(Thread):
             if callback not in self._callbacks:
                 self._callbacks.append(callback)
 
+    @property
+    def enabled(self) -> bool:
+        """Whether it looks for players: off, a replay plays the recording's own tracklets."""
+        return self.settings.enabled
+
     def submit(self, image: GpuImage) -> None:
-        """An uploaded image to look at (`Uploader`'s callback, the camera's thread); the newest per camera is kept."""
-        if not self.is_ready:
+        """An uploaded image to look at (`Uploader`'s callback, the camera's thread); the newest per camera is kept.
+        Disabled, it looks at nothing."""
+        if not self.is_ready or not self.settings.enabled:
             return
         with self._lock:
             if image.cam_id in self._pending:
