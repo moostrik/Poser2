@@ -118,8 +118,9 @@ hands frame `n`, its color and, where its chunk holds it, its depth together, at
 capture time minus the cameras' earliest first frame's plus its `video_latency`, so a frame comes as late after its capture as it came live and a frame lost live leaves
 its gap. The frame is stamped with its capture on that clock, its streams with one stamp. The chunk after the one
 playing carries the clock on (`carry_on`) and shares its origin, so the recorded time runs on across chunks; it
-starts when the first reader of the playing chunk has played its last frame, beside the rest, so a camera whose
-chunk ended first goes on without waiting for the others to end. A loop, a seek or another
+plays as soon as it is loaded, beside the playing chunk, its readers holding each frame until its moment, so every
+camera's first frame of it is there on time whichever camera's chunk ends first; the chunk after it loads once the
+playing one has ended. A loop, a seek or another
 folder starts it anew, and the player says so (`add_jump_callback`): the replay camera and `RecordedPoses` drop what
 waits for the frames before. Each stream has its own `StreamReader`, on its own thread, which takes its moments from
 the clock (`FrameSchedule`), never earlier than the frame before; a reader that falls behind by more than a frame
@@ -130,9 +131,11 @@ without their other stream and logged by the player's thread, which also writes 
 cameras play apart is `drift`: the recorded capture times of their last frames gone out, in ms.
 
 The markers, a seek and a scrub are places on camera 0's frames, and every other camera plays the same recorded
-moment: it starts at its first frame captured at or after camera 0's first frame of the range, and ends after its
-last at or before camera 0's last (`ChunkReaders`), so a camera that dropped unlike frames live starts and ends
-where camera 0 does. A stop ends a
+moment (`ChunkReaders`). The cameras of a rig run unsynced, so a camera's frame of the same round is up to half a
+frame period from camera 0's: each camera plays its frames captured from half a period before camera 0's first
+frame of the range to half a period after its last, and a range from a chunk's start or to its end takes every
+camera's from its start or to its end, where the recorder cut them all. So a camera that dropped unlike frames live
+starts and ends where camera 0 does. A stop ends a
 reader's decoder, so a decoder that stalled cannot hold the player. A clip without metadata plays at `fps`.
 
 The player is composed of parts, each in its own file of `modules/camera`:

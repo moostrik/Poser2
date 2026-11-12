@@ -214,11 +214,11 @@ class Player(Thread):
                     state = State.PLAYING
                 if state == State.PLAYING and self._follows() and self._finished_loading():
                     self._follow()
-                    self._load()
                 if state == State.PLAYING and self._finished_playing() and self._finished_loading():
                     self._start(follows=True)
                     self._load()
-                self._retire()
+                if self._retire() and state == State.PLAYING:
+                    self._load()
                 if state == State.STOP:
                     self._stop()
                     state = State.STOPPING
@@ -293,14 +293,16 @@ class Player(Thread):
                     logger.exception("Player loop callback failed")
 
     def _follows(self) -> bool:
-        """The chunk playing has a reader ended and the one loading is the next in the recording: it starts beside
-        the rest of the playing one, so no camera waits for the last to end."""
+        """The one loading is the next chunk in the recording after the one playing: it starts as soon as it is
+        loaded, its readers holding each frame until its moment, so every camera's first frame of it is there on
+        time, whichever camera's chunk ends first."""
         playing, loading = self.playing, self.loading
-        return (playing is not None and loading is not None and self.ending is None and playing.ending()
-                and not playing.finished() and loading.folder is playing.folder and loading.chunk == playing.chunk + 1)
+        return (playing is not None and loading is not None and self.ending is None and not playing.finished()
+                and loading.folder is playing.folder and loading.chunk == playing.chunk + 1)
 
     def _follow(self) -> None:
-        """Play the loaded next chunk on the playing one's clock, carried on, beside the playing one's last frames."""
+        """Play the loaded next chunk on the playing one's clock, carried on, beside the playing one's rest; the
+        chunk after it loads once the playing one has ended."""
         before: ChunkReaders | None = self.playing
         readers: ChunkReaders | None = self.loading
         assert before is not None and readers is not None
@@ -312,10 +314,12 @@ class Player(Thread):
         self.pairing.follow(readers)
         readers.play()
 
-    def _retire(self) -> None:
-        """The chunk ending, once all its readers have ended: no more of its frames go out."""
+    def _retire(self) -> bool:
+        """The chunk ending, once all its readers have ended: no more of its frames go out. Whether it ended now."""
         if self.ending is not None and self.ending.finished():
             self._close_ending()
+            return True
+        return False
 
     def _close_ending(self) -> None:
         ending: ChunkReaders | None = self.ending
