@@ -30,7 +30,7 @@ water is dragged toward where the body is (`drag_velocity`, never past it); and 
 acceleration added × dt (`add_acceleration`). The densities and the temperatures are sources, added
 × dt, each side at its own gain (`add_boundary_density`, `add_body_force_density`,
 `add_boundary_temperature`, `add_body_force_temperature`). Every input goes into the gaussian birth
-slab at `input.layer`.
+slab at each pixel's z position, its own; a pixel without one puts nothing in.
 """
 import math
 from dataclasses import replace
@@ -969,13 +969,13 @@ class Fluid3D:
         the body moves (its speed above DRAG_FLOOR), never past it. The volume's w is -z, in widths/s as x
         and y (the box as deep as it stands for); +W moves fluid away from the viewer (layer 0
         is the front face).
-        Without depth, z is 0, and so is w. The slab is centered on each pixel's `z_position` (red over green),
-        on input.layer where it has none or without one.
+        The slab is centered on each pixel's `z_position` (red over green); nothing is dragged where it has
+        none or without one.
         """
         if not self._allocated:
             return
         boundary = self.settings.input.boundary
-        self._add_to_faces_shader.drag(self._faces.volume, self._cells, texture, self.settings.input.layer, self._spread(),
+        self._add_to_faces_shader.drag(self._faces.volume, self._cells, texture, self._spread(),
                                        boundary.velocity_gain, drag_share(self._dt, boundary.velocity_drag), weight,
                                        DRAG_FLOOR, self._obstacle, self._closed, self._has_obstacles, z_position)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
@@ -986,8 +986,7 @@ class Fluid3D:
         boundary's."""
         if not self._allocated:
             return
-        self._add_to_faces_shader.add_acceleration(self._faces.volume, self._cells, texture, self.settings.input.layer,
-                                                   self._spread(), weight * self.settings.input.body_force.acceleration_gain * self._dt,
+        self._add_to_faces_shader.add_acceleration(self._faces.volume, self._cells, texture, self._spread(), weight * self.settings.input.body_force.acceleration_gain * self._dt,
                                                    self._obstacle, self._closed, self._has_obstacles, z_position)
         glMemoryBarrier(_BARRIER_FETCH_AND_IMAGE)
 
@@ -1009,7 +1008,7 @@ class Fluid3D:
         if not self._allocated:
             return
         for carrier in self._densities:
-            carrier.add(texture, gain, self._dt, self.settings.input.layer, self._spread(), mode, target_gain, z_position)
+            carrier.add(texture, gain, self._dt, self._spread(), mode, target_gain, z_position)
 
     def add_boundary_temperature(self, texture: Texture, weight: float = 1.0, z_position: Texture | None = None) -> None:
         """The boundary's warmth (-1 cold to 1 hot, its presence folded in): the water in the slab dragged toward
@@ -1033,7 +1032,7 @@ class Fluid3D:
         """The warmth into the temperature's gaussian birth slab: dragged toward (FILL) or added (RATE)."""
         if not self._allocated:
             return
-        self._inject_shader.use(texture, self._temperature, self.settings.input.layer, self._spread(), strength,
+        self._inject_shader.use(texture, self._temperature, self._spread(), strength,
                                 internal_format=GL_R16F, mode=int(mode), scalar=True, gain=target_gain, z_position=z_position)
         glMemoryBarrier(_BARRIER_IMAGE)
 

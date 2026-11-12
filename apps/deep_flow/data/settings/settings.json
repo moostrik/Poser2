@@ -6,7 +6,7 @@
     "keyframe_interval": 50,
     "color": true,
     "resolution": "P800",
-    "sim_enabled": true,
+    "sim_enabled": false,
     "model_path": "data/models",
     "fov": 80.0,
     "split_seconds": 60,
@@ -349,10 +349,10 @@
     "foreground_look": {
       "blend_factor": 0.2,
       "exposure": 0.99,
-      "gamma": 1.0,
+      "gamma": 0.8,
       "offset": 0.0,
-      "contrast": 1.1,
-      "saturation": 1.78,
+      "contrast": 1.24,
+      "saturation": 1.01,
       "levels": 0,
       "smoothness": 0.0,
       "colorize": 0.0,
@@ -380,7 +380,9 @@
       "near": 0.1,
       "far": 1.7,
       "guided_radius": 2.0,
-      "edge_contrast": 0.03
+      "edge_contrast": 0.03,
+      "depth_read": "SURFACE",
+      "bilateral_contrast": 0.1
     },
     "motion": {
       "guard": true,
@@ -500,13 +502,12 @@
         "time_scale": 1.0
       },
       "input": {
-        "layer": 0.0,
         "spread": 0.237,
         "boundary": {
           "velocity_drag": 75.0,
-          "velocity_gain": 1.0,
-          "density_drag": 0.0,
-          "density_gain": 1.0,
+          "velocity_gain": 3.0,
+          "density_drag": 300.0,
+          "density_gain": 10.0,
           "temperature_drag": 200.0,
           "temperature_gain": 1.0
         },
@@ -526,7 +527,7 @@
         "viscosity_iter": 20
       },
       "vorticity": {
-        "strength_1": 0.0,
+        "strength_1": 5.0,
         "strength_2": 0.0,
         "strength_3": 0.0,
         "radius_1": 0.1,
@@ -555,12 +556,12 @@
       "density": {
         "width": 448,
         "height": 800,
-        "depth": 24,
+        "depth": 64,
         "advection": "MACCORMACK",
         "limiter": "CLAMP",
         "advection_scale": 0.88,
-        "fade_time": 30.0,
-        "evaporation_time": 0.0
+        "fade_time": 0.0,
+        "evaporation_time": 60.0
       },
       "fine_density": {
         "enabled": true,
@@ -586,12 +587,12 @@
         "smooth": 3
       },
       "composite": {
-        "emission": 1.0,
-        "opacity": 0.02907,
-        "fog": 2.7899,
+        "emission": 10.0,
+        "opacity": 1.2,
+        "fog": 0.269,
         "tint": {
-          "r": 0.4708,
-          "g": 0.778,
+          "r": 1.0,
+          "g": 1.0,
           "b": 1.0,
           "a": 1.0
         },
@@ -603,13 +604,13 @@
           "y": 0.2,
           "z": -0.14,
           "grid": "FULL",
-          "intensity": 0.0,
-          "fog_scattering": 0.1,
+          "intensity": 10.4,
+          "fog_scattering": 0.11,
           "caustics": 0.0,
           "caustic_size": 0.25,
           "caustic_depth": 0.8,
           "caustic_speed": 0.15,
-          "scattering_model": "OCTAVES",
+          "scattering_model": "BLUR",
           "scattering": 0.72,
           "powder": 0.0,
           "sky_fill": 1.0,
@@ -634,30 +635,30 @@
         "legend": true,
         "blend_mode": "ADD",
         "orbit": {
-          "yaw": -86.20107444359162,
-          "pitch": 6.490384615384608,
+          "yaw": 52.59975975870282,
+          "pitch": 4.846153846153827,
           "zoom": 0.7184107424569811
         }
       }
     },
     "monitor_b": {
-      "stage": "BRIDGE",
-      "texture": "boundary_density.output",
+      "stage": "FLUID",
+      "texture": "density",
       "view": "COLORMAP",
       "advanced": {
         "channel": "ALL",
-        "scale": 1.0,
+        "scale": 2.0,
         "opacity": 3.0,
         "depth_fade": 0.0,
         "slice": true,
-        "slice_position": 0.5859375,
-        "slice_focus": 0.0,
+        "slice_position": 0.48,
+        "slice_focus": 0.36,
         "glyph_spacing": "SPACING_32",
         "legend": true,
         "blend_mode": "ADD",
         "orbit": {
-          "yaw": -86.20107444359162,
-          "pitch": 6.490384615384608,
+          "yaw": 52.59975975870282,
+          "pitch": 4.846153846153827,
           "zoom": 0.7184107424569811
         }
       }

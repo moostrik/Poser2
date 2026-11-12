@@ -5,10 +5,9 @@ acceleration from the readings as accelerations, its density and temperature a p
 readings as velocities, the change of speed). Each density and temperature is 0 to 1 (±1 warm): a presence,
 the readings' speed in widths/s, capped at 1, the dye the fluid fills the water toward or adds at a rate.
 
-Each trail holds where its motion was, a z position; the velocity and the acceleration each mix their
-readings' z positions by the readings' sizes at their shares (`ZPositionMix`), so the fluid takes each at
-the depth it was made at. The density and the temperature are on the body only (the mask), so they go in at
-the motion's z position now."""
+Each trail holds where its motion was, a z position; every output mixes its readings' z positions by the
+readings' sizes at its shares (`ZPositionMix`), so the fluid takes each at the depth it was made at, and a
+density or a temperature has a z position wherever its amount has one."""
 
 # Standard library imports
 from collections.abc import Callable
@@ -124,8 +123,11 @@ class Bridge3DLayer(BridgeLayer):
         self._body_force_density_amount: Fbo = Fbo()
         self._body_force_temperature_amount: Fbo = Fbo()
         self._boundary_velocity_z_position: Fbo = Fbo()             # red over green
+        self._boundary_density_z_position: Fbo = Fbo()
+        self._boundary_temperature_z_position: Fbo = Fbo()
         self._body_force_acceleration_z_position: Fbo = Fbo()
-        self._z_position: Texture | None = None                     # the motion's now, the input's
+        self._body_force_density_z_position: Fbo = Fbo()
+        self._body_force_temperature_z_position: Fbo = Fbo()
         self._mix_shader: WeightedSum = WeightedSum()
         self._z_position_mix_shader: ZPositionMix = ZPositionMix()
         self._boundary_density: DensityBridge = DensityBridge(settings.boundary.density)
@@ -150,9 +152,10 @@ class Bridge3DLayer(BridgeLayer):
             self._body_force_acceleration if self._mixed(body_force.acceleration) else None,
             merged['body_force_density'] if self._mixed(body_force.density) else None,
             merged['body_force_temperature'] if self._mixed(body_force.temperature) else None,
-            self._boundary_velocity_z_position,
+            self._boundary_velocity_z_position, self._boundary_density_z_position, self._boundary_temperature_z_position,
             self._body_force_acceleration_z_position if self._mixed(body_force.acceleration) else None,
-            self._z_position)
+            self._body_force_density_z_position if self._mixed(body_force.density) else None,
+            self._body_force_temperature_z_position if self._mixed(body_force.temperature) else None)
 
     def _outputs(self) -> dict[str, Texture]:
         """The densities and temperatures as the last step made them."""
@@ -170,11 +173,15 @@ class Bridge3DLayer(BridgeLayer):
         boundary: Ports = Ports({'velocity': Port(self._boundary_velocity, TextureKind.VELOCITY),
                                  'velocity_z_position': Port(self._boundary_velocity_z_position, TextureKind.Z_POSITION),
                                  'density_amount': Port(self._boundary_density_amount, TextureKind.SCALAR),
-                                 'temperature_amount': Port(self._boundary_temperature_amount, TextureKind.SCALAR)})
+                                 'density_z_position': Port(self._boundary_density_z_position, TextureKind.Z_POSITION),
+                                 'temperature_amount': Port(self._boundary_temperature_amount, TextureKind.SCALAR),
+                                 'temperature_z_position': Port(self._boundary_temperature_z_position, TextureKind.Z_POSITION)})
         body_force: Ports = Ports({'acceleration': Port(self._body_force_acceleration, TextureKind.ACCELERATION),
                                    'acceleration_z_position': Port(self._body_force_acceleration_z_position, TextureKind.Z_POSITION),
                                    'density_amount': Port(self._body_force_density_amount, TextureKind.SCALAR),
-                                   'temperature_amount': Port(self._body_force_temperature_amount, TextureKind.SCALAR)})
+                                   'density_z_position': Port(self._body_force_density_z_position, TextureKind.Z_POSITION),
+                                   'temperature_amount': Port(self._body_force_temperature_amount, TextureKind.SCALAR),
+                                   'temperature_z_position': Port(self._body_force_temperature_z_position, TextureKind.Z_POSITION)})
         return {'lowpass': self._shown_ports(self._lowpass.ports, self._show_lowpass),
                 'bandpass': self._shown_ports(self._bandpass.ports, self._show_bandpass),
                 'boundary': boundary, 'boundary_density': self._boundary_density, 'boundary_temperature': self._boundary_temperature,
@@ -225,7 +232,12 @@ class Bridge3DLayer(BridgeLayer):
         return ((self._boundary_velocity, GL_RGBA16F), (self._boundary_density_amount, GL_R32F),
                 (self._boundary_temperature_amount, GL_R32F), (self._body_force_acceleration, GL_RGBA16F),
                 (self._body_force_density_amount, GL_R32F), (self._body_force_temperature_amount, GL_R32F),
-                (self._boundary_velocity_z_position, GL_RG16F), (self._body_force_acceleration_z_position, GL_RG16F))
+                *((fbo, GL_RG16F) for fbo in self._z_position_fbos()))
+
+    def _z_position_fbos(self) -> tuple[Fbo, ...]:
+        return (self._boundary_velocity_z_position, self._boundary_density_z_position, self._boundary_temperature_z_position,
+                self._body_force_acceleration_z_position, self._body_force_density_z_position,
+                self._body_force_temperature_z_position)
 
     def _allocate_stages(self, width: int, height: int, output_width: int, output_height: int) -> None:
         self._lowpass.allocate(width, height, output_width, output_height)
@@ -264,7 +276,6 @@ class Bridge3DLayer(BridgeLayer):
         mixes: tuple[MixSettings, ...] = (*self._boundary_mixes(), *body_force)
 
         self._lowpass_timer.begin()
-        self._z_position = input.z_position
         self._lowpass.set_velocity(input.velocity)
         self._lowpass.set_z_position(input.z_position)
         self._lowpass.update(input.dt, self._lowpass_shown or self.settings.body_force.acceleration.trail > 0.0)
@@ -280,7 +291,9 @@ class Bridge3DLayer(BridgeLayer):
         self._mix(self._boundary_velocity, self._velocities(), boundary.velocity)
         self._mix_z_position(self._boundary_velocity_z_position, self._velocities(), boundary.velocity)
         self._mix(self._boundary_density_amount, self._velocities(), boundary.density, lengths=True)
+        self._mix_z_position(self._boundary_density_z_position, self._velocities(), boundary.density)
         self._mix(self._boundary_temperature_amount, self._velocities(), boundary.temperature, lengths=True)
+        self._mix_z_position(self._boundary_temperature_z_position, self._velocities(), boundary.temperature)
         self._update_density(self._boundary_density, self._boundary_density_amount, color)
         self._update_temperature(self._boundary_temperature, self._boundary_temperature_amount, color)
 
@@ -290,9 +303,11 @@ class Bridge3DLayer(BridgeLayer):
             self._mix_z_position(self._body_force_acceleration_z_position, self._accelerations(), side.acceleration)
         if self._mixed(side.density):
             self._mix(self._body_force_density_amount, self._velocities(), side.density, lengths=True)
+            self._mix_z_position(self._body_force_density_z_position, self._velocities(), side.density)
             self._update_density(self._body_force_density, self._body_force_density_amount, color)
         if self._mixed(side.temperature):
             self._mix(self._body_force_temperature_amount, self._velocities(), side.temperature, lengths=True)
+            self._mix_z_position(self._body_force_temperature_z_position, self._velocities(), side.temperature)
             self._update_temperature(self._body_force_temperature, self._body_force_temperature_amount, color)
         if self._merging:
             for name, texture in self._outputs().items():

@@ -4,18 +4,19 @@
 // middle: a body thinner than a cell fills the part of the cell it covers, moves smoothly between cells, and
 // comes to the same amount at any number of them; a sigma of 0 puts nothing in.
 //
-// Needs, declared before: uniform float uTargetLayer (where a pixel without a z position goes, 0 the first
-// layer's middle, 1 the last's), uniform float uSpread (the sigma, a share of the depth), uniform sampler2D
+// Needs, declared before: uniform float uSpread (the sigma, a share of the depth), uniform sampler2D
 // uZPosition (a z position: red the z position times its weight, green the weight) and uniform bool
 // uHasZPosition.
 
 const float Z_POSITION_FLOOR = 1e-6;    // a weight below it is no z position
+const float NO_Z_POSITION = -1.0;       // slab_center where there is none: nothing goes in there
 
-// The slab's center at `uv`: the z position there (red over green), uTargetLayer where it has none
+// The slab's center at `uv`: the z position there (red over green, 0 the first layer's middle, 1 the last's),
+// NO_Z_POSITION where it has none or without a z position bound
 float slab_center(vec2 uv) {
-    if (!uHasZPosition) return uTargetLayer;
+    if (!uHasZPosition) return NO_Z_POSITION;
     vec2 z_position = texture(uZPosition, uv).rg;
-    return z_position.g > Z_POSITION_FLOOR ? clamp(z_position.r / z_position.g, 0.0, 1.0) : uTargetLayer;
+    return z_position.g > Z_POSITION_FLOOR ? clamp(z_position.r / z_position.g, 0.0, 1.0) : NO_Z_POSITION;
 }
 
 // erf, Abramowitz and Stegun 7.1.26 (its error under 1.5e-7)

@@ -2,7 +2,7 @@
 
 /*
  * InjectAmount3D - a 2D source's amount (its alpha) into a one-channel volume, in the gaussian slab around
- * each pixel's z position (uTargetLayer without one), as Inject3D adds the whole RGBA, one invocation a column. The source is read by uv, so the volume may be finer: then
+ * each pixel's z position (nothing without one), as Inject3D adds the whole RGBA, one invocation a column. The source is read by uv, so the volume may be finer: then
  * uCubic enlarges it by a cubic B-spline, smooth through the source's texel corners, where a bilinear read keeps
  * them as steps a source texel apart; four bilinear reads (Sigg and Hadwiger, GPU Gems 2).
  */
@@ -13,7 +13,6 @@ layout(binding = 0) uniform sampler2D uInput;      // RGBA: the amount times the
 layout(binding = 1) uniform sampler2D uZPosition;  // its z position, red over green
 layout(r16f, binding = 0) uniform image3D uVolume;
 
-uniform float uTargetLayer;  // normalized depth [0, 1] of the slab's center where the source has no z position
 uniform bool  uHasZPosition;
 uniform float uSpread;       // the gaussian's sigma in normalized depth
 uniform float uStrength;
@@ -48,6 +47,7 @@ void main() {
     float source = uCubic ? bspline_alpha(uv) : texture(uInput, uv).a;
     if (source == 0.0) return;      // nothing to add or fill: the column stays as it is, unread and unwritten
     float center = slab_center(uv);
+    if (center == NO_Z_POSITION) return;
     ivec2 cells = slab_cells(center, uSize.z);
     for (int z = cells.x; z <= cells.y; z++) {
         float weight = slab_cell(z, center, uSize.z) * uStrength;     // the body's share of this cell (slab.glsl)

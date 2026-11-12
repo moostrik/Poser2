@@ -47,13 +47,16 @@ _SPRITES: dict[ParticleDraw, int] = {ParticleDraw.POINTS: ParticleSprites.POINTS
 FULL_WIDTH_HALF_MAXIMUM: float = 2.0 * math.sqrt(2.0 * math.log(2.0))   # a gaussian's width at half its height, in sigmas
 
 
-def slab_sum(layer: float, spread: float, layers: int) -> float:
+REFERENCE_Z_POSITION: float = 0.5     # the box's middle, a slab its walls cut nothing of: the reference mass's
+
+
+def slab_sum(z_position: float, spread: float, layers: int) -> float:
     """The body's shares summed over the grid's layers, as `slab.glsl` gives them (each cell the profile's mean
-    between its faces): what one unit of density a step puts into a texel's column. `spread` the sigma, a share
-    of the depth."""
+    between its faces), for a slab centered at `z_position` (0 to 1): what one unit of density a step puts into a
+    texel's column. `spread` the sigma, a share of the depth."""
     if spread <= 1e-6:
         return 0.0
-    target: float = (0.5 + layer * (layers - 1)) / layers
+    target: float = (0.5 + z_position * (layers - 1)) / layers
     scale: float = 1.0 / (spread * math.sqrt(2.0))
     area: float = 0.5 * spread * math.sqrt(2.0 * math.pi) * (math.erf((1.0 - target) * scale) - math.erf(-target * scale))
     return area * layers        # each cell's mean, over a cell of 1 / layers: the area over the column times the layers
@@ -150,9 +153,9 @@ class ParticleDensity(DensityCarrier):
         how much dye there is changes how many drops there are, not how big a drop is."""
         settings = self.settings
         spread: float = settings.input.spread / FULL_WIDTH_HALF_MAXIMUM / max(self._z_extent, 1e-6)     # the sigma, a share of the depth
-        return slab_sum(settings.input.layer, spread, self._layers) / max(self.settings.particles.rate, 1e-6)
+        return slab_sum(REFERENCE_Z_POSITION, spread, self._layers) / max(self.settings.particles.rate, 1e-6)
 
-    def add(self, texture: Texture, gain: float, dt: float, layer: float, spread: float, mode: InjectMode = InjectMode.RATE,
+    def add(self, texture: Texture, gain: float, dt: float, spread: float, mode: InjectMode = InjectMode.RATE,
             target_gain: float = 1.0, z_position: Texture | None = None) -> None:
         """Particles born where the dye is, as many as its presence × the rate; a FILL's share counted as that
         share of fully dyed added in the step, so a particle look sees both systems alike."""
@@ -165,7 +168,7 @@ class ParticleDensity(DensityCarrier):
         self._emit_timer.begin()
         self._emit_shader.use(texture, self._particles, self._ring, self._count, gain=gain, dt=dt,
                               rate=self.settings.particles.rate, floor=AMOUNT_FLOOR,
-                              layer=layer, layers=self._layers, spread=spread, seed=self._seed, z_position=z_position)
+                              layers=self._layers, spread=spread, seed=self._seed, z_position=z_position)
         self._emit_timer.end()
 
     def update(self, step: CarrierStep) -> None:

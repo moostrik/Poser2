@@ -1,7 +1,7 @@
 #version 460 core
 
 /*
- * Inject3D - a 2D input into a 3D volume, in the gaussian slab around each pixel's z position (uTargetLayer
+ * Inject3D - a 2D input into a 3D volume, in the gaussian slab around each pixel's z position (nothing
  * without one): weight = the body's share of the cell (slab.glsl) × uStrength. One invocation a column: the
  * input and its z position read once, then the cells the slab reaches. By uMode:
  *   0 ADD     the input × weight added
@@ -22,7 +22,6 @@ layout(binding = 1) uniform sampler2D uZPosition; // its z position, red over gr
 layout(rgba16f, binding = 0) uniform image3D uVolume;  // Read-write
 
 // Parameters
-uniform float uTargetLayer;  // Normalized depth [0, 1]: the center where the input has no z position
 uniform bool  uHasZPosition;
 uniform float uSpread;       // Gaussian sigma in normalized depth units
 uniform float uStrength;     // Injection strength multiplier: × dt for ADD and RATE, the drag's share for FILL
@@ -51,6 +50,7 @@ void main() {
     }
 
     float center = slab_center(uv);
+    if (center == NO_Z_POSITION) return;
     ivec2 cells = slab_cells(center, uSize.z);
     for (int z = cells.x; z <= cells.y; z++) {
         // The body's share of this cell's depth (slab.glsl)

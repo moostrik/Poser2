@@ -28,7 +28,6 @@ uniform float uGain;        // the source's gain × the injection's weight
 uniform float uDt;          // s
 uniform float uRate;        // particles per texel per second where ink is
 uniform float uFloor;       // the amount below which a texel spawns fewer
-uniform float uTargetLayer; // the slab's center where the source has no z position, 0 to 1, as `layer` is
 uniform bool  uHasZPosition;
 uniform int   uLayers;      // the grid's layers, which place the center and sum the slab
 uniform float uSpread;      // its sigma
@@ -59,6 +58,8 @@ void main() {
     vec4 source = texelFetch(uSource, gid, 0);
     float amount = source.a;
     if (amount <= 0.0) return;
+    float center = slab_center((vec2(gid) + 0.5) / vec2(size));
+    if (center == NO_Z_POSITION) return;        // no place in the depth: no particle
 
     uint state = hash(uint(gid.x) * 73856093u ^ uint(gid.y) * 19349663u ^ uSeed * 83492791u);
     float expected = uRate * uDt * min(amount / max(uFloor, 1e-6), 1.0);
@@ -66,7 +67,6 @@ void main() {
     n = min(n, MAX_PER_TEXEL);
     if (n <= 0) return;
 
-    float center = slab_center((vec2(gid) + 0.5) / vec2(size));
     float middle = slab_middle(center, uLayers);    // the slab's center in the volume's z, as the grid's layers place it
     float mass = amount * uGain * uDt * slab_column(center, uLayers) / max(expected, 1e-6);
     vec3 color = clamp(source.rgb / amount, 0.0, 1.0);

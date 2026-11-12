@@ -13,7 +13,7 @@ from .flow_base import FlowBase
 from .flow_util import FlowUtil
 
 # View: the flow's view of the capture, before the motion
-from .view import fixed_window, texture_roi, view_span, depth_step, view_per_depth_pixel, place_points, edge_aware_depth, DepthUpscale
+from .view import DepthRead, fixed_window, texture_roi, view_span, depth_step, view_per_depth_pixel, place_points, edge_aware_depth, mask_sided_depth, joint_bilateral_depth, DepthUpscale
 
 # Motion: the optical flow
 from .motion import DepthView, DepthVelocity, DepthVelocitySettings, catch_up_share, color_motion, filter_depth_steps, track_depth, track_weights, depth_threshold, \

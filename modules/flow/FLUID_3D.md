@@ -125,8 +125,8 @@ read every field as it is. The GPU is a 24 GB RTX 4090, so nothing pages. Every 
 [TIMING.md](TIMING.md).
 
 The layer injects the bridge's six outputs before the step (`Fluid3DLayer._inject`), each at the
-injection's `weight`, into the gaussian slab at `input.layer` (0.5) `input.spread` thick (0.2 widths,
-its width at half its height), each cell the body's share between its faces, each velocity's z as the
+injection's `weight`, into the gaussian slab at each pixel's z position ([The body's depth](#the-bodys-depth)),
+`input.spread` thick (0.2 widths, its width at half its height), each cell the body's share between its faces, each velocity's z as the
 volume's w = −z, in widths/s as x and y (the motion's `z_gain` its share); what the fluid does with each is
 [What the fluid takes](#what-the-fluid-takes).
 
@@ -143,8 +143,7 @@ The velocity is in image widths per second, as the bridge's; the advection moves
 velocity × dt × `density.advection_scale` (1) in uv, so 1 width/s crosses the width in 1 s.
 
 The volume's settings: `depth_ratio`, the box's depth over its width, its z cells stretched to it (`z_stretch`
-how many times longer a z cell is than an xy cell); `input.layer` and `input.spread`, where the body sits in
-the volume and how thick it is;
+how many times longer a z cell is than an xy cell); `input.spread`, how thick the body is in the volume;
 `emission`, `opacity`, `tint` and `fog`, the composite's march; `wall` and `slip_time`, every
 side of the box ([The walls](#the-walls)). Obstacles stay supported (`set_obstacle`, `add_obstacle`,
 `clear_obstacles`, no caller today): one R8 volume on the simulation's grid, which every field's pass
@@ -193,9 +192,10 @@ as a thin skin centered on its own z position, `spread` its thickness: an arm re
 pushes the water near the front and the torso further back. The box's depth is the player's depth range,
 the depth source's near to far, 0 front to 1 back, with no setting of its own. Each injection reads its
 output's z position ([BRIDGE.md](BRIDGE.md#the-z-positions)), red over green, at the pixel it reads
-(`slab.glsl`'s `slab_center`): the drag and the body force at their readings' depths, the densities and the
-temperatures, the fine density and the particles at the body's now. A pixel without one (no depth, out
-of the range) goes in at `layer`, and so does every pixel without depth. The densities and the
+(`slab.glsl`'s `slab_center`), each at its readings' depths, so an output's amount and its place come from
+the same trails; the fine density and the particles take the density's. A pixel without one puts nothing
+in, and an injection without a z position puts nothing in at all: a body has no place in the box without a
+depth. The densities and the
 temperature go in a column a thread (`inject_3d`, `inject_amount_3d`): the source and its z position read
 once, then the cells the slab reaches, out to 4 sigmas. The particles' mass is the slab's share inside
 the box per pixel, from erf at its two ends (`slab_column`).
@@ -442,7 +442,7 @@ as a tuning:
 | `velocity.advection_scale`                                                                                                                 | 1               | the velocity carries itself the full step                                                                                        |
 | `width`, `height`, `depth`                                                                                                                 | 256, 448, 128   | half a width deep, within 60 fps                                                                                                 |
 | `fine_density.enabled`, `particles.enabled`                                                                                                | off, off        | the density drawn                                                                                                                |
-| `input.layer`, `input.spread`                                                                                                              | 0.5, 0.2        | the body mid-volume, 0.2 widths thick at half its height                                                                         |
+| `input.spread`                                                                                                                             | 0.2             | the body 0.2 widths thick at half its height                                                                                     |
 | `wall` (every field, the volume)                                                                                                           | closed          | the operator's settings                                                                                                          |
 
 The fields' physics take the textbook's water, with no artificial decay or thickness, as defaults: the
@@ -452,7 +452,7 @@ velocity's `fade_time` 60 s (it keeps its momentum), `viscosity` 0 (water at thi
 0 (the density as heavy as the water, no buoyancy), gravity down the screen, every wall closed; the top
 speed off, a failsafe; the bridge's mix the boundary's trail alone and its lowpass's `smooth` its default
 160 ms, since the coast is the fluid's; the three confinements off (`vorticity.strength_1` to `_3` 0), each over its neighbors
-(`vorticity.radius_1` to `_3` one cell) where it runs, Fedkiw's ε 0.3 the textbook's start; in z, `input.layer` 0.5 and `input.spread` 0.2 widths, a body's thickness at
+(`vorticity.radius_1` to `_3` one cell) where it runs, Fedkiw's ε 0.3 the textbook's start; in z, `input.spread` 0.2 widths, a body's thickness at
 the camera's crop (from its `view_span` of 0.76 m, **(deduction)**) where it is at least half there. Kept as tuned: the composite's look (`emission`, `opacity`,
 `tint`, `fog`).
 

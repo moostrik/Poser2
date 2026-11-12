@@ -1,4 +1,4 @@
-"""Inject3D - Inject 2D input into 3D volume at a target depth with gaussian spread."""
+"""Inject3D - Inject 2D input into 3D volume at each pixel's z position with gaussian spread."""
 from __future__ import annotations
 
 from enum import IntEnum
@@ -27,7 +27,7 @@ class Inject3D(ComputeShader):
         super().__init__()
 
     def use(self, input_2d: Texture, volume: Texture3D,
-            target_layer: float, spread: float, strength: float = 1.0,
+            spread: float, strength: float = 1.0,
             internal_format: int = GL_RGBA16F, mode: int = 0, scalar: bool = False, gain: float = 1.0,
             z_position: Texture | None = None) -> None:
         """Add the 2D input into the 3D volume.
@@ -35,14 +35,14 @@ class Inject3D(ComputeShader):
         Args:
             input_2d: 2D source texture
             volume: 3D destination volume (read-write)
-            target_layer: Normalized depth [0, 1]: the center where a pixel has no z position
             spread: Gaussian sigma in normalized depth units
             strength: Injection strength multiplier
             internal_format: Image format for volume binding
             mode: 0 ADD, 1 RATE (added, capped at full), 2 FILL (dragged toward the input, never past it)
             scalar: A signed scalar in r, capped at ±1, else a premultiplied density, its alpha at 1
             gain: FILL: the input times this, at most full, is the target
-            z_position: The input's z position (red over green), or None: every pixel at `target_layer`
+            z_position: The input's z position (red over green); a pixel without one, or every pixel without
+                it, puts nothing in
         """
         if not self.allocated or not self.shader_program:
             return
@@ -58,7 +58,7 @@ class Inject3D(ComputeShader):
         self.bind_image_3d_readwrite(0, volume, internal_format)
 
         # Uniforms
-        bind_z_position(self, 1, z_position, target_layer)
+        bind_z_position(self, 1, z_position)
         glUniform1f(self.get_uniform_loc("uSpread"), spread)
         glUniform1f(self.get_uniform_loc("uStrength"), strength)
         glUniform1i(self.get_uniform_loc("uMode"), mode)

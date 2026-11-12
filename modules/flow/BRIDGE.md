@@ -177,7 +177,12 @@ and blurs with its trail; the bandpass's fast and slow trail each hold one.
 |--------------------------------------|----------------------------------------------------------------------------------------------------------------------|
 | `boundary_velocity_z_position`       | its readings' z positions weighted by their sizes at their shares (`ZPositionMix`)                                  |
 | `body_force_acceleration_z_position` | the same, by the accelerations' sizes                                                                                |
-| `z_position`                         | the motion's now: the densities and the temperatures are on the body only (the mask)                                 |
+| each density's and temperature's     | the same, by its readings' sizes at its own shares: its amount and its place from the same trails                    |
+
+A density's amount is mixed from the trails, which the lowpass advects and blurs past where the body has a
+depth now (the depth velocity gives none in a band a depth sample wide along every outline); its z position
+mixed from the same trails has one wherever its amount has, so the fluid never puts dye where there is no
+place for it.
 
 A reading reads its trail's z position: the trail the lowpass's, a start and a bow the fast trail's, a
 stop and a wake the slow trail's, the change the fast trail's where it is the faster, else the slow's.

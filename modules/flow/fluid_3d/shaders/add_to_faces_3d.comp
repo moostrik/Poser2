@@ -8,7 +8,7 @@
  *   1  the boundary's drag: each face pulled toward the body's velocity (uInput, the bridge's, at its place on
  *      the image plane) × uGain, by uShare × the body's presence × the injection's weight × the slab, never past it
  *   2  the body force: the bridge's acceleration at the face's place × uStrength (weight × gain × dt) × the slab
- * The slab is centered on the input's z position at the face's place (slab.glsl), uTargetLayer without one.
+ * The slab is centered on the input's z position at the face's place (slab.glsl); without one nothing is added.
  *
  * The body's z is the volume's w turned (w away from the viewer), in widths/s as x and y. A face held at 0
  * (a closed wall's, an obstacle's) is left.
@@ -28,7 +28,6 @@ uniform ivec3 uCells;
 uniform ivec3 uClosed;
 uniform bool  uHasObstacles;
 uniform float uStrength;      // modes 0, 2
-uniform float uTargetLayer;   // modes 1, 2: the slab's center where the input has no z position, 0 front to 1 back
 uniform bool  uHasZPosition;  // modes 1, 2
 uniform float uSpread;        // modes 1, 2: its sigma, a share of the depth
 uniform float uGain;          // mode 1
@@ -41,9 +40,11 @@ uniform float uFloor;         // mode 1: widths/s below which the body drags not
 #include "faces.glsl"
 #include "slab.glsl"
 
-// The slab at `p` (cells): the body's share over a layer's length around its depth, centered on its z position
+// The slab at `p` (cells): the body's share over a layer's length around its depth, centered on its z position;
+// 0 where it has none
 float slab(vec3 p) {
-    return slab_at(p.z, slab_center(p.xy / vec2(uCells.xy)), uCells.z);
+    float center = slab_center(p.xy / vec2(uCells.xy));
+    return center == NO_Z_POSITION ? 0.0 : slab_at(p.z, center, uCells.z);
 }
 
 // The bridge's vector at `p` (cells), in the volume's axes: z turned into w and scaled

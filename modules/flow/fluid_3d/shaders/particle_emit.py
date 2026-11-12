@@ -18,7 +18,7 @@ class ParticleEmit(ComputeShader):
         super().__init__()
 
     def use(self, source: Texture, particles: StorageBuffer, ring: StorageBuffer, count: int, *,
-            gain: float, dt: float, rate: float, floor: float, layer: float, layers: int, spread: float,
+            gain: float, dt: float, rate: float, floor: float, layers: int, spread: float,
             seed: int, z_position: Texture | None = None) -> None:
         """Emit from `source` into the ring of `count` particles.
 
@@ -31,11 +31,11 @@ class ParticleEmit(ComputeShader):
             dt: The step (s)
             rate: Particles per texel per second where ink is
             floor: The amount below which a texel spawns fewer
-            layer: The slab's center where a texel has no z position, 0 to 1, as `layer` is
             layers: The grid's layers, which place the center and sum the slab for the mass
             spread: Its sigma
             seed: The frame, for the hash
-            z_position: The source's z position (red over green), or None: every texel at `layer`
+            z_position: The source's z position (red over green); a texel without one, or every texel
+                without it, spawns none
         """
         if not self.allocated or not self.shader_program or not source.allocated:
             return
@@ -47,7 +47,7 @@ class ParticleEmit(ComputeShader):
         glUniform1f(self.get_uniform_loc("uDt"), dt)
         glUniform1f(self.get_uniform_loc("uRate"), rate)
         glUniform1f(self.get_uniform_loc("uFloor"), floor)
-        bind_z_position(self, 1, z_position, layer)
+        bind_z_position(self, 1, z_position)
         glUniform1i(self.get_uniform_loc("uLayers"), layers)
         glUniform1f(self.get_uniform_loc("uSpread"), spread)
         glUniform1ui(self.get_uniform_loc("uCount"), count)

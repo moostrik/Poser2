@@ -48,8 +48,7 @@ class BridgeOutput(StageOutput):
     the amount times the color, with the amount as alpha; `boundary_temperature`. The body force, what is
     added × dt, the 3D bridge's only: `body_force_acceleration`, widths/s², `body_force_density`,
     `body_force_temperature`, each None while the bridge gives none. Where each goes in depth, the 3D bridge's
-    only: `boundary_velocity_z_position` and `body_force_acceleration_z_position`, their readings' z positions,
-    and `z_position`, the body's now, for the densities and the temperatures; None without."""
+    only: each output's `_z_position`, its readings' z positions; None without."""
     boundary_velocity: Annotated[Texture, TextureKind.VELOCITY]
     boundary_density: Annotated[Texture, TextureKind.IMAGE]
     boundary_temperature: Annotated[Texture, TextureKind.SCALAR]
@@ -57,8 +56,11 @@ class BridgeOutput(StageOutput):
     body_force_density: Annotated[Texture | None, TextureKind.IMAGE] = None
     body_force_temperature: Annotated[Texture | None, TextureKind.SCALAR] = None
     boundary_velocity_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
+    boundary_density_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
+    boundary_temperature_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
     body_force_acceleration_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
-    z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
+    body_force_density_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
+    body_force_temperature_z_position: Annotated[Texture | None, TextureKind.Z_POSITION] = None
 
 
 class BridgeLayerSettings(StageLayerSettings):

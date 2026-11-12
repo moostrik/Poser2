@@ -11,11 +11,11 @@ fluid step once per flow frame by the frame's saved interval; `--every N` steps 
 frames' summed interval (the flow still measures every frame), a frame-rate check. `--save DIR` writes every side's
 composited output at four steps of the loop, a quarter apart, as 8-bit PNGs (DIR/<side>_<step>.png), for a picture
 compared across two runs, and its density seen from the side (DIR/<side>_<step>_side.png, depth across, the front at
-the left). A side named `flat` takes no z position: the body goes in at `layer`, as without depth.
+the left).
 
 Measured per frame on the moving player (the mask, 12 px and more inside, where it moves in the loop):
     body       the boundary velocity's |xy| mean, widths/s: what the water is dragged toward
-    water      the fluid velocity's |xy| mean on the injection layer's slice, widths/s
+    water      the fluid velocity's |xy| mean on the slice at `--slice` (0 front to 1 back), widths/s
     density    the density's mean (the max of r, g, b) over the whole slice, in density units; 0 for the
                particles, which keep no density volume
 
@@ -71,7 +71,8 @@ class Series:
 class Side:
     """A bridge and a fluid on the flow's velocity, with the preset's settings and the side's own."""
 
-    def __init__(self, spec: str, output: tuple[int, int]) -> None:
+    def __init__(self, spec: str, output: tuple[int, int], slice: float) -> None:
+        self.slice: float = slice
         self.name, _, items = spec.partition(':')
         preset = json.loads(PRESET.read_text())['render']
         self.bridge_settings = Bridge3DLayerSettings()
@@ -102,8 +103,11 @@ class Side:
         injection = Injection(out.boundary_velocity, out.boundary_density, out.boundary_temperature,
                               out.body_force_acceleration, out.body_force_density, out.body_force_temperature,
                               boundary_velocity_z_position=out.boundary_velocity_z_position,
+                              boundary_density_z_position=out.boundary_density_z_position,
+                              boundary_temperature_z_position=out.boundary_temperature_z_position,
                               body_force_acceleration_z_position=out.body_force_acceleration_z_position,
-                              z_position=out.z_position)
+                              body_force_density_z_position=out.body_force_density_z_position,
+                              body_force_temperature_z_position=out.body_force_temperature_z_position)
         self.fluid.set_input(FluidInput(delta_time, [injection]))
         glFinish()
         began = time.perf_counter()
@@ -112,11 +116,11 @@ class Side:
         self.milliseconds.append((time.perf_counter() - began) * 1000.0)
 
     def _slice(self, name: str) -> np.ndarray:
-        """The fluid's volume `name` on the injection layer, (H, W, 4) at the volume's size."""
+        """The fluid's volume `name` on the measured slice, (H, W, 4) at the volume's size."""
         port = self.fluid.ports[name]
         volume = port.texture
         assert isinstance(volume, Texture3D)
-        return read_back(self.cut.process(volume, Cut.SLICE, self.fluid_settings.input.layer, TextureKind.SCALAR, port.extent))
+        return read_back(self.cut.process(volume, Cut.SLICE, self.slice, TextureKind.SCALAR, port.extent))
 
     def measure(self, moving: np.ndarray, core: np.ndarray, still: bool) -> None:
         body = read_back(self.bridge.output.boundary_velocity)
@@ -188,6 +192,7 @@ def main() -> int:
     parser.add_argument('frames', type=Path)
     parser.add_argument('--side', action='append', default=[], metavar='NAME[:PATH=VALUE,...]')
     parser.add_argument('--every', type=int, default=1, help='step the bridge and the fluid once per N frames')
+    parser.add_argument('--slice', type=float, default=0.0, help='the measured slice, 0 front to 1 back')
     parser.add_argument('--save', type=Path, default=None, help='write the outputs at four steps here')
     parser.add_argument('--output', type=int, nargs=2, default=(2160, 3840), metavar=('W', 'H'),
                         help="the fluid's output allocation, as deep_flow's large layers (default 2160 3840)")
@@ -200,7 +205,7 @@ def main() -> int:
     flow_settings.update_from_dict(recorded_settings(frames.calls[0]['settings']))
     flow = LucasKanadeFlow3D(flow_settings)
     flow.allocate(width, height)
-    sides = [Side(spec, tuple(args.output)) for spec in (args.side or ['preset'])]
+    sides = [Side(spec, tuple(args.output), args.slice) for spec in (args.side or ['preset'])]
     print(frames.describe())
     for side in sides:
         print(f'{side.name}: {side.changed or "as the preset"}')
@@ -226,7 +231,7 @@ def main() -> int:
         moving = core & frames.moved
         still = frames.segment(k) == 'still' and frames.t[k] >= frames.still[0] + SETTLE
         for side in sides:
-            side.step(flow.velocity, mask_texture, pending, None if side.name == 'flat' else flow.z_position)
+            side.step(flow.velocity, mask_texture, pending, flow.z_position)
             side.measure(moving, core, still)
             step = len(side.milliseconds)
             if args.save is not None and step in saved:

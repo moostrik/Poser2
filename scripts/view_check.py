@@ -2,13 +2,15 @@
 
 Plays a recording's color and depth frames through the `Uploader` (the color straightened, the depth aligned, as the
 app does), takes them into GL and runs the view stage at the preset's settings. Checks, per frame:
-- the depth read into the view against `edge_aware_depth`, the numpy reading of the same rules: pixels off by over
-  1 mm (expected: none, a float rounding at the tolerance's edge at most);
+- the depth read into the view against its numpy reading (`edge_aware_depth`, `mask_sided_depth`,
+  `joint_bilateral_depth`, as `--read` says): pixels off by over 1 mm, BILATERAL's by over 2 cm as the GPU blends
+  the image with coarser weights (expected: none, a float rounding at the tolerance's edge at most); MASK's ties,
+  two depth pixels on the mask's side equally near, counted apart;
 - the mask against the depth mask it is made from: their overlap (intersection over union; the guided filter
   only moves the edge, by a few view pixels, so near 1) and the share of the view that is the player.
 Saves the last frame's image, depth mask, mask and foreground side by side as a PNG.
 
-    python scripts/view_check.py [RECORDING] [--frames 40] [--png PATH]
+    python scripts/view_check.py [RECORDING] [--frames 40] [--png PATH] [--read surface|mask|bilateral]
 """
 import argparse
 import json
@@ -25,7 +27,7 @@ from OpenGL.GL import GL_CLAMP_TO_BORDER, GL_FLOAT, GL_NEAREST, GL_RED, GL_RGBA,
 
 import monitor_harness as mh  # noqa: E402
 from modules.camera import CameraFrame, FrameType, read_metadata  # noqa: E402
-from modules.flow import DepthVelocitySettings, edge_aware_depth  # noqa: E402
+from modules.flow import DepthRead, DepthVelocitySettings, edge_aware_depth, joint_bilateral_depth, mask_sided_depth  # noqa: E402
 from modules.gl import Tensor, Texture  # noqa: E402
 from modules.inference import GpuDepth, GpuImage, Uploader, UploaderSettings  # noqa: E402
 from modules.render.layers import ViewInput, ViewLayer, ViewLayerSettings  # noqa: E402
@@ -66,6 +68,7 @@ def main() -> int:
     parser.add_argument('recording', nargs='?', default='20261111-123241')
     parser.add_argument('--frames', type=int, default=40)
     parser.add_argument('--png', default='')
+    parser.add_argument('--read', default='', help='surface, mask or bilateral; the preset\'s without')
     args = parser.parse_args()
     chunk = RECORDINGS / args.recording / '0_000.mkv'
     info = read_metadata(chunk).info
@@ -81,6 +84,8 @@ def main() -> int:
     settings.initialize()
     for name, value in preset['view'].items():
         setattr(settings, name, value)
+    if args.read:
+        settings.depth_read = DepthRead[args.read.upper()]
     depth_settings = DepthVelocitySettings()
     depth_settings.initialize()
     depth_settings.tolerance = preset['motion']['z']['tolerance']
@@ -98,7 +103,7 @@ def main() -> int:
 
     print(f'{args.recording}: {count} captures, view {view.output.image.width} x {view.output.image.height}, '
           f'tolerance {depth_settings.tolerance} m, near {settings.near} far {settings.far}')
-    off_total, pixels, overlaps, shares = 0, 0, [], []
+    off_total, ties, pixels, overlaps, shares = 0, 0, 0, [], []
     last: dict[str, np.ndarray] = {}
     for i in range(count):
         t = float(i)
@@ -123,8 +128,24 @@ def main() -> int:
         u = w.x + (np.arange(width) + 0.5) / width * w.width
         v = w.y + (np.arange(height) + 0.5) / height * w.height
         uu, vv = np.meshgrid(u, v)
-        want = edge_aware_depth(depth.depth.cpu().numpy(), uu, vv, depth_settings.tolerance)
-        off_total += int((np.abs(got - want) > 0.001).sum())
+        grid = depth.depth.cpu().numpy()
+        if settings.depth_read == DepthRead.MASK:
+            want = mask_sided_depth(grid, uu, vv, depth_settings.tolerance, read(output.mask) > 0.5, settings.near, settings.far,
+                                    settings.guided_radius)
+        elif settings.depth_read == DepthRead.BILATERAL:
+            camera = image.image.float().permute(1, 2, 0).cpu().numpy()
+            want = joint_bilateral_depth(grid, camera, uu, vv, settings.bilateral_contrast)
+        else:
+            want = edge_aware_depth(grid, uu, vv, depth_settings.tolerance)
+        off = np.abs(got - want) > (0.02 if settings.depth_read == DepthRead.BILATERAL else 0.001)
+        if settings.depth_read == DepthRead.MASK:
+            # two depth pixels on the pixel's side as near as each other: either is the rule's, float decides
+            def sided(d: np.ndarray) -> np.ndarray:
+                return ((d > 0.0) & (d >= settings.near) & (d <= settings.far)) == (read(output.mask) > 0.5)
+            tie = off & sided(got) & sided(want)
+            ties += int(tie.sum())
+            off &= ~tie
+        off_total += int(off.sum())
         pixels += got.size
 
         mask = read(output.mask) > 0.5
@@ -138,7 +159,8 @@ def main() -> int:
                     'foreground': read(output.foreground, 4)}
 
     uploader.stop()
-    print(f'depth in the view: {off_total} of {pixels} pixels off the reference by over 1 mm')
+    print(f'depth in the view: {off_total} of {pixels} pixels off the reference'
+          + (f', {ties} more a tie between two on the mask\'s side' if settings.depth_read == DepthRead.MASK else ''))
     if overlaps:
         print(f'mask vs depth mask: overlap mean {np.mean(overlaps):.3f}, min {np.min(overlaps):.3f}; '
               f'the player {np.mean(shares) * 100:.1f}% of the view')

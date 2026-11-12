@@ -114,29 +114,122 @@ share of the amount steps along the staircase.
 
 The input first, as good as it gets, before the 4K density's heavy side.
 
-### 1. The z position without the depth's staircase
+### 1. The depth read three ways, side by side
 
-The blocks in the 4K density are made at the injection: the bridge's boundary density, color × amount, is
-smooth; each of its pixels goes into the volume at its own depth, the slab around its z position
-(`slab_center`), and the z position steps. It is the motion's z position as made (`ZPosition`), its weight the
-depth mask × the mask: the depth mask is the depth's own cut, a staircase of depth pixels; inside the mask's
-smooth outline but outside that staircase its weight is 0, and a pixel without a z position goes in at
-`input.layer` instead. So neighbouring pixels along the outline go in at their own depth or at `layer`, and the
-composite shows the step between those layers as a staircase. The velocity takes the trails' z positions,
-which the lowpass's blur smooths (`blur`), so the water's placement has no such steps; the densities and the
-warmth take the z position raw.
+The staircase starts where the depth is read into the view: `depth_mask` and the z position step by depth
+pixels because the read takes a depth pixel's value across an edge. A view setting, `depth_read`, chooses the
+read, so the three are compared on the same recording:
 
-The fix: the z position spread over its neighbours by a normalized blur where it is made. It is held as z ×
-weight in red over the weight in green, so a blur of both channels and their ratio gives each pixel the
-weighted mean of its neighbours' z: inside the body a smooth placement, and in the staircase band, where the
-weight is 0, its neighbours' z instead of a jump to `layer`; the weight blurred with it says how much of the
-pixel has a z position. The radius in depth pixels, as the step it bridges is one, turned into the view's
-from the depth's spacing in the view (`depth_step`), a setting of the z position beside its range. It
-places where z goes in, not what z is: no filter on the depth or on z.
+| `depth_read` | At an edge, a view pixel takes                                  | Source                         |
+|--------------|-----------------------------------------------------------------|--------------------------------|
+| `SURFACE`    | the depth pixel it lies in: the edge on the depth's pixels      | the current read               |
+| `MASK`       | the nearest depth pixel on the side the mask gives it           | our own rule, no paper         |
+| `BILATERAL`  | a weighted mean of the 5 × 5 around it, weighed by the image    | Kopf et al. 2007, eq. 3        |
 
-Judged on the edges recording at drag 0, fresh injection: the steps along the outline.
+`MASK` reads as `SURFACE` does wherever that depth is on the pixel's side of the mask: a depth in `near`..`far`
+inside the mask, another depth (not 0) outside it. A pixel whose depth is on the wrong side takes the nearest
+depth pixel on its side within `guided_radius`, as that is how far the guided filter (He 2010) may move the
+mask's edge off the depth's; with none in reach it keeps its own. The depth's edge then lies on the mask's. The
+mask is made from a depth read, so `MASK` reads twice: `SURFACE`, the cut and the guided mask, then the read
+with that mask and the cut again. No paper does this; it carries the guided filter's edge into the depth
+without new parameters.
 
-### 2. The velocity for the fine density
+`BILATERAL` is joint bilateral upsampling (Kopf, Cohen, Lischinski, Uyttendaele 2007,
+[the paper](https://johanneskopf.de/publications/jbu/paper/FinalPaper_0185.pdf)). Each view pixel takes the depth
+pixels of a 5 × 5 window around it. Each pixel is weighed by two Gaussians:
+
+- f, the spatial Gaussian, of its distance in depth pixels, with σd = 0.5.
+- g, the range Gaussian, of the colour distance between the camera image at the view pixel and at that depth
+  pixel's place, on colour 0 to 1.
+
+These follow the paper: its window, its σd, and the range filter on the high-resolution guidance image. It
+differs in two places:
+
+| Deviation                                             | Why                                                       |
+|-------------------------------------------------------|-----------------------------------------------------------|
+| a depth pixel without depth (0) is left out of the sum | the paper's solution is dense; a 0 averaged in pulls an edge toward 0 m |
+| σr is a view setting, `bilateral_contrast`, the paper's 0.1 the default | the paper sets it per application; 0.1 is its value for stereo depth on colour 0 to 1 |
+
+Where the image shows no edge, `BILATERAL` blends the depths across a depth edge into a depth in between. The
+paper's filter does this too. `SURFACE` and `MASK` never do.
+
+What each read does to z and to what is made from the depth **(deduction)**:
+
+| Read        | z's edge                  | z inside                         | Risks                                              | Cost                 |
+|-------------|---------------------------|----------------------------------|----------------------------------------------------|----------------------|
+| `SURFACE`   | the depth's pixels        | the depth's, interpolated        | the staircase                                      | the read             |
+| `MASK`      | the mask's, the image's   | as `SURFACE`                     | a depth pixel that straddles the edge is taken whole | a second read and cut, the pixels within `guided_radius` at the edge |
+| `BILATERAL` | the image's edges         | close to `SURFACE`'s             | the image's texture and its noise in z; a depth in between where the image has no edge; the guided mask moves with `depth_mask` | 25 depth and 25 image reads a pixel |
+
+z is the depth's change over time per pixel, so a pixel that changes side between two frames reads as z. With
+`MASK` the depth's edge and `depth_mask`'s are the mask's, so no depth from behind the player lies inside
+the mask and z's gate cuts where the edge is. With `BILATERAL` the camera image's noise moves the weights every
+frame, which moves the depth where nothing moved. Inside the body it gains little: at σd 0.5 a neighbour one
+depth pixel away weighs 0.135 of the pixel itself.
+
+No read adds depth detail inside the body: z takes x/y's resolution at the outline and stays the depth's,
+interpolated, inside it.
+
+#### The tests
+
+The goal: z at the view's size, x/y's, with no more noise than `SURFACE` gives, preferably less.
+
+| Test           | Recording                    | What                                                       | Passes when                               |
+|----------------|------------------------------|------------------------------------------------------------|-------------------------------------------|
+| correctness    | measure                      | `scripts/view_check.py --read`, the shader against numpy   | no pixel off by over 1 mm                 |
+| the staircase  | measure                      | the share of the mask's pixels whose z position has no weight | below `SURFACE`'s, near 0               |
+| the edge       | measure                      | the fit along `depth_mask`'s edge                          | above `SURFACE`'s                         |
+| noise          | measure, the still part      | z p99 inside `SURFACE`'s mask and at its edge              | at most `SURFACE`'s                       |
+| the signal     | measure, slow and fast       | z on the moving player, fast ÷ noise                       | at least `SURFACE`'s                      |
+| x/y            | measure                      | x/y at the edge, a control                                  | unchanged                                 |
+| texture        | hands                        | the depth in the view, by eye, on the clothes and the hands | no image pattern in the depth             |
+| the look       | edges, drag 0, fresh injection | the 4K output along the outline, per read                 | no steps                                  |
+| cost           | show, one marked loop        | each read's GPU time                                        | reported                                  |
+
+Every number goes into one table per read, the motion's thresholds at 0, every read measured in `SURFACE`'s
+mask so the regions are the same. The staircase's share is the cause measured; `MASK`'s `depth_mask` lies on
+the mask by its rule, so its overlap with the mask says nothing.
+
+Measured on the measure recording, `-sim`, its first 16 s from the in marker (still 1–5 s, the slow move
+5.5–10 s, the fast 11.5–16 s), one run each, the motion's thresholds at 0, z in widths/s at `z_gain` 0.4:
+
+| Read        | No z position | Fit    | z noise inside / edge | Slow  | Fast  | Fast ÷ noise | x/y at edge |
+|-------------|---------------|--------|-----------------------|-------|-------|--------------|-------------|
+| `SURFACE`   | 8.0%          | 0.0413 | 0.183 / 0.134         | 0.016 | 0.028 | 0.153        | 0.124       |
+| `MASK`      | 7.7%          | 0.0613 | 0.155 / 0.127         | 0.017 | 0.027 | 0.177        | 0.125       |
+| `BILATERAL` | 10.1%         | 0.0590 | 0.138 / 0.115         | 0.015 | 0.024 | 0.177        | 0.159       |
+
+A second `MASK` run gave noise 0.179 / 0.151: the noise differences lie within one run's swing. With `MASK`
+the view's depth and `depth_mask` cover the whole mask; its 7.6% without a z position all lie where the depth
+track has no depth. That is the depth velocity's step filter (`DepthStepFilter`): a depth sample whose 3 × 3
+samples span a step beyond `tolerance` has no depth, a band a depth sample wide along every outline, along the
+staircase with `SURFACE` and along the mask's outline with `MASK`. It keeps z from jittering at a silhouette;
+the z position takes its depth from the same track.
+
+### 2. The dye at its readings' depth, and no `layer`
+
+The dye's amount and its depth come from two places. The amount is mixed from the readings (`Bridge3DLayer._mix`,
+`boundary.density`, `boundary.temperature`, the body force's), which the trails make, advected and blurred. Its
+depth is the motion's z position now (`input.z_position`), raw. Where the trail's blur spreads the amount into
+the band without a depth, the pixel has an amount and no z position, and `slab_center` puts it at
+`input.layer`: the step along the outline the composite shows. The velocity has no such step, as its amount
+and its z position both come from its readings (`ZPositionMix`).
+
+The fix, the velocity's: each dye output's z position is mixed from the readings it is mixed from, by the same
+mix (`ZPositionMix` with `boundary.density`, `boundary.temperature`, `body_force.density`,
+`body_force.temperature`), held by the density bridge as its amount is. The amount and its depth then come from
+one trail, and the trail's blur fills the band. The particles and the fine density take the density's.
+
+`layer` goes: a pixel without a z position puts nothing in, for the velocity, the acceleration, the densities
+and the warmth (`slab_center`, `uTargetLayer`, `input.layer` and its preset key removed). A capture without depth
+then puts nothing in; a 2D camera needs a depth of its own, made from the image, an item of
+[FLOW.md's Open](FLOW.md#open). [BRIDGE.md's z positions](BRIDGE.md#the-z-positions) and
+[FLUID_3D.md's inputs](FLUID_3D.md#the-inputs) change with it.
+
+Judged on the edges recording at drag 0, fresh injection, `MASK`: the steps along the outline; and the share of
+the dye's amount that lands without a z position (0 by the rule: the amount it loses).
+
+### 3. The velocity for the fine density
 
 The 4K amount is carried by the 288 × 512 velocity read straight between its cells, 7.5× coarser, whose
 kinks show as the cells in a sharp density. A tricubic read where the amount is carried: 8 trilinear reads
