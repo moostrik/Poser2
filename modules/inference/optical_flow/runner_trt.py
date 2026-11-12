@@ -23,6 +23,8 @@ logger = logging.getLogger(__name__)
 class RunnerTRT(Thread):
     """Asynchronous GPU optical flow computation using RAFT with TensorRT.
 
+    Runs in full precision (FP32).
+
     TensorRT-optimized inference for maximum performance. Drop-in replacement for PredictorONNX.
 
     Uses preallocated buffers and dedicated CUDA stream for ultra-low latency.

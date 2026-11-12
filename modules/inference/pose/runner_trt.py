@@ -25,6 +25,8 @@ IMAGENET_STD = torch.tensor([0.229, 0.224, 0.225], dtype=torch.float32).view(1, 
 class RunnerTRT(Thread):
     """Asynchronous GPU pose detection using RTMPose with TensorRT.
 
+    Runs in full precision (FP32).
+
     TensorRT-optimized inference for maximum performance. Drop-in replacement for PredictorONNX.
 
     Uses preallocated buffers and dedicated CUDA stream for ultra-low latency.

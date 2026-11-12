@@ -24,6 +24,8 @@ logger = logging.getLogger(__name__)
 class RunnerONNX(Thread):
     """Asynchronous GPU optical flow computation using RAFT with ONNX Runtime.
 
+    Runs in full precision (FP32).
+
     RAFT (Recurrent All-Pairs Field Transforms) computes dense optical flow between
     consecutive video frames using iterative refinement.
 

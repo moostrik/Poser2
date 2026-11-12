@@ -25,6 +25,8 @@ IMAGENET_STD = torch.tensor([0.229, 0.224, 0.225], dtype=torch.float32).view(1, 
 class RunnerONNX(Thread):
     """Asynchronous GPU pose detection using ONNX Runtime.
 
+    Runs RTMPose in full precision (FP32).
+
     Faster alternative to MMDetection using exported ONNX models.
     Architecture identical to MMDetection for drop-in replacement.
     """
