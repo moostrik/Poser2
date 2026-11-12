@@ -116,9 +116,9 @@ center layers stay as they are until [line 5](#5-the-2d-flow-follows-the-3d).
 
 ### Shared parts (`modules/`)
 
-1. The frame `Sync` takes the uploaded images (`submit_image(GpuImage)`) instead of the camera's frames: a round
+1. The frames' `FrameTrigger` takes the uploaded images (`submit_image(GpuImage)`) instead of the camera's frames: a round
    is one uploaded image per camera, and its bang fires on the uploader's thread once every camera's image of the
-   round is on the GPU. The tracklet `Sync` stays on the tracklets' thread.
+   round is on the GPU. The tracklets' `FrameTrigger` stays on the tracklets' thread.
 2. `CropExtractor` cuts each pose's region at every size asked for, one region per pose and one antialiased resize
    per size: the pose model's input size for RTMPose, and a larger one for RVM (hd_trio's 768 × 1024).
 3. The probe (`scripts/cadence_probe.py`) takes the app as an argument, with each app's measures: the camera's
@@ -128,7 +128,7 @@ center layers stay as they are until [line 5](#5-the-2d-flow-follows-the-3d).
 
 1. Each camera hands its frames to the uploader (`Uploader(settings)`) and the video recorder only.
 2. The uploader's images go to the -sim detector, the board (`set_camera_image`, the previews) and the frame
-   `Sync`, whose bang runs `PosesFromTracklets.process` and `PoseInference.submit` on every camera's newest image
+   `FrameTrigger`, whose trigger runs `PosesFromTracklets.process` and `PoseInference.submit` on every camera's newest image
    (`PoseInference(crop, pose, uploader)`, its crops already at the model's size); the crops go to the board.
 3. The light's calibration layer (`test_calibration.py`) reads the uploaded image instead of the CPU frame the
    camera's thread puts on the board (`_store_video_frame`, the board's video images, which go): it reduces its
@@ -141,7 +141,7 @@ center layers stay as they are until [line 5](#5-the-2d-flow-follows-the-3d).
 
 ### hd_trio
 
-1. The cameras, the uploader and the frame `Sync` as white_space's (1, 2, 4 above).
+1. The cameras, the uploader and the frames' `FrameTrigger` as white_space's (1, 2, 4 above).
 2. The crops: the pose model's at its input size (an antialiased cut where today it gets 768 × 1024 shrunk 4× by
    plain bilinear, an aliased input), RVM's at 768 × 1024 from the same region (shared part 2). RVM and the board
    take their crops and masks as they do now.

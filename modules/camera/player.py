@@ -1,6 +1,6 @@
 """Plays a folder of camera recordings: every camera's chunks in step on one clock, the recorded time
 (`PlayClock`), each frame handed over as late after its recorded capture as it came live, a frame's
-streams together (`FramePairing`), between in and out markers on the timeline, and the panel's playback
+streams together (`FrameHandOver`), between in and out markers on the timeline, and the panel's playback
 readouts. It feeds a source (the oak `Simulator` or the replay backend). A chunk is one `.mkv` with color,
 depth when it was recorded, and metadata (`chunk`), or a color-only clip of before; a folder plays with the
 streams it has, whatever `video_frame_types` asks for. A chunk's readers are `ChunkReaders`; the folders,
@@ -25,7 +25,7 @@ from modules.video import CoderType, CoderFormat, hwaccel
 from .chunk import ChunkInfo
 from .chunk_readers import ChunkReaders, Decoding
 from .frame import FrameType
-from .frame_pairing import ClipFrameCallback, FramePairing
+from .frame_hand_over import ClipFrameCallback, FrameHandOver
 from .recording_folder import RecordingFolder, Timeline, locate
 
 import logging
@@ -131,7 +131,7 @@ class Player(Thread):
         self.ending: ChunkReaders | None = None         # of the one before it, its last frames while the next plays,
         self.closing: list[ChunkReaders] = []           # and of those stopped, until their threads end
         self.known: ChunkReaders | None = None          # the last chunk played: its metadata for a seek after a stop
-        self.pairing: FramePairing = FramePairing(self.num_cams, self.types)
+        self.hand_over: FrameHandOver = FrameHandOver(self.num_cams, self.types)
 
         self.playback_lock: Lock = Lock()
         self.loop_callbacks: list[LoopCallback] = []
@@ -150,7 +150,7 @@ class Player(Thread):
 
     @property
     def frame_callbacks(self) -> list[ClipFrameCallback]:
-        return self.pairing.frame_callbacks
+        return self.hand_over.frame_callbacks
 
     def stop(self) -> None:
         self._set_play_chunk(-1)
@@ -251,7 +251,7 @@ class Player(Thread):
         known: ChunkReaders | None = self.playing or self.loading or self.known
         decoding = Decoding(self.gray, self.nv12, self.hwaccel, self.hwaccel_device, self.fps, self.suffix)
         self.loading = ChunkReaders(self.folders[self.load_folder], self._get_load_chunk(), lo, hi, self.num_cams, self.types,
-                                    self.pairing.submit_frame, decoding, known)
+                                    self.hand_over.submit_frame, decoding, known)
 
     def _start(self, loop: bool = True, follows: bool = False) -> None:
         """Play what is loaded. ``loop``: the loop callbacks may hear of it, at the in marker. ``follows``: it is
@@ -273,7 +273,7 @@ class Player(Thread):
                 readers.clock.carry_on(before.clock, perf_counter())
             else:
                 readers.clock.start(perf_counter())
-        self.pairing.start(readers)
+        self.hand_over.start(readers)
 
         if not runs_on:
             for callback in self.jump_callbacks:
@@ -311,7 +311,7 @@ class Player(Thread):
         self.playing = readers
         self._set_play_chunk(readers.chunk)
         readers.clock.carry_on(before.clock, perf_counter())
-        self.pairing.follow(readers)
+        self.hand_over.follow(readers)
         readers.play()
 
     def _retire(self) -> bool:
@@ -326,7 +326,7 @@ class Player(Thread):
         if ending is None:
             return
         self.ending = None
-        self.pairing.retire(ending)
+        self.hand_over.retire(ending)
         ending.stop()
         self.closing.append(ending)
 
@@ -366,7 +366,7 @@ class Player(Thread):
 
     def _stop(self) -> None:
         self._set_play_chunk(-1)
-        self.pairing.start(None)
+        self.hand_over.start(None)
         self.known = self.playing or self.loading or self.known
         self._close_ending()
         for readers in (self.loading, self.playing):
@@ -392,9 +392,9 @@ class Player(Thread):
 
     def _update_readouts(self) -> None:
         """On the player's thread: the panel's playback readouts, and the frames dropped unpaired since the last."""
-        if self.pairing.shown_frame >= 0:
-            self.update_gui(self.pairing.shown_frame)
-        unpaired: int = self.pairing.take_unpaired()
+        if self.hand_over.shown_frame >= 0:
+            self.update_gui(self.hand_over.shown_frame)
+        unpaired: int = self.hand_over.take_unpaired()
         if unpaired:
             logger.info("Player: %d frames dropped without their other stream", unpaired)
 
@@ -462,18 +462,18 @@ class Player(Thread):
 
     def get_drift(self) -> float:
         """How far apart the cameras' last frames gone out were captured, in ms."""
-        return self.pairing.drift
+        return self.hand_over.drift
 
     def get_chunk_info(self, cam_id: int) -> ChunkInfo | None:
         """The fixed info of the chunk a camera's frames play from; None for a recording without it."""
-        return self.pairing.info(cam_id)
+        return self.hand_over.info(cam_id)
 
     def add_frame_callback(self, callback: ClipFrameCallback) -> None:
         if self.running:
             logger.warning('Player: cannot add callback while it is running')
             return
-        if callback not in self.pairing.frame_callbacks:
-            self.pairing.frame_callbacks.append(callback)
+        if callback not in self.hand_over.frame_callbacks:
+            self.hand_over.frame_callbacks.append(callback)
 
     def add_loop_callback(self, callback: LoopCallback) -> None:
         """Called on the player thread when playback starts at the in marker: keep it short."""

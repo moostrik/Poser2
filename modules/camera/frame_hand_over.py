@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 ClipFrameCallback: TypeAlias = Callable[[int, FrameType, ndarray, FrameMetadata | None, float | None], None]
 
 
-class FramePairing:
+class FrameHandOver:
     def __init__(self, num_cams: int, types: list[FrameType]) -> None:
         """`types`: the kinds in the order a frame's streams go out, VIDEO first: its readings set up what the
         depth of the frame uses."""

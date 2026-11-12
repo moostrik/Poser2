@@ -12,13 +12,13 @@ from .geometry import       CameraResolution, RESOLUTION_SIZES, MONO_RESOLUTIONS
                             corrected_roi, corrected_keypoints, mirrored_roi, mirrored_keypoints, mirrored_intrinsics, depth_projection, \
                             mirrored_alignment, aligned_depth_size
 from .tilt_correction import TiltCorrection, TILT_STEP
-from .sync import           Sync, SyncSettings
+from .frame_trigger import  FrameTrigger, FrameTriggerSettings
 from .capture_match import  CaptureStream, MissedParts
 from .chunk import          ChunkInfo, ChunkMetadata, FrameMetadata, PoseArrays, merge_chunk, read_metadata, finish_unmerged
 from .recording_sync import RecordingSync, RecordedCapture, FramePoses
 from .recorder import       Recorder, RecorderSettings, make_file_name, make_chunk_name, make_folder_name
 from .play_clock import     PlayClock
 from .recording_folder import RecordingFolder, Timeline
-from .frame_pairing import   ClipFrameCallback
+from .frame_hand_over import ClipFrameCallback
 from .player import         Player, PlayerSettings, LoopCallback
 from .depthai_backend import oak_backend, require_backend

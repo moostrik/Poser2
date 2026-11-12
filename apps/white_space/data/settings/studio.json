@@ -359,8 +359,8 @@
       "overlap": 0.5,
       "verbose": false
     },
-    "frame_sync": {},
-    "tracklet_sync": {}
+    "frame_trigger": {},
+    "tracklet_trigger": {}
   },
   "tracker": {
     "age_filter": 3,

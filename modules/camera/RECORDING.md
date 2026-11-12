@@ -139,7 +139,7 @@ loaded and the last played, and its lines are parsed as the frames are read, so 
 | `play_clock.py`       | `PlayClock`                   | the recorded time of a play                                     |
 | `recording_folder.py` | `RecordingFolder`, `Timeline` | the folders, a folder's chunks and markers, places on them      |
 | `chunk_readers.py`    | `ChunkReaders`                | one chunk's readers of every camera, its metadata and its clock |
-| `frame_pairing.py`    | `FramePairing`                | each camera's frames handed over in order, the drift            |
+| `frame_hand_over.py`  | `FrameHandOver`               | each camera's frames handed over in order, the drift            |
 
 ## The replay camera
 

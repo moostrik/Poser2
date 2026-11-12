@@ -137,8 +137,8 @@
       "update_height_threshold": 0.2,
       "add_bottom_threshold": 0.25
     },
-    "frame_sync": {},
-    "tracklet_sync": {}
+    "frame_trigger": {},
+    "tracklet_trigger": {}
   },
   "inout": {
     "osc_sound": {
