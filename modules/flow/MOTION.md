@@ -57,7 +57,8 @@ OAK4, and two recordings at 0.65–1.5 m: `stillslowfast` (still, then an arm sl
 | use_mask               | on      | on/off    | C   | no x/y spill onto the background            |
 | x_gain, y_gain, z_gain | 1       | −10 to 10 | –   | 1 = true speed, 0 = axis off, < 0 inverted  |
 
-The flow's velocity is in image widths per second times its gains.
+The flow's velocity is in image widths per second times its gains. `z_gain` is the motion's one
+knob on z's size; the depth velocity's settings set z's noise and lag, not its scale.
 
 ### solve (x/y)
 

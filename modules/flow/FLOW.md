@@ -304,6 +304,9 @@ frame. How a frame gets there, thread by thread, and what costs frames are in
   viscosity takes its `viscosity_iter` at a 60 fps step and fewer at a shorter one, never more
   (`viscosity_iterations`). Iterations growing with the step would keep a dropped frame rate down:
   at 4 fps, 15 times the work per frame **(deduction)**.
+- The output is 4K, 2160 × 3840 (deep_flow's preset). Every frame runs the same passes, whatever
+  its content: no pass is skipped for what a frame holds, and nothing is read back from the GPU to
+  decide one.
 - The stages draw nothing; the monitors draw, only while shown, once per tick. A port's kind says
   how it is drawn when nothing else is asked; the monitor's `view` overrides it.
 - The 2D bridge keeps three classes the 3D bridge also has (`DensityBridge`, `TemperatureBridge`,
