@@ -92,8 +92,7 @@ class RecordedPosesTest(unittest.TestCase):
     def test_a_track_id_the_recording_has_not_goes_on_without_points_and_is_counted(self) -> None:
         captured = time.perf_counter()
         self.clip(captured, 10.0, {3: (BOX, POINTS)}, 0.0)
-        with self.assertLogs('modules.camera.capture_match', 'WARNING'):
-            self.node.submit({3: pose(3, captured), 4: pose(4, captured)})
+        self.node.submit({3: pose(3, captured), 4: pose(4, captured)})
         self.assertTrue(wait_for(lambda: self.played))
         self.assertFalse(np.any(self.played[0][1][4][Points2D].scores > 0.0))
         self.assertEqual(self.node.missed.total('track_id'), 1)

@@ -168,6 +168,7 @@ class RecordedPoses(FrameDictCallbackMixin):
                     return
                 _, _, frames = heapq.heappop(self._waiting)
             self._notify_frames_callbacks(frames)
+            self.missed.warn()
 
     def _on_model(self, frames: FrameDict) -> None:
         """The pose model's poses: on to the stage while the recorded ones do not play."""

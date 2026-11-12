@@ -49,8 +49,12 @@ RecordedCaptureCallback: TypeAlias = Callable[[RecordedCapture], None]
 
 @dataclass
 class _Waiting:
+    """A complete capture and the parts it got as they came, kept with it so newer parts cannot push them out."""
     video: CameraFrame
     depth: CameraFrame | None
+    tracklets: CameraTracklets | None = None
+    asked: bool | None = None           # whether poses were asked for its frame; None until the app says
+    poses: FramePoses | None = None
 
 
 def _later(stream: CaptureStream, timestamp: float) -> bool:
@@ -169,8 +173,23 @@ class RecordingSync:
             self._waiting[cam_id].append(_Waiting(video, depth))
             self.missed.started()
 
+    def _attach(self, cam_id: int) -> None:
+        """The parts come in the waiting captures' streams kept with them, before newer ones can push them out."""
+        tracklets: CaptureStream[CameraTracklets] = self._tracklets[cam_id]
+        asks: CaptureStream[bool] = self._asks[cam_id]
+        poses: CaptureStream[FramePoses] = self._poses[cam_id]
+        for waiting in self._waiting[cam_id]:
+            timestamp: float = waiting.video.timestamp
+            if waiting.tracklets is None:
+                waiting.tracklets = tracklets.at(timestamp)
+            if waiting.asked is None:
+                waiting.asked = asks.at(timestamp) if cam_id in self._asks_poses else False
+            if waiting.asked and waiting.poses is None:
+                waiting.poses = poses.at(timestamp)
+
     def _release(self, cam_id: int, force: bool) -> list[RecordedCapture]:
         """The captures at the head of this camera's line whose parts are in, or whose streams are past them."""
+        self._attach(cam_id)
         captures: list[RecordedCapture] = []
         waiting: deque[_Waiting] = self._waiting[cam_id]
         tracklets: CaptureStream[CameraTracklets] = self._tracklets[cam_id]
@@ -179,12 +198,12 @@ class RecordingSync:
         while waiting:
             head: _Waiting = waiting[0]
             timestamp: float = head.video.timestamp
-            found_tracklets: CameraTracklets | None = tracklets.at(timestamp)
+            found_tracklets: CameraTracklets | None = head.tracklets
             tracklets_due: bool = found_tracklets is None and cam_id in self._sends_tracklets and not _later(tracklets, timestamp)
-            asked: bool | None = asks.at(timestamp) if cam_id in self._asks_poses else False
+            asked: bool | None = head.asked
             if asked is None and _later(asks, timestamp):
                 asked = False           # the stream is past it without a word: no image was posed
-            found_poses: FramePoses | None = poses.at(timestamp) if asked else None
+            found_poses: FramePoses | None = head.poses if asked else None
             poses_due: bool = asked is None or (asked and found_poses is None and not _later(poses, timestamp))
             if not force and len(waiting) <= KEPT and (tracklets_due or poses_due):
                 break

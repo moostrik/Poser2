@@ -14,7 +14,7 @@ from modules import video
 from modules.camera import CameraFrame, CameraTracklet, CameraTracklets, ChunkInfo, DepthAlignment, FrameMetadata, FramePoses, FrameReadings, FrameType, \
     Player, PlayerSettings, Recorder, RecorderSettings, TrackingStatus, make_chunk_name, read_metadata
 from modules.camera.chunk import frame_line, info_line, parse_metadata
-from modules.camera.recorder import RecState
+from modules.camera.recorder import QUEUED, RecState
 from modules.camera.recording_sync import KEPT
 from modules.utils import Rect
 
@@ -210,6 +210,18 @@ class TrackletTest(unittest.TestCase):
         self.recorder.expect_poses(0, 2.0, False)
         self.assertIsNone(self.recorder.frames[0].get_nowait().poses)
 
+    def test_a_waiting_capture_keeps_its_tracklets_past_kept_newer_ones(self) -> None:
+        self.recorder.expect_poses(0, 0.0, True)
+        self.recorder.submit_tracklets(tracklets(0.0))
+        self.recorder.submit_frame(video_frame(0))
+        self.recorder.submit_frame(depth_frame(1000, 0.0))      # waits for its poses
+        for i in range(1, KEPT + 2):
+            self.recorder.submit_tracklets(tracklets(float(i)))  # its own tracklets pushed out of the stream
+        self.recorder.submit_poses(poses(0.0))
+        capture = self.recorder.frames[0].get_nowait()
+        assert capture.tracklets is not None
+        self.assertEqual(capture.tracklets.timestamp, 0.0)
+
     def test_the_end_writes_what_waits(self) -> None:
         self.recorder.submit_tracklets(tracklets(0.0))
         self.recorder.submit_frame(video_frame(0))
@@ -218,6 +230,66 @@ class TrackletTest(unittest.TestCase):
         self.recorder.submit_frame(depth_frame(1000, 1.0))
         self.recorder.sync.flush()
         self.assertEqual(self.recorder.frames[0].qsize(), 2)
+
+
+class QueueTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self.recorder = recorder([FrameType.VIDEO])
+        self.recorder.state = RecState.REC
+
+    def tearDown(self) -> None:
+        self.recorder.settings.unbind(RecorderSettings.start, self.recorder._on_start)
+
+    def test_a_full_queue_drops_its_oldest_and_counts_it(self) -> None:
+        for i in range(QUEUED + 3):
+            self.recorder.submit_frame(video_frame(i))
+        self.assertEqual(self.recorder.frames[0].qsize(), QUEUED)
+        self.assertEqual(self.recorder.frames[0].get_nowait().video.timestamp, 3.0)
+        self.recorder._update_missed()
+        self.assertEqual(self.recorder.settings.dropped, 3)
+
+    def test_a_capture_left_from_the_last_recording_is_not_in_the_next(self) -> None:
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            self.recorder.temp_path = Path(folder) / 'temp'
+            self.recorder.data_path = folder
+            self.recorder.submit_frame(video_frame(0))          # came after the last write
+            self.recorder._start_recording()
+            try:
+                self.assertTrue(self.recorder.frames[0].empty())
+            finally:
+                self.recorder.state = RecState.STOP
+                self.recorder._stop_recording()
+
+    def test_a_start_that_fails_is_given_up_once(self) -> None:
+        self.recorder.state = RecState.START
+        self.recorder.settings.recording = True
+        self.recorder._start_recording = lambda: (_ for _ in ()).throw(OSError('no disk'))  # pyright: ignore[reportAttributeAccessIssue]
+        with self.assertLogs('modules.camera.recorder', 'ERROR'):
+            self.recorder._begin()
+        self.assertEqual(self.recorder.state, RecState.IDLE)
+        self.assertFalse(self.recorder.settings.recording)
+
+
+class WriterTest(unittest.TestCase):
+    def test_a_dead_encoder_ends_the_writer_and_stop_returns(self) -> None:
+        writer = video.StreamWriter('no_such_encoder_xyz')
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            with self.assertLogs('modules.video.stream_writer', 'ERROR'):
+                writer.start(str(Path(folder) / 'out.mp4'), 30.0)
+                deadline = time.perf_counter() + 10.0
+                while not writer.failed and time.perf_counter() < deadline:
+                    writer.submit_frame(np.zeros((48, 64, 3), np.uint8))
+                    time.sleep(0.02)
+            self.assertTrue(writer.failed)
+            writer.stop()                                       # returns, the encoder gone
+            self.assertFalse(writer.thread is not None and writer.thread.is_alive())
+
+    def test_a_stop_right_after_the_start_ends_the_writer(self) -> None:
+        writer = video.StreamWriter('libx264')
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as folder:
+            writer.start(str(Path(folder) / 'out.mp4'), 30.0)
+            writer.stop()
+            self.assertFalse(writer.thread is not None and writer.thread.is_alive())
 
 
 class ColorOnlyTest(unittest.TestCase):

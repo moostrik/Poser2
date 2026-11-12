@@ -230,6 +230,7 @@ class CaptureSync(Thread):
         misses: int = self._missed.total('image') + self._missed.at_start('image')
         if self.settings.misses != misses:
             self.settings.misses = misses
+        self._missed.warn()         # outside the matching lock
         for capture in captures:
             for callback in self._callbacks:
                 try:

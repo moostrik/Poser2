@@ -74,9 +74,10 @@ class CaptureStream[T]:
 
 
 class MissedParts:
-    """The parts a sync made a capture without, or dropped as no capture's, per camera and part. Each rise is
-    logged as a warning naming the sync, the camera and the part, at most once in `WARN_INTERVAL`; what is
-    counted before the sync's first capture is counted apart and not warned of (`at_start`)."""
+    """The parts a sync made a capture without, or dropped as no capture's, per camera and part. `count` only
+    counts; `warn`, on the owner's thread, logs the rise as a warning naming the sync, the camera and the part, at
+    most once in `WARN_INTERVAL`. What is counted before the sync's first capture is counted apart and not warned
+    of (`at_start`)."""
 
     def __init__(self, name: str) -> None:
         self.name: str = name
@@ -110,8 +111,13 @@ class MissedParts:
             key: tuple[int, str] = (cam_id, part)
             self._counts[key] = self._counts.get(key, 0) + missed
             self._unwarned[key] = self._unwarned.get(key, 0) + missed
+
+    def warn(self) -> None:
+        """Log what was counted since the last warning, at most once in `WARN_INTERVAL`: called by the owner's own
+        thread, never where the count is made, which can be a camera's thread under a sync's lock."""
+        with self._lock:
             now: float = time.perf_counter()
-            if now - self._warned < WARN_INTERVAL:
+            if not self._unwarned or now - self._warned < WARN_INTERVAL:
                 return
             self._warned = now
             unwarned: dict[tuple[int, str], int] = self._unwarned

@@ -97,10 +97,10 @@ class DeepFlowMain:
         # The camera's thread only hands its frames and tracklets over: to the recorder as they came, to the uploader
         # for the rest, which straightens the tracklets with their frame and hands them to the tracker and the board
         for camera in self.cameras:
+            camera.add_frame_callback(self.uploader.submit_frame)           # the live path first, the recorder after it
+            camera.add_tracklet_callback(self.uploader.submit_tracklets)
             camera.add_frame_callback(self.recorder.submit_frame)
             camera.add_tracklet_callback(self.recorder.submit_tracklets)
-            camera.add_frame_callback(self.uploader.submit_frame)
-            camera.add_tracklet_callback(self.uploader.submit_tracklets)
         self.uploader.add_tracklet_callback(self.tracker.submit_cam_tracklets)
         self.uploader.add_tracklet_callback(self.board.set_camera_tracklets)
         self.uploader.add_tracklet_callback(self._on_tracklets)

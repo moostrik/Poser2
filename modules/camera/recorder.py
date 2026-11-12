@@ -16,7 +16,7 @@ from threading import Thread, Lock, Event
 from pathlib import Path
 import time
 from enum import Enum, auto
-from queue import Queue, Empty
+from queue import Queue, Empty, Full
 from typing import TextIO
 
 from modules.settings import BaseSettings, Field, Widget
@@ -57,6 +57,7 @@ class RecorderSettings(BaseSettings):
     missed_color:       Field[int]              = Field(0, access=Field.READ, description="Depth frames left out, their color frame missing")
     missed_tracklets:   Field[int]              = Field(0, access=Field.READ, description="Frames recorded without their tracklets")
     missed_poses:       Field[int]              = Field(0, access=Field.READ, description="Frames recorded without the poses asked for")
+    dropped:            Field[int]              = Field(0, access=Field.READ, description="Frames dropped because the writing fell behind")
 
 
 # The letter in a clip's file name: `0_C_001.mp4` is camera 0's video, chunk 1.
@@ -66,6 +67,7 @@ FRAME_TYPE_LABELS: dict[FrameType, str] = {
 }
 METADATA_LABEL: str = 'M'
 STOP_WAIT: float = 1.0      # s a stopping recording waits for the parts its last captures wait for
+QUEUED: int = 150           # captures per camera waiting for the recorder's thread: 3 s at 50 fps; beyond, the oldest is dropped
 DEPTH_SUFFIX: str = '.mkv'
 
 
@@ -83,6 +85,14 @@ def make_folder_name(name: str = "") -> str:
     if name:
         folder += f"_{name}"
     return folder
+
+
+def _empty(queue: Queue) -> None:
+    while True:
+        try:
+            queue.get_nowait()
+        except Empty:
+            return
 
 
 def _latency(arrival: float | None, timestamp: float) -> float | None:
@@ -106,6 +116,10 @@ class Recorder(Thread):
         self.with_depth: bool = FrameType.DEPTH in settings.video_frame_types
         self.recorders: dict[int, dict[FrameType, StreamWriter]] = {}
         self.frames: dict[int, Queue[RecordedCapture]] = {}
+        self._dropped: int = 0                          # captures dropped from a full queue, this recording
+        self._dropped_lock: Lock = Lock()
+        self._unmerged: Thread | None = None            # what a crash left, merged beside the recording
+        self._dropped_by_writers: int = 0               # the writers' drops before this recording, over their life
         self.sync: RecordingSync = RecordingSync(self.with_depth)
         self.sync.add_capture_callback(self._on_capture)
         self.metadata: dict[int, TextIO] = {}
@@ -114,7 +128,7 @@ class Recorder(Thread):
 
         for c in range(settings.num_cams):
             self.recorders[c] = {}
-            self.frames[c] = Queue()
+            self.frames[c] = Queue(maxsize=QUEUED)
             for t in self.settings.video_frame_types:
                 vcodec: str = DEPTH_ENCODER if t == FrameType.DEPTH else encoder_name(settings.video_format, settings.video_encoder)
                 self.recorders[c][t] = StreamWriter(vcodec, settings.keyframe_interval, settings.video_quality)
@@ -155,14 +169,31 @@ class Recorder(Thread):
                 if self._get_state() == RecState.REC:
                     self._update_recording()
                 if self._get_state() == RecState.START:
-                    self._start_recording()
-                    self._set_state(RecState.REC)
+                    self._begin()
             except Exception:
                 logger.exception("Recorder error")
 
             time.sleep(0.01)
 
-        self._stop_recording()
+        if self._get_state() in (RecState.REC, RecState.STOP):
+            self._set_state(RecState.STOP)
+            self._stop_recording()
+        self._set_state(RecState.IDLE)
+
+    def _begin(self) -> None:
+        """Start a recording; one that fails to start is given up once, and says why."""
+        try:
+            self._start_recording()
+        except Exception:
+            logger.exception("Recording could not start")
+            for writers in self.recorders.values():
+                for writer in writers.values():
+                    writer.stop()
+            self._close_metadata()
+            self._set_state(RecState.IDLE)
+            self.settings.recording = False
+            return
+        self._set_state(RecState.REC)
 
     def _stream_path(self, cam_id: int, frame_type: FrameType, chunk_index: int) -> Path:
         assert self.folder_path is not None
@@ -185,7 +216,9 @@ class Recorder(Thread):
 
     def _start_recording(self) -> None:
         output_path: Path = Path(self.data_path) / self.settings.output_path
-        finish_unmerged(self.temp_path, output_path)
+        if self._unmerged is None or not self._unmerged.is_alive():        # what a crash left, beside the recording
+            self._unmerged = Thread(target=finish_unmerged, args=(self.temp_path, output_path), daemon=True, name='RecorderUnmerged')
+            self._unmerged.start()
 
         self.folder_name = make_folder_name(self.settings.name)
         self.folder_path = self.temp_path / self.folder_name
@@ -197,12 +230,17 @@ class Recorder(Thread):
         self.chunk_index = 0
 
         self.sync.reset()
+        for queue in self.frames.values():          # a capture that came after the last recording's last write
+            _empty(queue)
+        with self._dropped_lock:
+            self._dropped = 0
+        self._dropped_by_writers = sum(w.dropped for writers in self.recorders.values() for w in writers.values())
         for c in range(self.settings.num_cams):
             for t in self.settings.video_frame_types:
                 self.recorders[c][t].start(str(self._stream_path(c, t, self.chunk_index)), self.settings.fps)
         self._open_metadata()
 
-        logger.info("VideoRecorder started → %s", self.output_folder_path)
+        logger.info("VideoRecorder started to %s", self.output_folder_path)
 
     def _stop_recording(self) -> None:
         """No frame is taken any more; the captures waiting are settled by the tracklets and poses that still come,
@@ -222,8 +260,11 @@ class Recorder(Thread):
         for merge in self.merges:
             merge.join()
         self.merges.clear()
+        if self._unmerged is not None:
+            self._unmerged.join()
         self._remove_temp_folder()
         self._update_missed()
+        self.sync.missed.warn()
         logger.info("VideoRecorder stopped")
 
     def _do_split(self) -> None:
@@ -268,6 +309,12 @@ class Recorder(Thread):
         split: bool = self.split_requested.is_set()      # read first: what was queued before the request ends its chunk
         self._write_queued()
         self._update_missed()
+        self.sync.missed.warn()
+        failed: list[str] = [w.output_file for writers in self.recorders.values() for w in writers.values() if w.failed]
+        if failed:
+            logger.error("Recording ended: the encoder of %s died", ', '.join(failed))
+            self._on_stop()
+            return
         if split:
             self.split_requested.clear()
             self._do_split()
@@ -283,6 +330,11 @@ class Recorder(Thread):
             self.settings.missed_tracklets = tracklets
         if self.settings.missed_poses != poses:
             self.settings.missed_poses = poses
+        with self._dropped_lock:
+            dropped: int = self._dropped
+        dropped += sum(w.dropped for writers in self.recorders.values() for w in writers.values()) - self._dropped_by_writers
+        if self.settings.dropped != dropped:
+            self.settings.dropped = dropped
 
     def _write_queued(self) -> None:
         """Everything queued, on every pass: with depth two streams arrive per camera at the full
@@ -362,7 +414,19 @@ class Recorder(Thread):
         return self._get_state() in (RecState.REC, RecState.STOP)
 
     def _on_capture(self, capture: RecordedCapture) -> None:
-        self.frames[capture.video.cam_id].put(capture)
+        """A capture the sync sent out, to the queue for the recorder's thread; a full queue drops its oldest."""
+        queue: Queue[RecordedCapture] = self.frames[capture.video.cam_id]
+        while True:
+            try:
+                queue.put_nowait(capture)
+                return
+            except Full:
+                try:
+                    queue.get_nowait()
+                except Empty:
+                    pass
+                with self._dropped_lock:
+                    self._dropped += 1
 
     # SETTINGS CALLBACKS
     def _on_enabled(self, value: bool) -> None:

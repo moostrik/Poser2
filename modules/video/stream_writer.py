@@ -1,12 +1,22 @@
-"""One ffmpeg encoder process fed raw frames from a queue: the writer of one camera recording stream."""
+"""One ffmpeg encoder process fed raw frames from a queue: the writer of one camera recording stream.
 
-from threading import Thread
-import ffmpeg
-import numpy as np
-from queue import Queue, Empty
+The queue holds at most `QUEUED` frames; beyond that the oldest is dropped and counted (`dropped`), so an encoder
+that cannot keep up loses frames instead of memory. An encoder that dies (an error, a full disk) ends the writer:
+it says so once (`failed`), drops what is queued, and `stop` and `split` return instead of waiting for it."""
+
+import logging
+from threading import Lock, Thread
+from queue import Empty, Full, Queue
 from time import sleep
 
+import ffmpeg
+import numpy as np
+
 from .depth_frame import DEPTH_PIX_FMT, DEPTH_QUALITY, depth_to_p012
+
+logger = logging.getLogger(__name__)
+
+QUEUED: int = 150       # frames waiting for the encoder: 3 s at 50 fps, over its start-up; some 180 MB of NV12 at 992 x 800
 
 
 class StreamWriter:
@@ -14,30 +24,44 @@ class StreamWriter:
         """``quality``: the encoder's constant quality, lower is better; 0 is its default."""
         self.output_file: str = ''
         self.fps: float = 30.0
-        self.is_recording = False
-        self.is_receiving = False
-        self.frames = Queue()
-        self.thread = None
+        self.is_recording: bool = False
+        self.is_receiving: bool = False
+        self.frames: Queue[tuple[np.ndarray, bool]] = Queue(maxsize=QUEUED)
+        self.thread: Thread | None = None
         self.vcodec: str = vcodec
         self.keyframe_interval: int = keyframe_interval
         self.quality: int = quality
+        self._lock: Lock = Lock()
+        self._dropped: int = 0
+        self._failed: bool = False
+
+    @property
+    def dropped(self) -> int:
+        """Frames dropped because the encoder had not taken the ones before them, over the writer's life."""
+        with self._lock:
+            return self._dropped
+
+    @property
+    def failed(self) -> bool:
+        """The encoder of the file being written died."""
+        return self._failed
 
     def start(self, output_file: str, fps: float) -> None:
         if self.is_recording:
             return
         self.fps = fps
         self.output_file = output_file
+        self._failed = False
+        self.is_recording = True        # before the thread: a stop right after the start finds it recording
         self.is_receiving = True
-        self.thread = Thread(target=self._record)
+        self.thread = Thread(target=self._record, daemon=True, name='StreamWriter')
         self.thread.start()
 
     def stop(self) -> None:
         if not self.is_recording:
             return
         self.is_receiving = False
-        while not self.frames.empty():
-            sleep(0.01)
-
+        self._drain()
         self.is_recording = False
         if self.thread is not None:
             self.thread.join()
@@ -47,59 +71,88 @@ class StreamWriter:
         caller that stops feeding first gets the same frames in every stream's chunk."""
         if not self.is_recording:
             return
-        while not self.frames.empty():
-            sleep(0.01)
-        if self.is_recording:
-            self.is_recording = False
+        self._drain()
+        self.is_recording = False
         if self.thread is not None:
             self.thread.join()
-
         self.start(output_file, fps)
+
+    def _drain(self) -> None:
+        """Wait until the encoder has taken what is queued, or has died."""
+        while not self.frames.empty() and self.thread is not None and self.thread.is_alive():
+            sleep(0.01)
 
     def submit_frame(self, frame: np.ndarray, nv12: bool = False) -> None:
         """Queue one frame: BGR (H, W, 3), gray (H, W), uint16 depth in millimetres (H, W), or with
         `nv12` packed NV12 (H * 3 / 2, W), which needs saying because it is 2-D too."""
-        if self.is_receiving:
-            self.frames.put((frame, nv12))
+        if not self.is_receiving:
+            return
+        while True:
+            try:
+                self.frames.put_nowait((frame, nv12))
+                return
+            except Full:
+                try:
+                    self.frames.get_nowait()        # the oldest goes
+                except Empty:
+                    pass
+                with self._lock:
+                    self._dropped += 1
 
     def _record(self) -> None:
-        self.is_recording = True
         process = None
+        try:
+            while self.is_recording:
+                try:
+                    frame, nv12 = self.frames.get(timeout=.1)
+                except Empty:
+                    continue
 
-        while self.is_recording:
-            frame: np.ndarray
-            nv12: bool
-            try:
-                frame, nv12 = self.frames.get(timeout=.1)
-            except Empty:
-                continue
-
-            depth: bool = frame.dtype == np.uint16
-            if process is None:
-                width: int = frame.shape[1]
-                height: int = frame.shape[0] * 2 // 3 if nv12 else frame.shape[0]
-                pix_fmt: str = DEPTH_PIX_FMT if depth else 'nv12' if nv12 else 'gray' if len(frame.shape) == 2 else 'bgr24'
-                output_kwargs = dict(pix_fmt=DEPTH_PIX_FMT if depth else 'yuv420p', vcodec=self.vcodec, r=self.fps)
+                depth: bool = frame.dtype == np.uint16
+                if process is None:
+                    process = self._open(frame, nv12, depth)
                 if depth:
-                    output_kwargs['q:v'] = DEPTH_QUALITY
-                    output_kwargs['bf'] = 0     # measured: with B-frames a seek in a merged chunk gave depth about 100 mm off, why is not settled
-                elif self.quality > 0:
-                    output_kwargs['q:v'] = self.quality
-                if self.keyframe_interval > 0:
-                    output_kwargs['g'] = self.keyframe_interval          # GOP size
-                    output_kwargs['keyint_min'] = self.keyframe_interval  # force exact spacing (no early IDR skip)
-                process = (
-                    ffmpeg
-                    .input('pipe:', format='rawvideo', pix_fmt=pix_fmt, s=f'{width}x{height}', r=self.fps)
-                    .output(self.output_file, **output_kwargs)
-                    .overwrite_output()
-                    .global_args('-loglevel', 'quiet')
-                    .run_async(pipe_stdin=True)
-                )
-
+                    process.stdin.write(depth_to_p012(frame))
+                else:
+                    process.stdin.write(np.ascontiguousarray(frame, dtype=np.uint8).data)   # the frame's own buffer when it is uint8 and contiguous
+        except (OSError, ValueError) as e:
+            self._failed = True
+            self.is_receiving = False
+            logger.error('Encoder of %s ended: %s; the stream is dropped from here', self.output_file, e)
+            self._clear()
+        finally:
             if process is not None:
-                process.stdin.write(depth_to_p012(frame) if depth else frame.astype(np.uint8).tobytes())
+                try:
+                    process.stdin.close()
+                except OSError:
+                    pass
+                process.wait()
 
-        if process is not None:
-            process.stdin.close()
-            process.wait()
+    def _open(self, frame: np.ndarray, nv12: bool, depth: bool):
+        width: int = frame.shape[1]
+        height: int = frame.shape[0] * 2 // 3 if nv12 else frame.shape[0]
+        pix_fmt: str = DEPTH_PIX_FMT if depth else 'nv12' if nv12 else 'gray' if len(frame.shape) == 2 else 'bgr24'
+        output_kwargs = dict(pix_fmt=DEPTH_PIX_FMT if depth else 'yuv420p', vcodec=self.vcodec, r=self.fps)
+        if depth:
+            output_kwargs['q:v'] = DEPTH_QUALITY
+            output_kwargs['bf'] = 0     # measured: with B-frames a seek in a merged chunk gave depth about 100 mm off, why is not settled
+        elif self.quality > 0:
+            output_kwargs['q:v'] = self.quality
+        if self.keyframe_interval > 0:
+            output_kwargs['g'] = self.keyframe_interval          # GOP size
+            output_kwargs['keyint_min'] = self.keyframe_interval  # force exact spacing (no early IDR skip)
+        return (
+            ffmpeg
+            .input('pipe:', format='rawvideo', pix_fmt=pix_fmt, s=f'{width}x{height}', r=self.fps)
+            .output(self.output_file, **output_kwargs)
+            .overwrite_output()
+            .global_args('-loglevel', 'quiet')
+            .run_async(pipe_stdin=True)
+        )
+
+    def _clear(self) -> None:
+        while True:
+            try:
+                self.frames.get_nowait()
+            except Empty:
+                return

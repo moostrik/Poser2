@@ -39,28 +39,35 @@ class MissedPartsTest(unittest.TestCase):
         missed = MissedParts('test')
         missed.count(0, 'depth', 3)
         missed.started()
-        with self.assertLogs('modules.camera.capture_match', 'WARNING'):
-            missed.count(0, 'depth')
+        missed.count(0, 'depth')
         self.assertEqual((missed.at_start('depth'), missed.total('depth')), (3, 1))
 
     def test_counts_per_part_and_a_reset(self) -> None:
         missed = MissedParts('test')
         missed.started()
-        with self.assertLogs('modules.camera.capture_match', 'WARNING'):
-            missed.count(0, 'depth')
-            missed.count(1, 'depth', 2)
-            missed.count(0, 'tracklets')
+        missed.count(0, 'depth')
+        missed.count(1, 'depth', 2)
+        missed.count(0, 'tracklets')
         self.assertEqual((missed.total('depth'), missed.total('tracklets')), (3, 1))
         missed.reset()
         self.assertEqual(missed.total('depth'), 0)
 
-    def test_warnings_are_at_most_once_a_second(self) -> None:
+    def test_counting_logs_nothing_the_owner_warns(self) -> None:
         missed = MissedParts('test')
         missed.started()
+        with self.assertNoLogs('modules.camera.capture_match', 'WARNING'):
+            missed.count(0, 'depth')
         with self.assertLogs('modules.camera.capture_match', 'WARNING') as logs:
-            for _ in range(5):
-                missed.count(0, 'depth')
+            missed.warn()
+            missed.count(0, 'depth')
+            missed.warn()           # within the second: not again
         self.assertEqual(len(logs.records), 1)
+
+    def test_nothing_new_nothing_said(self) -> None:
+        missed = MissedParts('test')
+        missed.started()
+        with self.assertNoLogs('modules.camera.capture_match', 'WARNING'):
+            missed.warn()
 
 
 if __name__ == '__main__':
