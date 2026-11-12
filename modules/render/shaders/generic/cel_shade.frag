@@ -35,9 +35,9 @@ void main() {
     vec4 color = texture(tex, texCoord);
     vec2 texelSize = 1.0 / vec2(textureSize(tex, 0));
 
-    // Check if we're in a dark area - if so, blur first
+    // Check if we're in a dark area - if so, blur first (only with the bands, levels > 0)
     float lum = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-    float blurAmount = smoothstep(0.3, 0.05, lum);  // More blur in darker areas
+    float blurAmount = levels > 0 ? smoothstep(0.3, 0.05, lum) : 0.0;  // More blur in darker areas
 
     if (blurAmount > 0.01) {
         // 3x3 gaussian-ish blur for dark areas
@@ -71,6 +71,12 @@ void main() {
 
     // Apply saturation
     hsv.y = clamp(hsv.y * saturation, 0.0, 1.0);
+
+    // levels 0: no bands, the corrected color as it is
+    if (levels <= 0) {
+        fragColor = vec4(hsv2rgb(hsv), color.a);
+        return;
+    }
 
     // Quantize value into discrete levels with smooth transitions
     // Use perceptual (gamma) space for more even banding in darks

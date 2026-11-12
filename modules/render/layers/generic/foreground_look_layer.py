@@ -19,7 +19,7 @@ class ForegroundLookSettings(BaseSettings):
     contrast:       Field[float] = Field(1.1, min=0.5, max=2.0, description="Contrast")
     saturation:     Field[float] = Field(2.0, min=0.5, max=2.0, description="Color saturation")
     # Cel shade
-    levels:         Field[int]   = Field(9, min=2, max=12, description="Number of color bands")
+    levels:         Field[int]   = Field(9, min=0, max=12, description="Number of color bands (0 = off: no bands)")
     smoothness:     Field[float] = Field(0.33, min=0.0, max=0.5, description="Gradient between bands")
     # Hue shift
     colorize:       Field[float] = Field(0.96, min=0.0, max=1.0, description="Hue shift toward track color (0.0 = off)")
