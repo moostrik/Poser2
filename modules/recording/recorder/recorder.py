@@ -208,7 +208,7 @@ class Recorder(Thread):
                                     name='RecorderUnmerged')
             self._unmerged.start()
 
-        self.folder_name = make_folder_name(self.settings.name)
+        self.folder_name = make_folder_name(self.settings.name, output_path)
         self.folder_path = self.temp_path / self.folder_name
         self.folder_path.mkdir(parents=True, exist_ok=True)
 

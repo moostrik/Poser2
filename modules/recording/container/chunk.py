@@ -57,12 +57,17 @@ def make_chunk_name(cam_id: int, chunk: int) -> str:
     return f"{cam_id}_{chunk:03d}.mkv"
 
 
-def make_folder_name(name: str = "") -> str:
-    """A recording's folder: its start time, and its name."""
+def make_folder_name(name: str = "", parent: Path | None = None) -> str:
+    """A recording's folder: its start time, and its name; with a counter when `parent` has that folder already."""
     folder = time.strftime("%Y%m%d-%H%M%S")
     if name:
         folder += f"_{name}"
-    return folder
+    if parent is None or not (parent / folder).exists():
+        return folder
+    count: int = 2
+    while (parent / f"{folder}-{count}").exists():
+        count += 1
+    return f"{folder}-{count}"
 
 
 @dataclass(frozen=True)

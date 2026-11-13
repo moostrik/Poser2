@@ -1,12 +1,15 @@
-"""A chunk's metadata: its lines written and read back."""
+"""A chunk's metadata: its lines written and read back; a recording's folder name."""
 
 import math
+import tempfile
 import unittest
+from pathlib import Path
+from unittest.mock import patch
 
 import numpy as np
 
 from modules.camera import CameraTracklet, DepthAlignment, FrameReadings, TrackingStatus
-from modules.recording import ChunkInfo, FrameMetadata
+from modules.recording import ChunkInfo, FrameMetadata, make_folder_name
 from modules.recording.container.chunk import frame_line, info_line, parse_metadata
 from modules.recording.tests.recordings import LENS
 from modules.utils import Rect
@@ -51,6 +54,17 @@ class MetadataTest(unittest.TestCase):
     def test_a_line_cut_off_by_a_crash_ends_the_list(self) -> None:
         text = info_line(ChunkInfo(900, 720, LENS, True, 60.0)) + frame_line(0, FrameMetadata(1.5)) + '{"frame": 1, "ti'
         self.assertEqual(len(parse_metadata(text).frames), 1)
+
+
+class FolderNameTest(unittest.TestCase):
+    def test_two_recordings_started_in_one_second_get_two_folders(self) -> None:
+        with tempfile.TemporaryDirectory() as parent:
+            with patch('time.strftime', return_value='20261113-120000'):
+                names: list[str] = []
+                for _ in range(3):
+                    names.append(make_folder_name('take', Path(parent)))
+                    (Path(parent) / names[-1]).mkdir()
+        self.assertEqual(names, ['20261113-120000_take', '20261113-120000_take-2', '20261113-120000_take-3'])
 
 
 if __name__ == '__main__':
