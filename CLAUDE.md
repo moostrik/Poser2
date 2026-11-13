@@ -16,7 +16,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - `apps/` may import `modules/`; `modules/` must never import app code
 - `modules/settings/` is shared infrastructure; any module may depend on it
 - `modules/camera/` is the camera contract; the tracker, inference, board and render import it, never a backend package such as `modules/camera/oak/`
-- `apps/smile/` has its own rules in its `CLAUDE.md`; its `cam` is the app's image source (a `modules/camera` backend, an image folder, a phone), not a camera backend
+- `apps/smile/` has its rules in `.claude/rules/smile.md` and its document in `apps/smile/SMILE.md`; its `cam` is the app's image source (a `modules/camera` backend, an image folder, a phone), not a camera backend
 
 ## Packages
 
