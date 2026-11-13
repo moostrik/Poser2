@@ -411,6 +411,11 @@ class Recorder(Thread):
         if self._taking_parts() and not cam_tracklets.straightened:
             self.sync.submit_tracklets(cam_tracklets)
 
+    def expect_parts(self, cam_id: int, tracklets: bool, poses: bool) -> None:
+        """Whether the camera sends tracklets and the app says per image whether it asked poses (`expect_poses`):
+        said before a recording starts, so its first frame waits for them as every later one does."""
+        self.sync.expect_parts(cam_id, tracklets, poses)
+
     def expect_poses(self, cam_id: int, timestamp: float, asked: bool) -> None:
         """Whether the pose model was asked poses for the camera's frame captured at `timestamp`: while
         recording, to the sync, so a frame nobody asked poses for does not wait for them."""

@@ -103,6 +103,11 @@ class DeepFlowMain:
             camera.add_tracklet_callback(self.uploader.submit_tracklets)
             camera.add_frame_callback(self.recorder.submit_frame)
             camera.add_tracklet_callback(self.recorder.submit_tracklets)
+        # What each camera's captures wait for from the first: live, a camera with a model sends tracklets (a replay's
+        # come or not with the recording); the pose step says per image whether it asked poses (`_on_image`)
+        live_tracklets: bool = not self.settings.camera.sim_enabled and self.settings.camera.cam_0.model_chain != ModelChain.OFF
+        for i in range(num_cams):
+            self.recorder.expect_parts(i, tracklets=live_tracklets, poses=True)
         self.uploader.add_tracklet_callback(self.tracker.submit_cam_tracklets)
         self.uploader.add_tracklet_callback(self.board.set_camera_tracklets)
         self.uploader.add_tracklet_callback(self._on_tracklets)

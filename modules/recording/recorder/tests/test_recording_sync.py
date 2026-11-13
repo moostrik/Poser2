@@ -107,6 +107,23 @@ class TrackletTest(unittest.TestCase):
             self.recorder.submit_frame(depth_frame(1000, float(i)))
         self.assertEqual(self.recorder.sync.waiting, KEPT)
 
+    def test_a_camera_said_to_send_tracklets_has_its_first_frame_wait_for_them(self) -> None:
+        self.recorder.expect_parts(0, tracklets=True, poses=False)
+        self.recorder.submit_frame(video_frame(0))
+        self.recorder.submit_frame(depth_frame(1000, 0.0))      # no tracklet has come yet: it waits
+        self.assertTrue(self.recorder.frames[0].empty())
+        self.recorder.submit_tracklets(tracklets(0.0))
+        capture = self.recorder.frames[0].get_nowait()
+        assert capture.tracklets is not None
+        self.assertEqual(capture.tracklets.timestamp, 0.0)
+
+    def test_what_a_camera_is_said_to_send_holds_across_recordings(self) -> None:
+        self.recorder.expect_parts(0, tracklets=True, poses=False)
+        self.recorder.sync.reset()
+        self.recorder.submit_frame(video_frame(0))
+        self.recorder.submit_frame(depth_frame(1000, 0.0))
+        self.assertTrue(self.recorder.frames[0].empty())
+
     def test_a_camera_without_tracklets_is_not_waited_for(self) -> None:
         self.recorder.submit_frame(video_frame(0))
         self.recorder.submit_frame(depth_frame(1000, 0.0))

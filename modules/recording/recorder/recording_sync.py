@@ -92,6 +92,7 @@ class RecordingSync:
         self.with_depth: bool = with_depth
         self._cameras_lock: Lock = Lock()
         self._cameras: dict[int, _Camera] = {}
+        self._expected: dict[int, tuple[bool, bool]] = {}      # each camera's parts said ahead: (tracklets, poses)
         self.missed: MissedParts = MissedParts('Recorder')
         self._callbacks: list[RecordedCaptureCallback] = []
 
@@ -105,11 +106,18 @@ class RecordingSync:
             self._cameras = {}
         self.missed.reset()
 
+    def expect_parts(self, cam_id: int, tracklets: bool, poses: bool) -> None:
+        """Whether a camera sends tracklets and the app says per image whether it asked poses, kept across
+        recordings: its first capture then waits for them as every later one does."""
+        with self._cameras_lock:
+            self._expected[cam_id] = (tracklets, poses)
+
     def _camera(self, cam_id: int) -> _Camera:
         with self._cameras_lock:
             camera: _Camera | None = self._cameras.get(cam_id)
             if camera is None:
-                camera = self._cameras[cam_id] = _Camera()
+                tracklets, poses = self._expected.get(cam_id, (False, False))
+                camera = self._cameras[cam_id] = _Camera(sends_tracklets=tracklets, asks_poses=poses)
             return camera
 
     @property
