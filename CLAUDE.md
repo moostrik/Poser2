@@ -24,7 +24,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Its `__init__.py` holds what other packages use
 - Its files each hold one class or one subject, named after it
 - Its tests sit in its `tests/` folder
-- Command-line scripts sit in the repo's `scripts/` folder
+- A script sits in a `scripts/` folder: the repo's, or its app's when only that app uses it
 
 ## Naming
 
@@ -111,6 +111,7 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 ## Error handling
 
 - Define module loggers as `logger = logging.getLogger(__name__)`
+- Prefer `logging` over `print`
 - Log exceptions with context; never fail silently
 - Degrade gracefully on non-critical runtime failures
 
