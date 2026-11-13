@@ -24,11 +24,15 @@ in that order.
    in `modules/tracker` (`modules/pose` imports nothing of ours, and it needs `Tracklet`): settings
    `TrackerFrameSourceSettings`, the group `tracklets` becomes `frame_source` in the three apps' settings and their
    presets (deep_flow `settings.json`, `very nice.json`; hd_trio `studio.json`, `umu.json`; white_space
-   `public.json`, `studio.json`), its test file and every mention in code and documents.
+   `public.json`, `studio.json`; in each the pose group's one `tracklets`, the one holding `detection_timeout`), its
+   test file and every mention: the code, INPUT_THREADS.md, white_space's `TRACKING.md` and `STATES.md`
+   (`pose.tracklets.detection_timeout` becomes `pose.frame_source.detection_timeout`).
 2. **The images travel with the call.** `TrackerFrameSource.submit(timestamp, cam_id, images)` takes the uploader's
    `ImageSnapshot` of the moment; its thread makes the poses and emits them with those images through its own
-   callback, the `FrameSource` protocol's (`add_frames_callback(callback(frames, images))`; the trackers' shared
-   mixin stays). The pipeline's `push` hands the images along the stage's chain to the async step,
+   callback, the `FrameSource` protocol's (`add_frames_callback(callback(frames, images))`); it no longer inherits
+   `FrameDictCallbackMixin`, whose `add_frames_callback` takes frames alone, and the trackers keep the mixin. The
+   pipeline's `push` hands the images along the stage's chain to the async step; the chain's other entries, the
+   tick (`PosePipeline.update`) and the crossing (`cross`), pass none, so the entry's images default to none:
    `AsyncNode.submit(frames, images)`; `PoseInference.submit(frames, images)` and `cut_crops` crop exactly those,
    `RecordedPoses` passes them through, and without images they raise: white_space and hd_trio stop at start until
    C and E wire their syncs to `submit`. `set_images` and deep_flow's bang callback go; the asked callback stays,
@@ -36,21 +40,25 @@ in that order.
 3. **A repeated box is one sample.** On every image between tracker updates the source pushes the same latched box
    again: the smoother skips the repeat (`array_euro_smooth`, a step of 0), the predictor keeps it as another
    sample at the same time (`array_predict.add_sample`), so its three-sample fit spans fewer boxes and with three
-   alike predicts no motion. A sample stamped as the newest replaces it instead of adding one; every predictor
-   takes the fix.
+   alike predicts no motion. A sample stamped as the newest replaces it instead of adding one. Every user of
+   `Predict` takes the fix: the RAW predictors (`FeaturePredictor`) and the crossing's interpolators in LERP
+   (`PredictBlend.set_target`, behind `BBoxPredictInterpolator`, `PointPredictInterpolator` and the others).
 
 4. **The camera's keypoints come out.** A tracklet from an OAK4 pose chain carries the camera's keypoints, and the
    source puts them on the pose (`Points2D` in the crop's window, `keypoint_window`); then the async step drops
    them: with the host pose model on, its points replace them, and with it off `pose.Predictor.submit` returns
-   without emitting, so no pose reaches RAW. With the host model off, `PoseInference` still cuts the crops (the
-   optical flow and the board read them) and hands on the poses that carry the camera's points as they are, as
-   `RecordedPoses` hands on recorded ones; with it on, the model's points replace them, as now. deep_flow has the
-   path now; white_space has it when its cameras send keypoints (the `oak` backend, depthai 2, sends none).
+   without emitting, so no pose reaches RAW. The check of `pose.enabled` moves from `pose.Predictor.submit` to
+   `PoseInference`: with the host model off it still cuts the crops (the optical flow and the board read them) and
+   hands on the poses that carry the camera's points as they are, as `RecordedPoses` hands on recorded ones; with
+   it on, the model's points replace them, as now. deep_flow's `posing` (what the recorder hears of the poses
+   asked) counts the poses carrying the camera's points, so a recording waits for them. deep_flow has the path
+   now; white_space has it when its cameras send keypoints (the `oak` backend, depthai 2, sends none).
 
 Checked by: the tracker's tests renamed, the pipeline's (the images reach the async node with their poses), the
 pose step's (the crop uses the images it was given, not the uploader's newest; with the host model off a pose with
 the camera's points comes out with them, one without none), `Predict`'s (a repeated stamp keeps the fit of distinct
-samples), the recorded poses' tests updated; then one run on `measure` 9–19 s against A6's numbers (capture
+samples) and an interpolator's through `PredictBlend` (a repeated target keeps its blend), the recorded poses' tests
+updated; then one run on `measure` 9–19 s against A6's numbers (capture
 latency, pose RAW and SMOOTH latency, poses out of RAW). One commit per step.
 
 ## C. white_space back
