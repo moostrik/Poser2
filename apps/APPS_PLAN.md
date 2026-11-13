@@ -71,8 +71,12 @@ Every package in `modules/`, one at a time in alphabetical order (`board`, `came
 `oak`, `panel`, `pose`, `recording`, `render`, `session`, `settings`, `tracker`, `utils`, `video`, and
 `log_config.py`; `flow` is held up in [its own plan](../modules/flow/FLOW_PLAN.md), line 1), against `CLAUDE.md` and `.claude/rules`: reported per package, a plan
 for what does not meet them, built on your go. App-specific code in a module comes first: what only one app uses or
-decides moves to that app. Each module's rules file, where it has one, is checked with it: still true of the code,
-about this module, a rule rather than a description, and nothing missing; what to change goes to the rules thread.
+decides moves to that app. Each module's rules file, where it has one, is checked with it, line by line: still true
+of the code (its paths match files, the code names it uses exist); about this module, not general or another's; a
+rule, not a description or a procedure, said once; clashing with or only repeating a `CLAUDE.md` line; checkable
+against the code, not too vague; without an unwanted side effect (something right it forbids, something wrong it
+invites); and nothing missing that the code keeps or the review found. What is wrong, and how it is known (seen in
+the code or inferred), goes to the rules thread, which works out the wording.
 
 ## G. hd_trio back
 
