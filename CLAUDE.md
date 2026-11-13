@@ -71,6 +71,8 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - Use threads with explicit synchronization, not async/await
 - Use `Lock` and `Event` for shared mutable state and lifecycle signals
 - Keep shared critical sections small
+- A callback stores or enqueues what it receives and returns
+- A receiver does its work on its own thread
 - A callback list has its own lock; register under it, copy the list under it, call the callbacks outside it
 - Avoid heavy pure-Python loops in hot paths; they hold the GIL, while numpy, ONNX Runtime, OpenGL and depthai release it
 
