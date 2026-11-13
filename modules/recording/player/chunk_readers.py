@@ -66,6 +66,11 @@ class ChunkReaders:
                 path: Path = folder.path / make_chunk_name(c, chunk)
                 if path.is_file():
                     self.metadata[c] = read_metadata(path, c)
+                    continue
+                clip: Path = folder.path / make_file_name(c, FrameType.VIDEO, chunk, decoding.suffix)
+                beside: ChunkMetadata = read_metadata(clip, c) if clip.is_file() else ChunkMetadata(None, [])
+                if beside.info is not None:         # an mp4 chunk with its metadata beside; an old clip has none
+                    self.metadata[c] = beside
         ranges: dict[int, tuple[int, int | None]] = {c: self._range(c, lo, hi) for c in range(num_cams)}
         frames: dict[int, Sequence[FrameMetadata]] = {c: metadata.frames for c, metadata in self.metadata.items()}
         self.clock: PlayClock = PlayClock(frames, {c: first for c, (first, _) in ranges.items()})
@@ -83,7 +88,7 @@ class ChunkReaders:
             for t in types:
                 path = folder.path / make_file_name(c, t, chunk, decoding.suffix)
                 if path.is_file():
-                    self._load(c, t, path, 0, first, end, frame_callback, decoding, None)
+                    self._load(c, t, path, 0, first, end, frame_callback, decoding, self.clock if c in self.metadata else None)
                 elif t == FrameType.VIDEO:
                     logger.warning(f"File {path} not found")
 
