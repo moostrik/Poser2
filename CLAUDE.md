@@ -16,7 +16,6 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 - `apps/` may import `modules/`; `modules/` must never import app code
 - `modules/settings/` is shared infrastructure; any module may depend on it
 - `modules/camera/` is the camera contract; the tracker, inference, board and render import it, never a backend package such as `modules/camera/oak/`
-- `apps/smile/` has its rules in `.claude/rules/smile.md` and its document in `apps/smile/SMILE.md`; its `cam` is the app's image source (a `modules/camera` backend, an image folder, a phone), not a camera backend
 
 ## Packages
 
@@ -59,7 +58,8 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 
 - Prefer composition over inheritance for runtime assembly
 - Pass collaborators and fixed structure (counts known at startup) through constructors; tunable values come from settings
-- Move data between components with callback pipelines
+- A consumer that needs every item gets a callback
+- A consumer that needs the latest value reads the board
 - Name public data-flow methods by execution timing: `set` stores for polling, `submit` enqueues deferred work, `process` transforms and emits synchronously, `update` advances on a tick
 - Name output channels verb + domain noun (`submit_frames`, `add_similarity_callback`)
 - Share runtime data through `modules/board/` protocol + mixin pairs; each app composes its own `RenderBoard` from the mixins it needs, and keeps a slice only it reads in `apps/<app>/board/`
@@ -70,7 +70,6 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 
 - Use threads with explicit synchronization, not async/await
 - Use `Lock` and `Event` for shared mutable state and lifecycle signals
-- Keep shared critical sections small
 - A callback stores or enqueues what it receives and returns
 - A receiver does its work on its own thread
 - A callback list has its own lock; register under it, copy the list under it, call the callbacks outside it
@@ -101,7 +100,6 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 
 ## Imports
 
-- Treat each direct subdirectory of `modules/` as an independent package whose `__init__.py` is its public boundary
 - Import from a package's `__init__.py`, never from its internal files
 - Import the package as a namespace (`from modules import X`, then `X.Y`) when the qualifier adds clarity; import names directly otherwise
 - Put all imports from one package on a single `from` line
@@ -134,8 +132,8 @@ Poser2 is a real-time, low-latency system: app-specific orchestration in `apps/`
 
 ```
 python -m unittest discover -s tests -t .                  # guard tests: import layering, glossary
-python -m unittest discover -s apps/<app>/tests -t .        # white_space, hd_trio, deep_flow; oak4_test in .venv-oak4
-python -m unittest discover -s apps/smile/<pkg>/tests -t .  # tests, comfy, render, player, relay, ...
+python -m unittest discover -s apps/<app>/tests -t .
+python -m unittest discover -s apps/<app>/<pkg>/tests -t .
 python -m unittest discover -s modules/<pkg>/tests -t .    # camera/oak4 in .venv-oak4
 ```
 

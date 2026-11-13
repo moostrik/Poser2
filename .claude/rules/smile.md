@@ -19,3 +19,4 @@ paths:
 - The online token is a file, never a setting in a preset
 - Send OSC bools as ints
 - SMILE reaches its walls by a call, never by OSC
+- `cam` is the app's image source (a `modules/camera` backend, an image folder, a phone), not a camera backend
