@@ -332,7 +332,7 @@ Order of work: 4.1 (the mask, the one that matters), 4.2, 4.3, 4.4, then 5. Each
   `logger = logging.getLogger(__name__)` as `Generator.py:35` does. Test with
   `self.assertLogs('modules.comfy.workflow', 'WARNING')` (the repo's idiom) for a missing checkpoint,
   distill LoRA and slot file, and `assertNoLogs` when every file is in the options. Test in `modules/comfy/tests/test_workflow.py` with `caplog`.
-- `CLAUDE.md`: the Image generator paragraph (line 77: "installed in `ComfyUI/` from the `comfy/` bundle;
+- `SMILE.md`: the Image generator paragraph (line 77: "installed in `ComfyUI/` from the `comfy/` bundle;
   `ComfyUI/` and `comfy/models/` are git-ignored") → installed by `scripts/install.bat` (`install_comfy.ps1`
   + the manifest `comfy/models.json`, models from the private HF repo or a mirror); line 119 (`aiia_grin`
   copied again by hand) → copied by every run of the install script.
@@ -387,7 +387,7 @@ with `--no-deps` (facenet-pytorch's `numpy<2` metadata contradicts the numpy 2.5
 
 - `modules/comfy/models.py` + tests (section 1, 8), `comfy/models.json` (32 files; the doc's 33 was a miscount), `comfy/comfy.lock`,
   `comfy/requirements.lock`, `scripts/install_comfy.ps1`, `scripts/install.bat`, `modules/comfy/smoke.py` (section 2, 3),
-  the code changes (section 6), README and CLAUDE.md (section 7); `comfy/README.md`, `comfy/setup.ps1`, `comfy/workflows/` deleted.
+  the code changes (section 6), README and SMILE.md (section 7); `comfy/README.md`, `comfy/setup.ps1`, `comfy/workflows/` deleted.
 - Found on the way: the registry serves some packs as a zip named `node.tar.gz` (`inventory.py` sniffs it); the pack archives
   have CRLF files, so the patches apply with `--ignore-whitespace`; clones are made with `core.autocrlf=false`.
 - Not done: the HF upload (`repo` is still the placeholder: the user creates the repo and a Write token, puts

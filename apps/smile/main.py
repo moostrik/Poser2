@@ -1,5 +1,5 @@
 """SMILE: a camera captures a face, an image generator turns it into a portrait, shown with music and lights,
-and the grins of the visitors before play on the two walls of the sphere (README.md, CLAUDE.md)."""
+and the grins of the visitors before play on the two walls of the sphere (README.md, SMILE.md)."""
 
 from .cam import Camera
 from modules.camera import vimba, webcam
