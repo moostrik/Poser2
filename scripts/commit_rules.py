@@ -2,7 +2,8 @@
 
 A rule file in `.claude/rules/` governs the files its `paths` match; one without `paths`, and `CLAUDE.md`,
 govern every file. With `--hook` the list goes out as the JSON a Claude Code hook hands to Claude, with the
-request to check the commit against those rules and report.
+request to check the commit against those rules and report; the hook runs after every shell command and
+answers only when the command it reads on stdin held a `git commit`.
 
     python scripts/commit_rules.py [commit] [--hook]
 """
@@ -18,6 +19,7 @@ from pathlib import Path
 ROOT: Path = Path(__file__).resolve().parent.parent
 RULES: Path = ROOT / ".claude" / "rules"
 SHOWN: int = 6      # the files named per rule file; the rest are counted
+COMMIT: re.Pattern[str] = re.compile(r"\bgit\s+(?:-\S+\s+(?:[^-\s]\S*\s+)?)*commit\b")   # git, its options, commit
 REQUEST: str = ("Check this commit against the rules below and report to the user: "
                 "per rule file, what is met and what is not, with the file it is in.")
 
@@ -102,11 +104,24 @@ def report(commit: str) -> str:
     return "\n".join(lines)
 
 
+def held_commit() -> bool:
+    """Whether the command a hook reads on stdin held a `git commit`; True without a command to read."""
+    if sys.stdin.isatty():
+        return True
+    try:
+        command = json.loads(sys.stdin.read())["tool_input"]["command"]
+    except (ValueError, KeyError, TypeError):
+        return True
+    return COMMIT.search(str(command)) is not None
+
+
 def main() -> None:
     parser: ArgumentParser = ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("commit", nargs="?", default="HEAD")
     parser.add_argument("--hook", action="store_true", help="print the JSON a Claude Code PostToolUse hook returns")
     args = parser.parse_args()
+    if args.hook and not held_commit():
+        return
     text: str = report(args.commit)
     if args.hook:
         text = json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse", "additionalContext": text}})
